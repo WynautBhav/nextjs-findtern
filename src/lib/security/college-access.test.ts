@@ -12,6 +12,7 @@ const {
   membershipFor,
   driveWindow,
 } = await import("../college/access.ts");
+const { rosterOnlyFacts, tpoStatus } = await import("../college/labels.ts");
 const { tpoProfile, canOpenArtifacts, driveDataOpen } = await import("../college/serialize.ts");
 const { generateDriveToken, hashDriveToken } = await import("../college/tokens.ts");
 const { createSession, readSession } = await import("./session.ts");
@@ -227,6 +228,14 @@ test("a student who only picked the college (claimed, no code) is hidden from th
   const admin = { uid: "ca-1", role: "college" as const };
   assert.equal(canCollegeAdminSee(admin, "college-x", { collegeId: "college-x", leftAt: null, status: "claimed" }), false);
   assert.equal(canCollegeAdminSee(admin, "college-x", { collegeId: "college-x", leftAt: null, status: "" }), false);
+});
+
+test("a student on college A's roster but verified at college B shows as On roster to officer A", () => {
+  // scope.ts only passes a user id when the roster row's matched user holds an active membership of A.
+  // B's student has none at A, so no user id arrives, whatever interview they finished at B.
+  const admin = { uid: "ca-1", role: "college" as const };
+  assert.equal(canCollegeAdminSee(admin, "college-a", { collegeId: "college-b", leftAt: null, status: "verified" }), false);
+  assert.equal(tpoStatus(rosterOnlyFacts({ memberUserId: null, codeUsed: false })), "on_roster");
 });
 
 test("a college session is a valid session but never an admin, and owns only itself", () => {

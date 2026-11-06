@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { coverMessage, membershipLabel, tpoStatus, tpoStatusLabel } from "./labels.ts";
+import { coverMessage, membershipLabel, rosterOnlyFacts, tpoStatus, tpoStatusLabel } from "./labels.ts";
 
 test("claimed student on the roster is not told they are missing from it", () => {
   assert.equal(membershipLabel({ status: "claimed", onRoster: true }), "On your roster, not verified yet. Share your student code");
@@ -34,4 +34,17 @@ test("coverMessage: covered, switched off, no seats, and nothing for a non-partn
   assert.equal(coverMessage({ ...base, isPartner: false }), null);
   assert.equal(coverMessage({ ...base, seatsLeft: null }), null);
   assert.equal(coverMessage(null), null);
+});
+
+test("roster-only rows never show onboarding or interview progress", () => {
+  // On college A's roster, matched to nobody in A (verified at college B, AI interview done): just "On roster".
+  assert.equal(tpoStatus(rosterOnlyFacts({ memberUserId: null, codeUsed: true })), "on_roster");
+  // A claimed member of this college: at most "Registered", or "Code used" once they entered the code.
+  assert.equal(tpoStatus(rosterOnlyFacts({ memberUserId: "u1", codeUsed: false })), "registered");
+  assert.equal(tpoStatus(rosterOnlyFacts({ memberUserId: "u1", codeUsed: true })), "code_used");
+  for (const memberUserId of [null, "u1"]) {
+    const f = rosterOnlyFacts({ memberUserId, codeUsed: true });
+    assert.equal(f.aiDone, false);
+    assert.equal(f.onboardingDone, false);
+  }
 });

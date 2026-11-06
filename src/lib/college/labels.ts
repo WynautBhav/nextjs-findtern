@@ -84,6 +84,15 @@ export function tpoStatus(f: TpoFacts): TpoStatus {
   return "on_roster";
 }
 
+/**
+ * Facts for a roster row that is not a verified member. Onboarding and interview progress are never read for them
+ * (the officer may only see those for verified students), so the furthest they can show is "Registered" or "Code used".
+ * `memberUserId` is set only for a row matched to a user holding an active membership of this college.
+ */
+export function rosterOnlyFacts(input: { memberUserId: string | null; codeUsed: boolean }): TpoFacts {
+  return { registered: input.memberUserId !== null, onboardingDone: false, codeUsed: input.memberUserId !== null && input.codeUsed, aiDone: false };
+}
+
 export const tpoStatusLabel = (s: TpoStatus): string => TPO_STATUSES.find((x) => x.id === s)?.label ?? "On roster";
 
 /** What a student sees before paying for the AI interview, about their college's cover. Null: nothing to say. */

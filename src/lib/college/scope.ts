@@ -14,7 +14,7 @@ import {
   type AccessResult,
   type StudentFacts,
 } from "./access";
-import { aiStatusLabel, type TpoFacts } from "./labels";
+import { aiStatusLabel, rosterOnlyFacts } from "./labels";
 import { toStudentRow } from "./serialize";
 
 /**
@@ -200,13 +200,17 @@ export async function tpoStudentList(ctx: CollegeContext, members?: CollegeStude
   const collegeId = ctx.college.id;
   const verified = members ?? (await studentsForCollegeAdmin(ctx));
   const r = schema.collegeRoster;
+  const m = schema.collegeMemberships;
   const [rosterRes, usageRes] = await Promise.all([
+    // `user_id` is the roster row's matched user (set only by a verified email or an admin link) and only while that
+    // user holds an active membership of THIS college. No other table of the student is read: a roster row never
+    // leaks onboarding or interview progress of someone who has not verified with this college.
     db.execute(sql`
       SELECT ${r.email} AS email, ${r.name} AS name, ${r.rollNo} AS roll_no, ${r.year} AS year, ${r.branch} AS branch,
-        ${schema.users.id} AS user_id, (${aiInterviewStatus()} = 'completed') AS ai_done
+        (CASE WHEN EXISTS (
+          SELECT 1 FROM ${m} WHERE ${m.userId} = ${r.matchedUserId} AND ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL
+        ) THEN ${r.matchedUserId} END) AS user_id
       FROM ${r}
-      LEFT JOIN ${schema.users} ON lower(${schema.users.email}) = ${r.email} AND ${schema.users.role} = 'intern'
-      LEFT JOIN ${schema.internOnboarding} ON ${schema.internOnboarding.userId} = ${schema.users.id}
       WHERE ${r.collegeId} = ${collegeId}
       ORDER BY ${r.name}, ${r.email}
     `),
@@ -216,9 +220,12 @@ export async function tpoStudentList(ctx: CollegeContext, members?: CollegeStude
       .innerJoin(schema.promoCodes, eq(schema.promoCodes.id, schema.promoCodeUsages.promoCodeId))
       .where(eq(schema.promoCodes.collegeId, collegeId)),
   ]);
-  const roster = (rosterRes.rows as Row[]).filter((x) => !verified.some((m) => m.email.trim().toLowerCase() === x.email));
+  const verifiedIds = new Set(verified.map((v) => v.userId));
+  const roster = (rosterRes.rows as Row[]).filter(
+    (x) => !verified.some((v) => v.email.trim().toLowerCase() === x.email) && !(x.user_id && verifiedIds.has(String(x.user_id))),
+  );
   const codeUsed = new Set(usageRes.map((u) => u.userId));
-  const doneIds = await onboardingDoneIds([...verified.map((m) => m.userId), ...roster.flatMap((x) => (x.user_id ? [String(x.user_id)] : []))]);
+  const doneIds = await onboardingDoneIds(verified.map((v) => v.userId));
 
   const rows: StudentRow[] = verified.map((s) => ({
     ...toStudentRow(s),
@@ -226,7 +233,7 @@ export async function tpoStudentList(ctx: CollegeContext, members?: CollegeStude
   }));
   for (const x of roster) {
     const uid = x.user_id ? String(x.user_id) : null;
-    const tpo: TpoFacts = { registered: uid !== null, onboardingDone: uid !== null && doneIds.has(uid), codeUsed: uid !== null && codeUsed.has(uid), aiDone: Boolean(x.ai_done) };
+    const tpo = rosterOnlyFacts({ memberUserId: uid, codeUsed: uid !== null && codeUsed.has(uid) });
     rows.push({
       userId: `roster:${String(x.email)}`,
       name: String(x.name ?? ""),
@@ -237,7 +244,7 @@ export async function tpoStudentList(ctx: CollegeContext, members?: CollegeStude
       branch: (x.branch as string | null) ?? null,
       cgpa: null,
       score: null,
-      aiStatus: tpo.aiDone ? "completed" : "not_applied",
+      aiStatus: "not_applied",
       lastSeenAt: null,
       lastActivityAt: null,
       offersPending: 0,
@@ -280,7 +287,9 @@ export async function collegeParticipation(collegeId: string): Promise<CollegePa
         (SELECT count(*)::int FROM ${schema.promoCodeUsages} pu JOIN ${schema.promoCodes} pc ON pc.id = pu.promo_code_id WHERE pc.college_id = ${collegeId}) AS code_uses,
         (SELECT count(*)::int FROM ${m}
           JOIN ${schema.users} ON ${schema.users.id} = ${m.userId}
-          LEFT JOIN ${schema.internOnboarding} ON ${schema.internOnboarding.userId} = ${m.userId}
+          LEFT JOIN LATERAL (
+            SELECT * FROM ${schema.internOnboarding} WHERE ${schema.internOnboarding.userId} = ${m.userId} ORDER BY created_at DESC LIMIT 1
+          ) AS intern_onboarding ON true
           WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL AND ${m.status} = 'verified' AND ${aiInterviewStatus()} = 'completed') AS interviews_done
     `),
     db
