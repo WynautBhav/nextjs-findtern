@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Check, Eye, FileText, Laptop, MapPin, Scale, Send } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowUpRight, Check, Eye, FileText, Heart, Loader2, Scale, Send } from "lucide-react";
 
 import { bandFor } from "@/lib/score";
 import { formatMoney, formatRate } from "@/lib/format";
@@ -12,7 +13,11 @@ import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
-import { DetailRow, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { DetailRow, Pill, SectionHead } from "@/components/app/primitives";
+import { PresenceDot } from "@/components/app/presence-dot";
+import { RowMenu, type RowMenuItem } from "@/components/app/row-menu";
+import type { PresenceLabel } from "@/lib/presence";
+import { csrfFetch } from "@/lib/client-fetch";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -52,7 +57,14 @@ export interface CandidateCardProps {
   fullTime?: FullTimeContext | null;
   /** Skills the list is filtered by: matching chips are tinted and listed first. */
   wantedSkills?: string[];
+  /** "Online now" / "Active today" / "Active this week"; null when hidden or older. Never a time. */
+  presence?: PresenceLabel | null;
+  /** The intern saved this employer's role for the selected project. */
+  interested?: boolean;
 }
+
+/** Skill chips shown on a row; a profile holds at most seven, "+N" covers older, longer lists. */
+const MAX_CHIPS = 7;
 
 /** The four AI interview axes as one compact meter. "-" when an axis is unrated. */
 export function RatingMeter({ ratings, className }: { ratings: Ratings; className?: string }) {
@@ -84,6 +96,70 @@ function skillName(skill: string): string {
   return skill.split(" · ")[0].trim();
 }
 
+/**
+ * Shortlist as a heart (the existing cart API). Not `disabled` while saving:
+ * that drops keyboard focus. An offer already out goes to it, as ShortlistToggle does.
+ */
+function HeartToggle({ internId, projectId, shortlisted }: { internId: string; projectId: string; shortlisted: boolean }) {
+  const router = useRouter();
+  const [on, setOn] = useState(shortlisted);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggle() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await csrfFetch("/api/employer/cart", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: on ? "remove" : "add", projectId, internId, listType: "cart" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && typeof data.proposalId === "string") {
+        router.push(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
+        return;
+      }
+      if (!res.ok) throw new Error(data.error ?? "Couldn't update the shortlist. Try again.");
+      setOn(!on);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof TypeError || !(e instanceof Error) ? "Couldn't reach the server. Check your connection and try again." : e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-disabled={busy || undefined}
+        aria-pressed={on}
+        aria-label="Shortlist"
+        title={on ? "Remove from your shortlist" : "Add to your shortlist for this project"}
+        className={cn(
+          "apple-spring grid size-11 shrink-0 place-items-center rounded-full border transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600",
+          on ? "border-brand-300 bg-brand-50 text-brand-700" : "border-ink-200 bg-white text-ink-600 hover:bg-ink-50 hover:text-brand-700",
+        )}
+      >
+        {busy ? (
+          <Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden />
+        ) : (
+          <Heart className={cn("size-5", on && "fill-current")} aria-hidden />
+        )}
+      </button>
+      {error ? (
+        <span role="alert" className="absolute right-4 top-full z-20 mt-1 max-w-64 rounded-apple-sm bg-white px-2 py-1 text-xs text-danger shadow-md ring-1 ring-danger/30">
+          {error}
+        </span>
+      ) : null}
+    </>
+  );
+}
+
 export function CandidateCard({
   candidate,
   currency,
@@ -99,6 +175,8 @@ export function CandidateCard({
   fullTimeFrom = null,
   fullTime = null,
   wantedSkills = [],
+  presence = null,
+  interested = false,
 }: CandidateCardProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const band = bandFor(candidate.score);
@@ -108,41 +186,29 @@ export function CandidateCard({
   const wanted = new Set(wantedSkills.map((s) => s.trim().toLowerCase()));
   const isWanted = (skill: string) => wanted.has(skillName(skill).toLowerCase());
   const skills = [...candidate.skills.filter(isWanted), ...candidate.skills.filter((s) => !isWanted(s))];
+  const shownSkills = skills.slice(0, MAX_CHIPS);
   const profileHref = `/employer/intern/${encodeURIComponent(candidate.id)}${projectId ? `?project=${encodeURIComponent(projectId)}` : ""}`;
   const sendHref = `/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ""}`;
+  const place = candidate.city || candidate.location || "City not stated";
+  const meta = [
+    place,
+    candidate.workModes.join(" / "),
+    candidate.hasLaptop === false ? "Needs a laptop" : candidate.hasLaptop ? "Own laptop" : "",
+  ].filter(Boolean);
 
-  const actions = (
-    <>
-      {proposal ? (
-        <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="outline" size="sm" className="min-h-10 touch:min-h-11">
-          {proposalActionLabel(proposal)}
-        </ButtonLink>
-      ) : projectId ? (
-        <>
-          <ShortlistToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} size="sm" emphasis="primary" />
-          <ButtonLink href={sendHref} variant={shortlisted ? "primary" : "outline"} size="sm" className="min-h-10 touch:min-h-11">
-            <Send className="size-4" aria-hidden />
-            Send proposal
-          </ButtonLink>
-        </>
-      ) : (
-        <ButtonLink href={sendHref} variant="primary" size="sm" className="min-h-10 touch:min-h-11">
-          <Send className="size-4" aria-hidden />
-          Send proposal
-        </ButtonLink>
-      )}
-      {fullTimeFrom && fullTime ? (
-        <FullTimeOfferButton
-          employerId={fullTime.employerId}
-          proposalId={fullTimeFrom}
-          candidate={displayName}
-          fteStatus={fullTime.fteStatus}
-          timezone={fullTime.timezone}
-        />
-      ) : null}
-    </>
+  // One primary action per row: the proposal when one is out, else "Send proposal".
+  const primary = proposal ? (
+    <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="outline" size="sm" className="min-h-11 flex-1 justify-center sm:flex-none">
+      {proposalActionLabel(proposal)}
+    </ButtonLink>
+  ) : (
+    <ButtonLink href={sendHref} variant="primary" size="sm" className="min-h-11 flex-1 justify-center sm:flex-none">
+      <Send className="size-4" aria-hidden />
+      Send proposal
+    </ButtonLink>
   );
 
+  // The drawer's own action row: the primary and the compare control as buttons.
   const compareControl = !comparable ? null : compareHref ? (
     <Link
       href={compareHref}
@@ -170,99 +236,116 @@ export function CandidateCard({
     </button>
   );
 
+  const drawerActions = (
+    <>
+      {!proposal && projectId ? <ShortlistToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} size="sm" emphasis="quiet" /> : null}
+      {primary}
+    </>
+  );
+
+  const menuItems: RowMenuItem[] = [
+    { label: "Quick view", icon: <Eye />, onSelect: () => setDrawerOpen(true) },
+    ...(comparable
+      ? [
+          compareHref
+            ? { label: selected ? "In compare: remove" : "Compare", icon: selected ? <Check /> : <Scale />, href: compareHref }
+            : { label: "Compare full (4)", icon: <Scale />, disabled: true },
+        ]
+      : []),
+    { label: "Open profile", icon: <ArrowUpRight />, href: profileHref },
+  ];
+
   return (
-    <Surface as="li" className="flex flex-col p-5">
-      {/* Identity, then the score as the hero on the right. */}
-      <div className="flex items-start gap-4">
-        <CandidateAvatar
-          photoUrl={candidate.photoUrl}
-          initials={candidate.initials}
-          className="size-12 rounded-apple-md text-base ring-1 ring-inset ring-brand-200/70"
-        />
-        <div className="min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            title={`Quick view of ${displayName}`}
-            className="max-w-full break-words rounded-apple-sm text-left text-base font-semibold text-ink-900 hover:text-brand-700"
-          >
-            {displayName}
-          </button>
-          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-600">
-            <span className="inline-flex min-w-0 items-center gap-1">
-              <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
-              <span className="break-words">{candidate.city || candidate.location || "City not stated"}</span>
+    <li className="relative grid gap-x-6 gap-y-3 px-4 py-4 transition-colors hover:bg-ink-50/60 sm:px-5 lg:grid-cols-[minmax(0,1fr)_8.5rem_auto] lg:items-center">
+      <div className="flex min-w-0 gap-4">
+        <div className="relative shrink-0 self-start">
+          <CandidateAvatar
+            photoUrl={candidate.photoUrl}
+            initials={candidate.initials}
+            className="size-14 rounded-full text-base ring-1 ring-inset ring-brand-200/70"
+          />
+          {presence ? (
+            <span className="absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-white">
+              <PresenceDot label={presence} />
             </span>
-            {candidate.hasLaptop !== null ? (
-              <span className={cn("inline-flex items-center gap-1", candidate.hasLaptop ? "text-brand-800" : "text-ink-600")}>
-                <Laptop className="size-3.5 shrink-0" aria-hidden />
-                {candidate.hasLaptop ? "Own laptop" : "Needs a laptop"}
-              </span>
-            ) : null}
-          </p>
-          {candidate.workModes.length > 0 ? (
-            <p className="mt-0.5 text-sm text-ink-600">{candidate.workModes.join(" · ")}</p>
           ) : null}
         </div>
-        <div className="shrink-0 text-right">
-          {candidate.scored ? <p className="text-2xs font-semibold uppercase tracking-wide text-brand-700">{band.name}</p> : null}
-          <p
-            className="nums mt-0.5 text-3xl font-semibold leading-none text-brand-700"
-            title={candidate.scored ? `Findtern Score ${candidate.score.toFixed(1)} out of 10` : "Not scored yet"}
-          >
-            {candidate.scored ? candidate.score.toFixed(1) : "-"}
-            <span className="ml-0.5 text-sm font-medium text-text-subtle">/10</span>
-          </p>
-          <p className="nums mt-1.5 text-sm font-semibold text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
+        <div className="min-w-0 flex-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            {/* The row opens the profile; the link is stretched over it and the controls sit above. */}
+            <Link
+              href={profileHref}
+              className="break-words text-base font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+            >
+              {displayName}
+              {presence ? <span className="sr-only">, {presence}</span> : null}
+            </Link>
+            {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
+            {interested ? (
+              <Pill tone="live" className="shrink-0 whitespace-nowrap">
+                <Heart className="size-3 fill-current" aria-hidden />
+                Interested in this role
+              </Pill>
+            ) : null}
+          </div>
+          <p className="mt-0.5 text-sm text-ink-600">{meta.join(" · ")}</p>
+
+          {/* At most seven (a profile holds no more); "+N" only for an older, longer list. */}
+          {shownSkills.length > 0 ? (
+            <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Skills">
+              {shownSkills.map((skill) => (
+                <li
+                  key={skill}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 text-xs font-medium",
+                    isWanted(skill) ? "bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-200" : "bg-ink-100 text-ink-700",
+                  )}
+                >
+                  {skill}
+                  {isWanted(skill) ? <span className="sr-only"> (matches)</span> : null}
+                </li>
+              ))}
+              {skills.length > shownSkills.length ? (
+                <li className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
+                  +{skills.length - shownSkills.length}
+                  <span className="sr-only"> more skills</span>
+                </li>
+              ) : null}
+            </ul>
+          ) : (
+            <p className="mt-2 text-sm text-ink-600">No skills listed yet.</p>
+          )}
         </div>
       </div>
 
-      {status ? (
-        <div className="mt-3">
-          <Pill tone={status.tone}>{status.label}</Pill>
-        </div>
-      ) : null}
+      <div className="flex items-baseline gap-3 pl-[4.5rem] lg:block lg:pl-0 lg:text-right">
+        <p
+          className="nums text-2xl font-semibold leading-none text-brand-700"
+          title={candidate.scored ? `Findtern Score ${candidate.score.toFixed(1)} out of 10` : "Not scored yet"}
+        >
+          {candidate.scored ? candidate.score.toFixed(1) : "-"}
+          <span className="ml-0.5 text-sm font-medium text-text-subtle">/10</span>
+          <span className="sr-only"> Findtern Score</span>
+        </p>
+        <p className="nums text-xs text-ink-600 lg:mt-1.5">
+          {candidate.scored ? `${band.name} · ` : ""}
+          <span className="font-semibold text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</span>
+        </p>
+      </div>
 
-
-      {/* Every skill (a profile holds at most seven), never "+N more". */}
-      {skills.length > 0 ? (
-        <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Skills">
-          {skills.map((skill) => (
-            <li
-              key={skill}
-              className={cn(
-                "rounded-full px-2.5 py-1 text-xs font-medium",
-                isWanted(skill) ? "bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-200" : "bg-ink-100 text-ink-700",
-              )}
-            >
-              {skill}
-              {isWanted(skill) ? <span className="sr-only"> (matches)</span> : null}
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-3 text-sm text-ink-600">No skills listed yet.</p>
-      )}
-
-      <RatingMeter ratings={candidate.ratings} className="mt-4 border-t border-ink-100 pt-4" />
-
-      <div className="mt-auto pt-4">
-        <div className="flex flex-wrap items-start gap-2">{actions}</div>
-        <div className="mt-2 flex flex-wrap items-center gap-1 border-t border-ink-100 pt-2">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-10 touch:min-h-11 px-2.5 text-ink-700" })}
-          >
-            <Eye className="size-4" aria-hidden />
-            Quick view
-          </button>
-          {compareControl}
-          <Link href={profileHref} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-10 touch:min-h-11 px-2.5 text-ink-700" })}>
-            Profile
-            <ArrowUpRight className="size-4" aria-hidden />
-          </Link>
-        </div>
+      <div className="relative z-10 flex items-center gap-2 max-lg:pl-[4.5rem]">
+        {!proposal && projectId ? <HeartToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} /> : null}
+        {primary}
+        {fullTimeFrom && fullTime ? (
+          <FullTimeOfferButton
+            employerId={fullTime.employerId}
+            proposalId={fullTimeFrom}
+            candidate={displayName}
+            fteStatus={fullTime.fteStatus}
+            timezone={fullTime.timezone}
+          />
+        ) : null}
+        <RowMenu label={`More actions for ${displayName}`} items={menuItems} />
       </div>
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -279,6 +362,11 @@ export function CandidateCard({
                 <SheetDescription className="mt-1 text-sm text-ink-600">
                   {candidate.location || "Location not stated"}
                 </SheetDescription>
+                {presence ? (
+                  <div className="mt-1.5">
+                    <PresenceDot label={presence} withText />
+                  </div>
+                ) : null}
                 {status ? (
                   <div className="mt-2">
                     <Pill tone={status.tone}>{status.label}</Pill>
@@ -308,7 +396,7 @@ export function CandidateCard({
             </div>
 
             <div className="flex flex-wrap items-start gap-2">
-              {actions}
+              {drawerActions}
               {compareControl}
               <ButtonLink href={profileHref} variant="ghost" size="sm" className="min-h-10 touch:min-h-11">
                 Full profile
@@ -401,6 +489,6 @@ export function CandidateCard({
           </div>
         </SheetContent>
       </Sheet>
-    </Surface>
+    </li>
   );
 }
