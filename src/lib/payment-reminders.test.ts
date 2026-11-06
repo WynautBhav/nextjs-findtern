@@ -143,3 +143,11 @@ test("the second line asks for payment (today on the due day) and never names th
   assert.match(mail({ dueToday: false }).lines[1], /pay as soon as you can/);
   assert.match(mail({ type: "upcoming" }).lines[1], /pay by 30 Oct 2026/);
 });
+
+test("new rule: a fee order that also paid Month 1 starts reminders at month 2; a fee-only (old rule) order still reminds for month 1", () => {
+  const feeM1 = { status: "paid", paidAt: "2026-09-01T00:00:00Z", raw: { notes: { proposalIds: ["p1"], paymentMode: "hiring_fee", firstMonthProposalIds: ["p1"] } } };
+  assert.equal(at("2026-10-28", [fee("p1")])!.k, 1);
+  const r = at("2026-11-28", [feeM1])!;
+  assert.equal(r.k, 2);
+  assert.equal(at("2026-10-28", [feeM1]), null); // month 1 is paid: nothing due in October
+});

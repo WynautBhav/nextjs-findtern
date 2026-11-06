@@ -34,7 +34,7 @@ test("billingPlanOf: the oldest paid order decides, unknown modes are upfront, u
   assert.equal(billingPlanOf("other", [fee]), "unpaid");
 });
 
-test("postpaidMonthsPaid: the fee order is not a month", () => {
+test("postpaidMonthsPaid (old rule, fee-only order): the fee order is not a month", () => {
   assert.equal(postpaidMonthsPaid("p1", [fee]), 0);
   assert.equal(postpaidMonthsPaid("p1", [fee, m1]), 1);
   assert.equal(postpaidMonthsPaid("p1", [fee, m1, m2]), 2);
@@ -93,22 +93,22 @@ test("IST: the anchor of a hire with no start date is its Indian day, so its dat
   assert.equal(at("2026-11-22T18:30:00Z"), "2026-12-21");
 });
 
-test("checkout: post-paid first payment is the fee only; no double fee on a month; low score / full-time are not offered", () => {
+test("checkout: post-paid first payment is the fee + Month 1; no double fee on a month; low score / full-time are not offered", () => {
   const first = lineCharge(offer, 7, "postpaid");
-  assert.equal(first.totalMinor, 500_000);
+  assert.equal(first.totalMinor, 500_000 + 1_000_000);
   assert.equal(first.perHireMinor, 500_000);
   const month = lineCharge(offer, 7, "postpaid", { firstPayment: false });
   assert.equal(month.totalMinor, 1_000_000);
   assert.equal(month.perHireMinor, 0);
-  // fee + every month = the whole engagement, fee counted once
-  assert.equal(first.totalMinor + 3 * month.totalMinor, lineCharge(offer, 7, "upfront").totalMinor);
+  // fee + Month 1, then the later months = the whole engagement, fee counted once
+  assert.equal(first.totalMinor + 2 * month.totalMinor, lineCharge(offer, 7, "upfront").totalMinor);
   assert.ok(lineCharge(offer, 5, "postpaid").monthlyBlocked);
   assert.ok(lineCharge(parseOffer({ fullTimeOffer: { annualCtc: 600000 } }, "INR"), 8, "postpaid").monthlyBlocked);
   // USD keeps $50
-  assert.equal(lineCharge(parseOffer({ monthlyAmount: 100, duration: "2m", currency: "USD" }, "USD"), 8, "postpaid").totalMinor, 5_000);
+  assert.equal(lineCharge(parseOffer({ monthlyAmount: 100, duration: "2m", currency: "USD" }, "USD"), 8, "postpaid").totalMinor, 5_000 + 10_000);
 });
 
-test("monthlyDues: month 1 is payable from 15 days before its due day (2 days before the intern's pay day), never blocked after", () => {
+test("monthlyDues (old rule, fee-only order): month 1 is payable from 15 days before its due day (2 days before the intern's pay day), never blocked after", () => {
   const hire = [{ id: "p1", status: "hired", offerDetails: OFFER, hiredAt: "2026-09-10T00:00:00Z" }];
   assert.deepEqual(monthlyDues(hire, [fee], "2026-09-30").map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[0, "2026-10-16", false]]);
   assert.deepEqual(monthlyDues(hire, [fee], "2026-10-01").map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[0, "2026-10-16", true]]);
@@ -127,7 +127,7 @@ test("grandfathered hires: a monthly (pay-at-start) hire owes its next month now
   assert.deepEqual(monthlyDues(hire, [ord("total", "2026-09-10")], "2026-09-11"), []);
 });
 
-test("placementLedger: after the fee only the hire is partly paid, never fully paid; due 2 days before the intern's pay day", () => {
+test("placementLedger (old rule, fee-only order): after the fee only the hire is partly paid, never fully paid; due 2 days before the intern's pay day", () => {
   const hire = { id: "p1", status: "hired", offerDetails: OFFER, currency: "INR", hiredAt: "2026-09-10T00:00:00Z" };
   const a = placementLedger(hire, [fee]);
   assert.deepEqual([a.plan, a.status, a.paidMinor, a.dueMinor, a.monthsPaid, a.nextDue], ["postpaid", "partially_paid", 500_000, 3_000_000, 0, "2026-10-16"]);
@@ -164,7 +164,7 @@ test("employerInvoices: post-paid order sequence prints Hiring charge, then Mont
   assert.equal(inv.get("b")!.lines.length, 1);
 });
 
-test("payout gate: a post-paid month is refused until the employer has paid it; grandfathered hires are not blocked", () => {
+test("payout gate (old rule, fee-only order): a post-paid month is refused until the employer has paid it; grandfathered hires are not blocked", () => {
   const hire = (id: string) => ({ id, status: "hired", employerId: "e1", offerDetails: OFFER, currency: "INR", hiredAt: "2026-09-10T00:00:00Z" });
   const gate = (orders: unknown[], paidPayouts: number) =>
     payoutRefusal(
@@ -285,4 +285,70 @@ test("admin money views price an accepted offer the same whatever the intern's s
     assert.deepEqual(receivables(score), [["instalment:p1:1", 1_000_000], ["instalment:p1:2", 1_000_000], ["instalment:p1:3", 1_000_000]], `receivables ${score}`);
     assert.equal(money(score), 3_000_000, `money ${score}`);
   }
+});
+
+// ── New rule: the first post-paid payment is the hiring charge + Month 1 (notes.firstMonthProposalIds) ──
+const feeM1 = ord("hiring_fee", "2026-09-10T10:00:00+05:30", { firstMonthProposalIds: ["p1"] });
+const feeM1Raw = (amountMinor: number) => ({ id: "o1", status: "paid", amountMinor, currency: "INR", paidAt: feeM1.paidAt, createdAt: null, raw: feeM1.raw });
+const hireP1 = { id: "p1", status: "hired", offerDetails: OFFER, currency: "INR", hiredAt: "2026-09-10T00:00:00Z" };
+
+test("new rule: a fee order that names the hire in firstMonthProposalIds pays month 1; the flag is ignored on any other mode", () => {
+  assert.equal(postpaidMonthsPaid("p1", [feeM1]), 1);
+  assert.equal(postpaidMonthsPaid("p1", [feeM1, m2]), 2);
+  assert.equal(postpaidMonthsPaid("other", [feeM1]), 0);
+  assert.equal(billingPlanOf("p1", [feeM1]), "postpaid");
+  assert.equal(postpaidMonthsPaid("p1", [ord("total", "2026-09-10", { firstMonthProposalIds: ["p1"] })]), 0);
+  // month 2 right after the new-rule fee order is the right month, not a mismatch
+  assert.deepEqual(monthMismatches(checkout("p1", 2), [feeM1]), []);
+  assert.deepEqual(monthMismatches(checkout("p1", 1), [feeM1]), [{ proposalId: "p1", dueMonth: 1, monthsPaid: 1 }]);
+});
+
+test("new rule: monthlyDues and placementLedger start at month 2; a one-month hire is fully paid", () => {
+  assert.deepEqual(monthlyDues([hireP1], [feeM1], "2026-11-01").map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[1, "2026-11-16", true]]);
+  const a = placementLedger(hireP1, [feeM1]);
+  assert.deepEqual([a.plan, a.status, a.paidMinor, a.dueMinor, a.monthsPaid, a.nextDue], ["postpaid", "partially_paid", 1_500_000, 2_000_000, 1, "2026-11-16"]);
+  const one = { ...hireP1, offerDetails: { ...OFFER, duration: "1m" } };
+  const b = placementLedger(one, [feeM1]);
+  assert.deepEqual([b.status, b.dueMinor, b.paidMinor, b.nextDue], ["fully_paid", 0, 1_500_000, null]);
+  assert.deepEqual(monthlyDues([one], [feeM1], "2026-11-01"), []);
+});
+
+test("new rule: companyLedger counts month 1 on the fee order", () => {
+  const l = companyLedger([{ ...hireP1, internId: "i1", projectId: "pr" }], [feeM1Raw(1_500_000)], () => 7);
+  const h = l.hires[0];
+  assert.deepEqual([h.plan, h.paidMinor, h.dueMinor, h.monthsPaid, h.nextDueDate], ["postpaid", 1_500_000, 2_000_000, 1, "2026-11-16"]);
+});
+
+test("new rule: payout gate lets intern month 1 through and employerSide reads one paid month; receivables label the order", () => {
+  const [d] = stipendDues([{ ...hireP1, employerId: "e1" }], [], 7, [feeM1] as never);
+  assert.equal(payoutRefusal(d, 500_000), null);
+  const side = employerSide("p1", offer, [feeM1]);
+  assert.deepEqual([side.paidInFull, side.paidMonths, side.plan], [false, 1, "postpaid"]);
+  const rows = computeReceivables(
+    {
+      since: null, until: null, now: new Date("2026-10-16T12:00:00+05:30"), employerName: () => "Acme", internName: () => "Asha", scoreOf: () => 7, activationFeeMinor: 0,
+      proposals: [{ ...hireP1, employerId: "e1", internId: "i1" }],
+      employerPayments: [{ ...feeM1Raw(1_500_000), employerId: "e1", orderId: "ord", paymentId: "pay" }],
+      internPayments: [], unpaidProfiles: [], payouts: [],
+    } as ReceivablesInput,
+    { receivables: "company", payables: "company" },
+  ).receivables;
+  assert.match(rows.find((r) => r.status === "received")!.description, /hiring charge \+ month 1/);
+  assert.deepEqual(rows.filter((r) => r.id.startsWith("instalment")).map((r) => r.id).sort(), ["instalment:p1:2", "instalment:p1:3"]);
+});
+
+test("new rule: invoice = Hiring charge line + Month 1 charge line; the next order says Month 2 of 3; free mode falls back to the list month", () => {
+  const base = { who: "Asha K", roleTitle: "Designer", projectName: "Brand", offer, paymentIndex: 0 };
+  const two = hireInvoiceLines({ ...base, monthly: false, postpaid: "fee", withMonth1: true, chargedMinor: 1_500_000 });
+  assert.deepEqual(two.map((l) => l.amountMinor), [500_000, 1_000_000]);
+  assert.match(two[0].label, /Hiring charge/);
+  assert.match(two[1].detail ?? "", /Month 1 charge \(18 Sep – 17 Oct\)/);
+  assert.deepEqual(hireInvoiceLines({ ...base, monthly: false, postpaid: "fee", withMonth1: true, chargedMinor: 0 }).map((l) => l.amountMinor), [500_000, 1_000_000]);
+  const hire: InvoiceHire = { proposalId: "p1", offerDetails: OFFER, currency: "INR", who: "Asha K", projectName: "Brand" };
+  const mk = (id: string, o: ReturnType<typeof ord>, amountMinor: number): InvoicePayment => ({ id, orderId: id, invoiceNumber: `FT/${id}`, status: "paid", paidAt: o.paidAt, amountMinor, raw: o.raw });
+  const pays = [mk("a", feeM1, 1_500_000), mk("b", m2, 1_000_000)];
+  const inv = employerInvoices({ payments: pays, allPayments: pays, legacyPaid: [], hires: new Map([["p1", hire]]) });
+  assert.equal(inv.get("a")!.lines.length, 2);
+  assert.match(inv.get("a")!.description, /hiring charge \+ Month 1 charge/);
+  assert.match(inv.get("b")!.lines[0].detail ?? "", /Month 2 of 3/);
 });

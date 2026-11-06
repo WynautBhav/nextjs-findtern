@@ -25,5 +25,5 @@ test("a score that later drops below 6 would reprice a due month; the fixed basi
   assert.equal(month.totalMinor, 1_000_000);
   assert.equal(month.monthlyBlocked, null);
   assert.equal(acceptedLineCharge(offer, "postpaid", { firstPayment: false }).totalMinor, 1_000_000);
-  assert.equal(acceptedLineCharge(offer, "postpaid").totalMinor, 500_000);
+  assert.equal(acceptedLineCharge(offer, "postpaid").totalMinor, 500_000 + 1_000_000);
 });

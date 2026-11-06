@@ -62,6 +62,7 @@ test("employer invoice lines never say stipend", () => {
   const base = { who: "Asha K", roleTitle: "Designer", projectName: "Brand", offer };
   const sets = [
     hireInvoiceLines({ ...base, monthly: false, paymentIndex: 0, postpaid: "fee" }),
+    hireInvoiceLines({ ...base, monthly: false, paymentIndex: 0, postpaid: "fee", withMonth1: true }),
     hireInvoiceLines({ ...base, monthly: true, paymentIndex: 0, postpaid: 2 }),
     hireInvoiceLines({ ...base, monthly: false, paymentIndex: 0 }),
     hireInvoiceLines({ ...base, monthly: true, paymentIndex: 0 }),
