@@ -34,6 +34,7 @@ export const REFUND_ERRORS = {
   open: "A refund is already open for this payment.",
   interviewNow: "The student has taken the AI interview since this refund was opened, so it now needs review.",
   inFlight: "A refund call to Razorpay may still be in progress. Refresh this refund in two minutes before retrying.",
+  needsReview: "Needs review: mark it refunded by hand once you have paid it back, or reject it.",
 } as const;
 
 export const REVIEW_REASON_LABELS: Record<string, string> = {
@@ -104,6 +105,7 @@ export function actionProblem(action: RefundAction, row: RowFacts, now: Date): s
   switch (action) {
     case "initiate":
       if (s === "pending" && !row.gatewayRefundId) return REFUND_ERRORS.inFlight;
+      if (s === "requires_review") return REFUND_ERRORS.needsReview;
       return s === "eligible" || s === "failed" ? null : `A refund that is ${REFUND_STATUS_LABELS[s].toLowerCase()} can't be started.`;
     case "refresh":
       return null;
@@ -132,14 +134,6 @@ export function statusFromGateway(current: RefundStatus, gatewayStatus: string):
   return next;
 }
 
-/** The refund in Razorpay's list that this row made (our notes or receipt carry the row id). */
-export function matchRefund(items: RazorpayRefund[], refundId: string): RazorpayRefund | undefined {
-  return items.find((r) => {
-    const notes = r.notes && !Array.isArray(r.notes) ? (r.notes as Record<string, string>) : {};
-    return notes.refund_id === refundId || (typeof r.receipt === "string" && r.receipt.startsWith(refundId.slice(0, 26)));
-  });
-}
-
 /**
  * Razorpay refuses a second refund with the same receipt on a payment. The first attempt uses the row id, so a
  * retry after a timeout cannot double-refund; a retry after a refund Razorpay itself failed needs a new receipt,
@@ -153,6 +147,43 @@ export function receiptFor(refundId: string, lastFailedGatewayId: string | null)
 export function lastFailedGatewayId(row: Pick<PaymentRefund, "gatewayResponse">): string | null {
   const r = row.gatewayResponse as { id?: unknown; status?: unknown } | null;
   return r && r.status === "failed" && typeof r.id === "string" ? r.id : null;
+}
+
+type AttemptFacts = Pick<PaymentRefund, "id" | "gatewayResponse">;
+
+/**
+ * Whether a Razorpay refund belongs to the row's current attempt. Every attempt carries the same `notes.refund_id`,
+ * so the receipt decides (it changes after each gateway failure); the refund that failed last is never the current
+ * one. Without a receipt, only a not-failed refund with our notes counts, so a replayed old failure can't adopt the row.
+ */
+export function isCurrentAttempt(r: RazorpayRefund, row: AttemptFacts): boolean {
+  if (r.id === lastFailedGatewayId(row)) return false;
+  if (typeof r.receipt === "string" && r.receipt) return r.receipt === receiptFor(row.id, lastFailedGatewayId(row));
+  const notes = r.notes && !Array.isArray(r.notes) ? (r.notes as Record<string, string>) : {};
+  return notes.refund_id === row.id && r.status !== "failed";
+}
+
+/** The refund in Razorpay's list that this row's current attempt made. */
+export function matchRefund(items: RazorpayRefund[], row: AttemptFacts): RazorpayRefund | undefined {
+  return items.find((r) => isCurrentAttempt(r, row));
+}
+
+/**
+ * A Razorpay refund the row must not take silently, or null. `amount`: not the full amount (say a partial refund made
+ * from the dashboard with our notes), so the status stays. `late_success`: money went back while the row is closed or
+ * not started (rejected, reverted to eligible), so no seat is claimed for it. Pure.
+ */
+export function gatewayAnomaly(
+  row: Pick<PaymentRefund, "status" | "amountMinor">,
+  refund: Pick<RazorpayRefund, "id" | "amount" | "status">,
+): { kind: "amount" | "late_success"; message: string } | null {
+  if (refund.amount !== row.amountMinor) {
+    return { kind: "amount", message: `Razorpay refund ${refund.id} is for ${refund.amount} paise, not ${row.amountMinor}; check the Razorpay dashboard.` };
+  }
+  if (refund.status === "processed" && row.status !== "refunded" && statusFromGateway(row.status, refund.status) === null) {
+    return { kind: "late_success", message: `Razorpay refunded this payment (${refund.id}) while the refund was ${REFUND_STATUS_LABELS[row.status].toLowerCase()}; check the Razorpay dashboard and the college seat.` };
+  }
+  return null;
 }
 
 /** The refund in a signed webhook event this module settles (`refund.processed` / `refund.failed`), else null. Pure. */
@@ -420,7 +451,7 @@ async function claimSeat(d: Deps, tx: Tx, row: PaymentRefund): Promise<string> {
   return mine.id;
 }
 
-/** The seat covers the student like the college code does: verified with that college (only when not verified with it already). */
+/** Once refunded, the seat covers the student like the college code does: verified with that college (only when not verified with it already). */
 async function verifyMember(d: Deps, tx: Tx, row: PaymentRefund): Promise<void> {
   const m = d.schema.collegeMemberships;
   const [mine] = await tx.select({ collegeId: m.collegeId, status: m.status, leftAt: m.leftAt }).from(m).where(d.orm.eq(m.userId, row.internId)).limit(1);
@@ -450,34 +481,52 @@ async function paymentOf(d: Deps, ex: Db | Tx, row: PaymentRefund) {
 
 /**
  * Applies a Razorpay refund to the row (adopting its id when the row had none). Conditional on the status read,
- * so a webhook and a refresh racing apply once. Audited when the status changes.
+ * so a webhook and a refresh racing apply once. Audited when the status changes or on an anomaly. The student is
+ * verified with the college only once the money is back, so a rejected or cancelled refund leaves no membership.
  */
 async function applyGateway(d: Deps, row: PaymentRefund, refund: RazorpayRefund, actor: string): Promise<PaymentRefund> {
   const { eq, and } = d.orm;
   const s = d.schema.paymentRefunds;
-  const next = statusFromGateway(row.status, refund.status);
+  const anomaly = gatewayAnomaly(row, refund);
+  // A refund for another amount isn't this one: keep the row's status and gateway id, flag it for the admin.
+  const foreign = anomaly?.kind === "amount";
+  const next = foreign ? null : statusFromGateway(row.status, refund.status);
   const now = new Date();
   const db = d.getDb();
   return db.transaction(async (tx) => {
     const [updated] = await tx
       .update(s)
       .set({
-        gatewayRefundId: refund.id,
-        gatewayStatus: refund.status,
-        gatewayResponse: refund as Record<string, unknown>,
+        ...(foreign ? {} : { gatewayRefundId: refund.id, gatewayStatus: refund.status, gatewayResponse: refund as Record<string, unknown> }),
         ...(next ? { status: next } : {}),
         ...(next === "refunded" ? { settledAt: now, lastError: null } : {}),
         ...(next === "failed" ? { lastError: "Razorpay could not process this refund. You can retry it." } : {}),
         ...(next === "initiated" ? { lastError: null } : {}),
+        ...(anomaly ? { lastError: anomaly.message } : {}),
         updatedAt: now,
       })
       .where(and(eq(s.id, row.id), eq(s.status, row.status)))
       .returning();
     if (!updated) return (await tx.select().from(s).where(eq(s.id, row.id)).limit(1))[0];
+    if (next === "refunded") await verifyMember(d, tx, updated);
     if (next === "refunded" || next === "failed") {
       await d.audit.recordAdminAudit(
         tx,
         { adminId: actor, action: next === "refunded" ? "refund.settle" : "refund.fail", targetType: "payment_refund", targetId: row.id, meta: { gatewayRefundId: refund.id, gatewayStatus: refund.status, amountMinor: refund.amount } },
+        { strict: true },
+      );
+    }
+    // Once per anomaly: the message names the Razorpay refund, so a replayed event doesn't audit twice.
+    if (anomaly && anomaly.message !== row.lastError) {
+      await d.audit.recordAdminAudit(
+        tx,
+        {
+          adminId: actor,
+          action: anomaly.kind === "amount" ? "refund.fail" : "refund.settle",
+          targetType: "payment_refund",
+          targetId: row.id,
+          meta: { anomaly: anomaly.kind, rowStatus: row.status, gatewayRefundId: refund.id, gatewayStatus: refund.status, gatewayAmountMinor: refund.amount, amountMinor: row.amountMinor },
+        },
         { strict: true },
       );
     }
@@ -502,10 +551,10 @@ export async function initiateRefund(id: string, adminId: string, confirmAmountM
       if (!isGatewayPayment(payment)) throw new Refused(409, "This payment didn't go through Razorpay. Mark it refunded by hand once you have paid it back.");
       if (interviewTakenFrom(await interviewStatusOf(d, tx, row.internId))) {
         await tx.update(s).set({ status: "requires_review", reviewReason: "interview_taken", updatedAt: now }).where(d.orm.eq(s.id, row.id));
+        await d.audit.recordAdminAudit(tx, { adminId, action: "refund.create", targetType: "payment_refund", targetId: row.id, meta: { from: row.status, to: "requires_review", reason: "interview_taken" } }, { strict: true });
         return { row, payment, review: true as const };
       }
       const seatUsageId = await claimSeat(d, tx, row);
-      await verifyMember(d, tx, row);
       const [pending] = await tx
         .update(s)
         .set({ status: "pending", seatUsageId, initiatedBy: adminId, initiatedAt: now, gatewayRefundId: null, gatewayStatus: null, lastError: null, updatedAt: now })
@@ -527,7 +576,7 @@ export async function initiateRefund(id: string, adminId: string, confirmAmountM
   } catch (e) {
     const message = e instanceof Error ? e.message : "Razorpay refund call failed";
     // A refused or timed-out call may still have made the refund (a duplicate receipt says it did): adopt it if so.
-    const adopted = await d.razorpay.listRefunds(payment.paymentId!).then((items) => matchRefund(items, row.id)).catch(() => undefined);
+    const adopted = await d.razorpay.listRefunds(payment.paymentId!).then((items) => matchRefund(items, row)).catch(() => undefined);
     if (adopted) {
       const after = await applyGateway(d, row, adopted, adminId);
       return { ok: true, value: { status: after.status, gatewayRefundId: after.gatewayRefundId } };
@@ -555,7 +604,7 @@ export async function refreshRefund(id: string, actor: string): Promise<RefundRe
       if (row.status === "failed") return out(row); // Razorpay's failed is final; a retry starts a new refund
       return out(await applyGateway(d, row, await d.razorpay.fetchRefund(row.gatewayRefundId), actor));
     }
-    const found = matchRefund(await d.razorpay.listRefunds(payment.paymentId!), row.id);
+    const found = matchRefund(await d.razorpay.listRefunds(payment.paymentId!), row);
     if (found) return out(await applyGateway(d, row, found, actor));
     if (!stalePending(row, new Date())) return out(row);
     const s = d.schema.paymentRefunds;
@@ -583,14 +632,15 @@ export async function settleFromWebhook(entity: RazorpayRefund): Promise<"update
   if (!row) {
     const notes = entity.notes && !Array.isArray(entity.notes) ? (entity.notes as Record<string, string>) : {};
     const byNote = typeof notes.refund_id === "string" ? await loadRow(d, notes.refund_id) : null;
-    if (!byNote || byNote.gatewayRefundId) return "ignored";
+    // Only the row's current attempt: a replayed event about an earlier, failed attempt must not settle a retry.
+    if (!byNote || byNote.gatewayRefundId || !isCurrentAttempt(entity, byNote)) return "ignored";
     const payment = await paymentOf(d, db, byNote);
     if (!payment || payment.paymentId !== entity.payment_id) return "ignored";
     row = byNote;
   }
   const before = row.status;
   const after = await applyGateway(d, row, entity, SYSTEM_ACTOR);
-  return after.status !== before || after.gatewayRefundId !== row.gatewayRefundId ? "updated" : "ignored";
+  return after.status !== before || after.gatewayRefundId !== row.gatewayRefundId || after.lastError !== row.lastError ? "updated" : "ignored";
 }
 
 /** PATCH mark_manual: the money went back outside the API (manual / test payment, or after review). Uses one seat too (OA6). */
@@ -644,7 +694,7 @@ export async function cancelRefund(id: string, adminId: string): Promise<RefundR
   if (payment && isGatewayPayment(payment)) {
     let found: RazorpayRefund | undefined;
     try {
-      found = matchRefund(await d.razorpay.listRefunds(payment.paymentId!), row.id);
+      found = matchRefund(await d.razorpay.listRefunds(payment.paymentId!), row);
     } catch (e) {
       return { ok: false, status: 502, error: `Couldn't check Razorpay first: ${e instanceof Error ? e.message : "unknown error"}` };
     }

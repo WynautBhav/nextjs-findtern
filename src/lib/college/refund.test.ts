@@ -6,7 +6,9 @@ import {
   REFUND_STALE_MS,
   actionProblem,
   displayStatus,
+  gatewayAnomaly,
   interviewTakenFrom,
+  isCurrentAttempt,
   isGatewayPayment,
   lastFailedGatewayId,
   matchRefund,
@@ -73,6 +75,7 @@ test("state machine: initiate only from eligible or failed", () => {
   assert.equal(actionProblem("initiate", row("failed"), now), null);
   assert.equal(actionProblem("initiate", row("pending"), now), REFUND_ERRORS.inFlight);
   for (const s of ["requires_review", "initiated", "refunded", "rejected"]) assert.notEqual(actionProblem("initiate", row(s), now), null, s);
+  assert.equal(actionProblem("initiate", row("requires_review"), now), REFUND_ERRORS.needsReview);
 });
 
 test("state machine: manual only from review; reject from open states; cancel only a stale pending", () => {
@@ -112,11 +115,46 @@ test("statusFromGateway: forward only, final states stay", () => {
 
 const refund = (over: Partial<RazorpayRefund>): RazorpayRefund => ({ id: "rfnd_1", payment_id: "pay_AbC123", amount: 249_900, status: "pending", ...over });
 
-test("matchRefund finds ours by notes.refund_id or receipt, not someone else's", () => {
-  const items = [refund({ id: "rfnd_other", notes: { refund_id: "x" } }), refund({ id: "rfnd_ours", notes: { refund_id: ID } })];
-  assert.equal(matchRefund(items, ID)?.id, "rfnd_ours");
-  assert.equal(matchRefund([refund({ id: "rfnd_r", notes: [], receipt: receiptFor(ID, "rfnd_failed00001") })], ID)?.id, "rfnd_r");
-  assert.equal(matchRefund([refund({ notes: [] })], ID), undefined);
+test("matchRefund finds the current attempt by receipt, not someone else's", () => {
+  const first = { id: ID, gatewayResponse: null };
+  const items = [refund({ id: "rfnd_other", receipt: "other", notes: { refund_id: "x" } }), refund({ id: "rfnd_ours", receipt: ID, notes: { refund_id: ID } })];
+  assert.equal(matchRefund(items, first)?.id, "rfnd_ours");
+  // No receipt echoed: our notes still match a refund that hasn't failed.
+  assert.equal(matchRefund([refund({ id: "rfnd_n", notes: { refund_id: ID } })], first)?.id, "rfnd_n");
+  assert.equal(matchRefund([refund({ id: "rfnd_n", status: "failed", notes: { refund_id: ID } })], first), undefined);
+  assert.equal(matchRefund([refund({ notes: [] })], first), undefined);
+});
+
+test("a retry never adopts the earlier failed Razorpay refund (review finding 1)", () => {
+  // Attempt 1 made rfnd_A, which Razorpay failed; the admin retried, so the row is pending with gateway_response = rfnd_A.
+  const failedA = refund({ id: "rfnd_AAAAAAAAAAAAAA", status: "failed", receipt: ID, notes: { refund_id: ID } });
+  const retrying = { id: ID, gatewayResponse: failedA as Record<string, unknown> };
+  // A replayed refund.failed webhook for rfnd_A is ignored, so the row stays pending.
+  assert.equal(isCurrentAttempt(failedA, retrying), false);
+  // A timed-out retry call: listRefunds returns rfnd_A first; only attempt 2's rfnd_B is adopted.
+  const b = refund({ id: "rfnd_BBBBBBBBBBBBBB", status: "processed", receipt: receiptFor(ID, failedA.id), notes: { refund_id: ID } });
+  assert.equal(matchRefund([failedA, b], retrying)?.id, "rfnd_BBBBBBBBBBBBBB");
+  assert.equal(isCurrentAttempt(b, retrying), true);
+  // A third attempt (rfnd_B failed too) ignores rfnd_A by its receipt, not only by the last failed id.
+  const third = { id: ID, gatewayResponse: { ...b, status: "failed" } as Record<string, unknown> };
+  assert.equal(isCurrentAttempt(failedA, third), false);
+  assert.equal(isCurrentAttempt({ ...failedA, status: "processed" }, third), false);
+  // The first attempt's own refund still settles a first-attempt row.
+  assert.equal(isCurrentAttempt({ ...failedA, status: "processed" }, { id: ID, gatewayResponse: null }), true);
+});
+
+test("gatewayAnomaly: a partial refund doesn't settle; a late success on a closed row is flagged (findings 4, 5)", () => {
+  const r = { status: "initiated" as const, amountMinor: 249_900 };
+  assert.equal(gatewayAnomaly(r, refund({ status: "processed" })), null);
+  assert.equal(gatewayAnomaly(r, refund({ status: "processed", amount: 100_000 }))?.kind, "amount");
+  for (const status of ["rejected", "eligible", "requires_review"] as const) {
+    assert.equal(gatewayAnomaly({ status, amountMinor: 249_900 }, refund({ status: "processed" }))?.kind, "late_success", status);
+    assert.equal(gatewayAnomaly({ status, amountMinor: 249_900 }, refund({ status: "failed" })), null, status);
+  }
+  // A replayed success on a refunded row is normal, not an anomaly.
+  assert.equal(gatewayAnomaly({ status: "refunded", amountMinor: 249_900 }, refund({ status: "processed" })), null);
+  // The message names the Razorpay refund so one anomaly is audited once.
+  assert.match(gatewayAnomaly({ status: "rejected", amountMinor: 249_900 }, refund({ id: "rfnd_late", status: "processed" }))!.message, /rfnd_late/);
 });
 
 test("receipts: stable per attempt, new after a gateway failure, ≤ 40 chars", () => {
@@ -149,4 +187,29 @@ test("webhook: only signed refund.processed / refund.failed with a real refund e
   // Replaying the same processed event changes nothing the second time.
   assert.equal(statusFromGateway("initiated", "processed"), "refunded");
   assert.equal(statusFromGateway("refunded", "processed"), null);
+});
+
+// The DB paths load `@/` modules plain node can't resolve, so these two guards read the source (like route-guards.test.ts).
+const SRC = (await import("node:fs")).readFileSync(new URL("./refund.ts", import.meta.url), "utf8");
+const fnBody = (name: string) => {
+  const start = SRC.indexOf(`async function ${name}(`);
+  assert.ok(start >= 0, name);
+  const end = SRC.indexOf("\nexport async function ", start + 1);
+  const next = SRC.indexOf("\nasync function ", start + 1);
+  return SRC.slice(start, Math.min(...[end, next].filter((i) => i > 0), SRC.length));
+};
+
+test("initiate: an interview found taken moves the row to review with an audit entry (review finding 2)", () => {
+  const body = fnBody("initiateRefund");
+  const branch = body.slice(body.indexOf('status: "requires_review"'), body.indexOf("review: true"));
+  assert.match(branch, /recordAdminAudit\(tx, \{[^}]*to: "requires_review", reason: "interview_taken"/);
+  assert.match(branch, /\{ strict: true \}/);
+});
+
+test("membership: verified only when the money is back, never at initiate (review finding 3)", () => {
+  assert.doesNotMatch(fnBody("initiateRefund"), /verifyMember/);
+  assert.match(fnBody("applyGateway"), /if \(next === "refunded"\) await verifyMember\(d, tx, updated\)/);
+  assert.match(fnBody("markManualRefund"), /verifyMember\(d, tx, row\)/);
+  // Reject and cancel only release the seat; there is no membership of theirs to undo.
+  for (const fn of ["rejectRefund", "cancelRefund"]) assert.doesNotMatch(fnBody(fn), /verifyMember|verifyByCollegeCode/, fn);
 });
