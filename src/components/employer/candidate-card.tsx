@@ -53,7 +53,7 @@ export interface CandidateCardProps {
  * "Save"/"Saved" from sm up; the heart alone on a phone. Not `disabled` while
  * saving: that drops keyboard focus. An offer already out goes to it.
  */
-function SaveToggle({ internId, projectId, shortlisted }: { internId: string; projectId: string; shortlisted: boolean }) {
+export function SaveToggle({ internId, projectId, shortlisted }: { internId: string; projectId: string; shortlisted: boolean }) {
   const router = useRouter();
   const [on, setOn] = useState(shortlisted);
   const [busy, setBusy] = useState(false);
