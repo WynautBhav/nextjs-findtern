@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { forgetAccountStatus } from "@/lib/account-status";
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notify } from "@/lib/notify";
@@ -54,6 +55,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (updated.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (b.isActive !== undefined) forgetAccountStatus("employer", id);
+  await recordAdminAudit(db, {
+    adminId: guard.session.uid,
+    action: "company.update",
+    targetType: "employer",
+    targetId: id,
+    meta: { ...(b.isActive !== undefined ? { isActive: b.isActive } : {}), ...(b.internationalFteStatus ? { internationalFteStatus: { from: String(before.fte ?? "none"), to: b.internationalFteStatus } } : {}) },
+  });
   const was = String(before.fte ?? "none");
   const now = b.internationalFteStatus;
   if (now === "approved" && was !== "approved") {
@@ -111,5 +119,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     await tx.delete(schema.employers).where(eq(schema.employers.id, id));
   });
   forgetAccountStatus("employer", id);
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "company.delete", targetType: "employer", targetId: id, meta: { email: employer.email } });
   return NextResponse.json({ ok: true });
 }

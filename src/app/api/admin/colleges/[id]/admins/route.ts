@@ -3,6 +3,7 @@ import { randomBytes } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { firstPaymentProblem } from "@/lib/college/seat-paid";
 import { paidSeatTotal } from "@/lib/college/seat-gate";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -38,6 +39,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .onConflictDoNothing()
     .returning({ id: schema.collegeAdmins.id });
   if (!row) return NextResponse.json({ error: "That email already has a placement console login" }, { status: 409 });
+  // The generated password is never logged; only who got a login.
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.admin_create", targetType: "college", targetId: id, meta: { collegeAdminId: row.id, name: parsed.data.name, email: parsed.data.email } });
   return NextResponse.json(
     { id: row.id, email: parsed.data.email, password },
     { status: 201, headers: { "Cache-Control": "no-store" } },

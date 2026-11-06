@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getSession } from "@/lib/auth";
 import { sanitizeRichText } from "@/lib/richtext";
 import { getDb, schema } from "@/lib/db";
@@ -54,6 +55,7 @@ export function legalDocRoute(table: LegalTable, defaultTitle: string) {
     if (existing) await db.update(table).set(values).where(eq(table.id, existing.id));
     else await db.insert(table).values(values);
     revalidatePath("/", "layout");
+    await recordAdminAudit(db, { adminId: guard.session.uid, action: "terms.publish", targetType: "terms", targetId: existing?.id ?? null, meta: { document: defaultTitle, title: parsed.data.title } });
     return NextResponse.json({ ok: true });
   }
 

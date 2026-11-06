@@ -2,6 +2,7 @@ import { inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { allows } from "@/lib/admin/permissions";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -60,6 +61,7 @@ export async function PATCH(req: Request) {
     .set({ isRead: isRead.data })
     .where(inArray(schema.contactMessages.id, ids));
 
+  await recordAdminAudit(getDb(), { adminId: guard.session.uid, action: "message.mark_read", targetType: "message", targetId: ids.length === 1 ? ids[0] : null, meta: { isRead: isRead.data, count: ids.length, ids } });
   return NextResponse.json({ ok: true, updated: ids.length });
 }
 
@@ -74,5 +76,6 @@ export async function DELETE(req: Request) {
   if (found.response) return found.response;
   await getDb().delete(schema.contactMessages).where(inArray(schema.contactMessages.id, ids));
 
+  await recordAdminAudit(getDb(), { adminId: guard.session.uid, action: "message.delete", targetType: "message", targetId: ids.length === 1 ? ids[0] : null, meta: { count: ids.length, ids } });
   return NextResponse.json({ ok: true, deleted: ids.length });
 }

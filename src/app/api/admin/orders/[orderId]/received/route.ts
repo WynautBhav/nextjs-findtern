@@ -1,6 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { receivedRefusal } from "@/lib/order-received";
@@ -23,5 +24,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ orderId
     .where(and(eq(schema.employerPayments.id, order.id), sql`(${schema.employerPayments.raw}->>'receivedAt') is null`))
     .returning({ id: schema.employerPayments.id });
   if (stamped.length === 0) return NextResponse.json({ error: "This order is already marked received." }, { status: 409 });
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "order.marked_received", targetType: "order", targetId: orderId, meta: { employerId: order.employerId, amountMinor: order.amountMinor } });
   return NextResponse.json({ ok: true });
 }

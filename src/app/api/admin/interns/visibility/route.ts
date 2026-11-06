@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { adminVisibilityExtra } from "@/lib/admin/visibility";
@@ -59,6 +60,14 @@ export async function POST(req: Request) {
       if (next) await tx.update(schema.internOnboarding).set({ extraData: next }).where(eq(schema.internOnboarding.id, row.id));
     }
     return users;
+  });
+
+  await recordAdminAudit(db, {
+    adminId: guard.session.uid,
+    action: "intern.visibility",
+    targetType: "intern",
+    targetId: updated.length === 1 ? updated[0].id : null,
+    meta: { visibility, count: updated.length, ids: updated.map((u) => u.id) },
   });
 
   // A short id list can still name ids that do not exist. Reporting the count

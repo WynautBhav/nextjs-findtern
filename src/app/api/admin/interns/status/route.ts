@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { forgetAccountStatus } from "@/lib/account-status";
 import { requireMutation } from "@/lib/guards-mutation";
 
@@ -42,6 +43,13 @@ export async function POST(req: Request) {
     .where(inArray(schema.users.id, ids))
     .returning({ id: schema.users.id });
   ids.forEach((uid) => forgetAccountStatus("intern", uid));
+  await recordAdminAudit(db, {
+    adminId: guard.session.uid,
+    action: isActive ? "user.activate" : "user.deactivate",
+    targetType: "intern",
+    targetId: updated.length === 1 ? updated[0].id : null,
+    meta: { count: updated.length, ids: updated.map((u) => u.id), bulk: true },
+  });
 
   if (updated.length !== ids.length) {
     return NextResponse.json({

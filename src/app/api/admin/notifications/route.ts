@@ -2,6 +2,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { realEmployers } from "@/lib/admin/scope";
@@ -96,5 +97,11 @@ export async function POST(req: Request) {
       })),
     );
   }
+  await recordAdminAudit(db, {
+    adminId: guard.session.uid,
+    action: "notification.send",
+    targetType: "notification",
+    meta: { title: d.title, type, count: recipients.length, interns: internIds.length, employers: employerIds.length },
+  });
   return NextResponse.json({ ok: true, count: recipients.length, interns: internIds.length, employers: employerIds.length });
 }

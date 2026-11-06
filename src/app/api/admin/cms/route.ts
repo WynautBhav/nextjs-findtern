@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { CMS_COLLECTIONS, CMS_TYPES, sanitizeCmsValues, validateCmsValues, type CmsType, type CmsValues } from "@/lib/admin/cms-collections";
 import { CMS_TABLES } from "@/lib/admin/cms-tables";
 import { getDb, schema } from "@/lib/db";
@@ -68,7 +69,9 @@ export async function POST(req: Request) {
     const table = TABLES[b.type];
     const [item] = await getDb().insert(table).values(values as never).returning();
     revalidatePath("/", "layout");
-    return NextResponse.json({ ok: true, item: { id: (item as { id: string }).id } }, { status: 201 });
+    const newId = (item as { id: string }).id;
+    await recordAdminAudit(getDb(), { adminId: guard.session.uid, action: "cms.create", targetType: "cms", targetId: newId, meta: { type: b.type, fields: Object.keys(values) } });
+    return NextResponse.json({ ok: true, item: { id: newId } }, { status: 201 });
   } catch (e) {
     return failed(e);
   }
@@ -111,6 +114,7 @@ export async function PATCH(req: Request) {
       .returning({ id: table.id });
     if (!updated.length) return NextResponse.json({ error: "This item no longer exists." }, { status: 404 });
     revalidatePath("/", "layout");
+    await recordAdminAudit(db, { adminId: guard.session.uid, action: "cms.update", targetType: "cms", targetId: id, meta: { type: b.type, fields: Object.keys(values) } });
     return NextResponse.json({ ok: true });
   } catch (e) {
     return failed(e);
@@ -124,7 +128,9 @@ export async function DELETE(req: Request) {
   const id = typeof b?.raw.id === "string" ? b.raw.id : null;
   if (!b || !id) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   const table = TABLES[b.type];
-  await getDb().delete(table).where(eq(table.id, id));
+  const db = getDb();
+  await db.delete(table).where(eq(table.id, id));
   revalidatePath("/", "layout");
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "cms.delete", targetType: "cms", targetId: id, meta: { type: b.type } });
   return NextResponse.json({ ok: true });
 }

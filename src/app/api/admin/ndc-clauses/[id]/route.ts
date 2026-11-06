@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { sanitizeRichText } from "@/lib/richtext";
@@ -31,6 +32,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const db = getDb();
   await db.update(schema.internNonDisclosureClauses).set({ ...values, updatedAt: new Date() }).where(eq(schema.internNonDisclosureClauses.id, id));
   revalidatePath("/", "layout"); // the public NDA page reads these
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "ndc.update", targetType: "ndc_clause", targetId: id, meta: { fields: Object.keys(values) } });
   return NextResponse.json({ ok: true });
 }
 
@@ -41,5 +43,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const db = getDb();
   await db.delete(schema.internNonDisclosureClauses).where(eq(schema.internNonDisclosureClauses.id, id));
   revalidatePath("/", "layout"); // the public NDA page reads these
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "ndc.delete", targetType: "ndc_clause", targetId: id });
   return NextResponse.json({ ok: true });
 }

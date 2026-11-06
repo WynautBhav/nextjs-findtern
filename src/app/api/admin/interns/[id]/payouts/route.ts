@@ -2,6 +2,7 @@ import { eq, desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { cycleFor, payoutRefusal } from "@/lib/admin/stipend-dues";
@@ -82,6 +83,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         },
       })
       .returning();
+    // Inside the transaction and strict: a failed audit row rolls the payout back instead of leaving an unlogged one.
+    await recordAdminAudit(
+      tx,
+      { adminId: guard.session.uid, action: "payout.create", targetType: "payout", targetId: payout.id, meta: { internId: id, proposalId: body.proposalId, amountMinor: body.amountMinor, method: body.method, scheduledFor: body.scheduledFor, months } },
+      { strict: true },
+    );
     return { payout } as const;
   });
 

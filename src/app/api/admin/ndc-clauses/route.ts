@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -39,5 +40,6 @@ export async function POST(req: Request) {
   const db = getDb();
   const [clause] = await db.insert(schema.internNonDisclosureClauses).values({ ...parsed.data, bodyHtml }).returning();
   revalidatePath("/", "layout"); // the public NDA page reads these
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "ndc.create", targetType: "ndc_clause", targetId: clause.id, meta: { title: parsed.data.title } });
   return NextResponse.json({ clause }, { status: 201 });
 }
