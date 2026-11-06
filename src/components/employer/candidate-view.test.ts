@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { rowSkills, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
+import { headlineOf, rowSkills, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
 
 test("skillBaseName drops the level", () => {
   assert.equal(skillBaseName("React · Advanced"), "React");
@@ -36,4 +36,13 @@ test("committing a held sort choice applies only a real change", () => {
   assert.equal(sortCommitValue("score", "fit"), "score");
   assert.equal(sortCommitValue("fit", "fit"), null);
   assert.equal(sortCommitValue(null, "fit"), null);
+});
+
+test("headlineOf: degree and field, else the top two skills, else nothing - never the bio", () => {
+  const academics = { degree: "B.Tech", specialization: "Computer Science" };
+  assert.equal(headlineOf({ academics, skills: ["React"] }), "B.Tech, Computer Science");
+  assert.equal(headlineOf({ academics: null, skills: ["React · Advanced", "Python", "SQL"] }), "React and Python intern");
+  assert.equal(headlineOf({ academics: { degree: "", specialization: "" }, skills: [] }), "");
+  // A bio on the object is ignored even if present.
+  assert.equal(headlineOf({ academics: null, skills: [], bio: "Call me on 98…" } as never), "");
 });

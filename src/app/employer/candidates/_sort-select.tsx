@@ -8,7 +8,7 @@ import { fieldClass } from "@/components/employer/ui-tokens";
 import { sortChangeAction, sortCommitValue } from "@/components/employer/candidate-view";
 
 /**
- * Sort by, in the results toolbar. A native select (keyboard and screen
+ * Sort by (and the project picker), in the results toolbar. A native select (keyboard and screen
  * readers for free); each option carries the URL that applies it, so the
  * server page stays the one place that builds query strings.
  */
@@ -16,10 +16,17 @@ export function SortSelect({
   value,
   options,
   className,
+  id = "candidate-sort",
+  label = "Sort by",
+  prefix = "Sort: ",
 }: {
   value: string;
   options: { value: string; label: string; href: string }[];
   className?: string;
+  id?: string;
+  label?: string;
+  /** Shown before each option ("Sort: Best match"). */
+  prefix?: string;
 }) {
   const router = useRouter();
   // A keyboard choice waits here for Enter or blur; the select shows it meanwhile.
@@ -41,11 +48,11 @@ export function SortSelect({
 
   return (
     <>
-      <label htmlFor="candidate-sort" className="sr-only">
-        Sort by
+      <label htmlFor={id} className="sr-only">
+        {label}
       </label>
       <select
-        id="candidate-sort"
+        id={id}
         value={held ?? value}
         onPointerDown={() => {
           keyboard.current = false;
@@ -72,7 +79,7 @@ export function SortSelect({
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
-            Sort: {o.label}
+            {`${prefix}${o.label}`}
           </option>
         ))}
       </select>

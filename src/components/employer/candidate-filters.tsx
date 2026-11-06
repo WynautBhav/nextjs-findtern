@@ -180,7 +180,7 @@ export function RatingSlider({
           ) : null}
           {label}
         </label>
-        <span className="nums text-sm font-semibold text-brand-700">{value > 0 ? `${value.toFixed(1)}+` : "Any"}</span>
+        <span className="nums text-sm font-semibold text-ink-900">{value > 0 ? `${value.toFixed(1)}+` : "Any"}</span>
       </div>
       <input
         id={id}
@@ -192,7 +192,7 @@ export function RatingSlider({
         value={value}
         onChange={(e) => setValue(Number(e.target.value))}
         aria-valuetext={value > 0 ? `${value.toFixed(1)} or more` : "Any"}
-        className="mt-1 h-6 w-full cursor-pointer accent-brand-700"
+        className="mt-1 h-6 w-full cursor-pointer accent-ink-900"
       />
     </div>
   );
