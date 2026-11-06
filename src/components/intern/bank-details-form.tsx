@@ -140,9 +140,9 @@ export function BankDetailsForm({ initialBank }: { initialBank?: BankDetails }) 
   if (!editing) {
     const last4 = stored.accountLast4;
     return (
-      <Surface className="flex flex-col gap-5 p-5 sm:flex-row sm:flex-wrap sm:items-end sm:p-6">
+      <Surface className="flex flex-col gap-4 p-5 sm:flex-row sm:flex-wrap sm:items-end sm:p-6">
         {/* The account as the thing it is: where the stipend lands. */}
-        <div className="flex flex-col justify-between gap-6 rounded-apple-lg bg-brand-800 p-5 text-white sm:aspect-[2.2/1] sm:w-full sm:max-w-md sm:p-6">
+        <div className="flex flex-col justify-between gap-6 rounded-apple-xl bg-brand-800 p-5 text-white sm:aspect-[2.2/1] sm:w-full sm:max-w-md sm:p-6">
           <div aria-hidden className="flex items-start justify-between gap-4">
             <p className="text-base font-medium">{stored.bankName || "Bank not added"}</p>
             <p className="nums text-sm text-white/70">{stored.ifscCode || "-"}</p>

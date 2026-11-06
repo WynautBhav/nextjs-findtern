@@ -25,7 +25,7 @@ export default function InternLoading() {
         ))}
         <div className={cn(TILE, "space-y-4 md:col-span-2")}>
           <Skeleton className="h-5 w-40 rounded-apple-sm" />
-          <Skeleton className="h-40 w-full rounded-apple-md" />
+          <Skeleton className="h-40 w-full rounded-apple-xl" />
         </div>
         <div className={cn(TILE, "space-y-3")}>
           <Skeleton className="h-5 w-32 rounded-apple-sm" />

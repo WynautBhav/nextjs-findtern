@@ -93,8 +93,8 @@ export function CreateTimesheetModal({
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleCreate} className="space-y-5 pt-1">
-            <dl className="divide-y divide-ink-100 rounded-apple-lg border border-ink-200/80 bg-ink-50/60 px-4">
+          <form onSubmit={handleCreate} className="space-y-4 pt-1">
+            <dl className="divide-y divide-ink-100 rounded-apple-sm border border-ink-200/80 bg-ink-50/60 px-4">
               <div className="flex items-baseline justify-between gap-4 py-3">
                 <dt className="text-sm text-ink-600">Internship</dt>
                 <dd className="min-w-0 text-right text-sm font-medium text-ink-900">
@@ -109,7 +109,7 @@ export function CreateTimesheetModal({
             </dl>
 
             {errorMsg ? (
-              <p role="alert" className="flex items-start gap-2 rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
+              <p role="alert" className="flex items-start gap-2 rounded-apple-sm bg-danger-soft px-4 py-3 text-sm text-danger">
                 <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
                 {errorMsg}
               </p>

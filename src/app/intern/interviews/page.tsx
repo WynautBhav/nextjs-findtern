@@ -10,6 +10,7 @@ import { AgendaRow } from "@/components/intern/interviews/agenda";
 import { ScoreReport } from "@/components/intern/interviews/score-report";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { requireRole } from "@/lib/auth";
+import { SITE } from "@/lib/content/site";
 import { isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
 import { formatIst } from "@/lib/format";
 import { HIDDEN_COMPANY, loadInternData, projectNames } from "@/lib/intern-data";
@@ -209,7 +210,7 @@ export default async function InternInterviews() {
                   )}
                   {/* A missed round can carry feedback too; the employer is told it is shared. */}
                   {(outcome.label === "Interview done" || outcome.label === "Missed") && feedback ? (
-                    <div className="mt-2 rounded-apple-md bg-brand-50/70 p-4">
+                    <div className="mt-2 rounded-apple-sm bg-brand-50/70 p-4">
                       <p className="text-xs font-medium text-brand-800">Feedback from the company</p>
                       <p className="mt-1 whitespace-pre-line text-pretty text-sm text-ink-800">{feedback}</p>
                     </div>
@@ -234,14 +235,22 @@ function toIso(d: Date | string | null | undefined): string | null {
  * How a finished company round reads (INW-20): a picked time that has passed
  * is an interview that happened; an invite nobody picked a time for expired.
  */
-function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: string } {
+function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: React.ReactNode } {
   const status = (i.status ?? "").toLowerCase();
   if (status === "missed") {
     return {
       label: "Missed",
       tone: "closed",
       // INW-22: no off-platform contact; support handles it.
-      detail: "This round was marked as missed. If that is wrong, write to communicate@findtern.in and we will look into it.",
+      detail: (
+        <>
+          This round was marked as missed. If that is wrong, write to{" "}
+          <a href={`mailto:${SITE.email}`} className="font-medium text-brand-700 underline-offset-4 hover:underline">
+            {SITE.email}
+          </a>{" "}
+          and we will look into it.
+        </>
+      ),
     };
   }
   if (status === "cancelled") return { label: "Cancelled", tone: "neutral", detail: "This interview was cancelled." };

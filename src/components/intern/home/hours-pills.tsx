@@ -2,9 +2,8 @@ import { shortDate } from "@/lib/format";
 import type { MonthHours } from "@/lib/journey";
 import { cn } from "@/lib/utils";
 
-// A month with no hours is a hatched pill (the reference's "no data" mark), never an empty track.
-const NONE =
-  "bg-[repeating-linear-gradient(135deg,var(--color-ink-300)_0_1.5px,transparent_1.5px_7px)] ring-1 ring-inset ring-ink-200"; // taste-skill-ignore
+// A month with no hours is a plain light pill, never an empty track.
+const NONE = "bg-ink-100 ring-1 ring-inset ring-ink-200";
 
 const PARTS = [
   { key: "approved", label: "Approved", swatch: "bg-brand-700" },
@@ -14,7 +13,7 @@ const PARTS = [
 
 /**
  * Home's hours per month as pill bars from the baseline: solid for hours,
- * stacked by state, hatched for a month with none. The legend lists only
+ * stacked by state, a light pill for a month with none. The legend lists only
  * the marks on screen.
  */
 export function HoursPills({ months, now }: { months: MonthHours[]; now: Date }) {
@@ -35,7 +34,7 @@ export function HoursPills({ months, now }: { months: MonthHours[]; now: Date })
             <li key={m.key} className="flex flex-col items-center gap-2">
               <span className="sr-only">
                 {`${label(m)}: ` +
-                  (sum ? `${sum} hours, ${m.approved} approved, ${m.sent} waiting for review, ${m.draft} not sent yet` : "no hours logged")}
+                  (sum ? `${sum} hours, ${Number(m.approved.toFixed(1))} approved, ${Number(m.sent.toFixed(1))} waiting for review, ${Number(m.draft.toFixed(1))} not sent yet` : "no hours logged")}
               </span>
               <span aria-hidden className="flex h-44 w-full max-w-14 flex-col items-center justify-end gap-2">
                 <span className={cn("nums text-xs font-medium", sum ? "text-ink-900" : "text-text-subtle")}>

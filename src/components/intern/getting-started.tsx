@@ -233,12 +233,12 @@ function Meter({ done, total }: { done: number; total: number }) {
  */
 function Checklist({ items, className }: { items: CompletionItem[]; className?: string }) {
   return (
-    <ul className={cn("grid gap-2.5 sm:grid-cols-2", className)}>
+    <ul className={cn("grid gap-3 sm:grid-cols-2", className)}>
       {items.map((item) => (
         <li
           key={item.id}
           className={cn(
-            "flex min-h-12 items-center gap-2.5 rounded-apple-md px-3.5 py-2 text-sm",
+            "flex min-h-12 items-center gap-3 rounded-apple-sm px-3.5 py-2 text-sm",
             item.done ? "bg-brand-50 text-ink-700" : "bg-ink-50 text-ink-900",
           )}
         >
@@ -277,7 +277,7 @@ function FeeTile({ fee, activated }: { fee: string; activated: boolean }) {
           "Your Findtern Score, the same report employers read",
           "Placed within 6 months of your AI interview, or the full fee back",
         ].map((line) => (
-          <li key={line} className="flex gap-2.5">
+          <li key={line} className="flex gap-3">
             <Check className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
             {line}
           </li>

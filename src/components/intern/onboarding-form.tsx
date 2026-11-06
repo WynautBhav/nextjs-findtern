@@ -321,7 +321,7 @@ export function OnboardingForm({
           <MobileSteps step={step} passes={done} reachable={reachable} onSelect={goTo} />
 
           {submittedBefore && needs.length > 0 ? (
-            <p className="mb-4 flex items-start gap-2 rounded-apple-md border border-accent-200 bg-accent-50 px-4 py-3 text-sm text-ink-800">
+            <p className="mb-4 flex items-start gap-2 rounded-apple-sm border border-accent-200 bg-accent-50 px-4 py-3 text-sm text-ink-800">
               <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent-500" />
               <span>
                 {needs.length === 1 ? "One step still needs something: " : `${needs.length} steps still need something: `}
@@ -379,7 +379,7 @@ export function OnboardingForm({
                 {notice ? (
                   <p
                     className={cn(
-                      "flex items-start gap-2.5 rounded-apple-md border px-4 py-3 text-sm",
+                      "flex items-start gap-3 rounded-apple-sm border px-4 py-3 text-sm",
                       notice.ok ? "border-brand-200 bg-brand-50 text-brand-900" : "border-danger/30 bg-danger-soft text-ink-900",
                     )}
                   >

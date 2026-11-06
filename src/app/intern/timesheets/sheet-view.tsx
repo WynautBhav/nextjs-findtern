@@ -67,7 +67,7 @@ export function SheetView({ sheet, backHref }: { sheet: TimesheetRow; backHref: 
 
       {adjusted.length > 0 ? (
         <Surface className="border-info/25 bg-info-soft/60 p-5">
-          <p className="text-[0.9375rem] font-semibold text-ink-900">
+          <p className="text-base font-semibold text-ink-900">
             Your manager changed {adjusted.length} day{adjusted.length === 1 ? "" : "s"}
           </p>
           <p className="mt-1 text-sm text-ink-700">Each one is marked below with what you had sent.</p>
@@ -130,7 +130,7 @@ function Note({ label, body }: { label: string; body: string }) {
   return (
     <div className="py-4">
       <p className="text-sm font-medium text-ink-600">{label}</p>
-      <p className="mt-1 whitespace-pre-wrap text-pretty text-[0.9375rem] leading-relaxed text-ink-800">{body}</p>
+      <p className="mt-1 whitespace-pre-wrap text-pretty text-sm leading-relaxed text-ink-800">{body}</p>
     </div>
   );
 }

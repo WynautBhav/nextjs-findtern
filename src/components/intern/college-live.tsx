@@ -106,8 +106,8 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
         // navigation. No looping ping. Full size on College; one line with a
         // link everywhere else, so it doesn't take the first screen.
         full ? (
-          <div className="mb-6 flex flex-col gap-3 rounded-apple-lg border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-start gap-2.5">
+          <div className="mb-6 flex flex-col gap-3 rounded-apple-sm border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
               <span aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-full bg-brand-600" />
               <p className="min-w-0 text-sm leading-relaxed text-brand-950">
                 <strong className="font-semibold">
@@ -120,7 +120,7 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
             <PushToggle vapidKey={vapidKey} className="shrink-0" />
           </div>
         ) : (
-          <p className="mb-6 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 rounded-apple-lg border border-brand-200 bg-brand-50 px-4 py-2 text-sm text-brand-950">
+          <p className="mb-6 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 rounded-apple-sm border border-brand-200 bg-brand-50 px-4 py-2 text-sm text-brand-950">
             <span aria-hidden className="size-2 shrink-0 rounded-full bg-brand-600" />
             <span className="font-semibold">{drive.title} is live</span>
             <span className="text-brand-900">until {shortDate(new Date(drive.endsAt), { day: "numeric", month: "short" })}</span>
@@ -162,18 +162,18 @@ function CallCard({
   onDismiss: (id: string) => void;
 }) {
   const ids = useId();
-  const acceptRef = useRef<HTMLButtonElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const accepted = meeting.status === "accepted";
   const company = meeting.company ?? "An employer";
 
-  // An incoming request takes focus, unless the student is typing somewhere.
+  // An incoming request moves focus to the alert itself (not to Accept, so a stray Enter or Space does nothing), unless the student is typing somewhere.
   useEffect(() => {
     if (accepted) return;
     const el = document.activeElement;
     const typing = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el as HTMLElement | null)?.isContentEditable;
-    if (!typing) acceptRef.current?.focus({ preventScroll: true });
+    if (!typing) cardRef.current?.focus({ preventScroll: true });
   }, [accepted]);
 
   async function answer(action: "accept" | "decline") {
@@ -197,6 +197,8 @@ function CallCard({
       }
       if (action === "decline") onGone(meeting.id);
       else onAnswered(body.meeting);
+    } catch {
+      setError("Couldn't reach Findtern. Check your connection and try again.");
     } finally {
       setBusy(null);
     }
@@ -204,13 +206,15 @@ function CallCard({
 
   return (
     <div
+      ref={cardRef}
+      tabIndex={-1}
       role="alertdialog"
       aria-modal="false"
       aria-labelledby={`${ids}-title`}
       aria-describedby={`${ids}-desc`}
       className={cn(
         // Above the chat launcher (z-80): an incoming call outranks it.
-        "fixed inset-x-3 z-[90] rounded-apple-xl border bg-white p-4 shadow-xl",
+        "fixed inset-x-3 z-[90] rounded-apple-xl border bg-white p-4 shadow-xl outline-none",
         "bottom-[calc(5.25rem+env(safe-area-inset-bottom))] lg:bottom-6 lg:left-auto lg:right-6 lg:w-[24rem]",
         "motion-safe:animate-[ft-call-in_240ms_cubic-bezier(0.16,1,0.3,1)]",
         accepted ? "border-brand-300" : "border-accent-300",
@@ -228,7 +232,7 @@ function CallCard({
           {accepted ? <Video className="size-5" /> : <Radio className="size-5" />}
         </span>
         <div className="min-w-0 flex-1">
-          <p id={`${ids}-title`} className="text-[0.9375rem] font-semibold leading-snug text-ink-900">
+          <p id={`${ids}-title`} className="text-base font-semibold leading-snug text-ink-900">
             {accepted ? `Call with ${company}` : `${company} wants to talk ${whenLabel(meeting.startsAt, now)}`}
           </p>
           <p id={`${ids}-desc`} className="mt-0.5 text-sm leading-relaxed text-ink-600">
@@ -282,7 +286,6 @@ function CallCard({
               {busy === "decline" ? "Declining…" : "Decline"}
             </button>
             <button
-              ref={acceptRef}
               type="button"
               onClick={() => answer("accept")}
               disabled={busy !== null}

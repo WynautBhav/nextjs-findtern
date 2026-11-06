@@ -2,6 +2,7 @@ import { Ban, Briefcase, ChevronDown, EyeOff, GraduationCap, MessageSquare, Phon
 import type { LucideIcon } from "lucide-react";
 
 import { LIGHT_TILE, SectionHead, Surface } from "@/components/app/primitives";
+import { SITE } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
 
 /**
@@ -71,7 +72,7 @@ const ITEMS: Item[] = [
     lines: [
       "If you receive a Pre-Placement Offer (PPO) or full-time employment opportunity during or after the internship, you must immediately inform Findtern at:",
     ],
-    email: "communicate@findtern.in",
+    email: SITE.email,
     after: "Failure to disclose PPO conversion may result in financial penalties and account action.",
   },
   {

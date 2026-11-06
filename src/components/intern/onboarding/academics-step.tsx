@@ -53,7 +53,11 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
 
   return (
     <div className="space-y-8">
-      <Section first title="Highest qualification">
+      <Section
+        first
+        title="Highest qualification"
+        hint={completed ? undefined : "Specialization, expected end year and score are optional while you are still studying."}
+      >
         <Grid>
           <SelectField
             id="qualificationLevel"
@@ -116,7 +120,7 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
           <Field
             id="branch"
             label="Specialization"
-            optional
+            optional={completed}
             placeholder="e.g. Computer Science, Marketing"
             value={a.branch}
             error={errors.branch}
@@ -149,7 +153,6 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
           <Field
             id="yearOfGraduation"
             label={completed ? "End year" : "Expected end year"}
-            optional={!completed}
             placeholder="YYYY"
             inputMode="numeric"
             maxLength={4}
@@ -166,8 +169,7 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
             <Choice
               id="scoreType"
               label="Score type"
-              optional={!completed}
-              value={a.scoreType}
+                value={a.scoreType}
               options={SCORE_TYPES}
               error={errors.scoreType}
               onChange={(v) => set({ scoreType: v })}
@@ -175,8 +177,7 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
             <Field
               id="cgpa"
               label={completed ? "Final score" : "Score so far"}
-              optional={!completed}
-              inputMode="decimal"
+                inputMode="decimal"
               placeholder={a.scoreType === "percentage" ? "e.g. 84" : "e.g. 8.4"}
               inputClassName="nums"
               value={a.cgpa}
@@ -231,7 +232,7 @@ function FileList({
       {files.length > 0 ? (
         <div>
           <p className="text-xs font-medium text-text-subtle">Uploaded</p>
-          <ul className="mt-2 divide-y divide-ink-200/70 rounded-apple-md border border-ink-200/80 bg-white">
+          <ul className="mt-2 divide-y divide-ink-200/70 rounded-apple-sm border border-ink-200/80 bg-white">
             {files.map((u, i) => (
               <li key={u.name} className="flex min-h-12 items-center gap-3 pl-3.5 pr-2">
                 <FileText className="size-4 shrink-0 text-brand-600" aria-hidden />
@@ -445,7 +446,7 @@ function ScoreField({
   return (
     <div className="min-w-0">
       <Label htmlFor={id}>Score</Label>
-      <div className="mt-2 grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-2.5">
+      <div className="mt-2 grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-3">
         <Select id={`${id}Type`} ariaLabel="Score type" value={type} onChange={(v) => onType(v as ScoreType)} options={SCORE_TYPES} />
         <input
           id={id}

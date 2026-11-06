@@ -28,7 +28,7 @@ export function AgendaRow({
       {iso ? (
         <p
           className={cn(
-            "flex h-16 flex-col items-center justify-center rounded-apple-md",
+            "flex h-16 flex-col items-center justify-center rounded-apple-sm",
             past ? "bg-ink-100 text-ink-700" : "bg-brand-700 text-white",
           )}
         >
@@ -37,7 +37,7 @@ export function AgendaRow({
           <span className="sr-only"> {weekday}</span>
         </p>
       ) : (
-        <p className="flex h-16 items-center justify-center rounded-apple-md border border-dashed border-ink-300 text-center text-xs text-text-subtle">
+        <p className="flex h-16 items-center justify-center rounded-apple-sm border border-dashed border-ink-300 text-center text-xs text-text-subtle">
           Date to pick
         </p>
       )}

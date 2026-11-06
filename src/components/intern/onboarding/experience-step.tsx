@@ -34,7 +34,7 @@ export function ExperienceStep({ values, update, errors }: StepProps) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {experiences.map((exp, i) => {
         const k = `exp.${exp.id}`;
         const project = exp.type === "Project";

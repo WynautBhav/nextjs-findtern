@@ -1,6 +1,6 @@
 import { ExternalLink, MapPin } from "lucide-react";
 
-import { DetailRow, EmptyScene, LIGHT_TILE, Pill, Surface, type Tone } from "@/components/app/primitives";
+import { DetailRow, EmptyScene, Pill, Surface, type Tone } from "@/components/app/primitives";
 import { ScoreScale } from "@/components/app/tiles";
 import { buttonClass } from "@/components/ui/button";
 import { InternAvatar } from "@/components/intern/avatar";
@@ -92,7 +92,7 @@ export function ProfileView({
       {/* ── Identity: the focal point ───────────────────────────── */}
       <Surface as="section" aria-label="Profile summary" className="overflow-hidden">
         <div className="flex flex-wrap items-start gap-4 p-5 lg:p-6">
-          <InternAvatar src={photoUrl} initials={initials} className="size-20 rounded-apple-lg text-2xl" />
+          <InternAvatar src={photoUrl} initials={initials} className="size-20 rounded-apple-xl text-2xl" />
           <div className="min-w-0 flex-1 basis-48">
             <div className="flex flex-wrap items-center gap-2">
               <p className="min-w-0 max-w-full text-xl font-semibold tracking-[-0.02em] text-ink-900 [overflow-wrap:anywhere]">{name}</p>
@@ -106,7 +106,7 @@ export function ProfileView({
           </div>
           {/* With a score, it lives on the card below (one figure, one place). */}
           {score === null ? (
-            <div className="w-full shrink-0 rounded-apple-lg bg-ink-50 p-4 sm:w-auto sm:min-w-44">
+            <div className="w-full shrink-0 p-4 sm:w-auto sm:min-w-44">
               <p className="text-sm text-text-subtle">Findtern Score</p>
               <p className="mt-1 text-base font-medium text-ink-700">After your AI interview</p>
             </div>
@@ -114,12 +114,12 @@ export function ProfileView({
         </div>
 
         {/* The anonymous card itself, built from this profile: what an employer sees before a hire. */}
-        <div className="grid gap-5 border-t border-ink-100 bg-ink-50/50 px-5 py-5 md:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] md:items-center lg:px-6">
+        <div className="grid gap-4 border-t border-ink-100 bg-ink-50/50 px-5 py-5 md:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] md:items-center lg:px-6">
           <p className="text-pretty text-sm leading-relaxed text-ink-700">
             <span className="font-medium text-ink-900">Before a hire, employers see this card.</span> Your initials and city,
             never your name, photo, LinkedIn or contact details.
           </p>
-          <div aria-label="What employers see" role="group" className={cn("rounded-apple-lg border border-ink-200/80 bg-white p-4", LIGHT_TILE)}>
+          <div aria-label="What employers see" role="group" className="p-4">
             <div className="flex items-center gap-3">
               <span className="nums grid size-11 shrink-0 place-items-center rounded-full bg-brand-700 text-sm font-semibold text-white">{initials}</span>
               <div className="min-w-0 flex-1">

@@ -61,7 +61,7 @@ export function PhotoUpload({
   const shownError = problem ?? error;
 
   return (
-    <div id="photo" tabIndex={-1} className="flex flex-col gap-5 outline-none sm:flex-row sm:items-center">
+    <div id="photo" tabIndex={-1} className="flex flex-col gap-4 outline-none sm:flex-row sm:items-center">
       <div
         className={cn(
           "grid size-28 shrink-0 place-items-center overflow-hidden rounded-apple-xl border bg-ink-50",
@@ -133,6 +133,7 @@ function Cropper({ source, onCancel, onDone }: { source: Loaded; onCancel: () =>
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [moved, setMoved] = useState("");
 
   useEffect(() => {
     const el = frame.current;
@@ -206,7 +207,8 @@ function Cropper({ source, onCancel, onDone }: { source: Loaded; onCancel: () =>
 
       <div
         ref={frame}
-        role="img"
+        role="application"
+        aria-roledescription="photo crop area"
         aria-label="Photo crop area. Use the arrow keys to move the photo."
         tabIndex={0}
         onPointerDown={(e) => {
@@ -226,9 +228,12 @@ function Cropper({ source, onCancel, onDone }: { source: Loaded; onCancel: () =>
           const m = moves[e.key];
           if (!m) return;
           e.preventDefault();
-          setOffset(clamp(at.x + m[0], at.y + m[1]));
+          const next = clamp(at.x + m[0], at.y + m[1]);
+          setOffset(next);
+          const dir = e.key.slice(5).toLowerCase();
+          setMoved(next.x === at.x && next.y === at.y ? `Photo is at the ${dir} edge` : `Photo moved ${dir}`);
         }}
-        className="relative mx-auto mt-5 aspect-square w-full max-w-[18rem] cursor-grab touch-none select-none overflow-hidden rounded-apple-lg bg-ink-900 outline-none focus-visible:ring-[3px] focus-visible:ring-brand-600/30 active:cursor-grabbing"
+        className="relative mx-auto mt-5 aspect-square w-full max-w-[18rem] cursor-grab touch-none select-none overflow-hidden rounded-apple-sm bg-ink-900 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:cursor-grabbing"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -243,6 +248,9 @@ function Cropper({ source, onCancel, onDone }: { source: Loaded; onCancel: () =>
           }}
           className="pointer-events-none absolute left-1/2 top-1/2"
         />
+        <span className="sr-only" role="status" aria-live="polite">
+          {moved}
+        </span>
         {/* Rule-of-thirds guide, so a face lands near the centre. */}
         <div aria-hidden className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3">
           {Array.from({ length: 9 }, (_, i) => (
@@ -287,7 +295,7 @@ function Cropper({ source, onCancel, onDone }: { source: Loaded; onCancel: () =>
         </p>
       ) : null}
 
-      <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+      <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button type="button" onClick={onCancel} disabled={busy} className={buttonClass({ variant: "light", size: "md", className: "w-full sm:w-auto" })}>
           Cancel
         </button>

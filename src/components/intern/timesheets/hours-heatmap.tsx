@@ -142,7 +142,7 @@ export function HoursHeatmap({ days, today }: { days: HeatDay[]; today: string }
         )}
       </p>
 
-      <div aria-hidden className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-ink-600">
+      <div aria-hidden className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-ink-600">
         <span className="flex items-center gap-1.5">
           Fewer hours
           {RAMP.map((c) => (

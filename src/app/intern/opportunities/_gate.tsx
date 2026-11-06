@@ -48,7 +48,7 @@ export function LockedRoles({ complete, activated, done, total }: { complete: bo
   return (
     <Surface className="max-w-2xl p-6 sm:p-8">
       <h2 className="text-lg font-semibold tracking-[-0.015em] text-ink-900">Two steps before you see open roles</h2>
-      <p className="mt-1.5 max-w-prose text-pretty text-[0.9375rem] leading-relaxed text-ink-600">
+      <p className="mt-1.5 max-w-prose text-pretty text-sm leading-relaxed text-ink-600">
         Companies only see profiles that are complete and active, so roles open up for you once both are done.
       </p>
       <ol className="mt-6 space-y-4">

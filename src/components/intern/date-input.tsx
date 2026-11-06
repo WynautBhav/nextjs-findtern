@@ -105,7 +105,7 @@ export function DateInput({
         onChange={(e) => {
           if (e.target.value) onChange(e.target.value);
         }}
-        className="pointer-events-none absolute right-0.5 top-0.5 size-10 opacity-0"
+        className="pointer-events-none absolute right-0.5 top-0.5 size-10 opacity-0 touch:size-11 touch:right-0 touch:top-0"
       />
       <button
         type="button"
@@ -113,7 +113,7 @@ export function DateInput({
         disabled={disabled}
         aria-label="Open calendar"
         tabIndex={-1}
-        className="apple-spring absolute right-0.5 top-0.5 grid size-10 place-items-center rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-brand-700 disabled:pointer-events-none"
+        className="apple-spring absolute right-0.5 top-0.5 grid size-10 touch:size-11 touch:right-0 touch:top-0 place-items-center rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-brand-700 disabled:pointer-events-none"
       >
         <CalendarDays className="size-[1.125rem]" aria-hidden />
       </button>
