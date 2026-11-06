@@ -20,6 +20,11 @@ export const ROLE_GRANTS: RoleGrant[] = [
     key: "admin_roles_migration:ops_interns_cms_write_v1",
     grant: { roles: ["admin", "exec_operations"], permissions: ["interns:write", "cms:write"] },
   },
+  {
+    // Owner, 6 Nov: Accounts opens intern records (read-only) to record an offline activation fee.
+    key: "admin_roles_migration:accounts_interns_read_v1",
+    grant: { roles: ["exec_accounts"], permissions: ["interns:read"] },
+  },
 ];
 
 /** The role's permissions with the grant added; null when nothing changes. */

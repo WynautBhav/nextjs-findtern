@@ -86,3 +86,12 @@ test("college billing and admin logins stay a company write; Accounts can open t
   assert.equal(allows(["transactions:read"], requiredPermissions("/admin/colleges/c1", "GET")), true);
   assert.equal(allows(["transactions:read"], requiredPermissions("/admin/colleges", "GET")), false);
 });
+
+test("Accounts records an offline activation fee; Operations (interns:write only) can't", () => {
+  const accounts = ["reports:read", "transactions:read", "transactions:write", "interns:read"];
+  assert.equal(allows(accounts, requiredPermissions("/api/admin/interns/i1/mark-paid", "POST")), true);
+  assert.equal(allows(["interns:read", "interns:write"], requiredPermissions("/api/admin/interns/i1/mark-paid", "POST")), false);
+  // the rest of the intern record stays an intern write
+  assert.equal(allows(accounts, requiredPermissions("/api/admin/interns/i1", "PATCH")), false);
+  assert.equal(allows(accounts, requiredPermissions("/admin/interns/i1")), true);
+});

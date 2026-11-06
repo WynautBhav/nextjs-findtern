@@ -136,6 +136,10 @@ function rulesFor(pathname: string): RuleLists | null {
   if (/^\/api\/admin\/interns\/[^/]+\/payouts/.test(pathname)) {
     return { read: ["transactions:read"], write: ["transactions:write"] };
   }
+  // Recording an offline activation fee is Accounts' work (owner, 6 Nov), not intern editing.
+  if (/^\/api\/admin\/interns\/[^/]+\/mark-paid\/?$/.test(pathname)) {
+    return { read: ["interns:read"], write: ["transactions:write"] };
+  }
   // College money (seat batches, payouts, bank, the seat code) is Accounts' work, not Sales': the same permission the routes check
   // in-route. Reading it is open to either side (Sales sees the college, Accounts sees the money).
   if (/^\/api\/admin\/colleges\/[^/]+\/(seat-batches|payouts|bank|promo-code)(\/|$)/.test(pathname)) {
