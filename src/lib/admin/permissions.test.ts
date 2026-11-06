@@ -103,3 +103,16 @@ test("take-down of a listing follows companies:write, not super admin only", () 
   assert.equal(allows(["companies:read"], requiredPermissions(route, "POST")), false);
   assert.equal(allows(["interns:write"], requiredPermissions(route, "POST")), false);
 });
+
+test("refunds are Accounts' work; the college review queue is Sales' only (review #6)", () => {
+  for (const m of ["POST", "PATCH"]) {
+    assert.equal(allows(["transactions:write"], requiredPermissions("/api/admin/refunds", m)), true, m);
+    assert.equal(allows(["transactions:write"], requiredPermissions("/api/admin/refunds/r1", m)), true, m);
+    assert.equal(allows(["companies:write"], requiredPermissions("/api/admin/refunds/r1", m)), false, m);
+  }
+  assert.equal(allows(["transactions:read"], requiredPermissions("/admin/colleges/refunds", "GET")), true);
+  assert.equal(allows(["companies:read"], requiredPermissions("/admin/colleges/refunds", "GET")), false);
+  assert.equal(allows(["transactions:read"], requiredPermissions("/admin/colleges/review", "GET")), false);
+  assert.equal(allows(["companies:read"], requiredPermissions("/admin/colleges/review", "GET")), true);
+  assert.equal(allows(["transactions:read"], requiredPermissions("/admin/colleges/c1", "GET")), true, "college page unchanged");
+});

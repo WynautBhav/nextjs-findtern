@@ -65,6 +65,9 @@ const RULES: Rule[] = [
   ["/admin/companies", ["companies:read"], ["companies:write"]],
   // College partners are customers like companies; issuing a placement officer's login is a company-side write.
   ["/admin/colleges", ["companies:read"], ["companies:write"]],
+  // The review queue shows candidate phones and emails: Sales only. Refunds are Accounts' work.
+  ["/admin/colleges/review", ["companies:read"], ["companies:write"]],
+  ["/admin/colleges/refunds", ["transactions:read"], ["transactions:write"]],
   ["/admin/roles", ["roles:write"]],
   ["/admin/audit-log", ["roles:write"]],
   ["/admin/projects", ["companies:read"]],
@@ -108,6 +111,8 @@ const RULES: Rule[] = [
   ["/api/admin/payouts", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/all-payouts", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/promo-codes", PROMO_R, PROMO_W],
+  // The routes also check transactions:write in-route; without this rule only a super admin got past the proxy.
+  ["/api/admin/refunds", ["transactions:read"], ["transactions:write"]],
   // Per-type check happens in the route (interns, companies, payments…).
   ["/api/admin/export", []],
   // Command palette search: any admin may call it; the handler checks each result group's permission.
@@ -147,7 +152,7 @@ function rulesFor(pathname: string): RuleLists | null {
     return { read: ["transactions:read", "companies:read"], write: ["transactions:write"] };
   }
   // The college's own page: Accounts opens it too, to pay a batch or a withdrawal. Editing the college stays a company write.
-  if (/^\/admin\/colleges\/[^/]+(\/|$)/.test(pathname)) {
+  if (/^\/admin\/colleges\/(?!(review|refunds)(\/|$))[^/]+(\/|$)/.test(pathname)) {
     return { read: ["companies:read", "transactions:read"], write: ["companies:write"] };
   }
   const rule = SORTED.find(([prefix]) => pathname === prefix || pathname.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`));
