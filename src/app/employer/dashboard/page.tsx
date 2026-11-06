@@ -1,29 +1,29 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { ArrowRight, CalendarClock, Check, ClipboardCheck, CreditCard, FolderPlus, ShoppingBag } from "lucide-react";
+import { ArrowRight, CalendarClock, Check, ClipboardCheck, CreditCard, FolderPlus, Hourglass, Search, ShoppingBag } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { ButtonLink } from "@/components/ui/button";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
-import { EmptyScene, HeroBand, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { requireRole } from "@/lib/auth";
 import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
-import { CandidateAvatar } from "@/components/employer/candidate-avatar";
+import { RowAvatar, ScoreBadge } from "@/components/employer/candidate-row-parts";
 import { SaveToggle } from "@/components/employer/candidate-card";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
-import { PresenceDot } from "@/components/app/presence-dot";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { rowSkills, skillBaseName } from "@/components/employer/candidate-view";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { payableCheckout } from "@/lib/employer-payable";
 import { isProjectOpen } from "@/lib/project-locations";
-import { proposalOutcome } from "@/lib/proposals";
+import { offerState } from "@/components/employer/proposal-state";
+import { proposalBucket } from "@/components/employer/proposal-bucket";
+import { parseOffer } from "@/lib/offer";
 import { scopeLabel } from "@/lib/db/schema";
-import { bandFor } from "@/lib/score";
 import { timezoneForLocation } from "@/lib/timezones";
 import { formatSlotTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -51,7 +51,7 @@ type Loaded = {
   companyName: string;
   timezone: string;
   projects: ProjectRow[];
-  proposals: { status: string; projectId: string; internId: string }[];
+  proposals: { status: string; projectId: string; internId: string; offerDetails: unknown }[];
   submittedSheets: number;
   pendingInterviews: number;
   nextInterview: InterviewRow | null;
@@ -70,6 +70,9 @@ type Loaded = {
   /** Who the next meeting is with (initials and photo only) and for which project. */
   nextWith: { initials: string; photoUrl: string | null; projectName: string | null } | null;
 };
+
+/** Borders for the four pipeline figures (2×2 on phones, 1×4 from sm). */
+const FIGURE_RULES = ["pl-0", "border-l", "max-sm:border-t max-sm:pl-0 sm:border-l", "border-l max-sm:border-t"];
 
 type Fit = { projectId: string; projectName: string; hit: number; of: number; skills: string[] };
 
@@ -104,12 +107,14 @@ export default async function EmployerDashboard() {
   }
 
   const { proposals, projects } = data;
-  const awaiting = proposals.filter((p) => p.status === "sent" || p.status === "interview_scheduled").length;
-  // One definition for every count on the page: accepted but not paid yet vs hired (paid).
+  // The same buckets as the Proposals tabs (an unanswered offer past its start
+  // date is closed there), so every figure here matches the tab it opens.
+  const bucket = proposals.map((p) => proposalBucket(p.status, offerState({ status: p.status, hiredAt: null }, parseOffer(p.offerDetails)).lapsed));
+  const awaiting = bucket.filter((b) => b === "open").length;
   const isToPay = (s: string) => s === "accepted" || s === "processing";
-  const accepted = proposals.filter((p) => isToPay(p.status)).length;
-  const hired = proposals.filter((p) => p.status === "hired").length;
-  const declined = proposals.filter((p) => proposalOutcome(p.status) === "lost").length;
+  const accepted = bucket.filter((b) => b === "accepted").length;
+  const hired = bucket.filter((b) => b === "hired").length;
+  const declined = bucket.filter((b) => b === "closed").length;
 
   const tasks: Task[] = (
     [
@@ -164,146 +169,158 @@ export default async function EmployerDashboard() {
     if (p.status === "hired") row.hired += 1;
     byProject.set(p.projectId, row);
   }
-  // The hero names the most urgent item that is the employer's own move. Items
-  // waiting on someone else never lead; they sit in the list below.
-  const top = tasks.find((t) => t.yours !== false);
-  const rest = tasks.filter((t) => t !== top);
+  // Your moves first; the meetings a candidate still has to pick sit with the
+  // other things waiting on candidates, never in the to-do list.
+  const mine = tasks.filter((t) => t.yours !== false);
+  const theirs = tasks.filter((t) => t.yours === false);
 
   const next = data.nextInterview;
   const nextAt = next ? slotDate(next) : null;
+  const joinLive = Boolean(next?.meetingLink && next && isMeetingLinkLive(next));
+
+  // The pipeline as type, each figure opening the matching Proposals tab.
+  const pipeline = [
+    { n: awaiting, label: "Awaiting a reply", status: "open" },
+    { n: accepted, label: "Accepted · to pay", status: "accepted" },
+    { n: hired, label: "Hired", status: "hired" },
+    { n: declined, label: "Declined or expired", status: "closed" },
+  ];
 
   return (
     <div>
-      <HeroBand
-        compact
-        // Name the first thing waiting rather than a total of different kinds
-        // of things, so the headline matches the list below it.
-        title={top ? `${top.count} ${top.label}` : proposals.length || tasks.length ? "You're all caught up" : "Let's make your first hire"}
-        lede={
-          top
-            ? top.detail
-            : proposals.length || tasks.length
-              ? "Nothing is waiting on you. Your candidates and offers are below."
-              : "Shortlist candidates ranked by their Findtern Score, meet them, and send a proposal."
-        }
-        actions={
+      <PageHead
+        title="Dashboard"
+        lede={data.companyName || undefined}
+        action={
           <>
-            {top ? (
-              <ButtonLink href={top.href} variant="accent">
-                {top.cta}
-                <ArrowRight className="size-4" aria-hidden />
-              </ButtonLink>
-            ) : (
-              <ButtonLink href="/employer/candidates" variant="accent">
-                Find candidates
-                <ArrowRight className="size-4" aria-hidden />
-              </ButtonLink>
-            )}
-            <ButtonLink href="/employer/projects?new=1" variant="outlineLight">
+            <ButtonLink href="/employer/projects/new" variant="outline" size="sm" className="max-sm:flex-1">
               <FolderPlus className="size-4" aria-hidden />
               New project
             </ButtonLink>
+            <ButtonLink href="/employer/candidates" variant="outline" size="sm" className="max-sm:flex-1">
+              <Search className="size-4" aria-hidden />
+              Find candidates
+            </ButtonLink>
           </>
         }
-      >
-        {proposals.length ? (
-          // The pipeline as one line, not four tiles: Proposals is where it's worked.
-          <Link
-            href="/employer/proposals"
-            className="group nums inline-flex flex-wrap items-baseline gap-x-5 gap-y-1 rounded-apple-sm text-sm text-on-dark-subtle hover:text-white"
-          >
-            {(
-              [
-                [awaiting, "awaiting a reply"],
-                [accepted, "accepted · to pay"],
-                [hired, "hired"],
-                [declined, "declined or expired"],
-              ] as const
-            ).map(([n, label]) => (
-              <span key={label}>
-                <span className="text-lg font-semibold text-white">{n}</span> {label}
-              </span>
-            ))}
-            <span className="inline-flex items-center gap-1 font-medium text-white underline-offset-4 group-hover:underline">
-              Proposals
-              <ArrowRight className="size-3.5" aria-hidden />
-            </span>
-          </Link>
-        ) : null}
-      </HeroBand>
+      />
 
-      {/* Phone order follows the DOM: next meeting, what's waiting, projects, matches.
-          From xl the meeting and matches share the right column. */}
-      <div className="grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_22rem] xl:grid-rows-[auto_1fr]">
-        {next && nextAt ? (
-          <Surface className="p-5 xl:col-start-2 xl:row-start-1 xl:self-start">
-            <p className="text-sm font-medium text-ink-600">Next meeting</p>
-            {data.nextWith ? (
-              <div className="mt-3 flex items-center gap-3">
-                <CandidateAvatar photoUrl={data.nextWith.photoUrl} initials={data.nextWith.initials} className="size-10 shrink-0 rounded-full text-xs" />
-                <div className="min-w-0">
-                  <p className="text-base font-semibold text-ink-900">{data.nextWith.initials}</p>
-                  <p className="line-clamp-1 text-sm text-ink-600">{data.nextWith.projectName ?? "No project linked"}</p>
-                </div>
-              </div>
-            ) : null}
-            <p className="mt-3 text-base font-semibold text-ink-900">{formatSlotTime(nextAt, data.timezone)}</p>
-            <p className="mt-0.5 text-sm text-ink-600">Your timezone ({data.timezone.replace(/_/g, " ")})</p>
-            {next.meetingLink && isMeetingLinkLive(next) ? (
-              <div className="mt-4 space-y-1">
-                <JoinMeetingButton link={next.meetingLink} size="md" block />
-                <Link href="/employer/schedule" className="flex min-h-11 items-center justify-center text-sm font-medium text-brand-700 hover:underline">
-                  Open schedule
-                </Link>
-              </div>
-            ) : (
-              <ButtonLink href="/employer/schedule" variant="outline" size="sm" block className="mt-4 min-h-11">
-                Open schedule
-              </ButtonLink>
-            )}
-          </Surface>
-        ) : null}
-
-        <div className="min-w-0 space-y-10 xl:col-start-1 xl:row-span-2 xl:row-start-1">
-          {/* The hero carries the first thing waiting; this list carries the rest,
-              so nothing is said twice. Nothing waiting: the hero says so. */}
-          {rest.length ? (
-            <section>
-              <SectionHead title={top ? "Also waiting" : "Waiting on others"} />
+      {/* Phone order: to-do, next meeting, waiting on candidates, matches,
+          projects. From xl the left column is the work, the right one people. */}
+      <div className="flex flex-col gap-10 xl:grid xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start xl:gap-x-12">
+        <div className="contents xl:block xl:min-w-0 xl:space-y-10">
+          <section aria-labelledby="todo-h" className="order-1">
+            <h2 id="todo-h" className="mb-4 text-lg font-semibold tracking-[-0.01em] text-ink-900">
+              Waiting on you
+            </h2>
+            {mine.length ? (
               <ul className="divide-y divide-ink-100 border-y border-ink-100">
-                {rest.map((t) => (
-                  <li key={t.href} className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-x-4 gap-y-3 py-4 sm:grid-cols-[3rem_minmax(0,1fr)_auto]">
-                    {/* The count leads the row: type, not an icon, carries it. */}
-                    <span className="nums text-right text-2xl font-semibold text-ink-900">{t.count}</span>
+                {mine.map((t, i) => (
+                  <li key={t.href} className="grid grid-cols-[2.75rem_minmax(0,1fr)] items-center gap-x-4 gap-y-3 py-4 sm:grid-cols-[2.75rem_minmax(0,1fr)_auto]">
+                    {/* The count leads the row: type, not an icon tile. */}
+                    <span className="nums text-right text-2xl font-semibold leading-none text-ink-900">{t.count}</span>
                     <div className="min-w-0">
-                      <p className="text-base font-medium text-ink-900">{t.label.charAt(0).toUpperCase() + t.label.slice(1)}</p>
+                      <p className="text-base font-semibold text-ink-900">{t.label.charAt(0).toUpperCase() + t.label.slice(1)}</p>
                       <p className="mt-0.5 text-sm text-ink-600">{t.detail}</p>
                     </div>
-                    <ButtonLink href={t.href} variant="outline" size="sm" className="col-start-2 min-h-11 justify-self-start sm:col-start-auto sm:justify-self-end">
+                    <ButtonLink
+                      href={t.href}
+                      // The first (most urgent) row carries the page's one filled button.
+                      variant={i === 0 ? "primary" : "outline"}
+                      size="sm"
+                      className="col-start-2 min-h-11 justify-self-start rounded-full px-4 sm:col-start-auto sm:justify-self-end"
+                    >
                       {t.cta}
                       <ArrowRight className="size-4" aria-hidden />
                     </ButtonLink>
                   </li>
                 ))}
               </ul>
+            ) : (
+              <div className="flex flex-wrap items-center justify-between gap-4 border-y border-ink-100 py-5">
+                <div className="min-w-0">
+                  <p className="text-base font-semibold text-ink-900">{proposals.length ? "Nothing needs you right now" : "Make your first hire"}</p>
+                  <p className="mt-0.5 text-sm text-ink-600">
+                    {proposals.length
+                      ? "No payments, hours or shortlisted candidates are waiting on you."
+                      : "Shortlist candidates ranked by their Findtern Score, meet them, and send a proposal."}
+                  </p>
+                </div>
+                <ButtonLink href="/employer/candidates" variant="primary" size="sm" className="min-h-11 rounded-full px-4">
+                  Find candidates
+                  <ArrowRight className="size-4" aria-hidden />
+                </ButtonLink>
+              </div>
+            )}
+          </section>
+
+          {proposals.length || theirs.length ? (
+            <section aria-labelledby="theirs-h" className="order-3">
+              <div className="mb-4 flex items-baseline justify-between gap-4">
+                <h2 id="theirs-h" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
+                  Proposals
+                </h2>
+                <Link href="/employer/proposals" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
+                  All proposals
+                  <ArrowRight className="size-3.5" aria-hidden />
+                </Link>
+              </div>
+              {proposals.length ? (
+                <dl className="grid grid-cols-2 border-y border-ink-100 sm:grid-cols-4">
+                  {pipeline.map((f, i) => (
+                    <div
+                      key={f.status}
+                      // Hairline rules between figures: one row of four, or two by two on a phone.
+                      className={cn("relative min-w-0 px-4 py-4 border-ink-100", FIGURE_RULES[i])}
+                    >
+                      <dt className="text-sm text-ink-600">
+                        <Link
+                          href={`/employer/proposals?status=${f.status}`}
+                          className="outline-none after:absolute after:inset-0 after:content-[''] hover:text-ink-900 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+                        >
+                          {f.label}
+                        </Link>
+                      </dt>
+                      <dd className="nums mt-1 text-2xl font-semibold leading-none text-ink-900">{f.n}</dd>
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
+              {/* "Awaiting a reply" is the offers; this adds the meetings, the other thing on candidates. */}
+              {theirs.map((t) => (
+                <p key={t.href} className="mt-3 flex items-center gap-1.5 text-sm text-ink-600">
+                  <Hourglass className="size-4 shrink-0 text-ink-400" aria-hidden />
+                  <span>
+                    Also waiting on candidates:{" "}
+                    <Link href={t.href} className="font-medium text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
+                      <span className="nums">{t.count}</span> {t.count === 1 ? "meeting time to pick" : "meeting times to pick"}
+                    </Link>
+                  </span>
+                </p>
+              ))}
             </section>
           ) : null}
 
-          <section>
-            <SectionHead
-              title="Projects"
-              hint={openProjects.length > shownProjects.length ? `Showing ${shownProjects.length} of ${openProjects.length} open` : `${openProjects.length} open of ${projects.length}`}
-              action={
-                <Link href="/employer/projects" className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline">
-                  All projects
-                </Link>
-              }
-            />
+          <section aria-labelledby="projects-h" className="order-5">
+            <div className="mb-4 flex items-baseline justify-between gap-4">
+              <div className="min-w-0">
+                <h2 id="projects-h" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
+                  Projects
+                </h2>
+                <p className="mt-1 text-sm text-text-subtle">
+                  {openProjects.length > shownProjects.length ? `Newest ${shownProjects.length} of ${openProjects.length} open` : `${openProjects.length} open of ${projects.length}`}
+                </p>
+              </div>
+              <Link href="/employer/projects" className="inline-flex min-h-11 shrink-0 items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
+                All projects
+                <ArrowRight className="size-3.5" aria-hidden />
+              </Link>
+            </div>
             {projects.length === 0 ? (
               <EmptyScene
                 title="No projects yet"
                 body="A project tells us the skills you need, so candidates are matched to it. It takes about five minutes."
-                next={{ label: "Create a project", href: "/employer/projects?new=1" }}
+                next={{ label: "Create a project", href: "/employer/projects/new" }}
                 who="You - about five minutes"
               />
             ) : (
@@ -313,7 +330,7 @@ export default async function EmployerDashboard() {
                   const skills = ((p.skills as string[]) ?? []).slice(0, 4);
                   const open = isProjectOpen(p.status, p.takenDownAt);
                   return (
-                    // Three on a phone, so Top matches is a short scroll away.
+                    // Three on a phone, so the list stays a short scroll.
                     <li key={p.id} className={i >= 3 ? "max-xl:hidden" : undefined}>
                       <Link
                         href={`/employer/candidates?project=${encodeURIComponent(p.id)}`}
@@ -330,22 +347,27 @@ export default async function EmployerDashboard() {
                             {skills.length ? ` · ${skills.join(", ")}` : ""}
                           </p>
                         </div>
-                        {/* "N sent" alone says little: it shows once there is a payment or a hire beside it. */}
-                        {stats.toPay || stats.hired ? (
-                        <p className="nums text-right text-sm text-ink-600">
-                          <span className="font-semibold text-ink-900">{stats.total}</span> sent
-                          {stats.toPay ? (
-                            <span className="block text-ink-900">
-                              <span className="font-semibold">{stats.toPay}</span> accepted · to pay
+                        <p className="nums flex items-center gap-3 text-right text-sm text-ink-600">
+                          {/* "N sent" alone says little: it shows once there is a payment or a hire beside it. */}
+                          {stats.toPay || stats.hired ? (
+                            <span>
+                              {stats.toPay ? (
+                                <span className="block text-ink-900">
+                                  <span className="font-semibold">{stats.toPay}</span> to pay
+                                </span>
+                              ) : null}
+                              {stats.hired ? (
+                                <span className="block text-success">
+                                  <span className="font-semibold">{stats.hired}</span> hired
+                                </span>
+                              ) : null}
                             </span>
                           ) : null}
-                          {stats.hired ? (
-                            <span className="block text-success">
-                              <span className="font-semibold">{stats.hired}</span> hired
-                            </span>
-                          ) : null}
+                          <span className="hidden items-center gap-1 font-medium text-brand-700 sm:inline-flex">
+                            Candidates
+                            <ArrowRight className="size-3.5" aria-hidden />
+                          </span>
                         </p>
-                        ) : null}
                       </Link>
                     </li>
                   );
@@ -355,94 +377,115 @@ export default async function EmployerDashboard() {
           </section>
         </div>
 
-        <section className={cn("min-w-0 xl:col-start-2 xl:self-start", next && nextAt ? "xl:row-start-2" : "xl:row-span-2 xl:row-start-1")}>
-            <SectionHead
-              title="Top matches"
-              action={
-                <Link href="/employer/candidates" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
-                  See all candidates
-                  <ArrowRight className="size-3.5" aria-hidden />
-                </Link>
-              }
-            />
+        <div className="contents xl:block xl:min-w-0 xl:space-y-10">
+          {next && nextAt ? (
+            <section aria-labelledby="next-h" className="order-2">
+              <h2 id="next-h" className="mb-4 text-lg font-semibold tracking-[-0.01em] text-ink-900">
+                Next meeting
+              </h2>
+              <div className="border-y border-ink-100 py-4">
+                <div className="flex items-center gap-3">
+                  {data.nextWith ? <RowAvatar photoUrl={data.nextWith.photoUrl} initials={data.nextWith.initials} className="size-12 sm:size-12" /> : null}
+                  <div className="min-w-0">
+                    <p className="text-base font-semibold text-ink-900">
+                      {data.nextWith ? `${data.nextWith.initials} · ` : ""}
+                      <span className="font-medium">{formatSlotTime(nextAt, data.timezone)}</span>
+                    </p>
+                    <p className="truncate text-sm text-ink-600">
+                      {data.nextWith?.projectName ?? "No project linked"} · {data.timezone.replace(/_/g, " ")}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {joinLive && next.meetingLink ? (
+                    // Filled only when nothing else on the page is: one primary per view.
+                    <JoinMeetingButton link={next.meetingLink} size="sm" variant={mine.length ? "outline" : "primary"} />
+                  ) : null}
+                  <ButtonLink href="/employer/schedule" variant={joinLive ? "ghost" : "outline"} size="sm" className="min-h-11">
+                    <CalendarClock className="size-4" aria-hidden />
+                    Open schedule
+                  </ButtonLink>
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          <section aria-labelledby="matches-h" className="order-4 min-w-0">
+            <div className="mb-4 flex items-baseline justify-between gap-4">
+              <h2 id="matches-h" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
+                Top matches
+              </h2>
+              <Link href="/employer/candidates" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
+                All candidates
+                <ArrowRight className="size-3.5" aria-hidden />
+              </Link>
+            </div>
             {data.candidates.length === 0 ? (
-              <p className="text-sm text-ink-600">No scored candidates match yet. New ones appear as they finish their AI interview.</p>
+              <p className="border-y border-ink-100 py-5 text-sm text-ink-600">No scored candidates match yet. New ones appear as they finish their AI interview.</p>
             ) : (
               <ul className="divide-y divide-ink-100 border-y border-ink-100">
                 {data.candidates.map((c) => {
-                  const band = bandFor(c.score);
                   const presence = data.presence[c.id] ?? null;
                   const fit = data.fit[c.id] ?? null;
                   // Tint against the project the row names, so chips and "n of m" agree.
                   const { shown: skills, more, isWanted } = rowSkills(c.skills, new Set(fit?.skills ?? data.wanted), 3);
                   const where = [c.city, c.workModes.includes("remote") ? "Remote" : ""].filter(Boolean).join(" · ");
+                  const href = `/employer/intern/${encodeURIComponent(c.id)}${fit ? `?project=${encodeURIComponent(fit.projectId)}` : ""}`;
                   return (
-                    // The link covers the person; the heart sits beside it, never inside it.
-                    <li key={c.id} className="relative flex items-start gap-1">
-                      <Link
-                        href={`/employer/intern/${encodeURIComponent(c.id)}${fit ? `?project=${encodeURIComponent(fit.projectId)}` : ""}`}
-                        className="group -ml-2 grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-3 rounded-apple-sm py-3.5 pl-2 pr-1 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
-                      >
-                        <span className="relative shrink-0">
-                          <CandidateAvatar photoUrl={c.photoUrl} initials={c.initials} className="size-11 rounded-full text-xs" />
-                          {presence ? (
-                            <span aria-hidden className="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-white">
-                              <PresenceDot label={presence} />
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm text-ink-600">
-                            <span className="text-base font-semibold text-ink-900 group-hover:text-brand-700">{c.initials}</span>
+                    // The name's link stretches over the row; the score tooltip and the heart sit above it.
+                    <li key={c.id} className="group relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 py-4">
+                      <RowAvatar photoUrl={c.photoUrl} initials={c.initials} presence={presence} />
+                      <div className="min-w-0">
+                        <p className="truncate pr-12 text-sm text-ink-600">
+                          <Link
+                            href={href}
+                            className="text-base font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] group-hover:text-brand-700 focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+                          >
+                            {c.initials}
                             {presence ? <span className="sr-only">, {presence}</span> : null}
-                            {" · "}
-                            {where || "Location not stated"}
-                          </span>
-                          {/* What tells two similar rows apart: the project they fit and how well. */}
-                          {fit?.of ? (
-                            <span className="mt-0.5 block truncate text-xs text-ink-600" title={`${fit.hit} of ${fit.of} skills for ${fit.projectName}`}>
-                              <span className="nums font-medium text-ink-900">
-                                {fit.hit} of {fit.of}
-                              </span>{" "}
-                              skills for {fit.projectName}
-                            </span>
-                          ) : null}
-                          {skills.length ? (
-                            <span className="mt-2 flex flex-wrap gap-1">
-                              {skills.map((k) =>
-                                isWanted(k) ? (
-                                  <span key={k} className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-800 ring-1 ring-inset ring-brand-200">
-                                    <Check className="size-3" aria-hidden />
-                                    {skillBaseName(k)}
-                                    <span className="sr-only"> (matches)</span>
-                                  </span>
-                                ) : (
-                                  <span key={k} className="rounded-full px-2 py-0.5 text-xs font-medium text-ink-700 ring-1 ring-inset ring-ink-200">
-                                    {skillBaseName(k)}
-                                  </span>
-                                ),
-                              )}
-                              {more ? (
-                                <span className="rounded-full px-1.5 py-0.5 text-xs font-medium text-ink-600">
-                                  +{more}
-                                  <span className="sr-only"> more skills</span>
-                                </span>
-                              ) : null}
-                            </span>
-                          ) : (
-                            <span className="mt-1 block text-sm text-ink-600">No skills listed</span>
-                          )}
-                        </span>
-                        <span className="text-right">
-                          <span className="nums block text-lg font-semibold leading-tight text-ink-900">
-                            {c.scored ? c.score.toFixed(1) : "-"}
-                            <span className="sr-only"> Findtern Score</span>
-                          </span>
-                          <span className="block text-xs text-ink-600">{c.scored ? band.name : "Not scored yet"}</span>
-                        </span>
-                      </Link>
+                          </Link>
+                          {" · "}
+                          {where || "Location not stated"}
+                        </p>
+                        {fit?.of ? (
+                          <p className="mt-0.5 truncate pr-12 text-xs text-ink-600" title={`${fit.hit} of ${fit.of} skills for ${fit.projectName}`}>
+                            <span className="nums font-medium text-ink-900">
+                              {fit.hit} of {fit.of}
+                            </span>{" "}
+                            skills for {fit.projectName}
+                          </p>
+                        ) : null}
+                        <div className="mt-1.5">
+                          <ScoreBadge score={c.score} scored={c.scored} />
+                        </div>
+                        {skills.length ? (
+                          <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Skills">
+                            {skills.map((k) =>
+                              isWanted(k) ? (
+                                <li key={k} className="inline-flex h-7 items-center gap-1 rounded-full bg-brand-100 px-2.5 text-[13px] font-medium text-brand-900">
+                                  <Check className="size-3.5 text-brand-700" strokeWidth={2.5} aria-hidden />
+                                  {skillBaseName(k)}
+                                  <span className="sr-only"> (matches)</span>
+                                </li>
+                              ) : (
+                                <li key={k} className="inline-flex h-7 items-center rounded-full px-2.5 text-[13px] font-medium text-ink-700 ring-1 ring-inset ring-ink-200">
+                                  {skillBaseName(k)}
+                                </li>
+                              ),
+                            )}
+                            {more ? (
+                              <li className="inline-flex h-7 items-center px-1 text-[13px] font-medium text-ink-600">
+                                +{more}
+                                <span className="sr-only"> more skills</span>
+                              </li>
+                            ) : null}
+                          </ul>
+                        ) : (
+                          <p className="mt-1 text-sm text-ink-600">No skills listed</p>
+                        )}
+                      </div>
                       {fit ? (
-                        <span className="shrink-0 pt-3">
+                        <span className="absolute right-0 top-3 z-10">
                           <SaveToggle internId={c.id} projectId={fit.projectId} shortlisted={data.saved.includes(`${fit.projectId}:${c.id}`)} />
                         </span>
                       ) : null}
@@ -452,6 +495,7 @@ export default async function EmployerDashboard() {
               </ul>
             )}
           </section>
+        </div>
       </div>
     </div>
   );
@@ -475,7 +519,7 @@ async function load(employerId: string): Promise<Loaded> {
       .limit(1),
     db.select().from(schema.projects).where(eq(schema.projects.employerId, employerId)).orderBy(desc(schema.projects.createdAt)),
     db
-      .select({ status: schema.proposals.status, projectId: schema.proposals.projectId, internId: schema.proposals.internId })
+      .select({ status: schema.proposals.status, projectId: schema.proposals.projectId, internId: schema.proposals.internId, offerDetails: schema.proposals.offerDetails })
       .from(schema.proposals)
       .where(eq(schema.proposals.employerId, employerId)),
     db
