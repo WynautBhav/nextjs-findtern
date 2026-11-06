@@ -21,7 +21,8 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   if (!thread) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const after = new URL(req.url).searchParams.get("after");
-  const [messages, who] = await Promise.all([threadMessages(viewer, thread, after && after.length <= 80 ? after : null), counterpartOf(viewer, thread)]);
+  const who = await counterpartOf(viewer, thread);
+  const messages = await threadMessages(viewer, thread, after && after.length <= 80 ? after : null, who.unlocked);
   return NextResponse.json(
     { messages, counterpartReadAt: counterpartReadAt(viewer, thread), counterpart: { name: who.name, presence: who.presence } },
     { headers: { "Cache-Control": "no-store" } },

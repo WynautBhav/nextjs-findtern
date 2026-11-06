@@ -2,9 +2,9 @@ import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-or
 
 import { getDb, schema } from "./db/index.ts";
 import { initialsOf } from "./employer-candidates.ts";
-import { emails, origin } from "./emails.ts";
+import { emails, origin, renderEmail } from "./emails.ts";
 import { scrubContact } from "./contact-scrub.ts";
-import { presenceLabel, presenceOf, type PresenceLabel } from "./presence.ts";
+import { ONLINE_ACTIVE_MS, presenceLabel, presenceOf, type PresenceLabel } from "./presence.ts";
 import { RateLimiter } from "./security/rate-limit.ts";
 
 /**
@@ -59,15 +59,46 @@ export function bodyToStore(body: string, contactUnlocked: boolean): { text: str
   return contactUnlocked ? { text: body, redacted: false } : scrubContact(body);
 }
 
+/** At most one email per thread and recipient in this window, whatever else says "due". */
+export const MIN_EMAIL_GAP_MS = 15 * 60_000;
+
+/**
+ * Someone who read this thread in the last 2 minutes is in the conversation,
+ * even when they have no presence row (employers never do) or sit in a
+ * background tab: treat them as online.
+ */
+export function effectivePresence(presence: PresenceLabel | null, lastReadAt: Date | null, now: Date = new Date()): PresenceLabel | null {
+  if (lastReadAt && now.getTime() - lastReadAt.getTime() < ONLINE_ACTIVE_MS) return "Online now";
+  return presence;
+}
+
 /**
  * One email per unread burst, and only when the recipient is not online. A
  * burst ends when the recipient reads the thread: the stamp must be older than
- * their last read to mail again.
+ * their last read to mail again, and never within MIN_EMAIL_GAP_MS of the last
+ * mail, so reading between messages cannot turn a chat into one email each.
  */
-export function emailDue(o: { recipientPresence: PresenceLabel | null; emailedAt: Date | null; lastReadAt: Date | null }): boolean {
+export function emailDue(o: {
+  recipientPresence: PresenceLabel | null;
+  emailedAt: Date | null;
+  lastReadAt: Date | null;
+  now?: Date;
+}): boolean {
   if (o.recipientPresence === "Online now") return false;
   if (!o.emailedAt) return true;
+  if ((o.now ?? new Date()).getTime() - o.emailedAt.getTime() < MIN_EMAIL_GAP_MS) return false;
   return o.lastReadAt !== null && o.emailedAt < o.lastReadAt;
+}
+
+/**
+ * What the reader sees. Contact details are scrubbed on send, but a body
+ * stored after a hire that is later undone, or under an older scrubber, must
+ * not leak: while locked, scrub again (regex only, and a no-op on clean text).
+ */
+export function bodyToShow(body: string, storedRedacted: boolean, unlocked: boolean): { body: string; redacted: boolean } {
+  if (unlocked) return { body, redacted: storedRedacted };
+  const s = scrubContact(body);
+  return { body: s.text, redacted: storedRedacted || s.redacted };
 }
 
 const other = (role: Viewer["role"]) => (role === "intern" ? "employer" : "intern");
@@ -87,7 +118,7 @@ export async function threadFor(viewer: Viewer, id: string): Promise<ThreadRow |
 export type MessageView = { id: string; mine: boolean; body: string; redacted: boolean; createdAt: string };
 
 /** The latest page, or the messages after `after` (oldest first). */
-export async function threadMessages(viewer: Viewer, thread: ThreadRow, after?: string | null): Promise<MessageView[]> {
+export async function threadMessages(viewer: Viewer, thread: ThreadRow, after: string | null | undefined, unlocked: boolean): Promise<MessageView[]> {
   const m = schema.messages;
   const db = getDb();
   const cols = { id: m.id, senderType: m.senderType, body: m.body, redacted: m.redacted, createdAt: m.createdAt };
@@ -108,7 +139,7 @@ export async function threadMessages(viewer: Viewer, thread: ThreadRow, after?: 
     if (rows.length === 0) {
       const [anchor] = await db.select({ id: m.id }).from(m).where(and(eq(m.id, after), eq(m.threadId, thread.id))).limit(1);
       // An unknown anchor falls back to the latest page; the client dedupes by id.
-      if (!anchor) return threadMessages(viewer, thread, null);
+      if (!anchor) return threadMessages(viewer, thread, null, unlocked);
     }
   } else {
     rows = (await db.select(cols).from(m).where(eq(m.threadId, thread.id)).orderBy(desc(m.createdAt), desc(m.id)).limit(PAGE_SIZE)).reverse();
@@ -116,8 +147,7 @@ export async function threadMessages(viewer: Viewer, thread: ThreadRow, after?: 
   return rows.map((r) => ({
     id: r.id,
     mine: r.senderType === viewer.role,
-    body: r.body,
-    redacted: r.redacted,
+    ...bodyToShow(r.body, r.redacted, unlocked),
     createdAt: new Date(r.createdAt).toISOString(),
   }));
 }
@@ -134,11 +164,13 @@ export async function counterpartOf(viewer: Viewer, thread: ThreadRow): Promise<
   const db = getDb();
   const { contactUnlocked } = await import("./messages-access.ts");
   const unlocked = await contactUnlocked(thread.employerId, thread.internId);
+  // The pair's newest sent proposal, not the one that opened the thread.
   const [role] = await db
     .select({ name: schema.projects.projectName })
     .from(schema.proposals)
     .leftJoin(schema.projects, eq(schema.projects.id, schema.proposals.projectId))
-    .where(eq(schema.proposals.id, thread.proposalId))
+    .where(and(eq(schema.proposals.employerId, thread.employerId), eq(schema.proposals.internId, thread.internId), ne(schema.proposals.status, "draft")))
+    .orderBy(desc(schema.proposals.createdAt))
     .limit(1);
   const roleTitle = role?.name?.trim() || null;
 
@@ -202,13 +234,23 @@ export async function listThreads(viewer: Viewer): Promise<ThreadSummary[]> {
       .select({ employerId: p.employerId, internId: p.internId })
       .from(p)
       .where(and(viewer.role === "employer" ? eq(p.employerId, viewer.id) : eq(p.internId, viewer.id), hiredProposalSql())),
+    // Newest sent proposal per pair, so a later role shows its own title.
     db
-      .select({ proposalId: p.id, name: schema.projects.projectName })
+      .selectDistinctOn([p.employerId, p.internId], { employerId: p.employerId, internId: p.internId, name: schema.projects.projectName })
       .from(p)
       .leftJoin(schema.projects, eq(schema.projects.id, p.projectId))
-      .where(inArray(p.id, threads.map((x) => x.proposalId))),
+      .where(
+        and(
+          viewer.role === "employer" ? eq(p.employerId, viewer.id) : eq(p.internId, viewer.id),
+          inArray(viewer.role === "employer" ? p.internId : p.employerId, threads.map((x) => (viewer.role === "employer" ? x.internId : x.employerId))),
+          ne(p.status, "draft"),
+        ),
+      )
+      .orderBy(p.employerId, p.internId, desc(p.createdAt)),
   ]);
 
+  // Counterparts this viewer has a paid hire with: unmasked, and their contact details stay readable.
+  const hiredWith = new Set(hired.map((h) => (viewer.role === "employer" ? h.internId : h.employerId)));
   const counterIds = threads.map((x) => (viewer.role === "employer" ? x.internId : x.employerId));
   const names = new Map<string, string>();
   if (viewer.role === "employer") {
@@ -216,27 +258,25 @@ export async function listThreads(viewer: Viewer): Promise<ThreadSummary[]> {
       .select({ id: schema.users.id, first: schema.users.firstName, last: schema.users.lastName })
       .from(schema.users)
       .where(inArray(schema.users.id, counterIds));
-    const hiredSet = new Set(hired.map((h) => h.internId));
-    for (const r of rows) names.set(r.id, hiredSet.has(r.id) ? `${r.first} ${r.last}`.trim() || "Intern" : initialsOf(r.first, r.last));
+    for (const r of rows) names.set(r.id, hiredWith.has(r.id) ? `${r.first} ${r.last}`.trim() || "Intern" : initialsOf(r.first, r.last));
   } else {
     const rows = await db.select({ id: schema.employers.id, company: schema.employers.companyName }).from(schema.employers).where(inArray(schema.employers.id, counterIds));
-    const hiredSet = new Set(hired.map((h) => h.employerId));
-    for (const r of rows) names.set(r.id, hiredSet.has(r.id) && r.company ? r.company : COMPANY_MASK);
+    for (const r of rows) names.set(r.id, hiredWith.has(r.id) && r.company ? r.company : COMPANY_MASK);
   }
   const presence = viewer.role === "employer" ? await presenceOf(counterIds) : {};
   const lastBy = new Map(lasts.map((l) => [l.threadId, l]));
   const unreadBy = new Map(unreads.map((u) => [u.threadId, Number(u.n)]));
-  const roleBy = new Map(roles.map((r) => [r.proposalId, r.name?.trim() || null]));
+  const roleBy = new Map(roles.map((r) => [`${r.employerId}:${r.internId}`, r.name?.trim() || null]));
 
   return threads.map((x) => {
     const counter = viewer.role === "employer" ? x.internId : x.employerId;
     const last = lastBy.get(x.id);
-    return {
+        return {
       id: x.id,
       name: names.get(counter) ?? (viewer.role === "employer" ? "Candidate" : COMPANY_MASK),
-      roleTitle: roleBy.get(x.proposalId) ?? null,
+      roleTitle: roleBy.get(`${x.employerId}:${x.internId}`) ?? null,
       presence: presence[counter] ?? null,
-      preview: last ? last.body : null,
+      preview: last ? bodyToShow(last.body, false, hiredWith.has(counter)).body : null,
       lastMine: last ? last.senderType === viewer.role : false,
       lastAt: last ? new Date(last.at).toISOString() : null,
       unread: unreadBy.get(x.id) ?? 0,
@@ -391,32 +431,57 @@ async function notifyRecipient(viewer: Viewer, thread: ThreadRow, messageId: str
     // The switch hides the label from employers, not the fact that the student is here.
     recipientPresence = presenceLabel(row ? { ...row, hidden: false } : null, new Date());
   }
+  // Employers have no presence row; a recent read of this thread means they are in it.
+  recipientPresence = effectivePresence(recipientPresence, recipientLastRead);
 
   const sender = (await counterpartNameFor(to, thread)) ?? "Someone";
-  const wantsEmail = emailDue({ recipientPresence, emailedAt, lastReadAt: recipientLastRead });
   const preview = text.length > 120 ? `${text.slice(0, 117)}…` : text;
   const { notify } = await import("./notify.ts");
-  const sent = await notify({
+  // The alert dedupes per burst; the email is decided separately below, so a burst that
+  // began while they were online still mails when they leave without reading.
+  await notify({
     to: { type: to, id: to === "intern" ? thread.internId : thread.employerId },
     type: "new_message",
     title: `New message from ${sender}`,
     message: preview,
     data: { threadId: thread.id },
     dedupeKey: `msg:${thread.id}:${firstUnreadId}`,
-    email: wantsEmail
-      ? emails.newMessage({
-          name: await recipientFirstName(to, thread),
-          from: sender,
-          url: `${origin()}/${to}/messages/${thread.id}`,
-        })
-      : undefined,
   });
-  if (sent && wantsEmail) {
+
+  if (!emailDue({ recipientPresence, emailedAt, lastReadAt: recipientLastRead })) return;
+  // Stamp first, and only if the gap has passed in the database, so two sends racing in one burst mail once.
+  const stampCol = to === "intern" ? t.internEmailedAt : t.employerEmailedAt;
+  const claimed = await db
+    .update(t)
+    .set(to === "intern" ? { internEmailedAt: sql`now()` } : { employerEmailedAt: sql`now()` })
+    .where(and(eq(t.id, thread.id), or(isNull(stampCol), sql`${stampCol} < now() - ${MIN_EMAIL_GAP_MS / 1000} * interval '1 second'`)))
+    .returning({ id: t.id });
+  if (claimed.length === 0) return;
+  const address = await recipientEmail(to, thread);
+  if (!address) return;
+  const { sendSmtpMail } = await import("./mailer.ts");
+  const mail = renderEmail(
+    emails.newMessage({ name: await recipientFirstName(to, thread), from: sender, url: `${origin()}/${to}/messages/${thread.id}` }),
+  );
+  const res = await sendSmtpMail({ to: address, ...mail }).catch((err) => ({ ok: false as const, error: String(err) }));
+  if (!res.ok) {
+    console.error("[messages] email failed", res.error);
+    // Release the claim so the next message tries again.
     await db
       .update(t)
-      .set(to === "intern" ? { internEmailedAt: sql`now()` } : { employerEmailedAt: sql`now()` })
+      .set(to === "intern" ? { internEmailedAt: emailedAt } : { employerEmailedAt: emailedAt })
       .where(eq(t.id, thread.id));
   }
+}
+
+async function recipientEmail(recipient: Viewer["role"], thread: ThreadRow): Promise<string | null> {
+  const db = getDb();
+  if (recipient === "intern") {
+    const [u] = await db.select({ email: schema.users.email }).from(schema.users).where(eq(schema.users.id, thread.internId)).limit(1);
+    return u?.email ?? null;
+  }
+  const [e] = await db.select({ email: schema.employers.companyEmail }).from(schema.employers).where(eq(schema.employers.id, thread.employerId)).limit(1);
+  return e?.email ?? null;
 }
 
 /** How the sender is named to this recipient: initials / company mask until the hire is paid. */

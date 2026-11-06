@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { bodyToStore, emailDue, isParticipant, MessageError, messageErrorResponse } from "./messages.ts";
+import { bodyToShow, bodyToStore, effectivePresence, emailDue, isParticipant, MessageError, messageErrorResponse } from "./messages.ts";
 
 const thread = { employerId: "e1", internId: "i1" };
 
@@ -48,6 +48,38 @@ test("burst email: a read ends the burst, so the next message mails again", () =
     emailDue({ recipientPresence: "Active this week", emailedAt: new Date("2026-11-06T10:00:00Z"), lastReadAt: new Date("2026-11-06T10:05:00Z") }),
     true,
   );
+});
+
+const NOW = new Date("2026-11-06T12:00:00Z");
+const ago = (ms: number) => new Date(NOW.getTime() - ms);
+
+test("burst email: a recipient who read the thread 30 s ago is in the conversation, so no email", () => {
+  const presence = effectivePresence(null, ago(30_000), NOW);
+  assert.equal(presence, "Online now");
+  assert.equal(emailDue({ recipientPresence: presence, emailedAt: null, lastReadAt: ago(30_000), now: NOW }), false);
+  // Read 3 minutes ago: no longer counted as in the conversation.
+  assert.equal(effectivePresence(null, ago(180_000), NOW), null);
+  assert.equal(effectivePresence("Active today", null, NOW), "Active today");
+});
+
+test("burst email: emailed 5 min ago and read since still does not mail (15 min gap per thread)", () => {
+  const o = { recipientPresence: null, emailedAt: ago(5 * 60_000), lastReadAt: ago(60_000), now: NOW };
+  assert.equal(emailDue(o), false);
+  assert.equal(emailDue({ ...o, emailedAt: ago(16 * 60_000), lastReadAt: ago(10 * 60_000) }), true, "gap passed and a read ended the burst");
+  assert.equal(emailDue({ ...o, emailedAt: ago(16 * 60_000), lastReadAt: ago(20 * 60_000) }), false, "gap passed but no read since");
+});
+
+test("read-time scrub: a locked thread hides contact details stored earlier, an unlocked one shows them", () => {
+  const stored = "reach me at 98765 43210 or a@b.co";
+  const locked = bodyToShow(stored, false, false);
+  assert.doesNotMatch(locked.body, /98765|a@b\.co/);
+  assert.equal(locked.redacted, true);
+  assert.deepEqual(bodyToShow(stored, false, true), { body: stored, redacted: false });
+  // Already scrubbed text is stable and keeps its flag.
+  const once = bodyToShow(stored, true, false);
+  assert.deepEqual(bodyToShow(once.body, true, false), once);
+  // Ordinary text is untouched.
+  assert.deepEqual(bodyToShow("See you in 3 months", false, false), { body: "See you in 3 months", redacted: false });
 });
 
 test("a MessageError becomes { error } with its status; anything else is rethrown", async () => {

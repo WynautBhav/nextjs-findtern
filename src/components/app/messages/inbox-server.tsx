@@ -29,7 +29,8 @@ export async function ThreadPage({ role, id }: { role: "intern" | "employer"; id
   const viewer = { role, id: session.uid } as const;
   const thread = await threadFor(viewer, id);
   if (!thread) notFound();
-  const [messages, who] = await Promise.all([threadMessages(viewer, thread), counterpartOf(viewer, thread)]);
+  const who = await counterpartOf(viewer, thread);
+  const messages = await threadMessages(viewer, thread, null, who.unlocked);
   return (
     <ThreadView
       role={role}
