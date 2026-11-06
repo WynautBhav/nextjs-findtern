@@ -3,7 +3,9 @@ import { eq } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { DetailRow, EmptyScene, SectionHead, Surface } from "@/components/app/primitives";
+import { DetailRow, SectionHead, Surface } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { PageHeader } from "@/components/layout/page-header";
 import { CompanyProfileForm, type CompanyProfile } from "@/components/employer/company-profile-form";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
@@ -34,12 +36,7 @@ export default async function EmployerAccount() {
     return (
       <div>
         <PageHeader title="Company profile" />
-        <EmptyScene
-          art
-          title="Couldn't load your company profile"
-          body="Something went wrong on our side. Nothing has changed - reload the page in a moment."
-          who="Us - a connection issue"
-        />
+        <LoadError what="your company profile" retryHref="/employer/account" email={SITE.adminEmail} />
       </div>
     );
   }

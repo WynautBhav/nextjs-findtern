@@ -9,6 +9,8 @@ import { hireFlowCounts } from "@/lib/employer-flow";
 import { expireStaleEmployerOrders } from "@/lib/payments";
 import { paymentsAreFree, testPayEnabled } from "@/lib/razorpay";
 import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { HireFlow, type HireFlowCounts } from "@/components/employer/hire-flow";
 import { CheckoutSummary } from "@/components/payments/checkout-summary";
 import { selectCheckoutLines } from "@/lib/checkout-selection";
@@ -54,12 +56,14 @@ export default async function EmployerCheckout({
     return (
       <div>
         <PageHead title="Checkout" />
-        <EmptyScene
-          art
-          title="Couldn't load your checkout"
-          body="We couldn't reach your accepted offers just now, so there is nothing to pay from this page yet. No payment has been taken; try again in a moment."
-          who="Us - connection issue"
-          next={{ label: "Try again", href: "/employer/checkout" }}
+        <LoadError
+          what="your checkout"
+          retryHref={
+            sp.proposal ?? sp.proposalId
+              ? `/employer/checkout?proposal=${encodeURIComponent((sp.proposal ?? sp.proposalId)!)}`
+              : "/employer/checkout"
+          }
+          email={SITE.adminEmail}
         />
       </div>
     );

@@ -11,6 +11,8 @@ import { hiredInternIds } from "@/lib/employer-visibility";
 import { dayDetails, formatDay, formatPeriod } from "@/lib/employer-timesheets";
 import { StatusPill } from "@/components/employer/timesheet-parts";
 import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -100,12 +102,7 @@ export default async function EmployerTimesheets({
     return (
       <div>
         <PageHead title="Timesheets" />
-        <EmptyScene
-          art
-          title="Couldn't load timesheets"
-          body="Your interns' hours are safe; we just couldn't reach them right now. Reload the page in a moment."
-          who="Us - a connection problem"
-        />
+        <LoadError what="your timesheets" retryHref={onlyIntern ? `/employer/timesheets?intern=${onlyIntern}` : "/employer/timesheets"} email={SITE.adminEmail} />
       </div>
     );
   }

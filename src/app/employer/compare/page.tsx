@@ -21,6 +21,8 @@ import { RememberSelection } from "@/components/employer/remember-selection";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedSelection } from "@/lib/employer-selection";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
 
@@ -174,16 +176,15 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   const backHref = `/employer/candidates?ids=${encodeURIComponent(ids.join(","))}${activeProject ? `&project=${encodeURIComponent(activeProject.id)}` : ""}`;
 
   if (loadFailed) {
+    const retryQs = new URLSearchParams();
+    if (sp.ids !== undefined) retryQs.set("ids", one(sp.ids) ?? "");
+    if (sp.project !== undefined) retryQs.set("project", one(sp.project) ?? "");
+    if (sp.skills !== undefined) retryQs.set("skills", one(sp.skills) ?? "");
+    const retryHref = `/employer/compare${retryQs.size ? `?${retryQs}` : ""}`;
     return (
       <div>
         <PageHead title="Compare candidates" />
-        <EmptyScene
-          art
-          title="Couldn't load the comparison"
-          body="Something went wrong on our side. Your picks are saved; try again in a moment."
-          next={{ label: "Try again", href: "/employer/compare" }}
-          who="Us - we're on it"
-        />
+        <LoadError what="the comparison" retryHref={retryHref} email={SITE.adminEmail} />
       </div>
     );
   }

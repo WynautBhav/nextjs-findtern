@@ -5,6 +5,8 @@ import { and, count, desc, eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { EmptyScene } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { NotificationList, type NotificationRow } from "@/components/app/notification-list";
 import { PageHeader } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
@@ -112,12 +114,7 @@ export default async function EmployerAlerts({
     return (
       <div>
         <PageHeader title="Alerts" />
-        <EmptyScene
-          art
-          title="Couldn't load your alerts"
-          body="Something went wrong on our side while loading your alerts. Nothing is lost - reload the page in a moment."
-          who="Us - a connection issue"
-        />
+        <LoadError what="your alerts" retryHref={unreadOnly ? "/employer/alerts?show=unread" : "/employer/alerts"} email={SITE.adminEmail} />
       </div>
     );
   }

@@ -11,6 +11,8 @@ import { displayNameOf, scoreOf, toCandidateProfile, type CandidateSummary } fro
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { EmptyScene, PageHead, Pill, Surface } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { offerState } from "@/components/employer/proposal-state";
 import { parseOffer } from "@/lib/offer";
 import { isProjectOpen } from "@/lib/project-locations";
@@ -213,15 +215,14 @@ export default async function SendProposal({
   }
 
   if (loadFailed) {
+    const retryQs = new URLSearchParams();
+    if (internId) retryQs.set("intern", internId);
+    if (projectId) retryQs.set("project", projectId);
+    const retryHref = `/employer/send-proposal${retryQs.size ? `?${retryQs}` : ""}`;
     return (
       <div>
         <PageHead title="Send a proposal" />
-        <EmptyScene
-          art
-          title="Couldn't load this offer"
-          body="We couldn't reach your projects or this candidate right now. Nothing was sent. Reload the page in a moment."
-          who="Us - a connection problem"
-        />
+        <LoadError what="this offer" retryHref={retryHref} email={SITE.adminEmail} />
       </div>
     );
   }

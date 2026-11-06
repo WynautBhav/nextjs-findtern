@@ -45,6 +45,8 @@ import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { candidateStatusPill, proposalActionLabel } from "@/components/employer/candidate-status";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { EmptyScene, PageHead, Pill, Surface } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { compareBySortFields, parseSortFields } from "@/lib/candidate-sort";
@@ -684,9 +686,11 @@ export default async function CandidatesPage({
           <div className="mb-5 flex flex-wrap items-end justify-between gap-3 border-b border-ink-100 pb-4">
             <div className="min-w-0">
               {/* A live count: filters apply on change, so this is how a screen reader hears the result. */}
-              <p role="status" className="nums text-base font-semibold text-ink-900">
-                {total} candidate{total === 1 ? "" : "s"}
-              </p>
+              {loadFailed ? null : (
+                <p role="status" className="nums text-base font-semibold text-ink-900">
+                  {total} candidate{total === 1 ? "" : "s"}
+                </p>
+              )}
               {candidates.length > 0 ? (
                 <p className="nums mt-0.5 text-sm text-ink-600">
                   Showing {firstShown}–{firstShown + candidates.length - 1}
@@ -732,13 +736,7 @@ export default async function CandidatesPage({
           </div>
 
           {loadFailed ? (
-            <EmptyScene
-              art
-              title="Couldn't load the candidate pool"
-              body="Something went wrong on our side while loading candidates. Your filters are fine; try again in a moment."
-              next={{ label: "Try again", href: withFilters(filters) }}
-              who="Us - we're on it"
-            />
+            <LoadError what="the candidate pool" retryHref={withFilters(filters)} email={SITE.adminEmail} />
           ) : candidates.length === 0 ? (
             cityList.length > 0 ? (
               // EMB-21: legacy offered "Clear location" and "Include remote

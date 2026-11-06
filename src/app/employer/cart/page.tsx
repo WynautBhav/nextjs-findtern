@@ -13,7 +13,9 @@ import { isBlockingInterview, isMeetingLinkLive, meetingEndsAt } from "@/lib/emp
 import { hireFlowCounts } from "@/lib/employer-flow";
 import { payableCheckout } from "@/lib/employer-payable";
 import { timezoneForLocation } from "@/lib/timezones";
-import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { PageHead } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { HireFlow, type HireFlowCounts } from "@/components/employer/hire-flow";
 import { CartManager, type CartLineItem } from "@/components/employer/cart-manager";
 
@@ -59,13 +61,7 @@ export default async function EmployerCartPage({
     return (
       <div>
         <PageHead title="Shortlist" />
-        <EmptyScene
-          art
-          title="Couldn't load your shortlist"
-          body="We couldn't reach your shortlisted candidates just now. They are still saved; try again in a moment."
-          who="Us - connection issue"
-          next={{ label: "Try again", href: "/employer/cart" }}
-        />
+        <LoadError what="your shortlist" retryHref="/employer/cart" email={SITE.adminEmail} />
       </div>
     );
   }

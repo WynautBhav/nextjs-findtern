@@ -26,7 +26,9 @@ import { parseOffer } from "@/lib/offer";
 import { timezoneForLocation } from "@/lib/timezones";
 import { dateLabel, draftFromRecord, linkedinHref, type OnboardingDraft } from "@/lib/onboarding";
 import { employerProposalPill } from "@/components/app/status";
-import { DetailRow, EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { ButtonLink } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -265,13 +267,7 @@ export default async function EmployerInternDetail({
     return (
       <div>
         <PageHead title="Candidate" />
-        <EmptyScene
-          art
-          title="Couldn't load this profile"
-          body="Something went wrong on our side. The link is fine; try again in a moment."
-          next={{ label: "Try again", href: `/employer/intern/${encodeURIComponent(id)}` }}
-          who="Us - we're on it"
-        />
+        <LoadError what="this profile" retryHref={`/employer/intern/${encodeURIComponent(id)}`} email={SITE.adminEmail} />
       </div>
     );
   }

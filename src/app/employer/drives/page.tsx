@@ -8,6 +8,8 @@ import { driveWindow } from "@/lib/college/access";
 import { getDb, schema } from "@/lib/db";
 
 import { Surface, EmptyScene, PageHead } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { CollegeMark, DriveStatePill, KIND_LABEL, driveTime, timeLeft } from "@/components/employer/drive-parts";
 import { compareDrives } from "@/lib/college/access";
 
@@ -46,9 +48,7 @@ export default async function EmployerDrivesPage() {
     <div>
       <PageHead title="Campus drives" />
       {failed ? (
-        <Surface className="p-6 text-sm text-danger" role="alert">
-          We couldn&apos;t load your drives just now. Refresh the page to try again.
-        </Surface>
+        <LoadError what="your drives" retryHref="/employer/drives" email={SITE.adminEmail} />
       ) : rows.length === 0 ? (
         <EmptyScene
           title="No drives yet"

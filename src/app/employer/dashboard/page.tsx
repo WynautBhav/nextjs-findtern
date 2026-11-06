@@ -5,7 +5,9 @@ import { ArrowRight, CalendarClock, ClipboardCheck, CreditCard, FolderPlus, Shop
 
 import { getDb, schema } from "@/lib/db";
 import { ButtonLink } from "@/components/ui/button";
-import { EmptyScene, HeroBand, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
+import { EmptyScene, HeroBand, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { requireRole } from "@/lib/auth";
 import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
@@ -74,13 +76,10 @@ export default async function EmployerDashboard() {
 
   if (!data) {
     return (
-      <EmptyScene
-        art
-        title="Couldn't load your dashboard"
-        body="We couldn't load your dashboard right now. Nothing is wrong with your account; try again in a moment."
-        who="Us - connection issue"
-        next={{ label: "Try again", href: "/employer/dashboard" }}
-      />
+      <div>
+        <PageHead title="Dashboard" />
+        <LoadError what="your dashboard" retryHref="/employer/dashboard" email={SITE.adminEmail} />
+      </div>
     );
   }
 
