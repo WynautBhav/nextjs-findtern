@@ -234,7 +234,7 @@ export default async function EmployerInternDetail({
         .limit(1);
 
       profile = toCandidateProfile(user, onboarding);
-      // Photo follows the name: initials until hired (bug sheet NC r41).
+      // Photo shows before hire (owner, 6 Nov); the name stays initials until hired.
       await attachPhotos(db, [profile]);
       if (onboarding) details = draftFromRecord(onboarding);
       plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
