@@ -21,7 +21,7 @@ test("pages that offer open projects to an employer skip taken-down ones", () =>
   assert.match(read("employer/send-proposal/page.tsx"), /isProjectOpen\(row\.status, row\.takenDownAt\)/);
   assert.match(read("employer/send-proposal/page.tsx"), /takenDownAt: schema\.projects\.takenDownAt/);
   assert.match(read("employer/dashboard/page.tsx"), /isProjectOpen\(p\.status, p\.takenDownAt\)/);
-  for (const p of ["employer/candidates/page.tsx", "employer/compare/page.tsx"]) {
+  for (const p of ["employer/candidates/_query.ts", "employer/compare/page.tsx"]) {
     assert.match(read(p), /isOpenProject\(p\.status, p\.takenDownAt\)/, p);
   }
   assert.match(read("employer/intern/[id]/page.tsx"), /isOpenProject\(row\.status, row\.takenDownAt\)/);

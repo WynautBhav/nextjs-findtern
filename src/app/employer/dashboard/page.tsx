@@ -119,7 +119,7 @@ export default async function EmployerDashboard() {
       {
         count: data.shortlisted,
         label: data.shortlisted === 1 ? "shortlisted candidate, no proposal yet" : "shortlisted candidates, no proposal yet",
-        detail: "Book a meeting or send a proposal before someone else does.",
+        detail: "Book a meeting or send a proposal to move them forward.",
         href: "/employer/cart",
         cta: "Open shortlist",
         Icon: ShoppingBag,

@@ -451,7 +451,8 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               {candidates.map((c) => {
                 const skills = Array.from(new Set(c.skills.map(nameOf).filter(Boolean)));
                 const isMatch = (s: string) => wanted.has(s.toLowerCase());
-                const ordered = [...skills.filter(isMatch), ...skills.filter((s) => !isMatch(s))];
+                // Matches first; a profile holds at most seven skills, so an older, longer list is cut to seven.
+                const ordered = [...skills.filter(isMatch), ...skills.filter((s) => !isMatch(s))].slice(0, 7);
                 return (
                   <Cell key={c.id}>
                     {ordered.length === 0 ? (

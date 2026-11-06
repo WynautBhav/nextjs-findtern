@@ -29,6 +29,8 @@ import { paymentsAreFree, testPayEnabled } from "@/lib/razorpay";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { profileCompletion } from "@/lib/onboarding";
 import { membershipOf } from "@/lib/college/membership";
+import { paidSeatTotal } from "@/lib/college/seat-gate";
+import { countsFor } from "@/lib/live-counts";
 
 export const metadata: Metadata = {
   title: "Home",
@@ -83,7 +85,7 @@ export default async function InternHome() {
   const session = await requireRole("intern");
 
   // Independent reads, in parallel. loadInternData is cache()d: the layout's call already did the work.
-  const [data, [user], activated, activationFeeMinor, paidMinor, college] = await Promise.all([
+  const [data, [user], activated, activationFeeMinor, paidMinor, college, counts] = await Promise.all([
     loadInternData(session.uid),
     getDb()
       .select({
@@ -102,7 +104,17 @@ export default async function InternHome() {
     getInternActivationFeeMinor(),
     internPaidMinor(session.uid),
     membershipOf(session.uid).catch(() => null),
+    // Unread messages for "What next". A failed read only drops that line.
+    countsFor("intern", session.uid).catch((err) => {
+      console.error("[intern/dashboard] live counts", err);
+      return null;
+    }),
   ]);
+  // The college covers the interview fee only once it has paid for a batch (owner, 6 Nov).
+  const collegePaid =
+    college?.isPartner && !activated
+      ? await paidSeatTotal(getDb(), college.collegeId).then((r) => r.seats > 0, () => false)
+      : false;
   const action = nextAction(data.thread);
   const working = data.stage === "working";
   const open = working ? [] : await openProjects(6, { strict: true });
@@ -279,19 +291,86 @@ export default async function InternHome() {
     )
   ) : null;
 
-  const waiting = action ? (
-    // The screen's one focal point: the only amber button.
-    <Tile title="Waiting on you" className="bg-accent-100/60">
-      <p className="text-pretty text-lg font-medium leading-snug text-ink-900">{action.title}</p>
-      <p className="mt-1 text-sm text-text-subtle">{action.detail}</p>
-      {action.href ? (
-        <Link href={action.href} className={buttonClass({ variant: "accent", className: "mt-4 w-full" })}>
-          {action.action ?? "Open"}
-          <ArrowRight className="size-4" aria-hidden />
-        </Link>
-      ) : null}
-    </Tile>
-  ) : null;
+  // What needs this person next, in one fixed order: messages, an offer waiting,
+  // the AI interview, the college's cover, the profile. Each line has one action.
+  const nextSteps: { key: string; title: string; detail?: string; href?: string; label?: string; external?: boolean }[] = [];
+  if (counts && counts.messages > 0) {
+    nextSteps.push({
+      key: "messages",
+      title: `${counts.messages} unread message${counts.messages === 1 ? "" : "s"}`,
+      detail: "Reply in your inbox.",
+      href: "/intern/messages",
+      label: "Open messages",
+    });
+  }
+  if (action) {
+    nextSteps.push({ key: "offer", title: action.title, detail: action.detail, href: action.href ?? undefined, label: action.action ?? "Open" });
+  }
+  if (aiPhase === "ready") {
+    const link = joinableLink(aiRow?.meetingLink);
+    if (link) {
+      nextSteps.push({
+        key: "ai-interview",
+        title: "Your AI interview is ready",
+        detail: "It is the last step before employers can find you.",
+        href: link,
+        label: "Start the interview",
+        external: true,
+      });
+    }
+  }
+  if (collegePaid && college) {
+    nextSteps.push({
+      key: "college",
+      title: `${college.name} is on Findtern`,
+      detail: "Have your placement officer's code ready: it can waive the interview fee when you activate.",
+      href: "/intern/dashboard#journey-title",
+      label: "Go to activation",
+    });
+  }
+  if (!completion.complete) {
+    const missing = completion.items.filter((i) => !i.done);
+    nextSteps.push({
+      key: "profile",
+      title: "Finish your profile",
+      detail: `${completion.done} of ${completion.total} steps done${missing[0] ? `. Next: ${missing[0].label.toLowerCase()}.` : "."}`,
+      href: missing[0]?.href ?? "/intern/onboarding",
+      label: "Continue",
+    });
+  }
+
+  const waiting =
+    nextSteps.length > 0 ? (
+      // The screen's one focal point: the first line's button is the only amber one.
+      <Tile title="What next" className="bg-accent-100/60">
+        <ol className="divide-y divide-ink-200/60">
+          {nextSteps.map((step, i) => (
+            <li key={step.key} className="py-3 first:pt-0 last:pb-0">
+              <p className={cn("text-pretty font-medium leading-snug text-ink-900", i === 0 ? "text-lg" : "text-base")}>{step.title}</p>
+              {step.detail ? <p className="mt-1 text-sm text-text-subtle">{step.detail}</p> : null}
+              {step.href ? (
+                step.external ? (
+                  <a
+                    href={step.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={buttonClass({ variant: i === 0 ? "accent" : "outline", className: "mt-3 w-full" })}
+                  >
+                    {step.label}
+                    <ArrowRight className="size-4" aria-hidden />
+                  </a>
+                ) : (
+                  <Link href={step.href} className={buttonClass({ variant: i === 0 ? "accent" : "outline", className: "mt-3 w-full" })}>
+                    {step.label}
+                    <ArrowRight className="size-4" aria-hidden />
+                  </Link>
+                )
+              ) : null}
+            </li>
+          ))}
+        </ol>
+      </Tile>
+    ) : null;
 
   const activity = (
     <Tile
