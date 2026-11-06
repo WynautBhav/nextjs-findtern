@@ -1,223 +1,75 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Briefcase, FolderPlus, Pause, Pencil, Play, Search, Trash2, Users, X } from "lucide-react";
+import { Briefcase, Pause, Pencil, Play, Plus, Search, Trash2, Users, X } from "lucide-react";
 
-import { EmptyScene, FilterTabs, Pill, Surface } from "@/components/app/primitives";
-import { PageHeader } from "@/components/layout/page-header";
+import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { buttonClass, ButtonLink } from "@/components/ui/button";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { FormNotice, controlClass } from "@/components/employer/company-fields";
-import { ProjectFields, projectFormErrors, type ProjectBaseline } from "@/components/employer/project-fields";
+import { FormNotice } from "@/components/employer/company-fields";
+import { fieldClass } from "@/components/employer/ui-tokens";
 import { csrfFetch } from "@/lib/client-fetch";
-import { scopeLabel, scopeValue, type Project } from "@/lib/db/schema";
-import { emptyProject, projectFromRecord, type ProjectDraft } from "@/lib/employer-onboarding";
-import { FINAL_PROJECT_STATUS, PAUSED_PROJECT_STATUS, isProjectClosedForGood, isProjectOpen, projectDescriptionError } from "@/lib/project-locations";
+import { scopeLabel, type Project } from "@/lib/db/schema";
+import { formatDayLabel } from "@/lib/format";
+import { FINAL_PROJECT_STATUS, PAUSED_PROJECT_STATUS, isProjectClosedForGood, isProjectOpen } from "@/lib/project-locations";
 import { cn } from "@/lib/utils";
 import { RowMenu } from "@/components/app/row-menu";
 import { useConfirm } from "@/components/app/use-confirm";
 
+export type ProjectCounts = { shortlisted: number; proposals: number; hired: number };
 /** A project row as the employer's browser gets it: never the admin who took it down. */
 export type EmployerProject = Omit<Project, "takenDownBy">;
 
-type Filter = "all" | "open" | "closed";
+type State = "live" | "paused" | "closed" | "down";
+type Filter = "all" | State;
 
 const MODE_LABEL: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" };
+const STATE_LABEL: Record<State, string> = { live: "Live", paused: "Paused", closed: "Closed", down: "Taken down" };
+const STATE_DOT: Record<State, string> = { live: "bg-brand-600", paused: "bg-accent-500", closed: "bg-ink-400", down: "bg-danger" };
+const PAGE = 20;
+const NO_COUNTS: ProjectCounts = { shortlisted: 0, proposals: 0, hired: 0 };
 
-type ListingState = "open" | "paused" | "closed" | "taken_down";
-
-/** What the employer sees for a listing; a taken-down one is only Findtern's to restore. */
-function listingState(p: Pick<EmployerProject, "status" | "takenDownAt">): ListingState {
-  if (p.takenDownAt) return "taken_down";
-  if (isProjectOpen(p.status)) return "open";
-  return isProjectClosedForGood(p.status) ? "closed" : "paused";
-}
-
-const STATE_LABEL: Record<ListingState, string> = { open: "Open", paused: "Paused", closed: "Closed", taken_down: "Taken down" };
+/** Taken down by Findtern beats the employer's own status. Paused ("inactive") can resume; closed is final. */
+const stateOf = (p: EmployerProject): State =>
+  p.takenDownAt ? "down" : isProjectOpen(p.status) ? "live" : isProjectClosedForGood(p.status) ? "closed" : "paused";
 
 /**
- * Projects: what you're hiring for.
- *
- * A project is the unit candidates are matched against, so the list leads
- * with what decides the match (skills, mode, place) and one action that uses
- * it, "Find candidates". Editing opens a drawer with the same fields as
- * onboarding (`ProjectFields`). A new project goes through a review step and
- * then goes live at once (OA8). Pause writes "inactive" and can be undone;
- * Close writes "closed" and is final. At least one project stays open (the
- * API enforces it). Findtern can take a listing down; the employer sees why.
+ * Projects: the listings you're hiring for, one row each, the way a jobs list
+ * reads: name and status, where and how long, the skills candidates are
+ * matched on, what has happened so far (shortlisted, proposals, hired), and
+ * one action. Posting and editing are their own page (`ProjectEditor`).
+ * Pause writes "inactive" and can be undone; Close writes "closed" and is
+ * final (it asks first). At least one project stays open (the API enforces
+ * it). A listing Findtern took down shows why and can't be reopened.
  */
 export function ProjectsManager({
-  employerId,
   initialProjects,
-  defaultTimezone = "Asia/Kolkata",
-  companyPlace,
-  companyName,
-  openNew = false,
+  counts,
 }: {
-  employerId: string;
   initialProjects: EmployerProject[];
-  /** The company's own timezone (from its location), for a new project. */
-  defaultTimezone?: string;
-  /** The company's city and state, offered when a role is on-site. */
-  companyPlace?: { city?: string | null; state?: string | null };
-  /** The company name, which a project name must not contain. */
-  companyName?: string | null;
-  /** Open the "New project" drawer on arrival (`?new=1`). */
-  openNew?: boolean;
+  counts: Record<string, ProjectCounts>;
 }) {
   const router = useRouter();
   const [projects, setProjects] = useState<EmployerProject[]>(initialProjects);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
-
-  const [sheetOpen, setSheetOpen] = useState(false);
-  const [editing, setEditing] = useState<EmployerProject | null>(null);
-  const [form, setForm] = useState<ProjectDraft>(() => ({ ...emptyProject(), timezone: defaultTimezone }));
-  const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [saveError, setSaveError] = useState("");
-  const [description, setDescription] = useState("");
-  const [descriptionError, setDescriptionError] = useState("");
-  // New projects are reviewed before they go live; there is no draft state.
-  const [reviewing, setReviewing] = useState(false);
-
-  const [listError, setListError] = useState("");
+  // A long list (one account has 55) shows a page at a time; a new filter or search starts over.
+  const [shown, setShown] = useState(PAGE);
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const { ask: askConfirm, dialog } = useConfirm();
-
-  // `?new=1` (the dashboard's "New project") opens the drawer straight away.
-  useEffect(() => {
-    if (!openNew) return;
-    openCreate();
-    router.replace("/employer/projects", { scroll: false });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openNew]);
-
-  const baseline: ProjectBaseline | null = editing
-    ? {
-        projectName: editing.projectName ?? "",
-        skills: (editing.skills as string[] | null) ?? [],
-        preferredLocations: (editing.preferredLocations as string[] | null) ?? [],
-        scopeOfWork: editing.scopeOfWork ?? "",
-        city: editing.city ?? "",
-        state: editing.state ?? "",
-        locationType: editing.locationType ?? "",
-      }
-    : null;
-
-  function setField(patch: Partial<ProjectDraft>) {
-    setForm((prev) => ({ ...prev, ...patch }));
-    setErrors((prev) => {
-      const next = { ...prev };
-      for (const key of Object.keys(patch)) delete next[key];
-      return next;
-    });
-  }
-
-  function openCreate() {
-    setEditing(null);
-    // Scope and work mode start unchosen (EMH-47).
-    setForm({ ...emptyProject(), timezone: defaultTimezone });
-    setErrors({});
-    setSaveError("");
-    setDescription("");
-    setDescriptionError("");
-    setReviewing(false);
-    setSheetOpen(true);
-  }
-
-  function openEdit(p: EmployerProject) {
-    setEditing(p);
-    const draft = projectFromRecord({ ...p, takenDownBy: null });
-    setForm({ ...draft, scopeOfWork: scopeValue(draft.scopeOfWork) || draft.scopeOfWork, timezone: draft.timezone || defaultTimezone });
-    setErrors({});
-    setSaveError("");
-    setDescription(p.description ?? "");
-    setDescriptionError("");
-    setReviewing(false);
-    setSheetOpen(true);
-  }
-
-  async function handleSave(e: React.FormEvent) {
-    e.preventDefault();
-    const problems = projectFormErrors(form, baseline, companyName);
-    setErrors(problems);
-    const descProblem = projectDescriptionError(description) ?? "";
-    setDescriptionError(descProblem);
-    if (Object.keys(problems).length > 0 || descProblem) {
-      setSaveError("Some details need a look - see the highlighted fields.");
-      // The first marked field takes focus once the errors have rendered.
-      const formEl = e.currentTarget;
-      window.requestAnimationFrame(() => formEl.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
-      return;
-    }
-    // A new project is shown back to the employer once before it goes live.
-    if (!editing && !reviewing) {
-      setReviewing(true);
-      return;
-    }
-    setSaving(true);
-    setSaveError("");
-    const remote = form.locationType === "remote";
-    const payload = {
-      projectName: form.projectName.trim(),
-      description: description.trim(),
-      skills: form.skills,
-      scopeOfWork: form.scopeOfWork,
-      locationType: form.locationType,
-      // A remote role has no place; null clears one left over from an edit.
-      city: remote ? null : form.city.trim() || null,
-      state: remote ? null : form.state.trim() || null,
-      preferredLocations: remote ? [] : form.preferredLocations,
-      timezone: form.timezone,
-      fullTimeOffer: form.fullTimeOffer,
-    };
-    try {
-      const res = editing
-        ? await csrfFetch(`/api/employer/projects/${editing.id}`, {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          })
-        : await csrfFetch(`/api/employer/${employerId}/projects`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-          });
-      const data = (await res.json().catch(() => ({}))) as { error?: string; project?: EmployerProject };
-      if (!res.ok) {
-        setSaveError(data.error ?? "Couldn't save this project. Try again.");
-        // A refused description is fixed on the form, not on the review.
-        setReviewing(false);
-        return;
-      }
-      if (editing) {
-        setProjects((prev) => prev.map((item) => (item.id === editing.id ? { ...item, ...payload, description: payload.description || null } : item)));
-      } else if (data.project) {
-        setProjects((prev) => [data.project!, ...prev]);
-      }
-      setSheetOpen(false);
-      router.refresh();
-    } catch {
-      setSaveError("Couldn't reach the server. Your answers are still here; try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function changeStatus(project: EmployerProject, nextStatus: "active" | typeof PAUSED_PROJECT_STATUS | typeof FINAL_PROJECT_STATUS) {
     if (nextStatus === FINAL_PROJECT_STATUS) {
       const ok = await askConfirm({
         title: `Close "${project.projectName}" for good?`,
-        body: "It leaves candidate search and its public page, and it can't be reopened. Offers already sent are not affected. To pause it instead, choose Pause.",
+        body: "It leaves candidate search and its public page, and it can't be reopened. Offers already sent are not affected. To stop it for a while instead, choose Pause.",
         confirmLabel: "Yes, close it",
       });
       if (!ok) return;
     }
     setBusyId(project.id);
-    setListError("");
     setRowError(null);
     try {
       const res = await csrfFetch(`/api/employer/projects/${project.id}`, {
@@ -260,99 +112,107 @@ export function ProjectsManager({
     }
   }
 
-  const openCount = projects.filter((p) => isProjectOpen(p.status, p.takenDownAt)).length;
-  const closedCount = projects.length - openCount;
-  const takenDown = projects.filter((p) => p.takenDownAt);
+  const tally: Record<State, number> = { live: 0, paused: 0, closed: 0, down: 0 };
+  for (const p of projects) tally[stateOf(p)] += 1;
   const q = query.trim().toLowerCase();
+  const order: Record<State, number> = { live: 0, down: 1, paused: 2, closed: 3 };
   const filtered = projects
-    .filter((p) => (filter === "open" ? isProjectOpen(p.status, p.takenDownAt) : filter === "closed" ? !isProjectOpen(p.status, p.takenDownAt) : true))
-    .filter(
-      (p) =>
-        !q ||
-        p.projectName.toLowerCase().includes(q) ||
-        ((p.skills as string[] | null) ?? []).some((s) => s.toLowerCase().includes(q)),
-    )
-    // Open projects first, newest first within each group.
-    .sort((a, b) => Number(isProjectOpen(b.status, b.takenDownAt)) - Number(isProjectOpen(a.status, a.takenDownAt)));
+    .filter((p) => filter === "all" || stateOf(p) === filter)
+    .filter((p) => !q || p.projectName.toLowerCase().includes(q) || ((p.skills as string[] | null) ?? []).some((s) => s.toLowerCase().includes(q)))
+    // Live first, then taken down (it needs a look), paused, closed; newest first within each.
+    .sort((a, b) => order[stateOf(a)] - order[stateOf(b)]);
+
+  const tabs: { key: Filter; label: string; count: number }[] = [
+    { key: "all", label: "All", count: projects.length },
+    { key: "live", label: "Live", count: tally.live },
+    ...(tally.paused > 0 ? [{ key: "paused" as const, label: "Paused", count: tally.paused }] : []),
+    { key: "closed", label: "Closed", count: tally.closed },
+    ...(tally.down > 0 ? [{ key: "down" as const, label: "Taken down", count: tally.down }] : []),
+  ];
 
   return (
     <div>
       {dialog}
-      <PageHeader
+      <PageHead
         title="Projects"
-        subtitle="What you're hiring for. Candidates are matched on each project's skills, work mode and place."
+        lede="What you're hiring for. Candidates are matched on each project's skills, work mode and place."
         action={
-          <button type="button" onClick={openCreate} className={buttonClass({ variant: "primary", size: "md" })}>
-            <FolderPlus className="size-4" aria-hidden />
-            New project
-          </button>
+          projects.length > 0 ? (
+            <ButtonLink href="/employer/projects/new" variant="primary" size="md">
+              <Plus className="size-4" aria-hidden />
+              Post a project
+            </ButtonLink>
+          ) : null
         }
       />
 
       {projects.length === 0 ? (
-        <div className="space-y-4">
-          <EmptyScene
-            art
-            title="No projects yet"
-            body="A project tells us the skills and work mode you need, so candidates are matched to it. It takes about two minutes."
-            who="You - about two minutes"
-          />
-          <div className="flex justify-center">
-            <button type="button" onClick={openCreate} className={buttonClass({ variant: "primary", size: "md" })}>
-              <FolderPlus className="size-4" aria-hidden />
-              Create your first project
-            </button>
-          </div>
-        </div>
+        <EmptyScene
+          art
+          title="No projects yet"
+          body="A project tells us the skills and work mode you need, so candidates are matched to it. It takes about two minutes."
+          who="You - about two minutes"
+          next={{ label: "Post your first project", href: "/employer/projects/new" }}
+        />
       ) : (
         <>
-          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <FilterTabs
-              label="Show projects"
-              value={filter}
-              onChange={(k) => setFilter(k as typeof filter)}
-              tabs={[
-                { key: "all", label: "All", count: projects.length },
-                { key: "open", label: "Open", count: openCount },
-                { key: "closed", label: "Paused or closed", count: closedCount },
-              ]}
+          <div className="relative max-w-xl">
+            <label htmlFor="project-search" className="sr-only">
+              Search projects or skills
+            </label>
+            <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+            <input
+              id="project-search"
+              type="search"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setShown(PAGE);
+              }}
+              placeholder="Search projects or skills"
+              className={cn(fieldClass, "rounded-full pl-10 pr-11 [&::-webkit-search-cancel-button]:hidden")}
             />
-
-            <div className="relative min-w-0 sm:w-72">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
-              <input
-                type="search"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search projects or skills"
-                aria-label="Search projects or skills"
-                className={controlClass(false, "pl-10 pr-10")}
-              />
-              {query ? (
-                <button
-                  type="button"
-                  onClick={() => setQuery("")}
-                  aria-label="Clear search"
-                  className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center touch:size-11 rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-ink-800"
-                >
-                  <X className="size-4" aria-hidden />
-                </button>
-              ) : null}
-            </div>
+            {query ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery("");
+                  setShown(PAGE);
+                }}
+                aria-label="Clear search"
+                className="absolute right-0.5 top-1/2 grid size-10 -translate-y-1/2 place-items-center rounded-full text-text-subtle hover:bg-ink-100 hover:text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600 touch:size-11"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            ) : null}
           </div>
 
-          {listError ? <FormNotice tone="error" className="mb-4">{listError}</FormNotice> : null}
-          {takenDown.map((p) => (
-            <FormNotice key={p.id} tone="error" className="mb-4">
-              Findtern took down &ldquo;{p.projectName}&rdquo;: {p.takenDownReason || "no reason recorded"}. Candidates can&apos;t see it. Contact support to have it restored.
-            </FormNotice>
-          ))}
+          <div role="group" aria-label="Show projects" className="mt-6 flex gap-6 overflow-x-auto border-b border-ink-100">
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                aria-pressed={filter === t.key}
+                onClick={() => {
+                  setFilter(t.key);
+                  setShown(PAGE);
+                }}
+                className={cn(
+                  "-mb-px inline-flex min-h-11 shrink-0 items-center gap-1.5 border-b-2 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600",
+                  filter === t.key ? "border-ink-900 text-ink-900" : "border-transparent text-ink-600 hover:text-ink-900",
+                )}
+              >
+                {t.label}
+                <span className="nums text-text-subtle">{t.count}</span>
+              </button>
+            ))}
+          </div>
 
           {filtered.length === 0 ? (
-            <Surface className="px-6 py-10 text-center">
+            <div className="py-12 text-center">
               <p className="text-base font-semibold text-ink-900">No projects match</p>
               <p className="mt-1 text-sm text-ink-600">
-                {q ? `Nothing matches "${query.trim()}"` : `No ${filter} projects`}. Clear the search or show all projects.
+                {q ? `Nothing matches "${query.trim()}"` : `No ${STATE_LABEL[filter as State].toLowerCase()} projects`}. Clear the search or show all projects.
               </p>
               <button
                 type="button"
@@ -364,184 +224,159 @@ export function ProjectsManager({
               >
                 Show all projects
               </button>
-            </Surface>
+            </div>
           ) : (
-            <Surface className="overflow-hidden">
-              <ul className="divide-y divide-ink-100">
-                {filtered.map((p) => {
-                  const skills = (p.skills as string[] | null) ?? [];
-                  const state = listingState(p);
-                  const open = state === "open";
-                  const mode = MODE_LABEL[p.locationType ?? ""] ?? "Work mode not set";
-                  const place = [p.city, p.state].filter(Boolean).join(", ");
-                  const meta = [
-                    `${mode}${place && p.locationType !== "remote" ? ` · ${place}` : ""}`,
-                    scopeLabel(p.scopeOfWork),
-                    p.fullTimeOffer ? "Full-time path" : "",
-                  ].filter(Boolean);
-                  return (
-                    <li
-                      key={p.id}
-                      className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-2 px-5 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_5.5rem_12rem]"
-                    >
-                      <div className="min-w-0">
-                        <h2 className={cn("break-words text-base font-medium", open ? "text-ink-900" : "text-ink-600")}>{p.projectName}</h2>
-                        <p className="text-sm text-ink-600">{meta.join(" · ")}</p>
-                      </div>
-                      <p className="min-w-0 truncate text-sm text-ink-600 max-lg:col-span-2" title={skills.join(", ")}>
-                        {skills.length ? (
-                          <>
-                            {skills.slice(0, 4).join(" · ")}
-                            {skills.length > 4 ? <span className="text-text-subtle"> +{skills.length - 4}</span> : null}
-                          </>
-                        ) : (
-                          <span className="text-accent-700">No skills yet, so no matches</span>
-                        )}
-                      </p>
-                      <div className="max-lg:col-start-2 max-lg:row-start-1">
-                        <Pill tone={open ? "live" : state === "taken_down" ? "waiting" : "closed"}>{STATE_LABEL[state]}</Pill>
-                      </div>
-                      <div className="flex items-center justify-end gap-1 max-lg:col-span-2 max-lg:justify-start">
-                        {open ? (
-                          <ButtonLink href={`/employer/candidates?project=${encodeURIComponent(p.id)}`} variant="outline" size="sm">
-                            <Users className="size-4" aria-hidden />
-                            Find candidates
-                          </ButtonLink>
-                        ) : null}
-                        <RowMenu
-                          label={`More actions for ${p.projectName}`}
-                          items={[
-                            { label: "Edit project", onSelect: () => openEdit(p), icon: <Pencil /> },
-                            ...(state === "open"
-                              ? [{ label: "Pause project", onSelect: () => changeStatus(p, PAUSED_PROJECT_STATUS), icon: <Pause />, disabled: busyId === p.id }]
-                              : state === "paused"
-                                ? [{ label: "Resume project", onSelect: () => changeStatus(p, "active"), icon: <Play />, disabled: busyId === p.id }]
-                                : []),
-                            ...(state === "open" || state === "paused"
-                              ? [{ label: "Close project for good", onSelect: () => changeStatus(p, FINAL_PROJECT_STATUS), icon: <Briefcase />, disabled: busyId === p.id }]
-                              : []),
-                            { label: "Delete project", onSelect: () => deleteProject(p), icon: <Trash2 />, destructive: true, disabled: busyId === p.id },
-                          ]}
-                        />
-                      </div>
-                      {rowError?.id === p.id ? (
-                        <FormNotice tone="error" className="col-span-full">
-                          {rowError.message}
-                        </FormNotice>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            </Surface>
+            <>
+            <ul className="divide-y divide-ink-100" aria-label="Projects">
+              {filtered.slice(0, shown).map((p) => (
+                <ProjectRow
+                  key={p.id}
+                  project={p}
+                  counts={counts[p.id] ?? NO_COUNTS}
+                  busy={busyId === p.id}
+                  error={rowError?.id === p.id ? rowError.message : null}
+                  onStatus={(next) => changeStatus(p, next)}
+                  onDelete={() => deleteProject(p)}
+                />
+              ))}
+            </ul>
+            {filtered.length > shown ? (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-ink-100 pt-6">
+                <button type="button" onClick={() => setShown((n) => n + PAGE)} className={buttonClass({ variant: "outline", size: "md" })}>
+                  Show {Math.min(PAGE, filtered.length - shown)} more
+                </button>
+                <p className="nums text-sm text-ink-600">
+                  Showing {shown} of {filtered.length}
+                </p>
+              </div>
+            ) : null}
+            </>
           )}
         </>
       )}
-
-      <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-        <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-xl">
-          <SheetHeader className="border-b border-ink-100 px-6 py-5">
-            <SheetTitle className="text-xl font-semibold text-ink-900">
-              {editing ? "Edit project" : reviewing ? "Review before you publish" : "New project"}
-            </SheetTitle>
-            <SheetDescription className="text-sm text-ink-600">
-              {reviewing
-                ? "This is what candidates will see. It goes live as soon as you publish."
-                : "Candidates are matched on the skills, work mode and place you set here."}
-            </SheetDescription>
-          </SheetHeader>
-
-          <form onSubmit={handleSave} noValidate className="px-6 pb-6 pt-5">
-            {saveError ? <FormNotice tone="error" className="mb-5">{saveError}</FormNotice> : null}
-            {reviewing ? (
-              <ListingReview form={form} description={description} />
-            ) : (
-              <ProjectFields
-                values={form}
-                set={setField}
-                errors={errors}
-                companyPlace={companyPlace}
-                idPrefix="sheet"
-                description={{
-                  value: description,
-                  onChange: (v) => {
-                    setDescription(v);
-                    setDescriptionError("");
-                  },
-                  onBlur: () => setDescriptionError(projectDescriptionError(description) ?? ""),
-                  error: descriptionError,
-                }}
-              />
-            )}
-            {/* Left-aligned, primary first. (The chat launcher steps aside
-                while a sheet is open, so no right padding is needed for it.) */}
-            <div className="sticky bottom-0 -mx-6 mt-8 flex items-center gap-2 border-t border-ink-100 bg-white px-6 py-4">
-              <button type="submit" disabled={saving} className={buttonClass({ variant: "primary", size: "md" })}>
-                {saving ? (reviewing ? "Publishing…" : "Saving…") : editing ? "Save changes" : reviewing ? "Publish listing" : "Review listing"}
-              </button>
-              {reviewing ? (
-                <button type="button" onClick={() => setReviewing(false)} disabled={saving} className={buttonClass({ variant: "light", size: "md" })}>
-                  Edit details
-                </button>
-              ) : null}
-              {/* On a phone the drawer's own close button does this. */}
-              <button
-                type="button"
-                onClick={() => setSheetOpen(false)}
-                className={buttonClass({ variant: "light", size: "md", className: "hidden sm:inline-flex" })}
-              >
-                Cancel
-              </button>
-            </div>
-          </form>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }
 
-/** The listing as candidates will read it, shown once before a new project goes live. */
-function ListingReview({ form, description }: { form: ProjectDraft; description: string }) {
-  const remote = form.locationType === "remote";
-  const place = [form.city, form.state].filter(Boolean).join(", ");
-  const rows: [string, string][] = [
-    ["Role", form.projectName.trim()],
-    ["Work mode", MODE_LABEL[form.locationType] ?? form.locationType],
-    ...(remote || !place ? [] : ([["Place", place]] as [string, string][])),
-    ["Runs for", scopeLabel(form.scopeOfWork)],
-    ["Full-time path", form.fullTimeOffer ? "Yes" : "No"],
+function ProjectRow({
+  project: p,
+  counts,
+  busy,
+  error,
+  onStatus,
+  onDelete,
+}: {
+  project: EmployerProject;
+  counts: ProjectCounts;
+  busy: boolean;
+  error: string | null;
+  onStatus: (next: "active" | typeof PAUSED_PROJECT_STATUS | typeof FINAL_PROJECT_STATUS) => void;
+  onDelete: () => void;
+}) {
+  const state = stateOf(p);
+  const skills = (p.skills as string[] | null) ?? [];
+  const place = p.locationType !== "remote" ? [p.city, p.state].filter(Boolean).join(", ") : "";
+  const day = p.createdAt ? formatDayLabel(p.createdAt) : null;
+  const meta = [
+    [MODE_LABEL[p.locationType ?? ""] ?? "Work mode not set", place].filter(Boolean).join(" · "),
+    scopeLabel(p.scopeOfWork),
+    p.fullTimeOffer ? "Can lead to full time" : "",
+  ].filter(Boolean);
+  const posted = day && day !== "Unknown" ? `Posted ${/^\d/.test(day) ? day : day.toLowerCase()}` : null;
+  const editHref = `/employer/projects/${encodeURIComponent(p.id)}/edit`;
+  const figures: [string, number][] = [
+    ["Shortlisted", counts.shortlisted],
+    ["Proposals", counts.proposals],
+    ["Hired", counts.hired],
   ];
+
   return (
-    <div className="space-y-6">
-      <dl className="divide-y divide-ink-100 rounded-apple-md border border-ink-200/80">
-        {rows.map(([label, value]) => (
-          <div key={label} className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 px-4 py-3 text-sm">
-            <dt className="text-ink-600">{label}</dt>
-            <dd className="min-w-0 break-words font-medium text-ink-900">{value}</dd>
+    <li className="grid gap-x-10 gap-y-3 py-6 lg:grid-cols-[minmax(0,1fr)_15rem_auto] lg:items-start">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          <h2 className={cn("min-w-0 break-words text-lg font-semibold tracking-[-0.01em]", state === "live" ? "text-ink-900" : "text-ink-600")}>
+            <Link
+              href={editHref}
+              className="rounded-apple-sm underline-offset-4 hover:text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 touch:inline-flex touch:min-h-11 touch:items-center"
+            >
+              {p.projectName}
+            </Link>
+          </h2>
+          <span className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-700">
+            <span className={cn("size-2 rounded-full", STATE_DOT[state])} aria-hidden />
+            {STATE_LABEL[state]}
+          </span>
+          {posted ? <span className="nums text-sm text-text-subtle">{posted}</span> : null}
+        </div>
+        <p className="nums mt-1 text-sm text-ink-600">{meta.join(" · ")}</p>
+
+        {state === "down" ? (
+          <p className="mt-3 text-sm text-danger">
+            <span className="font-medium">Findtern took this listing down</span>
+            {p.takenDownReason ? `: ${p.takenDownReason.trim().replace(/[.!?]*$/, ".")}` : "."} Candidates can&apos;t see it. Write to us if you think that was a mistake.
+          </p>
+        ) : null}
+
+        {skills.length > 0 ? (
+          <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Skills">
+            {skills.slice(0, 7).map((skill) => (
+              <li key={skill} className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
+                {skill}
+              </li>
+            ))}
+            {skills.length > 7 ? (
+              <li className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
+                +{skills.length - 7}
+                <span className="sr-only"> more skills</span>
+              </li>
+            ) : null}
+          </ul>
+        ) : (
+          <p className="mt-3 text-sm text-accent-700">No skills yet, so no matches. Edit the project to add them.</p>
+        )}
+      </div>
+
+      {/* Phones read it as one line ("5 Shortlisted  1 Proposals  0 Hired"); wide screens as three columns. */}
+      <dl className="flex flex-wrap gap-x-5 gap-y-1 lg:grid lg:grid-cols-3 lg:gap-4">
+        {figures.map(([label, n]) => (
+          <div key={label} className="flex min-w-0 flex-row-reverse items-baseline justify-end gap-1.5 lg:flex-col lg:items-start lg:justify-start lg:gap-0.5">
+            <dt className="text-sm text-ink-600 lg:text-xs">{label}</dt>
+            <dd className={cn("nums text-base font-semibold lg:text-lg", n > 0 ? "text-ink-900" : "text-text-subtle")}>{n}</dd>
           </div>
         ))}
       </dl>
-      <div>
-        <h3 className="text-sm font-medium text-ink-800">Skills</h3>
-        <ul className="mt-2 flex flex-wrap gap-1.5">
-          {form.skills.map((skill) => (
-            <li key={skill}>
-              <Pill tone="neutral">{skill}</Pill>
-            </li>
-          ))}
-        </ul>
+
+      <div className="flex items-center gap-2 lg:justify-end">
+        {state === "live" ? (
+          <ButtonLink href={`/employer/candidates?project=${encodeURIComponent(p.id)}`} variant="primary" size="sm">
+            <Users className="size-4" aria-hidden />
+            Find candidates
+          </ButtonLink>
+        ) : state === "paused" ? (
+          <button type="button" onClick={() => onStatus("active")} disabled={busy} className={buttonClass({ variant: "outline", size: "sm" })}>
+            <Play className="size-4" aria-hidden />
+            {busy ? "Resuming…" : "Resume"}
+          </button>
+        ) : null}
+        <RowMenu
+          label={`More actions for ${p.projectName}`}
+          items={[
+            { label: "Edit project", href: editHref, icon: <Pencil /> },
+            ...(state === "live" ? [{ label: "Pause project", onSelect: () => onStatus(PAUSED_PROJECT_STATUS), icon: <Pause />, disabled: busy }] : []),
+            ...(state === "live" || state === "paused"
+              ? [{ label: "Close project for good", onSelect: () => onStatus(FINAL_PROJECT_STATUS), icon: <Briefcase />, disabled: busy }]
+              : []),
+            // A taken-down listing can't be deleted and re-posted (the API refuses it), so the menu doesn't offer it.
+            ...(state === "down" ? [] : [{ label: "Delete project", onSelect: onDelete, icon: <Trash2 />, destructive: true, disabled: busy }]),
+          ]}
+        />
       </div>
-      <div>
-        <h3 className="text-sm font-medium text-ink-800">What the work involves</h3>
-        {description.trim() ? (
-          <p className="mt-2 max-w-prose whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-700">{description.trim()}</p>
-        ) : (
-          <p className="mt-2 text-sm text-ink-600">No description. You can add one later by editing the project.</p>
-        )}
-      </div>
-      <FormNotice tone="info">
-        Your company name stays hidden from candidates until you hire. Findtern may take down a listing that breaks the rules, and tells you why.
-      </FormNotice>
-    </div>
+
+      {error ? (
+        <FormNotice tone="error" className="lg:col-span-3">
+          {error}
+        </FormNotice>
+      ) : null}
+    </li>
   );
 }

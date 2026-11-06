@@ -7,6 +7,7 @@ import { scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
 import { contactFieldError } from "@/lib/contact-scrub";
 import { requireMutation } from "@/lib/guards-mutation";
+import { projectContactError } from "@/lib/project-contact";
 import { projectNameIssue } from "@/lib/project-name";
 import {
   MAX_PROJECT_DESCRIPTION,
@@ -70,7 +71,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .from(schema.employers)
     .where(eq(schema.employers.id, id))
     .limit(1);
-  const nameProblem = projectNameIssue(d.projectName, owner?.companyName);
+  const nameProblem = projectContactError(d.projectName) ?? projectNameIssue(d.projectName, owner?.companyName);
   if (nameProblem) return NextResponse.json({ error: nameProblem }, { status: 400 });
   // Project names are unique per employer, ignoring case (legacy R:10682).
   const [clash] = await db

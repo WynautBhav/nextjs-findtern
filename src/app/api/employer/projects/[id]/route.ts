@@ -7,6 +7,7 @@ import { scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
 import { contactFieldError } from "@/lib/contact-scrub";
 import { requireMutation } from "@/lib/guards-mutation";
+import { projectContactError } from "@/lib/project-contact";
 import { projectNameIssue } from "@/lib/project-name";
 import {
   CLOSED_PROJECT_STATUSES,
@@ -118,7 +119,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         .from(schema.employers)
         .where(eq(schema.employers.id, project.employerId))
         .limit(1);
-      const nameProblem = projectNameIssue(parsed.data.projectName, owner?.companyName);
+      const nameProblem = projectContactError(parsed.data.projectName) ?? projectNameIssue(parsed.data.projectName, owner?.companyName);
       if (nameProblem) return NextResponse.json({ error: nameProblem }, { status: 400 });
     }
     const [clash] = await db

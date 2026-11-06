@@ -273,7 +273,9 @@ test("UI: create goes through a review step before the listing is published [UI]
   const name = "Insights Reporting Intern";
   try {
     await visit(page, "/employer/projects");
-    await page.getByRole("button", { name: /new project|add project|create project|post a role/i }).first().click();
+    // Posting is its own page now (/employer/projects/new), reached from the header link.
+    await page.getByRole("link", { name: /post a project/i }).first().click();
+    await page.waitForURL(/\/employer\/projects\/new/);
     await page.getByLabel("Project name").fill(name);
     for (const skill of SKILLS) {
       const box = page.getByLabel(/^Skills/).first();
@@ -316,7 +318,7 @@ test("UI: pause and close are separate actions; a taken-down listing shows its r
     // Take it down as admin, then the employer's list shows why.
     assert.equal((await send(state.adminCtx, "PUT", `/api/admin/projects/${state.listingId}/status`, { action: "take_down", reason: "Needs rewording" })).status, 200);
     await page.reload();
-    await page.getByText(/Findtern took down .{0,80}Needs rewording/).first().waitFor();
+    await page.getByText(/Findtern took (?:this listing )?down.{0,80}Needs rewording/).first().waitFor();
     await send(state.adminCtx, "PUT", `/api/admin/projects/${state.listingId}/status`, { action: "restore" });
   } catch (err) {
     await page.screenshot({ path: join(ROOT, "e2e", ".artifacts", "fail-listings-ui-menu.png"), fullPage: true }).catch(() => {});
