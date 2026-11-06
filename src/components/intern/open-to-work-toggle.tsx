@@ -56,7 +56,7 @@ export function OpenToWorkToggle({
   return (
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
-        <p className="text-[0.9375rem] font-semibold text-ink-900">Open to work</p>
+        <p className="text-base font-semibold text-ink-900">Open to work</p>
         <p className={cn("mt-1 text-sm leading-relaxed text-ink-600", brief && on && "sr-only")}>
           {on
             ? "Employers can find you in the candidate pool. You can hide your profile whenever you need a break."
@@ -70,7 +70,14 @@ export function OpenToWorkToggle({
       </div>
       <div className="flex shrink-0 items-center gap-2 pt-0.5">
         {saving ? <Loader2 className="size-4 animate-spin text-text-subtle" aria-hidden /> : null}
-        <Switch checked={on} onCheckedChange={flip} disabled={saving} aria-label="Open to work" />
+        <Switch
+          checked={on}
+          onCheckedChange={flip}
+          disabled={saving}
+          aria-label="Open to work"
+          // The switch looks the same; an invisible 44px square around it is the hit area on every pointer, not only touch.
+          className="before:absolute before:left-1/2 before:top-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+        />
       </div>
     </div>
   );
