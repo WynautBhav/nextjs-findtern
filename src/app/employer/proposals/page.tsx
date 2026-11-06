@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { avatarUrl } from "@/lib/employer-pool";
+import { initialsOf } from "@/lib/employer-candidates";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { toEmployerProposal } from "@/lib/employer-proposal-view";
 import { PageHead } from "@/components/app/primitives";
@@ -19,6 +20,18 @@ export const metadata: Metadata = {
   title: "Proposals",
   robots: { index: false, follow: false },
 };
+
+/**
+ * What the client list gets of the intern. Before the hire only the initials
+ * leave the server (as two one-letter names), never the full name: the page's
+ * RSC payload is readable in the browser.
+ */
+function userFor(first: string | null, last: string | null, hired: boolean): ProposalItem["user"] {
+  if (first === null && last === null) return null;
+  if (hired) return { firstName: first ?? "", lastName: last ?? "" };
+  const initials = initialsOf(first ?? "", last ?? "");
+  return { firstName: initials.charAt(0), lastName: initials.slice(1) };
+}
 
 export default async function EmployerProposalsPage() {
   const session = await requireRole("employer");
@@ -71,10 +84,7 @@ export default async function EmployerProposalsPage() {
       internHired: hired.has(row.proposal.internId),
       photoUrl: withPhoto.has(row.proposal.internId) ? avatarUrl(row.proposal.internId) : null,
       presence: presence[row.proposal.internId] ?? null,
-      user:
-        row.firstName === null && row.lastName === null
-          ? null
-          : { firstName: row.firstName ?? "", lastName: row.lastName ?? "" },
+      user: userFor(row.firstName, row.lastName, hired.has(row.proposal.internId)),
     }));
   } catch (err) {
     console.error("[employer/proposals] load failed", err);
