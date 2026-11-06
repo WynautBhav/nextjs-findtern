@@ -73,7 +73,7 @@ export function CollegeMark({
     .join("");
   return logoUrl ? (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={logoUrl} alt={name} className={cn("size-12 rounded-xl border border-ink-200 bg-white object-contain p-1", className)} />
+    <img src={logoUrl} alt={name} width={48} height={48} loading="lazy" decoding="async" className={cn("size-12 rounded-xl border border-ink-200 bg-white object-contain p-1", className)} />
   ) : (
     <span
       aria-hidden
