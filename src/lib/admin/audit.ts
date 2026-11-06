@@ -76,6 +76,20 @@ export const AUDIT_ACTIONS = {
   "college.admin_create": "Created a TPO login",
   "terms.publish": "Published terms",
   "account.password_change": "Changed own password",
+  "project.take_down": "Took down a listing",
+  "project.restore": "Restored a taken-down listing",
+  "roster.import_commit": "Imported a college roster",
+  "roster.match_auto": "Linked roster students by email",
+  "roster.match_link": "Linked a roster student to an account",
+  "roster.match_reject": "Rejected a roster match",
+  "college.contact_update": "Edited a college's contact details",
+  "refund.create": "Opened a refund",
+  "refund.initiate": "Started a refund",
+  "refund.settle": "Refund completed",
+  "refund.fail": "Refund failed",
+  "refund.manual": "Marked a refund paid manually",
+  "refund.reject": "Rejected a refund",
+  "refund.cancel": "Cancelled a refund",
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

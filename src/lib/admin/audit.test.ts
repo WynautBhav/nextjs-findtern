@@ -139,6 +139,20 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "college.admin_create": { collegeAdminId: "ca-1", name: "Asha", email: "tpo@college.test" },
   "terms.publish": { document: "Intern Terms", title: "Intern Terms" },
   "account.password_change": {},
+  "project.take_down": { projectId: "p-1", employerId: "e-1", reason: "Asked students for a deposit" },
+  "project.restore": { projectId: "p-1", employerId: "e-1" },
+  "roster.import_commit": { collegeId: "c-1", importId: "ri-1", fileName: "roster.xlsx", created: 280, updated: 12, autoLinked: 40, review: 3, skippedInvalid: 5 },
+  "roster.match_auto": { collegeId: "c-1", importId: "ri-1", count: 40 },
+  "roster.match_link": { collegeId: "c-1", rosterId: "r-1", userId: "u-1", reason: "phone" },
+  "roster.match_reject": { collegeId: "c-1", rosterId: "r-1" },
+  "college.contact_update": { fields: ["contactName", "contactPhone"], contactPhone: { from: null, to: "9876543210" } },
+  "refund.create": { internPaymentId: "ip-1", internId: "i-1", amountMinor: 249900, status: "eligible" },
+  "refund.initiate": { refundId: "rf-1", amountMinor: 249900, gatewayRefundId: "rfnd_123", seatUsageId: "pu-1" },
+  "refund.settle": { refundId: "rf-1", gatewayRefundId: "rfnd_123", source: "webhook" },
+  "refund.fail": { refundId: "rf-1", gatewayRefundId: "rfnd_123", error: "Insufficient balance" },
+  "refund.manual": { refundId: "rf-1", reference: "UTR 412345678901", amountMinor: 249900 },
+  "refund.reject": { refundId: "rf-1", reason: "Student withdrew the request" },
+  "refund.cancel": { refundId: "rf-1" },
 };
 
 test("every call site's meta passes the redaction check: nothing sensitive leaks, nothing readable is lost", () => {
