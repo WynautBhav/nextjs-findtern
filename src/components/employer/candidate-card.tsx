@@ -223,7 +223,6 @@ export function CandidateCard({
         </div>
       ) : null}
 
-      {candidate.bio ? <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-ink-600">{candidate.bio}</p> : null}
 
       {/* Every skill (a profile holds at most seven), never "+N more". */}
       {skills.length > 0 ? (

@@ -289,11 +289,12 @@ export default async function CandidatesPage({
 
       if (filters.q) {
         // Keyword only - never a name. Employers browse a redacted pool, so the
-        // query matches skills, bio and city. Matching on name would let anyone
-        // probe whether a specific person is on the platform.
+        // query matches skills and city. Matching on name would let anyone
+        // probe whether a specific person is on the platform. Never the bio:
+        // employers do not receive it, so a search must not reveal it either.
         const needle = likePattern(filters.q);
         clauses.push(
-          sql`(${schema.internOnboarding.skills}::text ILIKE ${needle} ESCAPE '\\' OR ${schema.internOnboarding.bio} ILIKE ${needle} ESCAPE '\\' OR ${schema.internOnboarding.city} ILIKE ${needle} ESCAPE '\\')`,
+          sql`(${schema.internOnboarding.skills}::text ILIKE ${needle} ESCAPE '\\' OR ${schema.internOnboarding.city} ILIKE ${needle} ESCAPE '\\')`,
         );
       }
 
@@ -699,13 +700,13 @@ export default async function CandidatesPage({
             </div>
 
             <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-              {/* Keyword search: skills, bio or city - never a name (the pool is redacted). */}
+              {/* Keyword search: skills or city - never a name or bio (the pool is redacted). */}
               <form method="get" role="search" className="relative w-full sm:w-60">
                 {Array.from(new URLSearchParams(queryOf({ ...filters, q: "", page: 1 }).slice(1)).entries()).map(([k, v], i) => (
                   <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
                 ))}
                 <label htmlFor="candidate-search" className="sr-only">
-                  Search by skill, city or bio
+                  Search by skill or city
                 </label>
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
                 <input

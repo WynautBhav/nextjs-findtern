@@ -433,15 +433,6 @@ export default async function EmployerInternDetail({
             />
           </section>
 
-          {profile.bio ? (
-            <section>
-              <SectionHead title="About" />
-              <Surface className="p-6">
-                <p className="whitespace-pre-line text-sm leading-relaxed text-ink-700">{profile.bio}</p>
-              </Surface>
-            </section>
-          ) : null}
-
           {academics ? (
             <section>
               <SectionHead title="Academics" />

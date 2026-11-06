@@ -43,6 +43,13 @@ test("AI links that are not http(s) never reach the browser", () => {
   assert.equal(ok.aiRecordingLink, null);
 });
 
+test("employers never receive the bio (directive §1)", () => {
+  const user = { id: "u1", firstName: "A", lastName: "B", email: "a@b.c" } as never;
+  const profile = toCandidateProfile(user, { bio: "BIO-CANARY call me on 9876543210", extraData: {} } as never);
+  assert.equal("bio" in profile, false);
+  assert.ok(!JSON.stringify(profile).includes("BIO-CANARY"));
+});
+
 test("matchesPlace: remote-only candidate shows when the toggle is on, not when off", () => {
   const remoteOnly = { preferredLocations: [], locationTypes: ["remote"] };
   assert.equal(matchesPlace(remoteOnly, { cities: ["Jaipur"], includeRemote: true }), true);

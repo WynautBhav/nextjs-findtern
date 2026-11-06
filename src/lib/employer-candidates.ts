@@ -67,7 +67,6 @@ export type CandidateProfile = {
   state: string;
   /** "Bengaluru, Karnataka" - or just whichever half is filled in. */
   location: string;
-  bio: string;
   linkedinUrl: string;
   skills: string[];
   /** Findtern Score, out of 10. Zero when the intern has not been scored. */
@@ -218,7 +217,6 @@ export function toCandidateProfile(
     city,
     state,
     location: [city, state].filter(Boolean).join(", "),
-    bio: text(onboarding?.bio),
     linkedinUrl: text(onboarding?.linkedinUrl),
     skills: readSkills(onboarding?.skills),
     score: readScore(extra),

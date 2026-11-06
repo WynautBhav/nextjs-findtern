@@ -49,7 +49,6 @@ export function AiFeedbackReport({
   ratings: AiRatings;
   /** Kept for callers; the report shows only the scores. */
   skills?: string[];
-  bio?: string | null;
   aiFeedbackLink?: string | null;
   aiRecordingLink?: string | null;
 }) {
