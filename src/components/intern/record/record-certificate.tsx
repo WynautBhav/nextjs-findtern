@@ -97,7 +97,7 @@ export function RecordTimeline({ proofs }: { proofs: Proof[] }) {
         const Icon = ICON[proof.kind];
         const last = i === proofs.length - 1;
         return (
-          <li key={proof.id} className="relative grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-4 pb-8 last:pb-0 sm:gap-x-5">
+          <li key={proof.id} className="relative grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-4 pb-8 last:pb-0 sm:gap-x-4">
             {last ? null : <span aria-hidden className="absolute bottom-0 left-5 top-11 w-px -translate-x-1/2 bg-ink-200" />}
             <span className="relative grid size-10 place-items-center rounded-full bg-primary-soft text-primary ring-1 ring-inset ring-primary/15">
               <Icon className="size-4.5" aria-hidden />

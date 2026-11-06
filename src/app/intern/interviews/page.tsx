@@ -210,7 +210,7 @@ export default async function InternInterviews() {
                   )}
                   {/* A missed round can carry feedback too; the employer is told it is shared. */}
                   {(outcome.label === "Interview done" || outcome.label === "Missed") && feedback ? (
-                    <div className="mt-2 rounded-apple-md bg-brand-50/70 p-4">
+                    <div className="mt-2 rounded-apple-sm bg-brand-50/70 p-4">
                       <p className="text-xs font-medium text-brand-800">Feedback from the company</p>
                       <p className="mt-1 whitespace-pre-line text-pretty text-sm text-ink-800">{feedback}</p>
                     </div>

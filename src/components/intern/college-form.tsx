@@ -95,7 +95,7 @@ function Membership({
       <div className="min-w-0 space-y-8">
         <Surface className="p-5 sm:p-6">
           <div className="flex items-start gap-4">
-            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-apple-md bg-brand-50 text-brand-700">
+            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
               <Building2 className="size-5" />
             </span>
             <div className="min-w-0 flex-1">
@@ -502,7 +502,7 @@ function CollegeSearch({
         role="listbox"
         aria-label="Colleges"
         hidden={!showList}
-        className="mt-2 max-h-80 overflow-y-auto rounded-apple-lg border border-ink-200/80 bg-white p-1 shadow-sm"
+        className="mt-2 max-h-80 overflow-y-auto rounded-apple-sm border border-ink-200/80 bg-white p-1 shadow-sm"
       >
         {options.map((o, i) => (
           <li

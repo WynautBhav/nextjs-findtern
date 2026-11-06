@@ -61,7 +61,7 @@ export function PhotoUpload({
   const shownError = problem ?? error;
 
   return (
-    <div id="photo" tabIndex={-1} className="flex flex-col gap-5 outline-none sm:flex-row sm:items-center">
+    <div id="photo" tabIndex={-1} className="flex flex-col gap-4 outline-none sm:flex-row sm:items-center">
       <div
         className={cn(
           "grid size-28 shrink-0 place-items-center overflow-hidden rounded-apple-xl border bg-ink-50",
@@ -295,7 +295,7 @@ function Cropper({ source, onCancel, onDone }: { source: Loaded; onCancel: () =>
         </p>
       ) : null}
 
-      <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
+      <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         <button type="button" onClick={onCancel} disabled={busy} className={buttonClass({ variant: "light", size: "md", className: "w-full sm:w-auto" })}>
           Cancel
         </button>

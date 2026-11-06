@@ -102,7 +102,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
           {role.scopeOfWork ? (
             <Surface className="p-5 sm:p-6">
               <SectionHead title="What you would be doing" className="mb-0" />
-              <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-[0.9375rem] leading-relaxed text-ink-700">
+              <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-700">
                 {role.scopeOfWork}
               </p>
             </Surface>

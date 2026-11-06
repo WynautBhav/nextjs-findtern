@@ -57,7 +57,7 @@ export function LocationStep({ values, update, errors }: StepProps) {
                 data-field="locationTypes"
                 onClick={() => pick(value)}
                 className={cn(
-                  "apple-spring apple-pressable flex min-h-11 items-center gap-3 rounded-apple-lg border p-4 text-left",
+                  "apple-spring apple-pressable flex min-h-11 items-center gap-3 rounded-apple-xl border p-4 text-left",
                   on
                     ? "border-brand-600 bg-brand-50 shadow-xs ring-1 ring-brand-600/25"
                     : errors.locationTypes
@@ -69,7 +69,7 @@ export function LocationStep({ values, update, errors }: StepProps) {
                   <Icon className="size-[1.125rem]" aria-hidden />
                 </span>
                 <span className="min-w-0">
-                  <span className={cn("block text-[0.9375rem] font-semibold", on ? "text-brand-900" : "text-ink-900")}>{label}</span>
+                  <span className={cn("block text-base font-semibold", on ? "text-brand-900" : "text-ink-900")}>{label}</span>
                   <span className="block text-sm text-ink-600">{detail}</span>
                 </span>
               </button>
@@ -112,7 +112,7 @@ export function LocationStep({ values, update, errors }: StepProps) {
                 data-field="hasLaptop"
                 onClick={() => update("hasLaptop", o.value)}
                 className={cn(
-                  "apple-spring apple-pressable flex min-h-11 items-start gap-3 rounded-apple-lg border p-4 text-left",
+                  "apple-spring apple-pressable flex min-h-11 items-start gap-3 rounded-apple-xl border p-4 text-left",
                   on
                     ? "border-brand-600 bg-brand-50 shadow-xs ring-1 ring-brand-600/25"
                     : errors.hasLaptop
@@ -124,7 +124,7 @@ export function LocationStep({ values, update, errors }: StepProps) {
                   <Laptop className="size-[1.125rem]" aria-hidden />
                 </span>
                 <span className="min-w-0">
-                  <span className={cn("block text-[0.9375rem] font-semibold", on ? "text-brand-900" : "text-ink-900")}>{o.label}</span>
+                  <span className={cn("block text-base font-semibold", on ? "text-brand-900" : "text-ink-900")}>{o.label}</span>
                   <span className="block text-sm text-ink-600">{o.detail}</span>
                 </span>
               </button>

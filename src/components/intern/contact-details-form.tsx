@@ -72,7 +72,7 @@ export function ContactDetailsForm({
       </Grid>
       <div className="min-w-0">
         <Label htmlFor="phoneNumber">Mobile number</Label>
-        <div className="mt-2 grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-2.5">
+        <div className="mt-2 grid grid-cols-[minmax(0,8.5rem)_minmax(0,1fr)] gap-3">
           <Select
             id="countryCode"
             ariaLabel="Country code"

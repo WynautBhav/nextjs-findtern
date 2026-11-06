@@ -160,7 +160,7 @@ function DocCard({ doc }: { doc: DocumentRow }) {
   const type = (doc.contentType ?? "").toLowerCase();
   return (
     <li className="group relative min-w-0">
-      <span className="grid aspect-[4/3] place-items-center overflow-hidden rounded-apple-md bg-ink-50 text-text-subtle ring-1 ring-inset ring-ink-200/70 apple-spring group-hover:ring-brand-400">
+      <span className="grid aspect-[4/3] place-items-center overflow-hidden rounded-apple-sm bg-ink-50 text-text-subtle ring-1 ring-inset ring-ink-200/70 apple-spring group-hover:ring-brand-400">
         {type.startsWith("image/") ? (
           <DocImagePreview href={doc.href} fit={doc.label === "Profile photo" ? "cover" : "contain"} />
         ) : type.startsWith("video/") ? (

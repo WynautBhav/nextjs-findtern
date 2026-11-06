@@ -224,7 +224,7 @@ function PhonePrefixed({
     <div className="relative mt-2">
       <span
         aria-hidden
-        className="nums pointer-events-none absolute inset-y-0 left-0 flex items-center gap-1.5 border-r border-ink-200 pl-3.5 pr-3 text-[0.9375rem] font-medium text-ink-600"
+        className="nums pointer-events-none absolute inset-y-0 left-0 flex items-center gap-1.5 border-r border-ink-200 pl-3.5 pr-3 text-base font-medium text-ink-600"
       >
         {disabled ? <Lock className="size-3.5 text-text-subtle" /> : null}
         {code}
@@ -256,7 +256,7 @@ function DocSlot({ id, label, optional, error, children }: { id: string; label: 
       <Label optional={optional}>{label}</Label>
       <div
         className={cn(
-          "mt-2 rounded-apple-md border border-dashed p-3",
+          "mt-2 rounded-apple-sm border border-dashed p-3",
           error ? "border-danger bg-danger-soft/40" : "border-ink-200 bg-ink-50/40",
         )}
       >

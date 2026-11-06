@@ -30,7 +30,7 @@ import { loadRazorpay, RAZORPAY_THEME_COLOR } from "@/components/payments/razorp
 type Promo = { code: string; discountMinor: number; collegeName: string | null };
 
 const fieldClass =
-  "h-11 min-w-0 sm:flex-1 rounded-apple-sm border border-ink-200 bg-white px-3.5 text-base text-ink-900 placeholder:text-text-subtle sm:text-[0.9375rem] focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
+  "h-11 min-w-0 sm:flex-1 rounded-apple-sm border border-ink-200 bg-white px-3.5 text-base text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 
 export function ActivationCard({
   internId,
@@ -225,7 +225,7 @@ export function ActivationCard({
       ) : null}
 
       {promo ? (
-        <dl className="mt-3 space-y-2 rounded-apple-md bg-ink-50 p-4 text-sm">
+        <dl className="mt-3 space-y-2 rounded-apple-sm bg-ink-50 p-4 text-sm">
           <div className="flex items-baseline justify-between gap-4">
             <dt className="text-ink-600">Activation</dt>
             <dd className="nums text-ink-800">{formatMoney(feeMinor, "INR")}</dd>

@@ -23,7 +23,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
 
   return (
     <div className="space-y-6">
-      <p className="flex items-start gap-2.5 text-sm leading-relaxed text-ink-600">
+      <p className="flex items-start gap-3 text-sm leading-relaxed text-ink-600">
         <Eye className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
         This is what employers see when they search. Your name, photo and contact details stay hidden until an employer hires you.
       </p>
@@ -50,7 +50,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
         <div className="divide-y divide-ink-200/70">
           {values.bio.trim() ? (
             <Block title="About" onEdit={() => onJumpStep(0)}>
-              <p className="whitespace-pre-line text-[0.9375rem] leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{values.bio}</p>
+              <p className="whitespace-pre-line text-sm leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{values.bio}</p>
             </Block>
           ) : null}
 
@@ -101,7 +101,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
                 {values.experiences.map((e) => (
                   <li key={e.id}>
                     <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                      <p className="min-w-0 text-[0.9375rem] font-medium text-ink-900 [overflow-wrap:anywhere]">
+                      <p className="min-w-0 text-base font-medium text-ink-900 [overflow-wrap:anywhere]">
                         {e.role || "Role"} <span className="font-normal text-ink-600">at {e.company || "-"}</span>
                       </p>
                       <p className="nums text-xs text-text-subtle">
@@ -155,7 +155,7 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
         id="ndaAccepted"
         tabIndex={-1}
         className={cn(
-          "rounded-apple-lg border p-4 outline-none sm:p-5",
+          "rounded-apple-xl border p-4 outline-none sm:p-5",
           errors.ndaAccepted ? "border-danger bg-danger-soft/40" : "border-ink-200/80 bg-ink-50/50",
         )}
       >

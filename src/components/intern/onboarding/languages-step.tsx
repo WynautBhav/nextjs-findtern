@@ -22,7 +22,7 @@ export function LanguagesStep({ values, update, errors }: StepProps) {
   const add = () => update("languages", [...languages, { id: `lang-${Date.now()}`, language: "", level: "", read: true, write: true, speak: true }]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {errors.languages ? (
         <p id="languages" tabIndex={-1} className="text-sm font-medium text-danger outline-none">
           {errors.languages}
@@ -131,7 +131,7 @@ export function ExtracurricularStep({ values, update, errors }: StepProps) {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {rows.map((act, i) => {
         const k = `act.${act.id}`;
         return (

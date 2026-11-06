@@ -15,8 +15,8 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
   // built on these skills, so they stop being editable. The API enforces it.
   if (skillsLocked) {
     return (
-      <div className="space-y-5">
-        <div className="flex gap-3 rounded-apple-lg border border-ink-200/80 bg-ink-50 p-4">
+      <div className="space-y-4">
+        <div className="flex gap-3 rounded-apple-sm border border-ink-200/80 bg-ink-50 p-4">
           <Lock className="mt-0.5 size-4 shrink-0 text-text-subtle" aria-hidden />
           <p className="text-sm leading-relaxed text-ink-700">
             Your skills are locked because your AI interview is based on them. If one is wrong, write to{" "}
@@ -40,7 +40,7 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
   return (
     <div className="space-y-8">
       {/* The legacy skills notice (bug sheet 21 Oct), word for word. */}
-      <div className="flex gap-3 rounded-apple-lg border border-accent-300/60 bg-accent-100/50 p-4 sm:p-5">
+      <div className="flex gap-3 rounded-apple-sm border border-accent-300/60 bg-accent-100/50 p-4 sm:p-5">
         <TriangleAlert className="mt-0.5 size-4 shrink-0 text-accent-700" aria-hidden />
         <div className="text-sm leading-relaxed text-ink-800">
           <p className="font-semibold text-ink-900">Important note</p>

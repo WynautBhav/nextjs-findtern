@@ -384,7 +384,7 @@ export function Section({
   first?: boolean;
 }) {
   return (
-    <section className={cn("space-y-5", !first && "border-t border-ink-200/70 pt-8")}>
+    <section className={cn("space-y-4", !first && "border-t border-ink-200/70 pt-8")}>
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 max-w-xl">
           <h3 className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</h3>
@@ -400,7 +400,7 @@ export function Section({
 /** Two (or three) columns from `sm` up, one on phones. Items align to the top. */
 export function Grid({ children, cols = 2, className }: { children: React.ReactNode; cols?: 2 | 3; className?: string }) {
   return (
-    <div className={cn("grid items-start gap-x-5 gap-y-6", cols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2", className)}>
+    <div className={cn("grid items-start gap-x-4 gap-y-6", cols === 3 ? "sm:grid-cols-3" : "sm:grid-cols-2", className)}>
       {children}
     </div>
   );
@@ -419,7 +419,7 @@ export function EntryCard({
   children: React.ReactNode;
 }) {
   return (
-    <div className="rounded-apple-lg border border-ink-200/80 bg-ink-50/50 p-4 sm:p-5">
+    <div className="border-t border-ink-200/70 pt-4 sm:pt-5">
       <div className="mb-4 flex min-h-11 items-center justify-between gap-3">
         <p className="text-sm font-semibold text-ink-900">{title}</p>
         {onRemove ? <RemoveButton label={removeLabel} onClick={onRemove} /> : null}
@@ -455,8 +455,8 @@ export function AddButton({ onClick, children, disabled }: { onClick: () => void
 /** A quiet empty state inside a step: what goes here and the one action. */
 export function EmptyEntries({ title, body, action }: { title: string; body: string; action: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center rounded-apple-lg border border-dashed border-ink-200 bg-ink-50/40 px-6 py-9 text-center">
-      <p className="text-[0.9375rem] font-semibold text-ink-900">{title}</p>
+    <div className="flex flex-col items-center rounded-apple-xl border border-dashed border-ink-200 bg-ink-50/40 px-6 py-9 text-center">
+      <p className="text-base font-semibold text-ink-900">{title}</p>
       <p className="mt-1.5 max-w-sm text-pretty text-sm leading-relaxed text-ink-600">{body}</p>
       <div className="mt-5">{action}</div>
     </div>
@@ -478,7 +478,7 @@ export function Check({
   className?: string;
 }) {
   return (
-    <label className={cn("inline-flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800", className)}>
+    <label className={cn("inline-flex min-h-11 cursor-pointer items-center gap-3 text-sm text-ink-800", className)}>
       <input
         id={id}
         type="checkbox"

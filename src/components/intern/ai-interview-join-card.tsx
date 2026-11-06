@@ -170,7 +170,7 @@ export function AiInterviewAction({
 
   if (state.phase === "waiting") {
     return (
-      <p className="flex items-start gap-2.5 rounded-apple-md bg-accent-100/60 px-4 py-3 text-sm leading-relaxed text-ink-800">
+      <p className="flex items-start gap-3 rounded-apple-sm bg-accent-100/60 px-4 py-3 text-sm leading-relaxed text-ink-800">
         <Clock className="mt-0.5 size-4 shrink-0 text-accent-700" aria-hidden />
         <span>
           <span className="font-semibold">You have applied.</span> Your interview link goes live within 24 to 48
@@ -244,7 +244,7 @@ export function AiInterviewJoinCard({ interviewId, status, meetingLink, internId
     <Surface as="section" aria-labelledby={`ai-${interviewId}`} className="p-5 lg:p-6">
       <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="flex min-w-0 items-start gap-3">
-          <span className="grid size-11 shrink-0 place-items-center rounded-apple-md bg-brand-50 text-brand-700" aria-hidden>
+          <span className="grid size-11 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700" aria-hidden>
             <Video className="size-5" />
           </span>
           <div className="min-w-0">

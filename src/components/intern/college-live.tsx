@@ -106,8 +106,8 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
         // navigation. No looping ping. Full size on College; one line with a
         // link everywhere else, so it doesn't take the first screen.
         full ? (
-          <div className="mb-6 flex flex-col gap-3 rounded-apple-lg border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-start gap-2.5">
+          <div className="mb-6 flex flex-col gap-3 rounded-apple-sm border border-brand-200 bg-brand-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-start gap-3">
               <span aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-full bg-brand-600" />
               <p className="min-w-0 text-sm leading-relaxed text-brand-950">
                 <strong className="font-semibold">
@@ -120,7 +120,7 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
             <PushToggle vapidKey={vapidKey} className="shrink-0" />
           </div>
         ) : (
-          <p className="mb-6 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 rounded-apple-lg border border-brand-200 bg-brand-50 px-4 py-2 text-sm text-brand-950">
+          <p className="mb-6 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 rounded-apple-sm border border-brand-200 bg-brand-50 px-4 py-2 text-sm text-brand-950">
             <span aria-hidden className="size-2 shrink-0 rounded-full bg-brand-600" />
             <span className="font-semibold">{drive.title} is live</span>
             <span className="text-brand-900">until {shortDate(new Date(drive.endsAt), { day: "numeric", month: "short" })}</span>
@@ -232,7 +232,7 @@ function CallCard({
           {accepted ? <Video className="size-5" /> : <Radio className="size-5" />}
         </span>
         <div className="min-w-0 flex-1">
-          <p id={`${ids}-title`} className="text-[0.9375rem] font-semibold leading-snug text-ink-900">
+          <p id={`${ids}-title`} className="text-base font-semibold leading-snug text-ink-900">
             {accepted ? `Call with ${company}` : `${company} wants to talk ${whenLabel(meeting.startsAt, now)}`}
           </p>
           <p id={`${ids}-desc`} className="mt-0.5 text-sm leading-relaxed text-ink-600">
