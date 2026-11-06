@@ -2,15 +2,18 @@ import Link from "next/link";
 import { and, asc, count, desc, eq, not, sql, type SQL } from "drizzle-orm";
 import { Download } from "lucide-react";
 
+import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { q } from "@/lib/college/sql";
 import { formatDate, formatNumber } from "@/lib/format";
 import { flattenParams, parsePageRequest, searchAny, toPage, toQueryString } from "@/lib/admin/params";
+import { canWrite } from "@/lib/admin/permissions";
 import { activeProject, realEmployerId } from "@/lib/admin/scope";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { ProjectTakedown } from "@/components/admin/project-takedown";
 import { ButtonAnchor } from "@/components/ui/button";
 import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 
@@ -30,6 +33,8 @@ export default async function AdminProjectsPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = flattenParams(await searchParams);
+  // Taking a listing down is a company-moderation write (OA8).
+  const canModerate = canWrite((await getSession())?.permissions, "/admin/companies");
   const req = parsePageRequest(params);
   const sort = parseSort(params, SORTS, { key: "posted", dir: "desc" });
 
@@ -58,6 +63,8 @@ export default async function AdminProjectsPage({
           id: schema.projects.id,
           projectName: schema.projects.projectName,
           status: schema.projects.status,
+          takenDownAt: schema.projects.takenDownAt,
+          takenDownReason: schema.projects.takenDownReason,
           fullTimeOffer: schema.projects.fullTimeOffer,
           locationType: schema.projects.locationType,
           city: schema.projects.city,
@@ -226,8 +233,26 @@ export default async function AdminProjectsPage({
               </Link>
             ),
           },
-          { header: "Status", cell: (row) => <StatusBadge value={row.isActive ? "active" : "closed"} /> },
+          {
+            header: "Status",
+            cell: (row) =>
+              row.takenDownAt ? (
+                <StatusBadge tone="danger" label="Taken down" />
+              ) : (
+                <StatusBadge value={row.isActive ? "active" : String(row.status ?? "").trim().toLowerCase() === "inactive" ? "paused" : "closed"} />
+              ),
+          },
           { header: "Posted", sort: "posted", cell: (row) => <span className="nums whitespace-nowrap text-text-subtle">{formatDate(row.createdAt)}</span> },
+          ...(canModerate
+            ? [
+                {
+                  header: "Moderation",
+                  cell: (row: (typeof loaded.rows)[number]) => (
+                    <ProjectTakedown projectId={row.id} name={row.projectName} takenDown={Boolean(row.takenDownAt)} reason={row.takenDownReason} />
+                  ),
+                },
+              ]
+            : []),
         ]}
       />
     </div>

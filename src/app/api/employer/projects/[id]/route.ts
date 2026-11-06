@@ -8,13 +8,15 @@ import { STATES } from "@/lib/data/districts";
 import { requireMutation } from "@/lib/guards-mutation";
 import { projectNameIssue } from "@/lib/project-name";
 import {
-  CLOSED_PROJECT_STATUS,
   CLOSED_PROJECT_STATUSES,
+  MAX_PROJECT_DESCRIPTION,
   MAX_PROJECT_SKILLS,
   isProjectOpen,
+  projectDescriptionError,
   projectLocationsError,
   projectPlaceError,
   projectSkillsError,
+  projectStatusChangeError,
   resolveProjectSkills,
 } from "@/lib/project-locations";
 
@@ -27,6 +29,7 @@ const bodySchema = z.object({
     .max(MAX_PROJECT_SKILLS, `A project can have at most ${MAX_PROJECT_SKILLS} skills.`)
     .optional(),
   scopeOfWork: z.string().optional(),
+  description: z.string().trim().max(MAX_PROJECT_DESCRIPTION, `Keep the description under ${MAX_PROJECT_DESCRIPTION} characters.`).optional(),
   fullTimeOffer: z.boolean().optional(),
   locationType: z.enum(["remote", "hybrid", "onsite"]).optional(),
   preferredLocations: z.array(z.string()).optional(),
@@ -34,9 +37,8 @@ const bodySchema = z.object({
   city: z.string().nullable().optional(),
   state: z.string().nullable().optional(),
   timezone: z.string().optional(),
-  // Closing writes the legacy "inactive" (EMH-03); "closed" and "archived"
-  // are accepted from older clients and stored as "inactive" too.
-  status: z.enum(["active", "closed", "inactive", "archived"]).optional(),
+  // "inactive" pauses (the employer can reopen), "closed" is final (OA8).
+  status: z.enum(["active", "inactive", "closed"]).optional(),
 });
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -53,6 +55,14 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (project.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const d = { ...parsed.data };
+  if (d.status) {
+    const statusProblem = projectStatusChangeError(project, d.status);
+    if (statusProblem) return NextResponse.json({ error: statusProblem }, { status: 409 });
+  }
+  if (d.description !== undefined) {
+    const descriptionProblem = projectDescriptionError(d.description);
+    if (descriptionProblem) return NextResponse.json({ error: descriptionProblem }, { status: 400 });
+  }
   if (d.skills) {
     const skillsProblem = projectSkillsError(d.skills, (project.skills as string[] | null) ?? []);
     if (skillsProblem) return NextResponse.json({ error: skillsProblem }, { status: 400 });
@@ -88,8 +98,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       d.state = null;
     }
   }
-  if (d.status && d.status !== "active") d.status = CLOSED_PROJECT_STATUS;
-
   // At most three preferred locations, except that a project saved under the
   // old limit of five may resave the places it already has.
   if (parsed.data.preferredLocations) {
@@ -144,7 +152,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     }
   }
 
-  await db.update(schema.projects).set({ ...d, updatedAt: new Date() }).where(eq(schema.projects.id, id));
+  const { description, ...rest } = d;
+  await db
+    .update(schema.projects)
+    .set({ ...rest, ...(description !== undefined ? { description: description || null } : {}), updatedAt: new Date() })
+    .where(eq(schema.projects.id, id));
   return NextResponse.json({ ok: true });
 }
 

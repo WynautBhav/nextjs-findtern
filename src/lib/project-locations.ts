@@ -5,6 +5,7 @@
  * project already had, so an unchanged (or trimmed) legacy list still saves.
  * Pure, so the onboarding form, both project routes and the tests share it.
  */
+import { findContact } from "./contact-scrub.ts";
 import { canonicalSkill } from "./data/skills.ts";
 
 export const MAX_PROJECT_LOCATIONS = 3;
@@ -53,6 +54,26 @@ export const CLOSED_PROJECT_STATUS = "inactive";
 export function isProjectOpen(status: string | null | undefined): boolean {
   const s = String(status ?? "").trim().toLowerCase();
   return !(CLOSED_PROJECT_STATUSES as readonly string[]).includes(s);
+}
+
+/**
+ * Pause and Close (OA8). "inactive" is a pause the employer can undo;
+ * "closed" is final. Anything else is read as active (legacy rule above).
+ */
+export const PAUSED_PROJECT_STATUS = "inactive";
+export const FINAL_PROJECT_STATUS = "closed";
+
+export function isProjectClosedForGood(status: string | null | undefined): boolean {
+  return String(status ?? "").trim().toLowerCase() === FINAL_PROJECT_STATUS;
+}
+
+/**
+ * Whether a listing may show in discovery and on the public pages: status
+ * "active" and not taken down by Findtern. The caller also checks that the
+ * employer is active and a real (non-test) one, in SQL.
+ */
+export function isListingLive(p: { status?: string | null; takenDownAt?: Date | string | null }): boolean {
+  return String(p.status ?? "").trim().toLowerCase() === "active" && !p.takenDownAt;
 }
 
 /* ── Project skills (EMH-13, bug sheet 7 S1 r80) ─────────────────────────
@@ -116,5 +137,36 @@ export function projectPlaceError(
   if (!state) return "Pick the state for an on-site or hybrid role.";
   if (!city) return "Pick the city for an on-site or hybrid role.";
   if (!indianStates.some((s) => s.toLowerCase() === state.toLowerCase())) return INDIA_ONLY_NOTE;
+  return null;
+}
+
+/* ── Listing description and status changes (OA8) ───────────────────── */
+
+export const MAX_PROJECT_DESCRIPTION = 2000;
+
+/** Error message for this description, or null. Contact details are refused, not hidden. */
+export function projectDescriptionError(text: string | null | undefined): string | null {
+  const value = String(text ?? "");
+  if (value.length > MAX_PROJECT_DESCRIPTION) return `Keep the description under ${MAX_PROJECT_DESCRIPTION} characters.`;
+  if (findContact(value).kinds.length === 0) return null;
+  return "Remove the phone number / email / link from the description: candidates contact you through Findtern.";
+}
+
+/**
+ * Why an employer may not move a listing to `next`, or null when it may.
+ * Taken-down listings stay down until an admin restores them; a closed
+ * listing is final (use a new one).
+ */
+export function projectStatusChangeError(
+  project: { status?: string | null; takenDownAt?: Date | string | null; takenDownReason?: string | null },
+  next: "active" | "inactive" | "closed",
+): string | null {
+  if (project.takenDownAt && next === "active") {
+    return `Findtern took this listing down: ${project.takenDownReason || "no reason recorded"}. Contact support.`;
+  }
+  const current = String(project.status ?? "").trim().toLowerCase();
+  if (isProjectClosedForGood(current) && next !== "closed") {
+    return "This listing is closed for good. Create a new listing instead.";
+  }
   return null;
 }

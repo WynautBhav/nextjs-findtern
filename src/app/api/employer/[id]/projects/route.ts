@@ -8,7 +8,9 @@ import { STATES } from "@/lib/data/districts";
 import { requireMutation } from "@/lib/guards-mutation";
 import { projectNameIssue } from "@/lib/project-name";
 import {
+  MAX_PROJECT_DESCRIPTION,
   MAX_PROJECT_SKILLS,
+  projectDescriptionError,
   projectLocationsError,
   projectPlaceError,
   projectSkillsError,
@@ -23,6 +25,7 @@ const bodySchema = z.object({
     .max(MAX_PROJECT_SKILLS, `A project can have at most ${MAX_PROJECT_SKILLS} skills.`),
   // Both must be picked; nothing is pre-selected (EMH-47).
   scopeOfWork: z.string({ error: "Pick a scope of work." }).trim().min(1, "Pick a scope of work."),
+  description: z.string().trim().max(MAX_PROJECT_DESCRIPTION, `Keep the description under ${MAX_PROJECT_DESCRIPTION} characters.`).optional(),
   fullTimeOffer: z.boolean().optional(),
   locationType: z.enum(["remote", "hybrid", "onsite"], { error: "Pick a work mode." }),
   preferredLocations: z.array(z.string()).optional(),
@@ -43,6 +46,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const skillsProblem = projectSkillsError(d.skills);
   if (skillsProblem) return NextResponse.json({ error: skillsProblem }, { status: 400 });
+  // Candidates reach employers through Findtern only (OA8): contact details are refused.
+  const descriptionProblem = projectDescriptionError(d.description);
+  if (descriptionProblem) return NextResponse.json({ error: descriptionProblem }, { status: 400 });
   // From the shared list only, stored in its spelling.
   const picked = resolveProjectSkills(d.skills);
   if (picked.error) return NextResponse.json({ error: picked.error }, { status: 400 });
@@ -85,6 +91,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       ...d,
       skills: picked.skills,
       scopeOfWork: scope,
+      description: d.description || null,
       // A remote role has no place (legacy stored none).
       city: remote ? null : d.city?.trim() || null,
       state: remote ? null : d.state?.trim() || null,
