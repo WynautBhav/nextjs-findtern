@@ -1,13 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Building2, Home, Laptop, MapPin, Plus, Shuffle, X } from "lucide-react";
 
 import { suggestDistricts } from "@/lib/data/districts";
 import { CUSTOM_CITY, cascadeWorkModes, widestWorkMode } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 
-import { FieldNote, Label, Section, controlClass, onRadioKeys, radioTab } from "./fields";
+import { FieldNote, Label, Section, controlClass, describedBy, onRadioKeys, radioTab } from "./fields";
 import type { StepProps } from "./types";
 
 const MODES = [
@@ -149,6 +149,20 @@ function CityPicker({ cities, error, onChange }: { cities: string[]; error?: str
   const matches = q ? suggestDistricts(q, 6).map((d) => `${d.district}, ${d.state}`).filter((c) => !taken(c)) : [];
   const custom = q && CUSTOM_CITY.test(q) && !taken(q) && !matches.some((m) => m.toLowerCase() === q.toLowerCase()) ? q.replace(/\s*,\s*/, ", ") : null;
 
+  const shown = [...matches, ...(custom ? [custom] : [])];
+  const hint = q && matches.length === 0 && !custom ? "Not on the list? Type it as City, State - like Noida, Uttar Pradesh." : undefined;
+
+  // Removing a chip unmounts the focused button: land on the next chip's remove button, else the one before, else the input.
+  const chips = useRef<HTMLUListElement>(null);
+  const afterRemove = useRef<number | null>(null);
+  useEffect(() => {
+    const at = afterRemove.current;
+    if (at === null) return;
+    afterRemove.current = null;
+    const buttons = chips.current?.querySelectorAll<HTMLButtonElement>("button");
+    (buttons && buttons.length > 0 ? buttons[Math.min(at, buttons.length - 1)] : document.getElementById("preferredLocations"))?.focus();
+  }, [cities]);
+
   function add(city: string) {
     if (full || taken(city)) return;
     onChange([...cities, city]);
@@ -178,17 +192,20 @@ function CityPicker({ cities, error, onChange }: { cities: string[]; error?: str
           }
         }}
         aria-invalid={error ? true : undefined}
-        aria-describedby={error ? "preferredLocations-error" : "preferredLocations-hint"}
+        aria-describedby={describedBy("preferredLocations", error, hint)}
         className={controlClass(error, "mt-2")}
       />
       <FieldNote
         id="preferredLocations"
         error={error}
-        hint={q && matches.length === 0 && !custom ? "Not on the list? Type it as City, State - like Noida, Uttar Pradesh." : undefined}
+        hint={hint}
       />
-      {matches.length > 0 || custom ? (
+      <p className="sr-only" aria-live="polite">
+        {q ? `${shown.length} ${shown.length === 1 ? "city matches" : "cities match"}` : ""}
+      </p>
+      {shown.length > 0 ? (
         <ul aria-label="Matching cities" className="mt-3 flex flex-wrap gap-2">
-          {[...matches, ...(custom ? [custom] : [])].map((c) => (
+          {shown.map((c) => (
             <li key={c}>
               <button
                 type="button"
@@ -203,14 +220,17 @@ function CityPicker({ cities, error, onChange }: { cities: string[]; error?: str
         </ul>
       ) : null}
       {cities.length > 0 ? (
-        <ul aria-label="Your cities" className="mt-4 flex flex-wrap gap-2">
-          {cities.map((c) => (
+        <ul ref={chips} aria-label="Your cities" className="mt-4 flex flex-wrap gap-2">
+          {cities.map((c, i) => (
             <li key={c} className="inline-flex items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 pl-3.5 text-sm font-medium text-brand-900">
               <MapPin className="size-3.5 text-brand-600" aria-hidden />
               {c}
               <button
                 type="button"
-                onClick={() => onChange(cities.filter((x) => x !== c))}
+                onClick={() => {
+                  afterRemove.current = i;
+                  onChange(cities.filter((x) => x !== c));
+                }}
                 aria-label={`Remove ${c}`}
                 className="apple-spring grid size-11 place-items-center rounded-full text-brand-700 hover:bg-brand-100 hover:text-danger"
               >
