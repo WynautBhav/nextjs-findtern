@@ -7,6 +7,7 @@ import { AlertCircle, CalendarCheck, CheckCircle2, CreditCard, Laptop, Loader2, 
 
 import { EmptyScene, Pill } from "@/components/app/primitives";
 import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
+import { groupByCandidate, projectsLabel } from "@/components/employer/shortlist-group";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatRate, shortDateTime } from "@/lib/format";
@@ -87,6 +88,9 @@ export function CartManager({
   const proposed = inProject.filter((l) => l.openProposalId || l.acceptedProposalId);
   const shownPeople = new Set(shown.map((l) => l.candidate.id)).size;
   const shownProjects = new Set(shown.map((l) => l.projectId)).size;
+  // One row per person, whichever projects they are saved to.
+  const shownGroups = groupByCandidate(shown);
+  const proposedGroups = groupByCandidate(proposed);
 
   async function confirmRemove() {
     const item = removing;
@@ -213,16 +217,16 @@ export function CartManager({
       </div>
 
       <ul className="divide-y divide-ink-100">
-        {shown.map((line) => (
+        {shownGroups.map((group) => (
           <CartLine
-            key={line.id}
-            line={line}
-            name={nameOf(line)}
+            key={group.primary.id}
+            group={group}
+            name={nameOf(group.primary)}
             currency={currency}
             timezone={companyTimezone}
-            busy={busyId === line.id}
-            onMeeting={() => openMeeting(line)}
-            onRemove={() => setRemoving(line)}
+            busy={group.lines.some((l) => l.id === busyId)}
+            onMeeting={() => openMeeting(group.primary)}
+            onRemove={setRemoving}
           />
         ))}
       </ul>
@@ -231,19 +235,19 @@ export function CartManager({
       {proposed.length > 0 ? (
         <section aria-labelledby="proposed-heading" className="mt-8">
           <h2 id="proposed-heading" className="mb-3 text-sm font-semibold text-ink-900">
-            Already proposed <span className="nums font-normal text-text-subtle">{proposed.length}</span>
+            Already proposed <span className="nums font-normal text-text-subtle">{proposedGroups.length}</span>
           </h2>
           <ul className="divide-y divide-ink-100 border-t border-ink-100">
-            {proposed.map((line) => (
+            {proposedGroups.map((group) => (
               <CartLine
-                key={line.id}
-                line={line}
-                name={nameOf(line)}
+                key={group.primary.id}
+                group={group}
+                name={nameOf(group.primary)}
                 currency={currency}
                 timezone={companyTimezone}
-                busy={busyId === line.id}
-                onMeeting={() => openMeeting(line)}
-                onRemove={() => setRemoving(line)}
+                busy={group.lines.some((l) => l.id === busyId)}
+                onMeeting={() => openMeeting(group.primary)}
+                onRemove={setRemoving}
               />
             ))}
           </ul>
@@ -358,7 +362,7 @@ export function CartManager({
 }
 
 function CartLine({
-  line,
+  group,
   name,
   currency,
   timezone,
@@ -366,15 +370,17 @@ function CartLine({
   onMeeting,
   onRemove,
 }: {
-  line: CartLineItem;
+  group: { primary: CartLineItem; lines: CartLineItem[] };
   name: string;
   currency: Currency;
   timezone: string;
   busy: boolean;
   onMeeting: () => void;
-  onRemove: () => void;
+  onRemove: (line: CartLineItem) => void;
 }) {
+  const line = group.primary;
   const c = line.candidate;
+  const forProjects = projectsLabel(group.lines);
   const headline = headlineOf(c);
   const locked = meetingLocked(line);
   const closed = Boolean(line.projectClosed);
@@ -407,7 +413,7 @@ function CartLine({
             <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
             {c.city || c.location || "City not stated"}
           </span>
-          <span>For {line.projectName}</span>
+          <span className="min-w-0 max-w-full truncate" title={`For ${group.lines.map((l) => l.projectName).join(", ")}`}>For {forProjects}</span>
         </p>
       </div>
       <div className="col-span-2 min-w-0 sm:col-span-2 sm:col-start-2">
@@ -485,7 +491,13 @@ function CartLine({
           className={busy ? undefined : "ml-auto sm:ml-0"}
           items={[
             { label: "Open profile", href: profileHref, icon: <UserRound /> },
-            { label: "Remove from shortlist", onSelect: onRemove, icon: <Trash2 />, destructive: true, disabled: busy },
+            ...group.lines.map((l) => ({
+              label: `Remove from ${l.projectName}`,
+              onSelect: () => onRemove(l),
+              icon: <Trash2 />,
+              destructive: true,
+              disabled: busy,
+            })),
           ]}
         />
       </div>
