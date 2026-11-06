@@ -108,3 +108,22 @@ export function dayParts(iso: string): { weekday: string; date: string } {
 function toDay(value: Date | string): string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : isoDay(value);
 }
+
+/** The first date that appears twice in a save, or null. One day can carry one entry (two 8 h rows made a 16 h day). */
+export function duplicateDay(entries: readonly { date: string }[]): string | null {
+  const seen = new Set<string>();
+  for (const e of entries) {
+    if (seen.has(e.date)) return e.date;
+    seen.add(e.date);
+  }
+  return null;
+}
+
+/**
+ * A save replaces only the days it sends: days already on the sheet that the payload leaves out are kept, so a short or
+ * stale payload can't wipe the month. The editor sends a blank row to clear a day. Result is sorted by date.
+ */
+export function mergeEntriesByDate<T extends { date: string }>(existing: readonly T[], incoming: readonly T[]): T[] {
+  const sent = new Set(incoming.map((e) => e.date));
+  return [...existing.filter((e) => !sent.has(e.date)), ...incoming].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+}

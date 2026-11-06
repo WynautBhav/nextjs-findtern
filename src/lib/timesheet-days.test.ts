@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { clearFutureDays, periodDays, todayIst, weekdayOf } from "./timesheet-days.ts";
+import { clearFutureDays, duplicateDay, mergeEntriesByDate, periodDays, todayIst, weekdayOf } from "./timesheet-days.ts";
 
 test("a stored one-month period has exactly its calendar days (no phantom day in IST)", () => {
   // As the create route stores it: start T00:00Z, end T23:59:59.999Z.
@@ -62,4 +62,20 @@ test("clearFutureDays blanks status, hours and note after today only", () => {
   assert.deepEqual(out[0], e("2026-11-03"));
   assert.deepEqual(out[1], e("2026-11-04"));
   assert.deepEqual(out[2], { date: "2026-11-05", status: "", hours: 0, note: "" });
+});
+
+test("duplicateDay finds a date sent twice", () => {
+  assert.equal(duplicateDay([{ date: "2026-10-12" }, { date: "2026-10-13" }]), null);
+  assert.equal(duplicateDay([{ date: "2026-10-12" }, { date: "2026-10-13" }, { date: "2026-10-12" }]), "2026-10-12");
+});
+
+test("mergeEntriesByDate replaces sent days and keeps the days a short payload leaves out", () => {
+  const existing = [{ date: "2026-10-12", hours: 8 }, { date: "2026-10-13", hours: 8 }, { date: "2026-10-14", hours: 8 }];
+  const merged = mergeEntriesByDate(existing, [{ date: "2026-10-13", hours: 0 }, { date: "2026-10-15", hours: 4 }]);
+  assert.deepEqual(merged, [
+    { date: "2026-10-12", hours: 8 },
+    { date: "2026-10-13", hours: 0 },
+    { date: "2026-10-14", hours: 8 },
+    { date: "2026-10-15", hours: 4 },
+  ]);
 });
