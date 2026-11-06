@@ -52,10 +52,7 @@ export function NextUpTile({
       </p>
       {detail ? <p className="mt-1 text-sm text-white/75">{detail}</p> : null}
       <p className="mt-auto flex items-center gap-2 pt-4 text-sm font-medium">
-        <span
-          aria-hidden
-          className="size-2 rounded-full bg-accent-400 motion-safe:animate-pulse-dot motion-safe:[animation-iteration-count:3]"
-        />
+        <span aria-hidden className="size-2 rounded-full bg-accent-400" />
         {daysAway(today, next.day)}
       </p>
       {children ? <div className="mt-4">{children}</div> : null}
