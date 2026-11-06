@@ -21,8 +21,8 @@ const SELECTED_SLOT = sql`(CASE ${schema.interviews.selectedSlot} WHEN 1 THEN ${
 /** An AI-interview row (the internal "admin" employer or the AI employer). */
 const AI_INTERVIEW = sql`(i.employer_id = ${TEST_EMPLOYER_ID} OR i.employer_id IN (SELECT id FROM ${schema.employers} WHERE lower(company_email) = ${AI_INTERVIEW_EMAIL}))`;
 
-export type QueueWant = { payouts: boolean; candidates: boolean; pipeline: boolean };
-export type QueueCounts = { payouts: number | null; candidates: number | null; pipeline: number | null };
+export type QueueWant = { payouts: boolean; candidates: boolean; pipeline: boolean; collegePayouts?: boolean };
+export type QueueCounts = { payouts: number | null; candidates: number | null; pipeline: number | null; collegePayouts: number | null };
 
 /** Stipend payouts due now or within 3 days with no bank reference yet. */
 function payoutsDue(): Promise<number | null> {
@@ -78,11 +78,20 @@ function pipelineNeedingAction(): Promise<number | null> {
   });
 }
 
+/** College withdrawals waiting for an admin to pay them. */
+function collegePayoutsOpen(): Promise<number | null> {
+  return settleCount(async () => {
+    const [row] = await getDb().select({ value: count() }).from(schema.collegePayouts).where(eq(schema.collegePayouts.status, "requested"));
+    return row?.value ?? 0;
+  });
+}
+
 export async function loadQueueCounts(want: QueueWant): Promise<QueueCounts> {
-  const [payouts, candidates, pipeline] = await Promise.all([
+  const [payouts, candidates, pipeline, collegePayouts] = await Promise.all([
     want.payouts ? payoutsDue() : null,
     want.candidates ? candidatesAwaitingScore() : null,
     want.pipeline ? pipelineNeedingAction() : null,
+    want.collegePayouts ? collegePayoutsOpen() : null,
   ]);
-  return { payouts, candidates, pipeline };
+  return { payouts, candidates, pipeline, collegePayouts };
 }
