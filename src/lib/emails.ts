@@ -17,7 +17,7 @@ export type EmailTone = "wait" | "done" | "alert" | "neutral";
 
 export type EmailContent = {
   subject: string;
-  /** Hidden inbox preview line. A useful summary, not the subject again. */
+  /** Hidden inbox preview line: a useful summary, not the subject again. Falls back to the first body line. */
   preheader?: string;
   heading: string;
   greeting: string;
@@ -153,8 +153,9 @@ export function renderEmail(c: EmailContent): { subject: string; text: string; h
 <p class="t-muted" style="margin:16px 0 0;font-size:13px;line-height:20px;color:${MUTED};">If the button does not work, copy this link into your browser:<br><a class="t-link" href="${esc(c.cta.url)}" style="color:${BRAND};text-decoration:underline;word-break:break-all;">${esc(c.cta.url)}</a></p>`
     : "";
 
-  const preheader = c.preheader
-    ? `<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(c.preheader)}${"&#847;&zwnj;&nbsp;".repeat(40)}</div>`
+  const preheaderText = c.preheader ?? c.lines[0];
+  const preheader = preheaderText
+    ? `<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(preheaderText)}${"&#847;&zwnj;&nbsp;".repeat(40)}</div>`
     : "";
 
   const logoStyle = `display:block;border:0;outline:none;text-decoration:none;font-family:${FONT};font-size:24px;line-height:42px;font-weight:600;color:${BRAND};`;
@@ -194,16 +195,22 @@ const hi = (name: string) => `Hi ${name || "there"},`;
 export const emails = {
   proposalReceived: (o: { internName: string; companyName: string; role: string; proposalId: string }): EmailContent => ({
     subject: "You’ve received a new internship proposal on Findtern",
+    preheader: `${o.companyName} sent you a proposal for ${o.role}. Respond from your dashboard.`,
     heading: "You’ve received a new proposal",
     greeting: hi(o.internName),
-    lines: [`Good news! You’ve received a new internship proposal from ${o.companyName} for the role of ${o.role}.`],
-    bullets: ["Review the proposal details carefully", "Accept if it aligns with your goals", "You can turn down up to 3 offers; a 4th decline or lapse ends the refund guarantee"],
+    lines: [`${o.companyName} has sent you an internship proposal for the role of ${o.role}.`],
+    bullets: ["Read the proposal details carefully", "Accept it if it fits your goals", "You can turn down up to 3 offers; a 4th decline or lapse ends the refund guarantee"],
     status: "Awaiting your response",
     cta: { label: "View proposal", url: `${origin()}/intern/proposals/${o.proposalId}` },
   }),
 
   proposalDecision: (o: { employerName: string; candidate: string; role: string; accepted: boolean; proposalId: string; fullTime?: boolean }): EmailContent => ({
     subject: o.fullTime ? "Full-time offer update | Findtern" : "Candidate decision update | Findtern",
+    preheader: o.accepted
+      ? o.fullTime
+        ? `${o.candidate} accepted. Pay the hiring fee to confirm the joining.`
+        : `${o.candidate} accepted. Complete the payment to confirm the hire.`
+      : `${o.candidate} declined. You can send an offer to another candidate.`,
     heading: o.fullTime
       ? o.accepted
         ? "Your full-time offer was accepted"
@@ -229,6 +236,7 @@ export const emails = {
 
   proposalWithdrawn: (o: { internName: string; role: string }): EmailContent => ({
     subject: "Update on a proposal | Findtern",
+    preheader: "Nothing is needed from you. Your profile stays visible to other employers.",
     heading: "A proposal was withdrawn",
     greeting: hi(o.internName),
     lines: [`The company withdrew its proposal for ${o.role}. Nothing is needed from you.`, "Your profile stays visible to other employers."],
@@ -238,6 +246,7 @@ export const emails = {
   /** Staff closed an offer. Neutral: it was not the company withdrawing. */
   proposalClosed: (o: { internName: string; role: string }): EmailContent => ({
     subject: "Update on an offer | Findtern",
+    preheader: "Nothing is needed from you. Your profile stays visible to other employers.",
     heading: "An offer was closed",
     greeting: hi(o.internName),
     lines: [`The offer for ${o.role} has been closed by the Findtern team. Nothing is needed from you.`, "Your profile stays visible to other employers."],
@@ -246,6 +255,7 @@ export const emails = {
 
   interviewInvitation: (o: { internName: string; companyName: string; project?: string | null; slots?: string[]; timezone?: string }): EmailContent => ({
     subject: "Interview invitation | Select a time slot on Findtern",
+    preheader: `${o.companyName} invited you to an interview. Pick a time that suits you.`,
     heading: "You’ve been invited to an interview",
     greeting: hi(o.internName),
     lines: [
@@ -261,6 +271,7 @@ export const emails = {
 
   meetingScheduled: (o: { name: string; other: string; when: string; link?: string | null; forEmployer: boolean }): EmailContent => ({
     subject: o.forEmployer ? "Meeting scheduled | Candidate confirmed a slot" : "Meeting scheduled successfully | Findtern",
+    preheader: `${o.when} with ${o.other}.`,
     heading: "Your meeting is scheduled",
     greeting: hi(o.name),
     lines: [
@@ -274,6 +285,7 @@ export const emails = {
   /** Findtern added the meeting link by hand; no company name, the intern may not see it yet. */
   interviewLinkReady: (o: { name: string; link: string; forEmployer: boolean }): EmailContent => ({
     subject: "Your interview link is ready | Findtern",
+    preheader: "The link is below and in your dashboard.",
     heading: "Your interview link is ready",
     greeting: hi(o.name),
     lines: ["The meeting link for your interview has been added."],
@@ -283,15 +295,18 @@ export const emails = {
 
   aiInterviewLinkReady: (o: { name: string; link: string }): EmailContent => ({
     subject: "Your AI interview link is ready | Findtern",
+    preheader: "Use a laptop with a webcam and a quiet room, and finish it in one sitting.",
     heading: "Your AI interview link is ready",
     greeting: hi(o.name),
-    lines: ["Your AI interview is open. Before you start:", ...AI_INTERVIEW_INSTRUCTIONS],
+    lines: ["Your AI interview is open. Before you start:"],
+    bullets: [...AI_INTERVIEW_INSTRUCTIONS],
     facts: [["Interview link", o.link]],
     cta: { label: "Start AI interview", url: o.link },
   }),
 
   interviewRescheduled: (o: { name: string }): EmailContent => ({
     subject: "Interview rescheduled | Findtern",
+    preheader: "Open your dashboard to pick a new time.",
     heading: "An interview was rescheduled",
     greeting: hi(o.name),
     lines: ["The company proposed new time slots. Pick the one that works for you."],
@@ -300,6 +315,7 @@ export const emails = {
 
   timesheetSubmitted: (o: { employerName: string; candidate: string; period: string; timesheetId: string }): EmailContent => ({
     subject: "Timesheet submitted for approval | Findtern",
+    preheader: `Review ${o.candidate}’s timesheet for ${o.period}.`,
     heading: "A timesheet needs your approval",
     greeting: hi(o.employerName),
     lines: [`${o.candidate} submitted a timesheet for ${o.period}.`],
@@ -308,20 +324,23 @@ export const emails = {
 
   employerPaymentReceived: (o: { employerName: string; role: string; amount: string }): EmailContent => ({
     subject: "Payment received successfully | Findtern",
+    preheader: `Payment of ${o.amount} for ${o.role} is confirmed.`,
     heading: "We’ve received your payment",
     greeting: hi(o.employerName),
-    lines: [`We’ve successfully received your payment for ${o.role}.`, "The process now moves forward as agreed. Updates appear in your dashboard."],
+    lines: [`We’ve received your payment for ${o.role}.`, "The process now moves forward as agreed. Updates appear in your dashboard."],
     facts: [["Amount", o.amount]],
     cta: { label: "View orders and invoice", url: `${origin()}/employer/orders` },
   }),
 
   hireConfirmed: (o: { internName: string; companyName: string; role: string }): EmailContent => ({
-    subject: "You’re hired! | Internship confirmed on Findtern",
+    subject: "You’re hired | Internship confirmed on Findtern",
+    preheader: `${o.companyName} confirmed your engagement. Your dashboard has the next steps.`,
     heading: "You’re hired",
     greeting: hi(o.internName),
     lines: [
-      `Congratulations! You’ve been officially hired for ${o.role} with ${o.companyName}.`,
+      `Congratulations. You’ve been hired for ${o.role} with ${o.companyName}.`,
       "The employer has completed the payment and your engagement is confirmed. They may reach out shortly to begin onboarding.",
+      "Your dashboard now shows:",
     ],
     bullets: ["Engagement details", "Start date and next steps", "Timesheets for your first period"],
     cta: { label: "Open dashboard", url: `${origin()}/intern/dashboard` },
@@ -329,6 +348,7 @@ export const emails = {
 
   activationPaid: (o: { internName: string; amount: string }): EmailContent => ({
     subject: "Payment successful | Welcome to Findtern",
+    preheader: "You now have full access. Your AI interview is the first step.",
     heading: "Your profile is activated",
     greeting: hi(o.internName),
     lines: ["Your Findtern sign-up fee payment has been received. You now have full access to the platform, starting with your AI interview."],
@@ -338,6 +358,7 @@ export const emails = {
 
   stipendTransferred: (o: { internName: string; role: string; amount: string }): EmailContent => ({
     subject: "Stipend transferred successfully | Findtern",
+    preheader: `${o.amount} for ${o.role} has been transferred.`,
     heading: "Your stipend is on its way",
     greeting: hi(o.internName),
     lines: [
@@ -350,6 +371,7 @@ export const emails = {
 
   completionBonusPaid: (o: { internName: string; role: string; amount: string }): EmailContent => ({
     subject: "Completion bonus transferred | Findtern",
+    preheader: `Your ${o.amount} completion bonus has been transferred.`,
     heading: "Your completion bonus is on its way",
     greeting: hi(o.internName),
     lines: [
@@ -362,9 +384,10 @@ export const emails = {
 
   collegeSeatsPaid: (o: { collegeName: string; seats: number; amount: string; cap: number }): EmailContent => ({
     subject: "Seat payment received | Findtern",
+    preheader: `${o.seats} seats added. Your college code now covers ${o.cap} students.`,
     heading: "Your seats are active",
     greeting: hi(o.collegeName),
-    lines: [`We have received your payment for ${o.seats} seats. Your college code now covers ${o.cap} students.`],
+    lines: [`We’ve received your payment for ${o.seats} seats. Your college code now covers ${o.cap} students.`],
     facts: [
       ["Seats added", String(o.seats)],
       ["Amount", o.amount],
@@ -375,6 +398,7 @@ export const emails = {
 
   collegePayoutRequested: (o: { collegeName: string; amount: string }): EmailContent => ({
     subject: `Payout requested: ${o.collegeName} | Findtern`,
+    preheader: `${o.collegeName} asked to withdraw ${o.amount}.`,
     heading: "A college asked for a payout",
     greeting: "Hi team,",
     lines: [`${o.collegeName} has requested a withdrawal from its Findtern wallet.`],
@@ -387,6 +411,7 @@ export const emails = {
 
   collegePayoutPaid: (o: { collegeName: string; amount: string; referenceId: string }): EmailContent => ({
     subject: "Payout sent | Findtern",
+    preheader: `${o.amount} has been paid to the bank account on file.`,
     heading: "Your payout is on its way",
     greeting: hi(o.collegeName),
     lines: [
@@ -402,6 +427,7 @@ export const emails = {
 
   collegePayoutRejected: (o: { collegeName: string; amount: string; reason: string }): EmailContent => ({
     subject: "Payout request not approved | Findtern",
+    preheader: "Nothing was debited. The amount is available in your wallet again.",
     heading: "Your payout request was not approved",
     greeting: hi(o.collegeName),
     lines: ["Nothing was debited, and the amount is available in your wallet again.", `Reason: ${o.reason}`],
@@ -411,6 +437,7 @@ export const emails = {
 
   fullTimeOfferReceived: (o: { internName: string; companyName: string; role: string; proposalId: string }): EmailContent => ({
     subject: "Full-time job offer received | Findtern",
+    preheader: `${o.companyName} offered you a full-time role as ${o.role}.`,
     heading: "You have a full-time offer",
     greeting: hi(o.internName),
     lines: [`Congratulations. ${o.companyName} has offered you a full-time position as ${o.role} through Findtern.`],
@@ -421,6 +448,7 @@ export const emails = {
 
   fullTimeFeePaid: (o: { employerName: string; candidate: string; role: string; ctc: string; amount: string }): EmailContent => ({
     subject: "Payment confirmation – hiring fee received | Findtern",
+    preheader: `Hiring fee of ${o.amount} received for ${o.candidate}.`,
     heading: "Hiring fee received",
     greeting: hi(o.employerName),
     lines: [`We’ve received the full-time hiring fee for ${o.candidate}. Thank you for hiring through Findtern.`],
@@ -431,6 +459,7 @@ export const emails = {
   /** Signup code. Employers get the legacy "company email" wording. */
   otp: (o: { otp: string; ttlMinutes: number; forEmployer: boolean }): EmailContent => ({
     subject: o.forEmployer ? "Verify your company email | Findtern" : "Verify your Findtern email",
+    preheader: `Enter this code on Findtern to verify your email. It expires in ${o.ttlMinutes} minutes.`,
     heading: o.forEmployer ? "Verify your company email" : "Verify your email",
     greeting: hi(""),
     lines: [
@@ -444,6 +473,7 @@ export const emails = {
 
   passwordReset: (o: { url: string; ttlMinutes: number }): EmailContent => ({
     subject: "Reset your Findtern password",
+    preheader: `Use the link to choose a new password. It expires in ${o.ttlMinutes} minutes.`,
     heading: "Reset your password",
     greeting: hi(""),
     lines: [
@@ -462,13 +492,14 @@ export const emails = {
     }[o.type];
     return {
       subject: `${title} | Findtern`,
+      preheader: `For ${o.intern}. You can pay from your checkout.`,
       heading: title,
       greeting: hi(o.name),
       lines: [
         o.type === "upcoming"
           ? `This is a reminder that the month ${o.k} charge of ${o.amount} for ${o.intern} falls due on ${o.dueOn}. You can pay it now.`
           : `The month ${o.k} charge of ${o.amount} for ${o.intern} ${today ? "is due today" : `was due on ${o.dueOn} and is still unpaid`}.`,
-        `We would be grateful if you could pay ${o.type === "upcoming" ? `by ${o.dueOn}` : today ? "today" : "as soon as you can"}. Thank you.`,
+        `Please pay ${o.type === "upcoming" ? `by ${o.dueOn}` : today ? "today" : "as soon as you can"}.`,
       ],
       facts: [["Intern", o.intern], ["Month", String(o.k)], ["Amount", o.amount], ["Due on", o.dueOn]],
       status: o.type === "overdue" ? "Overdue" : o.type === "due" ? (today ? "Due today" : "Past due") : "Due soon",

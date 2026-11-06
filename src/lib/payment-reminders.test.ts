@@ -122,7 +122,7 @@ test("reminder mails and their in-app copy show 'due on 8 Nov 2026' and ₹16,00
   }
   const up = reminderEmail({ ...base, type: "upcoming", offset: -15 }, { name: "Acme", intern: "Asha Rao" });
   assert.match(up.lines[0], /charge of ₹16,000 for Asha Rao falls due on 8 Nov 2026\. You can pay it now\./);
-  assert.match(up.lines[1], /^We would be grateful if you could pay by 8 Nov 2026/);
+  assert.match(up.lines[1], /^Please pay by 8 Nov 2026/);
   assert.equal(up.cta?.url, "http://localhost:3000/employer/checkout"); // payable through the whole reminder window
   assert.match(reminderEmail({ ...base, type: "due", amountMinor: 1_234_550 }, { name: "Acme", intern: "A" }).heading, /₹12,345\.50/);
 });
@@ -139,8 +139,7 @@ test("the intern is told only once the month is due or overdue, never from the e
 test("the second line asks for payment (today on the due day) and never names the intern's pay", () => {
   const mail = (o: Partial<Parameters<typeof emails.paymentReminder>[0]>) =>
     emails.paymentReminder({ name: "Acme", type: "due", k: 1, amount: "₹1,000", dueOn: "30 Oct 2026", intern: "your intern", ...o });
-  assert.match(mail({}).lines[1], /^We would be grateful/);
-  assert.match(mail({}).lines[1], /pay today\. Thank you/);
+  assert.match(mail({}).lines[1], /^Please pay today\./);
   assert.match(mail({ dueToday: false }).lines[1], /pay as soon as you can/);
   assert.match(mail({ type: "upcoming" }).lines[1], /pay by 30 Oct 2026/);
 });
