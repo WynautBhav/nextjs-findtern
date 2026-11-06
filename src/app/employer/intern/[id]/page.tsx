@@ -29,7 +29,7 @@ import { parseOffer } from "@/lib/offer";
 import { timezoneForLocation } from "@/lib/timezones";
 import { dateLabel, draftFromRecord, linkedinHref, type OnboardingDraft } from "@/lib/onboarding";
 import { PageHead, Pill } from "@/components/app/primitives";
-import { ScoreScale } from "@/components/app/tiles";
+import { ScoreBar } from "@/components/app/score-bar";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
@@ -317,7 +317,9 @@ export default async function EmployerInternDetail({
   const skills = profile.skills;
   const matchCount = skills.filter((s) => wantedSet.has(skillBaseName(s).toLowerCase())).length;
   const headline = studyOf(academics);
-  const prefers = preferredCities(profile.preferredLocations);
+  // "Also works in" lists the other cities only: the home city is already in the line before it.
+  const homeCity = (profile.location ?? "").split(",")[0].trim().toLowerCase();
+  const prefers = preferredCities(profile.preferredLocations).filter((c) => c.trim().toLowerCase() !== homeCity);
   const axes = RATING_META.map((m) => ({ label: m.label, value: profile.ratings[m.key] > 0 ? Math.min(10, profile.ratings[m.key]) : null }));
   const rated = axes.filter((a): a is { label: string; value: number } => a.value !== null).sort((a, b) => b.value - a.value);
   const linkedin = nameUnlocked ? linkedinHref(profile.linkedinUrl) : null;
@@ -529,54 +531,59 @@ export default async function EmployerInternDetail({
           ) : null}
 
           <section id="ai-report" aria-labelledby="ai-h" className={`${SECTION} scroll-mt-24`}>
-            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-              <div className="min-w-0">
-                <h2 id="ai-h" className={H2}>
-                  AI interview
-                </h2>
-                <p className="mt-1 text-sm text-ink-600">
-                  {rated.length === 0 ? (
-                    "No AI interview score yet. The breakdown appears once the interview is reviewed."
-                  ) : rated.length > 1 && rated[0].value !== rated[rated.length - 1].value ? (
+            <h2 id="ai-h" className={H2}>
+              AI interview
+            </h2>
+            {/* The bars are the evidence; the sentence only names the spread. All parts tied: the bars say it. */}
+            {rated.length === 0 ? (
+              <p className="mt-1 text-sm text-ink-600">No AI interview score yet. The breakdown appears once the interview is reviewed.</p>
+            ) : rated.length > 1 && rated[0].value !== rated[rated.length - 1].value ? (
+              <p className="mt-1 text-sm text-ink-600">
+                Strongest in {rated[0].label} (<span className="nums">{rated[0].value.toFixed(1)}</span>), lowest in {rated[rated.length - 1].label} (
+                <span className="nums">{rated[rated.length - 1].value.toFixed(1)}</span>).
+              </p>
+            ) : null}
+            <dl className="mt-4 max-w-2xl divide-y divide-ink-100">
+              {axes.map(({ label, value }) => (
+                <div key={label} className="grid grid-cols-[6.5rem_minmax(0,1fr)_3rem] items-center gap-x-4 py-2 sm:grid-cols-[8rem_minmax(0,1fr)_3.5rem]">
+                  <dt className="text-sm text-ink-700">{label}</dt>
+                  {value !== null ? (
                     <>
-                      Strongest in {rated[0].label} (<span className="nums">{rated[0].value.toFixed(1)}</span>), lowest in{" "}
-                      {rated[rated.length - 1].label} (<span className="nums">{rated[rated.length - 1].value.toFixed(1)}</span>).
-                    </>
-                  ) : rated.length === 1 ? (
-                    <>
-                      {rated[0].label}: <span className="nums font-medium text-ink-900">{rated[0].value.toFixed(1)}</span>. The other parts are not rated yet.
+                      <div className="[&>div]:mt-0">
+                        <ScoreBar value={value} />
+                      </div>
+                      <dd className="nums text-right text-sm">
+                        <span className="font-semibold text-ink-900">{value.toFixed(1)}</span>
+                        <span className="text-ink-500">/10</span>
+                      </dd>
                     </>
                   ) : (
                     <>
-                      <span className="nums font-medium text-ink-900">{rated[0].value.toFixed(1)}</span> on all {rated.length} parts: {rated.map((a) => a.label).join(", ")}.
+                      <span className="text-sm text-ink-500">Not rated yet</span>
+                      <dd className="text-right text-sm text-ink-500">-</dd>
                     </>
                   )}
-                </p>
-              </div>
-              {rated.length > 0 ? (
-                <div className="-ml-3 flex flex-wrap items-center gap-1 print:hidden">
-                  {aiLinks.feedbackLink ? (
-                    <a href={aiLinks.feedbackLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
-                      <FileText className="size-4" aria-hidden />
-                      Feedback report
-                      <ExternalLink className="size-3.5" aria-hidden />
-                    </a>
-                  ) : null}
-                  {/* Recording only after hire; the written report before (legacy). */}
-                  {nameUnlocked && aiLinks.recordingLink ? (
-                    <a href={aiLinks.recordingLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
-                      <Video className="size-4" aria-hidden />
-                      Recording
-                      <ExternalLink className="size-3.5" aria-hidden />
-                    </a>
-                  ) : null}
-                  <PrintButton />
                 </div>
-              ) : null}
-            </div>
-            {rated.length > 1 && rated[0].value !== rated[rated.length - 1].value ? (
-              <div className="mt-5 max-w-2xl">
-                <ScoreScale rows={axes} />
+              ))}
+            </dl>
+            {rated.length > 0 ? (
+              <div className="-ml-3 mt-3 flex flex-wrap items-center gap-1 print:hidden">
+                {aiLinks.feedbackLink ? (
+                  <a href={aiLinks.feedbackLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
+                    <FileText className="size-4" aria-hidden />
+                    Feedback report
+                    <ExternalLink className="size-3.5" aria-hidden />
+                  </a>
+                ) : null}
+                {/* Recording only after hire; the written report before (legacy). */}
+                {nameUnlocked && aiLinks.recordingLink ? (
+                  <a href={aiLinks.recordingLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
+                    <Video className="size-4" aria-hidden />
+                    Recording
+                    <ExternalLink className="size-3.5" aria-hidden />
+                  </a>
+                ) : null}
+                <PrintButton />
               </div>
             ) : null}
           </section>
