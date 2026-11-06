@@ -162,18 +162,18 @@ function CallCard({
   onDismiss: (id: string) => void;
 }) {
   const ids = useId();
-  const acceptRef = useRef<HTMLButtonElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState<"accept" | "decline" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const accepted = meeting.status === "accepted";
   const company = meeting.company ?? "An employer";
 
-  // An incoming request takes focus, unless the student is typing somewhere.
+  // An incoming request moves focus to the alert itself (not to Accept, so a stray Enter or Space does nothing), unless the student is typing somewhere.
   useEffect(() => {
     if (accepted) return;
     const el = document.activeElement;
     const typing = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || (el as HTMLElement | null)?.isContentEditable;
-    if (!typing) acceptRef.current?.focus({ preventScroll: true });
+    if (!typing) cardRef.current?.focus({ preventScroll: true });
   }, [accepted]);
 
   async function answer(action: "accept" | "decline") {
@@ -197,6 +197,8 @@ function CallCard({
       }
       if (action === "decline") onGone(meeting.id);
       else onAnswered(body.meeting);
+    } catch {
+      setError("Couldn't reach Findtern. Check your connection and try again.");
     } finally {
       setBusy(null);
     }
@@ -204,13 +206,15 @@ function CallCard({
 
   return (
     <div
+      ref={cardRef}
+      tabIndex={-1}
       role="alertdialog"
       aria-modal="false"
       aria-labelledby={`${ids}-title`}
       aria-describedby={`${ids}-desc`}
       className={cn(
         // Above the chat launcher (z-80): an incoming call outranks it.
-        "fixed inset-x-3 z-[90] rounded-apple-xl border bg-white p-4 shadow-xl",
+        "fixed inset-x-3 z-[90] rounded-apple-xl border bg-white p-4 shadow-xl outline-none",
         "bottom-[calc(5.25rem+env(safe-area-inset-bottom))] lg:bottom-6 lg:left-auto lg:right-6 lg:w-[24rem]",
         "motion-safe:animate-[ft-call-in_240ms_cubic-bezier(0.16,1,0.3,1)]",
         accepted ? "border-brand-300" : "border-accent-300",
@@ -282,7 +286,6 @@ function CallCard({
               {busy === "decline" ? "Declining…" : "Decline"}
             </button>
             <button
-              ref={acceptRef}
               type="button"
               onClick={() => answer("accept")}
               disabled={busy !== null}
