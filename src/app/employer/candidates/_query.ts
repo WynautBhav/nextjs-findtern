@@ -471,9 +471,13 @@ export async function loadCandidates(
       // query matches skills and city. Matching on name would let anyone
       // probe whether a specific person is on the platform. Never the bio:
       // employers do not receive it, so a search must not reveal it either.
+      // Skill NAMES only: the raw jsonb text also holds keys and hidden levels ("Advanced").
       const needle = likePattern(filters.q);
+      const sk = schema.internOnboarding.skills;
       clauses.push(
-        sql`(${schema.internOnboarding.skills}::text ILIKE ${needle} ESCAPE '\\' OR ${schema.internOnboarding.city} ILIKE ${needle} ESCAPE '\\')`,
+        sql`(EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(${sk}) = 'array' THEN ${sk} ELSE '[]'::jsonb END) AS q(e)
+          WHERE (CASE jsonb_typeof(e) WHEN 'string' THEN e #>> '{}' ELSE coalesce(e->>'name', e->>'skill', e->>'title') END) ILIKE ${needle} ESCAPE '\\')
+          OR ${schema.internOnboarding.city} ILIKE ${needle} ESCAPE '\\')`,
       );
     }
 

@@ -103,3 +103,9 @@ test("#17 saving a role is gated like the roles list and capped", () => {
   assert.match(src, /if \(n >= MAX_SAVED_ROLES\)/);
   assert.match(read("app/employer/candidates/_query.ts"), /projectSkills: data\.activeProjectSkills,/);
 });
+
+test("#18 keyword search matches skill names, never the raw skills jsonb (hidden levels)", () => {
+  const src = read("app/employer/candidates/_query.ts");
+  assert.doesNotMatch(src, /skills\}::text ILIKE/);
+  assert.match(src, /coalesce\(e->>'name', e->>'skill', e->>'title'\) END\) ILIKE \$\{needle\}/);
+});
