@@ -3,7 +3,7 @@ import { proposalPill } from "@/components/employer/proposal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
-import { ArrowLeft, Check, ExternalLink, FileText, Link2, MapPin, Send, Video } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, Link2, MapPin, Send, Video } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -15,6 +15,8 @@ import { RATING_META, displayNameOf, isCatalogSkill, preferredCities, toCandidat
 import { hideContactText } from "@/lib/contact-scrub";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
+import { SkillChips } from "@/components/employer/candidate-row-parts";
+import { skillBaseName, studyOf } from "@/components/employer/candidate-view";
 import { candidateStatusPill } from "@/components/employer/candidate-status";
 import { CompareToggle } from "@/components/employer/compare-toggle";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
@@ -311,11 +313,10 @@ export default async function EmployerInternDetail({
       : null;
 
   const plan = PLAN_NAME[band.id];
-  const wantedSet = new Set((wanted?.skills ?? []).map(skillKey));
-  const isWanted = (skill: string) => wantedSet.has(skillKey(skill));
-  const skills = [...profile.skills.filter(isWanted), ...profile.skills.filter((s) => !isWanted(s))];
-  const matchCount = skills.filter(isWanted).length;
-  const headline = academics ? [academics.degree, academics.specialization].filter(Boolean).join(", ") : "";
+  const wantedSet = new Set((wanted?.skills ?? []).map((s) => skillBaseName(s).toLowerCase()));
+  const skills = profile.skills;
+  const matchCount = skills.filter((s) => wantedSet.has(skillBaseName(s).toLowerCase())).length;
+  const headline = studyOf(academics);
   const prefers = preferredCities(profile.preferredLocations);
   const axes = RATING_META.map((m) => ({ label: m.label, value: profile.ratings[m.key] > 0 ? Math.min(10, profile.ratings[m.key]) : null }));
   const rated = axes.filter((a): a is { label: string; value: number } => a.value !== null).sort((a, b) => b.value - a.value);
@@ -402,7 +403,7 @@ export default async function EmployerInternDetail({
           <dl className="mt-6 grid grid-cols-[auto_auto_auto] justify-start gap-x-8 gap-y-4 sm:flex sm:flex-wrap sm:gap-x-12 sm:pl-30">
             <div>
               <dt className="text-sm text-ink-600">Findtern Score</dt>
-              <dd className="nums mt-0.5 text-4xl font-semibold leading-none tracking-[-0.02em] text-brand-700">
+              <dd className="nums mt-0.5 text-4xl font-semibold leading-none tracking-[-0.02em] text-ink-900">
                 {profile.scored ? (
                   <>
                     {profile.score.toFixed(1)}
@@ -521,24 +522,8 @@ export default async function EmployerInternDetail({
                   </p>
                 ) : null}
               </div>
-              <ul className="flex flex-wrap gap-2">
-                {skills.slice(0, MAX_SKILLS).map((skill) => (
-                  <SkillChip key={skill} skill={skill} matched={isWanted(skill)} />
-                ))}
-              </ul>
-              {skills.length > MAX_SKILLS ? (
-                <details className="group mt-2">
-                  <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-apple-sm text-sm font-medium text-brand-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 [&::-webkit-details-marker]:hidden">
-                    <span className="group-open:hidden">+{skills.length - MAX_SKILLS} more</span>
-                    <span className="hidden group-open:inline">Show fewer</span>
-                  </summary>
-                  <ul className="flex flex-wrap gap-2">
-                    {skills.slice(MAX_SKILLS).map((skill) => (
-                      <SkillChip key={skill} skill={skill} matched={isWanted(skill)} />
-                    ))}
-                  </ul>
-                </details>
-              ) : null}
+              {/* The same chips as the candidate list: project matches first and ticked, at most seven, then +N. */}
+              <SkillChips skills={skills} wanted={wanted?.skills ?? []} />
             </section>
           ) : null}
 
@@ -705,31 +690,6 @@ export default async function EmployerInternDetail({
 
 /** "Your proposals to them" shows the latest few; the rest live on the Proposals page. */
 const PROPOSALS_SHOWN = 3;
-/** Chips shown before "+N more", as on the candidate list. */
-const MAX_SKILLS = 7;
-
-/** A stored skill may carry a level ("React · Advanced"); matching is on the name. */
-function skillKey(skill: string): string {
-  return skill.split(" · ")[0].trim().toLowerCase();
-}
-
-/** Matched: filled green with a tick. Others: outline. Same look as the candidate list. */
-function SkillChip({ skill, matched }: { skill: string; matched: boolean }) {
-  return (
-    <li
-      className={
-        matched
-          ? "inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800 ring-1 ring-inset ring-brand-200/70"
-          : "inline-flex items-center rounded-full px-3 py-1.5 text-sm text-ink-800 ring-1 ring-inset ring-ink-200"
-      }
-    >
-      {matched ? <Check className="size-3.5" aria-hidden /> : null}
-      {skill}
-      {matched ? <span className="sr-only"> (matches your project)</span> : null}
-    </li>
-  );
-}
-
 function humanise(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1).replace(/[_-]+/g, " ");
 }
