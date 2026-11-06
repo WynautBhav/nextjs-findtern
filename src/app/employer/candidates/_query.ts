@@ -224,9 +224,9 @@ export function queryOf(merged: Filters): string {
 }
 
 /** Just the filters: what is remembered per project (EMB-05). */
-function filterParams(merged: Filters): URLSearchParams {
+function filterParams(merged: Filters, withKeyword = true): URLSearchParams {
   const next = new URLSearchParams();
-  if (merged.q) next.set("q", merged.q);
+  if (withKeyword && merged.q) next.set("q", merged.q);
   if (merged.skillsSet) next.set("skills", merged.skills.join(","));
   if (merged.city) next.set("city", merged.city);
   if (merged.mode) next.set("mode", merged.mode);
@@ -249,8 +249,9 @@ function filterParams(merged: Filters): URLSearchParams {
   return next;
 }
 
+/** Structured filters only: a typed keyword is a one-off search, never restored on a fresh visit. */
 export function rememberQueryOf(filters: Filters): string {
-  return filterParams(filters).toString();
+  return filterParams(filters, false).toString();
 }
 
 /**
@@ -436,6 +437,7 @@ export async function loadCandidates(
       const savedFilters = await rememberedFilters(uid, activeProjectId);
       if (savedFilters) {
         const next = new URLSearchParams(savedFilters);
+        next.delete("q"); // cookies written before keywords stopped being remembered
         next.set("project", activeProjectId);
         if (compareIds.length > 0) next.set("ids", compareIds.join(","));
         data.restoreTo = `/employer/candidates?${next.toString()}`;
