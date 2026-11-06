@@ -5,10 +5,13 @@ SET LOCAL lock_timeout = '5s';
 --> statement-breakpoint
 CREATE TABLE IF NOT EXISTS "intern_skills_backup" (
 	"user_id" varchar PRIMARY KEY NOT NULL,
-	"skills" jsonb NOT NULL,
+	"skills" jsonb,
 	"extra_skills" jsonb,
 	"cut_at" timestamp DEFAULT now() NOT NULL
 );
+--> statement-breakpoint
+-- legacy rows may have skills NULL with >7 ratings; a DB that ran the first draft of this file gets the column relaxed
+ALTER TABLE "intern_skills_backup" ALTER COLUMN "skills" DROP NOT NULL;
 --> statement-breakpoint
 INSERT INTO "intern_skills_backup" ("user_id", "skills", "extra_skills")
 	SELECT "user_id", "skills", "extra_data"->'skillsWithRatings' FROM "intern_onboarding"

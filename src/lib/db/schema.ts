@@ -1390,7 +1390,7 @@ export type Message = typeof messages.$inferSelect;
 /** Skill arrays saved before migration 0021 cut every profile to 7 (OA9). Read only by its rollback. */
 export const internSkillsBackup = pgTable("intern_skills_backup", {
   userId: varchar("user_id").primaryKey(),
-  skills: jsonb("skills").notNull(),
+  skills: jsonb("skills"),
   extraSkills: jsonb("extra_skills"),
   cutAt: timestamp("cut_at").notNull().defaultNow(),
 });
