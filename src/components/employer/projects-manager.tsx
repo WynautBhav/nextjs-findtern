@@ -290,7 +290,7 @@ export function ProjectsManager({
                   type="button"
                   onClick={() => setQuery("")}
                   aria-label="Clear search"
-                  className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-ink-800"
+                  className="absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center touch:size-11 rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-ink-800"
                 >
                   <X className="size-4" aria-hidden />
                 </button>

@@ -114,19 +114,19 @@ export function CandidateCard({
   const actions = (
     <>
       {proposal ? (
-        <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="outline" size="sm" className="min-h-10">
+        <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="outline" size="sm" className="min-h-10 touch:min-h-11">
           {proposalActionLabel(proposal)}
         </ButtonLink>
       ) : projectId ? (
         <>
           <ShortlistToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} size="sm" emphasis="primary" />
-          <ButtonLink href={sendHref} variant={shortlisted ? "primary" : "outline"} size="sm" className="min-h-10">
+          <ButtonLink href={sendHref} variant={shortlisted ? "primary" : "outline"} size="sm" className="min-h-10 touch:min-h-11">
             <Send className="size-4" aria-hidden />
             Send proposal
           </ButtonLink>
         </>
       ) : (
-        <ButtonLink href={sendHref} variant="primary" size="sm" className="min-h-10">
+        <ButtonLink href={sendHref} variant="primary" size="sm" className="min-h-10 touch:min-h-11">
           <Send className="size-4" aria-hidden />
           Send proposal
         </ButtonLink>
@@ -253,13 +253,13 @@ export function CandidateCard({
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-10 px-2.5 text-ink-700" })}
+            className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-10 touch:min-h-11 px-2.5 text-ink-700" })}
           >
             <Eye className="size-4" aria-hidden />
             Quick view
           </button>
           {compareControl}
-          <Link href={profileHref} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-10 px-2.5 text-ink-700" })}>
+          <Link href={profileHref} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-10 touch:min-h-11 px-2.5 text-ink-700" })}>
             Profile
             <ArrowUpRight className="size-4" aria-hidden />
           </Link>
@@ -311,7 +311,7 @@ export function CandidateCard({
             <div className="flex flex-wrap items-start gap-2">
               {actions}
               {compareControl}
-              <ButtonLink href={profileHref} variant="ghost" size="sm" className="min-h-10">
+              <ButtonLink href={profileHref} variant="ghost" size="sm" className="min-h-10 touch:min-h-11">
                 Full profile
                 <ArrowUpRight className="size-4" aria-hidden />
               </ButtonLink>
@@ -327,14 +327,14 @@ export function CandidateCard({
                   href={candidate.aiFeedbackLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-10" })}
+                  className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-10 touch:min-h-11" })}
                 >
                   <FileText className="size-4" aria-hidden />
                   Feedback report
                 </a>
               ) : null}
               {candidate.scored ? (
-                <Link href={`${profileHref}#ai-report`} className="mt-3 ml-1 inline-flex min-h-10 items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
+                <Link href={`${profileHref}#ai-report`} className="mt-3 ml-1 inline-flex min-h-10 touch:min-h-11 items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
                   Full AI interview report
                 </Link>
               ) : null}

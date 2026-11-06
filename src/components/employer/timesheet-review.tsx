@@ -164,7 +164,7 @@ export function TimesheetReview({
                           title={`${dayLabel(d.date, { weekday: "long", day: "numeric", month: "long" })}: ${d.status || "not filled"}${d.status === "Present" ? `, ${d.hours} h` : ""}${d.note ? ` (${d.note})` : ""}`}
                           className={cn(
                             "mt-1 flex h-11 flex-col items-center justify-center rounded-apple-sm border text-sm font-bold leading-none",
-                            CELL[d.status] ?? "border-dashed border-ink-300 bg-white text-ink-400",
+                            CELL[d.status] ?? "border-dashed border-ink-500 bg-white text-text-subtle",
                           )}
                         >
                           {d.status ? (DAY_CODE[d.status] ?? d.status.charAt(0).toUpperCase()) : "–"}
