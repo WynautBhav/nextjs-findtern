@@ -97,3 +97,16 @@ export function offerState(
       return { ...base, label: status ? status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ") : "Unknown", tone: "neutral", next: "" };
   }
 }
+
+/**
+ * The pill on its own, for screens that know a proposal's status but not its
+ * offer terms (a candidate card, a profile's history): the same label and tone
+ * `offerState` gives the list and the detail page, so one status reads one way.
+ */
+export function proposalPill(status: string | null, fullTime = false): { label: string; tone: Tone } {
+  const { label, tone } = offerState(
+    { status: status ?? "", hiredAt: null },
+    { startDate: null, fullTime: fullTime ? ({} as Offer["fullTime"]) : null },
+  );
+  return { label, tone };
+}
