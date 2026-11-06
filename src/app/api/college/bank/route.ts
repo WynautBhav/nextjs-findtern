@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { collegeBankProblem } from "@/lib/college/money";
 import { requireCollegeMutation } from "@/lib/college/guard";
-import { getDb, schema } from "@/lib/db";
+import { schema } from "@/lib/db";
 import { withLock } from "@/lib/advisory-lock";
 
 const bodySchema = z.object({
