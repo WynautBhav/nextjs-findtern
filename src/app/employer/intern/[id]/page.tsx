@@ -30,6 +30,9 @@ import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/ap
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { ButtonLink } from "@/components/ui/button";
+import { PresenceDot } from "@/components/app/presence-dot";
+import { MessageButton } from "@/components/app/messages/message-button";
+import { presenceOf, type PresenceLabel } from "@/lib/presence";
 
 export const metadata: Metadata = {
   title: "Candidate",
@@ -87,6 +90,8 @@ export default async function EmployerInternDetail({
   let comparePicks: string[] = [];
   let employerFte = "none";
   let employerZone = "Asia/Kolkata";
+  /** "Online now" / "Active today" / "Active this week", never a time; null when hidden or older. */
+  let presence: PresenceLabel | null = null;
 
   try {
     const db = getDb();
@@ -236,6 +241,7 @@ export default async function EmployerInternDetail({
       profile = toCandidateProfile(user, onboarding);
       // Photo shows before hire (owner, 6 Nov); the name stays initials until hired.
       await attachPhotos(db, [profile]);
+      presence = (await presenceOf([profile.id]).catch(() => ({} as Record<string, PresenceLabel | null>)))[profile.id] ?? null;
       if (onboarding) details = draftFromRecord(onboarding);
       plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
 
@@ -313,102 +319,124 @@ export default async function EmployerInternDetail({
         </p>
       ) : null}
 
-      {/* ── Identity and the score, the one thing an employer decides on ── */}
-      <Surface className="mb-8 p-6 sm:p-8">
-        <div className="flex flex-wrap items-start gap-x-8 gap-y-6">
-          <div className="flex min-w-0 flex-1 basis-80 items-start gap-5">
-            <CandidateAvatar
-              photoUrl={profile.photoUrl}
-              initials={profile.initials}
-              className="size-16 rounded-apple-lg text-xl ring-1 ring-inset ring-brand-200/70"
-            />
-            <div className="min-w-0">
-              <h1 className="break-words text-3xl font-semibold leading-tight text-ink-900">{displayName}</h1>
-              <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
+      {/* ── Identity. The score and the hire actions are in the sticky box beside it. ── */}
+      <Surface className="mb-6 p-5 sm:p-7">
+        <div className="flex min-w-0 items-start gap-5">
+          <CandidateAvatar
+            photoUrl={profile.photoUrl}
+            initials={profile.initials}
+            className="size-16 rounded-full text-xl ring-1 ring-inset ring-brand-200/70"
+          />
+          <div className="min-w-0">
+            <h1 className="break-words text-3xl font-semibold leading-tight text-ink-900">{displayName}</h1>
+            {presence ? (
+              <div className="mt-1">
+                <PresenceDot label={presence} withText />
+              </div>
+            ) : null}
+            <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
+              <span className="inline-flex items-center gap-1.5">
+                <MapPin className="size-4 text-ink-400" aria-hidden />
+                {profile.location || "Location not stated"}
+              </span>
+              {profile.hasLaptop !== null ? (
                 <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="size-4 text-ink-400" aria-hidden />
-                  {profile.location || "Location not stated"}
+                  <Laptop className="size-4 text-ink-400" aria-hidden />
+                  {profile.hasLaptop ? "Has a laptop" : "Needs a laptop"}
                 </span>
-                {profile.hasLaptop !== null ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Laptop className="size-4 text-ink-400" aria-hidden />
-                    {profile.hasLaptop ? "Has a laptop" : "Needs a laptop"}
-                  </span>
-                ) : null}
-              </p>
-              {profile.workModes.length > 0 ? <p className="mt-1 text-sm text-ink-600">Open to {profile.workModes.join(", ").toLowerCase()}</p> : null}
-              {status ? (
-                <div className="mt-3">
-                  <Pill tone={status.tone}>{status.label}</Pill>
-                </div>
               ) : null}
-            </div>
+            </p>
+            {profile.workModes.length > 0 ? <p className="mt-1 text-sm text-ink-600">Open to {profile.workModes.join(", ").toLowerCase()}</p> : null}
+            {status ? (
+              <div className="mt-3">
+                <Pill tone={status.tone}>{status.label}</Pill>
+              </div>
+            ) : null}
           </div>
-
-          {/* Not shrink-0 on phones: the price line set the block's width and
-              ran to x=460 on a 375 screen (QA-119). It wraps instead. */}
-          <div className="flex min-w-0 gap-8 sm:shrink-0">
-            <div className="shrink-0">
-              <p className="text-sm font-medium text-ink-600">Findtern Score</p>
-              <p className="nums mt-1 text-4xl font-semibold leading-none text-brand-700">
-                {profile.scored ? profile.score.toFixed(1) : "-"}
-                <span className="ml-0.5 text-base font-medium text-text-subtle">/10</span>
-              </p>
-              <p className="mt-1.5 text-sm text-ink-600">{band.name}</p>
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-ink-600">Price</p>
-              <p className="nums mt-2.5 text-2xl font-semibold leading-none text-ink-900">
-                {formatRate(pricing.hourlyRateMinor, currency)}
-              </p>
-              <p className="mt-2.5 text-sm text-ink-600">
-                {/* The price is said once, here: no separate "what hiring costs" card. */}
-                {pricing.perHireMinor > 0 ? `+ ${formatMoney(pricing.perHireMinor, currency)} per hire · ` : ""}set by the score band
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-5">
-          {action.kind === "send" ? (
-            <ButtonLink
-              href={`/employer/send-proposal?intern=${encodeURIComponent(profile.id)}${shortlist ? `&project=${encodeURIComponent(shortlist.projectId)}` : ""}`}
-              variant="primary"
-            >
-              <Send className="size-4" aria-hidden />
-              Send proposal
-            </ButtonLink>
-          ) : action.kind === "view" ? (
-            <ButtonLink href={`/employer/proposal/${encodeURIComponent(action.proposalId)}`} variant="primary">
-              View sent proposal
-            </ButtonLink>
-          ) : relation?.hired ? null : (
-            <p className="rounded-apple-sm bg-ink-100 px-4 py-2.5 text-sm text-ink-700">{action.reason}</p>
-          )}
-          {relation?.hired && relation.proposal ? (
-            <ButtonLink href={`/employer/proposal/${encodeURIComponent(relation.proposal.id)}`} variant="primary">
-              View placement
-            </ButtonLink>
-          ) : null}
-          {relation?.fullTimeFrom ? (
-            <FullTimeOfferButton
-              employerId={employerId}
-              proposalId={relation.fullTimeFrom}
-              candidate={displayName}
-              fteStatus={employerFte}
-              timezone={employerZone}
-            />
-          ) : null}
-          {shortlist && action.kind === "send" ? (
-            <ShortlistToggle internId={profile.id} projectId={shortlist.projectId} shortlisted={shortlist.on} />
-          ) : null}
-          {/* EMB-12: hires and full-time offers are not compared (legacy). */}
-          {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} picked={comparePicks} />}
         </div>
       </Surface>
 
-      <div className="grid gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0 space-y-8">
+      <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+        {/* First in the DOM so a phone reads the decision first; the right column from lg up. */}
+        <aside aria-label="Hire" className="min-w-0 space-y-4 lg:order-2 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto">
+          <Surface className="p-5">
+            <p className="text-sm font-medium text-ink-600">Findtern Score</p>
+            <p className="nums mt-1 text-4xl font-semibold leading-none text-brand-700">
+              {profile.scored ? profile.score.toFixed(1) : "-"}
+              <span className="ml-0.5 text-base font-medium text-text-subtle">/10</span>
+            </p>
+            <p className="mt-1.5 text-sm text-ink-600">{profile.scored ? band.name : "Not scored yet"}</p>
+
+            <div className="mt-4 border-t border-ink-100 pt-4">
+              <p className="nums text-2xl font-semibold leading-none text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
+              <p className="mt-1.5 text-sm text-ink-600">Rate set by the score band</p>
+              {pricing.perHireMinor > 0 ? (
+                <p className="nums mt-1 text-sm font-medium text-ink-800">+ {formatMoney(pricing.perHireMinor, currency)} hiring charge</p>
+              ) : null}
+            </div>
+
+            <div className="mt-5 flex flex-col gap-2 [&_button]:w-full [&_button]:justify-center">
+              {action.kind === "send" ? (
+                <ButtonLink
+                  href={`/employer/send-proposal?intern=${encodeURIComponent(profile.id)}${shortlist ? `&project=${encodeURIComponent(shortlist.projectId)}` : ""}`}
+                  variant="primary"
+                  block
+                  className="min-h-11"
+                >
+                  <Send className="size-4" aria-hidden />
+                  Send proposal
+                </ButtonLink>
+              ) : action.kind === "view" ? (
+                <ButtonLink href={`/employer/proposal/${encodeURIComponent(action.proposalId)}`} variant="primary" block className="min-h-11">
+                  View sent proposal
+                </ButtonLink>
+              ) : relation?.hired ? null : (
+                <p className="rounded-apple-sm bg-ink-100 px-4 py-2.5 text-sm text-ink-700">{action.reason}</p>
+              )}
+              {relation?.hired && relation.proposal ? (
+                <ButtonLink href={`/employer/proposal/${encodeURIComponent(relation.proposal.id)}`} variant="primary" block className="min-h-11">
+                  View placement
+                </ButtonLink>
+              ) : null}
+              {relation?.proposal ? <MessageButton proposalId={relation.proposal.id} /> : null}
+              {relation?.fullTimeFrom ? (
+                <FullTimeOfferButton
+                  employerId={employerId}
+                  proposalId={relation.fullTimeFrom}
+                  candidate={displayName}
+                  fteStatus={employerFte}
+                  timezone={employerZone}
+                />
+              ) : null}
+              {shortlist && action.kind === "send" ? (
+                <ShortlistToggle internId={profile.id} projectId={shortlist.projectId} shortlisted={shortlist.on} />
+              ) : null}
+              {/* EMB-12: hires and full-time offers are not compared (legacy). */}
+              {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} picked={comparePicks} />}
+            </div>
+          </Surface>
+
+          {appliedProjects.length > 0 ? (
+            <Surface className="p-5">
+              <h2 className="text-base font-semibold text-ink-900">Your proposals to them</h2>
+              <ul className="mt-3 space-y-3">
+                {appliedProjects.map((entry) => {
+                  const pill = proposalPill(entry.status, entry.fullTime);
+                  return (
+                    <li key={entry.id} className="flex min-w-0 items-start justify-between gap-3 text-sm">
+                      <span className="min-w-0 font-medium text-ink-900">{entry.projectName ?? "Project no longer listed"}</span>
+                      <Pill tone={pill.tone} className="shrink-0">
+                        {pill.label}
+                      </Pill>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Surface>
+          ) : null}
+        </aside>
+
+        <div className="min-w-0 space-y-8 lg:order-1">
           {profile.skills.length > 0 ? (
             <section>
               <SectionHead title="Skills and tools" />
@@ -421,6 +449,39 @@ export default async function EmployerInternDetail({
               </ul>
             </section>
           ) : null}
+
+          <Surface className="px-5 py-2">
+            <h2 className="pt-3 text-base font-semibold text-ink-900">Practicalities</h2>
+            <dl className="divide-y divide-ink-100">
+              <DetailRow label="City" value={profile.city || "Not stated"} />
+              <DetailRow label="Work mode" value={profile.workModes.join(", ") || "Not stated"} />
+              <DetailRow
+                label="Prefers"
+                value={
+                  preferredCities(profile.preferredLocations).join(", ") ||
+                  (profile.workModes.length === 1 && profile.workModes[0] === "Remote" ? "Remote only" : "Not stated")
+                }
+              />
+              <DetailRow
+                label="Laptop"
+                value={profile.hasLaptop === null ? "Not stated" : profile.hasLaptop ? "Has one" : "Needs one provided"}
+              />
+            </dl>
+            {/* LinkedIn URLs usually contain the real name, so the link stays
+                hidden until the hire unmasks the candidate. */}
+            {nameUnlocked && linkedinHref(profile.linkedinUrl) ? (
+              <a
+                href={linkedinHref(profile.linkedinUrl) ?? undefined}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="mb-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
+              >
+                <Link2 className="size-4" aria-hidden />
+                LinkedIn profile
+              </a>
+            ) : null}
+          </Surface>
+
 
           <section id="ai-report" className="scroll-mt-24">
             <AiFeedbackReport
@@ -530,58 +591,6 @@ export default async function EmployerInternDetail({
           ) : null}
         </div>
 
-        <aside className="min-w-0 space-y-4">
-          <Surface className="px-5 py-2">
-            <h2 className="pt-3 text-base font-semibold text-ink-900">Practicalities</h2>
-            <dl className="divide-y divide-ink-100">
-              <DetailRow label="City" value={profile.city || "Not stated"} />
-              <DetailRow label="Work mode" value={profile.workModes.join(", ") || "Not stated"} />
-              <DetailRow
-                label="Prefers"
-                value={
-                  preferredCities(profile.preferredLocations).join(", ") ||
-                  (profile.workModes.length === 1 && profile.workModes[0] === "Remote" ? "Remote only" : "Not stated")
-                }
-              />
-              <DetailRow
-                label="Laptop"
-                value={profile.hasLaptop === null ? "Not stated" : profile.hasLaptop ? "Has one" : "Needs one provided"}
-              />
-            </dl>
-            {/* LinkedIn URLs usually contain the real name, so the link stays
-                hidden until the hire unmasks the candidate. */}
-            {nameUnlocked && linkedinHref(profile.linkedinUrl) ? (
-              <a
-                href={linkedinHref(profile.linkedinUrl) ?? undefined}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="mb-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
-              >
-                <Link2 className="size-4" aria-hidden />
-                LinkedIn profile
-              </a>
-            ) : null}
-          </Surface>
-
-          {appliedProjects.length > 0 ? (
-            <Surface className="p-5">
-              <h2 className="text-base font-semibold text-ink-900">Your proposals to them</h2>
-              <ul className="mt-3 space-y-3">
-                {appliedProjects.map((entry) => {
-                  const pill = proposalPill(entry.status, entry.fullTime);
-                  return (
-                    <li key={entry.id} className="flex min-w-0 items-start justify-between gap-3 text-sm">
-                      <span className="min-w-0 font-medium text-ink-900">{entry.projectName ?? "Project no longer listed"}</span>
-                      <Pill tone={pill.tone} className="shrink-0">
-                        {pill.label}
-                      </Pill>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Surface>
-          ) : null}
-        </aside>
       </div>
     </div>
   );
