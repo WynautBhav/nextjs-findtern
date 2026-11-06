@@ -18,6 +18,7 @@ import type { EmployerProposal } from "@/lib/employer-proposal-view";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { parseOffer } from "@/lib/offer";
 import { offerState } from "@/components/employer/proposal-state";
+import { proposalBucket } from "@/components/employer/proposal-bucket";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
 
@@ -42,25 +43,17 @@ function nameOf(item: ProposalItem): string {
 /** Rows shown at a time; "Show more" adds another page (as Projects). */
 const PAGE = 20;
 
-/** Status filter buckets (the raw enums never reach the select). */
-const FILTERS: { value: string; label: string; match: (status: string, lapsed: boolean) => boolean }[] = [
-  { value: "open", label: "Waiting on candidate", match: (s, l) => !l && (s === "sent" || s === "interview_scheduled" || s === "draft") },
-  { value: "accepted", label: "Accepted, to pay", match: (s) => s === "accepted" || s === "processing" },
-  { value: "hired", label: "Hired", match: (s) => s === "hired" },
-  { value: "closed", label: "Closed", match: (s, l) => l || ["rejected", "withdrawn", "expired"].includes(s) },
-];
-
 function formatStart(iso: string | null): string | null {
   if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
   const [y, m, d] = iso.slice(0, 10).split("-");
   return `${d}/${m}/${y}`;
 }
 
-export function ProposalsManager({ initialProposals }: { initialProposals: ProposalItem[] }) {
+export function ProposalsManager({ initialProposals, initialStatus = "all" }: { initialProposals: ProposalItem[]; initialStatus?: string }) {
   const router = useRouter();
   const [proposals, setProposals] = useState<ProposalItem[]>(initialProposals);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [projectFilter, setProjectFilter] = useState("all");
   const [shown, setShown] = useState(PAGE);
   const [withdrawTarget, setWithdrawTarget] = useState<ProposalItem | null>(null);
@@ -81,20 +74,18 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
 
   const projectOptions = Array.from(new Map(proposals.filter((p) => p.project).map((p) => [p.project!.id, p.project!.projectName])).entries());
 
-  const counts = {
-    open: rows.filter((r) => FILTERS[0].match(r.item.proposal.status, r.state.lapsed)).length,
-    accepted: rows.filter((r) => FILTERS[1].match(r.item.proposal.status, r.state.lapsed)).length,
-    hired: rows.filter((r) => r.item.proposal.status === "hired").length,
-    closed: rows.filter((r) => FILTERS[3].match(r.item.proposal.status, r.state.lapsed)).length,
-  };
+  const counts = { open: 0, accepted: 0, hired: 0, closed: 0 };
+  for (const r of rows) {
+    const b = proposalBucket(r.item.proposal.status, r.state.lapsed);
+    if (b) counts[b] += 1;
+  }
 
   const needle = search.trim().toLowerCase();
-  const filter = FILTERS.find((f) => f.value === statusFilter);
   const filtered = rows.filter(({ item, offer, state }) => {
     // Project, role or the initials shown - never a hidden name.
     const hay = `${item.project?.projectName ?? ""} ${offer.roleTitle} ${nameOf(item)}`.toLowerCase();
     if (needle && !hay.includes(needle)) return false;
-    if (filter && !filter.match(item.proposal.status, state.lapsed)) return false;
+    if (statusFilter !== "all" && proposalBucket(item.proposal.status, state.lapsed) !== statusFilter) return false;
     if (projectFilter !== "all" && item.proposal.projectId !== projectFilter) return false;
     return true;
   });
@@ -164,7 +155,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
   return (
     <div>
       {showTools ? (
-        <div className="mb-5 flex flex-col gap-2 sm:flex-row">
+        <div className="mb-5 flex gap-2">
           <label className="relative min-w-0 flex-1 sm:max-w-xl">
             <span className="sr-only">Search proposals</span>
             <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
@@ -187,7 +178,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                 setProjectFilter(e.target.value);
                 setShown(PAGE);
               }}
-              className={cn(fieldClass, "rounded-full sm:w-56")}
+              className={cn(fieldClass, "w-36 shrink-0 truncate rounded-full sm:w-56")}
               aria-label="Project"
             >
               <option value="all">All projects</option>
@@ -329,7 +320,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                 {/* Above the stretched link, so these stay clickable. */}
                 <div className="relative z-10 col-span-2 flex items-center gap-3 max-lg:pl-[4.5rem] max-sm:pl-0 lg:col-span-1">
                   {/* One visible action, chosen by the state (QA-120); the menu holds the rest. */}
-                  <div className="min-w-0 max-sm:flex-1 [&_button]:max-sm:w-full [&_a]:max-sm:w-full lg:w-36 [&_button]:lg:w-full [&_a]:lg:w-full">
+                  <div className="min-w-0 max-sm:flex-1 [&_a]:rounded-full [&_button]:rounded-full [&_button]:max-sm:w-full [&_a]:max-sm:w-full lg:w-36 [&_button]:lg:w-full [&_a]:lg:w-full">
                     {state.canPay ? (
                       <Link href="/employer/checkout" className={buttonClass({ variant: "primary" })}>
                         <CreditCard className="size-4" aria-hidden />
