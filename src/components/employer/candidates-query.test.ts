@@ -10,7 +10,7 @@ test("a typed keyword is never remembered, only structured filters", () => {
   assert.match(src, /rememberQueryOf\(filters: Filters\): string \{\s*return filterParams\(filters, false\)/);
   assert.match(src, /if \(withKeyword && merged\.q\) next\.set\("q"/);
   // Links (and compare's "back") still carry it: queryOf keeps the default.
-  assert.match(src, /const next = new URLSearchParams\(filterParams\(merged\)\)/);
+  assert.match(src, /const filters = filterParams\(merged\);/);
 });
 
 test("a cookie written before this still cannot restore a keyword", () => {
