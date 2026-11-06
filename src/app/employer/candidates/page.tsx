@@ -231,11 +231,12 @@ export default async function CandidatesPage({
           preferredLocations: schema.projects.preferredLocations,
           locationType: schema.projects.locationType,
           status: schema.projects.status,
+          takenDownAt: schema.projects.takenDownAt,
         })
         .from(schema.projects)
         .where(eq(schema.projects.employerId, uid))
         .orderBy(desc(schema.projects.createdAt))
-    ).filter((p) => isOpenProject(p.status));
+    ).filter((p) => isOpenProject(p.status, p.takenDownAt));
     projects = projectRows.map((p) => ({ id: p.id, projectName: p.projectName }));
     activeProjectId = (filters.project && projects.find((p) => p.id === filters.project)?.id) || projects[0]?.id || null;
     // A remembered project that was since closed or deleted is not carried on links.

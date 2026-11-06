@@ -72,7 +72,7 @@ export async function rememberedFilters(employerId: string, projectId: string | 
  * app wrote "closed" for a while and "archived" exists in old rows. Anything
  * else (normally "active") is open (EMH-03 / EMH-15).
  */
-export function isOpenProject(status: string | null | undefined): boolean {
-  // One rule: lib/project-locations owns the closed-status list.
-  return isProjectOpen(status);
+export function isOpenProject(status: string | null | undefined, takenDownAt?: Date | string | null): boolean {
+  // One rule: lib/project-locations owns the closed-status list and take-downs.
+  return isProjectOpen(status, takenDownAt);
 }

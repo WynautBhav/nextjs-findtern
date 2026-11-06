@@ -127,8 +127,8 @@ export default async function EmployerDashboard() {
     ] satisfies Task[]
   ).filter((t) => t.count > 0);
 
-  const openProjects = projects.filter((p) => isProjectOpen(p.status));
-  const shownProjects = [...openProjects, ...projects.filter((p) => !isProjectOpen(p.status))].slice(0, 5);
+  const openProjects = projects.filter((p) => isProjectOpen(p.status, p.takenDownAt));
+  const shownProjects = [...openProjects, ...projects.filter((p) => !isProjectOpen(p.status, p.takenDownAt))].slice(0, 5);
   const byProject = new Map<string, { total: number; won: number }>();
   for (const p of proposals) {
     const row = byProject.get(p.projectId) ?? { total: 0, won: 0 };
@@ -250,7 +250,7 @@ export default async function EmployerDashboard() {
                 {shownProjects.map((p) => {
                   const stats = byProject.get(p.id) ?? { total: 0, won: 0 };
                   const skills = ((p.skills as string[]) ?? []).slice(0, 4);
-                  const open = isProjectOpen(p.status);
+                  const open = isProjectOpen(p.status, p.takenDownAt);
                   return (
                     <li key={p.id}>
                       <Link
@@ -401,7 +401,7 @@ async function load(employerId: string): Promise<Loaded> {
   // first; the top of the pool when no open project lists skills. Same pool
   // rule as the candidate browser.
   const wanted = Array.from(
-    new Set(projectRows.filter((p) => isProjectOpen(p.status)).flatMap((p) => (p.skills as string[]) ?? [])),
+    new Set(projectRows.filter((p) => isProjectOpen(p.status, p.takenDownAt)).flatMap((p) => (p.skills as string[]) ?? [])),
   ).map((s) => s.toLowerCase());
   const pool = await db
     .select({ user: schema.users, onboarding: schema.internOnboarding })

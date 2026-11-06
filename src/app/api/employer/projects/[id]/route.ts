@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, ne, or, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -140,6 +140,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
         and(
           eq(schema.projects.employerId, project.employerId),
           ne(schema.projects.id, id),
+          // A listing Findtern took down is not a live one.
+          isNull(schema.projects.takenDownAt),
           sql`coalesce(lower(trim(${schema.projects.status})), '') not in (${sql.join(
             CLOSED_PROJECT_STATUSES.map((v) => sql`${v}`),
             sql`, `,

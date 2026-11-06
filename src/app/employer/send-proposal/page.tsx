@@ -89,13 +89,14 @@ export default async function SendProposal({
         locationType: schema.projects.locationType,
         timezone: schema.projects.timezone,
         status: schema.projects.status,
+        takenDownAt: schema.projects.takenDownAt,
       })
       .from(schema.projects)
       .where(eq(schema.projects.employerId, uid))
       .orderBy(desc(schema.projects.createdAt));
     // Open projects only, newest first; the default is the newest open one
     // (legacy picker; EMH-15). Closed covers closed/inactive/archived (EMH-03).
-    projects = rows.filter((row) => isProjectOpen(row.status)).map((row) => ({
+    projects = rows.filter((row) => isProjectOpen(row.status, row.takenDownAt)).map((row) => ({
       id: row.id,
       projectName: row.projectName,
       locationType: row.locationType,

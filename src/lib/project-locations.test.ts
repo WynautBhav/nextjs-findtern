@@ -117,3 +117,11 @@ test("a taken-down listing cannot be reopened by the employer; a closed one is f
   assert.equal(projectStatusChangeError({ status: "inactive" }, "active"), null, "a pause can be resumed");
   assert.equal(projectStatusChangeError({ status: "active" }, "closed"), null);
 });
+
+test("a taken-down listing is not open for offers even though its status stays active", () => {
+  assert.equal(isProjectOpen("active", new Date()), false);
+  assert.equal(isProjectOpen("active", "2026-11-06T10:00:00Z"), false);
+  assert.equal(isProjectOpen("active", null), true);
+  assert.equal(isProjectOpen("active", undefined), true);
+  assert.equal(isProjectOpen("inactive", null), false);
+});
