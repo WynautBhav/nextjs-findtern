@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
-import { ArrowLeft, ArrowUpRight, CreditCard, Download } from "lucide-react";
+import { and, eq, isNotNull } from "drizzle-orm";
+import { ArrowLeft, Check, Clock, CreditCard, Download, X } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -13,13 +13,18 @@ import { formatDmy, formatMoney } from "@/lib/format";
 import { fullTimeFeeMinor } from "@/lib/checkout";
 import { laptopLabel, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
 import { shiftInIst } from "@/lib/timezones";
-import { DetailRow, Pill, SectionHead, Surface } from "@/components/app/primitives";
-import { buttonClass } from "@/components/ui/button";
+import { DetailRow, Pill } from "@/components/app/primitives";
 import { MessageButton } from "@/components/app/messages/message-button";
+import { ProposalAvatar } from "@/components/employer/proposal-avatar";
+import { avatarUrl } from "@/lib/employer-pool";
+import { presenceOf, type PresenceLabel } from "@/lib/presence";
+import { cn } from "@/lib/utils";
+import { buttonClass } from "@/components/ui/button";
 import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
 import { offerState } from "@/components/employer/proposal-state";
-import { MeetingRulesBlock } from "@/components/employer/meeting-rules";
+import { offerTimeline } from "@/components/employer/proposal-timeline";
+import { MeetingRulesList } from "@/components/employer/meeting-rules";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
 
 export const metadata: Metadata = {
@@ -75,6 +80,8 @@ export default async function EmployerProposalDetail({
   let projectName: string | null = null;
   let preference: WorkPreference = { modes: [], cities: [] };
   let hasLaptop: boolean | null = null;
+  let photoUrl: string | null = null;
+  let presence: PresenceLabel | null = null;
   try {
     const db = getDb();
     const [row] = await db
@@ -110,6 +117,14 @@ export default async function EmployerProposalDetail({
       .limit(1);
     preference = workPreferenceOf(pref, Number(((pref?.extraData ?? {}) as Record<string, unknown>).findternScore ?? 0) || 0);
     hasLaptop = typeof pref?.hasLaptop === "boolean" ? pref.hasLaptop : null;
+    // Photo and presence show before hire (owner call, 6 Nov); the name stays initials.
+    const [doc] = await db
+      .select({ userId: schema.internDocuments.userId })
+      .from(schema.internDocuments)
+      .where(and(eq(schema.internDocuments.userId, proposal.internId), isNotNull(schema.internDocuments.profilePhotoName)))
+      .limit(1);
+    photoUrl = doc ? avatarUrl(proposal.internId) : null;
+    presence = (await presenceOf([proposal.internId]))[proposal.internId] ?? null;
   } catch (err) {
     console.error("[employer/proposal] names", err);
   }
@@ -147,66 +162,84 @@ export default async function EmployerProposalDetail({
         ["Length", `${offer.months} month${offer.months === 1 ? "" : "s"}`],
       ];
 
+  const timeline = offerTimeline(proposal, { startDate: offer.startDate, fullTime: Boolean(ft) }, state, formatDate);
+  const profileHref = `/employer/intern/${encodeURIComponent(proposal.internId)}`;
+
   return (
     <div>
       <Link
         href="/employer/proposals"
-        className="apple-spring mb-3 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm text-sm font-medium text-brand-700 hover:underline"
+        className="apple-spring mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm text-sm font-medium text-brand-700 hover:underline"
       >
         <ArrowLeft className="size-4" aria-hidden />
         All proposals
       </Link>
 
-      {/* ── Header: who, what, and the numbers ───────────────────────── */}
-      <Surface as="section" className="overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-4 p-6 sm:p-7">
-          <div className="flex min-w-0 items-start gap-4">
-            <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-50 text-base font-semibold text-brand-800">
-              {initials}
-            </span>
-            <div className="min-w-0">
-              <h1 className="text-balance text-2xl font-semibold text-ink-900 sm:text-3xl">
-                {offer.roleTitle || projectName || "Proposal"}
-              </h1>
-              <p className="mt-1.5 text-sm text-ink-600">
-                {ft ? "Full-time offer" : "Internship offer"}
-                {projectName ? ` for ${projectName}` : ""} to{" "}
-                <Link href={`/employer/intern/${encodeURIComponent(proposal.internId)}`} className="font-medium text-ink-900 underline-offset-4 hover:underline">
-                  {internName}
-                </Link>
-                {score > 0 ? <span className="nums ml-2">· Findtern Score {score.toFixed(1)}/10</span> : null}
-              </p>
-            </div>
-          </div>
-          <div className="flex flex-wrap items-start gap-3">
-            <Pill tone={state.tone}>{state.label}</Pill>
-            <MessageButton proposalId={proposal.id} label="Message" />
+      {/* ── Header: who, what, status, and the one thing to do ───────── */}
+      <header className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-start gap-4">
+          <ProposalAvatar photoUrl={photoUrl} initials={initials} presence={presence} />
+          <div className="min-w-0">
+            <p className="text-sm text-ink-600">
+              <Link
+                href={profileHref}
+                className="inline-flex min-h-11 items-center font-semibold text-ink-900 underline decoration-ink-300 underline-offset-4 outline-none hover:text-brand-700 hover:decoration-brand-500 focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 sm:min-h-0"
+              >
+                {internName}
+              </Link>
+              {projectName ? <span> · {projectName}</span> : null}
+            </p>
+            <h1 className="text-balance break-words text-2xl font-semibold tracking-[-0.02em] text-ink-900 sm:text-3xl">
+              {offer.roleTitle || projectName || "Proposal"}
+            </h1>
+            <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-600">
+              <Pill tone={state.tone}>{state.label}</Pill>
+              <span>{ft ? "Full-time offer" : "Internship offer"}</span>
+              {score > 0 ? (
+                <span className="nums">
+                  <span className="font-semibold text-ink-900">{score.toFixed(1)}</span> Findtern Score
+                </span>
+              ) : null}
+            </p>
           </div>
         </div>
-        <dl className="grid grid-cols-2 border-t border-ink-100 bg-ink-50/60 sm:grid-cols-4">
-          {strip.map(([label, value], i) => (
-            <div
-              key={label}
-              className={[
-                "px-6 py-4",
-                i % 2 === 1 ? "border-l border-ink-100" : "",
-                i >= 2 ? "border-t border-ink-100 sm:border-t-0" : "",
-                i === 2 ? "sm:border-l" : "",
-              ].join(" ")}
-            >
-              <dt className="text-sm text-ink-600">{label}</dt>
-              <dd className="nums mt-1 text-xl font-semibold text-ink-900">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      </Surface>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start lg:shrink-0">
+          {state.canPay ? (
+            <Link href="/employer/checkout" className={buttonClass({ className: "max-sm:w-full" })}>
+              <CreditCard className="size-4" aria-hidden />
+              {ft ? "Pay the hiring fee" : "Pay to confirm hire"}
+            </Link>
+          ) : null}
+          <div className="max-sm:[&_button]:w-full">
+            <MessageButton proposalId={proposal.id} />
+          </div>
+        </div>
+      </header>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
-        <div className="min-w-0 space-y-6">
+      {/* ── The four numbers the decision rests on ───────────────────── */}
+      <dl className="mt-8 grid grid-cols-2 border-y border-ink-100 sm:grid-cols-4">
+        {strip.map(([label, value], i) => (
+          <div
+            key={label}
+            className={[
+              "py-5 sm:px-6 sm:first:pl-0",
+              i % 2 === 1 ? "border-l border-ink-100 pl-5" : "",
+              i >= 2 ? "border-t border-ink-100 sm:border-t-0" : "",
+              i === 2 ? "sm:border-l" : "",
+            ].join(" ")}
+          >
+            <dt className="text-sm text-ink-600">{label}</dt>
+            <dd className="nums mt-1 text-xl font-semibold text-ink-900">{value}</dd>
+          </div>
+        ))}
+      </dl>
+
+      <div className="mt-10 grid gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="min-w-0 space-y-10">
           {!ft ? (
-            <Surface as="section" className="px-6 pb-2 pt-5">
-              <SectionHead title="Terms" />
-              <dl className="divide-y divide-ink-100">
+            <section>
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Terms</h2>
+              <dl className="mt-2 divide-y divide-ink-100 border-b border-ink-100">
                 <DetailRow label="Hourly rate" value={offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)} an hour` : offer.hourlyRateMinor === 0 ? "Free" : "-"} mono />
                 <DetailRow
                   label="Monthly amount"
@@ -242,7 +275,6 @@ export default async function EmployerProposalDetail({
                   mono
                 />
                 <DetailRow label="Timezone" value={offer.timezone || "Asia/Kolkata"} />
-                {/* Work setup sits in the same table: one card for one set of terms. */}
                 <DetailRow label="Mode" value={MODE[offer.mode] ?? "-"} />
                 {offer.mode !== "remote" ? (
                   <DetailRow label="Location" value={[offer.city, offer.state].filter(Boolean).join(", ") || offer.location || "-"} />
@@ -252,27 +284,24 @@ export default async function EmployerProposalDetail({
                 ) : null}
                 <DetailRow label="Laptop" value={laptopLabel(offer.laptop)} />
               </dl>
-            </Surface>
+            </section>
           ) : (
-            <Surface as="section" className="px-6 pb-2 pt-5">
-              <SectionHead
-                title="Full-time offer"
-                hint="As sent to the candidate."
-                action={
-                  ft.offerLetterKey || ft.offerLetterUrl ? (
-                    <a
-                      href={`/api/proposals/${encodeURIComponent(proposal.id)}/offer-letter`}
-                      target="_blank"
-                      rel="noreferrer"
-                      className={buttonClass({ size: "sm" })}
-                    >
-                      <Download className="size-4" aria-hidden />
-                      Offer letter
-                    </a>
-                  ) : null
-                }
-              />
-              <dl className="divide-y divide-ink-100">
+            <section>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Full-time terms</h2>
+                {ft.offerLetterKey || ft.offerLetterUrl ? (
+                  <a
+                    href={`/api/proposals/${encodeURIComponent(proposal.id)}/offer-letter`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={buttonClass({ variant: "outline", size: "sm" })}
+                  >
+                    <Download className="size-4" aria-hidden />
+                    Offer letter
+                  </a>
+                ) : null}
+              </div>
+              <dl className="mt-2 divide-y divide-ink-100 border-b border-ink-100">
                 <DetailRow label="Job mode" value={MODE[ft.jobMode] ?? (ft.jobMode || "-")} />
                 <DetailRow label="Location" value={ft.jobMode === "remote" ? "Remote" : ft.location || "-"} />
                 <DetailRow label="Timezone" value={ft.timezone || offer.timezone || "-"} />
@@ -284,68 +313,107 @@ export default async function EmployerProposalDetail({
                   mono
                 />
               </dl>
-            </Surface>
+            </section>
           )}
 
-
           {offer.jd ? (
-            <Surface as="section" className="p-6">
-              <SectionHead title="What the intern will do" />
+            <section>
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">What the intern will do</h2>
               {/* Text: legacy Quill HTML is read back as plain text (EMH-28). */}
-              <p className="whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{offer.jd}</p>
-            </Surface>
+              <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-base leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{offer.jd}</p>
+            </section>
           ) : null}
 
           {offer.additionalInfo ? (
-            <Surface as="section" className="p-6">
-              <SectionHead title="Additional information" />
-              <p className="whitespace-pre-line text-pretty text-sm leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{offer.additionalInfo}</p>
-            </Surface>
+            <section>
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Additional information</h2>
+              <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-base leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{offer.additionalInfo}</p>
+            </section>
           ) : null}
 
           {skills.length > 0 ? (
-            <Surface as="section" className="p-6">
-              <SectionHead title="Skills" />
-              <ul className="flex flex-wrap gap-1.5">
+            <section>
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Skills</h2>
+              <ul className="mt-3 flex flex-wrap gap-2">
                 {skills.map((skill) => (
-                  <li key={skill} className="rounded-apple-sm bg-ink-100 px-2.5 py-1 text-sm text-ink-700">
+                  <li key={skill} className="rounded-full border border-ink-200 px-3 py-1 text-sm font-medium text-ink-700">
                     {skill}
                   </li>
                 ))}
               </ul>
-            </Surface>
+            </section>
           ) : null}
 
-          <MeetingRulesBlock />
+          {/* Phones: the assessment after the terms, not above them. */}
+          {ratings.length > 0 ? (
+            <section className="border-t border-ink-100 pt-8 lg:hidden">
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Assessment at sending</h2>
+              <dl className="mt-1 divide-y divide-ink-100">
+                {ratings.map(([key, value]) => (
+                  <DetailRow
+                    key={key}
+                    label={key === "overall" ? "Findtern Score" : humanizeKey(key)}
+                    value={`${value}/10`}
+                    mono
+                  />
+                ))}
+              </dl>
+            </section>
+          ) : null}
+
+          <section className="border-t border-ink-100 pt-8">
+            <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Rules for meetings through Findtern</h2>
+            <p className="mt-1 text-sm text-text-subtle">By joining any meeting scheduled through Findtern, you agree to this conduct policy.</p>
+            <MeetingRulesList className="mt-4" />
+          </section>
         </div>
 
-        <aside className="order-first space-y-4 lg:order-none lg:sticky lg:top-24 lg:self-start">
-          <Link
-            href={`/employer/intern/${encodeURIComponent(proposal.internId)}`}
-            className="apple-spring flex min-h-11 items-center justify-between gap-2 rounded-apple-xl border border-dashed border-ink-200 px-5 py-4 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
-          >
-            {unlocked ? `${internName}'s profile` : "Candidate profile"}
-            <ArrowUpRight className="size-4 text-ink-400" aria-hidden />
-          </Link>
-          <Surface as="section" className="p-5">
-            <h2 className="text-base font-semibold text-ink-900">What happens next</h2>
-            <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-700">{state.next}</p>
-            <ol className="nums mt-4 space-y-1.5 border-t border-ink-100 pt-4 text-sm text-ink-600">
-              <li>Sent {formatDate(proposal.createdAt)}</li>
-              {proposal.updatedAt && proposal.updatedAt.getTime() - (proposal.createdAt?.getTime() ?? 0) > 60_000 ? (
-                <li>Updated {formatDate(proposal.updatedAt)}</li>
-              ) : null}
-              {proposal.hiredAt ? <li>Hired {formatDate(proposal.hiredAt)}</li> : null}
+        <aside className="order-first space-y-10 lg:order-none lg:sticky lg:top-24 lg:self-start">
+          {/* ── Timeline: what happened, what is next ─────────────────── */}
+          <section>
+            <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Offer timeline</h2>
+            <ol className="mt-4">
+              {timeline.map((step, i) => {
+                const last = i === timeline.length - 1;
+                return (
+                  <li key={step.label} className="relative flex gap-3.5 pb-6 last:pb-0" aria-current={step.state === "current" ? "step" : undefined}>
+                    {!last ? (
+                      <span aria-hidden className={cn("absolute left-[0.6875rem] top-7 bottom-1 w-px", step.state === "done" ? "bg-brand-300" : "bg-ink-200")} />
+                    ) : null}
+                    <span
+                      aria-hidden
+                      className={cn(
+                        "relative mt-0.5 grid size-6 shrink-0 place-items-center rounded-full",
+                        step.state === "done" && "bg-brand-700 text-white",
+                        step.state === "current" && "bg-white ring-2 ring-inset ring-brand-700",
+                        step.state === "todo" && "bg-white ring-1 ring-inset ring-ink-300",
+                        step.state === "closed" && "bg-ink-200 text-ink-700",
+                      )}
+                    >
+                      {step.state === "done" ? <Check className="size-3.5" strokeWidth={3} /> : null}
+                      {step.state === "current" ? <span className="size-2 rounded-full bg-brand-700" /> : null}
+                      {step.state === "closed" ? <X className="size-3.5" strokeWidth={3} /> : null}
+                    </span>
+                    <div className="min-w-0">
+                      <p className={cn("text-sm", step.state === "todo" ? "text-ink-600" : "font-semibold text-ink-900")}>
+                        {step.label}
+                        <span className="sr-only">{step.state === "done" ? " (done)" : step.state === "current" ? " (next)" : ""}</span>
+                      </p>
+                      {step.date ? <p className="nums text-sm text-ink-600">{step.date}</p> : null}
+                      {step.state === "current" || step.state === "closed" ? (
+                        state.next ? <p className="mt-1.5 text-pretty text-sm leading-relaxed text-ink-700">{state.next}</p> : null
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
             </ol>
+          </section>
 
-            {state.canPay || state.canWithdraw || state.canEdit || proposal.status === "hired" ? (
+          {state.canWithdraw || state.canEdit || proposal.status === "hired" ? (
+            <section className="border-t border-ink-100 pt-8">
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{proposal.status === "hired" ? "Hire" : "Change this offer"}</h2>
               <div className="mt-4 grid gap-2">
-                {state.canPay ? (
-                  <Link href="/employer/checkout" className={buttonClass({ variant: "accent", block: true })}>
-                    <CreditCard className="size-4" aria-hidden />
-                    Pay to confirm the hire
-                  </Link>
-                ) : null}
                 {state.canEdit ? (
                   <ProposalOfferForm
                     proposalId={proposal.id}
@@ -377,13 +445,19 @@ export default async function EmployerProposalDetail({
                   />
                 ) : null}
                 <ProposalActions proposalId={proposal.id} status={proposal.status} canPay={false} canWithdraw={state.canWithdraw} />
+                {proposal.status === "hired" && !ft ? (
+                  <Link href="/employer/timesheets" className={buttonClass({ variant: "outline", block: true })}>
+                    <Clock className="size-4" aria-hidden />
+                    Timesheets
+                  </Link>
+                ) : null}
               </div>
-            ) : null}
-          </Surface>
+            </section>
+          ) : null}
 
           {ratings.length > 0 ? (
-            <Surface as="section" className="px-5 pb-1 pt-4">
-              <h2 className="text-base font-semibold text-ink-900">Assessment at sending</h2>
+            <section className="border-t border-ink-100 pt-8 max-lg:hidden">
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Assessment at sending</h2>
               <dl className="mt-1 divide-y divide-ink-100">
                 {ratings.map(([key, value]) => (
                   <DetailRow
@@ -394,7 +468,7 @@ export default async function EmployerProposalDetail({
                   />
                 ))}
               </dl>
-            </Surface>
+            </section>
           ) : null}
         </aside>
       </div>
