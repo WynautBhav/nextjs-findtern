@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS "intern_skills_backup" (
 --> statement-breakpoint
 INSERT INTO "intern_skills_backup" ("user_id", "skills", "extra_skills")
 	SELECT "user_id", "skills", "extra_data"->'skillsWithRatings' FROM "intern_onboarding"
-	WHERE jsonb_typeof("skills") = 'array' AND jsonb_array_length("skills") > 7
+	WHERE (jsonb_typeof("skills") = 'array' AND jsonb_array_length("skills") > 7)
+	   OR (jsonb_typeof("extra_data"->'skillsWithRatings') = 'array' AND jsonb_array_length("extra_data"->'skillsWithRatings') > 7)
 	ON CONFLICT ("user_id") DO NOTHING;
 --> statement-breakpoint
 UPDATE "intern_onboarding" o SET "skills" = (
