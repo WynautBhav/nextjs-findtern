@@ -8,6 +8,8 @@ import {
   MAX_IMPORT_ROWS,
   REASON,
   buildPreviewRows,
+  candidateShown,
+  decisionBlock,
   countRows,
   overAllocationOf,
   readTable,
@@ -113,4 +115,21 @@ test("mapping must point at real columns, and the email is required", () => {
   assert.match(validateMapping({ name: 0, email: 5, phone: null }, 3) ?? "", /email/);
   assert.match(validateMapping({ name: 9, email: 1, phone: null }, 3) ?? "", /name/);
   assert.match(validateMapping({ name: 0, email: 1, phone: 3 }, 3) ?? "", /phone/);
+});
+
+test("only a review or unmatched row can be decided; rejected, linked and email rows give 409", () => {
+  assert.equal(decisionBlock("review"), null);
+  assert.equal(decisionBlock("unmatched"), null);
+  for (const st of ["rejected", "linked", "email"]) assert.equal(decisionBlock(st)?.status, 409, st);
+});
+
+test("link shortcut: phone only counts for an Indian number, verified email must equal the row", () => {
+  const row = { email: "asha@x.in", phone: "9876543210", matchCandidates: [{ userId: "c1" }] };
+  const user = { id: "u1", email: "other@y.in", verified: false, phone: "9876543210", countryCode: "+91" };
+  assert.equal(candidateShown(row, user), true);
+  assert.equal(candidateShown(row, { ...user, countryCode: "+1" }), false);
+  assert.equal(candidateShown(row, { ...user, phone: "9000000000" }), false);
+  assert.equal(candidateShown(row, { ...user, id: "c1", phone: "9000000000" }), true);
+  assert.equal(candidateShown(row, { ...user, phone: "1", email: "asha@x.in", verified: true }), true);
+  assert.equal(candidateShown(row, { ...user, phone: "1", email: "asha@x.in", verified: false }), false);
 });

@@ -426,54 +426,76 @@ export async function commitImport(input: { collegeId: string; importId: string;
       .update(schema.collegeRosterImports)
       .set({ status: "committed", committedAt: sql`now()`, counts: c.counts as unknown as Record<string, number> })
       .where(eq(schema.collegeRosterImports.id, imp.id));
-    return {
+    const out = {
       created: c.counts.valid,
       updated: c.counts.update,
       autoLinked: c.counts.matchedEmail,
       review: c.counts.review,
       skippedInvalid: c.counts.invalid + c.counts.duplicate,
     } satisfies CommitResult;
+    // Same transaction, strict: if an audit row cannot be written the roster write rolls back with it.
+    await l.recordAdminAudit(tx, { adminId: input.adminId, action: "roster.import_commit", targetType: "college", targetId: input.collegeId, meta: { importId: input.importId, ...out } }, { strict: true });
+    if (out.autoLinked > 0) {
+      await l.recordAdminAudit(tx, { adminId: input.adminId, action: "roster.match_auto", targetType: "college", targetId: input.collegeId, meta: { importId: input.importId, count: out.autoLinked } }, { strict: true });
+    }
+    return out;
   });
 
   const { verifyFromRoster } = await import("./membership");
   await verifyFromRoster(input.collegeId);
-  await l.recordAdminAudit(db, { adminId: input.adminId, action: "roster.import_commit", targetType: "college", targetId: input.collegeId, meta: { importId: input.importId, ...result } });
-  if (result.autoLinked > 0) {
-    await l.recordAdminAudit(db, { adminId: input.adminId, action: "roster.match_auto", targetType: "college", targetId: input.collegeId, meta: { importId: input.importId, count: result.autoLinked } });
-  }
   return result;
 }
 
-/** Admin decision on one roster row in the review queue. */
+/** Why a roster row cannot be linked or rejected now, or null: only `review` and `unmatched` rows can be decided. */
+export function decisionBlock(matchStatus: string): ImportError | null {
+  if (matchStatus === "email" || matchStatus === "linked") return new ImportError("This student is already linked.", 409);
+  if (matchStatus !== "review" && matchStatus !== "unmatched") return new ImportError("This row was already decided.", 409);
+  return null;
+}
+
+/** May the admin link this user to this row: a candidate the queue showed, or an intern whose verified email / Indian phone equals the row's. */
+export function candidateShown(
+  row: { email: string; phone: string | null; matchCandidates: readonly { userId: string }[] },
+  user: { id: string; email: string; verified: boolean; phone: string; countryCode: string },
+): boolean {
+  return (
+    row.matchCandidates.some((c) => c.userId === user.id) ||
+    (user.verified && user.email === row.email) ||
+    Boolean(row.phone && user.countryCode === "+91" && user.phone === row.phone)
+  );
+}
+
+/** Admin decision on one roster row in the review queue. Only a row still waiting (review) or never matched (unmatched) can be decided. */
 export async function decideMatch(input: { collegeId: string; rosterId: string; adminId: string; action: "link"; userId: string } | { collegeId: string; rosterId: string; adminId: string; action: "reject" }): Promise<{ matchStatus: string }> {
   const l = await lib();
   const { db, schema } = l;
   const R = schema.collegeRoster;
-  const [row] = await db.select().from(R).where(and(eq(R.id, input.rosterId), eq(R.collegeId, input.collegeId))).limit(1);
-  if (!row) throw new ImportError("Roster row not found", 404);
-
-  if (input.action === "reject") {
-    if (row.matchStatus === "email" || row.matchStatus === "linked") throw new ImportError("This student is already linked.", 409);
-    await db.update(R).set({ matchStatus: "rejected", matchedUserId: null, matchCandidates: [], matchDecidedBy: input.adminId, matchDecidedAt: sql`now()` }).where(eq(R.id, row.id));
-    await l.recordAdminAudit(db, { adminId: input.adminId, action: "roster.match_reject", targetType: "college", targetId: input.collegeId, meta: { rosterId: row.id, email: row.email } });
-    return { matchStatus: "rejected" };
-  }
-
-  if (row.matchStatus === "email" || row.matchStatus === "linked") throw new ImportError("This student is already linked.", 409);
-  const U = schema.users;
-  const [user] = await db.select({ id: U.id, role: U.role, phone: U.phoneNumber, email: sql<string>`lower(${U.email})`, verified: U.emailVerified }).from(U).where(eq(U.id, input.userId)).limit(1);
-  // Only a candidate the review queue showed, or an intern whose verified email / phone equals the row's.
-  const shown = row.matchCandidates.some((c) => c.userId === input.userId) || (user?.verified && user.email === row.email) || Boolean(row.phone && user?.phone === row.phone);
-  if (!user || user.role !== "intern" || !shown) throw new ImportError("That student is not a candidate for this row.", 400);
   try {
-    await db.update(R).set({ matchStatus: "linked", matchedUserId: user.id, matchCandidates: [], matchDecidedBy: input.adminId, matchDecidedAt: sql`now()` }).where(eq(R.id, row.id));
+    return await db.transaction(async (tx) => {
+      const [row] = await tx.select().from(R).where(and(eq(R.id, input.rosterId), eq(R.collegeId, input.collegeId))).limit(1).for("update");
+      if (!row) throw new ImportError("Roster row not found", 404);
+      const blocked = decisionBlock(row.matchStatus);
+      if (blocked) throw blocked;
+
+      if (input.action === "reject") {
+        await tx.update(R).set({ matchStatus: "rejected", matchedUserId: null, matchCandidates: [], matchDecidedBy: input.adminId, matchDecidedAt: sql`now()` }).where(eq(R.id, row.id));
+        await l.recordAdminAudit(tx, { adminId: input.adminId, action: "roster.match_reject", targetType: "college", targetId: input.collegeId, meta: { rosterId: row.id, email: row.email } }, { strict: true });
+        return { matchStatus: "rejected" };
+      }
+
+      const U = schema.users;
+      const [user] = await tx.select({ id: U.id, role: U.role, phone: U.phoneNumber, countryCode: U.countryCode, email: sql<string>`lower(${U.email})`, verified: U.emailVerified }).from(U).where(eq(U.id, input.userId)).limit(1);
+      // Only a candidate the review queue showed, or an intern whose verified email / Indian phone equals the row's.
+      if (!user || user.role !== "intern" || !candidateShown(row, user)) throw new ImportError("That student is not a candidate for this row.", 400);
+      await tx.update(R).set({ matchStatus: "linked", matchedUserId: user.id, matchCandidates: [], matchDecidedBy: input.adminId, matchDecidedAt: sql`now()` }).where(eq(R.id, row.id));
+      await l.recordAdminAudit(tx, { adminId: input.adminId, action: "roster.match_link", targetType: "college", targetId: input.collegeId, meta: { rosterId: row.id, email: row.email, userId: user.id } }, { strict: true });
+      return { matchStatus: "linked" };
+    });
   } catch (e) {
     const { isUniqueViolation } = await import("@/lib/promo");
     if (isUniqueViolation(e)) throw new ImportError("That student is already linked to another roster row in this college.", 409);
     throw e;
   }
-  await l.recordAdminAudit(db, { adminId: input.adminId, action: "roster.match_link", targetType: "college", targetId: input.collegeId, meta: { rosterId: row.id, email: row.email, userId: user.id } });
-  return { matchStatus: "linked" };
 }
 
 export type ReviewItem = {
