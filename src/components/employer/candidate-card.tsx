@@ -12,7 +12,7 @@ import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
-import { DetailRow, Pill, SectionHead } from "@/components/app/primitives";
+import { DetailRow, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -114,19 +114,19 @@ export function CandidateCard({
   const actions = (
     <>
       {proposal ? (
-        <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="outline" size="sm" className="min-h-10">
+        <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="outline" size="sm" className="min-h-10 touch:min-h-11">
           {proposalActionLabel(proposal)}
         </ButtonLink>
       ) : projectId ? (
         <>
           <ShortlistToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} size="sm" emphasis="primary" />
-          <ButtonLink href={sendHref} variant={shortlisted ? "primary" : "outline"} size="sm" className="min-h-10">
+          <ButtonLink href={sendHref} variant={shortlisted ? "primary" : "outline"} size="sm" className="min-h-10 touch:min-h-11">
             <Send className="size-4" aria-hidden />
             Send proposal
           </ButtonLink>
         </>
       ) : (
-        <ButtonLink href={sendHref} variant="primary" size="sm" className="min-h-10">
+        <ButtonLink href={sendHref} variant="primary" size="sm" className="min-h-10 touch:min-h-11">
           <Send className="size-4" aria-hidden />
           Send proposal
         </ButtonLink>
@@ -171,7 +171,7 @@ export function CandidateCard({
   );
 
   return (
-    <li className="flex min-w-0 flex-col rounded-apple-xl border border-ink-200/80 bg-white p-5 shadow-xs">
+    <Surface as="li" className="flex flex-col p-5">
       {/* Identity, then the score as the hero on the right. */}
       <div className="flex items-start gap-4">
         <CandidateAvatar
@@ -184,7 +184,7 @@ export function CandidateCard({
             type="button"
             onClick={() => setDrawerOpen(true)}
             title={`Quick view of ${displayName}`}
-            className="max-w-full break-words rounded-apple-sm text-left text-base font-semibold tracking-[-0.01em] text-ink-900 hover:text-brand-700"
+            className="max-w-full break-words rounded-apple-sm text-left text-base font-semibold text-ink-900 hover:text-brand-700"
           >
             {displayName}
           </button>
@@ -205,9 +205,9 @@ export function CandidateCard({
           ) : null}
         </div>
         <div className="shrink-0 text-right">
-          {candidate.scored ? <p className="text-2xs font-semibold uppercase tracking-[0.14em] text-brand-700">{band.name}</p> : null}
+          {candidate.scored ? <p className="text-2xs font-semibold uppercase tracking-wide text-brand-700">{band.name}</p> : null}
           <p
-            className="nums mt-0.5 text-3xl font-semibold leading-none tracking-[-0.02em] text-brand-700"
+            className="nums mt-0.5 text-3xl font-semibold leading-none text-brand-700"
             title={candidate.scored ? `Findtern Score ${candidate.score.toFixed(1)} out of 10` : "Not scored yet"}
           >
             {candidate.scored ? candidate.score.toFixed(1) : "-"}
@@ -253,13 +253,13 @@ export function CandidateCard({
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}
-            className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-10 px-2.5 text-ink-700" })}
+            className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-10 touch:min-h-11 px-2.5 text-ink-700" })}
           >
             <Eye className="size-4" aria-hidden />
             Quick view
           </button>
           {compareControl}
-          <Link href={profileHref} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-10 px-2.5 text-ink-700" })}>
+          <Link href={profileHref} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-10 touch:min-h-11 px-2.5 text-ink-700" })}>
             Profile
             <ArrowUpRight className="size-4" aria-hidden />
           </Link>
@@ -276,7 +276,7 @@ export function CandidateCard({
                 className="size-14 rounded-apple-lg text-lg ring-1 ring-inset ring-brand-200/70"
               />
               <div className="min-w-0 flex-1">
-                <SheetTitle className="break-words text-2xl font-semibold tracking-[-0.02em] text-ink-900">{displayName}</SheetTitle>
+                <SheetTitle className="break-words text-2xl font-semibold text-ink-900">{displayName}</SheetTitle>
                 <SheetDescription className="mt-1 text-sm text-ink-600">
                   {candidate.location || "Location not stated"}
                 </SheetDescription>
@@ -291,7 +291,7 @@ export function CandidateCard({
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-apple-lg border border-ink-200/80 bg-white p-4">
                 <p className="text-sm font-medium text-ink-600">Findtern Score</p>
-                <p className="nums mt-1 text-3xl font-semibold tracking-[-0.02em] text-brand-700">
+                <p className="nums mt-1 text-3xl font-semibold text-brand-700">
                   {candidate.scored ? candidate.score.toFixed(1) : "-"}
                   <span className="ml-0.5 text-sm font-medium text-text-subtle">/10</span>
                 </p>
@@ -299,7 +299,7 @@ export function CandidateCard({
               </div>
               <div className="rounded-apple-lg border border-ink-200/80 bg-white p-4">
                 <p className="text-sm font-medium text-ink-600">Price</p>
-                <p className="nums mt-2.5 text-2xl font-semibold tracking-[-0.02em] text-ink-900">
+                <p className="nums mt-2.5 text-2xl font-semibold text-ink-900">
                   {formatRate(pricing.hourlyRateMinor, currency)}
                 </p>
                 <p className="mt-1 text-sm text-ink-600">
@@ -311,7 +311,7 @@ export function CandidateCard({
             <div className="flex flex-wrap items-start gap-2">
               {actions}
               {compareControl}
-              <ButtonLink href={profileHref} variant="ghost" size="sm" className="min-h-10">
+              <ButtonLink href={profileHref} variant="ghost" size="sm" className="min-h-10 touch:min-h-11">
                 Full profile
                 <ArrowUpRight className="size-4" aria-hidden />
               </ButtonLink>
@@ -327,14 +327,14 @@ export function CandidateCard({
                   href={candidate.aiFeedbackLink}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-10" })}
+                  className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-10 touch:min-h-11" })}
                 >
                   <FileText className="size-4" aria-hidden />
                   Feedback report
                 </a>
               ) : null}
               {candidate.scored ? (
-                <Link href={`${profileHref}#ai-report`} className="mt-3 ml-1 inline-flex min-h-10 items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
+                <Link href={`${profileHref}#ai-report`} className="mt-3 ml-1 inline-flex min-h-10 touch:min-h-11 items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
                   Full AI interview report
                 </Link>
               ) : null}
@@ -380,7 +380,7 @@ export function CandidateCard({
               <section>
                 <SectionHead title="Academics" />
                 <div className="rounded-apple-lg border border-ink-200/80 bg-white p-4">
-                  <p className="text-[0.9375rem] font-medium text-ink-900">
+                  <p className="text-base font-medium text-ink-900">
                     {[candidate.academics.degree, candidate.academics.specialization].filter(Boolean).join(" · ") || "Degree not stated"}
                   </p>
                   {candidate.academics.institution ? <p className="mt-0.5 text-sm text-ink-600">{candidate.academics.institution}</p> : null}
@@ -402,6 +402,6 @@ export function CandidateCard({
           </div>
         </SheetContent>
       </Sheet>
-    </li>
+    </Surface>
   );
 }

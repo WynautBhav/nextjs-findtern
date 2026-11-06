@@ -8,6 +8,7 @@ import { KeepFocusClear } from "@/components/app/keep-focus-clear";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { DAY_CODE, EMPLOYER_DAY_STATUSES, weeklyTallies, type DayDetail } from "@/lib/employer-timesheets";
+import { shortDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -22,7 +23,7 @@ const CELL: Record<string, string> = {
 };
 
 function dayLabel(iso: string, opts: Intl.DateTimeFormatOptions): string {
-  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-IN", { ...opts, timeZone: "UTC" });
+  return shortDate(new Date(`${iso}T00:00:00Z`), { ...opts, timeZone: "UTC" });
 }
 
 /**
@@ -100,7 +101,7 @@ export function TimesheetReview({
         <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-ink-600" aria-label="Key">
           {(usedCodes.length ? usedCodes : ["Present"]).map((s) => (
             <li key={s} className="inline-flex items-center gap-1.5">
-              <span className={cn("grid size-5 place-items-center rounded-apple-sm border text-2xs font-bold", CELL[s] ?? "border-ink-200 bg-white text-ink-700")} aria-hidden>
+              <span className={cn("grid size-5 place-items-center rounded-apple-sm border text-2xs font-semibold", CELL[s] ?? "border-ink-200 bg-white text-ink-700")} aria-hidden>
                 {DAY_CODE[s] ?? s.charAt(0).toUpperCase()}
               </span>
               {s}
@@ -144,7 +145,7 @@ export function TimesheetReview({
                           value={values[d.date] ?? ""}
                           onChange={(e) => setValues((v) => ({ ...v, [d.date]: e.target.value }))}
                           className={cn(
-                            "mt-1 h-11 w-full appearance-none rounded-apple-sm border text-center text-base md:text-sm font-bold outline-none focus-visible:ring-2 focus-visible:ring-brand-600",
+                            "mt-1 h-11 w-full appearance-none rounded-apple-sm border text-center text-base md:text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-600",
                             CELL[values[d.date] ?? ""] ?? "border-dashed border-ink-300 bg-white text-text-subtle",
                             values[d.date] !== d.status && "ring-2 ring-accent-400",
                           )}
@@ -163,8 +164,8 @@ export function TimesheetReview({
                         <span
                           title={`${dayLabel(d.date, { weekday: "long", day: "numeric", month: "long" })}: ${d.status || "not filled"}${d.status === "Present" ? `, ${d.hours} h` : ""}${d.note ? ` (${d.note})` : ""}`}
                           className={cn(
-                            "mt-1 flex h-11 flex-col items-center justify-center rounded-apple-sm border text-sm font-bold leading-none",
-                            CELL[d.status] ?? "border-dashed border-ink-300 bg-white text-ink-400",
+                            "mt-1 flex h-11 flex-col items-center justify-center rounded-apple-sm border text-sm font-semibold leading-none",
+                            CELL[d.status] ?? "border-dashed border-ink-500 bg-white text-text-subtle",
                           )}
                         >
                           {d.status ? (DAY_CODE[d.status] ?? d.status.charAt(0).toUpperCase()) : "–"}

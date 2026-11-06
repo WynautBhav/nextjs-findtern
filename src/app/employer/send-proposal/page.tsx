@@ -11,6 +11,8 @@ import { displayNameOf, scoreOf, toCandidateProfile, type CandidateSummary } fro
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { EmptyScene, PageHead, Pill, Surface } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { offerState } from "@/components/employer/proposal-state";
 import { parseOffer } from "@/lib/offer";
 import { isProjectOpen } from "@/lib/project-locations";
@@ -213,15 +215,14 @@ export default async function SendProposal({
   }
 
   if (loadFailed) {
+    const retryQs = new URLSearchParams();
+    if (internId) retryQs.set("intern", internId);
+    if (projectId) retryQs.set("project", projectId);
+    const retryHref = `/employer/send-proposal${retryQs.size ? `?${retryQs}` : ""}`;
     return (
       <div>
         <PageHead title="Send a proposal" />
-        <EmptyScene
-          art
-          title="Couldn't load this offer"
-          body="We couldn't reach your projects or this candidate right now. Nothing was sent. Reload the page in a moment."
-          who="Us - a connection problem"
-        />
+        <LoadError what="this offer" retryHref={retryHref} email={SITE.adminEmail} />
       </div>
     );
   }
@@ -267,7 +268,7 @@ export default async function SendProposal({
             </h2>
             <Pill tone={existing.hired ? "live" : "waiting"}>{existing.label}</Pill>
           </div>
-          <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-700">
+          <p className="mt-2 text-sm leading-relaxed text-ink-700">
             {existing.hired
               ? `${candidate.name} already works with you, so a second internship offer isn't possible. Their placement is on Orders.`
               : `${candidate.name} already has a live offer from you. One offer per candidate: edit or withdraw that one before sending another.`}
@@ -298,7 +299,7 @@ export default async function SendProposal({
             <h2 className="text-lg font-semibold text-ink-900">Meeting first</h2>
             <Pill tone="waiting">Meeting booked</Pill>
           </div>
-          <p className="mt-2 text-[0.9375rem] leading-relaxed text-ink-700">
+          <p className="mt-2 text-sm leading-relaxed text-ink-700">
             You have a meeting with {candidate.name} that hasn&apos;t happened yet. The offer opens once it has.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">

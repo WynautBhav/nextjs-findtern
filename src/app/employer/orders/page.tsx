@@ -5,7 +5,9 @@ import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { invoiceBuyerOf } from "@/lib/invoice-buyer";
-import { EmptyScene } from "@/components/app/primitives";
+import { PageHead } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import {
   OrdersManager,
   type HireRow,
@@ -47,13 +49,10 @@ export default async function EmployerOrdersPage() {
   });
   if (!data) {
     return (
-      <EmptyScene
-        art
-        title="Couldn't load your orders"
-        body="We couldn't reach your payment records just now. Nothing has changed on your account; try again in a moment."
-        who="Us - connection issue"
-        next={{ label: "Try again", href: "/employer/orders" }}
-      />
+      <div>
+        <PageHead title="Orders & payments" />
+        <LoadError what="your orders" retryHref="/employer/orders" email={SITE.adminEmail} />
+      </div>
     );
   }
   return <OrdersManager employerId={employerId} {...data} />;

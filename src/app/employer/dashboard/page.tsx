@@ -5,7 +5,9 @@ import { ArrowRight, CalendarClock, ClipboardCheck, CreditCard, FolderPlus, Shop
 
 import { getDb, schema } from "@/lib/db";
 import { ButtonLink } from "@/components/ui/button";
-import { EmptyScene, HeroBand, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
+import { EmptyScene, HeroBand, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { requireRole } from "@/lib/auth";
 import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
@@ -74,13 +76,10 @@ export default async function EmployerDashboard() {
 
   if (!data) {
     return (
-      <EmptyScene
-        art
-        title="Couldn't load your dashboard"
-        body="We couldn't load your dashboard right now. Nothing is wrong with your account; try again in a moment."
-        who="Us - connection issue"
-        next={{ label: "Try again", href: "/employer/dashboard" }}
-      />
+      <div>
+        <PageHead title="Dashboard" />
+        <LoadError what="your dashboard" retryHref="/employer/dashboard" email={SITE.adminEmail} />
+      </div>
     );
   }
 
@@ -214,9 +213,9 @@ export default async function EmployerDashboard() {
                 {rest.map((t) => (
                   <li key={t.href} className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-[3rem_minmax(0,1fr)_auto]">
                     {/* The count leads the row: type, not an icon, carries it. */}
-                    <span className="nums text-right text-2xl font-semibold tracking-[-0.02em] text-ink-900">{t.count}</span>
+                    <span className="nums text-right text-2xl font-semibold text-ink-900">{t.count}</span>
                     <div className="min-w-0">
-                      <p className="text-[0.9375rem] font-medium text-ink-900">{t.label.charAt(0).toUpperCase() + t.label.slice(1)}</p>
+                      <p className="text-base font-medium text-ink-900">{t.label.charAt(0).toUpperCase() + t.label.slice(1)}</p>
                       <p className="mt-0.5 text-sm text-ink-600">{t.detail}</p>
                     </div>
                     <ButtonLink href={t.href} variant="outline" size="sm" className="col-start-2 min-h-11 justify-self-start sm:col-start-auto sm:justify-self-end">
@@ -260,7 +259,7 @@ export default async function EmployerDashboard() {
                       >
                         <div className="min-w-0">
                           <p className="flex flex-wrap items-center gap-2">
-                            <span className="line-clamp-2 break-words text-[0.9375rem] font-medium text-ink-900 group-hover:text-brand-700">{p.projectName}</span>
+                            <span className="line-clamp-2 break-words text-base font-medium text-ink-900 group-hover:text-brand-700">{p.projectName}</span>
                             {open ? null : <Pill tone="closed">Closed</Pill>}
                           </p>
                           {/* Two lines, then cut: a phone showed half a project name (QA-117). */}

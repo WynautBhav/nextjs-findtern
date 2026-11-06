@@ -7,7 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { bandFor } from "@/lib/score";
-import { formatMoney, formatRate } from "@/lib/format";
+import { formatDmy, formatMoney, formatRate } from "@/lib/format";
 import { RATING_META, displayNameOf, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { shortlistProjectsByIntern } from "@/lib/employer-shortlist";
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
@@ -21,6 +21,8 @@ import { RememberSelection } from "@/components/employer/remember-selection";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedSelection } from "@/lib/employer-selection";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
 
@@ -174,16 +176,15 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   const backHref = `/employer/candidates?ids=${encodeURIComponent(ids.join(","))}${activeProject ? `&project=${encodeURIComponent(activeProject.id)}` : ""}`;
 
   if (loadFailed) {
+    const retryQs = new URLSearchParams();
+    if (sp.ids !== undefined) retryQs.set("ids", one(sp.ids) ?? "");
+    if (sp.project !== undefined) retryQs.set("project", one(sp.project) ?? "");
+    if (sp.skills !== undefined) retryQs.set("skills", one(sp.skills) ?? "");
+    const retryHref = `/employer/compare${retryQs.size ? `?${retryQs}` : ""}`;
     return (
       <div>
         <PageHead title="Compare candidates" />
-        <EmptyScene
-          art
-          title="Couldn't load the comparison"
-          body="Something went wrong on our side. Your picks are saved; try again in a moment."
-          next={{ label: "Try again", href: "/employer/compare" }}
-          who="Us - we're on it"
-        />
+        <LoadError what="the comparison" retryHref={retryHref} email={SITE.adminEmail} />
       </div>
     );
   }
@@ -394,7 +395,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               candidates={candidates}
               render={(c) => (
                 <>
-                  <span className="nums text-2xl font-semibold tracking-[-0.02em] text-brand-700">{c.scored ? c.score.toFixed(1) : "-"}</span>
+                  <span className="nums text-2xl font-semibold text-brand-700">{c.scored ? c.score.toFixed(1) : "-"}</span>
                   <span className="text-sm text-text-subtle">/10</span>
                   <span className="mt-0.5 block text-sm text-ink-600">{bandFor(c.score).name}</span>
                 </>
@@ -520,7 +521,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                 <Cell key={c.id}>
                   <span className="nums">
                     {c.updatedAt
-                      ? new Date(c.updatedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" })
+                      ? formatDmy(c.updatedAt)
                       : "Never"}
                   </span>
                 </Cell>

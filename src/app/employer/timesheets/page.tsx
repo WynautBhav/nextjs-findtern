@@ -11,6 +11,8 @@ import { hiredInternIds } from "@/lib/employer-visibility";
 import { dayDetails, formatDay, formatPeriod } from "@/lib/employer-timesheets";
 import { StatusPill } from "@/components/employer/timesheet-parts";
 import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -100,12 +102,7 @@ export default async function EmployerTimesheets({
     return (
       <div>
         <PageHead title="Timesheets" />
-        <EmptyScene
-          art
-          title="Couldn't load timesheets"
-          body="Your interns' hours are safe; we just couldn't reach them right now. Reload the page in a moment."
-          who="Us - a connection problem"
-        />
+        <LoadError what="your timesheets" retryHref={onlyIntern ? `/employer/timesheets?intern=${onlyIntern}` : "/employer/timesheets"} email={SITE.adminEmail} />
       </div>
     );
   }
@@ -207,14 +204,14 @@ function SheetRow({ row, review = false }: { row: Row; review?: boolean }) {
   return (
     <li className={`${SHEET_GRID} relative grid items-center gap-x-6 gap-y-1.5 px-5 py-3.5 transition-colors hover:bg-ink-50/70`}>
       <div className="flex min-w-0 items-center gap-3">
-        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-bold text-brand-800">
+        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800">
           {row.initials}
         </span>
         <div className="min-w-0">
           {/* The row opens the sheet; the link is stretched over it. */}
           <Link
             href={href}
-            className="block break-words text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+            className="block break-words text-base font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
           >
             {row.name}
           </Link>

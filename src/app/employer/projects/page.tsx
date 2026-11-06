@@ -3,7 +3,8 @@ import { eq, desc } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { EmptyScene } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { PageHeader } from "@/components/layout/page-header";
 import { ProjectsManager } from "@/components/employer/projects-manager";
 import { timezoneForLocation } from "@/lib/timezones";
@@ -45,12 +46,7 @@ export default async function EmployerProjectsPage({
     return (
       <div>
         <PageHeader title="Projects" />
-        <EmptyScene
-          art
-          title="Couldn't load your projects"
-          body="Something went wrong on our side while loading your projects. Nothing is lost - reload the page in a moment."
-          who="Us - a connection issue"
-        />
+        <LoadError what="your projects" retryHref={openNew === "1" ? "/employer/projects?new=1" : "/employer/projects"} email={SITE.adminEmail} />
       </div>
     );
   }

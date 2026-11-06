@@ -11,7 +11,9 @@ import {
   projectFromRecord,
   type OnboardingDraft,
 } from "@/lib/employer-onboarding";
-import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { PageHead } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { EmployerOnboardingForm } from "@/components/employer/onboarding-form";
 
 export const metadata: Metadata = {
@@ -75,13 +77,8 @@ export default async function EmployerOnboarding({
     // Not a blank form: saving one would overwrite the profile we couldn't read.
     return (
       <div className="mx-auto max-w-4xl">
-        <PageHead eyebrow="Getting set up" title="Set up your hiring account" />
-        <EmptyScene
-          art
-          title="Couldn't load your company details"
-          body="Something went wrong on our side. Nothing is lost - reload the page in a moment and carry on where you left off."
-          who="Us - a connection issue"
-        />
+        <PageHead title="Set up your hiring account" />
+        <LoadError what="your company details" retryHref={stage === "project" ? "/employer/onboarding?stage=project" : "/employer/onboarding"} email={SITE.adminEmail} />
       </div>
     );
   }
@@ -90,7 +87,6 @@ export default async function EmployerOnboarding({
     <div>
       <PageHead
         className="mx-auto max-w-4xl"
-        eyebrow="Getting set up"
         title="Set up your hiring account"
         lede="Two short steps: your company, then the first role you're hiring for. Then you can browse scored candidates."
       />

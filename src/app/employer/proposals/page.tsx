@@ -7,7 +7,9 @@ import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { toEmployerProposal } from "@/lib/employer-proposal-view";
-import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { PageHead } from "@/components/app/primitives";
+import { LoadError } from "@/components/app/load-error";
+import { SITE } from "@/lib/content/site";
 import { ButtonLink } from "@/components/ui/button";
 import { ProposalsManager, type ProposalItem } from "@/components/employer/proposals-manager";
 
@@ -73,12 +75,7 @@ export default async function EmployerProposalsPage() {
       />
 
       {loadFailed ? (
-        <EmptyScene
-          art
-          title="Couldn't load your proposals"
-          body="Your offers are safe; we just couldn't reach them right now. Reload the page in a moment."
-          who="Us - a connection problem"
-        />
+        <LoadError what="your proposals" retryHref="/employer/proposals" email={SITE.adminEmail} />
       ) : (
         // The manager copies its props into state (for optimistic withdraws),
         // so a changed server list must remount it.

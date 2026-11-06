@@ -41,6 +41,11 @@ export function CandidateAvatar({
         ref={img}
         src={photoUrl}
         alt=""
+        // The class sets the real size; these only reserve the box so the grid doesn't shift.
+        width={48}
+        height={48}
+        loading="lazy"
+        decoding="async"
         onError={() => setFailed(true)}
         className={cn("shrink-0 bg-brand-50 object-cover", className)}
       />

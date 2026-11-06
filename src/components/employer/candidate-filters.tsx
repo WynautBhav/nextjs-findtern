@@ -25,9 +25,9 @@ const ZERO_IS_ANY = /^(min|r_[a-z]+)$/;
  * unmounts. Its name is kept here and focus is put back on the new copy, or a
  * keyboard or screen-reader user is thrown to the top of the page each time.
  */
-let refocus: { name: string; at: number } | null = null;
-/** `refocus.name` for "the Filters toggle": a phone submit folds the panel shut. */
-const TOGGLE = "";
+let refocus: { selector: string; at: number } | null = null;
+/** `refocus.selector` for "the Filters toggle": a phone submit folds the panel shut. */
+const TOGGLE = "@toggle";
 
 export function FilterForm({
   children,
@@ -46,14 +46,14 @@ export function FilterForm({
   /** Set when the project select changed since the last apply. */
   const projectChanged = useRef(false);
   // Phones: the remount would fold the panel shut and hide the control to refocus, so it stays open.
-  const [open, setOpen] = useState(() => refocus !== null && refocus.name !== TOGGLE && Date.now() - refocus.at < 5000);
+  const [open, setOpen] = useState(() => refocus !== null && refocus.selector !== TOGGLE && Date.now() - refocus.at < 5000);
   const toggle = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     // Only straight after an apply: a later visit to the page must not grab focus.
     if (refocus && Date.now() - refocus.at < 5000) {
-      if (refocus.name === TOGGLE) toggle.current?.focus();
-      else form.current?.querySelector<HTMLElement>(`[name="${CSS.escape(refocus.name)}"]:not([type="hidden"])`)?.focus();
+      if (refocus.selector === TOGGLE) toggle.current?.focus();
+      else form.current?.querySelector<HTMLElement>(refocus.selector)?.focus();
     }
     refocus = null;
   }, []);
@@ -62,7 +62,11 @@ export function FilterForm({
     const el = form.current;
     if (!el) return;
     const active = document.activeElement;
-    refocus = (active instanceof HTMLInputElement || active instanceof HTMLSelectElement) && active.name && el.contains(active) ? { name: active.name, at: Date.now() } : null;
+    // By name, or by id for a control with no name (the city box: its value travels in a hidden input).
+    refocus =
+      (active instanceof HTMLInputElement || active instanceof HTMLSelectElement) && el.contains(active) && (active.name || active.id)
+        ? { selector: active.name ? `[name="${CSS.escape(active.name)}"]:not([type="hidden"])` : `#${CSS.escape(active.id)}`, at: Date.now() }
+        : null;
     const next = new URLSearchParams();
     for (const [key, raw] of new FormData(el).entries()) {
       const value = String(raw).trim();
@@ -138,7 +142,7 @@ export function FilterForm({
           // Phones: the panel was just closed on purpose, so the remount must not
           // reopen it, and focus goes to its toggle instead of the hidden field.
           if (!window.matchMedia("(min-width: 1024px)").matches) {
-            refocus = { name: TOGGLE, at: Date.now() };
+            refocus = { selector: TOGGLE, at: Date.now() };
             toggle.current?.focus();
           }
           setOpen(false);

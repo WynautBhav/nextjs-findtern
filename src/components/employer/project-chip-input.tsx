@@ -175,7 +175,7 @@ export function ChipInput({
                 type="button"
                 onClick={() => onRemove(entry)}
                 aria-label={`Remove ${entry}`}
-                className="apple-spring grid size-8 shrink-0 place-items-center rounded-full text-brand-600 hover:bg-brand-100 hover:text-brand-900"
+                className="apple-spring grid size-8 shrink-0 place-items-center rounded-full text-brand-600 hover:bg-brand-100 hover:text-brand-900 touch:size-11"
               >
                 <X className="size-3.5" aria-hidden />
               </button>

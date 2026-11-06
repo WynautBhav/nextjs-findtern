@@ -172,7 +172,7 @@ export function CityField({
           type="text"
           role="combobox"
           aria-expanded={options.length > 0}
-          aria-controls={listId}
+          aria-controls={options.length > 0 ? listId : undefined}
           aria-autocomplete="list"
           aria-activedescendant={active >= 0 && options[active] ? `${listId}-${active}` : undefined}
           autoComplete="off"
@@ -223,12 +223,10 @@ export function CityField({
               key={`${d.district}-${d.state}`}
               id={`${listId}-${i}`}
               role="option"
-              aria-selected={i === active || d.district === p.value}
-              // onMouseDown so the pick lands before the input's blur.
-              onMouseDown={(e) => {
-                e.preventDefault();
-                pick(d);
-              }}
+              aria-selected={i === active}
+              // Keep focus in the box on press; the pick is the click, so assistive tech that only clicks works too.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => pick(d)}
               className={cn(
                 "flex min-h-11 cursor-pointer items-center justify-between gap-3 px-3.5 py-2 text-left text-sm text-ink-800 hover:bg-ink-50",
                 (i === active || d.district === p.value) && "bg-brand-50 text-brand-800",

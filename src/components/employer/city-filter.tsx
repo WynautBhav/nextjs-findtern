@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { MapPin, X } from "lucide-react";
 
 import { districtOptions } from "@/components/employer/location-fields";
@@ -44,9 +44,14 @@ export function CityFilter({
   // Chips change through state, which fires no form "change" event.
   useEffect(() => {
     if (!autoApply || chips.join("|") === initial.join("|")) return;
+    // A removed chip's button is gone by now: put focus on the box so the form
+    // remount that follows the submit restores it there, not on <body>.
+    document.getElementById("filter-city")?.focus();
     hidden.current?.form?.requestSubmit();
   }, [autoApply, chips, initial]);
   const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const listId = useId();
   const full = chips.length >= MAX;
 
   const options =
@@ -61,6 +66,8 @@ export function CityFilter({
     if (!city || full || chips.some((c) => c.toLowerCase() === city.toLowerCase())) return;
     setChips([...chips, city]);
     setDraft("");
+    setActive(-1);
+    setOpen(false);
   }
 
   const value = [...chips, draft.trim()].filter(Boolean).join(", ");
@@ -78,21 +85,37 @@ export function CityFilter({
         <input
           id="filter-city"
           type="text"
+          role="combobox"
+          aria-expanded={options.length > 0}
+          aria-controls={options.length > 0 ? listId : undefined}
+          aria-autocomplete="list"
+          aria-activedescendant={active >= 0 && options[active] ? `${listId}-${active}` : undefined}
           value={draft}
           disabled={full}
           autoComplete="off"
           placeholder={full ? `${MAX} cities max` : chips.length ? "Add another" : "Bengaluru, Pune"}
           onChange={(e) => {
             setDraft(e.target.value);
+            setActive(-1);
             setOpen(true);
           }}
           onFocus={() => setOpen(true)}
           onBlur={() => window.setTimeout(() => setOpen(false), 120)}
           onKeyDown={(e) => {
-            // Enter with text turns it into a chip; on an empty box it submits.
-            if ((e.key === "Enter" || e.key === ",") && draft.trim()) {
+            if (e.key === "ArrowDown" && !open) {
               e.preventDefault();
-              add(options[0]?.district ?? draft);
+              setOpen(true);
+            } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && options.length > 0) {
+              e.preventDefault();
+              const step = e.key === "ArrowDown" ? 1 : -1;
+              setActive((i) => (i < 0 && step < 0 ? options.length - 1 : (i + step + options.length) % options.length));
+            } else if (e.key === "Escape" && open) {
+              setOpen(false);
+              setActive(-1);
+            } else if ((e.key === "Enter" || e.key === ",") && draft.trim()) {
+              // Enter with text turns it into a chip (the highlighted suggestion, else the first); on an empty box it submits.
+              e.preventDefault();
+              add(options[active]?.district ?? options[0]?.district ?? draft);
             } else if (e.key === "Backspace" && !draft && chips.length > 0) {
               setChips(chips.slice(0, -1));
             }
@@ -100,20 +123,28 @@ export function CityFilter({
           className={cn(fieldClass, "pl-10 pr-3.5")}
         />
         {options.length > 0 ? (
-          <ul className="absolute left-0 z-20 mt-1 w-max min-w-full max-w-[18rem] overflow-hidden rounded-apple-sm border border-ink-200 bg-white shadow-sm">
-            {options.map((d) => (
-              <li key={`${d.district}-${d.state}`}>
-                <button
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    add(d.district);
-                  }}
-                  className="apple-spring flex min-h-11 w-full items-center justify-between gap-3 px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-ink-50"
-                >
-                  <span>{d.district}</span>
-                  <span className="text-xs text-text-subtle">{d.state}</span>
-                </button>
+          <ul
+            id={listId}
+            role="listbox"
+            aria-label={`${label} suggestions`}
+            className="absolute left-0 z-20 mt-1 w-max min-w-full max-w-[18rem] overflow-hidden rounded-apple-sm border border-ink-200 bg-white shadow-sm"
+          >
+            {options.map((d, i) => (
+              <li
+                key={`${d.district}-${d.state}`}
+                id={`${listId}-${i}`}
+                role="option"
+                aria-selected={i === active}
+                // Keep focus in the box on press; the pick itself is the click, so assistive tech that only clicks works too.
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => add(d.district)}
+                className={cn(
+                  "apple-spring flex min-h-11 cursor-pointer items-center justify-between gap-3 px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-ink-50",
+                  i === active && "bg-brand-50 text-brand-800",
+                )}
+              >
+                <span>{d.district}</span>
+                <span className="text-xs text-text-subtle">{d.state}</span>
               </li>
             ))}
           </ul>
@@ -131,7 +162,7 @@ export function CityFilter({
                 type="button"
                 onClick={() => setChips(chips.filter((c) => c !== city))}
                 aria-label={`Remove ${city}`}
-                className="apple-spring grid size-7 shrink-0 place-items-center rounded-full hover:bg-brand-100"
+                className="apple-spring grid size-7 shrink-0 place-items-center rounded-full hover:bg-brand-100 touch:size-11"
               >
                 <X className="size-3" aria-hidden />
               </button>

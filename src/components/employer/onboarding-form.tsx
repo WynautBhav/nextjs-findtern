@@ -305,7 +305,7 @@ export function EmployerOnboardingForm({
       </nav>
 
       <Surface className="p-5 sm:p-8">
-        <h2 ref={headingRef} tabIndex={-1} className="text-xl font-semibold tracking-[-0.015em] text-ink-900 outline-none">
+        <h2 ref={headingRef} tabIndex={-1} className="text-xl font-semibold text-ink-900 outline-none">
           {current.title}
         </h2>
         <p className="mt-1 text-sm leading-relaxed text-ink-600">{current.blurb}</p>

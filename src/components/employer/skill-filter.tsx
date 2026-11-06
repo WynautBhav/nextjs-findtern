@@ -85,7 +85,7 @@ export function SkillFilter({
 
   return (
     <section aria-labelledby="skills-heading" className="mb-5">
-      <h2 id="skills-heading" className="mb-3 text-base font-semibold tracking-[-0.01em] text-ink-900 max-lg:sr-only">
+      <h2 id="skills-heading" className="mb-3 text-base font-semibold text-ink-900 max-lg:sr-only">
         {title}
       </h2>
       <button
@@ -114,7 +114,7 @@ export function SkillFilter({
               <Link
                 href={hrefWith(active.filter((s) => s !== skill))}
                 scroll={false}
-                className="apple-spring inline-flex min-h-9 items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800 hover:border-brand-300 hover:bg-brand-100"
+                className="apple-spring inline-flex min-h-9 items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800 hover:border-brand-300 hover:bg-brand-100 touch:min-h-11"
               >
                 {skill}
                 <X className="size-3.5" aria-hidden />
@@ -147,7 +147,7 @@ export function SkillFilter({
             disabled={full}
             role="combobox"
             aria-expanded={items.length > 0}
-            aria-controls={listId}
+            aria-controls={items.length > 0 ? listId : undefined}
             aria-autocomplete="list"
             aria-activedescendant={highlight >= 0 && items[highlight] ? `${listId}-${highlight}` : undefined}
             onChange={(e) => {

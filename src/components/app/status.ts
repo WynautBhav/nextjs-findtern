@@ -1,4 +1,5 @@
 import type { Tone } from "@/components/app/primitives";
+import { proposalPill } from "@/components/employer/proposal-state";
 
 /**
  * Single status vocabulary for every dashboard surface.
@@ -162,24 +163,9 @@ export function timesheetPill(status: string | null): { label: string; tone: Ton
   }
 }
 
-/** Employer proposal row state. Replaces the five hand-rolled badges in
- *  proposals-manager (amber/emerald/rose/ink/blue). Labels kept - they are
- *  good copy - tones mapped onto the single Pill vocabulary. */
+/** Employer proposal row state: the one proposal vocabulary (`offerState`), not a second map. */
 export function employerProposalPill(status: string | null): { label: string; tone: Tone } {
-  switch ((status ?? "").toLowerCase()) {
-    case "sent":
-      return { label: "Under review", tone: "waiting" };
-    case "accepted":
-      return { label: "Accepted · ready to hire", tone: "paid" };
-    case "hired":
-      return { label: "Hired & active", tone: "live" };
-    case "rejected":
-      return { label: "Declined by candidate", tone: "closed" };
-    case "withdrawn":
-      return { label: "Withdrawn", tone: "neutral" };
-    default:
-      return { label: humanizeStatus(status ?? ""), tone: "neutral" };
-  }
+  return proposalPill(status);
 }
 
 /** Generic fallback for any other stored enum (projects, orders, alerts). */

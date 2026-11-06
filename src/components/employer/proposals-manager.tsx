@@ -1,9 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CreditCard, Loader2, Pencil, Search, X } from "lucide-react";
+import { CreditCard, Loader2, Pencil, RotateCcw, Search, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
@@ -60,6 +60,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
   const [withdrawTarget, setWithdrawTarget] = useState<ProposalItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const rows = useMemo(
     () =>
@@ -157,6 +158,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
             <span className="sr-only">Search proposals</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
             <input
+              ref={searchRef}
               type="search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -183,12 +185,34 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
         </p>
       ) : null}
 
+      <p className="sr-only" role="status">
+        {filtered.length} of {rows.length} proposals
+      </p>
+
       {filtered.length === 0 ? (
-        <EmptyScene
-          title="No proposals match"
-          body="Nothing fits this search and status. Clear the filters to see every offer."
-          who="You - loosen the filters"
-        />
+        <div>
+          <EmptyScene
+            title="No proposals match"
+            body="Nothing fits this search and status. Clear the filters to see every offer."
+            who="You - loosen the filters"
+          />
+          <p className="mt-3 text-center">
+            <button
+              type="button"
+              onClick={() => {
+                setSearch("");
+                setStatusFilter("all");
+                setProjectFilter("all");
+                // The button unmounts with the empty state: keep focus on the toolbar.
+                searchRef.current?.focus();
+              }}
+              className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}
+            >
+              <RotateCcw className="size-4" aria-hidden />
+              Clear filters
+            </button>
+          </p>
+        </div>
       ) : (
         <Surface className="overflow-hidden">
           {/* Column labels for sighted scanning; every row also says what each
@@ -221,7 +245,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                 className={cn(ROW_GRID, "relative grid items-center gap-x-6 gap-y-2 px-5 py-4 transition-colors hover:bg-ink-50/70")}
               >
                 <div className="flex min-w-0 items-center gap-3">
-                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-bold text-brand-800">
+                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800">
                     {ini === "?" ? "C" : ini}
                   </span>
                   <div className="min-w-0">
@@ -229,7 +253,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                         stretched over it, and keeps its own focus ring. */}
                     <Link
                       href={href}
-                      className="block break-words text-[0.9375rem] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+                      className="block break-words text-base font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
                     >
                       {title}
                     </Link>
