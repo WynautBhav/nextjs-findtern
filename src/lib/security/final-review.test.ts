@@ -47,3 +47,12 @@ test("#8 an intern without an offer only opens a live listing of an active, real
   const lib = read("lib/intern-data.ts");
   assert.match(lib, /and\(eq\(schema\.projects\.id, id\), eq\(schema\.employers\.isActive, true\), realEmployers\(\)\)/);
 });
+
+test("#9 0021 backs up and restores per onboarding row, not per user", () => {
+  const up = readFileSync(join(SRC, "../drizzle/0021_skills_cut_seven.sql"), "utf8");
+  assert.match(up, /"onboarding_id" varchar PRIMARY KEY NOT NULL/);
+  assert.match(up, /ON CONFLICT \("onboarding_id"\) DO NOTHING/);
+  const down = readFileSync(join(SRC, "../drizzle/rollback/0021_skills_cut_seven.down.sql"), "utf8");
+  assert.equal(down.match(/b\."onboarding_id" = o\."id"/g)?.length, 2);
+  assert.doesNotMatch(down, /b\."user_id" = o\."user_id"/);
+});
