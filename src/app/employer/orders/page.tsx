@@ -4,6 +4,7 @@ import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
+import { invoiceBuyerOf } from "@/lib/invoice-buyer";
 import { EmptyScene } from "@/components/app/primitives";
 import {
   OrdersManager,
@@ -87,16 +88,6 @@ async function loadOrders(employerId: string) {
 
   const fteStatus = employer?.internationalFteStatus ?? "none";
   const timezone = employer ? timezoneForLocation(employer) : "Asia/Kolkata";
-  const buyer = {
-    name: employer?.companyName ?? "Customer",
-    email: employer?.companyEmail,
-    gstin: employer?.gstNumber,
-    city: employer?.city,
-    country: employer?.country,
-    pincode: employer?.billingPincode,
-    state: employer?.state,
-  };
-
   const nameOf = (r: (typeof proposalRows)[number]) => `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim() || "Candidate";
   // The same hire loader and batch builder the admin ledger uses.
   const hiresById = await loadInvoiceHires(db, paymentRows);
@@ -176,7 +167,7 @@ async function loadOrders(employerId: string) {
           lines: lines.length ? lines : undefined,
           promo: inv.promo,
           seller,
-          buyer: { ...buyer, place: placeOfSupply({ ...buyer, currency }) },
+          buyer: { ...invoiceBuyerOf(p.raw, employer), place: placeOfSupply({ ...invoiceBuyerOf(p.raw, employer), currency }) },
         }),
       };
     });

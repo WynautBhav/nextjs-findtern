@@ -13,6 +13,7 @@ import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admi
 import { discountLabel, paymentPromo } from "@/lib/admin/payment-promo";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { isTestEmployer } from "@/lib/admin/scope";
+import { invoiceBuyerOf } from "@/lib/invoice-buyer";
 
 export const metadata: Metadata = {
   title: "Employer Orders · Admin Ledger",
@@ -88,15 +89,16 @@ async function loadOrders(): Promise<{ rows: AdminInvoiceRow[]; uncounted: Set<s
       needsReview: Boolean((o.raw as { needsReview?: unknown } | null)?.needsReview),
       partyName: o.companyName || "Unknown employer",
       partyEmail: o.companyEmail || "-",
-      buyer: {
-        name: o.companyName || "Unknown employer",
-        email: o.companyEmail,
-        gstin: o.gstNumber,
+      // The issued invoice's own buyer block (snapshot at settle), else the live profile.
+      buyer: invoiceBuyerOf(o.raw, {
+        companyName: o.companyName || "Unknown employer",
+        companyEmail: o.companyEmail,
+        gstNumber: o.gstNumber,
         country: o.country,
         city: o.city,
         state: o.state,
-        pincode: o.billingPincode,
-      },
+        billingPincode: o.billingPincode,
+      }),
     };
   });
   return { rows, uncounted };
