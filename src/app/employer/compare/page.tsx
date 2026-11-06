@@ -326,9 +326,11 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                       </div>
                     ) : null}
                     {/* EMB-08: the action follows what already exists with them. */}
-                    <div className="mt-3 flex gap-2">
+                    {/* Stacked in a narrow column, side by side with equal widths once a column can hold both. */}
+                    <div className="@container mt-3">
+                    <div className="flex flex-col gap-2 @[20rem]:flex-row">
                       {rel?.proposal ? (
-                        <ButtonLink href={`/employer/proposal/${encodeURIComponent(rel.proposal.id)}`} variant="outline" size="sm" className="min-h-11 flex-1">
+                        <ButtonLink href={`/employer/proposal/${encodeURIComponent(rel.proposal.id)}`} variant="outline" size="sm" className="min-h-11 min-w-0 flex-1">
                           {proposalActionLabel(rel.proposal)}
                         </ButtonLink>
                       ) : (
@@ -339,7 +341,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                               projectId={activeProject.id}
                               shortlisted={shortlisted.has(c.id)}
                               size="sm"
-                              className="flex-1"
+                              className="min-w-0 flex-1"
                               alsoOn={(shortlistedFor.get(c.id) ?? []).filter((n) => n !== activeProject.projectName)}
                             />
                           ) : null}
@@ -347,13 +349,14 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                             href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}${activeProject ? `&project=${encodeURIComponent(activeProject.id)}` : ""}`}
                             variant="primary"
                             size="sm"
-                            className="min-h-11 flex-1"
+                            className="min-h-11 min-w-0 flex-1"
                           >
                             <Send className="size-4" aria-hidden />
                             Send proposal
                           </ButtonLink>
                         </>
                       )}
+                    </div>
                     </div>
                   </th>
                 );
