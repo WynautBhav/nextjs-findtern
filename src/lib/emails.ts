@@ -350,9 +350,9 @@ export const emails = {
   paymentReminder: (o: { name: string; type: "upcoming" | "due" | "overdue"; k: number; amount: string; dueOn: string; dueToday?: boolean; intern: string }): EmailContent => {
     const today = o.type === "due" && o.dueToday !== false;
     const title = {
-      upcoming: `Month ${o.k} stipend of ${o.amount} is due on ${o.dueOn}`,
-      due: today ? `Month ${o.k} stipend of ${o.amount} is due today` : `Month ${o.k} stipend of ${o.amount} was due on ${o.dueOn}`,
-      overdue: `Month ${o.k} stipend of ${o.amount} is overdue`,
+      upcoming: `Month ${o.k} charge of ${o.amount} is due on ${o.dueOn}`,
+      due: today ? `Month ${o.k} charge of ${o.amount} is due today` : `Month ${o.k} charge of ${o.amount} was due on ${o.dueOn}`,
+      overdue: `Month ${o.k} charge of ${o.amount} is overdue`,
     }[o.type];
     return {
       subject: `${title} | Findtern`,
@@ -360,12 +360,9 @@ export const emails = {
       greeting: hi(o.name),
       lines: [
         o.type === "upcoming"
-          ? `This is a reminder that the month ${o.k} stipend of ${o.amount} for ${o.intern} falls due on ${o.dueOn}. You can pay it now.`
-          : `The month ${o.k} stipend of ${o.amount} for ${o.intern} ${today ? "is due today" : `was due on ${o.dueOn} and is still unpaid`}.`,
-        // The intern can read "your intern" when the name is missing, so the sentence opens with a capital.
-        ((s) => s.charAt(0).toUpperCase() + s.slice(1))(
-          `${o.intern}'s stipend for this month is paid out of this payment, so we would be grateful if you could pay ${o.type === "upcoming" ? `by ${o.dueOn}` : today ? "today" : "as soon as you can"}. Thank you.`,
-        ),
+          ? `This is a reminder that the month ${o.k} charge of ${o.amount} for ${o.intern} falls due on ${o.dueOn}. You can pay it now.`
+          : `The month ${o.k} charge of ${o.amount} for ${o.intern} ${today ? "is due today" : `was due on ${o.dueOn} and is still unpaid`}.`,
+        `We would be grateful if you could pay ${o.type === "upcoming" ? `by ${o.dueOn}` : today ? "today" : "as soon as you can"}. Thank you.`,
       ],
       facts: [["Intern", o.intern], ["Month", String(o.k)], ["Amount", o.amount], ["Due on", o.dueOn]],
       status: o.type === "overdue" ? "Overdue" : o.type === "due" ? (today ? "Due today" : "Past due") : "Due soon",

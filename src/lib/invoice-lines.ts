@@ -40,7 +40,7 @@ export function hireInvoiceLines(input: {
     return [
       {
         label: `${who} — Hiring charge`,
-        detail: `${projectName} · One-time hiring charge; each month's stipend is due 2 days before the intern's pay day`,
+        detail: `${projectName} · One-time hiring charge; each month's charge is billed separately`,
         amountMinor: input.chargedMinor != null && input.chargedMinor > 0 ? input.chargedMinor : fee,
       },
     ];
@@ -53,7 +53,7 @@ export function hireInvoiceLines(input: {
     return [
       {
         label: `${who} — ${roleTitle || projectName}`,
-        detail: `${offer.months}m · ${projectName} · Stipend, Month ${k} of ${offer.months}${p ? ` (${day(p.start)} – ${day(p.end)})` : ""}`,
+        detail: `${offer.months}m · ${projectName} · Monthly charge, Month ${k} of ${offer.months}${p ? ` (${day(p.start)} – ${day(p.end)})` : ""}`,
         amountMinor: input.chargedMinor != null && input.chargedMinor > 0 ? input.chargedMinor : listed,
       },
     ];
@@ -80,7 +80,7 @@ export function hireInvoiceLines(input: {
     {
       label: `${who} — ${roleTitle || projectName}`,
       // "2m" first, as on the reference invoice: how long the internship runs.
-      detail: `${offer.months}m · ${projectName} · Stipend, ${period}`,
+      detail: `${offer.months}m · ${projectName} · Internship charge, ${period}`,
       amountMinor: stipendMinor, // 0 prints as ₹0.00, never "Included"
     },
   ];

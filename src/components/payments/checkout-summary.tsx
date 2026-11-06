@@ -181,7 +181,7 @@ export function CheckoutSummary({
                     onChange={() => setPicked("postpaid")}
                   />
                   <span className="min-w-0 flex-1">
-                    {line.postpaidMinor != null ? `${m(line.postpaidMinor, line.currency)} now, then each month's stipend due 2 days before the intern's pay day` : "Each month's stipend due 2 days before the intern's pay day"}
+                    {line.postpaidMinor != null ? `${m(line.postpaidMinor, line.currency)} now, then each month's charge due 2 days before it is billed` : "Each month's charge due 2 days before it is billed"}
                     <span className="block text-xs text-text-subtle">
                       {promoApplied ? "Not with a promo code" : canPostpaid ? "Recommended" : line.monthlyBlocked}
                     </span>
@@ -214,7 +214,7 @@ export function CheckoutSummary({
                   <Row label="Hiring charge (one-time)">{m(amountMinor, line.currency)}</Row>
                 ) : (
                   <>
-                    <Row label={line.due ? line.durationLabel : "Stipend, whole internship"}>
+                    <Row label={line.due ? line.durationLabel : "Monthly charges, whole internship"}>
                       {m(amountMinor - (line.due ? 0 : line.feeMinor), line.currency)}
                     </Row>
                     {!line.due && line.feeMinor > 0 ? <Row label="Hiring charge (one-time)">{m(line.feeMinor, line.currency)}</Row> : null}

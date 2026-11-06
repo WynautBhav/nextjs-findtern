@@ -126,7 +126,7 @@ export default async function EmployerTimesheets({
               : "Showing one intern's timesheets only."
             : queue.length
             ? `${queue.length} timesheet${queue.length === 1 ? " is" : "s are"} waiting for your review. Interns are paid on approved days only.`
-            : "Your interns log their days here each month. Approving locks them for billing and the stipend."
+            : "Your interns log their days here each month. Approving locks them for billing."
         }
         action={
           onlyIntern ? (

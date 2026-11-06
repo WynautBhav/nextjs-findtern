@@ -130,7 +130,7 @@ export function TimesheetDecision({ timesheetId, unfilled = 0 }: { timesheetId: 
         {approveBlocked
           ? `${unfilled} day${unfilled === 1 ? " has" : "s have"} no status. Set each day in the grid, or send the sheet back for the intern to fill in.`
           : mode === "approve"
-            ? "Approving locks these days for billing and the stipend. It can't be undone."
+            ? "Approving locks these days for billing. It can't be undone."
             : "The intern sees your reason, corrects the days and sends it again."}
       </p>
     </div>

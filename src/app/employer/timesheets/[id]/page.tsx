@@ -157,7 +157,7 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
               ) : decided ? (
                 <p className="text-sm leading-relaxed text-ink-700">
                   {status === "approved"
-                    ? `Approved on ${formatDay(timesheet.approvedAt)}. These days are locked for billing and the stipend.`
+                    ? `Approved on ${formatDay(timesheet.approvedAt)}. These days are locked for billing.`
                     : `Sent back on ${formatDay(timesheet.rejectedAt)}. The intern corrects it and sends it again.`}
                 </p>
               ) : (
