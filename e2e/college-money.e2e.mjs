@@ -47,6 +47,10 @@ before(async () => {
     env: { ...process.env, DATABASE_URL: DB, PUBLIC_ORIGIN: BASE },
     stdio: "ignore",
   });
+  // The reseed re-hashes the officer's password under the same account id, and the server caches an account's
+  // password version for 30 s (lib/account-status.ts). Wait that out, or a session check made before the reseed
+  // by an earlier spec makes this login look stale.
+  await new Promise((r) => setTimeout(r, 31_000));
   pool = new pg.Pool({ connectionString: DB });
   browser = await chromium.launch();
   admin = await login("/api/auth/admin/login", ADMIN);

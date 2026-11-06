@@ -60,6 +60,9 @@ before(async () => {
     env: { ...process.env, DATABASE_URL: DB, PUBLIC_ORIGIN: BASE },
     stdio: "ignore",
   });
+  // The reseed re-hashes the officer's password under the same account id, and the server caches an account's
+  // password version for 30 s (lib/account-status.ts). Wait that out before signing in.
+  await new Promise((r) => setTimeout(r, 31_000));
   browser = await chromium.launch();
   // Each browser gets its own client address: the server trusts X-Forwarded-For here, and the login limiter is per address.
   const extraHTTPHeaders = (n) => ({ "x-forwarded-for": `10.99.${Math.floor(Date.now() / 1000) % 250}.${n}` });
