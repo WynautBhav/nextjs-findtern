@@ -251,6 +251,58 @@ export const emails = {
     signoff: "Team Findtern\nTransparent payments, zero confusion\nwww.findtern.in",
   }),
 
+  collegeSeatsPaid: (o: { collegeName: string; seats: number; amount: string; cap: number }): EmailContent => ({
+    subject: "Seat payment received | Findtern",
+    heading: "Your seats are active",
+    greeting: hi(o.collegeName),
+    lines: [`We have received your payment for ${o.seats} seats. Your college code now covers ${o.cap} students.`],
+    facts: [
+      ["Seats added", String(o.seats)],
+      ["Amount", o.amount],
+      ["Total seats", String(o.cap)],
+    ],
+    cta: { label: "View seats and invoice", url: `${origin()}/college/seats` },
+    signoff: "Team Findtern\nTransparent payments, zero confusion\nwww.findtern.in",
+  }),
+
+  collegePayoutRequested: (o: { collegeName: string; amount: string }): EmailContent => ({
+    subject: `Payout requested: ${o.collegeName} | Findtern`,
+    heading: "A college asked for a payout",
+    greeting: "Hi team,",
+    lines: [`${o.collegeName} has requested a withdrawal from its Findtern wallet.`],
+    facts: [
+      ["College", o.collegeName],
+      ["Amount", o.amount],
+    ],
+    cta: { label: "Review in admin", url: `${origin()}/admin/colleges` },
+  }),
+
+  collegePayoutPaid: (o: { collegeName: string; amount: string; referenceId: string }): EmailContent => ({
+    subject: "Payout sent | Findtern",
+    heading: "Your payout is on its way",
+    greeting: hi(o.collegeName),
+    lines: [
+      "Your withdrawal request has been paid out to the bank account on file.",
+      "If you don’t see it right away, allow standard bank processing time.",
+    ],
+    facts: [
+      ["Amount", o.amount],
+      ["Reference", o.referenceId],
+    ],
+    cta: { label: "View earnings", url: `${origin()}/college/earnings` },
+    signoff: "Team Findtern\nTransparent payments, zero confusion\nwww.findtern.in",
+  }),
+
+  collegePayoutRejected: (o: { collegeName: string; amount: string; reason: string }): EmailContent => ({
+    subject: "Payout request not approved | Findtern",
+    heading: "Your payout request was not approved",
+    greeting: hi(o.collegeName),
+    lines: ["Nothing was debited, and the amount is available in your wallet again.", `Reason: ${o.reason}`],
+    facts: [["Amount", o.amount]],
+    cta: { label: "View earnings", url: `${origin()}/college/earnings` },
+    signoff: "Team Findtern\nTransparent payments, zero confusion\nwww.findtern.in",
+  }),
+
   fullTimeOfferReceived: (o: { internName: string; companyName: string; role: string; proposalId: string }): EmailContent => ({
     subject: "Full-time job offer received | Findtern",
     heading: "You have a full-time offer",
