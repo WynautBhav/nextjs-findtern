@@ -3,7 +3,7 @@ import { and, asc, desc, eq, gt, inArray, isNull, ne, or, sql } from "drizzle-or
 import { getDb, schema } from "./db/index.ts";
 import { initialsOf } from "./employer-candidates.ts";
 import { emails, origin, renderEmail } from "./emails.ts";
-import { scrubContact } from "./contact-scrub.ts";
+import { CONTACT_REFUSED, findContact, scrubContact } from "./contact-scrub.ts";
 import { ONLINE_ACTIVE_MS, presenceLabel, presenceOf, type PresenceLabel } from "./presence.ts";
 import { RateLimiter } from "./security/rate-limit.ts";
 
@@ -54,9 +54,13 @@ export function isParticipant(thread: Pair, viewer: Viewer): boolean {
   return viewer.role === "employer" ? thread.employerId === viewer.id : thread.internId === viewer.id;
 }
 
-/** What is stored: contact details are replaced unless the hire is paid. */
+/**
+ * What is stored. Before the hire is paid a message carrying contact details is
+ * refused outright (OA1: never delivered, not even half-masked).
+ */
 export function bodyToStore(body: string, contactUnlocked: boolean): { text: string; redacted: boolean } {
-  return contactUnlocked ? { text: body, redacted: false } : scrubContact(body);
+  if (!contactUnlocked && findContact(body).kinds.length > 0) throw new MessageError(422, CONTACT_REFUSED);
+  return { text: body, redacted: false };
 }
 
 /** At most one email per thread and recipient in this window, whatever else says "due". */

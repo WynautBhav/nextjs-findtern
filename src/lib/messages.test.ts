@@ -15,12 +15,11 @@ test("participant check: exactly the two sides of the pair, each only in their o
   assert.equal(isParticipant(thread, { role: "employer", id: "i1" }), false);
 });
 
-test("scrub gating: contact details are hidden until the hire is paid, then stored as written", () => {
+test("send gating: a message with contact details is refused (422) until the hire is paid, then stored as written", () => {
   const body = "call me on 98765 43210 or mail a@b.co";
-  const locked = bodyToStore(body, false);
-  assert.equal(locked.redacted, true);
-  assert.doesNotMatch(locked.text, /98765|a@b\.co/);
-  assert.match(locked.text, /\[hidden until hire\]/);
+  for (const b of [body, "nine eight seven six five four three two one zero", "insta rahulsharma", "rahul at gmail"]) {
+    assert.throws(() => bodyToStore(b, false), (e: unknown) => e instanceof MessageError && e.status === 422, b);
+  }
 
   const open = bodyToStore(body, true);
   assert.deepEqual(open, { text: body, redacted: false });

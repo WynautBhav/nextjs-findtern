@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
+import { contactFieldError } from "@/lib/contact-scrub";
 import { requireMutation } from "@/lib/guards-mutation";
 import { projectNameIssue } from "@/lib/project-name";
 import {
@@ -21,7 +22,7 @@ import {
 } from "@/lib/project-locations";
 
 const bodySchema = z.object({
-  projectName: z.string().trim().min(2, "Project name must be at least 2 characters.").optional(),
+  projectName: z.string().trim().min(2, "Project name must be at least 2 characters.").max(120, "Keep the project name under 120 characters.").optional(),
   // Legacy: 4 to 7 skills (EMH-13; bug sheet 7 S1 r80). An older project
   // with fewer may resave its own list (checked below).
   skills: z
@@ -63,6 +64,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const descriptionProblem = projectDescriptionError(d.description);
     if (descriptionProblem) return NextResponse.json({ error: descriptionProblem }, { status: 400 });
   }
+  // Every public text field of a listing, not only the description (OA8).
+  const contactProblem = contactFieldError({ projectName: d.projectName, preferredLocations: d.preferredLocations, pincode: d.pincode, city: d.city, state: d.state, timezone: d.timezone }, "the listing");
+  if (contactProblem) return NextResponse.json({ error: contactProblem }, { status: 400 });
   if (d.skills) {
     const skillsProblem = projectSkillsError(d.skills, (project.skills as string[] | null) ?? []);
     if (skillsProblem) return NextResponse.json({ error: skillsProblem }, { status: 400 });

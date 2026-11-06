@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
+import { contactFieldError } from "@/lib/contact-scrub";
 import { requireMutation } from "@/lib/guards-mutation";
 import { projectNameIssue } from "@/lib/project-name";
 import {
@@ -18,7 +19,7 @@ import {
 } from "@/lib/project-locations";
 
 const bodySchema = z.object({
-  projectName: z.string().trim().min(2, "Project name must be at least 2 characters."),
+  projectName: z.string().trim().min(2, "Project name must be at least 2 characters.").max(120, "Keep the project name under 120 characters."),
   // Legacy: 4 to 7 skills (EMH-13; bug sheet 7 S1 r80).
   skills: z
     .array(z.string().trim().min(1))
@@ -47,7 +48,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const skillsProblem = projectSkillsError(d.skills);
   if (skillsProblem) return NextResponse.json({ error: skillsProblem }, { status: 400 });
   // Candidates reach employers through Findtern only (OA8): contact details are refused.
-  const descriptionProblem = projectDescriptionError(d.description);
+  const descriptionProblem = projectDescriptionError(d.description)
+    ?? contactFieldError({ projectName: d.projectName, preferredLocations: d.preferredLocations, pincode: d.pincode, city: d.city, state: d.state, timezone: d.timezone }, "the listing");
   if (descriptionProblem) return NextResponse.json({ error: descriptionProblem }, { status: 400 });
   // From the shared list only, stored in its spelling.
   const picked = resolveProjectSkills(d.skills);

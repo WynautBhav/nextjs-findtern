@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
+import { contactFieldError } from "@/lib/contact-scrub";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notify } from "@/lib/notify";
 import { hasOpenOrderFor } from "@/lib/payments";
@@ -105,6 +106,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const { message, ...edits } = parsed.data.offer;
+  // No contact details in an offer before the hire is paid (OA1).
+  const contactProblem = contactFieldError({ message, roleTitle: edits.roleTitle, additionalInfo: edits.additionalInfo, city: edits.city, state: edits.state }, "the proposal");
+  if (contactProblem) return NextResponse.json({ error: contactProblem }, { status: 400 });
   // No "candidate's own laptop" for someone without one (EMH-18).
   if (edits.laptop !== undefined && normalizeLaptop(edits.laptop) === "candidate") {
     const [ob] = await db
