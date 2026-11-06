@@ -5,7 +5,7 @@ import { CheckCircle2, Loader2, MessageCircleQuestion } from "lucide-react";
 
 import { FileUpload } from "@/components/app/file-upload";
 import { buttonClass } from "@/components/ui/button";
-import { onRadioKeys, radioTab } from "@/components/intern/onboarding/fields";
+import { onRadioKeys, radioTab } from "@/components/app/radio-keys";
 import { csrfFetch } from "@/lib/client-fetch";
 import {
   Dialog,

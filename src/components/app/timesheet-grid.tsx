@@ -28,6 +28,7 @@ import { LEGACY_DAY_STATUSES, dayHours, editableDayStatus, unfilledDays, type Le
 import { defaultDayStatus, holidayName } from "@/lib/holidays";
 import { canSendOn, dayParts, periodDays, periodSendableFrom, todayIst, weekdayOf } from "@/lib/timesheet-days";
 import { Surface } from "@/components/app/primitives";
+import { onRadioKeys, radioTab } from "@/components/app/radio-keys";
 import { DAY_MARK, DayCalendar } from "@/components/app/tiles";
 import { buttonClass } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -446,14 +447,16 @@ function DayRow({
         </div>
       </div>
 
-      <div role="group" aria-label={`Status for ${label}`} className="grid grid-cols-4 gap-1 rounded-apple-md bg-ink-100/70 p-1">
-        {LEGACY_DAY_STATUSES.map((s) => {
+      <div role="radiogroup" aria-label={`Status for ${label}`} onKeyDown={onRadioKeys} className="grid grid-cols-4 gap-1 rounded-apple-md bg-ink-100/70 p-1">
+        {LEGACY_DAY_STATUSES.map((s, i) => {
           const on = day.status === s;
           return (
             <button
               key={s}
               type="button"
-              aria-pressed={on}
+              role="radio"
+              aria-checked={on}
+              tabIndex={radioTab(on, i, LEGACY_DAY_STATUSES.some((x) => x === day.status))}
               disabled={future}
               onClick={() => update(day.date, { status: s })}
               className={cn(
