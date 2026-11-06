@@ -31,8 +31,11 @@ test("keep-one-active rule does not count a taken-down listing as live", () => {
   assert.match(read("api/employer/projects/[id]/route.ts"), /isNull\(schema\.projects\.takenDownAt\)/);
 });
 
-test("employer projects page never sends takenDownBy to the browser", () => {
-  const src = read("employer/projects/page.tsx");
-  assert.match(src, /takenDownBy: _adminId/);
-  assert.doesNotMatch(src, /\.select\(\)\s*\.from\(schema\.projects\)/);
+test("employer projects list and edit pages never send takenDownBy to the browser", () => {
+  assert.match(read("employer/projects/_company.ts"), /takenDownBy: _adminId/);
+  for (const p of ["employer/projects/page.tsx", "employer/projects/[id]/edit/page.tsx"]) {
+    const src = read(p);
+    assert.match(src, /\.select\(employerProjectColumns\)/, p);
+    assert.doesNotMatch(src, /\.select\(\)\s*\.from\(schema\.projects\)/, p);
+  }
 });
