@@ -10,14 +10,18 @@ import { SITE } from "@/lib/content/site";
 import { EmptyScene, HeroBand, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { requireRole } from "@/lib/auth";
 import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
-import { candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
+import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
+import { CandidateAvatar } from "@/components/employer/candidate-avatar";
+import { PresenceDot } from "@/components/app/presence-dot";
+import { presenceOf, type PresenceLabel } from "@/lib/presence";
+import { rowSkills, skillBaseName } from "@/components/employer/candidate-view";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { meetingEndsAt } from "@/lib/employer-interview-rules";
 import { payableCheckout } from "@/lib/employer-payable";
 import { isProjectOpen } from "@/lib/project-locations";
 import { proposalOutcome } from "@/lib/proposals";
 import { scopeLabel } from "@/lib/db/schema";
-import { PLAN_NAME, bandFor } from "@/lib/score";
+import { bandFor } from "@/lib/score";
 import { timezoneForLocation } from "@/lib/timezones";
 import { formatSlotTime } from "@/lib/format";
 
@@ -51,6 +55,9 @@ type Loaded = {
   shortlisted: number;
   toPay: number;
   candidates: CandidateProfile[];
+  presence: Record<string, PresenceLabel | null>;
+  /** Lower-cased project skill names the matches are ranked on. */
+  wanted: string[];
 };
 
 /**
@@ -85,7 +92,9 @@ export default async function EmployerDashboard() {
 
   const { proposals, projects } = data;
   const awaiting = proposals.filter((p) => p.status === "sent" || p.status === "interview_scheduled").length;
-  const accepted = proposals.filter((p) => p.status === "accepted" || p.status === "processing").length;
+  // One definition for every count on the page: accepted but not paid yet vs hired (paid).
+  const isToPay = (s: string) => s === "accepted" || s === "processing";
+  const accepted = proposals.filter((p) => isToPay(p.status)).length;
   const hired = proposals.filter((p) => p.status === "hired").length;
   const declined = proposals.filter((p) => proposalOutcome(p.status) === "lost").length;
 
@@ -129,15 +138,17 @@ export default async function EmployerDashboard() {
 
   const openProjects = projects.filter((p) => isProjectOpen(p.status));
   const shownProjects = [...openProjects, ...projects.filter((p) => !isProjectOpen(p.status))].slice(0, 5);
-  const byProject = new Map<string, { total: number; won: number }>();
+  const byProject = new Map<string, { total: number; toPay: number; hired: number }>();
   for (const p of proposals) {
-    const row = byProject.get(p.projectId) ?? { total: 0, won: 0 };
+    const row = byProject.get(p.projectId) ?? { total: 0, toPay: 0, hired: 0 };
     row.total += 1;
-    if (proposalOutcome(p.status) === "won") row.won += 1;
+    if (isToPay(p.status)) row.toPay += 1;
+    if (p.status === "hired") row.hired += 1;
     byProject.set(p.projectId, row);
   }
-  // The hero's amber action is only ever something the employer can do now.
-  const top = tasks.find((t) => t.yours !== false);
+  // The hero names the most urgent pending item: the employer's own moves first,
+  // then ones waiting on someone else. "All caught up" only when nothing is pending.
+  const top = tasks.find((t) => t.yours !== false) ?? tasks[0];
   const rest = tasks.filter((t) => t !== top);
 
   const next = data.nextInterview;
@@ -146,6 +157,7 @@ export default async function EmployerDashboard() {
   return (
     <div>
       <HeroBand
+        eyebrow={tasks.length > 1 ? `${tasks.length} things pending` : undefined}
         // Name the first thing waiting rather than a total of different kinds
         // of things, so the headline matches the list below it.
         title={top ? `${top.count} ${top.label}` : proposals.length ? "You're all caught up" : "Let's make your first hire"}
@@ -185,7 +197,7 @@ export default async function EmployerDashboard() {
             {(
               [
                 [awaiting, "awaiting a reply"],
-                [accepted, "accepted, to pay"],
+                [accepted, "accepted · to pay"],
                 [hired, "hired"],
                 [declined, "declined or expired"],
               ] as const
@@ -209,9 +221,9 @@ export default async function EmployerDashboard() {
           {rest.length ? (
             <section>
               <SectionHead title={top ? "Also waiting" : "Waiting"} />
-              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+              <ul className="divide-y divide-ink-100 border-y border-ink-100">
                 {rest.map((t) => (
-                  <li key={t.href} className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-[3rem_minmax(0,1fr)_auto]">
+                  <li key={t.href} className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-x-4 gap-y-3 py-4 sm:grid-cols-[3rem_minmax(0,1fr)_auto]">
                     {/* The count leads the row: type, not an icon, carries it. */}
                     <span className="nums text-right text-2xl font-semibold text-ink-900">{t.count}</span>
                     <div className="min-w-0">
@@ -224,7 +236,7 @@ export default async function EmployerDashboard() {
                     </ButtonLink>
                   </li>
                 ))}
-              </Surface>
+              </ul>
             </section>
           ) : null}
 
@@ -246,16 +258,16 @@ export default async function EmployerDashboard() {
                 who="You - about five minutes"
               />
             ) : (
-              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+              <ul className="divide-y divide-ink-100 border-y border-ink-100">
                 {shownProjects.map((p) => {
-                  const stats = byProject.get(p.id) ?? { total: 0, won: 0 };
+                  const stats = byProject.get(p.id) ?? { total: 0, toPay: 0, hired: 0 };
                   const skills = ((p.skills as string[]) ?? []).slice(0, 4);
                   const open = isProjectOpen(p.status);
                   return (
                     <li key={p.id}>
                       <Link
                         href={`/employer/candidates?project=${encodeURIComponent(p.id)}`}
-                        className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+                        className="group -mx-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 rounded-apple-sm px-2 py-4 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
                       >
                         <div className="min-w-0">
                           <p className="flex flex-wrap items-center gap-2">
@@ -270,9 +282,14 @@ export default async function EmployerDashboard() {
                         </div>
                         <p className="nums text-right text-sm text-ink-600">
                           <span className="font-semibold text-ink-900">{stats.total}</span> sent
-                          {stats.won ? (
+                          {stats.toPay ? (
+                            <span className="block text-ink-900">
+                              <span className="font-semibold">{stats.toPay}</span> accepted · to pay
+                            </span>
+                          ) : null}
+                          {stats.hired ? (
                             <span className="block text-success">
-                              <span className="font-semibold">{stats.won}</span> accepted
+                              <span className="font-semibold">{stats.hired}</span> hired
                             </span>
                           ) : null}
                         </p>
@@ -280,7 +297,7 @@ export default async function EmployerDashboard() {
                     </li>
                   );
                 })}
-              </Surface>
+              </ul>
             )}
           </section>
         </div>
@@ -306,41 +323,67 @@ export default async function EmployerDashboard() {
 
           <section>
             <SectionHead
-              title="Matches for your projects"
+              title="Top matches"
               action={
-                <Link href="/employer/candidates" className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline">
-                  Browse all
+                <Link href="/employer/candidates" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
+                  See all candidates
+                  <ArrowRight className="size-3.5" aria-hidden />
                 </Link>
               }
             />
             {data.candidates.length === 0 ? (
               <p className="text-sm text-ink-600">No scored candidates match yet. New ones appear as they finish their AI interview.</p>
             ) : (
-              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+              <ul className="divide-y divide-ink-100 border-y border-ink-100">
                 {data.candidates.map((c) => {
                   const band = bandFor(c.score);
+                  const presence = data.presence[c.id] ?? null;
+                  const { shown: skills, isWanted } = rowSkills(c.skills, new Set(data.wanted), 3);
+                  const where = [c.city, c.workModes.includes("remote") ? "Remote" : ""].filter(Boolean).join(" · ");
                   return (
                     <li key={c.id}>
                       <Link
                         href={`/employer/intern/${encodeURIComponent(c.id)}`}
-                        className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
+                        className="group grid grid-cols-[auto_minmax(0,1fr)_auto] -mx-2 items-start gap-3 rounded-apple-sm px-2 py-3.5 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
                       >
-                        <span aria-hidden className="grid size-10 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
-                          {c.initials}
+                        <span className="relative shrink-0">
+                          <CandidateAvatar photoUrl={c.photoUrl} initials={c.initials} className="size-10 rounded-full text-xs" />
+                          {presence ? (
+                            <span aria-hidden className="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-white">
+                              <PresenceDot label={presence} />
+                            </span>
+                          ) : null}
                         </span>
                         <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold text-ink-900 group-hover:text-brand-700">{c.initials}</span>
-                          <span className="line-clamp-2 text-sm text-ink-600">{c.skills.slice(0, 3).join(", ") || c.location || "Profile in progress"}</span>
+                          <span className="block text-sm text-ink-600">
+                            <span className="font-semibold text-ink-900 group-hover:text-brand-700">{c.initials}</span>
+                            {presence ? <span className="sr-only">, {presence}</span> : null}
+                            {" · "}
+                            {where || "Location not stated"}
+                          </span>
+                          <span className="mt-0.5 block text-pretty text-sm text-ink-600">
+                            {skills.length
+                              ? skills.map((k, i) => (
+                                  <span key={k}>
+                                    {i > 0 ? " · " : ""}
+                                    <span className={isWanted(k) ? "font-semibold text-ink-900" : undefined}>{skillBaseName(k)}</span>
+                                  </span>
+                                ))
+                              : "No skills listed"}
+                          </span>
                         </span>
                         <span className="text-right">
-                          <span className="nums block text-lg font-semibold leading-tight text-brand-700">{c.score.toFixed(1)}</span>
-                          <span className="block text-xs text-text-subtle">{PLAN_NAME[band.id]} plan</span>
+                          <span className="nums block text-lg font-semibold leading-tight text-ink-900">
+                            {c.scored ? c.score.toFixed(1) : "-"}
+                            <span className="sr-only"> Findtern Score</span>
+                          </span>
+                          <span className="block text-xs text-ink-600">{c.scored ? band.name : "Not scored yet"}</span>
                         </span>
                       </Link>
                     </li>
                   );
                 })}
-              </Surface>
+              </ul>
             )}
           </section>
         </aside>
@@ -416,7 +459,14 @@ async function load(employerId: string): Promise<Loaded> {
     .filter((r) => !seen.has(r.user.id) && Boolean(seen.add(r.user.id)))
     .filter((r) => !proposedTo.has(r.user.id))
     .map((r) => toCandidateProfile(r.user, r.onboarding));
-  const matching = wanted.length ? profiles.filter((c) => c.skills.some((s) => wanted.includes(s.toLowerCase()))) : profiles;
+  // Skills may carry a level ("React · Advanced"): match on the name.
+  const matching = wanted.length ? profiles.filter((c) => c.skills.some((s) => wanted.includes(skillBaseName(s).toLowerCase()))) : profiles;
+  const candidates = (matching.length ? matching : profiles).slice(0, 4);
+  await attachPhotos(db, candidates);
+  const presence = await presenceOf(candidates.map((c) => c.id)).catch((err) => {
+    console.error("[employer/dashboard] presence", err);
+    return {} as Record<string, PresenceLabel | null>;
+  });
 
   return {
     companyName: employer?.companyName ?? "",
@@ -428,6 +478,8 @@ async function load(employerId: string): Promise<Loaded> {
     nextInterview: upcoming[0]?.iv ?? null,
     shortlisted,
     toPay: payable.lines.length,
-    candidates: (matching.length ? matching : profiles).slice(0, 5),
+    candidates,
+    presence,
+    wanted,
   };
 }
