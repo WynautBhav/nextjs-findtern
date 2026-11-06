@@ -38,6 +38,8 @@ const samples = (n: string): [name: keyof typeof emails, content: EmailContent, 
   ["otp", emails.otp({ otp: n, ttlMinutes: 10, forEmployer: false }), false],
   ["otp", emails.otp({ otp: n, ttlMinutes: 10, forEmployer: true }), true],
   ["passwordReset", emails.passwordReset({ url: `https://example.com/reset?token=${n}`, ttlMinutes: 30 }), false],
+  ["newMessage", emails.newMessage({ name: n, from: n, url: "https://example.com/employer/messages/t1" }), true],
+  ["newMessage", emails.newMessage({ name: n, from: n, url: "https://example.com/intern/messages/t1" }), false],
   ...(["upcoming", "due", "overdue"] as const).map(
     (type) => ["paymentReminder", emails.paymentReminder({ name: n, type, k: 2, amount: n, dueOn: n, intern: n }), true] as [keyof typeof emails, EmailContent, boolean],
   ),
