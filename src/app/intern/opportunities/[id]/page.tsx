@@ -12,7 +12,6 @@ import { requireRole } from "@/lib/auth";
 import { loadInternData, projectById } from "@/lib/intern-data";
 import { formatDayLabel } from "@/lib/format";
 import { toArray } from "@/lib/journey";
-import { isListingLive } from "@/lib/project-locations";
 import { savedProjectIds } from "@/lib/saved-roles";
 import { readSkillRatings } from "@/lib/onboarding";
 
@@ -50,8 +49,8 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
   const existing = data.proposals.find((p) => p.projectId === id && (isHiredProposal(p) || proposalStatus(p.status).tone !== "closed")) ?? null;
   // A hire is a hire whether the status or only hiredAt says so (QA-010).
   const hired = existing ? isHiredProposal(existing) : false;
-  // Paused, closed and taken-down roles are gone unless this candidate already has an offer on it.
-  if (!existing && !isListingLive(role)) notFound();
+  // Paused, closed and taken-down roles, and inactive or test employers, are gone unless this candidate already has an offer on it.
+  if (!existing && !(await projectById(id, { strict: true }))) notFound();
   // A role they already have an offer on stays readable; anything else waits
   // for the same unlock as the list.
   if (!existing) {

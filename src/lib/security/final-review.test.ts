@@ -40,3 +40,10 @@ test("#19 shortlisting and meetings refuse a closed or taken-down listing", () =
     assert.match(src, /if \(!isProjectOpen\(project\.status, project\.takenDownAt\)\)/, p);
   }
 });
+
+test("#8 an intern without an offer only opens a live listing of an active, real employer", () => {
+  const src = read("app/intern/opportunities/[id]/page.tsx");
+  assert.match(src, /if \(!existing && !\(await projectById\(id, \{ strict: true \}\)\)\) notFound\(\);/);
+  const lib = read("lib/intern-data.ts");
+  assert.match(lib, /and\(eq\(schema\.projects\.id, id\), eq\(schema\.employers\.isActive, true\), realEmployers\(\)\)/);
+});
