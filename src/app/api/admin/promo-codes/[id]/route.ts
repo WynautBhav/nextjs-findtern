@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { diffFields, recordAdminAudit } from "@/lib/admin/audit";
+import { promoCodeProblem, promoDiscountProblem } from "@/lib/admin/promo-edit-rules";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
@@ -71,6 +72,20 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   // A college's code keeps its discount, audience and cap; those change on the college screen.
   const locked = collegeCodeEditProblem(existing, parsed.data);
   if (locked) return NextResponse.json({ error: locked }, { status: 403 });
+  // The same discount rules as create, on the row as it will be after this edit (an edit may send only one field).
+  const d = parsed.data;
+  if (d.discountType !== undefined || d.discountValue !== undefined || d.appliesTo !== undefined) {
+    const problem = promoDiscountProblem({
+      discountType: d.discountType ?? existing.discountType,
+      discountValue: d.discountValue ?? existing.discountValue,
+      appliesTo: d.appliesTo ?? existing.appliesTo,
+    });
+    if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+  }
+  if (code && code !== existing.code?.toUpperCase()) {
+    const bad = promoCodeProblem(code);
+    if (bad) return NextResponse.json({ error: bad }, { status: 400 });
+  }
   const nextFrom = toDate(parsed.data.validFrom);
   const nextUntil = toDate(parsed.data.validUntil);
   const window = promoWindowProblem(

@@ -68,3 +68,21 @@ test("every page that gates controls with canWrite keeps the right answer", () =
   }
 });
 
+
+test("college money routes need transactions:write: Accounts may pay, Sales may not", () => {
+  const accounts = ["transactions:read", "transactions:write"];
+  const sales = ["companies:read", "companies:write"];
+  for (const path of ["/api/admin/colleges/c1/seat-batches", "/api/admin/colleges/c1/seat-batches/b1", "/api/admin/colleges/c1/payouts/p1", "/api/admin/colleges/c1/bank", "/api/admin/colleges/c1/promo-code"]) {
+    assert.equal(allows(accounts, requiredPermissions(path, "POST")), true, `accounts ${path}`);
+    assert.equal(allows(sales, requiredPermissions(path, "POST")), false, `sales ${path}`);
+    assert.equal(allows(sales, requiredPermissions(path, "GET")), true, `sales read ${path}`);
+    assert.equal(allows(["transactions:read"], requiredPermissions(path, "GET")), true, `accounts read ${path}`);
+  }
+});
+
+test("college billing and admin logins stay a company write; Accounts can open the college page", () => {
+  assert.equal(allows(["transactions:write"], requiredPermissions("/api/admin/colleges/c1/admins", "POST")), false);
+  assert.equal(allows(["companies:write"], requiredPermissions("/api/admin/colleges/c1/admins", "POST")), true);
+  assert.equal(allows(["transactions:read"], requiredPermissions("/admin/colleges/c1", "GET")), true);
+  assert.equal(allows(["transactions:read"], requiredPermissions("/admin/colleges", "GET")), false);
+});

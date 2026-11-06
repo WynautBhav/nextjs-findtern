@@ -197,7 +197,7 @@ export function Intern360View({
       <InfoRow label="Account">{controls?.account ?? <StatusBadge value={user.isActive ? "active" : "inactive"} />}</InfoRow>
       <InfoRow label="Activation fee">
         <Pill tone={feePaid ? "paid" : "closed"}>{feePaid ? "Paid" : "Unpaid"}</Pill>
-        {!feePaid && canWrite ? <MarkPaidButton internId={user.id} /> : null}
+        {!feePaid && canWrite && canPay ? <MarkPaidButton internId={user.id} /> : null}
       </InfoRow>
     </InfoList>
   );

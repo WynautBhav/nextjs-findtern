@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { recordAdminAudit } from "@/lib/admin/audit";
+import { promoCodeProblem, promoDiscountProblem } from "@/lib/admin/promo-edit-rules";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
@@ -34,6 +35,9 @@ export async function POST(req: Request) {
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+
+  const bad = promoCodeProblem(parsed.data.code) ?? promoDiscountProblem(parsed.data);
+  if (bad) return NextResponse.json({ error: bad }, { status: 400 });
 
   const window = promoWindowProblem(
     parsed.data.validFrom ? new Date(parsed.data.validFrom) : null,

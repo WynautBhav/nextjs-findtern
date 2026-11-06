@@ -136,6 +136,15 @@ function rulesFor(pathname: string): RuleLists | null {
   if (/^\/api\/admin\/interns\/[^/]+\/payouts/.test(pathname)) {
     return { read: ["transactions:read"], write: ["transactions:write"] };
   }
+  // College money (seat batches, payouts, bank, the seat code) is Accounts' work, not Sales': the same permission the routes check
+  // in-route. Reading it is open to either side (Sales sees the college, Accounts sees the money).
+  if (/^\/api\/admin\/colleges\/[^/]+\/(seat-batches|payouts|bank|promo-code)(\/|$)/.test(pathname)) {
+    return { read: ["transactions:read", "companies:read"], write: ["transactions:write"] };
+  }
+  // The college's own page: Accounts opens it too, to pay a batch or a withdrawal. Editing the college stays a company write.
+  if (/^\/admin\/colleges\/[^/]+(\/|$)/.test(pathname)) {
+    return { read: ["companies:read", "transactions:read"], write: ["companies:write"] };
+  }
   const rule = SORTED.find(([prefix]) => pathname === prefix || pathname.startsWith(prefix.endsWith("/") ? prefix : `${prefix}/`));
   return rule ? { read: rule[1], write: rule[2] } : null;
 }
