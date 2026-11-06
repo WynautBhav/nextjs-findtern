@@ -124,3 +124,19 @@ export function normalizeEmails(raw: readonly string[]): string[] {
   }
   return [...out];
 }
+
+/**
+ * Values to match when removing roster rows: the stored string as sent (trimmed, plus its lower-case form, since
+ * imports store lower case). Not validated as an email, so rows saved by the old semicolon bug can still be removed.
+ * The caller scopes the delete to its own college.
+ */
+export function removalEmails(raw: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const e of raw) {
+    const v = e.trim();
+    if (!v) continue;
+    out.add(v);
+    out.add(v.toLowerCase());
+  }
+  return [...out];
+}

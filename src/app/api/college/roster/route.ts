@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { requireCollegeMutation } from "@/lib/college/guard";
 import { verifyFromRoster } from "@/lib/college/membership";
-import { normalizeEmails, parseRoster } from "@/lib/college/roster";
+import { parseRoster, removalEmails } from "@/lib/college/roster";
 import { getDb, schema } from "@/lib/db";
 
 const bodySchema = z.object({ csv: z.string().min(1).max(2_000_000) });
@@ -53,7 +53,7 @@ export async function DELETE(req: Request) {
   if (!g.ok) return g.response;
   const parsed = removeSchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Choose the students to remove" }, { status: 400 });
-  const emails = normalizeEmails(parsed.data.emails);
+  const emails = removalEmails(parsed.data.emails);
   if (emails.length === 0) return NextResponse.json({ error: "Choose the students to remove" }, { status: 400 });
 
   const removed = await getDb()

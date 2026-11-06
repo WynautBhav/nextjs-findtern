@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { normalizeEmails, parseRoster, readYear, splitCsv } from "./roster.ts";
+import { normalizeEmails, parseRoster, removalEmails, readYear, splitCsv } from "./roster.ts";
 
 test("loose headers, BOM, quotes and CRLF", () => {
   const csv = '﻿Roll No,Student Name,Email ID,Department,Year\r\n21CS001,"Sharma, Asha",Asha@JKLU.edu.in,CSE,3rd\r\n21CS002,Ravi,ravi@jklu.edu.in,"ECE",IV\r\n';
@@ -51,4 +51,10 @@ test("a semicolon or comma can't hide inside an email", () => {
 
 test("normalizeEmails lower-cases, de-duplicates and drops junk", () => {
   assert.deepEqual(normalizeEmails([" A@x.in", "a@x.in", "nope", "b@x.in"]), ["a@x.in", "b@x.in"]);
+});
+
+test("removalEmails keeps rows the old semicolon bug stored, which are not valid emails", () => {
+  assert.deepEqual(removalEmails([" semi;x@qati.edu.in "]), ["semi;x@qati.edu.in"]);
+  assert.deepEqual(removalEmails(["Asha@X.in", "", "  "]), ["Asha@X.in", "asha@x.in"]);
+  assert.deepEqual(normalizeEmails(["semi;x@qati.edu.in"]), []);
 });
