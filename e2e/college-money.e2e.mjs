@@ -25,8 +25,12 @@ const ADMIN = { email: process.env.E2E_ADMIN_EMAIL ?? "admin@findtern.dev", pass
 
 let browser, pool, admin, tpo, collegeId, code;
 const q = async (sql, params) => (await pool.query(sql, params)).rows;
-const send = (page, method, path, data) =>
-  page.request.fetch(`${BASE}${path}`, { method, data, headers: { origin: BASE } });
+// Mutations need the double-submit CSRF header, as csrfFetch sends it (src/lib/client-fetch.ts).
+const send = async (page, method, path, data) => {
+  const csrf = (await page.context().cookies(BASE)).find((c) => c.name === "ft_csrf")?.value;
+  const headers = { origin: BASE, ...(csrf && method !== "GET" ? { "x-csrf-token": decodeURIComponent(csrf) } : {}) };
+  return page.request.fetch(`${BASE}${path}`, { method, data, headers });
+};
 
 async function login(path, creds) {
   const page = await (await browser.newContext()).newPage();
