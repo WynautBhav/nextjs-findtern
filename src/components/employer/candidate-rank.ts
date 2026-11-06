@@ -4,8 +4,9 @@ import { compareBySortFields, type SortField } from "../../lib/candidate-sort.ts
  * The candidates list order, pure so it can be tested.
  *
  * Chain: an explicit employer sort leads; with none chosen, interns who SAVED
- * the project's role come first (OA3: saving raises them in that employer's
- * matches, never the score). Then more matched skills, more matched cities,
+ * the project's role and have at least one of its skills come first (OA3:
+ * saving raises them in that employer's matches, never the score; without the
+ * skill match, saving every listing would top every employer's list). Then more matched skills, more matched cities,
  * the sort fields, the Findtern Score, and initials / id for a total order.
  */
 export type Rankable = {
@@ -28,6 +29,8 @@ export type RankOptions = {
   cities: string[];
   /** Intern ids that saved the project this view is scoped to. */
   saved: ReadonlySet<string>;
+  /** That project's skills (any case): a save only counts with at least one of them. */
+  projectSkills: string[];
 };
 
 export function rankProfiles<T extends Rankable>(profiles: readonly T[], o: RankOptions): T[] {
@@ -43,7 +46,8 @@ export function rankProfiles<T extends Rankable>(profiles: readonly T[], o: Rank
     const have = new Set(p.skills.map((x) => x.split(" · ")[0].trim().toLowerCase()));
     return lowered.filter((t) => have.has(t)).length;
   };
-  const savedRank = (p: T) => (o.saved.has(p.id) ? 1 : 0);
+  const wanted = new Set(o.projectSkills.map((s) => s.trim().toLowerCase()));
+  const savedRank = (p: T) => (o.saved.has(p.id) && p.skills.some((x) => wanted.has(x.split(" · ")[0].trim().toLowerCase())) ? 1 : 0);
   const chosen = o.sorts.length > 0;
   return [...profiles].sort(
     (a, b) =>

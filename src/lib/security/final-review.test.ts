@@ -95,3 +95,11 @@ test("#14/#15 refunds check the seat code and the student's college before using
   const claim = src.slice(src.indexOf("async function claimSeat"));
   assert.match(claim.slice(0, 600), /REFUND_ERRORS\.seatCodeOff/);
 });
+
+test("#17 saving a role is gated like the roles list and capped", () => {
+  const src = read("app/api/intern/saved-projects/route.ts");
+  assert.match(src, /const MAX_SAVED_ROLES = 10;/);
+  assert.match(src, /if \(!gate\.unlocked\) return NextResponse\.json\([^)]*\{ status: 403 \}\)/);
+  assert.match(src, /if \(n >= MAX_SAVED_ROLES\)/);
+  assert.match(read("app/employer/candidates/_query.ts"), /projectSkills: data\.activeProjectSkills,/);
+});

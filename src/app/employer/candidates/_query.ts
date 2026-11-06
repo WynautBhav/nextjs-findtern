@@ -618,6 +618,7 @@ export async function loadCandidates(
       skillPriority: filters.skillPriority,
       cities: cityList,
       saved: data.saved,
+      projectSkills: data.activeProjectSkills,
     });
 
     data.total = ranked.length;

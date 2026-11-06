@@ -8,12 +8,12 @@ const make = (id: string, score: number, extra: Partial<Rankable> = {}): Rankabl
   initials: id.toUpperCase(),
   score,
   ratings: { communication: 5, coding: 5, aptitude: 5, interview: 5 },
-  skills: [],
+  skills: ["React"],
   preferredLocations: [],
   ...extra,
 });
 
-const base: RankOptions = { sorts: [], dir: "desc", skillTerms: [], skillPriority: true, cities: [], saved: new Set() };
+const base: RankOptions = { sorts: [], dir: "desc", skillTerms: [], skillPriority: true, cities: [], saved: new Set(), projectSkills: ["React"] };
 const ids = (list: Rankable[]) => list.map((p) => p.id);
 
 test("no saves: Findtern Score high to low, initials break ties", () => {
@@ -44,9 +44,9 @@ test("explicit sort, low to high", () => {
 
 test("saved outranks matched skills; matched skills outrank score", () => {
   const list = [
-    make("none", 9),
+    make("none", 9, { skills: [] }),
     make("two", 6, { skills: ["React", "Node"] }),
-    make("savedOnly", 5),
+    make("savedOnly", 5, { skills: ["react · Intermediate"] }),
   ];
   const out = rankProfiles(list, { ...base, skillTerms: ["react", "node"], saved: new Set(["savedOnly"]) });
   assert.deepEqual(ids(out), ["savedOnly", "two", "none"]);
@@ -56,4 +56,11 @@ test("does not mutate its input", () => {
   const list = [make("a", 1), make("b", 2)];
   rankProfiles(list, base);
   assert.deepEqual(ids(list), ["a", "b"]);
+});
+
+test("a save without any of the project's skills gives no boost (review #17)", () => {
+  const out = rankProfiles([make("hi", 9), make("spam", 6, { skills: ["Cooking"] })], { ...base, saved: new Set(["spam"]) });
+  assert.deepEqual(ids(out), ["hi", "spam"]);
+  const none = rankProfiles([make("hi", 9), make("s", 6)], { ...base, saved: new Set(["s"]), projectSkills: [] });
+  assert.deepEqual(ids(none), ["hi", "s"], "a project with no skills boosts nobody");
 });
