@@ -177,7 +177,7 @@ test("a mapping override re-classifies the same import (drop the phone column â†
 test("commit: valid rows land once, the verified email auto-links, nothing links on phone or an unverified email", async () => {
   const r = await send(state.adminCtx, "PATCH", importUrl(state.collegeId, state.import1), { action: "commit" });
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.deepEqual(r.body, { created: 6, updated: 0, autoLinked: 1, review: 1, skippedInvalid: 3 });
+  assert.deepEqual(r.body, { created: 6, updated: 0, autoLinked: 1, review: 1, skippedInvalid: 4 }); // skipped = 3 invalid + 1 duplicate
   const list = await dbRoster(state.collegeId);
   assert.equal(list.length, 6);
   const priya = byEmail(list, state.redeemer.email);
@@ -248,7 +248,8 @@ test("review queue: the admin sees the two phone matches, links one, refuses a s
   assert.equal(link.status, 200, JSON.stringify(link.body));
   assert.equal(link.body.matchStatus, "linked");
   const dupe = await send(state.adminCtx, "PATCH", `/api/admin/colleges/${state.collegeId}/roster/${prem.id}/match`, { action: "link", userId: state.phoneOnly.id });
-  assert.equal(dupe.status, 409, "one student, one roster row per college");
+  // Prem's row never showed this student as a candidate, so the link is refused before the one-row-per-college rule is reached.
+  assert.equal(dupe.status, 400, "a student who is not a candidate for the row cannot be linked to it");
   const stranger = await send(state.adminCtx, "PATCH", `/api/admin/colleges/${state.collegeId}/roster/${prem.id}/match`, { action: "link", userId: state.otherCollegeStudent.id });
   assert.ok([400, 404].includes(stranger.status), `an intern who is not a candidate cannot be linked (got ${stranger.status})`);
   const reject = await send(state.adminCtx, "PATCH", `/api/admin/colleges/${state.collegeId}/roster/${prem.id}/match`, { action: "reject" });
@@ -322,8 +323,7 @@ test("the officer dashboard shows the roster, joined and seat numbers [UI]", asy
   try {
     await visit(page, "/college");
     const main = await page.locator("main").innerText();
-    expectText(main, /Joined Findtern/, "joined card");
-    expectText(main, /\b1\s*\/\s*7\b/, "1 of the 7 roster students has joined (the redeemer)");
+    expectText(main, /Registered\s*1\s*of 7 on your roster/, "1 of the 7 roster students has registered (the redeemer)");
     expectText(main, /1 of 300 used\s*Â·\s*299 left/, "seats used and left");
     expectText(main, new RegExp(state.code), "the shared code is shown");
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
@@ -372,10 +372,12 @@ test("nothing crosses colleges: another college's student, roster row and import
   );
   const page = await state.tpoCtx.newPage();
   try {
-    const res = await page.goto(new URL(`/college/students/${state.otherCollegeStudent.id}`, baseUrl()).toString());
-    assert.equal(res.status(), 404, "the officer's student page for another college's student");
+    // The college layout streams behind loading.tsx, so Next sends 200 with the not-found page in the body: the proof is the body.
+    await page.goto(new URL(`/college/students/${state.otherCollegeStudent.id}`, baseUrl()).toString());
     const html = await page.content();
+    expectText(html, /Page not found/, "the officer's student page for another college's student is the not-found page");
     expectNoText(html, new RegExp(state.otherCollegeStudent.email.replace(/[.+]/g, "\\$&")), "no email of the other college's student");
+    expectNoText(html, new RegExp(`Other${state.tag}`), "no name of the other college's student");
   } finally {
     await page.close();
   }
