@@ -109,3 +109,9 @@ test("#18 keyword search matches skill names, never the raw skills jsonb (hidden
   assert.doesNotMatch(src, /skills\}::text ILIKE/);
   assert.match(src, /coalesce\(e->>'name', e->>'skill', e->>'title'\) END\) ILIKE \$\{needle\}/);
 });
+
+test("#20 the 0019 rollback keeps the refund ledger", () => {
+  const down = readFileSync(join(SRC, "../drizzle/rollback/0019_college_roster_refunds.down.sql"), "utf8");
+  assert.doesNotMatch(down, /DROP TABLE IF EXISTS "payment_refunds"/);
+  assert.match(down, /ALTER TABLE "payment_refunds" RENAME TO %I/);
+});
