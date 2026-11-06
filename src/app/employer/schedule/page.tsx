@@ -177,19 +177,14 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
     });
 
   const filtering = Boolean(q || dateFilter || statusFilter || projectFilter || tzFilter);
-  const booked = all.filter((r) => r.stage === "upcoming" || r.stage === "live").length;
-  const waiting = all.filter((r) => r.stage === "awaiting_pick").length;
   const field = fieldClass;
 
   return (
     <div>
       <PageHead
         title="Schedule"
-        lede={
-          all.length === 0
-            ? "Interviews you book with candidates land here, with what to do about each one."
-            : `${[booked ? `${booked} booked` : "", waiting ? `${waiting} waiting on the candidate` : ""].filter(Boolean).join(", ") || "Nothing booked right now"}. Times are shown in each interview's own timezone.`
-        }
+        // The tabs carry the counts and every row names its timezone, so a lede only helps an empty page.
+        lede={all.length === 0 ? "Interviews you book with candidates land here, with what to do about each one." : undefined}
         action={
           <Link href="/employer/cart" className={buttonClass({ variant: "outline", size: "sm" })}>
             <CalendarDays className="size-4" aria-hidden />

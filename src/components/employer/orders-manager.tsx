@@ -222,8 +222,9 @@ export function OrdersManager({
 function SearchField({ value, onChange, placeholder }: { value: string; onChange: (v: string) => void; placeholder: string }) {
   return (
     <label className={labelClass}>
-      Search
-      <span className="relative mt-1.5 block">
+      {/* The placeholder says what it searches; the word "Search" cost a line on phones. */}
+      <span className="sr-only">Search</span>
+      <span className="relative block">
         <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
         <input
           type="search"
@@ -238,6 +239,8 @@ function SearchField({ value, onChange, placeholder }: { value: string; onChange
 }
 
 function ResetButton({ enabled, onClick }: { enabled: boolean; onClick: () => void }) {
+  // Shown only when there is something to reset: a disabled button on its own row was noise.
+  if (!enabled) return null;
   return (
     <button type="button" disabled={!enabled} onClick={onClick} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
       <RotateCcw className="size-4" aria-hidden />
@@ -280,6 +283,13 @@ function HiresPanel({
   const [ftFor, setFtFor] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const rows = useMemo(() => filterHires(hires, q), [hires, q]);
+  // Same rule as each row's "pay offline" line, over the rows shown.
+  const offlineRows = rows.filter((h) => h.ledger.dueMinor > 0 && !payableIds.includes(h.proposalId) && h.ledger.plan !== "postpaid");
+  const offline = {
+    count: offlineRows.length,
+    minor: offlineRows.reduce((n, h) => n + h.ledger.dueMinor, 0),
+    currency: offlineRows[0]?.currency ?? "INR",
+  };
   if (hires.length === 0) {
     return (
       <EmptyScene
@@ -313,26 +323,41 @@ function HiresPanel({
 
   return (
     <div>
-      <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end lg:grid-cols-[minmax(0,1.6fr)_auto]">
-        <SearchField value={q} onChange={setQ} placeholder="Candidate, project or role" />
+      <div className="mb-4 flex items-center gap-2">
+        <div className="min-w-0 flex-1 lg:max-w-xl">
+          <SearchField value={q} onChange={setQ} placeholder="Candidate, project or role" />
+        </div>
         <ResetButton enabled={Boolean(q)} onClick={() => setQ("")} />
+        <button
+          type="button"
+          onClick={exportCsv}
+          disabled={rows.length === 0}
+          className={buttonClass({ variant: "outline", size: "sm", className: "h-11 shrink-0 lg:ml-auto" })}
+        >
+          <Download className="size-4" aria-hidden />
+          <span className="max-sm:sr-only">{rows.length !== hires.length ? `Export ${rows.length} shown` : "Export"}</span> CSV
+        </button>
         <LiveCount active={Boolean(q.trim())} shown={rows.length} total={hires.length} noun="hires" />
       </div>
       {rows.length === 0 ? (
         <EmptyScene title="No hire matches" body="Try another candidate, project or role, or reset the search." className="py-10" />
       ) : (
         <>
-      <div className="mb-3 flex items-center justify-between gap-4">
-        <p className="text-sm text-ink-600">
-          <span className="nums font-medium text-ink-900">{rows.length}</span> {rows.length === 1 ? "placement" : "placements"}
-          {rows.length !== hires.length ? ` of ${hires.length}` : ""}
-        </p>
-        <button type="button" onClick={exportCsv} disabled={rows.length === 0} className={buttonClass({ variant: "outline", size: "sm" })}>
-          <Download className="size-4" aria-hidden />
-          {rows.length !== hires.length ? `Export ${rows.length} shown (CSV)` : "Export hires (CSV)"}
-        </button>
-      </div>
-        <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+        {/* The tab already counts the hires; a count here only says what a search left. */}
+        {rows.length !== hires.length ? (
+          <p className="mb-3 text-sm text-ink-600">
+            <span className="nums font-medium text-ink-900">{rows.length}</span> of {hires.length} {hires.length === 1 ? "placement" : "placements"}
+          </p>
+        ) : null}
+        {offline.count ? (
+          <p role="note" className="mb-3 rounded-apple-md border border-danger/25 bg-danger-soft px-4 py-2.5 text-sm text-ink-800">
+            <span className="nums font-semibold">{formatMoney(offline.minor, offline.currency)}</span> on {offline.count} {offline.count === 1 ? "hire" : "hires"} can&apos;t be paid online. Email{" "}
+            <a href="mailto:communicate@findtern.in" className="font-medium text-brand-700 underline underline-offset-4 touch:inline-flex touch:min-h-11 touch:items-center">
+              communicate@findtern.in
+            </a>
+          </p>
+        ) : null}
+        <ul className="divide-y divide-ink-100 border-y border-ink-100">
           {rows.map((h) => {
             // Pay only where checkout can bill this placement; otherwise the
             // link opened a checkout for a different hire (QA-139).
@@ -343,7 +368,7 @@ function HiresPanel({
             const contract = `/employer/proposal/${encodeURIComponent(h.proposalId)}`;
             const plan = PLAN[h.ledger.plan];
             return (
-              <li key={h.proposalId} className="grid gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] lg:items-center">
+              <li key={h.proposalId} className="grid gap-4 py-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] lg:items-center">
                 <div className="flex min-w-0 items-start gap-3.5">
                   <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
                     {initials(h.candidateName)}
@@ -362,8 +387,9 @@ function HiresPanel({
                       {h.roleTitle === h.projectName ? h.roleTitle : `${h.roleTitle} · ${h.projectName}`}
                     </p>
                     {owedOffline ? (
-                      <p className="mt-1 text-sm text-danger">
-                        {formatMoney(h.ledger.dueMinor, h.currency)} unpaid · can&apos;t be paid online; write to communicate@findtern.in
+                      // How to pay it is said once above the list, not on every row.
+                      <p className="nums mt-1 text-sm text-ink-900">
+                        <span className="font-semibold">{formatMoney(h.ledger.dueMinor, h.currency)}</span> unpaid · pay offline
                       </p>
                     ) : null}
                     {postpaid && h.ledger.nextDue ? (
@@ -438,7 +464,7 @@ function HiresPanel({
               </li>
             );
           })}
-        </Surface>
+        </ul>
         </>
       )}
     </div>
