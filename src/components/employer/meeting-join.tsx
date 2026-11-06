@@ -26,11 +26,13 @@ export function JoinMeetingButton({
   size = "sm",
   variant = "primary",
   block = false,
+  label = "Join meeting",
 }: {
   link: string;
   size?: "sm" | "md";
   variant?: "primary" | "outline";
   block?: boolean;
+  label?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
@@ -49,7 +51,7 @@ export function JoinMeetingButton({
         className={buttonClass({ variant, size, block })}
       >
         <Video className="size-4" aria-hidden />
-        Join meeting
+        {label}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto rounded-apple-xl sm:max-w-2xl">
