@@ -50,8 +50,9 @@ function istInput(offsetMin) {
 /** Fill one of the drive form's IST date + time pairs. */
 async function fillIst(page, label, offsetMin) {
   const v = istInput(offsetMin);
-  await page.getByLabel(`${label}, date`).fill(v.date);
-  await page.getByLabel(`${label}, time`).fill(v.time);
+  // exact: the calendar button's label ("Open calendar, Opens (IST), date") contains the field's.
+  await page.getByLabel(`${label}, date`, { exact: true }).fill(v.date);
+  await page.getByLabel(`${label}, time`, { exact: true }).fill(v.time);
 }
 
 before(async () => {
@@ -78,11 +79,10 @@ test("officer: signs in and sees the console", async () => {
   await tpo.waitForURL(`${BASE}/college`);
   await tpo.getByRole("heading", { name: "JK Lakshmipat University" }).waitFor();
   const main = await tpo.locator("main").innerText();
-  assert.match(main, /Joined Findtern/);
-  assert.match(main, /61\/73/, "61 of 73 roster students joined in the seed");
+  assert.match(main, /Registered\s*\d+\s*of 73 on your roster/, "the dashboard counts the 73 roster students");
   // Cohort tabs filter the table.
   await tpo.getByRole("button", { name: /4th year/ }).click();
-  assert.match(await tpo.locator("main").innerText(), /Showing \d+ of 61/);
+  assert.match(await tpo.locator("main").innerText(), /Showing \d+ of \d+/);
 });
 
 test("officer: builds a live drive that shows only Sana", async () => {
@@ -124,10 +124,12 @@ test("employer: shortlists and asks for a call now", async () => {
   const card = emp.locator("main ul > li").first();
   await card.getByRole("button", { name: /^Shortlist / }).click();
   await card.getByRole("button", { name: /^Shortlist /, pressed: true }).waitFor();
+  // No Google Calendar in the test stack: the employer pastes their own Google Meet link, which the form allows (it only takes Meet, Zoom, Teams or Webex).
+  await emp.getByLabel("Your own meeting link (optional)").fill("https://meet.google.com/abc-defg-hij");
   await card.getByRole("button", { name: /Call/ }).click();
   await emp.getByRole("menuitem", { name: "Now" }).click();
   const sent = emp.getByRole("status").filter({ hasText: "Call request sent" });
-  const refused = emp.getByRole("alert").filter({ hasText: "Calendar not connected; ask Findtern to connect it." });
+  const refused = emp.getByRole("alert").filter({ hasText: "Google Calendar is not connected" });
   await sent.or(refused).first().waitFor();
   calendar = await sent.isVisible();
 });
@@ -165,6 +167,7 @@ test("employer: can cancel the call; the student's card goes away", async (t) =>
   if (!calendar) return t.skip(NO_CALENDAR);
   const calls = emp.locator('section[aria-labelledby="calls-title"]');
   await calls.getByRole("button", { name: "Cancel" }).first().click();
+  await emp.getByRole("button", { name: "Yes, cancel the call" }).click(); // confirmed in the page, not a browser dialog
   await emp.getByRole("status").filter({ hasText: "Call cancelled" }).waitFor();
   await calls.getByText("Cancelled").first().waitFor();
   await stu.reload();

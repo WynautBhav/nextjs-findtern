@@ -187,7 +187,7 @@ async function queueFromDb() {
   return { payouts: p.n, candidates: c.n, pipeline: l.n };
 }
 
-/** Paid money in INR minor units (revenue.ts: paid rows, real employers, USD at 100), optionally from `since`. */
+/** Paid money in INR minor units (revenue.ts: paid rows, real employers, USD at 100, plus paid college seat batches), optionally from `since`. */
 async function receivedFromDb({ since = null } = {}) {
   const inr = (a, c) => `(CASE WHEN upper(coalesce(${c}, 'INR')) = 'USD' THEN ${a} * 100 ELSE ${a} END)`;
   const at = (t) => (since ? `AND coalesce(${t}.paid_at, ${t}.created_at) >= $1` : "");
@@ -199,7 +199,12 @@ async function receivedFromDb({ since = null } = {}) {
     args,
   );
   const int = await one(`SELECT coalesce(sum(${inr("i.amount_minor", "i.currency")}), 0)::bigint v FROM intern_payments i WHERE i.status = 'paid' ${at("i")}`, args);
-  return { employer: Number(emp.v), intern: Number(int.v), total: Number(emp.v) + Number(int.v) };
+  // College seat sales are money received too (INR): paid batches, dated by paid_at, else created_at.
+  const college = await one(
+    `SELECT coalesce(sum(c.amount_minor), 0)::bigint v FROM college_seat_batches c WHERE c.status = 'paid' ${at("c")}`,
+    args,
+  );
+  return { employer: Number(emp.v), intern: Number(int.v), college: Number(college.v), total: Number(emp.v) + Number(int.v) + Number(college.v) };
 }
 
 async function ensureStaff() {
@@ -613,8 +618,8 @@ it("9 one money layer: Dashboard, Transactions, Reports, Reports/Money, Orders a
   const invoices = await read("/admin/intern-invoices", "Collected");
   close("Orders Collected (employer orders)", orders, want.employer, 1);
   close("Intern invoices Collected", invoices, want.intern, 1);
-  if (orders !== null && invoices !== null && Math.abs(orders + invoices - want.total) > 1) {
-    problems.push(`Orders + Intern invoices (${(orders + invoices) / 100}) differ from Transactions Received (${want.total / 100})`);
+  if (orders !== null && invoices !== null && Math.abs(orders + invoices - (want.employer + want.intern)) > 1) {
+    problems.push(`Orders + Intern invoices (${(orders + invoices) / 100}) differ from the employer + intern part of Received (${(want.employer + want.intern) / 100})`);
   }
   // The last 30 days, on the two pages that take a period (both start from now - 30 days).
   const since = new Date(Date.now() - 30 * 86_400_000);

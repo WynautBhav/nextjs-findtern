@@ -12,7 +12,11 @@
  *   E2E_REBUILD=1  run `next build` even when .next/BUILD_ID exists
  *   E2E_HEADED=1   show the browser
  *   E2E_SPECS      comma list of spec names to run (default: all, in SPECS order),
- *                  e.g. E2E_SPECS=skills-limit,bio-hidden
+ *                  e.g. E2E_SPECS=skills-limit,bio-hidden. The SEEDED specs (terms-popup,
+ *                  admin, college-money, college-partners) need the demo accounts, so they
+ *                  run only when named here: the runner then loads the demo seed first
+ *                  (scripts/seed.ts, which TRUNCATES, then seed-colleges and the QA
+ *                  situations) into the same test DB, after every other selected spec.
  *
  * The server also gets TRUST_PROXY=1 (it listens on loopback only), so each
  * login in a spec can carry its own X-Forwarded-For, and RAZORPAY_API_BASE
@@ -38,6 +42,9 @@ const SPECS = [
   "college-roster",
   "refunds",
 ];
+
+/** Specs that sign in as the demo / QA accounts; the runner seeds them (and wipes the test DB) before these only. */
+const SEEDED = ["terms-popup", "admin", "college-money", "college-partners"];
 
 const log = (...a) => console.log("[e2e]", ...a);
 
@@ -219,12 +226,25 @@ async function main() {
     log("canary passed: server reads the test DB");
     const started = Date.now();
     const wanted = (process.env.E2E_SPECS ?? "").split(",").map((x) => x.trim()).filter(Boolean);
-    const unknown = wanted.filter((x) => !SPECS.includes(x));
-    if (unknown.length) throw new Error(`unknown spec(s) in E2E_SPECS: ${unknown.join(", ")} (known: ${SPECS.join(", ")})`);
-    const specs = wanted.length ? SPECS.filter((x) => wanted.includes(x)) : SPECS;
+    const unknown = wanted.filter((x) => !SPECS.includes(x) && !SEEDED.includes(x));
+    if (unknown.length) throw new Error(`unknown spec(s) in E2E_SPECS: ${unknown.join(", ")} (known: ${[...SPECS, ...SEEDED].join(", ")})`);
+    const specs = wanted.length ? [...SPECS, ...SEEDED].filter((x) => wanted.includes(x)) : SPECS;
+    const seedAt = specs.findIndex((x) => SEEDED.includes(x));
     const failed = [];
     code = 0;
-    for (const name of specs) {
+    for (const [i, name] of specs.entries()) {
+      if (i === seedAt) {
+        log("loading the demo seed (wipes the test DB)");
+        const seedEnv = { ...process.env, DATABASE_URL, SESSION_SECRET: serverEnv.SESSION_SECRET, PUBLIC_ORIGIN: ORIGIN, MAIL_MODE: "log" };
+        for (const cmd of [
+          ["--experimental-strip-types", "scripts/seed.ts"],
+          ["--experimental-strip-types", "scripts/seed-colleges.ts"],
+          ["e2e/seed-situations.mjs", "--no-scrub"],
+        ]) {
+          const c = await run(process.execPath, cmd, { env: seedEnv, stdio: ["ignore", "ignore", "inherit"] });
+          if (c !== 0) throw new Error(`seed step failed: node ${cmd.join(" ")} (exit ${c})`);
+        }
+      }
       log(`spec ${name}`);
       const c = await run(
         process.execPath,
@@ -234,6 +254,9 @@ async function main() {
             ...process.env,
             DATABASE_URL,
             E2E_BASE_URL: ORIGIN,
+            // The college specs take the same two values under their own names.
+            E2E_BASE: ORIGIN,
+            E2E_DATABASE_URL: DATABASE_URL,
             E2E_RUN_STARTED: String(started),
             E2E_STUB_URL: stub.origin,
             E2E_STUB_WEBHOOK_SECRET: STUB_WEBHOOK_SECRET,
