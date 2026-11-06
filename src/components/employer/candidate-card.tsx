@@ -230,6 +230,8 @@ export function CandidateCard({
         <p className="mt-0.5 inline-flex items-center gap-1 text-sm text-ink-600">
           <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
           {place || "City not stated"}
+          {/* The grey dot alone reads as offline; say it in words (a label, never a time). */}
+          {presence && presence !== "Online now" ? <span className="whitespace-nowrap">· {presence}</span> : null}
         </p>
       </div>
 
