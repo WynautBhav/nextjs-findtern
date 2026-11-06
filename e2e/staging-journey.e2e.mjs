@@ -412,7 +412,6 @@ async function onboardIntern(page, who, over = {}) {
   expectOk(
     "POST /api/intern/onboarding (final)",
     await api(page, "POST", "/api/intern/onboarding", {
-      bio: "Final-year engineering student who builds data pipelines and small dashboards.",
       linkedinUrl: "",
       city: "Pune",
       state: "Maharashtra",
