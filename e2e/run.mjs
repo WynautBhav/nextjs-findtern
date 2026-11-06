@@ -11,6 +11,13 @@
  *   E2E_PORT       server port (default 3300)
  *   E2E_REBUILD=1  run `next build` even when .next/BUILD_ID exists
  *   E2E_HEADED=1   show the browser
+ *   E2E_SPECS      comma list of spec names to run (default: all, in SPECS order),
+ *                  e.g. E2E_SPECS=skills-limit,bio-hidden
+ *
+ * The server also gets TRUST_PROXY=1 (it listens on loopback only), so each
+ * login in a spec can carry its own X-Forwarded-For, and RAZORPAY_API_BASE
+ * pointing at the refund stub (e2e/lib/razorpay-stub.mjs) with throwaway test
+ * keys. PAYMENTS_MODE stays "free", so nothing else changes for the story.
  */
 import { spawn } from "node:child_process";
 import { createWriteStream, existsSync, mkdirSync, readFileSync } from "node:fs";
@@ -19,6 +26,18 @@ import { join } from "node:path";
 
 import { ARTIFACTS, ROOT, port, testDatabaseUrl } from "./lib/env.mjs";
 import { closeDb, one } from "./lib/db.mjs";
+import { STUB_KEY_ID, STUB_KEY_SECRET, STUB_WEBHOOK_SECRET, startStub } from "./lib/razorpay-stub.mjs";
+
+/** Specs in run order: the story first, then the feature specs (one file each). */
+const SPECS = [
+  "critical-path",
+  "bio-hidden",
+  "skills-limit",
+  "listings",
+  "messaging-presence",
+  "college-roster",
+  "refunds",
+];
 
 const log = (...a) => console.log("[e2e]", ...a);
 
@@ -36,6 +55,8 @@ try {
 process.env.DATABASE_URL = DATABASE_URL; // lib/db.mjs reads it
 const PORT = port();
 const ORIGIN = `http://localhost:${PORT}`;
+const STUB_PORT = PORT + 100;
+const STUB_ORIGIN = `http://127.0.0.1:${STUB_PORT}`;
 
 /**
  * Every variable that could make the server reach something real is set
@@ -51,9 +72,12 @@ const serverEnv = {
   MAIL_MODE: "log",
   PAYMENTS_MODE: "free",
   SCHEDULERS: "off",
-  RAZORPAY_KEY_ID: "",
-  RAZORPAY_KEY_SECRET: "",
-  RAZORPAY_WEBHOOK_SECRET: "",
+  // Throwaway test keys + the local refund stub: nothing can reach Razorpay (rzp_test_ is never a live key).
+  RAZORPAY_KEY_ID: STUB_KEY_ID,
+  RAZORPAY_KEY_SECRET: STUB_KEY_SECRET,
+  RAZORPAY_WEBHOOK_SECRET: STUB_WEBHOOK_SECRET,
+  RAZORPAY_API_BASE: STUB_ORIGIN,
+  VERCEL_ENV: "",
   SMTP_HOST: "",
   SMTP_USER: "",
   SMTP_PASS: "",
@@ -63,7 +87,7 @@ const serverEnv = {
   DEEPSEEK_API_KEY: "",
   INCRUITER_WEBHOOK_SECRET: "",
   STORAGE_BUCKET: "",
-  TRUST_PROXY: "",
+  TRUST_PROXY: "1",
   VERCEL: "",
   SESSION_SECRET: "e2e-session-secret-0123456789-abcdefghijklmnop",
   SIGNING_SECRET: "e2e-signing-secret-0123456789-abcdefghijklmnop",
@@ -157,6 +181,9 @@ async function main() {
   }
 
   if (!(await portFree(PORT))) fail(`port ${PORT} is in use; set E2E_PORT or stop that server`);
+  if (!(await portFree(STUB_PORT))) fail(`port ${STUB_PORT} (Razorpay stub) is in use; set E2E_PORT to another value`);
+  const stub = await startStub(STUB_PORT);
+  log(`Razorpay stub on ${stub.origin}`);
 
   const serverLog = createWriteStream(join(ARTIFACTS, "server.log"));
   log(`starting next start -p ${PORT} (log: e2e/.artifacts/server.log)`);
@@ -191,23 +218,40 @@ async function main() {
     await canary();
     log("canary passed: server reads the test DB");
     const started = Date.now();
-    code = await run(
-      process.execPath,
-      ["--test", "--test-concurrency=1", "--test-reporter=spec", join("e2e", "critical-path.e2e.mjs")],
-      {
-        env: {
-          ...process.env,
-          DATABASE_URL,
-          E2E_BASE_URL: ORIGIN,
-          E2E_RUN_STARTED: String(started),
+    const wanted = (process.env.E2E_SPECS ?? "").split(",").map((x) => x.trim()).filter(Boolean);
+    const unknown = wanted.filter((x) => !SPECS.includes(x));
+    if (unknown.length) throw new Error(`unknown spec(s) in E2E_SPECS: ${unknown.join(", ")} (known: ${SPECS.join(", ")})`);
+    const specs = wanted.length ? SPECS.filter((x) => wanted.includes(x)) : SPECS;
+    const failed = [];
+    code = 0;
+    for (const name of specs) {
+      log(`spec ${name}`);
+      const c = await run(
+        process.execPath,
+        ["--test", "--test-concurrency=1", "--test-reporter=spec", join("e2e", `${name}.e2e.mjs`)],
+        {
+          env: {
+            ...process.env,
+            DATABASE_URL,
+            E2E_BASE_URL: ORIGIN,
+            E2E_RUN_STARTED: String(started),
+            E2E_STUB_URL: stub.origin,
+            E2E_STUB_WEBHOOK_SECRET: STUB_WEBHOOK_SECRET,
+          },
         },
-      },
-    );
+      );
+      if (c !== 0) {
+        failed.push(name);
+        code = 1;
+      }
+    }
+    if (failed.length) log(`failed specs: ${failed.join(", ")}`);
   } catch (e) {
     console.error(`[e2e] ${e.message}`);
     code = 1;
   } finally {
     stop();
+    await stub.stop();
     await closeDb();
   }
   log(code === 0 ? "PASS" : `FAIL (exit ${code})`);
