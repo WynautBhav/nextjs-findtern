@@ -1,26 +1,15 @@
 import Link from "next/link";
-import { ArrowUpDown, LayoutGrid, List, Scale, Search, X } from "lucide-react";
+import { Search, X } from "lucide-react";
 
-import {
-  displayNameOf,
-  redactForEmployer,
-} from "@/lib/employer-candidates";
+import { redactForEmployer } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
-import { PLAN_NAME, bandFor } from "@/lib/score";
-import { formatRate } from "@/lib/format";
 import { MAX_COMPARE } from "@/lib/employer-selection";
 import { SITE } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
 import { CandidateCard } from "@/components/employer/candidate-card";
-import { CandidateAvatar } from "@/components/employer/candidate-avatar";
-import { candidateStatusPill, proposalActionLabel } from "@/components/employer/candidate-status";
-import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
-import { PresenceDot } from "@/components/app/presence-dot";
-import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
+import { EmptyScene } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
-import { ButtonLink, buttonClass } from "@/components/ui/button";
-import { fieldClass } from "@/components/employer/ui-tokens";
-import { rowSkills } from "@/components/employer/candidate-view";
+import { buttonClass } from "@/components/ui/button";
 import { SortSelect } from "./_sort-select";
 import {
   SORT_OPTIONS,
@@ -33,11 +22,45 @@ import {
   withoutCity,
   type CandidatesData,
   type Filters,
+  type SortKey,
 } from "./_query";
 
-/** Compact view: score + actions beside the name; the skills sit under the identity. */
-const COMPACT_GRID =
-  "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_6.5rem_10rem] 2xl:grid-cols-[minmax(0,1fr)_6.5rem_5.5rem_10rem]";
+/**
+ * Keyword search: skills or city - never a name or bio (the pool is redacted).
+ * The one search bar at the top of the page; the skill tokens sit under it.
+ */
+export function CandidateSearch({ filters, className }: { filters: Filters; className?: string }) {
+  return (
+    <form method="get" role="search" className={cn("relative min-w-0", className)}>
+      {Array.from(new URLSearchParams(queryOf({ ...filters, q: "", page: 1, saved: false }).slice(1)).entries()).map(([k, v], i) => (
+        <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
+      ))}
+      <label htmlFor="candidate-search" className="sr-only">
+        Search by skill or city
+      </label>
+      <Search className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-ink-400" aria-hidden />
+      <input
+        id="candidate-search"
+        name="q"
+        type="search"
+        defaultValue={filters.q}
+        placeholder="Search by skill or city"
+        className="h-11 w-full rounded-full border border-ink-200 bg-white pl-11 pr-4 text-base text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm"
+      />
+    </form>
+  );
+}
+
+/** Sort options: best match, each field high to low, and the score low to high. */
+function sortOptions(filters: Filters) {
+  const to = (sort: SortKey | "", dir: "asc" | "desc") =>
+    withFilters(filters, { sorts: sort ? [sort] : [], dir, page: "" });
+  return [
+    { value: "", label: "Best match", href: to("", "desc") },
+    ...SORT_OPTIONS.map((o) => ({ value: o.value, label: o.value === "score" ? "Highest Findtern Score" : `Highest ${o.label}`, href: to(o.value, "desc") })),
+    { value: "score:asc", label: "Lowest Findtern Score", href: to("score", "asc") },
+  ];
+}
 
 export function Results({
   data,
@@ -49,107 +72,91 @@ export function Results({
   compareIds: string[];
 }) {
   const { candidates, total, pages, loadFailed } = data;
-  const firstShown = (Math.min(filters.page, pages) - 1) * filters.pageSize + 1;
   const compareFull = compareIds.length >= MAX_COMPARE;
   const compareLink = (id: string) =>
     compareIds.includes(id) || !compareFull ? withFilters(filters, { ids: toggle(compareIds, id) }) : null;
-  const chips = activeChips(filters);
+  const chips = filters.saved ? [] : activeChips(filters);
   const reset = resetHref(data.activeProjectId);
+  const saved = filters.saved && Boolean(data.activeProjectId);
+  const sortValue = filters.sorts[0] ? `${filters.sorts[0]}${filters.dir === "asc" ? ":asc" : ""}` : "";
+  const projectName = data.projects.find((p) => p.id === data.activeProjectId)?.projectName;
+  const projectKeep = (id: string) => {
+    const next = new URLSearchParams({ project: id });
+    if (compareIds.length > 0) next.set("ids", compareIds.join(","));
+    return `/employer/candidates?${next.toString()}`;
+  };
 
   return (
     <>
-      <div className="mb-3 flex flex-wrap items-center gap-2">
-        {/* Keyword search: skills or city - never a name or bio (the pool is redacted). */}
-        <form method="get" role="search" className="relative min-w-0 flex-1 basis-56">
-          {Array.from(new URLSearchParams(queryOf({ ...filters, q: "", page: 1 }).slice(1)).entries()).map(([k, v], i) => (
-            <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
-          ))}
-          <label htmlFor="candidate-search" className="sr-only">
-            Search by skill or city
-          </label>
-          <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
-          <input
-            id="candidate-search"
-            name="q"
-            type="search"
-            defaultValue={filters.q}
-            placeholder="Search by skill or city"
-            className={cn(fieldClass, "rounded-full pl-10")}
-          />
-        </form>
-      </div>
-
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          {/* A live count: filters apply on change, so this is how a screen reader hears the result. */}
-          {loadFailed ? null : (
-            <p role="status" className="nums text-base font-semibold text-ink-900">
-              {total} candidate{total === 1 ? "" : "s"}
-              {candidates.length > 0 ? (
-                <span className="ml-2 text-sm font-normal text-ink-600">
-                  Showing {firstShown}–{firstShown + candidates.length - 1}
+      {/* One results bar: count and project, then All | Saved and Sort. */}
+      <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-ink-100 pb-3">
+        {loadFailed ? null : (
+          <h2 className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-ink-900 max-sm:sr-only">
+            <span role="status" className="nums whitespace-nowrap">
+              {total} {saved ? "saved" : `candidate${total === 1 ? "" : "s"}`}
+            </span>
+            {projectName ? (
+              data.projects.length > 1 ? (
+                <span className="flex min-w-0 items-center gap-1 font-normal text-ink-600">
+                  for
+                  <SortSelect
+                    id="results-project"
+                    label="Project"
+                    prefix=""
+                    value={data.activeProjectId ?? ""}
+                    options={data.projects.map((p) => ({ value: p.id, label: p.projectName, href: projectKeep(p.id) }))}
+                    className="h-9 max-w-64 border-transparent bg-transparent pl-1.5 font-semibold text-ink-900 [field-sizing:content] hover:border-ink-200 sm:min-h-9"
+                  />
                 </span>
-              ) : null}
-            </p>
-          )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex items-center gap-1">
+              ) : (
+                <span className="truncate font-normal text-ink-600">
+                  for <span className="font-semibold text-ink-900">{projectName}</span>
+                </span>
+              )
+            ) : null}
+          </h2>
+        )}
+        <div className="flex w-full items-center justify-between gap-2 sm:ml-auto sm:w-auto sm:justify-end sm:gap-3">
+          {data.activeProjectId ? (
+            <nav aria-label="Show" className="flex items-center gap-5">
+              <TabLink href={withFilters(filters, { saved: false, page: "" })} active={!saved}>
+                All
+                <span className="nums text-ink-600 sm:hidden">{saved ? "" : ` ${total}`}</span>
+              </TabLink>
+              <TabLink href={withFilters(filters, { saved: true, page: "" })} active={saved}>
+                Saved <span className="nums text-ink-600">({data.savedCount})</span>
+              </TabLink>
+            </nav>
+          ) : null}
+          {saved ? null : (
             <SortSelect
-              value={filters.sorts[0] ?? ""}
-              options={[
-                { value: "", label: "Best match", href: withFilters(filters, { sorts: [], page: "" }) },
-                ...SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label, href: withFilters(filters, { sorts: [o.value], page: "" }) })),
-              ]}
+              className="h-11 rounded-full border-ink-200 pl-3.5 [field-sizing:content] sm:h-9 sm:min-h-9 sm:touch:h-11"
+              value={sortValue}
+              options={sortOptions(filters)}
             />
-            <Link
-              href={withFilters(filters, { dir: filters.dir === "asc" ? "desc" : "asc", page: "" })}
-              scroll={false}
-              aria-label={filters.dir === "asc" ? "Order: low to high. Switch to high to low" : "Order: high to low. Switch to low to high"}
-              title={filters.dir === "asc" ? "Low to high" : "High to low"}
-              className={buttonClass({ variant: "outline", size: "icon", className: "size-11 sm:size-10" })}
-            >
-              <ArrowUpDown className="size-4" aria-hidden />
-            </Link>
-          </div>
-          <Segmented label="View">
-            <SegmentLink href={withFilters(filters, { view: "grid" })} active={filters.view === "grid"} label="Detailed rows">
-              <LayoutGrid className="size-4" aria-hidden />
-            </SegmentLink>
-            <SegmentLink href={withFilters(filters, { view: "table" })} active={filters.view === "table"} label="Compact rows">
-              <List className="size-4" aria-hidden />
-            </SegmentLink>
-          </Segmented>
-          <Segmented label="Per page">
-            {[12, 24, 48].map((size) => (
-              <SegmentLink key={size} href={withFilters(filters, { pageSize: size, page: 1 })} active={filters.pageSize === size} label={`${size} per page`}>
-                <span className="nums">{size}</span>
-              </SegmentLink>
-            ))}
-          </Segmented>
+          )}
         </div>
       </div>
 
       {chips.length > 0 ? (
-        <ul aria-label="Active filters" className="mb-4 flex flex-wrap items-center gap-2">
+        <ul aria-label="Active filters" className="flex flex-wrap items-center gap-x-1 py-2">
           {chips.map((chip) => (
             <li key={chip.key}>
               <Link
                 href={chip.href}
                 scroll={false}
                 aria-label={`Remove filter: ${chip.label}`}
-                className="inline-flex min-h-8 items-center gap-1.5 rounded-full bg-brand-50 py-1 pl-3 pr-2 text-sm font-medium text-brand-800 ring-1 ring-inset ring-brand-200 transition-colors hover:bg-brand-100 touch:min-h-11"
+                className="group inline-flex min-h-9 items-center touch:min-h-11"
               >
-                {chip.label}
-                <X className="size-3.5" aria-hidden />
+                <span className="inline-flex h-7 items-center gap-1 rounded-full bg-ink-100 pl-2.5 pr-2 text-[13px] font-medium text-ink-800 transition-colors group-hover:bg-ink-200">
+                  {chip.label}
+                  <X className="size-3.5 text-ink-500" aria-hidden />
+                </span>
               </Link>
             </li>
           ))}
           <li>
-            <Link
-              href={reset}
-              className="inline-flex min-h-8 items-center rounded-full px-2 text-sm font-medium text-brand-700 underline-offset-4 hover:underline touch:min-h-11"
-            >
+            <Link href={reset} className="inline-flex min-h-9 items-center px-2 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
               Clear all
             </Link>
           </li>
@@ -159,7 +166,15 @@ export function Results({
       {loadFailed ? (
         <LoadError what="the candidate pool" retryHref={withFilters(filters)} email={SITE.adminEmail} />
       ) : candidates.length === 0 ? (
-        data.cityList.length > 0 ? (
+        saved ? (
+          <EmptyScene
+            art
+            title="Nobody saved for this project yet"
+            body="Press Save on a candidate to keep them here. Saved candidates are your shortlist for this project."
+            next={{ label: "Browse all candidates", href: withFilters(filters, { saved: false, page: "" }) }}
+            who="You - save a candidate"
+          />
+        ) : data.cityList.length > 0 ? (
           // EMB-21: legacy offered "Clear location" and "Include remote
           // candidates" right on the empty result.
           <div>
@@ -192,56 +207,51 @@ export function Results({
         )
       ) : (
         <>
-          {filters.view === "table" ? (
-            <CompactRows data={data} compareIds={compareIds} compareLink={compareLink} />
-          ) : (
-            // Thin dividers, no card per row: one surface, one list.
-            <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-              {candidates.map((candidate) => {
-                const rel = data.relations.get(candidate.id);
-                return (
-                  <CandidateCard
-                    key={candidate.id}
-                    // The AI interview recording stays hidden until hire; only the
-                    // written report is shown before (legacy detail:1578).
-                    candidate={redactForEmployer(candidate, data.nameUnlocked.has(candidate.id))}
-                    currency={data.currency}
-                    region={data.region}
-                    selected={compareIds.includes(candidate.id)}
-                    compareHref={compareLink(candidate.id)}
-                    comparable={!rel?.hired}
-                    projectId={data.activeProjectId}
-                    shortlisted={data.shortlisted.has(candidate.id)}
-                    nameUnlocked={data.nameUnlocked.has(candidate.id)}
-                    pricing={resolvePricing(candidate.score, data.plans, data.currency, data.region)}
-                    proposal={rel?.proposal ?? null}
-                    fullTimeFrom={rel?.fullTimeFrom ?? null}
-                    fullTime={data.fullTime}
-                    wantedSkills={data.effectiveSkills}
-                    presence={data.presence[candidate.id] ?? null}
-                    interested={data.saved.has(candidate.id)}
-                  />
-                );
-              })}
-            </Surface>
-          )}
+          {/* Thin dividers, no box per row: one list. */}
+          <ul className="divide-y divide-ink-100">
+            {candidates.map((candidate) => {
+              const rel = data.relations.get(candidate.id);
+              return (
+                <CandidateCard
+                  key={candidate.id}
+                  // The AI interview recording stays hidden until hire; only the
+                  // written report is shown before (legacy detail:1578).
+                  candidate={redactForEmployer(candidate, data.nameUnlocked.has(candidate.id))}
+                  currency={data.currency}
+                  region={data.region}
+                  selected={compareIds.includes(candidate.id)}
+                  compareHref={compareLink(candidate.id)}
+                  comparable={!rel?.hired}
+                  projectId={data.activeProjectId}
+                  shortlisted={data.shortlisted.has(candidate.id)}
+                  nameUnlocked={data.nameUnlocked.has(candidate.id)}
+                  pricing={resolvePricing(candidate.score, data.plans, data.currency, data.region)}
+                  proposal={rel?.proposal ?? null}
+                  fullTimeFrom={rel?.fullTimeFrom ?? null}
+                  fullTime={data.fullTime}
+                  wantedSkills={data.effectiveSkills}
+                  presence={data.presence[candidate.id] ?? null}
+                  interested={data.saved.has(candidate.id)}
+                />
+              );
+            })}
+          </ul>
 
           {pages > 1 ? (
-            <nav aria-label="Pagination" className="mt-8 flex flex-wrap items-center justify-center gap-2">
+            <nav aria-label="Pagination" className="mt-6 flex flex-wrap items-center justify-center gap-1.5 border-t border-ink-100 pt-6">
               {Array.from({ length: pages }, (_, i) => i + 1)
                 .filter((page) => page === 1 || page === pages || Math.abs(page - filters.page) <= 1)
                 .map((page, i, visible) => (
-                  <span key={page} className="flex items-center gap-2">
+                  <span key={page} className="flex items-center gap-1.5">
                     {i > 0 && visible[i - 1] !== page - 1 ? <span className="px-1 text-ink-400">…</span> : null}
                     <Link
                       href={withFilters(filters, { page: page === 1 ? "" : page })}
                       aria-current={page === filters.page ? "page" : undefined}
                       aria-label={`Page ${page}`}
-                      className={buttonClass({
-                        variant: page === filters.page ? "primary" : "outline",
-                        size: "icon",
-                        className: "nums text-sm",
-                      })}
+                      className={cn(
+                        "nums grid size-10 place-items-center rounded-full text-sm font-medium touch:size-11",
+                        page === filters.page ? "bg-ink-900 text-white" : "text-ink-700 hover:bg-ink-100",
+                      )}
                     >
                       {page}
                     </Link>
@@ -255,158 +265,16 @@ export function Results({
   );
 }
 
-/** The dense ranked rows (the old "Rows" view), kept for scanning many at once. */
-function CompactRows({
-  data,
-  compareIds,
-  compareLink,
-}: {
-  data: CandidatesData;
-  compareIds: string[];
-  compareLink: (id: string) => string | null;
-}) {
-  const projectId = data.activeProjectId;
-  return (
-    <Surface className="overflow-hidden">
-      {/* Column labels for scanning; each row also names its figures. */}
-      <div aria-hidden className={cn(COMPACT_GRID, "hidden gap-x-6 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle lg:grid")}>
-        <span>Candidate</span>
-        <span className="text-right">Findtern Score</span>
-        <span className="hidden text-right 2xl:block">AI interview</span>
-        <span />
-      </div>
-      <ul className="divide-y divide-ink-100">
-        {data.candidates.map((c) => {
-          const rel = data.relations.get(c.id);
-          const status = candidateStatusPill(rel?.proposal ?? null);
-          const selected = compareIds.includes(c.id);
-          const link = compareLink(c.id);
-          const rate = resolvePricing(c.score, data.plans, data.currency, data.region);
-          const name = displayNameOf(c, data.nameUnlocked.has(c.id));
-          const wanted = new Set(data.effectiveSkills.map((k) => k.toLowerCase()));
-          // The project's skills first (matched on the name part), at most seven.
-          const { shown: skills, more: moreSkills, isWanted } = rowSkills(c.skills, wanted);
-          const meta = [c.city, c.workModes.join(" / "), c.hasLaptop === false ? "Needs a laptop" : c.hasLaptop ? "Own laptop" : ""].filter(Boolean).join(" · ");
-          const presence = data.presence[c.id] ?? null;
-          const skillLine =
-            skills.length === 0 ? (
-              "No skills listed"
-            ) : (
-              <>
-                {skills.map((k, i) => (
-                  <span key={k}>
-                    {i > 0 ? " · " : ""}
-                    <span className={isWanted(k) ? "font-semibold text-ink-900" : undefined}>{k}</span>
-                  </span>
-                ))}
-                {moreSkills > 0 ? ` · +${moreSkills} more` : null}
-              </>
-            );
-          return (
-            <li key={c.id} className={cn(COMPACT_GRID, "relative grid items-center gap-x-6 gap-y-2 px-5 py-3.5 transition-colors hover:bg-ink-50/70")}>
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="relative shrink-0">
-                  <CandidateAvatar photoUrl={c.photoUrl} initials={c.initials} className="size-10 rounded-full text-xs" />
-                  {presence ? (
-                    <span aria-hidden className="absolute -bottom-0.5 -right-0.5 grid size-3.5 place-items-center rounded-full bg-white">
-                      <PresenceDot label={presence} />
-                    </span>
-                  ) : null}
-                </div>
-                <div className="min-w-0">
-                  <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                    {/* The row opens the profile; the link is stretched over it. */}
-                    <Link
-                      href={`/employer/intern/${c.id}${projectId ? `?project=${encodeURIComponent(projectId)}` : ""}`}
-                      className="break-words text-base font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
-                    >
-                      {name}
-                      {presence ? <span className="sr-only">, {presence}</span> : null}
-                    </Link>
-                    {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
-                    {data.saved.has(c.id) ? (
-                      <Pill tone="live" className="shrink-0 whitespace-nowrap">
-                        Interested in this role
-                      </Pill>
-                    ) : null}
-                  </div>
-                  <p className="text-sm text-ink-600">{meta || "Location not stated"}</p>
-                  <p className="mt-0.5 hidden text-pretty text-sm text-ink-600 lg:block">{skillLine}</p>
-                </div>
-              </div>
-              <p className="min-w-0 text-pretty text-sm text-ink-600 max-lg:col-span-2 max-lg:pl-[3.25rem] lg:hidden">{skillLine}</p>
-              <div className="text-right max-lg:col-start-2 max-lg:row-start-1">
-                <p className="nums text-xl font-semibold text-ink-900">
-                  {c.scored ? c.score.toFixed(1) : "-"}
-                  <span className="sr-only"> Findtern Score</span>
-                </p>
-                <p className="nums whitespace-nowrap text-xs text-ink-600">
-                  {PLAN_NAME[bandFor(c.score).id]} · {formatRate(rate.hourlyRateMinor, data.currency)}
-                </p>
-              </div>
-              <p className="nums hidden text-right text-sm font-medium text-ink-900 2xl:block">
-                {c.ratings.interview > 0 ? c.ratings.interview.toFixed(1) : <span className="text-text-subtle">-</span>}
-                <span className="sr-only"> AI interview rating</span>
-              </p>
-              <div className="relative z-10 flex items-center justify-end gap-1.5 max-lg:col-span-2 max-lg:justify-start max-lg:pl-[3.25rem]">
-                {rel?.proposal ? (
-                  <ButtonLink
-                    href={`/employer/proposal/${encodeURIComponent(rel.proposal.id)}`}
-                    variant="outline"
-                    size="sm"
-                    // Starts with the visible word so voice control can say it (WCAG 2.5.3).
-                    aria-label={`${rel.proposal.status === "hired" ? "Placement" : "Proposal"}: ${proposalActionLabel(rel.proposal)}`}
-                  >
-                    {rel.proposal.status === "hired" ? "Placement" : "Proposal"}
-                  </ButtonLink>
-                ) : projectId ? (
-                  <ShortlistToggle internId={c.id} projectId={projectId} shortlisted={data.shortlisted.has(c.id)} size="sm" emphasis="primary" />
-                ) : null}
-                {rel?.hired ? null : link ? (
-                  <Link
-                    href={link}
-                    scroll={false}
-                    // Starts with the phone label ("In compare" / "Compare") so voice control can say it (2.5.3).
-                    aria-label={selected ? `In compare: remove ${name}` : `Compare ${name}`}
-                    className={buttonClass({
-                      variant: "outline",
-                      size: "sm",
-                      className: cn("min-h-11", selected && "bg-brand-50 text-brand-800"),
-                    })}
-                  >
-                    <Scale className="size-4" aria-hidden />
-                    {/* Icon-only beside the row's main action at desktop; named on phones. */}
-                    <span className="lg:sr-only">{selected ? "In compare" : "Compare"}</span>
-                  </Link>
-                ) : null}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
-    </Surface>
-  );
-}
-
-function Segmented({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div role="group" aria-label={label} className="inline-flex items-center gap-0.5 rounded-apple-md border border-ink-200/80 bg-white p-1">
-      {children}
-    </div>
-  );
-}
-
-function SegmentLink({ href, active, label, children }: { href: string; active: boolean; label: string; children: React.ReactNode }) {
+function TabLink({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
   return (
     <Link
       href={href}
       scroll={false}
-      aria-label={label}
-      aria-current={active ? "true" : undefined}
-      title={label}
+      aria-current={active ? "page" : undefined}
       className={cn(
-        "apple-spring inline-flex min-h-9 min-w-9 items-center justify-center rounded-apple-sm px-2 text-sm font-medium touch:min-h-11 touch:min-w-11",
-        active ? "bg-brand-50 text-brand-800" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
+        "relative inline-flex h-11 min-w-6 items-center justify-center whitespace-pre text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 sm:h-9 sm:touch:h-11",
+        "after:absolute after:inset-x-0 after:-bottom-[13px] after:h-0.5 after:rounded-full after:content-[''] max-sm:after:bottom-0",
+        active ? "font-semibold text-ink-900 after:bg-ink-900" : "font-medium text-ink-600 hover:text-ink-900",
       )}
     >
       {children}

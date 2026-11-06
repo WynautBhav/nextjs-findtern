@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import {
@@ -8,7 +8,7 @@ import {
   type Ratings,
 } from "@/lib/employer-candidates";
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
-import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
+import { attachPhotos, candidatePoolClauses, poolInternIds, scoreExpr } from "@/lib/employer-pool";
 import { projectCities } from "@/lib/project-locations";
 import { likePattern } from "@/lib/admin/palette-search";
 import { employerRegion, type Currency } from "@/lib/employer-pricing";
@@ -57,6 +57,8 @@ export type Filters = {
   project?: string;
   /** False when the employer chose "show everyone" over the project's defaults. */
   projectDefaults: boolean;
+  /** "Saved" tab: only this project's shortlisted candidates, other filters set aside. */
+  saved: boolean;
   /** Candidates ticked for Compare. Carried on every link so paging keeps them. */
   ids: string[];
   /** `ids` was in the URL (even empty): it wins over the remembered picks. */
@@ -85,6 +87,7 @@ export const FILTER_KEYS = [
   "remote",
   "sm",
   "page",
+  "saved",
   ...RATING_META.map((m) => `r_${m.key}`),
 ];
 
@@ -106,6 +109,7 @@ export type SearchParams = {
   pf?: string | string[];
   remote?: string | string[];
   sm?: string | string[];
+  saved?: string | string[];
   /** "Reset": start clean instead of restoring the remembered filters. */
   fresh?: string | string[];
   /** Legacy deep link that opened the full-time offer for a hire (EMH-42). */
@@ -159,6 +163,7 @@ export function readFilters(params: SearchParams): Filters {
     page: Number.isFinite(page) && page > 0 ? Math.floor(page) : 1,
     project: (one(params.project) ?? "").trim(),
     projectDefaults: one(params.pf) !== "0",
+    saved: one(params.saved) === "1",
     ids: parseIds(params.ids),
     idsSet: params.ids !== undefined,
   };
@@ -210,6 +215,8 @@ export function withoutCity(filters: Filters, effectiveSkills: string[], patch: 
 export function queryOf(merged: Filters): string {
   const next = new URLSearchParams(filterParams(merged));
   if (merged.project) next.set("project", merged.project);
+  // The Saved tab is a view, not a filter: carried on links, never remembered.
+  if (merged.saved) next.set("saved", "1");
   if (merged.ids.length > 0 || merged.idsSet) next.set("ids", merged.ids.join(","));
   if (merged.page > 1) next.set("page", String(merged.page));
   const query = next.toString();
@@ -352,6 +359,8 @@ export type CandidatesData = {
   presence: Record<string, PresenceLabel | null>;
   /** Interns who saved the selected project's role (it raises them in the ranking). */
   saved: Set<string>;
+  /** Shortlisted for the selected project and still in the pool: the "Saved (N)" tab. */
+  savedCount: number;
 };
 
 /**
@@ -385,6 +394,7 @@ export async function loadCandidates(
     fullTime: null,
     presence: {},
     saved: new Set(),
+    savedCount: 0,
   };
   const compareIds = filters.ids;
 
@@ -445,6 +455,7 @@ export async function loadCandidates(
           ),
         );
       data.shortlisted = new Set(rows.map((r) => r.internId));
+      data.savedCount = (await poolInternIds(db, [...data.shortlisted])).size;
     }
 
     const [employer] = await db
@@ -581,11 +592,17 @@ export async function loadCandidates(
     // The whole filtered pool, ranked in memory (EMB-06: this was the
     // newest 500 rows, so above 500 interns the score sort and the total
     // were wrong). The ceiling only guards against a runaway table.
+    const savedOnly = filters.saved && Boolean(activeProjectId);
     const rows = await db
       .select({ user: schema.users, onboarding: schema.internOnboarding })
       .from(schema.users)
       .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-      .where(and(...clauses))
+      // The Saved tab: the pool rule and the shortlist only; the search filters are set aside.
+      .where(
+        savedOnly
+          ? and(...candidatePoolClauses(), data.shortlisted.size > 0 ? inArray(schema.users.id, [...data.shortlisted]) : sql`false`)
+          : and(...clauses),
+      )
       // Newest onboarding row first, so the dedupe below keeps it (legacy
       // read only the newest row per intern); then id for a total order.
       .orderBy(desc(schema.internOnboarding.updatedAt), desc(schema.users.id))
@@ -602,7 +619,7 @@ export async function loadCandidates(
       .map((row) => toCandidateProfile(row.user, row.onboarding))
       // Rating floors run here: `ratings` is a nested jsonb object whose
       // values the legacy writer stored as numbers or numeric strings.
-      .filter((p) => RATING_META.every((meta) => p.ratings[meta.key] >= filters.minRatings[meta.key]));
+      .filter((p) => savedOnly || RATING_META.every((meta) => p.ratings[meta.key] >= filters.minRatings[meta.key]));
 
     // Roles students saved for this project (OA3). Optional: a failed read
     // only drops the "Interested in this role" boost, never the list.

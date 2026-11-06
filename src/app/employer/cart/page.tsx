@@ -8,7 +8,7 @@ import { requireEmployerSetup } from "@/lib/employer-setup";
 import { redactForEmployer, toCandidateProfile } from "@/lib/employer-candidates";
 import { hiredInternIds, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
-import { visibleInternIds } from "@/lib/employer-pool";
+import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
 import { isBlockingInterview, isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { hireFlowCounts } from "@/lib/employer-flow";
 import { payableCheckout } from "@/lib/employer-payable";
@@ -227,6 +227,12 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
       });
     }
   }
+
+  // Photos show before hire (owner call, 6 Nov); names stay initials. One query.
+  await attachPhotos(
+    db,
+    lines.map((l) => l.candidate),
+  );
 
   // Same figure the checkout shows: accepted offers plus months now due.
   const toPay = (await payableCheckout(uid)).lines.length;
