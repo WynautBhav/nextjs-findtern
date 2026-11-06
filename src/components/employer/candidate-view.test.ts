@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { headlineOf, rowSkills, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
+import { headlineOf, rowSkills, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
 
 test("skillBaseName drops the level", () => {
   assert.equal(skillBaseName("React · Advanced"), "React");
@@ -45,4 +45,12 @@ test("headlineOf: degree and field, else the top two skills, else nothing - neve
   assert.equal(headlineOf({ academics: { degree: "", specialization: "" }, skills: [] }), "");
   // A bio on the object is ignored even if present.
   assert.equal(headlineOf({ academics: null, skills: [], bio: "Call me on 98…" } as never), "");
+});
+
+test("studyOf / headlineOf drop a field the contact scrub masked whole (B.Tech read as a .tech domain)", () => {
+  const academics = { degree: "[hidden until hire]", specialization: "Computer Engineering" };
+  assert.equal(studyOf(academics), "Computer Engineering");
+  assert.equal(headlineOf({ academics, skills: ["React"] }), "Computer Engineering");
+  // Both masked: fall back to the skills line, never the marker.
+  assert.equal(headlineOf({ academics: { degree: "[hidden until hire]", specialization: "[hidden until hire]" }, skills: ["SQL"] }), "SQL intern");
 });
