@@ -33,6 +33,8 @@ export interface CandidateCardProps {
   shortlisted: boolean;
   /** True when this employer hired the candidate - the only case the full name shows. */
   nameUnlocked?: boolean;
+  /** Hired (on any project): the row says so, even when the live offer shown is another one. */
+  hired?: boolean;
   /** Resolved server-side against the CMS rate card; falls back to the bands. */
   pricing?: Pricing;
   /** This employer's live or hired offer to the candidate, if any. */
@@ -166,6 +168,7 @@ export function CandidateCard({
   projectId,
   shortlisted,
   nameUnlocked = false,
+  hired = false,
   pricing: resolved,
   proposal = null,
   fullTimeFrom = null,
@@ -211,6 +214,7 @@ export function CandidateCard({
             {headline ? <span className="sr-only">, {headline}</span> : null}
             {presence ? <span className="sr-only">, {presence}</span> : null}
           </Link>
+          {hired && proposal?.status !== "hired" ? <Pill tone="live" className="shrink-0 whitespace-nowrap">Hired</Pill> : null}
           {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
           {interested ? (
             <Pill tone="live" className="shrink-0 whitespace-nowrap">
