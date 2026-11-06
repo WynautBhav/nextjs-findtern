@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { eq, desc } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { Send } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { hiredInternIds } from "@/lib/employer-visibility";
+import { avatarUrl } from "@/lib/employer-pool";
+import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { toEmployerProposal } from "@/lib/employer-proposal-view";
 import { PageHead } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
@@ -48,10 +50,27 @@ export default async function EmployerProposalsPage() {
     // Unmask on a hire with this employer on any project, as every other
     // employer screen does.
     const hired = await hiredInternIds(db, employerId);
+    // Photo and presence show before hire (owner call, 6 Nov); the name stays initials.
+    const internIds = [...new Set(rows.map((r) => r.proposal.internId))];
+    const withPhoto = new Set<string>();
+    let presence: Record<string, PresenceLabel | null> = {};
+    if (internIds.length > 0) {
+      const docs = await db
+        .select({ userId: schema.internDocuments.userId })
+        .from(schema.internDocuments)
+        .where(and(inArray(schema.internDocuments.userId, internIds), isNotNull(schema.internDocuments.profilePhotoName)))
+        // Photos are decoration: a failed lookup shows initials, not an error page.
+        .catch(() => []);
+      for (const d of docs) withPhoto.add(d.userId);
+      // presenceOf takes at most 200 ids; the rest simply show no dot.
+      presence = await presenceOf(internIds.slice(0, 200)).catch(() => ({}));
+    }
     proposals = rows.map((row) => ({
       proposal: toEmployerProposal(row.proposal),
       project: row.projectId ? { id: row.projectId, projectName: row.projectName ?? "Project" } : null,
       internHired: hired.has(row.proposal.internId),
+      photoUrl: withPhoto.has(row.proposal.internId) ? avatarUrl(row.proposal.internId) : null,
+      presence: presence[row.proposal.internId] ?? null,
       user:
         row.firstName === null && row.lastName === null
           ? null
@@ -67,7 +86,7 @@ export default async function EmployerProposalsPage() {
       <PageHead
         title="Proposals"
         action={
-          <ButtonLink href="/employer/candidates" size="sm">
+          <ButtonLink href="/employer/candidates" size="sm" variant="outline">
             <Send className="size-4" aria-hidden />
             Send a proposal
           </ButtonLink>
