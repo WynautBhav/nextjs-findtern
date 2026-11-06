@@ -293,7 +293,7 @@ export default async function EmployerDashboard() {
                   <span>
                     Also waiting on candidates:{" "}
                     <Link href={t.href} className="font-medium text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
-                      <span className="nums">{t.count}</span> {t.count === 1 ? "meeting time to pick" : "meeting times to pick"}
+                      <span className="nums">{`${t.count} ${t.count === 1 ? "meeting time" : "meeting times"} to pick`}</span>
                     </Link>
                   </span>
                 </p>
