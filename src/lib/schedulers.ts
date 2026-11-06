@@ -1,8 +1,9 @@
-import { and, eq, gte, lt, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, lt, lte, or, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { readSkills, scoreOf } from "@/lib/employer-candidates";
 import { notify } from "@/lib/notify";
+import { profileCompletion } from "@/lib/onboarding";
 import { sendPaymentReminders } from "@/lib/payment-reminders-job";
 import { hasFeedbackText } from "@/lib/interview-feedback";
 
@@ -259,9 +260,21 @@ async function internProfileNudges(now: Date) {
     .from(schema.users)
     .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
     .where(and(eq(schema.users.isActive, true), notNotifiedYet("intern", schema.users.id, "profile_completion_nudge:", `:${dayKey(now)}`)));
+  // Same "complete" as the dashboard checklist and the payment gate (profileCompletion); bio is not part of it.
+  // Newest document row per intern, read once for the batch.
+  const docs = new Map<string, { pan: string | null; photo: string | null }>();
+  if (rows.length) {
+    const d = schema.internDocuments;
+    const docRows = await getDb()
+      .select({ userId: d.userId, pan: d.panImageName, photo: d.profilePhotoName })
+      .from(d)
+      .where(inArray(d.userId, rows.map((r) => r.id)))
+      .orderBy(desc(d.createdAt));
+    for (const doc of docRows) if (!docs.has(doc.userId)) docs.set(doc.userId, doc);
+  }
   for (const r of rows) {
-    const o = r.o;
-    if (o && readSkills(o.skills).length > 0 && o.bio?.trim() && o.city?.trim()) continue;
+    const doc = docs.get(r.id);
+    if (profileCompletion(r.o, { hasPanImage: Boolean(doc?.pan), hasPhoto: Boolean(doc?.photo) }).complete) continue;
     await notify({
       to: { type: "intern", id: r.id },
       type: "profile_completion_nudge",
