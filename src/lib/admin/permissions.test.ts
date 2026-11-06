@@ -95,3 +95,11 @@ test("Accounts records an offline activation fee; Operations (interns:write only
   assert.equal(allows(accounts, requiredPermissions("/api/admin/interns/i1", "PATCH")), false);
   assert.equal(allows(accounts, requiredPermissions("/admin/interns/i1")), true);
 });
+
+test("take-down of a listing follows companies:write, not super admin only", () => {
+  const route = "/api/admin/projects/abc/status";
+  assert.deepEqual(requiredPermissions(route, "POST"), ["companies:write"]);
+  assert.equal(allows(["companies:write"], requiredPermissions(route, "POST")), true);
+  assert.equal(allows(["companies:read"], requiredPermissions(route, "POST")), false);
+  assert.equal(allows(["interns:write"], requiredPermissions(route, "POST")), false);
+});
