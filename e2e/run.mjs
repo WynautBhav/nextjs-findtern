@@ -234,6 +234,9 @@ async function main() {
     code = 0;
     for (const [i, name] of specs.entries()) {
       if (i === seedAt) {
+        // The seed TRUNCATES: loopback alone is not enough (findtern_qa is loopback too).
+        const dbName = new URL(DATABASE_URL).pathname.slice(1);
+        if (!/e2e/i.test(dbName)) throw new Error(`refusing to seed "${dbName}": the seeded specs wipe the DB, so its name must contain "e2e"`);
         log("loading the demo seed (wipes the test DB)");
         const seedEnv = { ...process.env, DATABASE_URL, SESSION_SECRET: serverEnv.SESSION_SECRET, PUBLIC_ORIGIN: ORIGIN, MAIL_MODE: "log" };
         for (const cmd of [
