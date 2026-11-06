@@ -92,7 +92,7 @@ export function AiFeedbackReport({
       <section className={cn("min-w-0 p-6", SURFACE_CLASS)}>
         <div className="flex items-start gap-3">
           <div className="min-w-0">
-            <h3 className="text-base font-semibold text-ink-900">AI interview results pending</h3>
+            <h2 className="text-base font-semibold text-ink-900">AI interview results pending</h2>
             <p className="mt-0.5 text-sm text-ink-600">
               {candidateName} has no AI interview score yet. Scores appear here once the interview is reviewed.
             </p>
@@ -109,7 +109,7 @@ export function AiFeedbackReport({
     >
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-ink-100 p-5 sm:p-6">
         <div className="min-w-0">
-          <h3 className="break-words text-lg font-semibold text-ink-900">{heading ?? candidateName}</h3>
+          <h2 className="break-words text-lg font-semibold text-ink-900">{heading ?? candidateName}</h2>
           {strongest ? (
             <p className="mt-1 text-sm text-ink-600">
               AI interview. Strongest in {strongest.label}, <span className="nums">{strongest.value.toFixed(1)}</span>
