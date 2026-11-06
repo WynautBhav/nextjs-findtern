@@ -31,7 +31,6 @@ let browser;
 
 const fetchAs = async (ctx, path) => ctx.request.get(new URL(path, baseUrl()).toString(), { failOnStatusCode: false });
 const publicStatus = async (id) => (await fetchAs(state.guest, `/opportunities/${id}`)).status();
-const publicHas = async (id) => (await (await fetchAs(state.guest, `/opportunities/${id}`)).text()).length > 0;
 
 async function createListing(name, description = "Build and ship small data dashboards with our analytics team, weekly demos.") {
   const res = await send(state.employerCtx, "POST", `/api/employer/${state.employer.id}/projects`, {

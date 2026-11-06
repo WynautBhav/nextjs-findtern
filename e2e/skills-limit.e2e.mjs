@@ -58,7 +58,7 @@ async function openSkillsStep() {
 }
 
 async function failShot(page, name) {
-  await page.screenshot({ path: join(ROOT, "e2e", ".artifacts", `fail-skills-limit-.png`), fullPage: true }).catch(() => {});
+  await page.screenshot({ path: join(ROOT, "e2e", ".artifacts", `fail-skills-limit-${name}.png`), fullPage: true }).catch(() => {});
 }
 
 test("UI: with seven skills the add box and Add are disabled; removing one frees them", async () => {

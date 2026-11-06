@@ -30,7 +30,6 @@ import {
 
 testDatabaseUrl();
 
-const SINCE = Date.now() - 2000;
 const state = {};
 let browser;
 
