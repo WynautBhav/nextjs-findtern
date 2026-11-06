@@ -34,7 +34,8 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
 
   const db = getDb();
   const [[onboarding], [user], proposals, interviews, allCalls, views] = await Promise.all([
-    // Allowlist: no aadhaar, PAN, PIN or bank ever reaches this render (P-4); the JSON keys that hold them are cut in SQL.
+    // Allowlist: no Aadhaar, PAN, PIN, bank or emergency contact ever reaches this render (P-4). Columns are picked one by one,
+    // and extra_data keeps only the keys draftFromRecord, the ratings and aiInterviewLinks read.
     db
       .select({
         bio: schema.internOnboarding.bio,
@@ -43,7 +44,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
         linkedinUrl: schema.internOnboarding.linkedinUrl,
         skills: schema.internOnboarding.skills,
         experienceJson: schema.internOnboarding.experienceJson,
-        extraData: sql<Record<string, unknown>>`${schema.internOnboarding.extraData} - 'bankDetails' - 'bank' - 'aadhaarNumber' - 'panNumber'`,
+        extraData: sql<Record<string, unknown>>`(SELECT coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb) FROM jsonb_each(coalesce(${schema.internOnboarding.extraData}, '{}'::jsonb)) e WHERE e.key IN ('academics', 'languages', 'experiences', 'extracurricular', 'extracurriculars', 'skillsWithRatings', 'college', 'degree', 'graduationYear', 'ratings', 'aiFeedbackLink', 'aiRecordingLink'))`,
       })
       .from(schema.internOnboarding)
       .where(eq(schema.internOnboarding.userId, id))
