@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth";
-import { counterpartOf, counterpartReadAt, threadFor, threadMessages } from "@/lib/messages";
+import { counterpartOf, counterpartSeen, threadFor, threadMessages } from "@/lib/messages";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +24,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   const who = await counterpartOf(viewer, thread);
   const messages = await threadMessages(viewer, thread, after && after.length <= 80 ? after : null, who.unlocked);
   return NextResponse.json(
-    { messages, counterpartReadAt: counterpartReadAt(viewer, thread), counterpart: { name: who.name, presence: who.presence } },
+    { messages, seen: await counterpartSeen(viewer, thread), counterpart: { name: who.name, presence: who.presence } },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { InboxEmpty, InboxShell } from "@/components/app/messages/inbox-shell";
 import { ThreadView } from "@/components/app/messages/thread-view";
 import { requireRole } from "@/lib/auth";
-import { counterpartOf, counterpartReadAt, listThreads, threadFor, threadMessages } from "@/lib/messages";
+import { counterpartOf, counterpartSeen, listThreads, threadFor, threadMessages } from "@/lib/messages";
 
 /** /{role}/messages layout: the list plus whatever is open beside it. */
 export async function InboxLayout({ role, children }: { role: "intern" | "employer"; children: React.ReactNode }) {
@@ -36,7 +36,7 @@ export async function ThreadPage({ role, id }: { role: "intern" | "employer"; id
       role={role}
       threadId={thread.id}
       initialMessages={messages}
-      initialReadAt={counterpartReadAt(viewer, thread)}
+      initialSeen={await counterpartSeen(viewer, thread)}
       name={who.name}
       roleTitle={who.roleTitle}
       initialPresence={who.presence}

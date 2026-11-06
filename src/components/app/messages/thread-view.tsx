@@ -32,7 +32,7 @@ export function ThreadView({
   role,
   threadId,
   initialMessages,
-  initialReadAt,
+  initialSeen,
   name,
   roleTitle,
   initialPresence,
@@ -42,7 +42,7 @@ export function ThreadView({
   role: "intern" | "employer";
   threadId: string;
   initialMessages: MessageView[];
-  initialReadAt: string | null;
+  initialSeen: boolean;
   name: string;
   roleTitle: string | null;
   initialPresence: PresenceLabel | null;
@@ -51,7 +51,7 @@ export function ThreadView({
 }) {
   const [messages, setMessages] = useState(initialMessages);
   const [outbox, setOutbox] = useState<Outgoing[]>([]);
-  const [readAt, setReadAt] = useState(initialReadAt);
+  const [seen, setSeen] = useState(initialSeen);
   const [presence, setPresence] = useState(initialPresence);
   const [text, setText] = useState("");
   const [composeError, setComposeError] = useState("");
@@ -86,11 +86,11 @@ export function ThreadView({
       const qs = lastId.current ? `?after=${encodeURIComponent(lastId.current)}` : "";
       const res = await csrfFetch(`${base}${qs}`, { cache: "no-store" });
       if (!res.ok) return;
-      const body = (await res.json()) as { messages: MessageView[]; counterpartReadAt: string | null; counterpart: { presence: PresenceLabel | null } };
+      const body = (await res.json()) as { messages: MessageView[]; seen: boolean; counterpart: { presence: PresenceLabel | null } };
       // While a send is in flight its own row comes back in the POST reply; the next refresh picks up anything skipped here.
       const incoming = pending.current > 0 ? body.messages.filter((m) => !m.mine) : body.messages;
       merge(incoming);
-      setReadAt(body.counterpartReadAt);
+      setSeen(body.seen);
       setPresence(body.counterpart.presence);
       if (incoming.some((m) => !m.mine)) markRead();
     } catch {
@@ -165,12 +165,12 @@ export function ThreadView({
     setText("");
     const item: Outgoing = { clientId: crypto.randomUUID(), body, state: "sending" };
     setOutbox((o) => [...o, item]);
+    setSeen(false); // a new message is unseen until the next poll says otherwise
     void post(item);
     inputRef.current?.focus();
   }
 
   const lastMine = [...messages].reverse().find((m) => m.mine);
-  const seen = Boolean(lastMine && readAt && new Date(readAt).getTime() >= new Date(lastMine.createdAt).getTime());
   const left = MAX - text.length;
 
   return (

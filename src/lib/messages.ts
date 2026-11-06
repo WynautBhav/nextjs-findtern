@@ -152,9 +152,29 @@ export async function threadMessages(viewer: Viewer, thread: ThreadRow, after: s
   }));
 }
 
-export function counterpartReadAt(viewer: Viewer, thread: ThreadRow): string | null {
-  const at = viewer.role === "employer" ? thread.internLastReadAt : thread.employerLastReadAt;
-  return at ? new Date(at).toISOString() : null;
+/** "Seen" only: the exact read time is never sent, and an intern who hides presence is never "seen" (OA2). */
+export function seenFrom(readAt: Date | null, lastMineAt: Date | null, hidden: boolean): boolean {
+  return !hidden && readAt !== null && lastMineAt !== null && readAt.getTime() >= lastMineAt.getTime();
+}
+
+export async function counterpartSeen(viewer: Viewer, thread: ThreadRow): Promise<boolean> {
+  const readAt = viewer.role === "employer" ? thread.internLastReadAt : thread.employerLastReadAt;
+  if (!readAt) return false;
+  const db = getDb();
+  const m = schema.messages;
+  const [last] = await db
+    .select({ at: m.createdAt })
+    .from(m)
+    .where(and(eq(m.threadId, thread.id), eq(m.senderType, viewer.role)))
+    .orderBy(desc(m.createdAt))
+    .limit(1);
+  let hidden = false;
+  if (viewer.role === "employer") {
+    const p = schema.userPresence;
+    const [row] = await db.select({ hidden: p.hidden }).from(p).where(and(eq(p.userType, "intern"), eq(p.userId, thread.internId))).limit(1);
+    hidden = Boolean(row?.hidden);
+  }
+  return seenFrom(new Date(readAt), last ? new Date(last.at) : null, hidden);
 }
 
 export type Counterpart = { name: string; presence: PresenceLabel | null; roleTitle: string | null };

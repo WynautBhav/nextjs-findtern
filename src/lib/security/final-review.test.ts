@@ -14,3 +14,11 @@ test("#2 TPO presence and roster progress read verified members only", () => {
   const roster = src.slice(src.indexOf("export async function tpoStudentList"));
   assert.match(roster.slice(0, roster.indexOf("AS user_id")), /\$\{m\.status\} = 'verified'/);
 });
+
+test("#3 thread payloads carry a seen flag, never the counterpart's read time", () => {
+  const route = read("app/api/messages/threads/[id]/route.ts");
+  assert.doesNotMatch(route, /ReadAt/);
+  assert.match(route, /seen: await counterpartSeen\(viewer, thread\)/);
+  assert.doesNotMatch(read("components/app/messages/inbox-server.tsx"), /ReadAt/);
+  assert.doesNotMatch(read("lib/messages.ts"), /export function counterpartReadAt/);
+});

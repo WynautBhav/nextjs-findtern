@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { bodyToShow, bodyToStore, effectivePresence, emailDue, isParticipant, MessageError, messageErrorResponse } from "./messages.ts";
+import { bodyToShow, bodyToStore, effectivePresence, emailDue, isParticipant, seenFrom, MessageError, messageErrorResponse } from "./messages.ts";
 
 const thread = { employerId: "e1", internId: "i1" };
 
@@ -87,4 +87,14 @@ test("a MessageError becomes { error } with its status; anything else is rethrow
   assert.equal(res.status, 403);
   assert.deepEqual(await res.json(), { error: "Messaging opens once a proposal is sent." });
   assert.throws(() => messageErrorResponse(new Error("boom")), /boom/);
+});
+
+test("seenFrom: a boolean only, and never while the reader hides presence (review #3)", () => {
+  const sent = new Date("2026-11-06T10:00:00Z");
+  const later = new Date("2026-11-06T10:01:00Z");
+  assert.equal(seenFrom(later, sent, false), true);
+  assert.equal(seenFrom(sent, later, false), false, "read before my last message");
+  assert.equal(seenFrom(later, sent, true), false, "presence hidden");
+  assert.equal(seenFrom(null, sent, false), false);
+  assert.equal(seenFrom(later, null, false), false, "nothing of mine to see");
 });
