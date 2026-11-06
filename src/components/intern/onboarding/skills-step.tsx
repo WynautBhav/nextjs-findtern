@@ -3,6 +3,7 @@
 import { Lock, TriangleAlert } from "lucide-react";
 
 import { Pill } from "@/components/app/primitives";
+import { SITE } from "@/lib/content/site";
 import { SkillPicker } from "@/components/skills/skill-picker";
 
 import type { StepProps } from "./types";
@@ -19,8 +20,8 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
           <Lock className="mt-0.5 size-4 shrink-0 text-text-subtle" aria-hidden />
           <p className="text-sm leading-relaxed text-ink-700">
             Your skills are locked because your AI interview is based on them. If one is wrong, write to{" "}
-            <a href="mailto:communicate@findtern.in" className="font-medium text-brand-700 underline-offset-4 hover:underline">
-              communicate@findtern.in
+            <a href={`mailto:${SITE.email}`} className="font-medium text-brand-700 underline-offset-4 hover:underline">
+              {SITE.email}
             </a>
             .
           </p>

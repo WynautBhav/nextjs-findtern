@@ -5,6 +5,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { membershipOf, type MyCollege } from "@/lib/college/membership";
 import { emptyDraft, draftFromRecord, isOnboarded, type OnboardingDraft, type StoredDocument } from "@/lib/onboarding";
+import { SITE } from "@/lib/content/site";
 import { skillsLocked } from "@/lib/skills-lock";
 import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { OnboardingForm } from "@/components/intern/onboarding-form";
@@ -97,7 +98,7 @@ export default async function InternOnboarding() {
         <PageHead title="Your profile" />
         <EmptyScene
           title="We couldn't load your profile"
-          body="Nothing has been changed. Reload the page in a minute; if it keeps happening, write to communicate@findtern.in."
+          body={`Nothing has been changed. Reload the page in a minute; if it keeps happening, write to ${SITE.email}.`}
           next={{ label: "Reload", href: "/intern/onboarding" }}
           art
         />

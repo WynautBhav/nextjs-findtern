@@ -6,6 +6,7 @@ import { RotateCw } from "lucide-react";
 
 import { Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
+import { SITE } from "@/lib/content/site";
 
 /**
  * A failed read on any intern screen lands here, inside the shell, instead of
@@ -21,9 +22,12 @@ export default function InternError({ error, retry }: { error: Error & { digest?
       <h1 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900">
         This page could not load
       </h1>
-      <p className="mx-auto mt-3 max-w-md text-pretty text-[0.9375rem] leading-relaxed text-ink-600">
-        Your data is safe; we just could not read it right now. Try again in a moment. If it keeps happening, write to
-        communicate@findtern.in{error.digest ? ` and mention code ${error.digest}` : ""}.
+      <p className="mx-auto mt-3 max-w-md text-pretty text-base leading-relaxed text-ink-600">
+        Your data is safe; we just could not read it right now. Try again in a moment. If it keeps happening, write to{" "}
+        <a href={`mailto:${SITE.email}`} className="font-medium text-brand-700 underline underline-offset-4">
+          {SITE.email}
+        </a>
+        {error.digest ? ` and mention code ${error.digest}` : ""}.
       </p>
       <div className="mt-7 flex flex-wrap justify-center gap-3">
         <button type="button" onClick={() => retry()} className={buttonClass({})}>
