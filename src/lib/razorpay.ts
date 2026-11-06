@@ -14,10 +14,15 @@ function keys() {
   return { keyId, keySecret };
 }
 
-/** API root. RAZORPAY_API_BASE points the refund calls at the e2e stub; ignored in production. */
+/**
+ * API root. RAZORPAY_API_BASE points the refund calls at the e2e stub; ignored on Vercel production and whenever
+ * a live key is configured, so a stray override on the VPS can never send live credentials elsewhere.
+ * (Not keyed on NODE_ENV: the e2e runner serves `next start`, which is NODE_ENV=production.)
+ */
 export function razorpayApiBase(env: Record<string, string | undefined> = process.env): string {
   const override = (env.RAZORPAY_API_BASE ?? "").trim().replace(/\/+$/, "");
-  return override && env.VERCEL_ENV !== "production" ? override : "https://api.razorpay.com";
+  const live = env.VERCEL_ENV === "production" || (env.RAZORPAY_KEY_ID ?? "").trim().startsWith("rzp_live_");
+  return override && !live ? override : "https://api.razorpay.com";
 }
 
 function authHeader(): string {

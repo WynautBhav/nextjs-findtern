@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
-import { createOrder } from "./razorpay.ts";
+import { createOrder, razorpayApiBase } from "./razorpay.ts";
 
 const realFetch = globalThis.fetch;
 const env = { id: process.env.RAZORPAY_KEY_ID, secret: process.env.RAZORPAY_KEY_SECRET };
@@ -28,4 +28,14 @@ test("an order asks Razorpay to capture the payment itself, like the legacy app"
   assert.equal((sent as Record<string, unknown>).payment_capture, 1);
   assert.equal((sent as Record<string, unknown>).amount, 250000);
   assert.equal((sent as Record<string, unknown>).currency, "INR");
+});
+
+test("the API-base override is ignored for a live key or Vercel production (review #16)", () => {
+  const REAL = "https://api.razorpay.com";
+  const stub = { RAZORPAY_API_BASE: "http://127.0.0.1:4999/" };
+  assert.equal(razorpayApiBase({ ...stub, RAZORPAY_KEY_ID: "rzp_test_e2estub", NODE_ENV: "production" }), "http://127.0.0.1:4999", "e2e runs next start");
+  assert.equal(razorpayApiBase({ ...stub, RAZORPAY_KEY_ID: "rzp_live_abc" }), REAL);
+  assert.equal(razorpayApiBase({ ...stub, RAZORPAY_KEY_ID: " rzp_live_abc" }), REAL);
+  assert.equal(razorpayApiBase({ ...stub, RAZORPAY_KEY_ID: "rzp_test_x", VERCEL_ENV: "production" }), REAL);
+  assert.equal(razorpayApiBase({ RAZORPAY_KEY_ID: "rzp_test_x" }), REAL);
 });
