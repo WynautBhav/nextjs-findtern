@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { AlertCircle, Check, Send } from "lucide-react";
 
+import type { ContactType } from "@/lib/contact-types";
 import { SITE, getGmailComposeUrl } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
 import { EmailLink } from "@/components/marketing/email-link";
@@ -31,7 +32,7 @@ type Values = {
   email: string;
   countryCode: string;
   phone: string;
-  queryType: "intern" | "general" | "hiring";
+  queryType: ContactType;
   subject: string;
   message: string;
 };
@@ -64,10 +65,11 @@ const PLACEHOLDER: Record<Values["queryType"], string> = {
   general: "What are you trying to do?",
   hiring: "The role, the duration, and roughly what you need from the intern.",
   intern: "What kind of internship you are looking for, and in which field.",
+  college: "Your college, roughly how many students, and what you want placements to look like.",
 };
 
-export function ContactForm() {
-  const [v, setV] = useState<Values>(INITIAL);
+export function ContactForm({ initialType = "general" }: { initialType?: ContactType }) {
+  const [v, setV] = useState<Values>({ ...INITIAL, queryType: initialType });
   const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">(
     "idle",
   );
@@ -189,6 +191,7 @@ export function ContactForm() {
             <option value="general">General question</option>
             <option value="hiring">I want to hire an intern</option>
             <option value="intern">I am looking for an internship</option>
+            <option value="college">College partnership</option>
           </select>
         </Field>
 

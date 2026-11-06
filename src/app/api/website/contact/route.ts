@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
 import { isValidPhone } from "@/lib/phone";
+import { CONTACT_TYPES } from "@/lib/contact-types";
 
 const bodySchema = z.object({
   firstName: z.string().trim().min(1).max(80),
@@ -11,7 +12,7 @@ const bodySchema = z.object({
   email: z.string().trim().email().max(200),
   countryCode: z.string().trim().max(6).default("+91"),
   phone: z.string().default("").transform((v) => v.replace(/\D/g, "")).pipe(z.string().max(15)),
-  queryType: z.enum(["intern", "general", "hiring"]).default("general"),
+  queryType: z.enum(CONTACT_TYPES).default("general"),
   subject: z.string().trim().max(200).default(""),
   message: z.string().trim().min(2).max(5000),
 }).refine((d) => !d.phone || isValidPhone(d.countryCode, d.phone), {

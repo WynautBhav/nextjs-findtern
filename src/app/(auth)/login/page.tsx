@@ -110,7 +110,7 @@ export default async function LoginPage({
       {door === "college" ? (
         <p className="mt-7 text-sm text-text-subtle">
           Forgot your password, or need a login for a colleague?{" "}
-          <Link href="/contact" className="font-semibold text-brand-700 underline-offset-4 hover:underline">
+          <Link href="/contact?type=college" className="font-semibold text-brand-700 underline-offset-4 hover:underline">
             Ask Findtern
           </Link>
           . Placement console logins are issued and reset by our team.
