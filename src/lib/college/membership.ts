@@ -3,6 +3,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { membershipFor } from "./access";
 import { parseCollegeCode } from "./code";
+import { branchProblem } from "./join-input";
 
 /**
  * A student joining or leaving a college. Joining is the student's own choice
@@ -46,7 +47,7 @@ export async function joinCollege(input: {
   userId: string;
   collegeId: string;
   year: number | null;
-  branch: string | null;
+  branch: string;
   declaredAdult: boolean;
 }): Promise<{ ok: true; college: MyCollege } | { ok: false; error: string; status: number }> {
   if (!input.declaredAdult) {
@@ -56,6 +57,8 @@ export async function joinCollege(input: {
       error: "Students under 18 need a parent's consent. Ask your placement office to add you.",
     };
   }
+  const bad = branchProblem(input.branch);
+  if (bad) return { ok: false, status: 400, error: bad };
   const db = getDb();
   const [college] = await db.select().from(schema.colleges).where(eq(schema.colleges.id, input.collegeId)).limit(1);
   if (!college || !college.isActive) return { ok: false, status: 404, error: "College not found" };

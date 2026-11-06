@@ -11,6 +11,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { csrfFetch } from "@/lib/client-fetch";
 import type { MyCollege } from "@/lib/college/membership";
+import { branchProblem } from "@/lib/college/join-input";
 import { cn } from "@/lib/utils";
 import { PushToggle } from "./college-push";
 import { SelectField } from "./onboarding/fields";
@@ -207,7 +208,7 @@ function JoinForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Which control the message is about: it is marked invalid, tied to the message, and focused.
-  const [invalid, setInvalid] = useState<"college" | "adult" | null>(null);
+  const [invalid, setInvalid] = useState<"college" | "adult" | "branch" | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const errorId = `${ids}-error`;
 
@@ -217,6 +218,13 @@ function JoinForm({
       setError("Choose your college from the list.");
       setInvalid("college");
       searchRef.current?.focus();
+      return;
+    }
+    const branchBad = branchProblem(branch);
+    if (branchBad) {
+      setError(branchBad);
+      setInvalid("branch");
+      document.getElementById(`${ids}-branch`)?.focus();
       return;
     }
     if (!adult) {
@@ -235,7 +243,7 @@ function JoinForm({
         body: JSON.stringify({
           collegeId: chosen.id,
           year: year === "" ? null : year,
-          branch: branch.trim() || null,
+          branch: branch.trim(),
           declaredAdult: adult,
         }),
       });
@@ -311,13 +319,23 @@ function JoinForm({
         />
         <div>
           <label htmlFor={`${ids}-branch`} className="mb-1.5 block text-sm font-medium text-ink-800">
-            Branch <span className="font-normal text-text-subtle">(optional)</span>
+            Branch
           </label>
           <input
             id={`${ids}-branch`}
             value={branch}
-            onChange={(e) => setBranch(e.target.value)}
+            onChange={(e) => {
+              setBranch(e.target.value);
+              if (invalid === "branch") {
+                setInvalid(null);
+                setError(null);
+              }
+            }}
             maxLength={120}
+            required
+            aria-required="true"
+            aria-invalid={invalid === "branch" || undefined}
+            aria-describedby={invalid === "branch" ? errorId : undefined}
             placeholder="e.g. CSE, ECE, BBA"
             autoComplete="off"
             className={FIELD}
