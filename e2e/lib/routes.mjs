@@ -75,6 +75,8 @@ export async function dynamicValues(route, persona, ids) {
       return col(`SELECT id AS v FROM projects WHERE status = 'active' ORDER BY created_at DESC LIMIT 2`);
     case "/college/drives/[id]":
       return col(`SELECT id AS v FROM college_drives ORDER BY created_at DESC LIMIT 2`);
+    case "/admin/colleges/[id]":
+      return col(`SELECT id AS v FROM colleges WHERE is_partner LIMIT 2`);
     case "/college/students/[id]":
       return col(`SELECT user_id AS v FROM college_memberships WHERE status = 'verified' ORDER BY joined_at LIMIT 2`);
     case "/employer/drives/[id]":

@@ -26,6 +26,9 @@ import * as schema from "../src/lib/db/schema.ts";
 import { acceptanceValues } from "../src/lib/terms.ts";
 import { hashPassword } from "../src/lib/security/password.ts";
 import { withFreshCollegeCode } from "../src/lib/college/code.ts";
+import { generateTpoCode } from "../src/lib/college/code.ts";
+import { INCENTIVE_MINOR } from "../src/lib/college/wallet.ts";
+import { capAfterPaid, seatBatchAmount } from "../src/lib/college/money.ts";
 import { generateDriveToken } from "../src/lib/college/tokens.ts";
 
 if (process.env.NODE_ENV === "production") throw new Error("Refusing to seed in production");
@@ -98,6 +101,13 @@ async function main() {
   }
   await db.delete(schema.collegeNudges).where(eq(schema.collegeNudges.collegeId, jklu.id));
   await db.delete(schema.collegeAuditLog).where(eq(schema.collegeAuditLog.collegeId, jklu.id));
+  // Demo money: wipe it so the re-seed lands on the same totals.
+  const [oldPromo] = await db.select({ id: schema.promoCodes.id }).from(schema.promoCodes).where(eq(schema.promoCodes.collegeId, jklu.id));
+  if (oldPromo) await db.delete(schema.promoCodeUsages).where(eq(schema.promoCodeUsages.promoCodeId, oldPromo.id));
+  await db.delete(schema.promoCodes).where(eq(schema.promoCodes.collegeId, jklu.id));
+  await db.delete(schema.collegeSeatBatches).where(eq(schema.collegeSeatBatches.collegeId, jklu.id));
+  await db.delete(schema.collegeWalletEntries).where(eq(schema.collegeWalletEntries.collegeId, jklu.id));
+  await db.delete(schema.collegePayouts).where(eq(schema.collegePayouts.collegeId, jklu.id));
 
   const pw = await hashPassword(PASSWORD);
   await db
@@ -224,6 +234,46 @@ async function main() {
       );
     }
   }
+
+  // Demo money (local and QA only). No free seats: the TPO code's cap is the paid seats.
+  const tpoCode = generateTpoCode();
+  await db.insert(schema.promoCodes).values({
+    code: tpoCode, description: "College TPO code", discountType: "percentage", discountValue: 100, appliesTo: "intern",
+    collegeId: jklu.id, usedCount: 40, maxUsages: capAfterPaid({ cap: 0, paidSeatsBefore: 0, seats: 300 }),
+  });
+  const [paid] = await db
+    .insert(schema.collegeSeatBatches)
+    .values({ collegeId: jklu.id, seats: 300, amountMinor: seatBatchAmount(300), status: "paid", method: "bank", referenceId: "UTR-DEMO-001", paidAt: new Date(), createdBy: tpo.id })
+    .returning({ id: schema.collegeSeatBatches.id });
+  // invoice-number.ts imports through the "@/" alias, which plain node cannot resolve, so the same counter bump is inlined.
+  const fy = (() => { const n = new Date(Date.now() + 330 * 60_000); const y = n.getUTCMonth() >= 3 ? n.getUTCFullYear() : n.getUTCFullYear() - 1; return `${y}-${String((y + 1) % 100).padStart(2, "0")}`; })();
+  const [counter] = await db
+    .insert(schema.invoiceCounters).values({ fy, last: 1 })
+    .onConflictDoUpdate({ target: schema.invoiceCounters.fy, set: { last: sql`${schema.invoiceCounters.last} + 1`, updatedAt: new Date() } })
+    .returning({ last: schema.invoiceCounters.last });
+  const ist = new Date(Date.now() + 330 * 60_000).toISOString();
+  await db.update(schema.collegeSeatBatches).set({ invoiceNumber: `${ist.slice(8, 10)}${ist.slice(5, 7)}${ist.slice(2, 4)}-${String(counter.last).padStart(2, "0")}` }).where(eq(schema.collegeSeatBatches.id, paid.id));
+  await db.insert(schema.collegeSeatBatches).values({ collegeId: jklu.id, seats: 100, amountMinor: seatBatchAmount(100), status: "pending", createdBy: tpo.id });
+  await db
+    .update(schema.colleges)
+    .set({ state: "Rajasthan", bankAccountName: "JK Lakshmipat University", bankName: "HDFC Bank", bankAccountNumber: "000123456789", bankIfsc: "HDFC0000001" })
+    .where(eq(schema.colleges.id, jklu.id));
+  let incentiveTotal = 0;
+  if (northwind) {
+    const [project] = await db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.employerId, northwind.id)).limit(1);
+    if (project) {
+      const bands = ["standard", "skilled", "assured"] as const;
+      const done = await db
+        .insert(schema.proposals)
+        .values(bands.map((_, i) => ({ employerId: northwind.id, internId: inserted[6 + i].id, projectId: project.id, flowType: "direct", status: "completed", hiredAt: new Date(), offerDetails: { roleTitle: "Backend intern", monthlyAmount: 15000, duration: "3m" } })))
+        .returning({ id: schema.proposals.id, internId: schema.proposals.internId });
+      await db.insert(schema.collegeWalletEntries).values(
+        done.map((p, i) => ({ collegeId: jklu.id, kind: "incentive", amountMinor: INCENTIVE_MINOR[bands[i]], proposalId: p.id, internId: p.internId, bandId: bands[i] })),
+      );
+      incentiveTotal = bands.reduce((n, b) => n + INCENTIVE_MINOR[b], 0);
+    }
+  }
+  console.log(`demo money: TPO code ${tpoCode} (40 of 300 used), batch 300 paid, batch 100 pending, wallet ₹${incentiveTotal / 100}, bank ****6789`);
 
   const { token, hash } = generateDriveToken();
   const now = Date.now();

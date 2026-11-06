@@ -86,6 +86,11 @@ function inCurrency(inrMinor: number, currency: Currency): number {
   return currency === "USD" ? inrMinorToUsdMinor(inrMinor) : inrMinor;
 }
 
+/** A TPO code stops working when its college is switched off or no longer a partner (Q2-A). */
+export function collegeCodeProblem(college: { isActive: boolean; isPartner: boolean } | null): string | null {
+  return college?.isActive && college.isPartner ? null : "Your college's code is not active. Ask your placement officer.";
+}
+
 export const SEATS_USED_UP = "This college's free seats are used up";
 export const DEFAULT_COLLEGE_SEATS = 300;
 

@@ -159,6 +159,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       payouts: hasItem("/admin/payouts"),
       candidates: hasItem("/admin/interns"),
       pipeline: hasItem("/admin/proposal-tracker"),
+      collegePayouts: hasItem("/admin/colleges"),
     }),
   ]);
 
@@ -169,6 +170,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     "/admin/payouts": { count: queue.payouts, note: "due" },
     "/admin/interns": { count: queue.candidates, note: "awaiting a score" },
     "/admin/proposal-tracker": { count: queue.pipeline, note: "need action" },
+    "/admin/colleges": { count: queue.collegePayouts, note: "withdrawals to pay" },
   };
   const withBadges = groups.map((g) => ({
     ...g,

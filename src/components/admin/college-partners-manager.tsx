@@ -4,6 +4,8 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
+import { gstinStateError } from "@/lib/gst";
+import { GSTIN_HINT, isGstinFormat } from "@/lib/gstin";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
@@ -14,6 +16,8 @@ export type CollegeAdminRow = {
   id: string;
   name: string;
   city: string | null;
+  state: string | null;
+  gstin: string | null;
   aisheCode: string | null;
   /** Findtern college code students search by. */
   code: string | null;
@@ -24,7 +28,11 @@ export type CollegeAdminRow = {
   members: number;
   roster: number;
   drives: number;
-  /** The TPO's fee-waiver code and its seats; null until the admin creates it. */
+  /** True once any seat batch is paid: the TPO login and the code are issued only after that. */
+  hasPaidBatch: boolean;
+  /** A withdrawal request is waiting for admin. */
+  openRequest: boolean;
+  /** The TPO's seat code and its seats (cap = paid seats); null until the first batch is paid. */
   seatCode: { code: string; maxUsages: number | null; usedCount: number } | null;
   officers: { id: string; name: string; email: string; lastLoginAt: string | null }[];
 };
@@ -49,6 +57,9 @@ export function AddCollegeForm() {
       onSubmit={async (e) => {
         e.preventDefault();
         const f = new FormData(e.currentTarget);
+        const gstin = String(f.get("gstin") ?? "").trim().toUpperCase();
+        const bad = gstin ? (isGstinFormat(gstin) ? gstinStateError(gstin, String(f.get("state"))) : GSTIN_HINT) : null;
+        if (bad) return setError(bad);
         setBusy(true);
         setError(null);
         setExists(null);
@@ -56,6 +67,7 @@ export function AddCollegeForm() {
           name: f.get("name"),
           city: f.get("city"),
           state: f.get("state"),
+          gstin,
           aisheCode: f.get("aishe"),
           emailDomains: String(f.get("domains") ?? "").split(/[\s,]+/).map((d) => d.replace(/^@/, "")).filter(Boolean),
           isPartner: true,
@@ -87,6 +99,10 @@ export function AddCollegeForm() {
         <input name="aishe" className={cn(input, "mt-1")} placeholder="U-0657" />
       </label>
       <label>
+        <span className="text-sm font-medium text-foreground">GSTIN (optional)</span>
+        <input name="gstin" className={cn(input, "mt-1 uppercase")} placeholder="08AAPFU0939F1ZV" maxLength={15} />
+      </label>
+      <label>
         <span className="text-sm font-medium text-foreground">Student email domains</span>
         <input name="domains" className={cn(input, "mt-1")} placeholder="jklu.edu.in" />
       </label>
@@ -110,8 +126,42 @@ export function AddCollegeForm() {
   );
 }
 
-/** `canEdit`: companies:write (the college routes). `canMoney`: transactions:write (the fee-waiver code and its cap). */
-export function CollegeRowControls({ row, canEdit, canMoney }: { row: CollegeAdminRow; canEdit: boolean; canMoney: boolean }) {
+/** The college page's billing details: state and GSTIN for the tax invoice. */
+export function BillingForm({ collegeId, state, gstin, canEdit }: { collegeId: string; state: string | null; gstin: string | null; canEdit: boolean }) {
+  const router = useRouter();
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  return (
+    <form
+      className="flex flex-wrap items-end gap-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        const st = String(f.get("state") ?? "").trim();
+        const g = String(f.get("gstin") ?? "").trim().toUpperCase();
+        const bad = g ? (isGstinFormat(g) ? gstinStateError(g, st) : GSTIN_HINT) : null;
+        if (bad) return setMsg({ ok: false, text: bad });
+        const r = await send(`/api/admin/colleges/${collegeId}`, "PATCH", { state: st || null, gstin: g || null });
+        if (!r.ok) return setMsg({ ok: false, text: String(r.json.error ?? "Couldn't save") });
+        setMsg({ ok: true, text: "Saved" });
+        router.refresh();
+      }}
+    >
+      <label className="min-w-40 flex-1">
+        <span className="text-sm font-medium text-foreground">State</span>
+        <input name="state" defaultValue={state ?? ""} disabled={!canEdit} className={cn(input, "mt-1")} />
+      </label>
+      <label className="min-w-52 flex-1">
+        <span className="text-sm font-medium text-foreground">GSTIN</span>
+        <input name="gstin" defaultValue={gstin ?? ""} maxLength={15} disabled={!canEdit} className={cn(input, "mt-1 uppercase")} />
+      </label>
+      {canEdit ? <button className={buttonClass({ className: ADMIN_PILL_PRIMARY })}>Save billing details</button> : null}
+      <p role="status" className={cn("w-full text-sm", msg?.ok ? "text-foreground" : "text-danger")}>{msg?.text}</p>
+    </form>
+  );
+}
+
+/** `canEdit`: companies:write (the college routes). Seats and the code are managed on the college page. */
+export function CollegeRowControls({ row, canEdit }: { row: CollegeAdminRow; canEdit: boolean }) {
   const router = useRouter();
   const { ask, dialog } = useConfirm();
   const [issued, setIssued] = useState<{ email: string; password: string } | null>(null);
@@ -201,7 +251,9 @@ export function CollegeRowControls({ row, canEdit, canMoney }: { row: CollegeAdm
           under the existing one); shown outright when it has none. The summary
           stays visible while open: hiding it left a focusable control nobody
           could see. */}
-      {!canEdit ? null : row.officers.length === 0 ? (
+      {!canEdit ? null : row.officers.length === 0 && !row.hasPaidBatch ? (
+        <p className="text-sm text-text-subtle">Awaiting first payment. The placement officer login is issued once the first seat batch is paid.</p>
+      ) : row.officers.length === 0 ? (
         issueForm
       ) : (
         <details>
@@ -211,51 +263,18 @@ export function CollegeRowControls({ row, canEdit, canMoney }: { row: CollegeAdm
           <div className="pt-2">{issueForm}</div>
         </details>
       )}
-      {row.isPartner && (canMoney || row.seatCode) ? (
-        <div className="space-y-2 text-sm text-foreground">
-          {row.seatCode && !canMoney ? (
-            <p>Fee-waiver code <code className="rounded bg-[color:var(--admin-panel)] px-1.5 py-0.5 font-mono">{row.seatCode.code}</code> · {row.seatCode.usedCount} used of {row.seatCode.maxUsages ?? "no limit"}</p>
-          ) : row.seatCode ? (
-            <form
-              className="flex flex-wrap items-end gap-2"
-              onSubmit={async (e) => {
-                e.preventDefault();
-                setError(null);
-                const r = await send(`/api/admin/colleges/${row.id}/promo-code`, "PATCH", { maxUsages: Number(new FormData(e.currentTarget).get("cap")) });
-                if (!r.ok) return setError(String(r.json.error ?? "Couldn't save"));
-                router.refresh();
-              }}
-            >
-              <span className="w-full">
-                Fee-waiver code <code className="rounded bg-[color:var(--admin-panel)] px-1.5 py-0.5 font-mono">{row.seatCode.code}</code> · {row.seatCode.usedCount} used
-              </span>
-              <label className="min-w-32 flex-1">
-                <span className="text-sm font-medium text-foreground">Free seats (cap)</span>
-                <input name="cap" type="number" inputMode="numeric" min={Math.max(1, row.seatCode.usedCount)} defaultValue={row.seatCode.maxUsages ?? ""} required className={cn(input, "mt-1")} />
-              </label>
-              <button className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-                Save cap
-              </button>
-            </form>
+      {row.isPartner ? (
+        <p className="text-sm text-foreground">
+          {row.seatCode ? (
+            <>Seat code <code className="rounded bg-[color:var(--admin-panel)] px-1.5 py-0.5 font-mono">{row.seatCode.code}</code> · {row.seatCode.usedCount} used of {row.seatCode.maxUsages ?? 0} paid seats</>
           ) : (
-            <button
-              type="button"
-              onClick={async () => {
-                setError(null);
-                const r = await send(`/api/admin/colleges/${row.id}/promo-code`, "POST", {});
-                if (!r.ok) return setError(String(r.json.error ?? "Couldn't create the code"));
-                router.refresh();
-              }}
-              className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
-              Create fee-waiver code (300 seats)
-            </button>
+            "Awaiting first payment. The seat code is activated once the first seat batch is paid."
           )}
-        </div>
+        </p>
       ) : null}
       {row.isPartner && canEdit && <details>
         <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-          Edit name, city, AISHE code
+          Edit name, city, state, GSTIN, AISHE code
         </summary>
         <form
           className="flex flex-wrap items-end gap-2 pt-2"
@@ -263,7 +282,11 @@ export function CollegeRowControls({ row, canEdit, canMoney }: { row: CollegeAdm
             e.preventDefault();
             const f = new FormData(e.currentTarget);
             setError(null);
-            const r = await send(`/api/admin/colleges/${row.id}`, "PATCH", { name: f.get("name"), city: f.get("city"), aisheCode: String(f.get("aishe") ?? "").trim() || null });
+            const state = String(f.get("state") ?? "").trim();
+            const gstin = String(f.get("gstin") ?? "").trim().toUpperCase();
+            const bad = gstin ? (isGstinFormat(gstin) ? gstinStateError(gstin, state) : GSTIN_HINT) : null;
+            if (bad) return setError(bad);
+            const r = await send(`/api/admin/colleges/${row.id}`, "PATCH", { name: f.get("name"), city: f.get("city"), state: state || null, gstin: gstin || null, aisheCode: String(f.get("aishe") ?? "").trim() || null });
             if (!r.ok) return setError(String(r.json.error ?? "Couldn't save"));
             router.refresh();
           }}
@@ -275,6 +298,14 @@ export function CollegeRowControls({ row, canEdit, canMoney }: { row: CollegeAdm
           <label className="min-w-32 flex-1">
             <span className="text-sm font-medium text-foreground">City</span>
             <input name="city" defaultValue={row.city ?? ""} className={cn(input, "mt-1")} />
+          </label>
+          <label className="min-w-32 flex-1">
+            <span className="text-sm font-medium text-foreground">State</span>
+            <input name="state" defaultValue={row.state ?? ""} className={cn(input, "mt-1")} />
+          </label>
+          <label className="min-w-40 flex-1">
+            <span className="text-sm font-medium text-foreground">GSTIN</span>
+            <input name="gstin" defaultValue={row.gstin ?? ""} maxLength={15} className={cn(input, "mt-1 uppercase")} />
           </label>
           <label className="min-w-32 flex-1">
             <span className="text-sm font-medium text-foreground">AISHE code</span>

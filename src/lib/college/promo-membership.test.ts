@@ -6,7 +6,7 @@ import { PgDialect } from "drizzle-orm/pg-core";
 import { promoConsentNotice } from "./promo-consent.ts";
 import { consentProblem, membershipFromPromo, promoConsentHash } from "./promo-membership.ts";
 import { generateTpoCode } from "./code.ts";
-import { SEATS_USED_UP, promoProblem, seatCapProblem, seatFreeWhere } from "../promo-rules.ts";
+import { SEATS_USED_UP, collegeCodeProblem, promoProblem, seatCapProblem, seatFreeWhere } from "../promo-rules.ts";
 
 const row = (usedCount: number, collegeId: string | null = "c1") => ({
   code: "X", discountType: "percentage", discountValue: 100, maxUsages: 300, usedCount,
@@ -56,4 +56,11 @@ test("verification: new, same college, other college", () => {
 
 test("TPO code: 8 characters from the unambiguous alphabet", () => {
   assert.match(generateTpoCode(), /^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$/);
+});
+
+test("a college code works only while the college is active and a partner", () => {
+  assert.equal(collegeCodeProblem({ isActive: true, isPartner: true }), null);
+  for (const c of [null, { isActive: false, isPartner: true }, { isActive: true, isPartner: false }]) {
+    assert.match(collegeCodeProblem(c)!, /not active/);
+  }
 });

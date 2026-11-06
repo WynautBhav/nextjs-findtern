@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { after } from "next/server";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { FileText, PlayCircle, ShieldCheck } from "lucide-react";
 
 import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
@@ -34,7 +34,20 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
 
   const db = getDb();
   const [[onboarding], [user], proposals, interviews, allCalls, views] = await Promise.all([
-    db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).limit(1),
+    // Allowlist: no aadhaar, PAN, PIN or bank ever reaches this render (P-4); the JSON keys that hold them are cut in SQL.
+    db
+      .select({
+        bio: schema.internOnboarding.bio,
+        city: schema.internOnboarding.city,
+        state: schema.internOnboarding.state,
+        linkedinUrl: schema.internOnboarding.linkedinUrl,
+        skills: schema.internOnboarding.skills,
+        experienceJson: schema.internOnboarding.experienceJson,
+        extraData: sql<Record<string, unknown>>`${schema.internOnboarding.extraData} - 'bankDetails' - 'bank' - 'aadhaarNumber' - 'panNumber'`,
+      })
+      .from(schema.internOnboarding)
+      .where(eq(schema.internOnboarding.userId, id))
+      .limit(1),
     db.select({ phone: schema.users.phoneNumber, cc: schema.users.countryCode }).from(schema.users).where(eq(schema.users.id, id)).limit(1),
     db
       .select({ p: schema.proposals })

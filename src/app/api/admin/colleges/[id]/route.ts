@@ -5,6 +5,8 @@ import { z } from "zod";
 import { diffFields, recordAdminAudit } from "@/lib/admin/audit";
 import { requireMutation } from "@/lib/guards-mutation";
 import { forgetAccountStatus } from "@/lib/account-status";
+import { GSTIN_FORMAT, GSTIN_HINT } from "@/lib/gstin";
+import { gstinStateError } from "@/lib/gst";
 import { isSafeLink } from "@/lib/safe-url";
 import { isUniqueViolation } from "@/lib/promo";
 import { getDb, schema } from "@/lib/db";
@@ -13,6 +15,8 @@ const bodySchema = z.object({
   name: z.string().trim().min(3).max(200).optional(),
   city: z.string().trim().max(80).nullable().optional(),
   aisheCode: z.string().trim().regex(/^[CUS]-\d{3,6}$/i, "AISHE codes look like U-0657 or C-12345").nullable().optional(),
+  state: z.string().trim().max(80).nullable().optional(),
+  gstin: z.string().trim().toUpperCase().regex(GSTIN_FORMAT, GSTIN_HINT).nullable().optional(),
   isPartner: z.boolean().optional(),
   showOnWebsite: z.boolean().optional(),
   isActive: z.boolean().optional(),
@@ -33,11 +37,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (cur && !cur.isPartner && !parsed.data.isPartner) return NextResponse.json({ error: "Only partner colleges can be renamed or re-coded; the directory import owns the rest." }, { status: 409 });
   }
   // slug and Findtern code are never touched, so the college's URLs and code stay put.
-  const set = { ...parsed.data, ...(parsed.data.aisheCode !== undefined ? { aisheCode: parsed.data.aisheCode?.toUpperCase() || null } : {}), ...(parsed.data.city !== undefined ? { city: parsed.data.city || null } : {}) };
+  const set = { ...parsed.data, ...(parsed.data.state !== undefined ? { state: parsed.data.state || null } : {}), ...(parsed.data.aisheCode !== undefined ? { aisheCode: parsed.data.aisheCode?.toUpperCase() || null } : {}), ...(parsed.data.city !== undefined ? { city: parsed.data.city || null } : {}) };
   const [before] = await db
     .select({
       name: schema.colleges.name,
       city: schema.colleges.city,
+      state: schema.colleges.state,
+      gstin: schema.colleges.gstin,
       aisheCode: schema.colleges.aisheCode,
       isPartner: schema.colleges.isPartner,
       showOnWebsite: schema.colleges.showOnWebsite,
@@ -48,6 +54,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     .from(schema.colleges)
     .where(eq(schema.colleges.id, id))
     .limit(1);
+  // The GSTIN's state digits pick CGST+SGST vs IGST on the invoice, so they must agree with the state (checked against what the row will hold).
+  if (before && (parsed.data.state !== undefined || parsed.data.gstin !== undefined)) {
+    const problem = gstinStateError(parsed.data.gstin !== undefined ? parsed.data.gstin : before.gstin, parsed.data.state !== undefined ? parsed.data.state : before.state);
+    if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+  }
   let row: { id: string } | undefined;
   try {
     [row] = await db.update(schema.colleges).set(set).where(eq(schema.colleges.id, id)).returning({ id: schema.colleges.id });
@@ -61,9 +72,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const admins = await db.select({ id: schema.collegeAdmins.id }).from(schema.collegeAdmins).where(eq(schema.collegeAdmins.collegeId, id));
     for (const a of admins) forgetAccountStatus("college", a.id);
   }
-  const { isPartner, ...rest } = parsed.data;
+  const { isPartner, state, gstin, ...rest } = parsed.data;
   const was: Record<string, unknown> = before ?? {};
-  if (Object.keys(rest).length) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.update", targetType: "college", targetId: id, meta: { changes: diffFields(was, Object.fromEntries(Object.entries(set).filter(([k]) => k !== "isPartner"))) } });
+  if (Object.keys(rest).length) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.update", targetType: "college", targetId: id, meta: { changes: diffFields(was, Object.fromEntries(Object.entries(set).filter(([k]) => k !== "isPartner" && k !== "state" && k !== "gstin"))) } });
+  if (state !== undefined || gstin !== undefined) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.billing_update", targetType: "college", targetId: id, meta: { changes: diffFields(was, Object.fromEntries(Object.entries(set).filter(([k]) => k === "state" || k === "gstin"))) } });
   if (isPartner !== undefined) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.partner_toggle", targetType: "college", targetId: id, meta: { isPartner: { from: was.isPartner ?? null, to: isPartner } } });
   return NextResponse.json({ ok: true });
 }

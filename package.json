@@ -23,6 +23,7 @@
     "db:import-colleges": "DATABASE_URL=${DATABASE_URL:-postgresql://findtern:findtern_dev@localhost:5432/findtern} node --experimental-strip-types scripts/import-colleges.ts",
     "db:seed-colleges": "DATABASE_URL=${DATABASE_URL:-postgresql://findtern:findtern_dev@localhost:5432/findtern} node --experimental-strip-types scripts/seed-colleges.ts",
     "test:e2e:college": "node --test e2e/college-partners.e2e.mjs",
+    "test:e2e:college-money": "node --test e2e/college-money.e2e.mjs",
     "e2e:admin": "node --test e2e/admin.e2e.mjs",
     "qa": "node e2e/qa.mjs",
     "qa:serve": "node e2e/qa-serve.mjs",
