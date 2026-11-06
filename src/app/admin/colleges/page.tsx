@@ -100,6 +100,12 @@ export default async function AdminCollegesPage({
         title="College partners"
         subtitle={`${total.toLocaleString("en-IN")} ${total === 1 ? "college" : "colleges"} ${req.search ? "match" : "(partners and colleges with students)"}. Search to find any college and make it a partner.`}
         className="mb-2 lg:mb-4"
+        action={
+          <span className="flex flex-wrap items-center gap-4 text-sm font-medium">
+            <Link href="/admin/colleges/review" className="underline underline-offset-4 touch:inline-flex touch:min-h-11 touch:items-center">Review queue</Link>
+            <Link href="/admin/colleges/refunds" className="underline underline-offset-4 touch:inline-flex touch:min-h-11 touch:items-center">Refunds</Link>
+          </span>
+        }
       />
       <TableToolbar searchPlaceholder="Search name, city, AISHE or college code" />
       {list.length === 0 ? (
