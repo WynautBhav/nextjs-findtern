@@ -61,9 +61,11 @@ before(async () => {
     stdio: "ignore",
   });
   browser = await chromium.launch();
-  tpo = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
-  emp = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
-  stu = await (await browser.newContext({ ...devices["Pixel 7"] })).newPage();
+  // Each browser gets its own client address: the server trusts X-Forwarded-For here, and the login limiter is per address.
+  const extraHTTPHeaders = (n) => ({ "x-forwarded-for": `10.99.${Math.floor(Date.now() / 1000) % 250}.${n}` });
+  tpo = await (await browser.newContext({ viewport: { width: 1280, height: 900 }, extraHTTPHeaders: extraHTTPHeaders(1) })).newPage();
+  emp = await (await browser.newContext({ viewport: { width: 1280, height: 900 }, extraHTTPHeaders: extraHTTPHeaders(2) })).newPage();
+  stu = await (await browser.newContext({ ...devices["Pixel 7"], extraHTTPHeaders: extraHTTPHeaders(3) })).newPage();
   for (const p of [tpo, emp, stu]) p.setDefaultTimeout(T);
 });
 
