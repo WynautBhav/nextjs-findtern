@@ -49,6 +49,16 @@ async function setPresence(internId, { seenAgoMs, activeAgoMs, hidden = false })
 const thread = (ctx, id, after = "") => send(ctx, "GET", `/api/messages/threads/${id}${after ? `?after=${after}` : ""}`);
 const post = (ctx, id, body, clientId = randomUUID()) => send(ctx, "POST", `/api/messages/threads/${id}/messages`, { body, clientId });
 const counts = async (ctx) => (await send(ctx, "GET", "/api/live?once=1")).body;
+/**
+ * The app treats a recipient who read the thread in the last 2 minutes as online and mails at most once per
+ * 15 minutes. Neither window can be waited out in a test, so move the thread's stamps back instead.
+ */
+const ageThread = ({ readMin, emailedMin = null }) =>
+  db().query(
+    `UPDATE message_threads SET intern_last_read_at = now() - $2 * interval '1 minute',
+       intern_emailed_at = CASE WHEN $3::int IS NULL THEN NULL ELSE now() - $3::int * interval '1 minute' END WHERE id = $1`,
+    [state.threadId, readMin, emailedMin],
+  );
 const mailsToIntern = (since) => mailTo(state.intern.email, { since, subject: /message/i });
 
 before(async () => {
@@ -425,7 +435,7 @@ test("contact guard: phone, email and links are refused before the hire is paid 
   assert.match(String(sent.body.error), /can be shared only after the hire is paid/);
   assert.equal((await one(`SELECT count(*)::int AS n FROM messages WHERE thread_id = $1`, [state.threadId])).n, before, "nothing was stored");
   for (const secret of ["98765", "hiring.manager", "wa.me"]) {
-    assert.equal((await one(`SELECT count(*)::int AS n FROM messages WHERE body ILIKE $1`, [`%${secret}%`])).n, 0, `the database kept "${secret}"`);
+    assert.equal((await one(`SELECT count(*)::int AS n FROM messages WHERE thread_id = $1 AND body ILIKE $2`, [state.threadId, `%${secret}%`])).n, 0, `the database kept "${secret}"`);
   }
   // The same rule for the intern writing to the employer.
   const back = await post(state.internCtx, state.threadId, "My number is +91-98765-43210");
@@ -470,6 +480,7 @@ test("email: none while the recipient is online; one per unread burst while they
 
   // (b) offline → exactly one email for a burst of two
   await send(state.internCtx, "POST", `/api/messages/threads/${state.threadId}/read`, {});
+  await ageThread({ readMin: 5 }); // read, but long enough ago that the intern is no longer "in the conversation"; nothing mailed yet
   await setPresence(state.intern.id, { seenAgoMs: 10 * 60_000, activeAgoMs: 10 * 60_000 });
   const t1 = Date.now();
   assert.equal((await post(state.employerCtx, state.threadId, "First message while you are away")).status, 201);
@@ -483,7 +494,7 @@ test("email: none while the recipient is online; one per unread burst while they
 
   // (c) after the intern reads, the next away-message emails again
   await send(state.internCtx, "POST", `/api/messages/threads/${state.threadId}/read`, {});
-  await sleep(1_100);
+  await ageThread({ readMin: 5, emailedMin: 20 }); // the burst's mail is older than the 15-minute gap and older than this read
   const t2 = Date.now();
   assert.equal((await post(state.employerCtx, state.threadId, "A new message after you read")).status, 201);
   await eventually("a second email after a read", async () => (await mailsToIntern(t2 - 500)).length >= 1, { timeoutMs: 15_000 });

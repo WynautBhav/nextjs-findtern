@@ -109,6 +109,30 @@ test("create: plain numbers like '3 months' or '2026' are not treated as contact
   assert.equal(res.status, 201, JSON.stringify(res.body));
 });
 
+test("create and edit: place fields are length-capped and the city must belong to its state (400)", async () => {
+  const onsite = { locationType: "onsite", state: "Maharashtra", city: "Pune" };
+  const make = (extra) => send(state.employerCtx, "POST", `/api/employer/${state.employer.id}/projects`, {
+    projectName: "Place Check Role", skills: SKILLS, scopeOfWork: "short-term", timezone: "Asia/Kolkata", ...onsite, ...extra,
+  });
+  const before = (await one(`SELECT count(*)::int AS n FROM projects WHERE employer_id = $1`, [state.employer.id])).n;
+  for (const [what, extra] of [
+    ["a 121-character city", { city: "P".repeat(121) }],
+    ["a city of another state", { city: "Jaipur" }],
+    ["a 121-character state", { state: "M".repeat(121) }],
+    ["an 11-character pincode", { pincode: "4110010000x" }],
+    ["a 65-character timezone", { timezone: "A".repeat(65) }],
+    ["a 121-character preferred location", { preferredLocations: ["L".repeat(121)] }],
+  ]) {
+    const res = await make(extra);
+    assert.equal(res.status, 400, `${what}: ${JSON.stringify(res.body)}`);
+  }
+  assert.equal((await one(`SELECT count(*)::int AS n FROM projects WHERE employer_id = $1`, [state.employer.id])).n, before, "nothing was saved");
+  const ok = await make({ projectName: "Place Check Role Ok" });
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+  const edit = await send(state.employerCtx, "PUT", `/api/employer/projects/${ok.body.project.id}`, { locationType: "onsite", state: "Maharashtra", city: "Jaipur" });
+  assert.equal(edit.status, 400, `an edit to a city of another state: ${JSON.stringify(edit.body)}`);
+});
+
 test("edit: the description can be changed, and the same contact check applies to edits", async () => {
   const ok = await send(state.employerCtx, "PUT", `/api/employer/projects/${state.listingId}`, { description: "Updated: own the weekly KPI dashboard." });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));

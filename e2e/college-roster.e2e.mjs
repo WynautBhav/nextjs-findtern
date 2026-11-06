@@ -394,7 +394,7 @@ test("nothing crosses colleges: another college's student, roster row and import
   // The officer cannot reach the admin routes at all, and a student cannot either.
   const tpoUpload = await send(state.tpoCtx, "POST", importUrl(state.collegeId), { fileName: "x.csv", fileBase64: b64("a,b\n") });
   assert.ok([401, 403].includes(tpoUpload.status), `an officer is not an admin (got ${tpoUpload.status})`);
-  const studentCtx = await signedInContext(browser, state.unverified);
+  const studentCtx = await signedInContext(browser, state.redeemer); // an unverified email cannot sign in at all
   try {
     const s = await send(studentCtx, "POST", importUrl(state.collegeId), { fileName: "x.csv", fileBase64: b64("a,b\n") });
     assert.ok([401, 403].includes(s.status), `a student is not an admin (got ${s.status})`);

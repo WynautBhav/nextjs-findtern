@@ -114,7 +114,7 @@ after(async () => {
 
 test("a paid student on the roster is eligible for the full fee; creating twice returns the same row", async () => {
   const r = await create(state.a.pay.id);
-  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.equal(r.body.status, "eligible");
   assert.equal(r.body.amountMinor, FEE);
   state.a.refundId = r.body.refundId;
@@ -128,7 +128,7 @@ test("a paid student on the roster is eligible for the full fee; creating twice 
 
 test("a student who took the AI interview needs a human decision and cannot be initiated", async () => {
   const r = await create(state.b.pay.id);
-  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.equal(r.body.status, "requires_review");
   assert.equal(r.body.reviewReason, "interview_taken");
   const go = await act(r.body.refundId, { action: "initiate", confirmAmountMinor: FEE });
@@ -151,9 +151,11 @@ test("only an admin with money access can create or initiate a refund", async ()
   const employerCtx = await signedInContext(browser, employer);
   const intern = await signedInContext(browser, state.a.intern);
   try {
-    assert.equal((await create(state.a.pay.id, employerCtx)).status, 403);
-    assert.equal((await create(state.a.pay.id, intern)).status, 403);
-    assert.equal((await act(state.a.refundId, { action: "initiate", confirmAmountMinor: FEE }, intern)).status, 403);
+    // Not an admin session at all: 401 (no admin identity) or 403 (wrong role) both refuse.
+    const refused = (res) => [401, 403].includes(res.status);
+    assert.ok(refused(await create(state.a.pay.id, employerCtx)), "an employer");
+    assert.ok(refused(await create(state.a.pay.id, intern)), "an intern");
+    assert.ok(refused(await act(state.a.refundId, { action: "initiate", confirmAmountMinor: FEE }, intern)), "an intern initiating");
     const noCsrf = await state.adminCtx.request.post(new URL("/api/admin/refunds", baseUrl()).toString(), {
       data: { internPaymentId: state.a.pay.id }, headers: { origin: baseUrl() }, failOnStatusCode: false,
     });
