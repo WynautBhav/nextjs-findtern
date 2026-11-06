@@ -79,7 +79,13 @@ export function CartManager({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const projectOptions = Array.from(new Map(cartLines.map((l) => [l.projectId, l.projectName])).entries());
+  // The picked project stays an option after its last person is removed, so the select and the empty state still name it.
+  const projectOptions = Array.from(
+    new Map([
+      ...cartLines.map((l) => [l.projectId, l.projectName] as const),
+      ...initialCartLines.filter((l) => l.projectId === selectedProject).map((l) => [l.projectId, l.projectName] as const),
+    ]).entries(),
+  );
   const inProject = selectedProject === "all" ? cartLines : cartLines.filter((l) => l.projectId === selectedProject);
   // One meaning of "shortlisted": saved, no live proposal yet; anyone already
   // proposed to is listed apart, below (QA-124). The heading counts distinct
@@ -174,10 +180,9 @@ export function CartManager({
     return (
       <EmptyScene
         art
-        title="Your shortlist is empty"
-        body="Shortlist candidates while you browse. From here you book a meeting with them or send a proposal."
-        next={{ label: "Browse candidates", href: "/employer/candidates" }}
-        who="You - shortlist a candidate"
+        title="No one on your shortlist yet"
+        body="Tap the heart on a candidate to keep them here for a project."
+        next={{ label: "Find candidates", href: "/employer/candidates" }}
       />
     );
   }
@@ -230,7 +235,14 @@ export function CartManager({
           />
         ))}
       </ul>
-      {shown.length === 0 ? <p className="py-6 text-sm text-ink-600">Everyone saved here already has a proposal. They are listed under Already proposed.</p> : null}
+      {inProject.length === 0 ? (
+        <div className="py-12 text-center">
+          <p className="text-lg font-semibold text-ink-900">No one saved for {projectOptions.find(([id]) => id === selectedProject)?.[1] ?? "this project"}</p>
+          <button type="button" onClick={() => setSelectedProject("all")} className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 min-h-11" })}>
+            Show all projects
+          </button>
+        </div>
+      ) : shown.length === 0 ? <p className="py-6 text-sm text-ink-600">Everyone saved here already has a proposal. They are listed under Already proposed.</p> : null}
 
       {proposed.length > 0 ? (
         <section aria-labelledby="proposed-heading" className="mt-8">
