@@ -208,7 +208,7 @@ export async function tpoStudentList(ctx: CollegeContext, members?: CollegeStude
     db.execute(sql`
       SELECT ${r.email} AS email, ${r.name} AS name, ${r.rollNo} AS roll_no, ${r.year} AS year, ${r.branch} AS branch,
         (CASE WHEN EXISTS (
-          SELECT 1 FROM ${m} WHERE ${m.userId} = ${r.matchedUserId} AND ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL
+          SELECT 1 FROM ${m} WHERE ${m.userId} = ${r.matchedUserId} AND ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL AND ${m.status} = 'verified'
         ) THEN ${r.matchedUserId} END) AS user_id
       FROM ${r}
       WHERE ${r.collegeId} = ${collegeId}
@@ -403,7 +403,8 @@ export async function presenceSnapshot(collegeId: string, userIds?: string[]): P
     JOIN ${schema.users} u ON u.id = ${m.userId}
     LEFT JOIN ${schema.collegeRoster} r ON r.college_id = ${m.collegeId} AND r.email = lower(u.email)
     LEFT JOIN ${schema.collegePresence} p ON p.user_id = ${m.userId}
-    WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL
+    -- Q27: a TPO sees verified students only, never ones who merely picked the college.
+    WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL AND ${m.status} = 'verified'
   `);
   let rows = res.rows as Row[];
   if (userIds) {
