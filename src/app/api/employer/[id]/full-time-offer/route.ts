@@ -7,7 +7,7 @@ import { z } from "zod";
 import { withLock } from "@/lib/advisory-lock";
 import { SITE } from "@/lib/content/site";
 import { getDb, schema } from "@/lib/db";
-import { emails } from "@/lib/emails";
+import { emails, renderEmail } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
 import { sendSmtpMail } from "@/lib/mailer";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
@@ -169,8 +169,25 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
     await sendSmtpMail({
       to: process.env.ADMIN_ALERT_EMAIL ?? SITE.adminEmail,
-      subject: `PPO - Full-time offer proposal from ${companyName}`,
-      text: summary,
+      ...renderEmail(
+        emails.fullTimeOfferAdminAlert({
+          companyName,
+          employerId: id,
+          internName,
+          internId: base.internId,
+          internEmail: intern?.email,
+          proposalId: proposal.id,
+          jobTitle: b.jobTitle,
+          jobMode: b.jobMode,
+          jobLocation: b.jobMode !== "remote" ? `${b.jobLocationCity}, ${b.jobLocationState}` : undefined,
+          timezone: b.timezone,
+          shiftFrom: b.shiftFrom,
+          shiftTo: b.shiftTo,
+          ctcCurrency: b.ctcCurrency,
+          annualCtc: b.annualCtc,
+          offerLetterUrl,
+        }),
+      ),
     });
   } catch (err) {
     console.error("[full-time-offer] admin alert failed", err);

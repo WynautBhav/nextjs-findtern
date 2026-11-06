@@ -133,7 +133,7 @@ export function renderEmail(c: EmailContent): { subject: string; text: string; h
     ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" class="line" style="margin-top:24px;border-top:1px solid ${LINE};">${c.facts
         .map(([k, v]) => {
           const value = isUrl(v)
-            ? `<a class="t-link" href="${esc(v)}" style="color:${BRAND};text-decoration:underline;word-break:break-all;">${esc(v)}</a>`
+            ? `<a class="t-link" href="${esc(v)}" style="color:${BRAND};font-weight:400;text-decoration:underline;word-break:break-all;">${esc(v)}</a>`
             : isMoney(v)
               ? `<span class="amt" style="font-size:18px;line-height:26px;color:${BRAND};">${esc(v)}</span>`
               : esc(v);
@@ -189,6 +189,8 @@ ${cta}
 }
 
 /* ── Templates ─────────────────────────────────────────────────────────── */
+
+const INTERNAL_REASON = "This is an internal alert from the Findtern platform.";
 
 const hi = (name: string) => `Hi ${name || "there"},`;
 
@@ -407,6 +409,7 @@ export const emails = {
       ["Amount", o.amount],
     ],
     cta: { label: "Review in admin", url: `${origin()}/admin/colleges` },
+    reason: INTERNAL_REASON,
   }),
 
   collegePayoutPaid: (o: { collegeName: string; amount: string; referenceId: string }): EmailContent => ({
@@ -456,6 +459,45 @@ export const emails = {
     cta: { label: "View orders and invoice", url: `${origin()}/employer/orders` },
   }),
 
+  /** Internal alert to the Findtern team when an employer sends a full-time offer (PPO). Same facts the plain-text alert carried. */
+  fullTimeOfferAdminAlert: (o: {
+    companyName: string;
+    employerId: string;
+    internName: string;
+    internId: string;
+    internEmail?: string | null;
+    proposalId: string;
+    jobTitle: string;
+    jobMode: string;
+    jobLocation?: string;
+    timezone: string;
+    shiftFrom: string;
+    shiftTo: string;
+    ctcCurrency: string;
+    annualCtc: number;
+    offerLetterUrl: string;
+  }): EmailContent => ({
+    subject: `PPO - Full-time offer proposal from ${o.companyName}`,
+    preheader: `${o.companyName} offered ${o.internName} a full-time role as ${o.jobTitle}.`,
+    heading: "Full-time offer sent",
+    greeting: "Hi team,",
+    lines: [`${o.companyName} sent ${o.internName} a full-time offer. The details are below.`],
+    facts: [
+      ["Employer", `${o.companyName} (${o.employerId})`],
+      ["Candidate", `${o.internName} (${o.internId})`],
+      ...(o.internEmail ? ([["Candidate email", o.internEmail]] as [string, string][]) : []),
+      ["Proposal", o.proposalId],
+      ["Job title", o.jobTitle],
+      ["Job mode", o.jobMode],
+      ...(o.jobLocation ? ([["Job location", o.jobLocation]] as [string, string][]) : []),
+      ["Timezone", o.timezone],
+      ["Shift", `${o.shiftFrom} - ${o.shiftTo}`],
+      ["Annual CTC", `${o.ctcCurrency} ${o.annualCtc}`],
+      ["Offer letter", o.offerLetterUrl],
+    ],
+    reason: INTERNAL_REASON,
+  }),
+
   /** Signup code. Employers get the legacy "company email" wording. */
   otp: (o: { otp: string; ttlMinutes: number; forEmployer: boolean }): EmailContent => ({
     subject: o.forEmployer ? "Verify your company email | Findtern" : "Verify your Findtern email",
@@ -466,9 +508,9 @@ export const emails = {
       o.forEmployer
         ? "Use the code below to confirm your company email address on Findtern."
         : "Use the code below to confirm your Findtern email address.",
-      `This code expires in ${o.ttlMinutes} minutes. If you did not request it, you can ignore this email.`,
     ],
-    facts: [["Verification code", o.otp]],
+    code: { value: o.otp, note: `This code expires in ${o.ttlMinutes} minutes. If you did not request it, you can ignore this email.` },
+    reason: "You’re receiving this because this email address was used to sign up for Findtern.",
   }),
 
   passwordReset: (o: { url: string; ttlMinutes: number }): EmailContent => ({
