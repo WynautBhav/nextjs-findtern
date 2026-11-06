@@ -107,11 +107,11 @@ export default async function EmployerInternDetail({
       // newest open one (EMH-15).
       const projectRows = (
         await db
-          .select({ id: schema.projects.id, status: schema.projects.status })
+          .select({ id: schema.projects.id, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt })
           .from(schema.projects)
           .where(eq(schema.projects.employerId, employerId))
           .orderBy(desc(schema.projects.createdAt))
-      ).filter((row) => isOpenProject(row.status));
+      ).filter((row) => isOpenProject(row.status, row.takenDownAt));
       const project =
         projectRows.find((row) => row.id === requestedProject) ??
         projectRows.find((row) => row.id === remembered.project) ??

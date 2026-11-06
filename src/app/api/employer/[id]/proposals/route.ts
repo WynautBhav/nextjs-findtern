@@ -139,13 +139,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .limit(1);
   const currency = employerRegion(employer ?? {}) === "IN" ? "INR" : "USD";
   const [project] = await db
-    .select({ id: schema.projects.id, status: schema.projects.status })
+    .select({ id: schema.projects.id, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt })
     .from(schema.projects)
     .where(and(eq(schema.projects.id, b.projectId), eq(schema.projects.employerId, id)))
     .limit(1);
   if (!project) return NextResponse.json({ error: "Unknown project" }, { status: 404 });
   // Offers go out on open projects only (legacy picker; EMH-15).
-  if (!isProjectOpen(project.status)) {
+  if (!isProjectOpen(project.status, project.takenDownAt)) {
+    if (project.takenDownAt) {
+      return NextResponse.json({ error: "Findtern took this listing down. Pick another project." }, { status: 409 });
+    }
     return NextResponse.json({ error: "This project is closed. Reopen it or pick an open project." }, { status: 409 });
   }
 

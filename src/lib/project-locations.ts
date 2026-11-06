@@ -51,7 +51,9 @@ export const CLOSED_PROJECT_STATUSES = ["inactive", "closed", "archived"] as con
 /** The value written when an employer closes a project. */
 export const CLOSED_PROJECT_STATUS = "inactive";
 
-export function isProjectOpen(status: string | null | undefined): boolean {
+export function isProjectOpen(status: string | null | undefined, takenDownAt?: Date | string | null): boolean {
+  // A listing Findtern took down keeps status "active" but takes no offers.
+  if (takenDownAt) return false;
   const s = String(status ?? "").trim().toLowerCase();
   return !(CLOSED_PROJECT_STATUSES as readonly string[]).includes(s);
 }

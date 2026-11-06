@@ -86,11 +86,12 @@ export default async function CompareCandidates({ searchParams }: { searchParams
           projectName: schema.projects.projectName,
           skills: schema.projects.skills,
           status: schema.projects.status,
+          takenDownAt: schema.projects.takenDownAt,
         })
         .from(schema.projects)
         .where(eq(schema.projects.employerId, session.uid))
         .orderBy(desc(schema.projects.createdAt))
-    ).filter((p) => isOpenProject(p.status));
+    ).filter((p) => isOpenProject(p.status, p.takenDownAt));
     activeProject = (projectParam && projects.find((p) => p.id === projectParam)) || projects[0] || null;
 
     if (activeProject) {
