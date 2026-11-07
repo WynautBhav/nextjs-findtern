@@ -60,14 +60,35 @@ const PLAN: Record<PlacementLedger["plan"], { label: string; tone: Tone }> = {
   monthly: { label: "Monthly plan", tone: "live" },
   postpaid: { label: "Pay monthly", tone: "live" },
   full_time: { label: "Full-time", tone: "new" },
-  unpaid: { label: "Not paid", tone: "waiting" },
+  // The hire itself is paid (it is listed); this is the instalment plan, so say that.
+  unpaid: { label: "No instalment paid yet", tone: "waiting" },
 };
 
 const STATUS: Record<PlacementLedger["status"], { label: string; tone: Tone }> = {
   fully_paid: { label: "Fully paid", tone: "paid" },
   partially_paid: { label: "Partly paid", tone: "waiting" },
-  unpaid: { label: "Not paid", tone: "waiting" },
+  unpaid: { label: "No instalment paid", tone: "waiting" },
 };
+
+const PAYMENTS_EMAIL = "communicate@findtern.in";
+
+/** A pre-filled request for a payment link, naming this company's own hire and what is owed on it. */
+function paymentLinkHref(h: HireRow): string {
+  const owed = formatMoney(h.ledger.dueMinor, h.currency);
+  const subject = `Payment link for ${h.candidateName} (${owed})`;
+  const body = [
+    "Hello Findtern,",
+    "",
+    `Please send me a payment link for ${h.candidateName}'s placement (${h.roleTitle === h.projectName ? h.roleTitle : `${h.roleTitle}, ${h.projectName}`}).`,
+    `Outstanding: ${owed}.`,
+    `Proposal reference: ${h.proposalId}`,
+  ].join("\n");
+  return `mailto:${PAYMENTS_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+const payHref = (h: HireRow) => `/employer/checkout?proposal=${encodeURIComponent(h.proposalId)}`;
+
+const INLINE_LINK = "font-medium text-brand-700 underline underline-offset-4 touch:inline-flex touch:min-h-11 touch:items-center";
 
 /** Per-currency sum, printed as "₹32,000 + $400". */
 function sumLabel(rows: { currency: string; minor: number }[]): string | null {
@@ -133,7 +154,7 @@ export function OrdersManager({
           hires.length > 0
             ? [
                 `${hires.length} hire${hires.length === 1 ? "" : "s"}`,
-                paid ? `${paid} paid` : "nothing paid yet",
+                paid ? `${paid} paid` : "no instalment paid yet",
                 left ? `${left} to pay` : "",
               ]
                 .filter(Boolean)
@@ -347,10 +368,8 @@ function HiresPanel({
           <p role="note" className="mb-3 flex items-start gap-2 text-sm text-ink-800">
             <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden />
             <span>
-            <span className="nums font-semibold">{formatMoney(offline.minor, offline.currency)}</span> on {offline.count} {offline.count === 1 ? "hire" : "hires"} can&apos;t be paid online. Email{" "}
-            <a href="mailto:communicate@findtern.in" className="font-medium text-brand-700 underline underline-offset-4 touch:inline-flex touch:min-h-11 touch:items-center">
-              communicate@findtern.in
-            </a>
+              <span className="nums font-semibold">{formatMoney(offline.minor, offline.currency)}</span> on {offline.count} {offline.count === 1 ? "hire" : "hires"} can&apos;t be paid at online checkout. Use{" "}
+              <span className="font-medium">Request a payment link</span> on {offline.count === 1 ? "that hire" : "each one"}.
             </span>
           </p>
         ) : null}
@@ -383,14 +402,32 @@ function HiresPanel({
                       {h.roleTitle === h.projectName ? h.roleTitle : `${h.roleTitle} · ${h.projectName}`}
                     </p>
                     {owedOffline ? (
-                      // How to pay it is said once above the list, not on every row.
                       <p className="nums mt-1 text-sm text-ink-900">
-                        <span className="font-semibold">{formatMoney(h.ledger.dueMinor, h.currency)}</span> unpaid · pay offline
+                        <span className="font-semibold">{formatMoney(h.ledger.dueMinor, h.currency)}</span> owed · checkout can&apos;t bill this one online ·{" "}
+                        <a href={paymentLinkHref(h)} className={INLINE_LINK}>
+                          Request a payment link
+                        </a>
+                      </p>
+                    ) : null}
+                    {due && !postpaid ? (
+                      <p className="nums mt-1 text-sm text-ink-900">
+                        <span className="font-semibold">{formatMoney(h.ledger.dueMinor, h.currency)}</span> to pay ·{" "}
+                        <Link href={payHref(h)} className={INLINE_LINK}>
+                          Pay now
+                        </Link>
                       </p>
                     ) : null}
                     {postpaid && h.ledger.nextDue ? (
                       <p className="nums mt-1 text-sm font-medium text-ink-900">
                         Month {h.ledger.monthsPaid + 1} of {h.ledger.months} · {due && h.ledger.nextDue <= todayIst() ? "Due now" : `Due on ${formatDate(h.ledger.nextDue)}${due ? " · you can pay it now" : ""}`}
+                        {due ? (
+                          <>
+                            {" · "}
+                            <Link href={payHref(h)} className={INLINE_LINK}>
+                              Pay now
+                            </Link>
+                          </>
+                        ) : null}
                       </p>
                     ) : null}
                     <p className="nums mt-0.5 text-sm text-ink-600">
@@ -405,7 +442,7 @@ function HiresPanel({
                     the contract; the rest are in the menu (QA-122). */}
                 <div className="col-span-2 flex items-center gap-1 sm:col-span-1 sm:justify-end">
                   {due ? (
-                    <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(h.proposalId)}`} variant="primary" size="sm">
+                    <ButtonLink href={payHref(h)} variant="primary" size="sm">
                       <CreditCard className="size-4" aria-hidden />
                       Pay {formatMoney(postpaid ? (h.monthlyMinor ?? h.ledger.dueMinor) : h.ledger.dueMinor, h.currency)}
                     </ButtonLink>
@@ -549,6 +586,7 @@ function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payableIds: st
                 const overdue = Boolean(h.ledger.nextDue) && (h.ledger.nextDue as string) < today && h.ledger.dueMinor > 0;
                 const s = overdue ? { label: "Overdue", tone: "waiting" as Tone } : STATUS[h.ledger.status];
                 const m = (minor: number) => formatMoney(minor, h.currency, { zeroLabel: false });
+                const payable = h.ledger.dueMinor > 0 && (h.ledger.plan === "monthly" || (h.ledger.plan === "postpaid" && payableIds.includes(h.proposalId)));
                 return (
                   <tr key={h.proposalId}>
                     <td data-title className={tdClass}>
@@ -578,7 +616,17 @@ function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payableIds: st
                       {h.ledger.nextDue ? (
                         <div>
                           {h.ledger.nextDue < today ? (
-                            <span className="font-medium text-danger">Overdue since {formatDate(h.ledger.nextDue)}</span>
+                            <>
+                              <span className="font-medium text-danger">Overdue since {formatDate(h.ledger.nextDue)}</span>
+                              {payable ? (
+                                <>
+                                  {" · "}
+                                  <Link href={payHref(h)} className={INLINE_LINK}>
+                                    Pay now
+                                  </Link>
+                                </>
+                              ) : null}
+                            </>
                           ) : h.ledger.plan === "postpaid" ? (
                             h.ledger.nextDue === today ? <span className="font-medium">Due now</span> : `Due on ${formatDate(h.ledger.nextDue)}`
                           ) : (
@@ -593,8 +641,8 @@ function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payableIds: st
                       )}
                     </td>
                     <td className={cn(tdClass, "text-right")}>
-                      {h.ledger.dueMinor > 0 && (h.ledger.plan === "monthly" || (h.ledger.plan === "postpaid" && payableIds.includes(h.proposalId))) ? (
-                        <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(h.proposalId)}`} size="sm">
+                      {payable ? (
+                        <ButtonLink href={payHref(h)} size="sm">
                           Pay month {h.ledger.monthsPaid + 1}
                         </ButtonLink>
                       ) : null}
