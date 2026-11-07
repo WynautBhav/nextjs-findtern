@@ -1,8 +1,9 @@
 name: Reset staging demo data
 
 # Manual only. Empties the rows of the Neon STAGING database and loads the
-# 50-intern demo set (e2e/seed-demo-interns.mjs). The tables, the migration
-# record, platform_settings and admin_roles stay. Runs on GitHub's servers, so it does not depend on the network
+# 50-intern demo set (e2e/seed-demo-interns.mjs). Accounts, activity and
+# payments go; settings, roles, colleges, plans, promo codes, invoice counters,
+# terms and the website_* site content stay (list: KEEP_TABLES in the script). Runs on GitHub's servers, so it does not depend on the network
 # of whoever clicks the button.
 #
 # A run with "apply" off is a dry run: it connects, counts the rows it would
