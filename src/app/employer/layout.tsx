@@ -7,10 +7,8 @@ import {
   FolderKanban,
   FileText,
   ShoppingCart,
-  CalendarDays,
   Building2,
   Users,
-  GitCompare,
   ShoppingBag,
   Clock,
   KeyRound,
@@ -31,31 +29,35 @@ import { q } from "@/lib/college/sql";
 import { countsFor, type LiveCounts } from "@/lib/live-counts";
 import { shouldShowTermsPrompt } from "@/lib/terms";
 
+// The path in order: find, shortlist, offer, interview, hire, then timesheet and pay.
+// Shortlist and Compare sit under Candidates (tabs there, and the bag in the header);
+// Interviews sit under Proposals. `also` keeps the right item lit on every sub-page.
 const NAV_GROUPS: ConsoleNavGroup[] = [
   {
-    title: "Talent & Pipeline",
+    title: "Hiring",
     items: [
       { href: "/employer/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
-      { href: "/employer/candidates", label: "Candidates", icon: <Users /> },
-      { href: "/employer/compare", label: "Compare", icon: <GitCompare /> },
-      { href: "/employer/projects", label: "Projects", icon: <FolderKanban /> },
-    ],
-  },
-  {
-    title: "Proposals & Hiring",
-    items: [
-      { href: "/employer/proposals", label: "Proposals", icon: <FileText /> },
+      {
+        href: "/employer/candidates",
+        label: "Candidates",
+        icon: <Users />,
+        also: ["/employer/compare", "/employer/cart", "/employer/shortlist", "/employer/intern"],
+      },
+      { href: "/employer/projects", label: "Internships", icon: <FolderKanban /> },
+      {
+        href: "/employer/proposals",
+        label: "Proposals",
+        icon: <FileText />,
+        also: ["/employer/proposal", "/employer/send-proposal", "/employer/schedule"],
+      },
       { href: "/employer/messages", label: "Messages", icon: <MessageSquare /> },
-      { href: "/employer/schedule", label: "Schedule", icon: <CalendarDays /> },
-      { href: "/employer/timesheets", label: "Timesheets", icon: <Clock /> },
     ],
   },
   {
-    title: "Billing & Account",
+    title: "After the hire",
     items: [
-      { href: "/employer/cart", label: "Shortlist", icon: <ShoppingBag /> },
-      { href: "/employer/orders", label: "Orders", icon: <ShoppingCart /> },
-      { href: "/employer/account", label: "Company profile", icon: <Building2 /> },
+      { href: "/employer/timesheets", label: "Timesheets", icon: <Clock /> },
+      { href: "/employer/orders", label: "Orders", icon: <ShoppingCart />, also: ["/employer/checkout"] },
     ],
   },
 ];
@@ -99,17 +101,22 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     // Keep fallback
   }
 
-  const badgeFor = (href: string): number | undefined =>
-    href === "/employer/cart" ? cartCount : href === "/employer/messages" ? live.messages : undefined;
+  // Only Messages carries a count in the sidebar: it is the one queue that needs the employer.
   const withBadge = (i: ConsoleNavItem): ConsoleNavItem => {
-    const n = badgeFor(i.href);
-    return n && n > 0 ? { ...i, badge: n > 99 ? "99+" : n, attention: i.href === "/employer/messages" || undefined } : i;
+    const n = i.href === "/employer/messages" ? live.messages : 0;
+    return n > 0 ? { ...i, badge: n > 99 ? "99+" : n, attention: true } : i;
   };
   const groups = NAV_GROUPS.map((g) => ({ ...g, items: g.items.map(withBadge) }));
   // Phone tab bar: the five places an employer returns to (the rest stay in the menu).
   const flat = groups.flatMap((g) => g.items);
+  const shortlistTab: ConsoleNavItem = {
+    href: "/employer/cart",
+    label: "Shortlist",
+    icon: <ShoppingBag />,
+    ...(cartCount > 0 ? { badge: cartCount > 99 ? "99+" : cartCount } : {}),
+  };
   const tabs = ["/employer/dashboard", "/employer/candidates", "/employer/proposals", "/employer/messages", "/employer/cart"]
-    .map((href) => flat.find((i) => i.href === href))
+    .map((href) => (href === shortlistTab.href ? shortlistTab : flat.find((i) => i.href === href)))
     .filter((i): i is ConsoleNavItem => Boolean(i));
   const unreadAlerts = live.notifications;
 
