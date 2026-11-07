@@ -125,7 +125,6 @@ export default async function EmployerAlerts({
     <div>
       <PageHeader
         title="Alerts"
-        subtitle="Offer replies, interviews, timesheets and payments, newest first."
         action={<NotificationList mode="mark-all" disabled={unread === 0} />}
       />
 

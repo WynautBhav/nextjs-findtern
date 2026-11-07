@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { ArrowLeft, Send } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Send } from "lucide-react";
 
 import { MESSAGE_EVENT } from "@/components/app/live-provider";
 import { PresenceDot } from "@/components/app/presence-dot";
@@ -217,7 +217,7 @@ export function ThreadView({
           <p className="py-8 text-center text-sm text-ink-600">No messages yet. Say hello.</p>
         ) : null}
         {messages.map((m) => (
-          <Bubble key={m.id} mine={m.mine} body={m.body} at={m.createdAt} footer={m === lastMine && seen ? "Seen" : null} />
+          <Bubble key={m.id} mine={m.mine} body={m.body} at={m.createdAt} footer={m === lastMine ? (seen ? "Seen" : "Sent") : null} />
         ))}
         {outbox.map((o) => (
           <div key={o.clientId} className="flex flex-col items-end gap-1">
@@ -306,7 +306,12 @@ function Bubble({ mine, body, at, footer, dim = false }: { mine: boolean; body: 
             {stamp(at)}
           </time>
         ) : null}
-        {footer ? <span>{footer}</span> : null}
+        {footer ? (
+          <span className="inline-flex items-center gap-1 text-ink-600">
+            {footer === "Seen" ? <CheckCheck aria-hidden className="size-3.5" /> : footer === "Sent" ? <Check aria-hidden className="size-3.5" /> : null}
+            {footer}
+          </span>
+        ) : null}
       </p>
     </div>
   );

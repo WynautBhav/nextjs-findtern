@@ -135,10 +135,9 @@ export function ProjectsManager({
       {dialog}
       <PageHead
         title="Projects"
-        lede="What you're hiring for. Candidates are matched on each project's skills, work mode and place."
         action={
           projects.length > 0 ? (
-            <ButtonLink href="/employer/projects/new" variant="primary" size="md">
+            <ButtonLink href="/employer/projects/new" variant="primary" size="md" className="rounded-full max-sm:w-full">
               <Plus className="size-4" aria-hidden />
               Post a project
             </ButtonLink>
@@ -320,12 +319,12 @@ function ProjectRow({
         {skills.length > 0 ? (
           <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Skills">
             {skills.slice(0, 7).map((skill) => (
-              <li key={skill} className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
+              <li key={skill} className="inline-flex h-7 items-center rounded-full px-2.5 text-[13px] font-medium text-ink-700 ring-1 ring-inset ring-ink-200">
                 {skill}
               </li>
             ))}
             {skills.length > 7 ? (
-              <li className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
+              <li className="inline-flex h-7 items-center px-1 text-[13px] font-medium text-ink-600">
                 +{skills.length - 7}
                 <span className="sr-only"> more skills</span>
               </li>
@@ -348,12 +347,12 @@ function ProjectRow({
 
       <div className="flex items-center gap-2 lg:justify-end">
         {state === "live" ? (
-          <ButtonLink href={`/employer/candidates?project=${encodeURIComponent(p.id)}`} variant="primary" size="sm">
+          <ButtonLink href={`/employer/candidates?project=${encodeURIComponent(p.id)}`} variant="outline" size="sm" className="rounded-full px-4">
             <Users className="size-4" aria-hidden />
             Find candidates
           </ButtonLink>
         ) : state === "paused" ? (
-          <button type="button" onClick={() => onStatus("active")} disabled={busy} className={buttonClass({ variant: "outline", size: "sm" })}>
+          <button type="button" onClick={() => onStatus("active")} disabled={busy} className={buttonClass({ variant: "outline", size: "sm", className: "rounded-full px-4" })}>
             <Play className="size-4" aria-hidden />
             {busy ? "Resuming…" : "Resume"}
           </button>

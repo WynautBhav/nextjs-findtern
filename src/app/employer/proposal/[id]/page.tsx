@@ -9,7 +9,7 @@ import { requireRole } from "@/lib/auth";
 import { canAccess } from "@/lib/security/guards";
 import { initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
-import { formatDmy, formatMoney } from "@/lib/format";
+import { formatDate as formatWords, formatMoney } from "@/lib/format";
 import { fullTimeFeeMinor } from "@/lib/checkout";
 import { laptopLabel, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
 import { shiftInIst } from "@/lib/timezones";
@@ -479,12 +479,12 @@ export default async function EmployerProposalDetail({
   );
 }
 
-/** DD/MM/YYYY (bug sheet 7), in India time. */
+/** "1 Dec 2026", in India time (S6). */
 function formatDate(value: Date | string | null): string {
   if (!value) return "-";
   const d = typeof value === "string" ? new Date(`${value.slice(0, 10)}T00:00:00+05:30`) : new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
-  return formatDmy(d);
+  return formatWords(d);
 }
 
 /** "problemSolving" / "problem_solving" → "Problem solving". */
