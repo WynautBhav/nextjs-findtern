@@ -57,9 +57,9 @@ function localDatabaseUrl() {
   if (!["localhost", "127.0.0.1", "::1"].includes(host)) throw new Error(`STAGING_LOCAL_DB_URL must be a loopback host (got ${host})`);
   return url;
 }
-const sslFor = () => (localDatabaseUrl() ? false : { rejectUnauthorized: true });
+export const sslFor = () => (localDatabaseUrl() ? false : { rejectUnauthorized: true });
 
-function stagingDatabaseUrl() {
+export function stagingDatabaseUrl() {
   const local = localDatabaseUrl();
   if (local) return local;
   const file = process.env.NEON_ENV_FILE || join(homedir(), "findtern-dumps", ".neon.env");
