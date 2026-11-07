@@ -11,6 +11,9 @@ import { SkillFilter } from "@/components/employer/skill-filter";
 import { KeepFocusClear } from "@/components/app/keep-focus-clear";
 import { PageHead } from "@/components/app/primitives";
 import { RememberSelection } from "@/components/employer/remember-selection";
+import { HireFlow } from "@/components/employer/hire-flow";
+import { CandidateTabs } from "@/components/employer/section-tabs";
+import { hireFlowCountsFor } from "@/lib/employer-flow";
 import { cn } from "@/lib/utils";
 import { FILTER_PANEL_COOKIE } from "@/lib/rail";
 import { FilterCollapse } from "@/components/employer/candidate-filter-collapse";
@@ -57,10 +60,13 @@ export default async function CandidatesPage({
   if (!filters.project && remembered.project) filters.project = remembered.project;
   const compareIds = filters.ids;
 
-  const data = await loadCandidates(uid, filters, {
-    hasFilterParams: FILTER_KEYS.some((key) => params[key as keyof SearchParams] !== undefined),
-    fresh: one(params.fresh) === "1",
-  });
+  const [data, flow] = await Promise.all([
+    loadCandidates(uid, filters, {
+      hasFilterParams: FILTER_KEYS.some((key) => params[key as keyof SearchParams] !== undefined),
+      fresh: one(params.fresh) === "1",
+    }),
+    hireFlowCountsFor(uid),
+  ]);
   if (data.restoreTo) redirect(data.restoreTo);
 
   const { total, loadFailed, activeProjectId, projectApplied } = data;
@@ -74,8 +80,10 @@ export default async function CandidatesPage({
       <PageHead
         title="Candidates"
         lede="Names and contact details unlock once your hire is paid. Photos and scores are visible now."
-        className="mb-5 lg:mb-7"
+        className="mb-4 lg:mb-5"
       />
+      <CandidateTabs active="candidates" shortlist={flow?.shortlisted ?? 0} compare={compareIds.length} />
+      {flow ? <HireFlow counts={flow} current="candidates" /> : null}
 
       {/*
         Phones: search and the Filters button share the top line, the skill tokens sit under them, then the list.

@@ -14,6 +14,9 @@ import { PageHead } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { ButtonLink } from "@/components/ui/button";
+import { HireFlow } from "@/components/employer/hire-flow";
+import { ProposalTabs } from "@/components/employer/section-tabs";
+import { hireFlowCountsFor } from "@/lib/employer-flow";
 import { ProposalsManager, type ProposalItem } from "@/components/employer/proposals-manager";
 
 export const metadata: Metadata = {
@@ -45,6 +48,7 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
 
   let proposals: ProposalItem[] = [];
   let loadFailed = false;
+  const flow = await hireFlowCountsFor(employerId);
 
   try {
     const db = getDb();
@@ -106,7 +110,10 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
             Send a proposal
           </ButtonLink>
         }
+        className="mb-4 lg:mb-5"
       />
+      <ProposalTabs active="proposals" />
+      {flow ? <HireFlow counts={flow} current="proposals" /> : null}
 
       {loadFailed ? (
         <LoadError what="your proposals" retryHref="/employer/proposals" email={SITE.adminEmail} />
