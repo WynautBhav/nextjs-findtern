@@ -70,9 +70,15 @@ export default async function EmployerCartPage({
     <div>
       <PageHead
         title="Shortlist"
-        lede="Candidates you've saved. Book a meeting if you'd like to talk first, then send a proposal; you pay only once a candidate accepts."
+        // The path strip under the head says the same steps; phones keep the list higher.
+        lede={<span className="max-sm:sr-only">Book a meeting or send a proposal. You pay only once a candidate accepts.</span>}
+        className="mb-4 lg:mb-6"
       />
-      <HireFlow counts={data.counts} current="cart" />
+      {/* The strip counts people, not proposals. */}
+      <div title="People, not proposals">
+        <p className="sr-only">People, not proposals.</p>
+        <HireFlow counts={data.counts} current="cart" />
+      </div>
       <CartManager
         employerId={session.uid}
         initialCartLines={data.lines}

@@ -196,6 +196,15 @@ export function Results({
               </p>
             ) : null}
           </div>
+        ) : filters.q ? (
+          // The typed keyword is the likeliest cause: name it and offer to drop just that.
+          <EmptyScene
+            art
+            title={`No candidates match “${filters.q}”`}
+            body="Search looks at skills and cities, for example React or Pune. Names and profiles are not searched."
+            next={{ label: "Clear the search", href: withFilters(filters, { q: "", page: "" }) }}
+            who="You - try another word"
+          />
         ) : (
           <EmptyScene
             art

@@ -14,7 +14,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Plus } from "lucide-react";
+import { Heart, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -93,10 +93,9 @@ export function ShortlistToggle({
       >
         {busy ? (
           <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
-        ) : state ? (
-          <Check className="size-4" aria-hidden />
         ) : (
-          <Plus className="size-4" aria-hidden />
+          // The heart the candidate list uses for the same shortlist.
+          <Heart className={cn("size-4", state && "fill-current")} aria-hidden />
         )}
         {state ? "Shortlisted" : "Shortlist"}
       </button>

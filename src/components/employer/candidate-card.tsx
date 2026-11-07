@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Heart, Laptop, Loader2, MapPin, Send } from "lucide-react";
+import { Check, Heart, Loader2, MapPin, Send } from "lucide-react";
 
 import { formatRate } from "@/lib/format";
 import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
@@ -51,11 +51,11 @@ export interface CandidateCardProps {
 }
 
 /**
- * Save = the shortlist for this project (the existing cart API). Heart and
- * "Save"/"Saved" from sm up; the heart alone on a phone. Not `disabled` while
- * saving: that drops keyboard focus. An offer already out goes to it.
+ * The heart = this project's shortlist (the existing cart API), as an icon
+ * button at every width. Not `disabled` while saving: that drops keyboard
+ * focus. An offer already out goes to it.
  */
-export function SaveToggle({ internId, projectId, shortlisted }: { internId: string; projectId: string; shortlisted: boolean }) {
+export function SaveToggle({ internId, projectId, shortlisted, name }: { internId: string; projectId: string; shortlisted: boolean; name?: string }) {
   const router = useRouter();
   const [on, setOn] = useState(shortlisted);
   const [busy, setBusy] = useState(false);
@@ -93,10 +93,12 @@ export function SaveToggle({ internId, projectId, shortlisted }: { internId: str
         onClick={toggle}
         aria-disabled={busy || undefined}
         aria-pressed={on}
-        title={on ? "Saved to this project's shortlist. Press to remove." : "Save to this project's shortlist"}
+        // Upwork's heart: an icon alone, named for screen readers, its state in aria-pressed.
+        aria-label={name ? `Shortlist ${name}` : "Shortlist"}
+        title={on ? "On this project's shortlist. Press to remove." : "Add to this project's shortlist"}
         className={cn(
-          "inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 max-sm:w-11 max-sm:px-0 sm:h-9 sm:touch:h-11",
-          on ? "text-brand-800 hover:bg-brand-50" : "text-ink-700 hover:bg-ink-100 hover:text-ink-900",
+          "grid size-11 shrink-0 place-items-center rounded-full ring-1 ring-inset transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:size-9 sm:touch:size-11",
+          on ? "text-brand-700 ring-brand-200 hover:bg-brand-50" : "text-ink-600 ring-ink-200 hover:bg-ink-100 hover:text-ink-900",
         )}
       >
         {busy ? (
@@ -104,7 +106,6 @@ export function SaveToggle({ internId, projectId, shortlisted }: { internId: str
         ) : (
           <Heart className={cn("size-[18px]", on && "fill-brand-700 text-brand-700")} aria-hidden />
         )}
-        <span className="max-sm:sr-only">{on ? "Saved" : "Save"}</span>
       </button>
       {error ? (
         <span role="alert" className="absolute right-4 top-full z-20 mt-1 max-w-64 rounded-md bg-white px-2 py-1 text-xs text-danger shadow-md ring-1 ring-danger/30">
@@ -201,7 +202,7 @@ export function CandidateCard({
 
   return (
     <li className="group/row relative grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3.5 gap-y-3 py-5 sm:gap-x-5 sm:gap-y-2.5 sm:py-6">
-      <RowAvatar photoUrl={candidate.photoUrl} initials={candidate.initials} presence={presence} />
+      <RowAvatar photoUrl={candidate.photoUrl} initials={candidate.initials} seed={candidate.id} presence={presence} />
 
       <div className="min-w-0 self-center sm:self-start">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -237,7 +238,7 @@ export function CandidateCard({
 
       {/* Desktop: Save · Compare · Send proposal, top right. Phone: the heart alone, top right. */}
       <div className="relative z-10 flex items-start gap-1 sm:gap-1.5">
-        {canSave && projectId ? <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} /> : null}
+        {canSave && projectId ? <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} name={displayName} /> : null}
         <div className="flex items-center gap-1.5 max-sm:hidden">
           {comparable ? <CompareToggle href={compareHref} selected={selected} name={displayName} /> : null}
           {primary}
@@ -255,16 +256,10 @@ export function CandidateCard({
 
       {/* Stats line and skills: under the identity, running under the actions too. */}
       <div className="col-span-3 min-w-0 sm:col-span-2 sm:col-start-2">
-        <p className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-700">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-700 sm:gap-x-5 sm:gap-y-1.5">
           <ScoreBadge score={candidate.score} scored={candidate.scored} />
           <span className="nums font-semibold text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</span>
           {modes ? <span>{modes}</span> : null}
-          {candidate.hasLaptop !== null ? (
-            <span className="inline-flex items-center gap-1.5">
-              <Laptop className="size-4 shrink-0 text-ink-400" aria-hidden />
-              {candidate.hasLaptop ? "Own laptop" : "Needs a laptop"}
-            </span>
-          ) : null}
         </p>
         <SkillChips className="mt-3" skills={candidate.skills} wanted={wantedSkills} />
       </div>
