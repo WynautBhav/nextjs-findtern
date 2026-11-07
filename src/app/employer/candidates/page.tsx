@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
@@ -11,6 +12,8 @@ import { KeepFocusClear } from "@/components/app/keep-focus-clear";
 import { PageHead } from "@/components/app/primitives";
 import { RememberSelection } from "@/components/employer/remember-selection";
 import { cn } from "@/lib/utils";
+import { FILTERS_COOKIE } from "@/lib/rail";
+import { FilterCollapse } from "@/components/employer/candidate-filter-collapse";
 import { FilterColumn } from "./_filters";
 import { CandidateSearch, Results } from "./_results";
 import {
@@ -38,6 +41,8 @@ export default async function CandidatesPage({
   const uid = session.uid;
   await requireEmployerSetup(uid);
   const params = await searchParams;
+  // From lg up the filter column can be hidden; the choice is a cookie, so the server paints it with no flash.
+  const filtersHidden = (await cookies()).get(FILTERS_COOKIE)?.value === "1";
 
   // Legacy `?ftInternId=` opened the full-time offer for a hire: the offer
   // lives on the candidate's profile now.
@@ -66,17 +71,24 @@ export default async function CandidatesPage({
 
   return (
     <div>
-      <PageHead title="Candidates" className="mb-4 lg:mb-6" />
+      <PageHead
+        title="Candidates"
+        lede="Names and contact details unlock once your hire is paid. Photos and scores are visible now."
+        className="mb-5 lg:mb-7"
+      />
 
       {/*
         Phones: search and the Filters button share the top line, the skill tokens sit under them, then the list.
         lg: search and skills span the top; the filter column and the results sit side by side under them.
       */}
       {/* DOM order is the tab order: search, skills, then the filter column (row 3 at lg), then results. */}
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-x-12">
-        <CandidateSearch filters={filters} className="col-start-1 row-start-1 lg:col-span-2 lg:max-w-[44rem]" />
+      <FilterCollapse
+        initialHidden={filtersHidden}
+        className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-x-12 lg:data-[filters=hidden]:grid-cols-[minmax(0,1fr)]"
+      >
+        <CandidateSearch filters={filters} className="col-start-1 row-start-1 lg:col-span-full lg:max-w-[44rem]" />
         <SkillFilter
-          className="col-span-2 row-start-2 mt-2 mb-3 lg:mb-6"
+          className="col-span-2 row-start-2 mt-2 mb-3 lg:col-span-full lg:mb-6"
           active={data.effectiveSkills}
           projectSkills={data.activeProjectSkills}
           fromProject={!filters.skillsSet && filters.projectDefaults && data.activeProjectSkills.length > 0}
@@ -97,7 +109,7 @@ export default async function CandidatesPage({
           ) : null}
         </SkillFilter>
 
-        <div className="col-start-2 row-start-1 lg:col-span-1 lg:col-start-1 lg:row-start-3">
+        <div id="candidate-filter-column" className="col-start-2 row-start-1 lg:col-span-1 lg:col-start-1 lg:row-start-3 lg:group-data-[filters=hidden]/fl:hidden">
           <FilterColumn
             filters={filters}
             projects={data.projects}
@@ -112,7 +124,7 @@ export default async function CandidatesPage({
         </div>
 
         {/* Phones: the compare tray sits over the bottom nav, so the last row needs room to scroll clear of it. */}
-        <div className={cn("col-span-2 row-start-3 min-w-0 lg:col-span-1 lg:col-start-2", compareIds.length >= 1 && "pb-24")}>
+        <div className={cn("col-span-2 row-start-3 min-w-0 lg:col-span-1 lg:col-start-2 lg:group-data-[filters=hidden]/fl:col-start-1", compareIds.length >= 1 && "pb-24")}>
           <RememberSelection employerId={uid} project={activeProjectId} compare={compareIds} filters={loadFailed ? undefined : rememberQueryOf(filters)} />
 
           {compareIds.length >= 1 ? (
@@ -150,7 +162,7 @@ export default async function CandidatesPage({
 
           <Results data={data} filters={filters} compareIds={compareIds} />
         </div>
-      </div>
+      </FilterCollapse>
     </div>
   );
 }

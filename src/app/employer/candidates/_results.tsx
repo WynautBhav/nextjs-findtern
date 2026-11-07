@@ -10,10 +10,12 @@ import { CandidateCard } from "@/components/employer/candidate-card";
 import { EmptyScene } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { buttonClass } from "@/components/ui/button";
+import { FiltersToggle } from "@/components/employer/candidate-filter-collapse";
 import { SortSelect } from "./_sort-select";
 import {
   SORT_OPTIONS,
   activeChips,
+  activeFilterCount,
   queryOf,
   resetHref,
   titleCase,
@@ -89,7 +91,9 @@ export function Results({
   return (
     <>
       {/* One results bar: count and project, then All | Shortlist and Sort. */}
-      <div className="mb-1 flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-ink-100 pb-3">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-ink-100 pb-4">
+        {/* lg and up: hide or show the filter column (phones have the Filters sheet). */}
+        <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(filters)} />
         {loadFailed ? null : (
           <h2 className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-ink-900 max-sm:sr-only">
             <span role="status" className="nums whitespace-nowrap">
@@ -139,7 +143,7 @@ export function Results({
       </div>
 
       {chips.length > 0 ? (
-        <ul aria-label="Active filters" className="flex flex-wrap items-center gap-x-1 py-2">
+        <ul aria-label="Active filters" className="flex flex-wrap items-center gap-x-1 pt-3">
           {chips.map((chip) => (
             <li key={chip.key}>
               <Link
@@ -217,7 +221,7 @@ export function Results({
       ) : (
         <>
           {/* Thin dividers, no box per row: one list. */}
-          <ul className="divide-y divide-ink-100">
+          <ul className="mt-1 divide-y divide-ink-100">
             {candidates.map((candidate) => {
               const rel = data.relations.get(candidate.id);
               return (
@@ -242,6 +246,7 @@ export function Results({
                   wantedSkills={data.effectiveSkills}
                   presence={data.presence[candidate.id] ?? null}
                   interested={data.saved.has(candidate.id)}
+                  pendingMeetingAt={rel?.pendingMeetingAt ?? null}
                 />
               );
             })}

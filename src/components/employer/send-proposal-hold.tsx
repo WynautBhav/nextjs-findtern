@@ -22,7 +22,7 @@ export function SendProposalHold({
   const hold = sendProposalHold(pendingMeetingAt);
   if (!hold) return null;
   return (
-    <span className={cn("flex min-w-0 flex-col items-end gap-1 max-sm:items-start", className)}>
+    <span className={cn("flex min-w-0 flex-col items-end gap-1", className)}>
       <span
         aria-disabled="true"
         className={cn(
