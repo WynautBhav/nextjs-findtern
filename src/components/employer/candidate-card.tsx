@@ -55,7 +55,7 @@ export interface CandidateCardProps {
  * button at every width. Not `disabled` while saving: that drops keyboard
  * focus. An offer already out goes to it.
  */
-export function HeartToggle({ internId, projectId, shortlisted }: { internId: string; projectId: string; shortlisted: boolean }) {
+export function SaveToggle({ internId, projectId, shortlisted, name }: { internId: string; projectId: string; shortlisted: boolean; name?: string }) {
   const router = useRouter();
   const [on, setOn] = useState(shortlisted);
   const [busy, setBusy] = useState(false);

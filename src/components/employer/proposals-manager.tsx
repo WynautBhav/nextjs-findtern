@@ -43,6 +43,8 @@ function nameOf(item: ProposalItem): string {
 /** Rows shown at a time; "Show more" adds another page (as Projects). */
 const PAGE = 20;
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
 function formatStart(iso: string | null): string | null {
   if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
   const [y, m, d] = iso.slice(0, 10).split("-");
@@ -155,7 +157,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
   return (
     <div>
       {showTools ? (
-        <div className="mb-5 flex flex-col gap-2 sm:flex-row">
+        <div className="mb-5 flex gap-2">
           <label className="relative min-w-0 flex-1 sm:max-w-xl">
             <span className="sr-only">Search proposals</span>
             <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
@@ -163,7 +165,10 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
               ref={searchRef}
               type="search"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setShown(PAGE);
+              }}
               placeholder="Search by role, project or initials"
               className={cn(fieldClass, "rounded-full pl-10")}
             />
@@ -171,8 +176,11 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
           {projectOptions.length > 1 ? (
             <select
               value={projectFilter}
-              onChange={(e) => setProjectFilter(e.target.value)}
-              className={cn(fieldClass, "rounded-full sm:w-56")}
+              onChange={(e) => {
+                setProjectFilter(e.target.value);
+                setShown(PAGE);
+              }}
+              className={cn(fieldClass, "w-36 shrink-0 truncate rounded-full sm:w-56")}
               aria-label="Project"
             >
               <option value="all">All projects</option>
@@ -196,7 +204,10 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
               key={t.key}
               type="button"
               aria-pressed={on}
-              onClick={() => setStatusFilter(t.key)}
+              onClick={() => {
+                setStatusFilter(t.key);
+                setShown(PAGE);
+              }}
               className={cn(
                 "relative -mb-px inline-flex min-h-12 min-w-11 items-center justify-center gap-1 whitespace-nowrap sm:gap-1.5 text-sm outline-none transition-colors",
                 "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
@@ -237,6 +248,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                   setSearch("");
                   setStatusFilter("all");
                   setProjectFilter("all");
+                  setShown(PAGE);
                   // The button unmounts with the empty state: keep focus on the toolbar.
                   searchRef.current?.focus();
                 }}
@@ -250,7 +262,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
         </div>
       ) : (
         <ul className="divide-y divide-ink-100">
-          {filtered.map(({ item, offer, state }) => {
+          {filtered.slice(0, shown).map(({ item, offer, state }) => {
             const ini = initialsOf(item.user?.firstName?.trim() || "", item.user?.lastName?.trim() || "");
             const ft = offer.fullTime;
             // Full-time rows: annual CTC, not "-/month" (EMH-19). Only the
@@ -275,23 +287,24 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
               >
                 <ProposalAvatar photoUrl={item.photoUrl} initials={ini === "?" ? "C" : ini} presence={item.presence} />
                 <div className="min-w-0">
-                  <p className="truncate text-sm text-ink-600">
-                    <span className="font-semibold text-ink-900">{who}</span>
-                    {item.project ? ` · ${item.project.projectName}` : ""}
-                  </p>
-                  <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1">
-                    {/* The whole row opens the offer: the title's link is
+                  <p className="text-base leading-snug text-ink-600">
+                    {/* The whole row opens the offer: the name's link is
                         stretched over it, and keeps its own focus ring. */}
                     <Link
                       href={href}
+                      aria-label={`${title}, ${who}`}
                       className={cn(
-                        "break-words text-lg font-semibold leading-snug tracking-[-0.01em] outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-600",
+                        "break-words font-semibold outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-600",
                         closed ? "text-ink-700" : "text-ink-900",
                       )}
                     >
                       {who}
                     </Link>
+                    {item.project ? ` · ${item.project.projectName}` : ""}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-600">
                     {pill}
+                    <span className="break-words">{title}</span>
                   </div>
                   <p className="nums mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-600">
                     <span>
@@ -310,7 +323,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                 {/* Above the stretched link, so these stay clickable. */}
                 <div className="relative z-10 col-span-2 flex items-center gap-3 max-lg:pl-[4.5rem] max-sm:pl-0 lg:col-span-1">
                   {/* One visible action, chosen by the state (QA-120); the menu holds the rest. */}
-                  <div className="min-w-0 max-sm:flex-1 [&_button]:max-sm:w-full [&_a]:max-sm:w-full lg:w-36 [&_button]:lg:w-full [&_a]:lg:w-full">
+                  <div className="min-w-0 max-sm:flex-1 [&_a]:rounded-full [&_button]:rounded-full [&_button]:max-sm:w-full [&_a]:max-sm:w-full lg:w-36 [&_button]:lg:w-full [&_a]:lg:w-full">
                     {state.canPay ? (
                       <Link href="/employer/checkout" className={buttonClass({ variant: "primary" })}>
                         <CreditCard className="size-4" aria-hidden />
@@ -336,7 +349,16 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
           })}
         </ul>
       )}
-      {filtering && filtered.length > 0 ? (
+      {filtered.length > shown ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-ink-100 pt-6">
+          <button type="button" onClick={() => setShown((n) => n + PAGE)} className={buttonClass({ variant: "outline", size: "md", className: "min-h-11" })}>
+            Show {Math.min(PAGE, filtered.length - shown)} more
+          </button>
+          <p className="nums text-sm text-ink-600">
+            Showing {shown} of {filtered.length}
+          </p>
+        </div>
+      ) : filtering && filtered.length > 0 ? (
         <p className="mt-2 text-sm text-ink-600">
           Showing <span className="nums font-semibold text-ink-900">{filtered.length}</span> of <span className="nums">{proposals.length}</span>
         </p>

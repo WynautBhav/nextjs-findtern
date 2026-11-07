@@ -3,7 +3,7 @@ import { proposalPill } from "@/components/employer/proposal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
-import { ArrowLeft, Check, ExternalLink, FileText, Link2, MapPin, Send, Video } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, Link2, MapPin, Send, Video } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -11,7 +11,8 @@ import { candidateRelations, isAdminViewing, type CandidateRelation } from "@/li
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { PLAN_NAME, bandFor } from "@/lib/score";
 import { formatDate, formatMoney, formatRate } from "@/lib/format";
-import { RATING_META, displayNameOf, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { RATING_META, displayNameOf, isCatalogSkill, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { hideContactText } from "@/lib/contact-scrub";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { SkillChips } from "@/components/employer/candidate-row-parts";
@@ -28,7 +29,7 @@ import { parseOffer } from "@/lib/offer";
 import { timezoneForLocation } from "@/lib/timezones";
 import { dateLabel, draftFromRecord, linkedinHref, type OnboardingDraft } from "@/lib/onboarding";
 import { PageHead, Pill } from "@/components/app/primitives";
-import { ScoreScale } from "@/components/app/tiles";
+import { ScoreBar } from "@/components/app/score-bar";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
@@ -120,7 +121,7 @@ export default async function EmployerInternDetail({
       // newest open one (EMH-15).
       const projectRows = (
         await db
-          .select({ id: schema.projects.id, status: schema.projects.status, projectName: schema.projects.projectName, skills: schema.projects.skills })
+          .select({ id: schema.projects.id, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt, projectName: schema.projects.projectName, skills: schema.projects.skills })
           .from(schema.projects)
           .where(eq(schema.projects.employerId, employerId))
           .orderBy(desc(schema.projects.createdAt))
@@ -312,12 +313,13 @@ export default async function EmployerInternDetail({
       : null;
 
   const plan = PLAN_NAME[band.id];
-  const wantedSet = new Set((wanted?.skills ?? []).map(skillKey));
-  const isWanted = (skill: string) => wantedSet.has(skillKey(skill));
-  const skills = [...profile.skills.filter(isWanted), ...profile.skills.filter((s) => !isWanted(s))];
-  const matchCount = skills.filter(isWanted).length;
-  const headline = academics ? [academics.degree, academics.specialization].filter(Boolean).join(", ") : "";
-  const prefers = preferredCities(profile.preferredLocations);
+  const wantedSet = new Set((wanted?.skills ?? []).map((s) => skillBaseName(s).toLowerCase()));
+  const skills = profile.skills;
+  const matchCount = skills.filter((s) => wantedSet.has(skillBaseName(s).toLowerCase())).length;
+  const headline = studyOf(academics);
+  // "Also works in" lists the other cities only: the home city is already in the line before it.
+  const homeCity = (profile.location ?? "").split(",")[0].trim().toLowerCase();
+  const prefers = preferredCities(profile.preferredLocations).filter((c) => c.trim().toLowerCase() !== homeCity);
   const axes = RATING_META.map((m) => ({ label: m.label, value: profile.ratings[m.key] > 0 ? Math.min(10, profile.ratings[m.key]) : null }));
   const rated = axes.filter((a): a is { label: string; value: number } => a.value !== null).sort((a, b) => b.value - a.value);
   const linkedin = nameUnlocked ? linkedinHref(profile.linkedinUrl) : null;
@@ -355,7 +357,8 @@ export default async function EmployerInternDetail({
               <CandidateAvatar
                 photoUrl={profile.photoUrl}
                 initials={profile.initials}
-                className="size-18 rounded-full text-xl ring-1 ring-inset ring-brand-200/70 sm:size-24 sm:text-2xl"
+                seed={profile.id}
+                className="size-18 rounded-full text-xl ring-1 ring-inset ring-black/5 sm:size-24 sm:text-2xl"
               />
               {presence ? (
                 <span
@@ -370,7 +373,11 @@ export default async function EmployerInternDetail({
                   {displayName}
                   {nameUnlocked ? null : <span className="sr-only">, initials only until you hire</span>}
                 </h1>
-                {status ? <Pill tone={status.tone}>{status.label}</Pill> : null}
+                {status && statusProjectName ? (
+                  <Pill tone={status.tone} className="max-w-full">
+                    <span className="truncate">{statusProjectName}: {status.label}</span>
+                  </Pill>
+                ) : null}
               </div>
               {headline ? <p className="mt-1 break-words text-lg leading-snug text-ink-800 sm:text-xl">{headline}</p> : null}
               <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
@@ -399,7 +406,7 @@ export default async function EmployerInternDetail({
           <dl className="mt-6 grid grid-cols-[auto_auto_auto] justify-start gap-x-8 gap-y-4 sm:flex sm:flex-wrap sm:gap-x-12 sm:pl-30">
             <div>
               <dt className="text-sm text-ink-600">Findtern Score</dt>
-              <dd className="nums mt-0.5 text-4xl font-semibold leading-none tracking-[-0.02em] text-brand-700">
+              <dd className="nums mt-0.5 text-4xl font-semibold leading-none tracking-[-0.02em] text-ink-900">
                 {profile.scored ? (
                   <>
                     {profile.score.toFixed(1)}
@@ -483,7 +490,7 @@ export default async function EmployerInternDetail({
               <div className="border-t border-ink-100 pt-4">
                 <h2 className="text-sm font-semibold text-ink-900">Your proposals to them</h2>
                 <ul className="mt-2 space-y-2">
-                  {appliedProjects.map((entry) => {
+                  {appliedProjects.slice(0, PROPOSALS_SHOWN).map((entry) => {
                     const pill = proposalPill(entry.status, entry.fullTime);
                     return (
                       <li key={entry.id} className="flex min-w-0 items-start justify-between gap-3 text-sm">
@@ -495,6 +502,11 @@ export default async function EmployerInternDetail({
                     );
                   })}
                 </ul>
+                {appliedProjects.length > PROPOSALS_SHOWN ? (
+                  <Link href="/employer/proposals" className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900">
+                    See all {appliedProjects.length} in Proposals
+                  </Link>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -513,76 +525,65 @@ export default async function EmployerInternDetail({
                   </p>
                 ) : null}
               </div>
-              <ul className="flex flex-wrap gap-2">
-                {skills.slice(0, MAX_SKILLS).map((skill) => (
-                  <SkillChip key={skill} skill={skill} matched={isWanted(skill)} />
-                ))}
-              </ul>
-              {skills.length > MAX_SKILLS ? (
-                <details className="group mt-2">
-                  <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-apple-sm text-sm font-medium text-brand-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 [&::-webkit-details-marker]:hidden">
-                    <span className="group-open:hidden">+{skills.length - MAX_SKILLS} more</span>
-                    <span className="hidden group-open:inline">Show fewer</span>
-                  </summary>
-                  <ul className="flex flex-wrap gap-2">
-                    {skills.slice(MAX_SKILLS).map((skill) => (
-                      <SkillChip key={skill} skill={skill} matched={isWanted(skill)} />
-                    ))}
-                  </ul>
-                </details>
-              ) : null}
+              {/* The same chips as the candidate list: project matches first and ticked, at most seven, then +N. */}
+              <SkillChips skills={skills} wanted={wanted?.skills ?? []} />
             </section>
           ) : null}
 
           <section id="ai-report" aria-labelledby="ai-h" className={`${SECTION} scroll-mt-24`}>
-            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-              <div className="min-w-0">
-                <h2 id="ai-h" className={H2}>
-                  AI interview
-                </h2>
-                <p className="mt-1 text-sm text-ink-600">
-                  {rated.length === 0 ? (
-                    "No AI interview score yet. The breakdown appears once the interview is reviewed."
-                  ) : rated.length > 1 && rated[0].value !== rated[rated.length - 1].value ? (
+            <h2 id="ai-h" className={H2}>
+              AI interview
+            </h2>
+            {/* The bars are the evidence; the sentence only names the spread. All parts tied: the bars say it. */}
+            {rated.length === 0 ? (
+              <p className="mt-1 text-sm text-ink-600">No AI interview score yet. The breakdown appears once the interview is reviewed.</p>
+            ) : rated.length > 1 && rated[0].value !== rated[rated.length - 1].value ? (
+              <p className="mt-1 text-sm text-ink-600">
+                Strongest in {rated[0].label} (<span className="nums">{rated[0].value.toFixed(1)}</span>), lowest in {rated[rated.length - 1].label} (
+                <span className="nums">{rated[rated.length - 1].value.toFixed(1)}</span>).
+              </p>
+            ) : null}
+            <dl className="mt-4 max-w-2xl divide-y divide-ink-100">
+              {axes.map(({ label, value }) => (
+                <div key={label} className="grid grid-cols-[6.5rem_minmax(0,1fr)_3rem] items-center gap-x-4 py-2 sm:grid-cols-[8rem_minmax(0,1fr)_3.5rem]">
+                  <dt className="text-sm text-ink-700">{label}</dt>
+                  {value !== null ? (
                     <>
-                      Strongest in {rated[0].label} (<span className="nums">{rated[0].value.toFixed(1)}</span>), lowest in{" "}
-                      {rated[rated.length - 1].label} (<span className="nums">{rated[rated.length - 1].value.toFixed(1)}</span>).
-                    </>
-                  ) : rated.length === 1 ? (
-                    <>
-                      {rated[0].label}: <span className="nums font-medium text-ink-900">{rated[0].value.toFixed(1)}</span>. The other parts are not rated yet.
+                      <div className="[&>div]:mt-0">
+                        <ScoreBar value={value} />
+                      </div>
+                      <dd className="nums text-right text-sm">
+                        <span className="font-semibold text-ink-900">{value.toFixed(1)}</span>
+                        <span className="text-ink-500">/10</span>
+                      </dd>
                     </>
                   ) : (
                     <>
-                      <span className="nums font-medium text-ink-900">{rated[0].value.toFixed(1)}</span> on all {rated.length} parts: {rated.map((a) => a.label).join(", ")}.
+                      <span className="text-sm text-ink-500">Not rated yet</span>
+                      <dd className="text-right text-sm text-ink-500">-</dd>
                     </>
                   )}
-                </p>
-              </div>
-              {rated.length > 0 ? (
-                <div className="-ml-3 flex flex-wrap items-center gap-1 print:hidden">
-                  {aiLinks.feedbackLink ? (
-                    <a href={aiLinks.feedbackLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
-                      <FileText className="size-4" aria-hidden />
-                      Feedback report
-                      <ExternalLink className="size-3.5" aria-hidden />
-                    </a>
-                  ) : null}
-                  {/* Recording only after hire; the written report before (legacy). */}
-                  {nameUnlocked && aiLinks.recordingLink ? (
-                    <a href={aiLinks.recordingLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
-                      <Video className="size-4" aria-hidden />
-                      Recording
-                      <ExternalLink className="size-3.5" aria-hidden />
-                    </a>
-                  ) : null}
-                  <PrintButton />
                 </div>
-              ) : null}
-            </div>
-            {rated.length > 1 && rated[0].value !== rated[rated.length - 1].value ? (
-              <div className="mt-5 max-w-2xl">
-                <ScoreScale rows={axes} />
+              ))}
+            </dl>
+            {rated.length > 0 ? (
+              <div className="-ml-3 mt-3 flex flex-wrap items-center gap-1 print:hidden">
+                {aiLinks.feedbackLink ? (
+                  <a href={aiLinks.feedbackLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
+                    <FileText className="size-4" aria-hidden />
+                    Feedback report
+                    <ExternalLink className="size-3.5" aria-hidden />
+                  </a>
+                ) : null}
+                {/* Recording only after hire; the written report before (legacy). */}
+                {nameUnlocked && aiLinks.recordingLink ? (
+                  <a href={aiLinks.recordingLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
+                    <Video className="size-4" aria-hidden />
+                    Recording
+                    <ExternalLink className="size-3.5" aria-hidden />
+                  </a>
+                ) : null}
+                <PrintButton />
               </div>
             ) : null}
           </section>
@@ -695,31 +696,8 @@ export default async function EmployerInternDetail({
   );
 }
 
-/** Chips shown before "+N more", as on the candidate list. */
-const MAX_SKILLS = 7;
-
-/** A stored skill may carry a level ("React · Advanced"); matching is on the name. */
-function skillKey(skill: string): string {
-  return skill.split(" · ")[0].trim().toLowerCase();
-}
-
-/** Matched: filled green with a tick. Others: outline. Same look as the candidate list. */
-function SkillChip({ skill, matched }: { skill: string; matched: boolean }) {
-  return (
-    <li
-      className={
-        matched
-          ? "inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800 ring-1 ring-inset ring-brand-200/70"
-          : "inline-flex items-center rounded-full px-3 py-1.5 text-sm text-ink-800 ring-1 ring-inset ring-ink-200"
-      }
-    >
-      {matched ? <Check className="size-3.5" aria-hidden /> : null}
-      {skill}
-      {matched ? <span className="sr-only"> (matches your project)</span> : null}
-    </li>
-  );
-}
-
+/** "Your proposals to them" shows the latest few; the rest live on the Proposals page. */
+const PROPOSALS_SHOWN = 3;
 function humanise(value: string): string {
   return value.charAt(0).toUpperCase() + value.slice(1).replace(/[_-]+/g, " ");
 }

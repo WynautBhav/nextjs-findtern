@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { avatarUrl } from "@/lib/employer-pool";
+import { initialsOf } from "@/lib/employer-candidates";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { toEmployerProposal } from "@/lib/employer-proposal-view";
 import { PageHead } from "@/components/app/primitives";
@@ -88,10 +89,7 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
       internHired: hired.has(row.proposal.internId),
       photoUrl: withPhoto.has(row.proposal.internId) ? avatarUrl(row.proposal.internId) : null,
       presence: presence[row.proposal.internId] ?? null,
-      user:
-        row.firstName === null && row.lastName === null
-          ? null
-          : { firstName: row.firstName ?? "", lastName: row.lastName ?? "" },
+      user: userFor(row.firstName, row.lastName, hired.has(row.proposal.internId)),
     }));
   } catch (err) {
     console.error("[employer/proposals] load failed", err);

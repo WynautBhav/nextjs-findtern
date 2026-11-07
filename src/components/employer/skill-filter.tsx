@@ -24,8 +24,6 @@ import { suggestSkills } from "@/lib/data/skills";
 import { MAX_SKILLS } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 
-const MAX_SKILLS = 7;
-
 export function SkillFilter({
   active,
   projectSkills = [],

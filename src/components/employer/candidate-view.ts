@@ -14,12 +14,23 @@ export function rowSkills(skills: string[], wanted: Set<string>, max = MAX_SKILL
   return { shown: ordered.slice(0, max), more: Math.max(0, ordered.length - max), isWanted };
 }
 
+/** `HIDDEN_UNTIL_HIRE` in lib/contact-scrub (inlined: this module stays import-free for the node tests). */
+const MASKED = "[hidden until hire]";
+
+/**
+ * "B.Tech, Computer Science". A field the contact scrub masked whole is left
+ * out rather than shown as the marker (it reads "B.Tech" as a .tech domain).
+ */
+export function studyOf(academics: { degree: string; specialization: string } | null | undefined): string {
+  return [academics?.degree, academics?.specialization].filter((s) => s && s.trim() !== MASKED).join(", ");
+}
+
 /** The line under a candidate's initials: degree and field, else the top two skills. Never the bio. */
 export function headlineOf(c: {
   academics: { degree: string; specialization: string } | null;
   skills: string[];
 }): string {
-  const study = [c.academics?.degree, c.academics?.specialization].filter(Boolean).join(", ");
+  const study = studyOf(c.academics);
   if (study) return study;
   const top = c.skills.slice(0, 2).map(skillBaseName);
   return top.length ? `${top.join(" and ")} intern` : "";

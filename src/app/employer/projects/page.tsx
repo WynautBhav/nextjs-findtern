@@ -7,7 +7,8 @@ import { requireRole } from "@/lib/auth";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { PageHead } from "@/components/app/primitives";
-import { ProjectsManager, type ProjectCounts } from "@/components/employer/projects-manager";
+import { ProjectsManager, type EmployerProject, type ProjectCounts } from "@/components/employer/projects-manager";
+import { employerProjectColumns } from "./_company";
 
 export const metadata: Metadata = {
   title: "Projects",
@@ -24,14 +25,14 @@ export default async function EmployerProjectsPage({
   // The dashboard's "New project" links here with ?new=1; posting is its own page now.
   if ((await searchParams).new === "1") redirect("/employer/projects/new");
 
-  let rows: (typeof schema.projects.$inferSelect)[] = [];
+  let rows: EmployerProject[] = [];
   const counts: Record<string, ProjectCounts> = {};
   try {
     const db = getDb();
     const p = schema.proposals;
     const c = schema.employerCartItems;
     const [projectRows, proposalRows, shortlistRows] = await Promise.all([
-      db.select().from(schema.projects).where(eq(schema.projects.employerId, employerId)).orderBy(desc(schema.projects.createdAt)),
+      db.select(employerProjectColumns).from(schema.projects).where(eq(schema.projects.employerId, employerId)).orderBy(desc(schema.projects.createdAt)),
       db
         .select({
           projectId: p.projectId,
