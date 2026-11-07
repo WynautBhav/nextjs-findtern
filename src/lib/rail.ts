@@ -15,4 +15,4 @@ export const RAIL_COOKIE = "ft_rail";
  * A plain module for the same reason as RAIL_COOKIE: the server page reads it
  * and the client toggle writes it, and both must see the same string.
  */
-export const FILTERS_COOKIE = "ft_filters";
+export const FILTER_PANEL_COOKIE = "ft_filters";

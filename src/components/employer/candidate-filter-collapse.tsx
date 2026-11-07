@@ -2,7 +2,7 @@
 
 /**
  * Hide and show the Candidates filter column from lg up. The choice lives in a
- * cookie (FILTERS_COOKIE) that the server page reads, so a reload paints the
+ * cookie (FILTER_PANEL_COOKIE) that the server page reads, so a reload paints the
  * right layout with no flash. The grid carries `data-filters`; the column and
  * the results style themselves off it (`group-data-[filters=hidden]/fl:`).
  * Nothing animates: the columns just reflow.
@@ -11,7 +11,7 @@
 import { createContext, useContext, useState } from "react";
 import { SlidersHorizontal } from "lucide-react";
 
-import { FILTERS_COOKIE } from "@/lib/rail";
+import { FILTER_PANEL_COOKIE } from "@/lib/rail";
 import { cn } from "@/lib/utils";
 
 const Ctx = createContext<{ hidden: boolean; toggle: () => void } | null>(null);
@@ -22,7 +22,7 @@ export function FilterCollapse({ initialHidden, className, children }: { initial
     const next = !hidden;
     setHidden(next);
     try {
-      document.cookie = `${FILTERS_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
+      document.cookie = `${FILTER_PANEL_COOKIE}=${next ? "1" : "0"}; path=/; max-age=31536000; samesite=lax`;
     } catch {
       // Cookies blocked: it still works for this visit.
     }

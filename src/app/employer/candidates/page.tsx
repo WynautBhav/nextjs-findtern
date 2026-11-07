@@ -12,7 +12,7 @@ import { KeepFocusClear } from "@/components/app/keep-focus-clear";
 import { PageHead } from "@/components/app/primitives";
 import { RememberSelection } from "@/components/employer/remember-selection";
 import { cn } from "@/lib/utils";
-import { FILTERS_COOKIE } from "@/lib/rail";
+import { FILTER_PANEL_COOKIE } from "@/lib/rail";
 import { FilterCollapse } from "@/components/employer/candidate-filter-collapse";
 import { FilterColumn } from "./_filters";
 import { CandidateSearch, Results } from "./_results";
@@ -42,7 +42,7 @@ export default async function CandidatesPage({
   await requireEmployerSetup(uid);
   const params = await searchParams;
   // From lg up the filter column can be hidden; the choice is a cookie, so the server paints it with no flash.
-  const filtersHidden = (await cookies()).get(FILTERS_COOKIE)?.value === "1";
+  const filtersHidden = (await cookies()).get(FILTER_PANEL_COOKIE)?.value === "1";
 
   // Legacy `?ftInternId=` opened the full-time offer for a hire: the offer
   // lives on the candidate's profile now.

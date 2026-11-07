@@ -16,6 +16,7 @@ import { BANDS, PLAN_NAME, type BandId } from "@/lib/score";
 import { timezoneForLocation } from "@/lib/timezones";
 import { parseSortFields } from "@/lib/candidate-sort";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedFilters } from "@/lib/employer-selection";
+import { restorableFilters } from "@/lib/employer-filter-restore";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { savedInternIds } from "@/lib/saved-roles";
 import { rankProfiles } from "@/components/employer/candidate-rank";
@@ -434,10 +435,11 @@ export async function loadCandidates(
     // A bare visit (sidebar, "Back to candidates", a new project picked)
     // restores what this employer last applied on the project.
     if (!opts.hasFilterParams && !opts.fresh && activeProjectId) {
-      const savedFilters = await rememberedFilters(uid, activeProjectId);
+      // Only real filters are restored. A cookie holding just the retired `view`
+      // used to redirect to itself forever (see lib/employer-filter-restore).
+      const savedFilters = restorableFilters(await rememberedFilters(uid, activeProjectId), FILTER_KEYS);
       if (savedFilters) {
         const next = new URLSearchParams(savedFilters);
-        next.delete("q"); // cookies written before keywords stopped being remembered
         next.set("project", activeProjectId);
         if (compareIds.length > 0) next.set("ids", compareIds.join(","));
         data.restoreTo = `/employer/candidates?${next.toString()}`;
