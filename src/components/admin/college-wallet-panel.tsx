@@ -78,7 +78,7 @@ export function CollegeWalletPanel({ collegeId, summary, ledger, bank, canMoney 
         {bank ? (
           <p className="nums text-text-subtle">
             {bank.holder} · {bank.bankName} · {full ?? `•••• ${bank.last4}`} · {bank.ifsc}
-            {canMoney && !full ? <button type="button" onClick={reveal} disabled={busy} className="ml-3 inline-flex items-center underline touch:min-h-11 touch:min-w-11 touch:justify-center">Reveal</button> : null}
+            {canMoney && !full ? <button type="button" onClick={reveal} disabled={busy} className="ml-3 inline-flex min-h-9 items-center px-1 underline touch:min-h-11 touch:min-w-11 touch:justify-center">Reveal</button> : null}
           </p>
         ) : (
           <p className="text-text-subtle">None on file.</p>

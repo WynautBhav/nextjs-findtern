@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { avatarTint } from "@/components/employer/candidate-view";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,11 +18,14 @@ export function CandidateAvatar({
   photoUrl,
   initials,
   className,
+  seed,
 }: {
   photoUrl?: string | null;
   initials: string;
   /** Size, radius and type scale - the same classes the initials tile used. */
   className?: string;
+  /** The candidate's id: picks the initials tile's tint so neighbouring rows differ. */
+  seed?: string;
 }) {
   const [failed, setFailed] = useState(false);
   const img = useRef<HTMLImageElement>(null);
@@ -52,7 +56,7 @@ export function CandidateAvatar({
   }
 
   return (
-    <span aria-hidden className={cn("grid shrink-0 place-items-center bg-brand-50 font-semibold text-brand-800 nums ring-1 ring-inset ring-ink-900/5", className)}>
+    <span aria-hidden className={cn("grid shrink-0 place-items-center font-semibold nums", seed ? avatarTint(seed) : "bg-brand-50 text-brand-800", className)}>
       {initials}
     </span>
   );

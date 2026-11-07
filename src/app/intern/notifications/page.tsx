@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 
-import { EmptyScene, FilterTabs, PageHead, SectionHead } from "@/components/app/primitives";
-import type { NotificationRow } from "@/components/app/notification-list";
-import { NotificationTimeline } from "@/components/intern/kit/notification-timeline";
+import Link from "next/link";
+
+import { EmptyScene, PageHead, SectionHead } from "@/components/app/primitives";
+import { NotificationList, type NotificationRow } from "@/components/app/notification-list";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { requireRole } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { internNotificationHref } from "@/lib/notification-href";
+import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "Notifications",
@@ -74,21 +76,36 @@ export default async function InternNotifications({
             ? `${unreadCount} unread. Open one to go straight to what it is about.`
             : "You are all caught up. New offers, interviews and payments land here."
         }
-        action={<NotificationTimeline mode="mark-all" disabled={unreadCount === 0} />}
+        action={<NotificationList mode="mark-all" disabled={unreadCount === 0} />}
       />
 
       {/* The shared tab look; hidden when All and Unread are the same list. */}
       {unreadOnly || (unreadCount > 0 && unreadCount < total) ? (
-        <FilterTabs
-          label="Filter notifications"
-          className="mb-6"
-          value={unreadOnly ? "unread" : "all"}
-          tabs={[
-            { key: "all", label: "All", count: total },
-            { key: "unread", label: "Unread", count: unreadCount },
-          ]}
-          hrefFor={(k) => (k === "unread" ? "/intern/notifications?show=unread" : "/intern/notifications")}
-        />
+        <nav aria-label="Filter notifications" className="mb-6 flex gap-x-6 border-b border-ink-100">
+          {[
+            { key: "all", label: "All", count: total, href: "/intern/notifications" },
+            { key: "unread", label: "Unread", count: unreadCount, href: "/intern/notifications?show=unread" },
+          ].map((t) => {
+            const on = t.key === (unreadOnly ? "unread" : "all");
+            return (
+              <Link
+                key={t.key}
+                href={t.href}
+                scroll={false}
+                aria-current={on ? "page" : undefined}
+                className={cn(
+                  "relative -mb-px inline-flex min-h-12 items-center gap-1.5 whitespace-nowrap text-sm outline-none transition-colors",
+                  "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
+                  "focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent",
+                  on ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-600 hover:text-ink-900",
+                )}
+              >
+                {t.label}
+                <span className={cn("nums", on ? "text-ink-900" : "text-text-subtle")}>{t.count}</span>
+              </Link>
+            );
+          })}
+        </nav>
       ) : null}
 
       {rows.length === 0 ? (
@@ -111,14 +128,14 @@ export default async function InternNotifications({
           {needsYou.length > 0 ? (
             <section>
               <SectionHead title="Needs you" hint="A decision, a document, or something waiting on your side." />
-              <NotificationTimeline rows={needsYou} />
+              <NotificationList rows={needsYou} />
             </section>
           ) : null}
 
           {rest.length > 0 ? (
             <section>
               {needsYou.length > 0 ? <SectionHead title="Everything else" /> : null}
-              <NotificationTimeline rows={rest} />
+              <NotificationList rows={rest} />
             </section>
           ) : null}
 

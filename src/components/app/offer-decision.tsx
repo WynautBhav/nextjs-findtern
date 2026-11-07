@@ -52,6 +52,7 @@ export function OfferDecision({
   guaranteeEnded = false,
   bonusLabel = null,
   layout = "rail",
+  aside,
 }: {
   proposalId: string;
   roleTitle: string;
@@ -70,6 +71,8 @@ export function OfferDecision({
   bonusLabel?: string | null;
   /** "rail": the offer page's decision card. "row": a list card's footer. */
   layout?: "rail" | "row";
+  /** Row layout only: a quiet link that sits after the two buttons (and beside "Turn it down" on a phone). */
+  aside?: React.ReactNode;
 }) {
   const router = useRouter();
   const statusRef = useRef<HTMLDivElement>(null);
@@ -184,10 +187,10 @@ export function OfferDecision({
           onClick={() => setAcceptOpen(true)}
           disabled={busy !== null}
           className={buttonClass({
-            variant: rail ? "accent" : "primary",
+            variant: "primary",
             size: "md",
             block: rail,
-            className: cn("text-sm font-semibold", !rail && "flex-1 sm:flex-none"),
+            className: cn("text-sm font-semibold", !rail && "flex-1 max-sm:basis-full sm:flex-none"),
           })}
         >
           {busy === "accept" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Check className="size-4" aria-hidden />}
@@ -207,6 +210,7 @@ export function OfferDecision({
           {busy === "decline" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
           Turn it down
         </button>
+        {rail ? null : aside}
       </div>
 
       {rail ? (

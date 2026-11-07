@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { matchesPlace, preferredCities, rawScore, toCandidateProfile } from "./employer-candidates.ts";
+import { matchesPlace, preferredCities, rawScore, redactForEmployer, toCandidateProfile } from "./employer-candidates.ts";
 
 // EMB-02: legacy stored findternScore as a number or a numeric string and
 // read it with Number(); the new pool must agree on who is scored.
@@ -43,6 +43,13 @@ test("AI links that are not http(s) never reach the browser", () => {
   assert.equal(ok.aiRecordingLink, null);
 });
 
+test("employers never receive the bio (directive §1)", () => {
+  const user = { id: "u1", firstName: "A", lastName: "B", email: "a@b.c" } as never;
+  const profile = toCandidateProfile(user, { bio: "BIO-CANARY call me on 9876543210", extraData: {} } as never);
+  assert.equal("bio" in profile, false);
+  assert.ok(!JSON.stringify(profile).includes("BIO-CANARY"));
+});
+
 test("matchesPlace: remote-only candidate shows when the toggle is on, not when off", () => {
   const remoteOnly = { preferredLocations: [], locationTypes: ["remote"] };
   assert.equal(matchesPlace(remoteOnly, { cities: ["Jaipur"], includeRemote: true }), true);
@@ -54,4 +61,43 @@ test("matchesPlace: an onsite candidate in another city stays out even with the 
   assert.equal(matchesPlace(pune, { cities: ["Jaipur"], includeRemote: true }), false);
   assert.equal(matchesPlace(pune, { cities: ["pune"], includeRemote: false }), true);
   assert.equal(matchesPlace(pune, { cities: [], includeRemote: false }), true);
+});
+
+test("a redacted card carries no onboarding timestamp (review #19)", () => {
+  const user = { id: "u1", firstName: "A", lastName: "B", email: "a@b.c" } as never;
+  const profile = toCandidateProfile(user, { extraData: {}, updatedAt: new Date("2026-11-06T10:11:12Z") } as never);
+  assert.ok(profile.updatedAt);
+  assert.equal(redactForEmployer(profile, false).updatedAt, null);
+});
+
+test("legacy profile text with contact details is hidden from employers; catalog skills stay", () => {
+  const user = { id: "u1", firstName: "A", lastName: "B", email: "a@b.c" } as never;
+  const p = toCandidateProfile(user, {
+    city: "Pune 98765 43210",
+    state: "MH",
+    skills: ["React", "Socket.io", "insta rahul_x"],
+    preferredLocations: ["Pune", "wa.me/919876543210"],
+    extraData: { academics: { institution: "IIT", degree: "mail rahul@gmail.com" } },
+  } as never);
+  assert.equal(p.city, "[hidden until hire]");
+  assert.equal(p.state, "MH");
+  assert.ok(!p.location.includes("98765"));
+  assert.deepEqual(p.skills.slice().sort(), ["React", "Socket.io", "[hidden until hire]"].sort());
+  assert.deepEqual(p.preferredLocations, ["Pune", "[hidden until hire]"]);
+  assert.equal(p.academics?.institution, "IIT");
+  assert.equal(p.academics?.degree, "[hidden until hire]");
+});
+
+test("a list profile carries no contact field, locked or unlocked; unlocking keeps only the name", () => {
+  const user = { id: "u1", firstName: "Asha", lastName: "Rao", email: "asha@example.org" } as never;
+  const profile = toCandidateProfile(user, { linkedinUrl: "linkedin.com/in/asha-rao", aiRecordingLink: "https://rec.example/1", extraData: {} } as never);
+  assert.equal(profile.email, "asha@example.org");
+  for (const unlocked of [false, true]) {
+    const out = redactForEmployer(profile, unlocked);
+    assert.equal(out.email, "", `email, unlocked=${unlocked}`);
+    assert.equal(out.linkedinUrl, "", `linkedin, unlocked=${unlocked}`);
+    assert.equal(out.aiRecordingLink, null, `recording, unlocked=${unlocked}`);
+  }
+  assert.equal(redactForEmployer(profile, true).fullName, "Asha Rao");
+  assert.equal(redactForEmployer(profile, false).fullName, "");
 });

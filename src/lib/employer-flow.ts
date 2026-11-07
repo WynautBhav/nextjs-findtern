@@ -1,6 +1,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { payableCheckout } from "@/lib/employer-payable";
 import type { HireFlowCounts } from "@/components/employer/hire-flow";
 
 /**
@@ -33,4 +34,20 @@ export async function hireFlowCounts(employerId: string, toPay: number): Promise
     toPay,
     hired: new Set(proposals.filter((p) => p.status === "hired").map((p) => p.internId)).size,
   };
+}
+
+/**
+ * The strip for a page that does not compute the payable lines itself:
+ * `toPay` is the dashboard's and the cart's figure (accepted offers plus
+ * months now due), so every page says the same number. Null when either read
+ * fails: the strip is guidance, never a reason to fail the page.
+ */
+export async function hireFlowCountsFor(employerId: string): Promise<HireFlowCounts | null> {
+  try {
+    const toPay = (await payableCheckout(employerId)).lines.length;
+    return await hireFlowCounts(employerId, toPay);
+  } catch (err) {
+    console.error("[employer/flow] counts failed", err);
+    return null;
+  }
 }

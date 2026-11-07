@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import type { PayoutRow } from "../../../lib/journey.ts";
-import { stipendPlan, totalsByCurrency } from "./months.ts";
+import { engagementPhase, orderEngagements, stipendPlan, stipendTotalsLine, totalsByCurrency } from "./months.ts";
 
 const row = (o: Partial<PayoutRow>): PayoutRow => ({
   id: Math.random().toString(36),
@@ -48,4 +48,21 @@ test("pending fills after paid, carries its scheduled date; other currencies sta
 test("totals never add across currencies", () => {
   const t = totalsByCurrency([row({ amountMinor: 100 }), row({ amountMinor: 5, currency: "USD" }), row({ amountMinor: 7, status: "failed" })], "paid");
   assert.deepEqual(t, [{ currency: "INR", minor: 100 }, { currency: "USD", minor: 5 }]);
+});
+
+test("the stipend totals line prints zero as ₹0 (never 'Free') and adds scheduled only when there is some", () => {
+  const plan = (paidMinor: number, pendingMinor: number, toComeMinor: number) => ({ months: [], totalMinor: paidMinor + pendingMinor + toComeMinor, paidMinor, pendingMinor, toComeMinor });
+  const line = stipendTotalsLine([plan(0, 0, 3_960_000), null, plan(0, 0, 1_500_000)]);
+  assert.match(line, /^₹0 paid · ₹54,600 still to come$/);
+  assert.doesNotMatch(line, /Free/);
+  assert.match(stipendTotalsLine([plan(1_320_000, 1_320_000, 0)]), /^₹13,200 paid · ₹13,200 scheduled · ₹0 still to come$/);
+});
+
+test("internships list running first, then upcoming by start date, then finished newest first", () => {
+  const now = new Date("2026-11-07T06:00:00Z");
+  const c = (id: string, startDate: string | null, months = 3) => ({ id, startDate, months });
+  const out = orderEngagements([c("old", "2026-01-01"), c("later", "2027-02-01"), c("run", "2026-10-01"), c("soon", "2026-12-26"), c("older", "2025-06-01"), c("none", null)], now);
+  assert.deepEqual(out.map((x) => x.id), ["run", "soon", "later", "none", "old", "older"]);
+  assert.equal(engagementPhase("2026-08-07", 3, now), 2); // ended on the 7th, today is past the last day
+  assert.equal(engagementPhase("2026-11-07", 1, now), 0);
 });

@@ -335,15 +335,10 @@ export function OnboardingForm({
 
           <section aria-labelledby="step-title" className="rounded-apple-xl border border-ink-200/80 bg-white shadow-[0_1px_0_rgb(255_255_255)_inset,0_1px_2px_rgb(15_40_30/0.05),0_12px_32px_-12px_rgb(15_40_30/0.14)]">
             <header className="border-b border-ink-200/70 px-5 py-5 sm:px-8 sm:py-6">
-              {/* Count sits beside the title, not above it; phones and tablets get it from MobileSteps. */}
-              <div className="flex items-baseline justify-between gap-4">
-                <h2 id="step-title" ref={headingRef} tabIndex={-1} className="text-xl font-semibold tracking-[-0.015em] text-ink-900 outline-none">
-                  {STEPS[step].title}
-                </h2>
-                <p className="nums hidden shrink-0 text-sm text-text-subtle lg:block">
-                  Step {step + 1} of {STEPS.length}
-                </p>
-              </div>
+              {/* The step count lives in the progress above (desktop rail, MobileSteps on phones), once. */}
+              <h2 id="step-title" ref={headingRef} tabIndex={-1} className="text-xl font-semibold tracking-[-0.015em] text-ink-900 outline-none">
+                {STEPS[step].title}
+              </h2>
               <p className="mt-1.5 max-w-2xl text-pretty text-sm leading-relaxed text-ink-600">{STEPS[step].blurb}</p>
             </header>
 

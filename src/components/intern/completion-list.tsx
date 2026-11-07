@@ -1,17 +1,13 @@
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { ArrowRight, Check, ChevronDown } from "lucide-react";
 
-import { Surface } from "@/components/app/primitives";
-import { buttonClass } from "@/components/ui/button";
 import type { CompletionItem } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
-import { completionWhy } from "./completion-why";
 
 /**
  * Profile completeness, from the same rule the payment gate uses
  * (`profileCompletion` in lib/onboarding). One rule, so this list can never
- * say "complete" while activation still refuses (INT-20). Each open step says
- * why it matters; one primary button resumes the form at the first open step.
+ * say "complete" while activation still refuses (INT-20).
  */
 export function CompletionList({
   completion,
@@ -21,70 +17,54 @@ export function CompletionList({
   className?: string;
 }) {
   const pct = completion.total ? Math.round((completion.done / completion.total) * 100) : 0;
-  const open = completion.items.filter((i) => !i.done);
-  const doneItems = completion.items.filter((i) => i.done);
-  const first = open[0];
+  const left = completion.total - completion.done;
+  // What is missing is the list; what is done folds away, so on a phone the preview is not pushed far down.
+  const todo = completion.items.filter((i) => !i.done);
+  const done = completion.items.filter((i) => i.done);
   return (
-    <Surface as="section" aria-labelledby="completion-head" className={cn("p-5", className)}>
+    <section data-first-content aria-labelledby="completion-head" className={cn("border-b border-ink-200/70 pb-6", className)}>
       <div className="flex items-baseline justify-between gap-3">
-        <h2 id="completion-head" className="text-base font-semibold text-ink-900">
-          Finish your profile
+        <h2 id="completion-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
+          {left === 1 ? "1 thing left to add" : `${left} things left to add`}
         </h2>
         <p className="nums text-sm font-semibold text-ink-900">
-          {completion.done} of {completion.total}
-          <span className="sr-only"> steps done, {pct}%</span>
+          {pct}%<span className="sr-only"> complete</span>
         </p>
       </div>
-      <div
-        role="progressbar"
-        aria-label="Profile steps done"
-        aria-valuemin={0}
-        aria-valuemax={completion.total}
-        aria-valuenow={completion.done}
-        className="mt-3 h-2 overflow-hidden rounded-full bg-ink-100"
-      >
-        <span className="block h-full rounded-full bg-brand-700" style={{ width: `${pct}%` }} />
+      <div aria-hidden className="mt-3 h-1.5 overflow-hidden rounded-full bg-ink-200">
+        <div className="h-full rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
       </div>
-      {first ? (
-        <Link href={first.href} className={buttonClass({ className: "mt-4 w-full" })}>
-          Continue: {completionWhy(first.id).label ?? first.label}
-        </Link>
-      ) : null}
       <ul className="mt-3 divide-y divide-ink-100">
-        {open.map((item) => {
-          const w = completionWhy(item.id);
-          return (
-            <li key={item.id} className="flex gap-3 py-3">
-              <span aria-hidden className="mt-0.5 size-5 shrink-0 rounded-full border-2 border-ink-300" />
-              <div className="min-w-0">
-                <p className="text-sm font-medium text-ink-900">
-                  {w.label ?? item.label}
-                  <span className="sr-only"> (still needed)</span>
-                </p>
-                <p className="text-sm text-text-subtle">{w.why}</p>
-              </div>
-            </li>
-          );
-        })}
+        {todo.map((item) => (
+          <li key={item.id}>
+            <Link href={item.href} className="group flex min-h-11 items-center gap-3 py-1.5 text-sm font-medium text-ink-900 hover:text-brand-700">
+              <span aria-hidden className="size-5 shrink-0 rounded-full border-2 border-ink-300" />
+              <span className="flex-1">{item.label}</span>
+              <ArrowRight className="size-4 text-ink-400 group-hover:text-brand-700" aria-hidden />
+            </Link>
+          </li>
+        ))}
       </ul>
-      {doneItems.length > 0 ? (
-        <details className="mt-1 border-t border-ink-100">
-          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-ink-700">
-            {doneItems.length} done
+      {done.length > 0 ? (
+        <details className="group mt-1">
+          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-md text-sm font-medium text-ink-700 outline-none hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
+            <Check className="size-4 text-brand-700" strokeWidth={2.5} aria-hidden />
+            {done.length} done
+            <ChevronDown className="size-4 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
           </summary>
-          <ul className="pb-2">
-            {doneItems.map((item) => (
-              <li key={item.id} className="flex min-h-9 items-center gap-3 text-sm text-ink-600">
-                <span aria-hidden className="grid size-5 shrink-0 place-items-center rounded-full bg-brand-700 text-white">
+          <ul className="divide-y divide-ink-100">
+            {done.map((item) => (
+              <li key={item.id} className="flex min-h-10 items-center gap-3 py-1.5 text-sm text-ink-600">
+                <span aria-hidden className="grid size-5 shrink-0 place-items-center rounded-full bg-brand-600 text-white">
                   <Check className="size-3" strokeWidth={3} />
                 </span>
-                {completionWhy(item.id).label ?? item.label}
+                {item.label}
                 <span className="sr-only"> (done)</span>
               </li>
             ))}
           </ul>
         </details>
       ) : null}
-    </Surface>
+    </section>
   );
 }

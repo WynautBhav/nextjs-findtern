@@ -1,15 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { eq, desc } from "drizzle-orm";
-import { Upload } from "lucide-react";
+import { ExternalLink, FileImage, FileText, Upload, Video } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { Tile } from "@/components/app/tiles";
+import { cn } from "@/lib/utils";
 import { ButtonLink } from "@/components/ui/button";
-import { formatDmy } from "@/lib/format";
-import { DocGallery, kindLabel } from "@/components/intern/kit/doc-gallery";
+import { formatDate } from "@/lib/format";
+import { DocImagePreview } from "@/components/intern/doc-preview";
 import { certificateFiles } from "@/lib/onboarding";
 
 export const metadata: Metadata = {
@@ -133,7 +134,11 @@ export default async function InternDocuments() {
                 }
               >
                 {docs.length > 0 ? (
-                  <DocGallery wide={g.wide} docs={docs.map((d) => ({ id: d.id, href: d.href, label: d.label, fileName: d.fileName, contentType: d.contentType, size: d.size, stamped: d.stampedAt ? formatDmy(d.stampedAt) : null }))} />
+                  <ul className={cn("grid gap-4", g.wide ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-5" : "grid-cols-2")}>
+                    {docs.map((doc) => (
+                      <DocCard key={doc.id} doc={doc} />
+                    ))}
+                  </ul>
                 ) : null}
               </Tile>
             );
@@ -149,6 +154,43 @@ const GROUPS: { title: string; wide?: boolean; has: (label: string) => boolean }
   { title: "Your profile", has: (l) => l === "Profile photo" || l === "Intro video" },
   { title: "Education and certificates", wide: true, has: (l) => !["Aadhaar", "PAN", "Profile photo", "Intro video"].includes(l) },
 ];
+
+/** One file as itself: the image or the video's first frame, large enough to recognise. */
+function DocCard({ doc }: { doc: DocumentRow }) {
+  const type = (doc.contentType ?? "").toLowerCase();
+  return (
+    <li className="group relative min-w-0">
+      <span className="grid aspect-[4/3] place-items-center overflow-hidden rounded-apple-sm bg-ink-50 text-text-subtle ring-1 ring-inset ring-ink-200/70 apple-spring group-hover:ring-brand-400">
+        {type.startsWith("image/") ? (
+          <DocImagePreview href={doc.href} fit={doc.label === "Profile photo" ? "cover" : "contain"} />
+        ) : type.startsWith("video/") ? (
+          <video muted preload="metadata" src={doc.href} className="size-full object-cover" aria-hidden />
+        ) : (
+          <span className="flex flex-col items-center gap-2 text-xs">
+            <DocIcon contentType={doc.contentType} />
+            {kindLabel(doc.contentType)}
+          </span>
+        )}
+      </span>
+      <p className="mt-2.5 flex items-center gap-1.5 text-sm font-medium text-ink-900">
+        <a
+          href={doc.href}
+          target="_blank"
+          rel="noreferrer"
+          className="break-words rounded-apple-sm hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 after:absolute after:inset-0"
+        >
+          {doc.label}
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
+        <ExternalLink className="size-3.5 shrink-0 text-text-subtle" aria-hidden />
+      </p>
+      <p className="nums mt-0.5 text-xs text-text-subtle [overflow-wrap:anywhere]">
+        {doc.fileName} · {formatBytes(doc.size)}
+        {doc.stampedAt ? ` · ${formatDate(doc.stampedAt)}` : ""}
+      </p>
+    </li>
+  );
+}
 
 /** A stored record groups up to four files under one row; present them as a list. */
 function flattenRecord(record: typeof schema.internDocuments.$inferSelect): DocumentRow[] {
@@ -174,4 +216,26 @@ function flattenRecord(record: typeof schema.internDocuments.$inferSelect): Docu
       size: slot.size,
       stampedAt: record.updatedAt ?? record.createdAt ?? null,
     }));
+}
+
+function kindLabel(type: string | null): string {
+  const t = (type ?? "").toLowerCase();
+  if (t.startsWith("image/")) return `${t.slice(6).toUpperCase()} image`;
+  if (t.startsWith("video/")) return "Video";
+  if (t === "application/pdf") return "PDF";
+  return "File";
+}
+
+function DocIcon({ contentType }: { contentType: string | null }) {
+  const type = (contentType ?? "").toLowerCase();
+  if (type.startsWith("video/")) return <Video className="size-5" aria-hidden />;
+  if (type.startsWith("image/")) return <FileImage className="size-5" aria-hidden />;
+  return <FileText className="size-5" aria-hidden />;
+}
+
+function formatBytes(bytes: number | null): string {
+  if (bytes === null || !Number.isFinite(bytes) || bytes <= 0) return "Size unknown";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }

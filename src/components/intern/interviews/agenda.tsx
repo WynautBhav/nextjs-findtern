@@ -1,3 +1,5 @@
+import { CalendarClock } from "lucide-react";
+
 import { formatIstDay } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -37,8 +39,9 @@ export function AgendaRow({
           <span className="sr-only"> {weekday}</span>
         </p>
       ) : (
-        <p className="flex h-16 items-center justify-center rounded-apple-sm border border-dashed border-ink-300 text-center text-xs text-text-subtle">
-          Date to pick
+        <p className="grid size-12 place-items-center rounded-apple-md bg-ink-100">
+          <CalendarClock className="size-5 text-ink-600" aria-hidden />
+          <span className="sr-only">Date to pick</span>
         </p>
       )}
       <div className="min-w-0">

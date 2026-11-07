@@ -1,15 +1,12 @@
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
-
-import { Surface } from "@/components/app/primitives";
-import { buttonClass } from "@/components/ui/button";
+import { CornerLink } from "@/components/app/tiles";
 import { formatIstClock, shortDate } from "@/lib/format";
 
 import { daysAway, type NextUp } from "./next-up";
 
 /**
- * "Next up": the one dated thing coming, in the same Surface voice as every
- * other card. Every word comes from a row (PRODUCT.md: no invented urgency).
+ * The "Next up" tile (the reference's time tracker): the one dated
+ * thing coming, set as its date. Every word comes from a row; the only
+ * motion is the dot, which pulses three times and then rests.
  */
 export function NextUpTile({
   next,
@@ -27,36 +24,38 @@ export function NextUpTile({
   detail?: string;
   href: string;
   hrefLabel: string;
-  /** The tile's own primary action (Join for an interview). */
+  /** The tile's own action (Join for an interview). */
   children?: React.ReactNode;
 }) {
   // Midday UTC is the same calendar day in India.
   const day = new Date(`${next.day}T12:00:00Z`);
   return (
-    <Surface as="section" aria-labelledby="next-up-title" className="flex flex-col p-5 lg:p-6">
-      <h2 id="next-up-title" className="text-base font-semibold text-ink-900">
-        {heading}
-      </h2>
+    <section
+      aria-labelledby="next-up-title"
+      className="flex min-w-0 flex-col rounded-apple-xl bg-white p-5 shadow-tile lg:p-6"
+    >
+      <div className="mb-4 flex min-h-9 items-center justify-between gap-3">
+        <h2 id="next-up-title" className="text-base font-medium text-ink-900">
+          Next up
+        </h2>
+        <CornerLink href={href} label={hrefLabel} />
+      </div>
+      <p className="text-sm text-ink-600">{heading}</p>
       <p className="mt-2 flex flex-wrap items-baseline gap-x-2">
-        <time dateTime={next.at?.toISOString() ?? next.day} className="nums text-2xl font-semibold tracking-tight text-ink-900">
+        <time dateTime={next.at?.toISOString() ?? next.day} className="nums text-4xl font-medium tracking-tight text-ink-900">
           {shortDate(day, { day: "numeric", month: "short", timeZone: "UTC" })}
         </time>
-        <span className="text-sm text-text-subtle">
+        <span className="text-base text-ink-600">
           {shortDate(day, { weekday: "short", timeZone: "UTC" })}
           {next.kind === "interview" && next.at ? `, ${formatIstClock(next.at)}` : null}
-          {" · "}
-          {daysAway(today, next.day)}
         </span>
       </p>
-      {detail ? <p className="mt-1 text-sm text-text-subtle">{detail}</p> : null}
-      <div className="mt-4">
-        {children ?? (
-          <Link href={href} className={buttonClass({ className: "max-sm:w-full" })}>
-            {hrefLabel}
-            <ArrowRight className="size-4" aria-hidden />
-          </Link>
-        )}
-      </div>
-    </Surface>
+      {detail ? <p className="mt-1 text-sm text-ink-600">{detail}</p> : null}
+      <p className="mt-auto flex items-center gap-2 pt-4 text-sm font-medium text-ink-900">
+        <span aria-hidden className="size-2 rounded-full bg-accent-400" />
+        {daysAway(today, next.day)}
+      </p>
+      {children ? <div className="mt-4">{children}</div> : null}
+    </section>
   );
 }

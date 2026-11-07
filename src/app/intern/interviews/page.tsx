@@ -1,17 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ChevronDown } from "lucide-react";
 
-import { FigurePanel, SignatureHero } from "@/components/intern/kit/hero";
-import { soonest, untilLabel } from "@/components/intern/kit/countdown";
-import { MatchRing } from "@/components/intern/kit/ring";
-import { CountUp } from "@/components/motion/count-up";
-import { Stagger } from "@/components/intern/kit/motion";
-import { BigFigure, EmptyScene, FigureStrip, Pill, SectionHead, Surface, type Tone } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill, SectionHead, Surface, type Tone } from "@/components/app/primitives";
 import { SlotPicker } from "@/components/app/slot-picker";
 import { AiInterviewJoinCard } from "@/components/intern/ai-interview-join-card";
 import { isScored } from "@/lib/ai-interview";
 import { AiInterviewButton } from "@/components/intern/activation-card";
 import { AgendaRow } from "@/components/intern/interviews/agenda";
+import { splitUpcoming } from "@/components/intern/interviews/order";
 import { ScoreReport } from "@/components/intern/interviews/score-report";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { requireRole } from "@/lib/auth";
@@ -19,9 +16,12 @@ import { SITE } from "@/lib/content/site";
 import { isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
 import { formatIst } from "@/lib/format";
 import { HIDDEN_COMPANY, loadInternData, projectNames } from "@/lib/intern-data";
-import { feedbackTextOf } from "@/lib/interview-feedback";
+import { feedbackForIntern } from "@/lib/interview-feedback";
 import { isPast, slotOf, type InterviewRow } from "@/lib/journey";
 import { isInternPaid } from "@/lib/payments";
+
+/** Rows shown before "Show N more": a long list must not bury the score below it. */
+const SHOWN = 3;
 
 export const metadata: Metadata = {
   title: "Interviews & Assessment",
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
  * Template: list, ordered by state. Whatever needs the intern comes first
  * (the AI interview's own step, company rounds to pick a time for or join),
  * then the Findtern Score (ring + radar), then past rounds. The AI interview
- * is Findtern's, labelled "AI interview", never "Hidden company" (bug sheet 7,
+ * is Findtern's, labelled "AI Interview", never "Hidden company" (bug sheet 7,
  * S1 r63). Every time here is India time, labelled IST (INW-09, S2 r7).
  */
 export default async function InternInterviews() {
@@ -78,88 +78,58 @@ export default async function InternInterviews() {
       d instanceof Date ? [{ index: n + 1, iso: d.toISOString(), passed: isPast(d) }] : [],
     );
 
-  const nextRound = soonest(upcoming.filter((i) => i.selectedSlot).map((i) => slotOf(i)));
-  const nextIn = nextRound ? untilLabel(nextRound) : "";
-
-  const agenda =
-    upcoming.length > 0 ? (
-      <section className="space-y-4">
-        <SectionHead
-          title="Company interviews"
-          action={
-            <Link href="/intern/record" className="text-sm font-medium text-primary underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
-              What companies see
-            </Link>
-          }
-        />
-        <Surface as="ul" className="divide-y divide-ink-100">
-          {upcoming.map((i) => {
-            const slots = slotsOf(i);
-            const booked = Boolean(i.selectedSlot);
-            const when = booked ? slotOf(i) : null;
-            return (
-              <AgendaRow
-                key={i.id}
-                iso={when ? when.toISOString() : null}
-                title={titleOf(i)}
-                company={companyLine(i)}
-                status={booked ? <Pill tone="live">Booked</Pill> : slots.length > 0 ? <Pill tone="waiting">Pick a time</Pill> : <Pill tone="neutral">Times to follow</Pill>}
-              >
-                {slots.length > 0 ? (
-                  <SlotPicker
-                    interviewId={i.id}
-                    slots={slots}
-                    timezone={i.timezone}
-                    chosen={i.selectedSlot}
-                    meetUrl={isMeetingLinkLive(i) ? i.meetingLink : null}
-                  />
-                ) : (
-                  <p className="text-pretty text-sm text-text-subtle">
-                    The company has not sent its times yet. They appear here as soon as they are set.
-                  </p>
-                )}
-              </AgendaRow>
-            );
-          })}
-        </Surface>
-      </section>
-    ) : null;
+  const row = (i: InterviewRow) => {
+    const slots = slotsOf(i);
+    const booked = Boolean(i.selectedSlot);
+    const when = booked ? slotOf(i) : null;
+    return (
+      <AgendaRow
+        key={i.id}
+        iso={when ? when.toISOString() : null}
+        title={titleOf(i)}
+        company={companyLine(i)}
+        status={booked ? <Pill tone="live">Booked</Pill> : slots.length > 0 ? <Pill tone="waiting">Pick a time</Pill> : <Pill tone="neutral">Times to follow</Pill>}
+      >
+        {slots.length > 0 ? (
+          <SlotPicker interviewId={i.id} slots={slots} timezone={i.timezone} chosen={i.selectedSlot} meetUrl={isMeetingLinkLive(i) ? i.meetingLink : null} />
+        ) : (
+          <p className="text-pretty text-sm text-text-subtle">The company has not sent its times yet. They appear here as soon as they are set.</p>
+        )}
+      </AgendaRow>
+    );
+  };
+  const pastRow = (i: InterviewRow) => {
+    const outcome = pastOutcome(i);
+    const feedback = feedbackForIntern(i.notes);
+    const when = i.selectedSlot ? slotOf(i) : null;
+    return (
+      <AgendaRow
+        key={i.id}
+        past
+        iso={when ? when.toISOString() : null}
+        title={titleOf(i)}
+        company={companyLine(i)}
+        status={<Pill tone={outcome.tone}>{outcome.label}</Pill>}
+      >
+        {when ? <p className="nums text-sm text-ink-700">{formatIst(when, { year: true })}</p> : null}
+        {/* The pill already says "Interview done"; its generic sentence would repeat on every row. */}
+        {outcome.label === "Interview done" ? null : <p className="mt-1 text-pretty text-sm text-text-subtle">{outcome.detail}</p>}
+        {/* A missed round can carry feedback too; the employer is told it is shared. */}
+        {(outcome.label === "Interview done" || outcome.label === "Missed") && feedback ? (
+          <div className="mt-2 rounded-apple-sm bg-brand-50/70 p-4">
+            <p className="text-xs font-medium text-brand-800">Feedback from the company</p>
+            <p className="mt-1 whitespace-pre-line text-pretty text-sm text-ink-800">{feedback}</p>
+          </div>
+        ) : null}
+      </AgendaRow>
+    );
+  };
+  // Rounds waiting on the intern's pick come first; booked ones follow, soonest first.
+  const { toPick, booked } = splitUpcoming(upcoming);
 
   return (
-    <Stagger className="space-y-6 lg:space-y-8">
-      <SignatureHero
-        title="Interviews"
-        lede="Your Findtern Score and the rounds companies book with you. Every time here is India time (IST)."
-        aside={
-          <div className="flex flex-wrap items-center gap-8">
-            {scored && findternScore > 0 ? (
-              <div className="flex items-center gap-4">
-                <MatchRing tone="dark" size={96} have={Number(findternScore.toFixed(1))} total={10} label={`Findtern Score ${findternScore.toFixed(1)} out of 10`} />
-                <p className="text-sm text-on-dark-subtle">
-                  <span className="nums block text-3xl font-light leading-none text-white"><CountUp value={Number(findternScore.toFixed(1))} decimals={1} duration={1.2} /></span>
-                  Findtern Score
-                </p>
-              </div>
-            ) : null}
-            {nextRound ? (
-              <p className="text-sm text-on-dark-subtle">
-                <span className="nums block text-3xl font-light leading-none text-white">{nextIn}</span>
-                Next round, {formatIst(nextRound, { year: false })}
-              </p>
-            ) : null}
-          </div>
-        }
-      />
-
-      {upcoming.length + past.length > 0 ? (
-        <FigurePanel>
-          <FigureStrip tone="dark" className="max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
-            <BigFigure tone="dark" label="Upcoming" value={<CountUp value={upcoming.length} duration={1} />} hint="Company rounds" />
-            <BigFigure tone="dark" label="Awaiting your slot" value={<CountUp value={upcoming.filter((i) => !i.selectedSlot).length} duration={1} />} hint="Pick a time" />
-            <BigFigure tone="dark" label="Done" value={<CountUp value={past.length} duration={1} />} hint="Rounds completed" />
-          </FigureStrip>
-        </FigurePanel>
-      ) : null}
+    <div className="space-y-6 lg:space-y-8">
+      <PageHead title="Interviews" lede="Your Findtern Score and the rounds companies book with you." />
 
       {/* What needs you comes first: the AI interview's own step, then company rounds to pick or join. */}
       {showAiCard && aiInterview ? (
@@ -204,19 +174,39 @@ export default async function InternInterviews() {
         )
       ) : null}
 
-      {agenda}
-
       {scored ? (
         <ScoreReport findternScore={findternScore} ratings={ratings} feedbackLink={aiFeedbackLink} recordingLink={aiRecordingLink} />
       ) : null}
 
+      {toPick.length > 0 ? (
+        <section data-first-content className="space-y-4">
+          <SectionHead
+            title={toPick.length === 1 ? "Pick a time for 1 interview" : `Pick a time for ${toPick.length} interviews`}
+            hint="Choose one of the times the company offered, then confirm."
+          />
+          <FoldedList rows={toPick.map(row)} more="more" />
+        </section>
+      ) : null}
+
+      {booked.length > 0 ? (
+        <section data-first-content={toPick.length === 0 ? true : undefined} className="space-y-4">
+          <SectionHead
+            title={`Coming up · ${booked.length}`}
+            action={
+              <Link href="/intern/record" className="text-sm font-medium text-primary underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
+                What companies see
+              </Link>
+            }
+          />
+          <FoldedList rows={booked.map(row)} more="later" />
+        </section>
+      ) : null}
+
       {scored && upcoming.length === 0 && past.length === 0 ? (
         data.stage === "working" ? (
-          <EmptyScene
-            as="h2"
-            title="No company interviews"
-            body="You are working on a placement, so companies are not booking rounds with you."
-          />
+          <p className="text-pretty text-sm text-text-subtle">
+            No company interviews. You are working on a placement, so companies are not booking rounds with you.
+          </p>
         ) : (
           <EmptyScene
             as="h2"
@@ -232,38 +222,34 @@ export default async function InternInterviews() {
         <section className="space-y-4">
           <SectionHead title={`Past interviews · ${past.length}`} />
           {/* A finished round is read, not acted on: muted date blocks, outcome, feedback. */}
-          <Surface as="ul" className="divide-y divide-ink-100">
-            {past.map((i) => {
-              const outcome = pastOutcome(i);
-              const feedback = feedbackTextOf(i.notes);
-              const when = i.selectedSlot ? slotOf(i) : null;
-              return (
-                <AgendaRow
-                  key={i.id}
-                  past
-                  iso={when ? when.toISOString() : null}
-                  title={titleOf(i)}
-                  company={companyLine(i)}
-                  status={<Pill tone={outcome.tone}>{outcome.label}</Pill>}
-                >
-                  {when ? <p className="nums text-sm text-ink-700">{formatIst(when, { year: true })}</p> : null}
-                  {outcome.label === "Interview done" && feedback ? null : (
-                    <p className="mt-1 text-pretty text-sm text-text-subtle">{outcome.detail}</p>
-                  )}
-                  {/* A missed round can carry feedback too; the employer is told it is shared. */}
-                  {(outcome.label === "Interview done" || outcome.label === "Missed") && feedback ? (
-                    <div className="mt-2 rounded-apple-sm bg-brand-50/70 p-4">
-                      <p className="text-xs font-medium text-brand-800">Feedback from the company</p>
-                      <p className="mt-1 whitespace-pre-line text-pretty text-sm text-ink-800">{feedback}</p>
-                    </div>
-                  ) : null}
-                </AgendaRow>
-              );
-            })}
-          </Surface>
+          <FoldedList rows={past.map(pastRow)} more="older" shown={2} />
         </section>
       ) : null}
-    </Stagger>
+    </div>
+  );
+}
+
+function FoldedList({ rows, more, shown = SHOWN }: { rows: React.ReactNode[]; more: string; shown?: number }) {
+  return (
+    <>
+      <Surface as="ul" className="divide-y divide-ink-100">
+        {rows.slice(0, shown)}
+      </Surface>
+      {rows.length > shown ? (
+        <details className="group">
+          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-md text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
+            <span className="group-open:hidden">
+              Show {rows.length - shown} {more}
+            </span>
+            <span className="hidden group-open:inline">Show fewer</span>
+            <ChevronDown className="size-4 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+          </summary>
+          <Surface as="ul" className="mt-2 divide-y divide-ink-100">
+            {rows.slice(shown)}
+          </Surface>
+        </details>
+      ) : null}
+    </>
   );
 }
 

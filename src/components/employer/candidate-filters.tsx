@@ -112,7 +112,7 @@ export function FilterForm({
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-controls="candidate-filters"
-        className={buttonClass({ variant: "white", size: "md", className: "mb-3 rounded-full shadow-[0_1px_2px_rgb(7_47_36/0.06),0_8px_20px_-10px_rgb(7_47_36/0.2)] lg:hidden" })}
+        className={buttonClass({ variant: "outline", size: "md", className: "mb-3 lg:hidden" })}
       >
         <SlidersHorizontal className="size-4" aria-hidden />
         Filters
@@ -170,7 +170,7 @@ export function RatingSlider({
   const [value, setValue] = useState(defaultValue);
   const id = `filter-${name}`;
   return (
-    <div className="py-2">
+    <div className="py-1.5">
       <div className="flex items-center justify-between gap-2 text-sm text-ink-700">
         <label htmlFor={id} className="inline-flex items-center gap-1.5">
           {icon ? (
@@ -180,9 +180,7 @@ export function RatingSlider({
           ) : null}
           {label}
         </label>
-        <span className={cn("nums rounded-full px-2 py-0.5 text-xs font-semibold", value > 0 ? "bg-brand-50 text-brand-800" : "text-text-subtle")}>
-          {value > 0 ? `${value.toFixed(1)}+` : "Any"}
-        </span>
+        <span className="nums text-sm font-semibold text-ink-900">{value > 0 ? `${value.toFixed(1)}+` : "Any"}</span>
       </div>
       <input
         id={id}
@@ -194,37 +192,8 @@ export function RatingSlider({
         value={value}
         onChange={(e) => setValue(Number(e.target.value))}
         aria-valuetext={value > 0 ? `${value.toFixed(1)} or more` : "Any"}
-        style={{ ["--fill" as string]: `${value * 10}%` }}
-        className="range-brand mt-2.5 block w-full cursor-pointer touch:h-2"
+        className="mt-1 h-6 w-full cursor-pointer accent-ink-900"
       />
     </div>
-  );
-}
-
-/**
- * Compact sort control for the results toolbar. Each option is a ready-made
- * href from the server (same `sort` / `dir` params the rail uses), so the
- * filters, page and compare picks it carries stay exactly as the server built them.
- */
-export function SortSelect({ options, value }: { options: { label: string; href: string }[]; value: number }) {
-  const router = useRouter();
-  return (
-    <>
-      <label htmlFor="toolbar-sort" className="sr-only">
-        Sort by
-      </label>
-      <select
-        id="toolbar-sort"
-        value={value}
-        onChange={(e) => router.push(options[Number(e.target.value)].href, { scroll: false })}
-        className="min-h-11 min-w-0 flex-1 rounded-full bg-ink-100/80 px-4 text-sm font-medium text-ink-900 outline-none hover:bg-ink-100 focus-visible:ring-[3px] focus-visible:ring-brand-600/30 sm:w-40 sm:flex-none lg:min-h-10 touch:min-h-11"
-      >
-        {options.map((o, i) => (
-          <option key={o.label} value={i}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-    </>
   );
 }

@@ -60,3 +60,48 @@ export function membershipLabel(input: { status: string; onRoster: boolean }): s
     ? "On your roster, not verified yet. Share your student code"
     : "Claimed, not verified. Share your student code";
 }
+
+/**
+ * What the placement officer sees for each student on their list: the furthest step reached, in funnel order.
+ * Counts use the four facts directly (a student can have used the code without finishing onboarding).
+ */
+export type TpoFacts = { registered: boolean; onboardingDone: boolean; codeUsed: boolean; aiDone: boolean };
+export type TpoStatus = "on_roster" | "registered" | "onboarded" | "code_used" | "ai_done";
+
+export const TPO_STATUSES: { id: TpoStatus; label: string }[] = [
+  { id: "on_roster", label: "On roster" },
+  { id: "registered", label: "Registered" },
+  { id: "onboarded", label: "Onboarding done" },
+  { id: "code_used", label: "Code used" },
+  { id: "ai_done", label: "AI interview done" },
+];
+
+export function tpoStatus(f: TpoFacts): TpoStatus {
+  if (f.aiDone) return "ai_done";
+  if (f.codeUsed) return "code_used";
+  if (f.onboardingDone) return "onboarded";
+  if (f.registered) return "registered";
+  return "on_roster";
+}
+
+/**
+ * Facts for a roster row that is not a verified member. Onboarding and interview progress are never read for them
+ * (the officer may only see those for verified students), so the furthest they can show is "Registered" or "Code used".
+ * `memberUserId` is set only for a row matched to a user holding an active membership of this college.
+ */
+export function rosterOnlyFacts(input: { memberUserId: string | null; codeUsed: boolean }): TpoFacts {
+  return { registered: input.memberUserId !== null, onboardingDone: false, codeUsed: input.memberUserId !== null && input.codeUsed, aiDone: false };
+}
+
+export const tpoStatusLabel = (s: TpoStatus): string => TPO_STATUSES.find((x) => x.id === s)?.label ?? "On roster";
+
+/** What a student sees before paying for the AI interview, about their college's cover. Null: nothing to say. */
+export type CollegeCover = { collegeName: string; isPartner: boolean; isActive: boolean; seatsLeft: number | null };
+
+export function coverMessage(c: CollegeCover | null): { tone: "covered" | "unavailable"; text: string } | null {
+  if (!c || !c.isPartner) return null;
+  if (!c.isActive) return { tone: "unavailable", text: `${c.collegeName} is not active on Findtern right now, so your college cannot cover this interview. You can pay the fee yourself.` };
+  if (c.seatsLeft === null) return null;
+  if (c.seatsLeft <= 0) return { tone: "unavailable", text: `${c.collegeName} has no seats left to cover this interview. Ask your placement officer, or pay the fee yourself.` };
+  return { tone: "covered", text: "Your college covers this interview. Enter the code from your placement officer." };
+}

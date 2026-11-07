@@ -1,39 +1,67 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-/** Same frame as the page: hero, filter rail (lg), skills tile, toolbar, then cards sized like real ones. */
+/**
+ * Shaped like the page it stands in for, so nothing jumps when it lands: the
+ * title, search (with Filters beside it on phones), the skill line, then the
+ * filter column (lg+) beside the results bar and the divided rows. No boxes:
+ * the real page has none.
+ */
 export default function CandidatesLoading() {
   return (
     <div aria-busy="true">
-      <Skeleton className="mb-6 h-[16.5rem] rounded-[28px] bg-brand-100/70 sm:h-[18.5rem]" />
-      <div className="lg:grid lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start lg:gap-7">
-        <Skeleton className="mb-6 hidden h-[34rem] rounded-[24px] bg-white lg:block" />
+      <span className="sr-only" role="status">
+        Loading candidates
+      </span>
+      <Skeleton className="mb-4 h-8 w-44 rounded-apple-sm lg:mb-6" />
+
+      <div className="flex gap-2">
+        <Skeleton className="h-11 min-w-0 flex-1 rounded-full lg:max-w-[44rem]" />
+        <Skeleton className="h-11 w-28 shrink-0 rounded-full lg:hidden" />
+      </div>
+      <div className="mb-3 mt-3 flex gap-2 lg:mb-6">
+        <Skeleton className="h-7 w-20 rounded-full" />
+        <Skeleton className="h-7 w-24 rounded-full" />
+      </div>
+
+      <div className="lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-x-12">
+        <div className="hidden divide-y divide-ink-100 lg:block">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="space-y-3 py-4">
+              <Skeleton className="h-4 w-28 rounded-apple-sm" />
+              {i < 2 ? <Skeleton className="h-10 w-full rounded-apple-sm" /> : null}
+            </div>
+          ))}
+        </div>
+
         <div className="min-w-0">
-          <Skeleton className="mb-4 h-28 rounded-[24px] bg-white" />
-          <Skeleton className="mb-5 h-14 rounded-[22px] bg-white" />
-          <ul className="grid gap-5 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2" role="status" aria-label="Loading candidates">
-            {Array.from({ length: 6 }, (_, i) => (
-              <li key={i} className="flex min-h-[24rem] flex-col gap-4 rounded-[24px] bg-white p-6 shadow-tile">
-                <div className="flex items-start gap-4">
-                  <Skeleton className="size-14 shrink-0 rounded-full" />
-                  <div className="min-w-0 flex-1 space-y-2 pt-1">
-                    <Skeleton className="h-5 w-2/5" />
-                    <Skeleton className="h-3 w-1/3" />
-                  </div>
-                  <Skeleton className="size-14 shrink-0 rounded-full" />
+          <div className="flex items-center justify-between gap-3 border-b border-ink-100 pb-3">
+            <Skeleton className="h-6 w-48 rounded-apple-sm" />
+            <Skeleton className="h-9 w-40 rounded-full" />
+          </div>
+          <ul className="divide-y divide-ink-100">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <li key={i} className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3.5 gap-y-3 py-5 sm:gap-x-5 sm:py-6">
+                <Skeleton className="size-12 rounded-full sm:size-14" />
+                <div className="min-w-0 space-y-2">
+                  <Skeleton className="h-4 w-10 rounded-apple-sm" />
+                  <Skeleton className="h-5 w-64 max-w-full rounded-apple-sm" />
+                  <Skeleton className="h-3.5 w-24 rounded-apple-sm" />
                 </div>
-                <Skeleton className="mt-2 h-9 w-28" />
-                <Skeleton className="h-1.5 w-full rounded-full" />
                 <div className="flex gap-1.5">
-                  <Skeleton className="h-6 w-16 rounded-full" />
-                  <Skeleton className="h-6 w-20 rounded-full" />
-                  <Skeleton className="h-6 w-14 rounded-full" />
+                  <Skeleton className="size-11 rounded-full sm:size-9" />
+                  <Skeleton className="hidden h-9 w-36 rounded-full sm:block" />
                 </div>
-                <Skeleton className="h-16 w-full rounded-[18px]" />
-                <Skeleton className="mt-auto h-10 w-36 rounded-full" />
+                <div className="col-span-3 space-y-3 sm:col-span-2 sm:col-start-2">
+                  <Skeleton className="h-4 w-72 max-w-full rounded-apple-sm" />
+                  <div className="flex flex-wrap gap-1.5">
+                    {Array.from({ length: 4 }).map((__, j) => (
+                      <Skeleton key={j} className="h-7 w-20 rounded-full" />
+                    ))}
+                  </div>
+                </div>
               </li>
             ))}
           </ul>
-          <span className="sr-only">Loading candidates</span>
         </div>
       </div>
     </div>

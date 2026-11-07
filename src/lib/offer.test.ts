@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { billableWorkingDays, buildOffer, fixedInternStipendInrMinor, internStipendInrMinor, offerTermIssues, offerTimeLeft, parseOffer, scheduledMonthlyHours, weeklyScheduleOf } from "./offer.ts";
+import { billableWorkingDays, buildOffer, latestShiftEnd, shiftMinutes, fixedInternStipendInrMinor, internStipendInrMinor, offerEditTermIssues, offerTermIssues, offerTimeLeft, parseOffer, scheduledMonthlyHours, weeklyScheduleOf } from "./offer.ts";
 import { lineCharge } from "./checkout.ts";
 import { monthlyDues } from "./dues.ts";
 
@@ -207,6 +207,7 @@ test("laptop: legacy 'candidate' is written; the new app's old 'intern' reads as
   assert.equal(parseOffer({ laptop: "intern" }).laptop, "candidate");
   assert.equal(parseOffer({ laptop: "yes" }).laptop, "company");
   assert.equal(laptopLabel("intern"), "Candidate's own laptop");
+  assert.equal(laptopLabel("wa.me/919876543210"), "Not specified", "unknown values are never shown verbatim");
   const raw = buildOffer({
     currency: "INR", roleTitle: "x", mode: "remote", startDate: "2026-12-01", duration: "1m",
     monthlyHours: 160, hourlyRateMinor: 10_000, perHireMinor: 0, laptop: "intern",
@@ -305,6 +306,18 @@ test("offerTermIssues: the composer and the edit share one set of start/shift/ti
   assert.equal(offerTermIssues({ startDate: "2026-02-31" })[0]?.message, "Pick a real start date.");
 });
 
+test("a shift is at most 8 hours, overnight included", () => {
+  assert.equal(shiftMinutes("09:00", "17:00"), 480);
+  assert.equal(shiftMinutes("22:00", "06:00"), 480);
+  assert.equal(latestShiftEnd("09:00"), "17:00");
+  assert.equal(latestShiftEnd("20:30"), "04:30");
+  assert.deepEqual(offerTermIssues({ shiftFrom: "09:00", shiftTo: "17:00" }), []);
+  assert.deepEqual(offerTermIssues({ shiftFrom: "22:00", shiftTo: "06:00" }), []);
+  assert.equal(offerTermIssues({ shiftFrom: "09:00", shiftTo: "17:01" })[0]?.path, "shiftTo");
+  assert.match(offerTermIssues({ shiftFrom: "09:00", shiftTo: "18:00" })[0]?.message ?? "", /latest end is 17:00/);
+  assert.match(offerTermIssues({ shiftFrom: "09:00", shiftTo: "08:00" })[0]?.message ?? "", /longer than 8 hours/);
+});
+
 test("a no-stipend offer keeps a real 0", () => {
   const o = parseOffer({ monthlyAmount: 0, hourlyRate: 0 }, "INR");
   assert.equal(o.monthlyMinor, 0);
@@ -349,4 +362,22 @@ test("Emp P2-4: the form's default of zero paid leave bills the full 176 h of a 
   assert.equal(scheduledMonthlyHours("mon_fri", Number("0") || 0), 176);
   // The composer starts at "0", the server default when the field is absent.
   assert.equal(parseOffer({}, "INR").paidLeavesPerMonth, 0);
+});
+
+test("offerEditTermIssues: the 8-hour cap judges only a shift the edit changes; a stored 10-hour shift is grandfathered", () => {
+  const legacy = { startDate: "2020-01-01", timezone: "Asia/Kolkata", shiftFrom: "09:00", shiftTo: "19:00" }; // 10 h, stored before the cap
+  // The form resends every field unchanged: nothing is judged (the start date is also long past).
+  assert.deepEqual(offerEditTermIssues({ startDate: "2020-01-01", shiftFrom: "09:00", shiftTo: "19:00", timezone: "Asia/Kolkata" }, legacy), []);
+  // Edits that leave the shift out are fine too.
+  assert.deepEqual(offerEditTermIssues({ timezone: "Asia/Kolkata" }, legacy), []);
+  // Changing the shift to one over 8 hours is refused, naming the latest end.
+  const longer = offerEditTermIssues({ shiftFrom: "09:00", shiftTo: "20:00" }, legacy);
+  assert.equal(longer[0]?.path, "shiftTo");
+  assert.match(longer[0]?.message ?? "", /latest end is 17:00/);
+  // Changing it to 8 hours or less is accepted.
+  assert.deepEqual(offerEditTermIssues({ shiftFrom: "09:00", shiftTo: "17:00" }, legacy), []);
+  // One end moved is judged against the stored other end: 10:00 start with the stored 19:00 end is 9 h.
+  assert.match(offerEditTermIssues({ shiftFrom: "10:00", shiftTo: "19:00" }, legacy)[0]?.message ?? "", /longer than 8 hours/);
+  // A legacy flexible-hours offer still edits to a bounded shift.
+  assert.deepEqual(offerEditTermIssues({ shiftFrom: "09:00", shiftTo: "17:00" }, { shiftFrom: "flexible", shiftTo: "flexible" }), []);
 });

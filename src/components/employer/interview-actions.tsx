@@ -9,7 +9,7 @@
  *
  *   awaiting_pick → Send reminder · Offer new times
  *   expired       → Offer new times
- *   upcoming      → Join meeting · Send reminder · Reschedule
+ *   upcoming      → Join meeting (Meeting link until 15 minutes before) · Send reminder · Reschedule
  *   live          → Join meeting · Mark completed · Mark missed (after the grace period)
  *   over          → Leave feedback · Mark missed
  *   missed        → Leave feedback
@@ -45,6 +45,7 @@ export function InterviewActions({
   canMarkCompleted = false,
   canFeedback = false,
   internHref,
+  soon = false,
 }: {
   interviewId: string;
   stage: InterviewStage;
@@ -59,6 +60,8 @@ export function InterviewActions({
   /** Over or missed, and no feedback yet (it is shared once). */
   canFeedback?: boolean;
   internHref: string;
+  /** The meeting starts within 15 minutes (or is on): Join is the filled action. Otherwise it is a quiet "Meeting link". */
+  soon?: boolean;
 }) {
   const router = useRouter();
   const [panel, setPanel] = useState<Panel>("none");
@@ -170,11 +173,14 @@ export function InterviewActions({
             : null;
 
   return (
-    <div className="mt-5 border-t border-ink-100 pt-4">
+    // `contents`: the buttons sit in the row's last column, panels and messages span the whole row.
+    <div className="contents">
       {/* One visible action by stage; the rest in a menu (QA-121: two to four
           buttons a card). Panels still open inline under the card. */}
-      <div className="flex flex-wrap items-center gap-2">
-        {primary === "join" ? <JoinMeetingButton link={meetingLink!} /> : null}
+      <div className="flex flex-wrap items-center gap-2 sm:justify-self-end">
+        {primary === "join" ? (
+          soon ? <JoinMeetingButton link={meetingLink!} /> : <JoinMeetingButton link={meetingLink!} variant="outline" label="Meeting link" />
+        ) : null}
         {canMarkCompleted && stage === "live" ? (
           <button type="button" onClick={markCompleted} disabled={busy !== null} className={buttonClass({ variant: "outline", size: "sm" })}>
             {busy === "mark it completed" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <CalendarCheck className="size-4" aria-hidden />}
@@ -226,7 +232,7 @@ export function InterviewActions({
       </div>
 
       {panel === "reschedule" ? (
-        <div className="mt-4 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4">
+        <div className="mt-1 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4 sm:col-span-3">
           <p className="text-sm font-semibold text-ink-900">Offer three new times</p>
           <p className="mt-1 text-sm leading-relaxed text-ink-600">
             Suggested: the next quarter hour, then one and two hours after it. Change any of them. Times are in {timezone}.
@@ -247,7 +253,7 @@ export function InterviewActions({
       ) : null}
 
       {panel === "feedback" ? (
-        <div className="mt-4 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4">
+        <div className="mt-1 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4 sm:col-span-3">
           <label htmlFor={feedbackId} className="text-sm font-semibold text-ink-900">
             Feedback for the candidate
           </label>
@@ -277,7 +283,7 @@ export function InterviewActions({
       ) : null}
 
       {panel === "missed" ? (
-        <div className="mt-4 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4">
+        <div className="mt-1 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4 sm:col-span-3">
           <p className="text-sm font-semibold text-ink-900">Mark this interview missed?</p>
           <p className="mt-1 text-sm leading-relaxed text-ink-600">
             Use this when the candidate didn&apos;t join. You can still leave feedback afterwards.
@@ -295,12 +301,12 @@ export function InterviewActions({
       ) : null}
 
       {error ? (
-        <p id={errId} role="alert" className="mt-3 text-sm text-danger">
+        <p id={errId} role="alert" className="text-sm text-danger sm:col-span-3">
           {error}
         </p>
       ) : null}
       {/* Always mounted, so the result is announced when it fills in. */}
-      <p role="status" className={notice ? "mt-3 inline-flex items-center gap-1.5 text-sm text-brand-700" : "sr-only"}>
+      <p role="status" className={notice ? "inline-flex items-center gap-1.5 text-sm text-brand-700 sm:col-span-3" : "sr-only"}>
         {notice ? <Check className="size-4" aria-hidden /> : null}
         {notice}
       </p>

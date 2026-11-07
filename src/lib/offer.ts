@@ -149,7 +149,8 @@ export function laptopLabel(v: unknown): string {
   const s = normalizeLaptop(v);
   if (s === "company") return "Company provides";
   if (s === "candidate") return "Candidate's own laptop";
-  return s ? s : "Not specified";
+  // Any other stored value is free text the other side would read verbatim.
+  return "Not specified";
 }
 
 /**
@@ -339,6 +340,22 @@ export function addDays(from: string, days: number): string {
   return new Date(Date.parse(`${from}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 }
 
+/** The longest shift an intern can be offered: nobody works more than 8 hours a day. */
+export const MAX_SHIFT_MINUTES = 8 * 60;
+
+const clockMinutes = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5));
+
+/** Length of a shift between two "HH:MM" times; an end before the start runs past midnight. */
+export function shiftMinutes(from: string, to: string): number {
+  return (clockMinutes(to) - clockMinutes(from) + 1440) % 1440;
+}
+
+/** The latest end for a shift starting at `from` ("09:00" -> "17:00"). */
+export function latestShiftEnd(from: string): string {
+  const m = (clockMinutes(from) + MAX_SHIFT_MINUTES) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
 /** "09:30": a 24-hour clock time. */
 export function isClockTime(v: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(v);
@@ -488,10 +505,38 @@ export function offerTermIssues(t: {
       if (from === "flexible" || to === "flexible") out.push({ path: "shiftFrom", message: "Set both the start and end time, or choose flexible hours for both." });
       else if (!isClockTime(from) || !isClockTime(to)) out.push({ path: "shiftFrom", message: "Pick the working hours." });
       else if (from === to) out.push({ path: "shiftTo", message: "The shift can't start and end at the same time." });
+      else if (shiftMinutes(from, to) > MAX_SHIFT_MINUTES) {
+        out.push({ path: "shiftTo", message: `A shift can't run longer than 8 hours. Starting at ${from}, the latest end is ${latestShiftEnd(from)}.` });
+      }
     }
   }
   if (t.timezone !== undefined && !isKnownTimezone(t.timezone)) {
     out.push({ path: "timezone", message: "Pick a timezone from the list." });
   }
   return out;
+}
+
+/**
+ * The same term rules for an edit of a stored offer, judging only what the edit changes: the form resends every
+ * field, and an older offer (a shift over 8 hours, a start date now in the past, an odd timezone) may not meet
+ * today's rules. An edit of one shift end is judged against the stored other end.
+ */
+export function offerEditTermIssues(
+  edits: { startDate?: string; shiftFrom?: string; shiftTo?: string; timezone?: string },
+  stored: { startDate?: unknown; shiftFrom?: unknown; shiftTo?: unknown; timezone?: unknown },
+): { path: string; message: string }[] {
+  const storedShift = shiftFields(String(stored.shiftFrom ?? ""), String(stored.shiftTo ?? ""));
+  const changed = (v: string | undefined, was: unknown) => (v !== undefined && v !== String(was ?? "") ? v : undefined);
+  const newFrom = changed(edits.shiftFrom, storedShift.shiftFrom);
+  const newTo = changed(edits.shiftTo, storedShift.shiftTo);
+  return offerTermIssues({
+    startDate: changed(edits.startDate, stored.startDate),
+    timezone: changed(edits.timezone, stored.timezone),
+    ...(newFrom !== undefined || newTo !== undefined
+      ? {
+          shiftFrom: newFrom ?? (String(storedShift.shiftFrom) || "flexible"),
+          shiftTo: newTo ?? (String(storedShift.shiftTo) || "flexible"),
+        }
+      : {}),
+  });
 }

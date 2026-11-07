@@ -3,7 +3,7 @@ import Link from "next/link";
 import { ArrowRight, PencilLine } from "lucide-react";
 import { eq } from "drizzle-orm";
 
-import { DetailRow, PageHead, Surface } from "@/components/app/primitives";
+import { DetailRow, PageHead } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { CompletionList } from "@/components/intern/completion-list";
 import { OpenToWorkToggle } from "@/components/intern/open-to-work-toggle";
@@ -13,7 +13,7 @@ import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { aiInterviewPhase, isScored, latestAiInterview } from "@/lib/ai-interview";
 import { getDb, schema } from "@/lib/db";
 import { loadInternData } from "@/lib/intern-data";
-import { initialsOf as personInitials } from "@/lib/admin/person-tint";
+import { initialsOf } from "@/lib/employer-candidates";
 import { draftFromRecord, emptyDraft, linkedinHref, profileCompletion, type OnboardingDraft } from "@/lib/onboarding";
 import { isInternPaid } from "@/lib/payments";
 
@@ -54,8 +54,8 @@ export default async function InternProfile() {
     .limit(1);
   const activated = await isInternPaid(session.uid);
 
-  const name = `${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate";
-  const initials = personInitials(`${user?.first ?? ""} ${user?.last ?? ""}`);
+  // The exact initials an employer's row shows (never the full name before a hire).
+  const initials = initialsOf(user?.first ?? "", user?.last ?? "");
   // Stored rows can miss whole sections; fill them so every list is an array.
   const draft: OnboardingDraft | null = data.onboarding
     ? (() => {
@@ -109,19 +109,24 @@ export default async function InternProfile() {
     <div>
       <PageHead
         title="Your profile"
-        lede="What employers read when they consider you."
+        lede="Employers search this profile, not applications. Keep it current."
+        // An empty profile has its own "Start your profile" below; one filled button per view.
         action={
-          <ButtonLink href="/intern/onboarding">
-            <PencilLine className="size-4" aria-hidden />
-            Edit profile
-          </ButtonLink>
+          draft ? (
+            <ButtonLink href="/intern/onboarding">
+              <PencilLine className="size-4" aria-hidden />
+              Edit profile
+            </ButtonLink>
+          ) : undefined
         }
       />
 
-      <div className="grid gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-x-12 xl:grid-cols-[minmax(0,1fr)_19rem]">
+        {/* Phones: what is still missing comes first, it is the one thing to do here. */}
+        {!completion.complete ? <CompletionList completion={completion} className="mb-6 xl:hidden" /> : null}
+
         <div className="min-w-0">
           <ProfileView
-            name={name}
             initials={initials}
             photoUrl={data.document?.profilePhotoName ? "/api/intern/avatar" : null}
             status={status}
@@ -132,18 +137,18 @@ export default async function InternProfile() {
           />
         </div>
 
-        <aside className={completion.complete ? "space-y-4" : "space-y-4 max-xl:order-first"}>
-          {!completion.complete ? <CompletionList completion={completion} /> : null}
+        <aside className="min-w-0 border-t border-ink-200/70 xl:border-t-0 xl:border-l xl:pl-8">
+          {!completion.complete ? <CompletionList completion={completion} className="max-xl:hidden" /> : null}
 
-          <Surface className="p-5">
+          <div className="border-b border-ink-200/70 py-6 xl:pt-0 [&:not(:first-child)]:xl:pt-6">
             <OpenToWorkToggle initial={openToWork} />
-          </Surface>
+          </div>
 
-          <Surface as="section" aria-labelledby="private-head" className="p-5">
+          <section aria-labelledby="private-head" className="py-6">
             <h2 id="private-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-              Only you and Findtern see this
+              Hidden until you are hired
             </h2>
-            <p className="mt-1 text-sm text-ink-600">Shared with a company only after it hires you.</p>
+            <p className="mt-1 text-sm text-ink-600">Only you and Findtern see these. A company gets them once it hires you.</p>
             <dl className="mt-2 divide-y divide-ink-100">
               <DetailRow label="Email" value={<span className="break-all">{user?.email ?? "-"}</span>} />
               <DetailRow label="Phone" mono value={user?.phone ? `${user.countryCode} ${user.phone}` : "Not added"} />
@@ -162,13 +167,13 @@ export default async function InternProfile() {
               />
             </dl>
             <Link
-              href="/intern/settings"
+              href="/intern/settings#details"
               className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
             >
               Change name or phone in Settings
               <ArrowRight className="size-4" aria-hidden />
             </Link>
-          </Surface>
+          </section>
         </aside>
       </div>
     </div>

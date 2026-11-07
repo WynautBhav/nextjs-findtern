@@ -16,6 +16,8 @@ import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { offerState } from "@/components/employer/proposal-state";
 import { parseOffer } from "@/lib/offer";
+import type { PlaceOfSupply } from "@/lib/gst";
+import { offerPlace } from "@/lib/offer-breakdown";
 import { isProjectOpen } from "@/lib/project-locations";
 import { SendProposalForm } from "@/components/employer/send-proposal-form";
 import { timezoneForLocation } from "@/lib/timezones";
@@ -67,6 +69,7 @@ export default async function SendProposal({
   let pricing: Record<Currency, Pricing>;
   let currency: Currency = "INR";
   let companyTimezone = "Asia/Kolkata";
+  let place: PlaceOfSupply | null = null;
   let hasPlans = false;
   let hasLaptop: boolean | null = null;
   // An offer already live with this candidate (any project): said up front,
@@ -90,13 +93,14 @@ export default async function SendProposal({
         locationType: schema.projects.locationType,
         timezone: schema.projects.timezone,
         status: schema.projects.status,
+        takenDownAt: schema.projects.takenDownAt,
       })
       .from(schema.projects)
       .where(eq(schema.projects.employerId, uid))
       .orderBy(desc(schema.projects.createdAt));
     // Open projects only, newest first; the default is the newest open one
     // (legacy picker; EMH-15). Closed covers closed/inactive/archived (EMH-03).
-    projects = rows.filter((row) => isProjectOpen(row.status)).map((row) => ({
+    projects = rows.filter((row) => isProjectOpen(row.status, row.takenDownAt)).map((row) => ({
       id: row.id,
       projectName: row.projectName,
       locationType: row.locationType,
@@ -110,6 +114,9 @@ export default async function SendProposal({
         state: schema.employers.state,
         countryCode: schema.employers.countryCode,
         phoneNumber: schema.employers.phoneNumber,
+        city: schema.employers.city,
+        gstNumber: schema.employers.gstNumber,
+        billingPincode: schema.employers.billingPincode,
       })
       .from(schema.employers)
       .where(eq(schema.employers.id, uid))
@@ -120,6 +127,7 @@ export default async function SendProposal({
     // legacy client used the same inference (inferEmployerIsIndia).
     const region: "IN" | null = employerRegion(employer ?? {});
     currency = region === "IN" ? "INR" : "USD";
+    place = offerPlace(employer, currency);
 
     let score = 0;
     if (internId) {
@@ -337,6 +345,7 @@ export default async function SendProposal({
         companyTimezone={companyTimezone}
         candidateHasLaptop={hasLaptop}
         heldProjectIds={heldProjectIds}
+        place={place}
       />
     </div>
   );

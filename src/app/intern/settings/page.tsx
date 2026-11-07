@@ -6,6 +6,7 @@ import { ArrowRight } from "lucide-react";
 
 import { DetailRow, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
+import { CopyIdButton } from "@/components/intern/copy-id-button";
 import { CollegeForm } from "@/components/intern/college-form";
 import { BankDetailsForm, type BankDetails } from "@/components/intern/bank-details-form";
 import { InvoiceList } from "@/components/intern/invoice-list";
@@ -13,7 +14,7 @@ import { ContactDetailsForm } from "@/components/intern/contact-details-form";
 import { requireRole } from "@/lib/auth";
 import { membershipOf } from "@/lib/college/membership";
 import { getDb, schema } from "@/lib/db";
-import { formatDmy } from "@/lib/format";
+import { formatDate } from "@/lib/format";
 import { ownInternInvoices } from "@/lib/intern-invoice";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { SITE } from "@/lib/content/site";
@@ -24,7 +25,7 @@ export const metadata: Metadata = {
 };
 
 const SECTIONS: [id: string, label: string][] = [
-  ["details", "Details"],
+  ["details", "Your details"],
   ["bank", "Bank account"],
   ["college", "College"],
   ["invoices", "Invoices"],
@@ -104,7 +105,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
           isNotNull(schema.internPayments.invoiceNumber),
         ),
       )
-      .orderBy(desc(schema.internPayments.paidAt)),
+      .orderBy(desc(schema.internPayments.paidAt))
   ]);
   const invoices = ownInternInvoices(payments, uid, getInvoiceSeller());
   const extra = (row?.extra ?? {}) as Record<string, unknown>;
@@ -120,14 +121,17 @@ export default async function InternSettings({ searchParams }: { searchParams: P
 
   return (
     <div>
-      <PageHead title="Settings" lede="Your contact details, where your stipend is paid, your college and your password." />
+      <PageHead title="Settings" />
 
-      {/* Jump bar: sticky, glass because it floats over the forms. */}
-      <nav aria-label="Settings sections" className="sticky top-2 z-20 -mx-1 mb-8 overflow-x-auto rounded-full border border-ink-200/70 bg-white/80 p-1 shadow-tile backdrop-blur-md [scrollbar-width:none]">
-        <ul className="flex w-max gap-1">
+      {/* One long page: jump links instead of a lede that lists the same sections. */}
+      <nav aria-label="Settings sections" data-first-content className="-mt-2 mb-8">
+        <ul className="flex flex-wrap gap-2">
           {SECTIONS.map(([id, label]) => (
             <li key={id}>
-              <a href={`#${id}`} className="apple-spring inline-flex min-h-9 items-center rounded-full px-4 text-sm font-medium text-ink-700 hover:bg-brand-50 hover:text-brand-800 focus-visible:outline-2 focus-visible:outline-brand-600 touch:min-h-11">
+              <a
+                href={`#${id}`}
+                className="inline-flex h-9 items-center rounded-full px-3.5 text-sm font-medium text-ink-700 ring-1 ring-inset ring-ink-200 transition-colors hover:bg-ink-100 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 touch:h-11"
+              >
                 {label}
               </a>
             </li>
@@ -136,20 +140,20 @@ export default async function InternSettings({ searchParams }: { searchParams: P
       </nav>
 
       <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0 space-y-8">
-          <section id="details" style={{ "--i": 0 } as React.CSSProperties} className="rise scroll-mt-24">
+        <div className="min-w-0 space-y-10">
+          <section id="details" className="scroll-mt-24">
             <SectionHead title="Your details" hint="Your email is how you sign in, so it can't be changed here." />
-            <Surface className="p-5 shadow-tile lg:p-6">
+            <Surface className="p-5 lg:p-6">
               <ContactDetailsForm userId={uid} initial={contact} />
             </Surface>
           </section>
 
-          <section id="bank" style={{ "--i": 1 } as React.CSSProperties} className="rise scroll-mt-24">
+          <section id="bank" className="scroll-mt-24">
             <SectionHead title="Bank account" hint="Your monthly stipend is paid into this account." />
             <BankDetailsForm initialBank={initialBank} />
           </section>
 
-          <section id="college" style={{ "--i": 2 } as React.CSSProperties} className="rise scroll-mt-24">
+          <section id="college" className="scroll-mt-24">
             <SectionHead
               title="College"
               hint="Join your college so its placement team and virtual drives can find you. Your profile itself doesn't change."
@@ -161,23 +165,23 @@ export default async function InternSettings({ searchParams }: { searchParams: P
             />
           </section>
 
-          <section id="invoices" style={{ "--i": 3 } as React.CSSProperties} className="rise scroll-mt-24">
+          <section id="invoices" className="scroll-mt-24">
             <SectionHead title="Invoices" hint="Tax invoices for your activation fee." />
-            <Surface className="p-5 shadow-tile lg:p-6">
+            <Surface className="p-5 lg:p-6">
               <InvoiceList invoices={invoices} />
             </Surface>
           </section>
 
-          <section id="password" style={{ "--i": 4 } as React.CSSProperties} className="rise scroll-mt-24">
+          <section id="password" className="scroll-mt-24">
             <SectionHead title="Password" hint="Used when you sign in with your email instead of Google." />
-            <Surface className="p-5 shadow-tile lg:p-6">
+            <Surface className="p-5 lg:p-6">
               <ChangePasswordForm endpoint={`/api/users/${encodeURIComponent(uid)}/change-password`} />
             </Surface>
           </section>
         </div>
 
         <aside className="grid content-start gap-4 sm:grid-cols-2 xl:grid-cols-1">
-          <Surface as="section" aria-labelledby="account-head" className="rise p-5 shadow-tile">
+          <Surface as="section" aria-labelledby="account-head" className="p-5">
             <h2 id="account-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
               Your account
             </h2>
@@ -189,14 +193,17 @@ export default async function InternSettings({ searchParams }: { searchParams: P
               {/* Support finds you by this; quote it when you write in (INT-31). */}
               <div className="py-3">
                 <dt className="text-sm text-text-subtle">Findtern ID</dt>
-                <dd className="nums mt-1 select-all break-all text-sm font-medium text-ink-900">{uid}</dd>
+                <dd className="mt-1 flex flex-wrap items-center gap-x-3">
+                  <span className="select-all break-all font-mono text-sm font-medium text-ink-900">{uid}</span>
+                  <CopyIdButton id={uid} />
+                </dd>
                 <dd className="mt-1 text-pretty text-xs text-text-subtle">Your account&apos;s reference number. Quote it when you write to support so we can find you.</dd>
               </div>
               {user?.createdAt ? (
                 <DetailRow
                   label="Member since"
                   mono
-                  value={formatDmy(user.createdAt)}
+                  value={formatDate(user.createdAt)}
                 />
               ) : null}
             </dl>
@@ -209,7 +216,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
             </Link>
           </Surface>
 
-          <Surface as="section" aria-labelledby="help-head" style={{ "--i": 2 } as React.CSSProperties} className="rise p-5 shadow-tile">
+          <Surface as="section" aria-labelledby="help-head" className="p-5">
             <h2 id="help-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
               Need help?
             </h2>

@@ -1,19 +1,14 @@
 import Link from "next/link";
-import { ArrowRight, Check, Clock, MapPin, Briefcase, TrendingUp } from "lucide-react";
 
-import { MetaList } from "@/components/app/meta-list";
 import { Pill } from "@/components/app/primitives";
-import { Lift } from "@/components/intern/kit/motion";
-import { MatchRing } from "@/components/intern/kit/ring";
-import { skillMatch } from "@/components/app/skill-match";
+import { scopeLabel } from "@/lib/db/schema";
 import { formatDayLabel } from "@/lib/format";
 import { toArray } from "@/lib/journey";
-import { cn } from "@/lib/utils";
 
 /**
- * One open role for signed-in candidates, as a result card. The company is not
- * named (bug sheet 7): its name is shared once it hires. There is no apply
- * button by design; the only action is "View offer" when one exists.
+ * One open role, for signed-in candidates, as a list row. The company is not
+ * named or shown as initials (bug sheet 7, S1 r27/r67, S2 r5): its name is
+ * shared once it hires, and every row wearing the same "ZT" mark said nothing.
  */
 export type InternRole = {
   id: string;
@@ -33,99 +28,57 @@ export const MODE: Record<string, string> = { onsite: "On-site", hybrid: "Hybrid
 export function InternRoleCard({
   role,
   considered = false,
-  offerHref,
   mine,
 }: {
   role: InternRole;
   considered?: boolean;
-  /** Where "View offer" goes, when the candidate has an offer for this role. */
-  offerHref?: string;
-  /** The candidate's own skills, lowercased. */
+  /** The candidate's own skills, lowercased: the ones a role shares are marked, and listed first. */
   mine?: Set<string>;
 }) {
-  const wanted = toArray<string>(role.skills);
-  const mineList = [...(mine ?? [])];
-  const { matched } = skillMatch(mineList, wanted);
   const has = (skill: string) => Boolean(mine?.has(skill.toLowerCase().trim()));
-  const skills = [...wanted].sort((a, b) => Number(has(b)) - Number(has(a)));
+  const skills = [...toArray<string>(role.skills)].sort((a, b) => Number(has(b)) - Number(has(a)));
   const place = [role.city, role.state].filter(Boolean).join(", ");
   const mode = role.locationType ? (MODE[role.locationType.toLowerCase()] ?? role.locationType) : null;
+  const where = [mode, mode === "Remote" ? null : place].filter(Boolean).join(" · ");
   const day = role.createdAt ? formatDayLabel(role.createdAt) : null;
   const posted = day && day !== "Unknown" ? `Posted ${/^\d/.test(day) ? day : day.toLowerCase()}` : null;
-
-  const total = Math.min(wanted.length, 7);
+  const meta = [where, posted].filter(Boolean).join(" · ");
 
   return (
-    <Lift className="h-full">
-      <article className="group relative flex h-full flex-col gap-4 rounded-apple-xl border border-ink-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(4,29,23,0.05),0_12px_28px_-18px_rgba(4,29,23,0.2)] transition-shadow hover:shadow-[0_1px_2px_rgba(4,29,23,0.06),0_18px_36px_-16px_rgba(4,29,23,0.3)] lg:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            {considered ? <Pill tone="live" icon={<Check />} className="mb-2">Offer received</Pill> : null}
-            <h2 className="min-w-0 text-pretty text-lg font-semibold leading-snug tracking-[-0.01em] text-ink-900">
-              <Link
-                href={`/intern/opportunities/${role.id}`}
-                className="rounded-apple-sm hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 after:absolute after:inset-0 after:rounded-apple-xl"
-              >
-                {role.projectName}
-              </Link>
-            </h2>
-          </div>
-          {wanted.length > 0 ? (
-            <MatchRing have={matched.length} total={total} label={`You have ${matched.length} of ${total} skills`} />
-          ) : null}
-        </div>
-
-        {role.scopeOfWork ? <p className="line-clamp-2 text-pretty text-sm text-ink-600">{role.scopeOfWork}</p> : null}
-
-        <MetaList
-          className="nums"
-          items={[
-            { icon: <Briefcase />, text: mode },
-            { icon: <MapPin />, text: mode === "Remote" ? null : place },
-            { icon: <Clock />, text: posted },
-            role.fullTimeOffer
-              ? { icon: <TrendingUp />, text: <span className="font-medium text-ink-700">Can lead to full time</span> }
-              : {},
-          ]}
-        />
-
-        {skills.length > 0 ? (
-          <ul className="flex flex-wrap gap-1.5" aria-label="Skills wanted">
-            {skills.slice(0, 6).map((skill) => (
-              <li key={skill}>
-                <Pill
-                  tone={has(skill) ? "live" : "neutral"}
-                  icon={has(skill) ? <Check /> : undefined}
-                  className={cn(has(skill) ? "font-semibold" : "font-normal")}
-                >
-                  {skill}
-                  {has(skill) ? <span className="sr-only"> (you have this)</span> : null}
-                </Pill>
-              </li>
-            ))}
-            {skills.length > 6 ? <li className="nums self-center text-xs text-text-subtle">+{skills.length - 6}</li> : null}
-          </ul>
+    <div className="relative flex flex-col gap-2 px-5 py-4 transition-colors hover:bg-ink-50/60 sm:flex-row sm:items-start sm:gap-4 lg:px-6">
+      <div className="min-w-0 flex-1">
+        <h2 className="text-pretty text-base font-medium text-ink-900">
+          {/* The title stretches over the row, so the whole row is the link. */}
+          <Link
+            href={`/intern/opportunities/${role.id}`}
+            className="rounded-apple-sm hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 after:absolute after:inset-0"
+          >
+            {role.projectName}
+          </Link>
+        </h2>
+        {role.scopeOfWork ? (
+          <p className="mt-1 line-clamp-2 text-pretty text-sm text-ink-600">{scopeLabel(role.scopeOfWork)}</p>
         ) : null}
-
-        <div className="mt-auto flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          {wanted.length > 0 ? (
-            <p className="text-sm text-text-subtle">
-              You have <span className="nums font-semibold text-ink-800">{matched.length}</span> of <span className="nums">{total}</span> skills
-            </p>
-          ) : (
-            <span />
-          )}
-          {considered && offerHref ? (
-            <Link
-              href={offerHref}
-              className="relative z-10 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-apple-sm bg-brand-700 px-4 text-sm font-medium text-white hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 max-sm:w-full"
-            >
-              View offer
-              <ArrowRight className="size-4" aria-hidden />
-            </Link>
-          ) : null}
+        {meta ? <p className="nums mt-2 text-xs text-text-subtle">{meta}</p> : null}
+        {skills.length > 0 ? (
+          // Own line, so the skills a candidate shares are easy to scan and never wrap into the place and date.
+          <p className="mt-1 text-xs text-ink-600">
+            {skills.slice(0, 4).map((skill, i) => (
+              <span key={skill}>
+                {i > 0 ? ", " : null}
+                {has(skill) ? <span className="font-medium text-brand-700">{skill}<span className="sr-only"> (you have this)</span></span> : skill}
+              </span>
+            ))}
+            {skills.length > 4 ? <span className="nums text-text-subtle"> +{skills.length - 4}</span> : null}
+          </p>
+        ) : null}
+      </div>
+      {considered || role.fullTimeOffer ? (
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {considered ? <Pill tone="live">Offer received</Pill> : null}
+          {role.fullTimeOffer ? <Pill tone="neutral">Can lead to full time</Pill> : null}
         </div>
-      </article>
-    </Lift>
+      ) : null}
+    </div>
   );
 }

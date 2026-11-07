@@ -21,6 +21,7 @@ import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
 import { MessagingLive } from "@/components/messaging";
 import { TermsGate } from "@/components/app/terms-gate";
+import { ToastProvider } from "@/components/app/toast";
 import { CollegeLive } from "@/components/intern/college-live";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
@@ -37,22 +38,23 @@ export const metadata = { title: "Findtern" };
  * doesn't need Timesheets in front of them, and someone three weeks into a
  * role doesn't need Open roles. The stage is derived from the rows, never
  * stored, so it can't disagree with the data. These five are also the phone
- * tab bar; everything else sits under "More".
+ * tab bar, so Messages is one of them at every stage (a company that sent an
+ * offer is waiting on a reply); everything else sits under "More".
  */
 const STAGE_NAV: Record<Stage, ConsoleNavItem[]> = {
   seeking: [
     { href: "/intern/dashboard", label: "Home", icon: <House /> },
     { href: "/intern/opportunities", label: "Open roles", icon: <Compass /> },
     { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
+    { href: "/intern/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
     { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 /> },
-    { href: "/intern/record", label: "Record", icon: <ScrollText /> },
   ],
   working: [
     { href: "/intern/dashboard", label: "Home", icon: <House /> },
     { href: "/intern/timesheets", label: "Timesheets", icon: <LayoutList /> },
     { href: "/intern/earnings", label: "Stipend", icon: <ReceiptIndianRupee /> },
+    { href: "/intern/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
     { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 /> },
-    { href: "/intern/record", label: "Record", icon: <ScrollText /> },
   ],
 };
 
@@ -61,6 +63,7 @@ const MORE_NAV: ConsoleNavItem[] = [
   { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
   { href: "/intern/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
   { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 /> },
+  { href: "/intern/record", label: "Record", icon: <ScrollText /> },
   { href: "/intern/timesheets", label: "Timesheets", icon: <LayoutList /> },
   { href: "/intern/earnings", label: "Stipend", icon: <ReceiptIndianRupee /> },
   { href: "/intern/documents", label: "Documents", icon: <BadgeCheck /> },
@@ -110,15 +113,18 @@ export default async function InternLayout({ children }: { children: React.React
   const photoUrl = data.document?.profilePhotoName ? "/api/intern/avatar" : null;
   const unreadAlerts = Number(unread?.value ?? 0);
 
+  const badge = (n: number) => (n > 99 ? "99+" : n);
   const main = STAGE_NAV[data.stage].map((item) => ({
     ...item,
     attention: attentionHrefs.some((h) => h.startsWith(item.href)) && item.href !== "/intern/dashboard",
   }));
-  const more = MORE_NAV.filter((i) => !main.some((m) => m.href === i.href)).map((i) =>
-    i.href === "/intern/notifications" && unreadAlerts > 0 ? { ...i, badge: unreadAlerts > 99 ? "99+" : unreadAlerts } : i,
-  );
+  const more = MORE_NAV.filter((i) => !main.some((m) => m.href === i.href)).map((i) => {
+    if (i.href === "/intern/notifications" && unreadAlerts > 0) return { ...i, badge: badge(unreadAlerts) };
+    return i;
+  });
 
   return (
+    <ToastProvider>
     <ConsoleShell
       homeHref="/intern/dashboard"
       groups={[{ items: main }, { title: "More", items: more }]}
@@ -151,6 +157,7 @@ export default async function InternLayout({ children }: { children: React.React
       {children}
       <TermsGate role="intern" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>
+    </ToastProvider>
   );
 }
 

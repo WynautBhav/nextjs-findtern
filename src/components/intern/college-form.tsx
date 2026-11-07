@@ -268,7 +268,12 @@ function JoinForm({
       noValidate
     >
       <section>
-        <SectionHead title="College" hint="Type your college's name, or the code your placement office gave you." />
+        {/* Settings titles this section already; only the embedded form needs its own heading. */}
+        {embedded ? (
+          <SectionHead title="College" hint="Type your college's name, or the code your placement office gave you." />
+        ) : (
+          <p className="mb-4 text-sm text-ink-600">Type your college&apos;s name, or the code your placement office gave you.</p>
+        )}
         {chosen ? (
           <div className="flex items-center gap-3 rounded-apple-xl border border-ink-200/80 p-4">
             <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">

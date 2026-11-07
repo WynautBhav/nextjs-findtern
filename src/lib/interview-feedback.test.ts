@@ -37,3 +37,11 @@ test("hasFeedbackText uses the same line-start rule as the reader", () => {
   assert.equal(hasFeedbackText("n\nfeedback_text: done"), true);
   assert.equal(hasFeedbackText(null), false);
 });
+
+test("the intern never sees contact details in feedback; clean feedback is unchanged", async () => {
+  const { feedbackForIntern } = await import("./interview-feedback.ts");
+  const { HIDDEN_MESSAGE } = await import("./contact-scrub.ts");
+  assert.equal(feedbackForIntern("feedback_text: Great call! WhatsApp me 98765 43210"), HIDDEN_MESSAGE);
+  assert.equal(feedbackForIntern("feedback_text: Strong on React, work on SQL."), "Strong on React, work on SQL.");
+  assert.equal(feedbackForIntern(null), "");
+});

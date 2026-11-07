@@ -140,29 +140,15 @@ export function BankDetailsForm({ initialBank }: { initialBank?: BankDetails }) 
   if (!editing) {
     const last4 = stored.accountLast4;
     return (
-      <Surface className="flex flex-col gap-4 p-5 sm:flex-row sm:flex-wrap sm:items-end sm:p-6">
-        {/* The account as the thing it is: where the stipend lands. */}
-        <div className="flex flex-col justify-between gap-6 rounded-apple-xl bg-brand-800 p-5 text-white sm:aspect-[2.2/1] sm:w-full sm:max-w-md sm:p-6">
-          <div aria-hidden className="flex items-start justify-between gap-4">
-            <p className="text-base font-medium">{stored.bankName || "Bank not added"}</p>
-            <p className="nums text-sm text-white/70">{stored.ifscCode || "-"}</p>
-          </div>
-          <div aria-hidden>
-            <p className="nums text-2xl font-medium tracking-[0.08em]">{last4 ? `•••• ${last4}` : "-"}</p>
-            <p className="mt-2 text-sm text-white/80">{stored.accountHolderName || "-"}</p>
-          </div>
-          <dl className="sr-only">
-            <DetailRow label="Account holder" value={stored.accountHolderName || "-"} />
-            <DetailRow label="Bank" value={stored.bankName || "-"} />
-            <DetailRow label="Account number" value={last4 ? `ending ${last4}` : "-"} />
-            <DetailRow label="IFSC" value={stored.ifscCode || "-"} />
-          </dl>
-        </div>
-        {stored.upiId ? (
-          <dl className="min-w-0 sm:flex-1">
-            <DetailRow label="UPI ID" value={stored.upiId} />
-          </dl>
-        ) : null}
+      <Surface className="p-5 sm:p-6">
+        {/* Plain rows: the facts someone checks against their passbook, not a picture of a card. */}
+        <dl className="divide-y divide-ink-100">
+          <DetailRow label="Account holder" value={stored.accountHolderName || "Not added"} />
+          <DetailRow label="Bank" value={stored.bankName || "Not added"} />
+          <DetailRow label="Account number" mono value={last4 ? `Ending ${last4}` : "Not added"} />
+          <DetailRow label="IFSC" mono value={stored.ifscCode || "Not added"} />
+          {stored.upiId ? <DetailRow label="UPI ID" value={stored.upiId} /> : null}
+        </dl>
         <div className="flex flex-wrap items-center gap-3">
           <button
             ref={editButton}
@@ -175,12 +161,12 @@ export function BankDetailsForm({ initialBank }: { initialBank?: BankDetails }) 
               setEditing(true);
               window.requestAnimationFrame(() => document.getElementById("bankAccountHolderName")?.focus());
             }}
-            className={buttonClass({ variant: "outline", size: "sm" })}
+            className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 touch:min-h-11" })}
           >
             Edit bank details
           </button>
           {/* Mounted empty so the message is announced when it fills. */}
-          <span role="status" className="text-sm text-success">
+          <span role="status" className="mt-4 text-sm text-success">
             {saved ? "Bank details saved." : ""}
           </span>
         </div>

@@ -3,22 +3,26 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Info, Send } from "lucide-react";
+import { CircleGauge, Info, Send, TriangleAlert } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
-import { type CandidateSummary } from "@/lib/employer-candidates";
+import { RATING_META, type CandidateSummary } from "@/lib/employer-candidates";
 import { type Currency, type Pricing } from "@/lib/employer-pricing";
 import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
-import { billableWorkingDays, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
+import type { PlaceOfSupply } from "@/lib/gst";
+import { firstPaymentNote } from "@/lib/first-payment-copy";
+import { offerBreakdown } from "@/lib/offer-breakdown";
+import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
+import { billableWorkingDays, isClockTime, latestShiftEnd, MAX_SHIFT_MINUTES, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, shiftMinutes, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
+import { SURFACE_CLASS } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
 import { CountdownAgreement, EMPLOYER_HIRING_POLICY } from "@/components/app/countdown-agreement";
+import { DmyDateInput } from "@/components/app/dmy-date-input";
 import { onRadioKeys, radioTab } from "@/components/intern/onboarding/fields";
-import { Field, ReadOnlyField, SelectField, Step, TextArea } from "@/components/employer/send-proposal/fields";
-import { SummaryAside } from "@/components/employer/send-proposal/summary-aside";
-import { DURATIONS, tomorrowIst, validate } from "@/components/employer/send-proposal/model";
+import { fieldClass } from "@/components/employer/ui-tokens";
 
 /**
  * Proposal composer.
@@ -48,11 +52,21 @@ type ProjectOption = {
   timezone: string | null;
 };
 
+const DURATIONS = [
+  { value: "1m", label: "1 month" },
+  { value: "2m", label: "2 months" },
+  { value: "3m", label: "3 months" },
+  { value: "6m", label: "6 months" },
+] as const;
+
 const MODES = [
   { value: "remote", label: "Remote" },
   { value: "hybrid", label: "Hybrid" },
   { value: "onsite", label: "On-site" },
 ] as const;
+
+/** Column heads for the four-axis meter in the summary card. */
+const SHORT_RATING: Record<string, string> = { communication: "Comms", coding: "Coding", aptitude: "Aptitude", interview: "Interview" };
 
 /** Legacy values (EMH-04): "company" or "candidate". */
 const LAPTOP_OPTIONS = [
@@ -62,7 +76,7 @@ const LAPTOP_OPTIONS = [
 
 /** Quick fills for the working hours; the times stay editable (bug sheet 23 Oct). */
 const SHIFT_PRESETS = [
-  { label: "9am–6pm", from: "09:00", to: "18:00" },
+  { label: "9am–5pm", from: "09:00", to: "17:00" },
   { label: "9am–1pm", from: "09:00", to: "13:00" },
   { label: "5pm–9pm", from: "17:00", to: "21:00" },
 ] as const;
@@ -80,6 +94,7 @@ export function SendProposalForm({
   companyTimezone = "Asia/Kolkata",
   candidateHasLaptop = null,
   heldProjectIds = [],
+  place = null,
 }: {
   candidate: CandidateSummary;
   /** Where the candidate said they can work; the offer's location follows it. */
@@ -99,6 +114,8 @@ export function SendProposalForm({
   candidateHasLaptop?: boolean | null;
   /** Projects with a meeting still to happen: no offer until it has (QA-113). */
   heldProjectIds?: string[];
+  /** Where the company is taxed; null when its profile can't say, and the GST line is left out. */
+  place?: PlaceOfSupply | null;
 }) {
   const router = useRouter();
   // The project the employer came from, not just the first one in the list:
@@ -133,7 +150,15 @@ export function SendProposalForm({
   const week = workingDaysPerWeek(schedule);
   const homeDays = String(Math.max(0, week - (Number(officeDays) || 0)));
   const [shiftFrom, setShiftFrom] = useState("09:00");
-  const [shiftTo, setShiftTo] = useState("18:00");
+  const [shiftTo, setShiftTo] = useState("17:00");
+  // No intern works more than 8 hours: a later start pulls the end in, and an end
+  // typed past the limit is flagged where it is typed.
+  const shiftLimit = isClockTime(shiftFrom) ? `Up to 8 hours: a start at ${shiftFrom} can end by ${latestShiftEnd(shiftFrom)}.` : "Up to 8 hours.";
+  const shiftTooLong = isClockTime(shiftFrom) && isClockTime(shiftTo) && shiftMinutes(shiftFrom, shiftTo) > MAX_SHIFT_MINUTES;
+  function pickShiftFrom(v: string) {
+    setShiftFrom(v);
+    if (isClockTime(v) && isClockTime(shiftTo) && shiftMinutes(v, shiftTo) > MAX_SHIFT_MINUTES) setShiftTo(latestShiftEnd(v));
+  }
   const laptopOptions = LAPTOP_OPTIONS.filter((l) => l.value !== "candidate" || candidateHasLaptop !== false);
   const [laptop, setLaptop] = useState<string>("company");
   const [paidLeaves, setPaidLeaves] = useState("0");
@@ -160,6 +185,8 @@ export function SendProposalForm({
     const perHire = rate.perHireMinor / 100;
     return { monthly, perHire };
   }, [monthlyHours, rate]);
+  const firstNote = firstPaymentNote(candidate.scored ? candidate.score : null);
+  const breakdown = offerBreakdown({ currency, hourlyRateMinor: rate.hourlyRateMinor, hours: monthlyHours, perHireMinor: rate.perHireMinor, place });
 
   /** Validate first; the policy agreement only opens for a complete offer. */
   function review() {
@@ -236,6 +263,14 @@ export function SendProposalForm({
     }
   }
 
+  // Why "Review and send" is off, said next to the button (not only by its colour).
+  const blockedReason = sending
+    ? "Sending your proposal. This takes a moment."
+    : projects.length === 0
+      ? "Create an open project first. A proposal is filed under one."
+      : held
+        ? "A meeting for this project hasn't happened yet. Pick another project, or send once it has."
+        : null;
   const durationLabel = DURATIONS.find((d) => d.value === duration)?.label ?? "";
 
   return (
@@ -246,7 +281,7 @@ export function SendProposalForm({
           e.preventDefault();
           review();
         }}
-        className="min-w-0 space-y-4"
+        className={cn("min-w-0 overflow-hidden", SURFACE_CLASS)}
       >
         {/* ── 1. The role ─────────────────────────────────────────────── */}
         <Step n={1} title="The role" hint="What the candidate is being offered, and from when.">
@@ -471,9 +506,10 @@ export function SendProposalForm({
           <fieldset>
             <legend className="text-sm font-medium text-ink-800">Working hours</legend>
             <div className="mt-2 grid grid-cols-2 gap-3 sm:max-w-sm">
-              <Field id="shiftFrom" label="From" type="time" value={shiftFrom} error={errors.shiftFrom} onChange={setShiftFrom} />
-              <Field id="shiftTo" label="To" type="time" value={shiftTo} error={errors.shiftTo} onChange={setShiftTo} />
+              <Field id="shiftFrom" label="From" type="time" value={shiftFrom} error={errors.shiftFrom} onChange={pickShiftFrom} />
+              <Field id="shiftTo" label="To" type="time" value={shiftTo} error={errors.shiftTo ?? (shiftTooLong ? `Too long. ${shiftLimit}` : undefined)} onChange={setShiftTo} />
             </div>
+            {shiftTooLong ? null : <p className="mt-2 text-sm text-ink-600">{shiftLimit}</p>}
             <div className="mt-2 flex flex-wrap gap-1.5">
               {SHIFT_PRESETS.map((p) => (
                 <button
@@ -544,23 +580,101 @@ export function SendProposalForm({
         </Step>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-ink-100 bg-ink-50/60 px-6 py-4 lg:hidden">
-          <button type="submit" disabled={sending || projects.length === 0 || held} className={buttonClass({ block: true })}>
+          <button
+            type="submit"
+            disabled={Boolean(blockedReason)}
+            aria-describedby={blockedReason ? "send-blocked-form" : undefined}
+            className={buttonClass({ block: true })}
+          >
             <Send className="size-4" aria-hidden />
             Review and send
           </button>
+          {blockedReason ? (
+            <p id="send-blocked-form" className="basis-full text-sm text-ink-700">
+              {blockedReason}
+            </p>
+          ) : null}
         </div>
       </form>
 
-      <SummaryAside
-        candidate={candidate}
-        currency={currency}
-        monthly={totals.monthly}
-        perHire={totals.perHire}
-        durationLabel={durationLabel}
-        notice={notice}
-        disabled={sending || projects.length === 0 || held}
-        onReview={review}
-      />
+      {/* ── Summary ─────────────────────────────────────────────────── */}
+      <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
+        <section className={cn("overflow-hidden", SURFACE_CLASS)}>
+          <div className="flex items-center gap-3 border-b border-ink-100 p-5">
+            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
+              {candidate.initials}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="break-words font-semibold text-ink-900">{candidate.name}</p>
+              <p className="nums flex items-center gap-1.5 text-sm text-ink-600">
+                <CircleGauge className="size-4" aria-hidden />
+                {candidate.scored ? `${candidate.score.toFixed(1)}/10 Findtern Score` : "Not scored"}
+              </p>
+            </div>
+            <Link
+              href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
+              className="apple-spring inline-flex min-h-11 items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
+            >
+              Profile
+            </Link>
+          </div>
+          {RATING_META.some((r) => candidate.ratings[r.key] > 0) ? (
+            <dl className="grid grid-cols-4 border-b border-ink-100">
+              {RATING_META.map((r, i) => (
+                <div key={r.key} className={cn("px-3 py-3 text-center", i > 0 && "border-l border-ink-100")}>
+                  <dt className="truncate text-xs text-text-subtle">{SHORT_RATING[r.key] ?? r.label}</dt>
+                  <dd className="nums mt-0.5 text-sm font-semibold text-ink-900">{candidate.ratings[r.key] > 0 ? candidate.ratings[r.key].toFixed(1) : "-"}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+
+          <div className="p-5">
+            <h2 className="text-base font-semibold text-ink-900">Offer amount</h2>
+            {/* One month's figure only (client QA), not monthly × months. */}
+            <OfferBreakdownList lines={breakdown.lines} className="mt-4" />
+            <dl className="mt-2.5">
+              <Row label="Duration">{durationLabel || "-"}</Row>
+            </dl>
+            <p className="mt-3 text-sm leading-relaxed text-ink-600">
+              Nothing is charged now. You pay once the candidate accepts.
+              {firstNote ? ` ${firstNote}` : ""}
+            </p>
+
+            {/* Always mounted, so the result is announced when it fills in. */}
+            <p
+              role="status"
+              className={
+                notice
+                  ? cn(
+                      "mt-4 flex items-start gap-2 rounded-apple-md px-3 py-2.5 text-sm",
+                      notice.tone === "ok" ? "bg-success-soft text-ink-800" : "border border-warning/25 bg-warning-soft text-ink-700",
+                    )
+                  : "sr-only"
+              }
+            >
+              {notice?.tone === "bad" ? <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden /> : null}
+              {notice ? <span>{notice.text}</span> : null}
+            </p>
+
+            <button
+              type="button"
+              onClick={review}
+              disabled={Boolean(blockedReason)}
+              aria-describedby={blockedReason ? "send-blocked-aside" : undefined}
+              className={buttonClass({ block: true, className: "mt-4 hidden lg:inline-flex" })}
+            >
+              <Send className="size-4" aria-hidden />
+              Review and send
+            </button>
+            {blockedReason ? (
+              <p id="send-blocked-aside" className="mt-2 hidden text-sm text-ink-700 lg:block">
+                {blockedReason}
+              </p>
+            ) : null}
+          </div>
+        </section>
+      </aside>
 
       <CountdownAgreement
         open={policyOpen}
@@ -575,4 +689,313 @@ export function SendProposalForm({
       />
     </div>
   );
+}
+
+function Step({
+  n,
+  title,
+  hint,
+  last,
+  children,
+}: {
+  n: number;
+  title: string;
+  hint?: string;
+  last?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={cn("grid gap-5 p-6 sm:grid-cols-[2rem_minmax(0,1fr)] sm:gap-x-4", !last && "border-b border-ink-100")}>
+      <span aria-hidden className="nums hidden size-8 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800 sm:grid">
+        {n}
+      </span>
+      <div className="min-w-0 space-y-5">
+        <div>
+          <h2 className="text-base font-semibold text-ink-900">{title}</h2>
+          {hint ? <p className="mt-0.5 text-sm text-ink-600">{hint}</p> : null}
+        </div>
+        {children}
+      </div>
+    </section>
+  );
+}
+
+/** Tomorrow in India, as YYYY-MM-DD. */
+function tomorrowIst(): string {
+  return new Date(Date.now() + 330 * 60_000 + 86_400_000).toISOString().slice(0, 10);
+}
+
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-sm text-ink-600">{label}</dt>
+      <dd className="nums text-right text-sm font-medium text-ink-800">{children}</dd>
+    </div>
+  );
+}
+
+/* ── Form primitives ────────────────────────────────────────────────────── */
+
+const fieldCls = (error?: boolean, extra?: string) =>
+  cn(fieldClass, "mt-2 px-3.5", error && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger", extra);
+
+function Field({
+  id,
+  label,
+  value,
+  onChange,
+  error,
+  hint,
+  type = "text",
+  placeholder,
+  inputMode,
+  min,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  hint?: string;
+  type?: string;
+  placeholder?: string;
+  inputMode?: "text" | "numeric" | "decimal" | "email" | "url";
+  min?: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-ink-800">
+        {label}
+      </label>
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
+      {type === "date" ? (
+        // DD/MM/YYYY, not the browser's native date control (QA-126).
+        <DmyDateInput
+          id={id}
+          name={id}
+          value={value}
+          min={min}
+          onChange={onChange}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className={fieldCls(Boolean(error))}
+        />
+      ) : (
+        <input
+          id={id}
+          name={id}
+          type={type}
+          value={value}
+          placeholder={placeholder}
+          inputMode={inputMode}
+          min={min}
+          onChange={(e) => onChange(e.target.value)}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? `${id}-error` : undefined}
+          className={fieldCls(Boolean(error))}
+        />
+      )}
+      {error ? (
+        <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/** A value owned by the project, shown but not editable from here. */
+function ReadOnlyField({
+  id,
+  label,
+  value,
+  hint,
+  inputMode,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  hint?: string;
+  /** A figure: if a phone ever opens a keyboard on it, the numeric one (QA-126). */
+  inputMode?: "numeric" | "decimal";
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-ink-800">
+        {label}
+      </label>
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
+      <input
+        id={id}
+        name={id}
+        value={value}
+        readOnly
+        inputMode={inputMode}
+        className={fieldCls(false, "cursor-not-allowed bg-ink-50 text-ink-600")}
+      />
+    </div>
+  );
+}
+
+function SelectField({
+  id,
+  label,
+  value,
+  options,
+  onChange,
+  error,
+  hint,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  options: { value: string; label: string; disabled?: boolean }[];
+  onChange: (value: string) => void;
+  error?: string;
+  hint?: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-ink-800">
+        {label}
+      </label>
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
+      <select
+        id={id}
+        name={id}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={error ? true : undefined}
+        className={fieldCls(Boolean(error))}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value} disabled={option.disabled}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+      {error ? (
+        <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+function TextArea({
+  id,
+  label,
+  value,
+  onChange,
+  error,
+  hint,
+  rows = 4,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  error?: string;
+  hint?: string;
+  rows?: number;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <label htmlFor={id} className="block text-sm font-medium text-ink-800">
+        {label}
+      </label>
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
+      <textarea
+        id={id}
+        name={id}
+        rows={rows}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={fieldCls(Boolean(error), "py-2.5 leading-relaxed")}
+      />
+      {error ? (
+        <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
+/* ── Validation ──────────────────────────────────────────────────────────── */
+
+type Draft = {
+  projectId: string;
+  roleTitle: string;
+  duration: string;
+  startDate: string;
+  minStart: string;
+  mode: string;
+  city: string;
+  state: string;
+  officeDays: string;
+  homeDays: string;
+  /** Working days in the week: office + home must equal it (EMH-27). */
+  week: number;
+  laptop: string;
+  message: string;
+  shiftFrom: string;
+  shiftTo: string;
+  timezone: string;
+};
+
+function validate(draft: Draft): Record<string, string> {
+  const errors: Record<string, string> = {};
+
+  if (!draft.projectId) errors.projectId = "A proposal must attach to one of your projects.";
+  if (draft.roleTitle.trim().length < 2) errors.roleTitle = "Give the role a title.";
+  if (!DURATIONS.some((d) => d.value === draft.duration)) errors.duration = "Pick a duration.";
+  if (!draft.startDate) {
+    errors.startDate = "Pick a start date after today, as DD/MM/YYYY.";
+  } else if (Number.isNaN(Date.parse(draft.startDate))) {
+    errors.startDate = "That is not a date.";
+  } else if (draft.startDate < draft.minStart) {
+    errors.startDate = "Pick a date after today.";
+  }
+
+  if (draft.mode !== "remote" && !draft.city.trim()) {
+    errors.city = "An on-site or hybrid role needs a city.";
+  }
+  if (draft.mode !== "remote" && !draft.state.trim()) {
+    errors.state = "An on-site or hybrid role needs a state.";
+  }
+  if (draft.mode === "hybrid") {
+    const office = Number(draft.officeDays);
+    const home = Number(draft.homeDays);
+    if (!(office >= 1) || !(home >= 1) || office + home !== draft.week) {
+      errors.officeDays = `Split the ${draft.week} working days between office and home, at least one each.`;
+    }
+  }
+
+  const time = /^([01]\d|2[0-3]):[0-5]\d$/;
+  if (!time.test(draft.shiftFrom)) errors.shiftFrom = "Pick a start time.";
+  if (!time.test(draft.shiftTo)) errors.shiftTo = "Pick an end time.";
+  else if (draft.shiftFrom === draft.shiftTo) errors.shiftTo = "The end time must differ from the start.";
+  else if (time.test(draft.shiftFrom) && shiftMinutes(draft.shiftFrom, draft.shiftTo) > MAX_SHIFT_MINUTES) {
+    errors.shiftTo = `A shift can't run longer than 8 hours. Latest end for a ${draft.shiftFrom} start: ${latestShiftEnd(draft.shiftFrom)}.`;
+  }
+  if (!draft.timezone || draft.timezone.startsWith("group-")) errors.timezone = "Pick a timezone.";
+  if (!draft.laptop) errors.laptop = "Say who provides the laptop.";
+  if (draft.message.trim().length < 30) {
+    errors.message = "At least a couple of sentences - 30 characters minimum.";
+  }
+
+  return errors;
 }

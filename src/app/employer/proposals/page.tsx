@@ -1,16 +1,22 @@
 import type { Metadata } from "next";
-import { eq, desc } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { Send } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { hiredInternIds } from "@/lib/employer-visibility";
+import { avatarUrl } from "@/lib/employer-pool";
+import { initialsOf } from "@/lib/employer-candidates";
+import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { toEmployerProposal } from "@/lib/employer-proposal-view";
 import { PageHead } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { ButtonLink } from "@/components/ui/button";
+import { HireFlow } from "@/components/employer/hire-flow";
+import { ProposalTabs } from "@/components/employer/section-tabs";
+import { hireFlowCountsFor } from "@/lib/employer-flow";
 import { ProposalsManager, type ProposalItem } from "@/components/employer/proposals-manager";
 
 export const metadata: Metadata = {
@@ -18,13 +24,31 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function EmployerProposalsPage() {
+/**
+ * What the client list gets of the intern. Before the hire only the initials
+ * leave the server (as two one-letter names), never the full name: the page's
+ * RSC payload is readable in the browser.
+ */
+function userFor(first: string | null, last: string | null, hired: boolean): ProposalItem["user"] {
+  if (first === null && last === null) return null;
+  if (hired) return { firstName: first ?? "", lastName: last ?? "" };
+  const initials = initialsOf(first ?? "", last ?? "");
+  return { firstName: initials.charAt(0), lastName: initials.slice(1) };
+}
+
+const STATUSES = new Set(["open", "accepted", "hired", "closed"]);
+
+export default async function EmployerProposalsPage({ searchParams }: { searchParams: Promise<{ status?: string | string[] }> }) {
+  // The dashboard's figures open a tab here (?status=open|accepted|hired|closed).
+  const wanted = (await searchParams).status;
+  const initialStatus = typeof wanted === "string" && STATUSES.has(wanted) ? wanted : "all";
   const session = await requireRole("employer");
   await requireEmployerSetup(session.uid);
   const employerId = session.uid;
 
   let proposals: ProposalItem[] = [];
   let loadFailed = false;
+  const flow = await hireFlowCountsFor(employerId);
 
   try {
     const db = getDb();
@@ -48,14 +72,28 @@ export default async function EmployerProposalsPage() {
     // Unmask on a hire with this employer on any project, as every other
     // employer screen does.
     const hired = await hiredInternIds(db, employerId);
+    // Photo and presence show before hire (owner call, 6 Nov); the name stays initials.
+    const internIds = [...new Set(rows.map((r) => r.proposal.internId))];
+    const withPhoto = new Set<string>();
+    let presence: Record<string, PresenceLabel | null> = {};
+    if (internIds.length > 0) {
+      const docs = await db
+        .select({ userId: schema.internDocuments.userId })
+        .from(schema.internDocuments)
+        .where(and(inArray(schema.internDocuments.userId, internIds), isNotNull(schema.internDocuments.profilePhotoName)))
+        // Photos are decoration: a failed lookup shows initials, not an error page.
+        .catch(() => []);
+      for (const d of docs) withPhoto.add(d.userId);
+      // presenceOf takes at most 200 ids; the rest simply show no dot.
+      presence = await presenceOf(internIds.slice(0, 200)).catch(() => ({}));
+    }
     proposals = rows.map((row) => ({
       proposal: toEmployerProposal(row.proposal),
       project: row.projectId ? { id: row.projectId, projectName: row.projectName ?? "Project" } : null,
       internHired: hired.has(row.proposal.internId),
-      user:
-        row.firstName === null && row.lastName === null
-          ? null
-          : { firstName: row.firstName ?? "", lastName: row.lastName ?? "" },
+      photoUrl: withPhoto.has(row.proposal.internId) ? avatarUrl(row.proposal.internId) : null,
+      presence: presence[row.proposal.internId] ?? null,
+      user: userFor(row.firstName, row.lastName, hired.has(row.proposal.internId)),
     }));
   } catch (err) {
     console.error("[employer/proposals] load failed", err);
@@ -67,12 +105,15 @@ export default async function EmployerProposalsPage() {
       <PageHead
         title="Proposals"
         action={
-          <ButtonLink href="/employer/candidates" size="sm">
+          <ButtonLink href="/employer/candidates" size="sm" variant="outline">
             <Send className="size-4" aria-hidden />
             Send a proposal
           </ButtonLink>
         }
+        className="mb-4 lg:mb-5"
       />
+      <ProposalTabs active="proposals" />
+      {flow ? <HireFlow counts={flow} current="proposals" /> : null}
 
       {loadFailed ? (
         <LoadError what="your proposals" retryHref="/employer/proposals" email={SITE.adminEmail} />
@@ -82,6 +123,7 @@ export default async function EmployerProposalsPage() {
         <ProposalsManager
           key={proposals.map((p) => `${p.proposal.id}:${p.proposal.status}`).join("|")}
           initialProposals={proposals}
+          initialStatus={initialStatus}
         />
       )}
     </div>

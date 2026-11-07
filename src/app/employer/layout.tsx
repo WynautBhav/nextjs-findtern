@@ -1,59 +1,62 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { and, count, countDistinct, eq, inArray, sql } from "drizzle-orm";
 import {
   LayoutDashboard,
   FolderKanban,
   FileText,
   ShoppingCart,
-  CalendarDays,
   Building2,
   Users,
-  GitCompare,
   ShoppingBag,
   Clock,
   KeyRound,
-  Receipt,
   MessageSquare,
+  Receipt,
 } from "lucide-react";
 
-import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
+import { ConsoleShell, type ConsoleNavGroup, type ConsoleNavItem } from "@/components/layout/console-shell";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
 import { MessagingLive } from "@/components/messaging";
 import { TermsGate } from "@/components/app/terms-gate";
+import { ToastProvider } from "@/components/app/toast";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { SITE } from "@/lib/content/site";
 import { q } from "@/lib/college/sql";
 import { shouldShowTermsPrompt } from "@/lib/terms";
 
+// The path in order: find, shortlist, offer, interview, hire, then timesheet and pay.
+// Shortlist and Compare sit under Candidates (tabs there, and the bag in the header);
+// Interviews sit under Proposals. `also` keeps the right item lit on every sub-page.
 const NAV_GROUPS: ConsoleNavGroup[] = [
   {
-    title: "Talent & Pipeline",
+    title: "Hiring",
     items: [
       { href: "/employer/dashboard", label: "Dashboard", icon: <LayoutDashboard /> },
-      { href: "/employer/candidates", label: "Candidates", icon: <Users /> },
-      { href: "/employer/compare", label: "Compare", icon: <GitCompare /> },
-      { href: "/employer/projects", label: "Projects", icon: <FolderKanban /> },
-    ],
-  },
-  {
-    title: "Proposals & Hiring",
-    items: [
-      { href: "/employer/proposals", label: "Proposals", icon: <FileText /> },
+      {
+        href: "/employer/candidates",
+        label: "Candidates",
+        icon: <Users />,
+        also: ["/employer/compare", "/employer/cart", "/employer/shortlist", "/employer/intern"],
+      },
+      { href: "/employer/projects", label: "Internships", icon: <FolderKanban /> },
+      {
+        href: "/employer/proposals",
+        label: "Proposals",
+        icon: <FileText />,
+        also: ["/employer/proposal", "/employer/send-proposal", "/employer/schedule"],
+      },
       { href: "/employer/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
-      { href: "/employer/schedule", label: "Schedule", icon: <CalendarDays /> },
-      { href: "/employer/timesheets", label: "Timesheets", icon: <Clock /> },
     ],
   },
   {
-    title: "Billing & Account",
+    title: "After the hire",
     items: [
-      { href: "/employer/cart", label: "Shortlist", icon: <ShoppingBag /> },
-      { href: "/employer/orders", label: "Orders", icon: <ShoppingCart /> },
-      { href: "/employer/account", label: "Company profile", icon: <Building2 /> },
+      { href: "/employer/timesheets", label: "Timesheets", icon: <Clock /> },
+      { href: "/employer/orders", label: "Orders", icon: <ShoppingCart />, also: ["/employer/checkout"] },
     ],
   },
 ];
@@ -90,7 +93,8 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     unreadAlerts = Number(unread?.value ?? 0);
 
     const [cart] = await db
-      .select({ value: count() })
+      // Distinct people, not cart lines: one candidate saved to two projects is one.
+      .select({ value: countDistinct(schema.employerCartItems.internId) })
       .from(schema.employerCartItems)
       // Same set as the Shortlist page and its steps strip: saved, legacy
       // "checkout" rows included, and no live proposal yet (QA-124).
@@ -106,19 +110,27 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     // Keep fallback
   }
 
-  const groups = NAV_GROUPS.map((g) => ({
-    ...g,
-    items: g.items.map((i) =>
-      i.href === "/employer/cart" && cartCount > 0 ? { ...i, badge: cartCount } : i,
-    ),
-  }));
+  // Messages carries its own live unread count (MessagingLive); nothing else in the sidebar does.
+  const groups = NAV_GROUPS;
+  // Phone tab bar: the five places an employer returns to (the rest stay in the menu).
+  const flat = groups.flatMap((g) => g.items);
+  const shortlistTab: ConsoleNavItem = {
+    href: "/employer/cart",
+    label: "Shortlist",
+    icon: <ShoppingBag />,
+    ...(cartCount > 0 ? { badge: cartCount > 99 ? "99+" : cartCount } : {}),
+  };
+  const tabs = ["/employer/dashboard", "/employer/candidates", "/employer/proposals", "/employer/messages", "/employer/cart"]
+    .map((href) => (href === shortlistTab.href ? shortlistTab : flat.find((i) => i.href === href)))
+    .filter((i): i is ConsoleNavItem => Boolean(i));
 
   return (
+    <ToastProvider>
     <ConsoleShell
       roleLabel="Employer"
-      tone="light"
       homeHref="/employer/dashboard"
       groups={groups}
+      tabs={tabs}
       account={{ name: companyName, email: session.email }}
       menu={[
         { href: "/employer/account", label: "Company profile", icon: <Building2 /> },
@@ -154,5 +166,6 @@ export default async function EmployerLayout({ children }: { children: React.Rea
       {children}
       <TermsGate role="employer" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>
+    </ToastProvider>
   );
 }

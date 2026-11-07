@@ -177,7 +177,7 @@ export async function rosterCoverage(collegeId: string): Promise<RosterCoverage>
     SELECT ${r.email} AS email, ${r.name} AS name, ${r.rollNo} AS roll_no, ${r.year} AS year, ${r.branch} AS branch,
       EXISTS (
         SELECT 1 FROM ${schema.users} u JOIN ${schema.collegeMemberships} m ON m.user_id = u.id
-        WHERE lower(u.email) = ${r.email} AND m.college_id = ${collegeId} AND m.left_at IS NULL
+        WHERE lower(u.email) = ${r.email} AND m.college_id = ${collegeId} AND m.left_at IS NULL AND m.status = 'verified'
       ) AS joined
     FROM ${r} WHERE ${r.collegeId} = ${collegeId}
     ORDER BY ${r.name}
@@ -231,7 +231,8 @@ export async function presenceSnapshot(collegeId: string, userIds?: string[]): P
     JOIN ${schema.users} u ON u.id = ${m.userId}
     LEFT JOIN ${schema.collegeRoster} r ON r.college_id = ${m.collegeId} AND r.email = lower(u.email)
     LEFT JOIN ${schema.collegePresence} p ON p.user_id = ${m.userId}
-    WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL
+    -- A placement officer sees verified members only (Q27); a student who merely picked the college stays hidden.
+    WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL AND ${m.status} = 'verified'
   `);
   let rows = res.rows as Row[];
   if (userIds) {

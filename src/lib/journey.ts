@@ -1,6 +1,6 @@
 import { formatDate, formatMoney, shortDate } from "./format.ts";
 import { sheetHours } from "./employer-timesheets.ts";
-import { feedbackTextOf } from "./interview-feedback.ts";
+import { feedbackForIntern } from "./interview-feedback.ts";
 import { draftFromRecord, MIN_SKILLS } from "./onboarding.ts";
 import { formatPeriodDays } from "./timesheet-days.ts";
 /**
@@ -99,6 +99,7 @@ export type OnboardingRow = {
   linkedinUrl: string | null;
   city: string | null;
   state: string | null;
+  bio: string | null;
   skills: unknown;
   hasLaptop: boolean | null;
   extraData: Record<string, unknown> | null;
@@ -311,7 +312,7 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         at: slotOf(i) ?? i.createdAt,
         title: "Interview completed",
         // Only the company's written feedback: the rest of the notes is staff text and AI-interview links.
-        detail: feedbackTextOf(i.notes) || `You met ${withName}. Their notes are on the interview page.`,
+        detail: feedbackForIntern(i.notes) || `You met ${withName}. Their notes are on the interview page.`,
         with: withName,
         href: "/intern/interviews",
       });
@@ -542,7 +543,7 @@ export function deriveProofs(src: ProofSource): Proof[] {
       id: `pf-iv-${i.id}`,
       kind: "interview",
       title: "Interview completed",
-      line: feedbackTextOf(i.notes) || "You met the team and completed the conversation.",
+      line: feedbackForIntern(i.notes) || "You met the team and completed the conversation.",
       facts: [
         { label: "Company", value: name(i.employerId) },
         { label: "When", value: shortDate(at, { day: "numeric", month: "short", year: "numeric" }) },
@@ -701,7 +702,7 @@ export function deriveReadiness(
     {
       id: "photo",
       label: "A photo employers recognise",
-      unlocks: "Profiles with a face get roughly twice the callback.",
+      unlocks: "Employers recognise you by it once they hire you.",
       done: Boolean(doc?.profilePhotoName),
       href: "/intern/onboarding",
     },

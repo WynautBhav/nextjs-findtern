@@ -76,6 +76,11 @@ export function bandFor(score: number): Band {
   return BANDS.find((b) => s >= b.min && s < b.max) ?? BANDS[BANDS.length - 1];
 }
 
+/** The plan name an employer sees for a score: Espresso, Cappuccino or Latte. */
+export function planNameFor(score: number): string {
+  return PLAN_NAME[bandFor(score).id];
+}
+
 /* ── Regional rates ────────────────────────────────────────────────────
  * INR is the authored rate card (paise). USD is derived at ₹100 = $1 -
  * $0 / $1 / $2 hourly and a $50 fixed per-hire charge. Geometry (min/max)

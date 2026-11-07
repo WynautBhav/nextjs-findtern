@@ -1,5 +1,10 @@
 import type { internOnboarding, users } from "@/lib/db/schema";
+import { hideContactText } from "./contact-scrub.ts";
+import { canonicalSkill } from "./data/skills.ts";
 import { isSafeLink } from "./safe-url.ts";
+
+/** Catalog skills such as "Socket.io" look like domains but are not contact. */
+export const isCatalogSkill = (s: string): boolean => canonicalSkill(s) !== null;
 
 /**
  * Reading an intern profile out of `users` + `intern_onboarding`.
@@ -179,14 +184,16 @@ export function displayNameOf(
 }
 
 /**
- * What may cross to the browser for an employer who has not hired this
- * candidate: no name, no email, no LinkedIn, no interview recording. Pages
- * that hand profiles to client components pass them through this, so the
- * non-bypass rule does not depend on every component remembering it.
+ * What may cross to the browser in a list for an employer: never the email,
+ * LinkedIn or interview recording (no list view renders them), and the name
+ * only once the candidate is hired. Pages that hand profiles to client
+ * components pass them through this, so the non-bypass rule does not depend
+ * on every component remembering it.
  */
 export function redactForEmployer<T extends CandidateProfile>(profile: T, unlocked: boolean): T {
-  if (unlocked) return profile;
-  return { ...profile, firstName: "", lastName: "", fullName: "", email: "", linkedinUrl: "", aiRecordingLink: null };
+  const noContact = { ...profile, email: "", linkedinUrl: "", aiRecordingLink: null };
+  if (unlocked) return noContact;
+  return { ...noContact, firstName: "", lastName: "", fullName: "", updatedAt: null };
 }
 
 /**
@@ -207,6 +214,19 @@ export function toCandidateProfile(
   const state = text(onboarding?.state);
   const extra = (onboarding?.extraData ?? {}) as Record<string, unknown>;
 
+  // Every caller is an employer screen: profile text stored before the contact
+  // check (OA1) never shows a phone, email, link or handle.
+  const shown = hideContactText(
+    {
+      city,
+      state,
+      location: [city, state].filter(Boolean).join(", "),
+      skills: readSkills(onboarding?.skills),
+      academics: readAcademics(extra),
+      preferredLocations: stringArray(onboarding?.preferredLocations),
+    },
+    isCatalogSkill,
+  );
   return {
     id: user.id,
     firstName,
@@ -214,19 +234,19 @@ export function toCandidateProfile(
     fullName: `${firstName} ${lastName}`.trim() || "Intern",
     initials: initialsOf(firstName, lastName),
     email: text(user.email),
-    city,
-    state,
-    location: [city, state].filter(Boolean).join(", "),
+    city: shown.city,
+    state: shown.state,
+    location: shown.location,
     linkedinUrl: text(onboarding?.linkedinUrl),
-    skills: readSkills(onboarding?.skills),
+    skills: shown.skills,
     score: readScore(extra),
     scored: rawScore(extra) !== null,
     ratings: readRatings(extra),
-    academics: readAcademics(extra),
+    academics: shown.academics,
     workModes: stringArray(onboarding?.locationTypes).map((mode) =>
       MODE_LABEL[mode.toLowerCase()] ?? mode,
     ),
-    preferredLocations: stringArray(onboarding?.preferredLocations),
+    preferredLocations: shown.preferredLocations,
     hasLaptop: typeof onboarding?.hasLaptop === "boolean" ? onboarding.hasLaptop : null,
     updatedAt: onboarding?.updatedAt ?? null,
     aiFeedbackLink: safeLinkOf(extra?.aiFeedbackLink),

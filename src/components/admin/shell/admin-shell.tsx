@@ -307,8 +307,8 @@ export function AdminShell({
             >
               {/* Nested routes only: the way back up. A list page's H1 already says where you are. */}
               {nested ? (
-                <nav aria-label="Breadcrumb" className="mb-4 flex min-w-0 items-center gap-2 text-sm">
-                  <Link href={rootCrumb.href} className="apple-spring shrink-0 font-medium text-ink-600 hover:text-ink-900">
+                <nav aria-label="Breadcrumb" className="mb-2 flex min-w-0 items-center gap-2 text-sm">
+                  <Link href={rootCrumb.href} className="apple-spring inline-flex min-h-9 shrink-0 items-center font-medium text-ink-600 hover:text-ink-900">
                     {rootCrumb.label}
                   </Link>
                   {crumbs.map((crumb) => {
@@ -320,7 +320,7 @@ export function AdminShell({
                         {here ? (
                           <span aria-current="page" className="truncate font-semibold text-ink-900">{crumb.label}</span>
                         ) : crumb.link ? (
-                          <Link href={crumb.href} className="apple-spring truncate font-medium text-ink-600 hover:text-ink-900">{crumb.label}</Link>
+                          <Link href={crumb.href} className="apple-spring inline-flex min-h-9 items-center truncate font-medium text-ink-600 hover:text-ink-900">{crumb.label}</Link>
                         ) : (
                           <span className="truncate font-medium text-ink-600">{crumb.label}</span>
                         )}

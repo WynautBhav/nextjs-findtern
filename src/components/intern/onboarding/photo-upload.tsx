@@ -39,6 +39,12 @@ export function PhotoUpload({
   const [problem, setProblem] = useState<string | null>(null);
   // A stored photo that cannot be fetched shows the placeholder, not alt text.
   const [brokenSrc, setBrokenSrc] = useState<string | null>(null);
+  const shown = useRef<HTMLImageElement>(null);
+  // The step is server-rendered too, so the photo can fail before onError is attached; check once on mount.
+  useEffect(() => {
+    const img = shown.current;
+    if (img?.complete && img.naturalWidth === 0) setBrokenSrc(src);
+  }, [src]);
 
   useEffect(() => () => {
     if (loaded) URL.revokeObjectURL(loaded.url);
@@ -70,7 +76,7 @@ export function PhotoUpload({
       >
         {src && brokenSrc !== src ? (
           /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={src} alt="Your profile photo" onError={() => setBrokenSrc(src)} className="size-full object-cover" />
+          <img ref={shown} src={src} alt="Your profile photo" onError={() => setBrokenSrc(src)} className="size-full object-cover" />
         ) : (
           <UserRound className="size-10 text-ink-300" aria-hidden />
         )}

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PageHero } from "@/components/marketing/page-hero";
-import { RoleCard } from "@/components/marketing/role-card";
+import { OpportunityRow } from "@/components/intern/opportunity-row";
 import { ButtonLink } from "@/components/ui/button";
 import { openProjects } from "@/lib/intern-data";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -40,13 +40,15 @@ export default async function PublicOpportunities() {
           breadcrumbJsonLd([{ name: "Open roles", path: "/opportunities" }]),
         ]}
       />
+      {/* A listing page: a short hero, so the first role shows above the fold on a phone. */}
       <PageHero
-        eyebrow="Open roles"
+        align="left"
+        className="[&>.container-page]:py-8 sm:[&>.container-page]:py-12"
         title="Everything hiring on Findtern right now."
-        lead="Each listing is a live project a company has opened this month. Read the whole brief, then decide whether it is worth an account."
+        lead="Live projects, with the whole brief. No account needed to read."
       />
 
-      <section className="container-page section-y">
+      <section className="container-page section-y-tight pt-6! sm:pt-8!">
         {rows.length === 0 ? (
           <div className="mx-auto max-w-xl text-center">
             <p className="text-pretty text-base leading-relaxed text-ink-600">
@@ -65,13 +67,13 @@ export default async function PublicOpportunities() {
           </div>
         ) : (
           <>
-            <p className="mb-5 text-sm text-ink-600">
-              {rows.length} role{rows.length === 1 ? "" : "s"} open
+            <p className="nums mb-4 text-sm text-ink-600">
+              <span className="font-semibold text-ink-900">{rows.length}</span> role{rows.length === 1 ? "" : "s"} open, newest first
             </p>
-            <ul className="grid gap-3 lg:grid-cols-2">
+            <ul className="divide-y divide-ink-100 overflow-hidden rounded-2xl bg-white ring-1 ring-ink-100">
               {rows.map((role) => (
                 <li key={role.id}>
-                  <RoleCard role={role} />
+                  <OpportunityRow role={role} href={`/opportunities/${role.id}`} />
                 </li>
               ))}
             </ul>
@@ -104,7 +106,7 @@ export default async function PublicOpportunities() {
               Already have an account?{" "}
               <Link
                 href="/intern/opportunities"
-                className="font-medium text-primary underline-offset-4 hover:underline"
+                className="inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline"
               >
                 See the roles you have been considered for
               </Link>

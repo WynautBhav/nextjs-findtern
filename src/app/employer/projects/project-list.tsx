@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Briefcase, MapPin, Pencil, Pause, Play, Plus, Users, XCircle, Wrench, Undo2 } from "lucide-react";
 
-import { BigFigure, EmptyScene, FigureStrip, FilterTabs } from "@/components/app/primitives";
+import { EmptyScene, Figure, FilterTabs } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 import { FormNotice } from "@/components/employer/company-fields";
 import { buttonClass, ButtonLink } from "@/components/ui/button";
@@ -114,11 +114,11 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
   return (
     <div className="space-y-4">
       {dialog}
-      <FigureStrip className="max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
-        <BigFigure label="Live" value={counts.get("published") ?? 0} hint="Candidates can see these" />
-        <BigFigure label="Drafts" value={counts.get("draft") ?? 0} hint="Not yet sent to us" />
-        <BigFigure label="In review" value={counts.get("pending_review") ?? 0} hint="With Findtern" />
-      </FigureStrip>
+      <dl className="grid grid-cols-3 gap-4 rounded-apple-xl border border-ink-200/80 bg-white p-4 sm:p-5">
+        <Figure label="Live" value={counts.get("published") ?? 0} empty="None" hint="Candidates can see these" />
+        <Figure label="Drafts" value={counts.get("draft") ?? 0} empty="None" hint="Not yet sent to us" />
+        <Figure label="In review" value={counts.get("pending_review") ?? 0} empty="None" hint="With Findtern" />
+      </dl>
       <FilterTabs tabs={tabs} value={filter} onChange={setFilter} label="Filter projects by status" />
       {error && <FormNotice tone="error">{error}</FormNotice>}
       <ul className="grid gap-3">

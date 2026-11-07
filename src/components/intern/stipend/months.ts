@@ -1,7 +1,8 @@
+import { formatMoney } from "../../../lib/format.ts";
 import { payoutState, readScheduledForDate, type PayoutRow } from "../../../lib/journey.ts";
 
 /**
- * The stipend month by month, for the Stipend page's gauge and rail.
+ * The stipend month by month, for the Stipend page's internship rows and month rail.
  *
  * Payouts carry no month, so each month is filled from the payouts in the
  * order they landed (paid first, then pending by scheduled date), the same
@@ -121,6 +122,27 @@ export function stipendPlan(input: {
   return { months: out, totalMinor, paidMinor, pendingMinor, toComeMinor: Math.max(0, totalMinor - paidMinor - pendingMinor) };
 }
 
+/**
+ * Where an internship sits today (IST): 0 running, 1 not started (or no start date), 2 finished.
+ * The list shows what is happening now first, then what is coming, then history.
+ */
+export function engagementPhase(startDate: string | null, months: number, now: Date = new Date()): 0 | 1 | 2 {
+  if (!/^\d{4}-\d{2}-\d{2}/.test(startDate ?? "")) return 1;
+  const start = new Date(`${startDate!.slice(0, 10)}T00:00:00Z`);
+  const today = new Date(`${new Date(now.getTime() + 330 * 60_000).toISOString().slice(0, 10)}T00:00:00Z`);
+  if (today < start) return 1;
+  return today < addMonths(start, Math.max(0, months)) ? 0 : 2;
+}
+
+/** Stable order for the list: running, then upcoming by start date, then finished, newest first. */
+export function orderEngagements<T extends { startDate: string | null; months: number }>(cards: T[], now?: Date): T[] {
+  const key = (c: T) => (c.startDate ?? "9999").slice(0, 10);
+  return cards
+    .map((c, i) => ({ c, i, phase: engagementPhase(c.startDate, c.months, now) }))
+    .sort((a, b) => a.phase - b.phase || (a.phase === 2 ? key(b.c).localeCompare(key(a.c)) : key(a.c).localeCompare(key(b.c))) || a.i - b.i)
+    .map((x) => x.c);
+}
+
 /** Totals of one payout state, one entry per currency: amounts in different currencies are never added. */
 export function totalsByCurrency(payouts: PayoutRow[], state: "paid" | "pending" | "failed"): { currency: string; minor: number }[] {
   const by = new Map<string, number>();
@@ -130,4 +152,14 @@ export function totalsByCurrency(payouts: PayoutRow[], state: "paid" | "pending"
     by.set(c, (by.get(c) ?? 0) + Math.max(0, p.amountMinor ?? 0));
   }
   return [...by].filter(([, minor]) => minor > 0).map(([currency, minor]) => ({ currency, minor }));
+}
+
+/** "₹0 paid · ₹6,47,000 still to come" across every internship: stipends are all INR, so the plans add up. Scheduled only when there is some. */
+export function stipendTotalsLine(plans: (StipendPlan | null)[]): string {
+  const sum = (k: "paidMinor" | "pendingMinor" | "toComeMinor") => plans.reduce((n, p) => n + (p?.[k] ?? 0), 0);
+  const money = (n: number) => formatMoney(n, STIPEND_CURRENCY, { zeroLabel: false });
+  const parts = [`${money(sum("paidMinor"))} paid`];
+  if (sum("pendingMinor") > 0) parts.push(`${money(sum("pendingMinor"))} scheduled`);
+  parts.push(`${money(sum("toComeMinor"))} still to come`);
+  return parts.join(" · ");
 }

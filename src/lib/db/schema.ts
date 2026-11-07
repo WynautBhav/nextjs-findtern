@@ -415,6 +415,11 @@ export const projects = pgTable("projects", {
   rejectionReason: text("rejection_reason"),
   submittedAt: timestamp("submitted_at"),
   publishedAt: timestamp("published_at"),
+  description: text("description"),
+  /** Admin take-down, separate from `status`. */
+  takenDownAt: timestamp("taken_down_at"),
+  takenDownBy: varchar("taken_down_by"),
+  takenDownReason: text("taken_down_reason"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -1245,3 +1250,5 @@ export * from "./schema-drive-codes.ts";
 export * from "./schema-outbox.ts";
 export * from "./schema-refunds.ts";
 export * from "./schema-messaging.ts";
+export * from "./schema-listings.ts";
+export * from "./schema-roster-imports.ts";

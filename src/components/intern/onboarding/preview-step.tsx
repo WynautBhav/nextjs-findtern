@@ -1,8 +1,10 @@
 "use client";
 
-import { Eye, MapPin, Pencil, UserRound } from "lucide-react";
+import { Eye, MapPin, Pencil } from "lucide-react";
 
 import { DetailRow, Pill } from "@/components/app/primitives";
+import { RowAvatar } from "@/components/employer/candidate-row-parts";
+import { initialsOf } from "@/lib/employer-candidates";
 import { dateLabel, widestWorkMode } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 
@@ -11,10 +13,11 @@ import type { StepProps } from "./types";
 
 /**
  * The profile the way an employer reads it, then the agreement and submit.
- * Employers see initials, never the photo or name, until they hire (NC r41),
- * so the preview shows the same.
+ * Before a hire employers see the photo and initials, never the name or contact
+ * details (owner call, 6 Nov), so the preview shows the same.
  */
-export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
+export function PreviewStep({ values, update, errors, documents, onJumpStep }: StepProps) {
+  const photoSrc = values.photoUrl || (documents.some((d) => d.label === "Profile photo") ? "/api/intern/avatar" : "");
   const a = values.academics;
   const mode = widestWorkMode(values.locationTypes ?? []);
   const languages = (values.languages ?? []).filter((l) => l.language);
@@ -25,14 +28,12 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
     <div className="space-y-6">
       <p className="flex items-start gap-3 text-sm leading-relaxed text-ink-600">
         <Eye className="mt-0.5 size-4 shrink-0 text-brand-600" aria-hidden />
-        This is what employers see when they search. Your name, photo and contact details stay hidden until an employer hires you.
+        This is what employers see when they search: your photo, initials, city, score and up to 7 skills. Your name and contact details stay hidden until a company hires you.
       </p>
 
       <article className="overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white">
         <header className="flex items-center gap-4 bg-brand-950 px-5 py-5 text-white sm:px-6">
-          <span aria-hidden className="grid size-14 shrink-0 place-items-center rounded-full bg-white/10 ring-1 ring-white/20">
-            <UserRound className="size-6 text-white/80" />
-          </span>
+          <RowAvatar photoUrl={photoSrc} initials={initialsOf(values.firstName ?? "", values.lastName ?? "")} />
           <div className="min-w-0">
             <p className="[overflow-wrap:anywhere] text-lg font-semibold tracking-[-0.01em]">
               {[a.degree, a.branch].filter(Boolean).join(", ") || "Your degree"}

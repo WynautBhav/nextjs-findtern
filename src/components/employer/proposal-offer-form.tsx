@@ -6,12 +6,18 @@ import { Loader2, Pencil } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatMoney } from "@/lib/format";
+import type { PlaceOfSupply } from "@/lib/gst";
+import { offerBreakdown } from "@/lib/offer-breakdown";
+import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
 import {
   billableWorkingDays,
+  isClockTime,
+  latestShiftEnd,
+  MAX_SHIFT_MINUTES,
   normalizeLaptop,
   PAID_LEAVE_OPTIONS,
   scheduledMonthlyHours,
+  shiftMinutes,
   WEEKLY_SCHEDULES,
   weeklyScheduleOf,
   workingDaysPerWeek,
@@ -77,6 +83,8 @@ export function ProposalOfferForm({
   accepted = false,
   hasLaptop = null,
   preference = { modes: [], cities: [] },
+  place = null,
+  perHireMinor = null,
 }: {
   proposalId: string;
   /** The candidate already accepted: saving asks them to accept again. */
@@ -89,6 +97,10 @@ export function ProposalOfferForm({
   defaultOpen?: boolean;
   initial: EditableOffer;
   currency: "INR" | "USD";
+  /** Where the company is taxed; null leaves the GST line out. */
+  place?: PlaceOfSupply | null;
+  /** The one-time hiring fee on this offer, shown under the monthly amount. */
+  perHireMinor?: number | null;
   /** Score below 6: at most two months. */
   shortOnly?: boolean;
 }) {
@@ -103,7 +115,7 @@ export function ProposalOfferForm({
   const [leaves, setLeaves] = useState(String(Math.min(3, Math.round((initial.paidLeavesPerMonth ?? 0) * 2) / 2)));
   const hours = scheduledMonthlyHours(schedule, Number(leaves) || 0);
   const days = billableWorkingDays(schedule);
-  const monthlyMinor = initial.hourlyRateMinor ? Math.round(hours * initial.hourlyRateMinor) : null;
+  const breakdown = offerBreakdown({ currency, hourlyRateMinor: initial.hourlyRateMinor ?? null, hours, perHireMinor, place });
   const modes = MODE_OPTIONS.filter((m) => offerableModes(preference).includes(m.value) || m.value === initial.mode);
   const [mode, setMode] = useState(initial.mode || modes[0]?.value || "remote");
   const [timezone, setTimezone] = useState(initial.timezone || "Asia/Kolkata");
@@ -113,7 +125,7 @@ export function ProposalOfferForm({
   const [officeDays, setOfficeDays] = useState(String(Math.min(week - 1, Math.max(1, initial.officeDays ?? 3))));
   const homeDays = Math.max(0, week - (Number(officeDays) || 0));
   const [shiftFrom, setShiftFrom] = useState(flexibleAtStart ? "09:00" : initial.shiftFrom!);
-  const [shiftTo, setShiftTo] = useState(flexibleAtStart ? "18:00" : initial.shiftTo || "18:00");
+  const [shiftTo, setShiftTo] = useState(flexibleAtStart ? "18:00" : initial.shiftTo || "17:00");
   const noLaptop = hasLaptop === false;
   const [laptop, setLaptop] = useState(noLaptop ? "company" : normalizeLaptop(initial.laptop) || "company");
   const [message, setMessage] = useState(initial.message ?? "");
@@ -135,6 +147,12 @@ export function ProposalOfferForm({
     document.getElementById(`${uid}-${f}`)?.focus();
   };
   const ist = shiftInIst(shiftFrom, shiftTo, timezone, startDate);
+  const shiftTooLong = isClockTime(shiftFrom) && isClockTime(shiftTo) && shiftMinutes(shiftFrom, shiftTo) > MAX_SHIFT_MINUTES;
+  // A later start pulls the end in, so the shift never passes 8 hours.
+  const pickShiftFrom = (v: string) => {
+    setShiftFrom(v);
+    if (isClockTime(v) && isClockTime(shiftTo) && shiftMinutes(v, shiftTo) > MAX_SHIFT_MINUTES) setShiftTo(latestShiftEnd(v));
+  };
 
   async function save() {
     setError("");
@@ -144,6 +162,10 @@ export function ProposalOfferForm({
     if (mode !== "remote" && (!city.trim() || !state.trim())) return fail(city.trim() ? "state" : "city", "An on-site or hybrid role needs a city and state.");
     if (mode === "hybrid" && !(Number(officeDays) >= 1 && homeDays >= 1)) return fail("office", `Split the ${week} working days between office and home.`);
     if (!shiftFrom || !shiftTo || shiftFrom === shiftTo) return fail(shiftFrom ? "shiftTo" : "shiftFrom", "Pick a start and end time.");
+    // Judged only when the hours changed: an older offer longer than 8 hours can still have other terms edited.
+    if ((shiftFrom !== initial.shiftFrom || shiftTo !== initial.shiftTo) && shiftTooLong) {
+      return fail("shiftTo", `A shift can't run longer than 8 hours. Latest end for a ${shiftFrom} start: ${latestShiftEnd(shiftFrom)}.`);
+    }
     if (!message.trim()) return fail("message", "Add a job description.");
 
     const offer: Record<string, unknown> = {
@@ -254,11 +276,7 @@ export function ProposalOfferForm({
           </select>
         </label>
         <div className="col-span-2 space-y-0.5">
-          <p className="nums text-sm font-medium text-ink-800">
-            {hours} h a month
-            {monthlyMinor != null ? ` · ${formatMoney(monthlyMinor, currency)} a month` : ""}
-            {monthlyMinor != null && currency === "INR" ? <span className="text-text-subtle"> (includes GST)</span> : null}
-          </p>
+          <OfferBreakdownList lines={breakdown.lines} />
           <p className="text-xs text-text-subtle">
             ({days} working days − {Number(leaves) || 0} leave) × 8 h
           </p>
@@ -335,12 +353,19 @@ export function ProposalOfferForm({
         ) : null}
         <label className="block">
           <span className={LABEL}>From</span>
-          <input {...fieldProps("shiftFrom")} type="time" value={shiftFrom} onChange={(e) => setShiftFrom(e.target.value)} className={INPUT} />
+          <input {...fieldProps("shiftFrom")} type="time" value={shiftFrom} onChange={(e) => pickShiftFrom(e.target.value)} className={INPUT} />
         </label>
         <label className="block">
           <span className={LABEL}>To</span>
           <input {...fieldProps("shiftTo")} type="time" value={shiftTo} onChange={(e) => setShiftTo(e.target.value)} className={INPUT} />
         </label>
+        <p className={cn("col-span-2 -mt-1 text-xs", shiftTooLong ? "font-medium text-danger" : "text-text-subtle")}>
+          {shiftTooLong
+            ? `Longer than 8 hours. A start at ${shiftFrom} can end by ${latestShiftEnd(shiftFrom)}.`
+            : isClockTime(shiftFrom)
+              ? `Up to 8 hours: a start at ${shiftFrom} can end by ${latestShiftEnd(shiftFrom)}.`
+              : "Up to 8 hours."}
+        </p>
         <label className="col-span-2 block">
           <span className={LABEL}>Timezone</span>
           <select value={timezone} onChange={(e) => setTimezone(e.target.value)} className={INPUT}>

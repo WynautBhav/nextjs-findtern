@@ -12,9 +12,8 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, ArrowRight, Check, CheckCheck } from "lucide-react";
+import { AlertCircle, Check, CheckCheck } from "lucide-react";
 
-import { LIGHT_TILE } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
@@ -119,36 +118,30 @@ export function NotificationList({
       ) : null}
 
       {/* By day, newest first; each row then needs only its time. Day labels are h3 under the list's section. */}
-      <div className={cn("overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white", LIGHT_TILE)}>
+      <div>
         {byDay(rows ?? [], now ?? mountedAt).map(({ day, items }) => (
           <section key={day} aria-label={day}>
-            <h2 className="nums bg-ink-50/70 px-5 py-2 text-sm font-medium text-ink-700">{day}</h2>
-            <ul className="divide-y divide-ink-100">
+            <h2 className="nums px-3 pb-2 pt-6 text-xs font-semibold text-ink-600 first:pt-0">{day}</h2>
+            <ul className="divide-y divide-ink-100 border-y border-ink-100">
               {items.map((n) => {
                 const isRead = n.isRead || read.has(n.id);
                 const body = (
                   <>
-                    <span aria-hidden className={cn("mt-2 size-2 shrink-0 rounded-full", isRead ? "bg-transparent" : "bg-brand-600")} />
+                    <span aria-hidden className={cn("mt-2 size-2 shrink-0 rounded-full", isRead ? "bg-transparent" : "bg-brand-700")} />
                     <span className="min-w-0 flex-1">
                       {/* Title with the time on the right; one quiet line of detail. */}
-                      <span className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-                        <span className={cn("min-w-0 text-pretty text-base", isRead ? "font-medium text-ink-700" : "font-semibold text-ink-900")}>
+                      <span className="flex items-baseline justify-between gap-4">
+                        <span className={cn("min-w-0 text-pretty text-base", isRead ? "font-medium text-ink-800" : "font-semibold text-ink-900")}>
                           {n.title}
                           {!isRead ? <span className="sr-only"> (unread)</span> : null}
                         </span>
                         {n.createdAt ? (
-                          <time dateTime={new Date(n.createdAt).toISOString()} className="nums text-xs text-text-subtle sm:shrink-0">
+                          <time dateTime={new Date(n.createdAt).toISOString()} className="nums shrink-0 text-xs text-ink-600">
                             {shortDateTime(new Date(n.createdAt), TIME)} IST
                           </time>
                         ) : null}
                       </span>
                       <span className="mt-1 block text-pretty text-sm leading-relaxed text-ink-600">{n.message}</span>
-                      {n.href ? (
-                        <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-700">
-                          Open
-                          <ArrowRight className="size-3.5" aria-hidden />
-                        </span>
-                      ) : null}
                     </span>
                   </>
                 );
@@ -160,12 +153,12 @@ export function NotificationList({
                         onClick={() => {
                           if (!isRead) void markOne(n.id, true);
                         }}
-                        className="flex min-w-0 flex-1 items-start gap-4 py-4 pl-5 pr-12 sm:pr-14 transition-colors hover:bg-ink-50/80 focus-visible:bg-ink-50/80 focus-visible:-outline-offset-2"
+                        className="flex min-w-0 flex-1 items-start gap-4 py-4 pl-3 pr-14 transition-colors hover:bg-ink-50/80 focus-visible:bg-ink-50/80 focus-visible:-outline-offset-2"
                       >
                         {body}
                       </Link>
                     ) : (
-                      <div className="flex min-w-0 flex-1 items-start gap-4 py-4 pl-5 pr-12 sm:pr-14">{body}</div>
+                      <div className="flex min-w-0 flex-1 items-start gap-4 py-4 pl-3 pr-14">{body}</div>
                     )}
                     {!isRead ? (
                       // Always there on touch; on a pointer it shows on hover or focus.
@@ -174,7 +167,7 @@ export function NotificationList({
                         onClick={() => markOne(n.id)}
                         aria-label={`Mark "${n.title}" as read`}
                         title="Mark as read"
-                        className="absolute right-2 top-1/2 grid size-11 focus-visible:-outline-offset-2 -translate-y-1/2 place-items-center rounded-apple-sm text-text-subtle transition-opacity hover:bg-ink-100 hover:text-ink-900 focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100"
+                        className="absolute right-2 top-1/2 grid size-10 touch:size-11 focus-visible:-outline-offset-2 -translate-y-1/2 place-items-center rounded-apple-sm text-text-subtle transition-opacity hover:bg-ink-100 hover:text-ink-900 focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100"
                       >
                         <Check className="size-4" aria-hidden />
                       </button>

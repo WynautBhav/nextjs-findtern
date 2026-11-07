@@ -22,6 +22,7 @@ import { BadgeIndianRupee, Check, Loader2 } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { CollegeCodeRedeem } from "@/components/intern/college-code-redeem";
 import { AiInterviewAction } from "@/components/intern/ai-interview-join-card";
+import { coverMessage, type CollegeCover } from "@/lib/college/labels";
 import { promoConsentNotice } from "@/lib/college/promo-consent";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
@@ -40,7 +41,10 @@ export function ActivationCard({
   alreadyPaid = false,
   testMode = false,
   testPay = false,
+  collegeCover = null,
 }: {
+  /** From `collegeCoverFor(userId)`: says before payment whether the student's college covers this interview. */
+  collegeCover?: CollegeCover | null;
   /** PAYMENTS_TEST_BUTTON=1: a second button settles at the real amount without Razorpay. */
   testPay?: boolean;
   /** PAYMENTS_MODE=free: activation completes without Razorpay. */
@@ -64,6 +68,7 @@ export function ActivationCard({
   const [adult, setAdult] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
+  const cover = coverMessage(collegeCover);
   const discount = promo ? Math.min(promo.discountMinor, feeMinor) : 0;
   const payable = feeMinor - discount;
 
@@ -185,6 +190,15 @@ export function ActivationCard({
         you are not placed within 6 months of your AI interview, the full fee comes back.
       </p>
 
+      {cover ? (
+        <p
+          role="note"
+          className={cover.tone === "covered" ? "mt-3 rounded-apple-sm border border-brand-200 bg-brand-50 px-3.5 py-3 text-sm font-medium leading-relaxed text-brand-900" : "mt-3 rounded-apple-sm border border-ink-200 bg-ink-50 px-3.5 py-3 text-sm leading-relaxed text-ink-800"}
+        >
+          {cover.text}
+        </p>
+      ) : null}
+
       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
         <label htmlFor="activation-promo" className="sr-only">
           Promo code
@@ -206,6 +220,8 @@ export function ActivationCard({
           }}
           placeholder="Promo code (optional)"
           autoComplete="off"
+          aria-invalid={promoError ? true : undefined}
+          aria-describedby={promoError ? "activation-promo-error" : promo ? "activation-promo-ok" : undefined}
           className={fieldClass}
         />
         <button
@@ -215,18 +231,22 @@ export function ActivationCard({
           className={buttonClass({ variant: "outline", className: "shrink-0" })}
         >
           {checking ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
-          Apply
+          {checking ? "Checking…" : "Apply"}
         </button>
       </div>
 
       {promoError ? (
-        <p role="alert" className="mt-2 text-sm text-danger">
+        <p id="activation-promo-error" role="alert" className="mt-2 text-sm text-danger">
           {promoError}
         </p>
       ) : null}
 
+      {/* Mounted empty, so the applied code is announced when it fills. */}
+      <p id="activation-promo-ok" role="status" className="mt-2 text-sm font-medium text-brand-800 empty:hidden">
+        {promo ? `Code ${promo.code} applied.` : ""}
+      </p>
       {promo ? (
-        <dl className="mt-3 space-y-2 rounded-apple-sm bg-ink-50 p-4 text-sm">
+        <dl className="mt-2 space-y-2 rounded-apple-sm bg-ink-50 p-4 text-sm">
           <div className="flex items-baseline justify-between gap-4">
             <dt className="text-ink-600">Activation</dt>
             <dd className="nums text-ink-800">{formatMoney(feeMinor, "INR")}</dd>

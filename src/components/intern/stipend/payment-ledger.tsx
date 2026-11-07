@@ -20,11 +20,11 @@ const STATE = {
 export function PaymentLedger({ payouts }: { payouts: PayoutRow[] }) {
   const paidTotals = totalsByCurrency(payouts, "paid");
   return (
-    <div className="-mx-5 overflow-hidden lg:-mx-6">
+    <div className="overflow-hidden">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-ink-100 text-left text-xs text-text-subtle">
-            <th scope="col" className="py-2 pl-5 pr-3 font-medium lg:pl-6">
+            <th scope="col" className="py-2 pr-3 font-medium">
               Date
             </th>
             <th scope="col" className="hidden px-3 py-2 font-medium sm:table-cell">
@@ -33,7 +33,7 @@ export function PaymentLedger({ payouts }: { payouts: PayoutRow[] }) {
             <th scope="col" className="hidden px-3 py-2 font-medium sm:table-cell">
               Status
             </th>
-            <th scope="col" className="py-2 pl-3 pr-5 text-right font-medium lg:pr-6">
+            <th scope="col" className="py-2 pl-3 text-right font-medium">
               Amount
             </th>
           </tr>
@@ -48,7 +48,7 @@ export function PaymentLedger({ payouts }: { payouts: PayoutRow[] }) {
             const ref = state === "failed" ? p.notes || "The transfer did not go through" : p.referenceId ? `Ref ${p.referenceId}` : "No reference yet";
             return (
               <tr key={p.id} className="align-top">
-                <td className="py-3 pl-5 pr-3 lg:pl-6">
+                <td className="py-3 pr-3">
                   <p className="nums font-medium text-ink-900">{when}</p>
                   {p.kind === "completion_bonus" ? <p className="mt-0.5 text-xs font-medium text-brand-800">Completion bonus</p> : null}
                   <p className="mt-1 break-all text-xs text-text-subtle sm:hidden">{ref}</p>
@@ -57,7 +57,7 @@ export function PaymentLedger({ payouts }: { payouts: PayoutRow[] }) {
                 <td className="hidden px-3 py-3 sm:table-cell">
                   <Pill tone={s.tone}>{s.label}</Pill>
                 </td>
-                <td className="py-3 pl-3 pr-5 text-right lg:pr-6">
+                <td className="py-3 pl-3 text-right">
                   <p className="nums whitespace-nowrap font-semibold text-ink-900">
                     {formatMoney(p.amountMinor ?? 0, p.currency ?? STIPEND_CURRENCY, { zeroLabel: false })}
                   </p>
@@ -75,11 +75,11 @@ export function PaymentLedger({ payouts }: { payouts: PayoutRow[] }) {
               <tr key={t.currency}>
                 {/* Two label cells: the phone shows two columns, wider screens four. */}
                 {[" sm:hidden", " hidden sm:table-cell"].map((show, i) => (
-                  <th key={show} scope="row" colSpan={i ? 3 : 1} className={`py-3 pl-5 pr-3 text-left font-medium text-ink-700 lg:pl-6${show}`}>
+                  <th key={show} scope="row" colSpan={i ? 3 : 1} className={`py-3 pr-3 text-left font-medium text-ink-700${show}`}>
                     Paid in total{paidTotals.length > 1 ? ` (${t.currency})` : ""}
                   </th>
                 ))}
-                <td className="nums whitespace-nowrap py-3 pl-3 pr-5 text-right font-semibold text-ink-900 lg:pr-6">
+                <td className="nums whitespace-nowrap py-3 pl-3 text-right font-semibold text-ink-900">
                   {formatMoney(t.minor, t.currency, { zeroLabel: false })}
                 </td>
               </tr>

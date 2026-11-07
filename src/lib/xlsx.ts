@@ -246,6 +246,11 @@ function columnIndex(ref: string): number {
   return n - 1;
 }
 
+/** Column cap: a ref like ZZZZZZZZ1 would otherwise pad a row to ~10^11 cells. */
+export const XLSX_MAX_COLUMNS = 256;
+/** Cell cap (5,000 rows + a header, x 64), counted while parsing so a huge sheet fails before it fills memory. */
+export const XLSX_MAX_CELLS = 5_001 * 64;
+
 /** First worksheet as rows of cell strings. Fully blank rows are dropped. */
 export function readXlsxRows(bytes: Uint8Array): string[][] {
   const zipped = readZip(bytes);
@@ -269,6 +274,7 @@ export function readXlsxRows(bytes: Uint8Array): string[][] {
   if (!sheet) throw new Error("The workbook has no worksheet");
 
   const rows: string[][] = [];
+  let cells = 0;
   for (const rowMatch of sheet.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
     const row: string[] = [];
     let next = 0;
@@ -277,6 +283,7 @@ export function readXlsxRows(bytes: Uint8Array): string[][] {
       const body = c[2] ?? "";
       const ref = /\br="([^"]+)"/.exec(attrs)?.[1];
       const col = ref ? columnIndex(ref) : next;
+      if (col >= XLSX_MAX_COLUMNS) throw new Error("Too many columns");
       next = col + 1;
       const type = /\bt="([^"]+)"/.exec(attrs)?.[1];
       const v = /<v>([\s\S]*?)<\/v>/.exec(body)?.[1];
@@ -284,8 +291,11 @@ export function readXlsxRows(bytes: Uint8Array): string[][] {
       if (type === "s") value = shared[Number(v)] ?? "";
       else if (type === "inlineStr") value = textOf(body);
       else if (v !== undefined) value = decodeXml(v);
+      const before = row.length;
       while (row.length < col) row.push("");
       row[col] = value;
+      cells += row.length - before;
+      if (cells > XLSX_MAX_CELLS) throw new Error("Too many cells");
     }
     if (row.some((v) => v.trim())) rows.push(row);
   }

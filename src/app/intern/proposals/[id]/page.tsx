@@ -4,24 +4,23 @@ import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { AlertCircle, ArrowLeft, Download, Phone, User } from "lucide-react";
 
-import { DetailRow, Pill, SectionHead, Surface } from "@/components/app/primitives";
-import { ScoreScale } from "@/components/app/tiles";
+import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { ScoreScale, STAT_ROW, StatTile } from "@/components/app/tiles";
+import { MessageButton } from "@/components/app/message-button";
 import { OfferDecision } from "@/components/app/offer-decision";
 import { proposalStatus } from "@/components/app/status";
 import { ImportantInstructions } from "@/components/intern/offer/important-instructions";
 import { modeLabel, offerFacts } from "@/components/intern/offer/offer-facts";
 import { ButtonAnchor, ButtonLink, buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
-import { OfferHero } from "@/components/intern/offer/offer-hero";
-import { OfferSteps } from "@/components/intern/offer/offer-steps";
-import { Stagger } from "@/components/intern/kit/motion";
+import { cn } from "@/lib/utils";
 import { canAccess } from "@/lib/security/guards";
 import { getDb, hasDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
 import { loadInternData } from "@/lib/intern-data";
 import { rawScore } from "@/lib/employer-candidates";
 import { offerBonusMinor } from "@/lib/completion-bonus";
-import { formatJoiningDate, formatMoney, shortDate } from "@/lib/format";
+import { formatDate, formatMoney, shortDate } from "@/lib/format";
 import { canDecide, hybridSplit, offerJoiningDay, shiftInIst } from "@/lib/intern-offer-view";
 import { toArray } from "@/lib/journey";
 import { sanitizeRichText } from "@/lib/richtext";
@@ -39,8 +38,9 @@ function laptopLabel(raw: string): string {
   const v = raw.toLowerCase();
   if (!v) return "Not specified";
   if (v === "company" || v === "yes") return "Provided by the company";
-  if (v === "candidate" || v === "own" || v === "no") return "Your own";
-  return raw;
+  if (v === "candidate" || v === "intern" || v === "own" || v === "no") return "Your own";
+  // Never echo an unknown value: it is free text from the employer.
+  return "Not specified";
 }
 
 type Loaded<T> = { ok: boolean; row: T | null };
@@ -161,12 +161,12 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   const scope = scopeValue(rawScope) || /^not[-_ ]?sure$/i.test(rawScope) ? "" : rawScope;
   // One joining date for the whole page: the IST day the first shift starts (can differ from the employer's calendar day).
   const joiningDay = offerJoiningDay(offer);
-  const joining = formatJoiningDate(joiningDay);
+  const joining = joiningDay ? formatDate(joiningDay) : "To be agreed";
   const startsOn = joiningDay && !Number.isNaN(new Date(joiningDay).getTime()) ? new Date(joiningDay) : null;
   const durationParts = /^(\d+)\s+(.+)$/.exec(String(facts.duration ?? ""));
 
   return (
-    <Stagger>
+    <div>
       <Link
         href="/intern/proposals"
         className={buttonClass({ variant: "ghost", size: "sm", className: "-ml-3 mb-4 min-h-11 text-ink-600 hover:text-ink-900" })}
@@ -175,19 +175,29 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
         All offers
       </Link>
 
-      <OfferHero
-        role={facts.role}
-        company={facts.company ?? "Company shared after hire"}
-        project={project.row?.projectName}
-        status={status}
-        fullTime={fullTime}
-        edited={facts.edited}
-        moneyLabel={fullTime ? "Annual CTC" : "Monthly stipend"}
-        amount={facts.amount}
-        per={facts.per}
-        amountIsText={facts.amountIsText}
-        bonusLabel={bonusLabel}
-        terms={[
+      <PageHead
+        title={facts.role}
+        lede={
+          <>
+            {facts.company ?? "Company shared after hire"}
+            {project.row?.projectName ? <span className="text-text-subtle"> · {project.row.projectName}</span> : null}
+          </>
+        }
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Pill tone={status.tone}>{status.label}</Pill>
+            <Pill tone="neutral">{fullTime ? "Full-time role" : "Internship"}</Pill>
+            {facts.edited ? <Pill tone="new">Updated</Pill> : null}
+            <MessageButton proposalId={proposal.id} counterpartId={proposal.employerId} label="Message the company" />
+          </div>
+        }
+      />
+
+      {/* The terms that decide an offer, as key numbers; the money is the brand tile. */}
+      <div className={cn(STAT_ROW, "mb-6 lg:mb-8")}>
+        {[
+          { label: fullTime ? "Annual CTC" : "Monthly stipend", value: facts.amount, unit: facts.per ? facts.per.replace(/^\/\s*/, "/") : undefined, quiet: facts.amountIsText },
+          // A value and a smaller unit, so a 2-up tile on a phone never clips ("11 Oct" + "2026").
           startsOn
             ? { label: "Joining date", value: shortDate(startsOn, { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }), unit: shortDate(startsOn, { year: "numeric", timeZone: "Asia/Kolkata" }) }
             : { label: "Joining date", value: joining },
@@ -197,18 +207,19 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
               ? { label: "Duration", value: durationParts[1], unit: durationParts[2] }
               : { label: "Duration", value: facts.duration },
           { label: fullTime ? "Location" : "Work mode", value: fullTime ? facts.location : modeLabel(facts.mode) },
-          { label: "Status", value: status.label },
-        ]}
-      />
+        ].map((s, i) => (
+          <StatTile key={s.label} {...s} featured={i === 0} index={i} />
+        ))}
+      </div>
+      {bonusLabel ? <p className="-mt-3 mb-6 text-sm font-medium text-ink-700 lg:-mt-5 lg:mb-8">{bonusLabel}</p> : null}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* ── The decision (focal point; first on a phone) ─────────── */}
         <aside className="lg:sticky lg:top-24 lg:order-2">
-          <Surface className="p-5 shadow-[0_1px_2px_rgba(4,29,23,0.06),0_24px_48px_-24px_rgba(4,29,23,0.35)] ring-1 ring-brand-600/20 lg:p-6">
+          <Surface className="p-5 lg:p-6">
             <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
               {open ? "Your decision" : "Where this stands"}
             </h2>
-            <OfferSteps stateKey={facts.key} fullTime={fullTime} className="mt-4" />
 
             {facts.edited && open ? (
               <p className="mt-4 rounded-apple-sm bg-info-soft px-4 py-3 text-sm leading-relaxed text-info">
@@ -369,7 +380,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
           ) : null}
         </div>
       </div>
-    </Stagger>
+    </div>
   );
 }
 

@@ -84,6 +84,9 @@ export default async function AdminCollegePage({
   if (summary.openRequest) waiting.push({ text: `Withdrawal of ${formatMoney(summary.openRequest.amountMinor, "INR", { zeroLabel: false })} requested.`, href: tabHref("wallet"), cta: "Open Wallet" });
   if (reviews.length) waiting.push({ text: `${reviews.length} ${reviews.length === 1 ? "student match needs" : "student matches need"} your review.`, href: tabHref("drives"), cta: "Open Drives" });
 
+  // The Wallet tab shows the withdrawal itself, so a banner pointing at it from there repeats it.
+  const waitingElsewhere = waiting.filter((w) => w.href !== tabHref(tab));
+
   const place = [college.city, college.state].filter(Boolean).join(", ");
   return (
     <RecordLayout
@@ -111,9 +114,9 @@ export default async function AdminCollegePage({
         </Panel>
       }
     >
-      {waiting.length ? (
+      {waitingElsewhere.length ? (
         <div role="status" className="space-y-2 rounded-[var(--radius-admin-card)] bg-warning-soft px-5 py-4 text-sm">
-          {waiting.map((w) => (
+          {waitingElsewhere.map((w) => (
             <p key={w.href} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-foreground">
               <span>{w.text}</span>
               <Link href={w.href} className="inline-flex min-h-11 items-center font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">{w.cta}</Link>

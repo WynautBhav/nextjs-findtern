@@ -212,7 +212,6 @@ step("intern: completes onboarding (photo + PAN uploads, no Aadhaar image, final
 
   const skills = ["Python", "SQL", "React", "Data Analysis"];
   const res = await api(page, "POST", "/api/intern/onboarding", {
-    bio: "Final-year engineering student who builds data pipelines and small dashboards.",
     linkedinUrl: "",
     city: "Pune",
     state: "Maharashtra",

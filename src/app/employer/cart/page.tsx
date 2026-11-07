@@ -8,7 +8,8 @@ import { requireEmployerSetup } from "@/lib/employer-setup";
 import { redactForEmployer, toCandidateProfile } from "@/lib/employer-candidates";
 import { hiredInternIds, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
-import { visibleInternIds } from "@/lib/employer-pool";
+import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
+import { pendingMeetingAtFor } from "@/lib/proposal-guard";
 import { isBlockingInterview, isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { hireFlowCounts } from "@/lib/employer-flow";
 import { payableCheckout } from "@/lib/employer-payable";
@@ -17,6 +18,8 @@ import { PageHead } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { HireFlow, type HireFlowCounts } from "@/components/employer/hire-flow";
+import { CandidateTabs } from "@/components/employer/section-tabs";
+import { rememberedSelection } from "@/lib/employer-selection";
 import { CartManager, type CartLineItem } from "@/components/employer/cart-manager";
 
 export const metadata: Metadata = {
@@ -52,6 +55,7 @@ export default async function EmployerCartPage({
   }
 
   const unlockAll = await isAdminViewing();
+  const compareCount = (await rememberedSelection(session.uid)).compare.length;
   const data = await loadCart(session.uid, unlockAll).catch((err) => {
     console.error("[employer/cart] load failed", err);
     return null;
@@ -70,9 +74,14 @@ export default async function EmployerCartPage({
     <div>
       <PageHead
         title="Shortlist"
-        lede="Candidates you've saved. Book a meeting if you'd like to talk first, then send a proposal; you pay only once a candidate accepts."
+        // The path strip under the head says the same steps; phones keep the list higher.
+        lede={<span className="max-sm:sr-only">Book a meeting or send a proposal. You pay only once a candidate accepts.</span>}
+        className="mb-4 lg:mb-5"
       />
-      <div className="max-sm:[&_ol]:flex-nowrap max-sm:[&_ol]:overflow-x-auto max-sm:[&_ol]:gap-x-0 max-sm:[&_ol]:pr-6 max-sm:[&_a]:whitespace-nowrap max-sm:[&_a]:px-2 max-sm:[&_ol]:text-[0.8125rem] max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-1.5rem),transparent)]">
+      <CandidateTabs active="shortlist" shortlist={data.counts.shortlisted} compare={compareCount} />
+      {/* The strip counts people, not proposals. */}
+      <div title="People, not proposals">
+        <p className="sr-only">People, not proposals.</p>
         <HireFlow counts={data.counts} current="cart" />
       </div>
       <CartManager
@@ -196,7 +205,7 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
         ? db.select().from(schema.internOnboarding).where(inArray(schema.internOnboarding.userId, internIds))
         : Promise.resolve([] as (typeof schema.internOnboarding.$inferSelect)[]),
       db
-        .select({ id: schema.projects.id, projectName: schema.projects.projectName, status: schema.projects.status, skills: schema.projects.skills })
+        .select({ id: schema.projects.id, projectName: schema.projects.projectName, status: schema.projects.status })
         .from(schema.projects)
         .where(and(eq(schema.projects.employerId, uid), inArray(schema.projects.id, projectIds))),
     ]);
@@ -220,16 +229,22 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
         projectClosed: ["closed", "inactive", "archived"].includes(projectStatus),
         createdAt: item.createdAt ? item.createdAt.toISOString() : null,
         candidate,
-        projectSkills: Array.isArray(project?.skills) ? project.skills : [],
         hourlyRateMinor: pricing.hourlyRateMinor,
         perHireMinor: pricing.perHireMinor,
         openProposalId: openFor.get(item.internId) ?? null,
         acceptedProposalId: acceptedFor.get(item.internId) ?? null,
         meetingUntil: meetingUntil.get(item.internId) ?? null,
+        meetingAt: pendingMeetingAtFor(meetingRows.filter((iv) => iv.internId === item.internId), { projectId: item.projectId }),
         meetingLink: meetingLinks.get(item.internId) ?? null,
       });
     }
   }
+
+  // Photos show before hire (owner call, 6 Nov); names stay initials. One query.
+  await attachPhotos(
+    db,
+    lines.map((l) => l.candidate),
+  );
 
   // Same figure the checkout shows: accepted offers plus months now due.
   const toPay = (await payableCheckout(uid)).lines.length;

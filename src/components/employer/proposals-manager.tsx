@@ -3,19 +3,22 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, CircleDashed, CreditCard, Hourglass, Loader2, UserCheck, XCircle, Pencil, RotateCcw, Search, X } from "lucide-react";
+import { Clock, CreditCard, Eye, Loader2, Pencil, RotateCcw, Search, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
-import { BigFigure, EmptyScene, FigureStrip, FilterTabs, Pill, Surface } from "@/components/app/primitives";
-import { Avatar } from "@/components/app/avatar";
-import { RowMenu } from "@/components/app/row-menu";
+import { EmptyScene, Pill } from "@/components/app/primitives";
+import { RowMenu, type RowMenuItem } from "@/components/app/row-menu";
+import { MessageButton } from "@/components/app/message-button";
+import { ProposalAvatar } from "@/components/employer/proposal-avatar";
+import type { PresenceLabel } from "@/lib/presence";
 import { buttonClass } from "@/components/ui/button";
 import type { EmployerProposal } from "@/lib/employer-proposal-view";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { parseOffer } from "@/lib/offer";
 import { offerState } from "@/components/employer/proposal-state";
+import { proposalBucket } from "@/components/employer/proposal-bucket";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
 
@@ -26,45 +29,35 @@ export type ProposalItem = {
   project: { id: string; projectName: string } | null;
   /** Hired by this employer on any project - the unmasking rule. */
   internHired: boolean;
+  /** Avatar route when they uploaded a photo (shown before hire; the name is not). */
+  photoUrl: string | null;
+  presence: PresenceLabel | null;
 };
-
-const TONE_ICON = { paid: CreditCard, live: UserCheck, waiting: Hourglass, closed: XCircle, new: CircleDashed, neutral: CircleDashed } as const;
-function StateIcon({ tone, hired }: { tone: string; hired: boolean }) {
-  const Icon = hired ? CheckCircle2 : (TONE_ICON[tone as keyof typeof TONE_ICON] ?? CircleDashed);
-  return <Icon />;
-}
 
 function nameOf(item: ProposalItem): string {
   const first = item.user?.firstName?.trim() || "";
   const last = item.user?.lastName?.trim() || "";
-  const shown = displayNameOf({ id: item.proposal.internId, fullName: `${first} ${last}`.trim() || "Candidate", initials: initialsOf(first, last) }, item.internHired);
-  return item.internHired || shown === "Candidate" ? shown : `Candidate ${shown}`;
+  return displayNameOf({ id: item.proposal.internId, fullName: `${first} ${last}`.trim() || "Candidate", initials: initialsOf(first, last) }, item.internHired);
 }
 
-/** Status filter buckets (the raw enums never reach the select). */
-const FILTERS: { value: string; label: string; match: (status: string, lapsed: boolean) => boolean }[] = [
-  { value: "open", label: "Waiting on candidate", match: (s, l) => !l && (s === "sent" || s === "interview_scheduled" || s === "draft") },
-  { value: "accepted", label: "Accepted, to pay", match: (s) => s === "accepted" || s === "processing" },
-  { value: "hired", label: "Hired", match: (s) => s === "hired" },
-  { value: "closed", label: "Closed", match: (s, l) => l || ["rejected", "withdrawn", "expired"].includes(s) },
-];
+/** Rows shown at a time; "Show more" adds another page (as Projects). */
+const PAGE = 20;
 
-/** Offer · pay · starts · status · actions; one row per offer at desktop. */
-// Fixed columns need ~48rem; at lg the sidebar leaves less, so the table layout starts at xl.
-const ROW_GRID = "xl:grid-cols-[minmax(0,1fr)_11rem_6.5rem_12.5rem_9.5rem]";
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 function formatStart(iso: string | null): string | null {
   if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
   const [y, m, d] = iso.slice(0, 10).split("-");
-  return `${d}/${m}/${y}`;
+  return `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}`;
 }
 
-export function ProposalsManager({ initialProposals }: { initialProposals: ProposalItem[] }) {
+export function ProposalsManager({ initialProposals, initialStatus = "all" }: { initialProposals: ProposalItem[]; initialStatus?: string }) {
   const router = useRouter();
   const [proposals, setProposals] = useState<ProposalItem[]>(initialProposals);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(initialStatus);
   const [projectFilter, setProjectFilter] = useState("all");
+  const [shown, setShown] = useState(PAGE);
   const [withdrawTarget, setWithdrawTarget] = useState<ProposalItem | null>(null);
   const [busy, setBusy] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
@@ -75,26 +68,26 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
       proposals.map((item) => {
         const offer = parseOffer(item.proposal.offerDetails, item.proposal.currency);
         return { item, offer, state: offerState(item.proposal, offer) };
-      }),
+      })
+        // Offers waiting on your payment come first: they are the only rows that need you.
+        .sort((a, b) => Number(b.state.canPay) - Number(a.state.canPay)),
     [proposals],
   );
 
   const projectOptions = Array.from(new Map(proposals.filter((p) => p.project).map((p) => [p.project!.id, p.project!.projectName])).entries());
 
-  const counts = {
-    open: rows.filter((r) => FILTERS[0].match(r.item.proposal.status, r.state.lapsed)).length,
-    accepted: rows.filter((r) => FILTERS[1].match(r.item.proposal.status, r.state.lapsed)).length,
-    hired: rows.filter((r) => r.item.proposal.status === "hired").length,
-    closed: rows.filter((r) => FILTERS[3].match(r.item.proposal.status, r.state.lapsed)).length,
-  };
+  const counts = { open: 0, accepted: 0, hired: 0, closed: 0 };
+  for (const r of rows) {
+    const b = proposalBucket(r.item.proposal.status, r.state.lapsed);
+    if (b) counts[b] += 1;
+  }
 
   const needle = search.trim().toLowerCase();
-  const filter = FILTERS.find((f) => f.value === statusFilter);
   const filtered = rows.filter(({ item, offer, state }) => {
     // Project, role or the initials shown - never a hidden name.
     const hay = `${item.project?.projectName ?? ""} ${offer.roleTitle} ${nameOf(item)}`.toLowerCase();
     if (needle && !hay.includes(needle)) return false;
-    if (filter && !filter.match(item.proposal.status, state.lapsed)) return false;
+    if (statusFilter !== "all" && proposalBucket(item.proposal.status, state.lapsed) !== statusFilter) return false;
     if (projectFilter !== "all" && item.proposal.projectId !== projectFilter) return false;
     return true;
   });
@@ -128,6 +121,15 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
     }
   }
 
+  function menuFor(item: ProposalItem, state: ReturnType<typeof offerState>, href: string): RowMenuItem[] {
+    return [
+      { label: "View offer", href, icon: <Eye /> },
+      ...(state.canEdit ? [{ label: "Edit offer", href: `${href}?edit=1`, icon: <Pencil /> }] : []),
+      ...(item.proposal.status === "hired" ? [{ label: "Timesheets", href: "/employer/timesheets", icon: <Clock /> }] : []),
+      ...(state.canWithdraw ? [{ label: "Withdraw offer", onSelect: () => setWithdrawTarget(item), icon: <X />, destructive: true }] : []),
+    ];
+  }
+
   if (proposals.length === 0) {
     return (
       <EmptyScene
@@ -140,61 +142,47 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
     );
   }
 
-  const field = cn(fieldClass, "w-auto");
+  const tabs = [
+    { key: "all", label: "All", short: "All", count: rows.length },
+    { key: "open", label: "Waiting on candidate", short: "Waiting", count: counts.open },
+    // Accepted offers only; running placements' monthly dues are on Orders,
+    // so this is not called "payment due" beside the dashboard's count (QA-123).
+    { key: "accepted", label: "Accepted · to pay", short: "To pay", count: counts.accepted },
+    { key: "hired", label: "Hired", short: "Hired", count: counts.hired },
+    { key: "closed", label: "Declined & closed", short: "Closed", count: counts.closed },
+  ];
+  // A handful of offers reads at a glance; search only earns its place on a longer list.
+  const showTools = proposals.length > 5;
 
   return (
-    <div className="space-y-6">
-      <FigureStrip className="max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
-        <BigFigure label="Waiting" value={counts.open} hint="Offers out" />
-        <BigFigure label="Accepted" value={counts.accepted + counts.hired} hint="To pay or hired" />
-        <BigFigure label="Closed" value={counts.closed} hint="Declined, withdrawn or lapsed" />
-      </FigureStrip>
-      {rows.length > 0 ? (
-        <div
-          className="-mt-3 flex h-2 gap-1"
-          role="img"
-          aria-label={`${counts.open} waiting, ${counts.accepted} to pay, ${counts.hired} hired, ${counts.closed} closed`}
-        >
-          {([["open", "bg-amber-400"], ["accepted", "bg-brand-400"], ["hired", "bg-brand-700"], ["closed", "bg-ink-300"]] as const).map(([k, c]) =>
-            counts[k] > 0 ? <div key={k} className={cn("h-full rounded-full", c)} style={{ flexGrow: counts[k], flexBasis: 0 }} /> : null,
-          )}
-        </div>
-      ) : null}
-      {/* One toolbar row: status (with counts, in place of four tiles that
-          repeated them), then search and project. */}
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="-mx-1 max-w-full overflow-x-auto px-1 max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-1.5rem),transparent)] xl:overflow-visible">
-        <FilterTabs
-          className="max-sm:flex-nowrap"
-          label="Show proposals"
-          value={statusFilter}
-          onChange={setStatusFilter}
-          tabs={[
-            { key: "all", label: "All", count: rows.length },
-            { key: "open", label: "Waiting", count: counts.open },
-            // Accepted offers only; running placements' monthly dues are on Orders,
-            // so this is not called "payment due" beside the dashboard's count (QA-123).
-            { key: "accepted", label: "To pay", count: counts.accepted },
-            { key: "hired", label: "Hired", count: counts.hired },
-            { key: "closed", label: "Closed", count: counts.closed },
-          ]}
-        />
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row xl:shrink-0">
-          <label className="relative min-w-0 sm:w-64">
+    <div>
+      {showTools ? (
+        <div className="mb-5 flex gap-2">
+          <label className="relative min-w-0 flex-1 sm:max-w-xl">
             <span className="sr-only">Search proposals</span>
-            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
             <input
               ref={searchRef}
               type="search"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Role, project or initials"
-              className={cn(field, "w-full pl-9")}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setShown(PAGE);
+              }}
+              placeholder="Search by role, project or initials"
+              className={cn(fieldClass, "rounded-full pl-10")}
             />
           </label>
           {projectOptions.length > 1 ? (
-            <select value={projectFilter} onChange={(e) => setProjectFilter(e.target.value)} className={field} aria-label="Project">
+            <select
+              value={projectFilter}
+              onChange={(e) => {
+                setProjectFilter(e.target.value);
+                setShown(PAGE);
+              }}
+              className={cn(fieldClass, "w-36 shrink-0 truncate rounded-full sm:w-56")}
+              aria-label="Project"
+            >
               <option value="all">All projects</option>
               {projectOptions.map(([id, name]) => (
                 <option key={id} value={id}>
@@ -204,10 +192,39 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
             </select>
           ) : null}
         </div>
+      ) : null}
+
+      {/* Status tabs with counts, underlined like candidate search. Toggle
+          buttons, not role=tab: they narrow one list, they don't switch panels. */}
+      <div role="group" aria-label="Show proposals" className="flex flex-wrap gap-x-3 border-b border-ink-100 sm:gap-x-7">
+        {tabs.map((t) => {
+          const on = statusFilter === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              aria-pressed={on}
+              onClick={() => {
+                setStatusFilter(t.key);
+                setShown(PAGE);
+              }}
+              className={cn(
+                "relative -mb-px inline-flex min-h-12 min-w-11 items-center justify-center gap-1 whitespace-nowrap sm:gap-1.5 text-sm outline-none transition-colors",
+                "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
+                "focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent",
+                on ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-600 hover:text-ink-900",
+              )}
+            >
+              <span className="sm:hidden">{t.short}</span>
+              <span className="max-sm:hidden">{t.label}</span>
+              <span className={cn("nums", on ? "text-ink-900" : "text-text-subtle")}>{t.count}</span>
+            </button>
+          );
+        })}
       </div>
 
       {errorMsg ? (
-        <p role="alert" className="rounded-apple-md border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-ink-800">
+        <p role="alert" className="mt-4 rounded-apple-md border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-ink-800">
           {errorMsg}
         </p>
       ) : null}
@@ -217,138 +234,132 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
       </p>
 
       {filtered.length === 0 ? (
-        <div>
+        <div className="pt-8">
           <EmptyScene
-            title="No proposals match"
-            body={statusFilter === "all" ? "Nothing fits this search. Clear the filters to see every offer." : `No ${statusFilter === "open" ? "offers waiting on a candidate" : statusFilter === "accepted" ? "accepted offers to pay" : statusFilter === "hired" ? "hired candidates" : "closed offers"} right now. Clear the filters to see every offer.`}
-            who="You - loosen the filters"
+            title="No proposals here"
+            body={filtering ? "Nothing fits this search and status." : "No offers in this group yet."}
+            who="You - try another tab"
           />
-          <p className="mt-3 text-center">
-            <button
-              type="button"
-              onClick={() => {
-                setSearch("");
-                setStatusFilter("all");
-                setProjectFilter("all");
-                // The button unmounts with the empty state: keep focus on the toolbar.
-                searchRef.current?.focus();
-              }}
-              className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}
-            >
-              <RotateCcw className="size-4" aria-hidden />
-              Clear filters
-            </button>
-          </p>
+          {needle || projectFilter !== "all" ? (
+            <p className="mt-3 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("all");
+                  setProjectFilter("all");
+                  setShown(PAGE);
+                  // The button unmounts with the empty state: keep focus on the toolbar.
+                  searchRef.current?.focus();
+                }}
+                className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}
+              >
+                <RotateCcw className="size-4" aria-hidden />
+                Clear filters
+              </button>
+            </p>
+          ) : null}
         </div>
       ) : (
-        <Surface className="overflow-hidden">
-          {/* Column labels for sighted scanning; every row also says what each
-              figure is, so the list reads on its own to a screen reader. */}
-          <div aria-hidden className={cn(ROW_GRID, "hidden gap-x-6 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle xl:grid")}>
-            <span>Offer</span>
-            <span className="text-right">Pay</span>
-            <span>Starts</span>
-            <span>Status</span>
-            <span />
-          </div>
-          <ul className="divide-y divide-ink-100">
-          {filtered.map(({ item, offer, state }, idx) => {
+        <ul className="divide-y divide-ink-100">
+          {filtered.slice(0, shown).map(({ item, offer, state }) => {
             const ini = initialsOf(item.user?.firstName?.trim() || "", item.user?.lastName?.trim() || "");
             const ft = offer.fullTime;
-            // Full-time rows: annual CTC, not "—/month" (EMH-19).
+            // Full-time rows: annual CTC, not "-/month" (EMH-19). Only the
+            // employer's own price; the intern's stipend never reaches this view.
             const money = ft
               ? ft.annualCtcMinor
-                ? `${formatMoney(ft.annualCtcMinor, offer.currency)} a year`
-                : "CTC not set"
+                ? { amount: formatMoney(ft.annualCtcMinor, offer.currency), per: "a year" }
+                : null
               : offer.monthlyMinor != null
-                ? `${formatMoney(offer.monthlyMinor, offer.currency)} a month`
+                ? { amount: formatMoney(offer.monthlyMinor, offer.currency), per: "a month" }
                 : null;
             const start = formatStart(offer.startDate);
             const href = `/employer/proposal/${item.proposal.id}`;
             const title = offer.roleTitle || item.project?.projectName || "Internship";
+            const who = nameOf(item);
+            const pill = <Pill tone={state.tone} className="whitespace-nowrap">{state.label}</Pill>;
+            const closed = state.tone === "closed";
             return (
               <li
                 key={item.proposal.id}
-                style={{ "--i": Math.min(idx, 12) } as React.CSSProperties}
-                className={cn("rise ", ROW_GRID, "relative flex flex-wrap items-center gap-x-6 xl:grid gap-y-2 px-5 py-4 transition-colors hover:bg-ink-50/70")}
+                className="relative grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-4 gap-y-3 py-6 lg:grid-cols-[3.5rem_minmax(0,1fr)_auto] lg:items-center lg:gap-x-6"
               >
-                <div className="flex min-w-0 items-center gap-3 max-xl:basis-full">
-                  <Avatar masked={!item.internHired} name={item.internHired ? nameOf(item) : undefined} initials={ini === "?" ? "C" : ini} size="md" />
-                  <div className="min-w-0">
-                    {/* The whole row opens the offer: the title's link is
+                <ProposalAvatar photoUrl={item.photoUrl} initials={ini === "?" ? "C" : ini} presence={item.presence} />
+                <div className="min-w-0">
+                  <p className="text-base leading-snug text-ink-600">
+                    {/* The whole row opens the offer: the name's link is
                         stretched over it, and keeps its own focus ring. */}
                     <Link
                       href={href}
-                      className="block break-words text-base font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+                      aria-label={`${title}, ${who}`}
+                      className={cn(
+                        "break-words font-semibold outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-600",
+                        closed ? "text-ink-700" : "text-ink-900",
+                      )}
                     >
-                      {title}
+                      {who}
                     </Link>
-                    <p className="text-sm text-ink-600">
-                      {nameOf(item)}
-                      {item.project ? ` · ${item.project.projectName}` : ""}
-                      {ft ? " · Full-time" : ""}
-                    </p>
+                    {item.project ? ` · ${item.project.projectName}` : ""}
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-600">
+                    {pill}
+                    <span className="break-words">{title}</span>
                   </div>
-                </div>
-                <p className="nums text-sm font-semibold text-ink-900 max-xl:mr-auto xl:text-right">
-                  {money ?? <span className="font-normal text-text-subtle">Not set</span>}
-                  {!ft ? <span className="font-normal text-ink-600"> · {offer.months} mo</span> : null}
-                  {start ? <span className="font-normal text-ink-600 xl:hidden"> · {ft ? "joins" : "starts"} {start}</span> : null}
-                </p>
-                <p className="nums text-sm text-ink-700 max-xl:hidden">
-                  {start ? (
-                    <>
-                      <span className="xl:sr-only">{ft ? "Joins " : "Starts "}</span>
-                      {start}
-                    </>
-                  ) : (
-                    <span className="text-text-subtle">Not set</span>
-                  )}
-                </p>
-                <div className="">
-                  <Pill tone={state.tone} icon={<StateIcon tone={state.tone} hired={item.proposal.status === "hired"} />} className="whitespace-nowrap">{state.label}</Pill>
+                  <p className="nums mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-600">
+                    <span>
+                      {money ? (
+                        <>
+                          <span className="font-semibold text-ink-900">{money.amount}</span> {money.per}
+                        </>
+                      ) : (
+                        <span className="text-text-subtle">{ft ? "CTC not set" : "Price not set"}</span>
+                      )}
+                    </span>
+                    <span>{ft ? "Full-time" : `${offer.months} month${offer.months === 1 ? "" : "s"}`}</span>
+                    {start ? <span>{ft ? "Joins" : "Starts"} {start}</span> : null}
+                  </p>
                 </div>
                 {/* Above the stretched link, so these stay clickable. */}
-                {/* Below sm the actions take their own row: beside the title they squeezed it to one letter a line at 320. */}
-                <div className="relative z-10 flex items-center justify-end gap-1 max-xl:basis-full max-xl:flex-wrap max-xl:justify-start">
-                  {/* One visible action, chosen by the state; the row itself
-                      opens the offer, and the menu holds only the rest (QA-120). */}
-                  {state.canPay ? (
-                    <Link href="/employer/checkout" className={buttonClass({ variant: "accent", size: "sm" })}>
-                      <CreditCard className="size-4" aria-hidden />
-                      Pay to hire
-                    </Link>
-                  ) : state.canEdit ? (
-                    <Link href={`${href}?edit=1`} className={buttonClass({ variant: "outline", size: "sm" })}>
-                      <Pencil className="size-4" aria-hidden />
-                      Edit offer
-                    </Link>
-                  ) : item.proposal.status === "hired" ? (
-                    <Link href="/employer/timesheets" className={buttonClass({ variant: "outline", size: "sm" })}>
-                      Timesheets
-                    </Link>
-                  ) : null}
-                  {state.canWithdraw || (state.canEdit && state.canPay) ? (
-                    <RowMenu
-                      label={`More actions for ${title}, ${nameOf(item)}`}
-                      items={[
-                        ...(state.canEdit && state.canPay ? [{ label: "Edit offer", href: `${href}?edit=1`, icon: <Pencil /> }] : []),
-                        ...(state.canWithdraw ? [{ label: "Withdraw offer", onSelect: () => setWithdrawTarget(item), icon: <X />, destructive: true }] : []),
-                      ]}
-                    />
+                <div className="relative z-10 col-span-2 flex items-center gap-3 max-lg:pl-[4.5rem] max-sm:pl-0 lg:col-span-1">
+                  {/* One visible action, chosen by the state (QA-120); the menu holds the rest. */}
+                  <div className="min-w-0 max-sm:flex-1 [&_a]:rounded-full [&_button]:rounded-full [&_button]:max-sm:w-full [&_a]:max-sm:w-full lg:w-36 [&_button]:lg:w-full [&_a]:lg:w-full">
+                    {state.canPay ? (
+                      <Link href="/employer/checkout" className={buttonClass({ variant: "primary" })}>
+                        <CreditCard className="size-4" aria-hidden />
+                        Pay now
+                      </Link>
+                    ) : closed ? (
+                      <Link href={href} className={buttonClass({ variant: "outline" })} aria-label={`View ${title}, ${who}`}>
+                        View
+                      </Link>
+                    ) : (
+                      <MessageButton proposalId={item.proposal.id} counterpartId={item.proposal.internId} />
+                    )}
+                  </div>
+                  {menuFor(item, state, href).length > 0 ? (
+                    <RowMenu label={`More actions for ${title}, ${who}`} items={menuFor(item, state, href)} className="touch:size-11" />
                   ) : (
                     // Keeps the visible actions in one column when a row has no menu.
-                    <span aria-hidden className="size-10 shrink-0 max-sm:hidden" />
+                    <span aria-hidden className="size-10 shrink-0 touch:size-11" />
                   )}
                 </div>
               </li>
             );
           })}
-          </ul>
-        </Surface>
+        </ul>
       )}
-      {filtering && filtered.length > 0 ? (
-        <p className="text-sm text-ink-600">
+      {filtered.length > shown ? (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-ink-100 pt-6">
+          <button type="button" onClick={() => setShown((n) => n + PAGE)} className={buttonClass({ variant: "outline", size: "md", className: "min-h-11" })}>
+            Show {Math.min(PAGE, filtered.length - shown)} more
+          </button>
+          <p className="nums text-sm text-ink-600">
+            Showing {shown} of {filtered.length}
+          </p>
+        </div>
+      ) : filtering && filtered.length > 0 ? (
+        <p className="mt-2 text-sm text-ink-600">
           Showing <span className="nums font-semibold text-ink-900">{filtered.length}</span> of <span className="nums">{proposals.length}</span>
         </p>
       ) : null}

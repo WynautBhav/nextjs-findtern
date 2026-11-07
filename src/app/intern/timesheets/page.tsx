@@ -2,10 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CalendarClock } from "lucide-react";
 
-import { FigurePanel, SignatureHero } from "@/components/intern/kit/hero";
-import { CountUp } from "@/components/motion/count-up";
-import { Stagger } from "@/components/intern/kit/motion";
-import { BigFigure, EmptyScene, FigureStrip, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { sheetLabel, sheetTone } from "@/components/app/status";
 import { TimesheetGrid, type Entry } from "@/components/app/timesheet-grid";
 import { buttonClass } from "@/components/ui/button";
@@ -13,7 +10,7 @@ import { CreateTimesheetModal } from "@/components/intern/create-timesheet-modal
 import { HoursHeatmap, type HeatDay } from "@/components/intern/timesheets/hours-heatmap";
 import { requireRole } from "@/lib/auth";
 import { dayDetails, editableDayStatus, engagementPeriods, timesheetPeriod, uncoveredParts, unfilledDays, type Period } from "@/lib/employer-timesheets";
-import { formatJoiningDate, shortDate } from "@/lib/format";
+import { formatDate, shortDate } from "@/lib/format";
 import { isHiredProposal } from "@/lib/hire-status";
 import { loadInternData } from "@/lib/intern-data";
 import { hoursIn, isAcceptedStatus, toArray, type ProposalRow, type TimesheetRow } from "@/lib/journey";
@@ -180,231 +177,187 @@ export default async function InternTimesheets({
 
   return (
     <div>
-      <SignatureHero
-        className="mb-6 lg:mb-8"
+      <PageHead
         title="Timesheets"
-        lede={`${role(selected)} at ${company(selected)}, ${offer.months} month${offer.months === 1 ? "" : "s"}${joiningDay ? ` from ${formatJoiningDate(joiningDay)}` : ""}.`}
+        lede={`${role(selected)} at ${company(selected)}, ${offer.months} month${offer.months === 1 ? "" : "s"}${joiningDay ? ` from ${formatDate(joiningDay)}` : ""}.`}
       />
 
       {hires.length > 1 ? (
-        <nav aria-label="Your internships" className="mb-6 lg:mb-8">
-          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {hires.map((p) => {
-              const on = p.id === selected.id;
-              const count = sheetsOf(p.id).length;
-              return (
-                <li key={p.id}>
-                  <Link
-                    href={`/intern/timesheets?proposalId=${encodeURIComponent(p.id)}`}
-                    aria-current={on ? "page" : undefined}
-                    className={cn(
-                      "apple-spring flex min-h-11 items-start justify-between gap-3 rounded-apple-xl border p-4",
-                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400",
-                      on ? "border-brand-400 bg-brand-50/70" : "border-ink-200/80 bg-surface-raised hover:border-brand-300",
-                    )}
-                  >
-                    <span className="min-w-0">
-                      <span className="block break-words text-sm font-medium text-ink-900">{role(p)}</span>
-                      <span className="mt-1 block break-words text-xs text-text-subtle">{company(p)}</span>
-                    </span>
-                    <Pill tone={on ? "live" : "neutral"}>
-                      <span className="nums">{count}</span> sheet{count === 1 ? "" : "s"}
-                    </Pill>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
+        // Many placements share a role and a company, so each option carries its start date; a plain GET form works without script.
+        <form method="get" className="mb-6 flex flex-wrap items-end gap-3 lg:mb-8">
+          <div className="min-w-0 flex-1 basis-64">
+            <label htmlFor="ts-internship" className="text-sm font-medium text-ink-800">
+              Internship <span className="nums font-normal text-ink-600">({hires.length})</span>
+            </label>
+            <select
+              id="ts-internship"
+              name="proposalId"
+              defaultValue={selected.id}
+              className="mt-1.5 h-11 w-full min-w-0 rounded-apple-sm border border-ink-200 bg-white px-3 text-base text-ink-900 outline-none hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 sm:text-sm"
+            >
+              {hires.map((p) => {
+                const o = parseOffer(p.offerDetails, p.currency);
+                const from = realJoiningDay(o);
+                const count = sheetsOf(p.id).length;
+                return (
+                  <option key={p.id} value={p.id}>
+                    {/* The date first: on a phone the select cuts the end, and the date is what tells two "Product Intern" rows apart. */}
+                    {`${from ? `${formatDate(from)} · ` : ""}${role(p)}, ${company(p)} (${count} sheet${count === 1 ? "" : "s"})`}
+                  </option>
+                );
+              })}
+            </select>
+          </div>
+          <button type="submit" className={buttonClass({ variant: "outline", size: "md", className: "h-11" })}>
+            Show
+          </button>
+        </form>
       ) : null}
 
       {/* The real next action, before anything to read. */}
-      <Surface className="mb-4 flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between lg:mb-6 lg:p-6">
-        <div className="flex min-w-0 items-start gap-4">
-          <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-700">
-            <CalendarClock className="size-5" />
-          </span>
-          <div className="min-w-0">
-            <p className="text-base font-semibold text-ink-900">Next timesheet</p>
-            <p className="mt-0.5 text-pretty text-lg font-semibold leading-snug text-ink-900">{nextLine}</p>
-          </div>
+      <section
+        data-first-content
+        aria-label="Next timesheet"
+        className="mb-6 flex flex-col gap-4 border-y border-ink-200/70 py-5 sm:flex-row sm:items-center sm:justify-between lg:mb-8"
+      >
+        <div className="flex min-w-0 items-start gap-3">
+          <CalendarClock className="mt-1 size-5 shrink-0 text-brand-700" aria-hidden />
+          <p className="text-pretty text-base font-medium leading-snug text-ink-900 sm:text-lg">{nextLine}</p>
         </div>
         {createButton ? <div className="shrink-0">{createButton}</div> : null}
-      </Surface>
+      </section>
 
       {sheets.length > 0 ? (
         <SheetsOverview sheets={sheets} periods={periods} today={today} />
       ) : (
-      <div className="grid gap-x-8 gap-y-6 lg:gap-y-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
-        <section className="min-w-0">
-          <EmptyScene
-            title="No timesheet started yet"
-            body={
-              "error" in next
-                ? `${next.error}${upcoming ? ` Your first one opens on ${formatPeriodStart(upcoming.start)}.` : ""}`
-                : `Start your first one with New timesheet above. It covers ${formatPeriodDays(next.start, next.end)}.`
-            }
-          />
+        // The next-timesheet line above already says when the first one opens; this is the how, once.
+        <section aria-labelledby="ts-how" className="max-w-2xl">
+          <h2 id="ts-how" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
+            How timesheets work
+          </h2>
+          <ol className="mt-3 space-y-3">
+            {[
+              "Start a timesheet. Each one covers a month of your internship, counted from your joining date.",
+              "Mark every day Present, Absent, Fixed off or Holiday. Weekends and public holidays come pre-marked.",
+              "You can send it on the last day of the period, once every day is marked. Your manager approves it or sends it back with a note.",
+              "Changed your mind? Withdraw a sheet that is still waiting, fix it, and send it again.",
+            ].map((line, i) => (
+              <li key={i} className="flex gap-3">
+                <span className="nums grid size-6 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800">{i + 1}</span>
+                <span className="text-pretty text-sm text-ink-700">{line}</span>
+              </li>
+            ))}
+          </ol>
         </section>
-
-        <aside className="space-y-4">
-          {/* The tutorial is for before the first sheet, not a permanent rail. */}
-          <Surface className="p-5 lg:p-6">
-            <SectionHead title="How it works" />
-            <ol className="space-y-3">
-              {[
-                "Start a timesheet. Each one covers a month of your internship, counted from your joining date.",
-                "Mark every day Present, Absent, Fixed off or Holiday. Weekends and public holidays come pre-marked.",
-                "You can send it on the last day of the period, once every day is marked. Your manager approves it or sends it back with a note.",
-                "Changed your mind? Withdraw a sheet that is still waiting, fix it, and send it again.",
-              ].map((line, i) => (
-                <li key={i} className="flex gap-3">
-                  <span className="nums grid size-6 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800">
-                    {i + 1}
-                  </span>
-                  <span className="text-pretty text-sm text-ink-700">{line}</span>
-                </li>
-              ))}
-            </ol>
-          </Surface>
-        </aside>
-      </div>
       )}
     </div>
   );
 }
 
-const STATE_LINE: Record<string, string> = {
-  draft: "Open. Mark each day, then submit it for review.",
-  rejected: "Sent back by your manager. Fix it and send it again.",
-  submitted: "Submitted, waiting for review. Edits are locked until your manager replies.",
-  approved: "Approved by your manager.",
-  paid: "Paid.",
-};
-
 /**
- * The current period first, with where it stands in one sentence, then every
- * sheet as an aligned row (period, hours, status, one action), then the
- * hours heatmap for the whole internship.
+ * The internship's days as a heatmap of hours, beside every sheet on a
+ * rail from sent to approved. The heatmap answers "what have I logged";
+ * the rail answers "where is each month".
  */
 function SheetsOverview({ sheets, periods, today }: { sheets: TimesheetRow[]; periods: Period[]; today: string }) {
   const days = heatDays(sheets, periods);
   const logged = Number(days.reduce((n, d) => n + d.hours, 0).toFixed(1));
   const present = days.filter((d) => d.status === "Present" || d.hours > 0).length;
   const approved = Number(sheets.filter((t) => t.status === "approved").reduce((n, t) => n + hoursIn(t), 0).toFixed(1));
-  const current = sheets.find((t) => ["draft", "rejected", "submitted"].includes((t.status ?? "draft").toLowerCase())) ?? sheets[0];
-  const rest = sheets.filter((t) => t.id !== current.id);
 
   return (
-    <Stagger className="space-y-4 lg:space-y-6">
-      <FigurePanel>
-        <FigureStrip tone="dark" className="max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
-          <BigFigure tone="dark" label="Hours logged" value={<CountUp value={logged} decimals={Number.isInteger(logged) ? 0 : 1} duration={1.2} />} hint="Whole internship" />
-          <BigFigure tone="dark" label="Days worked" value={<CountUp value={present} duration={1} />} />
-          <BigFigure tone="dark" label="Hours approved" value={<CountUp value={approved} decimals={Number.isInteger(approved) ? 0 : 1} duration={1.2} />} hint="Counts toward your stipend" />
-        </FigureStrip>
-      </FigurePanel>
-      <Surface as="section" aria-label="Current period" className="p-5 lg:p-6">
-        <SectionHead title="Current period" />
-        <CurrentSheet sheet={current} />
-      </Surface>
-
-      {rest.length > 0 ? (
-        <Surface as="section" aria-label="Past timesheets" className="p-5 lg:p-6">
-          <SectionHead title="Past timesheets" hint="Newest first" />
-          <ul className="divide-y divide-ink-200/70">
-            {rest.map((sheet) => (
-              <SheetRow key={sheet.id} sheet={sheet} />
-            ))}
-          </ul>
-        </Surface>
-      ) : null}
-
+    <div className="grid items-start gap-4 lg:gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
       <Surface as="section" aria-labelledby="heat-title" className="p-4 sm:p-6">
-        <h2 id="heat-title" className="mb-5 text-lg font-semibold tracking-[-0.01em] text-ink-900">
-          Hours by day
-        </h2>
+        <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
+          <h2 id="heat-title" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
+            Hours by day
+          </h2>
+          <p className="nums text-sm text-ink-600">
+            <span className="font-semibold text-ink-900">{logged} h</span> logged · {present} day{present === 1 ? "" : "s"} worked
+            {approved > 0 ? <> · {approved} h approved</> : null}
+          </p>
+        </div>
         <HoursHeatmap days={days} today={today} />
       </Surface>
-    </Stagger>
-  );
-}
 
-function sheetAction(sheet: TimesheetRow, days: string[]): { label: string; primary: boolean } {
-  const status = (sheet.status ?? "draft").toLowerCase();
-  const marked = days.length - unfilledDays(days, sheet.entries).length;
-  if (status === "rejected") return { label: "Fix and resend", primary: true };
-  if (status === "draft") return { label: marked === days.length ? "Submit for review" : "Mark your days", primary: true };
-  return { label: "View", primary: false };
-}
-
-function CurrentSheet({ sheet }: { sheet: TimesheetRow }) {
-  const status = (sheet.status ?? "draft").toLowerCase();
-  const days = periodDays(sheet.periodStart, sheet.periodEnd);
-  const marked = days.length - unfilledDays(days, sheet.entries).length;
-  const href = `/intern/timesheets?sheet=${encodeURIComponent(sheet.id)}`;
-  const action = sheetAction(sheet, days);
-  const editable = status === "draft" || status === "rejected";
-  return (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <p className="nums text-xl font-semibold text-ink-900">{formatPeriodDays(sheet.periodStart, sheet.periodEnd) || "A period"}</p>
-          <p className="mt-1 text-pretty text-sm text-ink-700">{STATE_LINE[status] ?? STATE_LINE.draft}</p>
-          {editable ? (
-            <p className="nums mt-1 text-sm text-text-subtle">
-              {marked} of {days.length} days marked · {Number(hoursIn(sheet).toFixed(1))} h so far
-            </p>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Pill tone={sheetTone(sheet.status)}>{sheetLabel(sheet.status)}</Pill>
-          <Link
-            href={href}
-            className={
-              action.primary
-                ? buttonClass({ variant: status === "rejected" ? "accent" : "primary", size: "md" })
-                : "inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
-            }
-          >
-            {action.label}
-            <ArrowRight className="size-4" aria-hidden />
-          </Link>
-          {status === "draft" || status === "submitted" ? <DeleteSheetButton timesheetId={sheet.id} withdraw={status === "submitted"} /> : null}
-        </div>
-      </div>
-      {editable && sheet.managerNote ? (
-        <div className="mt-4 rounded-apple-sm bg-accent-50 px-4 py-3">
-          <p className="text-sm font-semibold text-accent-700">From your manager</p>
-          <p className="mt-1 whitespace-pre-wrap text-pretty text-sm text-ink-800">{sheet.managerNote}</p>
-        </div>
-      ) : null}
+      <Surface as="section" aria-label="Every timesheet" className="p-5 lg:p-6">
+        <SectionHead title="Every timesheet" hint="Newest first" />
+        <ol className="relative space-y-6 before:absolute before:inset-y-2 before:left-[0.4375rem] before:w-px before:bg-ink-200">
+          {sheets.map((sheet) => (
+            <SheetStep key={sheet.id} sheet={sheet} />
+          ))}
+        </ol>
+      </Surface>
     </div>
   );
 }
 
-/** A past sheet: period, hours, status and one action, aligned on every row. */
-function SheetRow({ sheet }: { sheet: TimesheetRow }) {
+const DOT: Record<string, string> = {
+  approved: "bg-success",
+  submitted: "bg-accent-500",
+  rejected: "bg-info",
+  draft: "bg-surface-raised ring-2 ring-inset ring-ink-400",
+};
+
+/** One sheet on the rail: its period, where it stands, the dates it moved, and its one action. */
+function SheetStep({ sheet }: { sheet: TimesheetRow }) {
+  const status = (sheet.status ?? "draft").toLowerCase();
+  const editable = status === "draft" || status === "rejected";
   const days = periodDays(sheet.periodStart, sheet.periodEnd);
+  const marked = days.length - unfilledDays(days, sheet.entries).length;
   const href = `/intern/timesheets?sheet=${encodeURIComponent(sheet.id)}`;
-  const action = sheetAction(sheet, days);
+  const steps = [
+    { label: "Started", at: sheet.createdAt },
+    sheet.submittedAt ? { label: "Sent", at: sheet.submittedAt } : null,
+    status === "approved" ? { label: "Approved", at: sheet.approvedAt } : null,
+    status === "rejected" ? { label: "Sent back", at: sheet.rejectedAt } : null,
+  ].filter((x): x is { label: string; at: Date | null } => x !== null);
+
   return (
-    <li className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 py-3 sm:grid-cols-[minmax(0,1fr)_5rem_9rem_auto]">
-      <span className="nums min-w-0 text-sm font-medium text-ink-900">{formatPeriodDays(sheet.periodStart, sheet.periodEnd) || "A period"}</span>
-      <span className="nums text-right text-sm text-ink-900 sm:order-none">{Number(hoursIn(sheet).toFixed(1))} h</span>
-      <span className="col-start-1 sm:col-start-auto">
+    <li className="relative pl-8">
+      <span aria-hidden className={cn("absolute left-0 top-1.5 size-3.5 rounded-full ring-4 ring-surface-raised", DOT[status] ?? DOT.draft)} />
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <Link
+          href={href}
+          className="nums rounded-apple-sm text-base font-medium text-ink-900 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+        >
+          {formatPeriodDays(sheet.periodStart, sheet.periodEnd) || "A period"}
+        </Link>
+        <span className="nums text-sm font-medium text-ink-900">{Number(hoursIn(sheet).toFixed(1))} h</span>
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-2">
         <Pill tone={sheetTone(sheet.status)}>{sheetLabel(sheet.status)}</Pill>
-      </span>
-      <Link
-        href={href}
-        className={
-          action.primary
-            ? buttonClass({ variant: "primary", size: "sm", className: "justify-self-end" })
-            : "inline-flex min-h-11 items-center justify-self-end px-1 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
-        }
-      >
-        {action.label}
-      </Link>
+        {editable ? <span className="nums text-xs text-text-subtle">{marked} of {days.length} days marked</span> : null}
+      </div>
+      <ol className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-ink-600" aria-label="History">
+        {steps.map((st, i) => (
+          <li key={st.label} className="flex items-center gap-1.5">
+            {i > 0 ? <ArrowRight aria-hidden className="size-3 text-text-subtle" /> : null}
+            <span>
+              {st.label} <span className="nums font-medium text-ink-800">{st.at ? dayMonth(st.at) : "–"}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+
+      {editable && sheet.managerNote ? (
+        <div className="mt-3 rounded-apple-sm bg-accent-50 px-4 py-3">
+          <p className="text-xs font-semibold text-accent-700">From your manager</p>
+          <p className="mt-1 whitespace-pre-wrap text-pretty text-sm text-ink-800">{sheet.managerNote}</p>
+        </div>
+      ) : null}
+
+      {editable || status === "submitted" ? (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {editable ? (
+            <Link href={href} className={buttonClass({ variant: status === "rejected" ? "accent" : "outline", size: "sm" })}>
+              {status === "rejected" ? "Fix and resend" : marked === days.length ? "Check and send" : "Mark your days"}
+              <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          ) : null}
+          {status === "draft" || status === "submitted" ? <DeleteSheetButton timesheetId={sheet.id} withdraw={status === "submitted"} /> : null}
+        </div>
+      ) : null}
     </li>
   );
 }
@@ -429,6 +382,10 @@ function heatDays(sheets: TimesheetRow[], periods: Period[]): HeatDay[] {
   return periodDays(bounds[0], bounds[bounds.length - 1]).map((date) => byDate.get(date) ?? { date, hours: 0, status: "", sheet: null });
 }
 
+function dayMonth(d: Date): string {
+  return shortDate(d, { day: "numeric", month: "short", timeZone: "Asia/Kolkata" });
+}
+
 function BackLink({ href }: { href: string }) {
   return (
     <Link
@@ -443,10 +400,6 @@ function BackLink({ href }: { href: string }) {
 
 function first(v: string | string[] | undefined): string {
   return (Array.isArray(v) ? v[0] : v) ?? "";
-}
-
-function formatPeriodStart(iso: string): string {
-  return shortDate(new Date(`${iso}T12:00:00Z`), { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
 }
 
 /** Turns the stored jsonb into typed entries, dropping anything malformed. */

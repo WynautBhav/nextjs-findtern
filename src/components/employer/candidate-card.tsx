@@ -2,35 +2,22 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Check, Eye, FileText, MapPin, Scale, Send } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Check, Heart, Loader2, MapPin, Send } from "lucide-react";
 
-import { bandFor } from "@/lib/score";
-import { formatMoney, formatRate } from "@/lib/format";
-import { RATING_META, displayNameOf, type CandidateProfile, type Ratings } from "@/lib/employer-candidates";
+import { formatRate } from "@/lib/format";
+import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
 import { resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
-import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
-import { Avatar } from "@/components/app/avatar";
-import { ScoreDial } from "@/components/app/score-dial";
-import { skillMatch } from "@/components/app/skill-match";
-import { MetaList } from "@/components/app/meta-list";
-import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
-import { DetailRow, Pill, SectionHead } from "@/components/app/primitives";
-import { ButtonLink, buttonClass } from "@/components/ui/button";
+import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
+import { Pill } from "@/components/app/primitives";
+import { SendProposalHold } from "@/components/employer/send-proposal-hold";
+import { sendProposalHold } from "@/lib/proposal-guard";
+import type { PresenceLabel } from "@/lib/presence";
+import { csrfFetch } from "@/lib/client-fetch";
+import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-
-/** Card-width labels for the four rating axes; the full label stays in `title`. */
-export const SHORT_LABEL: Record<keyof Ratings, string> = {
-  communication: "Comms",
-  coding: "Coding",
-  aptitude: "Aptitude",
-  // "AI interview" was cut to "AI intervie…" in a four-column meter at 375
-  // (QA-117); every axis here is from the AI interview.
-  interview: "Interview",
-};
 
 /** What a hired candidate's card needs to offer a full-time role (EMH-42). */
 export type FullTimeContext = { employerId: string; fteStatus: string; timezone: string };
@@ -48,6 +35,8 @@ export interface CandidateCardProps {
   shortlisted: boolean;
   /** True when this employer hired the candidate - the only case the full name shows. */
   nameUnlocked?: boolean;
+  /** Hired (on any project): the row says so, even when the live offer shown is another one. */
+  hired?: boolean;
   /** Resolved server-side against the CMS rate card; falls back to the bands. */
   pricing?: Pricing;
   /** This employer's live or hired offer to the candidate, if any. */
@@ -55,42 +44,125 @@ export interface CandidateCardProps {
   /** Internship hire a full-time offer can follow from (EMH-42), with context. */
   fullTimeFrom?: string | null;
   fullTime?: FullTimeContext | null;
-  /** Skills the list is filtered by: matching chips are tinted and listed first. */
+  /** Skills the list is filtered by: matching chips are filled and listed first. */
   wantedSkills?: string[];
-  /** Position in the list, for the entrance stagger. */
-  index?: number;
+  /** "Online now" / "Active today" / "Active this week"; null when hidden or older. Never a time. */
+  presence?: PresenceLabel | null;
+  /** The intern saved this employer's role for the selected project. */
+  interested?: boolean;
+  /** ISO time of a booked meeting that still holds the candidate: "Send proposal" waits for it. */
+  pendingMeetingAt?: string | null;
 }
 
-/** The four AI interview axes as one compact meter. "-" when an axis is unrated. */
-export function RatingMeter({ ratings, className }: { ratings: Ratings; className?: string }) {
+/**
+ * The heart = this project's shortlist (the existing cart API), as an icon
+ * button at every width. Not `disabled` while saving: that drops keyboard
+ * focus. An offer already out goes to it.
+ */
+export function SaveToggle({ internId, projectId, shortlisted, name }: { internId: string; projectId: string; shortlisted: boolean; name?: string }) {
+  const router = useRouter();
+  const [on, setOn] = useState(shortlisted);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function toggle() {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await csrfFetch("/api/employer/cart", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: on ? "remove" : "add", projectId, internId, listType: "cart" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && typeof data.proposalId === "string") {
+        router.push(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
+        return;
+      }
+      if (!res.ok) throw new Error(data.error ?? "Couldn't update your saved list. Try again.");
+      setOn(!on);
+      router.refresh();
+    } catch (e) {
+      setError(e instanceof TypeError || !(e instanceof Error) ? "Couldn't reach the server. Check your connection and try again." : e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
-    <dl className={cn("grid grid-cols-4 gap-x-2 sm:gap-x-3", className)}>
-      {RATING_META.map((meta) => {
-        const value = ratings[meta.key];
-        return (
-          // Labels wrap rather than cut; the figure sits at the bottom so the
-          // four stay level if one label takes two lines.
-          <div key={meta.key} className="flex min-w-0 flex-col justify-between">
-            <dt className="break-words text-xs leading-snug text-ink-600" title={meta.label}>
-              {SHORT_LABEL[meta.key]}
-            </dt>
-            <dd className="mt-0.5">
-              <span className="nums text-sm font-semibold text-ink-900">{value > 0 ? value.toFixed(1) : "-"}</span>
-              <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-ink-200/80" aria-hidden>
-                <span className="block h-full rounded-full bg-[linear-gradient(90deg,var(--color-brand-400),var(--color-brand-700))]" style={{ width: `${Math.min(100, value * 10)}%` }} />
-              </span>
-            </dd>
-          </div>
-        );
-      })}
-    </dl>
+    <>
+      <button
+        type="button"
+        onClick={toggle}
+        aria-disabled={busy || undefined}
+        aria-pressed={on}
+        // Upwork's heart: an icon alone, named for screen readers, its state in aria-pressed.
+        aria-label={name ? `Shortlist ${name}` : "Shortlist"}
+        title={on ? "On this project's shortlist. Press to remove." : "Add to this project's shortlist"}
+        className={cn(
+          "grid size-11 shrink-0 place-items-center rounded-full ring-1 ring-inset transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:size-9 sm:touch:size-11",
+          on ? "text-brand-700 ring-brand-200 hover:bg-brand-50" : "text-ink-600 ring-ink-200 hover:bg-ink-100 hover:text-ink-900",
+        )}
+      >
+        {busy ? (
+          <Loader2 className="size-[18px] animate-spin motion-reduce:animate-none" aria-hidden />
+        ) : (
+          <Heart className={cn("size-[18px]", on && "fill-brand-700 text-brand-700")} aria-hidden />
+        )}
+      </button>
+      {error ? (
+        <span role="alert" className="absolute right-4 top-full z-20 mt-1 max-w-64 rounded-md bg-white px-2 py-1 text-xs text-danger shadow-md ring-1 ring-danger/30">
+          {error}
+        </span>
+      ) : null}
+    </>
   );
 }
 
-function skillName(skill: string): string {
-  return skill.split(" · ")[0].trim();
+/** A checkbox-style link: the compare picks live in the URL, so it navigates. */
+function CompareToggle({ href, selected, name }: { href: string | null; selected: boolean; name: string }) {
+  const box = (
+    <span
+      aria-hidden
+      className={cn(
+        "grid size-[18px] shrink-0 place-items-center rounded-[5px] border transition-colors",
+        selected ? "border-ink-900 bg-ink-900 text-white" : "border-ink-300 bg-white",
+      )}
+    >
+      {selected ? <Check className="size-3" strokeWidth={3} /> : null}
+    </span>
+  );
+  const cls =
+    "relative z-10 inline-flex h-11 shrink-0 items-center gap-2 rounded-full px-3 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:h-9 sm:touch:h-11";
+  if (!href) {
+    return (
+      <span aria-disabled="true" title="Compare holds four. Remove one to add another." className={cn(cls, "cursor-not-allowed text-ink-400")}>
+        {box}
+        Compare
+        <span className="sr-only"> (four already picked)</span>
+      </span>
+    );
+  }
+  return (
+    <Link
+      href={href}
+      scroll={false}
+      // Starts with the visible word (WCAG 2.5.3); the state is in the name, as a link has no aria-checked.
+      aria-label={selected ? `Compare ${name}: selected, press to remove` : `Compare ${name}`}
+      className={cn(cls, selected ? "text-ink-900" : "text-ink-700 hover:bg-ink-100 hover:text-ink-900")}
+    >
+      {box}
+      Compare
+    </Link>
+  );
 }
 
+/**
+ * One candidate as a wide list row (Upwork's talent row): photo, initials and
+ * the score pill, degree · place, then price / availability on one line, the skills,
+ * and Save · Compare · Send proposal. On a phone the same row stacks into a card.
+ */
 export function CandidateCard({
   candidate,
   currency,
@@ -101,365 +173,120 @@ export function CandidateCard({
   projectId,
   shortlisted,
   nameUnlocked = false,
+  hired = false,
   pricing: resolved,
   proposal = null,
   fullTimeFrom = null,
   fullTime = null,
   wantedSkills = [],
-  index = 0,
+  presence = null,
+  interested = false,
+  pendingMeetingAt = null,
 }: CandidateCardProps) {
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const band = bandFor(candidate.score);
   const pricing = resolved ?? resolvePricing(candidate.score, [], currency, region);
   const displayName = displayNameOf(candidate, nameUnlocked);
   const status = candidateStatusPill(proposal);
-  const wanted = new Set(wantedSkills.map((s) => s.trim().toLowerCase()));
-  const isWanted = (skill: string) => wanted.has(skillName(skill).toLowerCase());
-  const skills = [...candidate.skills.filter(isWanted), ...candidate.skills.filter((s) => !isWanted(s))];
+  const showHired = hired && status?.label !== "Hired";
+  const headline = headlineOf(candidate);
   const profileHref = `/employer/intern/${encodeURIComponent(candidate.id)}${projectId ? `?project=${encodeURIComponent(projectId)}` : ""}`;
   const sendHref = `/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ""}`;
+  const place = candidate.city || candidate.location || "City not stated";
+  const modes = candidate.workModes.join(" / ");
+  const canSave = !proposal && Boolean(projectId);
 
-  const wantedList = wantedSkills.map((s) => s.trim()).filter(Boolean);
-  const matchCount = skillMatch(candidate.skills.map(skillName), wantedList);
-  const hasWanted = matchCount.total > 0;
-  const shownSkills = skills.slice(0, 3);
-  const moreSkills = skills.length - shownSkills.length;
-  const secondary = "relative z-10 min-h-10 rounded-full px-4 touch:min-h-11";
-
-  // Exactly one primary action per card, always bottom-left.
+  // One filled button per row: "Send proposal"; an offer already out is an outline link to it.
   const primary = proposal ? (
-    <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="primary" size="sm" className={secondary}>
+    <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="outline" size="sm" className="relative z-10 h-11 sm:h-9 sm:touch:h-11">
       {proposalActionLabel(proposal)}
     </ButtonLink>
+  ) : sendProposalHold(pendingMeetingAt) ? (
+    <SendProposalHold pendingMeetingAt={pendingMeetingAt} className="relative z-10" />
   ) : (
-    <ButtonLink href={sendHref} variant="primary" size="sm" className={secondary}>
+    <ButtonLink href={sendHref} variant="primary" size="sm" className="relative z-10 h-11 rounded-full px-4 sm:h-9 sm:touch:h-11">
       <Send className="size-4" aria-hidden />
       Send proposal
     </ButtonLink>
   );
-  const fullTimeOffer =
-    fullTimeFrom && fullTime ? (
-      <FullTimeOfferButton
-        employerId={fullTime.employerId}
-        proposalId={fullTimeFrom}
-        candidate={displayName}
-        fteStatus={fullTime.fteStatus}
-        timezone={fullTime.timezone}
-      />
-    ) : null;
-  // The drawer has room for everything: the shortlist (labelled), the primary, the full-time offer.
-  const actions = (
-    <>
-      {primary}
-      {!proposal && projectId ? <ShortlistToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} size="sm" /> : null}
-      {fullTimeOffer}
-    </>
-  );
-
-  // A quiet icon: the label carries the state.
-  const iconBtn = "relative z-10 inline-flex size-11 items-center justify-center rounded-full text-ink-600 outline-none transition-colors hover:bg-ink-100 hover:text-ink-900 focus-visible:ring-[3px] focus-visible:ring-brand-600/30";
-  const tip = (text: string, child: React.ReactElement) => (
-    <Tooltip>
-      <TooltipTrigger asChild>{child}</TooltipTrigger>
-      <TooltipContent>{text}</TooltipContent>
-    </Tooltip>
-  );
-  const slot = "flex size-11 shrink-0 items-center justify-center";
-  const compareIcon = !comparable
-    ? null
-    : compareHref
-      ? tip(
-          selected ? "In compare: remove" : "Add to compare",
-          <Link
-            href={compareHref}
-            scroll={false}
-            aria-label={selected ? `In compare: remove ${displayName}` : `Add ${displayName} to compare`}
-            className={cn(iconBtn, selected && "bg-brand-50 text-brand-800")}
-          >
-            {selected ? <Check className="size-5" aria-hidden /> : <Scale className="size-5" aria-hidden />}
-          </Link>,
-        )
-      : tip(
-          "Compare shows up to four candidates. Remove one to add another.",
-          <span tabIndex={0} role="button" aria-disabled="true" aria-label="Compare is full (4)" className={cn(iconBtn, "opacity-40")}>
-            <Scale className="size-5" aria-hidden />
-          </span>,
-        );
-
-  const compareControl = !comparable ? null : compareHref ? (
-    <Link
-      href={compareHref}
-      scroll={false}
-      aria-label={selected ? "In compare: remove" : undefined}
-      className={buttonClass({ variant: "outline", size: "sm", className: cn("min-h-11", selected && "bg-brand-50 font-semibold text-brand-800") })}
-    >
-      {selected ? <Check className="size-4" aria-hidden /> : <Scale className="size-4" aria-hidden />}
-      {selected ? "In compare" : "Compare"}
-    </Link>
-  ) : (
-    <button
-      type="button"
-      disabled
-      className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}
-      title="Compare shows up to four candidates. Remove one to add another."
-    >
-      <Scale className="size-4" aria-hidden />
-      Compare full (4)
-    </button>
-  );
-
-  const axes = {
-    communication: candidate.ratings.communication > 0 ? candidate.ratings.communication : null,
-    coding: candidate.ratings.coding > 0 ? candidate.ratings.coding : null,
-    aptitude: candidate.ratings.aptitude > 0 ? candidate.ratings.aptitude : null,
-    interview: candidate.ratings.interview > 0 ? candidate.ratings.interview : null,
-  };
-  const rateMinor = pricing.hourlyRateMinor;
 
   return (
-    <li
-      style={{ ["--i" as string]: Math.min(index, 11) }}
-      className="rise tile-lift group relative flex flex-col rounded-[24px] bg-white p-5 focus-within:ring-2 focus-within:ring-brand-600/30 lg:p-6"
-    >
-      <div className="flex items-start gap-4">
-        <Avatar src={candidate.photoUrl} initials={candidate.initials} masked={!nameUnlocked} name={nameUnlocked ? displayName : undefined} size="lg" />
-        <div className="min-w-0 flex-1 pt-0.5">
-          {/* The whole card opens the profile: this link is stretched over it. */}
+    <li className="group/row relative grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3.5 gap-y-3 py-6 sm:gap-x-5 sm:gap-y-3 sm:py-7">
+      <RowAvatar photoUrl={candidate.photoUrl} initials={candidate.initials} seed={candidate.id} presence={presence} />
+
+      <div className="min-w-0 self-center sm:self-start">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5">
+          {/* The whole row opens the profile: this link is stretched over it; the controls sit above. */}
           <Link
             href={profileHref}
-            className="block break-words rounded-apple-sm text-lg font-medium leading-snug tracking-[-0.01em] text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:rounded-[24px] focus-visible:after:ring-2 focus-visible:after:ring-brand-600"
+            className="-my-2 inline-flex h-11 min-w-11 items-center text-base font-semibold text-ink-900 outline-none group-hover/row:text-brand-800 after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500 sm:text-lg"
           >
             {displayName}
+            {presence === "Online now" ? <span className="sr-only">, online now</span> : null}
           </Link>
-          <div className="mt-1">
-            <MetaList
-              items={[
-                { icon: <MapPin />, text: candidate.city || candidate.location || "City not stated" },
-                { text: candidate.workModes.join(" · ") },
-              ]}
-            />
-          </div>
+          {hired && proposal?.status !== "hired" ? <Pill tone="live" className="shrink-0 whitespace-nowrap">Hired</Pill> : null}
+          {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
+          {interested ? (
+            <Pill tone="live" className="shrink-0 whitespace-nowrap">
+              Interested in this role
+            </Pill>
+          ) : null}
         </div>
-        {candidate.scored ? (
-          <ScoreDial score={candidate.score} axes={axes} size="sm" showBand={false} />
-        ) : (
-          <span className="grid size-14 shrink-0 place-items-center rounded-full border border-dashed border-ink-200 text-center text-[11px] leading-tight text-text-subtle">
-            Not scored
-          </span>
-        )}
-      </div>
-
-      <div className="mt-5 flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
-        <p className="nums text-[2.25rem] font-light leading-none tracking-[-0.045em] text-ink-900">
-          {formatMoney(rateMinor, currency)}
-          {rateMinor > 0 ? <span className="ml-1 text-sm font-normal tracking-normal text-text-subtle">/hr</span> : null}
+        {headline ? (
+          <p aria-hidden className="mt-0.5 line-clamp-2 text-pretty text-base font-medium leading-snug text-ink-900 group-hover/row:text-brand-800 sm:text-lg">
+            {headline}
+          </p>
+        ) : null}
+        <p className="mt-0.5 inline-flex items-center gap-1 text-sm text-ink-600">
+          <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+          {place || "City not stated"}
+          {/* The grey dot alone reads as offline; say it in words (a label, never a time). */}
+          {presence && presence !== "Online now" ? <span className="whitespace-nowrap">· {presence}</span> : null}
         </p>
-        <div className="flex flex-wrap items-center gap-2">
-          {status ? <Pill tone={status.tone} size="sm">{status.label}</Pill> : null}
-          <Pill tone="neutral" size="sm">{band.name}</Pill>
+      </div>
+
+      {/* Desktop: Save · Compare · Send proposal, top right. Phone: the heart alone, top right. */}
+      <div className="relative z-10 flex items-start gap-1 sm:gap-1.5">
+        {canSave && projectId ? <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} name={displayName} /> : null}
+        <div className="flex items-start gap-1.5 max-sm:hidden">
+          {comparable ? <CompareToggle href={compareHref} selected={selected} name={displayName} /> : null}
+          {primary}
+          {fullTimeFrom && fullTime ? (
+            <FullTimeOfferButton
+              employerId={fullTime.employerId}
+              proposalId={fullTimeFrom}
+              candidate={displayName}
+              fteStatus={fullTime.fteStatus}
+              timezone={fullTime.timezone}
+            />
+          ) : null}
         </div>
       </div>
 
-      {hasWanted ? (
-        <div className="mt-4">
-          <div className="mb-1.5 flex items-baseline justify-between text-xs text-text-subtle">
-            <span>Skill match</span>
-            <span>
-              <span className="nums text-sm font-semibold text-ink-900">{matchCount.matched.length}</span> of <span className="nums">{matchCount.total}</span>
-            </span>
-          </div>
-          <div aria-hidden className="flex gap-1">
-            {Array.from({ length: matchCount.total }, (_, i) => (
-              <span key={i} className={cn("h-1.5 flex-1 rounded-full", i < matchCount.matched.length ? "bg-brand-600" : "bg-ink-200")} />
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {shownSkills.length > 0 ? (
-        <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Skills">
-          {shownSkills.map((skill) => (
-            <li
-              key={skill}
-              className={cn(
-                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium",
-                isWanted(skill) ? "bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-200/80" : "bg-ink-100 text-ink-700",
-              )}
-            >
-              {isWanted(skill) ? <Check className="size-3" aria-hidden /> : null}
-              {skillName(skill)}
-              {isWanted(skill) ? <span className="sr-only"> (matches)</span> : null}
-            </li>
-          ))}
-          {moreSkills > 0 ? <li className="nums px-1 py-1 text-xs text-text-subtle">+{moreSkills}</li> : null}
-        </ul>
-      ) : (
-        <p className="mt-4 text-sm text-text-subtle">No skills listed yet.</p>
-      )}
-
-      {candidate.scored ? (
-        <div className="mt-4 rounded-[18px] bg-ink-50 px-4 py-3">
-          <RatingMeter ratings={candidate.ratings} />
-        </div>
-      ) : null}
-
-      <div className="mt-auto flex items-center justify-between gap-2 pt-5">
-        <div className="flex min-w-0 items-center gap-3">{primary}</div>
-        {/* Three reserved slots: the icons never shift, hired or not. */}
-        <div className="-mr-2 flex shrink-0 items-center">
-          <span className={slot}>
-            {!proposal && projectId ? (
-              <ShortlistToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} variant="icon" className="relative z-10" />
-            ) : null}
-          </span>
-          <span className={slot}>
-            {tip(
-              "Quick view",
-              <button type="button" onClick={() => setDrawerOpen(true)} aria-label={`Quick view of ${displayName}`} className={iconBtn}>
-                <Eye className="size-5" aria-hidden />
-              </button>,
-            )}
-          </span>
-          <span className={slot}>{compareIcon}</span>
-        </div>
+      {/* Stats line and skills: under the identity, running under the actions too. */}
+      <div className="col-span-3 min-w-0 sm:col-span-2 sm:col-start-2">
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-600 sm:gap-x-5">
+          <ScoreBadge size="hero" score={candidate.score} scored={candidate.scored} />
+          <span className="nums">{formatRate(pricing.hourlyRateMinor, currency)}</span>
+          {modes ? <span>{modes}</span> : null}
+        </p>
+        <SkillChips className="mt-3.5" skills={candidate.skills} wanted={wantedSkills} />
       </div>
 
-      <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-        <SheetContent side="right" className="w-full overflow-y-auto border-l border-ink-200/80 bg-surface p-0 sm:max-w-xl">
-          <div className="space-y-6 p-5 sm:p-7">
-            <div className="flex items-start gap-4 pr-8">
-              <CandidateAvatar
-                photoUrl={candidate.photoUrl}
-                initials={candidate.initials}
-                className="size-14 rounded-apple-lg text-lg ring-1 ring-inset ring-brand-200/70"
-              />
-              <div className="min-w-0 flex-1">
-                <SheetTitle className="break-words text-2xl font-semibold text-ink-900">{displayName}</SheetTitle>
-                <SheetDescription className="mt-1 text-sm text-ink-600">
-                  {candidate.location || "Location not stated"}
-                </SheetDescription>
-                {status ? (
-                  <div className="mt-2">
-                    <Pill tone={status.tone}>{status.label}</Pill>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-[18px] bg-white shadow-tile p-4">
-                <p className="text-sm font-medium text-ink-600">Findtern Score</p>
-                <p className="nums mt-1 text-3xl font-semibold text-brand-700">
-                  {candidate.scored ? candidate.score.toFixed(1) : "-"}
-                  <span className="ml-0.5 text-sm font-medium text-text-subtle">/10</span>
-                </p>
-                <p className="mt-1 text-sm text-ink-600">{band.name}</p>
-              </div>
-              <div className="rounded-[18px] bg-white shadow-tile p-4">
-                <p className="text-sm font-medium text-ink-600">Price</p>
-                <p className="nums mt-2.5 text-2xl font-semibold text-ink-900">
-                  {formatRate(pricing.hourlyRateMinor, currency)}
-                </p>
-                <p className="mt-1 text-sm text-ink-600">
-                  {pricing.perHireMinor > 0 ? `plus ${formatMoney(pricing.perHireMinor, currency)} per hire` : "Hourly, by band"}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-start gap-2">
-              {actions}
-              {compareControl}
-              <ButtonLink href={profileHref} variant="ghost" size="sm" className="min-h-10 touch:min-h-11">
-                Full profile
-                <ArrowUpRight className="size-4" aria-hidden />
-              </ButtonLink>
-            </div>
-
-            <section>
-              <SectionHead title="AI interview ratings" hint="Each axis out of 10." />
-              <div className="rounded-[18px] bg-white shadow-tile p-4">
-                <RatingMeter ratings={candidate.ratings} />
-              </div>
-              {candidate.aiFeedbackLink ? (
-                <a
-                  href={candidate.aiFeedbackLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-10 touch:min-h-11" })}
-                >
-                  <FileText className="size-4" aria-hidden />
-                  Feedback report
-                </a>
-              ) : null}
-              {candidate.scored ? (
-                <Link href={`${profileHref}#ai-report`} className="mt-3 ml-1 inline-flex min-h-10 touch:min-h-11 items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
-                  Full AI interview report
-                </Link>
-              ) : null}
-            </section>
-
-            <section>
-              <SectionHead title="Skills" />
-              {skills.length > 0 ? (
-                <ul className="flex flex-wrap gap-1.5">
-                  {skills.map((skill) => (
-                    <li
-                      key={skill}
-                      className={cn(
-                        "rounded-full px-2.5 py-1 text-xs font-medium",
-                        isWanted(skill) ? "bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-200" : "bg-ink-100 text-ink-700",
-                      )}
-                    >
-                      {skill}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-sm text-ink-600">No skills listed.</p>
-              )}
-            </section>
-
-            <section>
-              <SectionHead title="Work preferences" />
-              <dl className="divide-y divide-ink-100 rounded-[18px] bg-white shadow-tile px-4">
-                <DetailRow label="Work mode" value={candidate.workModes.join(", ") || "Not stated"} />
-                <DetailRow
-                  label="Preferred cities"
-                  value={candidate.preferredLocations.map((l) => l.split(",")[0].trim()).join(", ") || "Not stated"}
-                />
-                <DetailRow
-                  label="Laptop"
-                  value={candidate.hasLaptop === true ? "Has a laptop" : candidate.hasLaptop === false ? "Needs one provided" : "Not stated"}
-                />
-              </dl>
-            </section>
-
-            {candidate.academics ? (
-              <section>
-                <SectionHead title="Academics" />
-                <div className="rounded-[18px] bg-white shadow-tile p-4">
-                  <p className="text-base font-medium text-ink-900">
-                    {[candidate.academics.degree, candidate.academics.specialization].filter(Boolean).join(" · ") || "Degree not stated"}
-                  </p>
-                  {candidate.academics.institution ? <p className="mt-0.5 text-sm text-ink-600">{candidate.academics.institution}</p> : null}
-                  <p className="nums mt-2 text-sm text-ink-600">
-                    {[
-                      candidate.academics.startYear || candidate.academics.endYear
-                        ? `${candidate.academics.startYear || "?"} – ${candidate.academics.endYear || "?"}`
-                        : "",
-                      candidate.academics.score
-                        ? `${candidate.academics.scoreType === "percentage" ? "Percentage" : "CGPA"} ${candidate.academics.score}`
-                        : "",
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                </div>
-              </section>
-            ) : null}
-          </div>
-        </SheetContent>
-      </Sheet>
+      {/* Phone: Compare and the primary action as the card's last line. */}
+      <div className="relative z-10 col-span-3 flex items-start justify-between gap-2 sm:hidden">
+        {comparable ? <CompareToggle href={compareHref} selected={selected} name={displayName} /> : <span />}
+        <div className="flex items-center gap-1.5">
+          {fullTimeFrom && fullTime ? (
+            <FullTimeOfferButton
+              employerId={fullTime.employerId}
+              proposalId={fullTimeFrom}
+              candidate={displayName}
+              fteStatus={fullTime.fteStatus}
+              timezone={fullTime.timezone}
+            />
+          ) : null}
+          {primary}
+        </div>
+      </div>
     </li>
   );
 }

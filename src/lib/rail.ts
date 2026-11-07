@@ -9,3 +9,10 @@
  * load. Written and read from the same string, it behaves.
  */
 export const RAIL_COOKIE = "ft_rail";
+
+/**
+ * Whether the Candidates filter column is hidden ("1") or shown, from lg up.
+ * A plain module for the same reason as RAIL_COOKIE: the server page reads it
+ * and the client toggle writes it, and both must see the same string.
+ */
+export const FILTER_PANEL_COOKIE = "ft_filters";

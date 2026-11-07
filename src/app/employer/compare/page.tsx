@@ -1,32 +1,35 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { ArrowLeft, Check, Minus } from "lucide-react";
+import { ArrowLeft, Check, Minus, Send, X } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
-import { bandFor } from "@/lib/score";
-import { formatDmy, formatMoney, formatRate } from "@/lib/format";
-import { RATING_META, displayNameOf, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { formatDate, formatMoney, formatRate } from "@/lib/format";
+import { RATING_META, displayNameOf, preferredCities, redactForEmployer, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { shortlistProjectsByIntern } from "@/lib/employer-shortlist";
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
 import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
-import { Callout } from "@/components/app/layout-kit";
-import { ScrollRegion } from "./scroll-region";
-import { candidateStatusPill } from "@/components/employer/candidate-status";
+import { RowAvatar } from "@/components/employer/candidate-row-parts";
+import { SendProposalHold } from "@/components/employer/send-proposal-hold";
+import { planNameFor } from "@/lib/score";
+import { SaveToggle } from "@/components/employer/candidate-card";
+import { studyOf } from "@/components/employer/candidate-view";
+import { SortSelect } from "../candidates/_sort-select";
+import { candidateStatusPill, proposalActionLabel } from "@/components/employer/candidate-status";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
-import { CompareHeadCell } from "@/components/employer/compare/head-cell";
-import { CompareHero } from "@/components/employer/compare/compare-hero";
-import { Cell, LeaderMark, MatrixRow, NumericRow, RatingBar, leaders } from "@/components/employer/compare/matrix";
 import { SkillFilter } from "@/components/employer/skill-filter";
 import { RememberSelection } from "@/components/employer/remember-selection";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedSelection } from "@/lib/employer-selection";
-import { ButtonLink, buttonClass } from "@/components/ui/button";
-import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { ButtonLink } from "@/components/ui/button";
+import { CandidateTabs } from "@/components/employer/section-tabs";
+import { hireFlowCounts } from "@/lib/employer-flow";
+import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
-import { fieldClass } from "@/components/employer/ui-tokens";
+import { Cell, LeaderMark, MatrixRow, NumericRow, leaders } from "@/components/employer/compare/matrix";
 
 export const metadata: Metadata = {
   title: "Compare candidates",
@@ -41,8 +44,9 @@ function one(v: string | string[] | undefined): string | undefined {
 
 /**
  * Up to four candidates as a real comparison matrix: one column each, a
- * sticky header with the candidate and their next action, a sticky first
- * column of row labels, and the leader of every numeric row marked.
+ * header with the candidate and their next action, a sticky first column of
+ * row labels (the page scrolls down, the table scrolls sideways), and the
+ * leader of every numeric row marked.
  *
  * Benchmarked against an open project (newest first, as the candidates page),
  * whose skills can be swapped here to re-score the match (EMB-25).
@@ -71,6 +75,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   let activeProject: { id: string; projectName: string; skills: unknown } | null = null;
   let shortlisted = new Set<string>();
   let nameUnlocked = new Set<string>();
+  let profileUpdated = new Map<string, CandidateProfile["updatedAt"]>();
   let relations = new Map<string, CandidateRelation>();
   let shortlistedFor = new Map<string, string[]>();
   let loadFailed = false;
@@ -88,11 +93,12 @@ export default async function CompareCandidates({ searchParams }: { searchParams
           projectName: schema.projects.projectName,
           skills: schema.projects.skills,
           status: schema.projects.status,
+          takenDownAt: schema.projects.takenDownAt,
         })
         .from(schema.projects)
         .where(eq(schema.projects.employerId, session.uid))
         .orderBy(desc(schema.projects.createdAt))
-    ).filter((p) => isOpenProject(p.status));
+    ).filter((p) => isOpenProject(p.status, p.takenDownAt));
     activeProject = (projectParam && projects.find((p) => p.id === projectParam)) || projects[0] || null;
 
     if (activeProject) {
@@ -114,7 +120,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       // hired - legacy dropped both from compare (employer-compare.tsx:550).
       const [visible, rel] = await Promise.all([
         visibleInternIds(db, session.uid, ids),
-        candidateRelations(db, session.uid, ids),
+        candidateRelations(db, session.uid, ids, activeProject?.id ?? null),
       ]);
       relations = rel;
       // Compare is shared across projects but a shortlist is per project, so say where each one already sits.
@@ -149,10 +155,15 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       const onboardingByUser = new Map<string, (typeof onboardingRows)[number]>();
       for (const row of onboardingRows) if (!onboardingByUser.has(row.userId)) onboardingByUser.set(row.userId, row);
       const byId = new Map(rows.map((row) => [row.id, row]));
-      candidates = ids
+      const profiles = ids
         .map((id) => byId.get(id))
         .filter((row): row is NonNullable<typeof row> => Boolean(row))
         .map((row) => toCandidateProfile(row, onboardingByUser.get(row.id)));
+      // Only the redacted profile leaves this block (no email, LinkedIn, recording; name only once hired), so
+      // no child, server or client, can ever be handed the unredacted one. The "Profile updated" row is the one
+      // thing redaction drops that compare has always shown, so it is carried on its own.
+      profileUpdated = new Map(profiles.map((p) => [p.id, p.updatedAt]));
+      candidates = profiles.map((p) => redactForEmployer(p, nameUnlocked.has(p.id)));
       await attachPhotos(db, candidates);
 
       plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
@@ -191,11 +202,15 @@ export default async function CompareCandidates({ searchParams }: { searchParams
     );
   }
 
+  // The tab row's Shortlist figure: the same count the Shortlist page's strip shows.
+  const shortlistCount = (await hireFlowCounts(session.uid, 0).catch(() => null))?.shortlisted ?? 0;
+
   if (candidates.length === 0) {
     return (
       <div>
         <RememberSelection employerId={session.uid} compare={ids} />
-        <PageHead title="Compare candidates" lede={`Put up to ${MAX_COMPARE} candidates side by side.`} />
+        <PageHead title="Compare candidates" lede={`Put up to ${MAX_COMPARE} candidates side by side.`} className="mb-4 lg:mb-5" />
+        <CandidateTabs active="compare" shortlist={shortlistCount} compare={0} />
         <EmptyScene
           title="Nothing to compare yet"
           body="Tick Compare on two to four candidates in the candidate list, then open them here side by side."
@@ -204,6 +219,11 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         />
       </div>
     );
+  }
+
+  // Switching project re-benchmarks: its own skills apply, so typed ones are dropped.
+  function projectHref(projectId: string): string {
+    return `/employer/compare?${new URLSearchParams({ ids: ids.join(","), project: projectId }).toString()}`;
   }
 
   function removeHref(idToRemove: string): string {
@@ -225,6 +245,21 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       return [c.id, { matched, pct: requiredSkills.length ? Math.round((matched.length / requiredSkills.length) * 100) : 0 }];
     }),
   );
+  // The lede promises marked leaders only when some row has one (all-tied values mark nobody).
+  const anyLeader =
+    (requiredSkills.length > 0 && leaders(candidates.map((c) => fit.get(c.id)!.pct)).size > 0) ||
+    leaders(candidates.map((c) => (c.scored ? c.score : 0))).size > 0 ||
+    RATING_META.some((m) => leaders(candidates.map((c) => c.ratings[m.key])).size > 0);
+  const slotsLine = (
+    <>
+      <span className="nums block">{candidates.length} of {MAX_COMPARE} slots</span>
+      {candidates.length < MAX_COMPARE ? (
+        <Link href={backHref} className="-mx-1 inline-flex min-h-11 items-center px-1 text-sm font-medium text-ink-800 underline underline-offset-4 hover:text-ink-900 sm:mt-1">
+          Add a candidate
+        </Link>
+      ) : null}
+    </>
+  );
   const anyPerHire = candidates.some((c) => (pricing.get(c.id)?.perHireMinor ?? 0) > 0);
 
   return (
@@ -235,42 +270,28 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         Back to candidates
       </ButtonLink>
 
-      <CompareHero
-        count={candidates.length}
-        max={MAX_COMPARE}
-        lede={
-          candidates.length === 1
-            ? "Add at least one more from the candidate list to see who leads each row."
-            : "The leader of each row is marked. Hires are left out. The compare list is shared across your projects."
-        }
-        people={candidates.map((c) => ({ id: c.id, initials: c.initials }))}
-      />
-      <div className="mb-6 rounded-[24px] bg-white p-4 shadow-tile ring-1 ring-ink-100 sm:p-5">
-        {
+      <PageHead
+        className="mb-4 lg:mb-5"
+        title={`Comparing ${candidates.length} candidate${candidates.length === 1 ? "" : "s"}`}
+        lede={candidates.length === 1 ? "Add one more from the candidate list to see who leads each row." : anyLeader ? "The leader of each row is marked." : undefined}
+        action={
           projects.length > 0 ? (
-            <form method="get" className="flex w-full flex-wrap items-end gap-2 sm:w-auto">
-              <input type="hidden" name="ids" value={ids.join(",")} />
-              <label className="min-w-0 flex-1 text-sm font-medium text-ink-700 sm:flex-none">
-                Benchmark against
-                <select
-                  name="project"
-                  defaultValue={activeProject?.id ?? ""}
-                  className={cn(fieldClass, "mt-1.5 block sm:w-64")}
-                >
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.projectName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button type="submit" className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}>
-                Apply
-              </button>
-            </form>
+            // Applies on choice, like the project picker on Candidates: no Apply button.
+            <span className="flex min-w-0 items-center gap-2 text-sm text-ink-600 max-sm:w-full">
+              <span aria-hidden className="shrink-0">Benchmark</span>
+              <SortSelect
+                id="compare-project"
+                label="Benchmark against project"
+                prefix=""
+                value={activeProject?.id ?? ""}
+                options={projects.map((p) => ({ value: p.id, label: p.projectName, href: projectHref(p.id) }))}
+                className="min-w-0 font-medium text-ink-900 max-sm:flex-1 sm:max-w-64"
+              />
+            </span>
           ) : null
         }
-      </div>
+      />
+      <CandidateTabs active="compare" shortlist={shortlistCount} compare={candidates.length} />
 
       <SkillFilter
         title="Skills to match"
@@ -280,15 +301,15 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         note="Up to 7. Add or remove skills to re-score the project fit below."
       />
 
-      {/* Scrolls inside itself so the header row and the label column can both stick. */}
-      {candidates.length >= MAX_COMPARE ? (
-        <Callout tone="info" className="mb-4">
-          You are comparing the most we show at once ({MAX_COMPARE}). Remove one candidate to add another from the candidate list.
-        </Callout>
-      ) : null}
-      <ScrollRegion
-        label="Candidate comparison"
-        className="rise max-h-[calc(100dvh-8rem)] rounded-[24px] bg-white shadow-tile ring-1 ring-ink-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+      {/* Phone: the label column is hidden, so the slot count sits here once. */}
+      <div className="mb-1 flex items-center justify-between gap-3 text-sm text-ink-600 sm:hidden">{slotsLine}</div>
+
+      {/* The page scrolls vertically; only the width scrolls here, with the label column pinned (sm up). */}
+      <div
+        tabIndex={0}
+        role="region"
+        aria-label="Candidate comparison"
+        className="relative -mx-4 overflow-x-auto border-y border-ink-100 max-sm:snap-x max-sm:snap-mandatory focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:mx-0"
       >
         <table className="w-full border-separate border-spacing-0 text-left text-sm">
           <caption className="sr-only">Candidates compared side by side; the leader of each row is marked.</caption>
@@ -296,27 +317,83 @@ export default async function CompareCandidates({ searchParams }: { searchParams
             <tr>
               <th
                 scope="col"
-                className="sticky left-0 top-0 z-30 w-24 min-w-24 border-b border-r border-ink-100 bg-white p-3 align-bottom text-xs font-medium text-ink-600 sm:w-48 sm:min-w-48 sm:p-4"
+                className="sticky left-0 z-20 w-48 min-w-48 border-b border-r border-ink-100 bg-surface p-4 align-bottom text-xs font-medium text-ink-600 max-sm:hidden"
               >
-                {candidates.length} of {MAX_COMPARE}
+                {slotsLine}
               </th>
               {candidates.map((c) => {
                 const rel = relations.get(c.id);
                 const status = candidateStatusPill(rel?.proposal ?? null);
                 const name = displayNameOf(c, nameUnlocked.has(c.id));
+                const savedTo = shortlistedFor.get(c.id) ?? [];
+                const onActive = Boolean(activeProject && shortlisted.has(c.id));
+                const others = savedTo.filter((n) => n !== activeProject?.projectName);
                 return (
-                  <CompareHeadCell
+                  <th
                     key={c.id}
-                    c={c}
-                    name={name}
-                    unlocked={nameUnlocked.has(c.id)}
-                    status={status}
-                    proposal={rel?.proposal ?? null}
-                    removeHref={removeHref(c.id)}
-                    project={activeProject ? { id: activeProject.id, name: activeProject.projectName } : null}
-                    shortlisted={shortlisted.has(c.id)}
-                    shortlistedFor={shortlistedFor.get(c.id) ?? []}
-                  />
+                    scope="col"
+                    className="relative border-b border-r border-ink-100 p-3 align-top font-normal last:border-r-0 max-sm:w-[calc((100vw-2rem)/2)] max-sm:min-w-[calc((100vw-2rem)/2)] max-sm:snap-start sm:min-w-60 sm:p-4"
+                  >
+                    {/* Photo, name and city are one link to the profile: a big target on a phone. */}
+                    <Link
+                      href={`/employer/intern/${encodeURIComponent(c.id)}${activeProject ? `?project=${encodeURIComponent(activeProject.id)}` : ""}`}
+                      className="group/id flex items-center gap-3 rounded-lg max-sm:flex-col max-sm:items-start max-sm:gap-1.5 sm:mr-8 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                    >
+                      <RowAvatar photoUrl={c.photoUrl} initials={c.initials} seed={c.id} className="size-10 sm:size-14" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block break-words text-base font-semibold text-ink-900 underline-offset-4 group-hover/id:underline">{name}</span>
+                        <span className="block break-words text-sm text-ink-600">{c.city || c.location || "City not stated"}</span>
+                      </span>
+                    </Link>
+                    <Link
+                      href={removeHref(c.id)}
+                      aria-label={`Remove ${name} from the comparison`}
+                      title="Remove from the comparison"
+                      className="absolute right-1 top-1 grid size-11 place-items-center rounded-full text-ink-500 outline-none hover:bg-ink-100 hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 sm:right-2 sm:top-2"
+                    >
+                      <X className="size-4" aria-hidden />
+                    </Link>
+                    {/* EMB-08: the action follows what already exists with them. One filled button per column. */}
+                    <div className="relative mt-3 flex items-center gap-2">
+                      {rel?.proposal ? (
+                        <ButtonLink href={`/employer/proposal/${encodeURIComponent(rel.proposal.id)}`} variant="outline" size="sm" className="min-h-11 min-w-0 flex-1 rounded-full sm:min-h-9 sm:touch:min-h-11">
+                          {proposalActionLabel(rel.proposal)}
+                        </ButtonLink>
+                      ) : (
+                        <>
+                          {/* Phone: the heart joins the remove button on the top line. */}
+                          {activeProject ? (
+                            <span className="max-sm:absolute max-sm:right-12 max-sm:top-1">
+                              <SaveToggle internId={c.id} projectId={activeProject.id} shortlisted={shortlisted.has(c.id)} name={name} />
+                            </span>
+                          ) : null}
+{rel?.pendingMeetingAt ? (
+                            <SendProposalHold pendingMeetingAt={rel.pendingMeetingAt} className="min-w-0 flex-1 items-stretch" controlClassName="w-full justify-center" />
+                          ) : (
+                                                      <ButtonLink
+                              href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}${activeProject ? `&project=${encodeURIComponent(activeProject.id)}` : ""}`}
+                              variant="primary"
+                              size="sm"
+                              className="min-h-11 w-full min-w-0 flex-1 rounded-full max-sm:px-3 max-sm:[&>svg]:hidden sm:min-h-9 sm:touch:min-h-11"
+                            >
+                              <Send className="size-4" aria-hidden />
+                              Send proposal
+                            </ButtonLink>
+                          )}
+                        </>
+                      )}
+                    </div>
+                    {status || others.length > 0 ? (
+                      <p className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-600">
+                        {status ? <Pill tone={status.tone}>{status.label}</Pill> : null}
+                        {others.length > 0 ? (
+                          <span title={others.join(", ")}>
+                            {onActive ? "Also on" : "On"} {others.length === 1 ? `the ${others[0]} shortlist` : `${others.length} ${onActive ? "other " : ""}shortlists`}
+                          </span>
+                        ) : null}
+                      </p>
+                    ) : null}
+                  </th>
                 );
               })}
             </tr>
@@ -324,14 +401,14 @@ export default async function CompareCandidates({ searchParams }: { searchParams
 
           <tbody>
             {requiredSkills.length > 0 ? (
-              <MatrixRow label="Project fit" hint={`${activeProject && !skillsSet ? activeProject.projectName : "Your skills"} · ${requiredSkills.length} skills`} accent>
+              <MatrixRow label="Project fit" hint={`${activeProject && !skillsSet ? activeProject.projectName : "Your skills"} · ${requiredSkills.length} skill${requiredSkills.length === 1 ? "" : "s"}`} accent>
                 {candidates.map((c) => {
                   const f = fit.get(c.id)!;
                   const best = leaders(candidates.map((x) => fit.get(x.id)!.pct)).has(candidates.indexOf(c));
                   return (
                     <Cell key={c.id} leader={best}>
                       <div className="flex items-baseline justify-between gap-2">
-                        <span className="nums text-2xl font-light tracking-[-0.04em]">{f.pct}%</span>
+                        <span className="nums text-lg font-semibold text-brand-800">{f.pct}%</span>
                         <span className="nums text-sm text-ink-600">
                           {f.matched.length} of {requiredSkills.length}
                         </span>
@@ -352,9 +429,9 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               candidates={candidates}
               render={(c) => (
                 <>
-                  <span className="nums text-4xl font-light tracking-[-0.04em]">{c.scored ? c.score.toFixed(1) : "-"}</span>
+                  <span className="nums text-2xl font-semibold text-brand-700">{c.scored ? c.score.toFixed(1) : "-"}</span>
                   <span className="text-sm text-text-subtle">/10</span>
-                  <span className="mt-0.5 block text-sm text-ink-600">{bandFor(c.score).name}</span>
+                  {c.scored ? <span className="ml-1 text-sm font-medium text-ink-700">{planNameFor(c.score)}</span> : null}
                 </>
               )}
             />
@@ -362,7 +439,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
             <MatrixRow label="Hourly price">
               {candidates.map((c) => (
                 <Cell key={c.id}>
-                  <span className="nums text-base">{formatRate(pricing.get(c.id)!.hourlyRateMinor, currency)}</span>
+                  <span className="nums text-base font-semibold text-ink-900">{formatRate(pricing.get(c.id)!.hourlyRateMinor, currency)}</span>
                 </Cell>
               ))}
             </MatrixRow>
@@ -387,12 +464,14 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                 label={meta.label}
                 values={candidates.map((c) => c.ratings[meta.key])}
                 candidates={candidates}
-                render={(c, lead) =>
+                render={(c) =>
                   c.ratings[meta.key] > 0 ? (
                     <>
-                      <span className="nums text-base">{c.ratings[meta.key].toFixed(1)}</span>
+                      <span className="nums text-base font-semibold text-ink-900">{c.ratings[meta.key].toFixed(1)}</span>
                       <span className="text-sm text-text-subtle">/10</span>
-                      <RatingBar value={c.ratings[meta.key]} leader={lead} className="mt-2" />
+                      <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-ink-100" aria-hidden>
+                        <span className="block h-full rounded-full bg-brand-600" style={{ width: `${c.ratings[meta.key] * 10}%` }} />
+                      </span>
                     </>
                   ) : (
                     <span className="text-text-subtle">Not rated</span>
@@ -405,7 +484,9 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               {candidates.map((c) => {
                 const skills = Array.from(new Set(c.skills.map(nameOf).filter(Boolean)));
                 const isMatch = (s: string) => wanted.has(s.toLowerCase());
-                const ordered = [...skills.filter(isMatch), ...skills.filter((s) => !isMatch(s))];
+                // Matches first; a profile holds at most seven skills, so an older, longer list is cut to seven (+N).
+                const all = [...skills.filter(isMatch), ...skills.filter((s) => !isMatch(s))];
+                const ordered = all.slice(0, 7);
                 return (
                   <Cell key={c.id}>
                     {ordered.length === 0 ? (
@@ -422,6 +503,12 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                             {skill}
                           </li>
                         ))}
+                        {all.length > ordered.length ? (
+                          <li className="text-ink-700">
+                            +{all.length - ordered.length}
+                            <span className="sr-only"> more skills</span>
+                          </li>
+                        ) : null}
                       </ul>
                     )}
                   </Cell>
@@ -460,7 +547,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                 <Cell key={c.id}>
                   <p className="font-medium text-ink-900">{c.academics?.institution || "-"}</p>
                   <p className="mt-0.5 text-ink-600">
-                    {[c.academics?.degree, c.academics?.specialization].filter(Boolean).join(", ") || "Degree not stated"}
+                    {studyOf(c.academics) || "Degree not stated"}
                   </p>
                   {c.academics?.score ? (
                     <p className="nums mt-0.5 text-ink-600">
@@ -475,8 +562,8 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               {candidates.map((c) => (
                 <Cell key={c.id}>
                   <span className="nums">
-                    {c.updatedAt
-                      ? formatDmy(c.updatedAt)
+                    {profileUpdated.get(c.id)
+                      ? formatDate(profileUpdated.get(c.id)!)
                       : "Never"}
                   </span>
                 </Cell>
@@ -484,7 +571,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
             </MatrixRow>
           </tbody>
         </table>
-      </ScrollRegion>
+      </div>
     </div>
   );
 }

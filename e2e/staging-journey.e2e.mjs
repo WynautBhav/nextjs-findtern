@@ -412,7 +412,6 @@ async function onboardIntern(page, who, over = {}) {
   expectOk(
     "POST /api/intern/onboarding (final)",
     await api(page, "POST", "/api/intern/onboarding", {
-      bio: "Final-year engineering student who builds data pipelines and small dashboards.",
       linkedinUrl: "",
       city: "Pune",
       state: "Maharashtra",
@@ -695,7 +694,7 @@ step("employer: shortlists both interns and sees them in the cart [API + UI]", [
   assert.equal(inCart.length, 2);
   await visit(page, "/employer/cart");
   // Candidates show as initials ("IQ") before a hire, never by name.
-  await page.getByText(/2 shortlisted/i).first().waitFor();
+  await page.getByText(/\b2 candidates\b/i).first().waitFor(); // the shortlist heading counts distinct people
   assert.equal(await page.getByRole("button", { name: "Book meeting" }).count(), 2, "each shortlisted candidate can be booked");
   assert.ok(!(await page.locator("body").innerText()).includes(INTERNS[1].lastName), "the cart never shows a surname");
   await shot("employer-cart");
@@ -1486,7 +1485,7 @@ step("US employer: shortlists both, books intern 3 in the cart form (default tim
     expectOk("POST /api/employer/cart (add)", await api(page, "POST", "/api/employer/cart", { action: "add", projectId: state.project2Id, internId: id, listType: "cart" }));
   }
   await visit(page, "/employer/cart");
-  await page.getByText(/2 shortlisted/i).first().waitFor();
+  await page.getByText(/\b2 candidates\b/i).first().waitFor(); // the shortlist heading counts distinct people
   // The nearest block around the "IZ" initials that holds a Book meeting button is that candidate's card.
   const card3 = page.locator('xpath=(//*[normalize-space(text())="IZ"])[1]/ancestor::*[.//button[contains(., "Book meeting")]][1]');
   const before = Date.now();

@@ -22,7 +22,7 @@ export function AboutStep({ values, update, errors, documents, account, onUpload
 
   return (
     <div className="space-y-8">
-      <Section first title="Your photo" hint="Employers can see your photo before they hire you. Your name and contact details stay hidden until a hire.">
+      <Section first title="Your photo" hint="Employers see your photo and initials while they decide. Your name shows once a company hires you.">
         <PhotoUpload
           src={photoSrc}
           error={errors.photo}

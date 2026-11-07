@@ -1,22 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertCircle, Landmark } from "lucide-react";
+import { AlertCircle, ChevronDown, Landmark } from "lucide-react";
 
-import { BigFigure, EmptyScene, FigureStrip, PageHead, Surface } from "@/components/app/primitives";
-import { SignatureHero } from "@/components/intern/kit/hero";
-import { Stagger } from "@/components/intern/kit/motion";
+import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { Tile } from "@/components/app/tiles";
 import { MonthRail } from "@/components/intern/stipend/month-rail";
-import { STIPEND_CURRENCY, stipendPlan, totalsByCurrency } from "@/components/intern/stipend/months";
+import { STIPEND_CURRENCY, orderEngagements, stipendPlan, stipendTotalsLine, totalsByCurrency, type StipendPlan } from "@/components/intern/stipend/months";
 import { PaymentLedger } from "@/components/intern/stipend/payment-ledger";
-import { StipendGauge } from "@/components/intern/stipend/stipend-gauge";
 import { buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
 import { bankPrompt, earningsEngagements, earningsView, type EngagementEarnings } from "@/lib/earnings-view";
-import { formatJoiningDate, formatMoney, shortDate } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { isHiredProposal } from "@/lib/hire-status";
 import { loadInternData } from "@/lib/intern-data";
-import { isAcceptedStatus, payoutState, readScheduledForDate, type PayoutRow } from "@/lib/journey";
+import { isAcceptedStatus, payoutState, type PayoutRow } from "@/lib/journey";
 import { parseOffer } from "@/lib/offer";
 
 export const metadata: Metadata = {
@@ -25,13 +22,15 @@ export const metadata: Metadata = {
 };
 
 const BANK_HREF = "/intern/settings#bank";
+/** Internships shown before "Show all N": the running and next ones, not sixteen identical rows. */
+const SHOWN = 6;
 
 /**
  * Stipend (legacy earnings.tsx).
  *
- * Per HIRED internship (INW-11 / INT-08): a gauge of paid against the whole
- * stipend beside the months on a rail, each paid month with its date and bank
- * reference. Below, every payout as a ledger. Paid, scheduled and failed stay
+ * One row per HIRED internship (INW-11 / INT-08): paid against the whole
+ * stipend, with the months on a rail behind "Month by month", each paid month
+ * with its date and bank reference. Below, every payout as a ledger. Paid, scheduled and failed stay
  * apart (INT-01 / INW-04), and amounts in different currencies are never
  * added. An offer accepted but not yet paid for by the company earns nothing
  * yet and is not counted.
@@ -82,19 +81,18 @@ export default async function InternEarnings() {
   const bankName = typeof bank.bankName === "string" ? bank.bankName.trim() : "";
   const failed = totalsByCurrency(data.payouts, "failed");
   const prompt = bankPrompt({ last4, paidCount: data.payouts.filter((p) => payoutState(p.status) === "paid").length });
-  const paidTotals = totalsByCurrency(data.payouts, "paid");
-  const pendingTotals = totalsByCurrency(data.payouts, "pending");
-  const nextDate = data.payouts
-    .filter((p) => payoutState(p.status) === "pending")
-    .map((p) => readScheduledForDate(p))
-    .filter((d): d is Date => d instanceof Date)
-    .sort((a, b) => a.getTime() - b.getTime())[0];
-  const nextPayout = nextDate ? shortDate(nextDate, { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : null;
   const soleId = cards.length === 1 ? cards[0].proposalId : null;
+  const plans = cards.map((card) =>
+    card.eligible && card.monthlyMinor
+      ? stipendPlan({ months: card.months, monthlyMinor: card.monthlyMinor, startDate: card.startDate, payouts: stipends.filter((p) => belongsTo(p, card.proposalId, soleId)) })
+      : null,
+  );
+
+  const rows = orderEngagements(cards.map((card, i) => ({ card, plan: plans[i], startDate: card.startDate, months: card.months })));
 
   return (
-    <Stagger className="space-y-6 lg:space-y-8">
-      <SignatureHero
+    <div>
+      <PageHead
         title="Your stipend"
         lede={
           last4 ? (
@@ -105,27 +103,15 @@ export default async function InternEarnings() {
             prompt.text
           )
         }
-        actions={
-          <Link href={BANK_HREF} className={buttonClass({ variant: "outline", className: "border-white/30 bg-white/10 text-white hover:bg-white/15" })}>
+        action={
+          <Link href={BANK_HREF} className={buttonClass({ variant: "outline" })}>
             <Landmark className="size-4" aria-hidden />
             {prompt.button}
           </Link>
         }
-      >
-        <section aria-label="Money summary">
-          <FigureStrip tone="dark" className="max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
-            <BigFigure tone="dark" label="Paid to date" value={<span className="text-4xl lg:text-5xl">{moneyLine(paidTotals)}</span>} />
-            <BigFigure tone="dark" label="Pending approval" value={<span className="text-4xl lg:text-4xl">{moneyLine(pendingTotals)}</span>} hint="Awaiting timesheet approval" />
-            <BigFigure tone="dark" label="Next payout" value={<span className="text-3xl">{nextPayout ?? "Not set"}</span>} hint={nextPayout ? undefined : "Date not set yet"} />
-          </FigureStrip>
-          <p className="mt-4 max-w-2xl text-pretty text-sm text-on-dark-subtle">
-            Each month&apos;s stipend is paid into your bank account after that month&apos;s timesheet is approved.
-          </p>
-        </section>
-      </SignatureHero>
+      />
 
       <div className="space-y-6 lg:space-y-8">
-
         {failed.length > 0 ? (
           <Surface role="alert" className="flex flex-col gap-4 border-danger/25 bg-danger-soft/50 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-3">
@@ -157,9 +143,33 @@ export default async function InternEarnings() {
             />
           </Tile>
         ) : (
-          cards.map((card) => (
-            <Engagement key={card.proposalId} card={card} payouts={stipends.filter((p) => belongsTo(p, card.proposalId, soleId))} />
-          ))
+          <section data-first-content aria-label="Your internships">
+            <SectionHead
+              title={cards.length === 1 ? "Your internship" : `Your internships (${cards.length})`}
+              hint={stipendTotalsLine(plans)}
+              className="mb-0 border-b border-ink-200/70 pb-3"
+            />
+            {/* Thin dividers, one row per internship: the employer candidate list's language. */}
+            <ul className="divide-y divide-ink-200/70 border-b border-ink-200/70">
+              {rows.slice(0, SHOWN).map(({ card, plan }) => (
+                <Engagement key={card.proposalId} card={card} plan={plan} />
+              ))}
+            </ul>
+            {rows.length > SHOWN ? (
+              <details className="group">
+                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-md text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
+                  <span className="group-open:hidden">Show all {rows.length}</span>
+                  <span className="hidden group-open:inline">Show fewer</span>
+                  <ChevronDown className="size-4 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+                </summary>
+                <ul className="divide-y divide-ink-200/70 border-t border-ink-200/70">
+                  {rows.slice(SHOWN).map(({ card, plan }) => (
+                    <Engagement key={card.proposalId} card={card} plan={plan} />
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </section>
         )}
 
         {waitingOnPayment.length > 0 && cards.length > 0 ? (
@@ -186,12 +196,18 @@ export default async function InternEarnings() {
             </ol>
           </Tile>
         ) : (
-          <Tile title="Every payment" description="Newest first, in the currency it was paid in.">
-            <PaymentLedger payouts={data.payouts} />
-          </Tile>
+          <section aria-labelledby="ledger-head">
+            <h2 id="ledger-head" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
+              Every payment
+            </h2>
+            <p className="mt-1 text-sm text-text-subtle">Newest first, in the currency it was paid in.</p>
+            <div className="mt-3 border-t border-ink-200/70">
+              <PaymentLedger payouts={data.payouts} />
+            </div>
+          </section>
         )}
       </div>
-    </Stagger>
+    </div>
   );
 }
 
@@ -202,40 +218,84 @@ function belongsTo(p: PayoutRow, proposalId: string, soleId: string | null): boo
   return pid ? pid === proposalId : proposalId === soleId;
 }
 
-function Engagement({ card, payouts }: { card: EngagementEarnings; payouts: PayoutRow[] }) {
-  const description = `${card.company} · ${card.months} month${card.months === 1 ? "" : "s"}${card.joiningDate ? ` from ${formatJoiningDate(card.joiningDate)}` : ""}`;
-  const offer = { href: `/intern/proposals/${encodeURIComponent(card.proposalId)}`, label: "The offer" };
+function Engagement({ card, plan }: { card: EngagementEarnings; plan: StipendPlan | null }) {
+  const description = `${card.company} · ${card.months} month${card.months === 1 ? "" : "s"}${card.joiningDate ? ` from ${formatDate(card.joiningDate)}` : ""}`;
+  const title = (
+    <div className="min-w-0">
+      <Link
+        href={`/intern/proposals/${encodeURIComponent(card.proposalId)}`}
+        className="inline-flex min-h-11 items-center text-[15px] font-semibold text-ink-900 underline-offset-4 hover:text-brand-800 hover:underline sm:min-h-0"
+      >
+        {card.roleTitle}
+        <span className="sr-only">: open the offer</span>
+      </Link>
+      <p className="nums text-sm text-ink-600">{description}</p>
+    </div>
+  );
 
-  if (!card.eligible || !card.monthlyMinor) {
+  if (!plan) {
     return (
-      <Tile title={card.roleTitle} description={description} action={offer}>
-        <p className="text-pretty text-sm text-text-subtle">
+      <li className="py-5">
+        {title}
+        <p className="mt-2 max-w-prose text-pretty text-sm text-text-subtle">
           {!card.eligible
             ? "Candidates with a Findtern Score below 6 are not paid a stipend. A higher score makes later internships paid."
             : "The monthly stipend is not set on this offer, so there is nothing to track here yet."}
         </p>
-      </Tile>
+      </li>
     );
   }
 
-  const plan = stipendPlan({ months: card.months, monthlyMinor: card.monthlyMinor, startDate: card.startDate, payouts });
+  const pct = (n: number) => (plan.totalMinor > 0 ? `${(n / plan.totalMinor) * 100}%` : "0%");
+  const current = plan.months.some((m) => m.current);
   return (
-    <section aria-label={card.roleTitle} className="grid gap-4 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
-      <Tile title={card.roleTitle} description={description} action={offer}>
-        <StipendGauge plan={plan} id={card.proposalId} />
-      </Tile>
-      <Tile
-        title="Month by month"
-        description={`${formatMoney(card.monthlyMinor, STIPEND_CURRENCY)} a month, as agreed in your offer.`}
-        action={{ href: `/intern/timesheets?proposalId=${encodeURIComponent(card.proposalId)}`, label: "Timesheets" }}
-      >
-        <MonthRail months={plan.months} monthlyMinor={card.monthlyMinor} />
-      </Tile>
-    </section>
+    <li className="py-5">
+      <div className="grid gap-x-6 gap-y-3 sm:grid-cols-[minmax(0,1fr)_15rem] sm:items-start">
+        {title}
+        <div className="sm:text-right">
+          {plan.paidMinor > 0 ? (
+            <>
+              <p className="nums text-sm text-ink-600">
+                <span className="text-base font-semibold text-ink-900">{formatMoney(plan.paidMinor, STIPEND_CURRENCY, { zeroLabel: false })}</span> paid of{" "}
+                {formatMoney(plan.totalMinor, STIPEND_CURRENCY, { zeroLabel: false })}
+              </p>
+              {/* Paid solid, scheduled lighter, the rest is the track. Decorative: the figures say it in words. */}
+              <div aria-hidden className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-ink-200">
+                <span className="h-full bg-brand-700" style={{ width: pct(plan.paidMinor) }} />
+                <span className="h-full bg-brand-300" style={{ width: pct(plan.pendingMinor) }} />
+              </div>
+            </>
+          ) : (
+            // Nothing paid yet: an empty bar says nothing, the amount to come does.
+            <>
+              <p className="nums text-base font-semibold text-ink-900">{formatMoney(plan.totalMinor, STIPEND_CURRENCY, { zeroLabel: false })}</p>
+              <p className="text-xs text-ink-600">to come</p>
+            </>
+          )}
+        </div>
+      </div>
+      <details className="group mt-1">
+        <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-1.5 rounded-md py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
+          {/* One run of text, so a phone wraps it as a sentence, not as two columns. */}
+          <span>
+            <span className="font-medium text-primary group-hover:underline">Month by month</span>
+            <span className="nums text-ink-600">
+              {" "}
+              · {formatMoney(card.monthlyMinor ?? 0, STIPEND_CURRENCY, { zeroLabel: false })} a month{current ? ", running now" : ""}
+            </span>
+          </span>
+          <ChevronDown className="size-4 shrink-0 text-primary transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+        </summary>
+        <div className="mt-3 grid max-w-2xl gap-3">
+          <MonthRail months={plan.months} monthlyMinor={card.monthlyMinor ?? 0} />
+          <Link
+            href={`/intern/timesheets?proposalId=${encodeURIComponent(card.proposalId)}`}
+            className="inline-flex min-h-11 w-fit items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
+          >
+            Timesheets for this internship
+          </Link>
+        </div>
+      </details>
+    </li>
   );
-}
-
-function moneyLine(totals: { currency: string; minor: number }[]): string {
-  if (totals.length === 0) return formatMoney(0, "INR", { zeroLabel: false });
-  return totals.map((t) => formatMoney(t.minor, t.currency, { zeroLabel: false })).join(" and ");
 }

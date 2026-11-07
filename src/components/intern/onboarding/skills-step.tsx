@@ -55,7 +55,12 @@ export function SkillsStep({ values, update, errors, skillsLocked }: StepProps) 
         </div>
       </div>
 
-      <SkillPicker id="skills" label="Your key skills" value={skills} onChange={(n) => update("skills", n)} error={errors.skills} />
+      <div>
+        <SkillPicker id="skills" label="Your key skills" value={skills} onChange={(n) => update("skills", n)} error={errors.skills} />
+        <p className="mt-3 max-w-prose text-pretty text-sm text-ink-600">
+          Pick up to 7. Employers see these on your row.
+        </p>
+      </div>
     </div>
   );
 }

@@ -12,7 +12,7 @@ import {
   jdToHtml,
   normalizeLaptop,
   offerScore,
-  offerTermIssues,
+  offerEditTermIssues,
   PAID_LEAVE_OPTIONS,
   parseOffer,
   placeOf,
@@ -133,21 +133,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const modeIssue = modeProblem(workPreferenceOf(pref, offerScore(current) ?? liveScore), edits.mode);
     if (modeIssue) return NextResponse.json({ error: modeIssue }, { status: 400 });
   }
-  const storedShift = shiftFields(String(current.shiftFrom ?? ""), String(current.shiftTo ?? ""));
-  // Judge only what this edit changes: the form resends every field, and an older offer may not meet today's rules.
-  const changed = (v: string | undefined, stored: unknown) => (v !== undefined && v !== String(stored ?? "") ? v : undefined);
-  const newFrom = changed(edits.shiftFrom, storedShift.shiftFrom);
-  const newTo = changed(edits.shiftTo, storedShift.shiftTo);
-  // Same checks as the composer; an edit of one end is judged against the stored other end.
-  const termIssue = offerTermIssues({
-    startDate: changed(edits.startDate, before.startDate),
-    timezone: changed(edits.timezone, current.timezone),
-    ...(newFrom !== undefined || newTo !== undefined
-      ? {
-          shiftFrom: newFrom ?? (String(storedShift.shiftFrom) || "flexible"),
-          shiftTo: newTo ?? (String(storedShift.shiftTo) || "flexible"),
-        }
-      : {}),
+  // Judge only what this edit changes (legacy offers may not meet today's rules); same checks as the composer.
+  const termIssue = offerEditTermIssues(edits, {
+    startDate: before.startDate,
+    timezone: current.timezone,
+    shiftFrom: current.shiftFrom,
+    shiftTo: current.shiftTo,
   })[0];
   if (termIssue) return NextResponse.json({ error: termIssue.message }, { status: 400 });
   if (edits.startDate !== undefined && edits.startDate <= todayIst()) {

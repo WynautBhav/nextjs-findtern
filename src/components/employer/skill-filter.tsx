@@ -18,14 +18,11 @@
 import { useId, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Check, Plus, Search, X } from "lucide-react";
+import { Check, Plus, X } from "lucide-react";
 
 import { suggestSkills } from "@/lib/data/skills";
-import { MAX_SKILLS } from "@/lib/skills-limit";
+import { MAX_SKILLS } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
-import { fieldClass } from "@/components/employer/ui-tokens";
-
-
 
 export function SkillFilter({
   active,
@@ -33,7 +30,8 @@ export function SkillFilter({
   fromProject = false,
   title = "Required skills",
   note,
-  context,
+  className,
+  children,
 }: {
   /** The skills the list is filtered by right now. */
   active: string[];
@@ -44,8 +42,9 @@ export function SkillFilter({
   title?: string;
   /** Replaces the line under the chips that explains how they filter. */
   note?: string;
-  /** One quiet line after the counter (the matched project and its way out). */
-  context?: React.ReactNode;
+  className?: string;
+  /** Trailing quiet links (e.g. "Show everyone"). */
+  children?: React.ReactNode;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -54,9 +53,8 @@ export function SkillFilter({
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(-1);
   const listId = useId();
-  // Phones: the panel folds to one summary line, so the people list starts
-  // on the first screen (QA-125). Always open at lg.
-  const [shown, setShown] = useState(false);
+  // "Add skill" opens the inline box; it closes again when left empty.
+  const [adding, setAdding] = useState(false);
   const full = active.length >= MAX_SKILLS;
 
   const typed = query.trim();
@@ -87,72 +85,48 @@ export function SkillFilter({
     setHighlight(-1);
   }
 
+  const showAdd = adding || query.length > 0;
+  const restore = !fromProject && active.length > 0 && projectSkills.length > 0 && !sameSkills(active, projectSkills);
+
   return (
-    <section aria-labelledby="skills-heading" className="mb-3">
-      <h2 id="skills-heading" className="mb-1.5 text-sm font-semibold text-ink-900 max-lg:sr-only">
+    <section aria-labelledby="skills-heading" className={cn("flex flex-wrap items-center gap-x-1.5 gap-y-0", className)}>
+      <h2 id="skills-heading" className="mr-1 text-[13px] font-medium text-ink-600 max-sm:sr-only">
         {title}
       </h2>
-      <button
-        type="button"
-        onClick={() => setShown((v) => !v)}
-        aria-expanded={shown}
-        aria-controls="skills-panel"
-        className="apple-spring flex min-h-11 w-full items-center justify-between gap-3 rounded-apple-lg border border-ink-200/80 bg-white px-4 text-left text-sm lg:hidden"
-      >
-        <span className="min-w-0 truncate">
-          <span className="font-semibold text-ink-900">{title}</span>
-          <span className="text-ink-600"> · {active.length ? active.join(", ") : "none"}</span>
-        </span>
-        <span className="shrink-0 font-medium text-brand-700">{shown ? "Done" : "Edit"}</span>
-      </button>
-      <div
-        id="skills-panel"
-        className={cn(
-          "flex flex-col gap-2 rounded-apple-lg border border-ink-200/80 bg-white p-3 md:flex-row md:items-center lg:gap-3 lg:border-0 lg:bg-transparent lg:p-0",
-          shown ? "max-lg:mt-2" : "max-lg:hidden",
-        )}
-      >
-        <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5" aria-label="Selected skills">
-          {active.map((skill) => (
-            <li key={skill}>
-              <Link
-                href={hrefWith(active.filter((s) => s !== skill))}
-                scroll={false}
-                className="apple-spring inline-flex min-h-7 items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-800 hover:border-brand-300 hover:bg-brand-100 touch:min-h-11"
-              >
+      <p id={`${listId}-note`} className="sr-only">
+        {fromProject ? "Skills from the selected project. " : ""}
+        {note ?? `Up to ${MAX_SKILLS}. Candidates with any of them are shown; more matches rank higher.`}
+      </p>
+      <ul className="contents" aria-label="Selected skills">
+        {active.map((skill) => (
+          <li key={skill}>
+            <Link
+              href={hrefWith(active.filter((s) => s !== skill))}
+              scroll={false}
+              className="group inline-flex min-h-9 items-center outline-none touch:min-h-11"
+            >
+              <span className="inline-flex h-7 items-center gap-1 rounded-full bg-brand-100 pl-2.5 pr-1.5 text-[13px] font-medium text-brand-900 transition-colors group-hover:bg-brand-200 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
                 {skill}
-                <X className="size-3.5" aria-hidden />
-                <span className="sr-only">Remove {skill}</span>
-              </Link>
-            </li>
-          ))}
-          {active.length === 0 ? (
-            <li className="flex min-h-9 items-center gap-3 text-sm text-text-subtle">
-              No skills selected.
-              {projectSkills.length > 0 ? (
-                <Link
-                  href={hrefWith(null)}
-                  scroll={false}
-                  className="inline-flex min-h-9 items-center gap-1 font-medium text-brand-700 underline-offset-4 hover:underline"
-                >
-                  <Check className="size-3.5" aria-hidden />
-                  Restore project skills
-                </Link>
-              ) : null}
-            </li>
-          ) : null}
-        </ul>
+                <X className="size-3.5 text-brand-800/70" aria-hidden />
+              </span>
+              <span className="sr-only">Remove {skill}</span>
+            </Link>
+          </li>
+        ))}
+        {active.length === 0 ? <li className="inline-flex min-h-9 items-center text-[13px] text-text-subtle">None</li> : null}
+      </ul>
 
-        <div className="relative w-full md:w-52 md:shrink-0">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+      {full ? null : showAdd ? (
+        <div className="relative w-56">
           <input
             type="text"
             value={query}
-            disabled={full}
+            autoFocus={adding}
             role="combobox"
             aria-expanded={items.length > 0}
             aria-controls={items.length > 0 ? listId : undefined}
             aria-autocomplete="list"
+            aria-describedby={`${listId}-note`}
             aria-activedescendant={highlight >= 0 && items[highlight] ? `${listId}-${highlight}` : undefined}
             onChange={(e) => {
               setQuery(e.target.value);
@@ -160,7 +134,12 @@ export function SkillFilter({
               setHighlight(-1);
             }}
             onFocus={() => setOpen(true)}
-            onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+            onBlur={() =>
+              window.setTimeout(() => {
+                setOpen(false);
+                if (!query) setAdding(false);
+              }, 120)
+            }
             onKeyDown={(e) => {
               if ((e.key === "ArrowDown" || e.key === "ArrowUp") && items.length) {
                 e.preventDefault();
@@ -169,17 +148,18 @@ export function SkillFilter({
               } else if (e.key === "Escape") {
                 setOpen(false);
                 setHighlight(-1);
+                if (!query) setAdding(false);
               } else if (e.key === "Enter" && typed) {
                 e.preventDefault();
                 add(highlight >= 0 && items[highlight] ? items[highlight] : (options[0] ?? typed));
               }
             }}
-            placeholder={full ? `${MAX_SKILLS} skills max` : "Add a required skill…"}
-            aria-label="Search skills to filter by"
-            className={cn(fieldClass, "min-h-10 pl-9 pr-3.5")}
+            placeholder="Type a skill…"
+            aria-label="Add a required skill"
+            className="h-9 w-full rounded-full border border-ink-200 bg-white px-3.5 text-base text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm touch:h-11"
           />
           {open && (options.length > 0 || custom) ? (
-            <ul id={listId} role="listbox" aria-label="Skill suggestions" className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-apple-sm border border-ink-200 bg-white shadow-sm">
+            <ul id={listId} role="listbox" aria-label="Skill suggestions" className="absolute left-0 z-30 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-ink-200 bg-white py-1 shadow-lg">
               {options.map((skill, i) => (
                 <li
                   key={skill}
@@ -190,7 +170,7 @@ export function SkillFilter({
                     e.preventDefault();
                     add(skill);
                   }}
-                  className={cn("apple-spring flex min-h-11 cursor-pointer items-center px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-brand-50", i === highlight && "bg-brand-50")}
+                  className={cn("flex min-h-11 cursor-pointer items-center px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-ink-50", i === highlight && "bg-ink-100")}
                 >
                   {skill}
                 </li>
@@ -204,7 +184,7 @@ export function SkillFilter({
                     e.preventDefault();
                     add(custom);
                   }}
-                  className={cn("apple-spring flex min-h-11 cursor-pointer items-center gap-1.5 px-3 py-1.5 text-left text-sm text-brand-700 hover:bg-brand-50", highlight === options.length && "bg-brand-50")}
+                  className={cn("flex min-h-11 cursor-pointer items-center gap-1.5 px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-ink-50", highlight === options.length && "bg-ink-100")}
                 >
                   <Plus className="size-3.5" aria-hidden />
                   Add &ldquo;{custom}&rdquo; (Press Enter)
@@ -213,18 +193,30 @@ export function SkillFilter({
             </ul>
           ) : null}
         </div>
-      </div>
-      <p className={cn("mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-subtle", !shown && "max-lg:hidden")}>
-        <span title={note ?? "Candidates with any of these skills are shown; more matches rank higher."}>
-          <span aria-live="polite" className="nums font-medium">{active.length}/{MAX_SKILLS}</span> skills, any match
-        </span>
-        {context}
-        {!fromProject && active.length > 0 && projectSkills.length > 0 && !sameSkills(active, projectSkills) ? (
-          <Link href={hrefWith(null)} scroll={false} className="font-medium text-brand-700 underline-offset-4 hover:underline">
-            Restore project skills
-          </Link>
-        ) : null}
-      </p>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="group inline-flex min-h-9 items-center outline-none touch:min-h-11"
+        >
+          <span className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-medium border border-dashed border-ink-300 text-ink-700 transition-colors group-hover:border-ink-400 group-hover:text-ink-900 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
+            <Plus className="size-3.5" aria-hidden />
+            Add skill
+          </span>
+        </button>
+      )}
+
+      {active.length === 0 && projectSkills.length > 0 ? (
+        <Link href={hrefWith(null)} scroll={false} className="inline-flex min-h-9 items-center px-1.5 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
+          <Check className="mr-1 size-3.5" aria-hidden />
+          Restore project skills
+        </Link>
+      ) : restore ? (
+        <Link href={hrefWith(null)} scroll={false} className="inline-flex min-h-9 items-center px-1.5 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
+          Restore project skills
+        </Link>
+      ) : null}
+      {children}
     </section>
   );
 }

@@ -7,6 +7,7 @@ import {
   bandFor,
   bandsForRegion,
   currencyForRegion,
+  planNameFor,
 } from "./score.ts";
 
 test("USD bands mirror INR geometry with whole-dollar money", () => {
@@ -46,4 +47,13 @@ test("band geometry is shared across regions", () => {
     const usd = bandsForRegion(false).find((b) => b.id === inr.id);
     assert.ok(usd, `band ${inr.id} exists in USD set`);
   }
+});
+
+test("planNameFor gives the employer-facing band name at every boundary", () => {
+  assert.equal(planNameFor(0), "Espresso");
+  assert.equal(planNameFor(5.9), "Espresso");
+  assert.equal(planNameFor(6), "Cappuccino");
+  assert.equal(planNameFor(7.9), "Cappuccino");
+  assert.equal(planNameFor(8), "Latte");
+  assert.equal(planNameFor(10), "Latte");
 });

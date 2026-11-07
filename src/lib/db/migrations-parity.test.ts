@@ -17,7 +17,7 @@ const KNOWN_MISMATCHES: Record<string, string> = {
     "Named UNIQUE constraint in 0021 is produced by drizzle's implicit .unique() on idempotencyKey (default name matches).",
 };
 
-/** Exact (whitespace-normalised) UPDATE/DELETE statements permitted in 0018-0024. */
+/** Exact (whitespace-normalised) UPDATE/DELETE statements permitted in 0018-0026. */
 const ALLOWED_DML = new Set([
   `UPDATE "projects" SET "status" = 'published', "published_at" = COALESCE("published_at", "created_at") WHERE "status" = 'active';`,
   `UPDATE "projects" SET "status" = 'paused' WHERE "status" = 'inactive';`,
@@ -28,7 +28,7 @@ const ALLOWED_DML = new Set([
 const files = readdirSync(SQL_DIR).filter((f) => f.endsWith(".sql")).sort();
 const NEW = files.filter((f) => {
   const n = Number(f.slice(0, 4));
-  return n >= 18 && n <= 24;
+  return n >= 18 && n <= 26;
 });
 
 // Same split/strip as scripts/migrate.ts statements().
@@ -75,8 +75,8 @@ function sqlTables(sql: string) {
   return out;
 }
 
-describe("migration files 0018-0024", () => {
-  it("are present", () => assert.equal(NEW.length, 7));
+describe("migration files 0018-0026", () => {
+  it("are present", () => assert.equal(NEW.length, 9));
 
   for (const f of NEW) {
     const sql = read(join(SQL_DIR, f));
@@ -99,7 +99,7 @@ describe("migration files 0018-0024", () => {
 
     it(`${f}: identifiers are quoted (none can be a reserved word)`, () => {
       for (const s of stmts) {
-        for (const m of s.matchAll(/\b(?:CREATE TABLE IF NOT EXISTS|ALTER TABLE|ON|ADD COLUMN IF NOT EXISTS|INDEX IF NOT EXISTS)\s+(\S+)/g)) {
+        for (const m of s.matchAll(/\b(?:CREATE TABLE IF NOT EXISTS|ALTER TABLE|ON(?! CONFLICT)|ADD COLUMN IF NOT EXISTS|INDEX IF NOT EXISTS)\s+(\S+)/g)) {
           assert.ok(m[1].startsWith('"'), `unquoted identifier ${m[1]} in ${s.slice(0, 60)}`);
         }
         const body = s.match(/^CREATE TABLE IF NOT EXISTS "\w+" \(([\s\S]*)\);$/);
@@ -151,6 +151,14 @@ describe("migration files 0018-0024", () => {
     }
     assert.match(s, /driveOrderId: varchar\("drive_order_id"\)/);
     assert.match(s, /rejectionReason: text\("rejection_reason"\)/);
+    for (const c of ["description", "taken_down_at", "taken_down_by", "taken_down_reason"]) assert.ok(s.includes(`"${c}"`), c);
+  });
+
+  it("every 0018-0026 migration after 0024 has a rollback file", () => {
+    for (const f of NEW.filter((x) => Number(x.slice(0, 4)) >= 25)) {
+      const down = join(SQL_DIR, "rollback", f.replace(/\.sql$/, ".down.sql"));
+      assert.ok(readFileSync(down, "utf8").includes(`DELETE FROM "_ft_migrations" WHERE "name" = '${f}'`), down);
+    }
   });
 
   it("KNOWN_MISMATCHES entries are still needed", () => {
