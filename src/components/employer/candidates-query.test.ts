@@ -13,6 +13,8 @@ test("a typed keyword is never remembered, only structured filters", () => {
   assert.match(src, /const filters = filterParams\(merged\);/);
 });
 
+// The keyword (and the retired `view`) are stripped by restorableFilters; its behaviour is tested
+// in lib/employer-filter-restore.test.ts. Here we only pin that the restore goes through it.
 test("a cookie written before this still cannot restore a keyword", () => {
-  assert.match(src, /next\.delete\("q"\)/);
+  assert.match(src, /restorableFilters\(await rememberedFilters\(uid, activeProjectId\), FILTER_KEYS\)/);
 });
