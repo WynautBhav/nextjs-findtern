@@ -35,9 +35,10 @@ is the unit of work.
 4. **Per-hire charge + internship cost.** Priced in three bands — Espresso
    (under 6/10), Cappuccino (6–8), Latte (8+). The coffee metaphor is the
    brand's hook, not decoration.
-5. **The 12-month guarantee.** If the placement does not happen, the fee comes
-   back. It is the reason the fee is affordable and it must appear wherever the
-   fee does.
+5. **The 6-month guarantee.** A student's activation fee is refunded if the
+   placement does not happen within six months. It is student-side only; there
+   is no employer fee refund. It is the reason the student fee is affordable and
+   it must appear wherever that fee does.
 
 ## What must never be true
 
@@ -59,8 +60,10 @@ is the unit of work.
 - Payment → profile live → AI interview → score → employer visibility.
 - An intern is not "hired" until a proposal is accepted; stages are derived from
   rows, never stored as a mutable status.
-- Employers see masked candidate identity until they have sent an offer. That
-  masking is a product feature and must not be casually removed for convenience.
+- Employers see masked candidate identity (initials and photo only) until the
+  hire is paid.
+  That masking is a product feature and must not be casually removed for
+  convenience.
 - The intern and the employer must see **the same** score report. Black-box
   screening is the reason candidates distrust AI interviewers.
 

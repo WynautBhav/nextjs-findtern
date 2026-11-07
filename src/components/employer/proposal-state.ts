@@ -73,7 +73,7 @@ export function offerState(
         ...base,
         label: "Accepted · payment due",
         tone: "paid",
-        next: "Pay for this hire to confirm it. Names and contact details unlock on payment. Until then you can still edit the offer (the candidate accepts it again) or withdraw it.",
+        next: "Pay for this hire to confirm it. Names and contact details unlock once your hire is paid. Until then you can still edit the offer (the candidate accepts it again) or withdraw it.",
         canEdit: unpaid,
         canWithdraw: unpaid,
         canPay: unpaid,

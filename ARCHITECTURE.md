@@ -90,8 +90,8 @@ working on:
 - The layout checks the session and role (`getSession()`, then redirect).
   A page that shows one record also checks that the viewer owns it, or
   that the role is allowed to see it. Never trust an id from the URL.
-- Employers see masked candidate identity (initials, no photo, no name)
-  until an offer exists. The masking lives in lib (`employer-redaction`,
+- Employers see masked candidate identity (initials and photo only; no name or
+  contact details) until the hire is paid. The masking lives in lib (`employer-redaction`,
   `identity-mask`), never in JSX.
 
 **Writes (route handlers)**

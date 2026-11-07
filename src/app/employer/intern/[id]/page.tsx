@@ -52,8 +52,8 @@ export const metadata: Metadata = {
  * employer (offer accepted, being paid for, or hired). An intern who switched
  * off open-to-work disappears for everyone else, as on legacy (bug sheet r134).
  *
- * Names, photo and LinkedIn stay redacted until this employer hires the
- * intern - see `displayNameOf` in `lib/employer-candidates`.
+ * The photo shows before a hire. The name, contact details and LinkedIn stay
+ * redacted until this employer's hire is paid - see `displayNameOf` in `lib/employer-candidates`.
  */
 
 /** What the "Send proposal" control should do for this candidate. */
@@ -80,7 +80,7 @@ export default async function EmployerInternDetail({
   let statusProjectName: string | null = null;
   let currency: "INR" | "USD" = "INR";
   let region: "IN" | null = null;
-  /** Full name, photo and LinkedIn show only after this employer hired the intern. */
+  /** Full name, contact details and LinkedIn show only once this employer's hire is paid; the photo always shows. */
   let nameUnlocked = false;
   /** Admin "View as" only: the candidate's own contact details. */
   let adminContact: { email: string; phone: string } | null = null;
@@ -371,7 +371,7 @@ export default async function EmployerInternDetail({
               <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                 <h1 className="break-words text-2xl font-semibold leading-tight tracking-[-0.02em] text-ink-900 sm:text-3xl">
                   {displayName}
-                  {nameUnlocked ? null : <span className="sr-only">, initials only until you hire</span>}
+                  {nameUnlocked ? null : <span className="sr-only">. Names and contact details unlock once your hire is paid.</span>}
                 </h1>
                 {status && statusProjectName ? (
                   <Pill tone={status.tone} className="max-w-full">
