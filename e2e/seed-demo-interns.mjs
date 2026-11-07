@@ -6,6 +6,9 @@
  *
  *   node e2e/seed-demo-interns.mjs            # dry run: does everything, then rolls back
  *   node e2e/seed-demo-interns.mjs --yes      # same, then commits
+ *   add --reset to first empty every table (rows only: the tables, the
+ *   migration record, platform_settings and admin_roles stay), in the same
+ *   transaction, so a failed seed leaves the database as it was.
  *
  * Target: the Neon STAGING database (read from ~/findtern-dumps/.neon.env, host
  * pinned in e2e/lib/staging.mjs), or a loopback database when
@@ -39,6 +42,7 @@ const iso = (d) => new Date(Date.now() + d * DAY).toISOString();
 const dateOnly = (d) => iso(d).slice(0, 10);
 const pad = (n) => String(n).padStart(2, "0");
 const COMMIT = process.argv.includes("--yes");
+const RESET = process.argv.includes("--reset");
 
 /* ── Fixed lists: names, scores, places ─────────────────────────────────── */
 
@@ -193,6 +197,20 @@ async function main() {
 
   await q("BEGIN");
   try {
+    // 0. Optional: empty every table (rows only). The migration record is kept so the schema stays "up to date".
+    if (RESET) {
+      const tables = (
+        await q(`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE' AND table_name NOT IN ('_ft_migrations', 'platform_settings', 'admin_roles') AND table_name NOT LIKE '\\_\\_drizzle%' ORDER BY 1`)
+      ).rows.map((r) => r.table_name);
+      const filled = [];
+      for (const t of tables) {
+        const n = (await one(`SELECT count(*)::int AS n FROM "${t}"`)).n;
+        if (n) filled.push(`${t}:${n}`);
+      }
+      console.log(`[seed-demo] --reset: emptying ${tables.length} tables; rows now: ${filled.join("  ") || "none"}`);
+      await q(`TRUNCATE ${tables.map((t) => `"${t}"`).join(", ")} RESTART IDENTITY CASCADE`);
+    }
+
     // 1. Remove the previous run's rows (this domain only).
     const oldUsers = (await q(`SELECT id FROM users WHERE email LIKE $1`, [`%@${DOMAIN}`])).rows.map((r) => r.id);
     const oldEmps = (await q(`SELECT id FROM employers WHERE company_email LIKE $1`, [`%@${DOMAIN}`])).rows.map((r) => r.id);
