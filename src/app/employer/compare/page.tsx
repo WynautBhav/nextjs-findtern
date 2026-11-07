@@ -23,6 +23,8 @@ import { SkillFilter } from "@/components/employer/skill-filter";
 import { RememberSelection } from "@/components/employer/remember-selection";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedSelection } from "@/lib/employer-selection";
 import { ButtonLink } from "@/components/ui/button";
+import { CandidateTabs } from "@/components/employer/section-tabs";
+import { hireFlowCounts } from "@/lib/employer-flow";
 import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
@@ -194,11 +196,15 @@ export default async function CompareCandidates({ searchParams }: { searchParams
     );
   }
 
+  // The tab row's Shortlist figure: the same count the Shortlist page's strip shows.
+  const shortlistCount = (await hireFlowCounts(session.uid, 0).catch(() => null))?.shortlisted ?? 0;
+
   if (candidates.length === 0) {
     return (
       <div>
         <RememberSelection employerId={session.uid} compare={ids} />
-        <PageHead title="Compare candidates" lede={`Put up to ${MAX_COMPARE} candidates side by side.`} />
+        <PageHead title="Compare candidates" lede={`Put up to ${MAX_COMPARE} candidates side by side.`} className="mb-4 lg:mb-5" />
+        <CandidateTabs active="compare" shortlist={shortlistCount} compare={0} />
         <EmptyScene
           title="Nothing to compare yet"
           body="Tick Compare on two to four candidates in the candidate list, then open them here side by side."
@@ -259,7 +265,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       </ButtonLink>
 
       <PageHead
-        className="mb-4 lg:mb-6"
+        className="mb-4 lg:mb-5"
         title={`Comparing ${candidates.length} candidate${candidates.length === 1 ? "" : "s"}`}
         lede={candidates.length === 1 ? "Add one more from the candidate list to see who leads each row." : anyLeader ? "The leader of each row is marked." : undefined}
         action={
@@ -279,6 +285,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
           ) : null
         }
       />
+      <CandidateTabs active="compare" shortlist={shortlistCount} compare={candidates.length} />
 
       <SkillFilter
         title="Skills to match"

@@ -26,6 +26,7 @@ import { buttonClass } from "@/components/ui/button";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { formatSlotDay } from "@/lib/format";
+import { ProposalTabs } from "@/components/employer/section-tabs";
 import { InterviewActions } from "@/components/employer/interview-actions";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
@@ -219,7 +220,9 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
             Book from your shortlist
           </Link>
         }
+        className="mb-4 lg:mb-5"
       />
+      <ProposalTabs active="interviews" />
 
       {all.length === 0 ? (
         <EmptyScene

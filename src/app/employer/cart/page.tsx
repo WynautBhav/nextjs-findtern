@@ -18,6 +18,8 @@ import { PageHead } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { HireFlow, type HireFlowCounts } from "@/components/employer/hire-flow";
+import { CandidateTabs } from "@/components/employer/section-tabs";
+import { rememberedSelection } from "@/lib/employer-selection";
 import { CartManager, type CartLineItem } from "@/components/employer/cart-manager";
 
 export const metadata: Metadata = {
@@ -53,6 +55,7 @@ export default async function EmployerCartPage({
   }
 
   const unlockAll = await isAdminViewing();
+  const compareCount = (await rememberedSelection(session.uid)).compare.length;
   const data = await loadCart(session.uid, unlockAll).catch((err) => {
     console.error("[employer/cart] load failed", err);
     return null;
@@ -73,8 +76,9 @@ export default async function EmployerCartPage({
         title="Shortlist"
         // The path strip under the head says the same steps; phones keep the list higher.
         lede={<span className="max-sm:sr-only">Book a meeting or send a proposal. You pay only once a candidate accepts.</span>}
-        className="mb-4 lg:mb-6"
+        className="mb-4 lg:mb-5"
       />
+      <CandidateTabs active="shortlist" shortlist={data.counts.shortlisted} compare={compareCount} />
       {/* The strip counts people, not proposals. */}
       <div title="People, not proposals">
         <p className="sr-only">People, not proposals.</p>
