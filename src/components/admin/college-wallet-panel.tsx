@@ -66,8 +66,7 @@ export function CollegeWalletPanel({ collegeId, summary, ledger, bank, canMoney 
   }
 
   return (
-    <section className="space-y-4 rounded-xl border border-ink-200/80 bg-white p-5">
-      <h2 className="font-semibold">Wallet</h2>
+    <section className="space-y-4" aria-label="Wallet">
       <dl className="grid gap-3 sm:grid-cols-3 text-sm">
         <div><dt className="text-text-subtle">Balance</dt><dd className="nums text-xl font-semibold">{inr(summary.balanceMinor)}</dd></div>
         <div><dt className="text-text-subtle">Waiting for payout</dt><dd className="nums text-xl font-semibold">{inr(open?.amountMinor ?? 0)}</dd></div>

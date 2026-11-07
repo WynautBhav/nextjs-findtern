@@ -11,31 +11,7 @@ import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
 import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { useConfirm } from "@/components/app/use-confirm";
-
-export type CollegeAdminRow = {
-  id: string;
-  name: string;
-  city: string | null;
-  state: string | null;
-  gstin: string | null;
-  aisheCode: string | null;
-  /** Findtern college code students search by. */
-  code: string | null;
-  emailDomains: string[];
-  isPartner: boolean;
-  showOnWebsite: boolean;
-  isActive: boolean;
-  members: number;
-  roster: number;
-  drives: number;
-  /** True once any seat batch is paid: the TPO login and the code are issued only after that. */
-  hasPaidBatch: boolean;
-  /** A withdrawal request is waiting for admin. */
-  openRequest: boolean;
-  /** The TPO's seat code and its seats (cap = paid seats); null until the first batch is paid. */
-  seatCode: { code: string; maxUsages: number | null; usedCount: number } | null;
-  officers: { id: string; name: string; email: string; lastLoginAt: string | null }[];
-};
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const input =
   "h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus:border-brand-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
@@ -46,7 +22,7 @@ async function send(url: string, method: string, body: unknown) {
   return { ok: Boolean(res?.ok), status: res?.status ?? 0, json: json ?? {} };
 }
 
-export function AddCollegeForm() {
+export function AddCollegeForm({ onDone }: { onDone?: () => void } = {}) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -80,6 +56,7 @@ export function AddCollegeForm() {
         }
         (e.target as HTMLFormElement).reset();
         router.refresh();
+        onDone?.();
       }}
     >
       <label className="md:col-span-2">
@@ -117,7 +94,7 @@ export function AddCollegeForm() {
           {error}
         </span>
         {exists ? (
-          <Link href={`/admin/colleges?q=${encodeURIComponent(exists)}`} className="text-sm font-medium underline underline-offset-4">
+          <Link href={`/admin/colleges?q=${encodeURIComponent(exists)}`} onClick={() => onDone?.()} className="text-sm font-medium underline underline-offset-4">
             Find it and make it a partner
           </Link>
         ) : null}
@@ -126,62 +103,84 @@ export function AddCollegeForm() {
   );
 }
 
-/** The college page's billing details: state and GSTIN for the tax invoice. */
-export function BillingForm({ collegeId, state, gstin, canEdit }: { collegeId: string; state: string | null; gstin: string | null; canEdit: boolean }) {
-  const router = useRouter();
-  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
+/** "Add college" on the list page: the form in a dialog, closed once the college is saved. */
+export function AddCollegeButton() {
+  const [open, setOpen] = useState(false);
   return (
-    <form
-      className="flex flex-wrap items-end gap-2"
-      onSubmit={async (e) => {
-        e.preventDefault();
-        const f = new FormData(e.currentTarget);
-        const st = String(f.get("state") ?? "").trim();
-        const g = String(f.get("gstin") ?? "").trim().toUpperCase();
-        const bad = g ? (isGstinFormat(g) ? gstinStateError(g, st) : GSTIN_HINT) : null;
-        if (bad) return setMsg({ ok: false, text: bad });
-        const r = await send(`/api/admin/colleges/${collegeId}`, "PATCH", { state: st || null, gstin: g || null });
-        if (!r.ok) return setMsg({ ok: false, text: String(r.json.error ?? "Couldn't save") });
-        setMsg({ ok: true, text: "Saved" });
-        router.refresh();
-      }}
-    >
-      <label className="min-w-40 flex-1">
-        <span className="text-sm font-medium text-foreground">State</span>
-        <input name="state" defaultValue={state ?? ""} disabled={!canEdit} className={cn(input, "mt-1")} />
-      </label>
-      <label className="min-w-52 flex-1">
-        <span className="text-sm font-medium text-foreground">GSTIN</span>
-        <input name="gstin" defaultValue={gstin ?? ""} maxLength={15} disabled={!canEdit} className={cn(input, "mt-1 uppercase")} />
-      </label>
-      {canEdit ? <button className={buttonClass({ className: ADMIN_PILL_PRIMARY })}>Save billing details</button> : null}
-      <p role="status" className={cn("w-full text-sm", msg?.ok ? "text-foreground" : "text-danger")}>{msg?.text}</p>
-    </form>
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ size: "sm", className: ADMIN_PILL_PRIMARY })}>
+        Add college
+      </button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add a partner college</DialogTitle>
+            <DialogDescription>Fill in what you have. The placement officer login and seat code come after the first seat batch is paid.</DialogDescription>
+          </DialogHeader>
+          <AddCollegeForm onDone={() => setOpen(false)} />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
-/** `canEdit`: companies:write (the college routes). Seats and the code are managed on the college page. */
-export function CollegeRowControls({ row, canEdit }: { row: CollegeAdminRow; canEdit: boolean }) {
+const pill =
+  "inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60";
+
+/** Partner / On website / Active, in the college card. Switching Active off asks first. */
+export function CollegeSwitches({ college, canEdit }: { college: { id: string; name: string; isPartner: boolean; showOnWebsite: boolean; isActive: boolean }; canEdit: boolean }) {
   const router = useRouter();
   const { ask, dialog } = useConfirm();
-  const [issued, setIssued] = useState<{ email: string; password: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function toggle(key: "isPartner" | "showOnWebsite" | "isActive", value: boolean) {
     if (key === "isActive" && !value) {
       const ok = await ask({
-        title: `Deactivate ${row.name}?`,
-        body: "Its officers can no longer use the college console, and it drops out of the website strip and the college list.",
+        title: `Deactivate ${college.name}?`,
+        body: "Its officers can no longer use the college console, and it drops out of the website strip. It stays in the college list, marked Inactive.",
         confirmLabel: "Yes, deactivate",
       });
       if (!ok) return;
     }
-    const r = await send(`/api/admin/colleges/${row.id}`, "PATCH", { [key]: value });
+    setError(null);
+    const r = await send(`/api/admin/colleges/${college.id}`, "PATCH", { [key]: value });
     if (!r.ok) setError(String(r.json.error ?? "Couldn't save"));
     router.refresh();
   }
 
-  async function resetPassword(o: CollegeAdminRow["officers"][number]) {
+  const items = [
+    ["isPartner", "Partner", "Has a college console", college.isPartner],
+    ["showOnWebsite", "On website", "Shown in the College partners strip", college.showOnWebsite],
+    ["isActive", "Active", "Officers can sign in", college.isActive],
+  ] as const;
+  return (
+    <div className="space-y-2">
+      {dialog}
+      {items.map(([key, label, hint, value]) => (
+        <label key={key} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl bg-[color:var(--admin-panel-2)] px-4 py-2 text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:disabled]:cursor-default">
+          <input type="checkbox" checked={value} disabled={!canEdit} onChange={(e) => toggle(key, e.target.checked)} className="size-4 shrink-0 accent-brand-700" />
+          <span className="min-w-0 text-sm">
+            <span className="block font-medium">{label}</span>
+            <span className="block text-xs text-text-subtle">{hint}</span>
+          </span>
+        </label>
+      ))}
+      {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
+    </div>
+  );
+}
+
+export type CollegeOfficer = { id: string; name: string; email: string; lastLoginAt: string | null };
+
+/** The Logins tab: placement officers, Reset password, and Issue login (only once the first batch is paid). */
+export function CollegeLogins({ collegeId, officers, hasPaidBatch, canEdit }: { collegeId: string; officers: CollegeOfficer[]; hasPaidBatch: boolean; canEdit: boolean }) {
+  const router = useRouter();
+  const { ask, dialog } = useConfirm();
+  const [issued, setIssued] = useState<{ email: string; password: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function resetPassword(o: CollegeOfficer) {
     const ok = await ask({
       title: `Reset ${o.name}'s password?`,
       body: "They are signed out and the old password stops working. You get a new one to send them privately.",
@@ -189,7 +188,7 @@ export function CollegeRowControls({ row, canEdit }: { row: CollegeAdminRow; can
     });
     if (!ok) return;
     setError(null);
-    const r = await send(`/api/admin/colleges/${row.id}/admins/${o.id}/reset-password`, "POST", {});
+    const r = await send(`/api/admin/colleges/${collegeId}/admins/${o.id}/reset-password`, "POST", {});
     if (!r.ok) return setError(String(r.json.error ?? "Couldn't reset the password"));
     setIssued({ email: String(r.json.email), password: String(r.json.password) });
   }
@@ -199,12 +198,13 @@ export function CollegeRowControls({ row, canEdit }: { row: CollegeAdminRow; can
       className="flex flex-wrap items-end gap-2"
       onSubmit={async (e) => {
         e.preventDefault();
-        const f = new FormData(e.currentTarget);
+        const form = e.currentTarget;
+        const f = new FormData(form);
         setError(null);
-        const r = await send(`/api/admin/colleges/${row.id}/admins`, "POST", { name: f.get("name"), email: f.get("email") });
+        const r = await send(`/api/admin/colleges/${collegeId}/admins`, "POST", { name: f.get("name"), email: f.get("email") });
         if (!r.ok) return setError(String(r.json.error ?? "Couldn't create the login"));
         setIssued({ email: String(r.json.email), password: String(r.json.password) });
-        (e.target as HTMLFormElement).reset();
+        form.reset();
         router.refresh();
       }}
     >
@@ -216,106 +216,40 @@ export function CollegeRowControls({ row, canEdit }: { row: CollegeAdminRow; can
         <span className="text-sm font-medium text-foreground">Officer email</span>
         <input name="email" type="email" required className={cn(input, "mt-1")} />
       </label>
-      <button className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-        Issue login
-      </button>
+      <button className={pill}>Issue login</button>
     </form>
   );
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {dialog}
-      <div className="flex flex-wrap gap-2 text-sm">
-        {(
-          [
-            ["isPartner", "Partner (has a console)", row.isPartner],
-            ["showOnWebsite", "On website", row.showOnWebsite],
-            ["isActive", "Active", row.isActive],
-          ] as const
-        ).map(([key, label, value]) => (
-          <label key={key} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-foreground hover:bg-[color:var(--admin-bar-tint)] has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring">
-            <input type="checkbox" checked={value} disabled={!canEdit} onChange={(e) => toggle(key, e.target.checked)} className="size-4 accent-brand-700" />
-            {label}
-          </label>
-        ))}
-      </div>
-      {row.officers.map((o) => (
-        <div key={o.id} className="flex flex-wrap items-center gap-x-3 text-sm text-foreground">
-          <span>{o.name} · {o.email}</span>
-          {canEdit ? <button type="button" onClick={() => resetPassword(o)} aria-label={`Reset password for ${o.name}`} className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-            Reset password
-          </button> : null}
-        </div>
-      ))}
-      {/* Folded away once the college has an officer (an empty form sat
-          under the existing one); shown outright when it has none. The summary
-          stays visible while open: hiding it left a focusable control nobody
-          could see. */}
-      {!canEdit ? null : row.officers.length === 0 && !row.hasPaidBatch ? (
-        <p className="text-sm text-text-subtle">Awaiting first payment. The placement officer login is issued once the first seat batch is paid.</p>
-      ) : row.officers.length === 0 ? (
-        issueForm
+      {officers.length ? (
+        <ul className="divide-y divide-[color:var(--admin-rule)]">
+          {officers.map((o) => (
+            <li key={o.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0">
+              <div className="min-w-0 text-sm">
+                <p className="font-medium text-foreground">{o.name}</p>
+                <p className="text-text-subtle [overflow-wrap:anywhere]">{o.email} · {o.lastLoginAt ? `last signed in ${new Date(o.lastLoginAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : "never signed in"}</p>
+              </div>
+              {canEdit ? (
+                <button type="button" onClick={() => resetPassword(o)} aria-label={`Reset password for ${o.name}`} className={pill}>
+                  Reset password
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
       ) : (
-        <details>
-          <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-            Issue another officer login
-          </summary>
-          <div className="pt-2">{issueForm}</div>
-        </details>
+        <p className="text-sm text-text-subtle">No placement officer login yet.</p>
       )}
-      {row.isPartner ? (
-        <p className="text-sm text-foreground">
-          {row.seatCode ? (
-            <>Seat code <code className="rounded bg-[color:var(--admin-panel)] px-1.5 py-0.5 font-mono">{row.seatCode.code}</code> · {row.seatCode.usedCount} used of {row.seatCode.maxUsages ?? 0} paid seats</>
-          ) : (
-            "Awaiting first payment. The seat code is activated once the first seat batch is paid."
-          )}
-        </p>
-      ) : null}
-      {row.isPartner && canEdit && <details>
-        <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-          Edit name, city, state, GSTIN, AISHE code
-        </summary>
-        <form
-          className="flex flex-wrap items-end gap-2 pt-2"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const f = new FormData(e.currentTarget);
-            setError(null);
-            const state = String(f.get("state") ?? "").trim();
-            const gstin = String(f.get("gstin") ?? "").trim().toUpperCase();
-            const bad = gstin ? (isGstinFormat(gstin) ? gstinStateError(gstin, state) : GSTIN_HINT) : null;
-            if (bad) return setError(bad);
-            const r = await send(`/api/admin/colleges/${row.id}`, "PATCH", { name: f.get("name"), city: f.get("city"), state: state || null, gstin: gstin || null, aisheCode: String(f.get("aishe") ?? "").trim() || null });
-            if (!r.ok) return setError(String(r.json.error ?? "Couldn't save"));
-            router.refresh();
-          }}
-        >
-          <label className="min-w-52 flex-1">
-            <span className="text-sm font-medium text-foreground">College name</span>
-            <input name="name" required minLength={3} defaultValue={row.name} className={cn(input, "mt-1")} />
-          </label>
-          <label className="min-w-32 flex-1">
-            <span className="text-sm font-medium text-foreground">City</span>
-            <input name="city" defaultValue={row.city ?? ""} className={cn(input, "mt-1")} />
-          </label>
-          <label className="min-w-32 flex-1">
-            <span className="text-sm font-medium text-foreground">State</span>
-            <input name="state" defaultValue={row.state ?? ""} className={cn(input, "mt-1")} />
-          </label>
-          <label className="min-w-40 flex-1">
-            <span className="text-sm font-medium text-foreground">GSTIN</span>
-            <input name="gstin" defaultValue={row.gstin ?? ""} maxLength={15} className={cn(input, "mt-1 uppercase")} />
-          </label>
-          <label className="min-w-32 flex-1">
-            <span className="text-sm font-medium text-foreground">AISHE code</span>
-            <input name="aishe" defaultValue={row.aisheCode ?? ""} className={cn(input, "mt-1")} />
-          </label>
-          <button className="inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-            Save
-          </button>
-        </form>
-      </details>}
+      {!canEdit ? null : !hasPaidBatch && officers.length === 0 ? (
+        <p className="text-sm text-text-subtle">Awaiting first payment. The login can be issued once the first seat batch is paid (Seats tab).</p>
+      ) : (
+        <div className="space-y-2">
+          <h3 className="text-sm font-semibold text-foreground">{officers.length ? "Issue another officer login" : "Issue the officer login"}</h3>
+          {issueForm}
+        </div>
+      )}
       <div role="status" aria-live="polite">
         {issued ? (
           <p className="rounded-[var(--radius-admin-card)] bg-success-soft px-4 py-3 text-sm text-foreground">
@@ -325,5 +259,73 @@ export function CollegeRowControls({ row, canEdit }: { row: CollegeAdminRow; can
         {error ? <p className="text-sm text-danger">{error}</p> : null}
       </div>
     </div>
+  );
+}
+
+/**
+ * The Details tab: one form for the college's own details. The API only lets partner colleges
+ * change name, city and AISHE code (the directory import owns the rest), so those three are
+ * read-only for a non-partner and only state and GSTIN are sent.
+ */
+export function CollegeDetailsForm({ college, canEdit }: { college: { id: string; name: string; city: string | null; state: string | null; gstin: string | null; aisheCode: string | null; isPartner: boolean }; canEdit: boolean }) {
+  const router = useRouter();
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const locked = !college.isPartner;
+  return (
+    <form
+      className="space-y-4"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const f = new FormData(e.currentTarget);
+        const state = String(f.get("state") ?? "").trim();
+        const gstin = String(f.get("gstin") ?? "").trim().toUpperCase();
+        const bad = gstin ? (isGstinFormat(gstin) ? gstinStateError(gstin, state) : GSTIN_HINT) : null;
+        if (bad) return setMsg({ ok: false, text: bad });
+        setBusy(true);
+        setMsg(null);
+        const body = locked
+          ? { state: state || null, gstin: gstin || null }
+          : { name: f.get("name"), city: f.get("city"), state: state || null, gstin: gstin || null, aisheCode: String(f.get("aishe") ?? "").trim() || null };
+        const r = await send(`/api/admin/colleges/${college.id}`, "PATCH", body);
+        setBusy(false);
+        if (!r.ok) return setMsg({ ok: false, text: String(r.json.error ?? "Couldn't save") });
+        setMsg({ ok: true, text: "Saved" });
+        router.refresh();
+      }}
+    >
+      <div className="grid gap-3 md:grid-cols-2">
+        <label className="md:col-span-2">
+          <span className="text-sm font-medium text-foreground">College name</span>
+          <input name="name" required minLength={3} defaultValue={college.name} disabled={!canEdit || locked} className={cn(input, "mt-1")} />
+        </label>
+        <label>
+          <span className="text-sm font-medium text-foreground">City</span>
+          <input name="city" defaultValue={college.city ?? ""} disabled={!canEdit || locked} className={cn(input, "mt-1")} />
+        </label>
+        <label>
+          <span className="text-sm font-medium text-foreground">AISHE code</span>
+          <input name="aishe" defaultValue={college.aisheCode ?? ""} disabled={!canEdit || locked} className={cn(input, "mt-1")} />
+        </label>
+        <label>
+          <span className="text-sm font-medium text-foreground">State</span>
+          <input name="state" defaultValue={college.state ?? ""} disabled={!canEdit} className={cn(input, "mt-1")} />
+        </label>
+        <label>
+          <span className="text-sm font-medium text-foreground">GSTIN</span>
+          <input name="gstin" defaultValue={college.gstin ?? ""} maxLength={15} disabled={!canEdit} className={cn(input, "mt-1 uppercase")} />
+        </label>
+      </div>
+      <p className="text-sm text-text-subtle">
+        State and GSTIN print on the seat invoice and decide CGST + SGST or IGST.
+        {locked ? " Name, city and AISHE code can only be changed once the college is a partner." : ""}
+      </p>
+      {canEdit ? (
+        <div className="flex flex-wrap items-center gap-3">
+          <button disabled={busy} className={buttonClass({ className: cn(ADMIN_PILL_PRIMARY, "disabled:opacity-60") })}>{busy ? "Saving…" : "Save details"}</button>
+          <p role="status" className={cn("text-sm", msg?.ok ? "text-foreground" : "text-danger")}>{msg?.text}</p>
+        </div>
+      ) : null}
+    </form>
   );
 }

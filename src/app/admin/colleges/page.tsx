@@ -1,30 +1,20 @@
+import { count, inArray, sql } from "drizzle-orm";
+
+import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
+import { AddCollegeButton } from "@/components/admin/college-partners-manager";
+import { DataTable, IdentityCell } from "@/components/admin/data-table";
+import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { count, desc, inArray, sql } from "drizzle-orm";
-
-import Link from "next/link";
-
-import { AdminEmpty, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
-import { IdentityCell } from "@/components/admin/data-table";
-import { AddCollegeForm, CollegeRowControls, type CollegeAdminRow } from "@/components/admin/college-partners-manager";
-import { Pagination } from "@/components/admin/pagination";
-import { TableToolbar } from "@/components/admin/table-toolbar";
-import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
-import { getDb, schema } from "@/lib/db";
-import { q } from "@/lib/college/sql";
-import { formatDate, formatMoney } from "@/lib/format";
-import { getSession } from "@/lib/auth";
+import { flattenParams, parsePageRequest, searchAny, toPage, toQueryString } from "@/lib/admin/params";
 import { canWrite } from "@/lib/admin/permissions";
+import { getSession } from "@/lib/auth";
+import { q } from "@/lib/college/sql";
+import { getDb, schema } from "@/lib/db";
+import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-/** A count as a quiet pill, in place of a loose "12 students · 4 on roster" line. */
-function CountChip({ n, one, many }: { n: number; one: string; many: string }) {
-  return (
-    <span className="nums inline-flex h-6 items-center whitespace-nowrap rounded-full bg-[color:var(--admin-panel-2)] px-2.5 text-xs font-medium text-foreground">
-      {n.toLocaleString("en-IN")} {n === 1 ? one : many}
-    </span>
-  );
-}
+type View = "" | "students" | "withdrawals";
 
 export default async function AdminCollegesPage({
   searchParams,
@@ -32,134 +22,170 @@ export default async function AdminCollegesPage({
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = flattenParams(await searchParams);
-  const perms = (await getSession())?.permissions;
-  const canEdit = canWrite(perms, "/admin/colleges");
+  const canEdit = canWrite((await getSession())?.permissions, "/admin/colleges");
   const req = parsePageRequest(params);
+  const view: View = params.view === "students" || params.view === "withdrawals" ? params.view : "";
   const db = getDb();
   const c = schema.colleges;
   const cid = q(c, c.id);
-  // No search: partners and colleges with students. A search looks through the whole directory.
+
+  const hasStudents = sql`EXISTS (SELECT 1 FROM ${schema.collegeMemberships} m WHERE m.college_id = ${cid} AND m.left_at IS NULL)`;
+  const hasRequest = sql`EXISTS (SELECT 1 FROM ${schema.collegePayouts} p WHERE p.college_id = ${cid} AND p.status = 'requested')`;
+  const viewWhere = {
+    "": sql`${c.isPartner}`,
+    students: sql`NOT ${c.isPartner} AND ${hasStudents}`,
+    withdrawals: hasRequest,
+  } satisfies Record<View, ReturnType<typeof sql>>;
+  // A search looks through the whole directory and ignores the view, so a partner or a college
+  // with students is never hidden by the tab it happens to be on.
   const where = req.search
-    // The two codes have no trigram index, so they match exactly (as membership.ts does); name/city stay substring.
-    ? sql`(${searchAny([sql`${c.name}`, sql`${c.city}`], req.search)} OR ${c.aisheCode} = ${req.search.trim().toUpperCase()} OR ${c.code} = ${req.search.trim().toUpperCase()})`
-    : sql`${c.isPartner} OR EXISTS (SELECT 1 FROM ${schema.collegeMemberships} m WHERE m.college_id = ${cid} AND m.left_at IS NULL)`;
-  const [{ total }] = await db.select({ total: count() }).from(c).where(where);
-  const page = Math.min(req.page, Math.max(1, Math.ceil(total / req.perPage))); // a page past the end shows the last one
-  const rows = await db
-    .select({
-      college: c,
-      members: sql<number>`(SELECT count(*)::int FROM ${schema.collegeMemberships} m WHERE m.college_id = ${cid} AND m.left_at IS NULL)`,
-      roster: sql<number>`(SELECT count(*)::int FROM ${schema.collegeRoster} r WHERE r.college_id = ${cid})`,
-      drives: sql<number>`(SELECT count(*)::int FROM ${schema.collegeDrives} d WHERE d.college_id = ${cid})`,
-      paidBatches: sql<number>`(SELECT count(*)::int FROM ${schema.collegeSeatBatches} b WHERE b.college_id = ${cid} AND b.status = 'paid')`,
-      openRequest: sql<boolean>`EXISTS (SELECT 1 FROM ${schema.collegePayouts} p WHERE p.college_id = ${cid} AND p.status = 'requested')`,
-      balance: sql<number>`(SELECT coalesce(sum(w.amount_minor), 0)::int FROM ${schema.collegeWalletEntries} w WHERE w.college_id = ${cid})`,
-    })
-    .from(c)
-    .where(where)
-    .orderBy(desc(c.isPartner), c.name, c.id)
-    .limit(req.perPage)
-    .offset((page - 1) * req.perPage);
-  const seatCodes = await db
-    .select({ collegeId: schema.promoCodes.collegeId, code: schema.promoCodes.code, maxUsages: schema.promoCodes.maxUsages, usedCount: schema.promoCodes.usedCount })
-    .from(schema.promoCodes)
-    .where(inArray(schema.promoCodes.collegeId, rows.map((r) => r.college.id).concat("")));
-  const officers = await db
-    .select({ id: schema.collegeAdmins.id, collegeId: schema.collegeAdmins.collegeId, name: schema.collegeAdmins.name, email: schema.collegeAdmins.email, lastLoginAt: schema.collegeAdmins.lastLoginAt })
-    .from(schema.collegeAdmins)
-    .where(sql`${schema.collegeAdmins.isActive} AND ${inArray(schema.collegeAdmins.collegeId, rows.map((r) => r.college.id).concat(""))}`);
+    ? // The two codes have no trigram index, so they match exactly (as membership.ts does); name/city stay substring.
+      sql`(${searchAny([sql`${c.name}`, sql`${c.city}`], req.search)} OR ${c.aisheCode} = ${req.search.trim().toUpperCase()} OR ${c.code} = ${req.search.trim().toUpperCase()})`
+    : viewWhere[view];
 
-  const balances = new Map(rows.map((r) => [r.college.id, r.balance]));
-  const list: CollegeAdminRow[] = rows.map((r) => ({
-    id: r.college.id,
-    name: r.college.name,
-    city: r.college.city,
-    state: r.college.state,
-    gstin: r.college.gstin,
-    hasPaidBatch: r.paidBatches > 0,
-    openRequest: r.openRequest,
-    aisheCode: r.college.aisheCode,
-    code: r.college.code,
-    emailDomains: r.college.emailDomains,
-    isPartner: r.college.isPartner,
-    showOnWebsite: r.college.showOnWebsite,
-    isActive: r.college.isActive,
-    members: r.members,
-    roster: r.roster,
-    drives: r.drives,
-    seatCode: seatCodes.find((s) => s.collegeId === r.college.id) ?? null,
-    officers: officers
-      .filter((o) => o.collegeId === r.college.id)
-      .map((o) => ({ id: o.id, name: o.name, email: o.email, lastLoginAt: o.lastLoginAt?.toISOString() ?? null })),
-  }));
+  let loaded;
+  try {
+    const [[{ total }], [{ partners }], [{ withStudents }], [{ withdrawals }]] = await Promise.all([
+      db.select({ total: count() }).from(c).where(where),
+      db.select({ partners: count() }).from(c).where(viewWhere[""]),
+      db.select({ withStudents: count() }).from(c).where(viewWhere.students),
+      db.select({ withdrawals: count() }).from(c).where(viewWhere.withdrawals),
+    ]);
+    const page = Math.min(req.page, Math.max(1, Math.ceil(total / req.perPage))); // a page past the end shows the last one
+    const rows = await db
+      .select({
+        college: c,
+        members: sql<number>`(SELECT count(*)::int FROM ${schema.collegeMemberships} m WHERE m.college_id = ${cid} AND m.left_at IS NULL)`,
+        drives: sql<number>`(SELECT count(*)::int FROM ${schema.collegeDrives} d WHERE d.college_id = ${cid})`,
+        openRequest: hasRequest.mapWith(Boolean),
+        balance: sql<number>`(SELECT coalesce(sum(w.amount_minor), 0)::int FROM ${schema.collegeWalletEntries} w WHERE w.college_id = ${cid})`,
+      })
+      .from(c)
+      .where(where)
+      .orderBy(sql`${c.isPartner} DESC`, c.name, c.id)
+      .limit(req.perPage)
+      .offset((page - 1) * req.perPage);
+    const ids = rows.map((r) => r.college.id).concat("");
+    const [seatCodes, officers] = await Promise.all([
+      db
+        .select({ collegeId: schema.promoCodes.collegeId, maxUsages: schema.promoCodes.maxUsages, usedCount: schema.promoCodes.usedCount })
+        .from(schema.promoCodes)
+        .where(inArray(schema.promoCodes.collegeId, ids)),
+      db
+        .select({ collegeId: schema.collegeAdmins.collegeId, name: schema.collegeAdmins.name, lastLoginAt: schema.collegeAdmins.lastLoginAt })
+        .from(schema.collegeAdmins)
+        .where(sql`${schema.collegeAdmins.isActive} AND ${inArray(schema.collegeAdmins.collegeId, ids)}`),
+    ]);
+    loaded = { total, partners, withStudents, withdrawals, page, rows, seatCodes, officers };
+  } catch (error) {
+    console.error("[admin/colleges]", error);
+    loaded = null;
+  }
 
-  const pg = toPage(list, total, req.page, req.perPage);
+  const header = (subtitle?: string) => (
+    <AdminPageHeader title="Colleges" subtitle={subtitle} action={canEdit ? <AddCollegeButton /> : undefined} />
+  );
+  if (!loaded) {
+    return (
+      <div className="space-y-4">
+        {header()}
+        <Panel>
+          <AdminLoadError what="the college list" retryHref="/admin/colleges" />
+        </Panel>
+      </div>
+    );
+  }
+
+  const { rows, seatCodes, officers } = loaded;
+  const pg = toPage(rows, loaded.total, loaded.page, req.perPage);
+  const viewHref = (v: View) => `/admin/colleges${toQueryString({ ...params, view: v, q: "", page: "" })}`;
+  const tabs: AdminTabItem[] = [
+    { key: "", label: "Partners", count: loaded.partners, href: viewHref("") },
+    { key: "students", label: "Not partners, with students", count: loaded.withStudents, href: viewHref("students") },
+    { key: "withdrawals", label: "Withdrawals to pay", count: loaded.withdrawals, href: viewHref("withdrawals") },
+  ];
+
   return (
     <div className="space-y-4">
-      <AdminPageHeader
-        title="College partners"
-        subtitle={`${total.toLocaleString("en-IN")} ${total === 1 ? "college" : "colleges"} ${req.search ? "match" : "(partners and colleges with students)"}. Search to find any college and make it a partner.`}
-        className="mb-2 lg:mb-4"
+      {header(
+        req.search
+          ? `${formatNumber(loaded.total)} ${loaded.total === 1 ? "college matches" : "colleges match"} in the whole directory. Open one to make it a partner.`
+          : `${formatNumber(loaded.partners)} partner ${loaded.partners === 1 ? "college" : "colleges"}. Search to find any college in the directory.`,
+      )}
+      {/* While searching no tab is selected: the search covers every college. */}
+      <AdminTabs items={tabs} active={req.search ? "none" : view} label="College views" />
+      <DataTable
+        basePath="/admin/colleges"
+        params={params}
+        page={pg.page}
+        pages={pg.pages}
+        total={pg.total}
+        perPage={pg.perPage}
+        rows={rows}
+        rowKey={(r) => r.college.id}
+        rowHref={(r) => `/admin/colleges/${r.college.id}`}
+        keyboardNav
+        noun="colleges"
+        caption="Colleges"
+        searchPlaceholder="Search name, city, AISHE or college code"
+        empty={
+          view === "withdrawals"
+            ? { title: "No withdrawals waiting", body: "When a college asks to withdraw its wallet balance, it shows up here." }
+            : view === "students"
+              ? { title: "No other colleges with students", body: "Colleges that are not partners but have students signed up appear here." }
+              : { title: "No partner colleges yet", body: canEdit ? "Use Add college, then issue its placement officer a login once the first seat batch is paid." : "Partner colleges appear here once they are added." }
+        }
+        columns={[
+          {
+            header: "College",
+            cell: ({ college: r, openRequest }) => (
+              <div className="min-w-0 lg:max-w-80">
+                <IdentityCell
+                  name={r.name}
+                  id={r.id}
+                  href={`/admin/colleges/${r.id}`}
+                  sub={[r.code ? `Code ${r.code}` : null, r.city].filter(Boolean).join(" · ") || undefined}
+                />
+                {openRequest || !r.isActive ? (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5 pl-[3.25rem]">
+                    {openRequest ? <StatusBadge tone="warning" label="Withdrawal requested" dot={false} className="h-5" /> : null}
+                    {!r.isActive ? <StatusBadge tone="neutral" label="Inactive" dot={false} className="h-5" /> : null}
+                  </div>
+                ) : null}
+              </div>
+            ),
+          },
+          { header: "Students", align: "right", cell: (r) => formatNumber(r.members) },
+          {
+            header: "Seats used",
+            align: "right",
+            cell: (r) => {
+              const seat = seatCodes.find((s) => s.collegeId === r.college.id);
+              if (seat) return `${formatNumber(seat.usedCount)} of ${formatNumber(seat.maxUsages ?? 0)}`;
+              return r.college.isPartner ? <span className="text-text-subtle">Awaiting payment</span> : <span className="text-text-subtle">-</span>;
+            },
+          },
+          { header: "Drives", align: "right", cell: (r) => formatNumber(r.drives) },
+          { header: "Wallet", align: "right", cell: (r) => <span className="nums">{formatMoney(r.balance, "INR", { zeroLabel: false })}</span> },
+          {
+            header: "Placement officer",
+            cell: (r) => {
+              const mine = officers.filter((o) => o.collegeId === r.college.id);
+              if (mine.length === 0) return <span className="text-text-subtle">No login yet</span>;
+              const [first] = mine;
+              return (
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground">
+                    {first.name}
+                    {mine.length > 1 ? <span className="font-normal text-text-subtle"> +{mine.length - 1} more</span> : null}
+                  </p>
+                  <p className="text-xs text-text-subtle">{first.lastLoginAt ? `Signed in ${formatDate(first.lastLoginAt)}` : "Never signed in"}</p>
+                </div>
+              );
+            },
+          },
+        ]}
       />
-      <TableToolbar searchPlaceholder="Search name, city, AISHE or college code" />
-      {list.length === 0 ? (
-        <Panel>
-          <AdminEmpty title={req.search ? "No college matches" : "No partner colleges yet"} body={req.search ? "Try another name, city or code." : "Add the first one below, then issue its placement officer a login."} />
-        </Panel>
-      ) : null}
-      {list.map((r) => (
-        <Panel key={r.id}>
-          <PanelHeader
-            title={r.name}
-            description={[r.code ? `College code ${r.code}` : null, r.city, r.aisheCode ? `AISHE ${r.aisheCode}` : null, r.emailDomains.length ? `@${r.emailDomains.join(", @")}` : null].filter(Boolean).join(" · ")}
-            action={
-              <span className="flex flex-wrap items-center gap-1.5">
-                <CountChip n={r.members} one="student" many="students" />
-                <CountChip n={r.roster} one="on roster" many="on roster" />
-                <CountChip n={r.drives} one="drive" many="drives" />
-                {r.openRequest ? <StatusBadge tone="warning" label="Withdrawal requested" dot={false} /> : null}
-                <Link href={`/admin/colleges/${r.id}`} className="inline-flex h-6 touch:min-h-11 items-center whitespace-nowrap rounded-full bg-[color:var(--admin-panel-2)] px-2.5 text-xs font-medium text-foreground underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Seats and wallet</Link>
-                <span className="nums inline-flex h-6 items-center whitespace-nowrap rounded-full bg-[color:var(--admin-panel-2)] px-2.5 text-xs font-medium text-foreground">Wallet {formatMoney(balances.get(r.id) ?? 0, "INR", { zeroLabel: false })}</span>
-              </span>
-            }
-          />
-          <PanelBody className="space-y-3">
-            {r.officers.length ? (
-              <ul className="grid gap-2 text-sm sm:grid-cols-2">
-                {r.officers.map((o) => (
-                  <li key={o.email}>
-                    <IdentityCell
-                      name={o.name}
-                      id={o.email}
-                      size="sm"
-                      sub={`${o.email} · ${o.lastLoginAt ? `last signed in ${formatDate(o.lastLoginAt)}` : "never signed in"}`}
-                    />
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-text-subtle">No placement officer login yet.</p>
-            )}
-            <CollegeRowControls row={r} canEdit={canEdit} />
-          </PanelBody>
-        </Panel>
-      ))}
-      {total > 0 ? <Panel>
-        <Pagination page={pg.page} pages={pg.pages} total={total} perPage={req.perPage} rowsShown={list.length} params={params} basePath="/admin/colleges" noun="colleges" />
-      </Panel> : null}
-      {/* Last, and folded: adding a college is rare, and the open form put
-          ~450px above the colleges themselves (critique A). */}
-      {canEdit ? <Panel>
-        <details open={list.length === 0} className="group">
-          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-[var(--admin-pad-panel)] text-sm font-semibold text-foreground hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
-            Add a partner college
-            <span aria-hidden className="rounded-full bg-[color:var(--admin-panel-2)] px-3 py-1 text-xs font-medium group-open:hidden">Open</span>
-          </summary>
-          <PanelBody>
-            <AddCollegeForm />
-          </PanelBody>
-        </details>
-      </Panel> : null}
     </div>
   );
 }
