@@ -1,0 +1,65 @@
+name: Seed college students (staging)
+
+# Manual only. Adds ~300 dummy students (100 each in year 2, 3, 4) to one college on the
+# Neon STAGING database (e2e/seed-college-students.mjs). Additive: nothing else is touched,
+# and a re-run replaces only its own rows (@poornima.seed.findtern.test).
+#
+# "apply" off = dry run: finds the college, runs the whole seed in a transaction, rolls back.
+# Needs the repository secret NEON_STAGING_URL. Refuses any other database host and any branch but master.
+
+on:
+  workflow_dispatch:
+    inputs:
+      college:
+        description: "College name fragment (must match exactly one active college)"
+        type: string
+        default: "poornima"
+      college_id:
+        description: "College id, only if the name matched several (optional)"
+        type: string
+        default: ""
+      apply:
+        description: "Write to staging (off = dry run that changes nothing)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: seed-college-students
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_HOST: ep-mute-unit-b5ooitso-pooler.c-7.us-east-2.aws.neon.tech
+      COLLEGE: ${{ inputs.college }}
+      COLLEGE_ID: ${{ inputs.college_id }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Point the seed at staging (host check)
+        env:
+          NEON_STAGING_URL: ${{ secrets.NEON_STAGING_URL }}
+        run: |
+          node -e 'const h = new URL(process.env.NEON_STAGING_URL).hostname; if (h !== process.env.EXPECTED_HOST) { console.error("Refusing: the secret points at " + h + ", not the staging host."); process.exit(1); } console.log("host ok: " + h);'
+          printf 'DATABASE_URL=%s\n' "$NEON_STAGING_URL" > "$RUNNER_TEMP/neon.env"
+          echo "NEON_ENV_FILE=$RUNNER_TEMP/neon.env" >> "$GITHUB_ENV"
+
+      - name: Seed the students
+        run: |
+          args=(--college "$COLLEGE")
+          if [ -n "$COLLEGE_ID" ]; then args+=(--college-id "$COLLEGE_ID"); fi
+          if [ "${{ inputs.apply }}" = "true" ]; then args+=(--yes); fi
+          node e2e/seed-college-students.mjs "${args[@]}"
