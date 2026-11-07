@@ -83,9 +83,10 @@ export default async function EmployerAlerts({
   let rows: NotificationRow[] = [];
   let total = 0;
   let unread = 0;
+  let proposals = 0;
   try {
     const db = getDb();
-    const [list, [all], [unreadRow]] = await Promise.all([
+    const [list, [all], [unreadRow], [proposalRow]] = await Promise.all([
       db
         .select()
         .from(schema.notifications)
@@ -97,9 +98,11 @@ export default async function EmployerAlerts({
         .select({ value: count() })
         .from(schema.notifications)
         .where(and(mine, eq(schema.notifications.isRead, false))),
+      db.select({ value: count() }).from(schema.proposals).where(eq(schema.proposals.employerId, session.uid)),
     ]);
     total = Number(all?.value ?? 0);
     unread = Number(unreadRow?.value ?? 0);
+    proposals = Number(proposalRow?.value ?? 0);
     rows = list.map((n) => ({
       id: n.id,
       type: n.type,
@@ -125,7 +128,8 @@ export default async function EmployerAlerts({
     <div>
       <PageHeader
         title="Alerts"
-        action={<NotificationList mode="mark-all" disabled={unread === 0} />}
+        // Nothing to mark: no control, rather than a disabled one.
+        action={unread > 0 ? <NotificationList mode="mark-all" /> : undefined}
       />
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -167,7 +171,7 @@ export default async function EmployerAlerts({
             title="No alerts yet"
             body="When a candidate answers an offer, books an interview slot or sends a timesheet, it shows up here and on the bell."
             next={{ label: "Find candidates", href: "/employer/candidates" }}
-            who="Starts with your first proposal"
+            who={proposals > 0 ? "Candidates - answer one of your proposals" : "Starts with your first proposal"}
           />
         )
       ) : (

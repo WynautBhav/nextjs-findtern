@@ -24,7 +24,18 @@ function tileInitials(name: string): string {
  * time on a phone: the list at /messages, the thread at /messages/[id] with a
  * back link in the thread header.
  */
-export function InboxShell({ role, threads, children }: { role: "intern" | "employer"; threads: ThreadSummary[]; children: React.ReactNode }) {
+export function InboxShell({
+  role,
+  threads,
+  hasProposals = false,
+  children,
+}: {
+  role: "intern" | "employer";
+  threads: ThreadSummary[];
+  /** Employer only: they have sent at least one proposal, so the empty state points at it. */
+  hasProposals?: boolean;
+  children: React.ReactNode;
+}) {
   const open = useSelectedLayoutSegment();
   const base = `/${role}/messages`;
   const proposalsHref = role === "employer" ? "/employer/proposals" : "/intern/proposals";
@@ -36,16 +47,21 @@ export function InboxShell({ role, threads, children }: { role: "intern" | "empl
         lede={role === "employer" ? "Talk to candidates you have sent a proposal to." : "Talk to companies that have sent you a proposal."}
         className={cn(open && "max-lg:hidden")}
       />
-      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <nav aria-label="Conversations" className={cn("min-w-0 lg:sticky lg:top-24 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto", open && "max-lg:hidden")}>
-          {threads.length === 0 ? (
-            <EmptyScene
-              title="No conversations yet"
-              body="Messaging opens once a proposal is sent. Open a proposal and choose Message."
-              next={{ label: role === "employer" ? "Go to proposals" : "Go to offers", href: proposalsHref }}
-              who={role === "employer" ? "You - send a proposal first" : "A company - waiting on their offer"}
-            />
-          ) : (
+      {threads.length === 0 ? (
+        // One empty state across the whole width; the right pane would only repeat it.
+        <EmptyScene
+          title="No conversations yet"
+          body={
+            role === "employer" && hasProposals
+              ? "Open a proposal and choose Message to start a conversation."
+              : "Messaging opens once a proposal is sent. Open a proposal and choose Message."
+          }
+          next={{ label: role === "employer" ? "Go to proposals" : "Go to offers", href: proposalsHref }}
+          who={role === "employer" ? (hasProposals ? undefined : "You - send a proposal first") : "A company - waiting on their offer"}
+        />
+      ) : (
+        <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+          <nav aria-label="Conversations" className={cn("min-w-0 lg:sticky lg:top-24 lg:max-h-[calc(100dvh-8rem)] lg:overflow-y-auto", open && "max-lg:hidden")}>
             <ul className="divide-y divide-ink-100 border-y border-ink-100">
               {threads.map((t) => {
                 const current = open === t.id;
@@ -99,27 +115,27 @@ export function InboxShell({ role, threads, children }: { role: "intern" | "empl
                 );
               })}
             </ul>
-          )}
-        </nav>
+          </nav>
 
-        <div className={cn("min-w-0", !open && "max-lg:hidden")}>
-          {children}
+          <div className={cn("min-w-0", !open && "max-lg:hidden")}>
+            {children}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
 
 /** Desktop placeholder at /messages when the right pane has nothing open. */
 export function InboxEmpty({ hasThreads }: { hasThreads: boolean }) {
+  // No threads: the shell already shows the empty state across the page.
+  if (!hasThreads) return null;
   return (
     <Surface className="grid min-h-64 place-items-center p-8 text-center">
       <div>
         <MessageSquare aria-hidden className="mx-auto size-6 text-text-subtle" />
-        <p className="mt-3 text-base font-semibold text-ink-900">{hasThreads ? "Choose a conversation" : "Nothing here yet"}</p>
-        <p className="mt-1 text-sm text-ink-600">
-          {hasThreads ? "Pick one from the list to read and reply." : "Conversations appear here after a proposal is sent."}
-        </p>
+        <p className="mt-3 text-base font-semibold text-ink-900">Choose a conversation</p>
+        <p className="mt-1 text-sm text-ink-600">Pick one from the list to read and reply.</p>
       </div>
     </Surface>
   );
