@@ -10,6 +10,7 @@ import {
   Compass,
   House,
   LayoutList,
+  MessageSquare,
   ReceiptIndianRupee,
   ScrollText,
   Settings2,
@@ -18,6 +19,7 @@ import {
 import { ConsoleShell, type ConsoleNavItem } from "@/components/layout/console-shell";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
+import { MessagingLive } from "@/components/messaging";
 import { TermsGate } from "@/components/app/terms-gate";
 import { CollegeLive } from "@/components/intern/college-live";
 import { getSession } from "@/lib/auth";
@@ -57,6 +59,7 @@ const STAGE_NAV: Record<Stage, ConsoleNavItem[]> = {
 const MORE_NAV: ConsoleNavItem[] = [
   { href: "/intern/opportunities", label: "Open roles", icon: <Compass /> },
   { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
+  { href: "/intern/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
   { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 /> },
   { href: "/intern/timesheets", label: "Timesheets", icon: <LayoutList /> },
   { href: "/intern/earnings", label: "Stipend", icon: <ReceiptIndianRupee /> },
@@ -144,6 +147,7 @@ export default async function InternLayout({ children }: { children: React.React
           vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
         />
       ) : null}
+      <MessagingLive />
       {children}
       <TermsGate role="intern" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>

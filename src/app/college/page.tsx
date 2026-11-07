@@ -17,6 +17,8 @@ import { getDb, schema } from "@/lib/db";
 import { AWAITING_FIRST_PAYMENT } from "@/lib/college/seat-paid";
 import { paidSeatTotal } from "@/lib/college/seat-gate";
 import { PageHead } from "@/components/app/primitives";
+import { collegeHasDriveOrder } from "@/lib/drives/dashboard-db";
+import { DriveDashboard } from "./drive-dashboard";
 
 export const dynamic = "force-dynamic";
 
@@ -36,7 +38,7 @@ export default async function CollegeDashboard() {
   const ctx = await requireCollegeContext();
   const now = requestTime();
 
-  const [students, coverage, [liveDrive], [seat], paid] = await Promise.all([
+  const [students, coverage, [liveDrive], [seat], paid, hasDriveOrder] = await Promise.all([
     studentsForCollegeAdmin(ctx),
     rosterCoverage(ctx.college.id),
     getDb()
@@ -59,6 +61,7 @@ export default async function CollegeDashboard() {
       .where(eq(schema.promoCodes.collegeId, ctx.college.id))
       .limit(1),
     paidSeatTotal(getDb(), ctx.college.id),
+    collegeHasDriveOrder(ctx.college.id),
   ]);
 
   const presence = liveDrive
@@ -75,7 +78,7 @@ export default async function CollegeDashboard() {
     <div className="space-y-6">
       <PageHead
         title={ctx.college.name}
-        lede={`Placement console${ctx.college.city ? ` · ${ctx.college.city}` : ""}.${ctx.college.code ? ` College code ${ctx.college.code}: students find your college by name or this code.` : ""}`}
+        lede={`Placement console${ctx.college.city ? ` · ${ctx.college.city}` : ""}.${ctx.college.code && !hasDriveOrder ? ` College code ${ctx.college.code}: students find your college by name or this code.` : ""}`}
       />
 
       {liveDrive && presence ? (
@@ -87,9 +90,11 @@ export default async function CollegeDashboard() {
         />
       ) : null}
 
-      {seat ? (
-        <section className="rounded-apple-md border border-ink-200 bg-surface p-4" aria-label="Your student code">
-          <p className="text-sm text-ink-600">Your student code, different from the college code above. Share it with students: it waives their AI interview fee and verifies them with your college.</p>
+      <DriveDashboard />
+
+      {seat && !hasDriveOrder ? (
+        <section className="rounded-apple-md border border-ink-200 bg-surface p-4" aria-label="Legacy code (read-only)">
+          <p className="text-sm text-ink-600"><strong>Legacy code (read-only).</strong> Existing students keep using it; new drives use roster codes sent to each student.</p>
           <p className="mt-2 flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <code className="select-all break-all font-mono text-xl font-semibold tracking-widest text-ink-900">{seat.code}</code>
             <span className="nums text-sm font-medium text-ink-800">

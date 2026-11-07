@@ -22,6 +22,7 @@ import {
   ShoppingBag,
   Tag,
   UserCheck,
+  Undo2,
   Users,
   Video,
 } from "lucide-react";
@@ -71,6 +72,7 @@ const NAV: AdminNavGroup[] = [
       { href: "/admin/users", label: "Users", icon: <UserCheck /> },
       { href: "/admin/companies", label: "Companies", icon: <Building2 /> },
       { href: "/admin/colleges", label: "Colleges", icon: <GraduationCap /> },
+      { href: "/admin/drive-overview", label: "Drive overview", icon: <GraduationCap /> },
       { href: "/admin/projects", label: "Projects", icon: <Briefcase /> },
     ],
   },
@@ -80,6 +82,7 @@ const NAV: AdminNavGroup[] = [
       { href: "/admin/orders", label: "Orders", icon: <ShoppingBag /> },
       { href: "/admin/intern-invoices", label: "Intern invoices", icon: <Receipt /> },
       { href: "/admin/transactions", label: "Transactions", icon: <ArrowLeftRight /> },
+      { href: "/admin/refunds", label: "Refunds", icon: <Undo2 /> },
       { href: "/admin/promo-codes", label: "Promo codes", icon: <Tag /> },
       { href: "/admin/reports", label: "Reports", icon: <BarChart3 /> },
     ],

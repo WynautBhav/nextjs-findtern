@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
 import { requireMutation } from "@/lib/guards-mutation";
+import { editBlockedReason } from "@/lib/projects/transition";
 import { projectNameIssue } from "@/lib/project-name";
 import {
   CLOSED_PROJECT_STATUS,
@@ -53,7 +54,23 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (project.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const d = { ...parsed.data };
+  // Lifecycle: canonical rows move only through /transition. Legacy rows
+  // (active / inactive / archived) keep the old status toggle.
+  const legacyRow = ["active", "inactive", "archived"].includes(String(project.status ?? "").trim().toLowerCase());
+  if (d.status && !legacyRow) {
+    return NextResponse.json({ error: "Use the lifecycle actions to change a project's status." }, { status: 400 });
+  }
+  const current = project as Record<string, unknown>;
+  const changed = (Object.keys(d) as string[]).filter((k) => {
+    if (k === "status") return false;
+    const next = (d as Record<string, unknown>)[k];
+    return next !== undefined && JSON.stringify(next) !== JSON.stringify(current[k] ?? null);
+  });
+  // A legacy row's status toggle (close or reopen) is not an edit.
+  const blocked = legacyRow && d.status ? null : editBlockedReason(project.status, changed);
+  if (blocked) return NextResponse.json({ error: blocked }, { status: 409 });
   if (d.skills) {
+    if (d.skills.length > MAX_PROJECT_SKILLS) return NextResponse.json({ error: `A project can have at most ${MAX_PROJECT_SKILLS} skills.` }, { status: 400 });
     const skillsProblem = projectSkillsError(d.skills, (project.skills as string[] | null) ?? []);
     if (skillsProblem) return NextResponse.json({ error: skillsProblem }, { status: 400 });
     // From the shared list only; skills the project already has stay as they are.

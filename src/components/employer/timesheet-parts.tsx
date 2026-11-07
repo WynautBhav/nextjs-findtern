@@ -18,10 +18,17 @@ export {
   normaliseEntries,
 } from "@/lib/employer-timesheets";
 
+import { CheckCircle2, CircleDashed, Hourglass, XCircle } from "lucide-react";
+
 import { Pill } from "@/components/app/primitives";
 import { timesheetPill } from "@/components/app/status";
 
 export function StatusPill({ status }: { status: string }) {
   const s = timesheetPill(status);
-  return <Pill tone={s.tone}>{s.label}</Pill>;
+  const Icon = s.tone === "paid" || s.tone === "live" ? CheckCircle2 : s.tone === "closed" ? XCircle : s.tone === "waiting" ? Hourglass : CircleDashed;
+  return (
+    <Pill tone={s.tone} icon={<Icon />}>
+      {s.label}
+    </Pill>
+  );
 }

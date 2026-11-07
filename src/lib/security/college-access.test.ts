@@ -300,7 +300,6 @@ test("QA-200: reissuing a link swaps the token, reopens the drive and deletes th
 // ── WP8: what a TPO sees of a student ───────────────────────────────────
 
 const onboarding = {
-  bio: "Builder",
   city: "Jaipur",
   state: "Rajasthan",
   pinCode: "302001",
@@ -331,7 +330,7 @@ test("WP8: a verified student shows the agreed fields and never Aadhaar, PAN, ba
   assert.deepEqual(p.skills, ["React"]);
   assert.equal(p.education?.institution, "JKLU");
   assert.equal(p.experience[0].company, "Acme");
-  assert.equal(p.bio, "Builder");
+  assert.equal("bio" in p, false);
   assert.equal(canOpenArtifacts("verified"), true);
   const dump = JSON.stringify(p);
   for (const secret of ["999911112222", "ABCDE1234F", "123456789012", "HDFC0001234", "302001"]) {

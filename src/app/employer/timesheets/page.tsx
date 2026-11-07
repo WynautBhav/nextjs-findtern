@@ -9,7 +9,10 @@ import { requireEmployerSetup } from "@/lib/employer-setup";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { dayDetails, formatDay, formatPeriod } from "@/lib/employer-timesheets";
+import { Avatar } from "@/components/app/avatar";
 import { StatusPill } from "@/components/employer/timesheet-parts";
+import { HeroFigure, HeroPanel } from "@/components/employer/kit/hero-panel";
+import { RevealItem, RevealList } from "@/components/employer/kit/reveal";
 import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
@@ -25,6 +28,7 @@ type Row = {
   internId: string;
   name: string;
   initials: string;
+  masked: boolean;
   project: string | null;
   period: string;
   status: string;
@@ -32,6 +36,8 @@ type Row = {
   present: number;
   hours: number;
   days: number;
+  /** Per day of the period, in order: was the intern present. */
+  ribbon: boolean[];
   internNote: string | null;
 };
 
@@ -84,8 +90,9 @@ export default async function EmployerTimesheets({
         return {
           id: sheet.id,
           internId: sheet.internId,
-          name: displayNameOf({ id: sheet.internId, fullName: `${first} ${last}`.trim() || "Intern", initials: ini }, unlocked.has(sheet.internId)),
+          name: unlocked.has(sheet.internId) ? displayNameOf({ id: sheet.internId, fullName: `${first} ${last}`.trim() || "Intern", initials: ini }, true) : `Candidate ${ini === "?" ? "" : ini}`.trim(),
           initials: ini === "?" ? "I" : ini,
+          masked: !unlocked.has(sheet.internId),
           project,
           period: formatPeriod(sheet.periodStart, sheet.periodEnd),
           status: sheet.status,
@@ -93,6 +100,7 @@ export default async function EmployerTimesheets({
           present: days.filter((d) => d.status === "Present").length,
           hours: days.reduce((n, d) => n + d.hours, 0),
           days: days.length,
+          ribbon: days.map((d) => d.status === "Present"),
           internNote: sheet.internNote,
         };
       });
@@ -151,16 +159,25 @@ export default async function EmployerTimesheets({
         />
       ) : (
         <div className="space-y-8">
+          <HeroPanel>
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-end">
+              <HeroFigure lead label="Hours awaiting review" value={queue.reduce((n, r) => n + r.hours, 0)} hint={`${queue.length} timesheet${queue.length === 1 ? "" : "s"} to decide`} />
+              <div className="grid grid-cols-2 gap-6">
+                <HeroFigure label="Hours approved" value={rows.filter((r) => r.status === "approved").reduce((n, r) => n + r.hours, 0)} hint="Locked for billing" />
+                <HeroFigure label="Sheets sent" value={rows.length} hint="Drafts stay with the intern" />
+              </div>
+            </div>
+          </HeroPanel>
           {queue.length > 0 ? (
             <section>
               <SectionHead title="Waiting for your review" hint="Oldest first." />
               <Surface className="overflow-hidden">
                 <SheetHead />
-                <ul className="divide-y divide-ink-100">
+                <RevealList className="divide-y divide-ink-100">
                   {queue.map((r) => (
                     <SheetRow key={r.id} row={r} review />
                   ))}
-                </ul>
+                </RevealList>
               </Surface>
             </section>
           ) : null}
@@ -170,11 +187,11 @@ export default async function EmployerTimesheets({
               <SectionHead title={queue.length ? "Everything else" : "All timesheets"} />
               <Surface className="overflow-hidden">
                 <SheetHead />
-                <ul className="divide-y divide-ink-100">
+                <RevealList className="divide-y divide-ink-100">
                   {rest.map((r) => (
                     <SheetRow key={r.id} row={r} />
                   ))}
-                </ul>
+                </RevealList>
               </Surface>
             </section>
           ) : null}
@@ -202,11 +219,9 @@ function SheetHead() {
 function SheetRow({ row, review = false }: { row: Row; review?: boolean }) {
   const href = `/employer/timesheets/${encodeURIComponent(row.id)}`;
   return (
-    <li className={`${SHEET_GRID} relative grid items-center gap-x-6 gap-y-1.5 px-5 py-3.5 transition-colors hover:bg-ink-50/70`}>
+    <RevealItem className={`${SHEET_GRID} relative grid items-center gap-x-6 gap-y-1.5 px-5 py-4 transition-colors hover:bg-ink-50/70`}>
       <div className="flex min-w-0 items-center gap-3">
-        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800">
-          {row.initials}
-        </span>
+        <Avatar masked={row.masked} name={row.masked ? undefined : row.name} initials={row.initials} size="md" />
         <div className="min-w-0">
           {/* The row opens the sheet; the link is stretched over it. */}
           <Link
@@ -220,6 +235,13 @@ function SheetRow({ row, review = false }: { row: Row; review?: boolean }) {
             {row.project ? ` · ${row.project}` : ""}
             {review && row.submittedAt ? ` · sent ${formatDay(row.submittedAt)}` : ""}
           </p>
+          {row.days > 0 ? (
+            <div aria-hidden className="mt-2 flex h-1.5 max-w-56 gap-px overflow-hidden rounded-full">
+              {row.ribbon.map((on, i) => (
+                <span key={i} className={on ? "flex-1 bg-brand-600" : "flex-1 bg-ink-200"} />
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
       <p className="nums text-sm text-ink-700 max-lg:col-span-2 max-lg:pl-12 lg:text-right">
@@ -237,12 +259,12 @@ function SheetRow({ row, review = false }: { row: Row; review?: boolean }) {
       </div>
       <div className="relative z-10 flex justify-end max-lg:col-span-2 max-lg:justify-start max-lg:pl-12">
         {review ? (
-          <Link href={href} className={buttonClass({ size: "sm" })}>
+          <Link href={href} className={buttonClass({ size: "sm" })} aria-label={`Review ${row.name}, ${row.period}`}>
             Review
             <ArrowRight className="size-4" aria-hidden />
           </Link>
         ) : null}
       </div>
-    </li>
+    </RevealItem>
   );
 }

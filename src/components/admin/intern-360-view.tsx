@@ -480,8 +480,7 @@ function ProfileTab({
       <div className="min-w-0 space-y-4">
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="About" />
-          <p className="whitespace-pre-line text-[0.9375rem] leading-relaxed text-ink-800">{draft.bio || "No bio written yet."}</p>
-          {draft.previewSummary ? <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-ink-600">{draft.previewSummary}</p> : null}
+          <p className="whitespace-pre-line text-[0.9375rem] leading-relaxed text-ink-800">{draft.previewSummary || "No summary yet."}</p>
         </div>
 
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>

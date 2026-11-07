@@ -95,3 +95,24 @@ test("Accounts records an offline activation fee; Operations (interns:write only
   assert.equal(allows(accounts, requiredPermissions("/api/admin/interns/i1", "PATCH")), false);
   assert.equal(allows(accounts, requiredPermissions("/admin/interns/i1")), true);
 });
+
+test("drive order, import, identity-review, refund and project APIs follow the colleges pair", () => {
+  for (const base of ["/api/admin/drive-orders/x/imports", "/api/admin/imports/x/confirm", "/api/admin/identity-reviews/x", "/api/admin/projects/x"]) {
+    assert.deepEqual(requiredPermissions(base, "GET"), ["companies:read"], base);
+    assert.deepEqual(requiredPermissions(base, "POST"), ["companies:write"], base);
+  }
+  assert.equal(allows(["interns:write"], requiredPermissions("/api/admin/imports/x/confirm", "POST")), false);
+});
+
+test("refunds are money: transactions permissions, not companies", () => {
+  assert.deepEqual(requiredPermissions("/api/admin/refunds", "GET"), ["transactions:read"]);
+  assert.deepEqual(requiredPermissions("/api/admin/refunds/x/initiate", "POST"), ["transactions:write"]);
+  assert.equal(allows(["companies:write"], requiredPermissions("/api/admin/refunds/x/initiate", "POST")), false);
+  assert.deepEqual(requiredPermissions("/admin/refunds"), ["transactions:read"]);
+});
+
+test("marking a drive order paid needs transactions:write", () => {
+  assert.deepEqual(requiredPermissions("/api/admin/drive-orders/x/payment", "POST"), ["transactions:write"]);
+  assert.equal(allows(["companies:write"], requiredPermissions("/api/admin/drive-orders/x/payment", "POST")), false);
+  assert.equal(allows(["transactions:read"], requiredPermissions("/api/admin/drive-orders/x/payment", "GET")), true);
+});

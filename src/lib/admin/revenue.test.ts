@@ -146,3 +146,11 @@ test("totals with college included: employer + intern + college receipts add up"
   assert.equal(month?.totalMinor, 1000000 + 249900 + 8000000);
   assert.equal(month?.count, 3);
 });
+
+import { isMoneyReceived } from "./revenue.ts";
+
+test("college-drive waiver rows are not money received; a paid gateway row still is", () => {
+  const rows = [{ gateway: "razorpay" }, { gateway: "free" }, { gateway: "college_drive" }, {}];
+  assert.deepEqual(rows.filter(isMoneyReceived).length, 3);
+  assert.equal(isMoneyReceived({ gateway: "college_drive" }), false);
+});

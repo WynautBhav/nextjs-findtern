@@ -99,7 +99,6 @@ export type OnboardingRow = {
   linkedinUrl: string | null;
   city: string | null;
   state: string | null;
-  bio: string | null;
   skills: unknown;
   hasLaptop: boolean | null;
   extraData: Record<string, unknown> | null;
@@ -711,14 +710,6 @@ export function deriveReadiness(
       label: "LinkedIn profile",
       unlocks: "Helps employers verify you are who you say you are.",
       done: Boolean(onboarding?.linkedinUrl),
-      href: "/intern/onboarding",
-    },
-    {
-      id: "bio",
-      label: "A line about what you do well",
-      unlocks: "Optional, but it is the part a recruiter reads out loud.",
-      // Optional here and in the payment gate alike (INT-20; legacy had no bio).
-      done: (onboarding?.bio ?? "").trim().length > 0,
       href: "/intern/onboarding",
     },
     {

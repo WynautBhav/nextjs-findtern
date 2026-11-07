@@ -592,3 +592,24 @@ export function icsInvite(o: {
   ].join("\r\n");
   return { filename: o.cancel ? "cancel.ics" : "invite.ics", content: body, contentType: `text/calendar; method=${method}` };
 }
+
+/** Drive code email: personal one-time code for a college drive. Every value is escaped by renderEmail; no tracking. */
+export function driveCodeEmail(o: { name: string; collegeName: string; code: string; validUntil: Date }): EmailContent {
+  const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ").trim();
+  const college = oneLine(o.collegeName) || "your college";
+  const expiry = o.validUntil.toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
+  return {
+    subject: `Your Findtern access code from ${college}`,
+    preheader: `Use this code before ${expiry}. It is personal to you.`,
+    heading: "Your Findtern access code",
+    greeting: hi(oneLine(o.name)),
+    lines: [
+      `${college} has set up your Findtern access. Sign in and enter this code on your activation step.`,
+      "This code is personal to you. Do not share or forward it; it works for one student only.",
+    ],
+    code: { value: o.code, note: `Valid until ${expiry}` },
+    facts: [["College", college], ["Valid until", expiry]],
+    cta: { label: "Sign in to Findtern", url: `${origin()}/login` },
+    reason: "You’re receiving this because your college listed this email address for a Findtern drive.",
+  };
+}

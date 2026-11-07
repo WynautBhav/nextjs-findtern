@@ -104,10 +104,15 @@ export default async function AdminProjectsPage({
       title="Projects"
       subtitle={subtitle}
       action={
+        <div className="flex flex-wrap gap-2">
+        <ButtonAnchor href="/admin/projects/review" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
+          Review queue
+        </ButtonAnchor>
         <ButtonAnchor href={exportHref} variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
           <Download className="size-4" aria-hidden />
           Export CSV
         </ButtonAnchor>
+        </div>
       }
     />
   );

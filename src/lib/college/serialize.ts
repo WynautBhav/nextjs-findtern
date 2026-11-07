@@ -51,7 +51,6 @@ export function tpoProfile(status: string, onboarding: OnboardingLike | undefine
     languages: (d.languages ?? []).filter((l) => l.language).map((l) => (l.level ? `${l.language} (${l.level})` : l.language)),
     education: a ? { institution: a.institution, degree: a.degree, branch: a.branch, year: a.yearOfGraduation, score: a.cgpa, scoreType: a.scoreType } : null,
     experience: (d.experiences ?? []).map((e) => ({ company: e.company, role: e.role, from: e.from, to: e.current ? "Present" : e.to, description: e.description })),
-    bio: d.bio ?? "",
     links: { linkedin: d.linkedinUrl ?? "" },
   };
 }

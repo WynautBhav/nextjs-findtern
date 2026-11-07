@@ -87,14 +87,17 @@ export function CollegeMark({
   );
 }
 
-export function CoBrand({ collegeName }: { collegeName: string }) {
+export function CoBrand({ collegeName, tone = "light" }: { collegeName: string; tone?: "light" | "dark" }) {
+  const dark = tone === "dark";
   return (
-    <div className="flex items-center gap-2 text-xs font-medium text-ink-600">
+    <div className={cn("flex items-center gap-2 text-xs font-medium", dark ? "text-on-dark-subtle" : "text-ink-600")}>
       <span className="min-w-0 break-words">{collegeName}</span>
-      <span aria-hidden className="text-ink-300">
+      <span aria-hidden className={dark ? "text-white/50" : "text-ink-300"}>
         ×
       </span>
-      <Logo className="h-4" alt="Findtern" />
+      <span className={cn(dark && "rounded-md bg-white px-1.5 py-1")}>
+        <Logo className="h-4" alt="Findtern" />
+      </span>
     </div>
   );
 }

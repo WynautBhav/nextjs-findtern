@@ -9,10 +9,12 @@ import { requireRole } from "@/lib/auth";
 import { TimesheetDecision } from "@/components/employer/decision-button";
 import { TimesheetReview } from "@/components/employer/timesheet-review";
 import { canAccess } from "@/lib/security/guards";
+import { Avatar } from "@/components/app/avatar";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { dayDetails, formatDay, formatPeriod, unfilledDays } from "@/lib/employer-timesheets";
 import { periodDays } from "@/lib/timesheet-days";
+import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { StatusPill } from "@/components/employer/timesheet-parts";
 import { DetailRow, SectionHead, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
@@ -48,6 +50,7 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
 
   let name = "Intern";
   let initials = "I";
+  let masked = true;
   let projectName: string | null = null;
   try {
     const db = getDb();
@@ -66,7 +69,8 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
       initials = ini === "?" ? "I" : ini;
       projectName = row.projectName ?? null;
       const unlocked = (await hiredInternIds(db, timesheet.employerId)).has(timesheet.internId);
-      name = displayNameOf({ id: timesheet.internId, fullName: `${first} ${last}`.trim() || "Intern", initials: ini }, unlocked);
+      masked = !unlocked;
+      name = !unlocked && ini !== "?" ? `Candidate ${ini}` : displayNameOf({ id: timesheet.internId, fullName: `${first} ${last}`.trim() || "Intern", initials: ini }, unlocked);
     }
   } catch (err) {
     console.error("[employer/timesheet] names", err);
@@ -100,16 +104,13 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
         All timesheets
       </Link>
 
-      <Surface as="section" className="overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-4 p-6 sm:p-7">
+      <HeroPanel className="p-0 sm:p-0">
+        <div className="flex flex-wrap items-start justify-between gap-4 p-6 sm:p-8">
           <div className="flex min-w-0 items-start gap-4">
-            <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-50 text-base font-semibold text-brand-800">
-              {initials}
-            </span>
+            <Avatar masked={masked} name={masked ? undefined : name} initials={initials} size="lg" />
             <div className="min-w-0">
-              <h1 className="text-balance text-2xl font-semibold text-ink-900 sm:text-3xl">{name}</h1>
-              {/* The period and project as the meta line, not a kicker above the name. */}
-              <p className="nums mt-1 text-sm text-ink-600">
+              <h1 className="text-balance text-2xl font-medium tracking-[-0.02em] sm:text-3xl">{name}</h1>
+              <p className="nums mt-1 text-sm text-on-dark-subtle">
                 Timesheet for {formatPeriod(timesheet.periodStart, timesheet.periodEnd)}
                 {projectName ? ` · ${projectName}` : ""}
               </p>
@@ -117,23 +118,23 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
           </div>
           <StatusPill status={status} />
         </div>
-        <dl className="grid grid-cols-2 border-t border-ink-100 bg-ink-50/60 sm:grid-cols-4">
+        <dl className="grid grid-cols-2 border-t border-white/15 bg-black/10 sm:grid-cols-4">
           {totals.map(([label, value], i) => (
             <div
               key={label}
               className={[
-                "px-6 py-4",
-                i % 2 === 1 ? "border-l border-ink-100" : "",
-                i >= 2 ? "border-t border-ink-100 sm:border-t-0" : "",
+                "px-6 py-5 sm:px-8",
+                i % 2 === 1 ? "border-l border-white/15" : "",
+                i >= 2 ? "border-t border-white/15 sm:border-t-0" : "",
                 i === 2 ? "sm:border-l" : "",
               ].join(" ")}
             >
-              <dt className="text-sm text-ink-600">{label}</dt>
-              <dd className="nums mt-1 text-2xl font-semibold text-ink-900">{value}</dd>
+              <dt className="text-[13px] text-on-dark-subtle">{label}</dt>
+              <dd className="nums mt-1 text-3xl font-light tracking-[-0.03em]">{value}</dd>
             </div>
           ))}
         </dl>
-      </Surface>
+      </HeroPanel>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_21rem]">
         <Surface as="section" className="min-w-0 p-5 sm:p-6">

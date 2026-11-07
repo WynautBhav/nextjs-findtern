@@ -412,6 +412,9 @@ export const projects = pgTable("projects", {
   state: text("state"),
   timezone: text("timezone"),
   status: text("status").default("active"),
+  rejectionReason: text("rejection_reason"),
+  submittedAt: timestamp("submitted_at"),
+  publishedAt: timestamp("published_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -986,11 +989,14 @@ export const collegeSeatBatches = pgTable("college_seat_batches", {
   referenceId: text("reference_id"),
   invoiceNumber: text("invoice_number"),
   paidAt: timestamp("paid_at"),
+  /** Set when this batch backs a drive order (drizzle/0018). Drive-order batches never raise the seat cap. */
+  driveOrderId: varchar("drive_order_id"),
   createdBy: varchar("created_by"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   collegeSeatBatchesInvoiceUnique: uniqueIndex("college_seat_batches_invoice_unique").on(t.invoiceNumber),
   collegeSeatBatchesCollegeIdx: index("college_seat_batches_college_idx").on(t.collegeId, t.createdAt),
+  collegeSeatBatchesDriveOrderUnique: uniqueIndex("college_seat_batches_drive_order_unique").on(t.driveOrderId).where(sql`${t.driveOrderId} IS NOT NULL`),
 }));
 
 /** College wallet ledger. Signed amounts; balance = sum. One incentive per proposal. */
@@ -1132,6 +1138,8 @@ export const collegeDrives = pgTable("college_drives", {
   excludeUserIds: jsonb("exclude_user_ids").$type<string[]>().notNull().default([]),
   tokenHash: text("token_hash").notNull(),
   revokedAt: timestamp("revoked_at"),
+  /** The paid drive order this drive runs on (drizzle/0018). */
+  orderId: varchar("order_id"),
   createdBy: varchar("created_by").notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
@@ -1229,3 +1237,11 @@ export const pushSubscriptions = pgTable("push_subscriptions", {
   pushSubscriptionsEndpointUnique: uniqueIndex("push_subscriptions_endpoint_unique").on(t.endpoint),
   pushSubscriptionsUserIdx: index("push_subscriptions_user_idx").on(t.userId),
 }));
+
+// Work-package schema files (docs/plans/master-plan.md): each is owned by one builder.
+export * from "./schema-drive-orders.ts";
+export * from "./schema-drive-import.ts";
+export * from "./schema-drive-codes.ts";
+export * from "./schema-outbox.ts";
+export * from "./schema-refunds.ts";
+export * from "./schema-messaging.ts";

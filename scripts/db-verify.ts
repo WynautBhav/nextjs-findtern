@@ -101,6 +101,55 @@ async function main() {
   if (!hasDedupe) failed = true;
   console.log(`  ${hasDedupe ? "PASS" : "FAIL"}  notifications_dedupe_uniq (run npm run db:migrate if missing)`);
 
+  // Migrations 0018-0024. Run against a QA copy after `npm run db:migrate`.
+  console.log("\nmigration 0018-0024 schema");
+  const rowsOf = (r: unknown) => ((r as { rows?: unknown[] }).rows ?? (r as unknown[]));
+  const report = (ok: boolean, label: string) => {
+    if (!ok) failed = true;
+    console.log(`  ${ok ? "PASS" : "FAIL"}  ${label}${ok ? "" : " (run npm run db:migrate)"}`);
+  };
+  for (const t of [
+    "college_drive_orders", "drive_imports", "drive_roster_entries", "identity_reviews", "drive_codes",
+    "drive_entitlements", "email_campaigns", "email_outbox", "payment_refunds", "threads", "messages",
+    "user_presence", "realtime_events", "notification_prefs",
+  ]) {
+    const r = await db.execute(sql`select 1 from information_schema.tables where table_schema = current_schema() and table_name = ${t}`);
+    report(rowsOf(r).length > 0, `table ${t}`);
+  }
+  for (const [table, col] of [
+    ["college_seat_batches", "drive_order_id"], ["college_drives", "order_id"],
+    ["projects", "rejection_reason"], ["projects", "submitted_at"], ["projects", "published_at"],
+  ]) {
+    const r = await db.execute(sql`select 1 from information_schema.columns where table_schema = current_schema() and table_name = ${table} and column_name = ${col}`);
+    report(rowsOf(r).length > 0, `column ${table}.${col}`);
+  }
+  for (const [table, name, needle] of [
+    ["college_drive_orders", "college_drive_orders_amount_eq", "slots"],
+    ["college_drive_orders", "college_drive_orders_counts_valid", "issued_count"],
+    ["projects", "projects_status_check", "status"],
+  ]) {
+    const r = await db.execute(sql`select pg_get_constraintdef(c.oid) as def, c.convalidated as validated from pg_constraint c where c.conname = ${name} and c.conrelid = ${table}::regclass`);
+    const row = rowsOf(r)[0] as { def: string; validated: boolean } | undefined;
+    report(!!row && row.def.includes(needle), `check ${name}${row && !row.validated ? " (NOT VALID: validate by hand)" : ""}`);
+  }
+  const amountDef = rowsOf(await db.execute(sql`select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'college_drive_orders_amount_eq'`))[0] as { def: string } | undefined;
+  report(!!amountDef && /amount_minor.*slots.*fee_per_student_minor/.test(amountDef.def), "amount_minor = slots * fee_per_student_minor");
+  const countsDef = rowsOf(await db.execute(sql`select pg_get_constraintdef(oid) as def from pg_constraint where conname = 'college_drive_orders_counts_valid'`))[0] as { def: string } | undefined;
+  report(!!countsDef && /issued_count.*<=.*slots/.test(countsDef.def) && /redeemed_count.*<=.*issued_count/.test(countsDef.def), "issued <= slots, redeemed <= issued");
+  for (const [name, needle] of [
+    ["drive_codes_hash_uq", "code_hash"],
+    ["drive_entitlements_order_intern_uq", "order_id, intern_id"],
+    ["payment_refunds_live_per_payment", "failed"],
+    ["college_seat_batches_drive_order_unique", "drive_order_id"],
+  ]) {
+    const r = await db.execute(sql`select indexdef from pg_indexes where indexname = ${name}`);
+    const def = (rowsOf(r)[0] as { indexdef: string } | undefined)?.indexdef ?? "";
+    report(def.includes("UNIQUE") && def.includes(needle), `unique index ${name}`);
+  }
+  // email_outbox.idempotency_key is a UNIQUE constraint (backed by an index).
+  const ob = await db.execute(sql`select 1 from pg_constraint where conname = 'email_outbox_idempotency_key_unique' and contype = 'u'`);
+  report(rowsOf(ob).length > 0, "unique email_outbox.idempotency_key");
+
   // Verifying password against an admin account proves the stored format is
   // one verifyPassword accepts.
   console.log("\npassword verification");

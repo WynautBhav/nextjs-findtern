@@ -1,51 +1,24 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CalendarCheck, CheckCircle2, CreditCard, Laptop, Loader2, MapPin, Send, Trash2, UserRound, Video } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 
-import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
-import { ButtonLink, buttonClass } from "@/components/ui/button";
+import { EmptyScene } from "@/components/app/primitives";
+import { useConfirm } from "@/components/app/use-confirm";
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatRate, shortDateTime } from "@/lib/format";
-import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
+import { displayNameOf } from "@/lib/employer-candidates";
 import { isQuarterHourWall, meetingEndsAt, suggestedSlots } from "@/lib/employer-interview-rules";
-import { MeetingSlots, TimezoneSelect, type Slots } from "@/components/employer/meeting-slots";
-import { JoinMeetingButton } from "@/components/employer/meeting-join";
+import type { Slots } from "@/components/employer/meeting-slots";
 import { fieldClass, labelClass } from "@/components/employer/ui-tokens";
 import type { Currency } from "@/lib/employer-pricing";
-import { PLAN_NAME, bandFor } from "@/lib/score";
 import { cn } from "@/lib/utils";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { RowMenu } from "@/components/app/row-menu";
+import { meetingLocked, nowMs, type CartLineItem } from "./cart/cart-helpers";
+import { CartSummary } from "./cart/cart-summary";
+import { MeetingDialog } from "./cart/meeting-dialog";
+import { ProjectGroup, groupByProject } from "./cart/project-group";
 
-export type CartLineItem = {
-  id: string;
-  projectId: string;
-  projectName: string;
-  /** The project is closed (inactive): no new meetings or proposals on it. */
-  projectClosed?: boolean;
-  createdAt: string | null;
-  candidate: CandidateProfile;
-  hourlyRateMinor: number;
-  perHireMinor: number;
-  /** A proposal already out to this candidate (any project), if any. */
-  openProposalId?: string | null;
-  /** An accepted offer to this candidate (any project): it is paid, not re-proposed. */
-  acceptedProposalId?: string | null;
-  /** An open meeting holds the candidate until this time (ISO); no new booking or proposal before. */
-  meetingUntil?: string | null;
-  /** The booked meeting's link while it is live, for "Join meeting". */
-  meetingLink?: string | null;
-};
+export type { CartLineItem } from "./cart/cart-helpers";
 
 export function CartManager({
   employerId,
@@ -74,7 +47,7 @@ export function CartManager({
   const [meetingSuccess, setMeetingSuccess] = useState(false);
   const [meetingError, setMeetingError] = useState("");
 
-  const [removing, setRemoving] = useState<CartLineItem | null>(null);
+  const { ask, dialog: confirmDialog } = useConfirm();
   const [busyId, setBusyId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState("");
 
@@ -86,9 +59,17 @@ export function CartManager({
   const shown = inProject.filter((l) => !l.openProposalId && !l.acceptedProposalId);
   const proposed = inProject.filter((l) => l.openProposalId || l.acceptedProposalId);
 
-  async function confirmRemove() {
-    const item = removing;
-    if (!item) return;
+  async function requestRemove(item: CartLineItem) {
+    const ok = await ask({
+      title: `Remove ${nameOf(item)} from your shortlist?`,
+      body: `They come off the shortlist for ${item.projectName}. Proposals and meetings already sent are not affected, and you can shortlist them again from Candidates.`,
+      confirmLabel: "Remove",
+      cancelLabel: "Keep",
+    });
+    if (ok) await confirmRemove(item);
+  }
+
+  async function confirmRemove(item: CartLineItem) {
     setBusyId(item.id);
     setErrorMsg("");
     try {
@@ -104,16 +85,13 @@ export function CartManager({
       );
       if (results.some((r) => r.ok)) {
         setCartLines((prev) => prev.filter((l) => l.id !== item.id));
-        setRemoving(null);
         router.refresh();
       } else {
         const data = await results[0].json().catch(() => ({}));
         setErrorMsg(data.error ?? "Couldn't remove this candidate. Try again.");
-        setRemoving(null);
       }
     } catch {
       setErrorMsg("Couldn't reach the server. Check your connection and try again.");
-      setRemoving(null);
     } finally {
       setBusyId(null);
     }
@@ -176,6 +154,36 @@ export function CartManager({
     );
   }
 
+  const continueTarget = (() => {
+    const pay = proposed.find((l) => l.acceptedProposalId);
+    if (pay) return { href: "/employer/checkout", label: "Continue to checkout", next: "An offer was accepted. Pay to complete the hire." };
+    const first = shown.find((l) => !l.projectClosed && !meetingLocked(l));
+    if (first)
+      return {
+        href: `/employer/send-proposal?intern=${encodeURIComponent(first.candidate.id)}&project=${encodeURIComponent(first.projectId)}`,
+        label: "Continue",
+        next: `Start with ${nameOf(first)}: send a proposal. You pay only once a candidate accepts.`,
+      };
+    return null;
+  })();
+
+  const renderGroups = (lines: CartLineItem[], start = 0) =>
+    groupByProject(lines).map((g, gi, all) => (
+      <ProjectGroup
+        key={g.id}
+        name={g.name}
+        lines={g.lines}
+        closed={g.closed}
+        nameOf={nameOf}
+        currency={currency}
+        timezone={companyTimezone}
+        busyId={busyId}
+        onMeeting={openMeeting}
+        onRemove={requestRemove}
+        startIndex={start + all.slice(0, gi).reduce((n, x) => n + x.lines.length, 0)}
+      />
+    ));
+
   return (
     <div>
       {errorMsg ? (
@@ -185,329 +193,54 @@ export function CartManager({
         </p>
       ) : null}
 
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
-        <p className="text-sm text-ink-600">
-          <span className="nums font-semibold text-ink-900">{shown.length}</span> shortlisted
-          {selectedProject !== "all" ? " for this project" : ""}
-        </p>
-        {projectOptions.length > 1 ? (
-          <label className={cn(labelClass, "flex items-center gap-2")}>
-            <span className="shrink-0">Project</span>
-            <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className={cn(fieldClass, "w-auto min-w-48")}>
-              <option value="all">All projects</option>
-              {projectOptions.map(([id, name]) => (
-                <option key={id} value={id}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-        ) : null}
-      </div>
-
-      <ul className="space-y-3">
-        {shown.map((line) => (
-          <CartLine
-            key={line.id}
-            line={line}
-            name={nameOf(line)}
-            currency={currency}
-            timezone={companyTimezone}
-            busy={busyId === line.id}
-            onMeeting={() => openMeeting(line)}
-            onRemove={() => setRemoving(line)}
-          />
-        ))}
-      </ul>
-      {shown.length === 0 ? <p className="text-sm text-ink-600">Everyone saved here already has a proposal.</p> : null}
-
-      {proposed.length > 0 ? (
-        <section aria-labelledby="proposed-heading" className="mt-8">
-          <h2 id="proposed-heading" className="mb-3 text-sm font-semibold text-ink-900">
-            Already proposed <span className="nums font-normal text-text-subtle">{proposed.length}</span>
-          </h2>
-          <ul className="space-y-3">
-            {proposed.map((line) => (
-              <CartLine
-                key={line.id}
-                line={line}
-                name={nameOf(line)}
-                currency={currency}
-                timezone={companyTimezone}
-                busy={busyId === line.id}
-                onMeeting={() => openMeeting(line)}
-                onRemove={() => setRemoving(line)}
-              />
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {/* Remove: confirmed, as legacy did (EMB-16). */}
-      <Dialog open={Boolean(removing)} onOpenChange={(open) => !open && setRemoving(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Remove {removing ? nameOf(removing) : "candidate"} from your shortlist?</DialogTitle>
-            <DialogDescription>
-              {removing ? `They come off the shortlist for ${removing.projectName}. ` : ""}
-              Proposals and meetings already sent are not affected, and you can shortlist them again from Candidates.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <button type="button" onClick={() => setRemoving(null)} className={buttonClass({ variant: "light", size: "sm", className: "min-h-11" })}>
-              Keep
-            </button>
-            <button
-              type="button"
-              onClick={confirmRemove}
-              disabled={busyId !== null}
-              className={buttonClass({ variant: "primary", size: "sm", className: "min-h-11 bg-danger hover:bg-danger/90" })}
-            >
-              {busyId ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Trash2 className="size-4" aria-hidden />}
-              Remove
-            </button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Book a meeting */}
-      <Dialog open={Boolean(meetingCandidate)} onOpenChange={(open) => !open && setMeetingCandidate(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{meetingCandidate ? `Book a meeting with ${nameOf(meetingCandidate)}` : "Book a meeting"}</DialogTitle>
-            <DialogDescription>
-              Offer three times on the quarter hour. We suggest the next quarter hour and the two hours after it; change any of
-              them. The candidate picks one.
-            </DialogDescription>
-          </DialogHeader>
-
-          {meetingSuccess ? (
-            <div className="rounded-apple-md border border-brand-200 bg-brand-50 p-6 text-center transition-[opacity,scale] duration-[var(--dur-standard)] ease-[var(--ease-out-quart)] starting:scale-[0.97] starting:opacity-0">
-              <CheckCircle2 className="mx-auto size-8 text-brand-700" aria-hidden />
-              <p id="meeting-sent-title" className="mt-2 text-base font-semibold text-ink-900">Meeting request sent</p>
-              <p id="meeting-sent-body" className="mt-1 text-sm text-ink-600">It is on your Schedule as &ldquo;Waiting on candidate&rdquo; until they pick one of your times.</p>
-              {/* The form that held focus is gone: focus lands here and reads the result with it. */}
-              <button
-                type="button"
-                autoFocus
-                aria-describedby="meeting-sent-title meeting-sent-body"
-                onClick={() => setMeetingCandidate(null)}
-                className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 min-h-11" })}
-              >
-                Done
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleBookMeeting} className="space-y-4 pt-1">
-              <MeetingSlots
-                slots={slots}
-                timezone={timezone}
-                onChange={(next) => {
-                  setSlots(next);
-                  setSlotsTouched(true);
-                }}
-              />
-              <div>
-                <label htmlFor="cart-timezone" className={labelClass}>
-                  Timezone
-                </label>
-                <div className="mt-1.5">
-                  <TimezoneSelect
-                    id="cart-timezone"
-                    value={timezone}
-                    onChange={(tz) => {
-                      setTimezone(tz);
-                      // Untouched suggestions move to the new zone's next quarter hour.
-                      if (!slotsTouched) setSlots(suggestedSlots(nowMs(), tz));
-                    }}
-                  />
-                </div>
-                <p className="mt-1.5 text-xs text-text-subtle">Set from your company&apos;s location. The candidate sees the times in IST.</p>
-              </div>
-              {meetingError ? (
-                <p role="alert" className="text-sm text-danger">
-                  {meetingError}
-                </p>
-              ) : null}
-              <DialogFooter>
-                <button type="button" onClick={() => setMeetingCandidate(null)} className={buttonClass({ variant: "light", size: "sm", className: "min-h-11" })}>
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={busyId === "booking-meeting"}
-                  className={buttonClass({ variant: "primary", size: "sm", className: "min-h-11" })}
-                >
-                  {busyId === "booking-meeting" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-                  Send meeting request
-                </button>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
-    </div>
-  );
-}
-
-function CartLine({
-  line,
-  name,
-  currency,
-  timezone,
-  busy,
-  onMeeting,
-  onRemove,
-}: {
-  line: CartLineItem;
-  name: string;
-  currency: Currency;
-  timezone: string;
-  busy: boolean;
-  onMeeting: () => void;
-  onRemove: () => void;
-}) {
-  const c = line.candidate;
-  const band = bandFor(c.score);
-  const locked = meetingLocked(line);
-  const closed = Boolean(line.projectClosed);
-  const profileHref = `/employer/intern/${encodeURIComponent(c.id)}?project=${encodeURIComponent(line.projectId)}`;
-
-  return (
-    <Surface as="li" className="p-5">
-      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-        <span aria-hidden className="grid size-12 place-items-center rounded-apple-md bg-brand-50 text-base font-semibold text-brand-800">
-          {c.initials}
-        </span>
+      <div className="grid gap-6 pb-[calc(9rem+env(safe-area-inset-bottom))] lg:grid-cols-[minmax(0,1fr)_21rem] lg:items-start lg:pb-0">
         <div className="min-w-0">
-          <p className="flex flex-wrap items-center gap-2">
-            <Link href={profileHref} className="inline-flex min-h-6 min-w-6 items-center touch:min-h-11 touch:min-w-11 text-base font-medium text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline">
-              {name}
-            </Link>
-            {line.acceptedProposalId ? (
-              <Pill tone="waiting">Offer accepted</Pill>
-            ) : line.openProposalId ? (
-              <Pill tone="new">Proposal sent</Pill>
-            ) : locked ? (
-              <Pill tone="live">Meeting booked</Pill>
-            ) : null}
-            {closed ? <Pill tone="closed">Project closed</Pill> : null}
-          </p>
-          <p className="mt-0.5 text-sm text-ink-600">For {line.projectName}</p>
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
-            {c.location ? (
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="size-4 text-ink-400" aria-hidden />
-                {c.location}
-              </span>
-            ) : null}
-            {c.hasLaptop != null ? (
-              <span className="inline-flex items-center gap-1.5">
-                <Laptop className="size-4 text-ink-400" aria-hidden />
-                {c.hasLaptop ? "Has a laptop" : "No laptop"}
-              </span>
-            ) : null}
-          </p>
-          {c.skills.length ? (
-            <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Skills">
-              {c.skills.map((s) => (
-                <li key={s} className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
-                  {s}
-                </li>
-              ))}
-            </ul>
+          {projectOptions.length > 1 ? (
+            <label className={cn(labelClass, "mb-4 flex items-center gap-2")}>
+              <span className="shrink-0">Project</span>
+              <select value={selectedProject} onChange={(e) => setSelectedProject(e.target.value)} className={cn(fieldClass, "w-auto min-w-48")}>
+                <option value="all">All projects</option>
+                {projectOptions.map(([id, name]) => (
+                  <option key={id} value={id}>
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          {shown.length > 0 ? renderGroups(shown) : null}
+          {shown.length === 0 ? <p className="rounded-[24px] bg-white p-5 text-sm text-ink-600 shadow-tile ring-1 ring-ink-100">Everyone saved here already has a proposal.</p> : null}
+
+          {proposed.length > 0 ? (
+            <section aria-labelledby="proposed-heading" className="mt-10">
+              <h2 id="proposed-heading" className="mb-3 text-sm font-semibold text-ink-900">
+                Already proposed <span className="nums font-normal text-text-subtle">{proposed.length}</span>
+              </h2>
+              {renderGroups(proposed, shown.length)}
+            </section>
           ) : null}
         </div>
-        <div className="col-span-2 flex flex-wrap items-baseline gap-x-3 sm:col-span-1 sm:block sm:text-right">
-          <p className="nums text-3xl font-semibold leading-none text-brand-700">
-            {c.scored ? c.score.toFixed(1) : "-"}
-            <span className="ml-0.5 text-sm font-normal text-text-subtle">/10</span>
-          </p>
-          <p className="mt-1 text-xs font-medium text-ink-600">{PLAN_NAME[band.id]}</p>
-          <p className="nums mt-2 text-sm font-semibold text-ink-900">{formatRate(line.hourlyRateMinor, currency)}</p>
-        </div>
+
+        <CartSummary ready={shown.length} inProgress={proposed.length} target={continueTarget} />
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-4">
-        {line.acceptedProposalId ? (
-          <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(line.acceptedProposalId)}`} size="sm" className="min-h-11">
-            <CreditCard className="size-4" aria-hidden />
-            Pay to complete the hire
-          </ButtonLink>
-        ) : line.openProposalId ? (
-          <ButtonLink href={`/employer/proposal/${encodeURIComponent(line.openProposalId)}`} variant="outline" size="sm" className="min-h-11">
-            <Send className="size-4" aria-hidden />
-            View proposal
-          </ButtonLink>
-        ) : closed ? (
-          <span className="text-sm text-ink-600">Reopen the project to send a proposal.</span>
-        ) : locked ? (
-          // EMB-07: legacy kept Send Proposal off until the meeting was over.
-          <span
-            className={buttonClass({ size: "sm", className: "min-h-11 cursor-not-allowed opacity-55" })}
-            aria-disabled="true"
-            title="A proposal can be sent once the meeting is completed."
-          >
-            <Send className="size-4" aria-hidden />
-            Send proposal
-            <span className="sr-only"> (available once the meeting is completed)</span>
-          </span>
-        ) : (
-          <ButtonLink
-            href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}&project=${encodeURIComponent(line.projectId)}`}
-            size="sm"
-            className="min-h-11"
-          >
-            <Send className="size-4" aria-hidden />
-            Send proposal
-          </ButtonLink>
-        )}
+      {confirmDialog}
 
-        {/* Its own button, not in the menu (bug sheet 8). */}
-        {!line.acceptedProposalId && !closed && !locked ? (
-          <button type="button" onClick={onMeeting} className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}>
-            <Video className="size-4" aria-hidden />
-            Book meeting
-          </button>
-        ) : null}
-        {line.meetingLink ? <JoinMeetingButton link={line.meetingLink} variant="outline" /> : null}
-
-        {!line.acceptedProposalId && !closed && locked ? (
-          <span className="inline-flex min-h-11 items-center gap-1.5 px-2 text-sm text-ink-600" title="You can book another meeting once this one's time is over.">
-            <CalendarCheck className="size-4 text-brand-700" aria-hidden />
-            Meeting until {untilLabel(line.meetingUntil!, timezone)}
-          </span>
-        ) : null}
-
-        {/* Profile and remove stay in the menu (QA-124). */}
-        {busy ? <Loader2 className="ml-auto size-4 animate-spin motion-reduce:animate-none text-text-subtle" aria-label="Removing" /> : null}
-        <RowMenu
-          label={`More actions for ${name}`}
-          className={busy ? undefined : "ml-auto"}
-          items={[
-            { label: "Open profile", href: profileHref, icon: <UserRound /> },
-            { label: "Remove from shortlist", onSelect: onRemove, icon: <Trash2 />, destructive: true, disabled: busy },
-          ]}
-        />
-      </div>
-      {locked && !line.openProposalId && !line.acceptedProposalId ? (
-        <p className="mt-2 text-xs text-text-subtle">Send a proposal once the meeting is completed.</p>
-      ) : null}
-    </Surface>
+      <MeetingDialog
+        name={meetingCandidate ? nameOf(meetingCandidate) : null}
+        open={Boolean(meetingCandidate)}
+        onClose={() => setMeetingCandidate(null)}
+        success={meetingSuccess}
+        error={meetingError}
+        booking={busyId === "booking-meeting"}
+        slots={slots}
+        setSlots={setSlots}
+        slotsTouched={slotsTouched}
+        setSlotsTouched={setSlotsTouched}
+        timezone={timezone}
+        setTimezone={setTimezone}
+        onSubmit={handleBookMeeting}
+      />
+    </div>
   );
-}
-
-/** The clock, read in event handlers only. */
-function nowMs(): number {
-  return Date.now();
-}
-
-/** An open meeting still holds this candidate. */
-function meetingLocked(line: CartLineItem): boolean {
-  return Boolean(line.meetingUntil && Date.parse(line.meetingUntil) > nowMs());
-}
-
-/** "3 Nov, 4:30 pm" in the company's timezone. */
-function untilLabel(iso: string, timeZone: string): string {
-  return shortDateTime(new Date(iso), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit", timeZone });
 }

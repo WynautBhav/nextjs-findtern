@@ -43,6 +43,8 @@ async function loadInternInvoices(): Promise<AdminInvoiceRow[]> {
     .from(schema.internPayments)
     .leftJoin(schema.users, eq(schema.users.id, schema.internPayments.internId))
     .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.internPayments.internId))
+    // A college-paid waiver is not an invoice. IS DISTINCT FROM keeps legacy rows whose gateway is null.
+    .where(sql`${schema.internPayments.gateway} IS DISTINCT FROM 'college_drive'`)
     .orderBy(desc(schema.internPayments.createdAt));
 
   // Interns marked paid only by the profile flag (legacy/admin) have no

@@ -94,7 +94,7 @@ export default async function InternRecord({ searchParams }: { searchParams: Pro
       ) : (
         <div className="space-y-4 lg:space-y-6">
           <RecordCertificate name={candidate} internship={internship} asOf={new Date()} totals={totals} />
-          <Surface className="p-5 sm:p-8">
+          <Surface className="p-5 shadow-tile sm:p-8">
             <RecordTimeline proofs={shown} />
             {older > 0 ? (
               <div className="mt-6 border-t border-ink-100 pt-5 pl-14 sm:pl-15">

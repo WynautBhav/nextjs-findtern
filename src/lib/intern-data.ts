@@ -2,6 +2,7 @@ import { cache } from "react";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, hasDb, schema } from "@/lib/db";
+import { INTERN_VISIBLE_STATUSES } from "@/lib/projects/transition";
 import {
   HIDDEN_COMPANY,
   activeEngagement,
@@ -169,7 +170,8 @@ export async function openProjects(limit = 60, opts: { strict?: boolean } = {}) 
     })
     .from(schema.projects)
     .innerJoin(schema.employers, eq(schema.projects.employerId, schema.employers.id))
-    .where(and(eq(schema.projects.status, "active"), eq(schema.projects.employerId, schema.projects.employerId)))
+    // Only published postings (and legacy "active" rows) are visible to interns.
+    .where(inArray(schema.projects.status, [...INTERN_VISIBLE_STATUSES]))
     .orderBy(desc(schema.projects.createdAt))
     .limit(limit);
   } catch (e) {
@@ -201,7 +203,7 @@ export async function projectById(id: string, opts: { strict?: boolean } = {}) {
     })
     .from(schema.projects)
     .innerJoin(schema.employers, eq(schema.projects.employerId, schema.employers.id))
-    .where(eq(schema.projects.id, id))
+    .where(and(eq(schema.projects.id, id), inArray(schema.projects.status, [...INTERN_VISIBLE_STATUSES])))
     .limit(1);
     return row ?? null;
   } catch (e) {

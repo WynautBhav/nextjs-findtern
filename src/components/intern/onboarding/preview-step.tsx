@@ -48,12 +48,6 @@ export function PreviewStep({ values, update, errors, onJumpStep }: StepProps) {
         </header>
 
         <div className="divide-y divide-ink-200/70">
-          {values.bio.trim() ? (
-            <Block title="About" onEdit={() => onJumpStep(0)}>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{values.bio}</p>
-            </Block>
-          ) : null}
-
           <Block title="Academics" onEdit={() => onJumpStep(1)}>
             <dl className="divide-y divide-ink-100">
               <DetailRow label="Institution" value={a.institution || "-"} />

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 
-import { Pill, Surface } from "@/components/app/primitives";
+import { Pill } from "@/components/app/primitives";
 import { formatDate, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CheckoutPay } from "./checkout-pay";
@@ -84,7 +84,7 @@ export function CheckoutSummary({
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
       {/* ── What can be paid ───────────────────────────────────────── */}
       <fieldset className="min-w-0">
-        <legend className="mb-3 text-base font-semibold text-ink-900">
+        <legend className="mb-4 text-xl font-medium tracking-[-0.02em] text-ink-900">
           {lines.length === 1 ? "Ready to pay" : `${lines.length} ready to pay`}
           <span className="ml-2 text-sm font-normal text-ink-600">one hire per payment</span>
         </legend>
@@ -95,9 +95,9 @@ export function CheckoutSummary({
               <li key={l.id}>
                 <label
                   className={cn(
-                    "apple-spring flex cursor-pointer gap-4 rounded-apple-xl border bg-white p-5 shadow-xs",
+                    "apple-spring tile-lift flex cursor-pointer gap-4 rounded-[24px] border bg-white p-5 shadow-tile",
                     "has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-brand-600/30",
-                    selected ? "border-brand-600 ring-1 ring-brand-600" : "border-ink-200/80 hover:border-brand-300",
+                    selected ? "border-brand-600 ring-1 ring-brand-600" : "border-transparent ring-1 ring-ink-100 hover:ring-brand-300",
                   )}
                 >
                   <input
@@ -137,7 +137,7 @@ export function CheckoutSummary({
                       </span>
                     </span>
                     <span className="nums text-left sm:text-right">
-                      <span className="block text-lg font-semibold text-ink-900">{m(amountOf(l, l.id === line?.id ? mode : picked), l.currency)}</span>
+                      <span className="block text-2xl font-light tracking-[-0.03em] text-ink-900">{m(amountOf(l, l.id === line?.id ? mode : picked), l.currency)}</span>
                       <span className="block text-xs text-text-subtle">
                         {l.due ? "this month" : l.fullTimeCtcMinor != null ? "one-time fee" : l.postpaidMinor != null && (l.id === line?.id ? mode : picked) === "postpaid" ? "hiring charge + month 1, due now" : "whole internship"}
                       </span>
@@ -156,7 +156,7 @@ export function CheckoutSummary({
 
       {/* ── Order summary (sticky) ─────────────────────────────────── */}
       {line ? (
-        <Surface as="section" aria-label="Order summary" className="p-5 lg:sticky lg:top-24">
+        <section aria-label="Order summary" className="min-w-0 rounded-[24px] bg-white p-6 shadow-tile ring-1 ring-ink-100 lg:sticky lg:top-24">
           <h2 className="text-base font-semibold text-ink-900">Order summary</h2>
           <p className="mt-0.5 truncate text-sm text-ink-600">
             {line.who} · {line.roleTitle}
@@ -227,7 +227,7 @@ export function CheckoutSummary({
             )}
             <div className="flex items-baseline justify-between gap-3 border-t border-ink-100 pt-3">
               <dt className="text-sm font-medium text-ink-800">{mode === "upfront" ? "Total" : "Due now"}</dt>
-              <dd className="nums text-2xl font-semibold tracking-[-0.02em] text-ink-900">{m(amountMinor, line.currency)}</dd>
+              <dd className="nums text-4xl font-light tracking-[-0.04em] text-ink-900">{m(amountMinor, line.currency)}</dd>
             </div>
           </dl>
 
@@ -268,7 +268,7 @@ export function CheckoutSummary({
               Past payments
             </Link>
           </p>
-        </Surface>
+        </section>
       ) : null}
     </div>
   );

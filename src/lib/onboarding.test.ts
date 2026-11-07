@@ -33,7 +33,6 @@ import { districtsOf } from "./data/districts.ts";
 
 // Shaped exactly like a row the legacy onboarding page saves.
 const legacyRow = {
-  bio: "Final-year CS student",
   city: "Jaipur",
   state: "Rajasthan",
   skills: [
@@ -278,7 +277,6 @@ function complete(): OnboardingDraft {
   const d = emptyDraft();
   return {
     ...d,
-    bio: "",
     city: "Jaipur",
     state: "Rajasthan",
     pinCode: "302017",
@@ -475,7 +473,7 @@ test("bank details are required in full when saved", () => {
 });
 
 test("draft saves only refuse impossible values", () => {
-  assert.equal(formatProblems({ bio: "" }), null);
+  assert.equal(formatProblems({ city: "" }), null);
   assert.ok(formatProblems({ academics: { scoreType: "cgpa", cgpa: "42" } }));
 });
 

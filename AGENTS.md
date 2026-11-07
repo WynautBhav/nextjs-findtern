@@ -18,3 +18,13 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - UI primitives come from Watermelon registry (`@watermelon` in `components.json`). Install via `npx shadcn@latest add https://registry.watermelon.sh/r/<name>.json`.
 - Verify with: `npx tsc --noEmit` → `npm run lint` → `npm test` → `npm run db:verify`.
 
+
+## Agent workflow (plan, build, verify)
+
+The main chat runs on Sonnet. For work that spans several files or areas, use named agents from `.gg/agents/` through the `subagent` tool (not `spawn_agent`, which only offers the built-in names and caps at 8):
+
+1. **Plan:** call `opus-planner` (Opus, read-only). Spawn exactly one at the start. It returns a plan with file ownership per task, then ends.
+2. **Build:** call `sonnet-builder` (Sonnet), at most **6 `subagent` calls in one reply**, all in the same turn so they run in parallel. Give each one its own files, a standalone brief and acceptance criteria. Never let two builders edit the same file. One builder owns each new `drizzle/` migration.
+3. **Verify:** call `opus-reviewer` (Opus, read-only) on the integrated diff. It runs `npx tsc --noEmit`, `npm run lint` and `npm test`. Fix its findings before committing.
+
+Skip the Opus steps for small, clear fixes. Review each builder's diff before the next wave.

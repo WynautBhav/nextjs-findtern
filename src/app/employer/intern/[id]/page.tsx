@@ -3,18 +3,19 @@ import { proposalPill } from "@/components/employer/proposal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
-import { ArrowLeft, Laptop, Link2, MapPin, Send } from "lucide-react";
+import { ArrowLeft, Laptop, Link2, MapPin, Send, ShieldCheck, Wifi } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { candidateRelations, isAdminViewing, type CandidateRelation } from "@/lib/employer-visibility";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
-import { bandFor } from "@/lib/score";
 import { formatDate, formatMoney, formatRate } from "@/lib/format";
 import { displayNameOf, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
-import { CandidateAvatar } from "@/components/employer/candidate-avatar";
+import { Avatar } from "@/components/app/avatar";
+import { MetaList } from "@/components/app/meta-list";
+import { skillMatch } from "@/components/app/skill-match";
 import { candidateStatusPill } from "@/components/employer/candidate-status";
 import { CompareToggle } from "@/components/employer/compare-toggle";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
@@ -27,6 +28,8 @@ import { parseOffer } from "@/lib/offer";
 import { timezoneForLocation } from "@/lib/timezones";
 import { dateLabel, draftFromRecord, linkedinHref, type OnboardingDraft } from "@/lib/onboarding";
 import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { InternIdentityHero } from "@/components/employer/intern-detail/identity-hero";
+import { ScoreTile } from "@/components/employer/intern-detail/score-tile";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { ButtonLink } from "@/components/ui/button";
@@ -87,6 +90,7 @@ export default async function EmployerInternDetail({
   let comparePicks: string[] = [];
   let employerFte = "none";
   let employerZone = "Asia/Kolkata";
+  let projectSkills: string[] = [];
 
   try {
     const db = getDb();
@@ -117,6 +121,8 @@ export default async function EmployerInternDetail({
         projectRows.find((row) => row.id === remembered.project) ??
         projectRows[0];
       if (project) {
+        const [wanted] = await db.select({ skills: schema.projects.skills }).from(schema.projects).where(eq(schema.projects.id, project.id)).limit(1);
+        projectSkills = Array.isArray(wanted?.skills) ? wanted.skills.filter((x): x is string => typeof x === "string") : [];
         const [item] = await db
           .select({ id: schema.employerCartItems.id })
           .from(schema.employerCartItems)
@@ -278,7 +284,6 @@ export default async function EmployerInternDetail({
     aiFeedbackLink: profile.aiFeedbackLink,
     aiRecordingLink: profile.aiRecordingLink,
   });
-  const band = bandFor(profile.score);
   const pricing = resolvePricing(profile.score, plans, currency, region);
   const experiences = (details.experiences ?? []).filter((e) => e.company || e.role);
   const qualifications = [...(details.academics?.professional ?? []), ...(details.academics?.certifications ?? [])].filter((q) => q.name);
@@ -286,6 +291,23 @@ export default async function EmployerInternDetail({
   const activities = (details.extracurriculars ?? []).filter((a) => a.activity);
   const academics = profile.academics;
   const displayName = displayNameOf(profile, nameUnlocked);
+  const preferred = preferredCities(profile.preferredLocations).join(", ");
+  const sendHref = `/employer/send-proposal?intern=${encodeURIComponent(profile.id)}${shortlist ? `&project=${encodeURIComponent(shortlist.projectId)}` : ""}`;
+  const primary =
+    action.kind === "send" ? (
+      <ButtonLink href={sendHref} variant="primary">
+        <Send className="size-4" aria-hidden />
+        Send proposal
+      </ButtonLink>
+    ) : action.kind === "view" ? (
+      <ButtonLink href={`/employer/proposal/${encodeURIComponent(action.proposalId)}`} variant="primary">
+        View sent proposal
+      </ButtonLink>
+    ) : relation?.hired ? null : (
+      <p className="rounded-apple-sm bg-ink-100 px-4 py-2.5 text-sm text-ink-700">{action.reason}</p>
+    );
+  const matched = skillMatch(profile.skills, projectSkills);
+  const matchedSet = new Set(matched.matched.map((x) => x.toLowerCase()));
   const status = candidateStatusPill(relation?.proposal ?? null);
   const compareBlocked = relation?.hired
     ? "Hired - not compared"
@@ -313,118 +335,75 @@ export default async function EmployerInternDetail({
         </p>
       ) : null}
 
-      {/* ── Identity and the score, the one thing an employer decides on ── */}
-      <Surface className="mb-8 p-6 sm:p-8">
-        <div className="flex flex-wrap items-start gap-x-8 gap-y-6">
-          <div className="flex min-w-0 flex-1 basis-80 items-start gap-5">
-            <CandidateAvatar
-              photoUrl={profile.photoUrl}
-              initials={profile.initials}
-              className="size-16 rounded-apple-lg text-xl ring-1 ring-inset ring-brand-200/70"
-            />
-            <div className="min-w-0">
-              <h1 className="break-words text-3xl font-semibold leading-tight text-ink-900">{displayName}</h1>
-              <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
-                <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="size-4 text-ink-400" aria-hidden />
-                  {profile.location || "Location not stated"}
-                </span>
-                {profile.hasLaptop !== null ? (
-                  <span className="inline-flex items-center gap-1.5">
-                    <Laptop className="size-4 text-ink-400" aria-hidden />
-                    {profile.hasLaptop ? "Has a laptop" : "Needs a laptop"}
-                  </span>
-                ) : null}
-              </p>
-              {profile.workModes.length > 0 ? <p className="mt-1 text-sm text-ink-600">Open to {profile.workModes.join(", ").toLowerCase()}</p> : null}
-              {status ? (
-                <div className="mt-3">
-                  <Pill tone={status.tone}>{status.label}</Pill>
-                </div>
-              ) : null}
-            </div>
-          </div>
+      {/* ── Identity first: who, how they score, what they cost ── */}
+      <InternIdentityHero
+        avatar={
+          <Avatar
+            size="lg"
+            masked={!nameUnlocked}
+            name={nameUnlocked ? displayName : undefined}
+            initials={profile.initials}
+            src={profile.photoUrl}
+            className="size-16 sm:size-20"
+          />
+        }
+        title={nameUnlocked ? displayName : `Candidate ${displayName}`}
+        status={status ? <Pill tone={status.tone}>{status.label}</Pill> : null}
+        meta={
+          <MetaList
+            items={[
+              { icon: <MapPin />, text: profile.location || "Location not stated" },
+              { icon: <Wifi />, text: profile.workModes.length > 0 ? `Open to ${profile.workModes.join(", ").toLowerCase()}` : null },
+              { icon: <Laptop />, text: profile.hasLaptop === null ? null : profile.hasLaptop ? "Has a laptop" : "Needs a laptop" },
+            ]}
+          />
+        }
+        rate={formatRate(pricing.hourlyRateMinor, currency)}
+        rateHint="Hourly rate, set by score band"
+      />
+      <ScoreTile profile={profile} />
 
-          {/* Not shrink-0 on phones: the price line set the block's width and
-              ran to x=460 on a 375 screen (QA-119). It wraps instead. */}
-          <div className="flex min-w-0 gap-8 sm:shrink-0">
-            <div className="shrink-0">
-              <p className="text-sm font-medium text-ink-600">Findtern Score</p>
-              <p className="nums mt-1 text-4xl font-semibold leading-none text-brand-700">
-                {profile.scored ? profile.score.toFixed(1) : "-"}
-                <span className="ml-0.5 text-base font-medium text-text-subtle">/10</span>
-              </p>
-              <p className="mt-1.5 text-sm text-ink-600">{band.name}</p>
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-ink-600">Price</p>
-              <p className="nums mt-2.5 text-2xl font-semibold leading-none text-ink-900">
-                {formatRate(pricing.hourlyRateMinor, currency)}
-              </p>
-              <p className="mt-2.5 text-sm text-ink-600">
-                {/* The price is said once, here: no separate "what hiring costs" card. */}
-                {pricing.perHireMinor > 0 ? `+ ${formatMoney(pricing.perHireMinor, currency)} per hire · ` : ""}set by the score band
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-5">
-          {action.kind === "send" ? (
-            <ButtonLink
-              href={`/employer/send-proposal?intern=${encodeURIComponent(profile.id)}${shortlist ? `&project=${encodeURIComponent(shortlist.projectId)}` : ""}`}
-              variant="primary"
-            >
-              <Send className="size-4" aria-hidden />
-              Send proposal
-            </ButtonLink>
-          ) : action.kind === "view" ? (
-            <ButtonLink href={`/employer/proposal/${encodeURIComponent(action.proposalId)}`} variant="primary">
-              View sent proposal
-            </ButtonLink>
-          ) : relation?.hired ? null : (
-            <p className="rounded-apple-sm bg-ink-100 px-4 py-2.5 text-sm text-ink-700">{action.reason}</p>
-          )}
-          {relation?.hired && relation.proposal ? (
-            <ButtonLink href={`/employer/proposal/${encodeURIComponent(relation.proposal.id)}`} variant="primary">
-              View placement
-            </ButtonLink>
-          ) : null}
-          {relation?.fullTimeFrom ? (
-            <FullTimeOfferButton
-              employerId={employerId}
-              proposalId={relation.fullTimeFrom}
-              candidate={displayName}
-              fteStatus={employerFte}
-              timezone={employerZone}
-            />
-          ) : null}
-          {shortlist && action.kind === "send" ? (
-            <ShortlistToggle internId={profile.id} projectId={shortlist.projectId} shortlisted={shortlist.on} />
-          ) : null}
-          {/* EMB-12: hires and full-time offers are not compared (legacy). */}
-          {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} picked={comparePicks} />}
-        </div>
-      </Surface>
-
-      <div className="grid gap-x-10 gap-y-8 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-x-10 gap-y-8 pb-24 lg:grid-cols-[minmax(0,1fr)_21rem] lg:pb-0">
         <div className="min-w-0 space-y-8">
-          {profile.skills.length > 0 ? (
-            <section>
-              <SectionHead title="Skills and tools" />
-              <ul className="flex flex-wrap gap-2">
-                {profile.skills.map((skill) => (
-                  <li key={skill} className="rounded-full bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800 ring-1 ring-inset ring-brand-200/70">
-                    {skill}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
+          <section>
+            <SectionHead title="Skills and tools" />
+            {profile.skills.length > 0 ? (
+              <>
+                {projectSkills.length > 0 ? (
+                  <p className="mb-3 text-sm text-ink-700">
+                    <span className="nums font-semibold">{matched.matched.length} of {matched.total}</span> skills your project asks for.
+                  </p>
+                ) : null}
+                <ul className="flex flex-wrap gap-2">
+                  {profile.skills.map((skill) => {
+                    const hit = matchedSet.has(skill.toLowerCase());
+                    return (
+                      <li
+                        key={skill}
+                        className={
+                          hit
+                            ? "rounded-full bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800"
+                            : "rounded-full bg-ink-100 px-3 py-1.5 text-sm text-ink-700"
+                        }
+                      >
+                        {hit ? <span className="sr-only">Matches your project: </span> : null}
+                        {skill}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            ) : (
+              <p className="rounded-apple-md border border-dashed border-ink-200 px-4 py-5 text-sm text-text-subtle">
+                This candidate has not listed skills yet. The AI interview scores below are the best signal for now.
+              </p>
+            )}
+          </section>
 
           <section id="ai-report" className="scroll-mt-24">
             <AiFeedbackReport
               candidateName={displayName}
+              heading="AI interview report"
               findternScore={profile.score}
               ratings={profile.ratings}
               aiFeedbackLink={aiLinks.feedbackLink}
@@ -432,15 +411,6 @@ export default async function EmployerInternDetail({
               aiRecordingLink={nameUnlocked ? aiLinks.recordingLink : null}
             />
           </section>
-
-          {profile.bio ? (
-            <section>
-              <SectionHead title="About" />
-              <Surface className="p-6">
-                <p className="whitespace-pre-line text-sm leading-relaxed text-ink-700">{profile.bio}</p>
-              </Surface>
-            </section>
-          ) : null}
 
           {academics ? (
             <section>
@@ -539,38 +509,62 @@ export default async function EmployerInternDetail({
           ) : null}
         </div>
 
-        <aside className="min-w-0 space-y-4">
-          <Surface className="px-5 py-2">
-            <h2 className="pt-3 text-base font-semibold text-ink-900">Practicalities</h2>
-            <dl className="divide-y divide-ink-100">
-              <DetailRow label="City" value={profile.city || "Not stated"} />
-              <DetailRow label="Work mode" value={profile.workModes.join(", ") || "Not stated"} />
-              <DetailRow
-                label="Prefers"
-                value={
-                  preferredCities(profile.preferredLocations).join(", ") ||
-                  (profile.workModes.length === 1 && profile.workModes[0] === "Remote" ? "Remote only" : "Not stated")
-                }
-              />
-              <DetailRow
-                label="Laptop"
-                value={profile.hasLaptop === null ? "Not stated" : profile.hasLaptop ? "Has one" : "Needs one provided"}
-              />
-            </dl>
-            {/* LinkedIn URLs usually contain the real name, so the link stays
-                hidden until the hire unmasks the candidate. */}
-            {nameUnlocked && linkedinHref(profile.linkedinUrl) ? (
-              <a
-                href={linkedinHref(profile.linkedinUrl) ?? undefined}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="mb-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
-              >
-                <Link2 className="size-4" aria-hidden />
-                LinkedIn profile
-              </a>
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-6 lg:self-start">
+          <Surface className="rounded-[24px] p-6 shadow-tile">
+            <h2 className="text-base font-semibold text-ink-900">Hire {nameUnlocked ? displayName : "this candidate"}</h2>
+            <p className="nums mt-2 text-4xl font-light tracking-[-0.04em] text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
+            <p className="mt-1 text-sm text-ink-600">
+              You pay this rate for the hours worked
+              {pricing.perHireMinor > 0 ? `, plus a one-time ${formatMoney(pricing.perHireMinor, currency)} when you hire` : ""}. The rate is set by the score band, not negotiated.
+            </p>
+            <div className="mt-4 flex flex-col gap-2 [&>*]:w-full [&_a]:w-full [&_button]:w-full">
+              {primary}
+              {relation?.hired && relation.proposal ? (
+                <ButtonLink href={`/employer/proposal/${encodeURIComponent(relation.proposal.id)}`} variant="primary">
+                  View placement
+                </ButtonLink>
+              ) : null}
+              {relation?.fullTimeFrom ? (
+                <FullTimeOfferButton
+                  employerId={employerId}
+                  proposalId={relation.fullTimeFrom}
+                  candidate={displayName}
+                  fteStatus={employerFte}
+                  timezone={employerZone}
+                />
+              ) : null}
+              {shortlist && action.kind === "send" ? (
+                <ShortlistToggle internId={profile.id} projectId={shortlist.projectId} shortlisted={shortlist.on} />
+              ) : null}
+              {/* EMB-12: hires and full-time offers are not compared (legacy). */}
+              {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} picked={comparePicks} />}
+            </div>
+            {!nameUnlocked ? (
+              <p className="mt-4 flex items-start gap-2 text-sm text-text-subtle">
+                <ShieldCheck className="mt-0.5 size-4 shrink-0" aria-hidden />
+                Name and LinkedIn stay hidden until you hire. The photo and scores are visible now.
+              </p>
             ) : null}
           </Surface>
+
+          {preferred ? (
+            <p className="px-1 text-sm text-ink-600">
+              <span className="font-medium text-ink-900">Prefers: </span>
+              {preferred}
+            </p>
+          ) : null}
+
+          {nameUnlocked && linkedinHref(profile.linkedinUrl) ? (
+            <a
+              href={linkedinHref(profile.linkedinUrl) ?? undefined}
+              target="_blank"
+              rel="noreferrer noopener"
+              className="inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
+            >
+              <Link2 className="size-4" aria-hidden />
+              LinkedIn profile
+            </a>
+          ) : null}
 
           {appliedProjects.length > 0 ? (
             <Surface className="p-5">
@@ -592,6 +586,15 @@ export default async function EmployerInternDetail({
           ) : null}
         </aside>
       </div>
+      {/* Phones: the one primary action stays in reach, above the safe area. */}
+      {action.kind !== "blocked" ? (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white/95 px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
+          <div className="flex items-center gap-3 [&_a]:min-h-11 [&_a]:flex-1">
+            <p className="nums shrink-0 text-sm font-semibold text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
+            {primary}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

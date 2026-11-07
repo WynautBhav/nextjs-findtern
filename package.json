@@ -24,7 +24,11 @@
     "db:seed-colleges": "DATABASE_URL=${DATABASE_URL:-postgresql://findtern:findtern_dev@localhost:5432/findtern} node --experimental-strip-types scripts/seed-colleges.ts",
     "test:e2e:college": "node --test e2e/college-partners.e2e.mjs",
     "test:e2e:college-money": "node --test e2e/college-money.e2e.mjs",
+    "test:e2e:drive": "node --test --test-concurrency=1 e2e/drive-journey.e2e.mjs",
     "e2e:admin": "node --test e2e/admin.e2e.mjs",
+    "test:e2e:messaging": "node --test --test-concurrency=1 e2e/messaging.e2e.mjs",
+    "test:e2e:projects": "node --test --test-concurrency=1 e2e/projects-lifecycle.e2e.mjs",
+    "test:e2e:limits": "node --test --test-concurrency=1 e2e/profile-limits.e2e.mjs",
     "qa": "node e2e/qa.mjs",
     "qa:serve": "node e2e/qa-serve.mjs",
     "qa:seed": "node e2e/seed-situations.mjs"

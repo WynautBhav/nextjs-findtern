@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 
 import { EmptyScene, FilterTabs, PageHead, SectionHead } from "@/components/app/primitives";
-import { NotificationList, type NotificationRow } from "@/components/app/notification-list";
+import type { NotificationRow } from "@/components/app/notification-list";
+import { NotificationTimeline } from "@/components/intern/kit/notification-timeline";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { requireRole } from "@/lib/auth";
@@ -73,7 +74,7 @@ export default async function InternNotifications({
             ? `${unreadCount} unread. Open one to go straight to what it is about.`
             : "You are all caught up. New offers, interviews and payments land here."
         }
-        action={<NotificationList mode="mark-all" disabled={unreadCount === 0} />}
+        action={<NotificationTimeline mode="mark-all" disabled={unreadCount === 0} />}
       />
 
       {/* The shared tab look; hidden when All and Unread are the same list. */}
@@ -110,14 +111,14 @@ export default async function InternNotifications({
           {needsYou.length > 0 ? (
             <section>
               <SectionHead title="Needs you" hint="A decision, a document, or something waiting on your side." />
-              <NotificationList rows={needsYou} />
+              <NotificationTimeline rows={needsYou} />
             </section>
           ) : null}
 
           {rest.length > 0 ? (
             <section>
               {needsYou.length > 0 ? <SectionHead title="Everything else" /> : null}
-              <NotificationList rows={rest} />
+              <NotificationTimeline rows={rest} />
             </section>
           ) : null}
 

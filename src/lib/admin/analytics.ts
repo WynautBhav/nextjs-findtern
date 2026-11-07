@@ -103,7 +103,7 @@ export function computeAnalytics(input: AnalyticsInput) {
     paidOrders.set(pay.employerId, (paidOrders.get(pay.employerId) ?? 0) + 1);
   }
   const repeatEmployers = [...paidOrders.values()].filter((n) => n >= 2).length;
-  const activeProjects = projectsIn.filter((p) => !p.status || p.status.toLowerCase() === "active").length;
+  const activeProjects = projectsIn.filter((p) => !p.status || ["active", "published"].includes(p.status.toLowerCase())).length;
 
   const totals = {
     signups,

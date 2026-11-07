@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, BriefcaseBusiness, CalendarCheck2, CircleUserRound, LayoutList, ReceiptIndianRupee } from "lucide-react";
+import { BriefcaseBusiness, CalendarCheck2, CircleUserRound, LayoutList, ReceiptIndianRupee } from "lucide-react";
 
 import { Pill, type Tone } from "@/components/app/primitives";
 import { CompanyInitials } from "@/components/marketing/role-card";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  * tile only. Every tile's action is the round arrow in its top-right corner. */
 
 const TILE =
-  "min-w-0 rounded-apple-xl bg-white shadow-tile";
+  "min-w-0 rounded-apple-xl border border-ink-200/70 bg-white";
 
 /** The round corner action. 36px, with a 44px hit area on touch. */
 export function CornerLink({ href, label, onDark = false, prefetch }: { href: string; label: string; onDark?: boolean; prefetch?: boolean }) {
@@ -20,16 +20,13 @@ export function CornerLink({ href, label, onDark = false, prefetch }: { href: st
     <Link
       href={href}
       prefetch={prefetch}
-      aria-label={label}
       title={label}
       className={cn(
-        "apple-spring relative grid size-9 shrink-0 place-items-center rounded-full border touch:before:absolute touch:before:-inset-1 touch:before:content-['']",
-        onDark
-          ? "border-white/25 text-white hover:bg-white/10"
-          : "border-ink-200 text-ink-700 hover:border-brand-600 hover:bg-brand-50 hover:text-brand-700",
+        "apple-spring inline-flex min-h-9 shrink-0 items-center rounded-full px-3 text-sm font-medium touch:min-h-11",
+        onDark ? "text-white hover:bg-white/10" : "text-brand-700 hover:bg-brand-50",
       )}
     >
-      <ArrowUpRight className="size-4" aria-hidden />
+      Open<span className="sr-only"> {label}</span>
     </Link>
   );
 }
@@ -38,6 +35,7 @@ export function Tile({
   title,
   description,
   action,
+  corner = true,
   aside,
   children,
   className,
@@ -47,6 +45,8 @@ export function Tile({
   description?: React.ReactNode;
   /** `prefetch: false` for a link out to the marketing site: prefetching it downloads that page's scripts (gsap among them) on every dashboard visit. */
   action?: { href: string; label: string; prefetch?: boolean };
+  /** `false` hides the corner arrow (default true keeps current callers). */
+  corner?: boolean;
   /** Small control beside the title (a legend, a period). */
   aside?: React.ReactNode;
   children: React.ReactNode;
@@ -58,7 +58,7 @@ export function Tile({
         <h2 className="text-base font-medium text-ink-900">{title}</h2>
         <div className="flex items-center gap-2">
           {aside}
-          {action ? <CornerLink {...action} /> : null}
+          {action && corner ? <CornerLink {...action} /> : null}
         </div>
       </div>
       {description ? <p className="mb-4 text-pretty text-sm text-ink-600">{description}</p> : null}
@@ -81,6 +81,7 @@ export function StatTile({
   unit,
   meta,
   href,
+  corner = true,
   featured = false,
   index = 0,
   quiet = false,
@@ -90,6 +91,8 @@ export function StatTile({
   unit?: string;
   meta?: React.ReactNode;
   href?: string;
+  /** `false` hides the corner arrow (default true). */
+  corner?: boolean;
   /** The one brand-filled tile on the screen. */
   featured?: boolean;
   /** Position in the row, for the entrance stagger. */
@@ -109,19 +112,19 @@ export function StatTile({
         // No @container here: its layout containment switches subgrid off; the figure has its own.
         "relative isolate row-span-3 grid grid-rows-subgrid gap-0 overflow-hidden p-4 motion-safe:animate-tile-in sm:p-5",
         // The one brand tile is an owner decision (SPECS §2 dashboard exception).
-        featured && "max-sm:col-span-2 bg-[linear-gradient(140deg,var(--color-brand-600)_0%,var(--color-brand-800)_55%,var(--color-brand-950)_100%)] text-white shadow-tile-brand", // taste-skill-ignore
+        featured && "max-sm:col-span-2 bg-[linear-gradient(140deg,var(--color-brand-600)_0%,var(--color-brand-800)_55%,var(--color-brand-950)_100%)] border-transparent text-white", // taste-skill-ignore
       )}
     >
       {featured ? <Contours /> : null}
       <div className="flex items-start justify-between gap-3">
         <p className={cn("pt-1.5 text-sm font-medium", featured ? "text-white/85" : "text-ink-700")}>{label}</p>
-        {href ? <CornerLink href={href} label={label} onDark={featured} /> : null}
+        {href && corner ? <CornerLink href={href} label={label} onDark={featured} /> : null}
       </div>
       {/* Sized to the tile, not the window, so a figure never breaks mid-number. */}
       <div className="@container self-end pt-3">
         <p
           className={cn(
-            "nums font-medium",
+            "nums font-light",
             quiet
               ? "text-lg leading-snug"
               : cn("text-[clamp(var(--fig-min),16cqi,3.25rem)] leading-none tracking-[-0.03em]", long ? "break-words [--fig-min:1.25rem]" : "whitespace-nowrap [--fig-min:2rem]"),
@@ -331,35 +334,19 @@ export const DAY_MARK: Record<string, { cell: string; legend: string }> = {
  * Home and by the AI interview report, so the two never draw it differently.
  */
 export function ScoreScale({ rows }: { rows: { label: string; value: number | null }[] }) {
-  // Narrow: label and value on a line, the track under them. From 26rem: one line each.
-  const ROW = "grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 @[26rem]:grid-cols-[minmax(0,7.5rem)_minmax(0,1fr)_3.5rem]";
   return (
-    <dl className="@container grid content-start gap-y-3">
+    <dl className="grid content-start gap-y-3">
       {rows.map(({ label, value }) => (
-        <div key={label} className={ROW}>
+        <div key={label} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-1.5">
           <dt className="truncate text-sm text-ink-700">{label}</dt>
-          <dd className="nums text-right text-sm font-semibold text-ink-900 @[26rem]:order-last">
+          <dd className="nums text-right text-sm font-semibold tabular-nums text-ink-900">
             {value !== null ? value.toFixed(1) : <span className="font-normal text-text-subtle">Not rated</span>}
           </dd>
-          <dd aria-hidden className="relative col-span-2 h-2 rounded-full bg-ink-100 @[26rem]:col-span-1">
-            {value !== null ? (
-              <span
-                className="absolute top-1/2 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-700 ring-2 ring-white"
-                style={{ left: `${Math.min(10, Math.max(0, value)) * 10}%` }}
-              />
-            ) : null}
+          <dd aria-hidden className="col-span-2 h-0.5 rounded-full bg-ink-200">
+            {value !== null ? <span className="block h-full rounded-full bg-brand-600" style={{ width: `${Math.min(10, Math.max(0, value)) * 10}%` }} /> : null}
           </dd>
         </div>
       ))}
-      <div aria-hidden className={cn(ROW, "text-xs text-text-subtle")}>
-        <span className="hidden @[26rem]:block" />
-        <span className="nums col-span-2 flex justify-between @[26rem]:col-span-1">
-          <span>0</span>
-          <span>5</span>
-          <span>10</span>
-        </span>
-        <span className="hidden @[26rem]:block" />
-      </div>
     </dl>
   );
 }

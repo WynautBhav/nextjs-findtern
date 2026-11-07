@@ -2,19 +2,24 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Check, Eye, FileText, Laptop, MapPin, Scale, Send } from "lucide-react";
+import { ArrowUpRight, Check, Eye, FileText, MapPin, Scale, Send } from "lucide-react";
 
 import { bandFor } from "@/lib/score";
 import { formatMoney, formatRate } from "@/lib/format";
 import { RATING_META, displayNameOf, type CandidateProfile, type Ratings } from "@/lib/employer-candidates";
 import { resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
+import { Avatar } from "@/components/app/avatar";
+import { ScoreDial } from "@/components/app/score-dial";
+import { skillMatch } from "@/components/app/skill-match";
+import { MetaList } from "@/components/app/meta-list";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
-import { DetailRow, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { DetailRow, Pill, SectionHead } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
 /** Card-width labels for the four rating axes; the full label stays in `title`. */
@@ -52,6 +57,8 @@ export interface CandidateCardProps {
   fullTime?: FullTimeContext | null;
   /** Skills the list is filtered by: matching chips are tinted and listed first. */
   wantedSkills?: string[];
+  /** Position in the list, for the entrance stagger. */
+  index?: number;
 }
 
 /** The four AI interview axes as one compact meter. "-" when an axis is unrated. */
@@ -69,8 +76,8 @@ export function RatingMeter({ ratings, className }: { ratings: Ratings; classNam
             </dt>
             <dd className="mt-0.5">
               <span className="nums text-sm font-semibold text-ink-900">{value > 0 ? value.toFixed(1) : "-"}</span>
-              <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-ink-100" aria-hidden>
-                <span className="block h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, value * 10)}%` }} />
+              <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-ink-200/80" aria-hidden>
+                <span className="block h-full rounded-full bg-[linear-gradient(90deg,var(--color-brand-400),var(--color-brand-700))]" style={{ width: `${Math.min(100, value * 10)}%` }} />
               </span>
             </dd>
           </div>
@@ -99,6 +106,7 @@ export function CandidateCard({
   fullTimeFrom = null,
   fullTime = null,
   wantedSkills = [],
+  index = 0,
 }: CandidateCardProps) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const band = bandFor(candidate.score);
@@ -111,49 +119,79 @@ export function CandidateCard({
   const profileHref = `/employer/intern/${encodeURIComponent(candidate.id)}${projectId ? `?project=${encodeURIComponent(projectId)}` : ""}`;
   const sendHref = `/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ""}`;
 
+  const wantedList = wantedSkills.map((s) => s.trim()).filter(Boolean);
+  const matchCount = skillMatch(candidate.skills.map(skillName), wantedList);
+  const hasWanted = matchCount.total > 0;
+  const shownSkills = skills.slice(0, 3);
+  const moreSkills = skills.length - shownSkills.length;
+  const secondary = "relative z-10 min-h-10 rounded-full px-4 touch:min-h-11";
+
+  // Exactly one primary action per card, always bottom-left.
+  const primary = proposal ? (
+    <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="primary" size="sm" className={secondary}>
+      {proposalActionLabel(proposal)}
+    </ButtonLink>
+  ) : (
+    <ButtonLink href={sendHref} variant="primary" size="sm" className={secondary}>
+      <Send className="size-4" aria-hidden />
+      Send proposal
+    </ButtonLink>
+  );
+  const fullTimeOffer =
+    fullTimeFrom && fullTime ? (
+      <FullTimeOfferButton
+        employerId={fullTime.employerId}
+        proposalId={fullTimeFrom}
+        candidate={displayName}
+        fteStatus={fullTime.fteStatus}
+        timezone={fullTime.timezone}
+      />
+    ) : null;
+  // The drawer has room for everything: the shortlist (labelled), the primary, the full-time offer.
   const actions = (
     <>
-      {proposal ? (
-        <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="outline" size="sm" className="min-h-10 touch:min-h-11">
-          {proposalActionLabel(proposal)}
-        </ButtonLink>
-      ) : projectId ? (
-        <>
-          <ShortlistToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} size="sm" emphasis="primary" />
-          <ButtonLink href={sendHref} variant={shortlisted ? "primary" : "outline"} size="sm" className="min-h-10 touch:min-h-11">
-            <Send className="size-4" aria-hidden />
-            Send proposal
-          </ButtonLink>
-        </>
-      ) : (
-        <ButtonLink href={sendHref} variant="primary" size="sm" className="min-h-10 touch:min-h-11">
-          <Send className="size-4" aria-hidden />
-          Send proposal
-        </ButtonLink>
-      )}
-      {fullTimeFrom && fullTime ? (
-        <FullTimeOfferButton
-          employerId={fullTime.employerId}
-          proposalId={fullTimeFrom}
-          candidate={displayName}
-          fteStatus={fullTime.fteStatus}
-          timezone={fullTime.timezone}
-        />
-      ) : null}
+      {primary}
+      {!proposal && projectId ? <ShortlistToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} size="sm" /> : null}
+      {fullTimeOffer}
     </>
   );
+
+  // A quiet icon: the label carries the state.
+  const iconBtn = "relative z-10 inline-flex size-11 items-center justify-center rounded-full text-ink-600 outline-none transition-colors hover:bg-ink-100 hover:text-ink-900 focus-visible:ring-[3px] focus-visible:ring-brand-600/30";
+  const tip = (text: string, child: React.ReactElement) => (
+    <Tooltip>
+      <TooltipTrigger asChild>{child}</TooltipTrigger>
+      <TooltipContent>{text}</TooltipContent>
+    </Tooltip>
+  );
+  const slot = "flex size-11 shrink-0 items-center justify-center";
+  const compareIcon = !comparable
+    ? null
+    : compareHref
+      ? tip(
+          selected ? "In compare: remove" : "Add to compare",
+          <Link
+            href={compareHref}
+            scroll={false}
+            aria-label={selected ? `In compare: remove ${displayName}` : `Add ${displayName} to compare`}
+            className={cn(iconBtn, selected && "bg-brand-50 text-brand-800")}
+          >
+            {selected ? <Check className="size-5" aria-hidden /> : <Scale className="size-5" aria-hidden />}
+          </Link>,
+        )
+      : tip(
+          "Compare shows up to four candidates. Remove one to add another.",
+          <span tabIndex={0} role="button" aria-disabled="true" aria-label="Compare is full (4)" className={cn(iconBtn, "opacity-40")}>
+            <Scale className="size-5" aria-hidden />
+          </span>,
+        );
 
   const compareControl = !comparable ? null : compareHref ? (
     <Link
       href={compareHref}
       scroll={false}
-      // A link, so no aria-pressed: the label carries the state.
       aria-label={selected ? "In compare: remove" : undefined}
-      className={buttonClass({
-        variant: "outline",
-        size: "sm",
-        className: cn("min-h-11", selected && "bg-brand-50 font-semibold text-brand-800"),
-      })}
+      className={buttonClass({ variant: "outline", size: "sm", className: cn("min-h-11", selected && "bg-brand-50 font-semibold text-brand-800") })}
     >
       {selected ? <Check className="size-4" aria-hidden /> : <Scale className="size-4" aria-hidden />}
       {selected ? "In compare" : "Compare"}
@@ -170,99 +208,119 @@ export function CandidateCard({
     </button>
   );
 
+  const axes = {
+    communication: candidate.ratings.communication > 0 ? candidate.ratings.communication : null,
+    coding: candidate.ratings.coding > 0 ? candidate.ratings.coding : null,
+    aptitude: candidate.ratings.aptitude > 0 ? candidate.ratings.aptitude : null,
+    interview: candidate.ratings.interview > 0 ? candidate.ratings.interview : null,
+  };
+  const rateMinor = pricing.hourlyRateMinor;
+
   return (
-    <Surface as="li" className="flex flex-col p-5">
-      {/* Identity, then the score as the hero on the right. */}
+    <li
+      style={{ ["--i" as string]: Math.min(index, 11) }}
+      className="rise tile-lift group relative flex flex-col rounded-[24px] bg-white p-5 focus-within:ring-2 focus-within:ring-brand-600/30 lg:p-6"
+    >
       <div className="flex items-start gap-4">
-        <CandidateAvatar
-          photoUrl={candidate.photoUrl}
-          initials={candidate.initials}
-          className="size-12 rounded-apple-md text-base ring-1 ring-inset ring-brand-200/70"
-        />
-        <div className="min-w-0 flex-1">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            title={`Quick view of ${displayName}`}
-            className="max-w-full break-words rounded-apple-sm text-left text-base font-semibold text-ink-900 hover:text-brand-700"
+        <Avatar src={candidate.photoUrl} initials={candidate.initials} masked={!nameUnlocked} name={nameUnlocked ? displayName : undefined} size="lg" />
+        <div className="min-w-0 flex-1 pt-0.5">
+          {/* The whole card opens the profile: this link is stretched over it. */}
+          <Link
+            href={profileHref}
+            className="block break-words rounded-apple-sm text-lg font-medium leading-snug tracking-[-0.01em] text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:rounded-[24px] focus-visible:after:ring-2 focus-visible:after:ring-brand-600"
           >
             {displayName}
-          </button>
-          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-600">
-            <span className="inline-flex min-w-0 items-center gap-1">
-              <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
-              <span className="break-words">{candidate.city || candidate.location || "City not stated"}</span>
-            </span>
-            {candidate.hasLaptop !== null ? (
-              <span className={cn("inline-flex items-center gap-1", candidate.hasLaptop ? "text-brand-800" : "text-ink-600")}>
-                <Laptop className="size-3.5 shrink-0" aria-hidden />
-                {candidate.hasLaptop ? "Own laptop" : "Needs a laptop"}
-              </span>
-            ) : null}
-          </p>
-          {candidate.workModes.length > 0 ? (
-            <p className="mt-0.5 text-sm text-ink-600">{candidate.workModes.join(" · ")}</p>
-          ) : null}
+          </Link>
+          <div className="mt-1">
+            <MetaList
+              items={[
+                { icon: <MapPin />, text: candidate.city || candidate.location || "City not stated" },
+                { text: candidate.workModes.join(" · ") },
+              ]}
+            />
+          </div>
         </div>
-        <div className="shrink-0 text-right">
-          {candidate.scored ? <p className="text-2xs font-semibold uppercase tracking-wide text-brand-700">{band.name}</p> : null}
-          <p
-            className="nums mt-0.5 text-3xl font-semibold leading-none text-brand-700"
-            title={candidate.scored ? `Findtern Score ${candidate.score.toFixed(1)} out of 10` : "Not scored yet"}
-          >
-            {candidate.scored ? candidate.score.toFixed(1) : "-"}
-            <span className="ml-0.5 text-sm font-medium text-text-subtle">/10</span>
-          </p>
-          <p className="nums mt-1.5 text-sm font-semibold text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
+        {candidate.scored ? (
+          <ScoreDial score={candidate.score} axes={axes} size="sm" showBand={false} />
+        ) : (
+          <span className="grid size-14 shrink-0 place-items-center rounded-full border border-dashed border-ink-200 text-center text-[11px] leading-tight text-text-subtle">
+            Not scored
+          </span>
+        )}
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-end justify-between gap-x-3 gap-y-2">
+        <p className="nums text-[2.25rem] font-light leading-none tracking-[-0.045em] text-ink-900">
+          {formatMoney(rateMinor, currency)}
+          {rateMinor > 0 ? <span className="ml-1 text-sm font-normal tracking-normal text-text-subtle">/hr</span> : null}
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          {status ? <Pill tone={status.tone} size="sm">{status.label}</Pill> : null}
+          <Pill tone="neutral" size="sm">{band.name}</Pill>
         </div>
       </div>
 
-      {status ? (
-        <div className="mt-3">
-          <Pill tone={status.tone}>{status.label}</Pill>
+      {hasWanted ? (
+        <div className="mt-4">
+          <div className="mb-1.5 flex items-baseline justify-between text-xs text-text-subtle">
+            <span>Skill match</span>
+            <span>
+              <span className="nums text-sm font-semibold text-ink-900">{matchCount.matched.length}</span> of <span className="nums">{matchCount.total}</span>
+            </span>
+          </div>
+          <div aria-hidden className="flex gap-1">
+            {Array.from({ length: matchCount.total }, (_, i) => (
+              <span key={i} className={cn("h-1.5 flex-1 rounded-full", i < matchCount.matched.length ? "bg-brand-600" : "bg-ink-200")} />
+            ))}
+          </div>
         </div>
       ) : null}
 
-      {candidate.bio ? <p className="mt-3 line-clamp-2 text-sm leading-relaxed text-ink-600">{candidate.bio}</p> : null}
-
-      {/* Every skill (a profile holds at most seven), never "+N more". */}
-      {skills.length > 0 ? (
-        <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Skills">
-          {skills.map((skill) => (
+      {shownSkills.length > 0 ? (
+        <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Skills">
+          {shownSkills.map((skill) => (
             <li
               key={skill}
               className={cn(
-                "rounded-full px-2.5 py-1 text-xs font-medium",
-                isWanted(skill) ? "bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-200" : "bg-ink-100 text-ink-700",
+                "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium",
+                isWanted(skill) ? "bg-brand-50 text-brand-800 ring-1 ring-inset ring-brand-200/80" : "bg-ink-100 text-ink-700",
               )}
             >
-              {skill}
+              {isWanted(skill) ? <Check className="size-3" aria-hidden /> : null}
+              {skillName(skill)}
               {isWanted(skill) ? <span className="sr-only"> (matches)</span> : null}
             </li>
           ))}
+          {moreSkills > 0 ? <li className="nums px-1 py-1 text-xs text-text-subtle">+{moreSkills}</li> : null}
         </ul>
       ) : (
-        <p className="mt-3 text-sm text-ink-600">No skills listed yet.</p>
+        <p className="mt-4 text-sm text-text-subtle">No skills listed yet.</p>
       )}
 
-      <RatingMeter ratings={candidate.ratings} className="mt-4 border-t border-ink-100 pt-4" />
+      {candidate.scored ? (
+        <div className="mt-4 rounded-[18px] bg-ink-50 px-4 py-3">
+          <RatingMeter ratings={candidate.ratings} />
+        </div>
+      ) : null}
 
-      <div className="mt-auto pt-4">
-        <div className="flex flex-wrap items-start gap-2">{actions}</div>
-        <div className="mt-2 flex flex-wrap items-center gap-1 border-t border-ink-100 pt-2">
-          <button
-            type="button"
-            onClick={() => setDrawerOpen(true)}
-            className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-10 touch:min-h-11 px-2.5 text-ink-700" })}
-          >
-            <Eye className="size-4" aria-hidden />
-            Quick view
-          </button>
-          {compareControl}
-          <Link href={profileHref} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-10 touch:min-h-11 px-2.5 text-ink-700" })}>
-            Profile
-            <ArrowUpRight className="size-4" aria-hidden />
-          </Link>
+      <div className="mt-auto flex items-center justify-between gap-2 pt-5">
+        <div className="flex min-w-0 items-center gap-3">{primary}</div>
+        {/* Three reserved slots: the icons never shift, hired or not. */}
+        <div className="-mr-2 flex shrink-0 items-center">
+          <span className={slot}>
+            {!proposal && projectId ? (
+              <ShortlistToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} variant="icon" className="relative z-10" />
+            ) : null}
+          </span>
+          <span className={slot}>
+            {tip(
+              "Quick view",
+              <button type="button" onClick={() => setDrawerOpen(true)} aria-label={`Quick view of ${displayName}`} className={iconBtn}>
+                <Eye className="size-5" aria-hidden />
+              </button>,
+            )}
+          </span>
+          <span className={slot}>{compareIcon}</span>
         </div>
       </div>
 
@@ -289,7 +347,7 @@ export function CandidateCard({
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-apple-lg border border-ink-200/80 bg-white p-4">
+              <div className="rounded-[18px] bg-white shadow-tile p-4">
                 <p className="text-sm font-medium text-ink-600">Findtern Score</p>
                 <p className="nums mt-1 text-3xl font-semibold text-brand-700">
                   {candidate.scored ? candidate.score.toFixed(1) : "-"}
@@ -297,7 +355,7 @@ export function CandidateCard({
                 </p>
                 <p className="mt-1 text-sm text-ink-600">{band.name}</p>
               </div>
-              <div className="rounded-apple-lg border border-ink-200/80 bg-white p-4">
+              <div className="rounded-[18px] bg-white shadow-tile p-4">
                 <p className="text-sm font-medium text-ink-600">Price</p>
                 <p className="nums mt-2.5 text-2xl font-semibold text-ink-900">
                   {formatRate(pricing.hourlyRateMinor, currency)}
@@ -319,7 +377,7 @@ export function CandidateCard({
 
             <section>
               <SectionHead title="AI interview ratings" hint="Each axis out of 10." />
-              <div className="rounded-apple-lg border border-ink-200/80 bg-white p-4">
+              <div className="rounded-[18px] bg-white shadow-tile p-4">
                 <RatingMeter ratings={candidate.ratings} />
               </div>
               {candidate.aiFeedbackLink ? (
@@ -363,7 +421,7 @@ export function CandidateCard({
 
             <section>
               <SectionHead title="Work preferences" />
-              <dl className="divide-y divide-ink-100 rounded-apple-lg border border-ink-200/80 bg-white px-4">
+              <dl className="divide-y divide-ink-100 rounded-[18px] bg-white shadow-tile px-4">
                 <DetailRow label="Work mode" value={candidate.workModes.join(", ") || "Not stated"} />
                 <DetailRow
                   label="Preferred cities"
@@ -379,7 +437,7 @@ export function CandidateCard({
             {candidate.academics ? (
               <section>
                 <SectionHead title="Academics" />
-                <div className="rounded-apple-lg border border-ink-200/80 bg-white p-4">
+                <div className="rounded-[18px] bg-white shadow-tile p-4">
                   <p className="text-base font-medium text-ink-900">
                     {[candidate.academics.degree, candidate.academics.specialization].filter(Boolean).join(" · ") || "Degree not stated"}
                   </p>
@@ -402,6 +460,6 @@ export function CandidateCard({
           </div>
         </SheetContent>
       </Sheet>
-    </Surface>
+    </li>
   );
 }

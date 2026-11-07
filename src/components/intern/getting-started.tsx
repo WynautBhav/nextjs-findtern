@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 
-import { Pill } from "@/components/app/primitives";
+import { Pill, Surface } from "@/components/app/primitives";
 import { Tile } from "@/components/app/tiles";
 import { AiInterviewAction } from "@/components/intern/ai-interview-join-card";
 import { buttonClass } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import type { AiInterviewPhase } from "@/lib/ai-interview";
 import { formatMoney } from "@/lib/format";
 import type { CompletionItem } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
+import { completionWhy } from "./completion-why";
 
 type Completion = { items: CompletionItem[]; done: number; total: number; complete: boolean };
 type StopState = "done" | "current" | "todo";
@@ -87,63 +88,10 @@ export function GettingStarted({
 
   return (
     <div className="grid gap-4 xl:grid-cols-3">
-      {/* ── The journey: the screen's one brand tile. ── */}
-      <section
-        aria-labelledby="journey-title"
-        className="relative isolate overflow-hidden rounded-apple-xl bg-[linear-gradient(140deg,var(--color-brand-700)_0%,var(--color-brand-900)_60%,var(--color-brand-950)_100%)] p-5 text-white shadow-tile-brand motion-safe:animate-tile-in lg:p-6 xl:col-span-3" // taste-skill-ignore
-      >
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <h2 id="journey-title" className="text-base font-medium">
-            Before employers can find you
-          </h2>
-          <p className="nums text-sm text-white/80">
-            {doneCount} of 3 steps done
-          </p>
-        </div>
-
-        <ol className="mt-6 grid gap-0 md:grid-cols-4 md:gap-4">
-          {stops.map((stop, i) => {
-            const state = i === 3 ? "todo" : stateOf(i);
-            return (
-              <li
-                key={stop.title}
-                aria-current={state === "current" ? "step" : undefined}
-                className="relative flex gap-3 pb-6 last:pb-0 md:flex-col md:pb-0"
-              >
-                {i < stops.length - 1 ? <Connector fill={stop.fill} /> : null}
-                <span
-                  aria-hidden
-                  className={cn(
-                    "nums relative grid size-8 shrink-0 place-items-center rounded-full text-sm font-semibold",
-                    state === "done" && "bg-brand-300 text-brand-950",
-                    state === "current" && "bg-accent-400 text-brand-950 ring-4 ring-accent-400/25",
-                    state === "todo" && "text-white/80 ring-1 ring-inset ring-white/35",
-                  )}
-                >
-                  {state === "done" ? <Check className="size-4" strokeWidth={3} /> : i + 1}
-                </span>
-                <div className="min-w-0 pt-1 md:pt-0">
-                  <h3 className="text-sm font-semibold">
-                    {stop.title}
-                    <span className="sr-only">
-                      {state === "done" ? " (done)" : state === "current" ? " (current step)" : " (not started)"}
-                    </span>
-                  </h3>
-                  <p className={cn("nums mt-0.5 text-sm", state === "current" ? "text-accent-300" : "text-white/80")}>
-                    {stop.status}
-                  </p>
-                  <p className="mt-1 text-xs text-white/80">{stop.unlocks}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
-      </section>
-
       {/* ── The current stage, opened. ── */}
       {stage === 0 ? (
         <Tile
-          title="Complete your profile"
+          title="Next step: complete your profile"
           description="Free to build. Employers see it only once your score is in."
           aside={
             <p className="nums whitespace-nowrap text-sm font-medium text-ink-700">
@@ -189,6 +137,56 @@ export function GettingStarted({
         <FeeTile fee={fee} activated={activated} />
         {aside}
       </div>
+      {/* ── The journey: the screen's one brand tile. ── */}
+      <Surface as="section" aria-labelledby="journey-title" className="p-5 lg:p-6 xl:col-span-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <h2 id="journey-title" className="text-base font-semibold text-ink-900">
+            Before employers can find you
+          </h2>
+          <p className="nums text-sm text-text-subtle">
+            {doneCount} of 3 steps done
+          </p>
+        </div>
+
+        <ol className="mt-6 grid gap-0 md:grid-cols-4 md:gap-4">
+          {stops.map((stop, i) => {
+            const state = i === 3 ? "todo" : stateOf(i);
+            return (
+              <li
+                key={stop.title}
+                aria-current={state === "current" ? "step" : undefined}
+                className="relative flex gap-3 pb-6 last:pb-0 md:flex-col md:pb-0"
+              >
+                {i < stops.length - 1 ? <Connector fill={stop.fill} /> : null}
+                <span
+                  aria-hidden
+                  className={cn(
+                    "nums relative grid size-8 shrink-0 place-items-center rounded-full text-sm font-semibold",
+                    state === "done" && "bg-brand-700 text-white",
+                    state === "current" && "bg-accent-400 text-brand-950 ring-4 ring-accent-400/25",
+                    state === "todo" && "text-text-subtle ring-1 ring-inset ring-ink-300",
+                  )}
+                >
+                  {state === "done" ? <Check className="size-4" strokeWidth={3} /> : i + 1}
+                </span>
+                <div className="min-w-0 pt-1 md:pt-0">
+                  <h3 className="text-sm font-semibold text-ink-900">
+                    {stop.title}
+                    <span className="sr-only">
+                      {state === "done" ? " (done)" : state === "current" ? " (current step)" : " (not started)"}
+                    </span>
+                  </h3>
+                  <p className={cn("nums mt-0.5 text-sm", state === "current" ? "font-medium text-ink-900" : "text-text-subtle")}>
+                    {stop.status}
+                  </p>
+                  <p className="mt-1 text-sm text-text-subtle">{stop.unlocks}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </Surface>
+
     </div>
   );
 }
@@ -198,10 +196,10 @@ function Connector({ fill }: { fill: number }) {
   return (
     <span
       aria-hidden
-      className="absolute top-10 bottom-1 left-4 w-0.5 -translate-x-1/2 overflow-hidden rounded-full bg-white/15 md:top-4 md:right-0 md:bottom-auto md:left-11 md:h-0.5 md:w-auto md:-translate-x-0 md:-translate-y-1/2"
+      className="absolute top-10 bottom-1 left-4 w-0.5 -translate-x-1/2 overflow-hidden rounded-full bg-ink-200 md:top-4 md:right-0 md:bottom-auto md:left-11 md:h-0.5 md:w-auto md:-translate-x-0 md:-translate-y-1/2"
     >
       <span
-        className="block size-full origin-top-left bg-brand-300 transition-transform duration-500 max-md:scale-y-(--fill) md:scale-x-(--fill)"
+        className="block size-full origin-top-left bg-brand-700 transition-transform duration-500 max-md:scale-y-(--fill) md:scale-x-(--fill)"
         style={{ "--fill": Math.max(0, Math.min(1, fill)) } as React.CSSProperties}
       />
     </span>
@@ -238,7 +236,7 @@ function Checklist({ items, className }: { items: CompletionItem[]; className?: 
         <li
           key={item.id}
           className={cn(
-            "flex min-h-12 items-center gap-3 rounded-apple-sm px-3.5 py-2 text-sm",
+            "flex min-h-12 items-start gap-3 rounded-apple-sm px-3.5 py-3 text-sm",
             item.done ? "bg-brand-50 text-ink-700" : "bg-ink-50 text-ink-900",
           )}
         >
@@ -250,7 +248,8 @@ function Checklist({ items, className }: { items: CompletionItem[]; className?: 
             <span aria-hidden className="size-5 shrink-0 rounded-full border-2 border-ink-300" />
           )}
           <span className="min-w-0">
-            {item.label}
+            {completionWhy(item.id).label ?? item.label}
+            {item.done ? null : <span className="block text-sm text-text-subtle">{completionWhy(item.id).why}</span>}
             <span className="sr-only">{item.done ? " (done)" : " (still needed)"}</span>
           </span>
         </li>
@@ -265,7 +264,6 @@ function FeeTile({ fee, activated }: { fee: string; activated: boolean }) {
     <Tile
       title="Activation"
       aside={activated ? <Pill tone="live">Paid</Pill> : null}
-      action={{ href: "/guaranteed-internship-program", label: "How the 6-month guarantee works", prefetch: false }}
     >
       <p className="nums text-3xl font-medium leading-none tracking-[-0.03em] text-ink-900">
         {fee}
@@ -288,6 +286,13 @@ function FeeTile({ fee, activated }: { fee: string; activated: boolean }) {
           ? "Paid. Nothing else is ever charged to you."
           : "No subscription. The fee pays for the assessment; it never buys a higher score."}
       </p>
+      <Link
+        href="/guaranteed-internship-program"
+        prefetch={false}
+        className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
+      >
+        How the 6-month guarantee works
+      </Link>
     </Tile>
   );
 }

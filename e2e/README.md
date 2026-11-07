@@ -161,3 +161,35 @@ refuse a non-local database, except the staging journey.
 `e2e/lib/` holds the shared helpers: `env.mjs` (the loopback-only database rule),
 `db.mjs`, `mail.mjs` (reads `logs/mail/`), `browser.mjs`, `session.mjs`,
 `personas.mjs`, `routes.mjs`, `qa-server.mjs`, `one-window.mjs` and `staging.mjs`.
+
+## Messaging, project lifecycle and profile-limit suites (WP-T)
+
+Three QA-stack suites in the style of `admin.e2e.mjs` (node:test + playwright, one context per
+persona, CSRF header via `api()`, direct `pg` assertions). They were written without a database and
+have **not been run yet**; expect to adjust selectors on the first run.
+
+| Script | File | Covers |
+| --- | --- | --- |
+| `npm run test:e2e:messaging` | `messaging.e2e.mjs` | thread access rules, both-way messages, 404 for outsiders, 4000-char cap, HTML stripped, live unread badge (SSE, no reload), Read receipt, Online/Offline, stream 401/429/Last-Event-ID, no contact data in payloads |
+| `npm run test:e2e:projects` | `projects-lifecycle.e2e.mjs` | draft → review → reject/approve → pause/resume/close, 7-skill cap, 422 missing fields, race = one winner, ownership, legacy `active`, 390px + axe |
+| `npm run test:e2e:limits` | `profile-limits.e2e.mjs` | `bio` accepted but not stored/shown, 8 skills refused, legacy 9-skill rows (unchanged ok, swap refused, reduce ok), admin skills route |
+
+Run with the QA stack env (`E2E_BASE_URL`, `DATABASE_URL`) and a server started with `TRUST_PROXY=1`.
+`projects` also needs the seeded `admin` and `intern-hired` personas. Accounts and rows are created by
+`lib/fixtures2.mjs` (SQL inserts, tagged with the run id) and removed in `after()`.
+
+## Drive journey (`npm run test:e2e:drive`)
+
+`e2e/drive-journey.e2e.mjs` (helpers in `e2e/lib/drive.mjs`) covers the college drive order end to end, 14 tests in
+order: create order → mark paid (idempotent) → roster preview → confirm + identity matching → identity review →
+campaign/mail → redemption and its refusals → 8-way race → slot limits and CHECKs → TPO dashboard → refunds
+(scan, initiate, webhook) → mobile 390x844 smoke ×2 → axe on `/college`. Fake people only (`@e2e-drive.test`).
+
+It is **written but not run in CI**; it needs a real server and database:
+
+1. `DATABASE_URL=postgresql://…@localhost:5433/findtern_e2e npm run db:migrate` (all migrations incl. 0018 to 0022), plus the seeded super admin (`admin@findtern.dev`, or `E2E_ADMIN_EMAIL` / `E2E_ADMIN_PASSWORD`).
+2. Start a production server on that same DB with the `npm run e2e` env (`MAIL_MODE=log`, `SIGNING_SECRET`/`SESSION_SECRET` as in `e2e/run.mjs`, Razorpay keys blank, `PAYMENTS_MODE=free`), e.g. run `npm run e2e` once to build, or `next start` with that env.
+3. `E2E_BASE=http://localhost:3300 DATABASE_URL=… npm run test:e2e:drive`. It refuses a non-loopback DB or server host.
+
+Optional env: `E2E_SIGNING_SECRET` (else read from `e2e/run.mjs`; codes are derived from it, never stored), `CRON_SECRET` (set in BOTH the server and this process, with the server's `SCHEDULERS` not `off`, or the mail/resend assertions in test 6 skip with a reason), `E2E_WEBHOOK_SECRET` (same value as the server's `RAZORPAY_WEBHOOK_SECRET`, or test 11d skips).
+The suite leaves its fake rows behind (a new tag per run); use a throwaway database. The per-IP redeem limit is 30 per 15 minutes and the suite uses about 20, so wait 15 minutes between runs on one server.

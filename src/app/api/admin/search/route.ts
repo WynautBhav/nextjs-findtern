@@ -1,6 +1,7 @@
 import { desc, eq, sql, type SQL } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
+
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { realEmployers } from "@/lib/admin/scope";

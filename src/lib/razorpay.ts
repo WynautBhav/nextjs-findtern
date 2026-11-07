@@ -94,3 +94,55 @@ export function verifyWebhookSignature(rawBody: string, signature: string | null
   const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
   return Boolean(secret && signature) && hmacEquals(secret!, rawBody, signature!);
 }
+
+/** Pure: the request createRefund sends. The idempotency key rides as `receipt` (Razorpay echoes it back). */
+export function buildRefundRequest(input: { paymentId: string; amountMinor: number; idempotencyKey: string }) {
+  if (!/^pay_[A-Za-z0-9]+$/.test(input.paymentId)) throw new Error("Invalid gateway payment id");
+  if (!Number.isInteger(input.amountMinor) || input.amountMinor <= 0) throw new Error("Invalid refund amount");
+  return {
+    path: `/v1/payments/${input.paymentId}/refund`,
+    body: {
+      amount: input.amountMinor,
+      speed: "normal" as const,
+      receipt: input.idempotencyKey.slice(0, 40),
+      notes: { idempotency_key: input.idempotencyKey.slice(0, 256) },
+    },
+  };
+}
+
+/** `definite` = Razorpay answered with a 4xx, so no refund exists. Anything else (timeout, network, 5xx) may have succeeded. */
+export class RefundGatewayError extends Error {
+  definite: boolean;
+  constructor(message: string, definite: boolean) {
+    super(message);
+    this.definite = definite;
+  }
+}
+
+const inflightRefunds = new Map<string, Promise<{ id: string; raw: Record<string, unknown> }>>();
+
+/** Refunds part or all of a captured payment. Never throws a message containing keys. */
+export function createRefund(input: { paymentId: string; amountMinor: number; idempotencyKey: string }) {
+  const existing = inflightRefunds.get(input.idempotencyKey);
+  if (existing) return existing; // local dedupe of concurrent calls with the same key
+  const run = (async () => {
+    const { keyId, keySecret } = keys();
+    const req = buildRefundRequest(input);
+    const res = await fetch(`https://api.razorpay.com${req.path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(req.body),
+      signal: AbortSignal.timeout(15_000),
+    });
+    const body = (await res.json().catch(() => ({}))) as { id?: string; status?: string; error?: { description?: string } };
+    if (!res.ok || !body.id) {
+      throw new RefundGatewayError(`Razorpay refund failed (${res.status}): ${(body.error?.description ?? "no detail").slice(0, 120)}`, res.status >= 400 && res.status < 500);
+    }
+    return { id: body.id, raw: { id: body.id, status: body.status ?? null } };
+  })().finally(() => inflightRefunds.delete(input.idempotencyKey));
+  inflightRefunds.set(input.idempotencyKey, run);
+  return run;
+}

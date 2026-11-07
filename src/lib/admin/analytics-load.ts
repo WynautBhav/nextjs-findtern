@@ -3,7 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { computeAnalytics, type AnalyticsInput } from "@/lib/admin/analytics";
 import { periodStart } from "@/lib/admin/params";
-import { istDateRange, istMonthKeys, istMonthStart } from "@/lib/admin/revenue";
+import { isMoneyReceived, istDateRange, istMonthKeys, istMonthStart } from "@/lib/admin/revenue";
 import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
 
 /** Range from `?from=&to=` (`YYYY-MM-DD` India dates, inclusive; the date filter only sends that form), `?period=30d`, or `?period=all`; default the last 18 months (legacy). */
@@ -93,6 +93,7 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
     db
       .select({
         internId: schema.internPayments.internId,
+        gateway: schema.internPayments.gateway,
         amountMinor: schema.internPayments.amountMinor,
         currency: schema.internPayments.currency,
         status: schema.internPayments.status,
@@ -134,7 +135,8 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
     proposals,
     interviews,
     employerPayments,
-    internPayments,
+    // A college-drive waiver marks the fee covered (paidInterns above) but is not money received.
+    internPayments: internPayments.filter(isMoneyReceived),
     collegeBatches,
   };
   return computeAnalytics(input);

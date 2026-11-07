@@ -4,15 +4,17 @@ import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { AlertCircle, ArrowLeft, Download, Phone, User } from "lucide-react";
 
-import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
-import { ScoreScale, STAT_ROW, StatTile } from "@/components/app/tiles";
+import { DetailRow, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { ScoreScale } from "@/components/app/tiles";
 import { OfferDecision } from "@/components/app/offer-decision";
 import { proposalStatus } from "@/components/app/status";
 import { ImportantInstructions } from "@/components/intern/offer/important-instructions";
 import { modeLabel, offerFacts } from "@/components/intern/offer/offer-facts";
 import { ButtonAnchor, ButtonLink, buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
-import { cn } from "@/lib/utils";
+import { OfferHero } from "@/components/intern/offer/offer-hero";
+import { OfferSteps } from "@/components/intern/offer/offer-steps";
+import { Stagger } from "@/components/intern/kit/motion";
 import { canAccess } from "@/lib/security/guards";
 import { getDb, hasDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
@@ -164,7 +166,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   const durationParts = /^(\d+)\s+(.+)$/.exec(String(facts.duration ?? ""));
 
   return (
-    <div>
+    <Stagger>
       <Link
         href="/intern/proposals"
         className={buttonClass({ variant: "ghost", size: "sm", className: "-ml-3 mb-4 min-h-11 text-ink-600 hover:text-ink-900" })}
@@ -173,28 +175,19 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
         All offers
       </Link>
 
-      <PageHead
-        title={facts.role}
-        lede={
-          <>
-            {facts.company ?? "Company shared after hire"}
-            {project.row?.projectName ? <span className="text-text-subtle"> · {project.row.projectName}</span> : null}
-          </>
-        }
-        action={
-          <div className="flex flex-wrap gap-2">
-            <Pill tone={status.tone}>{status.label}</Pill>
-            <Pill tone="neutral">{fullTime ? "Full-time role" : "Internship"}</Pill>
-            {facts.edited ? <Pill tone="new">Updated</Pill> : null}
-          </div>
-        }
-      />
-
-      {/* The terms that decide an offer, as key numbers; the money is the brand tile. */}
-      <div className={cn(STAT_ROW, "mb-6 lg:mb-8")}>
-        {[
-          { label: fullTime ? "Annual CTC" : "Monthly stipend", value: facts.amount, unit: facts.per ? facts.per.replace(/^\/\s*/, "/") : undefined, quiet: facts.amountIsText },
-          // A value and a smaller unit, so a 2-up tile on a phone never clips ("11 Oct" + "2026").
+      <OfferHero
+        role={facts.role}
+        company={facts.company ?? "Company shared after hire"}
+        project={project.row?.projectName}
+        status={status}
+        fullTime={fullTime}
+        edited={facts.edited}
+        moneyLabel={fullTime ? "Annual CTC" : "Monthly stipend"}
+        amount={facts.amount}
+        per={facts.per}
+        amountIsText={facts.amountIsText}
+        bonusLabel={bonusLabel}
+        terms={[
           startsOn
             ? { label: "Joining date", value: shortDate(startsOn, { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }), unit: shortDate(startsOn, { year: "numeric", timeZone: "Asia/Kolkata" }) }
             : { label: "Joining date", value: joining },
@@ -204,19 +197,18 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
               ? { label: "Duration", value: durationParts[1], unit: durationParts[2] }
               : { label: "Duration", value: facts.duration },
           { label: fullTime ? "Location" : "Work mode", value: fullTime ? facts.location : modeLabel(facts.mode) },
-        ].map((s, i) => (
-          <StatTile key={s.label} {...s} featured={i === 0} index={i} />
-        ))}
-      </div>
-      {bonusLabel ? <p className="-mt-3 mb-6 text-sm font-medium text-ink-700 lg:-mt-5 lg:mb-8">{bonusLabel}</p> : null}
+          { label: "Status", value: status.label },
+        ]}
+      />
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* ── The decision (focal point; first on a phone) ─────────── */}
         <aside className="lg:sticky lg:top-24 lg:order-2">
-          <Surface className="p-5 lg:p-6">
+          <Surface className="p-5 shadow-[0_1px_2px_rgba(4,29,23,0.06),0_24px_48px_-24px_rgba(4,29,23,0.35)] ring-1 ring-brand-600/20 lg:p-6">
             <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
               {open ? "Your decision" : "Where this stands"}
             </h2>
+            <OfferSteps stateKey={facts.key} fullTime={fullTime} className="mt-4" />
 
             {facts.edited && open ? (
               <p className="mt-4 rounded-apple-sm bg-info-soft px-4 py-3 text-sm leading-relaxed text-info">
@@ -377,7 +369,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
           ) : null}
         </div>
       </div>
-    </div>
+    </Stagger>
   );
 }
 

@@ -166,6 +166,15 @@ export function TimesheetGrid({
     return ok;
   }
 
+  async function confirmSend() {
+    const ok = await askConfirm({
+      title: "Submit this timesheet for review?",
+      body: `You are submitting ${totalHours} hour${totalHours === 1 ? "" : "s"}. Once submitted, edits lock until your manager approves it or sends it back.`,
+      confirmLabel: "Yes, submit it",
+    });
+    if (ok) await send();
+  }
+
   async function send() {
     setSendState("sending");
     setSendError("");
@@ -240,12 +249,12 @@ export function TimesheetGrid({
       )}
       <button
         type="button"
-        onClick={send}
+        onClick={confirmSend}
         disabled={sendState === "sending" || !canSend || missing.length > 0}
         className={buttonClass({ variant: "primary", size: "md", className: "w-full" })}
       >
         {sendState === "sending" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <CloudUpload className="size-4" aria-hidden />}
-        {sentBack ? "Send again for approval" : "Send for approval"}
+        {sentBack ? "Send again for review" : "Submit for review"}
       </button>
       {sendState === "error" ? (
         <p role="alert" className="flex items-start gap-2 rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
@@ -277,6 +286,9 @@ export function TimesheetGrid({
                 </span>
               </p>
             </div>
+            <p className="nums mt-2 text-sm text-ink-700">
+              <span className="font-semibold text-ink-900">{totalHours} h</span> logged so far
+            </p>
             <div className="mt-2">
               <SaveIndicator state={saveState} />
             </div>

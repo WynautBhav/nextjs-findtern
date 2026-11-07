@@ -684,7 +684,7 @@ async function main() {
       recipientId: insertedUsers[0].id,
       type: "proposal_accepted",
       title: "Proposal accepted",
-      message: "Northwind Labs accepted your proposal for React Dashboard Rebuild.",
+      message: "You accepted Northwind Labs' offer for React Dashboard Rebuild.",
     },
     {
       recipientType: "intern",

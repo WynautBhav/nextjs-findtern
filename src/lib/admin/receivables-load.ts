@@ -4,7 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { computeReceivables } from "@/lib/admin/receivables";
 import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
-import { istDayKeys, istDayStart, istKeySql, istMonthKeys, istMonthStart, PAID_STATUS, receivedAtSql, utcSql, type Bucket } from "@/lib/admin/revenue";
+import { istDayKeys, istDayStart, istKeySql, istMonthKeys, istMonthStart, DRIVE_WAIVER_GATEWAY, isMoneyReceived, PAID_STATUS, receivedAtSql, utcSql, type Bucket } from "@/lib/admin/revenue";
 
 export type MoneyFilter = "both" | "company" | "candidate";
 
@@ -65,6 +65,7 @@ export async function loadReceivables(
       .select({
         id: schema.internPayments.id,
         internId: schema.internPayments.internId,
+        gateway: schema.internPayments.gateway,
         paymentId: schema.internPayments.paymentId,
         status: schema.internPayments.status,
         amountMinor: schema.internPayments.amountMinor,
@@ -104,7 +105,7 @@ export async function loadReceivables(
       activationFeeMinor: feeMinor,
       proposals: proposals.filter((p) => realIds.has(p.employerId)),
       employerPayments,
-      internPayments,
+      internPayments: internPayments.filter(isMoneyReceived),
       unpaidProfiles,
       payouts,
       collegeBatches,
@@ -128,7 +129,7 @@ function paidReceipts(): SQL {
       FROM ${ep} WHERE ${ep.status} = ${PAID_STATUS} AND ${realEmployerId(ep.employerId)}
     UNION ALL
     SELECT 'intern', ${inrMinorSql(ip.amountMinor, ip.currency)}, ${receivedAtSql(ip.paidAt, ip.createdAt)}
-      FROM ${ip} WHERE ${ip.status} = ${PAID_STATUS}
+      FROM ${ip} WHERE ${ip.status} = ${PAID_STATUS} AND ${ip.gateway} <> ${DRIVE_WAIVER_GATEWAY}
     UNION ALL
     SELECT 'college', ${csb.amountMinor}, ${receivedAtSql(csb.paidAt, csb.createdAt)}
       FROM ${csb} WHERE ${csb.status} = ${PAID_STATUS}

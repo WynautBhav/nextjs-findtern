@@ -121,7 +121,7 @@ export function TimesheetReview({
       </div>
 
       <div ref={grid} className="mt-4 space-y-3">
-        {weeks.map((w) => {
+        {weeks.map((w, wi) => {
           // Pad the week to Monday-Sunday so columns line up across weeks.
           const cells: (DayDetail | null)[] = Array.from({ length: 7 }, (_, i) => {
             const t = new Date(`${w.weekOf}T00:00:00Z`);
@@ -130,8 +130,20 @@ export function TimesheetReview({
             return w.days.find((d) => d.date === iso) ?? null;
           });
           return (
-            <div key={w.weekOf} className="grid gap-3 rounded-apple-lg border border-ink-200/80 p-3 sm:grid-cols-[minmax(0,1fr)_9rem] sm:items-center sm:p-4">
-              <ol className="grid grid-cols-7 gap-1.5" aria-label={`Week of ${dayLabel(w.weekOf, { day: "numeric", month: "short" })}`}>
+            <div key={w.weekOf} style={{ "--i": wi } as React.CSSProperties} className="rise rounded-[24px] border border-ink-200/70 bg-white p-4 shadow-tile sm:p-5">
+              <div className="mb-3 flex items-baseline justify-between gap-3">
+                <p className="text-sm font-semibold text-ink-900">
+                  Week of <span className="nums">{dayLabel(w.weekOf, { day: "numeric", month: "short" })}</span>
+                </p>
+                <p className="nums text-sm text-ink-600">
+                  <span className="text-lg font-light tracking-tight text-ink-900">{w.hours}</span> h · {w.present} present
+                  {w.unclaimed ? <span className="font-medium text-accent-700"> · {w.unclaimed} not filled</span> : null}
+                </p>
+              </div>
+              <div aria-hidden className="mb-4 h-1.5 overflow-hidden rounded-full bg-ink-100">
+                <div className="h-full rounded-full bg-gradient-to-r from-brand-600 to-brand-400" style={{ width: `${Math.min(100, (w.hours / 40) * 100)}%` }} />
+              </div>
+              <ol className="grid grid-cols-7 gap-1.5 sm:gap-2" aria-label={`Week of ${dayLabel(w.weekOf, { day: "numeric", month: "short" })}`}>
                 {cells.map((d, i) =>
                   d ? (
                     <li key={d.date} className="min-w-0">
@@ -145,7 +157,7 @@ export function TimesheetReview({
                           value={values[d.date] ?? ""}
                           onChange={(e) => setValues((v) => ({ ...v, [d.date]: e.target.value }))}
                           className={cn(
-                            "mt-1 h-11 w-full appearance-none rounded-apple-sm border text-center text-base md:text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-600",
+                            "mt-1 h-14 w-full appearance-none sm:h-16 rounded-apple-sm border text-center text-base md:text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-600",
                             CELL[values[d.date] ?? ""] ?? "border-dashed border-ink-300 bg-white text-text-subtle",
                             values[d.date] !== d.status && "ring-2 ring-accent-400",
                           )}
@@ -164,7 +176,7 @@ export function TimesheetReview({
                         <span
                           title={`${dayLabel(d.date, { weekday: "long", day: "numeric", month: "long" })}: ${d.status || "not filled"}${d.status === "Present" ? `, ${d.hours} h` : ""}${d.note ? ` (${d.note})` : ""}`}
                           className={cn(
-                            "mt-1 flex h-11 flex-col items-center justify-center rounded-apple-sm border text-sm font-semibold leading-none",
+                            "mt-1 flex h-14 flex-col sm:h-16 items-center justify-center rounded-apple-sm border text-sm font-semibold leading-none",
                             CELL[d.status] ?? "border-dashed border-ink-500 bg-white text-text-subtle",
                           )}
                         >
@@ -180,34 +192,18 @@ export function TimesheetReview({
                         <span className="sm:hidden">{WEEKDAYS[i][0]}</span>
                         <span className="hidden sm:inline">{WEEKDAYS[i]}</span>
                       </span>
-                      <span className="mt-1 block h-11 rounded-apple-sm bg-ink-50" />
+                      <span className="mt-1 block h-14 rounded-apple-sm bg-ink-50 sm:h-16" />
                     </li>
                   ),
                 )}
               </ol>
-              <dl className="nums flex items-baseline justify-between gap-3 border-t border-ink-100 pt-2 text-sm sm:block sm:border-l sm:border-t-0 sm:pl-4 sm:pt-0">
-                <div className="flex items-baseline gap-1.5 sm:justify-between">
-                  <dt className="text-ink-600">Present</dt>
-                  <dd className="font-semibold text-ink-900">{w.present}</dd>
-                </div>
-                <div className="flex items-baseline gap-1.5 sm:mt-1 sm:justify-between">
-                  <dt className="text-ink-600">Hours</dt>
-                  <dd className="font-semibold text-ink-900">{w.hours}</dd>
-                </div>
-                {w.unclaimed ? (
-                  <div className="flex items-baseline gap-1.5 sm:mt-1 sm:justify-between">
-                    <dt className="text-ink-600">Not filled</dt>
-                    <dd className="font-semibold text-accent-700">{w.unclaimed}</dd>
-                  </div>
-                ) : null}
-              </dl>
             </div>
           );
         })}
       </div>
 
       {editing ? (
-        <div id="timesheet-save-bar" className="sticky bottom-4 z-10 mt-4 flex flex-wrap items-center gap-2 rounded-apple-lg border border-ink-200/80 bg-white p-3 shadow-sm transition-[opacity,translate] duration-[var(--dur-quick)] ease-[var(--ease-out-quart)] starting:translate-y-2 starting:opacity-0">
+        <div id="timesheet-save-bar" className="sticky bottom-4 z-10 mt-4 flex flex-wrap items-center gap-2 rounded-[20px] border border-ink-200/80 bg-white/85 p-3 shadow-tile backdrop-blur-md transition-[opacity,translate] duration-[var(--dur-quick)] ease-[var(--ease-out-quart)] starting:translate-y-2 starting:opacity-0">
           <button type="button" disabled={busy || changed.length === 0} onClick={save} className={buttonClass({ size: "sm" })}>
             {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
             {changed.length ? `Save ${changed.length} change${changed.length === 1 ? "" : "s"}` : "No changes yet"}

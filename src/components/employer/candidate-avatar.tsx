@@ -52,7 +52,7 @@ export function CandidateAvatar({
   }
 
   return (
-    <span aria-hidden className={cn("grid shrink-0 place-items-center bg-brand-50 font-semibold text-brand-800 nums", className)}>
+    <span aria-hidden className={cn("grid shrink-0 place-items-center bg-brand-50 font-semibold text-brand-800 nums ring-1 ring-inset ring-ink-900/5", className)}>
       {initials}
     </span>
   );

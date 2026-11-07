@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { AlertCircle, Landmark } from "lucide-react";
 
-import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
+import { BigFigure, EmptyScene, FigureStrip, PageHead, Surface } from "@/components/app/primitives";
+import { SignatureHero } from "@/components/intern/kit/hero";
+import { Stagger } from "@/components/intern/kit/motion";
 import { Tile } from "@/components/app/tiles";
 import { MonthRail } from "@/components/intern/stipend/month-rail";
 import { STIPEND_CURRENCY, stipendPlan, totalsByCurrency } from "@/components/intern/stipend/months";
@@ -11,10 +13,10 @@ import { StipendGauge } from "@/components/intern/stipend/stipend-gauge";
 import { buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
 import { bankPrompt, earningsEngagements, earningsView, type EngagementEarnings } from "@/lib/earnings-view";
-import { formatJoiningDate, formatMoney } from "@/lib/format";
+import { formatJoiningDate, formatMoney, shortDate } from "@/lib/format";
 import { isHiredProposal } from "@/lib/hire-status";
 import { loadInternData } from "@/lib/intern-data";
-import { isAcceptedStatus, payoutState, type PayoutRow } from "@/lib/journey";
+import { isAcceptedStatus, payoutState, readScheduledForDate, type PayoutRow } from "@/lib/journey";
 import { parseOffer } from "@/lib/offer";
 
 export const metadata: Metadata = {
@@ -80,11 +82,19 @@ export default async function InternEarnings() {
   const bankName = typeof bank.bankName === "string" ? bank.bankName.trim() : "";
   const failed = totalsByCurrency(data.payouts, "failed");
   const prompt = bankPrompt({ last4, paidCount: data.payouts.filter((p) => payoutState(p.status) === "paid").length });
+  const paidTotals = totalsByCurrency(data.payouts, "paid");
+  const pendingTotals = totalsByCurrency(data.payouts, "pending");
+  const nextDate = data.payouts
+    .filter((p) => payoutState(p.status) === "pending")
+    .map((p) => readScheduledForDate(p))
+    .filter((d): d is Date => d instanceof Date)
+    .sort((a, b) => a.getTime() - b.getTime())[0];
+  const nextPayout = nextDate ? shortDate(nextDate, { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : null;
   const soleId = cards.length === 1 ? cards[0].proposalId : null;
 
   return (
-    <div>
-      <PageHead
+    <Stagger className="space-y-6 lg:space-y-8">
+      <SignatureHero
         title="Your stipend"
         lede={
           last4 ? (
@@ -95,15 +105,27 @@ export default async function InternEarnings() {
             prompt.text
           )
         }
-        action={
-          <Link href={BANK_HREF} className={buttonClass({ variant: "outline" })}>
+        actions={
+          <Link href={BANK_HREF} className={buttonClass({ variant: "outline", className: "border-white/30 bg-white/10 text-white hover:bg-white/15" })}>
             <Landmark className="size-4" aria-hidden />
             {prompt.button}
           </Link>
         }
-      />
+      >
+        <section aria-label="Money summary">
+          <FigureStrip tone="dark" className="max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
+            <BigFigure tone="dark" label="Paid to date" value={<span className="text-4xl lg:text-5xl">{moneyLine(paidTotals)}</span>} />
+            <BigFigure tone="dark" label="Pending approval" value={<span className="text-4xl lg:text-4xl">{moneyLine(pendingTotals)}</span>} hint="Awaiting timesheet approval" />
+            <BigFigure tone="dark" label="Next payout" value={<span className="text-3xl">{nextPayout ?? "Not set"}</span>} hint={nextPayout ? undefined : "Date not set yet"} />
+          </FigureStrip>
+          <p className="mt-4 max-w-2xl text-pretty text-sm text-on-dark-subtle">
+            Each month&apos;s stipend is paid into your bank account after that month&apos;s timesheet is approved.
+          </p>
+        </section>
+      </SignatureHero>
 
       <div className="space-y-6 lg:space-y-8">
+
         {failed.length > 0 ? (
           <Surface role="alert" className="flex flex-col gap-4 border-danger/25 bg-danger-soft/50 p-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex gap-3">
@@ -169,7 +191,7 @@ export default async function InternEarnings() {
           </Tile>
         )}
       </div>
-    </div>
+    </Stagger>
   );
 }
 
@@ -211,4 +233,9 @@ function Engagement({ card, payouts }: { card: EngagementEarnings; payouts: Payo
       </Tile>
     </section>
   );
+}
+
+function moneyLine(totals: { currency: string; minor: number }[]): string {
+  if (totals.length === 0) return formatMoney(0, "INR", { zeroLabel: false });
+  return totals.map((t) => formatMoney(t.minor, t.currency, { zeroLabel: false })).join(" and ");
 }

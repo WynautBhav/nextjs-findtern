@@ -21,10 +21,11 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Check, Plus, Search, X } from "lucide-react";
 
 import { suggestSkills } from "@/lib/data/skills";
+import { MAX_SKILLS } from "@/lib/skills-limit";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
 
-const MAX_SKILLS = 7;
+
 
 export function SkillFilter({
   active,
@@ -32,6 +33,7 @@ export function SkillFilter({
   fromProject = false,
   title = "Required skills",
   note,
+  context,
 }: {
   /** The skills the list is filtered by right now. */
   active: string[];
@@ -42,6 +44,8 @@ export function SkillFilter({
   title?: string;
   /** Replaces the line under the chips that explains how they filter. */
   note?: string;
+  /** One quiet line after the counter (the matched project and its way out). */
+  context?: React.ReactNode;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -84,8 +88,8 @@ export function SkillFilter({
   }
 
   return (
-    <section aria-labelledby="skills-heading" className="mb-5">
-      <h2 id="skills-heading" className="mb-3 text-base font-semibold text-ink-900 max-lg:sr-only">
+    <section aria-labelledby="skills-heading" className="mb-3">
+      <h2 id="skills-heading" className="mb-1.5 text-sm font-semibold text-ink-900 max-lg:sr-only">
         {title}
       </h2>
       <button
@@ -104,17 +108,17 @@ export function SkillFilter({
       <div
         id="skills-panel"
         className={cn(
-          "flex flex-col gap-3 rounded-apple-lg border border-ink-200/80 bg-white p-3 sm:p-4 md:flex-row md:items-start",
+          "flex flex-col gap-2 rounded-apple-lg border border-ink-200/80 bg-white p-3 md:flex-row md:items-center lg:gap-3 lg:border-0 lg:bg-transparent lg:p-0",
           shown ? "max-lg:mt-2" : "max-lg:hidden",
         )}
       >
-        <ul className="flex min-w-0 flex-1 flex-wrap gap-2" aria-label="Selected skills">
+        <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5" aria-label="Selected skills">
           {active.map((skill) => (
             <li key={skill}>
               <Link
                 href={hrefWith(active.filter((s) => s !== skill))}
                 scroll={false}
-                className="apple-spring inline-flex min-h-9 items-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800 hover:border-brand-300 hover:bg-brand-100 touch:min-h-11"
+                className="apple-spring inline-flex min-h-7 items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-800 hover:border-brand-300 hover:bg-brand-100 touch:min-h-11"
               >
                 {skill}
                 <X className="size-3.5" aria-hidden />
@@ -139,7 +143,7 @@ export function SkillFilter({
           ) : null}
         </ul>
 
-        <div className="relative w-full md:w-80">
+        <div className="relative w-full md:w-52 md:shrink-0">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
           <input
             type="text"
@@ -172,7 +176,7 @@ export function SkillFilter({
             }}
             placeholder={full ? `${MAX_SKILLS} skills max` : "Add a required skill…"}
             aria-label="Search skills to filter by"
-            className={cn(fieldClass, "pl-9 pr-3.5")}
+            className={cn(fieldClass, "min-h-10 pl-9 pr-3.5")}
           />
           {open && (options.length > 0 || custom) ? (
             <ul id={listId} role="listbox" aria-label="Skill suggestions" className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-apple-sm border border-ink-200 bg-white shadow-sm">
@@ -210,11 +214,11 @@ export function SkillFilter({
           ) : null}
         </div>
       </div>
-      <p className={cn("mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-subtle", !shown && "max-lg:hidden")}>
-        <span>
-          {fromProject ? "Skills from the selected project. " : ""}
-          {note ?? `Up to ${MAX_SKILLS}. Candidates with any of them are shown; more matches rank higher.`}
+      <p className={cn("mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-subtle", !shown && "max-lg:hidden")}>
+        <span title={note ?? "Candidates with any of these skills are shown; more matches rank higher."}>
+          <span aria-live="polite" className="nums font-medium">{active.length}/{MAX_SKILLS}</span> skills, any match
         </span>
+        {context}
         {!fromProject && active.length > 0 && projectSkills.length > 0 && !sameSkills(active, projectSkills) ? (
           <Link href={hrefWith(null)} scroll={false} className="font-medium text-brand-700 underline-offset-4 hover:underline">
             Restore project skills

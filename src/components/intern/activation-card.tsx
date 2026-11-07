@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { BadgeIndianRupee, Check, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
+import { CollegeCodeRedeem } from "@/components/intern/college-code-redeem";
 import { AiInterviewAction } from "@/components/intern/ai-interview-join-card";
 import { promoConsentNotice } from "@/lib/college/promo-consent";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -172,7 +173,7 @@ export function ActivationCard({
     return (
       <p role="status" className="flex items-center gap-2 text-sm font-medium text-brand-800">
         <Check className="size-4" aria-hidden />
-        Activation paid. Nothing else is ever charged to you.
+        Activation covered. Nothing else is ever charged to you.
       </p>
     );
   }
@@ -273,6 +274,8 @@ export function ActivationCard({
           Test: mark as paid, no charge ({formatMoney(payable, "INR")})
         </button>
       ) : null}
+
+      <CollegeCodeRedeem onRedeemed={markPaid} />
 
       {error ? (
         <p role="alert" className="mt-2 text-pretty text-sm leading-relaxed text-danger">

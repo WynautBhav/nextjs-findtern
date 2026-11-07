@@ -34,8 +34,7 @@ export type PublicStudent = {
   available: boolean;
 };
 
-/** Server-side only: the bio is used to match a category, never returned. */
-type Candidate = PublicStudent & { bio: string };
+type Candidate = PublicStudent;
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
   "human resource": [
@@ -96,7 +95,6 @@ function matchesCategory(student: Candidate, keywords: string[]): boolean {
     targetCategory,
     ...student.skills,
     student.degree,
-    student.bio,
   ].join(" ");
 
   return keywords.some((kw) => {
@@ -155,7 +153,6 @@ export async function GET(req: Request) {
             interview: real("interview"),
             domain: real("domain"),
           },
-          bio: onboarding.bio || onboarding.previewSummary || "",
           available: extra.openToWork !== false,
         } satisfies Candidate,
       ];
@@ -170,9 +167,7 @@ export async function GET(req: Request) {
   }
   students.sort((a, b) => b.score - a.score);
   const visible: PublicStudent[] = students.slice(0, 40).map((c, i) => {
-    const pub: PublicStudent & { bio?: string } = { ...c, id: `c${i + 1}` };
-    delete pub.bio;
-    return pub;
+    return { ...c, id: `c${i + 1}` };
   });
   return NextResponse.json({ skill: rawSkill || "all", students: visible, total: students.length });
 }

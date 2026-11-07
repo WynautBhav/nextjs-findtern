@@ -178,7 +178,7 @@ export function OfferDecision({
         </p>
       ) : null}
 
-      <div className={cn("flex gap-3", rail ? "flex-col" : "flex-wrap")}>
+      <div className={cn("flex gap-3", rail ? "flex-col max-lg:sticky max-lg:bottom-[4.5rem] max-lg:z-10 max-lg:-mx-5 max-lg:border-t max-lg:border-ink-200/80 max-lg:bg-white max-lg:px-5 max-lg:py-3" : "flex-wrap")}>
         <button
           type="button"
           onClick={() => setAcceptOpen(true)}

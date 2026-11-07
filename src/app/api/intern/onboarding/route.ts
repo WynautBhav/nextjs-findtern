@@ -25,6 +25,7 @@ import {
 import { contactPhoneTaken, employerHasPhone } from "@/lib/onboarding-phone";
 import { openToWorkPatch } from "@/lib/open-to-work";
 import { sameSkills, skillsLocked } from "@/lib/skills-lock";
+import { validateSkills } from "@/lib/skills-limit";
 
 const upload = z.object({
   name: z.string().min(1).max(300),
@@ -49,7 +50,6 @@ const qualification = z.object({
 });
 
 const bodySchema = z.object({
-  bio: z.string().trim().max(2000).optional(),
   linkedinUrl: z.string().trim().max(300).optional(),
   city: z.string().trim().max(120).optional(),
   state: z.string().trim().max(120).optional(),
@@ -80,12 +80,12 @@ const bodySchema = z.object({
       certifications: z.array(qualification).max(20).optional(),
     })
     .optional(),
-  skills: z.array(z.string().max(80)).max(MAX_SKILLS, `Pick at most ${MAX_SKILLS} key skills.`).optional(),
+  skills: z.array(z.string().max(80)).max(60, `Pick at most ${MAX_SKILLS} key skills.`).optional(),
   // Older clients also send a level per skill. Zod drops it here and
   // `skillsToStore` stores every skill at the default level regardless.
   skillsWithRatings: z
     .array(z.object({ name: z.string().max(80) }))
-    .max(MAX_SKILLS, `Pick at most ${MAX_SKILLS} key skills.`)
+    .max(60, `Pick at most ${MAX_SKILLS} key skills.`)
     .optional(),
   experiences: z
     .array(
@@ -286,8 +286,10 @@ export async function POST(req: Request) {
   // Skills: the 7 cap and the lock apply to the list that is actually stored
   // (INT-03), which comes from `skills` (or `skillsWithRatings` from an older client).
   const nextSkills = body.skills !== undefined || body.skillsWithRatings !== undefined ? skillsToStore(body) : null;
-  if (nextSkills && nextSkills.length > MAX_SKILLS) {
-    return NextResponse.json({ error: `Pick at most ${MAX_SKILLS} key skills.`, step: 3 }, { status: 400 });
+  if (nextSkills) {
+    // Legacy rows above the cap may be resubmitted unchanged or reduced, never grown.
+    const checked = validateSkills(nextSkills.map((s) => s.name), existing?.skills);
+    if (!checked.ok) return NextResponse.json({ error: checked.error, step: 3 }, { status: 400 });
   }
   if (nextSkills && existing) {
     // Names only: levels are not part of a skill any more, so resubmitting the
@@ -389,7 +391,6 @@ export async function POST(req: Request) {
 
   const values = {
     userId: session.uid,
-    bio: body.bio ?? existing?.bio ?? null,
     linkedinUrl: body.linkedinUrl ?? existing?.linkedinUrl ?? null,
     city: body.city ?? existing?.city ?? null,
     state: body.state ?? existing?.state ?? null,

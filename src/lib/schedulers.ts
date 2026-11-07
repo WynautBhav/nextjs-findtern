@@ -27,6 +27,7 @@ export function startSchedulers() {
   daily();
   setInterval(reminders, 5 * 60 * 1000);
   setInterval(daily, 6 * 60 * 60 * 1000);
+  setInterval(() => void import("@/lib/outbox/run").then((m) => m.runOutboxTick()).catch((e) => console.error("[scheduler] email outbox failed", e)), 30_000);
   console.log("[scheduler] started");
 }
 
@@ -261,7 +262,7 @@ async function internProfileNudges(now: Date) {
     .where(and(eq(schema.users.isActive, true), notNotifiedYet("intern", schema.users.id, "profile_completion_nudge:", `:${dayKey(now)}`)));
   for (const r of rows) {
     const o = r.o;
-    if (o && readSkills(o.skills).length > 0 && o.bio?.trim() && o.city?.trim()) continue;
+    if (o && readSkills(o.skills).length > 0 && o.city?.trim()) continue;
     await notify({
       to: { type: "intern", id: r.id },
       type: "profile_completion_nudge",

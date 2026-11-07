@@ -107,6 +107,7 @@ export function ProjectFields({
   companyPlace,
   idPrefix = "project",
   showPincode = false,
+  part = "all",
 }: {
   values: ProjectDraft;
   set: (patch: Partial<ProjectDraft>) => void;
@@ -115,7 +116,10 @@ export function ProjectFields({
   companyPlace?: { city?: string | null; state?: string | null };
   idPrefix?: string;
   showPincode?: boolean;
+  /** Render one section of the form (the post page groups them) or everything (onboarding). */
+  part?: "all" | "basics" | "skills" | "location";
 }) {
+  const show = (p: "basics" | "skills" | "location") => part === "all" || part === p;
   const id = (name: string) => `${idPrefix}-${name}`;
   const onsite = Boolean(values.locationType) && values.locationType !== "remote";
 
@@ -132,17 +136,45 @@ export function ProjectFields({
 
   return (
     <div className="space-y-6">
+      {show("basics") && (
+      <>
       <TextField
         id={id("name")}
         label="Project name"
         required
-        placeholder="Frontend engineering, Growth marketing"
+        placeholder="e.g. Frontend engineering"
         value={values.projectName}
         error={errors.projectName}
         hint="Candidates see this as the role. Name the work, not a requisition number or your company."
         onChange={(v) => set({ projectName: v })}
       />
 
+      <ChoiceGroup
+        id={id("scope")}
+        label="Scope of work"
+        required
+        value={scopeValue(values.scopeOfWork) || values.scopeOfWork}
+        options={scopeOfWorkOptions}
+        error={errors.scopeOfWork}
+        onChange={(v) => set({ scopeOfWork: v })}
+      />
+
+      <label className="flex cursor-pointer items-start gap-3 rounded-apple-md border border-ink-200/80 bg-white px-4 py-3.5">
+        <input
+          type="checkbox"
+          checked={values.fullTimeOffer}
+          onChange={(e) => set({ fullTimeOffer: e.target.checked })}
+          className="mt-0.5 size-4.5 shrink-0 rounded accent-brand-700"
+        />
+        <span>
+          <span className="block text-sm font-medium text-ink-900">Full-time role after the internship</span>
+          <span className="mt-0.5 block text-sm text-text-subtle">Shown to candidates as a conversion path.</span>
+        </span>
+      </label>
+      </>
+      )}
+
+      {show("skills") && (
       <ChipInput
         id={id("skills")}
         label="Skills"
@@ -158,16 +190,10 @@ export function ProjectFields({
         suggest={(q) => suggestSkills(q, 8)}
         listOnly
       />
+      )}
 
-      <ChoiceGroup
-        id={id("scope")}
-        label="Scope of work"
-        required
-        value={scopeValue(values.scopeOfWork) || values.scopeOfWork}
-        options={scopeOfWorkOptions}
-        error={errors.scopeOfWork}
-        onChange={(v) => set({ scopeOfWork: v })}
-      />
+      {show("location") && (
+      <>
 
       <ChoiceGroup
         id={id("mode")}
@@ -237,7 +263,7 @@ export function ProjectFields({
         </div>
       ) : null}
 
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="max-w-md">
         <div>
           <FieldLabel htmlFor={id("tz")} required>
             Timezone
@@ -264,19 +290,9 @@ export function ProjectFields({
           </NativeSelect>
           <FieldHint>Set from your company&apos;s location. Meeting slots and offers use it.</FieldHint>
         </div>
-        <label className="flex cursor-pointer items-start gap-3 self-start rounded-apple-md border border-ink-200/80 bg-white px-4 py-3.5 sm:mt-7">
-          <input
-            type="checkbox"
-            checked={values.fullTimeOffer}
-            onChange={(e) => set({ fullTimeOffer: e.target.checked })}
-            className="mt-0.5 size-4.5 shrink-0 rounded accent-brand-700"
-          />
-          <span>
-            <span className="block text-sm font-medium text-ink-900">Full-time role after the internship</span>
-            <span className="mt-0.5 block text-xs text-ink-600">Shown to candidates as a conversion path.</span>
-          </span>
-        </label>
       </div>
+      </>
+      )}
     </div>
   );
 }

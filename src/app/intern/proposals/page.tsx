@@ -1,29 +1,19 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight } from "lucide-react";
 
+import { SignatureHero } from "@/components/intern/kit/hero";
+import { CountUp } from "@/components/motion/count-up";
+import { Stagger } from "@/components/intern/kit/motion";
 import {
   EmptyScene,
-  PageHead,
-  Pill,
-  SectionHead,
+  FilterTabs,
   Surface,
 } from "@/components/app/primitives";
-import { OfferDecision } from "@/components/app/offer-decision";
-import { proposalStatus } from "@/components/app/status";
-import {
-  modeLabel,
-  offerFacts,
-  type OfferFacts,
-} from "@/components/intern/offer/offer-facts";
+import { OfferCard, type OfferCardDecision, type OfferCardRow } from "@/components/intern/offer/offer-card";
+import { offerFacts } from "@/components/intern/offer/offer-facts";
 import { requireRole } from "@/lib/auth";
-import { formatJoiningDate } from "@/lib/format";
 import { loadInternData, projectNames } from "@/lib/intern-data";
-import { cn } from "@/lib/utils";
-import { canDecide, offerGroup } from "@/lib/intern-offer-view";
-import type { ProposalRow } from "@/lib/journey";
 import { guaranteeEnded as isGuaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
-import { FREE_DECLINES } from "@/lib/offer";
+import { canDecide, offerGroup } from "@/lib/intern-offer-view";
 
 export const metadata: Metadata = {
   title: "Offers",
@@ -37,8 +27,16 @@ export const metadata: Metadata = {
  * and an open offer can be accepted or turned down right here with the same
  * dialogs as the offer page (INW-28).
  */
-export default async function InternProposals() {
+const TABS = ["reply", "working", "past"] as const;
+type Tab = (typeof TABS)[number];
+
+export default async function InternProposals({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>;
+}) {
   const session = await requireRole("intern");
+  const sp = await searchParams;
 
   const data = await loadInternData(session.uid);
   const projects = await projectNames(
@@ -48,8 +46,7 @@ export default async function InternProposals() {
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
   const score = Number(extra.findternScore ?? 0) || 0;
   const misses = guaranteeMisses(data.proposals);
-  const guaranteeEnded = isGuaranteeEnded(extra, misses);
-  const declinesUsed = misses.total;
+  const decision = { declinesUsed: misses.total, guaranteeEnded: isGuaranteeEnded(extra, misses) };
 
   // Drafts are the company's, not the intern's.
   const rows = data.proposals
@@ -59,24 +56,37 @@ export default async function InternProposals() {
       facts: offerFacts(p, { score, names: data.names }),
       project: p.projectId ? (projects[p.projectId] ?? null) : null,
     }));
-  const groups = {
-    open: rows.filter((r) => offerGroup(r.facts.key) === "open"),
-    accepted: rows.filter((r) => offerGroup(r.facts.key) === "accepted"),
-    active: rows.filter((r) => offerGroup(r.facts.key) === "active"),
-    closed: rows.filter((r) => offerGroup(r.facts.key) === "closed"),
+  const by: Record<Tab, Row[]> = {
+    reply: rows.filter((r) => offerGroup(r.facts.key) === "open"),
+    working: rows.filter((r) => ["accepted", "active"].includes(offerGroup(r.facts.key))),
+    past: rows.filter((r) => offerGroup(r.facts.key) === "closed"),
   };
-
-  const decision = { declinesUsed, guaranteeEnded };
-  const waiting = groups.open.filter((r) => canDecide(r.facts.key)).length;
+  const waiting = by.reply.filter((r) => canDecide(r.facts.key)).length;
+  const requested = TABS.find((t) => t === sp.tab);
+  const tab: Tab = requested ?? (by.reply.length ? "reply" : by.working.length ? "working" : by.past.length ? "past" : "reply");
+  const shown = by[tab];
 
   return (
-    <div>
-      <PageHead
+    <Stagger>
+      <SignatureHero
+        className="mb-6"
         title="Your offers"
         lede={
           waiting > 0
             ? `${waiting} offer${waiting === 1 ? " is" : "s are"} waiting on your answer. Read each one and decide before its joining date.`
             : "Companies send offers here rather than application forms. You read each one and decide."
+        }
+        aside={
+          rows.length > 0 ? (
+            <dl className="flex gap-8 lg:gap-10">
+              {([["Waiting on you", waiting], ["Accepted or working", by.working.length], ["Past", by.past.length]] as const).map(([label, n]) => (
+                <div key={label}>
+                  <dd className="text-5xl font-light leading-none tracking-[-0.04em] text-white"><CountUp value={n} duration={1} /></dd>
+                  <dt className="mt-2 max-w-[7rem] text-[13px] text-on-dark-subtle">{label}</dt>
+                </div>
+              ))}
+            </dl>
+          ) : null
         }
       />
 
@@ -89,190 +99,51 @@ export default async function InternProposals() {
           who="Companies come to you"
         />
       ) : (
-        <div className="space-y-6 lg:space-y-8">
-          <Group
-            title="Waiting on you"
-            hint="Answer before the joining date; on that date an unanswered offer closes as rejected."
-            rows={groups.open}
-            decision={decision}
+        <div className="space-y-4">
+          <FilterTabs
+            label="Show offers"
+            value={tab}
+            hrefFor={(k) => `/intern/proposals?tab=${k}`}
+            tabs={[
+              { key: "reply", label: "Needs your reply", count: by.reply.length },
+              { key: "working", label: "Accepted or working", count: by.working.length },
+              { key: "past", label: "Past offers", count: by.past.length },
+            ]}
           />
-          <Group
-            title="Accepted, awaiting payment"
-            hint="You said yes. You're hired once the company pays."
-            rows={groups.accepted}
-            decision={decision}
-          />
-          <Group
-            title="Hired"
-            rows={groups.active}
-            decision={decision}
-          />
-          <Group
-            title="Closed"
-            rows={groups.closed}
-            decision={decision}
-            compact
-          />
+          {tab === "reply" && shown.length > 0 ? (
+            <p className="text-sm text-text-subtle">
+              Answer before the joining date; on that date an unanswered offer closes as rejected.
+            </p>
+          ) : null}
+          {shown.length === 0 ? (
+            <Surface className="p-6 text-sm text-ink-600">
+              {tab === "reply"
+                ? "Nothing needs your reply right now."
+                : tab === "working"
+                  ? "No accepted or active offers yet."
+                  : "No past offers."}
+            </Surface>
+          ) : (
+            <OfferList rows={shown} decision={decision} />
+          )}
         </div>
       )}
-    </div>
+    </Stagger>
   );
 }
 
-type Row = { p: ProposalRow; facts: OfferFacts; project: string | null };
+type Row = OfferCardRow;
 
-function Group({
-  title,
-  hint,
-  rows,
-  decision,
-  compact = false,
-}: {
-  title: string;
-  hint?: string;
-  rows: Row[];
-  decision: { declinesUsed: number; guaranteeEnded: boolean };
-  /** Closed offers: the money and the date only. */
-  compact?: boolean;
-}) {
-  if (rows.length === 0) return null;
+type Decision = OfferCardDecision;
+
+function OfferList({ rows, decision }: { rows: Row[]; decision: Decision }) {
   return (
-    <section>
-      <SectionHead title={`${title} · ${rows.length}`} hint={hint} />
-      <ul className={cn("grid gap-4", rows.length > 1 && "xl:grid-cols-2")}>
-        {rows.map((row) => (
-          <li key={row.p.id} className="min-w-0">
-            <OfferCard {...row} decision={decision} compact={compact} wide={rows.length === 1} />
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function OfferCard({
-  p,
-  facts,
-  project,
-  decision,
-  compact,
-  wide,
-}: Row & {
-  decision: { declinesUsed: number; guaranteeEnded: boolean };
-  compact: boolean;
-  /** Alone in its group: full width, terms in one row. */
-  wide: boolean;
-}) {
-  const status = proposalStatus(facts.key);
-  const open = canDecide(facts.key);
-  const href = `/intern/proposals/${p.id}`;
-
-  return (
-    <Surface as="article" className="flex h-full flex-col p-5 lg:p-6">
-      {/* The money leads the card; the status sits with the title, not above it.
-          A grid, not a wrapping flex: a long role wraps in its column and the figure stays put. */}
-      <div className="grid items-start gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:gap-x-8">
-        <div className="min-w-0">
-          <h3 className="text-pretty text-base font-semibold text-ink-900">
-            <Link
-              href={href}
-              className="rounded-apple-sm hover:text-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-            >
-              {facts.role}
-            </Link>
-          </h3>
-          <p className="mt-1 text-sm text-ink-600">
-            {facts.company ?? "Company shared after hire"}
-            {project ? <span className="text-text-subtle"> · {project}</span> : null}
-          </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Pill tone={status.tone}>{status.label}</Pill>
-            {facts.fullTime ? <Pill tone="live">Full-time role</Pill> : null}
-            {facts.edited ? <Pill tone="new">Updated</Pill> : null}
-          </div>
-        </div>
-        <div className="sm:text-right">
-          <p className="text-sm text-ink-600">{facts.moneyLabel}</p>
-          <p className={cn("nums mt-1 font-medium text-ink-900", facts.amountIsText ? "text-lg leading-snug" : "text-3xl leading-none tracking-[-0.03em] sm:whitespace-nowrap sm:text-4xl")}>
-            {facts.amount}
-            {facts.per ? <span className="ml-1 text-base font-normal tracking-normal text-text-subtle">{facts.per}</span> : null}
-          </p>
-        </div>
-      </div>
-
-      <dl className={cn("mt-4 grid grid-cols-2 gap-4 border-t border-ink-200/80 pt-4", wide && "sm:grid-cols-3")}>
-        <div className="col-span-2 sm:col-span-1">
-          <dt className="text-xs text-text-subtle">
-            Joining date
-          </dt>
-          <dd className="nums mt-1 text-sm font-medium text-ink-900">
-            {formatJoiningDate(facts.joiningDate)}
-          </dd>
-        </div>
-        {compact ? null : (
-          <>
-            <div>
-              <dt className="text-xs text-text-subtle">
-                {facts.fullTime ? "Location" : "Work mode"}
-              </dt>
-              <dd className="mt-1 text-sm font-medium text-ink-900">
-                {facts.fullTime ? facts.location : modeLabel(facts.mode)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-xs text-text-subtle">
-                {facts.fullTime ? "Job mode" : "Duration"}
-              </dt>
-              <dd className="mt-1 text-sm font-medium text-ink-900">
-                {facts.fullTime ? modeLabel(facts.mode) : facts.duration}
-              </dd>
-            </div>
-          </>
-        )}
-      </dl>
-
-      {!open ? (
-        <p className="mt-4 text-pretty text-sm leading-relaxed text-ink-600">
-          {status.detail}
-        </p>
-      ) : null}
-
-      <div className="mt-auto pt-4">
-        {open ? (
-          <div className="space-y-3">
-            <OfferDecision
-              layout="row"
-              proposalId={p.id}
-              roleTitle={facts.role}
-              company={facts.company ?? "The company"}
-              startDate={facts.startDate}
-              joiningDate={facts.joiningDate}
-              fullTime={facts.fullTime}
-              declinesUsed={decision.declinesUsed}
-              freeDeclines={FREE_DECLINES}
-              guaranteeEnded={decision.guaranteeEnded}
-            />
-            <Link
-              href={href}
-              className="inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 text-sm font-medium text-brand-700 hover:text-brand-800"
-            >
-              Read the full offer
-              <ArrowRight className="size-4" aria-hidden />
-            </Link>
-          </div>
-        ) : (
-          <Link
-            href={href}
-            className="group inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 text-sm font-medium text-brand-700 hover:text-brand-800"
-          >
-            See the offer
-            <ArrowRight
-              className="size-4 apple-spring group-hover:translate-x-0.5"
-              aria-hidden
-            />
-          </Link>
-        )}
-      </div>
-    </Surface>
+    <ul className="mt-3 grid gap-4">
+      {rows.map((row) => (
+        <li key={row.p.id} className="min-w-0">
+          <OfferCard {...row} decision={decision} />
+        </li>
+      ))}
+    </ul>
   );
 }

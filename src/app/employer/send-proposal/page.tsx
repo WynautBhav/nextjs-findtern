@@ -11,6 +11,7 @@ import { displayNameOf, scoreOf, toCandidateProfile, type CandidateSummary } fro
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { EmptyScene, PageHead, Pill, Surface } from "@/components/app/primitives";
+import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { offerState } from "@/components/employer/proposal-state";
@@ -316,10 +317,12 @@ export default async function SendProposal({
   return (
     <div>
       {back}
-      <PageHead
-        title="Send a proposal"
-        lede="Pay follows the candidate's Findtern Score band. Nothing is charged until they accept."
-      />
+      <HeroPanel className="rise mb-6 sm:p-10">
+        <h1 className="text-balance text-3xl font-medium leading-[1.05] tracking-[-0.03em] sm:text-5xl">Send a proposal</h1>
+        <p className="mt-3 max-w-xl text-pretty text-base text-on-dark-subtle sm:text-lg">
+          Pay follows the candidate&apos;s Findtern Score band. Nothing is charged until they accept.
+        </p>
+      </HeroPanel>
 
       <SendProposalForm
         candidate={candidate}

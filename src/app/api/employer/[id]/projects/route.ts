@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
 import { requireMutation } from "@/lib/guards-mutation";
+import { MAX_SKILLS_PER_PROJECT } from "@/lib/projects/lifecycle";
 import { projectNameIssue } from "@/lib/project-name";
 import {
   MAX_PROJECT_SKILLS,
@@ -41,6 +42,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   const d = parsed.data;
 
+  if (d.skills.length < 1 || d.skills.length > MAX_SKILLS_PER_PROJECT) {
+    return NextResponse.json({ error: `Pick 1 to ${MAX_SKILLS_PER_PROJECT} skills.` }, { status: 400 });
+  }
   const skillsProblem = projectSkillsError(d.skills);
   if (skillsProblem) return NextResponse.json({ error: skillsProblem }, { status: 400 });
   // From the shared list only, stored in its spelling.
@@ -89,7 +93,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       city: remote ? null : d.city?.trim() || null,
       state: remote ? null : d.state?.trim() || null,
       preferredLocations: remote ? [] : (d.preferredLocations ?? []),
-      status: "active",
+      // Self-service posting starts as a draft; it goes live only after admin review.
+      status: "draft",
     })
     .returning();
   // The first project completes onboarding, as in legacy.

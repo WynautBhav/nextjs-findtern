@@ -1,13 +1,22 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { ArrowRight, CalendarClock, ClipboardCheck, CreditCard, FolderPlus, ShoppingBag, Video } from "lucide-react";
+import { CheckCircle2, Circle, Plus, Video } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { ButtonLink } from "@/components/ui/button";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
-import { EmptyScene, HeroBand, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { BigFigure, EmptyScene, FigureStrip, HeroBand, PageHead, SectionHead, Surface } from "@/components/app/primitives";
+import { Avatar } from "@/components/app/avatar";
+import { ScoreDial } from "@/components/app/score-dial";
+import { MatchLine } from "@/components/app/match-line";
+import { Callout } from "@/components/app/layout-kit";
+import { bestProjectFor } from "@/components/employer/dashboard-helpers";
+import { RatioBar } from "@/components/employer/kit/ratio-bar";
+import { PipelineBar } from "@/components/employer/kit/pipeline-bar";
+import { StatusPill } from "../projects/status-icon";
+import { normalizeStatus } from "@/lib/projects/lifecycle";
 import { requireRole } from "@/lib/auth";
 import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
@@ -16,8 +25,6 @@ import { meetingEndsAt } from "@/lib/employer-interview-rules";
 import { payableCheckout } from "@/lib/employer-payable";
 import { isProjectOpen } from "@/lib/project-locations";
 import { proposalOutcome } from "@/lib/proposals";
-import { scopeLabel } from "@/lib/db/schema";
-import { PLAN_NAME, bandFor } from "@/lib/score";
 import { timezoneForLocation } from "@/lib/timezones";
 import { formatSlotTime } from "@/lib/format";
 
@@ -35,7 +42,6 @@ type Task = {
   detail: string;
   href: string;
   cta: string;
-  Icon: typeof CreditCard;
   /** False when the next move is someone else's (the candidate picking a time). */
   yours?: boolean;
 };
@@ -84,10 +90,6 @@ export default async function EmployerDashboard() {
   }
 
   const { proposals, projects } = data;
-  const awaiting = proposals.filter((p) => p.status === "sent" || p.status === "interview_scheduled").length;
-  const accepted = proposals.filter((p) => p.status === "accepted" || p.status === "processing").length;
-  const hired = proposals.filter((p) => p.status === "hired").length;
-  const declined = proposals.filter((p) => proposalOutcome(p.status) === "lost").length;
 
   const tasks: Task[] = (
     [
@@ -97,7 +99,6 @@ export default async function EmployerDashboard() {
         detail: "An accepted offer becomes a hire once the first payment is made: the hiring charge, plus the Month 1 charge for scores 6 and above. Each later month's charge is due 2 days before the month's pay date; you can pay up to 15 days early.",
         href: "/employer/checkout",
         cta: "Go to checkout",
-        Icon: CreditCard,
       },
       {
         count: data.submittedSheets,
@@ -105,7 +106,6 @@ export default async function EmployerDashboard() {
         detail: "Interns are paid on approved hours only.",
         href: "/employer/timesheets",
         cta: "Review hours",
-        Icon: ClipboardCheck,
       },
       {
         count: data.pendingInterviews,
@@ -113,16 +113,14 @@ export default async function EmployerDashboard() {
         detail: "They pick one of the three times you offered. Send a reminder from your schedule if it's been a while.",
         href: "/employer/schedule",
         cta: "Open schedule",
-        Icon: CalendarClock,
         yours: false,
       },
       {
         count: data.shortlisted,
         label: data.shortlisted === 1 ? "shortlisted candidate, no proposal yet" : "shortlisted candidates, no proposal yet",
-        detail: "Book a meeting or send a proposal before someone else does.",
+        detail: "Book a meeting or send a proposal to move them forward.",
         href: "/employer/cart",
         cta: "Open shortlist",
-        Icon: ShoppingBag,
       },
     ] satisfies Task[]
   ).filter((t) => t.count > 0);
@@ -136,177 +134,174 @@ export default async function EmployerDashboard() {
     if (proposalOutcome(p.status) === "won") row.won += 1;
     byProject.set(p.projectId, row);
   }
-  // The hero's amber action is only ever something the employer can do now.
-  const top = tasks.find((t) => t.yours !== false);
-  const rest = tasks.filter((t) => t !== top);
-
+  const pipeline = [
+    { key: "open", label: "In progress", count: proposals.filter((p) => proposalOutcome(p.status) === "open").length, tone: "open" as const },
+    { key: "won", label: "Accepted", count: proposals.filter((p) => proposalOutcome(p.status) === "won").length, tone: "won" as const },
+    { key: "lost", label: "Declined or expired", count: proposals.filter((p) => proposalOutcome(p.status) === "lost").length, tone: "lost" as const },
+  ];
   const next = data.nextInterview;
   const nextAt = next ? slotDate(next) : null;
+  const attention = tasks.filter((t) => t.count > 0);
+  const live = openProjects.filter((p) => normalizeStatus(p.status) === "published");
+  const matchProjects = (live.length ? live : openProjects).map((p) => ({ id: p.id, projectName: p.projectName, skills: (p.skills as string[]) ?? [] }));
+  const postButton = (
+    <ButtonLink href="/employer/projects/new">
+      <Plus className="size-4" aria-hidden />
+      Post an internship
+    </ButtonLink>
+  );
+
+  // Nothing sent, nothing live: a checklist with the next step, not empty tables.
+  const fresh = proposals.length === 0 && live.length === 0;
+  const steps = [
+    { done: true, label: "Company profile", href: "/employer/account" },
+    { done: projects.length > 0, label: "Create an internship", href: "/employer/projects/new" },
+    { done: live.length > 0, label: "Get it approved (we review within one working day)", href: "/employer/projects" },
+    { done: data.shortlisted > 0 || proposals.length > 0, label: "Shortlist candidates and send a proposal", href: "/employer/candidates" },
+  ];
+  const yoursCount = tasks.filter((t) => t.yours !== false).length;
+  const stateLine =
+    yoursCount > 0
+      ? `${yoursCount === 1 ? "One thing needs" : `${yoursCount} things need`} you today.`
+      : "Nothing is waiting on you today.";
+  const nextStep = steps.find((s) => !s.done);
 
   return (
     <div>
       <HeroBand
-        // Name the first thing waiting rather than a total of different kinds
-        // of things, so the headline matches the list below it.
-        title={top ? `${top.count} ${top.label}` : proposals.length ? "You're all caught up" : "Let's make your first hire"}
-        lede={
-          top
-            ? top.detail
-            : proposals.length
-              ? "Nothing is waiting on you. Your candidates and offers are below."
-              : "Shortlist candidates ranked by their Findtern Score, meet them, and send a proposal."
-        }
-        actions={
-          <>
-            {top ? (
-              <ButtonLink href={top.href} variant="accent">
-                {top.cta}
-                <ArrowRight className="size-4" aria-hidden />
-              </ButtonLink>
-            ) : (
-              <ButtonLink href="/employer/candidates" variant="accent">
-                Find candidates
-                <ArrowRight className="size-4" aria-hidden />
-              </ButtonLink>
-            )}
-            <ButtonLink href="/employer/projects?new=1" variant="outlineLight">
-              <FolderPlus className="size-4" aria-hidden />
-              New project
-            </ButtonLink>
-          </>
-        }
+        title={data.companyName || "Dashboard"}
+        lede={stateLine}
+        actions={postButton}
       >
-        {proposals.length ? (
-          // The pipeline as one line, not four tiles: Proposals is where it's worked.
-          <Link
-            href="/employer/proposals"
-            className="group nums inline-flex flex-wrap items-baseline gap-x-5 gap-y-1 rounded-apple-sm text-sm text-on-dark-subtle hover:text-white"
-          >
-            {(
-              [
-                [awaiting, "awaiting a reply"],
-                [accepted, "accepted, to pay"],
-                [hired, "hired"],
-                [declined, "declined or expired"],
-              ] as const
-            ).map(([n, label]) => (
-              <span key={label}>
-                <span className="text-lg font-semibold text-white">{n}</span> {label}
-              </span>
-            ))}
-            <span className="inline-flex items-center gap-1 font-medium text-white underline-offset-4 group-hover:underline">
-              Proposals
-              <ArrowRight className="size-3.5" aria-hidden />
-            </span>
-          </Link>
-        ) : null}
+        <FigureStrip tone="dark" className="max-sm:[&>*:last-child]:col-span-2">
+          <BigFigure tone="dark" label="Timesheets to review" value={data.submittedSheets} hint="Interns are paid on approved hours" href="/employer/timesheets" />
+          <BigFigure tone="dark" label="Waiting on candidates" value={data.pendingInterviews} hint="Meetings they have not yet booked" href="/employer/schedule" />
+          <BigFigure tone="dark" label="Shortlisted, no proposal" value={data.shortlisted} hint="Ready for a meeting or an offer" href="/employer/cart" />
+        </FigureStrip>
+        <div className="mt-8 border-t border-white/15 pt-6">
+          <PipelineBar stages={pipeline} />
+        </div>
       </HeroBand>
+
+      {fresh ? (
+        <Surface className="mb-8 p-5 sm:p-6">
+          <h2 className="text-lg font-semibold text-ink-900">Get to your first hire</h2>
+          <ol className="mt-4 space-y-1">
+            {steps.map((st) => (
+              <li key={st.label}>
+                <Link
+                  href={st.href}
+                  className="flex min-h-11 items-center gap-3 rounded-apple-sm px-2 text-sm hover:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+                >
+                  {st.done ? <CheckCircle2 className="size-5 text-brand-700" aria-hidden /> : <Circle className="size-5 text-ink-400" aria-hidden />}
+                  <span className={st.done ? "text-text-subtle line-through" : "font-medium text-ink-900"}>{st.label}</span>
+                  <span className="sr-only">{st.done ? "done" : st === nextStep ? "next step" : "to do"}</span>
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </Surface>
+      ) : null}
 
       <div className="grid gap-x-10 gap-y-10 xl:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-10">
-          {/* The hero carries the first thing waiting; this list carries the rest,
-              so nothing is said twice. Nothing waiting: the hero says so. */}
-          {rest.length ? (
-            <section>
-              <SectionHead title={top ? "Also waiting" : "Waiting"} />
-              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-                {rest.map((t) => (
-                  <li key={t.href} className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-[3rem_minmax(0,1fr)_auto]">
-                    {/* The count leads the row: type, not an icon, carries it. */}
-                    <span className="nums text-right text-2xl font-semibold text-ink-900">{t.count}</span>
-                    <div className="min-w-0">
-                      <p className="text-base font-medium text-ink-900">{t.label.charAt(0).toUpperCase() + t.label.slice(1)}</p>
-                      <p className="mt-0.5 text-sm text-ink-600">{t.detail}</p>
-                    </div>
-                    <ButtonLink href={t.href} variant="outline" size="sm" className="col-start-2 min-h-11 justify-self-start sm:col-start-auto sm:justify-self-end">
-                      {t.cta}
-                      <ArrowRight className="size-4" aria-hidden />
-                    </ButtonLink>
-                  </li>
-                ))}
-              </Surface>
-            </section>
-          ) : null}
+          <section aria-labelledby="attn-h">
+            <SectionHead title="Needs your decision" />
+            {attention.length === 0 ? (
+              <Callout tone="success" title="You're all caught up">
+                Nothing is waiting on you. Candidates and offers are in{" "}
+                <Link href="/employer/proposals" className="font-medium underline underline-offset-2">Proposals</Link>.
+              </Callout>
+            ) : (
+              <ul className="grid gap-3">
+                {attention.map((t, i) => {
+                  const mine = t.yours !== false;
+                  return (
+                    <li
+                      key={t.href}
+                      style={{ "--i": i } as React.CSSProperties}
+                      className={`rise tile-lift grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-5 gap-y-3 rounded-apple-xl border bg-white p-4 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:p-5 ${mine ? "border-ink-200/70 border-l-4 border-l-accent" : "border-ink-200/70"}`}
+                    >
+                      <span className="nums w-12 text-5xl font-light leading-none tracking-[-0.05em] text-ink-900">{t.count}</span>
+                      <div className="min-w-0">
+                        <p className="text-base font-medium text-ink-900">{t.label}</p>
+                        <p className="mt-0.5 line-clamp-2 text-sm text-text-subtle">{t.detail}</p>
+                      </div>
+                      <ButtonLink
+                        href={t.href}
+                        variant={i === 0 && mine ? "primary" : "outline"}
+                        size="sm"
+                        className="min-h-11 max-sm:col-span-2 sm:justify-self-end"
+                      >
+                        {t.cta}
+                      </ButtonLink>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
 
-          <section>
+          <section aria-labelledby="int-h">
             <SectionHead
-              title="Projects"
-              hint={`${openProjects.length} open of ${projects.length}`}
+              title="Your internships"
+              hint={projects.length ? `${live.length} live of ${projects.length}` : undefined}
               action={
                 <Link href="/employer/projects" className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline">
-                  Manage
+                  Manage all
                 </Link>
               }
             />
             {projects.length === 0 ? (
               <EmptyScene
-                title="No projects yet"
-                body="A project tells us the skills you need, so candidates are matched to it. It takes about five minutes."
-                next={{ label: "Create a project", href: "/employer/projects?new=1" }}
+                title="No internships yet"
+                body="An internship tells us the skills you need, so candidates are matched to it."
+                next={{ label: "Post an internship", href: "/employer/projects/new" }}
                 who="You - about five minutes"
               />
             ) : (
-              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-                {shownProjects.map((p) => {
+              <ul className="grid gap-3">
+                {shownProjects.map((p, idx) => {
                   const stats = byProject.get(p.id) ?? { total: 0, won: 0 };
-                  const skills = ((p.skills as string[]) ?? []).slice(0, 4);
-                  const open = isProjectOpen(p.status);
+                  const key = normalizeStatus(p.status);
+                  const action =
+                    key === "published"
+                      ? { href: `/employer/candidates?project=${encodeURIComponent(p.id)}`, label: "View candidates" }
+                      : { href: key === "closed" ? "/employer/projects" : `/employer/projects/${p.id}/edit`, label: key === "closed" ? "View" : key === "paused" ? "Open" : key === "pending_review" ? "View" : "Edit" };
                   return (
-                    <li key={p.id}>
-                      <Link
-                        href={`/employer/candidates?project=${encodeURIComponent(p.id)}`}
-                        className="group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 px-5 py-4 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
-                      >
-                        <div className="min-w-0">
-                          <p className="flex flex-wrap items-center gap-2">
-                            <span className="line-clamp-2 break-words text-base font-medium text-ink-900 group-hover:text-brand-700">{p.projectName}</span>
-                            {open ? null : <Pill tone="closed">Closed</Pill>}
-                          </p>
-                          {/* Two lines, then cut: a phone showed half a project name (QA-117). */}
-                          <p className="mt-0.5 line-clamp-2 text-sm text-ink-600">
-                            {scopeLabel(p.scopeOfWork)}
-                            {skills.length ? ` · ${skills.join(", ")}` : ""}
-                          </p>
-                        </div>
-                        <p className="nums text-right text-sm text-ink-600">
-                          <span className="font-semibold text-ink-900">{stats.total}</span> sent
-                          {stats.won ? (
-                            <span className="block text-success">
-                              <span className="font-semibold">{stats.won}</span> accepted
-                            </span>
-                          ) : null}
-                        </p>
-                      </Link>
+                    <li key={p.id} style={{ "--i": idx } as React.CSSProperties} className="rise tile-lift grid grid-cols-1 gap-x-6 gap-y-3 rounded-apple-xl border border-ink-200/70 bg-white p-4 sm:grid-cols-[minmax(0,1fr)_13rem_9.5rem] sm:items-center sm:p-5">
+                      <div className="min-w-0">
+                        <p className="line-clamp-2 break-words text-base font-medium text-ink-900">{p.projectName}</p>
+                        <div className="mt-1.5"><StatusPill status={p.status} /></div>
+                      </div>
+                      <RatioBar sent={stats.total} accepted={stats.won} />
+                      <ButtonLink href={action.href} variant="outline" size="sm" block className="min-h-11 sm:w-full">
+                        {action.label}
+                      </ButtonLink>
                     </li>
                   );
                 })}
-              </Surface>
+              </ul>
             )}
           </section>
         </div>
 
         <aside className="min-w-0 space-y-8">
           {next && nextAt ? (
-            <Surface className="p-5">
-              <p className="text-sm font-medium text-ink-600">Next meeting</p>
+            <Surface className="border-l-4 border-l-brand-600 p-5">
+              <p className="text-sm font-medium text-text-subtle">Next meeting</p>
               <p className="mt-1 text-base font-semibold text-ink-900">{formatSlotTime(nextAt, data.timezone)}</p>
-              <p className="mt-0.5 text-sm text-ink-600">Your timezone ({data.timezone.replace(/_/g, " ")})</p>
-              {next.meetingLink ? (
-                <ButtonLink href="/employer/schedule" size="sm" block className="mt-4 min-h-11">
-                  <Video className="size-4" aria-hidden />
-                  Open in schedule
-                </ButtonLink>
-              ) : (
-                <ButtonLink href="/employer/schedule" variant="outline" size="sm" block className="mt-4 min-h-11">
-                  Open schedule
-                </ButtonLink>
-              )}
+              <p className="mt-0.5 text-sm text-text-subtle">Your timezone ({data.timezone.replace(/_/g, " ")})</p>
+              <ButtonLink href="/employer/schedule" variant="outline" size="sm" block className="mt-4 min-h-11">
+                {next.meetingLink ? <Video className="size-4" aria-hidden /> : null}
+                Open in schedule
+              </ButtonLink>
             </Surface>
           ) : null}
 
-          <section>
+          <section aria-labelledby="top-h">
             <SectionHead
-              title="Matches for your projects"
+              title="Top matches"
               action={
                 <Link href="/employer/candidates" className="inline-flex min-h-11 items-center text-sm font-medium text-brand-700 hover:underline">
                   Browse all
@@ -314,33 +309,43 @@ export default async function EmployerDashboard() {
               }
             />
             {data.candidates.length === 0 ? (
-              <p className="text-sm text-ink-600">No scored candidates match yet. New ones appear as they finish their AI interview.</p>
+              <p className="text-sm text-text-subtle">No scored candidates match yet. New ones appear as they finish their AI interview.</p>
             ) : (
-              <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
-                {data.candidates.map((c) => {
-                  const band = bandFor(c.score);
-                  return (
-                    <li key={c.id}>
-                      <Link
-                        href={`/employer/intern/${encodeURIComponent(c.id)}`}
-                        className="group grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 px-4 py-3.5 transition-colors hover:bg-ink-50/70 focus-visible:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500"
-                      >
-                        <span aria-hidden className="grid size-10 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
-                          {c.initials}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block truncate text-sm font-semibold text-ink-900 group-hover:text-brand-700">{c.initials}</span>
-                          <span className="line-clamp-2 text-sm text-ink-600">{c.skills.slice(0, 3).join(", ") || c.location || "Profile in progress"}</span>
-                        </span>
-                        <span className="text-right">
-                          <span className="nums block text-lg font-semibold leading-tight text-brand-700">{c.score.toFixed(1)}</span>
-                          <span className="block text-xs text-text-subtle">{PLAN_NAME[band.id]} plan</span>
-                        </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </Surface>
+              <>
+                <p className="mb-3 text-sm text-text-subtle">Names stay hidden until you hire.</p>
+                <ol className="overflow-hidden rounded-apple-xl border border-ink-200/70 bg-gradient-to-b from-brand-50/60 to-white shadow-tile divide-y divide-ink-100">
+                  {data.candidates.map((c, rank) => {
+                    const fit = bestProjectFor(c.skills, matchProjects);
+                    return (
+                      <li key={c.id} className="space-y-2 px-4 py-3.5">
+                        <p className="nums text-xs font-medium text-text-subtle">#{rank + 1}</p>
+                        <div className="flex items-center gap-3">
+                          <Avatar masked initials={c.initials} size="md" />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-semibold text-ink-900">Candidate {c.initials}</p>
+                            <p className="truncate text-sm text-text-subtle">{c.location || "Location not shared"}</p>
+                          </div>
+                          {c.scored ? <ScoreDial score={c.score} axes={c.ratings} size={rank === 0 ? "md" : "sm"} showBand={false} /> : null}
+                        </div>
+                        {fit ? (
+                          <div className="min-w-0 text-sm">
+                            <p className="truncate text-text-subtle">For <span className="font-medium text-ink-800">{fit.project.projectName}</span></p>
+                            <MatchLine candidateSkills={c.skills} wantedSkills={fit.project.skills} />
+                          </div>
+                        ) : null}
+                        <ButtonLink
+                          href={`/employer/intern/${encodeURIComponent(c.id)}${fit ? `?project=${encodeURIComponent(fit.project.id)}` : ""}`}
+                          variant="outline"
+                          size="sm"
+                          className="min-h-11"
+                        >
+                          View profile
+                        </ButtonLink>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </>
             )}
           </section>
         </aside>

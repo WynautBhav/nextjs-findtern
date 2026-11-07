@@ -23,12 +23,12 @@ import { cn } from "@/lib/utils";
 export function PageHead({
   title,
   lede,
-  eyebrow,
   action,
   className,
 }: {
   title: React.ReactNode;
   lede?: React.ReactNode;
+  /** @deprecated Kickers are banned by the craft floor. Accepted so callers compile; never rendered. */
   eyebrow?: string;
   action?: React.ReactNode;
   className?: string;
@@ -36,11 +36,8 @@ export function PageHead({
   return (
     <header className={cn("mb-6 flex flex-wrap items-end justify-between gap-4 lg:mb-8", className)}>
       <div className="min-w-0 max-w-3xl">
-        {eyebrow ? (
-          <p className="mb-1 text-sm font-medium text-text-subtle">{eyebrow}</p>
-        ) : null}
-        <h1 className="text-balance break-words text-2xl font-semibold tracking-[-0.02em] text-ink-900">{title}</h1>
-        {lede ? <p className="mt-1 max-w-2xl text-pretty text-sm text-text-subtle">{lede}</p> : null}
+        <h1 className="text-balance break-words text-3xl font-medium leading-[1.08] tracking-[-0.03em] text-ink-900">{title}</h1>
+        {lede ? <p className="mt-2 max-w-2xl text-pretty text-base text-text-subtle">{lede}</p> : null}
       </div>
       {action ? <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0">{action}</div> : null}
     </header>
@@ -54,49 +51,113 @@ export function PageHead({
  * at most; more than one and it stops being the focal point. */
 
 export function HeroBand({
-  eyebrow,
   title,
   lede,
   actions,
+  aside,
   children,
   className,
 }: {
+  /** @deprecated Accepted so callers compile; never rendered. */
   eyebrow?: React.ReactNode;
   title: React.ReactNode;
   lede?: React.ReactNode;
   actions?: React.ReactNode;
+  /** Right-hand slot on lg (the intern's score dial); stacks below the copy on mobile. */
+  aside?: React.ReactNode;
   /** Figures under the copy. */
   children?: React.ReactNode;
   className?: string;
 }) {
   return (
-    <section className={cn("relative isolate mb-8 overflow-hidden rounded-apple-xl bg-brand-950 px-6 py-8 text-white sm:px-9 sm:py-10", className)}>
-      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-6">
-        <div className="min-w-0 max-w-2xl">
-          {eyebrow ? <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-accent-300">{eyebrow}</p> : null}
-          <h1 className="text-balance text-3xl font-semibold leading-[1.1] tracking-[-0.025em] sm:text-4xl">{title}</h1>
-          {lede ? <p className="mt-3 max-w-xl text-pretty text-base leading-relaxed text-on-dark-subtle sm:text-lg">{lede}</p> : null}
+    <section className={cn("relative isolate mb-8 overflow-hidden rounded-[28px] bg-[linear-gradient(125deg,var(--color-brand-700)_0%,var(--color-brand-900)_52%,var(--color-brand-950)_100%)] px-6 py-8 text-white shadow-tile-brand sm:px-10 sm:py-10", className)}>
+      <div aria-hidden className="glow-drift pointer-events-none absolute -right-24 -top-32 -z-10 size-[28rem] rounded-full bg-[radial-gradient(closest-side,rgb(245_187_99/0.30),rgb(245_187_99/0.07)_55%,transparent)]" />
+      <div aria-hidden className="pointer-events-none absolute -bottom-40 left-1/4 -z-10 size-[26rem] rounded-full bg-[radial-gradient(closest-side,rgb(92_151_131/0.26),transparent)]" />
+      <svg aria-hidden viewBox="0 0 800 260" preserveAspectRatio="xMaxYMid slice" className="pointer-events-none absolute inset-0 -z-10 size-full text-white/[0.07]" fill="none" stroke="currentColor" strokeWidth="1.25">
+        {Array.from({ length: 11 }, (_, i) => (
+          <path key={i} d={`M${330 + i * 18} 290 C ${400 + i * 14} ${210 - i * 10}, ${520 + i * 9} ${160 - i * 12}, 820 ${130 - i * 16}`} />
+        ))}
+        {Array.from({ length: 6 }, (_, i) => (
+          <ellipse key={`e${i}`} cx="700" cy="60" rx={30 + i * 26} ry={20 + i * 18} />
+        ))}
+      </svg>
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 max-w-2xl flex-col gap-6">
+          <div>
+            <h1 className="text-balance text-4xl font-medium leading-[1.04] tracking-[-0.035em]">{title}</h1>
+            {lede ? <p className="mt-3 max-w-xl text-pretty text-base leading-relaxed text-on-dark-subtle sm:text-lg">{lede}</p> : null}
+          </div>
+          {actions ? <div className="flex w-full flex-wrap gap-3 sm:w-auto">{actions}</div> : null}
         </div>
-        {actions ? <div className="flex w-full flex-wrap gap-3 sm:w-auto">{actions}</div> : null}
+        {aside ? <div className="shrink-0 lg:pr-4">{aside}</div> : null}
       </div>
       {children ? <div className="mt-8">{children}</div> : null}
     </section>
   );
 }
 
-/** One headline number in a page's figure strip (a `<dl>`): label, figure, quiet hint. */
+/** One headline number in a page's figure strip (a `<dl>`): label above, big light figure, quiet hint. */
 export function Figure({ label, value, empty, hint }: { label: string; value: React.ReactNode | null; empty: string; hint?: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-sm text-text-subtle">{label}</dt>
-      <dd className="mt-1">
+      <dt className="text-[13px] font-medium text-text-subtle">{label}</dt>
+      <dd className="mt-1.5">
         {value !== null ? (
-          <span className="nums block text-3xl font-semibold tracking-tight text-ink-900">{value}</span>
+          <span className="nums block text-5xl font-light tracking-[-0.04em] text-ink-900">{value}</span>
         ) : (
           <span className="block text-base font-medium text-ink-700">{empty}</span>
         )}
-        {hint ? <span className="mt-1 block text-xs text-text-subtle">{hint}</span> : null}
+        {hint ? <span className="mt-1.5 block text-xs text-text-subtle">{hint}</span> : null}
       </dd>
+    </div>
+  );
+}
+
+/** KPI as type: label, a large light tabular number, hint. A whole-unit Link when `href` is given. */
+export function BigFigure({
+  label,
+  value,
+  hint,
+  tone = "light",
+  href,
+}: {
+  label: string;
+  value: React.ReactNode;
+  hint?: React.ReactNode;
+  tone?: "light" | "dark";
+  href?: string;
+}) {
+  const dark = tone === "dark";
+  const body = (
+    <>
+      <span className={cn("block text-[13px] font-medium", dark ? "text-on-dark-subtle" : "text-text-subtle")}>{label}</span>
+      <span className={cn("nums mt-1.5 block text-5xl font-light leading-none tracking-[-0.04em] tabular-nums lg:text-[56px]", dark ? "text-white" : "text-ink-900")}>{value}</span>
+      {hint ? <span className={cn("mt-2 block text-xs", dark ? "text-on-dark-subtle" : "text-text-subtle")}>{hint}</span> : null}
+    </>
+  );
+  const base = "block min-w-0 px-5 py-5 sm:px-6";
+  return href ? (
+    <Link href={href} className={cn(base, "apple-spring focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-600", dark ? "hover:bg-white/5 focus-visible:outline-white" : "hover:bg-ink-50")}>
+      {body}
+    </Link>
+  ) : (
+    <div className={base}>{body}</div>
+  );
+}
+
+/** Row of BigFigures: one white hairline panel, or (tone dark, inside HeroBand) transparent with vertical hairlines. 2 columns on mobile. */
+export function FigureStrip({ children, tone = "light", className }: { children: React.ReactNode; tone?: "light" | "dark"; className?: string }) {
+  return (
+    <div
+      className={cn(
+        "grid grid-cols-2 gap-px overflow-hidden sm:flex sm:gap-0 sm:[&>*]:flex-1",
+        tone === "dark"
+          ? "sm:divide-x sm:divide-white/15 max-sm:bg-white/15 max-sm:[&>*]:bg-brand-950"
+          : cn(SURFACE_CLASS, "max-sm:bg-ink-200/70 max-sm:[&>*]:bg-white sm:divide-x sm:divide-ink-200/70"),
+        className,
+      )}
+    >
+      {children}
     </div>
   );
 }
@@ -132,11 +193,10 @@ export function SectionHead({
  * pixels shipped unnoticed. */
 
 /** On the light console's grey canvas a card is a dashboard tile: no border, one soft shadow. */
-export const LIGHT_TILE =
-  "in-data-[tone=light]:border-transparent in-data-[tone=light]:shadow-tile";
+export const LIGHT_TILE = "";
 
 /** The card look as a class string, for blocks that are not a `Surface` element (Panel, DataTable, a toolbar). */
-export const SURFACE_CLASS = `rounded-apple-xl border border-ink-200/80 bg-white ${LIGHT_TILE}`;
+export const SURFACE_CLASS = `rounded-apple-xl border border-ink-200/70 bg-white ${LIGHT_TILE}`.trim();
 
 export function Surface({
   children,
@@ -164,7 +224,7 @@ export function Surface({
  * bare uppercase string on others, and as the literal database enum
  * `interview_first` on a third. Enums never reach a user. */
 
-export type Tone = "live" | "waiting" | "closed" | "new" | "paid" | "neutral";
+export type Tone = "live" | "waiting" | "closed" | "new" | "paid" | "neutral" | "danger";
 
 const TONE: Record<Tone, string> = {
   live: "bg-brand-50 text-brand-800 ring-brand-200/70",
@@ -173,25 +233,34 @@ const TONE: Record<Tone, string> = {
   new: "bg-info-soft text-info ring-info/25",
   paid: "bg-success-soft text-success ring-success/25",
   neutral: "bg-ink-100 text-ink-700 ring-ink-200",
+  danger: "bg-danger-soft text-danger ring-danger/25",
 };
 
 export function Pill({
   tone = "neutral",
   children,
   className,
+  icon,
+  size = "sm",
 }: {
   tone?: Tone;
   children: React.ReactNode;
   className?: string;
+  /** Optional lucide icon element, rendered decoratively before the text. */
+  icon?: React.ReactNode;
+  /** sm (default, unchanged) or md. */
+  size?: "sm" | "md";
 }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset",
+        "inline-flex items-center gap-1.5 rounded-full font-medium ring-1 ring-inset",
+        size === "md" ? "px-2.5 py-1 text-sm" : "px-2 py-1 text-xs",
         TONE[tone],
         className,
       )}
     >
+      {icon ? <span aria-hidden className="inline-flex shrink-0 [&_svg]:size-3.5">{icon}</span> : null}
       {children}
     </span>
   );
@@ -399,11 +468,11 @@ export function FilterTabs({
           </>
         );
         return hrefFor ? (
-          <Link key={t.key} href={hrefFor(t.key)} scroll={false} aria-current={on ? "page" : undefined} className={cls}>
+          <Link key={t.key} href={hrefFor(t.key)} scroll={false} aria-current={on ? "page" : undefined} data-on={on ? "" : undefined} className={cls}>
             {inner}
           </Link>
         ) : (
-          <button key={t.key} type="button" aria-pressed={on} onClick={() => onChange?.(t.key)} className={cls}>
+          <button key={t.key} type="button" aria-pressed={on} data-on={on ? "" : undefined} onClick={() => onChange?.(t.key)} className={cls}>
             {inner}
           </button>
         );

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { settleEmployerOrder, settleInternOrder } from "@/lib/payments";
 import { verifyWebhookSignature } from "@/lib/razorpay";
+import { settleRefundWebhook } from "@/lib/refunds/refunds-db";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +22,16 @@ export async function POST(req: Request) {
     event = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Bad payload" }, { status: 400 });
+  }
+  if (event.event === "refund.processed" || event.event === "refund.failed") {
+    try {
+      const outcome = await settleRefundWebhook(event as Parameters<typeof settleRefundWebhook>[0]);
+      if (outcome === "unknown") console.warn("[razorpay webhook] refund event for unknown refund id");
+      return NextResponse.json({ status: outcome === "unknown" ? "unknown_refund" : "ok" });
+    } catch (error) {
+      console.error("[razorpay webhook] refund", error);
+      return NextResponse.json({ error: "Webhook error" }, { status: 500 });
+    }
   }
   if (event.event !== "payment.captured" && event.event !== "order.paid") return NextResponse.json({ status: "ignored" });
 

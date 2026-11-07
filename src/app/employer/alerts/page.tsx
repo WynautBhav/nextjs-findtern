@@ -7,7 +7,9 @@ import { requireRole } from "@/lib/auth";
 import { EmptyScene } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
-import { NotificationList, type NotificationRow } from "@/components/app/notification-list";
+import type { NotificationRow } from "@/components/app/notification-list";
+import { NotificationTimeline } from "@/components/intern/kit/notification-timeline";
+import { HeroPanel, HeroFigure } from "@/components/employer/kit/hero-panel";
 import { PageHeader } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
 
@@ -126,8 +128,17 @@ export default async function EmployerAlerts({
       <PageHeader
         title="Alerts"
         subtitle="Offer replies, interviews, timesheets and payments, newest first."
-        action={<NotificationList mode="mark-all" disabled={unread === 0} />}
+        action={<NotificationTimeline mode="mark-all" disabled={unread === 0} />}
       />
+
+      {total > 0 ? (
+        <HeroPanel className="mb-6 py-6">
+          <div className="grid grid-cols-2 gap-6 sm:max-w-md">
+            <HeroFigure lead label="Unread" value={unread} hint={unread === 0 ? "You are caught up" : "Waiting for you"} />
+            <HeroFigure label="Total alerts" value={total} hint="Offers, interviews, payments" />
+          </div>
+        </HeroPanel>
+      ) : null}
 
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <nav aria-label="Filter alerts" className="inline-flex rounded-apple-md border border-ink-200/80 bg-white p-1 shadow-xs">
@@ -172,7 +183,7 @@ export default async function EmployerAlerts({
           />
         )
       ) : (
-        <NotificationList rows={rows} />
+        <NotificationTimeline rows={rows} />
       )}
     </div>
   );

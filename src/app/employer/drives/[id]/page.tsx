@@ -9,6 +9,7 @@ import { ONLINE_WINDOW_MS, driveForEmployer, eligibleStudents } from "@/lib/coll
 import { getDb, schema } from "@/lib/db";
 import { displayNameOf, initialsOf, readSkills } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
+import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { EmptyScene } from "@/components/app/primitives";
 import { CoBrand, CollegeMark, DriveStatePill, KIND_LABEL, driveTime, timeLeft } from "@/components/employer/drive-parts";
 import { DriveWorkspace, type DriveCandidate } from "@/components/employer/drive-workspace";
@@ -46,25 +47,26 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
   const state = driveWindow(drive);
   const fullTime = drive.kind === "full_time";
 
+  const left = state === "live" ? timeLeft(drive.endsAt) : null;
   const header = (
-    <header className="mb-7">
-      <CoBrand collegeName={college.name} />
-      <div className="mt-3 flex items-start gap-4">
+    <HeroPanel className="rise mb-6">
+      <CoBrand collegeName={college.name} tone="dark" />
+      <div className="mt-4 flex items-start gap-4">
         <CollegeMark name={college.name} logoUrl={college.logoUrl} className="hidden sm:grid" />
         <div className="min-w-0 flex-1">
-          <h1 className="text-balance text-2xl font-semibold text-ink-900 md:text-3xl">{drive.title}</h1>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-ink-600">
+          <h1 className="text-balance text-[clamp(1.75rem,3.6vw,2.75rem)] font-light leading-tight tracking-[-0.03em]">{drive.title}</h1>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-on-dark-subtle">
             <DriveStatePill state={state} />
             <span>{KIND_LABEL[drive.kind] ?? "Campus drive"}</span>
-            <span aria-hidden className="text-ink-300">·</span>
+            <span aria-hidden>·</span>
             <span className="nums">
               Closes {driveTime(drive.endsAt)}
-              {state === "live" && timeLeft(drive.endsAt) ? ` (${timeLeft(drive.endsAt)})` : ""}
+              {left ? ` (${left})` : ""}
             </span>
           </div>
         </div>
       </div>
-    </header>
+    </HeroPanel>
   );
 
   if (!access.ok) {

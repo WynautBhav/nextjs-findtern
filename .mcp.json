@@ -13,6 +13,13 @@
         "--screenshotMaxWidth=1440",
         "--chromeArg=no-sandbox"
       ]
+    },
+    "awwwards": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "awwwards-mcp@1.18.0"
+      ]
     }
   }
 }

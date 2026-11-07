@@ -2,6 +2,7 @@ import { desc } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
+
 import { getSession } from "@/lib/auth";
 
 export async function GET() {

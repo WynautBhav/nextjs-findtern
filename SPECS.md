@@ -361,3 +361,15 @@ changed.
   admin page gets its own composition ("no two pages alike"); the per-page
   plan is in `docs/plans/admin-dark-ops-desk.md` and each wave is
   shown to the owner before the next starts.
+- 7 Nov 2026: owner decision ("renovation"): **bolder pass on intern and
+  employer**, aiming at an award-level console. SPECS §2 "Banned" is relaxed
+  for these two consoles: depth (layered soft shadows), brand gradients on
+  hero surfaces, glass on floating bars only (compare bar, sticky toolbars),
+  ambient glow behind one hero figure, and expressive motion (staggered
+  entrances, count-ups, spring hover, shared-layout moves, transform and
+  opacity only, `prefers-reduced-motion` honoured) are allowed. Still locked:
+  security/money/data rules, 44px targets, no horizontal scroll at 375, WCAG
+  AA contrast, one amber call to action per screen, initials before hire,
+  copy rules. The employer console moves to `ConsoleShell tone="light"`
+  (the intern shell). Direction and per-page plan: goal folder
+  `~/.gg/goals/renovation/DIRECTION.md`.

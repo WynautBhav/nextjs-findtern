@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { EmptyScene, PageHead, Pill, SectionHead, Surface, type Tone } from "@/components/app/primitives";
+import { FigurePanel, SignatureHero } from "@/components/intern/kit/hero";
+import { soonest, untilLabel } from "@/components/intern/kit/countdown";
+import { MatchRing } from "@/components/intern/kit/ring";
+import { CountUp } from "@/components/motion/count-up";
+import { Stagger } from "@/components/intern/kit/motion";
+import { BigFigure, EmptyScene, FigureStrip, Pill, SectionHead, Surface, type Tone } from "@/components/app/primitives";
 import { SlotPicker } from "@/components/app/slot-picker";
 import { AiInterviewJoinCard } from "@/components/intern/ai-interview-join-card";
 import { isScored } from "@/lib/ai-interview";
@@ -27,7 +32,7 @@ export const metadata: Metadata = {
  * Template: list, ordered by state. Whatever needs the intern comes first
  * (the AI interview's own step, company rounds to pick a time for or join),
  * then the Findtern Score (ring + radar), then past rounds. The AI interview
- * is Findtern's, labelled "AI Interview", never "Hidden company" (bug sheet 7,
+ * is Findtern's, labelled "AI interview", never "Hidden company" (bug sheet 7,
  * S1 r63). Every time here is India time, labelled IST (INW-09, S2 r7).
  */
 export default async function InternInterviews() {
@@ -72,6 +77,9 @@ export default async function InternInterviews() {
       // so an empty slot 1 must not renumber slot 2.
       d instanceof Date ? [{ index: n + 1, iso: d.toISOString(), passed: isPast(d) }] : [],
     );
+
+  const nextRound = soonest(upcoming.filter((i) => i.selectedSlot).map((i) => slotOf(i)));
+  const nextIn = nextRound ? untilLabel(nextRound) : "";
 
   const agenda =
     upcoming.length > 0 ? (
@@ -118,8 +126,40 @@ export default async function InternInterviews() {
     ) : null;
 
   return (
-    <div className="space-y-6 lg:space-y-8">
-      <PageHead title="Interviews" lede="Your Findtern Score and the rounds companies book with you. Every time here is India time (IST)." />
+    <Stagger className="space-y-6 lg:space-y-8">
+      <SignatureHero
+        title="Interviews"
+        lede="Your Findtern Score and the rounds companies book with you. Every time here is India time (IST)."
+        aside={
+          <div className="flex flex-wrap items-center gap-8">
+            {scored && findternScore > 0 ? (
+              <div className="flex items-center gap-4">
+                <MatchRing tone="dark" size={96} have={Number(findternScore.toFixed(1))} total={10} label={`Findtern Score ${findternScore.toFixed(1)} out of 10`} />
+                <p className="text-sm text-on-dark-subtle">
+                  <span className="nums block text-3xl font-light leading-none text-white"><CountUp value={Number(findternScore.toFixed(1))} decimals={1} duration={1.2} /></span>
+                  Findtern Score
+                </p>
+              </div>
+            ) : null}
+            {nextRound ? (
+              <p className="text-sm text-on-dark-subtle">
+                <span className="nums block text-3xl font-light leading-none text-white">{nextIn}</span>
+                Next round, {formatIst(nextRound, { year: false })}
+              </p>
+            ) : null}
+          </div>
+        }
+      />
+
+      {upcoming.length + past.length > 0 ? (
+        <FigurePanel>
+          <FigureStrip tone="dark" className="max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
+            <BigFigure tone="dark" label="Upcoming" value={<CountUp value={upcoming.length} duration={1} />} hint="Company rounds" />
+            <BigFigure tone="dark" label="Awaiting your slot" value={<CountUp value={upcoming.filter((i) => !i.selectedSlot).length} duration={1} />} hint="Pick a time" />
+            <BigFigure tone="dark" label="Done" value={<CountUp value={past.length} duration={1} />} hint="Rounds completed" />
+          </FigureStrip>
+        </FigurePanel>
+      ) : null}
 
       {/* What needs you comes first: the AI interview's own step, then company rounds to pick or join. */}
       {showAiCard && aiInterview ? (
@@ -172,9 +212,11 @@ export default async function InternInterviews() {
 
       {scored && upcoming.length === 0 && past.length === 0 ? (
         data.stage === "working" ? (
-          <p className="text-pretty text-sm text-text-subtle">
-            No company interviews. You are working on a placement, so companies are not booking rounds with you.
-          </p>
+          <EmptyScene
+            as="h2"
+            title="No company interviews"
+            body="You are working on a placement, so companies are not booking rounds with you."
+          />
         ) : (
           <EmptyScene
             as="h2"
@@ -221,7 +263,7 @@ export default async function InternInterviews() {
           </Surface>
         </section>
       ) : null}
-    </div>
+    </Stagger>
   );
 }
 

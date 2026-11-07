@@ -72,7 +72,9 @@ export default async function EmployerCartPage({
         title="Shortlist"
         lede="Candidates you've saved. Book a meeting if you'd like to talk first, then send a proposal; you pay only once a candidate accepts."
       />
-      <HireFlow counts={data.counts} current="cart" />
+      <div className="max-sm:[&_ol]:flex-nowrap max-sm:[&_ol]:overflow-x-auto max-sm:[&_ol]:gap-x-0 max-sm:[&_ol]:pr-6 max-sm:[&_a]:whitespace-nowrap max-sm:[&_a]:px-2 max-sm:[&_ol]:text-[0.8125rem] max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-1.5rem),transparent)]">
+        <HireFlow counts={data.counts} current="cart" />
+      </div>
       <CartManager
         employerId={session.uid}
         initialCartLines={data.lines}
@@ -194,7 +196,7 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
         ? db.select().from(schema.internOnboarding).where(inArray(schema.internOnboarding.userId, internIds))
         : Promise.resolve([] as (typeof schema.internOnboarding.$inferSelect)[]),
       db
-        .select({ id: schema.projects.id, projectName: schema.projects.projectName, status: schema.projects.status })
+        .select({ id: schema.projects.id, projectName: schema.projects.projectName, status: schema.projects.status, skills: schema.projects.skills })
         .from(schema.projects)
         .where(and(eq(schema.projects.employerId, uid), inArray(schema.projects.id, projectIds))),
     ]);
@@ -218,6 +220,7 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
         projectClosed: ["closed", "inactive", "archived"].includes(projectStatus),
         createdAt: item.createdAt ? item.createdAt.toISOString() : null,
         candidate,
+        projectSkills: Array.isArray(project?.skills) ? project.skills : [],
         hourlyRateMinor: pricing.hourlyRateMinor,
         perHireMinor: pricing.perHireMinor,
         openProposalId: openFor.get(item.internId) ?? null,

@@ -4,6 +4,10 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight, Building2, Check, MapPin } from "lucide-react";
 
 import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { SignatureHero } from "@/components/intern/kit/hero";
+import { Stagger } from "@/components/intern/kit/motion";
+import { MatchRing } from "@/components/intern/kit/ring";
+import { CountUp } from "@/components/motion/count-up";
 import { ButtonLink } from "@/components/ui/button";
 import { CompanyInitials } from "@/components/marketing/role-card";
 import { proposalStatus } from "@/components/app/status";
@@ -68,7 +72,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
   const place = [role.city, role.state].filter(Boolean).join(", ");
 
   return (
-    <div>
+    <Stagger>
       <Link
         href="/intern/opportunities"
         className="mb-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-ink-900"
@@ -77,7 +81,9 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
         All open roles
       </Link>
 
-      <PageHead
+      <SignatureHero
+        compact
+        className="mb-6 lg:mb-8"
         title={role.projectName}
         lede={
           existing
@@ -86,7 +92,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
               : "You have an offer for this role."
             : "This company is hiring for this right now."
         }
-        action={
+        actions={
           existing ? (
             <Pill tone={hired ? "live" : existing.status === "sent" ? "waiting" : "neutral"}>
               {hired ? "Hired" : existing.status === "sent" ? "Offer waiting on you" : "Offer received"}
@@ -95,9 +101,20 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
             <Pill tone="neutral">Can lead to full time</Pill>
           ) : null
         }
+        aside={
+          skills.length > 0 ? (
+            <div className="flex items-center gap-4">
+              <MatchRing tone="dark" size={88} have={skills.filter(has).length} total={skills.length} label={`${skills.filter(has).length} of ${skills.length} skills on your profile`} />
+              <p className="max-w-[10rem] text-sm text-on-dark-subtle">
+                <span className="nums block text-3xl font-light leading-none tracking-[-0.03em] text-white"><CountUp value={skills.filter(has).length} duration={1} /> of {skills.length}</span>
+                <span className="mt-1 block">skills already on your profile</span>
+              </p>
+            </div>
+          ) : null
+        }
       />
 
-      <div className="grid gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1fr)_18rem]">
+      <div className="grid items-start gap-x-8 gap-y-4 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0">
           {role.scopeOfWork ? (
             <Surface className="p-5 sm:p-6">
@@ -138,7 +155,7 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
           {/* ── The honest next step ──────────────────────────────────
               No button that pretends. What actually happens is written
               out, which is the thing a candidate is actually missing. */}
-          <Surface className="mt-4 p-5 sm:p-6">
+          {existing ? null : <Surface className="mt-4 p-5 sm:p-6">
             <SectionHead title={existing ? (hired ? "Your placement" : "Your offer") : "What happens next"} className="mb-0" />
             {/* The explainer is for someone without an offer; with one it only
                 contradicted where they are (steps 3-4 undone for a hire). */}
@@ -180,30 +197,27 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
             </ol>
             )}
 
-            <div className={existing ? "mt-4" : "mt-6 border-t border-ink-100 pt-5"}>
-              {existing ? (
-                <ButtonLink href={`/intern/proposals/${existing.id}`}>
-                  {hired ? "Open your placement" : "Open your offer"}
-                  <ArrowRight className="size-4" aria-hidden />
-                </ButtonLink>
-              ) : (
-                <div>
-                  <p className="text-pretty text-sm leading-relaxed text-ink-600">
-                    There is no apply button, on purpose: companies on Findtern search for
-                    candidates rather than collecting applications. What gets you seen is your
-                    profile.
-                  </p>
-                  <ButtonLink href="/intern/profile" className="mt-4">
-                    See what employers see
-                    <ArrowRight className="size-4" aria-hidden />
-                  </ButtonLink>
-                </div>
-              )}
-            </div>
-          </Surface>
+            {existing ? null : (
+              <p className="mt-6 border-t border-ink-100 pt-5 text-pretty text-sm leading-relaxed text-ink-600">
+                There is no apply button, on purpose: companies on Findtern search for
+                candidates rather than collecting applications. What gets you seen is your
+                profile.
+              </p>
+            )}
+          </Surface>}
         </div>
 
-        <aside>
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-24 lg:self-start">
+          <Surface className="p-5 ring-1 ring-brand-600/20 shadow-[0_24px_48px_-24px_rgba(4,29,23,0.35)]">
+            <h2 className="text-base font-semibold text-ink-900">{existing ? (hired ? "Your placement" : "Your offer") : "Your next move"}</h2>
+            <p className="mt-1 text-pretty text-sm text-ink-600">
+              {existing ? "Everything about it is on the offer page." : "Make your profile the one companies shortlist."}
+            </p>
+            <ButtonLink href={existing ? `/intern/proposals/${existing.id}` : "/intern/profile"} block className="mt-4">
+              {existing ? (hired ? "Open your placement" : "Open your offer") : "See what employers see"}
+              <ArrowRight className="size-4" aria-hidden />
+            </ButtonLink>
+          </Surface>
           <Surface className="p-5">
             <SectionHead title="At a glance" className="mb-0" />
             <dl className="divide-y divide-ink-100">
@@ -254,6 +268,6 @@ export default async function RoleDetail({ params }: { params: Promise<{ id: str
           </Surface>
         </aside>
       </div>
-    </div>
+    </Stagger>
   );
 }

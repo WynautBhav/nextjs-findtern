@@ -63,8 +63,8 @@ export function SkillPicker({
         <div className="flex items-baseline justify-between gap-4">
           <Label htmlFor={id}>{label}</Label>
           <p className="nums text-sm text-ink-600" aria-live="polite">
-            <span className="font-semibold text-ink-900">{value.length}</span>{" "}
-            of {max}
+            <span className="sr-only">{value.length} of {max} skills selected{full ? ", limit reached" : ""}</span>
+            <span aria-hidden className="font-semibold text-ink-900">{value.length}/{max}</span>
             {value.length < min ? (
               <span className="text-text-subtle"> · at least {min}</span>
             ) : null}

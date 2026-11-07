@@ -13,7 +13,12 @@ import { getDb, schema } from "@/lib/db";
 import { seatInvoiceInput } from "@/lib/college/seat-invoice";
 import { taxInvoiceHtml } from "@/lib/invoice";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
+import { listOrders, listPendingReviews } from "@/lib/drives/admin-db";
 import { walletLedger, walletSummary } from "@/lib/college/wallet-read";
+
+import { DriveOrdersPanel } from "./drive-orders-panel";
+import { CampaignPanel } from "./campaign-panel";
+import { IdentityReviewQueue } from "./identity-review-queue";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +28,9 @@ export default async function AdminCollegePage({ params }: { params: Promise<{ i
   const db = getDb();
   const [college] = await db.select().from(schema.colleges).where(eq(schema.colleges.id, id)).limit(1);
   if (!college) notFound();
-  const [batches, [promo], summary, ledger] = await Promise.all([
+  const [orders, reviews, batches, [promo], summary, ledger] = await Promise.all([
+    listOrders(id),
+    listPendingReviews(id),
     db.select().from(schema.collegeSeatBatches).where(eq(schema.collegeSeatBatches.collegeId, id)).orderBy(desc(schema.collegeSeatBatches.createdAt)),
     db.select({ code: schema.promoCodes.code, maxUsages: schema.promoCodes.maxUsages, usedCount: schema.promoCodes.usedCount }).from(schema.promoCodes).where(eq(schema.promoCodes.collegeId, id)).limit(1),
     walletSummary(id),
@@ -55,6 +62,19 @@ export default async function AdminCollegePage({ params }: { params: Promise<{ i
         <PanelHeader title="Seats" description={hasPaid ? undefined : "Awaiting first payment. The placement officer login and seat code are issued once the first batch is paid."} />
         <PanelBody>
           <CollegeSeatBatches collegeId={id} batches={rows} seat={promo ? { code: promo.code, cap: promo.maxUsages, used: promo.usedCount } : null} canMoney={allows(perms, ["transactions:write"])} />
+        </PanelBody>
+      </Panel>
+      <Panel>
+        <PanelHeader title="Drive orders" description="Per-student drive codes. Create an order, record its payment, upload the roster, then confirm to issue one code per student." />
+        <PanelBody>
+          <DriveOrdersPanel collegeId={id} orders={orders} canMoney={allows(perms, ["transactions:write"])} canWrite={canWrite(perms, "/api/admin/drive-orders")} />
+        </PanelBody>
+      </Panel>
+      <CampaignPanel orderIds={orders.filter((o) => o.status === "paid").map((o) => o.id)} canWrite={canWrite(perms, "/api/admin/drive-orders")} />
+      <Panel>
+        <PanelHeader title="Identity review" description="Roster rows whose phone and name match a student with a different email. Nothing links until you approve it." />
+        <PanelBody>
+          <IdentityReviewQueue reviews={reviews} canWrite={canWrite(perms, "/api/admin/identity-reviews")} />
         </PanelBody>
       </Panel>
       <Panel>

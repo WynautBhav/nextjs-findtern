@@ -3,12 +3,13 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CreditCard, Loader2, Pencil, RotateCcw, Search, X } from "lucide-react";
+import { CheckCircle2, CircleDashed, CreditCard, Hourglass, Loader2, UserCheck, XCircle, Pencil, RotateCcw, Search, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
-import { EmptyScene, FilterTabs, Pill, Surface } from "@/components/app/primitives";
+import { BigFigure, EmptyScene, FigureStrip, FilterTabs, Pill, Surface } from "@/components/app/primitives";
+import { Avatar } from "@/components/app/avatar";
 import { RowMenu } from "@/components/app/row-menu";
 import { buttonClass } from "@/components/ui/button";
 import type { EmployerProposal } from "@/lib/employer-proposal-view";
@@ -27,10 +28,17 @@ export type ProposalItem = {
   internHired: boolean;
 };
 
+const TONE_ICON = { paid: CreditCard, live: UserCheck, waiting: Hourglass, closed: XCircle, new: CircleDashed, neutral: CircleDashed } as const;
+function StateIcon({ tone, hired }: { tone: string; hired: boolean }) {
+  const Icon = hired ? CheckCircle2 : (TONE_ICON[tone as keyof typeof TONE_ICON] ?? CircleDashed);
+  return <Icon />;
+}
+
 function nameOf(item: ProposalItem): string {
   const first = item.user?.firstName?.trim() || "";
   const last = item.user?.lastName?.trim() || "";
-  return displayNameOf({ id: item.proposal.internId, fullName: `${first} ${last}`.trim() || "Candidate", initials: initialsOf(first, last) }, item.internHired);
+  const shown = displayNameOf({ id: item.proposal.internId, fullName: `${first} ${last}`.trim() || "Candidate", initials: initialsOf(first, last) }, item.internHired);
+  return item.internHired || shown === "Candidate" ? shown : `Candidate ${shown}`;
 }
 
 /** Status filter buckets (the raw enums never reach the select). */
@@ -43,7 +51,7 @@ const FILTERS: { value: string; label: string; match: (status: string, lapsed: b
 
 /** Offer · pay · starts · status · actions; one row per offer at desktop. */
 // Fixed columns need ~48rem; at lg the sidebar leaves less, so the table layout starts at xl.
-const ROW_GRID = "grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-[minmax(0,1fr)_11rem_6.5rem_12.5rem_9.5rem]";
+const ROW_GRID = "xl:grid-cols-[minmax(0,1fr)_11rem_6.5rem_12.5rem_9.5rem]";
 
 function formatStart(iso: string | null): string | null {
   if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
@@ -136,23 +144,42 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
 
   return (
     <div className="space-y-6">
+      <FigureStrip className="max-sm:[&>*:last-child:nth-child(odd)]:col-span-2">
+        <BigFigure label="Waiting" value={counts.open} hint="Offers out" />
+        <BigFigure label="Accepted" value={counts.accepted + counts.hired} hint="To pay or hired" />
+        <BigFigure label="Closed" value={counts.closed} hint="Declined, withdrawn or lapsed" />
+      </FigureStrip>
+      {rows.length > 0 ? (
+        <div
+          className="-mt-3 flex h-2 gap-1"
+          role="img"
+          aria-label={`${counts.open} waiting, ${counts.accepted} to pay, ${counts.hired} hired, ${counts.closed} closed`}
+        >
+          {([["open", "bg-amber-400"], ["accepted", "bg-brand-400"], ["hired", "bg-brand-700"], ["closed", "bg-ink-300"]] as const).map(([k, c]) =>
+            counts[k] > 0 ? <div key={k} className={cn("h-full rounded-full", c)} style={{ flexGrow: counts[k], flexBasis: 0 }} /> : null,
+          )}
+        </div>
+      ) : null}
       {/* One toolbar row: status (with counts, in place of four tiles that
           repeated them), then search and project. */}
       <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="-mx-1 max-w-full overflow-x-auto px-1 max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-1.5rem),transparent)] xl:overflow-visible">
         <FilterTabs
+          className="max-sm:flex-nowrap"
           label="Show proposals"
           value={statusFilter}
           onChange={setStatusFilter}
           tabs={[
             { key: "all", label: "All", count: rows.length },
-            { key: "open", label: "Waiting on candidate", count: counts.open },
+            { key: "open", label: "Waiting", count: counts.open },
             // Accepted offers only; running placements' monthly dues are on Orders,
             // so this is not called "payment due" beside the dashboard's count (QA-123).
-            { key: "accepted", label: "Accepted, to pay", count: counts.accepted },
+            { key: "accepted", label: "To pay", count: counts.accepted },
             { key: "hired", label: "Hired", count: counts.hired },
             { key: "closed", label: "Closed", count: counts.closed },
           ]}
         />
+        </div>
         <div className="flex flex-col gap-2 sm:flex-row xl:shrink-0">
           <label className="relative min-w-0 sm:w-64">
             <span className="sr-only">Search proposals</span>
@@ -193,7 +220,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
         <div>
           <EmptyScene
             title="No proposals match"
-            body="Nothing fits this search and status. Clear the filters to see every offer."
+            body={statusFilter === "all" ? "Nothing fits this search. Clear the filters to see every offer." : `No ${statusFilter === "open" ? "offers waiting on a candidate" : statusFilter === "accepted" ? "accepted offers to pay" : statusFilter === "hired" ? "hired candidates" : "closed offers"} right now. Clear the filters to see every offer.`}
             who="You - loosen the filters"
           />
           <p className="mt-3 text-center">
@@ -225,7 +252,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
             <span />
           </div>
           <ul className="divide-y divide-ink-100">
-          {filtered.map(({ item, offer, state }) => {
+          {filtered.map(({ item, offer, state }, idx) => {
             const ini = initialsOf(item.user?.firstName?.trim() || "", item.user?.lastName?.trim() || "");
             const ft = offer.fullTime;
             // Full-time rows: annual CTC, not "—/month" (EMH-19).
@@ -242,12 +269,11 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
             return (
               <li
                 key={item.proposal.id}
-                className={cn(ROW_GRID, "relative grid items-center gap-x-6 gap-y-2 px-5 py-4 transition-colors hover:bg-ink-50/70")}
+                style={{ "--i": Math.min(idx, 12) } as React.CSSProperties}
+                className={cn("rise ", ROW_GRID, "relative flex flex-wrap items-center gap-x-6 xl:grid gap-y-2 px-5 py-4 transition-colors hover:bg-ink-50/70")}
               >
-                <div className="flex min-w-0 items-center gap-3">
-                  <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800">
-                    {ini === "?" ? "C" : ini}
-                  </span>
+                <div className="flex min-w-0 items-center gap-3 max-xl:basis-full">
+                  <Avatar masked={!item.internHired} name={item.internHired ? nameOf(item) : undefined} initials={ini === "?" ? "C" : ini} size="md" />
                   <div className="min-w-0">
                     {/* The whole row opens the offer: the title's link is
                         stretched over it, and keeps its own focus ring. */}
@@ -264,7 +290,7 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                     </p>
                   </div>
                 </div>
-                <p className="nums text-sm font-semibold text-ink-900 max-xl:col-span-2 max-xl:row-start-2 max-xl:pl-12 xl:text-right">
+                <p className="nums text-sm font-semibold text-ink-900 max-xl:mr-auto xl:text-right">
                   {money ?? <span className="font-normal text-text-subtle">Not set</span>}
                   {!ft ? <span className="font-normal text-ink-600"> · {offer.months} mo</span> : null}
                   {start ? <span className="font-normal text-ink-600 xl:hidden"> · {ft ? "joins" : "starts"} {start}</span> : null}
@@ -279,12 +305,12 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                     <span className="text-text-subtle">Not set</span>
                   )}
                 </p>
-                <div className="max-xl:col-span-2 max-xl:row-start-3 max-xl:pl-12">
-                  <Pill tone={state.tone} className="whitespace-nowrap">{state.label}</Pill>
+                <div className="">
+                  <Pill tone={state.tone} icon={<StateIcon tone={state.tone} hired={item.proposal.status === "hired"} />} className="whitespace-nowrap">{state.label}</Pill>
                 </div>
                 {/* Above the stretched link, so these stay clickable. */}
                 {/* Below sm the actions take their own row: beside the title they squeezed it to one letter a line at 320. */}
-                <div className="relative z-10 flex items-center justify-end gap-1 max-xl:col-start-2 max-xl:row-start-1 max-sm:col-span-2 max-sm:col-start-1 max-sm:row-start-4 max-sm:justify-start max-sm:pl-12">
+                <div className="relative z-10 flex items-center justify-end gap-1 max-xl:basis-full max-xl:flex-wrap max-xl:justify-start">
                   {/* One visible action, chosen by the state; the row itself
                       opens the offer, and the menu holds only the rest (QA-120). */}
                   {state.canPay ? (

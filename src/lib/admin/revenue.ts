@@ -48,6 +48,13 @@ import { toInrMinor } from "./money.ts";
  */
 
 export const PAID_STATUS = "paid";
+
+/**
+ * College-drive waivers (gateway 'college_drive', amount 0, status 'paid') mark
+ * a fee as covered; no money moved and no invoice exists. They are not receipts.
+ */
+export const DRIVE_WAIVER_GATEWAY = "college_drive";
+export const isMoneyReceived = (p: { gateway?: string | null }) => p.gateway !== DRIVE_WAIVER_GATEWAY;
 const IST_OFFSET_MS = 330 * 60_000;
 const DAY_MS = 86_400_000;
 

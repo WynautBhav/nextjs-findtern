@@ -109,7 +109,7 @@ export default async function InternProfile() {
     <div>
       <PageHead
         title="Your profile"
-        lede="This is what employers read when they consider you. Keep it current: it is the only thing they search."
+        lede="What employers read when they consider you."
         action={
           <ButtonLink href="/intern/onboarding">
             <PencilLine className="size-4" aria-hidden />
@@ -132,7 +132,7 @@ export default async function InternProfile() {
           />
         </div>
 
-        <aside className="space-y-4">
+        <aside className={completion.complete ? "space-y-4" : "space-y-4 max-xl:order-first"}>
           {!completion.complete ? <CompletionList completion={completion} /> : null}
 
           <Surface className="p-5">

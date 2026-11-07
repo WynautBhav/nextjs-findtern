@@ -51,6 +51,8 @@
   --color-ink-50: #f7faf9;
   --color-ink-100: #edf2ef;
   --color-ink-200: #dee6e2;
+  /* App ground: mint-tinted grey, deeper than ink-100 so white panels read as panels. */
+  --color-canvas: #e6ede9;
   --color-ink-300: #c2cec8;
   --color-ink-400: #93a29b;
   --color-ink-500: #6b7c74;
@@ -81,7 +83,7 @@
   --color-foreground: var(--color-ink-900);
   --color-muted-foreground: var(--color-ink-600);
   --color-subtle-foreground: var(--color-ink-500);
-  --color-text-subtle: #5f7069;
+  --color-text-subtle: #56675f;
   --color-border: var(--color-ink-200);
   --color-border-strong: var(--color-ink-300);
   --color-dark-surface: var(--color-brand-950);
@@ -91,6 +93,7 @@
   --color-on-dark: #d8e8e0;
   --color-on-dark-subtle: #a8bdb3;
   --color-on-dark-accent: #f5bb63;
+  --color-data-on-dark: #7fd4b2;
 
   /* ── Feedback ──────────────────────────────────────────────────────── */
   --color-success: #0e7a4a;
@@ -654,7 +657,7 @@
       --color-surface-raised: #ffffff;
       --color-foreground: #0f1a17;
       --color-muted-foreground: #4e5f58;
-      --color-text-subtle: #5f7069;
+      --color-text-subtle: #56675f;
       --color-border: #dee6e2;
       --color-border-strong: #c2cec8;
       --color-primary: #0e6049;
@@ -1810,3 +1813,103 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     text-wrap: pretty;
   }
 }
+
+/* Console pages wrap themselves in `container-page section-y` (marketing
+   rhythm). Inside the console shell `#main` already supplies the gutter,
+   the max width and the top padding, so the wrapper must not add a second
+   gutter or ~100px of blank space above the page title. */
+#main > :is(.container-page, .container-wide) {
+  max-width: none;
+  padding-inline: 0;
+}
+#main > .section-y {
+  padding-top: 0;
+  padding-bottom: 1rem;
+}
+
+/* Browser surfaces: caret and scrollbars follow the theme. */
+html {
+  caret-color: var(--color-primary);
+  scrollbar-color: var(--color-ink-300) transparent;
+}
+
+/* Score dial: fill arcs draw in once, CSS only. */
+@keyframes score-dial-in {
+  from { stroke-dasharray: 0 var(--dial-circ); }
+  to { stroke-dasharray: var(--dial-len) calc(var(--dial-circ) - var(--dial-len)); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .score-dial-fill { animation: score-dial-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+}
+
+/* ==========================================================================
+   RENOVATION (7 Nov 2026): entrance + depth helpers for the bold pass
+   ========================================================================== */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.985);
+  }
+}
+
+@keyframes glow-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-3%, 4%, 0) scale(1.08); }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* Stagger: set --i on each item. 42ms apart, capped by the caller. */
+  .rise {
+    animation: rise-in 560ms var(--ease-out-soft, cubic-bezier(0.22, 1, 0.36, 1)) both;
+    animation-delay: calc(var(--i, 0) * 42ms);
+  }
+  .glow-drift {
+    animation: glow-drift 14s ease-in-out infinite;
+  }
+}
+
+/* A white tile lifting off the canvas: layered, tinted shadows. */
+.tile-lift {
+  box-shadow:
+    0 1px 2px rgb(7 47 36 / 0.04),
+    0 10px 28px -14px rgb(7 47 36 / 0.14);
+  transition: box-shadow 0.28s var(--ease-out-soft, ease), transform 0.35s var(--ease-apple-spring, ease);
+}
+.tile-lift:hover {
+  box-shadow:
+    0 1px 2px rgb(7 47 36 / 0.05),
+    0 4px 8px -2px rgb(7 47 36 / 0.06),
+    0 24px 44px -18px rgb(14 96 73 / 0.28);
+  transform: translateY(-2px);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tile-lift { transition: none; }
+  .tile-lift:hover { transform: none; }
+}
+
+/* Range input skin for score floors: fill follows --fill. */
+.range-brand {
+  appearance: none;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to right, var(--color-brand-600) var(--fill, 0%), var(--color-ink-200) var(--fill, 0%));
+  outline: none;
+}
+.range-brand::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px; height: 20px; border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--color-brand-700);
+  box-shadow: 0 2px 6px rgb(7 47 36 / 0.25);
+  cursor: grab;
+}
+.range-brand::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 999px;
+  background: #fff;
+  border: 2px solid var(--color-brand-700);
+  box-shadow: 0 2px 6px rgb(7 47 36 / 0.25);
+  cursor: grab;
+}
+.range-brand:focus-visible::-webkit-slider-thumb { outline: 3px solid rgb(22 107 84 / 0.35); outline-offset: 2px; }
+.range-brand:focus-visible::-moz-range-thumb { outline: 3px solid rgb(22 107 84 / 0.35); outline-offset: 2px; }

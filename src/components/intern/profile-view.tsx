@@ -1,7 +1,9 @@
 import { ExternalLink, MapPin } from "lucide-react";
 
 import { DetailRow, EmptyScene, Pill, Surface, type Tone } from "@/components/app/primitives";
-import { ScoreScale } from "@/components/app/tiles";
+import { ScoreDial } from "@/components/app/score-dial";
+import { bandRateLine } from "@/components/intern/home/band-rate";
+import { EmployerCard } from "@/components/intern/kit/employer-card";
 import { buttonClass } from "@/components/ui/button";
 import { InternAvatar } from "@/components/intern/avatar";
 import { dateLabel, type OnboardingDraft } from "@/lib/onboarding";
@@ -18,6 +20,13 @@ import { cn } from "@/lib/utils";
  * the order an employer scans them.
  */
 
+const AXIS_LEGEND = [
+  ["Communication", "communication"],
+  ["Coding", "coding"],
+  ["Aptitude", "aptitude"],
+  ["Interview", "interview"],
+] as const;
+
 export type ProfileStatus = { tone: Tone; label: string; detail: string };
 
 /** Work modes are stored as the implied set (onsite ⇒ hybrid + remote); say it the same way. */
@@ -31,20 +40,23 @@ function workModeLine(modes: string[]): string | null {
 
 function Section({
   title,
+  count,
   children,
   className,
 }: {
   title: string;
+  count?: string;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <Surface as="section" className={cn("p-5 lg:p-6", className)}>
-      <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
+    <section className={cn("py-6 first:pt-0 last:pb-0", className)}>
+      <h2 className="flex items-baseline justify-between gap-3 text-lg font-semibold tracking-[-0.01em] text-ink-900">
         {title}
+        {count ? <span className="nums text-sm font-normal text-text-subtle">{count}</span> : null}
       </h2>
       <div className="mt-4">{children}</div>
-    </Surface>
+    </section>
   );
 }
 
@@ -86,71 +98,68 @@ export function ProfileView({
   const languages = draft.languages.filter((l) => l.language);
   const activities = draft.extracurriculars.filter((x) => x.activity);
   const modes = workModeLine(draft.locationTypes);
+  const byLabel = new Map(ratings);
+  const dialAxes = {
+    communication: byLabel.get("Communication") ?? null,
+    coding: byLabel.get("Coding") ?? null,
+    aptitude: byLabel.get("Aptitude") ?? null,
+    interview: byLabel.get("AI interview") ?? null,
+  };
 
   return (
     <div className="space-y-6">
-      {/* ── Identity: the focal point ───────────────────────────── */}
-      <Surface as="section" aria-label="Profile summary" className="overflow-hidden">
-        <div className="flex flex-wrap items-start gap-4 p-5 lg:p-6">
-          <InternAvatar src={photoUrl} initials={initials} className="size-20 rounded-apple-xl text-2xl" />
-          <div className="min-w-0 flex-1 basis-48">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="min-w-0 max-w-full text-xl font-semibold tracking-[-0.02em] text-ink-900 [overflow-wrap:anywhere]">{name}</p>
-              <Pill tone={status.tone}>{status.label}</Pill>
-            </div>
-            <p className="mt-1 flex min-w-0 items-center gap-1.5 text-sm text-ink-600 [overflow-wrap:anywhere]">
-              <MapPin className="size-4 shrink-0 text-text-subtle" aria-hidden />
-              {place || "City not added yet"}
-            </p>
-            <p className="mt-3 max-w-prose text-pretty text-sm leading-relaxed text-ink-600">{status.detail}</p>
-          </div>
-          {/* With a score, it lives on the card below (one figure, one place). */}
-          {score === null ? (
-            <div className="w-full shrink-0 p-4 sm:w-auto sm:min-w-44">
-              <p className="text-sm text-text-subtle">Findtern Score</p>
-              <p className="mt-1 text-base font-medium text-ink-700">After your AI interview</p>
-            </div>
-          ) : null}
-        </div>
-
-        {/* The anonymous card itself, built from this profile: what an employer sees before a hire. */}
-        <div className="grid gap-4 border-t border-ink-100 bg-ink-50/50 px-5 py-5 md:grid-cols-[minmax(0,1fr)_minmax(0,20rem)] md:items-center lg:px-6">
-          <p className="text-pretty text-sm leading-relaxed text-ink-700">
-            <span className="font-medium text-ink-900">Before a hire, employers see this card.</span> Your initials and city,
-            never your name, photo, LinkedIn or contact details.
-          </p>
-          <div aria-label="What employers see" role="group" className="p-4">
-            <div className="flex items-center gap-3">
-              <span className="nums grid size-11 shrink-0 place-items-center rounded-full bg-brand-700 text-sm font-semibold text-white">{initials}</span>
+      <EmployerCard initials={initials} place={place} score={score} skills={skills} />
+      {/* ── Header: who you are, how you score, whether you are live ── */}
+      <Surface as="section" aria-label="Profile summary" className="p-5 lg:p-8">
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 max-w-xl">
+            <div className="flex items-center gap-4">
+              <InternAvatar src={photoUrl} initials={initials} className="size-16 rounded-full text-xl" />
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold text-ink-900">Candidate {initials}</p>
-                <p className="truncate text-xs text-ink-600">{place || "City not added yet"}</p>
-              </div>
-              {score !== null ? (
-                <p className="nums text-right text-2xl font-medium leading-none tracking-[-0.03em] text-brand-700">
-                  {score.toFixed(1)}
-                  <span className="ml-0.5 text-xs font-normal tracking-normal text-text-subtle">/10</span>
+                <h2 className="min-w-0 max-w-full text-3xl font-medium leading-[1.08] tracking-[-0.03em] text-ink-900 [overflow-wrap:anywhere]">{name}</h2>
+                <p className="mt-1 flex min-w-0 items-center gap-1.5 text-sm text-ink-600 [overflow-wrap:anywhere]">
+                  <MapPin className="size-4 shrink-0 text-text-subtle" aria-hidden />
+                  {place || "City not added yet"}
                 </p>
-              ) : null}
+              </div>
             </div>
-            {skills.length > 0 ? (
-              <p className="mt-3 truncate text-xs text-ink-700">
-                {skills.slice(0, 4).join(" · ")}
-                {skills.length > 4 ? <span className="text-text-subtle"> +{skills.length - 4}</span> : null}
-              </p>
-            ) : null}
+            <div className="mt-4"><Pill tone={status.tone}>{status.label}</Pill></div>
+            <p className="mt-3 max-w-prose text-pretty text-sm leading-relaxed text-ink-600">{status.detail}</p>
+            {score !== null ? <p className="mt-3 max-w-prose text-pretty text-sm leading-relaxed text-ink-800">{bandRateLine(score)}</p> : null}
           </div>
+          {score !== null ? (
+            <div className="flex flex-col items-center gap-5 sm:flex-row lg:flex-col">
+              <ScoreDial score={score} axes={dialAxes} size="lg" />
+              <dl className="grid w-full min-w-48 gap-y-2 text-sm">
+                {AXIS_LEGEND.map(([label, key]) => (
+                  <div key={key} className="flex items-baseline justify-between gap-6 border-b border-ink-100 pb-2 last:border-0 last:pb-0">
+                    <dt className="text-text-subtle">{label}</dt>
+                    <dd className="nums font-medium text-ink-900">
+                      {typeof dialAxes[key] === "number" ? (
+                        <>{dialAxes[key]!.toFixed(1)}<span className="ml-0.5 font-normal text-text-subtle">/10</span></>
+                      ) : (
+                        <span className="font-normal text-text-subtle">Not scored</span>
+                      )}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          ) : (
+            <p className="max-w-56 text-sm text-text-subtle">Your score and its four axes appear after your AI interview.</p>
+          )}
         </div>
       </Surface>
 
+      <Surface className="px-5 py-6 lg:px-8 [&>*]:border-b [&>*]:border-ink-100 [&>*]:py-6 [&>*]:first:pt-0 [&>*:last-child]:border-0 [&>*:last-child]:pb-0">
       {/* ── Skills ──────────────────────────────────────────────── */}
-      <Section title="Skills">
+      <Section title="Skills" count={`${Math.min(skills.length, 7)}/7`}>
         {skills.length === 0 ? (
           <p className="text-sm text-ink-600">No skills added yet. Employers filter candidates by skill first.</p>
         ) : (
           <ul className="flex flex-wrap gap-2">
             {skills.map((skill) => (
-              <li key={skill} className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-ink-200/80 px-3 py-1 text-sm">
+              <li key={skill} className="inline-flex min-h-9 max-w-full items-center rounded-full bg-ink-50 px-3 py-1 text-sm">
                 <span className="min-w-0 font-medium text-ink-900 [overflow-wrap:anywhere]">{skill}</span>
               </li>
             ))}
@@ -159,14 +168,10 @@ export function ProfileView({
       </Section>
 
       {/* ── Score and the AI interview ──────────────────────────── */}
-      {ratings.length > 0 || aiLinks.feedbackLink || aiLinks.recordingLink ? (
+      {aiLinks.feedbackLink || aiLinks.recordingLink ? (
         <Section title="AI interview">
-          {ratings.length > 0 ? (
-            // The same scale Home draws these on, so the two pages never disagree.
-            <ScoreScale rows={ratings.map(([label, value]) => ({ label, value }))} />
-          ) : null}
           {aiLinks.feedbackLink || aiLinks.recordingLink ? (
-            <div className={cn("flex flex-wrap gap-2", ratings.length > 0 && "mt-4 border-t border-ink-100 pt-4")}>
+            <div className="flex flex-wrap gap-2">
               {aiLinks.feedbackLink ? (
                 <a href={aiLinks.feedbackLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>
                   Feedback report
@@ -187,12 +192,6 @@ export function ProfileView({
       ) : null}
 
       {/* ── About ───────────────────────────────────────────────── */}
-      {draft.bio ? (
-        <Section title="About">
-          <p className="whitespace-pre-line text-pretty text-base leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{draft.bio}</p>
-        </Section>
-      ) : null}
-
       {/* ── Where and how ───────────────────────────────────────── */}
       <Section title="Work preferences">
         <dl className="divide-y divide-ink-100">
@@ -296,6 +295,7 @@ export function ProfileView({
           ) : null}
         </div>
       ) : null}
+      </Surface>
     </div>
   );
 }

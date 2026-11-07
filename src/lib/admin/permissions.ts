@@ -65,6 +65,8 @@ const RULES: Rule[] = [
   ["/admin/companies", ["companies:read"], ["companies:write"]],
   // College partners are customers like companies; issuing a placement officer's login is a company-side write.
   ["/admin/colleges", ["companies:read"], ["companies:write"]],
+  ["/admin/drive-overview", ["companies:read"], ["companies:write"]],
+  ["/admin/refunds", ["transactions:read"]],
   ["/admin/roles", ["roles:write"]],
   ["/admin/audit-log", ["roles:write"]],
   ["/admin/projects", ["companies:read"]],
@@ -93,6 +95,13 @@ const RULES: Rule[] = [
   ["/api/admin/company", COMPANY_LEGAL_R, COMPANY_LEGAL_W],
   ["/api/admin/companies", ["companies:read"], ["companies:write"]],
   ["/api/admin/colleges", ["companies:read"], ["companies:write"]],
+  // Drive orders, roster imports, identity reviews: college customer work like /api/admin/colleges. Refunds (package M) and projects (package L) reuse the pair.
+  ["/api/admin/drive-orders", ["companies:read"], ["companies:write"]],
+  ["/api/admin/imports", ["companies:read"], ["companies:write"]],
+  ["/api/admin/identity-reviews", ["companies:read"], ["companies:write"]],
+  ["/api/admin/drive-overview", ["companies:read"], ["companies:write"]],
+  ["/api/admin/refunds", ["transactions:read"], ["transactions:write"]],
+  ["/api/admin/projects", ["companies:read"], ["companies:write"]],
   ["/api/admin/users", ["users:read"], ["interns:write"]],
   ["/api/admin/contact", ["users:read"], ["interns:write", "companies:write"]],
   // /api/admin/impersonate has no rule on purpose: no rule = super admin only.
@@ -143,6 +152,10 @@ function rulesFor(pathname: string): RuleLists | null {
   // College money (seat batches, payouts, bank, the seat code) is Accounts' work, not Sales': the same permission the routes check
   // in-route. Reading it is open to either side (Sales sees the college, Accounts sees the money).
   if (/^\/api\/admin\/colleges\/[^/]+\/(seat-batches|payouts|bank|promo-code)(\/|$)/.test(pathname)) {
+    return { read: ["transactions:read", "companies:read"], write: ["transactions:write"] };
+  }
+  // Recording that a drive order was paid is money: Accounts, like a seat batch. Reading stays open to either side.
+  if (/^\/api\/admin\/drive-orders\/[^/]+\/payment\/?$/.test(pathname)) {
     return { read: ["transactions:read", "companies:read"], write: ["transactions:write"] };
   }
   // The college's own page: Accounts opens it too, to pay a batch or a withdrawal. Editing the college stays a company write.

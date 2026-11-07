@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { CompanyProfileForm, type CompanyProfile } from "@/components/employer/company-profile-form";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { missingProfileFields } from "@/lib/employer-onboarding";
+import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { formatDate } from "@/lib/format";
 import { timezoneForLocation } from "@/lib/timezones";
 
@@ -75,7 +76,18 @@ export default async function EmployerAccount() {
           <CompanyProfileForm employerId={uid} profile={profile} hasLogo={Boolean(employer?.logoUrl)} />
         </Surface>
 
-        <aside className="min-w-0 space-y-4">
+        <aside className="min-w-0 space-y-4 xl:sticky xl:top-24 xl:self-start">
+          <HeroPanel className="p-6">
+            <span aria-hidden className="grid size-14 place-items-center rounded-apple-lg bg-white/15 text-xl font-medium ring-1 ring-white/25">
+              {(profile.companyName.trim()[0] ?? "C").toUpperCase()}
+            </span>
+            <p className="mt-4 break-words text-xl font-medium tracking-[-0.02em]">{profile.companyName || "Your company"}</p>
+            <p className="mt-1 text-sm text-on-dark-subtle">
+              {[profile.city, profile.country].filter(Boolean).join(", ") || "Location not set"}
+              {profile.companySize ? ` · ${profile.companySize} people` : ""}
+            </p>
+            <p className="mt-4 text-xs text-on-dark-subtle">How you appear on proposals. Contacts stay private.</p>
+          </HeroPanel>
           <Surface className="p-5">
             <SectionHead title="Account" />
             <dl className="divide-y divide-ink-100">

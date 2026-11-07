@@ -28,9 +28,9 @@ export function realEmployerId(col: SQLWrapper): SQL {
   return sql`${col} <> ${TEST_EMPLOYER_ID} AND ${col} NOT IN (SELECT ${schema.employers.id} FROM ${schema.employers} WHERE lower(${schema.employers.companyEmail}) = ${AI_INTERVIEW_EMAIL})`;
 }
 
-/** A project is active unless explicitly closed; empty status counts as active (legacy rule). */
+/** Only live postings count as active: published, or the legacy 'active' (an empty status is legacy active). Drafts, review, paused, rejected and closed do not. */
 export function activeProject(): SQL {
-  return sql`coalesce(nullif(lower(${schema.projects.status}), ''), 'active') NOT IN ('inactive', 'closed', 'archived')`;
+  return sql`coalesce(nullif(lower(${schema.projects.status}), ''), 'active') IN ('active', 'published')`;
 }
 
 export { toInrMinor } from "./money";
@@ -50,7 +50,7 @@ export function meaningfulProfile(): SQL<boolean> {
   const filled = (c: SQLWrapper) => sql`coalesce(trim(${c}), '') <> ''`;
   const nonEmpty = (c: SQLWrapper) => sql`coalesce(jsonb_array_length(CASE WHEN jsonb_typeof(${c}) = 'array' THEN ${c} END), 0) > 0`;
   return sql<boolean>`(${o.id} IS NOT NULL AND (
-    ${filled(o.linkedinUrl)} OR ${filled(o.bio)} OR ${filled(o.previewSummary)}
+    ${filled(o.linkedinUrl)} OR ${filled(o.previewSummary)}
     OR ${filled(o.city)} OR ${filled(o.state)} OR ${filled(o.pinCode)}
     OR ${nonEmpty(o.skills)} OR ${nonEmpty(o.locationTypes)} OR ${nonEmpty(o.preferredLocations)} OR ${nonEmpty(o.experienceJson)}
     OR ${o.hasLaptop} IS NOT NULL

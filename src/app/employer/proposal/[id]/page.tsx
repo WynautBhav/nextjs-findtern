@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
-import { ArrowLeft, ArrowUpRight, CreditCard, Download } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, CheckCircle2, CircleDashed, CreditCard, Download, Hourglass, XCircle } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -13,12 +13,15 @@ import { formatDmy, formatMoney } from "@/lib/format";
 import { fullTimeFeeMinor } from "@/lib/checkout";
 import { laptopLabel, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
 import { shiftInIst } from "@/lib/timezones";
+import { Avatar } from "@/components/app/avatar";
 import { DetailRow, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
 import { offerState } from "@/components/employer/proposal-state";
+import { ProposalHero } from "@/components/employer/proposal-detail/hero";
 import { MeetingRulesBlock } from "@/components/employer/meeting-rules";
+import { StartThreadButton } from "@/components/messaging";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
 
 export const metadata: Metadata = {
@@ -131,6 +134,15 @@ export default async function EmployerProposalDetail({
   // "Free" only for a real zero (fee-only band stores hourly 0); a missing value stays "-".
   const monthlyFree = offer.monthlyMinor === 0 || (offer.monthlyMinor == null && offer.hourlyRateMinor === 0);
 
+  const status = (proposal.status ?? "").toLowerCase();
+  const answered = ["accepted", "processing", "hired", "rejected", "withdrawn"].includes(status);
+  const timeline: { label: string; done: boolean; when?: string }[] = [
+    { label: "Offer sent", done: true, when: formatDate(proposal.createdAt) },
+    { label: "Interview booked", done: status === "interview_scheduled" || answered },
+    { label: status === "rejected" ? "Declined" : status === "withdrawn" ? "Withdrawn" : "Candidate accepted", done: answered },
+    { label: "Hired", done: Boolean(proposal.hiredAt), when: proposal.hiredAt ? formatDate(proposal.hiredAt) : undefined },
+  ];
+
   const strip: [string, string][] = ft
     ? [
         ["Annual CTC", ft.annualCtcMinor ? formatMoney(ft.annualCtcMinor, currency) : "-"],
@@ -148,6 +160,14 @@ export default async function EmployerProposalDetail({
 
   return (
     <div>
+      {state.canPay ? (
+        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-ink-100 bg-white/95 p-3 lg:hidden">
+          <Link href="/employer/checkout" className={buttonClass({ variant: "accent", block: true })}>
+            <CreditCard className="size-4" aria-hidden />
+            Pay to confirm the hire
+          </Link>
+        </div>
+      ) : null}
       <Link
         href="/employer/proposals"
         className="apple-spring mb-3 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm text-sm font-medium text-brand-700 hover:underline"
@@ -156,46 +176,24 @@ export default async function EmployerProposalDetail({
         All proposals
       </Link>
 
-      {/* ── Header: who, what, and the numbers ───────────────────────── */}
-      <Surface as="section" className="overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-4 p-6 sm:p-7">
-          <div className="flex min-w-0 items-start gap-4">
-            <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-50 text-base font-semibold text-brand-800">
-              {initials}
-            </span>
-            <div className="min-w-0">
-              <h1 className="text-balance text-2xl font-semibold text-ink-900 sm:text-3xl">
-                {offer.roleTitle || projectName || "Proposal"}
-              </h1>
-              <p className="mt-1.5 text-sm text-ink-600">
-                {ft ? "Full-time offer" : "Internship offer"}
-                {projectName ? ` for ${projectName}` : ""} to{" "}
-                <Link href={`/employer/intern/${encodeURIComponent(proposal.internId)}`} className="font-medium text-ink-900 underline-offset-4 hover:underline">
-                  {internName}
-                </Link>
-                {score > 0 ? <span className="nums ml-2">· Findtern Score {score.toFixed(1)}/10</span> : null}
-              </p>
-            </div>
-          </div>
-          <Pill tone={state.tone}>{state.label}</Pill>
-        </div>
-        <dl className="grid grid-cols-2 border-t border-ink-100 bg-ink-50/60 sm:grid-cols-4">
-          {strip.map(([label, value], i) => (
-            <div
-              key={label}
-              className={[
-                "px-6 py-4",
-                i % 2 === 1 ? "border-l border-ink-100" : "",
-                i >= 2 ? "border-t border-ink-100 sm:border-t-0" : "",
-                i === 2 ? "sm:border-l" : "",
-              ].join(" ")}
-            >
-              <dt className="text-sm text-ink-600">{label}</dt>
-              <dd className="nums mt-1 text-xl font-semibold text-ink-900">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      </Surface>
+      <ProposalHero
+        avatar={<Avatar masked={!unlocked} name={unlocked ? internName : undefined} initials={initials} size="lg" />}
+        title={offer.roleTitle || projectName || "Proposal"}
+        subtitle={
+          <>
+            {ft ? "Full-time offer" : "Internship offer"}
+            {projectName ? ` for ${projectName}` : ""} to{" "}
+            <Link href={`/employer/intern/${encodeURIComponent(proposal.internId)}`} className="font-medium text-white underline-offset-4 hover:underline">
+              {internName}
+            </Link>
+            {score > 0 ? <span className="nums ml-2">· Findtern Score {score.toFixed(1)}/10</span> : null}
+          </>
+        }
+        status={<Pill tone={state.tone} size="md" icon={<StatusIcon tone={state.tone} hired={proposal.status === "hired"} />}>{state.label}</Pill>}
+        next={state.next}
+        figures={strip.slice(0, 4).map(([l, v]) => [l, v] as [string, string])}
+        timeline={timeline}
+      />
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
         <div className="min-w-0 space-y-6">
@@ -323,17 +321,16 @@ export default async function EmployerProposalDetail({
             {unlocked ? `${internName}'s profile` : "Candidate profile"}
             <ArrowUpRight className="size-4 text-ink-400" aria-hidden />
           </Link>
-          <Surface as="section" className="p-5">
-            <h2 className="text-base font-semibold text-ink-900">What happens next</h2>
-            <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-700">{state.next}</p>
-            <ol className="nums mt-4 space-y-1.5 border-t border-ink-100 pt-4 text-sm text-ink-600">
-              <li>Sent {formatDate(proposal.createdAt)}</li>
-              {proposal.updatedAt && proposal.updatedAt.getTime() - (proposal.createdAt?.getTime() ?? 0) > 60_000 ? (
-                <li>Updated {formatDate(proposal.updatedAt)}</li>
-              ) : null}
-              {proposal.hiredAt ? <li>Hired {formatDate(proposal.hiredAt)}</li> : null}
-            </ol>
-
+          <StartThreadButton
+            counterpartId={proposal.internId}
+            proposalId={proposal.id}
+            role="employer"
+            className="w-full border border-ink-200 bg-white font-medium text-ink-800 hover:bg-ink-50"
+          >
+            Message the candidate
+          </StartThreadButton>
+          <Surface as="section" className="rounded-[24px] p-5 shadow-tile">
+            <h2 className="text-base font-semibold text-ink-900">Actions</h2>
             {state.canPay || state.canWithdraw || state.canEdit || proposal.status === "hired" ? (
               <div className="mt-4 grid gap-2">
                 {state.canPay ? (
@@ -410,4 +407,12 @@ function formatDate(value: Date | string | null): string {
 function humanizeKey(key: string): string {
   const words = key.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function StatusIcon({ tone, hired }: { tone: string; hired: boolean }) {
+  if (hired) return <CheckCircle2 />;
+  if (tone === "closed") return <XCircle />;
+  if (tone === "waiting") return <Hourglass />;
+  if (tone === "paid") return <CreditCard />;
+  return <CircleDashed />;
 }

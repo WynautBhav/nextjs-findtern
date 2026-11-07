@@ -96,12 +96,38 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
   // else, Home included: on a phone the Home card pushed the intern's own
   // offer below the fold (QA-153).
   const full = /^\/intern\/college(\/|$)/.test(pathname ?? "");
+  const onDriveRoute = /^\/intern\/(dashboard|opportunities)(\/|$)/.test(pathname ?? "");
+  // Per-session dismissal. `null` = client has not read storage yet, so the
+  // banner stays hidden (no flash, no layout shift after hydration).
+  const [bannerGone, setBannerGone] = useState<boolean | null>(null);
+  const driveId = drive?.id ?? null;
+  useEffect(() => {
+    if (!driveId) return;
+    let gone = false;
+    try {
+      gone = sessionStorage.getItem(`findtern:drive-banner:${driveId}`) === "1";
+    } catch {
+      /* storage blocked: show it */
+    }
+    const t = setTimeout(() => setBannerGone(gone), 0);
+    return () => clearTimeout(t);
+  }, [driveId]);
+  function closeBanner() {
+    setBannerGone(true);
+    try {
+      if (driveId) sessionStorage.setItem(`findtern:drive-banner:${driveId}`, "1");
+    } catch {
+      /* private mode: dismissed for this view only */
+    }
+  }
+  // The College page keeps its full card (call alerts live there), never dismissed.
+  const showBanner = !!drive && (full || (bannerGone === false && onDriveRoute));
   const visible = meetings.filter((m) => !dismissed.has(m.id));
   const current = visible[0] ?? null;
 
   return (
     <>
-      {drive ? (
+      {showBanner && drive ? (
         // Not role="status": it was re-announced (about 50 words) on every
         // navigation. No looping ping. Full size on College; one line with a
         // link everywhere else, so it doesn't take the first screen.
@@ -120,14 +146,28 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
             <PushToggle vapidKey={vapidKey} className="shrink-0" />
           </div>
         ) : (
-          <p className="mb-6 flex min-h-11 flex-wrap items-center gap-x-2 gap-y-1 rounded-apple-sm border border-brand-200 bg-brand-50 px-4 py-2 text-sm text-brand-950">
-            <span aria-hidden className="size-2 shrink-0 rounded-full bg-brand-600" />
-            <span className="font-semibold">{drive.title} is live</span>
-            <span className="text-brand-900">until {shortDate(new Date(drive.endsAt), { day: "numeric", month: "short" })}</span>
-            <Link href="/intern/settings#college" className="ml-auto font-medium text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
-              Call alerts
-            </Link>
+          <div className="mb-6 flex items-center gap-1 rounded-apple-sm border border-brand-200 bg-brand-50 pl-4 text-sm text-brand-950">
+          <p className="flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5 py-2">
+            <span className="flex min-w-0 items-center gap-2 font-semibold">
+              <span aria-hidden className="size-2 shrink-0 rounded-full bg-brand-600" />
+              <span className="text-pretty">{drive.title} is live</span>
+            </span>
+            <span className="flex items-center gap-3 pl-4 sm:pl-0">
+              <span className="whitespace-nowrap text-brand-900">until {shortDate(new Date(drive.endsAt), { day: "numeric", month: "short" })}</span>
+              <Link href="/intern/settings#college" className="whitespace-nowrap font-medium text-brand-700 underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
+                Call alerts
+              </Link>
+            </span>
           </p>
+          <button
+            type="button"
+            onClick={closeBanner}
+            aria-label="Dismiss drive notice"
+            className="grid size-11 shrink-0 place-items-center rounded-apple-sm text-brand-800 hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-brand-600"
+          >
+            <X aria-hidden className="size-4" />
+          </button>
+          </div>
         )
       ) : null}
 

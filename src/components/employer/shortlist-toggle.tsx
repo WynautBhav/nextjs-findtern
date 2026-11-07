@@ -14,8 +14,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Loader2, Plus } from "lucide-react";
+import { Bookmark, Check, Loader2, Plus } from "lucide-react";
 
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,7 @@ export function ShortlistToggle({
   shortlisted,
   size = "md",
   emphasis = "quiet",
+  variant: look = "labelled",
   alsoOn,
   className,
 }: {
@@ -35,6 +37,8 @@ export function ShortlistToggle({
   size?: "sm" | "md";
   /** "primary" while not shortlisted: the filled brand button. */
   emphasis?: "primary" | "quiet";
+  /** "icon": a quiet bookmark for a card corner; the label stays for assistive tech. */
+  variant?: "labelled" | "icon";
   /** Names of other projects this candidate is already shortlisted for; shown under the button. */
   alsoOn?: string[];
   /** Applied to the wrapper; the button always fills it. */
@@ -79,6 +83,37 @@ export function ShortlistToggle({
   }
 
   const variant = state ? "outline" : emphasis === "primary" ? "primary" : "outline";
+
+  if (look === "icon") {
+    const label = state ? "Shortlisted: remove from shortlist" : "Add to shortlist";
+    return (
+      <span className={cn("inline-flex", className)}>
+        <Tooltip>
+        <TooltipTrigger asChild>
+        <button
+          type="button"
+          onClick={toggle}
+          aria-disabled={busy || undefined}
+          aria-pressed={state}
+          aria-label={label}
+          className={cn(
+            "inline-flex size-11 items-center justify-center rounded-full outline-none transition-colors hover:bg-ink-100 focus-visible:ring-[3px] focus-visible:ring-brand-600/30",
+            state ? "text-brand-700" : "text-ink-600 hover:text-ink-900",
+          )}
+        >
+          {busy ? (
+            <Loader2 className="size-5 animate-spin motion-reduce:animate-none" aria-hidden />
+          ) : (
+            <Bookmark className={cn("size-5", state && "fill-current")} aria-hidden />
+          )}
+        </button>
+        </TooltipTrigger>
+        <TooltipContent>{error ?? label}</TooltipContent>
+        </Tooltip>
+        {error ? <span role="alert" className="sr-only">{error}</span> : null}
+      </span>
+    );
+  }
 
   return (
     <span className={cn("inline-flex min-w-0 flex-col items-stretch gap-1", className)}>

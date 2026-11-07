@@ -45,7 +45,20 @@ import { breadcrumbsFor } from "@/lib/breadcrumbs";
 import { initialsOf as personInitials } from "@/lib/admin/person-tint";
 import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { csrfFetch } from "@/lib/client-fetch";
+import { useUnread } from "@/hooks/use-unread";
+import { badgeText } from "@/lib/messaging/ui-logic";
 import { cn } from "@/lib/utils";
+
+function LiveUnreadBadge({ light }: { light: boolean }) {
+  const n = useUnread();
+  if (n <= 0) return null;
+  return (
+    <span className={cn("nums rounded-full px-2 py-0.5 text-2xs font-semibold", light ? "bg-brand-700 text-white" : "bg-accent-500/20 text-accent-300")}>
+      {badgeText(n)}
+      <span className="sr-only"> unread messages</span>
+    </span>
+  );
+}
 
 export type ConsoleNavItem = {
   href: string;
@@ -53,6 +66,8 @@ export type ConsoleNavItem = {
   icon: React.ReactNode;
   /** A count shown beside the label (unread, items waiting). */
   badge?: number | string;
+  /** Show the live unread-message count (kept current by the messaging store) instead of a fixed badge. */
+  liveUnread?: boolean;
   /** A quiet dot: this needs the user, without turning it into a score. */
   attention?: boolean;
   /** Other paths this item stands for (one "Legal texts" item for four pages). */
@@ -182,7 +197,7 @@ export function ConsoleShell({
               compact ? (
                 <div aria-hidden className={cn("mx-auto mb-2 h-px w-6", light ? "bg-ink-200" : "bg-white/10")} />
               ) : (
-                <p className={cn("mb-2 px-3 text-2xs font-semibold uppercase tracking-[0.14em]", light ? "text-text-subtle" : "text-on-dark-subtle")}>{group.title}</p>
+                <p className={cn("mb-2 px-3 text-xs font-semibold tracking-[0.04em]", light ? "text-ink-600" : "text-on-dark")}>{group.title}</p>
               )
             ) : null}
             <ul className="flex flex-col gap-0.5">
@@ -198,7 +213,7 @@ export function ConsoleShell({
           {compact ? (
             <div aria-hidden className="mx-auto mb-2 h-px w-6 bg-white/10" />
           ) : (
-            <p className="mb-2 px-3 text-2xs font-semibold uppercase tracking-[0.14em] text-on-dark-subtle">Help</p>
+            <p className="mb-2 px-3 text-xs font-semibold tracking-[0.04em] text-on-dark">Help</p>
           )}
           <ul className="flex flex-col gap-0.5">
             {helpLinks.map((item) => (
@@ -236,7 +251,7 @@ export function ConsoleShell({
     <MotionConfig reducedMotion="user">
     <div data-tone={tone} className={cn(
         "apple-admin min-h-[100dvh] overflow-x-clip lg:flex",
-        light ? "bg-ink-100 lg:gap-3 lg:p-3" : "bg-surface",
+        light ? "bg-canvas lg:gap-3 lg:p-3" : "bg-canvas",
         // Rail width for fixed bars that centre on the content column (employer Compare pill).
         light ? (collapsed ? "lg:[--console-rail:6.25rem]" : "lg:[--console-rail:17.5rem]") : collapsed ? "lg:[--console-rail:4.75rem]" : "lg:[--console-rail:16rem]",
       )}>
@@ -277,7 +292,7 @@ export function ConsoleShell({
 
       {/* ── Content column ───────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className={cn("sticky top-0 z-30 backdrop-blur-md", light ? "bg-ink-100/85" : "border-b border-ink-200/70 bg-surface/85")}>
+        <header className={cn("sticky top-0 z-30 backdrop-blur-md", light ? "bg-canvas/85" : "border-b border-ink-200/70 bg-canvas/85")}>
           <div className="flex h-16 items-center gap-2 px-[clamp(1rem,3vw,2rem)]">
             {/* Phone / tablet: drawer + logo */}
             <Sheet open={drawer} onOpenChange={setDrawer}>
@@ -331,7 +346,7 @@ export function ConsoleShell({
                   type="button"
                   onClick={() => window.dispatchEvent(new Event(OPEN_CHAT_EVENT))}
                   // Intern and employer: on phones too, labelled, in place of the floating launcher.
-                  className={buttonClass({ variant: "outline", size: "sm", className: cn("mr-1", askInBar ? "touch:min-h-11" : "hidden lg:inline-flex") })}
+                  className={buttonClass({ variant: "outline", size: "sm", className: cn("mr-1", askInBar ? "touch:min-h-11 touch:px-4" : "hidden lg:inline-flex") })}
                 >
                   <MessageCircle className="size-4" aria-hidden />
                   Ask me
@@ -342,11 +357,11 @@ export function ConsoleShell({
                 <Link
                   href={alerts.href}
                   aria-label={alerts.count > 0 ? `${alerts.label ?? "Notifications"}, ${alerts.count} unread` : alerts.label ?? "Notifications"}
-                  className="apple-spring relative grid size-11 place-items-center rounded-apple-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900"
+                  className="apple-spring relative grid size-11 shrink-0 place-items-center rounded-apple-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900"
                 >
                   <Bell className="size-5" aria-hidden />
                   {alerts.count > 0 ? (
-                    <span className="nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-2xs font-bold text-brand-950 ring-2 ring-surface">
+                    <span className="nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-2xs font-semibold text-brand-950 ring-2 ring-surface">
                       {alerts.count > 99 ? "99+" : alerts.count}
                     </span>
                   ) : null}
@@ -432,7 +447,7 @@ function RailLink({ item, active, compact, light, onNavigate }: { item: ConsoleN
     "apple-spring apple-pressable group relative flex min-h-11 items-center gap-3 rounded-apple-sm px-3 text-[0.9375rem] tracking-[-0.01em] [@media(pointer:fine)]:min-h-10",
     light
       ? active ? "bg-brand-50 font-medium text-brand-800" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"
-      : cn("focus-visible:outline-accent-300", active ? "bg-white/[0.09] font-semibold text-white" : "text-on-dark-subtle hover:bg-white/[0.06] hover:text-white"),
+      : cn("focus-visible:outline-accent-300", active ? "bg-white/[0.12] font-semibold text-white" : "text-on-dark-subtle hover:bg-white/[0.06] hover:text-white"),
     compact && "justify-center px-0",
   );
   const body = (
@@ -456,8 +471,10 @@ function RailLink({ item, active, compact, light, onNavigate }: { item: ConsoleN
         {compact && item.attention ? ", needs you" : ""}
         {compact && item.badge ? `, ${item.badge} unread` : ""}
       </span>
-      {!compact && item.badge ? (
-        <span className={cn("nums rounded-full px-2 py-0.5 text-2xs font-bold", light ? "bg-brand-700 text-white" : "bg-accent-500/20 text-accent-300")}>{item.badge}</span>
+      {!compact && item.liveUnread ? (
+        <LiveUnreadBadge light={light} />
+      ) : !compact && item.badge ? (
+        <span className={cn("nums rounded-full px-2 py-0.5 text-2xs font-semibold", light ? "bg-brand-700 text-white" : "bg-accent-500/20 text-accent-300")}>{item.badge}</span>
       ) : !compact && item.attention ? (
         <span className="size-1.5 shrink-0 rounded-full bg-accent-400">
           <span className="sr-only">Needs you</span>
@@ -570,7 +587,7 @@ function RoleChip({ label, light }: { label: string; light: boolean }) {
   return (
     <span
       className={cn(
-        "shrink-0 rounded-full border px-2 py-0.5 text-2xs font-bold uppercase tracking-wider",
+        "shrink-0 rounded-full border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider",
         // accent-300 is 1.6:1 on white; the light rail takes the "waiting" pill colours.
         light ? "border-accent-300/70 bg-accent-100 text-accent-700" : "border-accent-400/30 bg-accent-500/15 text-accent-300",
       )}

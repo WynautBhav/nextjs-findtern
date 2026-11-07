@@ -17,11 +17,11 @@ export interface AiRatings {
 }
 
 /** Labels and order as the legacy profile printed them (ProfileResume ratingEntries). */
-const AXES: { key: keyof AiRatings; label: string }[] = [
-  { key: "communication", label: "Communication" },
-  { key: "coding", label: "Coding" },
-  { key: "aptitude", label: "Aptitude" },
-  { key: "interview", label: "AI Interview" },
+const AXES: { key: keyof AiRatings; label: string; hint: string }[] = [
+  { key: "communication", hint: "How clearly they explain their thinking and answer in conversation.", label: "Communication" },
+  { key: "coding", hint: "How well they solve and write code in a timed task.", label: "Coding" },
+  { key: "aptitude", hint: "Logic and problem solving on structured questions.", label: "Aptitude" },
+  { key: "interview", hint: "The AI interviewer's overall rating of the full conversation.", label: "AI interview" },
 ];
 
 /** Ratings are out of 10; anything else stored is shown as not rated. */
@@ -49,7 +49,6 @@ export function AiFeedbackReport({
   ratings: AiRatings;
   /** Kept for callers; the report shows only the scores. */
   skills?: string[];
-  bio?: string | null;
   aiFeedbackLink?: string | null;
   aiRecordingLink?: string | null;
 }) {
@@ -160,17 +159,27 @@ export function AiFeedbackReport({
         </div>
       </div>
 
-      <div className="grid gap-6 p-5 sm:p-6 md:grid-cols-[minmax(0,13rem)_minmax(0,1fr)] md:gap-10">
-        <dl>
-          <dt className="text-sm font-medium text-brand-800">Findtern Score</dt>
-          <dd className="mt-2 flex items-baseline gap-1">
-            <span className="nums text-6xl font-medium leading-none text-brand-700">{score !== null ? score.toFixed(1) : "–"}</span>
-            <span className="nums text-base text-text-subtle">/10</span>
-          </dd>
-        </dl>
-
+      <div className="space-y-5 p-5 sm:p-6">
+        <p className="flex items-baseline gap-2 text-sm text-ink-700">
+          <span className="font-medium">Findtern Score</span>
+          <span className="nums text-2xl font-semibold text-brand-700">{score !== null ? score.toFixed(1) : "–"}</span>
+          <span className="nums text-text-subtle">out of 10</span>
+        </p>
         {/* Every part on one shared 0–10 scale, so they compare at a glance. */}
         <ScoreScale rows={AXES.map((axis) => ({ label: axis.label, value: axes.find((a) => a.key === axis.key)?.value ?? null }))} />
+        <details className="group border-t border-ink-100 pt-4 print:hidden">
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline">
+            What these scores mean
+          </summary>
+          <dl className="mt-2 space-y-2 text-sm text-ink-700">
+            {AXES.map((axis) => (
+              <div key={axis.key}>
+                <dt className="inline font-medium text-ink-900">{axis.label}: </dt>
+                <dd className="inline">{axis.hint}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
       </div>
     </section>
   );

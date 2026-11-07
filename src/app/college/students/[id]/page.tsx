@@ -44,7 +44,6 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
     // and extra_data keeps only the keys draftFromRecord, the ratings and aiInterviewLinks read.
     db
       .select({
-        bio: schema.internOnboarding.bio,
         city: schema.internOnboarding.city,
         state: schema.internOnboarding.state,
         linkedinUrl: schema.internOnboarding.linkedinUrl,
@@ -145,12 +144,6 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                   <dd className="break-words text-ink-900">{v || "—"}</dd>
                 </div>
               ))}
-              {profile.bio ? (
-                <div className="sm:col-span-2">
-                  <dt className="text-text-subtle">About</dt>
-                  <dd className="whitespace-pre-line text-ink-900">{profile.bio}</dd>
-                </div>
-              ) : null}
               {profile.experience.length > 0 ? (
                 <div className="sm:col-span-2">
                   <dt className="text-text-subtle">Experience</dt>

@@ -5,7 +5,7 @@ import { phoneError } from "./phone.ts";
  * Intern onboarding shape across the 8-step wizard.
  *
  * Steps:
- * 1. About Me (photo, bio, identity documents, address, phone, emergency contact)
+ * 1. About Me (photo, identity documents, address, phone, emergency contact)
  * 2. Academics (level, degree, status, institution, years, score, marksheets, courses)
  * 3. Experience (Internship, Job, Project, Freelancing)
  * 4. Skills (4 to 7 names; no level is asked, each is stored as Intermediate)
@@ -103,8 +103,6 @@ export type OnboardingDraft = {
   // Step 1: About Me
   firstName?: string;
   lastName?: string;
-  /** Optional, as in legacy (which had no bio). */
-  bio: string;
   phone?: string;
   /** Emergency contact, stored flat in extra_data like the legacy form. */
   emergencyName?: string;
@@ -187,7 +185,6 @@ export type StoredDocument = {
 const BLANK: OnboardingDraft = {
   firstName: "",
   lastName: "",
-  bio: "",
   phone: "",
   emergencyName: "",
   emergencyRelation: "",
@@ -465,7 +462,6 @@ export function draftFromRecord(row: OnboardingLike): Partial<OnboardingDraft> {
   const degree = canonicalDegree(text(academics.degree || extra.degree), qualificationLevel);
 
   return {
-    bio: text(row.bio),
     linkedinUrl: text(row.linkedinUrl),
     city: text(row.city),
     state: text(row.state),
@@ -952,7 +948,8 @@ export type ValidationContext = {
 };
 
 /** Maximum key skills (legacy client cap, enforced by the API too). */
-export const MAX_SKILLS = 7;
+export { MAX_SKILLS } from "./skills-limit.ts";
+import { MAX_SKILLS } from "./skills-limit.ts";
 /** Minimum key skills: the step, the dashboard meter and the payment gate agree. */
 export const MIN_SKILLS = 4;
 
@@ -1040,7 +1037,6 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     if (!ctx.hasPhoto && !(values.photoUrl ?? "").startsWith("/api/intern/avatar")) {
       errors.photo = "Upload a clear, front-facing profile photo.";
     }
-    // Bio is optional (legacy had none; INT-20). Nothing to check.
     const linkedin = (values.linkedinUrl ?? "").trim();
     // Optional (bug sheet 21 Oct); a link that is given must be a LinkedIn one.
     if (linkedin && !LINKEDIN.test(linkedin)) errors.linkedinUrl = "Enter your LinkedIn profile link, like linkedin.com/in/your-name.";

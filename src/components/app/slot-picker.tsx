@@ -95,6 +95,34 @@ export function SlotPicker({
     return (
       <div>
         <Booked iso={bookedSlot.iso} meetUrl={meetUrl} justBooked={Boolean(booked && !chosen)} />
+        <ul className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="The three offered times">
+          {slots.map((slot) => {
+            const mine = slot.index === bookedSlot.index;
+            return (
+              <li
+                key={slot.index}
+                className={cn(
+                  "flex min-h-11 items-center justify-between gap-3 rounded-apple-sm border px-4 py-3 sm:flex-col sm:items-start sm:gap-1",
+                  mine ? "border-brand-700 bg-brand-50 ring-1 ring-inset ring-brand-700" : "border-ink-200/80 text-text-subtle",
+                )}
+              >
+                <span className="nums text-sm text-ink-700">{formatIstDay(slot.iso)}</span>
+                <span className="nums text-base font-semibold text-ink-900">{formatIstClock(slot.iso)}</span>
+                {mine ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-800">
+                    <Check className="size-3.5" aria-hidden />
+                    Your choice
+                  </span>
+                ) : (
+                  <span className="text-xs">Not chosen</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        <p className="mt-3 text-pretty text-xs text-text-subtle">
+          A booked time can&apos;t be changed here. To reschedule or cancel, write to support before the start.
+        </p>
         {status}
       </div>
     );
