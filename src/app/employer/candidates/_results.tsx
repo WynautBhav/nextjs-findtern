@@ -120,11 +120,10 @@ export function Results({
           {data.activeProjectId ? (
             <nav aria-label="Show" className="flex items-center gap-5">
               <TabLink href={withFilters(filters, { saved: false, page: "" })} active={!saved}>
-                All
-                <span className="nums text-ink-600 sm:hidden">{saved ? "" : ` ${total}`}</span>
+                All{saved ? null : <span className="nums font-normal text-ink-600"> {total}</span>}
               </TabLink>
               <TabLink href={withFilters(filters, { saved: true, page: "" })} active={saved}>
-                Shortlist <span className="nums text-ink-600">({data.savedCount})</span>
+                Shortlist <span className="nums font-normal text-ink-600">{data.savedCount}</span>
               </TabLink>
             </nav>
           ) : null}
@@ -169,7 +168,7 @@ export function Results({
         saved ? (
           <EmptyScene
             art
-            title="Nobody shortlisted for this project yet"
+            title="Nobody on this project's shortlist yet"
             body="Press Save on a candidate to add them to this project's shortlist."
             next={{ label: "Browse all candidates", href: withFilters(filters, { saved: false, page: "" }) }}
             who="You - save a candidate"
@@ -225,7 +224,8 @@ export function Results({
                   key={candidate.id}
                   // The AI interview recording stays hidden until hire; only the
                   // written report is shown before (legacy detail:1578).
-                  candidate={redactForEmployer(candidate, data.nameUnlocked.has(candidate.id))}
+                  // The list never shows contact details, so they stay off the wire even after hire.
+                  candidate={{ ...redactForEmployer(candidate, data.nameUnlocked.has(candidate.id)), email: "", linkedinUrl: "" }}
                   currency={data.currency}
                   region={data.region}
                   selected={compareIds.includes(candidate.id)}
@@ -234,7 +234,6 @@ export function Results({
                   projectId={data.activeProjectId}
                   shortlisted={data.shortlisted.has(candidate.id)}
                   nameUnlocked={data.nameUnlocked.has(candidate.id)}
-                  hired={rel?.hired}
                   pricing={resolvePricing(candidate.score, data.plans, data.currency, data.region)}
                   proposal={rel?.proposal ?? null}
                   fullTimeFrom={rel?.fullTimeFrom ?? null}
@@ -242,6 +241,7 @@ export function Results({
                   wantedSkills={data.effectiveSkills}
                   presence={data.presence[candidate.id] ?? null}
                   interested={data.saved.has(candidate.id)}
+                  hired={Boolean(rel?.hired)}
                 />
               );
             })}
@@ -282,8 +282,8 @@ function TabLink({ href, active, children }: { href: string; active: boolean; ch
       scroll={false}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative -mx-1 inline-flex h-11 min-w-6 items-center justify-center whitespace-pre rounded-sm px-1 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:h-9 sm:touch:h-11",
-        "after:absolute after:inset-x-0 after:-bottom-[13px] after:h-0.5 after:rounded-full after:content-[''] max-sm:after:bottom-0",
+        "relative -mx-1 inline-flex h-11 min-w-11 items-center justify-center whitespace-pre rounded-sm px-1 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:h-9 sm:touch:h-11",
+        "after:absolute after:inset-x-1 after:-bottom-[13px] after:h-0.5 after:rounded-full after:content-[''] max-sm:after:bottom-0",
         active ? "font-semibold text-ink-900 after:bg-ink-900" : "font-medium text-ink-600 hover:text-ink-900",
       )}
     >

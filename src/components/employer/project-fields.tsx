@@ -104,15 +104,6 @@ export function companyPlaceDefault(company: { city?: string | null; state?: str
   return inIndia ? { state, city: (company.city ?? "").trim() } : { state: "", city: "" };
 }
 
-/** The free-text brief, kept apart from `ProjectDraft` (onboarding has no such field). */
-export type DescriptionField = {
-  value: string;
-  onChange: (value: string) => void;
-  /** Runs on blur, so contact details are caught before the employer submits. */
-  onBlur?: () => void;
-  error?: string;
-};
-
 /** With `on`, a titled section split from the one above by a thin rule; without, a plain run of fields (onboarding). */
 function Group({ on, id, title, children }: { on: boolean; id: string; title: string; children: React.ReactNode }) {
   if (!on) return <>{children}</>;
@@ -133,7 +124,6 @@ export function ProjectFields({
   companyPlace,
   idPrefix = "project",
   showPincode = false,
-  description,
   headings = false,
 }: {
   values: ProjectDraft;
@@ -143,8 +133,6 @@ export function ProjectFields({
   companyPlace?: { city?: string | null; state?: string | null };
   idPrefix?: string;
   showPincode?: boolean;
-  /** Shown only where given: the Projects page, not onboarding. */
-  description?: DescriptionField;
   /** Group the fields under section headings (the full-page editor). */
   headings?: boolean;
 }) {

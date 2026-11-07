@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq, isNotNull } from "drizzle-orm";
-import { ArrowLeft, Check, ChevronDown, Clock, CreditCard, Download, X } from "lucide-react";
+import { ArrowLeft, Check, Clock, CreditCard, Download, X } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -361,14 +361,11 @@ export default async function EmployerProposalDetail({
             </section>
           ) : null}
 
-          <details className="group border-t border-ink-100 pt-2">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-sm text-lg font-semibold tracking-[-0.01em] text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 [&::-webkit-details-marker]:hidden">
-              Meeting rules
-              <ChevronDown className="size-5 shrink-0 text-ink-500 transition-transform group-open:rotate-180" aria-hidden />
-            </summary>
+          <section className="border-t border-ink-100 pt-8">
+            <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Rules for meetings through Findtern</h2>
             <p className="mt-1 text-sm text-text-subtle">By joining any meeting scheduled through Findtern, you agree to this conduct policy.</p>
             <MeetingRulesList className="mt-4" />
-          </details>
+          </section>
         </div>
 
         <aside className="order-first space-y-10 lg:order-none lg:sticky lg:top-24 lg:self-start">

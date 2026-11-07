@@ -1,4 +1,4 @@
-import { eq, getTableColumns } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 
@@ -11,8 +11,3 @@ export async function projectCompany(employerId: string) {
     .limit(1);
   return company;
 }
-
-// Every project column but takenDownBy: an admin's id never goes to the employer's browser.
-const { takenDownBy: _adminId, ...columns } = getTableColumns(schema.projects);
-void _adminId;
-export const employerProjectColumns = columns;

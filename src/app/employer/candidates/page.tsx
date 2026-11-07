@@ -72,7 +72,6 @@ export default async function CandidatesPage({
         Phones: search and the Filters button share the top line, the skill tokens sit under them, then the list.
         lg: search and skills span the top; the filter column and the results sit side by side under them.
       */}
-      {/* DOM order is the tab order: search, skills, then the filter column (row 3 at lg), then results. */}
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-x-12">
         <CandidateSearch filters={filters} className="col-start-1 row-start-1 lg:col-span-2 lg:max-w-[44rem]" />
         <SkillFilter
@@ -97,6 +96,7 @@ export default async function CandidatesPage({
           ) : null}
         </SkillFilter>
 
+        {/* After the skills in the DOM so focus follows the visual order (WCAG 2.4.3); the grid places it. */}
         <div className="col-start-2 row-start-1 lg:col-span-1 lg:col-start-1 lg:row-start-3">
           <FilterColumn
             filters={filters}
@@ -111,7 +111,7 @@ export default async function CandidatesPage({
           />
         </div>
 
-        {/* Phones: the compare tray sits over the bottom nav, so the last row needs room to scroll clear of it. */}
+        {/* The compare tray floats over the list, so the last row needs room to scroll clear of it. */}
         <div className={cn("col-span-2 row-start-3 min-w-0 lg:col-span-1 lg:col-start-2", compareIds.length >= 1 && "pb-24")}>
           <RememberSelection employerId={uid} project={activeProjectId} compare={compareIds} filters={loadFailed ? undefined : rememberQueryOf(filters)} />
 
@@ -120,7 +120,7 @@ export default async function CandidatesPage({
               id="compare-bar"
               role="region"
               aria-label="Compare selection"
-              className="fixed bottom-24 left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center gap-2 rounded-full bg-ink-900 py-1.5 pl-5 pr-1.5 text-white shadow-[0_12px_32px_-8px_rgb(0_0_0/0.35)] sm:w-max lg:bottom-6 lg:left-[calc(50%+var(--console-rail,0rem)/2)]"
+              className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 items-center gap-2 rounded-full bg-ink-900 py-1.5 pl-5 pr-1.5 text-white shadow-[0_12px_32px_-8px_rgb(0_0_0/0.35)] sm:w-max lg:bottom-6 lg:left-[calc(50%+var(--console-rail,0rem)/2)]"
             >
               <KeepFocusClear of="compare-bar" />
               <span className="nums min-w-0 flex-1 truncate text-sm font-medium">

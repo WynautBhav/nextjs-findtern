@@ -56,6 +56,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (project.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
+  // A listing Findtern took down stays down; only an admin can restore it (OA8).
+  if (project.takenDownAt && parsed.data.status === "active") {
+    return NextResponse.json({ error: "Findtern took this listing down, so it can't be reopened. Write to us if you think that was a mistake." }, { status: 409 });
+  }
+
   const d = { ...parsed.data };
   if (d.status) {
     const statusProblem = projectStatusChangeError(project, d.status);

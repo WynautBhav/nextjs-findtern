@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { Check, Info } from "lucide-react";
 
 import { PLAN_NAME, bandFor } from "@/lib/score";
@@ -18,74 +17,54 @@ import { cn } from "@/lib/utils";
  * photo yes; never the bio, contact details or the intern's pay.
  */
 
-/** Photo (or brand-tinted initials) with the presence dot on its edge. */
+/** Photo (or brand-tinted initials) with a green dot on its edge when online now. */
 export function RowAvatar({
   photoUrl,
   initials,
   presence = null,
   className,
-  seed,
 }: {
   photoUrl?: string | null;
   initials: string;
   presence?: PresenceLabel | null;
   className?: string;
-  seed?: string;
 }) {
   const online = presence === "Online now";
   return (
-    <div className="relative shrink-0 self-start">
+    <div className="relative shrink-0 self-start sm:row-span-2">
       <CandidateAvatar
         photoUrl={photoUrl}
         initials={initials}
-        seed={seed}
-        className={cn("size-12 rounded-full text-sm ring-1 ring-inset ring-black/5 sm:size-14 sm:text-base", className)}
+        className={cn("size-12 rounded-full bg-brand-100/70 text-sm ring-1 ring-inset ring-brand-200/70 sm:size-14 sm:text-base", className)}
       />
-      {presence ? (
-        <span
-          aria-hidden
-          title={presence}
-          className={cn(
-            "absolute bottom-0 right-0 size-3.5 rounded-full ring-[2.5px] ring-white",
-            online ? "bg-success" : "bg-ink-300",
-          )}
-        />
-      ) : null}
+      {/* Green only: a grey dot reads as "offline"; older activity is spelled out on the meta line. */}
+      {online ? <span aria-hidden className="absolute bottom-0 right-0 size-3.5 rounded-full bg-success ring-[2.5px] ring-white" /> : null}
     </div>
   );
 }
 
 /**
- * "9.0 Findtern Score · Latte (i)": the plan name is explained in a tooltip,
- * never a bare word. Hover, focus and a tap open it (Radix alone closes it
- * again on the tap's click, so on a phone it never showed).
+ * "9.0 Findtern Score · Latte (i)": the plan name is explained in a tooltip
+ * (hover, focus or long-press), never a bare word.
  */
 export function ScoreBadge({ score, scored }: { score: number; scored: boolean }) {
-  const [open, setOpen] = useState(false);
   if (!scored) return <span className="text-sm text-ink-600">Not scored yet</span>;
   const band = bandFor(score);
   const plan = PLAN_NAME[band.id];
   const range = band.max >= 10 ? `${band.min} or above` : `${band.min} to under ${band.max}`;
+  // The one number employers filter on gets the row's one tinted anchor.
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm">
-      <span className="nums text-base font-semibold text-ink-900">{score.toFixed(1)}</span>
-      <span className="text-ink-600">Findtern Score</span>
-      <Tooltip open={open} onOpenChange={setOpen}>
-        <TooltipTrigger
-          asChild
-          // A tap focuses (which opens it) and then clicks, which Radix treats as "close": keep it open.
-          // On the Trigger, not the button: only here does preventDefault skip that close. Tap outside, Escape or blur close it.
-          onClick={(e) => {
-            e.preventDefault();
-            setOpen(true);
-          }}
-        >
-          <button
-            type="button"
-            className="relative z-10 -my-1 inline-flex min-h-7 items-center gap-1 rounded-full px-1.5 font-medium text-ink-800 outline-none hover:bg-ink-100 focus-visible:ring-2 focus-visible:ring-brand-500 touch:min-h-11"
-          >
-            {plan}
-            <Info className="size-3.5 text-ink-400" aria-hidden />
+    <span className="inline-flex h-7 items-center gap-1.5 rounded-full bg-brand-50 pl-2.5 pr-0.5 text-sm ring-1 ring-inset ring-brand-100">
+      <span className="nums font-semibold text-ink-900">{score.toFixed(1)}</span>
+      <span className="text-ink-700">Findtern Score</span>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          {/* 44px tall to the finger, 24px to the eye: the negative margin keeps the pill h-7. */}
+          <button type="button" className="group/band relative z-10 -my-2 inline-flex h-11 min-w-11 items-center outline-none">
+            <span className="inline-flex h-6 items-center gap-1 rounded-full bg-white px-2 text-[13px] font-medium text-brand-900 ring-1 ring-inset ring-brand-100 group-hover/band:bg-brand-100 group-focus-visible/band:ring-2 group-focus-visible/band:ring-brand-500">
+              {plan}
+              <Info className="size-3.5 text-brand-700/70" aria-hidden />
+            </span>
             <span className="sr-only">: what this means</span>
           </button>
         </TooltipTrigger>

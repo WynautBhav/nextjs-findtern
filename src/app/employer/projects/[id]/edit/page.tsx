@@ -6,7 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { ProjectEditor } from "@/components/employer/project-editor";
 import { timezoneForLocation } from "@/lib/timezones";
-import { employerProjectColumns, projectCompany } from "../../_company";
+import { projectCompany } from "../../_company";
 
 export const metadata: Metadata = {
   title: "Edit project",
@@ -19,7 +19,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
   // Scoped to this employer: another company's project id is simply not found.
   const [[project], company] = await Promise.all([
     getDb()
-      .select(employerProjectColumns)
+      .select()
       .from(schema.projects)
       .where(and(eq(schema.projects.id, id), eq(schema.projects.employerId, session.uid)))
       .limit(1),
