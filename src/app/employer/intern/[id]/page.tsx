@@ -3,17 +3,16 @@ import { proposalPill } from "@/components/employer/proposal-state";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
-import { ArrowLeft, Laptop, Link2, MapPin, Send } from "lucide-react";
+import { ArrowLeft, Check, ExternalLink, FileText, Link2, MapPin, Send, Video } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { candidateRelations, isAdminViewing, type CandidateRelation } from "@/lib/employer-visibility";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
-import { bandFor } from "@/lib/score";
+import { PLAN_NAME, bandFor } from "@/lib/score";
 import { formatDate, formatMoney, formatRate } from "@/lib/format";
-import { displayNameOf, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { RATING_META, displayNameOf, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
-import { AiFeedbackReport } from "@/components/employer/ai-feedback-report";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { candidateStatusPill } from "@/components/employer/candidate-status";
 import { CompareToggle } from "@/components/employer/compare-toggle";
@@ -26,10 +25,13 @@ import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { parseOffer } from "@/lib/offer";
 import { timezoneForLocation } from "@/lib/timezones";
 import { dateLabel, draftFromRecord, linkedinHref, type OnboardingDraft } from "@/lib/onboarding";
-import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { PageHead, Pill } from "@/components/app/primitives";
+import { ScoreScale } from "@/components/app/tiles";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
-import { ButtonLink } from "@/components/ui/button";
+import { ButtonLink, buttonClass } from "@/components/ui/button";
+import { PrintButton } from "./_print-button";
+import { profileText } from "@/components/employer/profile-text";
 import { PresenceDot } from "@/components/app/presence-dot";
 import { MessageButton } from "@/components/app/messages/message-button";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
@@ -92,6 +94,8 @@ export default async function EmployerInternDetail({
   let employerZone = "Asia/Kolkata";
   /** "Online now" / "Active today" / "Active this week", never a time; null when hidden or older. */
   let presence: PresenceLabel | null = null;
+  /** The selected project's skills: matching chips are ticked and listed first, as on the candidate list. */
+  let wanted: { project: string; skills: string[] } | null = null;
 
   try {
     const db = getDb();
@@ -112,7 +116,7 @@ export default async function EmployerInternDetail({
       // newest open one (EMH-15).
       const projectRows = (
         await db
-          .select({ id: schema.projects.id, status: schema.projects.status })
+          .select({ id: schema.projects.id, status: schema.projects.status, projectName: schema.projects.projectName, skills: schema.projects.skills })
           .from(schema.projects)
           .where(eq(schema.projects.employerId, employerId))
           .orderBy(desc(schema.projects.createdAt))
@@ -122,6 +126,7 @@ export default async function EmployerInternDetail({
         projectRows.find((row) => row.id === remembered.project) ??
         projectRows[0];
       if (project) {
+        wanted = { project: project.projectName ?? "your project", skills: (Array.isArray(project.skills) ? project.skills : []).filter(Boolean) };
         const [item] = await db
           .select({ id: schema.employerCartItems.id })
           .from(schema.employerCartItems)
@@ -299,18 +304,34 @@ export default async function EmployerInternDetail({
       ? "Full-time offer out"
       : null;
 
+  const plan = PLAN_NAME[band.id];
+  const wantedSet = new Set((wanted?.skills ?? []).map(skillKey));
+  const isWanted = (skill: string) => wantedSet.has(skillKey(skill));
+  const skills = [...profile.skills.filter(isWanted), ...profile.skills.filter((s) => !isWanted(s))];
+  const matchCount = skills.filter(isWanted).length;
+  const headline = academics ? [academics.degree, academics.specialization].filter(Boolean).join(", ") : "";
+  const prefers = preferredCities(profile.preferredLocations);
+  const axes = RATING_META.map((m) => ({ label: m.label, value: profile.ratings[m.key] > 0 ? Math.min(10, profile.ratings[m.key]) : null }));
+  const rated = axes.filter((a): a is { label: string; value: number } => a.value !== null).sort((a, b) => b.value - a.value);
+  const linkedin = nameUnlocked ? linkedinHref(profile.linkedinUrl) : null;
+  const sendHref = `/employer/send-proposal?intern=${encodeURIComponent(profile.id)}${shortlist ? `&project=${encodeURIComponent(shortlist.projectId)}` : ""}`;
+  /** Free text with contact details hidden until hire. */
+  const t = (value: string | null | undefined) => (value ? profileText(value, nameUnlocked) : "");
+  const SECTION = "border-t border-ink-100 py-8";
+  const H2 = "text-lg font-semibold tracking-[-0.01em] text-ink-900";
+
   return (
-    <div>
+    <div className="pb-12">
       <Link
-        href="/employer/candidates"
-        className="mb-4 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
+        href={`/employer/candidates${shortlist ? `?project=${encodeURIComponent(shortlist.projectId)}` : ""}`}
+        className="-ml-1 mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm px-1 text-sm font-medium text-brand-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
       >
         <ArrowLeft className="size-4" aria-hidden />
         Back to candidates
       </Link>
 
       {adminContact ? (
-        <p className="mb-4 rounded-apple-md border border-accent-300 bg-accent-100/60 px-4 py-2.5 text-sm text-ink-800">
+        <p className="mb-6 rounded-apple-md border border-accent-300 bg-accent-100/60 px-4 py-2.5 text-sm text-ink-800">
           <span className="font-semibold">Admin view:</span>{" "}
           <a href={`mailto:${adminContact.email}`} className="underline underline-offset-4">
             {adminContact.email}
@@ -319,70 +340,106 @@ export default async function EmployerInternDetail({
         </p>
       ) : null}
 
-      {/* ── Identity. The score and the hire actions are in the sticky box beside it. ── */}
-      <Surface className="mb-6 p-5 sm:p-7">
-        <div className="flex min-w-0 items-start gap-5">
-          <CandidateAvatar
-            photoUrl={profile.photoUrl}
-            initials={profile.initials}
-            className="size-16 rounded-full text-xl ring-1 ring-inset ring-brand-200/70"
-          />
-          <div className="min-w-0">
-            <h1 className="break-words text-3xl font-semibold leading-tight text-ink-900">{displayName}</h1>
-            {presence ? (
-              <div className="mt-1">
-                <PresenceDot label={presence} withText />
-              </div>
-            ) : null}
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="size-4 text-ink-400" aria-hidden />
-                {profile.location || "Location not stated"}
-              </span>
-              {profile.hasLaptop !== null ? (
-                <span className="inline-flex items-center gap-1.5">
-                  <Laptop className="size-4 text-ink-400" aria-hidden />
-                  {profile.hasLaptop ? "Has a laptop" : "Needs a laptop"}
-                </span>
+      {/* Left: who they are, then the evidence. Right (lg): the sticky hire box. A phone reads header, hire box, evidence. */}
+      <div className="grid gap-x-12 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <header className="min-w-0 pb-8 lg:col-start-1">
+          <div className="flex min-w-0 items-start gap-4 sm:gap-6">
+            <span className="relative shrink-0">
+              <CandidateAvatar
+                photoUrl={profile.photoUrl}
+                initials={profile.initials}
+                className="size-18 rounded-full text-xl ring-1 ring-inset ring-brand-200/70 sm:size-24 sm:text-2xl"
+              />
+              {presence ? (
+                <span
+                  aria-hidden
+                  className={`absolute bottom-0.5 right-0.5 size-4 rounded-full ring-[3px] ring-white sm:bottom-1 sm:right-1 ${presence === "Online now" ? "bg-success" : "bg-ink-300"}`}
+                />
               ) : null}
-            </p>
-            {profile.workModes.length > 0 ? <p className="mt-1 text-sm text-ink-600">Open to {profile.workModes.join(", ").toLowerCase()}</p> : null}
-            {status ? (
-              <div className="mt-3">
-                <Pill tone={status.tone}>{status.label}</Pill>
+            </span>
+            <div className="min-w-0 pt-1">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                <h1 className="break-words text-2xl font-semibold leading-tight tracking-[-0.02em] text-ink-900 sm:text-3xl">
+                  {displayName}
+                  {nameUnlocked ? null : <span className="sr-only">, initials only until you hire</span>}
+                </h1>
+                {status ? <Pill tone={status.tone}>{status.label}</Pill> : null}
               </div>
-            ) : null}
+              {headline ? <p className="mt-1 break-words text-lg leading-snug text-ink-800 sm:text-xl">{headline}</p> : null}
+              <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="size-4 shrink-0 text-ink-400" aria-hidden />
+                  {profile.location || "Location not stated"}
+                </span>
+                {prefers.length > 0 ? <span>Also works in {prefers.join(", ")}</span> : null}
+                {presence ? <PresenceDot label={presence} withText /> : null}
+                {linkedin ? (
+                  <a
+                    href={linkedin}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex min-h-11 items-center gap-1.5 font-medium text-brand-700 underline-offset-4 hover:underline"
+                  >
+                    <Link2 className="size-4" aria-hidden />
+                    LinkedIn
+                  </a>
+                ) : null}
+              </p>
+            </div>
           </div>
-        </div>
-      </Surface>
 
-      <div className="grid gap-x-8 gap-y-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
-        {/* First in the DOM so a phone reads the decision first; the right column from lg up. */}
-        <aside aria-label="Hire" className="min-w-0 space-y-4 lg:order-2 lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto">
-          <Surface className="p-5">
-            <p className="text-sm font-medium text-ink-600">Findtern Score</p>
-            <p className="nums mt-1 text-4xl font-semibold leading-none text-brand-700">
-              {profile.scored ? profile.score.toFixed(1) : "-"}
-              <span className="ml-0.5 text-base font-medium text-text-subtle">/10</span>
+          {/* The stats line, as on the candidate list: score and band, rate, how they work. */}
+          <dl className="mt-6 grid grid-cols-[auto_auto_auto] justify-start gap-x-8 gap-y-4 sm:flex sm:flex-wrap sm:gap-x-12 sm:pl-30">
+            <div>
+              <dt className="text-sm text-ink-600">Findtern Score</dt>
+              <dd className="nums mt-0.5 text-4xl font-semibold leading-none tracking-[-0.02em] text-brand-700">
+                {profile.scored ? (
+                  <>
+                    {profile.score.toFixed(1)}
+                    <span className="ml-0.5 text-base font-medium tracking-normal text-text-subtle">/10</span>
+                  </>
+                ) : (
+                  <span className="text-base font-medium text-ink-700">Not scored yet</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-sm text-ink-600">Works</dt>
+              <dd className="mt-1.5 text-base font-medium text-ink-900">{profile.workModes.join(" / ") || "Not stated"}</dd>
+            </div>
+            <div>
+              <dt className="text-sm text-ink-600">Laptop</dt>
+              <dd className="mt-1.5 text-base font-medium text-ink-900">
+                {profile.hasLaptop === null ? "Not stated" : profile.hasLaptop ? "Own" : "Needs one"}
+              </dd>
+            </div>
+          </dl>
+          {profile.scored ? (
+            // The band's own published meaning (lib/score BANDS), not a made-up label.
+            <p className="mt-3 text-sm text-ink-600 sm:pl-30">
+              <span className="mr-2 inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-sm font-medium text-brand-800 ring-1 ring-inset ring-brand-200/70">
+                {plan}
+              </span>
+              Score {band.max >= 10 ? `${band.min}+` : `${band.min}–${band.max}`}. {band.blurb}
             </p>
-            <p className="mt-1.5 text-sm text-ink-600">{profile.scored ? band.name : "Not scored yet"}</p>
+          ) : null}
+        </header>
 
-            <div className="mt-4 border-t border-ink-100 pt-4">
-              <p className="nums text-2xl font-semibold leading-none text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
-              <p className="mt-1.5 text-sm text-ink-600">Rate set by the score band</p>
+        <aside aria-label="Hire" className="min-w-0 pb-8 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pb-0">
+          <div className="space-y-5 rounded-apple-xl border border-ink-200/80 bg-white p-5 lg:sticky lg:top-20">
+            <div>
+              <p className="nums text-3xl font-semibold leading-none text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
+              <p className="mt-2 text-sm text-ink-600">What you pay, set by the {profile.scored ? `${plan} ` : ""}band</p>
               {pricing.perHireMinor > 0 ? (
-                <p className="nums mt-1 text-sm font-medium text-ink-800">+ {formatMoney(pricing.perHireMinor, currency)} hiring charge</p>
+                <p className="nums mt-0.5 text-sm text-ink-600">
+                  plus <span className="font-medium text-ink-900">{formatMoney(pricing.perHireMinor, currency)}</span> one-time hiring charge
+                </p>
               ) : null}
             </div>
 
-            <div className="mt-5 flex flex-col gap-2 [&_button]:w-full [&_button]:justify-center">
+            <div className="flex flex-col gap-2 [&_button]:w-full [&_button]:justify-center">
               {action.kind === "send" ? (
-                <ButtonLink
-                  href={`/employer/send-proposal?intern=${encodeURIComponent(profile.id)}${shortlist ? `&project=${encodeURIComponent(shortlist.projectId)}` : ""}`}
-                  variant="primary"
-                  block
-                  className="min-h-11"
-                >
+                <ButtonLink href={sendHref} variant="primary" block className="min-h-11">
                   <Send className="size-4" aria-hidden />
                   Send proposal
                 </ButtonLink>
@@ -414,185 +471,245 @@ export default async function EmployerInternDetail({
               {/* EMB-12: hires and full-time offers are not compared (legacy). */}
               {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} picked={comparePicks} />}
             </div>
-          </Surface>
 
-          {appliedProjects.length > 0 ? (
-            <Surface className="p-5">
-              <h2 className="text-base font-semibold text-ink-900">Your proposals to them</h2>
-              <ul className="mt-3 space-y-3">
-                {appliedProjects.map((entry) => {
-                  const pill = proposalPill(entry.status, entry.fullTime);
-                  return (
-                    <li key={entry.id} className="flex min-w-0 items-start justify-between gap-3 text-sm">
-                      <span className="min-w-0 font-medium text-ink-900">{entry.projectName ?? "Project no longer listed"}</span>
-                      <Pill tone={pill.tone} className="shrink-0">
-                        {pill.label}
-                      </Pill>
-                    </li>
-                  );
-                })}
-              </ul>
-            </Surface>
-          ) : null}
+            {appliedProjects.length > 0 ? (
+              <div className="border-t border-ink-100 pt-4">
+                <h2 className="text-sm font-semibold text-ink-900">Your proposals to them</h2>
+                <ul className="mt-2 space-y-2">
+                  {appliedProjects.map((entry) => {
+                    const pill = proposalPill(entry.status, entry.fullTime);
+                    return (
+                      <li key={entry.id} className="flex min-w-0 items-start justify-between gap-3 text-sm">
+                        <span className="min-w-0 break-words text-ink-800">{entry.projectName ?? "Project no longer listed"}</span>
+                        <Pill tone={pill.tone} className="shrink-0">
+                          {pill.label}
+                        </Pill>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
+          </div>
         </aside>
 
-        <div className="min-w-0 space-y-8 lg:order-1">
-          {profile.skills.length > 0 ? (
-            <section>
-              <SectionHead title="Skills and tools" />
+        <div className="min-w-0 lg:col-start-1">
+          {skills.length > 0 ? (
+            <section aria-labelledby="skills-h" className={SECTION}>
+              <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <h2 id="skills-h" className={H2}>
+                  Skills
+                </h2>
+                {wanted && wanted.skills.length > 0 ? (
+                  <p className="text-sm text-ink-600">
+                    <span className="nums">{matchCount}</span> of {wanted.skills.length} match {wanted.project}
+                  </p>
+                ) : null}
+              </div>
               <ul className="flex flex-wrap gap-2">
-                {profile.skills.map((skill) => (
-                  <li key={skill} className="rounded-full bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800 ring-1 ring-inset ring-brand-200/70">
-                    {skill}
-                  </li>
+                {skills.slice(0, MAX_SKILLS).map((skill) => (
+                  <SkillChip key={skill} skill={skill} matched={isWanted(skill)} />
                 ))}
               </ul>
+              {skills.length > MAX_SKILLS ? (
+                <details className="group mt-2">
+                  <summary className="inline-flex min-h-11 cursor-pointer list-none items-center rounded-apple-sm text-sm font-medium text-brand-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 [&::-webkit-details-marker]:hidden">
+                    <span className="group-open:hidden">+{skills.length - MAX_SKILLS} more</span>
+                    <span className="hidden group-open:inline">Show fewer</span>
+                  </summary>
+                  <ul className="flex flex-wrap gap-2">
+                    {skills.slice(MAX_SKILLS).map((skill) => (
+                      <SkillChip key={skill} skill={skill} matched={isWanted(skill)} />
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
             </section>
           ) : null}
 
-          <Surface className="px-5 py-2">
-            <h2 className="pt-3 text-base font-semibold text-ink-900">Practicalities</h2>
-            <dl className="divide-y divide-ink-100">
-              <DetailRow label="City" value={profile.city || "Not stated"} />
-              <DetailRow label="Work mode" value={profile.workModes.join(", ") || "Not stated"} />
-              <DetailRow
-                label="Prefers"
-                value={
-                  preferredCities(profile.preferredLocations).join(", ") ||
-                  (profile.workModes.length === 1 && profile.workModes[0] === "Remote" ? "Remote only" : "Not stated")
-                }
-              />
-              <DetailRow
-                label="Laptop"
-                value={profile.hasLaptop === null ? "Not stated" : profile.hasLaptop ? "Has one" : "Needs one provided"}
-              />
-            </dl>
-            {/* LinkedIn URLs usually contain the real name, so the link stays
-                hidden until the hire unmasks the candidate. */}
-            {nameUnlocked && linkedinHref(profile.linkedinUrl) ? (
-              <a
-                href={linkedinHref(profile.linkedinUrl) ?? undefined}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="mb-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
-              >
-                <Link2 className="size-4" aria-hidden />
-                LinkedIn profile
-              </a>
+          <section id="ai-report" aria-labelledby="ai-h" className={`${SECTION} scroll-mt-24`}>
+            <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+              <div className="min-w-0">
+                <h2 id="ai-h" className={H2}>
+                  AI interview
+                </h2>
+                <p className="mt-1 text-sm text-ink-600">
+                  {rated.length === 0 ? (
+                    "No AI interview score yet. The breakdown appears once the interview is reviewed."
+                  ) : rated.length > 1 && rated[0].value !== rated[rated.length - 1].value ? (
+                    <>
+                      Strongest in {rated[0].label} (<span className="nums">{rated[0].value.toFixed(1)}</span>), lowest in{" "}
+                      {rated[rated.length - 1].label} (<span className="nums">{rated[rated.length - 1].value.toFixed(1)}</span>).
+                    </>
+                  ) : rated.length === 1 ? (
+                    <>
+                      {rated[0].label}: <span className="nums font-medium text-ink-900">{rated[0].value.toFixed(1)}</span>. The other parts are not rated yet.
+                    </>
+                  ) : (
+                    <>
+                      <span className="nums font-medium text-ink-900">{rated[0].value.toFixed(1)}</span> on all {rated.length} parts: {rated.map((a) => a.label).join(", ")}.
+                    </>
+                  )}
+                </p>
+              </div>
+              {rated.length > 0 ? (
+                <div className="-ml-3 flex flex-wrap items-center gap-1 print:hidden">
+                  {aiLinks.feedbackLink ? (
+                    <a href={aiLinks.feedbackLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
+                      <FileText className="size-4" aria-hidden />
+                      Feedback report
+                      <ExternalLink className="size-3.5" aria-hidden />
+                    </a>
+                  ) : null}
+                  {/* Recording only after hire; the written report before (legacy). */}
+                  {nameUnlocked && aiLinks.recordingLink ? (
+                    <a href={aiLinks.recordingLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
+                      <Video className="size-4" aria-hidden />
+                      Recording
+                      <ExternalLink className="size-3.5" aria-hidden />
+                    </a>
+                  ) : null}
+                  <PrintButton />
+                </div>
+              ) : null}
+            </div>
+            {rated.length > 1 && rated[0].value !== rated[rated.length - 1].value ? (
+              <div className="mt-5 max-w-2xl">
+                <ScoreScale rows={axes} />
+              </div>
             ) : null}
-          </Surface>
-
-
-          <section id="ai-report" className="scroll-mt-24">
-            <AiFeedbackReport
-              candidateName={displayName}
-              findternScore={profile.score}
-              ratings={profile.ratings}
-              aiFeedbackLink={aiLinks.feedbackLink}
-              // Recording only after hire; the written report before (legacy).
-              aiRecordingLink={nameUnlocked ? aiLinks.recordingLink : null}
-            />
           </section>
 
           {academics ? (
-            <section>
-              <SectionHead title="Academics" />
-              <Surface className="px-6 py-2">
-                <dl className="divide-y divide-ink-100">
-                  <DetailRow label="Institution" value={academics.institution || "Not stated"} />
-                  <DetailRow label="Degree" value={[academics.degree, academics.specialization].filter(Boolean).join(", ") || "Not stated"} />
-                  <DetailRow label="Level" value={academics.level ? humanise(academics.level) : "Not stated"} />
-                  <DetailRow label="Years" value={[academics.startYear, academics.endYear].filter(Boolean).join(" – ") || "Not stated"} mono />
-                  <DetailRow
-                    label="Score"
-                    value={academics.score ? `${academics.score}${academics.scoreType ? ` ${academics.scoreType}` : ""}` : "Not stated"}
-                    mono
-                  />
-                  <DetailRow label="Status" value={academics.status ? humanise(academics.status) : "Not stated"} />
-                </dl>
-              </Surface>
+            <section aria-labelledby="edu-h" className={SECTION}>
+              <h2 id="edu-h" className={`${H2} mb-4`}>
+                Education
+              </h2>
+              <p className="break-words text-base font-medium text-ink-900">{academics.institution || "Institution not stated"}</p>
+              <p className="mt-0.5 break-words text-sm text-ink-700">
+                {[headline, academics.level ? humanise(academics.level) : ""].filter(Boolean).join(" · ") || "Degree not stated"}
+              </p>
+              <p className="nums mt-0.5 text-sm text-ink-600">
+                {[
+                  [academics.startYear, academics.endYear].filter(Boolean).join(" – "),
+                  academics.score ? `${academics.score}${academics.scoreType ? ` ${academics.scoreType.toUpperCase()}` : ""}` : "",
+                  academics.status ? humanise(academics.status) : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
             </section>
           ) : null}
 
           {experiences.length > 0 ? (
-            <section>
-              <SectionHead title="Experience and projects" />
-              <Surface as="ul" className="divide-y divide-ink-100">
+            <section aria-labelledby="exp-h" className={SECTION}>
+              <h2 id="exp-h" className={`${H2} mb-2`}>
+                Experience and projects
+              </h2>
+              <ul className="divide-y divide-ink-100">
                 {experiences.map((exp) => (
-                  <li key={exp.id} className="px-6 py-4">
-                    <p className="text-base font-medium text-ink-900">{[exp.role, exp.company].filter(Boolean).join(" · ")}</p>
-                    <p className="nums mt-0.5 text-sm text-ink-600">
-                      {[exp.type, [dateLabel(exp.from), exp.current ? "Present" : dateLabel(exp.to)].filter(Boolean).join(" – ")]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
-                    {exp.description ? <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink-700">{exp.description}</p> : null}
+                  <li key={exp.id} className="py-4">
+                    <p className="break-words text-base font-medium text-ink-900">{[t(exp.role), t(exp.company)].filter(Boolean).join(" · ")}</p>
+                    {exp.type || exp.from || exp.to || exp.current ? (
+                      <p className="nums mt-0.5 text-sm text-ink-600">
+                        {[exp.type, [dateLabel(exp.from), exp.current ? "Present" : dateLabel(exp.to)].filter(Boolean).join(" – ")]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </p>
+                    ) : null}
+                    {exp.description ? <p className="mt-2 max-w-prose whitespace-pre-line break-words text-sm leading-relaxed text-ink-700">{t(exp.description)}</p> : null}
                   </li>
                 ))}
-              </Surface>
+              </ul>
             </section>
           ) : null}
 
           {qualifications.length > 0 || (academics && academics.courses.length > 0) ? (
-            <section>
-              <SectionHead title="Courses and certifications" />
-              <Surface as="ul" className="divide-y divide-ink-100">
+            <section aria-labelledby="cert-h" className={SECTION}>
+              <h2 id="cert-h" className={`${H2} mb-2`}>
+                Certificates and courses
+              </h2>
+              <ul className="divide-y divide-ink-100">
                 {qualifications.map((q) => (
-                  <li key={q.id} className="px-6 py-4">
-                    <p className="text-base font-medium text-ink-900">{q.name}</p>
+                  <li key={q.id} className="py-3">
+                    <p className="break-words text-base font-medium text-ink-900">{t(q.name)}</p>
                     <p className="nums mt-0.5 text-sm text-ink-600">
-                      {[q.issuer, q.completionDate && formatDate(q.completionDate)].filter(Boolean).join(" · ") || "No further detail recorded"}
+                      {[t(q.issuer), q.completionDate && formatDate(q.completionDate)].filter(Boolean).join(" · ") || "No further detail recorded"}
                     </p>
                   </li>
                 ))}
                 {(academics?.courses ?? []).map((course, i) => (
-                  <li key={`${course.name}-${i}`} className="px-6 py-4">
-                    <p className="text-base font-medium text-ink-900">{course.name}</p>
+                  <li key={`${course.name}-${i}`} className="py-3">
+                    <p className="break-words text-base font-medium text-ink-900">{t(course.name)}</p>
                     <p className="nums mt-0.5 text-sm text-ink-600">
-                      {[course.institution, course.level, course.completed, course.score].filter(Boolean).join(" · ") || "No further detail recorded"}
+                      {[t(course.institution), course.level, course.completed, course.score].filter(Boolean).join(" · ") || "No further detail recorded"}
                     </p>
                   </li>
                 ))}
-              </Surface>
+              </ul>
             </section>
           ) : null}
 
           {languages.length > 0 || activities.length > 0 ? (
-            <section className="grid gap-8 sm:grid-cols-2">
+            <section aria-label="Languages and activities" className={`${SECTION} grid gap-8 sm:grid-cols-2`}>
               {languages.length > 0 ? (
                 <div className="min-w-0">
-                  <SectionHead title="Languages" />
-                  <Surface as="ul" className="divide-y divide-ink-100">
+                  <h2 className={`${H2} mb-3`}>Languages</h2>
+                  <ul className="space-y-3">
                     {languages.map((l) => (
-                      <li key={l.id} className="px-5 py-3 text-sm">
+                      <li key={l.id} className="text-sm">
                         <span className="font-medium text-ink-900">{l.language}</span>
                         <span className="block text-ink-600">
                           {[l.level, l.read && "Read", l.write && "Write", l.speak && "Speak"].filter(Boolean).join(", ")}
                         </span>
                       </li>
                     ))}
-                  </Surface>
+                  </ul>
                 </div>
               ) : null}
               {activities.length > 0 ? (
                 <div className="min-w-0">
-                  <SectionHead title="Extracurriculars" />
-                  <Surface as="ul" className="divide-y divide-ink-100">
+                  <h2 className={`${H2} mb-3`}>Activities</h2>
+                  <ul className="space-y-3">
                     {activities.map((a) => (
-                      <li key={a.id} className="px-5 py-3 text-sm">
-                        <span className="font-medium text-ink-900">{a.activity}</span>
+                      <li key={a.id} className="text-sm">
+                        <span className="font-medium text-ink-900">{t(a.activity)}</span>
                         <span className="block text-ink-600">{[a.category, a.level].filter(Boolean).join(", ")}</span>
                       </li>
                     ))}
-                  </Surface>
+                  </ul>
                 </div>
               ) : null}
             </section>
           ) : null}
         </div>
-
       </div>
     </div>
+  );
+}
+
+/** Chips shown before "+N more", as on the candidate list. */
+const MAX_SKILLS = 7;
+
+/** A stored skill may carry a level ("React · Advanced"); matching is on the name. */
+function skillKey(skill: string): string {
+  return skill.split(" · ")[0].trim().toLowerCase();
+}
+
+/** Matched: filled green with a tick. Others: outline. Same look as the candidate list. */
+function SkillChip({ skill, matched }: { skill: string; matched: boolean }) {
+  return (
+    <li
+      className={
+        matched
+          ? "inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-800 ring-1 ring-inset ring-brand-200/70"
+          : "inline-flex items-center rounded-full px-3 py-1.5 text-sm text-ink-800 ring-1 ring-inset ring-ink-200"
+      }
+    >
+      {matched ? <Check className="size-3.5" aria-hidden /> : null}
+      {skill}
+      {matched ? <span className="sr-only"> (matches your project)</span> : null}
+    </li>
   );
 }
 

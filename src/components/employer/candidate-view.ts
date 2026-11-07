@@ -14,6 +14,17 @@ export function rowSkills(skills: string[], wanted: Set<string>, max = MAX_SKILL
   return { shown: ordered.slice(0, max), more: Math.max(0, ordered.length - max), isWanted };
 }
 
+/** The line under a candidate's initials: degree and field, else the top two skills. Never the bio. */
+export function headlineOf(c: {
+  academics: { degree: string; specialization: string } | null;
+  skills: string[];
+}): string {
+  const study = [c.academics?.degree, c.academics?.specialization].filter(Boolean).join(", ");
+  if (study) return study;
+  const top = c.skills.slice(0, 2).map(skillBaseName);
+  return top.length ? `${top.join(" and ")} intern` : "";
+}
+
 /**
  * The sort select: a pointer choice applies at once, but arrow keys on a closed
  * select fire `change` per step (Chrome/Firefox on Windows), so a keyboard choice

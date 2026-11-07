@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, CalendarCheck, CheckCircle2, CreditCard, Laptop, Loader2, MapPin, Send, Trash2, UserRound, Video } from "lucide-react";
 
-import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
+import { EmptyScene, Pill } from "@/components/app/primitives";
+import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatRate, shortDateTime } from "@/lib/format";
@@ -15,7 +16,6 @@ import { MeetingSlots, TimezoneSelect, type Slots } from "@/components/employer/
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { fieldClass, labelClass } from "@/components/employer/ui-tokens";
 import type { Currency } from "@/lib/employer-pricing";
-import { PLAN_NAME, bandFor } from "@/lib/score";
 import { cn } from "@/lib/utils";
 import {
   Dialog,
@@ -84,6 +84,8 @@ export function CartManager({
   // badge, the hiring-steps strip and this heading all count that; anyone
   // already proposed to is listed apart, below (QA-124).
   const shown = inProject.filter((l) => !l.openProposalId && !l.acceptedProposalId);
+  // Counted in people, like the strip and the nav badge: one candidate saved to two projects is one.
+  const shownPeople = new Set(shown.map((l) => l.candidate.id)).size;
   const proposed = inProject.filter((l) => l.openProposalId || l.acceptedProposalId);
 
   async function confirmRemove() {
@@ -187,8 +189,11 @@ export function CartManager({
 
       <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
         <p className="text-sm text-ink-600">
-          <span className="nums font-semibold text-ink-900">{shown.length}</span> shortlisted
-          {selectedProject !== "all" ? " for this project" : ""}
+          <span className="nums font-semibold text-ink-900">{shownPeople}</span> {shownPeople === 1 ? "candidate" : "candidates"}
+          {selectedProject !== "all" ? " for this project" : " shortlisted"}
+          {selectedProject === "all" && shown.length > shownPeople ? (
+            <span className="text-ink-600"> · saved to {new Set(shown.map((l) => l.projectId)).size} projects</span>
+          ) : null}
         </p>
         {projectOptions.length > 1 ? (
           <label className={cn(labelClass, "flex items-center gap-2")}>
@@ -205,7 +210,7 @@ export function CartManager({
         ) : null}
       </div>
 
-      <ul className="space-y-3">
+      <ul className="divide-y divide-ink-100 border-t border-ink-100">
         {shown.map((line) => (
           <CartLine
             key={line.id}
@@ -226,7 +231,7 @@ export function CartManager({
           <h2 id="proposed-heading" className="mb-3 text-sm font-semibold text-ink-900">
             Already proposed <span className="nums font-normal text-text-subtle">{proposed.length}</span>
           </h2>
-          <ul className="space-y-3">
+          <ul className="divide-y divide-ink-100 border-t border-ink-100">
             {proposed.map((line) => (
               <CartLine
                 key={line.id}
@@ -368,74 +373,64 @@ function CartLine({
   onRemove: () => void;
 }) {
   const c = line.candidate;
-  const band = bandFor(c.score);
+  const headline = headlineOf(c);
   const locked = meetingLocked(line);
   const closed = Boolean(line.projectClosed);
   const profileHref = `/employer/intern/${encodeURIComponent(c.id)}?project=${encodeURIComponent(line.projectId)}`;
 
   return (
-    <Surface as="li" className="p-5">
-      <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-        <span aria-hidden className="grid size-12 place-items-center rounded-apple-md bg-brand-50 text-base font-semibold text-brand-800">
-          {c.initials}
-        </span>
-        <div className="min-w-0">
-          <p className="flex flex-wrap items-center gap-2">
-            <Link href={profileHref} className="inline-flex min-h-6 min-w-6 items-center touch:min-h-11 touch:min-w-11 text-base font-medium text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline">
-              {name}
-            </Link>
-            {line.acceptedProposalId ? (
-              <Pill tone="waiting">Offer accepted</Pill>
-            ) : line.openProposalId ? (
-              <Pill tone="new">Proposal sent</Pill>
-            ) : locked ? (
-              <Pill tone="live">Meeting booked</Pill>
-            ) : null}
-            {closed ? <Pill tone="closed">Project closed</Pill> : null}
-          </p>
-          <p className="mt-0.5 text-sm text-ink-600">For {line.projectName}</p>
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
-            {c.location ? (
-              <span className="inline-flex items-center gap-1.5">
-                <MapPin className="size-4 text-ink-400" aria-hidden />
-                {c.location}
-              </span>
-            ) : null}
-            {c.hasLaptop != null ? (
-              <span className="inline-flex items-center gap-1.5">
-                <Laptop className="size-4 text-ink-400" aria-hidden />
-                {c.hasLaptop ? "Has a laptop" : "No laptop"}
-              </span>
-            ) : null}
-          </p>
-          {c.skills.length ? (
-            <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Skills">
-              {c.skills.map((s) => (
-                <li key={s} className="rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">
-                  {s}
-                </li>
-              ))}
-            </ul>
+    <li className="relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-3.5 gap-y-3 py-5 sm:gap-x-5 sm:gap-y-1 sm:py-6">
+      <RowAvatar photoUrl={c.photoUrl} initials={c.initials} />
+      <div className="min-w-0">
+        <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
+          <Link href={profileHref} className="-my-2 inline-flex h-11 min-w-11 items-center text-base font-semibold sm:text-lg text-ink-900 underline-offset-4 hover:underline">
+            {name}
+          </Link>
+          <span className="max-sm:basis-full">
+            <ScoreBadge score={c.score} scored={c.scored} />
+          </span>
+          {line.acceptedProposalId ? (
+            <Pill tone="waiting">Offer accepted</Pill>
+          ) : line.openProposalId ? (
+            <Pill tone="new">Proposal sent</Pill>
+          ) : locked ? (
+            <Pill tone="live">Meeting booked</Pill>
           ) : null}
-        </div>
-        <div className="col-span-2 flex flex-wrap items-baseline gap-x-3 sm:col-span-1 sm:block sm:text-right">
-          <p className="nums text-3xl font-semibold leading-none text-brand-700">
-            {c.scored ? c.score.toFixed(1) : "-"}
-            <span className="ml-0.5 text-sm font-normal text-text-subtle">/10</span>
-          </p>
-          <p className="mt-1 text-xs font-medium text-ink-600">{PLAN_NAME[band.id]}</p>
-          <p className="nums mt-2 text-sm font-semibold text-ink-900">{formatRate(line.hourlyRateMinor, currency)}</p>
-        </div>
+          {closed ? <Pill tone="closed">Project closed</Pill> : null}
+        </p>
+      </div>
+      <div className="col-span-2 min-w-0 sm:col-span-1 sm:col-start-2">
+        <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-ink-600">
+          {headline ? <span>{headline}</span> : null}
+          {headline ? <span aria-hidden className="text-ink-300">·</span> : null}
+          <span className="inline-flex items-center gap-1">
+            <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+            {c.city || c.location || "City not stated"}
+          </span>
+          <span aria-hidden className="text-ink-300">·</span>
+          <span>Saved for {line.projectName}</span>
+        </p>
+        <p className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-1.5 text-sm text-ink-700 sm:mt-2.5">
+          <span className="nums font-semibold text-ink-900">{formatRate(line.hourlyRateMinor, currency)}</span>
+          {c.workModes.length ? <span>{c.workModes.join(" / ")}</span> : null}
+          {c.hasLaptop != null ? (
+            <span className="inline-flex items-center gap-1.5">
+              <Laptop className="size-4 shrink-0 text-ink-400" aria-hidden />
+              {c.hasLaptop ? "Own laptop" : "Needs a laptop"}
+            </span>
+          ) : null}
+        </p>
+        <SkillChips className="mt-3" skills={c.skills} wanted={[]} />
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-4">
+      <div className="col-span-2 flex flex-wrap items-center gap-2 sm:col-span-1 sm:col-start-2 sm:mt-3">
         {line.acceptedProposalId ? (
-          <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(line.acceptedProposalId)}`} size="sm" className="min-h-11">
+          <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(line.acceptedProposalId)}`} size="sm" className="h-11 rounded-full px-4 sm:h-9 sm:touch:h-11">
             <CreditCard className="size-4" aria-hidden />
             Pay to complete the hire
           </ButtonLink>
         ) : line.openProposalId ? (
-          <ButtonLink href={`/employer/proposal/${encodeURIComponent(line.openProposalId)}`} variant="outline" size="sm" className="min-h-11">
+          <ButtonLink href={`/employer/proposal/${encodeURIComponent(line.openProposalId)}`} variant="outline" size="sm" className="h-11 rounded-full px-4 sm:h-9 sm:touch:h-11">
             <Send className="size-4" aria-hidden />
             View proposal
           </ButtonLink>
@@ -444,7 +439,7 @@ function CartLine({
         ) : locked ? (
           // EMB-07: legacy kept Send Proposal off until the meeting was over.
           <span
-            className={buttonClass({ size: "sm", className: "min-h-11 cursor-not-allowed opacity-55" })}
+            className={buttonClass({ size: "sm", className: "h-11 rounded-full px-4 sm:h-9 sm:touch:h-11 cursor-not-allowed opacity-55" })}
             aria-disabled="true"
             title="A proposal can be sent once the meeting is completed."
           >
@@ -456,7 +451,7 @@ function CartLine({
           <ButtonLink
             href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}&project=${encodeURIComponent(line.projectId)}`}
             size="sm"
-            className="min-h-11"
+            className="h-11 rounded-full px-4 sm:h-9 sm:touch:h-11"
           >
             <Send className="size-4" aria-hidden />
             Send proposal
@@ -465,7 +460,7 @@ function CartLine({
 
         {/* Its own button, not in the menu (bug sheet 8). */}
         {!line.acceptedProposalId && !closed && !locked ? (
-          <button type="button" onClick={onMeeting} className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}>
+          <button type="button" onClick={onMeeting} className={buttonClass({ variant: "outline", size: "sm", className: "h-11 rounded-full px-4 sm:h-9 sm:touch:h-11" })}>
             <Video className="size-4" aria-hidden />
             Book meeting
           </button>
@@ -491,9 +486,9 @@ function CartLine({
         />
       </div>
       {locked && !line.openProposalId && !line.acceptedProposalId ? (
-        <p className="mt-2 text-xs text-text-subtle">Send a proposal once the meeting is completed.</p>
+        <p className="col-span-2 -mt-1 text-xs text-text-subtle sm:col-start-2">Send a proposal once the meeting is completed.</p>
       ) : null}
-    </Surface>
+    </li>
   );
 }
 

@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { eq, desc } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
-import { PageHeader } from "@/components/layout/page-header";
-import { ProjectsManager } from "@/components/employer/projects-manager";
-import { timezoneForLocation } from "@/lib/timezones";
+import { PageHead } from "@/components/app/primitives";
+import { ProjectsManager, type ProjectCounts } from "@/components/employer/projects-manager";
 
 export const metadata: Metadata = {
   title: "Projects",
@@ -21,44 +21,46 @@ export default async function EmployerProjectsPage({
 }) {
   const session = await requireRole("employer");
   const employerId = session.uid;
-  const { new: openNew } = await searchParams;
+  // The dashboard's "New project" links here with ?new=1; posting is its own page now.
+  if ((await searchParams).new === "1") redirect("/employer/projects/new");
 
   let rows: (typeof schema.projects.$inferSelect)[] = [];
-  let company: { companyName: string | null; country: string | null; state: string | null; city: string | null } | undefined;
+  const counts: Record<string, ProjectCounts> = {};
   try {
     const db = getDb();
-    [rows, [company]] = await Promise.all([
+    const p = schema.proposals;
+    const c = schema.employerCartItems;
+    const [projectRows, proposalRows, shortlistRows] = await Promise.all([
+      db.select().from(schema.projects).where(eq(schema.projects.employerId, employerId)).orderBy(desc(schema.projects.createdAt)),
       db
-        .select()
-        .from(schema.projects)
-        .where(eq(schema.projects.employerId, employerId))
-        .orderBy(desc(schema.projects.createdAt)),
+        .select({
+          projectId: p.projectId,
+          sent: sql<number>`count(*)::int`,
+          hired: sql<number>`count(*) filter (where ${p.status} = 'hired')::int`,
+        })
+        .from(p)
+        .where(and(eq(p.employerId, employerId), ne(p.status, "draft")))
+        .groupBy(p.projectId),
       db
-        .select({ companyName: schema.employers.companyName, country: schema.employers.country, state: schema.employers.state, city: schema.employers.city })
-        .from(schema.employers)
-        .where(eq(schema.employers.id, employerId))
-        .limit(1),
+        .select({ projectId: c.projectId, n: sql<number>`count(distinct ${c.internId})::int` })
+        .from(c)
+        .where(and(eq(c.employerId, employerId), eq(c.listType, "cart")))
+        .groupBy(c.projectId),
     ]);
+    rows = projectRows;
+    const at = (id: string) => (counts[id] ??= { shortlisted: 0, proposals: 0, hired: 0 });
+    for (const r of proposalRows) Object.assign(at(r.projectId), { proposals: r.sent, hired: r.hired });
+    for (const r of shortlistRows) at(r.projectId).shortlisted = r.n;
   } catch (err) {
     console.error("Failed to load employer projects:", err);
-    // A failed query is not "no projects": say so, and don't offer a form
-    // that would create a duplicate of a project we just couldn't see.
+    // A failed query is not "no projects": say so, and offer no way to post a duplicate.
     return (
       <div>
-        <PageHeader title="Projects" />
-        <LoadError what="your projects" retryHref={openNew === "1" ? "/employer/projects?new=1" : "/employer/projects"} email={SITE.adminEmail} />
+        <PageHead title="Projects" />
+        <LoadError what="your projects" retryHref="/employer/projects" email={SITE.adminEmail} />
       </div>
     );
   }
 
-  return (
-    <ProjectsManager
-      employerId={employerId}
-      initialProjects={rows}
-      defaultTimezone={timezoneForLocation(company ?? {})}
-      companyName={company?.companyName}
-      companyPlace={company ? { city: company.city, state: company.state } : undefined}
-      openNew={openNew === "1"}
-    />
-  );
+  return <ProjectsManager initialProjects={rows} counts={counts} />;
 }

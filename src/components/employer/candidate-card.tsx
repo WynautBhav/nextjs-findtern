@@ -100,7 +100,7 @@ function skillName(skill: string): string {
  * Shortlist as a heart (the existing cart API). Not `disabled` while saving:
  * that drops keyboard focus. An offer already out goes to it, as ShortlistToggle does.
  */
-function HeartToggle({ internId, projectId, shortlisted }: { internId: string; projectId: string; shortlisted: boolean }) {
+export function HeartToggle({ internId, projectId, shortlisted }: { internId: string; projectId: string; shortlisted: boolean }) {
   const router = useRouter();
   const [on, setOn] = useState(shortlisted);
   const [busy, setBusy] = useState(false);

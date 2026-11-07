@@ -16,7 +16,6 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { SlidersHorizontal } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
 /** Range filters at zero mean "any" and are left out of the URL. */
@@ -151,12 +150,12 @@ export function FilterPanel({
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        className={buttonClass({ variant: "outline", size: "md", className: "min-h-11 w-full justify-center sm:w-auto" })}
+        className="inline-flex h-11 items-center gap-2 rounded-full border border-ink-200 bg-white px-4 text-sm font-medium text-ink-900 outline-none hover:border-ink-300 focus-visible:ring-2 focus-visible:ring-brand-500"
       >
         <SlidersHorizontal className="size-4" aria-hidden />
         Filters
         {activeCount > 0 ? (
-          <span className="nums rounded-full bg-brand-700 px-2 py-0.5 text-xs font-semibold text-white">
+          <span className="nums grid min-w-5 place-items-center rounded-full bg-ink-900 px-1.5 text-xs font-semibold leading-5 text-white">
             {activeCount}
             <span className="sr-only"> active</span>
           </span>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { and, count, countDistinct, eq, inArray, sql } from "drizzle-orm";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -87,7 +87,8 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     unreadAlerts = Number(unread?.value ?? 0);
 
     const [cart] = await db
-      .select({ value: count() })
+      // Distinct people, not cart lines: one candidate saved to two projects is one.
+      .select({ value: countDistinct(schema.employerCartItems.internId) })
       .from(schema.employerCartItems)
       // Same set as the Shortlist page and its steps strip: saved, legacy
       // "checkout" rows included, and no live proposal yet (QA-124).

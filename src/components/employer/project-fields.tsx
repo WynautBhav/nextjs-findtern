@@ -34,6 +34,7 @@ import {
   projectPlaceError,
   projectSkillsError,
 } from "@/lib/project-locations";
+import { projectContactError } from "@/lib/project-contact";
 import { projectNameIssue } from "@/lib/project-name";
 import { TIMEZONES } from "@/lib/timezones";
 
@@ -60,7 +61,9 @@ export function projectFormErrors(
   companyName?: string | null,
 ): Record<string, string> {
   const errors: Record<string, string> = {};
+  const contact = projectContactError(p.projectName);
   if (p.projectName.trim().length < 2) errors.projectName = "Name the project (at least 2 characters).";
+  else if (contact && p.projectName.trim() !== (before?.projectName ?? "").trim()) errors.projectName = contact;
   // Only a new or renamed project is judged; an older name still saves.
   else if (companyName && p.projectName.trim().toLowerCase() !== (before?.projectName ?? "").trim().toLowerCase()) {
     const issue = projectNameIssue(p.projectName, companyName);
@@ -100,6 +103,19 @@ export function companyPlaceDefault(company: { city?: string | null; state?: str
   return inIndia ? { state, city: (company.city ?? "").trim() } : { state: "", city: "" };
 }
 
+/** With `on`, a titled section split from the one above by a thin rule; without, a plain run of fields (onboarding). */
+function Group({ on, id, title, children }: { on: boolean; id: string; title: string; children: React.ReactNode }) {
+  if (!on) return <>{children}</>;
+  return (
+    <section aria-labelledby={id} className="space-y-6 border-t border-ink-100 pt-8 first:border-t-0 first:pt-0">
+      <h2 id={id} className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
 export function ProjectFields({
   values,
   set,
@@ -107,6 +123,7 @@ export function ProjectFields({
   companyPlace,
   idPrefix = "project",
   showPincode = false,
+  headings = false,
 }: {
   values: ProjectDraft;
   set: (patch: Partial<ProjectDraft>) => void;
@@ -115,6 +132,8 @@ export function ProjectFields({
   companyPlace?: { city?: string | null; state?: string | null };
   idPrefix?: string;
   showPincode?: boolean;
+  /** Group the fields under section headings (the full-page editor). */
+  headings?: boolean;
 }) {
   const id = (name: string) => `${idPrefix}-${name}`;
   const onsite = Boolean(values.locationType) && values.locationType !== "remote";
@@ -131,7 +150,8 @@ export function ProjectFields({
   }
 
   return (
-    <div className="space-y-6">
+    <div className={headings ? "space-y-8" : "space-y-6"}>
+      <Group on={headings} id={id("h-the")} title="The role">
       <TextField
         id={id("name")}
         label="Project name"
@@ -158,7 +178,9 @@ export function ProjectFields({
         suggest={(q) => suggestSkills(q, 8)}
         listOnly
       />
+      </Group>
 
+      <Group on={headings} id={id("h-length")} title="Length and place">
       <ChoiceGroup
         id={id("scope")}
         label="Scope of work"
@@ -236,7 +258,9 @@ export function ProjectFields({
           />
         </div>
       ) : null}
+      </Group>
 
+      <Group on={headings} id={id("h-schedule")} title="Timezone and what comes after">
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <FieldLabel htmlFor={id("tz")} required>
@@ -277,6 +301,7 @@ export function ProjectFields({
           </span>
         </label>
       </div>
+      </Group>
     </div>
   );
 }

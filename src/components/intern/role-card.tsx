@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { Pill } from "@/components/app/primitives";
+import { scopeLabel } from "@/lib/db/schema";
 import { formatDayLabel } from "@/lib/format";
 import { toArray } from "@/lib/journey";
 
@@ -56,7 +57,7 @@ export function InternRoleCard({
           </Link>
         </h2>
         {role.scopeOfWork ? (
-          <p className="mt-1 line-clamp-2 text-pretty text-sm text-ink-600">{role.scopeOfWork}</p>
+          <p className="mt-1 line-clamp-2 text-pretty text-sm text-ink-600">{scopeLabel(role.scopeOfWork)}</p>
         ) : null}
         {meta ? <p className="nums mt-2 text-xs text-text-subtle">{meta}</p> : null}
         {skills.length > 0 ? (

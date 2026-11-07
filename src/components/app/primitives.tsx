@@ -60,6 +60,7 @@ export function HeroBand({
   actions,
   children,
   className,
+  compact = false,
 }: {
   eyebrow?: React.ReactNode;
   title: React.ReactNode;
@@ -68,18 +69,20 @@ export function HeroBand({
   /** Figures under the copy. */
   children?: React.ReactNode;
   className?: string;
+  /** Smaller type and padding, for work screens where the band is a status line, not a greeting. */
+  compact?: boolean;
 }) {
   return (
-    <section className={cn("relative isolate mb-8 overflow-hidden rounded-apple-xl bg-brand-950 px-6 py-8 text-white sm:px-9 sm:py-10", className)}>
+    <section className={cn("relative isolate mb-8 overflow-hidden rounded-apple-xl bg-brand-950 px-6 text-white sm:px-9", compact ? "py-6 sm:py-7" : "py-8 sm:py-10", className)}>
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-6">
         <div className="min-w-0 max-w-2xl">
           {eyebrow ? <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-accent-300">{eyebrow}</p> : null}
-          <h1 className="text-balance text-3xl font-semibold leading-[1.1] tracking-[-0.025em] sm:text-4xl">{title}</h1>
-          {lede ? <p className="mt-3 max-w-xl text-pretty text-base leading-relaxed text-on-dark-subtle sm:text-lg">{lede}</p> : null}
+          <h1 className={cn("text-balance font-semibold leading-[1.1] tracking-[-0.025em]", compact ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl")}>{title}</h1>
+          {lede ? <p className={cn("mt-3 max-w-xl text-pretty leading-relaxed text-on-dark-subtle", compact ? "text-base" : "text-base sm:text-lg")}>{lede}</p> : null}
         </div>
         {actions ? <div className="flex w-full flex-wrap gap-3 sm:w-auto">{actions}</div> : null}
       </div>
-      {children ? <div className="mt-8">{children}</div> : null}
+      {children ? <div className={compact ? "mt-6" : "mt-8"}>{children}</div> : null}
     </section>
   );
 }
