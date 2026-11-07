@@ -507,7 +507,7 @@ export function SendProposalForm({
               <Field id="shiftFrom" label="From" type="time" value={shiftFrom} error={errors.shiftFrom} onChange={pickShiftFrom} />
               <Field id="shiftTo" label="To" type="time" value={shiftTo} error={errors.shiftTo ?? (shiftTooLong ? `Too long. ${shiftLimit}` : undefined)} onChange={setShiftTo} />
             </div>
-            <p className="mt-2 text-sm text-ink-600">{shiftLimit}</p>
+            {shiftTooLong ? null : <p className="mt-2 text-sm text-ink-600">{shiftLimit}</p>}
             <div className="mt-2 flex flex-wrap gap-1.5">
               {SHIFT_PRESETS.map((p) => (
                 <button
