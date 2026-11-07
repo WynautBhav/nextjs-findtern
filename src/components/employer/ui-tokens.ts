@@ -5,7 +5,7 @@
  */
 
 export const fieldClass =
-  "min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-base md:text-sm text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-text-subtle";
+  "min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-base md:text-sm text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-800 focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-2 focus-visible:ring-offset-white disabled:cursor-not-allowed disabled:bg-ink-50 disabled:text-text-subtle";
 
 export const labelClass = "block text-sm font-medium text-ink-800";
 

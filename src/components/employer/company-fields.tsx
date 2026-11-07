@@ -25,7 +25,7 @@ export function controlClass(error?: boolean, className?: string) {
     "block px-3.5 shadow-xs",
     // aria-readonly, not :read-only - a <select> always matches :read-only.
     "aria-readonly:cursor-default aria-readonly:bg-ink-50 aria-readonly:text-ink-600 aria-readonly:shadow-none",
-    error && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger/20",
+    error && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger",
     className,
   );
 }

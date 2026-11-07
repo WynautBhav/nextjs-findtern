@@ -6,7 +6,9 @@ import { Loader2, Pencil } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatMoney } from "@/lib/format";
+import type { PlaceOfSupply } from "@/lib/gst";
+import { offerBreakdown } from "@/lib/offer-breakdown";
+import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
 import {
   billableWorkingDays,
   normalizeLaptop,
@@ -77,6 +79,8 @@ export function ProposalOfferForm({
   accepted = false,
   hasLaptop = null,
   preference = { modes: [], cities: [] },
+  place = null,
+  perHireMinor = null,
 }: {
   proposalId: string;
   /** The candidate already accepted: saving asks them to accept again. */
@@ -89,6 +93,10 @@ export function ProposalOfferForm({
   defaultOpen?: boolean;
   initial: EditableOffer;
   currency: "INR" | "USD";
+  /** Where the company is taxed; null leaves the GST line out. */
+  place?: PlaceOfSupply | null;
+  /** The one-time hiring fee on this offer, shown under the monthly amount. */
+  perHireMinor?: number | null;
   /** Score below 6: at most two months. */
   shortOnly?: boolean;
 }) {
@@ -103,7 +111,7 @@ export function ProposalOfferForm({
   const [leaves, setLeaves] = useState(String(Math.min(3, Math.round((initial.paidLeavesPerMonth ?? 0) * 2) / 2)));
   const hours = scheduledMonthlyHours(schedule, Number(leaves) || 0);
   const days = billableWorkingDays(schedule);
-  const monthlyMinor = initial.hourlyRateMinor ? Math.round(hours * initial.hourlyRateMinor) : null;
+  const breakdown = offerBreakdown({ currency, hourlyRateMinor: initial.hourlyRateMinor ?? null, hours, perHireMinor, place });
   const modes = MODE_OPTIONS.filter((m) => offerableModes(preference).includes(m.value) || m.value === initial.mode);
   const [mode, setMode] = useState(initial.mode || modes[0]?.value || "remote");
   const [timezone, setTimezone] = useState(initial.timezone || "Asia/Kolkata");
@@ -254,11 +262,7 @@ export function ProposalOfferForm({
           </select>
         </label>
         <div className="col-span-2 space-y-0.5">
-          <p className="nums text-sm font-medium text-ink-800">
-            {hours} h a month
-            {monthlyMinor != null ? ` · ${formatMoney(monthlyMinor, currency)} a month` : ""}
-            {monthlyMinor != null && currency === "INR" ? <span className="text-text-subtle"> (includes GST)</span> : null}
-          </p>
+          <OfferBreakdownList lines={breakdown.lines} />
           <p className="text-xs text-text-subtle">
             ({days} working days − {Number(leaves) || 0} leave) × 8 h
           </p>

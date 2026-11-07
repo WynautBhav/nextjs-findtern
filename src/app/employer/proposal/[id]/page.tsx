@@ -13,6 +13,9 @@ import { formatDate as formatWords, formatMoney } from "@/lib/format";
 import { fullTimeFeeMinor } from "@/lib/checkout";
 import { laptopLabel, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
 import { shiftInIst } from "@/lib/timezones";
+import type { PlaceOfSupply } from "@/lib/gst";
+import { offerBreakdown, offerPlace } from "@/lib/offer-breakdown";
+import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
 import { DetailRow, Pill } from "@/components/app/primitives";
 import { MessageButton } from "@/components/app/messages/message-button";
 import { ProposalAvatar } from "@/components/employer/proposal-avatar";
@@ -132,6 +135,15 @@ export default async function EmployerProposalDetail({
   const raw = (proposal.offerDetails ?? {}) as Record<string, unknown>;
   const offer = parseOffer(raw, proposal.currency);
   const currency = offer.currency;
+  // Where the company is taxed, for the GST inside the monthly amount. If the
+  // profile can't be read the GST line is left out, never guessed.
+  let place: PlaceOfSupply | null = null;
+  try {
+    const [employer] = await getDb().select().from(schema.employers).where(eq(schema.employers.id, proposal.employerId)).limit(1);
+    place = offerPlace(employer, currency);
+  } catch (err) {
+    console.error("[employer/proposal] tax place", err);
+  }
   const state = offerState(proposal, offer);
   const skills = Array.isArray(proposal.skills) ? proposal.skills.filter(Boolean) : [];
   const snapshot = Object.entries(proposal.aiRatings ?? {}).filter(
@@ -161,6 +173,15 @@ export default async function EmployerProposalDetail({
         ["Starts", formatDate(offer.startDate)],
         ["Length", `${offer.months} month${offer.months === 1 ? "" : "s"}`],
       ];
+
+  const breakdown = offerBreakdown({
+    currency,
+    hourlyRateMinor: offer.hourlyRateMinor,
+    hours: offer.monthlyHours,
+    monthlyMinor: offer.monthlyMinor,
+    perHireMinor: offer.perHireMinor,
+    place,
+  });
 
   const timeline = offerTimeline(proposal, { startDate: offer.startDate, fullTime: Boolean(ft) }, state, formatDate);
   const profileHref = `/employer/intern/${encodeURIComponent(proposal.internId)}`;
@@ -238,26 +259,10 @@ export default async function EmployerProposalDetail({
         <div className="min-w-0 space-y-10">
           {!ft ? (
             <section>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Terms</h2>
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Amount</h2>
+              <OfferBreakdownList lines={breakdown.lines} className="mt-4 max-w-md" />
+              <h2 className="mt-10 text-lg font-semibold tracking-[-0.01em] text-ink-900">Terms</h2>
               <dl className="mt-2 divide-y divide-ink-100 border-b border-ink-100">
-                <DetailRow label="Hourly rate" value={offer.hourlyRateMinor ? `${formatMoney(offer.hourlyRateMinor, currency)} an hour` : offer.hourlyRateMinor === 0 ? "Free" : "-"} mono />
-                <DetailRow
-                  label="Monthly amount"
-                  value={
-                    offer.monthlyMinor ? (
-                      <>
-                        {formatMoney(offer.monthlyMinor, currency)}
-                        {currency === "INR" ? <span className="ml-1 text-xs font-normal text-text-subtle">(includes GST)</span> : null}
-                      </>
-                    ) : monthlyFree ? (
-                      "Free"
-                    ) : (
-                      "-"
-                    )
-                  }
-                  mono
-                />
-                {offer.perHireMinor ? <DetailRow label="One-time hiring fee" value={formatMoney(offer.perHireMinor, currency)} mono /> : null}
                 <DetailRow label="Working week" value={WEEKLY_SCHEDULES[offer.weeklySchedule].label} />
                 <DetailRow label="Paid leave" value={offer.paidLeavesPerMonth ? `${offer.paidLeavesPerMonth} day${offer.paidLeavesPerMonth === 1 ? "" : "s"} a month` : "None"} />
                 <DetailRow
@@ -424,6 +429,8 @@ export default async function EmployerProposalDetail({
                     accepted={proposal.status === "accepted"}
                     preference={preference}
                     currency={currency}
+                    place={place}
+                    perHireMinor={offer.perHireMinor}
                     shortOnly={score > 0 && score < 6}
                     hasLaptop={hasLaptop}
                     initial={{

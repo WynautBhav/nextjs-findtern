@@ -9,6 +9,9 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { RATING_META, type CandidateSummary } from "@/lib/employer-candidates";
 import { type Currency, type Pricing } from "@/lib/employer-pricing";
 import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
+import type { PlaceOfSupply } from "@/lib/gst";
+import { offerBreakdown } from "@/lib/offer-breakdown";
+import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
 import { billableWorkingDays, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
 import { SURFACE_CLASS } from "@/components/app/primitives";
@@ -90,6 +93,7 @@ export function SendProposalForm({
   companyTimezone = "Asia/Kolkata",
   candidateHasLaptop = null,
   heldProjectIds = [],
+  place = null,
 }: {
   candidate: CandidateSummary;
   /** Where the candidate said they can work; the offer's location follows it. */
@@ -109,6 +113,8 @@ export function SendProposalForm({
   candidateHasLaptop?: boolean | null;
   /** Projects with a meeting still to happen: no offer until it has (QA-113). */
   heldProjectIds?: string[];
+  /** Where the company is taxed; null when its profile can't say, and the GST line is left out. */
+  place?: PlaceOfSupply | null;
 }) {
   const router = useRouter();
   // The project the employer came from, not just the first one in the list:
@@ -170,6 +176,7 @@ export function SendProposalForm({
     const perHire = rate.perHireMinor / 100;
     return { monthly, perHire };
   }, [monthlyHours, rate]);
+  const breakdown = offerBreakdown({ currency, hourlyRateMinor: rate.hourlyRateMinor, hours: monthlyHours, perHireMinor: rate.perHireMinor, place });
 
   /** Validate first; the policy agreement only opens for a complete offer. */
   function review() {
@@ -246,6 +253,14 @@ export function SendProposalForm({
     }
   }
 
+  // Why "Review and send" is off, said next to the button (not only by its colour).
+  const blockedReason = sending
+    ? "Sending your proposal. This takes a moment."
+    : projects.length === 0
+      ? "Create an open project first. A proposal is filed under one."
+      : held
+        ? "A meeting for this project hasn't happened yet. Pick another project, or send once it has."
+        : null;
   const durationLabel = DURATIONS.find((d) => d.value === duration)?.label ?? "";
 
   return (
@@ -554,10 +569,20 @@ export function SendProposalForm({
         </Step>
 
         <div className="flex flex-wrap items-center gap-3 border-t border-ink-100 bg-ink-50/60 px-6 py-4 lg:hidden">
-          <button type="submit" disabled={sending || projects.length === 0 || held} className={buttonClass({ block: true })}>
+          <button
+            type="submit"
+            disabled={Boolean(blockedReason)}
+            aria-describedby={blockedReason ? "send-blocked-form" : undefined}
+            className={buttonClass({ block: true })}
+          >
             <Send className="size-4" aria-hidden />
             Review and send
           </button>
+          {blockedReason ? (
+            <p id="send-blocked-form" className="basis-full text-sm text-ink-700">
+              {blockedReason}
+            </p>
+          ) : null}
         </div>
       </form>
 
@@ -596,14 +621,9 @@ export function SendProposalForm({
           <div className="p-5">
             <h2 className="text-base font-semibold text-ink-900">Offer amount</h2>
             {/* One month's figure only (client QA), not monthly × months. */}
-            <dl className="mt-4 space-y-2.5">
-              <Row label={currency === "INR" && totals.monthly > 0 ? "Monthly (incl. GST)" : "Monthly amount"} strong>
-                {formatMoney(Math.round(totals.monthly * 100), currency)}
-              </Row>
+            <OfferBreakdownList lines={breakdown.lines} className="mt-4" />
+            <dl className="mt-2.5">
               <Row label="Duration">{durationLabel || "-"}</Row>
-              {totals.perHire > 0 ? (
-                <Row label="Hiring fee (one-time)">{formatMoney(Math.round(totals.perHire * 100), currency)}</Row>
-              ) : null}
             </dl>
             <p className="mt-3 text-sm leading-relaxed text-ink-600">
               Nothing is charged now. You pay once the candidate accepts.
@@ -628,12 +648,18 @@ export function SendProposalForm({
             <button
               type="button"
               onClick={review}
-              disabled={sending || projects.length === 0 || held}
+              disabled={Boolean(blockedReason)}
+              aria-describedby={blockedReason ? "send-blocked-aside" : undefined}
               className={buttonClass({ block: true, className: "mt-4 hidden lg:inline-flex" })}
             >
               <Send className="size-4" aria-hidden />
               Review and send
             </button>
+            {blockedReason ? (
+              <p id="send-blocked-aside" className="mt-2 hidden text-sm text-ink-700 lg:block">
+                {blockedReason}
+              </p>
+            ) : null}
           </div>
         </section>
       </aside>
@@ -690,18 +716,14 @@ function tomorrowIst(): string {
 function Row({
   label,
   children,
-  strong,
 }: {
   label: string;
   children: React.ReactNode;
-  strong?: boolean;
 }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
       <dt className="text-sm text-ink-600">{label}</dt>
-      <dd className={strong ? "nums text-lg font-semibold tracking-tight text-ink-900" : "nums text-sm font-medium text-ink-800"}>
-        {children}
-      </dd>
+      <dd className="nums text-right text-sm font-medium text-ink-800">{children}</dd>
     </div>
   );
 }
@@ -709,7 +731,7 @@ function Row({
 /* ── Form primitives ────────────────────────────────────────────────────── */
 
 const fieldCls = (error?: boolean, extra?: string) =>
-  cn(fieldClass, "mt-2 px-3.5", error && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger/20", extra);
+  cn(fieldClass, "mt-2 px-3.5", error && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger", extra);
 
 function Field({
   id,
