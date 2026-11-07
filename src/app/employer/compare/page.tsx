@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Children, cloneElement, isValidElement } from "react";
 import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { ArrowLeft, Check, Minus, Send, X } from "lucide-react";
@@ -13,6 +12,8 @@ import { shortlistProjectsByIntern } from "@/lib/employer-shortlist";
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
 import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
 import { RowAvatar } from "@/components/employer/candidate-row-parts";
+import { SendProposalHold } from "@/components/employer/send-proposal-hold";
+import { planNameFor } from "@/lib/score";
 import { SaveToggle } from "@/components/employer/candidate-card";
 import { studyOf } from "@/components/employer/candidate-view";
 import { SortSelect } from "../candidates/_sort-select";
@@ -26,6 +27,7 @@ import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
+import { Cell, LeaderMark, MatrixRow, NumericRow, leaders } from "@/components/employer/compare/matrix";
 
 export const metadata: Metadata = {
   title: "Compare candidates",
@@ -115,7 +117,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       // hired - legacy dropped both from compare (employer-compare.tsx:550).
       const [visible, rel] = await Promise.all([
         visibleInternIds(db, session.uid, ids),
-        candidateRelations(db, session.uid, ids),
+        candidateRelations(db, session.uid, ids, activeProject?.id ?? null),
       ]);
       relations = rel;
       // Compare is shared across projects but a shortlist is per project, so say where each one already sits.
@@ -352,15 +354,19 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                               <SaveToggle internId={c.id} projectId={activeProject.id} shortlisted={shortlisted.has(c.id)} name={name} />
                             </span>
                           ) : null}
-                          <ButtonLink
-                            href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}${activeProject ? `&project=${encodeURIComponent(activeProject.id)}` : ""}`}
-                            variant="primary"
-                            size="sm"
-                            className="min-h-11 w-full min-w-0 flex-1 rounded-full max-sm:px-3 max-sm:[&>svg]:hidden sm:min-h-9 sm:touch:min-h-11"
-                          >
-                            <Send className="size-4" aria-hidden />
-                            Send proposal
-                          </ButtonLink>
+{rel?.pendingMeetingAt ? (
+                            <SendProposalHold pendingMeetingAt={rel.pendingMeetingAt} className="min-w-0 flex-1 items-stretch" controlClassName="w-full justify-center" />
+                          ) : (
+                                                      <ButtonLink
+                              href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}${activeProject ? `&project=${encodeURIComponent(activeProject.id)}` : ""}`}
+                              variant="primary"
+                              size="sm"
+                              className="min-h-11 w-full min-w-0 flex-1 rounded-full max-sm:px-3 max-sm:[&>svg]:hidden sm:min-h-9 sm:touch:min-h-11"
+                            >
+                              <Send className="size-4" aria-hidden />
+                              Send proposal
+                            </ButtonLink>
+                          )}
                         </>
                       )}
                     </div>
@@ -410,8 +416,9 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               candidates={candidates}
               render={(c) => (
                 <>
-                  <span className="nums text-2xl font-semibold text-ink-900">{c.scored ? c.score.toFixed(1) : "-"}</span>
+                  <span className="nums text-2xl font-semibold text-brand-700">{c.scored ? c.score.toFixed(1) : "-"}</span>
                   <span className="text-sm text-text-subtle">/10</span>
+                  {c.scored ? <span className="ml-1 text-sm font-medium text-ink-700">{planNameFor(c.score)}</span> : null}
                 </>
               )}
             />
@@ -553,92 +560,5 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         </table>
       </div>
     </div>
-  );
-}
-
-/* ── Matrix pieces ───────────────────────────────────────────────────────── */
-
-/** Index of the single highest value, if one candidate leads outright. */
-function leaders(values: number[]): Set<number> {
-  const max = Math.max(...values, 0);
-  const at = values.map((v, i) => (v === max ? i : -1)).filter((i) => i >= 0);
-  return max > 0 && at.length === 1 && values.length > 1 ? new Set(at) : new Set();
-}
-
-function MatrixRow({
-  label,
-  hint,
-  accent,
-  last,
-  children,
-}: {
-  label: string;
-  hint?: string;
-  accent?: boolean;
-  last?: boolean;
-  children: React.ReactNode;
-}) {
-  return (
-    <tr className={cn("[&>td]:border-b [&>td]:border-ink-100", last && "[&>td]:border-b-0")}>
-      <th
-        scope="row"
-        className={cn(
-          "sticky left-0 z-10 border-r border-ink-100 p-4 text-left align-top text-sm font-semibold text-ink-900 max-sm:hidden",
-          last ? "" : "border-b",
-          accent ? "bg-brand-50" : "bg-surface",
-        )}
-      >
-        {label}
-        {hint ? <span className="mt-0.5 block text-xs font-normal text-ink-600">{hint}</span> : null}
-      </th>
-      {/* Phone: no label column, so each cell carries its row's label. */}
-      {Children.map(children, (child) => (isValidElement<{ label?: string }>(child) ? cloneElement(child, { label }) : child))}
-    </tr>
-  );
-}
-
-function Cell({ leader, label, children }: { leader?: boolean; label?: string; children: React.ReactNode }) {
-  return (
-    <td className={cn("border-r border-ink-100 p-3 align-top text-sm text-ink-800 max-sm:snap-start sm:p-4 last:border-r-0", leader && "bg-brand-50/60")}>
-      {label ? <span className="mb-1 block text-xs font-medium text-ink-600 sm:hidden">{label}</span> : null}
-      {children}
-    </td>
-  );
-}
-
-function LeaderMark() {
-  return (
-    <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-800">
-      <Check className="size-3.5" aria-hidden />
-      Leads
-    </span>
-  );
-}
-
-function NumericRow({
-  label,
-  values,
-  candidates,
-  render,
-}: {
-  label: string;
-  values: number[];
-  candidates: CandidateProfile[];
-  render: (candidate: CandidateProfile) => React.ReactNode;
-}) {
-  const lead = leaders(values);
-  return (
-    <MatrixRow label={label}>
-      {candidates.map((c, i) => (
-        <Cell key={c.id} leader={lead.has(i)}>
-          {render(c)}
-          {lead.has(i) ? (
-            <span className="block">
-              <LeaderMark />
-            </span>
-          ) : null}
-        </Cell>
-      ))}
-    </MatrixRow>
   );
 }

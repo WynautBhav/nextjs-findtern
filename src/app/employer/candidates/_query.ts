@@ -12,7 +12,7 @@ import { attachPhotos, candidatePoolClauses, poolInternIds, scoreExpr } from "@/
 import { projectCities } from "@/lib/project-locations";
 import { likePattern } from "@/lib/admin/palette-search";
 import { employerRegion, type Currency } from "@/lib/employer-pricing";
-import { BANDS, type BandId } from "@/lib/score";
+import { BANDS, PLAN_NAME, type BandId } from "@/lib/score";
 import { timezoneForLocation } from "@/lib/timezones";
 import { parseSortFields } from "@/lib/candidate-sort";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedFilters } from "@/lib/employer-selection";
@@ -302,7 +302,7 @@ export function activeChips(filters: Filters): FilterChip[] {
   }
   if (filters.laptop === "yes") chips.push({ key: "laptop", label: "Has a laptop", href: drop({ laptop: "" }) });
   const band = BANDS.find((b) => b.id === filters.plan);
-  if (band) chips.push({ key: "plan", label: `Band: ${band.name}`, href: drop({ plan: "" }) });
+  if (band) chips.push({ key: "plan", label: `Band: ${PLAN_NAME[band.id]}`, href: drop({ plan: "" }) });
   if (filters.minScore > 0) chips.push({ key: "min", label: `Findtern Score ${filters.minScore.toFixed(1)}+`, href: drop({ minScore: 0 }) });
   for (const meta of RATING_META) {
     const floor = filters.minRatings[meta.key];
@@ -652,7 +652,7 @@ export async function loadCandidates(
 
     data.plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
     const pageIds = data.candidates.map((c) => c.id);
-    data.relations = await candidateRelations(db, uid, pageIds);
+    data.relations = await candidateRelations(db, uid, pageIds, activeProjectId);
     // Labels like "Online now", never a time. Optional, like the saved roles.
     data.presence = await presenceOf(pageIds).catch((err) => {
       console.error("[employer/candidates] presence", err);

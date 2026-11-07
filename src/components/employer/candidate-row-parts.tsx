@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Check, Info } from "lucide-react";
 
-import { PLAN_NAME, bandFor } from "@/lib/score";
+import { bandFor, planNameFor } from "@/lib/score";
 import type { PresenceLabel } from "@/lib/presence";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { rowSkills } from "@/components/employer/candidate-view";
@@ -56,43 +56,51 @@ export function RowAvatar({
 }
 
 /**
- * "9.0 Findtern Score · Latte (i)": the plan name is explained in a tooltip,
- * never a bare word. Hover, focus and a tap open it (Radix alone closes it
- * again on the tap's click, so on a phone it never showed).
+ * The score as the hero of a row: "9.1" large in brand-700, the band name
+ * (Espresso, Cappuccino, Latte) and "Findtern Score" beside it. The band name
+ * is explained in a tooltip, never a bare word. Hover, focus and a tap open it
+ * (Radix alone closes it again on the tap's click, so on a phone it never
+ * showed). `size="inline"` keeps the small one-line form for dense lists.
  */
-export function ScoreBadge({ score, scored }: { score: number; scored: boolean }) {
+export function ScoreBadge({ score, scored, size = "inline" }: { score: number; scored: boolean; size?: "hero" | "inline" }) {
   const [open, setOpen] = useState(false);
   if (!scored) return <span className="text-sm text-ink-600">Not scored yet</span>;
   const band = bandFor(score);
-  const plan = PLAN_NAME[band.id];
+  const plan = planNameFor(score);
   const range = band.max >= 10 ? `${band.min} or above` : `${band.min} to under ${band.max}`;
+  const hero = size === "hero";
   return (
-    <span className="inline-flex items-center gap-1.5 text-sm">
-      <span className="nums text-base font-semibold text-ink-900">{score.toFixed(1)}</span>
-      <span className="text-ink-600">Findtern Score</span>
-      <Tooltip open={open} onOpenChange={setOpen}>
-        <TooltipTrigger
-          asChild
-          // A tap focuses (which opens it) and then clicks, which Radix treats as "close": keep it open.
-          // On the Trigger, not the button: only here does preventDefault skip that close. Tap outside, Escape or blur close it.
-          onClick={(e) => {
-            e.preventDefault();
-            setOpen(true);
-          }}
-        >
-          <button
-            type="button"
-            className="relative z-10 -my-1 inline-flex min-h-7 items-center gap-1 rounded-full px-1.5 font-medium text-ink-800 outline-none hover:bg-ink-100 focus-visible:ring-2 focus-visible:ring-brand-500 touch:min-h-11"
+    <span className={cn("inline-flex items-center text-sm", hero ? "gap-3" : "gap-1.5")}>
+      <span className={cn("nums font-semibold", hero ? "text-[28px] leading-none text-brand-700" : "text-base text-ink-900")}>{score.toFixed(1)}</span>
+      <span className={cn("inline-flex", hero ? "flex-col-reverse items-start" : "items-center gap-1.5")}>
+        <span className={cn(hero ? "text-xs text-ink-600" : "text-ink-600")}>Findtern Score</span>
+        <Tooltip open={open} onOpenChange={setOpen}>
+          <TooltipTrigger
+            asChild
+            // A tap focuses (which opens it) and then clicks, which Radix treats as "close": keep it open.
+            // On the Trigger, not the button: only here does preventDefault skip that close. Tap outside, Escape or blur close it.
+            onClick={(e) => {
+              e.preventDefault();
+              setOpen(true);
+            }}
           >
-            {plan}
-            <Info className="size-3.5 text-ink-400" aria-hidden />
-            <span className="sr-only">: what this means</span>
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="top">
-          {plan} is the price band for a Findtern Score of {range}. {band.blurb}
-        </TooltipContent>
-      </Tooltip>
+            <button
+              type="button"
+              className={cn(
+                "relative z-10 inline-flex min-h-7 items-center gap-1 rounded-full font-medium text-ink-800 outline-none hover:bg-ink-100 focus-visible:ring-2 focus-visible:ring-brand-500 touch:min-h-11",
+                hero ? "-ml-1.5 -my-0.5 px-1.5 text-[15px]" : "-my-1 px-1.5",
+              )}
+            >
+              {plan}
+              <Info className="size-3.5 text-ink-400" aria-hidden />
+              <span className="sr-only">: what this means</span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top">
+            {plan} is the price band for a Findtern Score of {range}. {band.blurb}
+          </TooltipContent>
+        </Tooltip>
+      </span>
     </span>
   );
 }

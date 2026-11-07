@@ -9,6 +9,7 @@ import { redactForEmployer, toCandidateProfile } from "@/lib/employer-candidates
 import { hiredInternIds, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
 import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
+import { pendingMeetingAtFor } from "@/lib/proposal-guard";
 import { isBlockingInterview, isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { hireFlowCounts } from "@/lib/employer-flow";
 import { payableCheckout } from "@/lib/employer-payable";
@@ -229,6 +230,7 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
         openProposalId: openFor.get(item.internId) ?? null,
         acceptedProposalId: acceptedFor.get(item.internId) ?? null,
         meetingUntil: meetingUntil.get(item.internId) ?? null,
+        meetingAt: pendingMeetingAtFor(meetingRows.filter((iv) => iv.internId === item.internId), { projectId: item.projectId }),
         meetingLink: meetingLinks.get(item.internId) ?? null,
       });
     }

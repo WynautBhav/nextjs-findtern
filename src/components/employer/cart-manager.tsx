@@ -12,8 +12,9 @@ import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatRate, shortDateTime } from "@/lib/format";
 import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
-import { isQuarterHourWall, meetingEndsAt, suggestedSlots } from "@/lib/employer-interview-rules";
+import { isQuarterHourWall, meetingEndsAt, meetingTime, suggestedSlots } from "@/lib/employer-interview-rules";
 import { MeetingSlots, TimezoneSelect, type Slots } from "@/components/employer/meeting-slots";
+import { SendProposalHold } from "@/components/employer/send-proposal-hold";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { fieldClass, labelClass } from "@/components/employer/ui-tokens";
 import type { Currency } from "@/lib/employer-pricing";
@@ -44,6 +45,8 @@ export type CartLineItem = {
   acceptedProposalId?: string | null;
   /** An open meeting holds the candidate until this time (ISO); no new booking or proposal before. */
   meetingUntil?: string | null;
+  /** When that meeting is (ISO), for "Meeting on <date>" on the held Send proposal. */
+  meetingAt?: string | null;
   /** The booked meeting's link while it is live, for "Join meeting". */
   meetingLink?: string | null;
 };
@@ -165,7 +168,12 @@ export function CartManager({
       const end = data.interview ? meetingEndsAt(data.interview) : null;
       const internId = meetingCandidate.candidate.id;
       if (end !== null) {
-        setCartLines((prev) => prev.map((l) => (l.candidate.id === internId ? { ...l, meetingUntil: new Date(end).toISOString() } : l)));
+        const at = meetingTime(data.interview);
+        setCartLines((prev) =>
+          prev.map((l) =>
+            l.candidate.id === internId ? { ...l, meetingUntil: new Date(end).toISOString(), meetingAt: at === null ? null : new Date(at).toISOString() } : l,
+          ),
+        );
       }
       setMeetingSuccess(true);
       router.refresh();
@@ -430,8 +438,8 @@ function CartLine({
       </div>
       <div className="col-span-2 min-w-0 sm:col-span-2 sm:col-start-2">
         <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-700 sm:gap-x-5 sm:gap-y-1.5">
-          <ScoreBadge score={c.score} scored={c.scored} />
-          <span className="nums font-semibold text-ink-900">{formatRate(line.hourlyRateMinor, currency)}</span>
+          <ScoreBadge size="hero" score={c.score} scored={c.scored} />
+          <span className="nums text-ink-600">{formatRate(line.hourlyRateMinor, currency)}</span>
           {c.workModes.length ? <span>{c.workModes.join(" / ")}</span> : null}
         </p>
         <SkillChips className="mt-3" skills={c.skills} wanted={[]} />
@@ -439,7 +447,7 @@ function CartLine({
           <p className="mt-2 flex items-start gap-1.5 text-sm text-ink-600" title="You can book another meeting once this one's time is over.">
             <CalendarCheck className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
             <span>
-              Meeting until {untilLabel(line.meetingUntil!, timezone)}.{line.openProposalId ? "" : " Send a proposal once it is over."}
+              Meeting until {untilLabel(line.meetingUntil!, timezone)}.
             </span>
           </p>
         ) : null}
@@ -469,16 +477,8 @@ function CartLine({
         ) : closed ? (
           <span className="inline-flex min-h-11 items-center text-sm text-ink-600 sm:min-h-9">Reopen the project to send a proposal.</span>
         ) : locked ? (
-          // EMB-07: legacy kept Send Proposal off until the meeting was over.
-          <span
-            className={buttonClass({ size: "sm", className: "h-11 cursor-not-allowed rounded-full px-4 opacity-55 sm:h-9 sm:touch:h-11" })}
-            aria-disabled="true"
-            title="A proposal can be sent once the meeting is completed."
-          >
-            <Send className="size-4" aria-hidden />
-            Send proposal
-            <span className="sr-only"> (available once the meeting is completed)</span>
-          </span>
+          // EMB-07: legacy kept Send Proposal off until the meeting was over; the date and reason are visible text.
+          <SendProposalHold pendingMeetingAt={line.meetingAt ?? line.meetingUntil} />
         ) : (
           <ButtonLink
             href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}&project=${encodeURIComponent(line.projectId)}`}

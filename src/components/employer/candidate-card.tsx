@@ -12,6 +12,8 @@ import { FullTimeOfferButton } from "@/components/employer/full-time-offer-butto
 import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
 import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
 import { Pill } from "@/components/app/primitives";
+import { SendProposalHold } from "@/components/employer/send-proposal-hold";
+import { sendProposalHold } from "@/lib/proposal-guard";
 import type { PresenceLabel } from "@/lib/presence";
 import { csrfFetch } from "@/lib/client-fetch";
 import { ButtonLink } from "@/components/ui/button";
@@ -48,6 +50,8 @@ export interface CandidateCardProps {
   presence?: PresenceLabel | null;
   /** The intern saved this employer's role for the selected project. */
   interested?: boolean;
+  /** ISO time of a booked meeting that still holds the candidate: "Send proposal" waits for it. */
+  pendingMeetingAt?: string | null;
 }
 
 /**
@@ -177,6 +181,7 @@ export function CandidateCard({
   wantedSkills = [],
   presence = null,
   interested = false,
+  pendingMeetingAt = null,
 }: CandidateCardProps) {
   const pricing = resolved ?? resolvePricing(candidate.score, [], currency, region);
   const displayName = displayNameOf(candidate, nameUnlocked);
@@ -193,6 +198,8 @@ export function CandidateCard({
     <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="outline" size="sm" className="relative z-10 h-11 sm:h-9 sm:touch:h-11">
       {proposalActionLabel(proposal)}
     </ButtonLink>
+  ) : sendProposalHold(pendingMeetingAt) ? (
+    <SendProposalHold pendingMeetingAt={pendingMeetingAt} className="relative z-10" />
   ) : (
     <ButtonLink href={sendHref} variant="primary" size="sm" className="relative z-10 h-11 rounded-full px-4 sm:h-9 sm:touch:h-11">
       <Send className="size-4" aria-hidden />
@@ -201,7 +208,7 @@ export function CandidateCard({
   );
 
   return (
-    <li className="group/row relative grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3.5 gap-y-3 py-5 sm:gap-x-5 sm:gap-y-2.5 sm:py-6">
+    <li className="group/row relative grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3.5 gap-y-3 py-6 sm:gap-x-5 sm:gap-y-3 sm:py-7">
       <RowAvatar photoUrl={candidate.photoUrl} initials={candidate.initials} seed={candidate.id} presence={presence} />
 
       <div className="min-w-0 self-center sm:self-start">
@@ -239,7 +246,7 @@ export function CandidateCard({
       {/* Desktop: Save · Compare · Send proposal, top right. Phone: the heart alone, top right. */}
       <div className="relative z-10 flex items-start gap-1 sm:gap-1.5">
         {canSave && projectId ? <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} name={displayName} /> : null}
-        <div className="flex items-center gap-1.5 max-sm:hidden">
+        <div className="flex items-start gap-1.5 max-sm:hidden">
           {comparable ? <CompareToggle href={compareHref} selected={selected} name={displayName} /> : null}
           {primary}
           {fullTimeFrom && fullTime ? (
@@ -256,16 +263,16 @@ export function CandidateCard({
 
       {/* Stats line and skills: under the identity, running under the actions too. */}
       <div className="col-span-3 min-w-0 sm:col-span-2 sm:col-start-2">
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-700 sm:gap-x-5 sm:gap-y-1.5">
-          <ScoreBadge score={candidate.score} scored={candidate.scored} />
-          <span className="nums font-semibold text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</span>
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-600 sm:gap-x-5">
+          <ScoreBadge size="hero" score={candidate.score} scored={candidate.scored} />
+          <span className="nums">{formatRate(pricing.hourlyRateMinor, currency)}</span>
           {modes ? <span>{modes}</span> : null}
         </p>
-        <SkillChips className="mt-3" skills={candidate.skills} wanted={wantedSkills} />
+        <SkillChips className="mt-3.5" skills={candidate.skills} wanted={wantedSkills} />
       </div>
 
       {/* Phone: Compare and the primary action as the card's last line. */}
-      <div className="relative z-10 col-span-3 flex items-center justify-between gap-2 sm:hidden">
+      <div className="relative z-10 col-span-3 flex items-start justify-between gap-2 sm:hidden">
         {comparable ? <CompareToggle href={compareHref} selected={selected} name={displayName} /> : <span />}
         <div className="flex items-center gap-1.5">
           {fullTimeFrom && fullTime ? (

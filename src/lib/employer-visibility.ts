@@ -2,10 +2,11 @@ import { and, desc, eq, inArray, isNotNull, or, type SQL } from "drizzle-orm";
 
 import { getSession } from "./auth";
 import { getDb } from "./db";
-import { proposals } from "./db/schema";
+import { interviews, proposals } from "./db/schema";
 import { isHiredProposal } from "./hire-status";
 import { parseOffer } from "./offer";
 import { LIVE_STATUSES } from "./employer-offer-status";
+import { pendingMeetingAtFor } from "./proposal-guard";
 
 export { isLiveOffer } from "./employer-offer-status";
 
@@ -67,6 +68,13 @@ export type CandidateRelation = {
   hired: boolean;
   /** The internship hire a full-time offer would follow from, if offerable (EMH-42). */
   fullTimeFrom: string | null;
+  /**
+   * When this employer's booked (or offered) meeting with them is, as an ISO
+   * string, while it still holds the candidate; null otherwise. A date only:
+   * no link, notes or slots leave the server. Screens use it to hold
+   * "Send proposal" until the interview is over (lib/proposal-guard).
+   */
+  pendingMeetingAt: string | null;
 };
 
 const CLOSED_STATUSES = ["rejected", "withdrawn", "expired"];
@@ -81,6 +89,8 @@ export async function candidateRelations(
   db: ReturnType<typeof getDb>,
   employerId: string,
   internIds: string[],
+  /** The project an offer would be for: a meeting tied to another project does not hold it. */
+  projectId?: string | null,
 ): Promise<Map<string, CandidateRelation>> {
   const out = new Map<string, CandidateRelation>();
   const ids = [...new Set(internIds.filter(Boolean))];
@@ -97,6 +107,10 @@ export async function candidateRelations(
     .from(proposals)
     .where(and(eq(proposals.employerId, employerId), inArray(proposals.internId, ids)))
     .orderBy(desc(proposals.createdAt));
+  const meetings = await db
+    .select()
+    .from(interviews)
+    .where(and(eq(interviews.employerId, employerId), inArray(interviews.internId, ids), inArray(interviews.status, ["pending", "scheduled"])));
 
   for (const id of ids) {
     const mine = rows.filter((r) => r.internId === id);
@@ -110,6 +124,10 @@ export async function candidateRelations(
       proposal: shown ? { id: shown.id, status: isHiredProposal(shown) ? "hired" : shown.status, fullTime: shown.fullTime } : null,
       hired: hires.length > 0,
       fullTimeFrom: internship && !fullTimeOut ? internship.id : null,
+      pendingMeetingAt: pendingMeetingAtFor(
+        meetings.filter((m) => m.internId === id),
+        { projectId },
+      ),
     });
   }
   return out;
