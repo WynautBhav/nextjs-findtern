@@ -260,7 +260,7 @@ export default async function EmployerProposalDetail({
           {!ft ? (
             <section>
               <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Amount</h2>
-              <OfferBreakdownList lines={breakdown.lines} className="mt-4 max-w-md" />
+              <OfferBreakdownList lines={breakdown.lines} className="mt-4" />
               <h2 className="mt-10 text-lg font-semibold tracking-[-0.01em] text-ink-900">Terms</h2>
               <dl className="mt-2 divide-y divide-ink-100 border-b border-ink-100">
                 <DetailRow label="Working week" value={WEEKLY_SCHEDULES[offer.weeklySchedule].label} />

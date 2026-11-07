@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { billableWorkingDays, buildOffer, fixedInternStipendInrMinor, internStipendInrMinor, offerTermIssues, offerTimeLeft, parseOffer, scheduledMonthlyHours, weeklyScheduleOf } from "./offer.ts";
+import { billableWorkingDays, buildOffer, latestShiftEnd, shiftMinutes, fixedInternStipendInrMinor, internStipendInrMinor, offerTermIssues, offerTimeLeft, parseOffer, scheduledMonthlyHours, weeklyScheduleOf } from "./offer.ts";
 import { lineCharge } from "./checkout.ts";
 import { monthlyDues } from "./dues.ts";
 
@@ -304,6 +304,18 @@ test("offerTermIssues: the composer and the edit share one set of start/shift/ti
   assert.equal(offerTermIssues({ shiftFrom: "10:00", shiftTo: "10:00" })[0]?.message, "The shift can't start and end at the same time.");
   assert.equal(offerTermIssues({ startDate: day(900) })[0]?.message, "Pick a start date within the next year.");
   assert.equal(offerTermIssues({ startDate: "2026-02-31" })[0]?.message, "Pick a real start date.");
+});
+
+test("a shift is at most 8 hours, overnight included", () => {
+  assert.equal(shiftMinutes("09:00", "17:00"), 480);
+  assert.equal(shiftMinutes("22:00", "06:00"), 480);
+  assert.equal(latestShiftEnd("09:00"), "17:00");
+  assert.equal(latestShiftEnd("20:30"), "04:30");
+  assert.deepEqual(offerTermIssues({ shiftFrom: "09:00", shiftTo: "17:00" }), []);
+  assert.deepEqual(offerTermIssues({ shiftFrom: "22:00", shiftTo: "06:00" }), []);
+  assert.equal(offerTermIssues({ shiftFrom: "09:00", shiftTo: "17:01" })[0]?.path, "shiftTo");
+  assert.match(offerTermIssues({ shiftFrom: "09:00", shiftTo: "18:00" })[0]?.message ?? "", /latest end is 17:00/);
+  assert.match(offerTermIssues({ shiftFrom: "09:00", shiftTo: "08:00" })[0]?.message ?? "", /longer than 8 hours/);
 });
 
 test("a no-stipend offer keeps a real 0", () => {

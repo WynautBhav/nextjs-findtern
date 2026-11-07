@@ -12,7 +12,7 @@ import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
 import type { PlaceOfSupply } from "@/lib/gst";
 import { offerBreakdown } from "@/lib/offer-breakdown";
 import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
-import { billableWorkingDays, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
+import { billableWorkingDays, isClockTime, latestShiftEnd, MAX_SHIFT_MINUTES, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, shiftMinutes, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
 import { SURFACE_CLASS } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
@@ -75,7 +75,7 @@ const LAPTOP_OPTIONS = [
 
 /** Quick fills for the working hours; the times stay editable (bug sheet 23 Oct). */
 const SHIFT_PRESETS = [
-  { label: "9am–6pm", from: "09:00", to: "18:00" },
+  { label: "9am–5pm", from: "09:00", to: "17:00" },
   { label: "9am–1pm", from: "09:00", to: "13:00" },
   { label: "5pm–9pm", from: "17:00", to: "21:00" },
 ] as const;
@@ -149,7 +149,15 @@ export function SendProposalForm({
   const week = workingDaysPerWeek(schedule);
   const homeDays = String(Math.max(0, week - (Number(officeDays) || 0)));
   const [shiftFrom, setShiftFrom] = useState("09:00");
-  const [shiftTo, setShiftTo] = useState("18:00");
+  const [shiftTo, setShiftTo] = useState("17:00");
+  // No intern works more than 8 hours: a later start pulls the end in, and an end
+  // typed past the limit is flagged where it is typed.
+  const shiftLimit = isClockTime(shiftFrom) ? `Up to 8 hours: a start at ${shiftFrom} can end by ${latestShiftEnd(shiftFrom)}.` : "Up to 8 hours.";
+  const shiftTooLong = isClockTime(shiftFrom) && isClockTime(shiftTo) && shiftMinutes(shiftFrom, shiftTo) > MAX_SHIFT_MINUTES;
+  function pickShiftFrom(v: string) {
+    setShiftFrom(v);
+    if (isClockTime(v) && isClockTime(shiftTo) && shiftMinutes(v, shiftTo) > MAX_SHIFT_MINUTES) setShiftTo(latestShiftEnd(v));
+  }
   const laptopOptions = LAPTOP_OPTIONS.filter((l) => l.value !== "candidate" || candidateHasLaptop !== false);
   const [laptop, setLaptop] = useState<string>("company");
   const [paidLeaves, setPaidLeaves] = useState("0");
@@ -496,9 +504,10 @@ export function SendProposalForm({
           <fieldset>
             <legend className="text-sm font-medium text-ink-800">Working hours</legend>
             <div className="mt-2 grid grid-cols-2 gap-3 sm:max-w-sm">
-              <Field id="shiftFrom" label="From" type="time" value={shiftFrom} error={errors.shiftFrom} onChange={setShiftFrom} />
-              <Field id="shiftTo" label="To" type="time" value={shiftTo} error={errors.shiftTo} onChange={setShiftTo} />
+              <Field id="shiftFrom" label="From" type="time" value={shiftFrom} error={errors.shiftFrom} onChange={pickShiftFrom} />
+              <Field id="shiftTo" label="To" type="time" value={shiftTo} error={errors.shiftTo ?? (shiftTooLong ? `Too long. ${shiftLimit}` : undefined)} onChange={setShiftTo} />
             </div>
+            <p className="mt-2 text-sm text-ink-600">{shiftLimit}</p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {SHIFT_PRESETS.map((p) => (
                 <button
@@ -976,6 +985,9 @@ function validate(draft: Draft): Record<string, string> {
   if (!time.test(draft.shiftFrom)) errors.shiftFrom = "Pick a start time.";
   if (!time.test(draft.shiftTo)) errors.shiftTo = "Pick an end time.";
   else if (draft.shiftFrom === draft.shiftTo) errors.shiftTo = "The end time must differ from the start.";
+  else if (time.test(draft.shiftFrom) && shiftMinutes(draft.shiftFrom, draft.shiftTo) > MAX_SHIFT_MINUTES) {
+    errors.shiftTo = `A shift can't run longer than 8 hours. Latest end for a ${draft.shiftFrom} start: ${latestShiftEnd(draft.shiftFrom)}.`;
+  }
   if (!draft.timezone || draft.timezone.startsWith("group-")) errors.timezone = "Pick a timezone.";
   if (!draft.laptop) errors.laptop = "Say who provides the laptop.";
   if (draft.message.trim().length < 30) {
