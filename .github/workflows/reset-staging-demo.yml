@@ -1,0 +1,75 @@
+name: Reset staging demo data
+
+# Manual only. Empties the rows of the Neon STAGING database and loads the
+# 50-intern demo set (e2e/seed-demo-interns.mjs). The tables, the migration
+# record, platform_settings and admin_roles stay. Runs on GitHub's servers, so it does not depend on the network
+# of whoever clicks the button.
+#
+# A run with "apply" off is a dry run: it connects, counts the rows it would
+# remove, runs the whole seed inside a transaction and rolls it back.
+#
+# Needs the repository secret NEON_STAGING_URL (the staging connection string).
+# The job refuses any other database host, and refuses to run off master.
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Write to staging (off = dry run that changes nothing)"
+        type: boolean
+        default: false
+      confirm:
+        description: "To apply, type RESET STAGING (ignored on a dry run)"
+        type: string
+        default: ""
+
+concurrency:
+  group: reset-staging-demo
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  reset:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      EXPECTED_HOST: ep-mute-unit-b5ooitso-pooler.c-7.us-east-2.aws.neon.tech
+      APPLY: ${{ inputs.apply }}
+      CONFIRM: ${{ inputs.confirm }}
+    steps:
+      - name: Refuse an unconfirmed write
+        if: ${{ inputs.apply }}
+        run: |
+          if [ "$CONFIRM" != "RESET STAGING" ]; then
+            echo "To apply, type RESET STAGING in the confirm box. Nothing was changed."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Point the seed at staging (host check)
+        env:
+          NEON_STAGING_URL: ${{ secrets.NEON_STAGING_URL }}
+        run: |
+          node -e 'const h = new URL(process.env.NEON_STAGING_URL).hostname; if (h !== process.env.EXPECTED_HOST) { console.error("Refusing: the secret points at " + h + ", not the staging host."); process.exit(1); } console.log("host ok: " + h);'
+          printf 'DATABASE_URL=%s\n' "$NEON_STAGING_URL" > "$RUNNER_TEMP/neon.env"
+          echo "NEON_ENV_FILE=$RUNNER_TEMP/neon.env" >> "$GITHUB_ENV"
+
+      - name: Apply migrations
+        if: ${{ inputs.apply }}
+        env:
+          DATABASE_URL: ${{ secrets.NEON_STAGING_URL }}
+        run: node --experimental-strip-types scripts/migrate.ts
+
+      - name: Empty the tables and seed the demo interns
+        run: node e2e/seed-demo-interns.mjs --reset ${{ inputs.apply && '--yes' || '' }}
