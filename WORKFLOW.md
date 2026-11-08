@@ -20,6 +20,7 @@ Master is the only long-lived branch. Everything else is a short-lived branch in
 - **When it still runs:** outside Vercel (`VERCEL` unset: local, CI, the GitHub staging workflows, `npm run db:migrate`) it always runs, as before. `MIGRATE_ALLOW=1` forces it on a Vercel build, for example a Vercel custom environment used as staging. Only `1` counts. The decision lives in `scripts/migrate-gate.ts`.
 - Take **only the next number on master** (`drizzle/NNNN_<name>.sql`). Rebase first; if someone else landed that number, renumber.
 - Every migration has a matching `drizzle/rollback/NNNN_<name>.down.sql`.
+- **Roll back a migration only after reverting the code that uses it** (revert and deploy first, then run the `.down.sql`). Dropping a column or table the live code still selects breaks the app. Put this line in the header of any migration whose columns app code reads (e.g. 0027).
 - Test the migration, the rollback, and a re-migrate on a **local scratch Postgres**. Assert the host is `localhost` before running anything. Never run against Neon, `.env.production`, or the staging workflows.
 - `scripts/migrate.ts` records migrations by file name and makes statements idempotent. Two branches that both add the same table with different columns will silently skip one: do not carry a schema branch around, land it first.
 

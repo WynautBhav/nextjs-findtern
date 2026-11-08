@@ -29,6 +29,11 @@ export const messages = pgTable("messages", {
   messagesBodyLenChk: check("messages_body_len_chk", sql`char_length(${t.body}) BETWEEN 1 AND 4000`),
 }));
 
+/**
+ * One row per user (no FK to users). Nothing deletes or truncates these rows: no cleanup job, retention purge or
+ * account-deletion path touches user_presence (checked 0027), and the heartbeat upsert only sets last_seen_at. Keep
+ * it that way: a DELETE or a full-row upsert here silently resets a student's hide choice to visible (default true).
+ */
 export const userPresence = pgTable("user_presence", {
   userId: varchar("user_id").primaryKey(),
   lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
