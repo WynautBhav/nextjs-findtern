@@ -2,7 +2,8 @@ import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { RateLimiter } from "@/lib/security/rate-limit";
-import { isOnline, otherParticipant } from "./logic";
+import { presenceText, presenceView } from "../presence-logic";
+import { otherParticipant } from "./logic";
 
 /** Per-user, in memory (same limitation as the other limiters). */
 export const messageLimiter = new RateLimiter(30, 60_000);
@@ -18,7 +19,11 @@ export async function pushEvent(userId: string, type: string, payload: Record<st
   await getDb().insert(schema.realtimeEvents).values({ userId, type, payload });
 }
 
-/** The caller's threads. Counterpart is an id plus online flag only: no email, no phone. */
+/**
+ * The caller's threads. Counterpart is an id plus a presence label only: no email, no phone, no timestamp. A
+ * counterpart who hid their activity (user_presence.show_activity) gets a null label and `online: false`; the
+ * database never returns their last_seen_at (CASE below), so nothing downstream can leak it.
+ */
 export async function listThreads(uid: string, role: "employer" | "intern") {
   const db = getDb();
   const mine = role === "employer" ? schema.threads.employerId : schema.threads.internId;
@@ -38,8 +43,17 @@ export async function listThreads(uid: string, role: "employer" | "intern") {
     .orderBy(schema.messages.threadId, desc(schema.messages.createdAt));
   const lastBy = new Map(last.map((l) => [l.threadId, l]));
   const others = rows.map((r) => otherParticipant(r, uid)!);
-  const pres = await db.select().from(schema.userPresence).where(inArray(schema.userPresence.userId, others));
-  const presBy = new Map(pres.map((p) => [p.userId, p.lastSeenAt]));
+  const up = schema.userPresence;
+  const pres = await db
+    .select({
+      userId: up.userId,
+      showActivity: up.showActivity,
+      lastSeenAt: sql<Date | null>`CASE WHEN ${up.showActivity} THEN ${up.lastSeenAt} ELSE NULL END`.mapWith(up.lastSeenAt),
+    })
+    .from(up)
+    .where(inArray(up.userId, others));
+  const now = Date.now();
+  const presBy = new Map(pres.map((p) => [p.userId, presenceView(p, now)]));
   return rows.map((r) => {
     const other = otherParticipant(r, uid)!;
     const l = lastBy.get(r.id);
@@ -47,7 +61,8 @@ export async function listThreads(uid: string, role: "employer" | "intern") {
       id: r.id,
       proposalId: r.proposalId,
       counterpartId: other,
-      counterpartOnline: isOnline(presBy.get(other)),
+      counterpartOnline: presBy.get(other)?.state === "online",
+      counterpartPresence: presBy.has(other) ? presenceText(presBy.get(other)!, now) : null,
       lastMessage: l ? { body: l.body, mine: l.senderId === uid, createdAt: l.createdAt } : null,
       lastMessageAt: r.lastMessageAt,
       unread: unreadBy.get(r.id) ?? 0,

@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { applyThreadEvent, badgeText, failSent, groupByDay, markMineRead, mergeMessages, reconcileSent, relativeTime, statusText, truncatePreview, type Msg, type ThreadRow } from "./ui-logic.ts";
 
 const NOW = new Date(2026, 10, 7, 12, 0, 0).getTime();
-const th = (id: string, unread = 0, at: string | null = null): ThreadRow => ({ id, proposalId: null, counterpartId: "x", counterpartOnline: false, lastMessage: null, lastMessageAt: at, unread });
+const th = (id: string, unread = 0, at: string | null = null): ThreadRow => ({ id, proposalId: null, counterpartId: "x", counterpartOnline: false, counterpartPresence: null, lastMessage: null, lastMessageAt: at, unread });
 const msg = (id: string, createdAt: string, extra: Partial<Msg> = {}): Msg => ({ id, mine: true, body: "hi", createdAt, deliveredAt: null, readAt: null, ...extra });
 
 test("relative time", () => {

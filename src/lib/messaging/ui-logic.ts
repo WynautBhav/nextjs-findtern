@@ -4,7 +4,10 @@ export type ThreadRow = {
   id: string;
   proposalId: string | null;
   counterpartId: string;
+  /** True only when the counterpart is active now and has not hidden it. */
   counterpartOnline: boolean;
+  /** "Active now" / "Last seen 2h ago" / "Offline"; null when hidden or never seen: show nothing. */
+  counterpartPresence: string | null;
   lastMessage: { body: string; mine: boolean; createdAt: string } | null;
   lastMessageAt: string | null;
   unread: number;

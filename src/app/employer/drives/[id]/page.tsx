@@ -84,7 +84,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
   const db = getDb();
   const students = await eligibleStudents(drive);
   const ids = students.map((s) => s.userId);
-  const [onboarding, shortlist, meetings, hired] = await Promise.all([
+  const [onboarding, shortlist, meetings, hired, hiding] = await Promise.all([
     ids.length
       ? db
           .select({ userId: schema.internOnboarding.userId, skills: schema.internOnboarding.skills })
@@ -101,7 +101,15 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
       .where(and(eq(schema.collegeDriveMeetings.driveId, drive.id), eq(schema.collegeDriveMeetings.employerId, session.uid), isNotNull(schema.collegeDriveMeetings.meetingLink)))
       .orderBy(desc(schema.collegeDriveMeetings.createdAt)),
     hiredInternIds(db, session.uid),
+    // Students who hid their activity (settings) never show as online here either.
+    ids.length
+      ? db
+          .select({ userId: schema.userPresence.userId })
+          .from(schema.userPresence)
+          .where(and(inArray(schema.userPresence.userId, ids), eq(schema.userPresence.showActivity, false)))
+      : Promise.resolve([]),
   ]);
+  const hidingIds = new Set(hiding.map((h) => h.userId));
   const skillsOf = new Map(onboarding.map((o) => [o.userId, readSkills(o.skills).map((s) => s.split(" · ")[0])]));
   const shortlisted = new Set(shortlist.map((s) => s.userId));
 
@@ -120,7 +128,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
       score: s.score,
       skills: skillsOf.get(s.userId) ?? [],
       shortlisted: shortlisted.has(s.userId),
-      online: Boolean(s.lastSeenAt && now - s.lastSeenAt.getTime() < ONLINE_WINDOW_MS),
+      online: !hidingIds.has(s.userId) && Boolean(s.lastSeenAt && now - s.lastSeenAt.getTime() < ONLINE_WINDOW_MS),
     };
   });
 

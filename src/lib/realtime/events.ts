@@ -11,10 +11,23 @@ export function parseCursor(v: string | null | undefined): number | null {
   return Number(v);
 }
 
-/** One SSE frame; the id lets the browser resume with Last-Event-ID. */
+/** Keys that carry another user's activity. Presence is read from the threads/candidate APIs, where the hide setting is enforced; never over the wire here. */
+const PRESENCE_KEYS = /^(last_?seen(_?at)?|online|is_?online|presence|show_?activity|counterpart_?(online|presence))$/i;
+
+/** Drops presence fields at any depth, so a stream event can never leak last seen or the hide setting. */
+export function scrubPresence(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(scrubPresence);
+  if (v && typeof v === "object") {
+    return Object.fromEntries(Object.entries(v as Record<string, unknown>).filter(([k]) => !PRESENCE_KEYS.test(k)).map(([k, x]) => [k, scrubPresence(x)]));
+  }
+  return v;
+}
+
+/** One SSE frame; the id lets the browser resume with Last-Event-ID. A presence.changed frame is only a nudge to refetch: its payload is always empty. */
 export function shapeEvent(e: { id: number | string; type: string; payload: unknown }): string {
   const type = String(e.type).replace(/[\r\n]/g, "");
-  return `id: ${e.id}\nevent: ${type}\ndata: ${JSON.stringify(e.payload ?? {})}\n\n`;
+  const payload = type === "presence.changed" ? {} : scrubPresence(e.payload ?? {});
+  return `id: ${e.id}\nevent: ${type}\ndata: ${JSON.stringify(payload)}\n\n`;
 }
 
 /** Exponential backoff for reconnects, capped, no jitter needed at this scale. */
