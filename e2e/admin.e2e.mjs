@@ -187,19 +187,32 @@ async function queueFromDb() {
   return { payouts: p.n, candidates: c.n, pipeline: l.n };
 }
 
-/** Paid money in INR minor units (revenue.ts: paid rows, real employers, USD at 100), optionally from `since`. */
+/**
+ * Paid money in INR minor units, by the rules in revenue.ts: paid employer orders (real employers, USD at 100), paid
+ * intern fees (drive waivers excluded) and paid college seat batches, optionally from `since`.
+ *
+ * College seat batches are money received (revenue.ts collegeBatchReceipts: "college seat sales are customers' money
+ * like employer orders"); this SQL once left them out, so every total was short by the paid batches (₹240,000 on the
+ * QA seed, more after college-money / drive-journey runs).
+ *
+ * `since` is bound as an ISO string cast to `timestamp`, like the app's utcSql(): these columns are `timestamp without
+ * time zone` holding UTC, and a JS Date parameter is sent as local wall-clock time, which Postgres then compares as if
+ * it were UTC. On a non-UTC machine (IST: 5h30) that moved the 7-day cutoff 5h30 late, so a payment inside that
+ * sliver was counted by the page and not by the test (the unexplained ₹95,000 in the gate log).
+ */
 async function receivedFromDb({ since = null } = {}) {
   const inr = (a, c) => `(CASE WHEN upper(coalesce(${c}, 'INR')) = 'USD' THEN ${a} * 100 ELSE ${a} END)`;
-  const at = (t) => (since ? `AND coalesce(${t}.paid_at, ${t}.created_at) >= $1` : "");
-  const args = since ? [since] : [];
+  const at = (t) => (since ? `AND coalesce(${t}.paid_at, ${t}.created_at) >= $1::timestamp` : "");
+  const args = since ? [since.toISOString()] : [];
   const emp = await one(
     `SELECT coalesce(sum(${inr("e.amount_minor", "e.currency")}), 0)::bigint v FROM employer_payments e
       WHERE e.status = 'paid' AND e.employer_id <> 'admin'
         AND e.employer_id NOT IN (SELECT id FROM employers WHERE lower(company_email) = '${AI_EMAIL}') ${at("e")}`,
     args,
   );
-  const int = await one(`SELECT coalesce(sum(${inr("i.amount_minor", "i.currency")}), 0)::bigint v FROM intern_payments i WHERE i.status = 'paid' ${at("i")}`, args);
-  return { employer: Number(emp.v), intern: Number(int.v), total: Number(emp.v) + Number(int.v) };
+  const int = await one(`SELECT coalesce(sum(${inr("i.amount_minor", "i.currency")}), 0)::bigint v FROM intern_payments i WHERE i.status = 'paid' AND i.gateway <> 'college_drive' ${at("i")}`, args);
+  const col = await one(`SELECT coalesce(sum(b.amount_minor), 0)::bigint v FROM college_seat_batches b WHERE b.status = 'paid' ${at("b")}`, args);
+  return { employer: Number(emp.v), intern: Number(int.v), college: Number(col.v), total: Number(emp.v) + Number(int.v) + Number(col.v) };
 }
 
 async function ensureStaff() {
@@ -613,8 +626,9 @@ it("9 one money layer: Dashboard, Transactions, Reports, Reports/Money, Orders a
   const invoices = await read("/admin/intern-invoices", "Collected");
   close("Orders Collected (employer orders)", orders, want.employer, 1);
   close("Intern invoices Collected", invoices, want.intern, 1);
-  if (orders !== null && invoices !== null && Math.abs(orders + invoices - want.total) > 1) {
-    problems.push(`Orders + Intern invoices (${(orders + invoices) / 100}) differ from Transactions Received (${want.total / 100})`);
+  // Transactions Received is the whole ledger: employer orders + intern invoices + college seat batches.
+  if (orders !== null && invoices !== null && Math.abs(orders + invoices + want.college - want.total) > 1) {
+    problems.push(`Orders + Intern invoices + college batches (${(orders + invoices + want.college) / 100}) differ from Transactions Received (${want.total / 100})`);
   }
   // The last 30 days, on the two pages that take a period (both start from now - 30 days).
   const since = new Date(Date.now() - 30 * 86_400_000);
