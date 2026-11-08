@@ -75,6 +75,7 @@ before(async () => {
   await mkProposal(E.id, I.id, proj);
   P.E = await signedIn(browser, E);
   P.I = await signedIn(browser, I);
+  P.N = await signedIn(browser, await mkIntern("prN")); // second candidate: the notice is per user
   const prop = await one(`SELECT id FROM proposals WHERE employer_id = $1 AND intern_id = $2`, [E.id, I.id]);
   proposalId = prop.id;
   const r = await api(P.E.page, "POST", "/api/threads", { counterpartId: I.id, proposalId: prop.id });
@@ -159,6 +160,38 @@ test("stale heartbeat reads as offline, never online", async () => {
   assert.match(prof.body, /Offline/);
   assert.doesNotMatch(prof.body, /Last seen/);
   await prof.page.close();
+});
+
+test("one-time notice on the candidate dashboard: shown while on, dismiss persists, links to the toggle", async () => {
+  const NOTICE = "Employers can now see when you're active.";
+  for (const [name, vp] of VIEWS) {
+    const page = await P.I.ctx.newPage();
+    await page.setViewportSize(vp);
+    await settle(page, "/intern/dashboard");
+    const region = page.getByRole("region", { name: "Activity visibility" });
+    await region.waitFor();
+    assert.match(await region.innerText(), new RegExp(NOTICE.replace(/[.']/g, "\\$&")));
+    assert.equal(await region.getByRole("link", { name: "Settings → Privacy" }).getAttribute("href"), "/intern/settings#privacy");
+    await shot(page, `candidate-dashboard-notice-${name}`);
+    if (name === "1440") {
+      await region.getByRole("button", { name: "Dismiss" }).click();
+      await region.waitFor({ state: "detached" });
+    }
+    await page.close();
+  }
+  // Dismissed: gone after a reload, and for this user only.
+  const again = await P.I.ctx.newPage();
+  await settle(again, "/intern/dashboard");
+  assert.equal(await again.getByRole("region", { name: "Activity visibility" }).count(), 0);
+  await again.close();
+  const other = await P.N.ctx.newPage();
+  await settle(other, "/intern/dashboard");
+  assert.equal(await other.getByRole("region", { name: "Activity visibility" }).count(), 1, "another user still sees it");
+  // Not shown at all once that user has turned the setting off.
+  assert.equal((await api(other, "POST", "/api/intern/presence-visibility", { showActivity: false })).status, 200);
+  await settle(other, "/intern/dashboard");
+  assert.equal(await other.getByRole("region", { name: "Activity visibility" }).count(), 0, "no notice while the setting is off");
+  await other.close();
 });
 
 test("the candidate sees the toggle in settings, on by default, and flips it", async () => {

@@ -9,6 +9,7 @@ import { ActivationCard } from "@/components/intern/activation-card";
 import { GettingStarted } from "@/components/intern/getting-started";
 import { MeetingJoinButton } from "@/components/intern/meeting-join";
 import { OpenToWorkToggle } from "@/components/intern/open-to-work-toggle";
+import { PresenceNotice } from "@/components/intern/presence-notice";
 import { aiInterviewPhase, isAiInterview, isScored, joinableLink, latestAiInterview } from "@/lib/ai-interview";
 import { requireRole } from "@/lib/auth";
 import { cn } from "@/lib/utils";
@@ -85,7 +86,7 @@ export default async function InternHome() {
   const session = await requireRole("intern");
 
   // Independent reads, in parallel. loadInternData is cache()d: the layout's call already did the work.
-  const [data, [user], activated, activationFeeMinor, paidMinor, college, counts] = await Promise.all([
+  const [data, [user], activated, activationFeeMinor, paidMinor, college, counts, [presenceRow]] = await Promise.all([
     loadInternData(session.uid),
     getDb()
       .select({
@@ -111,6 +112,12 @@ export default async function InternHome() {
         console.error("[intern/dashboard] unread messages", err);
         return null;
       }),
+    // The one-time "employers can see when you're active" notice shows only while this is still on.
+    getDb()
+      .select({ show: schema.userPresence.showActivity })
+      .from(schema.userPresence)
+      .where(eq(schema.userPresence.userId, session.uid))
+      .limit(1),
   ]);
   // The college covers the interview fee only once it has paid for a batch (owner, 6 Nov).
   const collegePaid =
@@ -520,6 +527,7 @@ export default async function InternHome() {
       />
 
       <div className="space-y-4">
+        <PresenceNotice userId={session.uid} on={presenceRow?.show ?? true} />
         {gettingStarted ? (
           <GettingStarted
             completion={completion}
