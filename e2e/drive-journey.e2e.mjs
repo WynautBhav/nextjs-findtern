@@ -17,7 +17,7 @@ import { createHmac } from "node:crypto";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
 
-import { SEED_PASSWORD } from "./lib/env.mjs";
+import { SEED_PASSWORD, freshIpHeaders } from "./lib/env.mjs";
 import { rows, one, closeDb } from "./lib/db.mjs";
 import { mailTo, waitForMail } from "./lib/mail.mjs";
 import {
@@ -32,17 +32,19 @@ const FEE = 80_000; // paise, the form default
 let browser, admin, tpo, tpoOther, college, other, driveId;
 const A = {}; // main order (5 slots) and its import
 
-/** Mutations need the double-submit CSRF header, as csrfFetch sends it (src/lib/client-fetch.ts). */
+/** Mutations need the double-submit CSRF header, as csrfFetch sends it (src/lib/client-fetch.ts); always sent, because GET /api/admin/refunds is also behind requireMutation and refuses a request without it. */
 async function send(page, method, path, data, extra = {}) {
   const csrf = (await page.context().cookies(BASE)).find((c) => c.name === "ft_csrf")?.value;
-  const headers = { origin: BASE, ...(csrf && method !== "GET" ? { "x-csrf-token": decodeURIComponent(csrf) } : {}), ...(extra.headers ?? {}) };
+  const headers = { origin: BASE, ...(csrf ? { "x-csrf-token": decodeURIComponent(csrf) } : {}), ...(extra.headers ?? {}) };
   return page.request.fetch(`${BASE}${path}`, { method, headers, ...(extra.multipart ? { multipart: extra.multipart } : data !== undefined ? { data } : {}) });
 }
 const idem = (k) => ({ headers: { "idempotency-key": `e2e-${RUN}-${k}` } });
 const json = async (res) => res.json().catch(() => ({}));
 
 async function login(path, creds, viewport) {
-  const ctx = await browser.newContext(viewport ? { viewport } : {});
+  // Each context signs in from its own private IP (TRUST_PROXY=1 on the e2e server): the redeem route allows 30 tries
+  // per address per 15 minutes, never bypassed, and a full run (or a rerun inside the window) used to exhaust it.
+  const ctx = await browser.newContext({ ...(viewport ? { viewport } : {}), extraHTTPHeaders: freshIpHeaders() });
   const page = await ctx.newPage();
   const res = await page.request.post(`${BASE}${path}`, { data: creds, headers: { origin: BASE } });
   assert.equal(res.status(), 200, `login ${path} as ${creds.email}: ${await res.text()}`);
@@ -448,7 +450,7 @@ test("11a refunds: scan copies the paid amount once; a consumed interview goes t
     // as if it settled just before the redemption (e.g. a late webhook): paid_at one hour before redeemed_at.
     await rows(
       `INSERT INTO intern_payments (intern_id, gateway, order_id, payment_id, amount_minor, currency, status, paid_at)
-       SELECT $1, 'razorpay', $2, $3, 250000, 'INR', 'paid', e.redeemed_at - interval '1 hour' FROM drive_entitlements e WHERE e.intern_id = $1`,
+       SELECT $1::varchar, 'razorpay', $2, $3, 250000, 'INR', 'paid', e.redeemed_at - interval '1 hour' FROM drive_entitlements e WHERE e.intern_id = $1`,
       [intern.id, `order_e2e_${RUN}_${i}`, `pay_e2e_${RUN}_${i}`],
     );
   }
@@ -470,7 +472,9 @@ test("11a refunds: scan copies the paid amount once; a consumed interview goes t
   await send(admin, "POST", "/api/admin/refunds");
   assert.equal((await refundsFor()).length, 2);
   // The listing shows it.
-  const list = await json(await send(admin, "GET", "/api/admin/refunds?status=review&per=100"));
+  const listRes = await send(admin, "GET", "/api/admin/refunds?status=review&per=100");
+  assert.equal(listRes.status(), 200, await listRes.text());
+  const list = await json(listRes);
   assert.ok(list.rows.some((r) => r.id === R.second.id));
 });
 
@@ -525,7 +529,7 @@ const noHorizontalScroll = (page) => page.evaluate(() => document.documentElemen
 
 test("12 mobile 390x844: admin drive panel has no horizontal scroll and its headings", async () => {
   const page = await login("/api/auth/admin/login", ADMIN, MOBILE);
-  await page.goto(`${BASE}/admin/colleges/${college.id}`, { waitUntil: "domcontentloaded" });
+  await page.goto(`${BASE}/admin/colleges/${college.id}?tab=drives`, { waitUntil: "domcontentloaded" });
   await page.getByText("Drive orders", { exact: true }).first().waitFor({ timeout: 20_000 });
   await page.getByText("Identity review", { exact: true }).first().waitFor();
   assert.ok(await noHorizontalScroll(page), "page scrolls sideways at 390px");

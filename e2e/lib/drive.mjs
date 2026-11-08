@@ -63,9 +63,13 @@ export const csvMultipart = (bytes, name = "roster.csv") => ({ file: { name, mim
 
 const ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ";
 
-/** The server's signing secret: E2E_SIGNING_SECRET, else the value e2e/run.mjs gives the server. */
+/**
+ * The server's signing secret: E2E_SIGNING_SECRET, else the value e2e/run.mjs gives the server (as e2e/README.md says).
+ * A bare SIGNING_SECRET is deliberately not read: a gate shell often exports one for the seed scripts that is not the
+ * server's, and every derived code (hence every redemption step) was then wrong.
+ */
 export function signingSecret() {
-  const fromEnv = process.env.E2E_SIGNING_SECRET ?? process.env.SIGNING_SECRET;
+  const fromEnv = process.env.E2E_SIGNING_SECRET;
   if (fromEnv && fromEnv.length >= 32) return fromEnv;
   const m = /SIGNING_SECRET:\s*"([^"]{32,})"/.exec(readFileSync(join(E2E_DIR, "run.mjs"), "utf8"));
   if (!m) throw new Error("Set E2E_SIGNING_SECRET to the server's SIGNING_SECRET (>= 32 chars)");
@@ -108,11 +112,14 @@ export async function seedIntern({ label, first, last, phone = fakePhone(), veri
   return { id: u.id, email: addr, phone, first, last, password: PASSWORD };
 }
 
-/** A throwaway college plus one placement officer who can log in. */
-export async function seedCollege(label) {
+/**
+ * A throwaway college plus one placement officer who can log in. A partner by default: only partner colleges
+ * can buy drive orders (src/lib/drives/admin-db.ts), which every step of the journey needs.
+ */
+export async function seedCollege(label, { partner = true } = {}) {
   const [c] = await rows(
-    "INSERT INTO colleges (name, slug) VALUES ($1,$2) RETURNING id, name",
-    [`E2E Drive College ${label} ${RUN}`, `e2e-drive-${label}-${RUN}`],
+    "INSERT INTO colleges (name, slug, is_partner) VALUES ($1,$2,$3) RETURNING id, name",
+    [`E2E Drive College ${label} ${RUN}`, `e2e-drive-${label}-${RUN}`, partner],
   );
   const mail = email(`tpo-${label}`);
   const [a] = await rows(
