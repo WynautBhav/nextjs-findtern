@@ -16,7 +16,8 @@ Master is the only long-lived branch. Everything else is a short-lived branch in
 
 ## Migrations
 
-- **Vercel runs `scripts/migrate.ts` on every build** (`vercel.json` buildCommand). A merge to master migrates whatever database Vercel points at. Treat each migration as a production change.
+- **Vercel runs `scripts/migrate.ts` on every build** (`vercel.json` buildCommand), but the script only migrates when `VERCEL_ENV=production`. On any other Vercel build (Preview, Development, a custom environment, or `VERCEL_ENV` missing) it prints `migrate: skipped, <reason>`, exits 0 and the build continues. A merge to master migrates whatever database Vercel's Production environment points at. Treat each migration as a production change.
+- **When it still runs:** outside Vercel (`VERCEL` unset: local, CI, the GitHub staging workflows, `npm run db:migrate`) it always runs, as before. `MIGRATE_ALLOW=1` forces it on a Vercel build, for example a Vercel custom environment used as staging. Only `1` counts. The decision lives in `scripts/migrate-gate.ts`.
 - Take **only the next number on master** (`drizzle/NNNN_<name>.sql`). Rebase first; if someone else landed that number, renumber.
 - Every migration has a matching `drizzle/rollback/NNNN_<name>.down.sql`.
 - Test the migration, the rollback, and a re-migrate on a **local scratch Postgres**. Assert the host is `localhost` before running anything. Never run against Neon, `.env.production`, or the staging workflows.

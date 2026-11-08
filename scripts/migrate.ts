@@ -10,12 +10,17 @@
  * - scripts/legacy-backfill.sql runs last on every invocation; it only fixes
  *   legacy rows and is idempotent.
  *
+ * On Vercel it only runs for production builds (or MIGRATE_ALLOW=1); see
+ * scripts/migrate-gate.ts. Elsewhere (local, CI, staging workflows) it always runs.
+ *
  * Usage: DATABASE_URL=… npm run db:migrate
  */
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import pg from "pg";
+
+import { migrateDecision } from "./migrate-gate.ts";
 
 const DIR = join(process.cwd(), "drizzle");
 const BACKFILL = join(process.cwd(), "scripts", "legacy-backfill.sql");
@@ -35,6 +40,11 @@ export function statements(sql: string): string[] {
 }
 
 async function main() {
+  const decision = migrateDecision(process.env);
+  if (!decision.run) {
+    console.log(`migrate: skipped, ${decision.reason}`);
+    return;
+  }
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
   const client = new pg.Client({ connectionString: url });
