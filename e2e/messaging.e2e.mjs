@@ -227,7 +227,7 @@ test("thread list and messages carry no email, phone or company before hire", as
     one(`SELECT company_email, phone_number, company_name, name FROM employers WHERE id = $1`, [E.id]),
   ]);
   const forbidden = [ie.email, ie.phone_number, ee.company_email, ee.phone_number, ee.company_name, ee.name];
-  const ALLOWED = ["counterpartId", "counterpartOnline", "id", "lastMessage", "lastMessageAt", "proposalId", "unread"];
+  const ALLOWED = ["counterpartId", "counterpartOnline", "counterpartPresence", "id", "lastMessage", "lastMessageAt", "proposalId", "unread"];
   for (const [who, side] of [["intern", P.I], ["employer", P.E]]) {
     const list = await api(side.page, "GET", "/api/threads");
     assert.equal(list.status, 200);
