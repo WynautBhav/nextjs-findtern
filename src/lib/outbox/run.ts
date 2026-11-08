@@ -34,6 +34,42 @@ export async function runOutboxTick(sender?: Sender): Promise<TickResult> {
   return r.skipped ? { skipped: true, sent: 0, retried: 0, dead: 0 } : { skipped: false, ...r.value };
 }
 
+export const DRAIN_BUDGET_MS = 30_000;
+export const DRAIN_MAX_BATCHES = 20;
+export type DrainResult = TickResult & { batches: number; stoppedBy: "empty" | "budget" | "max_batches" | "busy" };
+
+/**
+ * Runs ticks back to back until a batch comes back short (nothing more is due), the time budget is spent
+ * (checked before each batch, so a batch may overrun it) or `maxBatches` is reached. A cron that fires once
+ * a day then still clears a backlog of more than one batch. Rows that just failed are not due again until their
+ * backoff passes, so the loop cannot spin on them.
+ */
+export async function drainOutbox(
+  tick: () => Promise<TickResult>,
+  o: { budgetMs?: number; maxBatches?: number; clock?: () => number } = {},
+): Promise<DrainResult> {
+  const clock = o.clock ?? Date.now;
+  const budget = o.budgetMs ?? DRAIN_BUDGET_MS;
+  const max = o.maxBatches ?? DRAIN_MAX_BATCHES;
+  const started = clock();
+  const out: DrainResult = { skipped: false, sent: 0, retried: 0, dead: 0, batches: 0, stoppedBy: "max_batches" };
+  while (out.batches < max) {
+    if (out.batches > 0 && clock() - started >= budget) return { ...out, stoppedBy: "budget" };
+    const r = await tick();
+    if (r.skipped) return { ...out, skipped: out.batches === 0, stoppedBy: "busy" };
+    out.batches += 1;
+    out.sent += r.sent;
+    out.retried += r.retried;
+    out.dead += r.dead;
+    if (r.sent + r.retried + r.dead < BATCH_SIZE) return { ...out, stoppedBy: "empty" };
+  }
+  return out;
+}
+
+export function runOutboxDrain(o?: Parameters<typeof drainOutbox>[1]): Promise<DrainResult> {
+  return drainOutbox(() => runOutboxTick(), o);
+}
+
 /* ── Pure campaign helpers ───────────────────────────────────────────── */
 
 export type PlanEntry = { entryId: string; email: string; codeId: string | null; codeStatus: string | null };

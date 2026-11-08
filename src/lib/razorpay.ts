@@ -95,6 +95,11 @@ export function verifyWebhookSignature(rawBody: string, signature: string | null
   return Boolean(secret && signature) && hmacEquals(secret!, rawBody, signature!);
 }
 
+/** The `receipt` Razorpay stores and echoes for a refund created with this idempotency key. */
+export function refundReceipt(idempotencyKey: string): string {
+  return idempotencyKey.slice(0, 40);
+}
+
 /** Pure: the request createRefund sends. The idempotency key rides as `receipt` (Razorpay echoes it back). */
 export function buildRefundRequest(input: { paymentId: string; amountMinor: number; idempotencyKey: string }) {
   if (!/^pay_[A-Za-z0-9]+$/.test(input.paymentId)) throw new Error("Invalid gateway payment id");
@@ -104,7 +109,7 @@ export function buildRefundRequest(input: { paymentId: string; amountMinor: numb
     body: {
       amount: input.amountMinor,
       speed: "normal" as const,
-      receipt: input.idempotencyKey.slice(0, 40),
+      receipt: refundReceipt(input.idempotencyKey),
       notes: { idempotency_key: input.idempotencyKey.slice(0, 256) },
     },
   };
@@ -145,4 +150,73 @@ export function createRefund(input: { paymentId: string; amountMinor: number; id
   })().finally(() => inflightRefunds.delete(input.idempotencyKey));
   inflightRefunds.set(input.idempotencyKey, run);
   return run;
+}
+
+/**
+ * Where reads go. api.razorpay.com, unless RAZORPAY_API_BASE names a loopback host and this is not production
+ * (the e2e stub). A mis-set variable on the live site is ignored, so a read can never be pointed elsewhere.
+ */
+export function razorpayApiBase(env: Record<string, string | undefined> = process.env): string {
+  const raw = (env.RAZORPAY_API_BASE ?? "").trim();
+  if (!raw || env.VERCEL_ENV === "production") return "https://api.razorpay.com";
+  try {
+    const u = new URL(raw);
+    if (u.protocol === "http:" && ["127.0.0.1", "localhost", "[::1]"].includes(u.hostname)) return u.origin;
+  } catch {
+    // fall through
+  }
+  return "https://api.razorpay.com";
+}
+
+/** A Razorpay refund entity, reduced to what the reconcile job reads. */
+export interface GatewayRefundEntity {
+  id: string;
+  status: string;
+  amountMinor: number | null;
+  paymentId: string | null;
+  receipt: string | null;
+}
+
+function toEntity(x: unknown): GatewayRefundEntity | null {
+  const r = x as { id?: unknown; status?: unknown; amount?: unknown; payment_id?: unknown; receipt?: unknown } | null;
+  if (!r || typeof r.id !== "string" || typeof r.status !== "string") return null;
+  return {
+    id: r.id,
+    status: r.status,
+    amountMinor: typeof r.amount === "number" ? r.amount : null,
+    paymentId: typeof r.payment_id === "string" ? r.payment_id : null,
+    receipt: typeof r.receipt === "string" ? r.receipt : null,
+  };
+}
+
+/** GET against Razorpay. null = a 404 (the id does not exist). Anything else that is not a 2xx throws, with no keys in the message. */
+async function gatewayGet(path: string): Promise<unknown | null> {
+  const { keyId, keySecret } = keys();
+  const res = await fetch(`${razorpayApiBase()}${path}`, {
+    method: "GET",
+    headers: { Authorization: `Basic ${Buffer.from(`${keyId}:${keySecret}`).toString("base64")}` },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (res.status === 404) return null;
+  const body = (await res.json().catch(() => ({}))) as { error?: { description?: string } };
+  if (!res.ok) throw new Error(`Razorpay GET failed (${res.status}): ${(body.error?.description ?? "no detail").slice(0, 120)}`);
+  return body;
+}
+
+/** Read-only. Never creates or changes anything at Razorpay. */
+export async function fetchGatewayRefund(refundId: string): Promise<GatewayRefundEntity | null> {
+  if (!/^rfnd_[A-Za-z0-9_]+$/.test(refundId)) throw new Error("Invalid gateway refund id");
+  return toEntity(await gatewayGet(`/v1/refunds/${refundId}`));
+}
+
+/** Read-only. Refunds Razorpay holds for one payment (first page, up to 100). */
+export async function listGatewayPaymentRefunds(paymentId: string): Promise<GatewayRefundEntity[]> {
+  if (!/^pay_[A-Za-z0-9]+$/.test(paymentId)) throw new Error("Invalid gateway payment id");
+  const body = (await gatewayGet(`/v1/payments/${paymentId}/refunds?count=100`)) as { items?: unknown[] } | null;
+  return (body?.items ?? []).map(toEntity).filter((e): e is GatewayRefundEntity => e !== null);
+}
+
+/** True when the Razorpay key pair is present (the reconcile job refuses to run without it). */
+export function razorpayConfigured(env: Record<string, string | undefined> = process.env): boolean {
+  return Boolean((env.RAZORPAY_KEY_ID ?? "").trim() && (env.RAZORPAY_KEY_SECRET ?? "").trim());
 }

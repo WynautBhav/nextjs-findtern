@@ -1,6 +1,6 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
+import { cronAuthorized } from "@/lib/cron-auth";
 import { sendPaymentReminders } from "@/lib/payment-reminders-job";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +12,7 @@ export const dynamic = "force-dynamic";
  * of the live data sets SCHEDULERS=off and never emails real employers.
  */
 export async function GET(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  const got = Buffer.from(req.headers.get("authorization") ?? "");
-  const want = Buffer.from(`Bearer ${secret}`);
-  if (!secret || got.length !== want.length || !timingSafeEqual(got, want)) {
+  if (!cronAuthorized(req)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   if (process.env.SCHEDULERS === "off") return NextResponse.json({ skipped: true, reason: "SCHEDULERS is off" });

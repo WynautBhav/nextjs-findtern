@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { driveCodeEmail, renderEmail } from "../emails.ts";
 import { deriveDriveCode } from "../drives/code-derive.ts";
-import { canResend, makeGuard, maskEmail, planRecipients, shapeCounts } from "./run.ts";
+import { BATCH_SIZE, canResend, drainOutbox, makeGuard, maskEmail, planRecipients, shapeCounts } from "./run.ts";
 import { makeSender } from "./send-db.ts";
 import type { OutboxRow } from "./index.ts";
 
@@ -65,4 +65,44 @@ test("sender derives the code at send time and redacts errors; no real mail", as
     (e: Error) => !e.message.includes("someone@x.com"),
   );
   await assert.rejects(makeSender({ lookup: async () => ({ name: "A", collegeName: "B", status: "revoked", validUntil: new Date(Date.now() + 1e6) }), secret: () => SECRET, mail: async () => ({ ok: true, mode: "log" }) })(row));
+});
+
+const tickOf = (...claimed: number[]) => {
+  let i = 0;
+  return async () => ({ skipped: false, sent: claimed[i++] ?? 0, retried: 0, dead: 0 });
+};
+
+test("drain: keeps going while batches come back full, stops on a short one", async () => {
+  const r = await drainOutbox(tickOf(BATCH_SIZE, BATCH_SIZE, 7, 99));
+  assert.deepEqual(r, { skipped: false, sent: BATCH_SIZE * 2 + 7, retried: 0, dead: 0, batches: 3, stoppedBy: "empty" });
+});
+
+test("drain: an empty queue is one cheap tick", async () => {
+  const r = await drainOutbox(tickOf(0));
+  assert.equal(r.batches, 1);
+  assert.equal(r.stoppedBy, "empty");
+});
+
+test("drain: retried and dead rows count toward a full batch and are summed", async () => {
+  const ticks = [{ skipped: false, sent: 10, retried: 30, dead: 10 }, { skipped: false, sent: 1, retried: 0, dead: 0 }];
+  let i = 0;
+  const r = await drainOutbox(async () => ticks[i++]);
+  assert.deepEqual(r, { skipped: false, sent: 11, retried: 30, dead: 10, batches: 2, stoppedBy: "empty" });
+});
+
+test("drain: stops at the time budget (checked before each batch) and at max batches", async () => {
+  let t = 0;
+  const clock = () => t;
+  const slow = async () => ((t += 10_000), { skipped: false, sent: BATCH_SIZE, retried: 0, dead: 0 });
+  const r = await drainOutbox(slow, { budgetMs: 25_000, clock });
+  assert.equal(r.batches, 3);
+  assert.equal(r.stoppedBy, "budget");
+  const capped = await drainOutbox(async () => ({ skipped: false, sent: BATCH_SIZE, retried: 0, dead: 0 }), { maxBatches: 4 });
+  assert.equal(capped.batches, 4);
+  assert.equal(capped.stoppedBy, "max_batches");
+});
+
+test("drain: a tick that is already running in this process skips the whole drain", async () => {
+  const r = await drainOutbox(async () => ({ skipped: true, sent: 0, retried: 0, dead: 0 }));
+  assert.deepEqual(r, { skipped: true, sent: 0, retried: 0, dead: 0, batches: 0, stoppedBy: "busy" });
 });

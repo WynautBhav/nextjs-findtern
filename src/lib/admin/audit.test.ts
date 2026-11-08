@@ -88,6 +88,7 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "payout.mark_paid": { internId: "i-1", amountMinor: 300000, referenceId: "412345678901" },
   "refund.create": { created: 3, review: 1 },
   "refund.initiate": { refundId: "r-1", amountMinor: 250000, idempotencyKey: "k-1" },
+  "refund.reconcile": { refundId: "r-1", from: "initiated", to: "refunded", gatewayRefundId: "rfnd_1", gatewayStatus: "processed", gatewayAmountMinor: 250000, storedAmountMinor: 250000 },
   "pricing.update": { plan: "Standard", changes: { monthlyPriceMinor: { from: 100000, to: 120000 }, featureList: { from: ["a"], to: ["a", "b"] } } },
   "settings.update": { value: { from: 99900, to: 149900 } },
   "identity.reveal": { field: "phone" },

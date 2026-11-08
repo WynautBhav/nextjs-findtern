@@ -102,6 +102,7 @@ export async function loadAudit(params: Record<string, string>, search: string, 
   if (actorIds.length) {
     for (const e of await db.select({ id: schema.employers.id, a: schema.employers.companyName }).from(schema.employers).where(inArray(schema.employers.id, actorIds))) actors.set(e.id, `Employer: ${e.a}`);
   }
+  for (const id of actorIds) if (id.startsWith("system:")) actors.set(id, "Automatic job");
   const names: AuditNames = emptyNames();
   for (const u of users) names.intern.set(u.id, [u.a, u.b].filter(Boolean).join(" ") || "Candidate");
   for (const e of employers) names.company.set(e.id, e.a);

@@ -50,6 +50,7 @@ export const AUDIT_ACTIONS = {
   "user.deactivate": "Deactivated a user",
   "refund.create": "Created refund rows for students who got a drive seat",
   "refund.initiate": "Initiated a student refund",
+  "refund.reconcile": "Refund status settled from Razorpay (automatic job)",
   "promo.create": "Created a promo code",
   "promo.update": "Edited a promo code",
   "promo.delete": "Deleted a promo code",
