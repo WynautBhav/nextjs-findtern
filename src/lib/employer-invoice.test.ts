@@ -103,8 +103,18 @@ test("batch builder: 5000 payments finish fast and equal the single-call version
   const t0 = Date.now();
   const batch = employerInvoices({ payments, allPayments: payments, legacyPaid, hires: manyHires });
   const ms = Date.now() - t0;
-  console.log(`employerInvoices(${N}) took ${ms} ms`);
-  assert.ok(ms < 2000, `took ${ms} ms`);
+  // Not a tight wall-clock bound (it flaked under CI/builder load: ~0.6s idle, 3s+ loaded).
+  // Compare with the per-payment path measured in the same process, so machine load cancels out:
+  // calling employerInvoice() once per payment costs ~50ms each (~250s for N), the batch ~0.6s idle.
+  // The batch must stay under 1/20 of that estimate; an O(N^2) regression blows through it.
+  // The absolute ceiling is ~50x the idle time (9s was seen with 12 busy loops running) and only catches a runaway.
+  const SAMPLES = 3;
+  const t1 = Date.now();
+  for (let i = 0; i < SAMPLES; i++) employerInvoice({ payment: payments[i * 1000], allPayments: payments, legacyPaid, hires: manyHires });
+  const naiveMs = ((Date.now() - t1) / SAMPLES) * N;
+  console.log(`employerInvoices(${N}) took ${ms} ms (per-payment path would take ~${Math.round(naiveMs)} ms)`);
+  assert.ok(ms < naiveMs / 20, `batch took ${ms} ms, per-payment path would take ~${Math.round(naiveMs)} ms`);
+  assert.ok(ms < 30_000, `took ${ms} ms`);
   assert.equal(batch.size, N);
 
   for (let i = 0; i < N; i += 97) {
