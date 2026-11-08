@@ -8,7 +8,8 @@ export const dynamic = "force-dynamic";
 /**
  * Deletes expired college roster imports (the uploaded names, emails and phones with them), one
  * batch per call, idempotent. Same CRON_SECRET bearer check as /api/cron/payment-reminders; an
- * unset secret is closed. SCHEDULERS=off (a copy of live data) skips it.
+ * unset secret is closed. SCHEDULERS=off does
+ * not skip it: the job sends nothing, and expired personal data should go on a copy of live data too.
  */
 export async function GET(req: Request) {
   const secret = process.env.CRON_SECRET;
@@ -17,7 +18,6 @@ export async function GET(req: Request) {
   if (!secret || got.length !== want.length || !timingSafeEqual(got, want)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  if (process.env.SCHEDULERS === "off") return NextResponse.json({ skipped: true, reason: "SCHEDULERS is off" });
   try {
     return NextResponse.json(await purgeRosterImports());
   } catch (e) {
