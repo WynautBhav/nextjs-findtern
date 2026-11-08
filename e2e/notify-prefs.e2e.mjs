@@ -4,7 +4,7 @@
  *   E2E_BASE_URL=http://localhost:3152 DATABASE_URL=postgresql://findtern@127.0.0.1:55452/findtern_e2e \
  *   CRON_SECRET=<the server's> node --test --test-concurrency=1 e2e/notify-prefs.e2e.mjs   (npm run test:e2e:notify)
  *
- * Needs a migrated DB and a server started with TRUST_PROXY=1, MAIL_MODE=log, CRON_SECRET set and SCHEDULERS not "off"
+ * Needs a migrated DB and a server started with TRUST_PROXY=1, MAIL_MODE=log, PUBLIC_ORIGIN, CRON_SECRET set and SCHEDULERS not "off"
  * (the outbox cron route is what runs the fallback scan). Creates its own employer / intern accounts and removes them.
  * The fallback tests need the server started with NOTIFY_FALLBACK=1 and E2E_NOTIFY_FALLBACK=1 here; without both, the
  * kill-switch test runs instead (default OFF: a tick queues nothing). Prefs UI/API tests run either way.
@@ -129,7 +129,7 @@ test("the prefs API: session user only, strict body, no id, no required category
 
 /* ── email fallback ──────────────────────────────────────────────────── */
 
-test("kill switch: NOTIFY_FALLBACK unset (default OFF) queues and sends nothing, however old the unread message", async () => {
+test("kill switch: NOTIFY_FALLBACK unset (default OFF) queues and sends nothing, however old the unread message", { skip: FALLBACK && "fallback is ON for this run" }, async () => {
   if (!threadId) {
     const t = await api(P.E.page, "POST", "/api/threads", { counterpartId: I.id, proposalId });
     threadId = t.body.thread?.id ?? t.body.id;
@@ -142,7 +142,7 @@ test("kill switch: NOTIFY_FALLBACK unset (default OFF) queues and sends nothing,
   assert.equal((await outboxFor(I)).length, 0, "nothing queued");
   assert.equal((await fallbackMail(I)).length, 0, "nothing mailed");
   await reset();
-}, { skip: FALLBACK && "fallback is ON for this run" });
+});
 
 
 test("setup: the employer opens a thread and messages the intern through the real routes", ON, async () => {
@@ -178,20 +178,6 @@ test("an unread message after 15 minutes: ONE email to the recipient, none to th
   const ob = await outboxFor(I);
   assert.equal(ob.length, 1);
   assert.equal(ob[0].status, "sent");
-});
-
-test("lookback is 48 hours: a 30-hour-old unread message is emailed once, a 50-hour-old one is not", async () => {
-  await reset();
-  await msg(E, "50 hours");
-  await tick();
-  assert.equal((await outboxFor(I)).length, 0, "older than the window");
-  await msg(E, "30 hours");
-  await tick();
-  await tick();
-  assert.equal((await outboxFor(I)).length, 1, "inside the window, once");
-  const mail = await fallbackMail(I);
-  assert.ok(mail.every((m) => !/15 minutes/.test(m.text)), "no claim about 15 minutes");
-  await reset();
 });
 
 test("dedupe: more ticks and a new message in the same unread run send nothing more", ON, async () => {
@@ -312,5 +298,21 @@ test("an unread proposal update: ONE email per proposal after 15 minutes; prefs 
   assert.equal((await offerMail()).length, 1);
   assert.ok(first);
   await rows(`DELETE FROM email_outbox WHERE template = 'offer_unread' AND payload->>'recipientId' = $1`, [I.id]);
+  await reset();
+});
+
+test("lookback is 48 hours: a 30-hour-old unread message is emailed once, a 50-hour-old one is not", ON, async () => {
+  await reset();
+  const mailBefore = (await fallbackMail(I)).length;
+  await msg(E, "50 hours");
+  await tick();
+  assert.equal((await outboxFor(I)).length, 0, "older than the window");
+  await msg(E, "30 hours");
+  await tick();
+  await tick();
+  assert.equal((await outboxFor(I)).length, 1, "inside the window, once");
+  const mail = (await fallbackMail(I)).slice(mailBefore);
+  assert.equal(mail.length, 1, "one email");
+  assert.ok(mail.every((m) => !/15 minutes/.test(m.text ?? JSON.stringify(m))), "no claim about 15 minutes");
   await reset();
 });
