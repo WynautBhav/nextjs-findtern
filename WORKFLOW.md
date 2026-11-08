@@ -29,9 +29,9 @@ Master is the only long-lived branch. Everything else is a short-lived branch in
 
 ```
 scripts/wt.sh new <slug> [feat|fix|ui|chore] [--no-install]   # fetch, worktree + branch from origin/master, npm ci
-scripts/wt.sh done <slug> [--skip-build] [--dry-run]          # fetch, rebase, gates, y/N, ff-only push, remove worktree + branch
+scripts/wt.sh done <slug> [--skip-build] [--dry-run] [--run-gates]  # fetch, rebase, gates, y/N, ff-only push, remove worktree + branch
 ```
 
-`done` stops on a dirty tree, a rebase conflict, a failed gate, or a new migration that is not the next number or has no rollback. It warns past 3 days or 400 lines. `--dry-run` prints what it would do and pushes nothing. `--skip-build` skips only `npm run build`.
+`done` stops on a dirty tree, a rebase conflict, a failed gate, or a new migration that is not the next number or has no rollback. It warns past 3 days or 400 lines. `--dry-run` prints what it would do and pushes nothing; it only **lists** the gates, it does not run them. `--run-gates` is a dry run that really runs the gates (still no push, no rebase, no cleanup). `--skip-build` skips only `npm run build`.
 
-Set `WT_ROOT` to use a different worktree folder. The gates run with the throwaway values from `ci.yml`, never your `.env.local`.
+`WT_ROOT` (different worktree folder) and `WT_GATES` (replaces the gate list; for testing the script itself) are read from the environment, so a stale `export` in your shell changes behavior: `new` and `done` print a warning when either is set, and `done` refuses to push while `WT_GATES` is set unless `WT_ALLOW_CUSTOM_GATES=1`. Run `unset WT_ROOT WT_GATES` if you did not mean it. The gates run with the throwaway values from `ci.yml`, never your `.env.local`.

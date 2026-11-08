@@ -2,10 +2,11 @@
 # One task = one branch = one worktree. See WORKFLOW.md.
 #
 #   scripts/wt.sh new <slug> [feat|fix|ui|chore] [--no-install]
-#   scripts/wt.sh done <slug> [--skip-build] [--dry-run]
+#   scripts/wt.sh done <slug> [--skip-build] [--dry-run] [--run-gates]
 #
 # Env: WT_ROOT (default ~/wt/findtern), WT_REMOTE (origin), WT_BASE (master),
 #      WT_GATES (override the gate command list; used to test this script).
+#      WT_ALLOW_CUSTOM_GATES=1 lets `done` push while WT_GATES is set (testing only).
 set -euo pipefail
 
 ROOT_DIR="${WT_ROOT:-$HOME/wt/findtern}"
@@ -16,6 +17,12 @@ MAX_LINES=400
 
 die() { echo "wt: $*" >&2; exit 1; }
 say() { echo "wt: $*"; }
+
+# WT_ROOT / WT_GATES left over in a shell silently redirect worktrees or fake the gates.
+warn_env() {
+  [ -z "${WT_ROOT:-}" ] || say "WARNING: WT_ROOT is set in the environment ($WT_ROOT); worktrees are NOT under ~/wt/findtern"
+  [ -z "${WT_GATES:-}" ] || say "WARNING: WT_GATES is set in the environment; the real gates will NOT run (unset WT_GATES)"
+}
 
 main_repo() {
   local common
@@ -38,6 +45,7 @@ cmd_new() {
       *) die "unknown argument '$a'" ;;
     esac
   done
+  warn_env
   check_slug "$slug"
   local repo path branch="$type/$slug"
   repo=$(main_repo)
@@ -55,7 +63,7 @@ cmd_new() {
 }
 
 run_gates() {
-  local skip_build="$1" dry="$2"
+  local skip_build="$1" dry="$2" run="${3:-0}"
   local gates
   if [ -n "${WT_GATES:-}" ]; then
     gates="$WT_GATES"
@@ -75,7 +83,7 @@ npm run build"
   local line
   while IFS= read -r line; do
     [ -n "$line" ] || continue
-    if [ "$dry" = 1 ]; then say "[dry-run] would run: $line"; continue; fi
+    if [ "$dry" = 1 ] && [ "$run" != 1 ]; then say "[dry-run] would run: $line (not executed; use --run-gates)"; continue; fi
     say "gate: $line"
     bash -c "$line" || die "gate failed: $line"
   done <<<"$gates"
@@ -96,16 +104,21 @@ check_migrations() {
 }
 
 cmd_done() {
-  local slug="${1:-}" skip_build=0 dry=0
-  [ -n "$slug" ] || die "usage: wt.sh done <slug> [--skip-build] [--dry-run]"
+  local slug="${1:-}" skip_build=0 dry=0 run=0
+  [ -n "$slug" ] || die "usage: wt.sh done <slug> [--skip-build] [--dry-run] [--run-gates]"
   shift
   for a in "$@"; do
     case "$a" in
       --skip-build) skip_build=1 ;;
       --dry-run) dry=1 ;;
+      --run-gates) dry=1; run=1 ;; # dry run that really runs the gates; never pushes
       *) die "unknown argument '$a'" ;;
     esac
   done
+  warn_env
+  if [ "$dry" != 1 ] && [ -n "${WT_GATES:-}" ] && [ "${WT_ALLOW_CUSTOM_GATES:-}" != 1 ]; then
+    die "WT_GATES is set, so the real gates would not run; unset it (or set WT_ALLOW_CUSTOM_GATES=1 to push anyway)"
+  fi
   check_slug "$slug"
   local repo path branch
   repo=$(main_repo)
@@ -144,10 +157,10 @@ cmd_done() {
 
   check_migrations "$path"
 
-  if [ "$dry" != 1 ] && [ ! -d "$path/node_modules" ] && [ -f "$path/package-lock.json" ] && [ -z "${WT_GATES:-}" ]; then
+  if { [ "$dry" != 1 ] || [ "$run" = 1 ]; } && [ ! -d "$path/node_modules" ] && [ -f "$path/package-lock.json" ] && [ -z "${WT_GATES:-}" ]; then
     (cd "$path" && npm ci --no-audit --no-fund)
   fi
-  (cd "$path" && run_gates "$skip_build" "$dry")
+  (cd "$path" && run_gates "$skip_build" "$dry" "$run")
   [ "$skip_build" = 0 ] || say "build skipped; e2e (npm run e2e) and the migrate/db:verify steps are left to CI or you"
 
   if [ "$dry" = 1 ]; then
@@ -178,6 +191,6 @@ case "${1:-}" in
   new) shift; cmd_new "$@" ;;
   done) shift; cmd_done "$@" ;;
   *) echo "usage: scripts/wt.sh new <slug> [feat|fix|ui|chore] [--no-install]"
-     echo "       scripts/wt.sh done <slug> [--skip-build] [--dry-run]"
+     echo "       scripts/wt.sh done <slug> [--skip-build] [--dry-run] [--run-gates]"
      exit 2 ;;
 esac
