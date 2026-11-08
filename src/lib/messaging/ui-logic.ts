@@ -143,7 +143,7 @@ export function markMineRead(msgs: Msg[], at = new Date().toISOString()): Msg[] 
 export function statusText(m: Msg): string {
   if (m.failed) return "Not sent";
   if (m.pending) return "Sending";
-  return m.readAt ? "Read" : "Sent";
+  return m.readAt ? "Read" : m.deliveredAt ? "Delivered" : "Sent";
 }
 
 /** Display identity for the other side. The threads API returns ids only (no names), so this is a generic word plus a short ref from the id; `label` includes the ref, `word` does not. */
@@ -165,4 +165,30 @@ export function senderRuns<T extends { mine: boolean; createdAt: string }>(msgs:
     prev = t;
   }
   return out;
+}
+
+/** What the proposal card in a thread shows. Drafts are never shown to the intern; the loader returns null for them. */
+export type ProposalCardData = { id: string; title: string; status: string; duration: string | null };
+
+const PROPOSAL_STATUS_LABEL: Record<string, string> = {
+  draft: "Draft",
+  sent: "Awaiting reply",
+  interview_scheduled: "Interview scheduled",
+  accepted: "Accepted",
+  hired: "Hired",
+  rejected: "Declined",
+  withdrawn: "Withdrawn",
+  expired: "Expired",
+};
+
+export function proposalStatusLabel(status: string): string {
+  return PROPOSAL_STATUS_LABEL[status] ?? "In progress";
+}
+
+/** "3m" -> "3 months", "1m" -> "1 month"; anything else is not shown. */
+export function durationLabel(raw: unknown): string | null {
+  const m = /^(\d{1,2})\s*m$/i.exec(String(raw ?? "").trim());
+  if (!m) return null;
+  const n = Number(m[1]);
+  return n > 0 ? `${n} ${n === 1 ? "month" : "months"}` : null;
 }

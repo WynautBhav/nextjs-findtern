@@ -57,13 +57,14 @@ test("optimistic reconcile, rollback and read marks", () => {
   assert.equal(failSent([temp], "tmp")[0].failed, true);
   assert.equal(statusText(failSent([temp], "tmp")[0]), "Not sent");
   assert.equal(statusText(server), "Sent");
+  assert.equal(statusText({ ...server, deliveredAt: "2026-01-01T00:00:02Z" }), "Delivered");
   const read = markMineRead([server, temp]);
   assert.equal(statusText(read[0]), "Read");
   assert.equal(read[1].readAt, null);
   assert.equal(mergeMessages([server], [server, msg("n", "2026-01-01T00:00:00Z")]).map((m) => m.id).join(), "n,srv");
 });
 
-import { counterpartIdentity, senderRuns } from "./ui-logic.ts";
+import { counterpartIdentity, durationLabel, proposalStatusLabel, senderRuns } from "./ui-logic.ts";
 
 test("counterpart identity is a stable masked mark", () => {
   const a = counterpartIdentity("employer", "abc-12gv9");
@@ -77,4 +78,14 @@ test("sender runs break on sender change and long gaps", () => {
   const m = (mine: boolean, min: number) => ({ mine, createdAt: new Date(NOW + min * 60_000).toISOString() });
   const runs = senderRuns([m(true, 0), m(true, 2), m(false, 3), m(false, 30), m(false, 31)]);
   assert.deepEqual(runs.map((r) => r.items.length), [2, 1, 2]);
+});
+
+test("proposal card labels", () => {
+  assert.equal(proposalStatusLabel("sent"), "Awaiting reply");
+  assert.equal(proposalStatusLabel("rejected"), "Declined");
+  assert.equal(proposalStatusLabel("something_new"), "In progress");
+  assert.equal(durationLabel("3m"), "3 months");
+  assert.equal(durationLabel("1m"), "1 month");
+  assert.equal(durationLabel("soon"), null);
+  assert.equal(durationLabel(undefined), null);
 });

@@ -5,8 +5,8 @@ export function PresenceDot({ online, label, showText = true }: { online: boolea
   if (!label) return null;
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-text-subtle">
-      <span aria-hidden className={cn("size-2 rounded-full", online ? "bg-success" : "bg-ink-300")} />
-      <span className={showText ? undefined : "sr-only"}>{label}</span>
+      <span aria-hidden className={cn("size-2 shrink-0 rounded-full", online ? "bg-success" : "bg-ink-300")} />
+      <span className={showText ? "truncate" : "sr-only"}>{label}</span>
     </span>
   );
 }
