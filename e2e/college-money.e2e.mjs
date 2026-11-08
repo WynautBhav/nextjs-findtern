@@ -13,7 +13,7 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { seedColleges } from "./lib/env.mjs";
 
 import pg from "pg";
 import { chromium } from "playwright";
@@ -40,10 +40,7 @@ async function login(path, creds) {
 }
 
 before(async () => {
-  execFileSync("node", ["--experimental-strip-types", "scripts/seed-colleges.ts"], {
-    env: { ...process.env, DATABASE_URL: DB, PUBLIC_ORIGIN: BASE },
-    stdio: "ignore",
-  });
+  seedColleges(DB, BASE);
   pool = new pg.Pool({ connectionString: DB });
   browser = await chromium.launch();
   admin = await login("/api/auth/admin/login", ADMIN);

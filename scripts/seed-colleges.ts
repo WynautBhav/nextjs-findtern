@@ -24,7 +24,7 @@ import pg from "pg";
 
 import * as schema from "../src/lib/db/schema.ts";
 import { acceptanceValues } from "../src/lib/terms.ts";
-import { hashPassword } from "../src/lib/security/password.ts";
+import { hashPassword, verifyPassword } from "../src/lib/security/password.ts";
 import { withFreshCollegeCode } from "../src/lib/college/code.ts";
 import { generateTpoCode } from "../src/lib/college/code.ts";
 import { INCENTIVE_MINOR } from "../src/lib/college/wallet.ts";
@@ -109,7 +109,10 @@ async function main() {
   await db.delete(schema.collegeWalletEntries).where(eq(schema.collegeWalletEntries.collegeId, jklu.id));
   await db.delete(schema.collegePayouts).where(eq(schema.collegePayouts.collegeId, jklu.id));
 
-  const pw = await hashPassword(PASSWORD);
+  // Keep the officer's stored hash when it already matches: a fresh salt changes the password version, and a running
+  // server (which caches it for 30 s) then rejects the sessions of everyone who signs in right after a re-seed.
+  const [existingTpo] = await db.select({ password: schema.collegeAdmins.password }).from(schema.collegeAdmins).where(eq(schema.collegeAdmins.email, "tpo@jklu.edu.in"));
+  const pw = existingTpo && (await verifyPassword(PASSWORD, existingTpo.password)) ? existingTpo.password : await hashPassword(PASSWORD);
   await db
     .insert(schema.collegeAdmins)
     .values({ collegeId: jklu.id, name: "Bhavesh Sharma", email: "tpo@jklu.edu.in", password: pw, ...acceptanceValues() })

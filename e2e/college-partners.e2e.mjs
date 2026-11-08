@@ -6,9 +6,9 @@
  *      and asks for a call now.
  *   3. Sana (phone-sized screen) sees the call, accepts, gets the join link.
  *      Without a meeting link source (a production build with no Google
- *      calendar connected) the request is refused instead (QA-001): the suite
- *      asserts the refusal, checks Sana gets no call, and skips the accept,
- *      join and cancel steps, saying why.
+ *      calendar connected) the first request is refused (QA-001); the suite
+ *      asserts the refusal, pastes its own meeting link as the message says,
+ *      and the same request then goes through to accept, join and cancel.
  *   4. Officer sees the call and Sana online, then closes the link; the
  *      employer is locked out at once.
  *
@@ -21,17 +21,17 @@
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
-
+import pg from "pg";
 import { chromium, devices } from "playwright";
+
+import { freshIpHeaders, seedColleges } from "./lib/env.mjs";
 
 const BASE = process.env.E2E_BASE ?? "http://localhost:3200";
 const DB = process.env.E2E_DATABASE_URL ?? "postgresql://findtern:findtern_dev@localhost:5433/findtern";
 const PASSWORD = "Findtern@2026";
 const T = 30_000;
-/** False once the server refuses the call for want of a calendar (QA-001). */
-let calendar = true;
-const NO_CALENDAR = "no meeting link source: the server refused the call (QA-001), as it should without a calendar";
+const NO_CALENDAR_MESSAGE = "Google Calendar is not connected. Paste a meeting link instead.";
+const MANUAL_LINK = "https://meet.google.com/e2e-test-room";
 
 let browser;
 let tpo; // officer page
@@ -50,19 +50,17 @@ function istInput(offsetMin) {
 /** Fill one of the drive form's IST date + time pairs. */
 async function fillIst(page, label, offsetMin) {
   const v = istInput(offsetMin);
-  await page.getByLabel(`${label}, date`).fill(v.date);
-  await page.getByLabel(`${label}, time`).fill(v.time);
+  // exact: the date field also has a calendar button labelled "Open calendar, <label>, date", which a substring match hits too.
+  await page.getByLabel(`${label}, date`, { exact: true }).fill(v.date);
+  await page.getByLabel(`${label}, time`, { exact: true }).fill(v.time);
 }
 
 before(async () => {
-  execFileSync("node", ["--experimental-strip-types", "scripts/seed-colleges.ts"], {
-    env: { ...process.env, DATABASE_URL: DB, PUBLIC_ORIGIN: BASE },
-    stdio: "ignore",
-  });
+  seedColleges(DB, BASE);
   browser = await chromium.launch();
-  tpo = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
-  emp = await (await browser.newContext({ viewport: { width: 1280, height: 900 } })).newPage();
-  stu = await (await browser.newContext({ ...devices["Pixel 7"] })).newPage();
+  tpo = await (await browser.newContext({ viewport: { width: 1280, height: 900 }, extraHTTPHeaders: freshIpHeaders() })).newPage();
+  emp = await (await browser.newContext({ viewport: { width: 1280, height: 900 }, extraHTTPHeaders: freshIpHeaders() })).newPage();
+  stu = await (await browser.newContext({ ...devices["Pixel 7"], extraHTTPHeaders: freshIpHeaders() })).newPage();
   for (const p of [tpo, emp, stu]) p.setDefaultTimeout(T);
 });
 
@@ -80,9 +78,19 @@ test("officer: signs in and sees the console", async () => {
   const main = await tpo.locator("main").innerText();
   assert.match(main, /Joined Findtern/);
   assert.match(main, /61\/73/, "61 of 73 roster students joined in the seed");
-  // Cohort tabs filter the table.
+  // Cohort tabs filter the table; the footer's total is every member of the college who has not left
+  // (studentsForCollegeAdmin). It is not the 61 "joined" above: that counts roster rows that joined, and
+  // the QA situations seed adds one verified member (Ritika) with no roster row, so ask the DB.
+  const db = new pg.Client({ connectionString: DB });
+  await db.connect();
+  const { rows } = await db.query(
+    "SELECT count(*)::int AS n FROM college_memberships m JOIN colleges c ON c.id = m.college_id WHERE c.slug = 'jklu' AND m.left_at IS NULL",
+  );
+  await db.end();
+  const members = rows[0].n;
+  assert.ok(members >= 61, `the seed gives JKLU at least 61 members, found ${members}`);
   await tpo.getByRole("button", { name: /4th year/ }).click();
-  assert.match(await tpo.locator("main").innerText(), /Showing \d+ of 61/);
+  assert.match(await tpo.locator("main").innerText(), new RegExp(`Showing \\d+ of ${members}\\b`));
 });
 
 test("officer: builds a live drive that shows only Sana", async () => {
@@ -127,9 +135,16 @@ test("employer: shortlists and asks for a call now", async () => {
   await card.getByRole("button", { name: /Call/ }).click();
   await emp.getByRole("menuitem", { name: "Now" }).click();
   const sent = emp.getByRole("status").filter({ hasText: "Call request sent" });
-  const refused = emp.getByRole("alert").filter({ hasText: "Calendar not connected; ask Findtern to connect it." });
+  const refused = emp.getByRole("alert").filter({ hasText: NO_CALENDAR_MESSAGE });
   await sent.or(refused).first().waitFor();
-  calendar = await sent.isVisible();
+  if (await refused.isVisible()) {
+    // QA-001: no calendar and no pasted link, so the server refuses. The refusal tells the employer what to do:
+    // paste their own meeting link (the "Your own meeting link" field), and the same request then goes through.
+    await emp.getByLabel("Your own meeting link (optional)").fill(MANUAL_LINK);
+    await card.getByRole("button", { name: /Call/ }).click();
+    await emp.getByRole("menuitem", { name: "Now" }).click();
+    await sent.first().waitFor();
+  }
 });
 
 test("student: sees the call on a phone and accepts", async () => {
@@ -138,12 +153,6 @@ test("student: sees the call on a phone and accepts", async () => {
   await stu.goto(`${BASE}/intern/dashboard`);
   await stu.getByText(/E2E campus drive is live/).waitFor();
   const call = stu.getByRole("alertdialog");
-  if (!calendar) {
-    // A refused request leaves nothing for the student to accept.
-    await stu.waitForTimeout(1500);
-    assert.equal(await call.count(), 0, "no call card without a meeting link");
-    return;
-  }
   await call.waitFor();
   assert.match(await call.innerText(), /now/i);
   await call.getByRole("button", { name: "Accept" }).click();
@@ -154,17 +163,17 @@ test("student: sees the call on a phone and accepts", async () => {
   assert.equal(overflow, false, "no sideways scroll on the phone");
 });
 
-test("employer: the call shows as accepted with a join link", async (t) => {
-  if (!calendar) return t.skip(NO_CALENDAR);
+test("employer: the call shows as accepted with a join link", async () => {
   await emp.reload();
   await emp.getByText("Accepted").first().waitFor();
   await emp.getByRole("link", { name: "Join call" }).first().waitFor();
 });
 
-test("employer: can cancel the call; the student's card goes away", async (t) => {
-  if (!calendar) return t.skip(NO_CALENDAR);
+test("employer: can cancel the call; the student's card goes away", async () => {
   const calls = emp.locator('section[aria-labelledby="calls-title"]');
   await calls.getByRole("button", { name: "Cancel" }).first().click();
+  // Cancelling asks first (an in-page confirm, like closing the drive link).
+  await emp.getByRole("button", { name: "Yes, cancel the call" }).click();
   await emp.getByRole("status").filter({ hasText: "Call cancelled" }).waitFor();
   await calls.getByText("Cancelled").first().waitFor();
   await stu.reload();
@@ -177,7 +186,7 @@ test("officer: sees Sana online and the employer inside; closes the link", async
   await tpo.goto(`${BASE}${drivePath}`);
   const main = tpo.locator("main");
   await main.getByText("Northwind Labs").waitFor();
-  assert.match(await main.innerText(), calendar ? /1 shortlisted · 1 call\b/ : /1 shortlisted · 0 calls/);
+  assert.match(await main.innerText(), /1 shortlisted · 1 call\b/);
   await main.getByText(/^1\s*\/1$/).waitFor(); // presence: 1 of 1 eligible online
   // Confirmed in the page now, not a browser dialog.
   await tpo.getByRole("button", { name: "Close link now" }).click();
