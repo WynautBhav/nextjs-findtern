@@ -4,10 +4,10 @@ import { ONLINE_WINDOW_MS } from "./messaging/logic.ts";
 /**
  * Which notifications a person may turn off.
  *
- * - `required`: payments, invoices, stipends, security, interviews, timesheets, hires, everything not listed below.
+ * - `required`: payments, invoices, stipends, security, interviews, timesheets, hires, new proposals and full-time offers, everything not listed below.
  *   Never suppressible. A type we have not classified is `required`: fail closed, so a new money email can never be
  *   switched off by accident.
- * - `message` / `offer`: the unread-message and unread-offer reminder emails, and the immediate offer emails.
+ * - `message` / `offer`: the unread-message and unread-offer reminder emails (and proposal updates). The first email about a new proposal or offer is `required`.
  * - `tips`: nudges and suggestions (profile views, weekly tip, talent spotlight, cart reminder, profile nudges).
  */
 export type NotifyCategory = "required" | "message" | "offer" | "tips";
@@ -20,7 +20,9 @@ export type NotifyChannel = "email" | "inApp";
 export type PrefsRow = { emailMessages: boolean; pushMessages: boolean };
 
 const MESSAGE_TYPES = new Set(["message_unread"]);
-const OFFER_TYPES = new Set(["proposal_received", "proposal_updated", "full_time_offer_received", "offer_unread"]);
+// proposal_received and full_time_offer_received are NOT here: the first email about a proposal or offer is core hiring
+// mail, so the email switch cannot silence it. Only the unread reminders (and proposal updates) are optional.
+const OFFER_TYPES = new Set(["proposal_updated", "offer_unread"]);
 const TIPS_TYPES = new Set([
   "weekly_hire_tip",
   "talent_spotlight",

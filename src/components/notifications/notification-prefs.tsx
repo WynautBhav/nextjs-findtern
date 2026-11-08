@@ -16,7 +16,7 @@ const COPY: Record<"intern" | "employer", { key: Key; title: string; help: strin
       title: "Email me about messages and offers I haven't seen",
       help: "If a message or an updated proposal sits unread for 15 minutes, we send one email with a link. Never while you're online.",
       on: "You'll get an email if a message or proposal update goes unread.",
-      off: "No emails for unread messages or proposal updates. They still show in the app.",
+      off: "No reminder emails for unread messages or proposal updates. They still show in the app, and new proposals and offers are still emailed.",
     },
     {
       key: "pushMessages",
@@ -56,7 +56,7 @@ export function NotificationPrefs({ role, initial }: { role: "intern" | "employe
         <PrefRow key={c.key} item={c} initial={initial[c.key]} />
       ))}
       <p className="text-sm leading-relaxed text-text-subtle">
-        Emails about payments, invoices, interviews and your account&apos;s security are always sent. They can&apos;t be turned off.
+        Emails about new proposals and offers, payments, invoices, interviews and your account&apos;s security are always sent. They can&apos;t be turned off.
       </p>
     </div>
   );

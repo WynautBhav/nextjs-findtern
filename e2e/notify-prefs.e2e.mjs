@@ -90,7 +90,7 @@ for (const [who, path, label] of [
     const emailSwitch = section.getByRole("switch", { name: /Email me about/ });
     assert.equal(await emailSwitch.getAttribute("aria-checked"), "true", "defaults to on with no row");
     assert.equal(await section.getByRole("switch").count(), 2);
-    assert.match(await section.innerText(), /payments, invoices, interviews and your account.s security are always sent/);
+    assert.match(await section.innerText(), /new proposals and offers, payments, invoices, interviews and your account.s security are always sent/);
 
     await emailSwitch.click();
     await page.waitForFunction(() => document.querySelector('#notifications [data-pref="emailMessages"] [role="status"]')?.textContent?.trim());

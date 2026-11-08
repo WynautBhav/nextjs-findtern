@@ -55,9 +55,17 @@ describe("categoryOf", () => {
   });
   it("messages, offers and tips are the optional ones", () => {
     assert.equal(categoryOf("message_unread"), "message");
-    for (const t of ["proposal_received", "proposal_updated", "full_time_offer_received", "offer_unread"]) assert.equal(categoryOf(t), "offer", t);
+    for (const t of ["proposal_updated", "offer_unread"]) assert.equal(categoryOf(t), "offer", t);
     for (const t of ["weekly_hire_tip", "talent_spotlight", "cart_inactivity", "profile_completion_nudge", "monthly_profile_views"]) {
       assert.equal(categoryOf(t), "tips", t);
+    }
+  });
+  it("the first proposal and full-time offer emails are required: the email switch cannot silence them", () => {
+    for (const t of ["proposal_received", "full_time_offer_received"]) {
+      assert.equal(categoryOf(t), "required", t);
+      for (const ch of ["email", "inApp"] as const) {
+        assert.equal(channelAllowed({ emailMessages: false, pushMessages: false }, categoryOf(t), ch), true, `${t} ${ch}`);
+      }
     }
   });
   it("isSuppressible is false only for required", () => {
