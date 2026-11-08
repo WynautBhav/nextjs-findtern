@@ -5,6 +5,7 @@ import { Check, Info } from "lucide-react";
 
 import { bandFor, planNameFor } from "@/lib/score";
 import type { PresenceLabel } from "@/lib/presence";
+import { PRESENCE_ONLINE } from "@/lib/presence-logic";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { rowSkills } from "@/components/employer/candidate-view";
 
@@ -32,7 +33,7 @@ export function RowAvatar({
   className?: string;
   seed?: string;
 }) {
-  const online = presence === "Online now";
+  const online = presence === PRESENCE_ONLINE;
   return (
     <div className="relative shrink-0 self-start sm:row-span-2">
       <CandidateAvatar

@@ -655,7 +655,7 @@ export async function loadCandidates(
     data.plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
     const pageIds = data.candidates.map((c) => c.id);
     data.relations = await candidateRelations(db, uid, pageIds, activeProjectId);
-    // Labels like "Online now", never a time. Optional, like the saved roles.
+    // Labels like "Active now" / "Last seen 2h ago"; hidden candidates get null (lib/presence.ts). Optional, like the saved roles.
     data.presence = await presenceOf(pageIds).catch((err) => {
       console.error("[employer/candidates] presence", err);
       return {};

@@ -15,6 +15,7 @@ import { Pill } from "@/components/app/primitives";
 import { SendProposalHold } from "@/components/employer/send-proposal-hold";
 import { sendProposalHold } from "@/lib/proposal-guard";
 import type { PresenceLabel } from "@/lib/presence";
+import { PRESENCE_ONLINE } from "@/lib/presence-logic";
 import { csrfFetch } from "@/lib/client-fetch";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -46,7 +47,7 @@ export interface CandidateCardProps {
   fullTime?: FullTimeContext | null;
   /** Skills the list is filtered by: matching chips are filled and listed first. */
   wantedSkills?: string[];
-  /** "Online now" / "Active today" / "Active this week"; null when hidden or older. Never a time. */
+  /** "Active now" / "Last seen 2h ago" / "Offline"; null when the candidate hides it. */
   presence?: PresenceLabel | null;
   /** The intern saved this employer's role for the selected project. */
   interested?: boolean;
@@ -220,7 +221,7 @@ export function CandidateCard({
             className="-my-2 inline-flex h-11 min-w-11 items-center text-base font-semibold text-ink-900 outline-none group-hover/row:text-brand-800 after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500 sm:text-lg"
           >
             {displayName}
-            {presence === "Online now" ? <span className="sr-only">, online now</span> : null}
+            {presence === PRESENCE_ONLINE ? <span className="sr-only">, active now</span> : null}
           </Link>
           {hired && proposal?.status !== "hired" ? <Pill tone="live" className="shrink-0 whitespace-nowrap">Hired</Pill> : null}
           {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
@@ -238,8 +239,8 @@ export function CandidateCard({
         <p className="mt-0.5 inline-flex items-center gap-1 text-sm text-ink-600">
           <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
           {place || "City not stated"}
-          {/* The grey dot alone reads as offline; say it in words (a label, never a time). */}
-          {presence && presence !== "Online now" ? <span className="whitespace-nowrap">· {presence}</span> : null}
+          {/* The grey dot alone reads as offline; say it in words (a coarse label). */}
+          {presence && presence !== PRESENCE_ONLINE ? <span className="whitespace-nowrap">· {presence}</span> : null}
         </p>
       </div>
 

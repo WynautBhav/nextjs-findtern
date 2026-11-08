@@ -38,6 +38,7 @@ import { profileText } from "@/components/employer/profile-text";
 import { PresenceDot } from "@/components/app/presence-dot";
 import { MessageButton } from "@/components/app/message-button";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
+import { PRESENCE_ONLINE } from "@/lib/presence-logic";
 
 export const metadata: Metadata = {
   title: "Candidate",
@@ -97,7 +98,7 @@ export default async function EmployerInternDetail({
   let comparePicks: string[] = [];
   let employerFte = "none";
   let employerZone = "Asia/Kolkata";
-  /** "Online now" / "Active today" / "Active this week", never a time; null when hidden or older. */
+  /** "Active now" / "Last seen 2h ago" / "Offline"; null when the candidate hides it. */
   let presence: PresenceLabel | null = null;
   /** The selected project's skills: matching chips are ticked and listed first, as on the candidate list. */
   let wanted: { project: string; skills: string[] } | null = null;
@@ -363,7 +364,7 @@ export default async function EmployerInternDetail({
               {presence ? (
                 <span
                   aria-hidden
-                  className={`absolute bottom-0.5 right-0.5 size-4 rounded-full ring-[3px] ring-white sm:bottom-1 sm:right-1 ${presence === "Online now" ? "bg-success" : "bg-ink-300"}`}
+                  className={`absolute bottom-0.5 right-0.5 size-4 rounded-full ring-[3px] ring-white sm:bottom-1 sm:right-1 ${presence === PRESENCE_ONLINE ? "bg-success" : "bg-ink-300"}`}
                 />
               ) : null}
             </span>

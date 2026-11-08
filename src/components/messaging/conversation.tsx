@@ -183,7 +183,7 @@ export function Conversation({ base, threadId }: { base: "employer" | "intern"; 
             {who}
           </h1>
           <div className="flex items-center gap-2">
-            {thread ? <PresenceDot online={thread.counterpartOnline} /> : null}
+            {thread ? <PresenceDot online={thread.counterpartOnline} label={thread.counterpartPresence} /> : null}
             {offline ? (
               <span role="status" className="text-xs text-text-subtle">
                 · Reconnecting…

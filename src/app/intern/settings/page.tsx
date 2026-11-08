@@ -7,6 +7,7 @@ import { ArrowRight } from "lucide-react";
 import { DetailRow, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { CopyIdButton } from "@/components/intern/copy-id-button";
+import { ActivityVisibilityToggle } from "@/components/intern/activity-visibility-toggle";
 import { CollegeForm } from "@/components/intern/college-form";
 import { BankDetailsForm, type BankDetails } from "@/components/intern/bank-details-form";
 import { InvoiceList } from "@/components/intern/invoice-list";
@@ -28,6 +29,7 @@ const SECTIONS: [id: string, label: string][] = [
   ["details", "Your details"],
   ["bank", "Bank account"],
   ["college", "College"],
+  ["privacy", "Privacy"],
   ["invoices", "Invoices"],
   ["password", "Password"],
 ];
@@ -53,7 +55,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
 
   const uid = session.uid;
   const db = getDb();
-  const [[row], [user], college, payments] = await Promise.all([
+  const [[row], [user], college, [presenceRow], payments] = await Promise.all([
     db
       .select({ extra: schema.internOnboarding.extraData })
       .from(schema.internOnboarding)
@@ -72,6 +74,8 @@ export default async function InternSettings({ searchParams }: { searchParams: P
       .where(eq(schema.users.id, uid))
       .limit(1),
     membershipOf(uid),
+    // No row yet means never seen, which counts as visible (the default).
+    db.select({ show: schema.userPresence.showActivity }).from(schema.userPresence).where(eq(schema.userPresence.userId, uid)).limit(1),
     // Ownership is the session's uid, never a URL id; paid, ₹0 and number-less rows are dropped (also re-checked in ownInternInvoices).
     db
       .select({
@@ -163,6 +167,13 @@ export default async function InternSettings({ searchParams }: { searchParams: P
               institution={institution}
               vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
             />
+          </section>
+
+          <section id="privacy" className="scroll-mt-24">
+            <SectionHead title="Privacy" hint="What employers can see about you while you browse." />
+            <Surface className="p-5 lg:p-6">
+              <ActivityVisibilityToggle initial={presenceRow?.show ?? true} />
+            </Surface>
           </section>
 
           <section id="invoices" className="scroll-mt-24">
