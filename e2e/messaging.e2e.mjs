@@ -158,10 +158,11 @@ test("unread badge rises WITHOUT reload for the recipient, clears on opening; se
   // Intern opens the thread: the badge clears and the employer's message turns Read.
   await P.I.page.goto(url(`/intern/messages/${threadId}`), { waitUntil: "domcontentloaded" });
   await waitBadge(P.I.page, "intern", (n) => n === 0, "cleared");
+  // The receipt of THIS message, not any bubble: earlier messages in the thread are already "Read", so a
+  // thread-wide match is true at once and the DB read below raced the intern's POST /read.
   await P.E.page
-    .locator("p:has(time)")
+    .locator(`div:has(> p:has-text("live ping ${RUN}")) > p:has(time)`)
     .filter({ hasText: "Read" })
-    .last()
     .waitFor({ timeout: 20_000 });
   const m = await one(`SELECT read_at FROM messages WHERE thread_id = $1 AND body = $2`, [threadId, `live ping ${RUN}`]);
   assert.ok(m.read_at, "read_at stored");

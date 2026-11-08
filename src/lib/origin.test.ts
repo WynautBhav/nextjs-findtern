@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { isRealDomain, isStagingOrigin, isTestHost, requirePublicOrigin } from "./origin.ts";
+import { isRealDomain, isStagingOrigin, isTestHost, requirePublicOrigin, tryPublicOrigin } from "./origin.ts";
 import { paymentsAreFree, testPayEnabled } from "./razorpay.ts";
 
 const STAGING = "https://nextjs-findtern.vercel.app";
@@ -85,4 +85,11 @@ test("test hosts are a list: localhost, Vercel deployments, STAGING_HOSTS; never
   for (const o of [undefined, "", "https://findtern.in", "https://www.findtern.in.", "https://app.findtern.in", "https://example.com", "https://vercel.app.evil.com", "https://evilvercel.app"]) assert.equal(isTestHost({ PUBLIC_ORIGIN: o }), false, String(o));
   assert.equal(isTestHost({ PUBLIC_ORIGIN: "https://qa.example.com", STAGING_HOSTS: "other.example.com, QA.example.com." }), true);
   assert.equal(isTestHost({ PUBLIC_ORIGIN: "https://findtern.in", STAGING_HOSTS: "findtern.in" }), false, "the real domain cannot be listed in");
+});
+
+test("tryPublicOrigin: null instead of a throw when production has no PUBLIC_ORIGIN (post-commit emails must not 500 a saved decision)", () => {
+  assert.equal(tryPublicOrigin({ NODE_ENV: "production" }), null);
+  assert.equal(tryPublicOrigin({ NODE_ENV: "production", PUBLIC_ORIGIN: "not a url" }), null);
+  assert.equal(tryPublicOrigin({ NODE_ENV: "production", PUBLIC_ORIGIN: "https://findtern.in/" }), "https://findtern.in");
+  assert.equal(tryPublicOrigin({ NODE_ENV: "development" }), "http://localhost:3000");
 });

@@ -5,8 +5,8 @@ import { z } from "zod";
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
-import { origin } from "@/lib/emails";
 import { notify } from "@/lib/notify";
+import { tryPublicOrigin } from "@/lib/origin";
 import { isTransitionConflict, planReview } from "@/lib/projects/transition";
 
 const bodySchema = z.object({ decision: z.enum(["approve", "reject"]), reason: z.string().max(1000).optional() });
@@ -43,7 +43,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     meta: { projectName: project.projectName, ...(plan.to === "rejected" ? { reason: plan.set.rejectionReason } : {}) },
   });
 
-  // Best effort: a failed notification or email never undoes the decision.
+  // Best effort: a failed notification or email never undoes the decision, and it is already
+  // committed, so nothing here may 500. No PUBLIC_ORIGIN (production) means no email link: the
+  // employer still gets the in-app notification.
+  const site = tryPublicOrigin();
   const approved = plan.to === "published";
   const name = project.projectName;
   await notify({
@@ -53,7 +56,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     message: approved ? `"${name}" is now visible to candidates.` : `"${name}" was not approved: ${plan.set.rejectionReason}`,
     data: { projectId: id },
     dedupeKey: `project-review:${id}:${plan.to}:${Date.now()}`,
-    email: {
+    email: site === null ? undefined : {
       subject: approved ? `Your internship "${name}" is live` : `Your internship "${name}" needs changes`,
       heading: approved ? "Your internship is live" : "Your internship needs changes",
       greeting: "Hello,",
@@ -62,7 +65,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         : [`"${name}" was not approved.`, `Reason: ${plan.set.rejectionReason}`, "Edit it and submit again when you are ready."],
       status: approved ? "Published" : "Needs changes",
       tone: approved ? "done" : "wait",
-      cta: { label: "Open your projects", url: `${origin()}/employer/projects` },
+      cta: { label: "Open your projects", url: `${site}/employer/projects` },
     },
   }).catch((err) => console.error("[admin/projects/review] notify failed", err));
 

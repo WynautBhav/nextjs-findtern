@@ -34,6 +34,19 @@ export function requirePublicOrigin(env: Record<string, string | undefined> = pr
 }
 
 /**
+ * Like requirePublicOrigin, but null instead of a throw. For work that runs AFTER a
+ * write has committed (a notification email's link): a missing origin must cost the
+ * email, never turn a saved decision into a 500.
+ */
+export function tryPublicOrigin(env: Record<string, string | undefined> = process.env): string | null {
+  try {
+    return requirePublicOrigin(env);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Where the test-only switches (the test payment button, free-payments mode, the
  * rate-limit bypass) may work: this machine, a Vercel deployment, or a host
  * named in STAGING_HOSTS. A list rather than "anything but findtern.in", so an

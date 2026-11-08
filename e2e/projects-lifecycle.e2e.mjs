@@ -43,6 +43,8 @@ const review = (id, decision, reason) => api(P.A.page, "POST", `/api/admin/proje
 async function internSees(name) {
   await P.I.page.goto(url(`/intern/opportunities?q=${encodeURIComponent(name)}`), { waitUntil: "domcontentloaded" });
   await P.I.page.locator("main").waitFor();
+  // loading.tsx renders a skeleton inside <main> first; read the list only once the page itself has streamed in.
+  await P.I.page.getByRole("search").waitFor({ timeout: 20_000 });
   return ((await P.I.page.locator("main").textContent()) ?? "").includes(name);
 }
 
@@ -122,8 +124,12 @@ test("admin rejects without a reason (refused), then with a reason; the employer
 });
 
 test("the employer resubmits through the button; admin approves → published and on the intern list", async () => {
+  // "Edit and resubmit" reopens the rejected project as a draft and opens the edit form (project-list.tsx resubmit()).
   await P.E.page.getByRole("button", { name: "Edit and resubmit" }).first().click();
-  await P.E.page.getByText(/in review/i).first().waitFor({ timeout: 20_000 });
+  await P.E.page.waitForURL(new RegExp(`/employer/projects/${pid}/edit`), { timeout: 20_000 });
+  assert.equal((await status(pid)).status, "draft");
+  const submit = await move(P.E.page, pid, "pending_review");
+  assert.equal(submit.status, 200, JSON.stringify(submit.body));
   assert.equal((await status(pid)).status, "pending_review");
   assert.equal((await status(pid)).rejection_reason, null, "the old reason is cleared on resubmit");
 
