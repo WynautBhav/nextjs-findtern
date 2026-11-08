@@ -13,17 +13,17 @@ const AUDIT_SQL = `INSERT INTO admin_audit_log (admin_id, action, target_type, t
 export function pgReconcileStore(): ReconcileStore {
   const pool = () => getDb().$client;
   return {
-    async findStuck({ olderThan, limit }) {
+    async findStuck({ minAgeMinutes: age, limit }) {
       // Never-checked rows first, then the least recently checked (ISO strings sort as time), so rows that stay
       // unresolved cannot starve newer ones.
       const r = await pool().query(
         `SELECT r.id, r.intern_payment_id, r.amount_minor, r.gateway_refund_id, r.idempotency_key, r.initiated_at,
                 p.payment_id AS gateway_payment_id
            FROM payment_refunds r LEFT JOIN intern_payments p ON p.id = r.intern_payment_id
-          WHERE r.status = 'initiated' AND coalesce(r.initiated_at, r.updated_at, r.created_at) <= $1
+          WHERE r.status = 'initiated' AND coalesce(r.initiated_at, r.updated_at, r.created_at) <= now() - make_interval(mins => $1::int)
           ORDER BY coalesce(r.raw->'reconcile'->>'checkedAt', '') ASC, r.initiated_at ASC NULLS FIRST
           LIMIT $2`,
-        [olderThan, limit],
+        [age, limit],
       );
       return r.rows.map((x) => ({
         id: x.id, internPaymentId: x.intern_payment_id, amountMinor: x.amount_minor, gatewayRefundId: x.gateway_refund_id,

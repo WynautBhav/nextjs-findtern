@@ -59,8 +59,12 @@ export type Flag =
 export type StampInfo = { checkedAt: string; outcome: string; flag?: Flag; gatewayStatus?: string; error?: string };
 
 export interface ReconcileStore {
-  /** status='initiated' and initiated_at (else updated_at) <= olderThan, least recently checked first. */
-  findStuck(o: { olderThan: Date; limit: number }): Promise<StuckRefund[]>;
+  /**
+   * status='initiated' and initiated_at (else updated_at) at least `minAgeMinutes` ago, least recently checked first.
+   * The age is computed by the database clock (the columns are timestamp-without-zone; a JS Date parameter would be
+   * shifted by the Node process's time zone).
+   */
+  findStuck(o: { minAgeMinutes: number; limit: number }): Promise<StuckRefund[]>;
   /**
    * One transaction: UPDATE payment_refunds SET status=to ... WHERE id AND status='initiated'; only if that changed a
    * row, write the audit entry. Returns false when the row was no longer 'initiated' (someone else settled it).
@@ -131,10 +135,9 @@ export async function reconcileRefunds(deps: {
   const clock = deps.now ?? (() => new Date());
   const started = clock().getTime();
   const budget = deps.budgetMs ?? DEFAULT_BUDGET_MS;
-  const olderThan = new Date(started - (deps.minAgeMinutes ?? DEFAULT_MIN_AGE_MINUTES) * 60_000);
   const out: ReconcileSummary = { checked: 0, refunded: 0, failed: 0, pending: 0, noop: 0, flagged: 0, errors: 0, stoppedBy: "done" };
 
-  const stuck = await store.findStuck({ olderThan, limit: deps.limit ?? DEFAULT_BATCH_LIMIT });
+  const stuck = await store.findStuck({ minAgeMinutes: deps.minAgeMinutes ?? DEFAULT_MIN_AGE_MINUTES, limit: deps.limit ?? DEFAULT_BATCH_LIMIT });
   for (const r of stuck) {
     if (clock().getTime() - started >= budget) {
       out.stoppedBy = "budget";

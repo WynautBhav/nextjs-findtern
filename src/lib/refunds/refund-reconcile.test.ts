@@ -18,11 +18,11 @@ type Audit = { kind: "settle" | "flag"; refundId: string; to?: string; flag?: st
 function fakeStore(rows: Row[]) {
   const audits: Audit[] = [];
   const stamps: { id: string; info: StampInfo }[] = [];
-  const asked: { olderThan: Date; limit: number }[] = [];
+  const asked: { minAgeMinutes: number; limit: number }[] = [];
   const store: ReconcileStore = {
     async findStuck(o) {
       asked.push(o);
-      return rows.filter((r) => r.status === "initiated" && (r.initiatedAt ?? NOW) <= o.olderThan).slice(0, o.limit).map((r) => ({ ...r }));
+      return rows.filter((r) => r.status === "initiated" && (r.initiatedAt ?? NOW).getTime() <= NOW.getTime() - o.minAgeMinutes * 60_000).slice(0, o.limit).map((r) => ({ ...r }));
     },
     async settle(refund, to, g) {
       await Promise.resolve(); // yield so concurrent runs interleave between "read" and "write"
@@ -234,7 +234,7 @@ test("N-minute threshold: only rows older than N minutes are asked for; a fresh 
   const { store, asked } = fakeStore(rows);
   const { gateway, calls } = fakeGateway({ rfnd_old: {}, rfnd_edge: {}, rfnd_fresh: {} });
   await run(store, gateway, { minAgeMinutes: 30 });
-  assert.equal(asked[0].olderThan.getTime(), minutesAgo(30).getTime());
+  assert.equal(asked[0].minAgeMinutes, 30);
   assert.deepEqual(rows.map((r) => r.status), ["refunded", "refunded", "initiated"]);
   assert.deepEqual(calls, ["GET refund rfnd_old", "GET refund rfnd_edge"]);
 });

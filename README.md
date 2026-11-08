@@ -282,7 +282,7 @@ Names only. `.env.example` lists each one with a comment; real values stay in un
 | Core | `DATABASE_URL`, `DATABASE_SSL_REJECT_UNAUTHORIZED`, `PUBLIC_ORIGIN`, `SESSION_SECRET`, `SIGNING_SECRET`, `TRUST_PROXY`, `RATE_LIMIT_BYPASS_IPS`, `PASSWORD_UPGRADE`, `TZ` |
 | Payments | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `PAYMENTS_MODE`, `PAYMENTS_TEST_BUTTON` |
 | Email | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`, `MAIL_MODE`, `ADMIN_ALERT_EMAIL` |
-| Jobs | `SCHEDULERS` (`on` on exactly one server for the in-process schedulers), `CRON_SECRET` (bearer token for `/api/cron/payment-reminders`) |
+| Jobs | `SCHEDULERS` (`on` on exactly one server for the in-process schedulers), `CRON_SECRET` (bearer token for every `/api/cron/*` route), `REFUND_RECONCILE` (`1` turns the refund reconcile cron on; default off), `REFUND_RECONCILE_MIN_AGE_MINUTES` (default 30) |
 | Google | `GOOGLE_LOGIN`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`, `FINDTERN_GOOGLE_OAUTH_REDIRECT_URI`, `FINDTERN_GOOGLE_TOKEN_OWNER_ID`, `MEET_CALENDAR_ID` |
 | Files | `UPLOAD_ROOT`, `LEGACY_UPLOAD_ROOT`, `STORAGE_BUCKET` (S3; the AWS SDK reads its own `AWS_*` variables) |
 | Invoices | `FINDTERN_LEGAL_NAME`, `FINDTERN_GSTIN`, `FINDTERN_BILLING_ADDRESS`, `FINDTERN_BILLING_EMAIL`, `FINDTERN_BANK_NAME`, `FINDTERN_BANK_ACCOUNT`, `FINDTERN_BANK_IFSC` |
@@ -299,8 +299,14 @@ need 32+ random characters.
 
 - `buildCommand`: `node --experimental-strip-types scripts/migrate.ts && next build`. **Every build applies pending migrations
   to the `DATABASE_URL` of that environment**, so check which database an environment points at before deploying.
-- `crons`: `GET /api/cron/payment-reminders` daily at 03:30 UTC (09:00 IST), authorised with `CRON_SECRET`. It sends the
-  payment reminders unless `SCHEDULERS=off`. Region `cle1`.
+- `crons`: all three are `GET`, authorised with `CRON_SECRET`, and skip when `SCHEDULERS=off`. Region `cle1`.
+  - `/api/cron/payment-reminders` daily at 03:30 UTC (09:00 IST): sends the payment reminders.
+  - `/api/cron/email-outbox` daily at 04:00 UTC: sends queued campaign mail, batches of 50 until nothing is due or ~30 s
+    are used. Daily is the only schedule valid on Vercel's Hobby plan (a more frequent one fails the deploy). On Pro,
+    change it to `*/5 * * * *` so retries (1 min, 5 min, 30 min, 2 h backoff) and new campaigns go out promptly.
+  - `/api/cron/refund-reconcile` daily at 04:30 UTC: settles refunds stuck in `initiated` by reading Razorpay. **Does
+    nothing (`{skipped:true}`) unless `REFUND_RECONCILE=1`** and the Razorpay keys are set. Read-only towards Razorpay.
+    Design and invariants: `src/lib/refunds/refund-reconcile.ts`.
 
 `deploy/` holds the alternative self-hosted setup on a VPS: `backup.sh` (dump and restore-test), `release.sh` (pull, install,
 build, migrate, reload PM2), `ecosystem.config.cjs` (one PM2 process, because the in-process schedulers must run once) and

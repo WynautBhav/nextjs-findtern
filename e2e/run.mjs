@@ -37,6 +37,7 @@ const SPECS = [
   "critical-path",
   "bio-hidden",
   "skills-limit",
+  "money-crons",
   // listings, messaging-presence, college-roster and refunds (integrate's
   // backend scenarios) are not on this branch: those features live on master's
   // own backend and have their own suites (messaging, college-*, drive-journey).
@@ -63,6 +64,7 @@ const PORT = port();
 const ORIGIN = `http://localhost:${PORT}`;
 const STUB_PORT = PORT + 100;
 const STUB_ORIGIN = `http://127.0.0.1:${STUB_PORT}`;
+const E2E_CRON_SECRET = "e2e-cron-secret-0123456789-abcdefghijklmnop";
 
 /**
  * Every variable that could make the server reach something real is set
@@ -77,7 +79,10 @@ const serverEnv = {
   DATABASE_URL,
   MAIL_MODE: "log",
   PAYMENTS_MODE: "free",
-  SCHEDULERS: "off",
+  // Not "off": the cron routes answer {skipped} under "off". Only "on" starts the in-process schedulers, so "" starts none.
+  SCHEDULERS: "",
+  CRON_SECRET: E2E_CRON_SECRET,
+  REFUND_RECONCILE: "1", // the reconcile route reads the stub only (RAZORPAY_API_BASE below)
   // Throwaway test keys + the local refund stub: nothing can reach Razorpay (rzp_test_ is never a live key).
   RAZORPAY_KEY_ID: STUB_KEY_ID,
   RAZORPAY_KEY_SECRET: STUB_KEY_SECRET,
@@ -261,6 +266,7 @@ async function main() {
             E2E_DATABASE_URL: DATABASE_URL,
             E2E_RUN_STARTED: String(started),
             E2E_STUB_URL: stub.origin,
+            E2E_CRON_SECRET,
             E2E_STUB_WEBHOOK_SECRET: STUB_WEBHOOK_SECRET,
           },
         },

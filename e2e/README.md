@@ -52,7 +52,7 @@ its own accounts and does not use them.
 | `E2E_HEADED` | unset | `1` shows the browser |
 
 These are fixed in the server's env: `NODE_ENV=production`, `MAIL_MODE=log`,
-`PAYMENTS_MODE=free` and `SCHEDULERS=off`. These are set empty:
+`PAYMENTS_MODE=free`, `REFUND_RECONCILE=1` (reads the local Razorpay stub only) and a throwaway `CRON_SECRET`. `SCHEDULERS` is set empty, not `off`, so the `/api/cron/*` routes run when a spec calls them; only `on` starts the in-process schedulers. These are set empty:
 `RAZORPAY_KEY_ID/SECRET`, `RAZORPAY_WEBHOOK_SECRET`, `SMTP_HOST/USER/PASS/FROM`,
 `GOOGLE_CLIENT_ID/SECRET`, `DEEPSEEK_API_KEY`, `INCRUITER_WEBHOOK_SECRET`,
 `STORAGE_BUCKET`, `TRUST_PROXY` and `VERCEL`. `SESSION_SECRET` and `SIGNING_SECRET` are 32+ characters,
