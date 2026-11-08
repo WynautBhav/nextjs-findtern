@@ -66,6 +66,8 @@ test("admin: a 100-seat batch marked paid lifts the cap; the officer sees it and
   const [b] = await q("SELECT invoice_number FROM college_seat_batches WHERE id = $1", [id]);
   assert.ok(b.invoice_number, "paying assigns an invoice number");
   await tpo.goto(`${BASE}/college/seats`);
+  // The page streams its body in; on a cold server <main> is still empty at domcontentloaded, so wait for the batch row.
+  await tpo.locator("main").getByText(/E2E-UPI-1|100 seats/).first().waitFor();
   const text = await tpo.locator("main").innerText();
   assert.match(text, /E2E-UPI-1|100/);
 });

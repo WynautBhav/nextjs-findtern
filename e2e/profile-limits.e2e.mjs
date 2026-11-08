@@ -93,6 +93,7 @@ test("a legacy intern with 9 skills keeps all 9; the profile preview shows 7 chi
   assert.equal((await skillNames(L.id)).length, 9, "nothing is dropped from the stored list");
   await P.L.page.goto(url("/intern/profile"), { waitUntil: "domcontentloaded" });
   const chips = P.L.page.locator('main ul[aria-label="Skills"] > li');
+  await chips.first().waitFor(); // the page streams in; a cold server has no chips at domcontentloaded
   assert.deepEqual(await chips.evaluateAll((els) => els.slice(0, 7).map((e) => e.textContent.trim())), SKILLS.slice(0, 7), "the first 7 are shown, in order");
   assert.match((await chips.last().textContent()) ?? "", /\+2/, "the other 2 are counted, not lost");
   assert.match((await P.L.page.locator("main").textContent()) ?? "", /up to 7 skills/);

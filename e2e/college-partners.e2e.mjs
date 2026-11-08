@@ -79,12 +79,12 @@ test("officer: signs in and sees the console", async () => {
   assert.match(main, /Joined Findtern/);
   assert.match(main, /61\/73/, "61 of 73 roster students joined in the seed");
   // Cohort tabs filter the table; the footer's total is every member of the college who has not left
-  // (studentsForCollegeAdmin). It is not the 61 "joined" above: that counts roster rows that joined, and
+  // (studentsForCollegeAdmin: memberships joined to users, so rows orphaned by a TRUNCATE of users do not count). It is not the 61 "joined" above: that counts roster rows that joined, and
   // the QA situations seed adds one verified member (Ritika) with no roster row, so ask the DB.
   const db = new pg.Client({ connectionString: DB });
   await db.connect();
   const { rows } = await db.query(
-    "SELECT count(*)::int AS n FROM college_memberships m JOIN colleges c ON c.id = m.college_id WHERE c.slug = 'jklu' AND m.left_at IS NULL",
+    "SELECT count(*)::int AS n FROM college_memberships m JOIN colleges c ON c.id = m.college_id JOIN users u ON u.id = m.user_id WHERE c.slug = 'jklu' AND m.left_at IS NULL",
   );
   await db.end();
   const members = rows[0].n;
