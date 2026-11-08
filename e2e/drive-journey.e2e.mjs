@@ -333,6 +333,12 @@ test("7 redemption: waiver payment, entitlement, verified membership; every refu
   assert.equal((await one("SELECT redeemed_count FROM college_drive_orders WHERE id = $1", [A.orderId])).redeemed_count, 1);
   assert.equal((await one("SELECT status FROM drive_codes WHERE entry_id = (SELECT id FROM drive_roster_entries WHERE import_id = $1 AND row_no = 6)", [A.importId])).status, "redeemed");
 
+  // The student's registered email is never replaced by the roster's college email (this student's differs from it).
+  assert.equal((await one("SELECT email FROM users WHERE id = $1", [P.r1.id])).email, P.r1.email, "redeeming does not overwrite the registered email");
+  // Not signed in: refused (CSRF or auth, whichever answers first) and nothing is redeemed.
+  const anon = await (await browser.newContext({ extraHTTPHeaders: freshIpHeaders() })).request.post(`${BASE}/api/intern/drive-codes/redeem`, { data: { code: code6, declaredAdult: true }, headers: { origin: BASE } });
+  assert.ok([401, 403].includes(anon.status()), `anonymous redeem got ${anon.status()}`);
+  assert.equal((await one("SELECT redeemed_count FROM college_drive_orders WHERE id = $1", [A.orderId])).redeemed_count, 1, "an anonymous call redeems nothing");
   // Same code again by the same student: used.
   assert.equal((await redeem(r1, code6)).status, 409);
   // A second student with the used code: refused (403 once the row is bound to the first student, 409 if the code is simply used).
