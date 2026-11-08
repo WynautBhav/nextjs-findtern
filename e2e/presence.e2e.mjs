@@ -17,11 +17,13 @@ import { chromium } from "playwright";
 
 import { api, url } from "./lib/browser.mjs";
 import { closeDb, one, rows } from "./lib/db.mjs";
+import { seedAdmin } from "./lib/fixtures.mjs";
+import { loginState } from "./lib/session.mjs";
 import { RUN, cleanup, collectFrames, mkEmployer, mkIntern, mkProject, mkProposal, openStream, signedIn } from "./lib/fixtures2.mjs";
 
 const SHOTS = process.env.PRESENCE_SHOTS;
 let browser;
-let E, I, P = {}, threadId;
+let E, I, P = {}, threadId, proposalId;
 const VIEWS = [
   ["390", { width: 390, height: 844 }],
   ["1440", { width: 1440, height: 900 }],
@@ -46,6 +48,9 @@ const text = async (path, vp) => {
   const body = await page.locator("body").innerText();
   return { page, body };
 };
+/** The employer pages that can carry the candidate's presence (labels may be sr-only, which innerText still returns). */
+const EMPLOYER_PAGES = () => ["/employer/dashboard", "/employer/proposals", `/employer/proposal/${proposalId}`, `/employer/intern/${I.id}`, "/employer/candidates"];
+const PRESENCE_RE = /Active now|Last seen|Offline|Online/;
 const shot = async (page, name) => {
   if (!SHOTS) return;
   mkdirSync(SHOTS, { recursive: true });
@@ -71,6 +76,7 @@ before(async () => {
   P.E = await signedIn(browser, E);
   P.I = await signedIn(browser, I);
   const prop = await one(`SELECT id FROM proposals WHERE employer_id = $1 AND intern_id = $2`, [E.id, I.id]);
+  proposalId = prop.id;
   const r = await api(P.E.page, "POST", "/api/threads", { counterpartId: I.id, proposalId: prop.id });
   assert.equal(r.status, 200, JSON.stringify(r.body));
   threadId = r.body.thread?.id ?? r.body.id ?? r.body.threadId;
@@ -127,6 +133,12 @@ test("default: the employer sees the candidate as active now (threads API, pages
     await shot(prof.page, `employer-profile-online-${name}`);
     await prof.page.close();
   }
+  // Positive control for the hidden-state sweep below: these pages do render the label while it is visible.
+  for (const path of ["/employer/proposals", `/employer/proposal/${proposalId}`]) {
+    const pg = await text(path);
+    assert.match(pg.body, /Active now/, `${path} shows the label while visible`);
+    await pg.page.close();
+  }
 });
 
 test("stale heartbeat reads as offline, never online", async () => {
@@ -179,7 +191,13 @@ test("the candidate sees the toggle in settings, on by default, and flips it", a
 });
 
 test("hidden: the employer sees nothing, anywhere, and no timestamp leaks", async () => {
-  await setSeen("5 seconds"); // still beating (the heartbeat route is rate limited, so write the beat directly)
+  // A REAL heartbeat after the hide: it must refresh last_seen_at without flipping show_activity back on.
+  await setSeen("1 hour");
+  const hb = await api(P.I.page, "POST", "/api/presence/heartbeat");
+  assert.equal(hb.status, 200, JSON.stringify(hb.body));
+  const beat = await one(`SELECT show_activity, last_seen_at > now() - interval '30 seconds' AS fresh FROM user_presence WHERE user_id = $1`, [I.id]);
+  assert.equal(beat.show_activity, false, "a heartbeat does not undo the hide");
+  assert.equal(beat.fresh, true, "the heartbeat did record (so the hide is applied on read, not by not recording)");
   const t = await threadsOf();
   assert.equal(t.counterpartOnline, false);
   assert.equal(t.counterpartPresence, null);
@@ -201,6 +219,20 @@ test("hidden: the employer sees nothing, anywhere, and no timestamp leaks", asyn
     assert.doesNotMatch(prof.body, /Active now|Last seen|Offline/);
     await shot(prof.page, `employer-profile-hidden-${name}`);
     await prof.page.close();
+  }
+  // Every employer page that can show presence (dashboard, proposals, proposal, profile, candidates), as rendered text.
+  for (const path of EMPLOYER_PAGES()) {
+    const pg = await text(path);
+    assert.doesNotMatch(pg.body, PRESENCE_RE, `${path} shows no presence for a hidden candidate`);
+    await pg.page.close();
+  }
+  // And the raw HTML plus the RSC (flight) payload, which would carry a prop even if no text were drawn.
+  for (const path of EMPLOYER_PAGES()) {
+    for (const headers of [{}, { RSC: "1" }]) {
+      const res = await P.E.ctx.request.get(url(path), { headers });
+      assert.equal(res.status(), 200, `${path} ${JSON.stringify(headers)}`);
+      assert.doesNotMatch(await res.text(), /Last seen|Active now|last_seen|lastSeen/, `${path} ${JSON.stringify(headers)} leaks presence`);
+    }
   }
   // The raw HTML of an employer page carries no presence for the hidden candidate either.
   const html = await (await P.E.ctx.request.get(url("/employer/candidates"))).text();
@@ -243,4 +275,61 @@ test("turning it back on restores the labels; admin and the candidate are unaffe
   assert.equal(mine.status, 200);
   const beat = await rows(`SELECT show_activity FROM user_presence WHERE user_id = $1`, [I.id]);
   assert.equal(beat.length, 1);
+});
+
+test("candidate side: an employer shows as Online / Offline only, never a last-seen label or timestamp", async () => {
+  const beatE = (ago) =>
+    one(`INSERT INTO user_presence (user_id, last_seen_at) VALUES ($1, now() - $2::interval) ON CONFLICT (user_id) DO UPDATE SET last_seen_at = now() - $2::interval RETURNING 1 AS x`, [E.id, ago]);
+  const mineOf = async () => (await api(P.I.page, "GET", "/api/threads")).body.threads.find((t) => t.id === threadId);
+  await beatE("5 seconds");
+  const on = await mineOf();
+  assert.equal(on.counterpartOnline, true);
+  assert.equal(on.counterpartPresence, "Online");
+  for (const ago of ["3 hours", "2 days", "40 days"]) {
+    await beatE(ago);
+    const off = await mineOf();
+    assert.equal(off.counterpartOnline, false);
+    assert.equal(off.counterpartPresence, "Offline", `employer idle ${ago}`);
+  }
+  const raw = JSON.stringify((await api(P.I.page, "GET", "/api/threads")).body);
+  assert.doesNotMatch(raw, /Last seen|lastSeen|last_seen/);
+  const page = await P.I.ctx.newPage();
+  await settle(page, `/intern/messages/${threadId}`);
+  const body = await page.locator("body").innerText();
+  assert.doesNotMatch(body, /Last seen|Active now/);
+  await page.close();
+});
+
+test("toggle: the 21st change inside a minute is 429 and changes nothing", async () => {
+  const fresh = await mkIntern("prR");
+  const R = await signedIn(browser, fresh);
+  P.R = R;
+  let last;
+  for (let i = 0; i < 21; i++) last = await api(R.page, "POST", "/api/intern/presence-visibility", { showActivity: i % 2 === 0 });
+  assert.equal(last.status, 429, JSON.stringify(last.body));
+  // 20 accepted changes: the 20th (i = 19) set false; the rejected 21st (would be true) did not apply.
+  const row = await one(`SELECT show_activity FROM user_presence WHERE user_id = $1`, [fresh.id]);
+  assert.equal(row.show_activity, false);
+});
+
+test("toggle: an admin viewing as the candidate (impersonation) cannot change it", async () => {
+  const admin = await seedAdmin();
+  try {
+    const A = { ctx: null };
+    const state = await loginState(browser, admin);
+    A.ctx = await browser.newContext({ storageState: state });
+    P.A = A;
+    A.page = await A.ctx.newPage();
+    const start = await api(A.page, "POST", "/api/admin/impersonate", { targetType: "intern", targetId: I.id });
+    assert.equal(start.status, 200, JSON.stringify(start.body));
+    await A.page.goto(url("/intern/dashboard"), { waitUntil: "domcontentloaded" });
+    const before = await one(`SELECT show_activity FROM user_presence WHERE user_id = $1`, [I.id]);
+    const r = await api(A.page, "POST", "/api/intern/presence-visibility", { showActivity: !before.show_activity });
+    assert.equal(r.status, 403, JSON.stringify(r.body));
+    const after = await one(`SELECT show_activity FROM user_presence WHERE user_id = $1`, [I.id]);
+    assert.equal(after.show_activity, before.show_activity, "the viewed-as candidate's choice is untouched");
+  } finally {
+    await rows(`DELETE FROM admin_audit_log WHERE admin_id = $1`, [admin.id]).catch(() => {});
+    await rows(`DELETE FROM admins WHERE id = $1`, [admin.id]).catch(() => {});
+  }
 });
