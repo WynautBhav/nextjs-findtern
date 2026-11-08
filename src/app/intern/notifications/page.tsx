@@ -81,7 +81,7 @@ export default async function InternNotifications({
 
       {/* The shared tab look; hidden when All and Unread are the same list. */}
       {unreadOnly || (unreadCount > 0 && unreadCount < total) ? (
-        <nav aria-label="Filter notifications" className="mb-6 flex gap-x-6 border-b border-ink-100">
+        <nav aria-label="Filter notifications" className="mb-6 flex gap-x-6 border-b border-ink-200">
           {[
             { key: "all", label: "All", count: total, href: "/intern/notifications" },
             { key: "unread", label: "Unread", count: unreadCount, href: "/intern/notifications?show=unread" },

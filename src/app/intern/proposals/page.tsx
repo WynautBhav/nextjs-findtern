@@ -39,7 +39,7 @@ export const metadata: Metadata = {
  * survives a reload; it opens on "Waiting on you" when anything is.
  */
 const GROUPS = [
-  { key: "open", label: "Waiting on you" },
+  { key: "open", label: "Waiting on you", short: "Waiting" },
   { key: "accepted", label: "Accepted", hint: "You said yes. You're hired once the company pays." },
   { key: "active", label: "Hired" },
   { key: "closed", label: "Closed" },
@@ -83,8 +83,8 @@ export default async function InternProposals({ searchParams }: { searchParams: 
   const view: GroupKey | "all" =
     show === "all" || GROUPS.some((g) => g.key === show) ? (show as GroupKey | "all") : groups.open.length > 0 ? "open" : "all";
   const tabs = [
-    ...GROUPS.filter((g) => groups[g.key].length > 0 || g.key === view).map((g) => ({ key: g.key, label: g.label, count: groups[g.key].length })),
-    { key: "all", label: "All", count: rows.length },
+    ...GROUPS.filter((g) => groups[g.key].length > 0 || g.key === view).map((g) => ({ key: g.key, label: g.label, short: "short" in g ? g.short : g.label, count: groups[g.key].length })),
+    { key: "all", label: "All", short: "All", count: rows.length },
   ];
   const visible = GROUPS.filter((g) => view === "all" || g.key === view);
 
@@ -110,7 +110,7 @@ export default async function InternProposals({ searchParams }: { searchParams: 
       ) : (
         <div className="space-y-6">
           {tabs.length > 2 ? (
-            <nav aria-label="Show offers" className="flex flex-wrap gap-x-5 border-b border-ink-100 sm:gap-x-6">
+            <nav aria-label="Show offers" className="flex flex-wrap gap-x-3 border-b border-ink-200 sm:gap-x-6">
               {tabs.map((t) => {
                 const on = t.key === view;
                 return (
@@ -120,13 +120,14 @@ export default async function InternProposals({ searchParams }: { searchParams: 
                     scroll={false}
                     aria-current={on ? "page" : undefined}
                     className={cn(
-                      "relative -mb-px inline-flex min-h-12 items-center justify-center gap-1.5 whitespace-nowrap text-sm outline-none transition-colors",
+                      "relative -mb-px inline-flex min-h-12 items-center justify-center gap-1 whitespace-nowrap text-[13px] outline-none transition-colors sm:gap-1.5 sm:text-sm",
                       "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
                       "focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent",
                       on ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-600 hover:text-ink-900",
                     )}
                   >
-                    {t.label}
+                    <span className="sm:hidden">{t.short}</span>
+                    <span className="max-sm:hidden">{t.label}</span>
                     <span className={cn("nums", on ? "text-ink-900" : "text-text-subtle")}>{t.count}</span>
                   </Link>
                 );

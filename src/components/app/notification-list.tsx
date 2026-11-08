@@ -122,7 +122,7 @@ export function NotificationList({
         {byDay(rows ?? [], now ?? mountedAt).map(({ day, items }) => (
           <section key={day} aria-label={day}>
             <h2 className="nums px-3 pb-2 pt-6 text-xs font-semibold text-ink-600 first:pt-0">{day}</h2>
-            <ul className="divide-y divide-ink-100 border-y border-ink-100">
+            <ul className="divide-y divide-ink-200 border-y border-ink-200">
               {items.map((n) => {
                 const isRead = n.isRead || read.has(n.id);
                 const body = (
