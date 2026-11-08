@@ -204,7 +204,7 @@ export const emails = {
     lines: [`You have ${o.count === 1 ? "1 unread message" : `${o.count} unread messages`} from ${o.from} on Findtern.`],
     status: "Waiting for your reply",
     cta: { label: "Open messages", url: o.url },
-    reason: `You’re getting this because a message was unread for 15 minutes. Turn these emails off in your notification settings: ${o.settingsUrl}`,
+    reason: `You’re getting this because you have unread messages on Findtern. Turn these emails off in your notification settings: ${o.settingsUrl}`,
   }),
 
   /** Sent once per proposal when an update sits unread. Generic: the company stays hidden until a hire. */
@@ -216,7 +216,7 @@ export const emails = {
     lines: ["A proposal you received was updated. Review the latest terms from your dashboard."],
     status: "Awaiting your review",
     cta: { label: "View proposal", url: o.url },
-    reason: `You’re getting this because the update was unread for 15 minutes. Turn these emails off in your notification settings: ${o.settingsUrl}`,
+    reason: `You’re getting this because a proposal update is waiting for you on Findtern. Turn these emails off in your notification settings: ${o.settingsUrl}`,
   }),
 
   proposalReceived: (o: { internName: string; companyName: string; role: string; proposalId: string }): EmailContent => ({

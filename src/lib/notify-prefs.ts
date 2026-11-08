@@ -54,8 +54,40 @@ export function channelAllowed(prefs: PrefsRow | null | undefined, category: Not
 
 /** How long a message or offer may sit unread before we email. */
 export const FALLBACK_DELAY_MS = 15 * 60_000;
-/** Threads quiet for longer than this are never emailed (no backlog blast on the first run). */
-export const FALLBACK_LOOKBACK_MS = 24 * 3_600_000;
+/**
+ * Threads quiet for longer than this are never emailed (no backlog blast on the first run). It must be longer than the
+ * scan period: on Vercel the scan runs from a daily cron, and a window shorter than a day leaves gaps. Mail is still sent
+ * once per thread and recipient per unread run (the idempotency key names the run), so a wide window does not repeat mail.
+ */
+export const FALLBACK_LOOKBACK_HOURS = 48;
+export const FALLBACK_LOOKBACK_MS = FALLBACK_LOOKBACK_HOURS * 3_600_000;
+
+/**
+ * Kill switch for the unread message / offer email fallback: only `NOTIFY_FALLBACK=1` turns it on, default OFF. It gates
+ * the scan that queues the mail. Preferences (settings UI, notify() honouring them) do not depend on it.
+ */
+export function fallbackEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return env.NOTIFY_FALLBACK?.trim() === "1";
+}
+
+/** After a full batch the drain is assumed to continue; a tick within this long of one does not scan again. */
+export const SCAN_CONTINUE_MS = 60_000;
+
+/**
+ * Runs the unread scan once per drain, not once per batch. A drain is a run of back-to-back ticks while batches come
+ * back full (see drainOutbox); the first tick scans, and ticks that follow a full batch within SCAN_CONTINUE_MS do not.
+ * A short batch ends the drain, so the next tick scans again. Lives here, not in the drain loop, so it works for the
+ * in-process 30 s scheduler and the cron drain alike.
+ */
+export function makeScanGate(batchSize: number, clock: () => number = Date.now) {
+  let fullAt = -Infinity;
+  return {
+    shouldScan: () => clock() - fullAt > SCAN_CONTINUE_MS,
+    recordBatch: (r: { sent: number; retried: number; dead: number }) => {
+      fullAt = r.sent + r.retried + r.dead >= batchSize ? clock() : -Infinity;
+    },
+  };
+}
 
 export type UnreadMessage = { id: string; threadId: string; senderId: string; createdAt: Date | string };
 export type ThreadSides = { id: string; employerId: string; internId: string };

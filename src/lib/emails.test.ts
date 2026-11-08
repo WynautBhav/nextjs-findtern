@@ -106,3 +106,16 @@ test("no exclamation-mark cheer in any subject, heading or text", () => {
     assert.doesNotMatch(`${subject}\n${text}`, /!/, name);
   }
 });
+
+test("unread fallback mail makes no claim about how long it was unread", () => {
+  const urls = { url: "https://example.com/m", settingsUrl: "https://example.com/s" };
+  for (const c of [
+    emails.unreadMessages({ name: "A", count: 1, from: "an employer", ...urls }),
+    emails.unreadMessages({ name: "A", count: 3, from: "a candidate", ...urls }),
+    emails.unreadOffer({ name: "A", ...urls }),
+  ]) {
+    const r = renderEmail(c);
+    assert.ok(!/\b15\s*min|minutes/i.test(r.text + r.html), r.subject);
+  }
+  assert.match(renderEmail(emails.unreadMessages({ name: "A", count: 2, from: "an employer", url: "https://example.com/m", settingsUrl: "https://example.com/s" })).text, /because you have unread messages on Findtern/);
+});

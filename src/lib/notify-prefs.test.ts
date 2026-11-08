@@ -5,6 +5,11 @@ import {
   categoryOf,
   channelAllowed,
   FALLBACK_DELAY_MS,
+  FALLBACK_LOOKBACK_HOURS,
+  FALLBACK_LOOKBACK_MS,
+  fallbackEnabled,
+  makeScanGate,
+  SCAN_CONTINUE_MS,
   heartbeatLive,
   isSuppressible,
   messageRunKey,
@@ -160,5 +165,48 @@ describe("heartbeatLive", () => {
     assert.equal(heartbeatLive(ago(30_000), NOW), true);
     assert.equal(heartbeatLive(ago(5 * MIN), NOW), false);
     assert.equal(heartbeatLive(null, NOW), false);
+  });
+});
+
+describe("fallback kill switch, lookback and scan gate", () => {
+  it("NOTIFY_FALLBACK: only exactly 1 turns the fallback on; unset is OFF", () => {
+    assert.equal(fallbackEnabled({}), false);
+    for (const v of ["", "0", "on", "true", "yes", "off"]) assert.equal(fallbackEnabled({ NOTIFY_FALLBACK: v }), false, v);
+    assert.equal(fallbackEnabled({ NOTIFY_FALLBACK: "1" }), true);
+    assert.equal(fallbackEnabled({ NOTIFY_FALLBACK: " 1 " }), true);
+  });
+
+  it("preferences do not depend on the switch (pure rules unchanged with the fallback off)", () => {
+    assert.equal(channelAllowed(OFF, categoryOf("message_unread"), "email"), false);
+    assert.equal(channelAllowed(ON, categoryOf("message_unread"), "email"), true);
+    assert.equal(channelAllowed(OFF, categoryOf("payment_reminder"), "email"), true);
+  });
+
+  it("lookback is a named 48 hour window; a run older than it is not scanned into, a 30 h one is", () => {
+    assert.equal(FALLBACK_LOOKBACK_HOURS, 48);
+    assert.equal(FALLBACK_LOOKBACK_MS, 48 * 3_600_000);
+  });
+
+  it("scan gate: first tick scans; after a full batch the next ticks of the drain do not; a short batch ends the drain", () => {
+    let t = 1_000_000;
+    const g = makeScanGate(50, () => t);
+    assert.equal(g.shouldScan(), true, "first tick of a drain");
+    g.recordBatch({ sent: 50, retried: 0, dead: 0 });
+    for (let i = 0; i < 5; i++) {
+      t += 2_000;
+      assert.equal(g.shouldScan(), false, `batch ${i + 2} of the drain`);
+      g.recordBatch({ sent: 30, retried: 15, dead: 5 }); // full again (50)
+    }
+    t += 2_000;
+    g.recordBatch({ sent: 3, retried: 0, dead: 0 }); // short: drain over
+    assert.equal(g.shouldScan(), true, "next drain scans again");
+  });
+
+  it("scan gate: a full batch long ago does not suppress the scan (abandoned drain)", () => {
+    let t = 0;
+    const g = makeScanGate(50, () => t);
+    g.recordBatch({ sent: 50, retried: 0, dead: 0 });
+    t += SCAN_CONTINUE_MS + 1;
+    assert.equal(g.shouldScan(), true);
   });
 });

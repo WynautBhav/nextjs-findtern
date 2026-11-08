@@ -6,6 +6,8 @@
  *
  * Needs a migrated DB and a server started with TRUST_PROXY=1, MAIL_MODE=log, CRON_SECRET set and SCHEDULERS not "off"
  * (the outbox cron route is what runs the fallback scan). Creates its own employer / intern accounts and removes them.
+ * The fallback tests need the server started with NOTIFY_FALLBACK=1 and E2E_NOTIFY_FALLBACK=1 here; without both, the
+ * kill-switch test runs instead (default OFF: a tick queues nothing). Prefs UI/API tests run either way.
  * Messages are back-dated in SQL (the 15-minute delay is a constant), and the cron route is called directly.
  */
 import { test, before, after } from "node:test";
@@ -19,6 +21,8 @@ import { mailTo } from "./lib/mail.mjs";
 import { RUN, cleanup, mkEmployer, mkIntern, mkProject, mkProposal, signedIn } from "./lib/fixtures2.mjs";
 
 const SECRET = process.env.CRON_SECRET ?? "";
+const FALLBACK = process.env.E2E_NOTIFY_FALLBACK === "1";
+const ON = { skip: !FALLBACK && "needs NOTIFY_FALLBACK=1 on the server (E2E_NOTIFY_FALLBACK=1)" };
 const STARTED = Date.now() - 2_000;
 let browser;
 const P = {};
@@ -125,7 +129,23 @@ test("the prefs API: session user only, strict body, no id, no required category
 
 /* ── email fallback ──────────────────────────────────────────────────── */
 
-test("setup: the employer opens a thread and messages the intern through the real routes", async () => {
+test("kill switch: NOTIFY_FALLBACK unset (default OFF) queues and sends nothing, however old the unread message", async () => {
+  if (!threadId) {
+    const t = await api(P.E.page, "POST", "/api/threads", { counterpartId: I.id, proposalId });
+    threadId = t.body.thread?.id ?? t.body.id;
+  }
+  await rows(`DELETE FROM messages WHERE thread_id = $1`, [threadId]);
+  await msg(E, "20 minutes");
+  await msg(E, "30 hours");
+  const r = await tick();
+  assert.equal(r.skipped, false);
+  assert.equal((await outboxFor(I)).length, 0, "nothing queued");
+  assert.equal((await fallbackMail(I)).length, 0, "nothing mailed");
+  await reset();
+}, { skip: FALLBACK && "fallback is ON for this run" });
+
+
+test("setup: the employer opens a thread and messages the intern through the real routes", ON, async () => {
   const t = await api(P.E.page, "POST", "/api/threads", { counterpartId: I.id, proposalId });
   assert.equal(t.status, 200, JSON.stringify(t.body));
   threadId = t.body.thread?.id ?? t.body.id;
@@ -135,7 +155,7 @@ test("setup: the employer opens a thread and messages the intern through the rea
   await reset();
 });
 
-test("a fresh message waits: nothing is emailed before 15 minutes", async () => {
+test("a fresh message waits: nothing is emailed before 15 minutes", ON, async () => {
   await msg(E, "5 minutes");
   await tick();
   assert.equal((await fallbackMail(I)).length, 0);
@@ -143,7 +163,7 @@ test("a fresh message waits: nothing is emailed before 15 minutes", async () => 
   await reset();
 });
 
-test("an unread message after 15 minutes: ONE email to the recipient, none to the sender, a link, no body text", async () => {
+test("an unread message after 15 minutes: ONE email to the recipient, none to the sender, a link, no body text", ON, async () => {
   await msg(E, "20 minutes");
   await msg(E, "18 minutes");
   await msg(E, "16 minutes");
@@ -160,7 +180,21 @@ test("an unread message after 15 minutes: ONE email to the recipient, none to th
   assert.equal(ob[0].status, "sent");
 });
 
-test("dedupe: more ticks and a new message in the same unread run send nothing more", async () => {
+test("lookback is 48 hours: a 30-hour-old unread message is emailed once, a 50-hour-old one is not", async () => {
+  await reset();
+  await msg(E, "50 hours");
+  await tick();
+  assert.equal((await outboxFor(I)).length, 0, "older than the window");
+  await msg(E, "30 hours");
+  await tick();
+  await tick();
+  assert.equal((await outboxFor(I)).length, 1, "inside the window, once");
+  const mail = await fallbackMail(I);
+  assert.ok(mail.every((m) => !/15 minutes/.test(m.text)), "no claim about 15 minutes");
+  await reset();
+});
+
+test("dedupe: more ticks and a new message in the same unread run send nothing more", ON, async () => {
   await tick();
   await msg(E, "17 minutes");
   await tick();
@@ -169,7 +203,7 @@ test("dedupe: more ticks and a new message in the same unread run send nothing m
   assert.equal((await outboxFor(I)).length, 1);
 });
 
-test("after the thread is read, a new unread run emails again (one per window)", async () => {
+test("after the thread is read, a new unread run emails again (one per window)", ON, async () => {
   const r = await api(P.I.page, "POST", `/api/threads/${threadId}/read`);
   assert.ok(r.status < 300, `read → ${r.status}`);
   await msg(E, "20 minutes");
@@ -178,7 +212,7 @@ test("after the thread is read, a new unread run emails again (one per window)",
   assert.equal((await outboxFor(I)).length, 2);
 });
 
-test("a message that was read before the delay is never emailed", async () => {
+test("a message that was read before the delay is never emailed", ON, async () => {
   await reset();
   const id = await msg(E, "30 minutes");
   await rows(`UPDATE messages SET read_at = now() WHERE id = $1`, [id]);
@@ -188,7 +222,7 @@ test("a message that was read before the delay is never emailed", async () => {
   assert.equal((await outboxFor(I)).length, 0);
 });
 
-test("an online recipient is not emailed, including one who hid their activity (the real heartbeat decides, silently)", async () => {
+test("an online recipient is not emailed, including one who hid their activity (the real heartbeat decides, silently)", ON, async () => {
   await reset();
   await msg(E, "20 minutes");
   await rows(`INSERT INTO user_presence (user_id, last_seen_at, show_activity) VALUES ($1, now(), false) ON CONFLICT (user_id) DO UPDATE SET last_seen_at = now(), show_activity = false`, [I.id]);
@@ -204,7 +238,7 @@ test("an online recipient is not emailed, including one who hid their activity (
   assert.equal(st.show_activity, false, "the hide setting was not touched");
 });
 
-test("prefs off: no email and nothing queued; the message is still in the app", async () => {
+test("prefs off: no email and nothing queued; the message is still in the app", ON, async () => {
   await reset();
   await setPrefs(I, false);
   await msg(E, "20 minutes");
@@ -216,7 +250,7 @@ test("prefs off: no email and nothing queued; the message is still in the app", 
   assert.ok(t.body.threads.find((x) => x.id === threadId).unread >= 1, "still unread in the app");
 });
 
-test("switching it off after the row was queued: skipped at send time, not sent", async () => {
+test("switching it off after the row was queued: skipped at send time, not sent", ON, async () => {
   await reset();
   await msg(E, "20 minutes");
   await rows(`INSERT INTO email_outbox (campaign_id, entry_id, to_email, template, payload, idempotency_key, next_at)
@@ -232,7 +266,7 @@ test("switching it off after the row was queued: skipped at send time, not sent"
   assert.match(ob.provider_id, /^skipped:prefs:/);
 });
 
-test("the other direction: an unread candidate message emails the employer; employer prefs off stops it", async () => {
+test("the other direction: an unread candidate message emails the employer; employer prefs off stops it", ON, async () => {
   await reset();
   await msg(I, "20 minutes");
   const before = (await fallbackMail(E)).length;
@@ -248,7 +282,7 @@ test("the other direction: an unread candidate message emails the employer; empl
   assert.equal((await fallbackMail(I)).length, senderBefore, "not the sender");
 });
 
-test("an unread proposal update: ONE email per proposal after 15 minutes; prefs off or read stops it", async () => {
+test("an unread proposal update: ONE email per proposal after 15 minutes; prefs off or read stops it", ON, async () => {
   await reset();
   const mk = async (ago) => {
     const n = await one(

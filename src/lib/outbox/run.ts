@@ -1,3 +1,4 @@
+import { fallbackEnabled, makeScanGate } from "../notify-prefs.ts";
 import { processBatchTx, type Sender } from "./index.ts";
 
 export const BATCH_SIZE = 50;
@@ -16,6 +17,7 @@ export function makeGuard() {
   };
 }
 const guard = makeGuard();
+const scanGate = makeScanGate(BATCH_SIZE);
 
 export type TickResult = { skipped: boolean; sent: number; retried: number; dead: number };
 
@@ -30,10 +32,14 @@ export async function runOutboxTick(sender?: Sender): Promise<TickResult> {
       import("./send-db.ts"),
       import("../unread-fallback.ts"),
     ]);
-    // Queue "you have unread messages" mail first; the claim below then sends it. A scan failure must not
-    // hold back drive-code mail.
-    await withPgTransaction((c) => enqueueUnreadFallbacks(asRowsExecutor(c))).catch((e) => console.error("[outbox] unread fallback scan failed", e));
-    return processBatchTx((fn) => withPgTransaction((c) => fn(asRowsExecutor(c))), sender ?? sendDriveCodeRow, { limit: BATCH_SIZE });
+    // Queue "you have unread messages" mail first; the claim below then sends it. Off unless NOTIFY_FALLBACK=1, and once
+    // per drain (scanGate), not per batch. A scan failure must not hold back drive-code mail.
+    if (fallbackEnabled() && scanGate.shouldScan()) {
+      await withPgTransaction((c) => enqueueUnreadFallbacks(asRowsExecutor(c))).catch((e) => console.error("[outbox] unread fallback scan failed", e));
+    }
+    const result = await processBatchTx((fn) => withPgTransaction((c) => fn(asRowsExecutor(c))), sender ?? sendDriveCodeRow, { limit: BATCH_SIZE });
+    scanGate.recordBatch(result);
+    return result;
   });
   return r.skipped ? { skipped: true, sent: 0, retried: 0, dead: 0 } : { skipped: false, ...r.value };
 }
