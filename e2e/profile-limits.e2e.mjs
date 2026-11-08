@@ -1,5 +1,5 @@
 /**
- * Bio removal and the 7-skill limit end to end (Chromium, QA stack). WRITTEN, NOT YET RUN.
+ * Bio removal and the 7-skill limit end to end (Chromium, QA stack). Run green on the scratch seed (WP-E).
  *
  *   E2E_BASE_URL=http://localhost:3500 DATABASE_URL=postgresql://findtern@127.0.0.1:5435/findtern_qa \
  *     node --test --test-concurrency=1 e2e/profile-limits.e2e.mjs      (npm run test:e2e:limits)
@@ -87,11 +87,15 @@ test("onboarding: 8 skills → refused with a clear message, 7 accepted", async 
   assert.equal((await skillNames(I.id)).length, 7);
 });
 
-test("a legacy intern with 9 skills sees all 9", async () => {
+test("a legacy intern with 9 skills keeps all 9; the profile preview shows 7 chips and \"+2\" for the rest", async () => {
+  // The profile page is "as employers read it": at most MAX_SKILL_CHIPS (7) chips, then "+N more" (SkillChips), and a
+  // line saying so. It was once a full list, which is why this test used to expect all 9 on the page.
+  assert.equal((await skillNames(L.id)).length, 9, "nothing is dropped from the stored list");
   await P.L.page.goto(url("/intern/profile"), { waitUntil: "domcontentloaded" });
-  const text = (await P.L.page.locator("main").textContent()) ?? "";
-  const missing = SKILLS.filter((s) => !text.includes(s));
-  assert.deepEqual(missing, [], "every one of the 9 skills is shown");
+  const chips = P.L.page.locator('main ul[aria-label="Skills"] > li');
+  assert.deepEqual(await chips.evaluateAll((els) => els.slice(0, 7).map((e) => e.textContent.trim())), SKILLS.slice(0, 7), "the first 7 are shown, in order");
+  assert.match((await chips.last().textContent()) ?? "", /\+2/, "the other 2 are counted, not lost");
+  assert.match((await P.L.page.locator("main").textContent()) ?? "", /up to 7 skills/);
 });
 
 test("legacy 9 skills: unchanged save ok, swapped 9 refused, growing refused, reduce to 7 ok", async () => {
