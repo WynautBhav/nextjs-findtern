@@ -9,6 +9,7 @@ import { SITE } from "@/lib/content/site";
 import { PageHeader } from "@/components/layout/page-header";
 import { CompanyProfileForm, type CompanyProfile } from "@/components/employer/company-profile-form";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
+import { NotificationPrefs } from "@/components/notifications/notification-prefs";
 import { missingProfileFields } from "@/lib/employer-onboarding";
 import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { formatDate } from "@/lib/format";
@@ -30,8 +31,14 @@ export default async function EmployerAccount() {
   const uid = session.uid;
 
   let employer: typeof schema.employers.$inferSelect | undefined;
+  let prefs: { emailMessages: boolean; pushMessages: boolean } | undefined;
   try {
     [employer] = await getDb().select().from(schema.employers).where(eq(schema.employers.id, uid)).limit(1);
+    [prefs] = await getDb()
+      .select({ emailMessages: schema.notificationPrefs.emailMessages, pushMessages: schema.notificationPrefs.pushMessages })
+      .from(schema.notificationPrefs)
+      .where(eq(schema.notificationPrefs.userId, uid))
+      .limit(1);
   } catch (err) {
     console.error("Failed to load employer account:", err);
     return (
@@ -106,6 +113,13 @@ export default async function EmployerAccount() {
                 }
               />
             </dl>
+          </Surface>
+
+          <Surface as="section" id="notifications" className="scroll-mt-24 p-5" aria-labelledby="notifications-title">
+            <h2 id="notifications-title" className="mb-4 text-base font-semibold text-ink-900">
+              Notifications
+            </h2>
+            <NotificationPrefs role="employer" initial={{ emailMessages: prefs?.emailMessages ?? true, pushMessages: prefs?.pushMessages ?? true }} />
           </Surface>
 
           <Surface as="section" id="security" className="scroll-mt-24 p-5" aria-labelledby="security-title">

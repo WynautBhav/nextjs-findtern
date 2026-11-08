@@ -1,6 +1,7 @@
 import { driveCodeEmail, renderEmail } from "../emails.ts";
 import { driveCodeSecret, deriveDriveCode } from "../drives/code-derive.ts";
 import { sendSmtpMail } from "../mailer.ts";
+import { MESSAGE_TEMPLATE, OFFER_TEMPLATE, sendUnreadRow } from "../unread-fallback.ts";
 import { redactError, type OutboxRow, type Sender } from "./index.ts";
 
 type Lookup = (codeId: string) => Promise<{ name: string; collegeName: string; status: string; validUntil: Date } | null>;
@@ -44,4 +45,13 @@ export function makeSender(deps: { lookup?: Lookup; mail?: Mail; secret?: () => 
   };
 }
 
-export const sendDriveCodeRow: Sender = (row) => makeSender()(row);
+/** Unread-message and offer-update fallback mail (lib/unread-fallback.ts); needs the database to re-check at send time. */
+async function sendFallbackRow(row: OutboxRow) {
+  const { getDb } = await import("../db/index.ts");
+  const pool = getDb().$client;
+  return sendUnreadRow({ query: async <T,>(text: string, params?: unknown[]) => (await pool.query(text, params)).rows as T[] }, row);
+}
+
+/** The outbox's sender: fallback mail by template, everything else is drive-code mail. */
+export const sendDriveCodeRow: Sender = (row) =>
+  row.template === MESSAGE_TEMPLATE || row.template === OFFER_TEMPLATE ? sendFallbackRow(row) : makeSender()(row);

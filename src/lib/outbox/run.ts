@@ -20,15 +20,19 @@ const guard = makeGuard();
 export type TickResult = { skipped: boolean; sent: number; retried: number; dead: number };
 
 /**
- * Claims and sends one batch. Safe from two places at once: overlapping ticks in this process skip,
+ * Queues unread-message and unread-offer fallback mail, then claims and sends one batch. Safe from two places at once: overlapping ticks in this process skip,
  * and across processes `FOR UPDATE SKIP LOCKED` gives each row to one claimer.
  */
 export async function runOutboxTick(sender?: Sender): Promise<TickResult> {
   const r = await guard(async () => {
-    const [{ withPgTransaction, asRowsExecutor }, { sendDriveCodeRow }] = await Promise.all([
+    const [{ withPgTransaction, asRowsExecutor }, { sendDriveCodeRow }, { enqueueUnreadFallbacks }] = await Promise.all([
       import("../db/pg-tx.ts"),
       import("./send-db.ts"),
+      import("../unread-fallback.ts"),
     ]);
+    // Queue "you have unread messages" mail first; the claim below then sends it. A scan failure must not
+    // hold back drive-code mail.
+    await withPgTransaction((c) => enqueueUnreadFallbacks(asRowsExecutor(c))).catch((e) => console.error("[outbox] unread fallback scan failed", e));
     return processBatchTx((fn) => withPgTransaction((c) => fn(asRowsExecutor(c))), sender ?? sendDriveCodeRow, { limit: BATCH_SIZE });
   });
   return r.skipped ? { skipped: true, sent: 0, retried: 0, dead: 0 } : { skipped: false, ...r.value };

@@ -8,6 +8,7 @@ import { DetailRow, PageHead, SectionHead, Surface } from "@/components/app/prim
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { CopyIdButton } from "@/components/intern/copy-id-button";
 import { ActivityVisibilityToggle } from "@/components/intern/activity-visibility-toggle";
+import { NotificationPrefs } from "@/components/notifications/notification-prefs";
 import { CollegeForm } from "@/components/intern/college-form";
 import { BankDetailsForm, type BankDetails } from "@/components/intern/bank-details-form";
 import { InvoiceList } from "@/components/intern/invoice-list";
@@ -30,6 +31,7 @@ const SECTIONS: [id: string, label: string][] = [
   ["bank", "Bank account"],
   ["college", "College"],
   ["privacy", "Privacy"],
+  ["notifications", "Notifications"],
   ["invoices", "Invoices"],
   ["password", "Password"],
 ];
@@ -55,7 +57,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
 
   const uid = session.uid;
   const db = getDb();
-  const [[row], [user], college, [presenceRow], payments] = await Promise.all([
+  const [[row], [user], college, [presenceRow], [prefsRow], payments] = await Promise.all([
     db
       .select({ extra: schema.internOnboarding.extraData })
       .from(schema.internOnboarding)
@@ -76,6 +78,11 @@ export default async function InternSettings({ searchParams }: { searchParams: P
     membershipOf(uid),
     // No row yet means never seen, which counts as visible (the default).
     db.select({ show: schema.userPresence.showActivity }).from(schema.userPresence).where(eq(schema.userPresence.userId, uid)).limit(1),
+    db
+      .select({ emailMessages: schema.notificationPrefs.emailMessages, pushMessages: schema.notificationPrefs.pushMessages })
+      .from(schema.notificationPrefs)
+      .where(eq(schema.notificationPrefs.userId, uid))
+      .limit(1),
     // Ownership is the session's uid, never a URL id; paid, ₹0 and number-less rows are dropped (also re-checked in ownInternInvoices).
     db
       .select({
@@ -173,6 +180,13 @@ export default async function InternSettings({ searchParams }: { searchParams: P
             <SectionHead title="Privacy" hint="What employers can see about you while you browse." />
             <Surface className="p-5 lg:p-6">
               <ActivityVisibilityToggle initial={presenceRow?.show ?? true} />
+            </Surface>
+          </section>
+
+          <section id="notifications" className="scroll-mt-24">
+            <SectionHead title="Notifications" hint="Choose which optional emails you get." />
+            <Surface className="p-5 lg:p-6">
+              <NotificationPrefs role="intern" initial={{ emailMessages: prefsRow?.emailMessages ?? true, pushMessages: prefsRow?.pushMessages ?? true }} />
             </Surface>
           </section>
 

@@ -3,12 +3,16 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { renderEmail, type EmailContent } from "@/lib/emails";
 import { sendSmtpMail, type SmtpAttachment } from "@/lib/mailer";
+import { categoryOf, channelAllowed, type PrefsRow } from "@/lib/notify-prefs";
 
 /**
  * One call per event: the in-app notification (durable record) and,
  * optionally, the email. A repeated `dedupeKey` is a no-op for both, so
  * scheduled jobs can call this freely. Email is best-effort: a mail failure
  * never undoes the action that triggered it.
+ *
+ * Preferences (notification_prefs): only message, offer and tips-style types can be switched off (see
+ * lib/notify-prefs.ts); anything else, money and security included, is sent regardless. No row means all on.
  */
 export async function notify(n: {
   to: { type: "intern" | "employer"; id: string };
@@ -22,6 +26,9 @@ export async function notify(n: {
 }): Promise<boolean> {
   const db = getDb();
   const { type, data } = legacyShape(n.to.type, n.type, n.data ?? {});
+  const category = categoryOf(n.type);
+  const prefs = category === "required" ? null : await prefsOf(n.to.id);
+  if (!channelAllowed(prefs, category, "inApp")) return false;
   const inserted = await db
     .insert(schema.notifications)
     .values({
@@ -38,7 +45,7 @@ export async function notify(n: {
     .onConflictDoNothing()
     .returning({ id: schema.notifications.id });
   if (inserted.length === 0) return false;
-  if (!n.email) return true;
+  if (!n.email || !channelAllowed(prefs, category, "email")) return true;
 
   try {
     const address = await emailOf(n.to.type, n.to.id);
@@ -49,6 +56,24 @@ export async function notify(n: {
     console.error(`[notify] ${n.type} email failed`, err);
   }
   return true;
+}
+
+/**
+ * The person's stored switches, or null when they never saved any (= all on). A failed read also gives null: it
+ * costs an optional message its opt-out, never a required one its delivery.
+ */
+export async function prefsOf(userId: string): Promise<PrefsRow | null> {
+  try {
+    const [row] = await getDb()
+      .select({ emailMessages: schema.notificationPrefs.emailMessages, pushMessages: schema.notificationPrefs.pushMessages })
+      .from(schema.notificationPrefs)
+      .where(eq(schema.notificationPrefs.userId, userId))
+      .limit(1);
+    return row ?? null;
+  } catch (err) {
+    console.error("[notify] prefs lookup failed", err);
+    return null;
+  }
 }
 
 /**
