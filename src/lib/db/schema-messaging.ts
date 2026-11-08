@@ -32,6 +32,8 @@ export const messages = pgTable("messages", {
 export const userPresence = pgTable("user_presence", {
   userId: varchar("user_id").primaryKey(),
   lastSeenAt: timestamp("last_seen_at").notNull().defaultNow(),
+  /** 0027. Employers see this user's online / last seen only while true. Enforced in lib/presence.ts. */
+  showActivity: boolean("show_activity").notNull().default(true),
 });
 
 export const realtimeEvents = pgTable("realtime_events", {

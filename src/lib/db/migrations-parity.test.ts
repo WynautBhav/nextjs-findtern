@@ -17,7 +17,7 @@ const KNOWN_MISMATCHES: Record<string, string> = {
     "Named UNIQUE constraint in 0021 is produced by drizzle's implicit .unique() on idempotencyKey (default name matches).",
 };
 
-/** Exact (whitespace-normalised) UPDATE/DELETE statements permitted in 0018-0026. */
+/** Exact (whitespace-normalised) UPDATE/DELETE statements permitted in 0018-0027. */
 const ALLOWED_DML = new Set([
   `UPDATE "projects" SET "status" = 'published', "published_at" = COALESCE("published_at", "created_at") WHERE "status" = 'active';`,
   `UPDATE "projects" SET "status" = 'paused' WHERE "status" = 'inactive';`,
@@ -28,13 +28,20 @@ const ALLOWED_DML = new Set([
 const files = readdirSync(SQL_DIR).filter((f) => f.endsWith(".sql")).sort();
 const NEW = files.filter((f) => {
   const n = Number(f.slice(0, 4));
-  return n >= 18 && n <= 26;
+  return n >= 18 && n <= 27;
 });
 
 // Same split/strip as scripts/migrate.ts statements().
 const split = (sql: string) =>
   sql.split("--> statement-breakpoint").map((s) => s.replace(/^\s*--.*$/gm, "").trim()).filter(Boolean);
 const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+
+/** "table.column" added by ALTER TABLE ... ADD COLUMN in any of these files: a CREATE TABLE in an earlier file may lack it. */
+const ALTER_ADDED = new Set(
+  NEW.flatMap((f) =>
+    [...read(join(SQL_DIR, f)).matchAll(/ALTER TABLE "(\w+)" ADD COLUMN IF NOT EXISTS "(\w+)"/g)].map((m) => `${m[1]}.${m[2]}`),
+  ),
+);
 
 const DRIZZLE_FILES: Record<string, string> = Object.fromEntries(
   readdirSync(DB_DIR)
@@ -75,8 +82,8 @@ function sqlTables(sql: string) {
   return out;
 }
 
-describe("migration files 0018-0026", () => {
-  it("are present", () => assert.equal(NEW.length, 9));
+describe("migration files 0018-0027", () => {
+  it("are present", () => assert.equal(NEW.length, 10));
 
   for (const f of NEW) {
     const sql = read(join(SQL_DIR, f));
@@ -129,7 +136,7 @@ describe("migration files 0018-0026", () => {
           assert.ok(d.has(name), `${table}.${name} in SQL but not in drizzle`);
           assert.equal(d.get(name), nn, `${table}.${name} notNull differs (sql=${nn})`);
         }
-        for (const name of d.keys()) assert.ok(cols.has(name), `${table}.${name} in drizzle but not in SQL`);
+        for (const name of d.keys()) assert.ok(cols.has(name) || ALTER_ADDED.has(`${table}.${name}`), `${table}.${name} in drizzle but not in SQL`);
       }
       for (const s of stmts) {
         const names = [
@@ -154,7 +161,16 @@ describe("migration files 0018-0026", () => {
     for (const c of ["description", "taken_down_at", "taken_down_by", "taken_down_reason"]) assert.ok(s.includes(`"${c}"`), c);
   });
 
-  it("every 0018-0026 migration after 0024 has a rollback file", () => {
+  it("0027 adds user_presence.show_activity: boolean NOT NULL DEFAULT TRUE, additive, matching drizzle", () => {
+    const stmts = split(read(join(SQL_DIR, "0027_presence_visibility.sql")));
+    assert.ok(stmts.some((s) => norm(s) === 'ALTER TABLE "user_presence" ADD COLUMN IF NOT EXISTS "show_activity" boolean DEFAULT true NOT NULL;'));
+    assert.match(DRIZZLE_FILES["schema-messaging.ts"], /showActivity: boolean\("show_activity"\)\.notNull\(\)\.default\(true\)/);
+    assert.equal(drizzleColumns("user_presence").get("show_activity"), true);
+    const down = read(join(SQL_DIR, "rollback", "0027_presence_visibility.down.sql"));
+    assert.match(down, /DROP COLUMN IF EXISTS "show_activity"/);
+  });
+
+  it("every 0018-0027 migration after 0024 has a rollback file", () => {
     for (const f of NEW.filter((x) => Number(x.slice(0, 4)) >= 25)) {
       const down = join(SQL_DIR, "rollback", f.replace(/\.sql$/, ".down.sql"));
       assert.ok(readFileSync(down, "utf8").includes(`DELETE FROM "_ft_migrations" WHERE "name" = '${f}'`), down);
