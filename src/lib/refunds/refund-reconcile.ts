@@ -156,7 +156,8 @@ export async function reconcileRefunds(deps: {
         detail = res.detail ?? {};
       } else {
         g = res.gateway;
-        if (g.amountMinor !== null && g.amountMinor !== r.amountMinor) {
+        // A missing gateway amount cannot confirm the stored one, so it is flagged like a mismatch: never settle unverified.
+        if (g.amountMinor === null || g.amountMinor !== r.amountMinor) {
           flag = "amount_mismatch";
           detail = { gatewayAmountMinor: g.amountMinor, storedAmountMinor: r.amountMinor };
         } else if (g.paymentId && r.gatewayPaymentId && g.paymentId !== r.gatewayPaymentId) {

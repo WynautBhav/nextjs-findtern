@@ -196,6 +196,25 @@ test("amount or payment differing at the gateway is flagged; the stored amount i
   assert.equal(s.flagged, 2);
 });
 
+test("a gateway answer with no amount is flagged for manual review, never settled; the row stays initiated and is audited once", async () => {
+  const rows = [mkRow("a")];
+  const { store, audits } = fakeStore(rows);
+  const details: unknown[] = [];
+  const inner = store.auditFlag.bind(store);
+  store.auditFlag = async (refund, flag, detail, at) => { details.push(detail); return inner(refund, flag, detail, at); };
+  const { gateway } = fakeGateway({ rfnd_a: { status: "processed", amountMinor: null } });
+  const s1 = await run(store, gateway);
+  const s2 = await run(store, gateway);
+  assert.equal(rows[0].status, "initiated");
+  assert.equal(rows[0].amountMinor, 250000);
+  assert.equal(rows[0].raw?.flag, "amount_mismatch");
+  assert.deepEqual(audits, [{ kind: "flag", refundId: "a", flag: "amount_mismatch" }]);
+  assert.deepEqual(details, [{ gatewayAmountMinor: null, storedAmountMinor: 250000, gatewayRefundId: "rfnd_a" }]);
+  assert.equal(s1.flagged, 1);
+  assert.equal(s1.refunded, 0);
+  assert.equal(s2.flagged, 1);
+});
+
 test("a gateway answering with a different refund id than asked for is flagged, not trusted", async () => {
   const rows = [mkRow("a")];
   const { store, audits } = fakeStore(rows);

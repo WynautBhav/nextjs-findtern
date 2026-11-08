@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { cronAuthorized } from "@/lib/cron-auth";
+import { outboxCronOff } from "@/lib/outbox/cron-switch";
 import { runOutboxDrain } from "@/lib/outbox/run";
 
 export const dynamic = "force-dynamic";
@@ -9,11 +10,13 @@ export const maxDuration = 60;
 /**
  * Same CRON_SECRET bearer check as /api/cron/payment-reminders. Sends queued campaign mail: batches of 50
  * until the queue has nothing due or the time budget is used (a daily Vercel cron still clears a backlog).
- * MAIL_MODE=log sends nothing real (the mailer writes to the log instead).
+ * MAIL_MODE=log sends nothing real (the mailer writes to the log instead). `OUTBOX_CRON=off` is a second kill switch
+ * (default on): the route answers {skipped:true} without touching the queue. Env changes need a redeploy on Vercel.
  */
 export async function GET(req: Request) {
   if (!cronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (process.env.SCHEDULERS === "off") return NextResponse.json({ skipped: true, reason: "SCHEDULERS is off" });
+  if (outboxCronOff()) return NextResponse.json({ skipped: true, reason: "OUTBOX_CRON is off" });
   try {
     return NextResponse.json(await runOutboxDrain());
   } catch (e) {
