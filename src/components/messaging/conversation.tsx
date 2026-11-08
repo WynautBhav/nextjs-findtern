@@ -77,7 +77,6 @@ export function Conversation({ base, threadId, proposal = null }: { base: "emplo
 
   useEffect(() => {
     seenFirstLoad.current = false;
-    setNewFromId(null);
     setOpenThread(threadId);
     const t = setTimeout(() => void load(), 0);
     return () => {
