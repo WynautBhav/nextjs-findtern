@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // Claude Code's per-agent worktrees: full copies of the repo, not source.
     ".claude/**",
+    // Gitignored local probe scripts (WORKFLOW.md rule 9).
+    "scratch/**",
   ]),
 ]);
 
