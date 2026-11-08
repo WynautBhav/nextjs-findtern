@@ -1,8 +1,8 @@
 import { and, eq, gt } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { origin } from "@/lib/emails";
 import { notify } from "@/lib/notify";
+import { linkTo } from "@/lib/origin";
 import { sendPush } from "./push";
 
 /**
@@ -61,6 +61,8 @@ export async function sendNudge(input: {
     kind: input.kind,
   });
   const copy = COPY[input.kind](input.collegeName);
+  // The nudge row is committed: with no PUBLIC_ORIGIN the student gets the bell and push, not an email.
+  const link = input.kind === "online" ? null : linkTo(copy.url);
   await notify({
     to: { type: "intern", id: input.userId },
     type: `college_nudge_${input.kind}`,
@@ -70,9 +72,9 @@ export async function sendNudge(input: {
     // Drive-day "come online" nudges go out by the hundred and are stale in
     // minutes: bell + push only. Offer and interview chases also email.
     email:
-      input.kind === "online"
+      link === null
         ? undefined
-        : { subject: copy.title, heading: copy.title, greeting: "Hi,", lines: [copy.message], cta: { label: "Open Findtern", url: `${origin()}${copy.url}` } },
+        : { subject: copy.title, heading: copy.title, greeting: "Hi,", lines: [copy.message], cta: { label: "Open Findtern", url: link } },
   }).catch((err) => console.error("[nudge] notify failed", err));
   const pushed = await sendPush(input.userId, { title: copy.title, body: copy.message, url: copy.url, tag: `nudge-${input.kind}` }).catch(() => 0);
   return { ok: true, pushed: pushed > 0 };

@@ -13,6 +13,7 @@ import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-tabl
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ButtonAnchor } from "@/components/ui/button";
 import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { TakedownAction } from "./takedown-action";
 
 /**
  * Projects (legacy admin-projects.tsx). "Active" is the shared rule: any
@@ -66,6 +67,8 @@ export default async function AdminProjectsPage({
           createdAt: schema.projects.createdAt,
           employerId: schema.projects.employerId,
           employerName: schema.employers.companyName,
+          takenDownAt: schema.projects.takenDownAt,
+          takenDownReason: schema.projects.takenDownReason,
           proposalCount,
           isActive: sql<boolean>`${activeProject()}`,
         })
@@ -231,8 +234,20 @@ export default async function AdminProjectsPage({
               </Link>
             ),
           },
-          { header: "Status", cell: (row) => <StatusBadge value={row.isActive ? "active" : "closed"} /> },
+          {
+            header: "Status",
+            cell: (row) =>
+              row.takenDownAt ? (
+                <div className="min-w-0 whitespace-normal lg:max-w-40">
+                  <StatusBadge tone="danger" label="Taken down" />
+                  <p className="mt-1 line-clamp-2 break-words text-[0.8125rem] text-text-subtle" title={row.takenDownReason ?? ""}>{row.takenDownReason}</p>
+                </div>
+              ) : (
+                <StatusBadge value={row.isActive ? "active" : "closed"} />
+              ),
+          },
           { header: "Posted", sort: "posted", cell: (row) => <span className="nums whitespace-nowrap text-text-subtle">{formatDate(row.createdAt)}</span> },
+          { header: "Moderation", cell: (row) => <TakedownAction id={row.id} name={row.projectName} takenDown={Boolean(row.takenDownAt)} /> },
         ]}
       />
     </div>

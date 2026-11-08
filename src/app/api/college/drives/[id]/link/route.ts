@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 
-import { origin } from "@/lib/emails";
+import { tryPublicOrigin } from "@/lib/origin";
 import { requireCollegeMutation } from "@/lib/college/guard";
-import { driveUrl } from "@/lib/college/drive-input";
+import { driveShareUrl } from "@/lib/college/drive-input";
 import { driveForCollegeAdmin } from "@/lib/college/scope";
 import { generateDriveToken } from "@/lib/college/tokens";
 import { reissueDriveLink } from "@/lib/college/link";
@@ -22,7 +22,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!drive) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const { token, hash } = generateDriveToken();
   await reissueDriveLink(getDb(), drive.id, hash);
-  return NextResponse.json({ url: driveUrl(origin(), token) });
+  return NextResponse.json({ url: driveShareUrl(tryPublicOrigin(), token) });
 }
 
 export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }> }) {

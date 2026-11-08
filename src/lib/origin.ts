@@ -47,6 +47,15 @@ export function tryPublicOrigin(env: Record<string, string | undefined> = proces
 }
 
 /**
+ * `path` on the public origin, or null when there is none. For a notification email's link
+ * after a write has committed: no origin costs the email, never the saved action.
+ */
+export function linkTo(path: string, env: Record<string, string | undefined> = process.env): string | null {
+  const site = tryPublicOrigin(env);
+  return site === null ? null : `${site}${path}`;
+}
+
+/**
  * Where the test-only switches (the test payment button, free-payments mode, the
  * rate-limit bypass) may work: this machine, a Vercel deployment, or a host
  * named in STAGING_HOSTS. A list rather than "anything but findtern.in", so an

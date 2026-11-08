@@ -4,8 +4,8 @@ import { randomBytes } from "node:crypto";
 import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { CALENDAR_TOKEN_OWNER, calendarConfig, createMeetEvent } from "@/lib/google";
-import { origin } from "@/lib/emails";
 import { notify } from "@/lib/notify";
+import { linkTo } from "@/lib/origin";
 import { pickMeetingLink } from "./meeting-link";
 import { sendPush } from "./push";
 
@@ -133,13 +133,15 @@ export async function requestMeeting(input: {
   const when = input.inMinutes === 0 ? "right now" : `in ${input.inMinutes} minutes`;
   const title = `An employer wants to talk ${when}`;
   const message = `${input.driveTitle}: accept to get the call link. The request lapses 10 minutes after the start time.`;
+  // The request is committed: with no PUBLIC_ORIGIN the student gets the bell and push, not an email.
+  const dashboard = linkTo("/intern/dashboard");
   await notify({
     to: { type: "intern", id: input.userId },
     type: "drive_meeting_request",
     title,
     message,
     data: { meetingId: row.id, driveId: input.driveId, url: "/intern/dashboard" },
-    email: { subject: title, heading: title, greeting: "Hi,", lines: [message], cta: { label: "Open Findtern", url: `${origin()}/intern/dashboard` } },
+    email: dashboard === null ? undefined : { subject: title, heading: title, greeting: "Hi,", lines: [message], cta: { label: "Open Findtern", url: dashboard } },
   }).catch((err) => console.error("[drive-meeting] notify failed", err));
   await sendPush(input.userId, { title, body: message, url: "/intern/dashboard", tag: `drive-meeting-${row.id}` }).catch(() => 0);
 

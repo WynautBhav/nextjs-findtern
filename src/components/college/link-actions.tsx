@@ -46,7 +46,7 @@ export function LinkActions(props: {
     const body = (await res?.json().catch(() => null)) as { url?: string; error?: string } | null;
     setBusy(false);
     if (!res?.ok) return setError(body?.error ?? "Couldn't update the link.");
-    setUrl(method === "POST" ? body?.url ?? null : null);
+    setUrl(method === "POST" && body?.url ? new URL(body.url, window.location.origin).href : null);
     router.refresh();
   }
 

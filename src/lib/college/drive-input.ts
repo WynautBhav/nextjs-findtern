@@ -30,3 +30,12 @@ export type DriveInput = z.infer<typeof driveInput>;
 export function driveUrl(origin: string, token: string): string {
   return `${origin.replace(/\/$/, "")}/drive/${token}`;
 }
+
+/**
+ * The share link for a token that exists only in this response (it is stored hashed). Called
+ * after the drive or the new token is committed, so a missing PUBLIC_ORIGIN must not 500: it
+ * answers the site-relative path and the browser prefixes its own origin.
+ */
+export function driveShareUrl(origin: string | null, token: string): string {
+  return origin === null ? `/drive/${token}` : driveUrl(origin, token);
+}

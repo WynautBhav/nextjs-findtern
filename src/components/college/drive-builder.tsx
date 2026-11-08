@@ -121,7 +121,7 @@ export function DriveBuilder({
     }
     if (!d.id && body?.id) {
       setD((x) => ({ ...x, id: body.id }));
-      setLink(body.url ?? null);
+      setLink(body.url ? new URL(body.url, window.location.origin).href : null);
       // Update the address without remounting, so the one-time link stays on screen.
       window.history.replaceState(null, "", `/college/drives/${body.id}`);
       window.scrollTo({ top: 0, behavior: "smooth" });

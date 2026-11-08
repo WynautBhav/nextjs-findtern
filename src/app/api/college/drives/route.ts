@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
-import { origin } from "@/lib/emails";
+import { tryPublicOrigin } from "@/lib/origin";
 import { requireCollegeMutation } from "@/lib/college/guard";
-import { driveInput, driveUrl } from "@/lib/college/drive-input";
+import { driveInput, driveShareUrl } from "@/lib/college/drive-input";
 import { generateDriveToken } from "@/lib/college/tokens";
 import { getDb, schema } from "@/lib/db";
 
@@ -19,5 +19,5 @@ export async function POST(req: Request) {
     .insert(schema.collegeDrives)
     .values({ ...parsed.data, collegeId: g.ctx.college.id, tokenHash: hash, createdBy: g.ctx.admin.id })
     .returning({ id: schema.collegeDrives.id });
-  return NextResponse.json({ id: drive.id, url: driveUrl(origin(), token) }, { status: 201 });
+  return NextResponse.json({ id: drive.id, url: driveShareUrl(tryPublicOrigin(), token) }, { status: 201 });
 }

@@ -53,6 +53,8 @@ export default async function EmployerProjectsPage() {
       skills: (p.skills as string[] | null) ?? [],
       locationType: p.locationType,
       rejectionReason: p.rejectionReason,
+      takenDown: Boolean(p.takenDownAt),
+      takenDownReason: p.takenDownReason,
     }));
   } catch (err) {
     console.error("Failed to load employer projects:", err);

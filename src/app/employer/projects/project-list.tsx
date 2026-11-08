@@ -24,6 +24,8 @@ export type ListProject = {
   skills: string[];
   locationType: string | null;
   rejectionReason: string | null;
+  takenDown: boolean;
+  takenDownReason: string | null;
   sent: number;
   accepted: number;
   fullTimeOffer: boolean;
@@ -195,6 +197,12 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
                   <RowMenu label={`More actions for ${p.projectName}`} items={menu} />
                 </div>
               </div>
+              {p.takenDown && (
+                <div role="note" className="rounded-apple-md bg-danger-soft p-3 text-sm text-ink-900">
+                  <p className="font-semibold">Taken down by Findtern</p>
+                  <p className="mt-0.5 break-words">{p.takenDownReason || "No reason was recorded."} Contact support if you think this is a mistake.</p>
+                </div>
+              )}
               {meta.key === "pending_review" && <p className="text-sm text-text-subtle">With Findtern. We review within one working day; you can still withdraw it to a draft.</p>}
               {meta.key === "rejected" && (
                 <div role="note" className="rounded-apple-md bg-danger-soft p-3 text-sm text-ink-900">
