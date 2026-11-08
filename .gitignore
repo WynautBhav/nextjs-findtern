@@ -38,3 +38,6 @@ scripts/seed-category-students.ts
 # design tool output
 .taste-skill/
 .impeccable/
+
+# Throwaway probes (WORKFLOW.md)
+scratch/
