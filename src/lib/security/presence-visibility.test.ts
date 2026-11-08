@@ -53,6 +53,13 @@ describe("hidden candidates never leak last seen", () => {
     assert.match(drive, /online: !hidingIds\.has\(s\.userId\)/);
   });
 
+  it("a candidate's thread list never receives an employer's last-seen (server-side, not just hidden in the UI)", () => {
+    const store = read("lib/messaging/store.ts");
+    assert.match(store, /role === "employer"\s*\?/, "the timestamp query is chosen by viewer role");
+    assert.match(store, /localtimestamp - make_interval/, "intern side: only timestamps inside the online window are selected");
+    assert.match(store, /threadPresence\(role,/);
+  });
+
   it("the threads route and the realtime stream apply the same rules (store.listThreads, shapeEvent)", () => {
     assert.match(read("app/api/threads/route.ts"), /listThreads\(/);
     assert.match(read("app/api/realtime/stream/route.ts"), /shapeEvent\(r\)/);

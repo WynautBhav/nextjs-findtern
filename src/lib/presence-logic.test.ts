@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { lastSeenLabel, OFFLINE_AFTER_MS, presenceText, presenceView, PRESENCE_ONLINE } from "./presence-logic.ts";
+import { lastSeenLabel, threadPresence, OFFLINE_AFTER_MS, presenceText, presenceView, PRESENCE_ONLINE } from "./presence-logic.ts";
 
 const NOW = Date.parse("2026-11-08T10:00:00Z");
 const ago = (ms: number) => new Date(NOW - ms);
@@ -63,5 +63,24 @@ describe("labels", () => {
   });
   it("a clock-skewed future time does not throw or go negative", () => {
     assert.equal(lastSeenLabel(new Date(NOW + HOUR), NOW), "Last seen a few minutes ago");
+  });
+});
+
+describe("threadPresence: who sees what in a thread", () => {
+  const online = presenceView(row(10_000), NOW);
+  const stale = presenceView(row(3 * HOUR), NOW);
+  const hidden = presenceView(row(10_000, false), NOW);
+
+  it("employer viewer gets the candidate's label, or nothing when hidden", () => {
+    assert.deepEqual(threadPresence("employer", online, NOW), { online: true, label: PRESENCE_ONLINE });
+    assert.deepEqual(threadPresence("employer", stale, NOW), { online: false, label: "Last seen 3h ago" });
+    assert.deepEqual(threadPresence("employer", hidden, NOW), { online: false, label: null });
+    assert.deepEqual(threadPresence("employer", undefined, NOW), { online: false, label: null });
+  });
+  it("candidate viewer only ever gets Online / Offline for an employer, never a last-seen label", () => {
+    assert.deepEqual(threadPresence("intern", online, NOW), { online: true, label: "Online" });
+    for (const v of [stale, hidden, undefined, presenceView(row(40 * DAY), NOW)]) {
+      assert.deepEqual(threadPresence("intern", v, NOW), { online: false, label: "Offline" });
+    }
   });
 });

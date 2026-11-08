@@ -47,3 +47,18 @@ export function presenceText(v: PresenceView, now = Date.now()): string | null {
   if (v.state === "offline") return lastSeenLabel(v.lastSeenAt, now);
   return null;
 }
+
+/**
+ * What a thread participant may see of the other side. Employers get the candidate's label per the candidate's
+ * toggle. Candidates get only Online / Offline for an employer: employers have no toggle, so their last-seen is
+ * never sent to a candidate (their coarse timestamps stay as private as before the toggle existed).
+ */
+export function threadPresence(
+  viewer: "employer" | "intern",
+  v: PresenceView | undefined,
+  now = Date.now(),
+): { online: boolean; label: string | null } {
+  const online = v?.state === "online";
+  if (viewer === "intern") return { online, label: online ? "Online" : "Offline" };
+  return { online, label: v ? presenceText(v, now) : null };
+}

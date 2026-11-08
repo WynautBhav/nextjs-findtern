@@ -2,8 +2,8 @@ import { and, desc, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { RateLimiter } from "@/lib/security/rate-limit";
-import { presenceText, presenceView } from "../presence-logic";
-import { otherParticipant } from "./logic";
+import { presenceView, threadPresence } from "../presence-logic";
+import { ONLINE_WINDOW_MS, otherParticipant } from "./logic";
 
 /** Per-user, in memory (same limitation as the other limiters). */
 export const messageLimiter = new RateLimiter(30, 60_000);
@@ -44,11 +44,18 @@ export async function listThreads(uid: string, role: "employer" | "intern") {
   const lastBy = new Map(last.map((l) => [l.threadId, l]));
   const others = rows.map((r) => otherParticipant(r, uid)!);
   const up = schema.userPresence;
+  // Employer viewer: the candidate's timestamp, unless hidden. Candidate viewer: the employer's timestamp is only
+  // ever returned while it is inside the online window, so a stale last-seen never leaves Postgres for a student.
+  // (localtimestamp: the heartbeat stores now() into this timestamp-without-zone column the same way.)
+  const seen =
+    role === "employer"
+      ? sql<Date | null>`CASE WHEN ${up.showActivity} THEN ${up.lastSeenAt} ELSE NULL END`
+      : sql<Date | null>`CASE WHEN ${up.showActivity} AND ${up.lastSeenAt} > localtimestamp - make_interval(secs => ${ONLINE_WINDOW_MS / 1000}) THEN ${up.lastSeenAt} ELSE NULL END`;
   const pres = await db
     .select({
       userId: up.userId,
       showActivity: up.showActivity,
-      lastSeenAt: sql<Date | null>`CASE WHEN ${up.showActivity} THEN ${up.lastSeenAt} ELSE NULL END`.mapWith(up.lastSeenAt),
+      lastSeenAt: seen.mapWith(up.lastSeenAt),
     })
     .from(up)
     .where(inArray(up.userId, others));
@@ -57,12 +64,13 @@ export async function listThreads(uid: string, role: "employer" | "intern") {
   return rows.map((r) => {
     const other = otherParticipant(r, uid)!;
     const l = lastBy.get(r.id);
+    const pr = threadPresence(role, presBy.get(other), now);
     return {
       id: r.id,
       proposalId: r.proposalId,
       counterpartId: other,
-      counterpartOnline: presBy.get(other)?.state === "online",
-      counterpartPresence: presBy.has(other) ? presenceText(presBy.get(other)!, now) : null,
+      counterpartOnline: pr.online,
+      counterpartPresence: pr.label,
       lastMessage: l ? { body: l.body, mine: l.senderId === uid, createdAt: l.createdAt } : null,
       lastMessageAt: r.lastMessageAt,
       unread: unreadBy.get(r.id) ?? 0,
