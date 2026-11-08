@@ -100,7 +100,7 @@ check_migrations() {
     fi
     compgen -G "$wt/drizzle/rollback/${n}_*.down.sql" >/dev/null || die "migration $f has no drizzle/rollback/${n}_*.down.sql"
     say "WARNING: $f runs on every Vercel build (migrate-on-build). Test it and its rollback on a scratch DB, never Neon."
-  done < <(git -C "$wt" diff --name-only --diff-filter=A "$REMOTE/$BASE"...HEAD -- 'drizzle/*.sql')
+  done < <(git -C "$wt" diff --name-only --diff-filter=A "$REMOTE/$BASE"...HEAD -- ':(glob)drizzle/*.sql')
 }
 
 cmd_done() {
