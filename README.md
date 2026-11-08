@@ -299,15 +299,16 @@ need 32+ random characters.
 
 - `buildCommand`: `node --experimental-strip-types scripts/migrate.ts && next build`. **Every build applies pending migrations
   to the `DATABASE_URL` of that environment**, so check which database an environment points at before deploying.
-- `crons`: all three are `GET`, authorised with `CRON_SECRET`, and skip when `SCHEDULERS=off`. Region `cle1`.
+- `crons`: all are `GET` and authorised with `CRON_SECRET`; all skip when `SCHEDULERS=off` except roster-import-purge. Region `cle1`.
   - `/api/cron/payment-reminders` daily at 03:30 UTC (09:00 IST): sends the payment reminders.
-  - `/api/cron/email-outbox` daily at 04:00 UTC: sends queued campaign mail, batches of 50 until nothing is due or ~30 s
-    are used. Daily is the only schedule valid on Vercel's Hobby plan (a more frequent one fails the deploy). On Pro,
-    change it to `*/5 * * * *` so retries (1 min, 5 min, 30 min, 2 h backoff) and new campaigns go out promptly.
+  - `/api/cron/email-outbox` is **not registered** yet (route, drain loop and `OUTBOX_CRON` switch are in place). Enabling it
+    is a follow-up, see `docs/cron-activation.md`. It sends queued campaign mail in batches of 50 until nothing is due or ~30 s
+    are used.
   - `/api/cron/refund-reconcile` daily at 04:30 UTC: settles refunds stuck in `initiated` by reading Razorpay. **Does
     nothing (`{skipped:true}`) unless `REFUND_RECONCILE=1`** and the Razorpay keys are set. Read-only towards Razorpay.
     Design and invariants: `src/lib/refunds/refund-reconcile.ts`.
-  - `/api/cron/email-outbox` also answers `{skipped:true}` when `OUTBOX_CRON=off`.
+  - `/api/cron/roster-import-purge` daily at 04:15 UTC: deletes expired college roster imports. Ignores `SCHEDULERS=off`.
+  - `/api/cron/email-outbox` (once registered) also answers `{skipped:true}` when `OUTBOX_CRON=off`.
   - **Vercel env changes apply only on the next deployment**, so turning a switch on or off needs a redeploy. Step-by-step
     activation and turn-off: [`docs/cron-activation.md`](docs/cron-activation.md).
 
