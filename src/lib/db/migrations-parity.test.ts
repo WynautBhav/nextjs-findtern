@@ -204,3 +204,34 @@ describe("migration numbering and schema exports", () => {
     }
   });
 });
+
+describe("rollback files for 0018-0027", () => {
+  const RB_DIR = join(SQL_DIR, "rollback");
+  const rbFiles = readdirSync(RB_DIR).filter((f) => f.endsWith(".down.sql"));
+
+  it("every migration has drizzle/rollback/<same name>.down.sql and no orphans", () => {
+    for (const f of NEW) assert.ok(rbFiles.includes(f.replace(/\.sql$/, ".down.sql")), `no rollback for ${f}`);
+    for (const r of rbFiles) assert.ok(files.includes(r.replace(/\.down\.sql$/, ".sql")), `orphan rollback ${r}`);
+  });
+
+  for (const r of rbFiles) {
+    const sql = read(join(RB_DIR, r));
+    const up = r.replace(/\.down\.sql$/, ".sql");
+    const code = sql.replace(/^\s*--.*$/gm, "");
+
+    it(`${r}: lock_timeout, idempotent drops, unregisters the migration`, () => {
+      assert.match(code.trim(), /^SET LOCAL lock_timeout = '\d+s';/);
+      for (const m of code.matchAll(/\bDROP (TABLE|INDEX|CONSTRAINT|COLUMN)\b(?! IF EXISTS)/g)) {
+        assert.fail(`${r}: DROP ${m[1]} without IF EXISTS`);
+      }
+      assert.ok(code.includes(`DELETE FROM "_ft_migrations" WHERE "name" = '${up}';`), `${r} does not unregister ${up}`);
+    });
+
+    // 0018-0024 destroy data; the earlier 0025-0027 files carry their own warnings.
+    if (Number(r.slice(0, 4)) <= 24) {
+      it(`${r}: header warns that it destroys data`, () => {
+        assert.match(sql, /^-- DESTROYS DATA:/m);
+      });
+    }
+  }
+});
