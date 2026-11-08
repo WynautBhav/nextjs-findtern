@@ -27,6 +27,7 @@
     "test:e2e:drive": "node --test --test-concurrency=1 e2e/drive-journey.e2e.mjs",
     "e2e:admin": "node --test e2e/admin.e2e.mjs",
     "test:e2e:messaging": "node --test --test-concurrency=1 e2e/messaging.e2e.mjs",
+    "test:e2e:presence": "node --test --test-concurrency=1 e2e/presence.e2e.mjs",
     "test:e2e:projects": "node --test --test-concurrency=1 e2e/projects-lifecycle.e2e.mjs",
     "test:e2e:limits": "node --test --test-concurrency=1 e2e/profile-limits.e2e.mjs",
     "qa": "node e2e/qa.mjs",

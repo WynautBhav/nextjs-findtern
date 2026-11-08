@@ -57,7 +57,7 @@ export function ThreadList({ base, activeId }: { base: "employer" | "intern"; ac
                 t.unread > 0 && !active && "bg-brand-50/30",
               )}
             >
-              <Avatar masked={base === "employer"} initials={id.initials} name={title} label={title} online={t.counterpartOnline} />
+              <Avatar masked={base === "employer"} initials={id.initials} name={title} label={title} online={t.counterpartPresence ? t.counterpartOnline : null} />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-2">
                   <span className={cn("truncate text-sm text-ink-900", t.unread > 0 ? "font-semibold" : "font-medium")}>{title}</span>
