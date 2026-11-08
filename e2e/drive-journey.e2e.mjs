@@ -295,7 +295,7 @@ test("6 campaign: one email per code, no plain code in the DB, resend adds an ou
   const people = await rows("SELECT e.college_email_norm AS mail, c.id AS code_id FROM drive_roster_entries e JOIN drive_codes c ON c.entry_id = e.id WHERE e.order_id = $1", [A.orderId]);
   for (const p of people) {
     const mine = deriveCode(p.code_id);
-    const [m] = await waitForMail(p.mail, { since });
+    const m = await waitForMail(p.mail, { since });
     const all = await mailTo(p.mail, { since });
     assert.equal(all.length, 1, `exactly one email to ${p.mail}`);
     assert.ok(m.text.includes(mine) || m.text.includes(compact(mine)), "the email carries the student's code");
