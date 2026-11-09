@@ -50,7 +50,7 @@ export function CandidateAvatar({
         loading="lazy"
         decoding="async"
         onError={() => setFailed(true)}
-        className={cn("shrink-0 bg-brand-50 object-cover", className)}
+        className={cn("shrink-0 bg-brand-50 object-cover object-[50%_20%]", className)}
       />
     );
   }
