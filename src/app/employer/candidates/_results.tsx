@@ -110,7 +110,7 @@ export function Results({
                     prefix=""
                     value={data.activeProjectId ?? ""}
                     options={data.projects.map((p) => ({ value: p.id, label: p.projectName, href: projectKeep(p.id) }))}
-                    className="h-9 max-w-64 border-transparent bg-transparent pl-1.5 font-semibold text-ink-900 [field-sizing:content] hover:border-ink-200 sm:min-h-9"
+                    className="h-9 max-w-80 border-transparent bg-transparent pl-1.5 font-semibold text-ink-900 [field-sizing:content] hover:border-ink-200 sm:min-h-9"
                   />
                 </span>
               ) : (

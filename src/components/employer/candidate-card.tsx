@@ -222,7 +222,7 @@ export function CandidateCard({
           {/* The whole row opens the profile: this link is stretched over it; the controls sit above. */}
           <Link
             href={profileHref}
-            className="-my-2 inline-flex h-11 min-w-11 items-center text-sm font-semibold text-ink-700 outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] group-hover/row:text-brand-800 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+            className="-my-2 inline-flex h-11 min-w-11 items-center text-sm font-medium text-ink-600 outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] group-hover/row:text-brand-800 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
           >
             {displayName}
           </Link>
@@ -235,7 +235,7 @@ export function CandidateCard({
           ) : null}
         </div>
         {headline ? (
-          <p className="line-clamp-2 text-pretty text-lg font-semibold leading-snug tracking-tight text-ink-900 group-hover/row:text-brand-800">
+          <p className="line-clamp-2 text-pretty text-lg font-medium leading-snug text-ink-900 group-hover/row:text-brand-800">
             {headline}
           </p>
         ) : null}
@@ -248,7 +248,7 @@ export function CandidateCard({
         </p>
         {wanted.total > 0 ? (
           <p className="mt-1.5 text-sm text-ink-600">
-            Matches <span className="nums font-semibold text-ink-900">{wanted.matched.length}</span> of <span className="nums">{wanted.total}</span> of your skills
+            <span className="nums font-medium text-ink-900">{wanted.matched.length} of {wanted.total}</span> skills you asked for
           </p>
         ) : null}
       </div>
@@ -256,7 +256,7 @@ export function CandidateCard({
       {/* The numbers: the Findtern Score and the rate, right-aligned from sm up. */}
       <div className="col-span-2 flex flex-wrap items-center gap-x-5 gap-y-1 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:flex-col sm:items-end sm:gap-y-2">
         <ScoreBadge size="hero" score={candidate.score} scored={candidate.scored} />
-        <p className="nums text-base font-semibold text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
+        <p className="nums text-base font-medium text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
       </div>
 
       <SkillChips className="col-span-2 sm:col-span-2 sm:col-start-2" skills={candidate.skills} wanted={wantedSkills} />
