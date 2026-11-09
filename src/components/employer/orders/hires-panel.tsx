@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { BriefcaseBusiness, CalendarCheck, CreditCard, Download, FileText } from "lucide-react";
 
-import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
+import { EmptyScene, Pill } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { RowMenu } from "@/components/app/row-menu";
@@ -77,7 +77,7 @@ export function HiresPanel({
       ) : (
         <>
       <div className="mb-3 flex items-center justify-between gap-4">
-        <p className="text-sm text-ink-600">
+        <p className="text-sm text-ink-700">
           <span className="nums font-medium text-ink-900">{rows.length}</span> {rows.length === 1 ? "placement" : "placements"}
           {rows.length !== hires.length ? ` of ${hires.length}` : ""}
         </p>
@@ -86,7 +86,7 @@ export function HiresPanel({
           {rows.length !== hires.length ? `Export ${rows.length} shown (CSV)` : "Export hires (CSV)"}
         </button>
       </div>
-        <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+        <ul className="space-y-4">
           {rows.map((h) => {
             // Pay only where checkout can bill this placement; otherwise the
             // link opened a checkout for a different hire (QA-139).
@@ -97,9 +97,9 @@ export function HiresPanel({
             const contract = `/employer/proposal/${encodeURIComponent(h.proposalId)}`;
             const plan = PLAN[h.ledger.plan];
             return (
-              <li key={h.proposalId} className="grid transition-colors hover:bg-ink-50/60 gap-4 px-5 py-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto] lg:items-center">
+              <li key={h.proposalId} className="grid gap-4 rounded-2xl border border-ink-200 bg-white p-4 shadow-xs transition-colors hover:border-ink-300 sm:p-5 lg:grid-cols-[minmax(0,1fr)_15rem_12rem_auto] lg:items-center lg:gap-x-6">
                 <div className="flex min-w-0 items-start gap-3.5">
-                  <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
+                  <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-200/70">
                     {initials(h.candidateName)}
                   </span>
                   <div className="min-w-0">
@@ -110,9 +110,8 @@ export function HiresPanel({
                       >
                         {h.candidateName}
                       </Link>
-                      <Pill tone={plan.tone}>{plan.label}</Pill>
                     </p>
-                    <p className="mt-0.5 text-sm text-ink-600">
+                    <p className="mt-0.5 text-sm text-ink-700">
                       {h.roleTitle === h.projectName ? h.roleTitle : `${h.roleTitle} · ${h.projectName}`}
                     </p>
                     {owedOffline ? (
@@ -125,15 +124,15 @@ export function HiresPanel({
                         Month {h.ledger.monthsPaid + 1} of {h.ledger.months} · {due && h.ledger.nextDue <= todayIst() ? "Due now" : `Due on ${formatDate(h.ledger.nextDue)}${due ? " · you can pay it now" : ""}`}
                       </p>
                     ) : null}
-                    <p className="nums mt-1 text-sm text-ink-600">
+                    <p className="nums mt-1 text-sm text-ink-700">
                       {h.fullTime ? `Joining ${h.startDate ? formatDate(h.startDate) : "date to be agreed"}` : dateRange(h.startDate, h.ledger.endsOn)}
                     </p>
                   </div>
                 </div>
 
-                <div className="min-w-0"><dl className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm">
-                  <dt className="text-ink-600">{h.fullTime ? "Annual CTC" : "Monthly"}</dt>
-                  <dd className="nums text-right font-medium text-ink-900 lg:text-left">
+                <div className="min-w-0"><dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm lg:grid-cols-[5rem_1fr]">
+                  <dt className="text-ink-700">{h.fullTime ? "Annual CTC" : "Monthly"}</dt>
+                  <dd className="nums font-medium text-ink-900">
                     {h.fullTime
                       ? h.annualCtcMinor != null
                         ? formatMoney(h.annualCtcMinor, h.currency, { zeroLabel: false })
@@ -142,8 +141,8 @@ export function HiresPanel({
                         ? `${formatMoney(h.monthlyMinor, h.currency)}/month`
                         : "-"}
                   </dd>
-                  <dt className="text-ink-600">{h.fullTime ? "Hiring fee" : "Duration"}</dt>
-                  <dd className="nums text-right font-medium text-ink-900 lg:text-left">
+                  <dt className="text-ink-700">{h.fullTime ? "Hiring fee" : "Duration"}</dt>
+                  <dd className="nums font-medium text-ink-900">
                     {h.fullTime
                       ? formatMoney(h.ledger.totalMinor, h.currency, { zeroLabel: false })
                       : <span className="whitespace-nowrap">{`${h.months} month${h.months === 1 ? "" : "s"}${h.ledger.plan === "monthly" ? ` · ${h.ledger.monthsPaid} paid` : ""}`}</span>}
@@ -158,10 +157,14 @@ export function HiresPanel({
                 ) : null}
                 </div>
 
+                <div className="flex items-start lg:justify-start">
+                  <Pill tone={plan.tone} className="whitespace-nowrap">{plan.label}</Pill>
+                </div>
+
                 {/* One visible action by state: Pay while money is due (it was
                     only reachable from the page header), else Timesheets, else
                     the contract; the rest are in the menu (QA-122). */}
-                <div className="flex items-center gap-1 lg:justify-end">
+                <div className="flex items-center gap-1 border-t border-ink-100 pt-3 lg:justify-end lg:border-0 lg:pt-0">
                   {due ? (
                     <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(h.proposalId)}`} variant="accent" size="sm">
                       <CreditCard className="size-4" aria-hidden />
@@ -200,7 +203,7 @@ export function HiresPanel({
               </li>
             );
           })}
-        </Surface>
+        </ul>
         </>
       )}
     </div>

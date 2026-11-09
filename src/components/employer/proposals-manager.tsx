@@ -157,7 +157,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
   return (
     <div>
       {showTools ? (
-        <div className="mb-5 flex gap-2">
+        <div className="mb-4 flex gap-2">
           <label className="relative min-w-0 flex-1 sm:max-w-xl">
             <span className="sr-only">Search proposals</span>
             <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
@@ -170,7 +170,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                 setShown(PAGE);
               }}
               placeholder="Search by role, project or initials"
-              className={cn(fieldClass, "rounded-full pl-10")}
+              className={cn(fieldClass, "rounded-xl pl-10")}
             />
           </label>
           {projectOptions.length > 1 ? (
@@ -180,7 +180,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                 setProjectFilter(e.target.value);
                 setShown(PAGE);
               }}
-              className={cn(fieldClass, "w-36 shrink-0 truncate rounded-full sm:w-56")}
+              className={cn(fieldClass, "w-36 shrink-0 truncate rounded-xl sm:w-56")}
               aria-label="Project"
             >
               <option value="all">All projects</option>
@@ -212,12 +212,12 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                 "relative -mb-px inline-flex min-h-12 min-w-11 items-center justify-center gap-1 whitespace-nowrap sm:gap-1.5 text-sm outline-none transition-colors",
                 "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
                 "focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent",
-                on ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-600 hover:text-ink-900",
+                on ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-700 hover:text-ink-900",
               )}
             >
               <span className="sm:hidden">{t.short}</span>
               <span className="max-sm:hidden">{t.label}</span>
-              <span className={cn("nums", on ? "text-ink-900" : "text-text-subtle")}>{t.count}</span>
+              <span className={cn("nums", on ? "text-ink-900" : "text-ink-600")}>{t.count}</span>
             </button>
           );
         })}
@@ -261,7 +261,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
           ) : null}
         </div>
       ) : (
-        <ul className="divide-y divide-ink-100">
+        <ul className="space-y-4 pt-5">
           {filtered.slice(0, shown).map(({ item, offer, state }) => {
             const ini = initialsOf(item.user?.firstName?.trim() || "", item.user?.lastName?.trim() || "");
             const ft = offer.fullTime;
@@ -278,52 +278,56 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
             const href = `/employer/proposal/${item.proposal.id}`;
             const title = offer.roleTitle || item.project?.projectName || "Internship";
             const who = nameOf(item);
-            const pill = <Pill tone={state.tone} className="whitespace-nowrap">{state.label}</Pill>;
+            // One colour per meaning on this list: Hired green, Waiting amber, To pay blue, Closed grey.
+            const chipTone = item.proposal.status === "hired" ? "paid" : state.canPay || item.proposal.status === "accepted" ? "new" : state.tone;
+            const pill = <Pill tone={chipTone} className="whitespace-nowrap">{state.label}</Pill>;
             const closed = state.tone === "closed";
+            const label = "text-[11px] font-semibold uppercase tracking-wider text-text-subtle";
             return (
               <li
                 key={item.proposal.id}
-                className="relative grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-4 gap-y-3 py-6 lg:grid-cols-[3.5rem_minmax(0,1fr)_auto] lg:items-center lg:gap-x-6"
+                className="relative grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-4 gap-y-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-xs transition-colors hover:border-ink-300 sm:p-5 lg:grid-cols-[3.5rem_minmax(0,1fr)_11rem_13.5rem_auto] lg:items-center lg:gap-x-6"
               >
                 <ProposalAvatar photoUrl={item.photoUrl} initials={ini === "?" ? "C" : ini} presence={item.presence} />
                 <div className="min-w-0">
-                  <p className="text-base leading-snug text-ink-600">
-                    {/* The whole row opens the offer: the name's link is
+                  <p className="text-base leading-snug text-ink-900">
+                    {/* The whole card opens the offer: the name's link is
                         stretched over it, and keeps its own focus ring. */}
                     <Link
                       href={href}
                       aria-label={`${title}, ${who}`}
                       className={cn(
-                        "break-words font-semibold outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:rounded-apple-sm focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-600",
+                        "break-words font-semibold outline-none after:absolute after:inset-0 after:rounded-2xl after:content-[''] hover:text-brand-700 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-600",
                         closed ? "text-ink-700" : "text-ink-900",
                       )}
                     >
                       {who}
                     </Link>
-                    {item.project ? ` · ${item.project.projectName}` : ""}
                   </p>
-                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-ink-600">
-                    {pill}
-                    <span className="break-words">{title}</span>
-                  </div>
-                  <p className="nums mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-sm text-ink-600">
+                  <p className="mt-0.5 break-words text-sm font-medium text-ink-800">{title}</p>
+                  {item.project ? <p className="mt-0.5 break-words text-sm text-ink-700">{item.project.projectName}</p> : null}
+                </div>
+                <div className="col-span-2 flex flex-col items-start gap-1 lg:col-span-1">
+                  <span className={cn(label, "lg:sr-only")}>Status</span>
+                  {pill}
+                </div>
+                <div className="nums col-span-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-ink-700 lg:col-span-1 lg:flex-col lg:gap-y-0.5">
+                  {money ? (
                     <span>
-                      {money ? (
-                        <>
-                          <span className="font-semibold text-ink-900">{money.amount}</span> {money.per}
-                        </>
-                      ) : (
-                        <span className="text-text-subtle">{ft ? "CTC not set" : "Price not set"}</span>
-                      )}
+                      <span className="text-base font-semibold text-ink-900">{money.amount}</span> {money.per}
                     </span>
-                    <span>{ft ? "Full-time" : `${offer.months} month${offer.months === 1 ? "" : "s"}`}</span>
-                    {start ? <span>{ft ? "Joins" : "Starts"} {start}</span> : null}
-                  </p>
+                  ) : (
+                    <span className="text-ink-700">{ft ? "CTC not set" : "Price not set"}</span>
+                  )}
+                  <span className="lg:whitespace-nowrap">
+                    {ft ? "Full-time" : `${offer.months} month${offer.months === 1 ? "" : "s"}`}
+                    {start ? ` · ${ft ? "Joins" : "Starts"} ${start}` : ""}
+                  </span>
                 </div>
                 {/* Above the stretched link, so these stay clickable. */}
-                <div className="relative z-10 col-span-2 flex items-center gap-3 max-lg:pl-[4.5rem] max-sm:pl-0 lg:col-span-1">
+                <div className="relative z-10 col-span-2 flex items-center gap-3 border-t border-ink-100 pt-3 lg:col-span-1 lg:border-0 lg:pt-0">
                   {/* One visible action, chosen by the state (QA-120); the menu holds the rest. */}
-                  <div className="min-w-0 max-sm:flex-1 [&_a]:rounded-full [&_button]:rounded-full [&_button]:max-sm:w-full [&_a]:max-sm:w-full lg:w-36 [&_button]:lg:w-full [&_a]:lg:w-full">
+                  <div className="min-w-0 max-sm:flex-1 [&_a]:rounded-xl [&_button]:rounded-xl [&_button]:max-sm:w-full [&_a]:max-sm:w-full lg:w-36 [&_button]:lg:w-full [&_a]:lg:w-full">
                     {state.canPay ? (
                       <Link href="/employer/checkout" className={buttonClass({ variant: "primary" })}>
                         <CreditCard className="size-4" aria-hidden />

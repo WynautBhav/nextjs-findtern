@@ -203,7 +203,7 @@ export function OrdersManager({
               "relative -mb-px inline-flex min-h-12 min-w-11 items-center justify-center gap-1 whitespace-nowrap text-sm outline-none transition-colors sm:gap-1.5",
               "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
               "focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent",
-              tab === t.id ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-600 hover:text-ink-900",
+              tab === t.id ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-700 hover:text-ink-900",
             )}
           >
             {t.short ? (
@@ -214,7 +214,7 @@ export function OrdersManager({
             ) : (
               t.label
             )}
-            <span className={cn("nums", tab === t.id ? "text-ink-900" : "text-text-subtle")}>{t.count}</span>
+            <span className={cn("nums", tab === t.id ? "text-ink-900" : "text-ink-600")}>{t.count}</span>
           </button>
         ))}
       </div>

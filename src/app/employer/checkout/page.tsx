@@ -8,10 +8,11 @@ import { displayNameOf } from "@/lib/employer-candidates";
 import { hireFlowCounts } from "@/lib/employer-flow";
 import { expireStaleEmployerOrders } from "@/lib/payments";
 import { paymentsAreFree, testPayEnabled } from "@/lib/razorpay";
-import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { PageHead } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { HireFlow, type HireFlowCounts } from "@/components/employer/hire-flow";
+import { CheckoutEmpty } from "./_empty";
 import { CheckoutSummary } from "@/components/payments/checkout-summary";
 import { selectCheckoutLines } from "@/lib/checkout-selection";
 
@@ -84,7 +85,7 @@ export default async function EmployerCheckout({
       {selection.missing ? (
         // A link named a placement this page can't bill: say so, never show
         // a different hire in its place (QA-139).
-        <EmptyScene
+        <CheckoutEmpty
           title="This placement can't be paid here"
           body="Checkout bills offers a candidate has accepted and the next month of a running monthly placement. The placement in your link is neither, so there is nothing to pay for it online. If you think you owe for it, write to us and we'll sort it out."
           next={
@@ -93,10 +94,10 @@ export default async function EmployerCheckout({
               : { label: "Back to orders", href: "/employer/orders" }
           }
           who="Findtern - write to communicate@findtern.in"
+          secondary={result.lines.length > 0 ? { label: "Back to orders", href: "/employer/orders" } : undefined}
         />
       ) : lines.length === 0 ? (
-        <EmptyScene
-          art
+        <CheckoutEmpty
           title="Nothing to pay yet"
           body="Checkout bills offers a candidate has accepted, and the next month of a running monthly placement. None are waiting right now."
           next={
@@ -105,6 +106,7 @@ export default async function EmployerCheckout({
               : { label: "Open your shortlist", href: "/employer/cart" }
           }
           who={counts && counts.awaitingReply > 0 ? "Candidates - reply to your offers" : "You - send a proposal"}
+          secondary={{ label: counts && counts.awaitingReply > 0 ? "Open your shortlist" : "Browse candidates", href: counts && counts.awaitingReply > 0 ? "/employer/cart" : "/employer/candidates" }}
         />
       ) : (
         <>

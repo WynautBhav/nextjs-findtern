@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Scale } from "lucide-react";
 import { redirect } from "next/navigation";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
@@ -18,7 +19,7 @@ import { PageHead } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { HireFlow, type HireFlowCounts } from "@/components/employer/hire-flow";
-import { CandidateTabs } from "@/components/employer/section-tabs";
+import { ButtonLink } from "@/components/ui/button";
 import { rememberedSelection } from "@/lib/employer-selection";
 import { CartManager, type CartLineItem } from "@/components/employer/cart-manager";
 
@@ -76,9 +77,15 @@ export default async function EmployerCartPage({
         title="Shortlist"
         // The path strip under the head says the same steps; phones keep the list higher.
         lede={<span className="max-sm:sr-only">Book a meeting or send a proposal. You pay only once a candidate accepts.</span>}
+        action={
+          // Compare lives here, not in a second tab bar: the pipeline strip below already has Candidates and Shortlist.
+          <ButtonLink href="/employer/compare" size="sm" variant="outline" className="h-11 rounded-xl sm:h-10 sm:touch:h-11">
+            <Scale className="size-4" aria-hidden />
+            Compare{compareCount > 0 ? ` (${compareCount})` : ""}
+          </ButtonLink>
+        }
         className="mb-4 lg:mb-5"
       />
-      <CandidateTabs active="shortlist" shortlist={data.counts.shortlisted} compare={compareCount} />
       {/* The strip counts people, not proposals. */}
       <div title="People, not proposals">
         <p className="sr-only">People, not proposals.</p>
@@ -249,5 +256,8 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
   // Same figure the checkout shows: accepted offers plus months now due.
   const toPay = (await payableCheckout(uid)).lines.length;
   const counts = await hireFlowCounts(uid, toPay);
-  return { lines, currency, timezone, counts };
+  // The strip counts what this page lists: people saved and not yet proposed to, who are still in the pool.
+  // hireFlowCounts counts raw saved rows, which includes people who have since left the pool.
+  const shortlisted = new Set(lines.filter((l) => !l.openProposalId && !l.acceptedProposalId).map((l) => l.candidate.id)).size;
+  return { lines, currency, timezone, counts: { ...counts, shortlisted } };
 }
