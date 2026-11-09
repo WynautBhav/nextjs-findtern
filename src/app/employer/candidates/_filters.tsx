@@ -31,7 +31,9 @@ export function FilterColumn({
   region,
   compareIds,
   total,
-  projectScope = false,
+  effectiveSkills,
+  projectCity = "",
+  projectToggle = null,
 }: {
   filters: Filters;
   projects: { id: string; projectName: string }[];
@@ -42,8 +44,12 @@ export function FilterColumn({
   region: "IN" | null;
   compareIds: string[];
   total: number;
-  /** The project's own skills or city are narrowing the list. */
-  projectScope?: boolean;
+  /** The skill chips under the search box: each one counts as an active filter. */
+  effectiveSkills: string[];
+  /** A city the selected project brings (not typed by hand): shown as its own chip and counted. */
+  projectCity?: string;
+  /** "Ignore project skills" / "Match to project": on a phone it lives in the sheet, not on the page. */
+  projectToggle?: React.ReactNode;
 }) {
   // Sub-score floors and the skill-match switch live behind "More filters".
   const moreSet = RATING_META.some((meta) => filters.minRatings[meta.key] > 0) || !filters.skillPriority;
@@ -56,7 +62,7 @@ export function FilterColumn({
         "lg:[scrollbar-color:transparent_transparent] lg:[scrollbar-width:thin] lg:hover:[scrollbar-color:var(--color-ink-300)_transparent] lg:focus-within:[scrollbar-color:var(--color-ink-300)_transparent]",
       )}
     >
-      <FilterPanel key={queryOf(filters)} activeCount={activeFilterCount(filters, projectScope)} total={total}>
+      <FilterPanel key={queryOf(filters)} activeCount={activeFilterCount(filters, effectiveSkills, projectCity)} total={total}>
         {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
         {!filters.projectDefaults ? <input type="hidden" name="pf" value="0" /> : null}
         {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}
@@ -87,6 +93,7 @@ export function FilterColumn({
             ) : (
               <p className="mt-2 text-sm text-ink-600">No open projects. Create one to save and match candidates.</p>
             )}
+            {projectToggle ? <div className="mt-1">{projectToggle}</div> : null}
           </div>
 
           <Group title="Location" open>

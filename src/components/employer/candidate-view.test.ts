@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { AVATAR_TINTS, avatarTint, headlineOf, rowSkills, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
+import { AVATAR_TINTS, avatarTint, headlineOf, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
 
 test("skillBaseName drops the level", () => {
   assert.equal(skillBaseName("React · Advanced"), "React");
@@ -62,4 +62,20 @@ test("avatarTint: deterministic, one of the four, and ids can differ", () => {
   assert.equal(avatarTint("a"), AVATAR_TINTS[1]);
   assert.notEqual(avatarTint("a"), avatarTint("b"));
   assert.equal(avatarTint(""), AVATAR_TINTS[0]);
+});
+
+test("skillLead: top three skills (asked-for first) lead the row, the chips get the rest", () => {
+  const skills = ["React · Advanced", "Python", "SQL", "Redis", "Go"];
+  assert.deepEqual(skillLead(skills, new Set()), { lead: "React, Python and SQL", rest: ["Redis", "Go"] });
+  assert.deepEqual(skillLead(skills, new Set(["go", "redis"])), { lead: "Redis, Go and React", rest: ["Python", "SQL"] });
+  assert.deepEqual(skillLead(["Rust", "C"], new Set()), { lead: "Rust and C", rest: [] });
+  assert.deepEqual(skillLead(["Rust"], new Set()), { lead: "Rust", rest: [] });
+  assert.deepEqual(skillLead([], new Set()), { lead: "", rest: [] });
+});
+
+test("rowSkills: skip keeps the lead and the chips within seven together", () => {
+  const ten = Array.from({ length: 10 }, (_, i) => `S${i + 1}`);
+  const { shown, more } = rowSkills(ten, new Set(), 7, 3);
+  assert.deepEqual(shown, ["S4", "S5", "S6", "S7"]);
+  assert.equal(more, 3);
 });

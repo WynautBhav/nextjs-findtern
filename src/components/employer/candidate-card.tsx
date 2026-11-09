@@ -11,6 +11,7 @@ import { resolvePricing, type Currency, type Pricing } from "@/lib/employer-pric
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
 import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
+import { skillLead, studyOf } from "@/components/employer/candidate-view";
 import { Pill } from "@/components/app/primitives";
 import { skillMatch } from "@/components/app/skill-match";
 import { SendProposalHold } from "@/components/employer/send-proposal-hold";
@@ -189,7 +190,11 @@ export function CandidateCard({
   const displayName = displayNameOf(candidate, nameUnlocked);
   const status = candidateStatusPill(proposal);
   const showHired = hired && status?.label !== "Hired";
-  const headline = headlineOf(candidate);
+  const wantedSet = new Set(wantedSkills.map((w) => w.trim().toLowerCase()));
+  // Lead with the top skills (the schema has no role or headline); the degree moves to the meta line.
+  const { lead, rest } = skillLead(candidate.skills, wantedSet);
+  const headline = lead || headlineOf(candidate);
+  const study = lead ? studyOf(candidate.academics) : "";
   const profileHref = `/employer/intern/${encodeURIComponent(candidate.id)}${projectId ? `?project=${encodeURIComponent(projectId)}` : ""}`;
   const sendHref = `/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ""}`;
   const place = candidate.city || candidate.location || "City not stated";
@@ -213,7 +218,7 @@ export function CandidateCard({
   const wanted = skillMatch(candidate.skills, wantedSkills);
 
   return (
-    <li className="group/row relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 py-6 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-x-5 sm:py-7">
+    <li className="group/row relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 py-5 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-x-5 sm:py-7">
       <RowAvatar photoUrl={candidate.photoUrl} initials={candidate.initials} seed={candidate.id} presence={presence} />
 
       {/* Who: name, then what they are (the headline is what an employer scans), where, and why they fit. */}
@@ -241,6 +246,7 @@ export function CandidateCard({
         ) : null}
         <p className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-ink-600">
           <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+          {study ? <span className="max-sm:hidden">{study} ·</span> : null}
           <span>{place}</span>
           {modes ? <span>, {modes}</span> : null}
           {/* The dot alone is colour only; say it in words (a coarse label, nothing when the candidate hides it). */}
@@ -259,7 +265,7 @@ export function CandidateCard({
         <p className="nums text-base font-medium text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
       </div>
 
-      <SkillChips className="col-span-2 sm:col-span-2 sm:col-start-2" skills={candidate.skills} wanted={wantedSkills} />
+      <SkillChips className="col-span-2 sm:col-span-2 sm:col-start-2" skills={candidate.skills} wanted={wantedSkills} skip={lead ? candidate.skills.length - rest.length : 0} />
 
       {/* Actions: Compare on the left, Save and the one primary action on the right. */}
       <div className="relative z-10 col-span-2 flex items-center justify-between gap-2 border-t border-ink-100 pt-3 sm:col-span-2 sm:col-start-2">

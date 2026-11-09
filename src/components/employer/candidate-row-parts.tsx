@@ -85,6 +85,8 @@ export function ScoreBadge({ score, scored, size = "inline" }: { score: number; 
               )}
             >
               {plan}
+              {/* One word of meaning beside the coffee name, so the tier is never a bare label. */}
+              <span className="font-normal text-ink-600">· {band.name}</span>
               <Info className="size-3.5 text-ink-400" aria-hidden />
               <span className="sr-only">: what this means</span>
             </button>
@@ -102,8 +104,9 @@ export function ScoreBadge({ score, scored, size = "inline" }: { score: number; 
  * Skills that match the search first, as filled chips with a check; the rest
  * as quiet outlines. At most seven, then "+N". Levels stay private.
  */
-export function SkillChips({ skills, wanted, className }: { skills: string[]; wanted: string[]; className?: string }) {
-  const { shown, more, isWanted } = rowSkills(skills, new Set(wanted.map((w) => w.trim().toLowerCase())));
+export function SkillChips({ skills, wanted, className, skip = 0 }: { skills: string[]; wanted: string[]; className?: string; skip?: number }) {
+  const { shown, more, isWanted } = rowSkills(skills, new Set(wanted.map((w) => w.trim().toLowerCase())), undefined, skip);
+  if (skip > 0 && shown.length === 0 && more === 0) return null;
   if (shown.length === 0) return <p className={cn("text-sm text-ink-600", className)}>No skills listed yet.</p>;
   return (
     <ul className={cn("flex flex-wrap gap-1.5", className)} aria-label="Skills">

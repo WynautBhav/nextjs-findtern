@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { FlowScroll } from "@/components/employer/hire-flow-scroll";
 import { currentStepKey, type FlowPage, type FlowStepKey } from "@/lib/employer-flow-steps";
 
 export type HireFlowCounts = {
@@ -32,20 +33,20 @@ export function HireFlow({ counts, current }: { counts: HireFlowCounts; current:
   // One line, not four cards: it says where the page sits in the flow and
   // links each stage, without competing with the page's own content.
   return (
-    <nav aria-label="Hiring steps" className="mb-6">
-      <ol className="flex flex-wrap items-center gap-x-0 gap-y-1 text-[13px] sm:gap-x-1 sm:text-sm sm:gap-y-2">
+    <nav aria-label="Hiring steps" className="mb-3 sm:mb-6">
+      <FlowScroll className="relative flex items-center gap-x-0 gap-y-1 overflow-x-auto text-[13px] max-sm:-m-1.5 max-sm:p-1.5 [scrollbar-width:none] sm:flex-wrap sm:gap-x-1 sm:gap-y-2 sm:overflow-visible sm:text-sm [&::-webkit-scrollbar]:hidden">
         {STEPS.map((s, i) => {
           const active = s.key === currentKey;
           // Finding candidates is the start of the path, not a queue: no count.
           const n = s.key === "candidates" ? null : counts[s.key];
           return (
-            <li key={s.key} className="flex items-center gap-1">
+            <li key={s.key} className="flex shrink-0 items-center gap-1">
               <Link
                 href={s.href}
                 aria-current={active ? "step" : undefined}
                 title={s.hint}
                 className={cn(
-                  "apple-spring inline-flex min-h-10 items-center gap-1 rounded-full sm:gap-1.5 px-2 sm:px-3 touch:min-h-11",
+                  "apple-spring inline-flex min-h-10 items-center gap-1 whitespace-nowrap rounded-full sm:gap-1.5 px-2 sm:px-3 touch:min-h-11",
                   active ? "bg-brand-50 font-semibold text-brand-800" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
                 )}
               >
@@ -58,7 +59,7 @@ export function HireFlow({ counts, current }: { counts: HireFlowCounts; current:
             </li>
           );
         })}
-      </ol>
+      </FlowScroll>
     </nav>
   );
 }

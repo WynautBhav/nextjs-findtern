@@ -74,15 +74,37 @@ export default async function CandidatesPage({
 
   const quietLink =
     "inline-flex min-h-9 items-center px-1.5 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11";
+  // The selected project's skills on or off. lg and up: beside the skill chips; phones: inside the Filters sheet, so it is not a row of its own.
+  const projectToggle = projectApplied ? (
+    <Link
+      href={withFilters(filters, { projectDefaults: false, page: "" })}
+      className={quietLink}
+      title={projectApplied.city ? `Matched to ${projectApplied.name}, open to working in ${projectApplied.city}` : `Matched to ${projectApplied.name}`}
+    >
+      Ignore project skills
+    </Link>
+  ) : !filters.projectDefaults && activeProjectId ? (
+    <Link href={withFilters(filters, { projectDefaults: true, page: "" })} className={quietLink}>
+      Match to project
+    </Link>
+  ) : null;
 
   return (
     <div>
       <PageHead
         title="Candidates"
-        lede="Names and contact details unlock once your hire is paid. Photos and scores are visible now."
-        className="mb-4 lg:mb-5"
+        lede={
+          <>
+            <span className="max-sm:hidden">Names and contact details unlock once your hire is paid. Photos and scores are visible now.</span>
+            <span className="sm:hidden">Names unlock once your hire is paid.</span>
+          </>
+        }
+        className="mb-3 sm:mb-4 lg:mb-5"
       />
-      <CandidateTabs active="candidates" shortlist={flow?.shortlisted ?? 0} compare={compareIds.length} />
+      {/* Phones: the hiring-steps strip below already links Candidates and Shortlist (and the bottom bar has Proposals), so these tabs would repeat it. */}
+      <div className="max-sm:hidden">
+        <CandidateTabs active="candidates" shortlist={flow?.shortlisted ?? 0} compare={compareIds.length} />
+      </div>
       {flow ? <HireFlow counts={flow} current="candidates" /> : null}
 
       {/*
@@ -102,19 +124,7 @@ export default async function CandidatesPage({
           fromProject={!filters.skillsSet && filters.projectDefaults && data.activeProjectSkills.length > 0}
         >
           {/* The selected project fills in its skills (and city); one quiet link turns that off. */}
-          {projectApplied ? (
-            <Link
-              href={withFilters(filters, { projectDefaults: false, page: "" })}
-              className={quietLink}
-              title={projectApplied.city ? `Matched to ${projectApplied.name}, open to working in ${projectApplied.city}` : `Matched to ${projectApplied.name}`}
-            >
-              Ignore project skills
-            </Link>
-          ) : !filters.projectDefaults && activeProjectId ? (
-            <Link href={withFilters(filters, { projectDefaults: true, page: "" })} className={quietLink}>
-              Match to project
-            </Link>
-          ) : null}
+          {projectToggle ? <span className="contents max-lg:hidden">{projectToggle}</span> : null}
         </SkillFilter>
 
         <div id="candidate-filter-column" className="col-start-2 row-start-1 lg:col-span-1 lg:col-start-1 lg:row-start-3 lg:group-data-[filters=hidden]/fl:hidden">
@@ -128,7 +138,9 @@ export default async function CandidatesPage({
             region={data.region}
             compareIds={compareIds}
             total={total}
-            projectScope={Boolean(projectApplied)}
+            effectiveSkills={data.effectiveSkills}
+            projectCity={projectApplied?.city ?? ""}
+            projectToggle={projectToggle}
           />
         </div>
 

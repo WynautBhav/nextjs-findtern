@@ -75,7 +75,7 @@ export function SortSelect({
             setHeld(e.target.value);
           } else apply(e.target.value);
         }}
-        className={cn(fieldClass, "min-h-11 w-auto min-w-0 pr-8 sm:min-h-10", className)}
+        className={cn(fieldClass, "min-h-11 w-auto min-w-0 max-w-full pr-8 sm:min-h-10", className)}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>

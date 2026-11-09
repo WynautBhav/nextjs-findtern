@@ -264,26 +264,13 @@ export function compareHref(filters: Filters): string {
 }
 
 /**
- * How many filters are narrowing the list: the ones set by hand, plus the
- * project's own skills and city when they are applied (`projectScope`), so the
- * count matches why the list is short.
+ * The number on the Filters button: one for every removable chip in the
+ * "Active filters" row (Findtern Score and the sub-score floors included), one
+ * for each required-skill chip under the search box, and one for the city a
+ * project brings. Sorting is not a filter. The filter sheet says so too.
  */
-export function activeFilterCount(filters: Filters, projectScope = false): number {
-  return [
-    projectScope,
-    Boolean(filters.q),
-    Boolean(filters.city),
-    Boolean(filters.mode),
-    filters.remote !== null,
-    filters.laptop === "yes",
-    Boolean(filters.plan),
-    filters.minScore > 0,
-    ...RATING_META.map((meta) => filters.minRatings[meta.key] > 0),
-    filters.sorts.length > 0,
-    filters.dir === "asc",
-    !filters.skillPriority,
-    filters.skillsSet && filters.skills.length > 0,
-  ].filter(Boolean).length;
+export function activeFilterCount(filters: Filters, effectiveSkills: string[], projectCity = ""): number {
+  return activeChips(filters).length + effectiveSkills.length + (projectCity ? 1 : 0);
 }
 
 /** Start clean: drops the remembered filters, keeps the project. */

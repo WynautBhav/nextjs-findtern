@@ -164,6 +164,11 @@ export function FilterPanel({
             <SheetTitle className="text-base text-ink-900">Filters</SheetTitle>
             <SheetDescription className="mt-0.5 nums">
               {total} candidate{total === 1 ? "" : "s"} match
+              {activeCount > 0 ? (
+                <span className="block font-normal">
+                  {activeCount} active: each required skill and each filter counts once. Sorting does not.
+                </span>
+              ) : null}
             </SheetDescription>
           </div>
           <div className="px-5 pb-6 pt-1">{formEl}</div>

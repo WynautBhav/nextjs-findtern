@@ -46,6 +46,7 @@ export function FiltersToggle({ controls, count, className }: { controls: string
       onClick={state.toggle}
       aria-expanded={!state.hidden}
       aria-controls={controls}
+      title={count > 0 ? "Counts each required skill and each filter. Sorting does not." : undefined}
       className={cn(
         "inline-flex h-9 items-center gap-2 rounded-full border border-ink-200 px-3.5 text-sm font-medium text-ink-900 outline-none hover:border-ink-300 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 touch:h-11 max-lg:hidden",
         state.hidden ? "bg-white" : "bg-ink-100",

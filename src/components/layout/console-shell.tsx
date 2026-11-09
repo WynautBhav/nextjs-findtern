@@ -284,7 +284,7 @@ export function ConsoleShell({
           onClick={toggleRail}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           aria-expanded={!collapsed}
-          className="apple-spring absolute -right-3.5 top-[4.25rem] z-10 grid size-7 place-items-center rounded-full border border-ink-200 bg-white text-ink-600 shadow-sm hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-600"
+          className="apple-spring absolute -right-3.5 top-[4.25rem] z-10 grid size-7 place-items-center rounded-full border border-ink-200 bg-white text-ink-600 shadow-sm hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 focus-visible:shadow-[0_0_0_2px_#fff]"
         >
           {collapsed ? <ChevronsRight className="size-4" aria-hidden /> : <ChevronsLeft className="size-4" aria-hidden />}
         </button>

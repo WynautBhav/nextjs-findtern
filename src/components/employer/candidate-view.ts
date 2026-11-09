@@ -7,11 +7,15 @@ export function skillBaseName(skill: string): string {
   return skill.split(" · ")[0].trim();
 }
 
-/** Project skills first, at most `max` shown, and how many were left out. */
-export function rowSkills(skills: string[], wanted: Set<string>, max = MAX_SKILL_CHIPS) {
+/**
+ * Project skills first, at most `max` shown, and how many were left out.
+ * `skip` leaves out the first few (the row's lead line already names them), so
+ * the lead and the chips together still stay within `max`.
+ */
+export function rowSkills(skills: string[], wanted: Set<string>, max = MAX_SKILL_CHIPS, skip = 0) {
   const isWanted = (s: string) => wanted.has(skillBaseName(s).toLowerCase());
   const ordered = [...skills.filter(isWanted), ...skills.filter((s) => !isWanted(s))];
-  return { shown: ordered.slice(0, max), more: Math.max(0, ordered.length - max), isWanted };
+  return { shown: ordered.slice(skip, max), more: Math.max(0, ordered.length - max), isWanted };
 }
 
 /** `HIDDEN_UNTIL_HIRE` in lib/contact-scrub (inlined: this module stays import-free for the node tests). */
@@ -23,6 +27,20 @@ const MASKED = "[hidden until hire]";
  */
 export function studyOf(academics: { degree: string; specialization: string } | null | undefined): string {
   return [academics?.degree, academics?.specialization].filter((s) => s && s.trim() !== MASKED).join(", ");
+}
+
+/**
+ * What leads a row. Names are masked until hire and the schema has no role,
+ * specialty or headline field (bio and summary are free text and stay hidden),
+ * so the lead is the candidate's top skills, the ones you asked for first.
+ * `rest` is what is left for the chip row, so no skill shows twice.
+ */
+export function skillLead(skills: string[], wanted: Set<string>, max = 3): { lead: string; rest: string[] } {
+  const isWanted = (s: string) => wanted.has(skillBaseName(s).toLowerCase());
+  const ordered = [...skills.filter(isWanted), ...skills.filter((s) => !isWanted(s))];
+  const names = ordered.slice(0, max).map(skillBaseName);
+  const lead = names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+  return { lead, rest: ordered.slice(max) };
 }
 
 /** The line under a candidate's initials: degree and field, else the top two skills. Never the bio. */

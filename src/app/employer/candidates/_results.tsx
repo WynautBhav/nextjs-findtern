@@ -78,7 +78,14 @@ export function Results({
   const compareFull = compareIds.length >= MAX_COMPARE;
   const compareLink = (id: string) =>
     compareIds.includes(id) || !compareFull ? withFilters(filters, { ids: toggle(compareIds, id) }) : null;
-  const chips = filters.saved ? [] : activeChips(filters);
+  const projectCity = data.projectApplied?.city ?? "";
+  const chips = filters.saved
+    ? []
+    : [
+        ...activeChips(filters),
+        // The project's own city narrows the list too: say so, and let it be dropped like the others.
+        ...(projectCity ? [{ key: "project-city", label: `City: ${projectCity} (from project)`, href: withoutCity(filters, data.effectiveSkills) }] : []),
+      ];
   const reset = resetHref(data.activeProjectId);
   const saved = filters.saved && Boolean(data.activeProjectId);
   const sortValue = filters.sorts[0] ? `${filters.sorts[0]}${filters.dir === "asc" ? ":asc" : ""}` : "";
@@ -92,17 +99,17 @@ export function Results({
   return (
     <>
       {/* One results bar: count and project, then All | Shortlist and Sort. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-ink-100 pb-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-ink-100 pb-3 sm:pb-4">
         {/* lg and up: hide or show the filter column (phones have the Filters sheet). */}
-        <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(filters, Boolean(data.projectApplied))} />
+        <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(filters, data.effectiveSkills, projectCity)} />
         {loadFailed ? null : (
-          <h2 className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-ink-900 max-sm:sr-only">
+          <h2 className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-ink-900">
             <span role="status" className="nums whitespace-nowrap">
               {total} {saved ? "shortlisted" : `candidate${total === 1 ? "" : "s"}`}
             </span>
             {projectName ? (
               data.projects.length > 1 ? (
-                <span className="flex min-w-0 items-center gap-1 font-normal text-ink-600">
+                <span className="flex min-w-0 items-center gap-1 font-normal text-ink-600 max-sm:hidden">
                   for
                   <SortSelect
                     id="results-project"
@@ -114,16 +121,16 @@ export function Results({
                   />
                 </span>
               ) : (
-                <span className="truncate font-normal text-ink-600">
+                <span className="truncate font-normal text-ink-600 max-sm:hidden">
                   for <span className="font-semibold text-ink-900">{projectName}</span>
                 </span>
               )
             ) : null}
           </h2>
         )}
-        <div className="flex w-full items-center justify-between gap-2 sm:ml-auto sm:w-auto sm:justify-end sm:gap-3">
+        <div className="ml-auto flex min-w-0 max-w-full items-center justify-end gap-2 sm:gap-3">
           {data.activeProjectId ? (
-            <nav aria-label="Show" className="flex items-center gap-5">
+            <nav aria-label="Show" className={cn("items-center gap-5", saved ? "flex" : "flex max-sm:hidden")}>
               <TabLink href={withFilters(filters, { saved: false, page: "" })} active={!saved}>
                 All{saved ? null : <span className="nums font-normal text-ink-600"> {total}</span>}
               </TabLink>
@@ -302,7 +309,8 @@ function TabLink({ href, active, children }: { href: string; active: boolean; ch
 /** What Espresso, Cappuccino and Latte mean, once per page (the row tooltip says it for one candidate). */
 function ScoreLegend() {
   return (
-    <details className="group/legend mt-1 border-b border-ink-100 text-sm">
+    // Phones: every card already names its tier and what it means, so the legend only takes room above the first one.
+    <details className="group/legend mt-1 border-b border-ink-100 text-sm max-sm:hidden">
       <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-sm font-medium text-ink-700 outline-none hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
         What the score bands mean
         <ChevronDown className="size-4 text-ink-500 transition-transform group-open/legend:rotate-180 motion-reduce:transition-none" aria-hidden />
