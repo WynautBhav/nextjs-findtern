@@ -129,6 +129,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     <ConsoleShell
       roleLabel="Employer"
       tone="light"
+      flush
       homeHref="/employer/dashboard"
       groups={groups}
       tabs={tabs}
@@ -142,6 +143,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
         <Link
           href="/employer/cart"
           aria-label={cartCount > 0 ? `Shortlist, ${cartCount} candidates` : "Shortlist"}
+          title="Shortlist"
           className="apple-spring relative grid size-11 place-items-center rounded-apple-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900"
         >
           <ShoppingBag className="size-5" aria-hidden />
@@ -157,6 +159,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
       signOutTo="/login?as=employer"
       initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
       rootCrumb={{ label: "Home", href: "/employer/dashboard" }}
+      crumbLabels={{ "/employer/cart": "Shortlist" }}
       crumbParents={{
         "/employer/proposal": { label: "Proposals", href: "/employer/proposals" },
         "/employer/intern": { label: "Candidates", href: "/employer/candidates" },

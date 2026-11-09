@@ -28,6 +28,10 @@
   --color-brand-800: #0a4a39;
   --color-brand-900: #072f24;
   --color-brand-950: #041d17;
+  /* Employer rail (the mock's surface-container / primary-fixed, greened to the brand): a mint column and its selected row. */
+  --color-rail: #d4ebdf;
+  --color-rail-line: #b4d3c3;
+  --color-rail-active: #a6dcc0;
 
   /* ── Amber accent ──────────────────────────────────────────────────────
      500 is the legacy #F0B24A - the smile underline and the "Featured"/star
@@ -55,7 +59,7 @@
   --color-canvas: #e6ede9;
   --color-ink-300: #c2cec8;
   --color-ink-400: #93a29b;
-  --color-ink-500: #6b7c74;
+  --color-ink-500: #5a6b63; /* 4.6:1 on the deepest mint (brand-100), 5.6:1 on white; was 3.6:1 on the app canvas */
   --color-ink-600: #4e5f58;
   --color-ink-700: #33433d;
   --color-ink-800: #1e2b26;

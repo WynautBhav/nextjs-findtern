@@ -101,6 +101,7 @@ export function ConsoleShell({
   rootCrumb,
   width = "wide",
   tone = "dark",
+  flush = false,
   banner,
   children,
 }: {
@@ -128,6 +129,8 @@ export function ConsoleShell({
   width?: "reading" | "wide";
   /** `light` is the intern frame; everyone else keeps the dark rail. */
   tone?: "dark" | "light";
+  /** With `tone="light"`: a full-height mint column instead of a floating card, and header and page share one grid line. */
+  flush?: boolean;
   banner?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -153,6 +156,9 @@ export function ConsoleShell({
     (c) => c.href !== rootCrumb.href,
   );
 
+  // Employer: "Home / Candidates" above a "Candidates" title says nothing; trails show from two levels deep.
+  const showCrumbs = !flush || crumbs.length > 1;
+
   function toggleRail() {
     const next = !collapsed;
     setCollapsed(next);
@@ -176,6 +182,9 @@ export function ConsoleShell({
   }
 
   const light = tone === "light";
+  const column = light && flush;
+  // Header and page body share this left/right line (a breadcrumb used to start 60px left of the title).
+  const gridLine = cn("mx-auto w-full min-w-0 px-[clamp(1rem,4vw,2.5rem)]", width === "reading" ? "max-w-[75rem]" : "max-w-[90rem]");
   // Intern and employer carry "Ask me" in the top bar at every width; the floating launcher is off there (chat-widget).
   const askInBar = light || /^\/employer(\/|$)/.test(pathname);
   // The global ring (brand-700) is 2.3:1 on the dark rail; the accent clears 3:1 there.
@@ -190,7 +199,7 @@ export function ConsoleShell({
 
   const rail = (compact: boolean, onNavigate?: () => void) => (
     <>
-      <RailScroller light={light}>
+      <RailScroller light={light} column={column}>
         {groups.map((group, i) => (
           <div key={group.title ?? i}>
             {group.title ? (
@@ -203,7 +212,7 @@ export function ConsoleShell({
             <ul className="flex flex-col gap-0.5">
               {group.items.map((item) => (
                 <li key={item.href}>
-                  <RailLink item={item} active={activeHref === item.href.split("#")[0]} compact={compact} light={light} onNavigate={onNavigate} />
+                  <RailLink item={item} active={activeHref === item.href.split("#")[0]} compact={compact} light={light} column={column} onNavigate={onNavigate} />
                 </li>
               ))}
             </ul>
@@ -218,17 +227,18 @@ export function ConsoleShell({
           <ul className="flex flex-col gap-0.5">
             {helpLinks.map((item) => (
               <li key={item.href}>
-                <RailLink item={item} active={false} compact={compact} light={light} onNavigate={onNavigate} />
+                <RailLink item={item} active={false} compact={compact} light={light} column={column} onNavigate={onNavigate} />
               </li>
             ))}
           </ul>
         </div> : null}
       </RailScroller>
 
-      <div className={cn("mt-4 shrink-0 space-y-1 border-t pt-3", light ? "border-ink-100" : "border-white/10")}>
+      <div className={cn("mt-4 shrink-0 space-y-1 border-t pt-3", column ? cn("border-rail-line bg-rail-active/40", onNavigate ? "-mx-4 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]" : "-mx-3 px-3 pb-4") : light ? "border-ink-100" : "border-white/10")}>
+        {column && !compact ? <p className="px-3 pb-1 text-xs font-semibold tracking-[0.04em] text-ink-600">Help &amp; account</p> : null}
         {/* Light rail: FAQ stays one click away; contact and email sit in the account menu. */}
-        {light && helpLinks[0] ? <RailLink item={{ ...helpLinks[0], label: "Help & FAQ" }} active={false} compact={compact} light onNavigate={onNavigate} /> : null}
-        <FeedbackFab variant="link" deepLink={!onNavigate} className={cn("w-full gap-3 [&>svg]:size-5", darkRing, light && "text-ink-600 hover:bg-ink-50 hover:text-ink-900", compact && "justify-center px-0 [&>span]:sr-only")} />
+        {light && helpLinks[0] ? <RailLink item={{ ...helpLinks[0], label: "Help & FAQ" }} active={false} compact={compact} light column={column} onNavigate={onNavigate} /> : null}
+        <FeedbackFab variant="link" deepLink={!onNavigate} className={cn("w-full gap-3 [&>svg]:size-5", darkRing, light && (column ? "text-ink-700 hover:bg-rail-active/50 hover:text-ink-900" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"), compact && "justify-center px-0 [&>span]:sr-only")} />
         <button
           type="button"
           onClick={signOut}
@@ -236,7 +246,7 @@ export function ConsoleShell({
           className={cn(
             "apple-spring flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 text-sm",
             darkRing,
-            light ? "text-ink-600 hover:bg-ink-50 hover:text-ink-900" : "text-on-dark-subtle hover:bg-white/8 hover:text-white",
+            light ? (column ? "text-ink-700 hover:bg-rail-active/50 hover:text-ink-900" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900") : "text-on-dark-subtle hover:bg-white/8 hover:text-white",
             compact && "justify-center px-0",
           )}
         >
@@ -251,16 +261,16 @@ export function ConsoleShell({
     <MotionConfig reducedMotion="user">
     <div data-tone={tone} className={cn(
         "apple-admin min-h-[100dvh] overflow-x-clip lg:flex",
-        light ? "bg-canvas lg:gap-3 lg:p-3" : "bg-canvas",
+        column ? "bg-canvas" : light ? "bg-canvas lg:gap-3 lg:p-3" : "bg-canvas",
         // Rail width for fixed bars that centre on the content column (employer Compare pill).
-        light ? (collapsed ? "lg:[--console-rail:6.25rem]" : "lg:[--console-rail:17.5rem]") : collapsed ? "lg:[--console-rail:4.75rem]" : "lg:[--console-rail:16rem]",
+        column ? (collapsed ? "lg:[--console-rail:4.75rem]" : "lg:[--console-rail:16rem]") : light ? (collapsed ? "lg:[--console-rail:6.25rem]" : "lg:[--console-rail:17.5rem]") : collapsed ? "lg:[--console-rail:4.75rem]" : "lg:[--console-rail:16rem]",
       )}>
       {/* ── Desktop rail ─────────────────────────────────────────────── */}
       <aside
         aria-label="Sidebar"
         className={cn(
-          "relative sticky hidden shrink-0 flex-col px-3 py-5 transition-[width] duration-200 ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none lg:flex",
-          light ? "top-3 h-[calc(100dvh-1.5rem)] rounded-apple-xl bg-white" : "top-0 h-[100dvh] bg-brand-950",
+          "relative sticky hidden shrink-0 flex-col px-3 transition-[width] duration-200 ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none lg:flex",
+          column ? "top-0 h-[100dvh] border-r border-rail-line bg-rail pt-5" : light ? "top-3 h-[calc(100dvh-1.5rem)] rounded-apple-xl bg-white py-5" : "top-0 h-[100dvh] bg-brand-950 py-5",
           collapsed ? "w-[4.75rem]" : "w-64",
         )}
       >
@@ -276,7 +286,7 @@ export function ConsoleShell({
               <Logo variant={light ? "green" : "white"} priority className="h-10" />
             )}
           </Link>
-          {!collapsed && roleLabel ? <RoleChip label={roleLabel} light={light} /> : null}
+          {!collapsed && roleLabel ? <RoleChip label={roleLabel} light={light} column={column} /> : null}
         </div>
         <div className="relative flex min-h-0 flex-1 flex-col">{rail(collapsed)}</div>
         <button
@@ -293,7 +303,7 @@ export function ConsoleShell({
       {/* ── Content column ───────────────────────────────────────────── */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className={cn("sticky top-0 z-30 backdrop-blur-md", light ? "bg-canvas/85" : "border-b border-ink-200/70 bg-canvas/85")}>
-          <div className="flex h-16 items-center gap-2 px-[clamp(1rem,3vw,2rem)]">
+          <div className={cn("flex h-16 items-center gap-2", column ? gridLine : "px-[clamp(1rem,3vw,2rem)]")}>
             {/* Phone / tablet: drawer + logo */}
             <Sheet open={drawer} onOpenChange={setDrawer}>
               <SheetTrigger asChild>
@@ -301,7 +311,7 @@ export function ConsoleShell({
                   <Menu className="size-5" aria-hidden />
                 </button>
               </SheetTrigger>
-              <SheetContent side="left" showCloseButton={false} aria-modal="true" className={cn("flex w-[19rem] flex-col border-r-0 p-4", light ? "bg-white text-ink-900" : "bg-brand-950 text-white")}>
+              <SheetContent side="left" showCloseButton={false} aria-modal="true" className={cn("flex w-[19rem] flex-col border-r-0 p-4", column ? "bg-rail pb-0 text-ink-900" : light ? "bg-white text-ink-900" : "bg-brand-950 text-white")}>
                 <SheetTitle className="sr-only">Navigation</SheetTitle>
                 <div className="flex min-h-12 items-center justify-between gap-2 px-2">
                   <Logo variant={light ? "green" : "white"} className="h-9" />
@@ -319,7 +329,7 @@ export function ConsoleShell({
             </Link>
 
             {/* Desktop: where you are */}
-            <nav aria-label="Breadcrumb" className="hidden min-w-0 flex-1 items-center gap-1.5 text-sm lg:flex">
+            {showCrumbs ? <nav aria-label="Breadcrumb" className="hidden min-w-0 flex-1 items-center gap-1.5 text-sm lg:flex">
               <Link href={rootCrumb.href} className="apple-spring shrink-0 font-medium text-ink-600 hover:text-brand-700">
                 {rootCrumb.label}
               </Link>
@@ -335,7 +345,7 @@ export function ConsoleShell({
                   )}
                 </span>
               ))}
-            </nav>
+            </nav> : null}
 
             <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
               {/* Customer consoles (the ones with `help`) open the chat from
@@ -346,7 +356,7 @@ export function ConsoleShell({
                   type="button"
                   onClick={() => window.dispatchEvent(new Event(OPEN_CHAT_EVENT))}
                   // Intern and employer: on phones too, labelled, in place of the floating launcher.
-                  className={buttonClass({ variant: "outline", size: "sm", className: cn("mr-1", askInBar ? "touch:min-h-11 touch:px-4" : "hidden lg:inline-flex") })}
+                  className={buttonClass({ size: "sm", variant: column ? "ghost" : "outline", className: cn("mr-1", column && "text-ink-700 hover:text-ink-900", askInBar ? "touch:min-h-11 touch:px-4" : "hidden lg:inline-flex") })}
                 >
                   <MessageCircle className="size-4" aria-hidden />
                   Ask me
@@ -357,11 +367,12 @@ export function ConsoleShell({
                 <Link
                   href={alerts.href}
                   aria-label={alerts.count > 0 ? `${alerts.label ?? "Notifications"}, ${alerts.count} unread` : alerts.label ?? "Notifications"}
+                  title={alerts.label ?? "Notifications"}
                   className="apple-spring relative grid size-11 shrink-0 place-items-center rounded-apple-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900"
                 >
                   <Bell className="size-5" aria-hidden />
                   {alerts.count > 0 ? (
-                    <span className="nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent-500 px-1 text-2xs font-semibold text-brand-950 ring-2 ring-surface">
+                    <span className={cn("nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-2xs font-semibold ring-2 ring-surface", light ? "bg-brand-700 text-white" : "bg-accent-500 text-brand-950")}>
                       {alerts.count > 99 ? "99+" : alerts.count}
                     </span>
                   ) : null}
@@ -376,8 +387,8 @@ export function ConsoleShell({
           id="main"
           tabIndex={-1}
           className={cn(
-            "mx-auto w-full min-w-0 flex-1 px-[clamp(1rem,4vw,2.5rem)] pt-6 outline-none lg:pt-9",
-            width === "reading" ? "max-w-[75rem]" : "max-w-[90rem]",
+            gridLine,
+            "flex-1 pt-6 outline-none lg:pt-9",
             // Clears the floating "Ask me" on phones: it sits above the tab
             // bar (top edge 136px up) or in the corner (76px) (QA-136).
             tabs ? "pb-40 lg:pb-24" : "pb-24",
@@ -400,7 +411,7 @@ export function ConsoleShell({
  * always visible, the bottom fades only while there is more below, and the
  * current page is scrolled into view, so it is never hidden under the fold.
  */
-function RailScroller({ light, children }: { light: boolean; children: React.ReactNode }) {
+function RailScroller({ light, column, children }: { light: boolean; column: boolean; children: React.ReactNode }) {
   const ref = useRef<HTMLElement>(null);
   const [more, setMore] = useState(false);
 
@@ -430,7 +441,7 @@ function RailScroller({ light, children }: { light: boolean; children: React.Rea
       aria-label="Main"
       className={cn(
         "mt-6 min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain pb-6 [scrollbar-width:thin]",
-        light ? "[scrollbar-color:var(--color-ink-200)_transparent]" : "[scrollbar-color:rgb(255_255_255/0.2)_transparent]",
+        light ? (column ? "[scrollbar-color:var(--color-rail-line)_transparent]" : "[scrollbar-color:var(--color-ink-200)_transparent]") : "[scrollbar-color:rgb(255_255_255/0.2)_transparent]",
         more && "[mask-image:linear-gradient(to_bottom,black_calc(100%-1.25rem),transparent)]",
       )}
     >
@@ -439,31 +450,33 @@ function RailScroller({ light, children }: { light: boolean; children: React.Rea
   );
 }
 
-function RailLink({ item, active, compact, light, onNavigate }: { item: ConsoleNavItem; active: boolean; compact: boolean; light: boolean; onNavigate?: () => void }) {
+function RailLink({ item, active, compact, light, column = false, onNavigate }: { item: ConsoleNavItem; active: boolean; compact: boolean; light: boolean; column?: boolean; onNavigate?: () => void }) {
   const external = item.href.startsWith("mailto:");
   const className = cn(
     // 44px on touch; 40px with a mouse. A short window scrolls the rail
     // rather than squeezing the links (QA-144).
     "apple-spring apple-pressable group relative flex min-h-11 items-center gap-3 rounded-apple-sm px-3 text-[0.9375rem] tracking-[-0.01em] [@media(pointer:fine)]:min-h-10",
     light
-      ? active ? "bg-brand-50 font-medium text-brand-800" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"
+      ? column
+        ? active ? "bg-rail-active font-bold text-brand-900" : "text-ink-700 hover:bg-rail-active/50 hover:text-ink-900"
+        : active ? "bg-brand-50 font-medium text-brand-800" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"
       : cn("focus-visible:outline-accent-300", active ? "bg-white/[0.12] font-semibold text-white" : "text-on-dark-subtle hover:bg-white/[0.06] hover:text-white"),
     compact && "justify-center px-0",
   );
   const body = (
     <>
-      {active ? <span aria-hidden className={cn("absolute inset-y-2 left-0 w-[3px] rounded-full", light ? "bg-brand-600" : "bg-accent-400")} /> : null}
+      {active ? <span aria-hidden className={cn("absolute inset-y-2 left-0 w-[3px] rounded-full", light ? (column ? "bg-brand-700" : "bg-brand-600") : "bg-accent-400")} /> : null}
       <span
         className={cn(
           "relative shrink-0 [&_svg]:size-5",
           light
-            ? active ? "text-brand-700" : "text-ink-500 group-hover:text-ink-900"
+            ? active ? (column ? "text-brand-800" : "text-brand-700") : column ? "text-ink-600 group-hover:text-ink-900" : "text-ink-500 group-hover:text-ink-900"
             : active ? "text-accent-300" : "text-on-dark-subtle group-hover:text-white",
         )}
       >
         {item.icon}
         {compact && (item.attention || item.badge) ? (
-          <span aria-hidden className={cn("absolute -right-1 -top-1 size-2 rounded-full bg-accent-400 ring-2", light ? "ring-white" : "ring-brand-950")} />
+          <span aria-hidden className={cn("absolute -right-1 -top-1 size-2 rounded-full ring-2", item.attention ? "bg-accent-400" : light ? "bg-brand-700" : "bg-accent-400", column ? "ring-rail" : light ? "ring-white" : "ring-brand-950")} />
         ) : null}
       </span>
       <span className={cn("min-w-0 flex-1 truncate", compact && "sr-only")}>
@@ -583,13 +596,13 @@ function TabBar({ tabs, pathname }: { tabs: ConsoleNavItem[]; pathname: string }
   );
 }
 
-function RoleChip({ label, light }: { label: string; light: boolean }) {
+function RoleChip({ label, light, column }: { label: string; light: boolean; column: boolean }) {
   return (
     <span
       className={cn(
         "shrink-0 rounded-full border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider",
         // accent-300 is 1.6:1 on white; the light rail takes the "waiting" pill colours.
-        light ? "border-accent-300/70 bg-accent-100 text-accent-700" : "border-accent-400/30 bg-accent-500/15 text-accent-300",
+        column ? "border-brand-300 bg-brand-700 px-2.5 text-xs text-white" : light ? "border-accent-300/70 bg-accent-100 text-accent-700" : "border-accent-400/30 bg-accent-500/15 text-accent-300",
       )}
     >
       {label}

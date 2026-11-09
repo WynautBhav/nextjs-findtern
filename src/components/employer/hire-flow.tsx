@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { Check } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { FlowScroll } from "@/components/employer/hire-flow-scroll";
@@ -33,26 +32,26 @@ export function HireFlow({ counts, current, currentCount = null }: { counts: Hir
   // One line, not four cards: it says where the page sits in the flow and
   // links each stage, without competing with the page's own content.
   return (
-    <nav aria-label="Hiring steps" className="relative mb-3 sm:mb-5 sm:rounded-xl sm:border sm:border-ink-200 sm:bg-white sm:p-1.5 sm:shadow-xs">
-      <FlowScroll className="relative flex items-center gap-x-0 gap-y-1 overflow-x-auto text-[13px] max-sm:-m-1.5 max-sm:p-1.5 [scrollbar-width:none] sm:flex-wrap sm:gap-x-1.5 sm:gap-y-2 sm:overflow-visible sm:text-sm [&::-webkit-scrollbar]:hidden">
+    <nav aria-label="Hiring steps" className="relative mb-4 rounded-xl border border-brand-200 bg-brand-100/60 p-1 sm:mb-5">
+      <FlowScroll className="relative flex items-stretch gap-1 overflow-x-auto text-[13px] [scrollbar-width:none] sm:overflow-visible sm:text-sm [&::-webkit-scrollbar]:hidden">
         {STEPS.map((s) => {
           const active = s.key === currentKey;
           // Finding candidates is the start of the path, not a queue: no count.
           const n = s.key === "candidates" ? (active ? currentCount : null) : counts[s.key];
           return (
-            <li key={s.key} className="flex shrink-0 items-center gap-1">
+            <li key={s.key} className="flex shrink-0 sm:min-w-0 sm:flex-1">
               <Link
                 href={s.href}
                 aria-current={active ? "step" : undefined}
                 title={s.hint}
                 className={cn(
-                  "apple-spring inline-flex min-h-10 items-center gap-1 whitespace-nowrap rounded-full px-2 sm:gap-2.5 sm:rounded-lg sm:border sm:px-4 touch:min-h-11",
-                  active ? "bg-brand-50 font-semibold text-brand-800 sm:border-ink-200 sm:bg-ink-100 sm:text-ink-900 sm:shadow-xs" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900 sm:border-transparent",
+                  "apple-spring inline-flex min-h-10 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 sm:px-4 touch:min-h-11",
+                  active ? "bg-white font-bold text-brand-900 shadow-sm ring-1 ring-brand-200" : "font-medium text-ink-700 hover:bg-white/60 hover:text-ink-900",
                 )}
               >
-                {s.key === "hired" && n !== null && n > 0 && !active ? <Check className="size-3.5" aria-hidden /> : null}
                 {s.label}
-                {n === null ? null : <span className={cn("nums", active ? "text-brand-700 sm:rounded-full sm:bg-white sm:px-2 sm:py-0.5 sm:text-xs sm:font-bold sm:text-ink-900" : "text-text-subtle")}>{n}</span>}
+                {/* One badge for every count; the selected step's is the filled one. */}
+                {n === null ? null : <span className={cn("nums min-w-5 rounded-full px-1.5 py-px text-center text-xs font-bold", active ? "bg-brand-700 text-white" : "bg-white text-ink-700 ring-1 ring-brand-200")}>{n}</span>}
               </Link>
             </li>
           );
