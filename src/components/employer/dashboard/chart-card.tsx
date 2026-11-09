@@ -32,7 +32,7 @@ export function ChartCard({
   children: React.ReactNode;
 }) {
   return (
-    <section aria-labelledby={titleId} className={cn("@container flex h-full flex-col p-5 @xl:p-6", SURFACE_CLASS, className)}>
+    <section aria-labelledby={titleId} className={cn("@container flex h-full scroll-mt-20 flex-col p-5 @xl:p-6", SURFACE_CLASS, className)}>
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <h2 id={titleId} className="text-base font-semibold leading-6 text-ink-900">

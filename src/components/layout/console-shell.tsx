@@ -378,7 +378,7 @@ export function ConsoleShell({
                 >
                   <Bell className="size-5" aria-hidden />
                   {alerts.count > 0 ? (
-                    <span className={cn("nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-2xs font-semibold ring-2 ring-surface", light ? "bg-brand-700 text-white" : "bg-accent-500 text-brand-950")}>
+                    <span className={cn("nums absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-2xs font-semibold ring-2 ring-surface", light ? "bg-brand-700 text-white" : "bg-accent-500 text-brand-950")}>
                       {alerts.count > 99 ? "99+" : alerts.count}
                     </span>
                   ) : null}

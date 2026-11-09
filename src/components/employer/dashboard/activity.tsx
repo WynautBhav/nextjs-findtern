@@ -9,15 +9,15 @@ import { ChartCard } from "./chart-card";
 export type ActivityProps = { activity: ActivityData };
 
 const PLOT = 112; // tallest column, px
-const MAX_DOTS = 4; // more hires than this in one week print as a number
+const MAX_DOTS = 3; // more hires than this in one week print as a number
 
 /** A hire is a dot; a busy week is a number so the stack never outgrows the card. */
 function Hires({ n, pin = false }: { n: number; pin?: boolean }) {
   if (n === 0) return null;
-  const lift = pin ? "relative z-10 -mb-1" : "";
+  const lift = pin ? "relative z-10 mt-2 -mb-1" : "";
   if (n > MAX_DOTS) return <span aria-hidden className={cn("nums grid size-5 place-items-center rounded-full bg-brand-700 text-xs font-semibold leading-none text-white ring-2 ring-white", lift)}>{n}</span>;
   return (
-    <span aria-hidden className={cn("flex flex-col items-center gap-1", lift)}>
+    <span aria-hidden className={cn("flex flex-col items-center gap-1.5", lift)}>
       {Array.from({ length: n }, (_, i) => (
         <span key={i} className="size-2 rounded-full bg-brand-700 ring-2 ring-white" />
       ))}
@@ -84,8 +84,8 @@ export function Activity({ activity }: ActivityProps) {
           <div role="img" aria-label={`Proposals sent per week, last 8 weeks: ${weeks.map((w) => `${w.label} ${w.sent}`).join(", ")}`} className="mt-auto pt-5">
             <ol aria-hidden className="grid grid-cols-8 items-end gap-1.5">
               {weeks.map((w, i) => (
-                <li key={w.start} className={cn("flex h-44 flex-col items-center justify-end rounded-lg border border-transparent px-0.5 pb-1.5", w.current && "border border-dashed border-ink-400")}>
-                  {w.sent > 0 ? <span className="nums mb-1 text-xs leading-4 text-ink-900">{w.sent}</span> : null}
+                <li key={w.start} className={cn("flex h-48 flex-col items-center justify-end rounded-lg border border-transparent px-0.5 pb-1.5", w.current && "border border-dashed border-ink-400")}>
+                  {w.sent > 0 ? <span className="nums text-xs leading-4 text-ink-900">{w.sent}</span> : null}
                   <Hires n={w.hires} pin />
                   <Reveal axis="y" index={i} className={cn("w-full", w.sent > 0 ? "border-t-2 border-ink-500 bg-ink-300" : "bg-ink-200")} style={{ height: w.sent > 0 ? Math.max(4, Math.round((w.sent / max) * PLOT)) : 2 }} />
                 </li>
@@ -99,17 +99,20 @@ export function Activity({ activity }: ActivityProps) {
               ))}
             </ol>
           </div>
-          <table className="sr-only">
-            <caption>Proposals sent and hires per week, oldest first</caption>
-            <thead>
-              <tr><th scope="col">Week of</th><th scope="col">Proposals sent</th><th scope="col">Hires</th></tr>
-            </thead>
-            <tbody>
-              {weeks.map((w) => (
-                <tr key={w.start}><th scope="row">{w.label}{w.current ? " (this week)" : ""}</th><td>{w.sent}</td><td>{w.hires}</td></tr>
-              ))}
-            </tbody>
-          </table>
+          {/* The wrapper is the sr-only box: on a <table> itself the 1px width is only a minimum and the caption sits outside the table's clip, so it printed over the card header. */}
+          <div className="sr-only">
+            <table>
+              <caption>Proposals sent and hires per week, oldest first</caption>
+              <thead>
+                <tr><th scope="col">Week of</th><th scope="col">Proposals sent</th><th scope="col">Hires</th></tr>
+              </thead>
+              <tbody>
+                {weeks.map((w) => (
+                  <tr key={w.start}><th scope="row">{w.label}{w.current ? " (this week)" : ""}</th><td>{w.sent}</td><td>{w.hires}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </>
       )}
 

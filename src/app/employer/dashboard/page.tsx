@@ -236,7 +236,7 @@ export default async function EmployerDashboard() {
     // 12 columns from xl (1104px of content at 1440: 8 + 4 columns under the hero). Below that one column.
     // The phone order is hero, funnel, matches, activity, projects; the next meeting lives in the hero.
     <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-12">
-      <div className="min-w-0 xl:col-span-12">
+      <div className="min-w-0 scroll-mt-20 xl:col-span-12">
         <Hero
           companyName={data.companyName}
           dateLabel={dateLabel}

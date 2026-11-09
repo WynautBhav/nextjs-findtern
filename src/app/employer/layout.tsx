@@ -154,7 +154,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
         >
           <ShoppingBag className="size-5" aria-hidden />
           {cartCount > 0 ? (
-            <span className="nums absolute right-1.5 top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-700 px-1 text-2xs font-semibold text-white ring-2 ring-surface">
+            <span className="nums absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-700 px-1 text-2xs font-semibold text-white ring-2 ring-surface">
               {cartCount > 99 ? "99+" : cartCount}
             </span>
           ) : null}
