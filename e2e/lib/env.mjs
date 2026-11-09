@@ -25,10 +25,16 @@ const LOOPBACK = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 export function testDatabaseUrl(raw = process.env.DATABASE_URL) {
   const url = (raw ?? "").trim() || DEFAULT_DATABASE_URL;
   let host;
+  let u;
   try {
-    host = new URL(url).hostname;
+    u = new URL(url);
+    host = u.hostname;
   } catch {
     throw new Error(`Refusing to run: DATABASE_URL is not a valid URL`);
+  }
+  // pg takes ?host= / ?hostaddr= from the query string over the authority, so ...@localhost/db?host=evil connects to evil.
+  for (const k of u.searchParams.keys()) {
+    if (/^(host|hostaddr)$/i.test(k)) throw new Error(`Refusing to run: DATABASE_URL has a "${k}" query parameter`);
   }
   if (!LOOPBACK.has(host)) {
     throw new Error(`Refusing to run: DATABASE_URL host "${host}" is not localhost/127.0.0.1/::1`);

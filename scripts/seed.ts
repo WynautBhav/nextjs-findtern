@@ -120,10 +120,16 @@ const COMPANIES = [
  */
 function assertLocalDatabase(url: string): void {
   let host: string;
+  let u: URL;
   try {
-    host = new URL(url).hostname;
+    u = new URL(url);
+    host = u.hostname;
   } catch {
     throw new Error("Refusing to seed: DATABASE_URL is not a valid URL");
+  }
+  // pg takes ?host= / ?hostaddr= from the query string over the authority, so ...@localhost/db?host=evil connects to evil.
+  for (const k of u.searchParams.keys()) {
+    if (/^(host|hostaddr)$/i.test(k)) throw new Error(`Refusing to seed: DATABASE_URL has a "${k}" query parameter`);
   }
   if (!["localhost", "127.0.0.1", "::1", "[::1]"].includes(host)) {
     throw new Error(`Refusing to seed: DATABASE_URL host "${host}" is not localhost/127.0.0.1/::1`);

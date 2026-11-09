@@ -320,7 +320,6 @@ export const emails = {
     cta: ctaTo("Open dashboard", `/${o.forEmployer ? "employer/schedule" : "intern/interviews"}`),
   }),
 
-  /** Findtern added the meeting link by hand; no company name, the intern may not see it yet. */
   /** The employer's nudge about a pending or scheduled interview (send-reminder route). `text` is the same line as the in-app note. */
   interviewReminder: (o: { name: string; pending: boolean; text: string; link: string | null }): EmailContent => ({
     subject: "Interview reminder | Findtern",
@@ -332,6 +331,7 @@ export const emails = {
     cta: ctaTo("Open interviews", "/intern/interviews"),
   }),
 
+  /** Findtern added the meeting link by hand; no company name, the intern may not see it yet. */
   interviewLinkReady: (o: { name: string; link: string; forEmployer: boolean }): EmailContent => ({
     subject: "Your interview link is ready | Findtern",
     preheader: "The link is below and in your dashboard.",
