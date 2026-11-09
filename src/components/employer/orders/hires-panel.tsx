@@ -36,10 +36,10 @@ const payHref = (h: HireRow) => `/employer/checkout?proposal=${encodeURIComponen
 
 /**
  * The columns, from lg up: hire, monthly rate, period, paid, status, actions.
- * Fixed widths, so every row lines up under its heading and a date range
- * never has to wrap; below lg each hire is a card with the same fields labelled.
+ * Hire is the flexible column; the rest are fixed, so every row lines up
+ * under its heading and a date range never has to wrap; below lg each hire is a card with the same fields labelled.
  */
-const COLS = "lg:grid lg:grid-cols-[minmax(0,1fr)_7.5rem_12rem_7.5rem_9rem_9.5rem] lg:items-center lg:gap-x-6";
+const COLS = "lg:grid lg:grid-cols-[minmax(280px,1fr)_120px_220px_140px_140px_9.5rem] lg:items-center lg:gap-x-6";
 
 /** A field's label: visible on the card, a screen-reader label in the table. */
 const FIELD_LABEL = "mb-0.5 block text-xs font-medium text-ink-600 lg:sr-only";
@@ -114,7 +114,7 @@ export function HiresPanel({
           className={buttonClass({ variant: "outline", size: "sm", className: "h-11 shrink-0 lg:ml-auto" })}
         >
           <Download className="size-4" aria-hidden />
-          <span className="max-sm:sr-only">{rows.length !== hires.length ? `Export ${rows.length} shown` : "Export"}</span> CSV
+          <span><span className="max-sm:sr-only">{rows.length !== hires.length ? `Export ${rows.length} shown` : "Export"}</span> CSV</span>
         </button>
         <LiveCount active={Boolean(q.trim())} shown={rows.length} total={hires.length} noun="hires" />
       </div>
@@ -158,7 +158,6 @@ export function HiresPanel({
               const contract = `/employer/proposal/${encodeURIComponent(h.proposalId)}`;
               const plan = PLAN[h.ledger.plan];
               const fee = feePaidMinor(h);
-              const role = h.roleTitle === h.projectName ? h.roleTitle : `${h.roleTitle} · ${h.projectName}`;
               return (
                 <li key={h.proposalId} className={cn(COLS, "rounded-xl border border-ink-200 bg-white p-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-3 lg:py-4")}>
                   <div className="min-w-0">
@@ -173,9 +172,14 @@ export function HiresPanel({
                         >
                           {h.candidateName}
                         </Link>
-                        <p className="text-sm text-ink-600">
-                          {role}
+                        <p className="truncate text-sm text-ink-700" title={h.roleTitle}>
+                          {h.roleTitle}
                         </p>
+                        {h.projectName !== h.roleTitle ? (
+                          <p className="truncate text-sm text-ink-600" title={h.projectName}>
+                            {h.projectName}
+                          </p>
+                        ) : null}
                       </div>
                     </div>
                     {owedOffline ? (
@@ -232,18 +236,18 @@ export function HiresPanel({
                         <dd className="text-sm text-ink-900">
                           <span className="whitespace-nowrap">{h.fullTime ? `Joining ${h.startDate ? formatDate(h.startDate) : "to be agreed"}` : dateRange(h.startDate, h.ledger.endsOn)}</span>
                           {h.fullTime ? null : (
-                            <span className="block text-xs text-ink-600">
+                            <span className="block text-sm text-ink-600">
                               {h.months} month{h.months === 1 ? "" : "s"}
                               {h.ledger.plan === "monthly" ? ` · ${h.ledger.monthsPaid} paid` : ""}
                             </span>
                           )}
                         </dd>
                       </div>
-                      <div className="nums lg:text-right">
+                      <div className="nums lg:text-right lg:tabular-nums">
                         <dt className={FIELD_LABEL}>Paid</dt>
                         <dd className="text-sm font-medium text-ink-900">
                           {formatMoney(h.ledger.paidMinor, h.currency, { zeroLabel: false })}
-                          <span className="block text-xs font-normal text-ink-600">
+                          <span className="block whitespace-nowrap text-sm font-normal text-ink-600">
                             {h.fullTime ? "hiring fee" : fee > 0 ? `incl. ${formatMoney(fee, h.currency, { zeroLabel: false })} fee` : "\u00a0"}
                           </span>
                         </dd>
