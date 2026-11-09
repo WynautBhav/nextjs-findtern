@@ -13,6 +13,7 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { filterHires } from "@/lib/orders-filter";
 import { todayIst } from "@/lib/offer";
 import { cn } from "@/lib/utils";
+import { tintFor } from "@/components/employer/dashboard/card-geometry";
 import type { HireRow } from "./types";
 import { INLINE_LINK, PLAN, dateRange, feePaidMinor, initials, LiveCount, ResetButton, SearchField } from "./shared";
 
@@ -30,6 +31,23 @@ function paymentLinkHref(h: HireRow): string {
     `Proposal reference: ${h.proposalId}`,
   ].join("\n");
   return `mailto:${PAYMENTS_EMAIL}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
+const DAY_MS = 86_400_000;
+const dayNum = (iso: string) => Date.parse(`${iso.slice(0, 10)}T00:00:00Z`) / DAY_MS;
+
+/** Elapsed share of the contract from its real start and end dates; null when either is missing or the range is empty. */
+function contractProgress(start: string | null, end: string | null): { pct: number; note: string } | null {
+  if (!start || !end) return null;
+  const s = dayNum(start);
+  const e = dayNum(end);
+  const t = dayNum(todayIst());
+  if (!(e > s) || Number.isNaN(t)) return null;
+  if (t < s) return { pct: 0, note: `Starts in ${Math.ceil(s - t)} ${Math.ceil(s - t) === 1 ? "day" : "days"}` };
+  if (t >= e) return { pct: 100, note: "Contract ended" };
+  const total = Math.round(e - s);
+  const day = Math.floor(t - s) + 1;
+  return { pct: Math.min(100, Math.max(0, ((t - s) / (e - s)) * 100)), note: `Day ${day} of ${total}` };
 }
 
 const payHref = (h: HireRow) => `/employer/checkout?proposal=${encodeURIComponent(h.proposalId)}`;
@@ -139,7 +157,8 @@ export function HiresPanel({
           ) : null}
 
           {/* Column headings: the table's header row from lg; below it each card labels its own fields. */}
-          <div aria-hidden className={cn(COLS, "hidden border-b border-ink-200 px-3 pb-2.5 text-xs font-medium text-ink-600")}>
+          <div className="lg:overflow-hidden lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:shadow-[0_1px_2px_rgba(16,24,20,0.04)]">
+          <div aria-hidden className={cn(COLS, "hidden border-b border-ink-200 bg-ink-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-600")}>
             <span>Hire</span>
             <span>Monthly</span>
             <span>Period</span>
@@ -147,7 +166,7 @@ export function HiresPanel({
             <span>Status</span>
             <span />
           </div>
-          <ul aria-label="Hires" className="space-y-3 lg:space-y-0 lg:divide-y lg:divide-ink-100 lg:border-b lg:border-ink-100">
+          <ul aria-label="Hires" className="space-y-3 lg:space-y-0 lg:divide-y lg:divide-ink-100">
             {rows.map((h) => {
               // Pay only where checkout can bill this placement; otherwise the
               // link opened a checkout for a different hire (QA-139).
@@ -158,11 +177,12 @@ export function HiresPanel({
               const contract = `/employer/proposal/${encodeURIComponent(h.proposalId)}`;
               const plan = PLAN[h.ledger.plan];
               const fee = feePaidMinor(h);
+              const progress = h.fullTime ? null : contractProgress(h.startDate, h.ledger.endsOn);
               return (
-                <li key={h.proposalId} className={cn(COLS, "rounded-xl border border-ink-200 bg-white p-4 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-3 lg:py-4")}>
+                <li key={h.proposalId} className={cn(COLS, "rounded-xl border border-ink-200 bg-white p-4 transition-colors lg:rounded-none lg:border-0 lg:px-4 lg:py-4 lg:even:bg-ink-50/60 lg:hover:bg-brand-50/70")}>
                   <div className="min-w-0">
                     <div className="flex items-center gap-3">
-                      <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-800">
+                      <span aria-hidden className={cn("grid size-10 shrink-0 place-items-center rounded-full text-sm font-semibold ring-1 ring-inset ring-black/5", tintFor(h.internId))}>
                         {initials(h.candidateName)}
                       </span>
                       <div className="min-w-0">
@@ -241,6 +261,14 @@ export function HiresPanel({
                               {h.ledger.plan === "monthly" ? ` · ${h.ledger.monthsPaid} paid` : ""}
                             </span>
                           )}
+                          {progress ? (
+                            <span className="mt-1.5 block">
+                              <span aria-hidden className="block h-1.5 overflow-hidden rounded-full bg-ink-200">
+                                <span className="block h-full rounded-full bg-brand-600" style={{ width: `${progress.pct}%` }} />
+                              </span>
+                              <span className="mt-1 block text-xs text-ink-600">{progress.note}</span>
+                            </span>
+                          ) : null}
                         </dd>
                       </div>
                       <div className="nums lg:text-right lg:tabular-nums">
@@ -255,7 +283,7 @@ export function HiresPanel({
                   </dl>
 
                   <div className="mt-4 lg:mt-0">
-                    <Pill tone={plan.tone}>{plan.label}</Pill>
+                    <Pill tone={plan.tone} icon={<span aria-hidden className="!size-2 rounded-full bg-current" />}>{plan.label}</Pill>
                   </div>
 
                   {/* One visible action by state: Pay while money is due (it was
@@ -301,6 +329,7 @@ export function HiresPanel({
               );
             })}
           </ul>
+          </div>
         </>
       )}
     </div>
