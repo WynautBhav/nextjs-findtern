@@ -9,6 +9,8 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 
+import { createHmac } from "node:crypto";
+
 import { hash } from "@node-rs/argon2";
 import { chromium } from "playwright";
 
@@ -87,7 +89,7 @@ test("non-admins get 403, bad bodies 400/422, unknown id 404; nothing is written
 test("admin takes it down: fields, audit row, employer notification, status untouched", async () => {
   const r = await td(pid, { reason: REASON });
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.deepEqual(r.body, { ok: true, takenDown: true, withdrawnOffers: 0 });
+  assert.deepEqual(r.body, { ok: true, takenDown: true, withdrawnOffers: 0, skippedOffers: 0, skippedOfferIds: [] });
   const p = await row(pid);
   assert.ok(p.taken_down_at);
   assert.equal(p.taken_down_by, ADMIN.id);
@@ -320,6 +322,7 @@ test("takedown withdraws open offers (sent, interview, accepted-unpaid), leaves 
     return { id, intern };
   };
   const sent = await mk("sent", "sent");
+  const draft = await mk("draft", "draft");
   const interview = await mk("iv", "interview_scheduled");
   const accepted = await mk("acc", "accepted", offerJson({ termsAcceptedAt: new Date().toISOString() }));
   const hired = await mk("hired", "hired", offerJson(), wp, true);
@@ -333,7 +336,8 @@ test("takedown withdraws open offers (sent, interview, accepted-unpaid), leaves 
 
   const r = await td(wp, { reason: `Duplicate listing ${RUN}` });
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.deepEqual(r.body, { ok: true, takenDown: true, withdrawnOffers: 3 });
+  // Withdrawn: sent, draft, interview, accepted-unpaid. Left (reported): the accepted offer with an open checkout, and legacy processing.
+  assert.deepEqual({ ...r.body, skippedOfferIds: [...r.body.skippedOfferIds].sort() }, { ok: true, takenDown: true, withdrawnOffers: 4, skippedOffers: 2, skippedOfferIds: [ordered.id, processing.id].sort() });
 
   for (const o of [sent, interview, accepted]) {
     const w = await withdrawn(o.id);
@@ -347,24 +351,32 @@ test("takedown withdraws open offers (sent, interview, accepted-unpaid), leaves 
     assert.match(notes[0].message, /closed by Findtern/);
     assert.doesNotMatch(notes[0].message, new RegExp(`Duplicate listing`), "neutral line: no takedown reason, no blame");
   }
-  assert.equal((await withdrawn(sent.id)).status, "withdrawn");
+  // A withdrawn draft is audited and withdrawn, but the intern (who never saw it) gets no notice.
+  assert.equal((await withdrawn(draft.id)).status, "withdrawn");
+  assert.equal((await rows(`SELECT 1 FROM admin_audit_log WHERE action = 'proposal.takedown_withdraw' AND target_id = $1`, [draft.id])).length, 1, "draft: audit row kept");
+  assert.equal((await rows(`SELECT 1 FROM notifications WHERE recipient_id = $1 AND type = 'proposal_withdrawn'`, [draft.intern.id])).length, 0, "draft: intern not notified");
+  assert.equal((await rows(`SELECT 1 FROM notifications WHERE recipient_id = $1`, [draft.intern.id])).length, 0, "draft: intern not notified at all");
   for (const [name, o, st] of [["hired", hired, "hired"], ["open order", ordered, "accepted"], ["full-time acceptance", ftAccepted, "accepted"], ["processing", processing, "processing"], ["declined", declined, "rejected"], ["other project", elsewhere, "sent"]]) {
     assert.equal((await withdrawn(o.id)).status, st, `${name} untouched`);
     assert.equal((await rows(`SELECT 1 FROM admin_audit_log WHERE action = 'proposal.takedown_withdraw' AND target_id = $1`, [o.id])).length, 0, `${name}: no audit row`);
   }
   assert.ok((await one(`SELECT hired_at FROM proposals WHERE id = $1`, [hired.id])).hired_at, "hired_at kept");
   const sum = await rows(`SELECT meta FROM admin_audit_log WHERE action = 'project.takedown' AND target_id = $1`, [wp]);
-  assert.equal(sum[0].meta.withdrawnOffers, 3);
+  assert.equal(sum[0].meta.withdrawnOffers, 4);
+  assert.deepEqual([...sum[0].meta.skippedOffers].sort(), [ordered.id, processing.id].sort(), "skipped offers audited by id");
   const emp = await rows(`SELECT message FROM notifications WHERE recipient_id = $1 AND type = 'project_taken_down' AND message LIKE $2`, [E.id, `%Duplicate listing ${RUN}%`]);
-  assert.match(emp[0].message, /3 open offers on it were withdrawn/);
+  assert.match(emp[0].message, /4 open offers on it were withdrawn/);
+  assert.match(emp[0].message, /2 accepted offers with a payment in progress were left as it is/);
 
   // Restore does not revive them.
   assert.equal((await restore(wp)).status, 200);
   for (const o of [sent, interview, accepted]) assert.equal((await withdrawn(o.id)).status, "withdrawn", "still withdrawn after restore");
   // And taking it down again finds nothing left to withdraw.
   const again = await td(wp, { reason: "again" });
-  assert.deepEqual(again.body, { ok: true, takenDown: true, withdrawnOffers: 0 });
+  // The checkout is still open and the legacy offer is still processing: both reported again, nothing withdrawn.
+  assert.deepEqual({ ...again.body, skippedOfferIds: [...again.body.skippedOfferIds].sort() }, { ok: true, takenDown: true, withdrawnOffers: 0, skippedOffers: 2, skippedOfferIds: [ordered.id, processing.id].sort() });
   S.wp = wp;
+  S.orderedId = ordered.id;
   S.wpHired = hired.id;
 });
 
@@ -373,6 +385,10 @@ test("admin UI: the takedown confirmation says open offers are withdrawn and not
   const intern = await mkIntern("wdui");
   const o = await mkProposal(E.id, intern.id, uiPid);
   await one(SET_OFFER, [o, "sent", offerJson()]);
+  // An accepted offer with a checkout open stays; the admin is told to withdraw it by hand later.
+  const held = await mkProposal(E.id, (await mkIntern("wdui2")).id, uiPid);
+  await one(SET_OFFER, [held, "accepted", offerJson()]);
+  await one(`INSERT INTO employer_payments (employer_id, order_id, status, raw) VALUES ($1,$2,'created',$3::jsonb) RETURNING id`, [E.id, `order_ui_${RUN}`, JSON.stringify({ notes: { proposalIds: [held] } })]);
   await P.A.page.goto(url(`/admin/projects?q=${encodeURIComponent(`Confirm Role ${RUN}`)}`), { waitUntil: "domcontentloaded" });
   await P.A.page.getByRole("button", { name: "Take down…" }).first().click();
   await P.A.page.getByLabel("Reason for the employer (required)").fill("UI withdraw");
@@ -382,7 +398,9 @@ test("admin UI: the takedown confirmation says open offers are withdrawn and not
   assert.match((await dialog.textContent()) ?? "", /withdrawn offers are not revived/);
   await dialog.getByRole("button", { name: "Take down", exact: true }).click();
   await P.A.page.getByText(/1 open offer was withdrawn/).waitFor({ timeout: 20_000 });
+  assert.match((await P.A.page.getByRole("status").filter({ hasText: /withdrawn\./ }).first().textContent()) ?? "", /1 accepted offer with an open checkout was left; withdraw it by hand after the checkout expires/);
   assert.equal(await status(o), "withdrawn");
+  assert.equal(await status(held), "accepted", "the offer with an open checkout is left");
 });
 
 test("a taken-down listing sends no new offer: internship proposal and full-time offer both 409 listing_taken_down, nothing inserted", async () => {
@@ -438,6 +456,93 @@ test("send race: a takedown that commits after the early check but before the in
   assert.equal(reply.status, 409, JSON.stringify(reply.body));
   assert.equal(reply.body.code, "listing_taken_down");
   assert.equal((await one(`SELECT count(*)::int AS n FROM proposals WHERE project_id = $1`, [racePid])).n, 1, "no full-time proposal inserted");
+});
+
+// ── Revision 3 ──
+const SIGN = (orderId, paymentId) => createHmac("sha256", process.env.E2E_RZP_SECRET).update(`${orderId}|${paymentId}`).digest("hex");
+
+test("an order opened before the takedown still settles to hired (verify route; needs E2E_RZP_SECRET on runner and server)", { skip: !process.env.E2E_RZP_SECRET && "E2E_RZP_SECRET not set" }, async () => {
+  assert.ok(S.orderedId, "set by the withdraw test");
+  // The send-block test restored the listing; take it down again. The offer still has its (open) checkout, so it is left.
+  assert.equal((await td(S.wp, { reason: "settle after takedown" })).status, 200);
+  assert.ok((await row(S.wp)).taken_down_at, "precondition: the listing is down");
+  assert.equal(await status(S.orderedId), "accepted");
+  const orderId = `order_wd_${RUN}`;
+  const paymentId = `pay_wd_${RUN}`;
+  const r = await api(P.E.page, "POST", `/api/employer/${E.id}/payment/razorpay/verify`, { orderId, paymentId, signature: SIGN(orderId, paymentId) });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.hired, 1);
+  assert.equal(await status(S.orderedId), "hired", "decision (c): an order opened before the takedown settles normally");
+});
+
+test("order race: a takedown that commits after the early check but before the order insert refuses the order (409), no order row, not hired", async () => {
+  const racePid = await mkProject(E.id, `Order Race ${RUN}`);
+  const intern = await mkIntern("ordrace");
+  const offerId = await mkProposal(E.id, intern.id, racePid);
+  await one(SET_OFFER, [offerId, "accepted", offerJson()]);
+  const client = await db().connect();
+  let reply;
+  try {
+    await client.query("BEGIN");
+    await client.query(`UPDATE projects SET taken_down_at = now(), taken_down_by = $2, taken_down_reason = 'race' WHERE id = $1`, [racePid, ADMIN.id]);
+    // The early check cannot see the uncommitted takedown; the order must wait on the project row under the lock.
+    const inflight = order(offerId);
+    const early = await Promise.race([inflight, new Promise((ok) => setTimeout(() => ok("waiting"), 2500))]);
+    assert.equal(early, "waiting", `the order should wait on the project row lock, got ${JSON.stringify(early)}`);
+    await client.query("COMMIT");
+    reply = await inflight;
+  } finally {
+    await client.query("ROLLBACK").catch(() => {});
+    client.release();
+  }
+  assert.equal(reply.status, 409, JSON.stringify(reply.body));
+  assert.equal(reply.body.code, "listing_taken_down");
+  assert.equal(await status(offerId), "accepted", "not hired");
+  assert.equal((await one(`SELECT count(*)::int AS n FROM employer_payments WHERE employer_id = $1 AND raw::text LIKE $2`, [E.id, `%${offerId}%`])).n, 0, "no order row opened");
+});
+
+test("editing an accepted offer on a taken-down listing is refused (409 listing_taken_down) and the offer stays accepted; restored, the edit goes through", async () => {
+  const editPid = await mkProject(E.id, `Edit Role ${RUN}`);
+  assert.equal((await td(editPid, { reason: "edit block" })).status, 200);
+  const intern = await mkIntern("edit");
+  const offerId = await mkProposal(E.id, intern.id, editPid);
+  // Accepted after the takedown (as the legacy app could leave it); no open order.
+  await one(SET_OFFER, [offerId, "accepted", offerJson({ termsAcceptedAt: new Date().toISOString(), mode: "remote", shiftFrom: "09:00", shiftTo: "17:00", timezone: "Asia/Kolkata", laptop: "company" })]);
+  const edit = () => api(P.E.page, "PATCH", `/api/proposals/${offerId}`, { offer: { additionalInfo: "Bring a charger." } });
+  const r = await edit();
+  assert.equal(r.status, 409, JSON.stringify(r.body));
+  assert.equal(r.body.code, "listing_taken_down");
+  assert.equal(await status(offerId), "accepted", "not sent back to the intern");
+  assert.equal((await one(`SELECT offer_details ? 'reopenedAfterEditAt' AS reopened FROM proposals WHERE id = $1`, [offerId])).reopened, false);
+  assert.equal((await rows(`SELECT 1 FROM notifications WHERE recipient_id = $1 AND type = 'proposal_updated'`, [intern.id])).length, 0, "intern not told to accept again");
+  assert.equal((await restore(editPid)).status, 200);
+  const ok = await edit();
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(await status(offerId), "sent", "restored: an edit reopens the offer as before");
+});
+
+test("a failed audit write rolls the whole takedown back: project still up, offers untouched, no notice", async () => {
+  const auPid = await mkProject(E.id, `Audit Role ${RUN}`);
+  const intern = await mkIntern("audit");
+  const offerId = await mkProposal(E.id, intern.id, auPid);
+  await one(SET_OFFER, [offerId, "sent", offerJson()]);
+  // Scratch DB only: make the per-offer audit insert fail, after the project row is updated and the offer withdrawn.
+  await rows(`CREATE OR REPLACE FUNCTION td_fail_audit() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'audit write refused (test)'; END $$ LANGUAGE plpgsql`);
+  await rows(`CREATE TRIGGER td_fail_audit BEFORE INSERT ON admin_audit_log FOR EACH ROW WHEN (NEW.target_id = '${offerId}') EXECUTE FUNCTION td_fail_audit()`);
+  try {
+    const r = await td(auPid, { reason: "audit failure" });
+    assert.ok(r.status >= 500, `expected a server error, got ${r.status} ${JSON.stringify(r.body)}`);
+  } finally {
+    await rows(`DROP TRIGGER IF EXISTS td_fail_audit ON admin_audit_log`);
+    await rows(`DROP FUNCTION IF EXISTS td_fail_audit()`);
+  }
+  assert.equal((await row(auPid)).taken_down_at, null, "project not taken down");
+  assert.equal(await status(offerId), "sent", "offer not withdrawn");
+  assert.equal((await rows(`SELECT 1 FROM admin_audit_log WHERE target_id = ANY($1)`, [[auPid, offerId]])).length, 0, "no audit rows");
+  assert.equal((await rows(`SELECT 1 FROM notifications WHERE data->>'projectId' = $1`, [auPid])).length, 0, "no employer or intern notice");
+  assert.equal((await rows(`SELECT 1 FROM notifications WHERE recipient_id = $1`, [intern.id])).length, 0);
+  // With the trigger gone the same takedown succeeds.
+  assert.equal((await td(auPid, { reason: "audit failure" })).body.withdrawnOffers, 1);
 });
 
 // ── Roster-import retention (WP-I part 3): the cron route against the real table. ──

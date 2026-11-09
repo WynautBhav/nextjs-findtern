@@ -17,6 +17,11 @@ import { lockOpenOfferRows, notifyWithdrawnOffers, withdrawOpenOffers } from "./
  *
  * Restore does NOT revive the offers a takedown withdrew: they stay withdrawn and the employer
  * sends new ones.
+ *
+ * Taking down an already-down listing is a no-op (the row locks above are still taken first): it does
+ * not sweep offers that slipped in afterwards, for example ones the legacy app created. Restore and
+ * take down again to sweep those. Accepted offers with a checkout open are not withdrawn; they are
+ * counted and audited (`skippedOffers`) and the admin withdraws them by hand once the checkout lapses.
  */
 export async function applyTakedown(input: {
   projectId: string;
@@ -47,7 +52,7 @@ export async function applyTakedown(input: {
     if (plan.noop) return { kind: "noop" as const, down: Boolean(project.takenDownAt) };
 
     await tx.update(schema.projects).set({ ...plan.set, updatedAt: new Date() }).where(eq(schema.projects.id, input.projectId));
-    const withdrawn = input.action === "takedown" ? await withdrawOpenOffers(tx, { projectId: input.projectId, employerId: project.employerId }) : [];
+    const { withdrawn, skipped } = input.action === "takedown" ? await withdrawOpenOffers(tx, { projectId: input.projectId, employerId: project.employerId }) : { withdrawn: [], skipped: [] };
     // strict: if an audit row can't be written the takedown rolls back with it.
     await recordAdminAudit(tx, {
       adminId: input.adminId,
@@ -56,7 +61,7 @@ export async function applyTakedown(input: {
       targetId: input.projectId,
       meta: {
         projectName: project.projectName,
-        ...(input.action === "takedown" ? { reason: plan.set.takenDownReason, withdrawnOffers: withdrawn.length } : {}),
+        ...(input.action === "takedown" ? { reason: plan.set.takenDownReason, withdrawnOffers: withdrawn.length, skippedOffers: skipped.map((o) => o.id) } : {}),
       },
     }, { strict: true });
     for (const o of withdrawn) {
@@ -68,7 +73,7 @@ export async function applyTakedown(input: {
         meta: { projectId: input.projectId, projectName: project.projectName, internId: o.internId, previousStatus: o.previousStatus },
       }, { strict: true });
     }
-    return { kind: "changed" as const, project, reason: plan.set.takenDownReason, withdrawn };
+    return { kind: "changed" as const, project, reason: plan.set.takenDownReason, withdrawn, skipped };
   });
 
   if (out.kind === "missing") return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -79,6 +84,9 @@ export async function applyTakedown(input: {
   const name = out.project.projectName;
   const count = out.withdrawn.length;
   const withdrawnNote = count > 0 ? ` ${count === 1 ? "1 open offer on it was" : `${count} open offers on it were`} withdrawn.` : "";
+  // Neutral: accepted offers with a payment in progress are left as they are; the team closes them if the payment lapses.
+  const skippedCount = out.skipped.length;
+  const skippedNote = skippedCount > 0 ? ` ${skippedCount === 1 ? "1 accepted offer" : `${skippedCount} accepted offers`} with a payment in progress ${skippedCount === 1 ? "was" : "were"} left as it is.` : "";
   await notifyWithdrawnOffers(out.withdrawn, input.projectId);
   const site = tryPublicOrigin();
   try {
@@ -86,7 +94,7 @@ export async function applyTakedown(input: {
       to: { type: "employer", id: out.project.employerId },
       type: down ? "project_taken_down" : "project_restored",
       title: down ? "Your internship was taken down" : "Your internship is back up",
-      message: down ? `"${name}" was taken down by Findtern: ${out.reason}${withdrawnNote}` : `"${name}" is visible to candidates again.`,
+      message: down ? `"${name}" was taken down by Findtern: ${out.reason}${withdrawnNote}${skippedNote}` : `"${name}" is visible to candidates again.`,
       data: { projectId: input.projectId },
       dedupeKey: `project-takedown:${input.projectId}:${input.action}:${Date.now()}`,
       email:
@@ -97,7 +105,7 @@ export async function applyTakedown(input: {
               heading: down ? "Your internship was taken down" : "Your internship is back up",
               greeting: "Hello,",
               lines: down
-                ? [`"${name}" was taken down by Findtern and is no longer visible to candidates.`, `Reason: ${out.reason}`, ...(count > 0 ? [withdrawnNote.trim()] : []), "Contact support if you think this is a mistake."]
+                ? [`"${name}" was taken down by Findtern and is no longer visible to candidates.`, `Reason: ${out.reason}`, ...(count > 0 ? [withdrawnNote.trim()] : []), ...(skippedCount > 0 ? [skippedNote.trim()] : []), "Contact support if you think this is a mistake."]
                 : [`"${name}" was restored and is visible to candidates again.`],
               status: down ? "Taken down" : "Restored",
               tone: down ? "wait" : "done",
@@ -107,5 +115,5 @@ export async function applyTakedown(input: {
   } catch (err) {
     console.error("[admin/projects/takedown] notify failed", err);
   }
-  return NextResponse.json({ ok: true, takenDown: down, ...(down ? { withdrawnOffers: count } : {}) });
+  return NextResponse.json({ ok: true, takenDown: down, ...(down ? { withdrawnOffers: count, skippedOffers: skippedCount, skippedOfferIds: out.skipped.map((o) => o.id) } : {}) });
 }

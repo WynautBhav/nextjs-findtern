@@ -132,3 +132,31 @@ test("intern offer screens mark Accept unavailable with the reason; decline butt
   assert.match(read("intern/proposals/page.tsx"), /acceptBlocked=\{takenDown \? TAKEDOWN_BLOCKS\.accept : null\}/);
   assert.match(read("intern/proposals/[id]/page.tsx"), /acceptBlocked=\{takedownBlock\(project\.row, "accept"\)\}/);
 });
+
+// ── Revision 3 (wiring pins; the behaviour is in e2e/listing-takedown.e2e.mjs) ──
+
+test("openOrder re-checks the takedown under a shared project lock, inside the employer lock, before the order insert", () => {
+  const src = read("api/employer/[id]/payment/razorpay/order/route.ts");
+  const open = src.slice(src.indexOf("async function openOrder("), src.indexOf("export async function POST("));
+  const share = open.indexOf('.for("share", { of: schema.projects })');
+  assert.ok(share > 0, "FOR SHARE on the project rows only");
+  assert.ok(open.indexOf("takedownCheckedLineIds(paying)") < share, "same line rule as the early check");
+  assert.ok(share < open.indexOf(".insert(schema.employerPayments)"), "lock before the insert");
+  assert.match(open, /\.orderBy\(schema\.projects\.id\)/, "projects locked in id order");
+  assert.match(open, /listing_taken_down/);
+  assert.doesNotMatch(open, /\.for\("update"\)/, "never locks proposals here");
+});
+
+test("offer rows are locked in id order by accept and by a multi-offer settlement (the takedown locks in id order too)", () => {
+  assert.match(read("api/proposals/[id]/status/route.ts"), /\.where\(eq\(schema\.proposals\.internId, proposal\.internId\)\)\.orderBy\(schema\.proposals\.id\)\.for\("update"\)/);
+  const pay = readFileSync(join(APP, "../lib/payments.ts"), "utf8");
+  assert.match(pay, /\.orderBy\(schema\.proposals\.id\)\s+\.for\("update"\)/);
+  assert.ok(pay.indexOf('.orderBy(schema.proposals.id)') < pay.indexOf('status: "hired"'), "locked before the hire update");
+});
+
+test("editing an accepted offer is refused on a taken-down listing, before anything is written", () => {
+  const src = read("api/proposals/[id]/route.ts");
+  const at = src.indexOf('takedownBlock(project, "send")');
+  assert.ok(at > 0 && at < src.indexOf(".update(schema.proposals)"));
+  assert.match(src.slice(at - 400, at + 250), /proposal\.status === "accepted"[\s\S]*listing_taken_down[\s\S]*status: 409/);
+});

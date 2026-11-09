@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notify } from "@/lib/notify";
 import { hasOpenOrderFor } from "@/lib/payments";
+import { takedownBlock } from "@/lib/projects/takedown";
 import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
 import {
   hybridDaysOf,
@@ -95,6 +96,18 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   if (proposal.status === "accepted" && (await hasOpenOrderFor(proposal.employerId, proposal.id))) {
     return NextResponse.json({ error: "A payment for this offer is in progress. Try again in a few minutes." }, { status: 409 });
+  }
+
+  // Editing an accepted offer sends it back to the intern as `sent`. On a taken-down listing that
+  // would bring back an offer the takedown froze (the intern could not accept it anyway).
+  if (proposal.status === "accepted" && proposal.projectId) {
+    const [project] = await db
+      .select({ takenDownAt: schema.projects.takenDownAt })
+      .from(schema.projects)
+      .where(eq(schema.projects.id, proposal.projectId))
+      .limit(1);
+    const blocked = takedownBlock(project, "send");
+    if (blocked) return NextResponse.json({ error: blocked, code: "listing_taken_down" }, { status: 409 });
   }
 
   const current = (proposal.offerDetails ?? {}) as Record<string, unknown>;

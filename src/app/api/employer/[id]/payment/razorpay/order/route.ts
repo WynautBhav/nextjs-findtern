@@ -68,6 +68,8 @@ async function openConflict(q: Db | Tx, employerId: string, proposalIds: string[
   return null;
 }
 
+type Refusal = { error: string; code?: "listing_taken_down" };
+
 /**
  * Check and insert as one step per employer, so two requests at once (a double
  * click, two tabs) can't both pass the check and open two orders. Only database
@@ -80,10 +82,27 @@ async function openOrder(
   paying: PayableLine[],
   promoCode: string | undefined,
   row: typeof schema.employerPayments.$inferInsert,
-): Promise<string | null> {
-  return withLock(`employer-pay:${employerId}`, async (tx) => {
+): Promise<Refusal | null> {
+  return withLock(`employer-pay:${employerId}`, async (tx): Promise<Refusal | null> => {
     const conflict = await openConflict(tx, employerId, paying.map((l) => l.id), promoCode);
-    if (conflict) return conflict;
+    if (conflict) return { error: conflict };
+    // Takedown re-check for the new-hire lines, under a shared lock on the project rows (id order).
+    // The admin takedown holds FOR UPDATE on the project, so it either committed before this read
+    // (seen here) or waits until this order is committed, and then sees it and leaves the offer.
+    // Only the project rows are locked, never proposals, so this cannot deadlock with the takedown.
+    const hireIds = takedownCheckedLineIds(paying);
+    if (hireIds.length > 0) {
+      // Every project row is read (and so locked), not only taken-down ones: a lock on the rows that
+      // match a takenDownAt filter would leave a live project unlocked for the takedown to race.
+      const projects = await tx
+        .select({ takenDownAt: schema.projects.takenDownAt })
+        .from(schema.projects)
+        .innerJoin(schema.proposals, eq(schema.proposals.projectId, schema.projects.id))
+        .where(inArray(schema.proposals.id, hireIds))
+        .orderBy(schema.projects.id)
+        .for("share", { of: schema.projects });
+      if (projects.some((p) => p.takenDownAt)) return { error: TAKEDOWN_BLOCKS.pay, code: "listing_taken_down" };
+    }
     // The offers were priced before the lock. A request ahead of this one may
     // have paid them since (they read paid, not open), so confirm each is still
     // what was owed: an accepted hire, or the same month due as when priced.
@@ -93,7 +112,7 @@ async function openOrder(
         ? dues.get(l.id)?.monthsPaid !== l.due.monthsPaid
         : !open.some((p) => p.id === l.id && (p.status === "accepted" || p.status === "processing")),
     );
-    if (alreadyPaid) return "This was already paid. Refresh the page to see it under Orders.";
+    if (alreadyPaid) return { error: "This was already paid. Refresh the page to see it under Orders." };
     await tx.insert(schema.employerPayments).values(row);
     return null;
   });
@@ -195,7 +214,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       status: "created",
       raw: { notes, order: legacyOrderRaw({ id: orderId, amountMinor: charged, currency, notes }), testMode: true, ...(promo ? { promo } : {}) },
     });
-    if (refused) return NextResponse.json({ error: refused }, { status: 409 });
+    if (refused) return NextResponse.json(refused, { status: 409 });
     // An order that never settles is closed, or it would block the next try for 30 minutes.
     // The status guard leaves one alone once it has been paid.
     const close = () =>
@@ -226,7 +245,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       status: "created",
       raw: { notes, order: legacyOrderRaw({ id: order.id, amountMinor, currency, notes }), ...(promo ? { promo } : {}) },
     });
-    if (refused) return NextResponse.json({ error: refused }, { status: 409 });
+    if (refused) return NextResponse.json(refused, { status: 409 });
     return NextResponse.json({ orderId: order.id, amount: amountMinor, currency, keyId: razorpayKeyId() });
   } catch (e: unknown) {
     console.error("[employer/payment/razorpay/order]", e);

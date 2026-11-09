@@ -210,7 +210,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // two simultaneous acceptances queue instead of both winning.
   let expired: { id: string; employerId: string }[] = [];
   const updated = await db.transaction(async (tx) => {
-    await tx.select({ id: schema.proposals.id }).from(schema.proposals).where(eq(schema.proposals.internId, proposal.internId)).for("update");
+    // In id order, the same order the takedown locks a project's offers in, so the two cannot deadlock.
+    await tx.select({ id: schema.proposals.id }).from(schema.proposals).where(eq(schema.proposals.internId, proposal.internId)).orderBy(schema.proposals.id).for("update");
     // Re-check the takedown under a shared row lock: the admin takedown holds FOR UPDATE on the project
     // row, so it either committed before this read (seen here) or waits until this transaction ends.
     if (recordTerms && proposal.projectId) {

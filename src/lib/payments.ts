@@ -140,6 +140,16 @@ export async function settleEmployerOrder(input: {
     // Only the proposals this order paid for become hires. A month's instalment
     // for a running placement (dueProposalIds) is already hired: it is paid,
     // not hired again, and must not count as a missing hire.
+    // Lock the rows in id order first (the takedown and the accept take theirs in id order), so a
+    // takedown running at the same time cannot deadlock with a multi-offer settlement.
+    if (hireIds.length > 1) {
+      await tx
+        .select({ id: schema.proposals.id })
+        .from(schema.proposals)
+        .where(and(eq(schema.proposals.employerId, order.employerId), inArray(schema.proposals.id, hireIds)))
+        .orderBy(schema.proposals.id)
+        .for("update");
+    }
     const hired = hireIds.length === 0 ? [] : await tx
       .update(schema.proposals)
       .set({ status: "hired", hiredAt: new Date(), updatedAt: new Date() })

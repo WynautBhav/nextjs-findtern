@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, isNull } from "drizzle-orm";
 
 import { emails } from "@/lib/emails";
 import { getDb, schema } from "@/lib/db";
@@ -9,6 +9,12 @@ import { OPEN_ORDER_MINUTES } from "@/lib/payments";
 import { TAKEDOWN_WITHDRAW_STATUSES, takedownWithdraws } from "./takedown";
 
 type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
+
+/** An offer the takedown left alone that can end up stuck on the taken-down listing (see `withdrawOpenOffers`). */
+export interface SkippedOffer {
+  id: string;
+  previousStatus: string;
+}
 
 export interface WithdrawnOffer {
   id: string;
@@ -44,13 +50,25 @@ export async function lockOpenOfferRows(tx: Tx, projectId: string): Promise<void
  *
  * Restoring the project does NOT revive these: they stay withdrawn and the employer sends new ones.
  */
-export async function withdrawOpenOffers(tx: Tx, input: { projectId: string; employerId: string }): Promise<WithdrawnOffer[]> {
+export async function withdrawOpenOffers(
+  tx: Tx,
+  input: { projectId: string; employerId: string },
+): Promise<{ withdrawn: WithdrawnOffer[]; skipped: SkippedOffer[] }> {
   const candidates = await tx
     .select()
     .from(schema.proposals)
     .where(and(eq(schema.proposals.projectId, input.projectId), inArray(schema.proposals.status, [...TAKEDOWN_WITHDRAW_STATUSES])))
+    .orderBy(schema.proposals.id)
     .for("update");
-  if (candidates.length === 0) return [];
+  // Legacy "processing" (accepted, checkout open on the legacy site) is never withdrawn here; if that
+  // checkout is abandoned the offer is stuck, so it is reported like an accepted offer with an open order.
+  const processing = await tx
+    .select({ id: schema.proposals.id })
+    .from(schema.proposals)
+    .where(and(eq(schema.proposals.projectId, input.projectId), eq(schema.proposals.status, "processing"), isNull(schema.proposals.hiredAt)))
+    .orderBy(schema.proposals.id);
+  const skipped: SkippedOffer[] = processing.map((p) => ({ id: p.id, previousStatus: "processing" }));
+  if (candidates.length === 0) return { withdrawn: [], skipped };
 
   const open = await tx
     .select({ raw: schema.employerPayments.raw })
@@ -68,7 +86,11 @@ export async function withdrawOpenOffers(tx: Tx, input: { projectId: string; emp
   const now = new Date().toISOString();
   for (const p of candidates) {
     const offer = parseOffer(p.offerDetails, p.currency);
-    if (!takedownWithdraws({ status: p.status, hiredAt: p.hiredAt, fullTime: Boolean(offer.fullTime), hasOpenOrder: inOpenOrder.has(p.id) })) continue;
+    if (!takedownWithdraws({ status: p.status, hiredAt: p.hiredAt, fullTime: Boolean(offer.fullTime), hasOpenOrder: inOpenOrder.has(p.id) })) {
+      // Accepted with a checkout open. A full-time acceptance or a hired row is not stuck (its fee stays payable), so it is not listed.
+      if (p.status === "accepted" && !p.hiredAt && !offer.fullTime) skipped.push({ id: p.id, previousStatus: p.status });
+      continue;
+    }
     const base = (p.offerDetails ?? {}) as Record<string, unknown>;
     const [row] = await tx
       .update(schema.proposals)
@@ -81,16 +103,18 @@ export async function withdrawOpenOffers(tx: Tx, input: { projectId: string; emp
       .returning({ id: schema.proposals.id });
     if (row) out.push({ id: p.id, internId: p.internId, role: offer.roleTitle || "the role", previousStatus: p.status });
   }
-  return out;
+  return { withdrawn: out, skipped };
 }
 
 /**
  * After the commit: tell each intern their offer closed (the neutral "closed by Findtern" wording of
  * the admin withdraw, no blame) and clear their "you have an offer" prompts. The employer is told in
  * the takedown notice itself. Each failure costs one notification, never the committed takedown.
+ * A withdrawn draft is skipped: the intern never saw it, so there is nothing to close (the audit row stays).
  */
 export async function notifyWithdrawnOffers(offers: WithdrawnOffer[], projectId: string): Promise<void> {
   for (const o of offers) {
+    if (o.previousStatus === "draft") continue;
     try {
       await resolveOfferNotifications(o.internId, [o.id]);
       await notify({

@@ -32,7 +32,10 @@ export function TakedownAction({ id, name, takenDown }: { id: string; name: stri
       setOpen(false);
       setReason("");
       const n = Number(data.withdrawnOffers ?? 0);
-      setNotice(path === "takedown" ? (n > 0 ? `Taken down. ${n === 1 ? "1 open offer was" : `${n} open offers were`} withdrawn.` : "Taken down. No open offers to withdraw.") : null);
+      const left = Number(data.skippedOffers ?? 0);
+      const base = n > 0 ? `Taken down. ${n === 1 ? "1 open offer was" : `${n} open offers were`} withdrawn.` : "Taken down. No open offers to withdraw.";
+      const leftNote = left > 0 ? ` ${left === 1 ? "1 accepted offer" : `${left} accepted offers`} with an open checkout ${left === 1 ? "was" : "were"} left; withdraw ${left === 1 ? "it" : "them"} by hand after the checkout expires.` : "";
+      setNotice(path === "takedown" ? base + leftNote : null);
       router.refresh();
     } catch {
       setError("Network problem. Try again.");
