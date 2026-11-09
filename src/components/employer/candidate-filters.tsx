@@ -180,7 +180,7 @@ export function RatingSlider({
           ) : null}
           {label}
         </label>
-        <span className="nums text-sm font-semibold text-ink-900">{value > 0 ? `${value.toFixed(1)}+` : "Any"}</span>
+        <span className="nums rounded-md border border-ink-200 bg-ink-100 px-2 py-0.5 text-xs font-bold text-ink-900">{value > 0 ? `${value.toFixed(1)} / 10` : "Any"}</span>
       </div>
       <input
         id={id}

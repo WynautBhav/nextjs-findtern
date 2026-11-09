@@ -105,7 +105,7 @@ export function SkillFilter({
               scroll={false}
               className="group inline-flex min-h-9 items-center outline-none touch:min-h-11"
             >
-              <span className="inline-flex h-7 items-center gap-1 rounded-full bg-brand-100 pl-2.5 pr-1.5 text-[13px] font-medium text-brand-900 transition-colors group-hover:bg-brand-200 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
+              <span className="inline-flex h-7 items-center gap-1 rounded-lg bg-brand-100 pl-2.5 pr-1.5 text-[13px] font-medium text-brand-900 transition-colors group-hover:bg-brand-200 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
                 {skill}
                 <X className="size-3.5 text-brand-800/70" aria-hidden />
               </span>
@@ -156,7 +156,7 @@ export function SkillFilter({
             }}
             placeholder="Type a skill…"
             aria-label="Add a required skill"
-            className="h-9 w-full rounded-full border border-ink-200 bg-white px-3.5 text-base text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm touch:h-11"
+            className="h-9 w-full rounded-xl border border-ink-200 bg-white px-3.5 text-base text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm touch:h-11"
           />
           {open && (options.length > 0 || custom) ? (
             <ul id={listId} role="listbox" aria-label="Skill suggestions" className="absolute left-0 z-30 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-ink-200 bg-white py-1 shadow-lg">
@@ -199,7 +199,7 @@ export function SkillFilter({
           onClick={() => setAdding(true)}
           className="group inline-flex min-h-9 items-center outline-none touch:min-h-11"
         >
-          <span className="inline-flex h-7 items-center gap-1 rounded-full px-2.5 text-[13px] font-medium border border-dashed border-ink-300 text-ink-700 transition-colors group-hover:border-ink-400 group-hover:text-ink-900 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
+          <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium border border-dashed border-ink-300 text-ink-700 transition-colors group-hover:border-ink-400 group-hover:text-ink-900 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
             <Plus className="size-3.5" aria-hidden />
             Add skill
           </span>

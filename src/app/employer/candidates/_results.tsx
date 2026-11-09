@@ -49,7 +49,7 @@ export function CandidateSearch({ filters, className }: { filters: Filters; clas
         type="search"
         defaultValue={filters.q}
         placeholder="Skill or city"
-        className="h-11 w-full rounded-full border border-ink-200 bg-white pl-11 pr-4 text-base text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm"
+        className="h-11 w-full rounded-xl border border-ink-200 bg-ink-50 pl-11 pr-4 text-base text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:bg-white focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm"
       />
     </form>
   );
@@ -66,6 +66,53 @@ function sortOptions(filters: Filters) {
   ];
 }
 
+/**
+ * What narrows the list besides the skill tokens: each chip drops its filter,
+ * "Clear all" resets to the project's defaults. Rendered once, in the toolbar
+ * card above the columns, so the Filters sheet, the card and this row all say
+ * the same count.
+ */
+export function ActiveFilters({ data, filters, className }: { data: CandidatesData; filters: Filters; className?: string }) {
+  const projectCity = data.projectApplied?.city ?? "";
+  const chips = filters.saved
+    ? []
+    : [
+        ...activeChips(filters),
+        // The project's own city narrows the list too: say so, and let it be dropped like the others.
+        ...(projectCity ? [{ key: "project-city", label: `City: ${projectCity} (from project)`, href: withoutCity(filters, data.effectiveSkills) }] : []),
+      ];
+  if (chips.length === 0) return null;
+  return (
+    <div className={cn("flex flex-wrap items-center gap-x-1", className)}>
+      <span aria-hidden className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-text-subtle max-lg:hidden">
+        Active filters
+      </span>
+      <ul aria-label="Active filters" className="contents">
+        {chips.map((chip) => (
+          <li key={chip.key}>
+            <Link
+              href={chip.href}
+              scroll={false}
+              aria-label={`Remove filter: ${chip.label}`}
+              className="group inline-flex min-h-9 items-center outline-none touch:min-h-11"
+            >
+              <span className="inline-flex h-7 items-center gap-1 rounded-lg border border-ink-200 bg-ink-100 pl-2.5 pr-2 text-[13px] font-medium text-ink-800 transition-colors group-hover:bg-ink-200 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
+                {chip.label}
+                <X className="size-3.5 text-ink-500" aria-hidden />
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {showClearAll(chips.map((chip) => chip.key)) ? (
+        <Link href={resetHref(data.activeProjectId)} className="inline-flex min-h-9 items-center px-2 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11 lg:ml-auto">
+          Clear all
+        </Link>
+      ) : null}
+    </div>
+  );
+}
+
 export function Results({
   data,
   filters,
@@ -80,15 +127,12 @@ export function Results({
   const compareLink = (id: string) =>
     compareIds.includes(id) || !compareFull ? withFilters(filters, { ids: toggle(compareIds, id) }) : null;
   const projectCity = data.projectApplied?.city ?? "";
-  const chips = filters.saved
-    ? []
-    : [
-        ...activeChips(filters),
-        // The project's own city narrows the list too: say so, and let it be dropped like the others.
-        ...(projectCity ? [{ key: "project-city", label: `City: ${projectCity} (from project)`, href: withoutCity(filters, data.effectiveSkills) }] : []),
-      ];
   const reset = resetHref(data.activeProjectId);
   const saved = filters.saved && Boolean(data.activeProjectId);
+  const firstShown = (filters.page - 1) * filters.pageSize + 1;
+  const lastShown = firstShown + candidates.length - 1;
+  const pageLink =
+    "inline-flex h-10 items-center rounded-xl bg-ink-100 px-3.5 text-sm font-medium text-ink-700 outline-none hover:bg-ink-200 hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 touch:h-11";
   const sortValue = filters.sorts[0] ? `${filters.sorts[0]}${filters.dir === "asc" ? ":asc" : ""}` : "";
   const projectName = data.projects.find((p) => p.id === data.activeProjectId)?.projectName;
   const projectKeep = (id: string) => {
@@ -100,7 +144,7 @@ export function Results({
   return (
     <>
       {/* One results bar: count and project, then All | Shortlist and Sort. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-ink-100 pb-3 sm:pb-4">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-ink-100 pb-3 sm:pb-4 lg:border-b-0 lg:pb-5">
         {/* lg and up: hide or show the filter column (phones have the Filters sheet). */}
         <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(filters, data.effectiveSkills, projectCity)} />
         {loadFailed ? null : (
@@ -142,40 +186,13 @@ export function Results({
           ) : null}
           {saved ? null : (
             <SortSelect
-              className="h-11 rounded-full border-ink-200 pl-3.5 [field-sizing:content] sm:h-9 sm:min-h-9 sm:touch:h-11"
+              className="h-11 rounded-xl border-ink-200 bg-white pl-3.5 [field-sizing:content] sm:h-9 sm:min-h-9 sm:touch:h-11"
               value={sortValue}
               options={sortOptions(filters)}
             />
           )}
         </div>
       </div>
-
-      {chips.length > 0 ? (
-        <ul aria-label="Active filters" className="flex flex-wrap items-center gap-x-1 pt-3">
-          {chips.map((chip) => (
-            <li key={chip.key}>
-              <Link
-                href={chip.href}
-                scroll={false}
-                aria-label={`Remove filter: ${chip.label}`}
-                className="group inline-flex min-h-9 items-center touch:min-h-11"
-              >
-                <span className="inline-flex h-7 items-center gap-1 rounded-full bg-ink-100 pl-2.5 pr-2 text-[13px] font-medium text-ink-800 transition-colors group-hover:bg-ink-200">
-                  {chip.label}
-                  <X className="size-3.5 text-ink-500" aria-hidden />
-                </span>
-              </Link>
-            </li>
-          ))}
-          {showClearAll(chips.map((chip) => chip.key)) ? (
-            <li>
-              <Link href={reset} className="inline-flex min-h-9 items-center px-2 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
-                Clear all
-              </Link>
-            </li>
-          ) : null}
-        </ul>
-      ) : null}
 
       {loadFailed ? (
         <LoadError what="the candidate pool" retryHref={withFilters(filters)} email={SITE.adminEmail} />
@@ -231,8 +248,7 @@ export function Results({
       ) : (
         <>
           <ScoreLegend />
-          {/* Thin dividers, no box per row: one list. */}
-          <ul className="mt-1 divide-y divide-ink-100">
+          <ul aria-label="Candidates" className="mt-3 flex flex-col gap-4 lg:mt-1 lg:gap-5">
             {candidates.map((candidate) => {
               const rel = data.relations.get(candidate.id);
               return (
@@ -260,28 +276,44 @@ export function Results({
             })}
           </ul>
 
-          {pages > 1 ? (
-            <nav aria-label="Pagination" className="mt-6 flex flex-wrap items-center justify-center gap-1.5 border-t border-ink-100 pt-6">
-              {Array.from({ length: pages }, (_, i) => i + 1)
-                .filter((page) => page === 1 || page === pages || Math.abs(page - filters.page) <= 1)
-                .map((page, i, visible) => (
-                  <span key={page} className="flex items-center gap-1.5">
-                    {i > 0 && visible[i - 1] !== page - 1 ? <span className="px-1 text-ink-400">…</span> : null}
-                    <Link
-                      href={withFilters(filters, { page: page === 1 ? "" : page })}
-                      aria-current={page === filters.page ? "page" : undefined}
-                      aria-label={`Page ${page}`}
-                      className={cn(
-                        "nums grid size-10 place-items-center rounded-full text-sm font-medium touch:size-11",
-                        page === filters.page ? "bg-ink-900 text-white" : "text-ink-700 hover:bg-ink-100",
-                      )}
-                    >
-                      {page}
-                    </Link>
-                  </span>
-                ))}
-            </nav>
-          ) : null}
+          {/* "Showing 1-4 of 24", then the page links when there is more than one page. */}
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-xs sm:p-5">
+            <p className="nums text-sm text-ink-600">
+              Showing <strong className="font-semibold text-ink-900">{firstShown}&ndash;{lastShown}</strong> of <strong className="font-semibold text-ink-900">{total}</strong> candidate{total === 1 ? "" : "s"}
+            </p>
+            {pages > 1 ? (
+              <nav aria-label="Pagination" className="flex flex-wrap items-center gap-1.5">
+                {filters.page > 1 ? (
+                  <Link href={withFilters(filters, { page: filters.page - 1 === 1 ? "" : filters.page - 1 })} className={pageLink}>
+                    Previous
+                  </Link>
+                ) : null}
+                {Array.from({ length: pages }, (_, i) => i + 1)
+                  .filter((page) => page === 1 || page === pages || Math.abs(page - filters.page) <= 1)
+                  .map((page, i, visible) => (
+                    <span key={page} className="flex items-center gap-1.5">
+                      {i > 0 && visible[i - 1] !== page - 1 ? <span className="px-1 text-ink-400">…</span> : null}
+                      <Link
+                        href={withFilters(filters, { page: page === 1 ? "" : page })}
+                        aria-current={page === filters.page ? "page" : undefined}
+                        aria-label={`Page ${page}`}
+                        className={cn(
+                          "nums grid size-10 place-items-center rounded-xl text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 touch:size-11",
+                          page === filters.page ? "bg-ink-900 text-white" : "text-ink-800 hover:bg-ink-100",
+                        )}
+                      >
+                        {page}
+                      </Link>
+                    </span>
+                  ))}
+                {filters.page < pages ? (
+                  <Link href={withFilters(filters, { page: filters.page + 1 })} className={cn(pageLink, "text-ink-900")}>
+                    Next
+                  </Link>
+                ) : null}
+              </nav>
+            ) : null}
+          </div>
         </>
       )}
     </>

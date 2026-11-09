@@ -150,7 +150,7 @@ export function FilterPanel({
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        className="inline-flex h-11 items-center gap-2 rounded-full border border-ink-200 bg-white px-4 text-sm font-medium text-ink-900 outline-none hover:border-ink-300 focus-visible:ring-2 focus-visible:ring-brand-500"
+        className="inline-flex h-11 items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 text-sm font-medium text-ink-900 outline-none hover:border-ink-300 focus-visible:ring-2 focus-visible:ring-brand-500"
       >
         <SlidersHorizontal className="size-4" aria-hidden />
         Filters

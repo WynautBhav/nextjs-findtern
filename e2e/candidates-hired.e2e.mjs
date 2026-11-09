@@ -70,7 +70,7 @@ async function read(ctx, path) {
     assert.equal(res.status(), 200, `${path} → ${res.status()}`);
     await page.locator('h2 [role="status"]').first().waitFor();
     const heading = (await page.locator('h2 [role="status"]').first().innerText()).trim();
-    const hrefs = await page.locator('ul.divide-y a[href^="/employer/intern/"]').evaluateAll((els) => els.map((e) => e.getAttribute("href")));
+    const hrefs = await page.locator('ul[aria-label="Candidates"] a[href^="/employer/intern/"]').evaluateAll((els) => els.map((e) => e.getAttribute("href")));
     const ids = [...new Set(hrefs.map((h) => h.split("/")[3].split("?")[0]))];
     // count() answers at once when the element is absent; innerText() would wait out the 20s timeout.
     const text = async (locator) => ((await locator.count()) ? (await locator.first().innerText()).replace(/\s+/g, " ").trim() : "");

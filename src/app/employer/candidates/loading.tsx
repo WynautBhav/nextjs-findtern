@@ -15,8 +15,8 @@ export default function CandidatesLoading() {
       <Skeleton className="mb-4 h-8 w-44 rounded-apple-sm lg:mb-6" />
 
       <div className="flex gap-2">
-        <Skeleton className="h-11 min-w-0 flex-1 rounded-full lg:max-w-[44rem]" />
-        <Skeleton className="h-11 w-28 shrink-0 rounded-full lg:hidden" />
+        <Skeleton className="h-11 min-w-0 flex-1 rounded-xl lg:max-w-[44rem]" />
+        <Skeleton className="h-11 w-28 shrink-0 rounded-xl lg:hidden" />
       </div>
       <div className="mb-3 mt-3 flex gap-2 lg:mb-6">
         <Skeleton className="h-7 w-20 rounded-full" />
@@ -36,28 +36,25 @@ export default function CandidatesLoading() {
         <div className="min-w-0">
           <div className="flex items-center justify-between gap-3 border-b border-ink-100 pb-3">
             <Skeleton className="h-6 w-48 rounded-apple-sm" />
-            <Skeleton className="h-9 w-40 rounded-full" />
+            <Skeleton className="h-9 w-40 rounded-xl" />
           </div>
-          <ul className="divide-y divide-ink-100">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <li key={i} className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3.5 gap-y-3 py-5 sm:gap-x-5 sm:py-6">
-                <Skeleton className="size-12 rounded-full sm:size-14" />
-                <div className="min-w-0 space-y-2">
-                  <Skeleton className="h-4 w-10 rounded-apple-sm" />
-                  <Skeleton className="h-5 w-64 max-w-full rounded-apple-sm" />
-                  <Skeleton className="h-3.5 w-24 rounded-apple-sm" />
-                </div>
-                <div className="flex gap-1.5">
-                  <Skeleton className="size-11 rounded-full sm:size-9" />
-                  <Skeleton className="hidden h-9 w-36 rounded-full sm:block" />
-                </div>
-                <div className="col-span-3 space-y-3 sm:col-span-2 sm:col-start-2">
-                  <Skeleton className="h-4 w-72 max-w-full rounded-apple-sm" />
-                  <div className="flex flex-wrap gap-1.5">
-                    {Array.from({ length: 4 }).map((__, j) => (
-                      <Skeleton key={j} className="h-7 w-20 rounded-full" />
-                    ))}
+          <ul className="flex flex-col gap-4 lg:gap-5">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <li key={i} className="flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-4 sm:gap-5 sm:p-6">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <Skeleton className="size-12 rounded-2xl sm:size-14" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-5 w-24 rounded-apple-sm" />
+                    <Skeleton className="h-3.5 w-40 max-w-full rounded-apple-sm" />
                   </div>
+                  <Skeleton className="h-10 w-24 rounded-xl" />
+                </div>
+                <Skeleton className="h-6 w-72 max-w-full rounded-apple-sm" />
+                <Skeleton className="h-20 w-full rounded-xl" />
+                <div className="flex flex-wrap gap-1.5">
+                  {Array.from({ length: 4 }).map((__, j) => (
+                    <Skeleton key={j} className="h-7 w-20 rounded-lg" />
+                  ))}
                 </div>
               </li>
             ))}

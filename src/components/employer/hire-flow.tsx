@@ -28,17 +28,17 @@ const STEPS: Step[] = [
  * on both, says where each candidate is and links every stage, so paying
  * reads as the last step of the shortlist rather than a separate shop.
  */
-export function HireFlow({ counts, current }: { counts: HireFlowCounts; current: FlowPage | null }) {
+export function HireFlow({ counts, current, currentCount = null }: { counts: HireFlowCounts; current: FlowPage | null; /** A count for the current step when it has none of its own (Candidates: the list total). */ currentCount?: number | null }) {
   const currentKey = currentStepKey(current);
   // One line, not four cards: it says where the page sits in the flow and
   // links each stage, without competing with the page's own content.
   return (
-    <nav aria-label="Hiring steps" className="relative mb-3 sm:mb-6">
+    <nav aria-label="Hiring steps" className="relative mb-3 sm:mb-5 sm:rounded-xl sm:border sm:border-ink-200 sm:bg-white sm:p-1.5 sm:shadow-xs">
       <FlowScroll className="relative flex items-center gap-x-0 gap-y-1 overflow-x-auto text-[13px] max-sm:-m-1.5 max-sm:p-1.5 [scrollbar-width:none] sm:flex-wrap sm:gap-x-1 sm:gap-y-2 sm:overflow-visible sm:text-sm [&::-webkit-scrollbar]:hidden">
         {STEPS.map((s, i) => {
           const active = s.key === currentKey;
           // Finding candidates is the start of the path, not a queue: no count.
-          const n = s.key === "candidates" ? null : counts[s.key];
+          const n = s.key === "candidates" ? (active ? currentCount : null) : counts[s.key];
           return (
             <li key={s.key} className="flex shrink-0 items-center gap-1">
               <Link
@@ -46,13 +46,13 @@ export function HireFlow({ counts, current }: { counts: HireFlowCounts; current:
                 aria-current={active ? "step" : undefined}
                 title={s.hint}
                 className={cn(
-                  "apple-spring inline-flex min-h-10 items-center gap-1 whitespace-nowrap rounded-full sm:gap-1.5 px-2 sm:px-3 touch:min-h-11",
-                  active ? "bg-brand-50 font-semibold text-brand-800" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
+                  "apple-spring inline-flex min-h-10 items-center gap-1 whitespace-nowrap rounded-full px-2 sm:gap-2 sm:rounded-lg sm:px-4 touch:min-h-11",
+                  active ? "bg-brand-50 font-semibold text-brand-800 sm:bg-ink-100 sm:text-ink-900" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
                 )}
               >
                 {s.key === "hired" && n !== null && n > 0 && !active ? <Check className="size-3.5" aria-hidden /> : null}
                 {s.label}
-                {n === null ? null : <span className={cn("nums", active ? "text-brand-700" : "text-text-subtle")}>{n}</span>}
+                {n === null ? null : <span className={cn("nums", active ? "text-brand-700 sm:rounded-full sm:bg-white sm:px-2 sm:py-0.5 sm:text-xs sm:font-bold sm:text-ink-900" : "text-text-subtle")}>{n}</span>}
               </Link>
               {/* After the step, so a wrap never starts a line with a chevron (QA-124). */}
               {i < STEPS.length - 1 ? <ChevronRight className="size-4 shrink-0 text-ink-300 max-sm:hidden" aria-hidden /> : null}

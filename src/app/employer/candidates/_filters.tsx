@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, Plus, RotateCcw } from "lucide-react";
+import { ChevronDown, Plus, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import { RATING_META } from "@/lib/employer-candidates";
 import { resolvePricing, type Currency } from "@/lib/employer-pricing";
@@ -57,7 +57,7 @@ export function FilterColumn({
     <aside
       aria-label="Filters"
       className={cn(
-        "lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:pb-2",
+        "lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-6 lg:shadow-xs",
         // Still scrollable, but the track only shows on hover or focus, so it does not read as a nested box.
         "lg:[scrollbar-color:transparent_transparent] lg:[scrollbar-width:thin] lg:hover:[scrollbar-color:var(--color-ink-300)_transparent] lg:focus-within:[scrollbar-color:var(--color-ink-300)_transparent]",
       )}
@@ -70,6 +70,16 @@ export function FilterColumn({
         {filters.sorts.length > 0 ? <input type="hidden" name="sort" value={filters.sorts.join(",")} /> : null}
         {filters.dir === "asc" ? <input type="hidden" name="dir" value="asc" /> : null}
 
+        {/* lg: the card's own header. Phones get "Filters" from the sheet title. */}
+        <div className="mb-1 flex items-center justify-between border-b border-ink-100 pb-3 max-lg:hidden">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-ink-900">
+            <SlidersHorizontal className="size-[18px] text-ink-600" aria-hidden />
+            Filters
+          </h2>
+          <Link href={resetHref(activeProjectId)} className="inline-flex min-h-9 items-center px-1 text-[13px] font-medium text-text-subtle underline-offset-4 hover:text-ink-900 hover:underline touch:min-h-11">
+            Reset
+          </Link>
+        </div>
         <div className="divide-y divide-ink-100">
           {/* Project: the results bar picks it from lg up; the phone sheet needs it here. */}
           <div className="pb-4 lg:hidden">
@@ -116,7 +126,7 @@ export function FilterColumn({
             <RatingSlider name="min" label="Minimum score" defaultValue={filters.minScore} />
           </Group>
 
-          <Group title="Hourly price" open={Boolean(filters.plan)}>
+          <Group title="Hourly price" open>
             <label htmlFor="filter-plan" className="sr-only">
               Hourly price
             </label>
@@ -130,7 +140,7 @@ export function FilterColumn({
             </select>
           </Group>
 
-          <Group title="Availability" open={Boolean(filters.mode) || filters.laptop === "yes"}>
+          <Group title="Availability" open>
             <label htmlFor="filter-mode" className="text-sm text-ink-700">
               Work mode
             </label>
@@ -170,8 +180,8 @@ export function FilterColumn({
           </Group>
 
           {/* Filters apply as they change (QA-125): no Apply. On a phone "Show results" closes the sheet. */}
-          <div className="flex items-center gap-2 pt-3">
-            <Link href={resetHref(activeProjectId)} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-700 underline-offset-4 hover:text-ink-900 hover:underline">
+          <div className="flex items-center gap-2 pt-3 lg:hidden">
+            <Link href={resetHref(activeProjectId)} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-700 underline-offset-4 hover:text-ink-900 hover:underline lg:hidden">
               <RotateCcw className="size-3.5" aria-hidden />
               Reset filters
             </Link>
