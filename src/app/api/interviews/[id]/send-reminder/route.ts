@@ -3,11 +3,11 @@ import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
 import { hiredProposalSql } from "@/lib/employer-visibility";
+import { emails } from "@/lib/emails";
 import { formatSlotTime } from "@/lib/format";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { hasNoSlotsToPick, isMeetingOver, isStaleInterview, normalizeMeetingLink, reminderWindow } from "@/lib/employer-interview-rules";
-import { requirePublicOrigin } from "@/lib/origin";
 import { limiters } from "@/lib/security/rate-limit";
 
 /**
@@ -69,14 +69,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     message: text,
     data: { interviewId: id, meetingLink: link },
     dedupeKey: `employer_reminder:${id}:${window}`,
-    email: {
-      subject: "Interview reminder | Findtern",
-      heading: interview.status === "pending" ? "Pick your interview slot" : "Your interview is coming up",
-      greeting: `Hi ${(await internFirstName(interview.internId)) || "there"},`,
-      lines: [text],
-      facts: link ? [["Meet link", link]] : undefined,
-      cta: { label: "Open interviews", url: `${requirePublicOrigin()}/intern/interviews` },
-    },
+    email: emails.interviewReminder({
+      name: (await internFirstName(interview.internId)) || "there",
+      pending: interview.status === "pending",
+      text,
+      link,
+    }),
   });
   // A booked meeting reminds both sides (legacy routes.ts:11797): the
   // employer gets an in-app note keyed the same way.

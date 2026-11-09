@@ -321,6 +321,17 @@ export const emails = {
   }),
 
   /** Findtern added the meeting link by hand; no company name, the intern may not see it yet. */
+  /** The employer's nudge about a pending or scheduled interview (send-reminder route). `text` is the same line as the in-app note. */
+  interviewReminder: (o: { name: string; pending: boolean; text: string; link: string | null }): EmailContent => ({
+    subject: "Interview reminder | Findtern",
+    preheader: o.pending ? "An employer is waiting for you to pick an interview slot." : "An interview you booked is coming up.",
+    heading: o.pending ? "Pick your interview slot" : "Your interview is coming up",
+    greeting: hi(o.name),
+    lines: [o.text],
+    facts: o.link ? [["Meet link", o.link]] : undefined,
+    cta: ctaTo("Open interviews", "/intern/interviews"),
+  }),
+
   interviewLinkReady: (o: { name: string; link: string; forEmployer: boolean }): EmailContent => ({
     subject: "Your interview link is ready | Findtern",
     preheader: "The link is below and in your dashboard.",
