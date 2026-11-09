@@ -354,6 +354,15 @@ test("7 redemption: waiver payment, entitlement, verified membership; every refu
   const bound = await redeem(r2, await codeForRow(A.importId, 1));
   assert.equal(bound.status, 403);
   assert.equal((await rows("SELECT 1 FROM drive_entitlements WHERE intern_id = $1", [P.r2.id])).length, 0);
+  // Signed in with the wrong role: an admin and a placement officer are refused (403) and redeem nothing,
+  // even with a valid, unbound, unused code (row 7, which a student could redeem right now) and the CSRF header.
+  const unusedCode = await codeForRow(A.importId, 7);
+  for (const [who, page] of [["admin", admin], ["college officer", tpo]]) {
+    const r = await redeem(page, unusedCode);
+    assert.equal(r.status, 403, `${who} redeem got ${r.status}`);
+  }
+  assert.equal((await one("SELECT status FROM drive_codes WHERE entry_id = (SELECT id FROM drive_roster_entries WHERE import_id = $1 AND row_no = 7)", [A.importId])).status, "issued", "a wrong-role call leaves the code unused");
+  assert.equal((await one("SELECT redeemed_count FROM college_drive_orders WHERE id = $1", [A.orderId])).redeemed_count, 1, "a wrong-role call redeems nothing");
   // Expired code (row 7).
   await rows("UPDATE drive_codes SET valid_until = now() - interval '1 day' WHERE entry_id = (SELECT id FROM drive_roster_entries WHERE import_id = $1 AND row_no = 7)", [A.importId]);
   assert.equal((await redeem(r2, await codeForRow(A.importId, 7))).status, 410);
@@ -462,6 +471,10 @@ test("11a refunds: scan copies the paid amount once; a consumed interview goes t
   }
   await rows("UPDATE drive_entitlements SET interview_status = 'completed' WHERE intern_id = $1", [R.interns[1].id]);
   const ids = R.interns.map((i) => i.id);
+  const [adminRow] = await rows("SELECT id FROM admins WHERE email = $1", [ADMIN.email]);
+  R.adminId = adminRow.id;
+  const scans = async () => (await one("SELECT count(*)::int AS n FROM admin_audit_log WHERE action = 'refund.create' AND admin_id = $1", [R.adminId])).n;
+  const scansBefore = await scans();
   const scan = await send(admin, "POST", "/api/admin/refunds");
   assert.equal(scan.status(), 200, await scan.text());
   const refundsFor = () => rows("SELECT r.id, r.amount_minor, r.status, r.reason, p.intern_id FROM payment_refunds r JOIN intern_payments p ON p.id = r.intern_payment_id WHERE p.intern_id = ANY($1::text[]) ORDER BY p.intern_id", [ids]);
@@ -474,6 +487,8 @@ test("11a refunds: scan copies the paid amount once; a consumed interview goes t
   assert.equal(byIntern[R.interns[1].id].reason, "interview_consumed");
   R.first = byIntern[R.interns[0].id];
   R.second = byIntern[R.interns[1].id];
+  // The scan is an admin action: it leaves one refund.create audit row, written by this admin.
+  assert.equal(await scans(), scansBefore + 1, "the scan wrote one refund.create audit row, by this admin");
   // A second scan creates nothing for these payments.
   await send(admin, "POST", "/api/admin/refunds");
   assert.equal((await refundsFor()).length, 2);
@@ -494,6 +509,8 @@ test("11b refunds: initiate needs confirm and the equal amount; with no Razorpay
   assert.ok(wrong.status() >= 400 && wrong.status() < 500);
   assert.equal((await json(wrong)).reason, "amount_mismatch");
   assert.equal((await status()).status, "eligible", "a refused initiate changes nothing");
+  const audits = () => rows("SELECT admin_id, target_type, meta FROM admin_audit_log WHERE action = 'refund.initiate' AND target_id = $1", [R.first.id]);
+  assert.equal((await audits()).length, 0, "a refused initiate (no confirm, wrong amount) writes no audit row");
   // Server env has RAZORPAY_KEY_ID/SECRET blank (e2e/run.mjs): the gateway call cannot succeed.
   const go = await send(admin, "POST", url, { confirm: true, amountMinor: 250000 });
   assert.equal(go.ok(), false, "must not report success without a gateway");
@@ -501,9 +518,18 @@ test("11b refunds: initiate needs confirm and the equal amount; with no Razorpay
   assert.notEqual(after.status, "refunded");
   assert.ok(["failed", "initiated"].includes(after.status), `status ${after.status}`);
   assert.equal(after.gateway_refund_id, null);
+  // The attempt reached the gateway step, so it is audited: who, which refund, how much, and how it ended.
+  const logged = await audits();
+  assert.equal(logged.length, 1, "exactly one refund.initiate audit row for the attempt");
+  assert.equal(logged[0].admin_id, R.adminId, "the audit row names the admin who initiated");
+  assert.equal(logged[0].target_type, "payment_refunds");
+  assert.equal(logged[0].meta.refundId, R.first.id);
+  assert.equal(logged[0].meta.amountMinor, 250000);
+  assert.ok(["initiated", "gateway_error", "gateway_unknown"].includes(logged[0].meta.outcome), `outcome ${logged[0].meta.outcome}`);
   // No second attempt on the same row.
   const again = await send(admin, "POST", url, { confirm: true, amountMinor: 250000 });
   assert.equal(again.ok(), false);
+  assert.equal((await audits()).length, 1, "a refused repeat writes no second audit row");
 });
 
 const webhookBody = (refundId) => JSON.stringify({ event: "refund.processed", payload: { refund: { entity: { id: refundId, status: "processed" } } } });

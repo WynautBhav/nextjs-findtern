@@ -14,7 +14,7 @@ test("entry binding", () => {
   assert.equal(entryBindingDecision("u2", "u1"), "refuse");
 });
 
-function fakeClient(opts: { entryIntern: string | null; codeStatus?: string; paid?: boolean }) {
+function fakeClient(opts: { entryIntern: string | null; codeStatus?: string; paid?: boolean; orderStatus?: string }) {
   const log: string[] = [];
   const client = {
     async query(sql: string, params: unknown[] = []) {
@@ -26,7 +26,7 @@ function fakeClient(opts: { entryIntern: string | null; codeStatus?: string; pai
         assert.equal(params[0], hashDriveCode(code, secret));
         return r([{ id: "k1", order_id: "o1", status: opts.codeStatus ?? "issued", valid_until: "2027-01-01" }]);
       }
-      if (sql.includes("FROM college_drive_orders WHERE id")) return r([{ id: "o1", college_id: "c1", status: "paid" }]);
+      if (sql.includes("FROM college_drive_orders WHERE id")) return r([{ id: "o1", college_id: "c1", status: opts.orderStatus ?? "paid" }]);
       if (sql.startsWith("UPDATE drive_codes") || sql.startsWith("UPDATE college_drive_orders")) return r([], 1);
       if (sql.includes("INSERT INTO drive_entitlements")) return r([{ id: "ent1" }]);
       if (sql.includes("FROM intern_payments")) return r(opts.paid ? [{ "?column?": 1 }] : []);
@@ -61,4 +61,13 @@ test("already redeemed is 409; an already-activated student is 409; no 18+ tick 
   await assert.rejects(redeemDriveCode(fakeClient({ entryIntern: "u1", codeStatus: "redeemed" }).client, input), (e) => e instanceof RedeemRefused && e.status === 409);
   await assert.rejects(redeemDriveCode(fakeClient({ entryIntern: null, paid: true }).client, input), (e) => e instanceof RedeemRefused && e.status === 409);
   await assert.rejects(redeemDriveCode(fakeClient({ entryIntern: null }).client, { ...input, declaredAdult: false }), (e) => e instanceof RedeemRefused && e.status === 400);
+});
+
+test("a drive whose order is not paid refuses with 402 and writes no payment, consent or membership", async () => {
+  for (const orderStatus of ["pending", "failed", "refunded"]) {
+    const { client, log } = fakeClient({ entryIntern: null, orderStatus });
+    await assert.rejects(redeemDriveCode(client, input), (e) => e instanceof RedeemRefused && e.status === 402 && /not active/.test(e.publicMessage), orderStatus);
+    assert.ok(!log.some((s) => s.startsWith("INSERT")), `${orderStatus}: no insert ran`);
+    assert.ok(!log.some((s) => s.startsWith("UPDATE drive_roster_entries")), `${orderStatus}: the entry stayed unbound`);
+  }
 });

@@ -126,3 +126,12 @@ test("a student who already holds a seat on the order gets 409, not a server err
   const r = await f.run((tx) => redeemInTransaction(tx, inp("u1")));
   assert.equal(!r.ok && r.status, 409);
 });
+
+test("an order that is not paid (pending, failed, refunded) refuses with 402 and changes nothing", async () => {
+  for (const orderStatus of ["pending", "failed", "refunded"]) {
+    const f = fake({ orderStatus });
+    const r = await f.run((tx) => redeemInTransaction(tx, inp("u1")));
+    assert.deepEqual(!r.ok && [r.reason, r.status], ["order_unpaid", 402], orderStatus);
+    assert.deepEqual([f.st.codeStatus, f.st.redeemed, f.st.ents.length], ["issued", 0, 0], `${orderStatus}: nothing was written`);
+  }
+});
