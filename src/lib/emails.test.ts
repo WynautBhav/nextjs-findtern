@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { emails, renderEmail, type EmailContent } from "./emails.ts";
+import { driveCodeEmail, emails, renderEmail, type EmailContent } from "./emails.ts";
 
 process.env.PUBLIC_ORIGIN = "http://localhost:3000";
 
@@ -118,4 +118,26 @@ test("unread fallback mail makes no claim about how long it was unread", () => {
     assert.ok(!/\b15\s*min|minutes/i.test(r.text + r.html), r.subject);
   }
   assert.match(renderEmail(emails.unreadMessages({ name: "A", count: 2, from: "an employer", url: "https://example.com/m", settingsUrl: "https://example.com/s" })).text, /because you have unread messages on Findtern/);
+});
+
+test("production with PUBLIC_ORIGIN unset: building any template never throws (they run after the write has committed)", () => {
+  const env = process.env as Record<string, string | undefined>; // NODE_ENV is read-only in its own typing
+  const was = { origin: env.PUBLIC_ORIGIN, node: env.NODE_ENV };
+  delete env.PUBLIC_ORIGIN;
+  env.NODE_ENV = "production";
+  try {
+    let built: ReturnType<typeof samples> = [];
+    assert.doesNotThrow(() => {
+      built = samples("Asha");
+    });
+    assert.ok(built.length > 0);
+    assert.doesNotThrow(() => driveCodeEmail({ name: "Asha", collegeName: "NIT", code: "ABCD-EFGH-JKLM", validUntil: new Date("2027-01-01") }));
+    // No origin means no button, never a link to localhost; notify() then drops the mail inside its own try.
+    for (const [name, content] of built) assert.doesNotMatch(content.cta?.url ?? "", /localhost/, name);
+  } finally {
+    if (was.origin === undefined) delete env.PUBLIC_ORIGIN;
+    else env.PUBLIC_ORIGIN = was.origin;
+    if (was.node === undefined) delete env.NODE_ENV;
+    else env.NODE_ENV = was.node;
+  }
 });

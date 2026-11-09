@@ -10,7 +10,7 @@
  */
 
 import { AI_INTERVIEW_INSTRUCTIONS } from "./ai-interview.ts";
-import { requirePublicOrigin } from "./origin.ts";
+import { linkTo, requirePublicOrigin } from "./origin.ts";
 
 /** Meaning of the status pill: waiting on someone, finished, overdue/at risk, or just information. */
 export type EmailTone = "wait" | "done" | "alert" | "neutral";
@@ -57,8 +57,20 @@ const esc = (v: unknown) =>
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 
+/** Throws without PUBLIC_ORIGIN in production. Only renderEmail uses it (notify() catches it): templates must not. */
 export function origin(): string {
   return requirePublicOrigin();
+}
+
+/**
+ * A button to `path` on the public origin, or none when there is no origin. Templates run
+ * as call arguments, after the write they report has committed: a throw here is a 500 on a
+ * saved action. No origin costs the email's link (renderEmail then refuses the whole mail
+ * inside notify's try), never the action.
+ */
+function ctaTo(label: string, path: string): EmailContent["cta"] {
+  const url = linkTo(path);
+  return url === null ? undefined : { label, url };
 }
 
 const isUrl = (v: string) => /^https?:\/\/\S+$/.test(v);
@@ -227,7 +239,7 @@ export const emails = {
     lines: [`${o.companyName} has sent you an internship proposal for the role of ${o.role}.`],
     bullets: ["Read the proposal details carefully", "Accept it if it fits your goals", "You can turn down up to 3 offers; a 4th decline or lapse ends the refund guarantee"],
     status: "Awaiting your response",
-    cta: { label: "View proposal", url: `${origin()}/intern/proposals/${o.proposalId}` },
+    cta: ctaTo("View proposal", `/intern/proposals/${o.proposalId}`),
   }),
 
   proposalDecision: (o: { employerName: string; candidate: string; role: string; accepted: boolean; proposalId: string; fullTime?: boolean }): EmailContent => ({
@@ -256,8 +268,8 @@ export const emails = {
     status: o.accepted ? "Accepted" : "Declined",
     tone: o.accepted ? "done" : "neutral",
     cta: o.accepted
-      ? { label: "Go to checkout", url: `${origin()}/employer/checkout` }
-      : { label: "View proposal", url: `${origin()}/employer/proposal/${o.proposalId}` },
+      ? ctaTo("Go to checkout", "/employer/checkout")
+      : ctaTo("View proposal", `/employer/proposal/${o.proposalId}`),
   }),
 
   proposalWithdrawn: (o: { internName: string; role: string }): EmailContent => ({
@@ -266,7 +278,7 @@ export const emails = {
     heading: "A proposal was withdrawn",
     greeting: hi(o.internName),
     lines: [`The company withdrew its proposal for ${o.role}. Nothing is needed from you.`, "Your profile stays visible to other employers."],
-    cta: { label: "See open roles", url: `${origin()}/intern/opportunities` },
+    cta: ctaTo("See open roles", "/intern/opportunities"),
   }),
 
   /** Staff closed an offer. Neutral: it was not the company withdrawing. */
@@ -276,7 +288,7 @@ export const emails = {
     heading: "An offer was closed",
     greeting: hi(o.internName),
     lines: [`The offer for ${o.role} has been closed by the Findtern team. Nothing is needed from you.`, "Your profile stays visible to other employers."],
-    cta: { label: "See your offers", url: `${origin()}/intern/proposals` },
+    cta: ctaTo("See your offers", "/intern/proposals"),
   }),
 
   interviewInvitation: (o: { internName: string; companyName: string; project?: string | null; slots?: string[]; timezone?: string }): EmailContent => ({
@@ -292,7 +304,7 @@ export const emails = {
     ],
     bullets: o.slots?.length ? o.slots : ["View the available slots", "Select the time that works best for you", "Confirm the meeting"],
     status: "Awaiting your slot selection",
-    cta: { label: "Pick a slot", url: `${origin()}/intern/interviews` },
+    cta: ctaTo("Pick a slot", "/intern/interviews"),
   }),
 
   meetingScheduled: (o: { name: string; other: string; when: string; link?: string | null; forEmployer: boolean }): EmailContent => ({
@@ -305,7 +317,7 @@ export const emails = {
       ...(o.link ? [] : ["The meeting link will follow by email."]),
     ],
     facts: [[o.forEmployer ? "Candidate" : "Company", o.other], ["When", o.when], ...(o.link ? ([["Meet link", o.link]] as [string, string][]) : [])],
-    cta: { label: "Open dashboard", url: `${origin()}/${o.forEmployer ? "employer/schedule" : "intern/interviews"}` },
+    cta: ctaTo("Open dashboard", `/${o.forEmployer ? "employer/schedule" : "intern/interviews"}`),
   }),
 
   /** Findtern added the meeting link by hand; no company name, the intern may not see it yet. */
@@ -316,7 +328,7 @@ export const emails = {
     greeting: hi(o.name),
     lines: ["The meeting link for your interview has been added."],
     facts: [["Meet link", o.link]],
-    cta: { label: "Open dashboard", url: `${origin()}/${o.forEmployer ? "employer/schedule" : "intern/interviews"}` },
+    cta: ctaTo("Open dashboard", `/${o.forEmployer ? "employer/schedule" : "intern/interviews"}`),
   }),
 
   aiInterviewLinkReady: (o: { name: string; link: string }): EmailContent => ({
@@ -336,7 +348,7 @@ export const emails = {
     heading: "An interview was rescheduled",
     greeting: hi(o.name),
     lines: ["The company proposed new time slots. Pick the one that works for you."],
-    cta: { label: "Open dashboard", url: `${origin()}/intern/interviews` },
+    cta: ctaTo("Open dashboard", "/intern/interviews"),
   }),
 
   timesheetSubmitted: (o: { employerName: string; candidate: string; period: string; timesheetId: string }): EmailContent => ({
@@ -345,7 +357,7 @@ export const emails = {
     heading: "A timesheet needs your approval",
     greeting: hi(o.employerName),
     lines: [`${o.candidate} submitted a timesheet for ${o.period}.`],
-    cta: { label: "Review timesheet", url: `${origin()}/employer/timesheets/${o.timesheetId}` },
+    cta: ctaTo("Review timesheet", `/employer/timesheets/${o.timesheetId}`),
   }),
 
   employerPaymentReceived: (o: { employerName: string; role: string; amount: string }): EmailContent => ({
@@ -355,7 +367,7 @@ export const emails = {
     greeting: hi(o.employerName),
     lines: [`We’ve received your payment for ${o.role}.`, "The process now moves forward as agreed. Updates appear in your dashboard."],
     facts: [["Amount", o.amount]],
-    cta: { label: "View orders and invoice", url: `${origin()}/employer/orders` },
+    cta: ctaTo("View orders and invoice", "/employer/orders"),
   }),
 
   hireConfirmed: (o: { internName: string; companyName: string; role: string }): EmailContent => ({
@@ -369,7 +381,7 @@ export const emails = {
       "Your dashboard now shows:",
     ],
     bullets: ["Engagement details", "Start date and next steps", "Timesheets for your first period"],
-    cta: { label: "Open dashboard", url: `${origin()}/intern/dashboard` },
+    cta: ctaTo("Open dashboard", "/intern/dashboard"),
   }),
 
   activationPaid: (o: { internName: string; amount: string }): EmailContent => ({
@@ -379,7 +391,7 @@ export const emails = {
     greeting: hi(o.internName),
     lines: ["Your Findtern sign-up fee payment has been received. You now have full access to the platform, starting with your AI interview."],
     facts: [["Amount", o.amount]],
-    cta: { label: "Open dashboard", url: `${origin()}/intern/dashboard` },
+    cta: ctaTo("Open dashboard", "/intern/dashboard"),
   }),
 
   stipendTransferred: (o: { internName: string; role: string; amount: string }): EmailContent => ({
@@ -392,7 +404,7 @@ export const emails = {
       "If you don’t see it in your account right away, allow standard bank processing time.",
     ],
     facts: [["Amount", o.amount]],
-    cta: { label: "View payments", url: `${origin()}/intern/earnings` },
+    cta: ctaTo("View payments", "/intern/earnings"),
   }),
 
   completionBonusPaid: (o: { internName: string; role: string; amount: string }): EmailContent => ({
@@ -405,7 +417,7 @@ export const emails = {
       "If you don’t see it in your account right away, allow standard bank processing time.",
     ],
     facts: [["Amount", o.amount]],
-    cta: { label: "View earnings", url: `${origin()}/intern/earnings` },
+    cta: ctaTo("View earnings", "/intern/earnings"),
   }),
 
   collegeSeatsPaid: (o: { collegeName: string; seats: number; amount: string; cap: number }): EmailContent => ({
@@ -419,7 +431,7 @@ export const emails = {
       ["Amount", o.amount],
       ["Total seats", String(o.cap)],
     ],
-    cta: { label: "View seats and invoice", url: `${origin()}/college/seats` },
+    cta: ctaTo("View seats and invoice", "/college/seats"),
   }),
 
   collegePayoutRequested: (o: { collegeName: string; amount: string }): EmailContent => ({
@@ -432,7 +444,7 @@ export const emails = {
       ["College", o.collegeName],
       ["Amount", o.amount],
     ],
-    cta: { label: "Review in admin", url: `${origin()}/admin/colleges` },
+    cta: ctaTo("Review in admin", "/admin/colleges"),
     reason: INTERNAL_REASON,
   }),
 
@@ -449,7 +461,7 @@ export const emails = {
       ["Amount", o.amount],
       ["Reference", o.referenceId],
     ],
-    cta: { label: "View earnings", url: `${origin()}/college/earnings` },
+    cta: ctaTo("View earnings", "/college/earnings"),
   }),
 
   collegePayoutRejected: (o: { collegeName: string; amount: string; reason: string }): EmailContent => ({
@@ -459,7 +471,7 @@ export const emails = {
     greeting: hi(o.collegeName),
     lines: ["Nothing was debited, and the amount is available in your wallet again.", `Reason: ${o.reason}`],
     facts: [["Amount", o.amount]],
-    cta: { label: "View earnings", url: `${origin()}/college/earnings` },
+    cta: ctaTo("View earnings", "/college/earnings"),
   }),
 
   fullTimeOfferReceived: (o: { internName: string; companyName: string; role: string; proposalId: string }): EmailContent => ({
@@ -470,7 +482,7 @@ export const emails = {
     lines: [`Congratulations. ${o.companyName} has offered you a full-time position as ${o.role} through Findtern.`],
     bullets: ["Review the full offer carefully", "Accept or decline it from your dashboard"],
     status: "Awaiting your response",
-    cta: { label: "View offer", url: `${origin()}/intern/proposals/${o.proposalId}` },
+    cta: ctaTo("View offer", `/intern/proposals/${o.proposalId}`),
   }),
 
   fullTimeFeePaid: (o: { employerName: string; candidate: string; role: string; ctc: string; amount: string }): EmailContent => ({
@@ -480,7 +492,7 @@ export const emails = {
     greeting: hi(o.employerName),
     lines: [`We’ve received the full-time hiring fee for ${o.candidate}. Thank you for hiring through Findtern.`],
     facts: [["Candidate", o.candidate], ["Role", o.role], ["Annual CTC offered", o.ctc], ["Amount paid", o.amount]],
-    cta: { label: "View orders and invoice", url: `${origin()}/employer/orders` },
+    cta: ctaTo("View orders and invoice", "/employer/orders"),
   }),
 
   /** Internal alert to the Findtern team when an employer sends a full-time offer (PPO). Same facts the plain-text alert carried. */
@@ -570,7 +582,7 @@ export const emails = {
       facts: [["Intern", o.intern], ["Month", String(o.k)], ["Amount", o.amount], ["Due on", o.dueOn]],
       status: o.type === "overdue" ? "Overdue" : o.type === "due" ? (today ? "Due today" : "Past due") : "Due soon",
       tone: o.type === "overdue" || (o.type === "due" && !today) ? "alert" : "wait",
-      cta: { label: "Pay now", url: `${origin()}/employer/checkout` },
+      cta: ctaTo("Pay now", "/employer/checkout"),
     };
   },
 };
@@ -633,7 +645,7 @@ export function driveCodeEmail(o: { name: string; collegeName: string; code: str
     ],
     code: { value: o.code, note: `Valid until ${expiry}` },
     facts: [["College", college], ["Valid until", expiry]],
-    cta: { label: "Sign in to Findtern", url: `${origin()}/login` },
+    cta: ctaTo("Sign in to Findtern", "/login"),
     reason: "You’re receiving this because your college listed this email address for a Findtern drive.",
   };
 }
