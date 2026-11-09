@@ -135,7 +135,7 @@ export function ToolbarSort({ data, filters, compareIds, className }: { data: Ca
           prefix="Project: "
           value={data.activeProjectId}
           options={data.projects.map((p) => ({ value: p.id, label: p.projectName, href: projectKeep(p.id) }))}
-          className={cn(select, "max-w-72 max-lg:hidden")}
+          className={cn(select, "max-w-[min(28rem,100%)] max-lg:hidden")}
         />
       ) : null}
       {saved ? null : <SortSelect className={select} value={sortValue} options={sortOptions(filters)} />}

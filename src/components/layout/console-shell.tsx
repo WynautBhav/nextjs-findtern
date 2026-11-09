@@ -68,6 +68,8 @@ export type ConsoleNavItem = {
   icon: React.ReactNode;
   /** A count shown beside the label (unread, items waiting). */
   badge?: number | string;
+  /** What the badge counts, for the collapsed rail's screen-reader text (default "unread"). */
+  badgeLabel?: string;
   /** Show the live unread-message count (kept current by the messaging store) instead of a fixed badge. */
   liveUnread?: boolean;
   /** A quiet dot: this needs the user, without turning it into a score. */
@@ -486,7 +488,7 @@ function RailLink({ item, active, compact, light, column = false, onNavigate }: 
       <span className={cn("min-w-0 flex-1 truncate", compact && "sr-only")}>
         {item.label}
         {compact && item.attention ? ", needs you" : ""}
-        {compact && item.badge ? `, ${item.badge} unread` : ""}
+        {compact && item.badge ? `, ${item.badge} ${item.badgeLabel ?? "unread"}` : ""}
       </span>
       {!compact && item.liveUnread ? (
         <LiveUnreadBadge light={light} />

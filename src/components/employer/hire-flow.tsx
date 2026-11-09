@@ -1,7 +1,6 @@
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
-import { FlowScroll } from "@/components/employer/hire-flow-scroll";
 import { currentStepKey, type FlowPage, type FlowStepKey } from "@/lib/employer-flow-steps";
 
 export type HireFlowCounts = {
@@ -33,19 +32,20 @@ export function HireFlow({ counts, current, currentCount = null }: { counts: Hir
   // links each stage, without competing with the page's own content.
   return (
     <nav aria-label="Hiring steps" className="relative mb-4 rounded-xl border border-brand-200 bg-brand-100/60 p-1 sm:mb-5">
-      <FlowScroll className="relative flex items-stretch gap-1 overflow-x-auto text-[13px] [scrollbar-width:none] sm:overflow-visible sm:text-sm [&::-webkit-scrollbar]:hidden">
-        {STEPS.map((s) => {
+      {/* Phones: three steps, then two, each row filling the width. Nothing scrolls, so no step is ever cut off at the edge. */}
+      <ol className="grid grid-cols-6 items-stretch gap-1 text-[13px] sm:flex sm:text-sm">
+        {STEPS.map((s, i) => {
           const active = s.key === currentKey;
           // Finding candidates is the start of the path, not a queue: no count.
           const n = s.key === "candidates" ? (active ? currentCount : null) : counts[s.key];
           return (
-            <li key={s.key} className="flex shrink-0 sm:min-w-0 sm:flex-1">
+            <li key={s.key} className={cn("flex min-w-0 sm:flex-1", i < 3 ? "col-span-2" : "col-span-3")}>
               <Link
                 href={s.href}
                 aria-current={active ? "step" : undefined}
                 title={s.hint}
                 className={cn(
-                  "apple-spring inline-flex min-h-10 w-full items-center justify-center gap-2 whitespace-nowrap rounded-lg px-3 sm:px-4 touch:min-h-11",
+                  "apple-spring inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-1.5 sm:min-h-10 sm:gap-2 sm:px-4 sm:touch:min-h-11",
                   active ? "bg-white font-bold text-brand-900 shadow-sm ring-1 ring-brand-200" : "font-medium text-ink-700 hover:bg-white/60 hover:text-ink-900",
                 )}
               >
@@ -56,7 +56,7 @@ export function HireFlow({ counts, current, currentCount = null }: { counts: Hir
             </li>
           );
         })}
-      </FlowScroll>
+      </ol>
     </nav>
   );
 }

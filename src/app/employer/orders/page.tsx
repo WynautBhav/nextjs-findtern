@@ -14,6 +14,7 @@ import {
   type InvoiceRow,
 } from "@/components/employer/orders-manager";
 import { placementLedger } from "@/lib/dues";
+import { acceptedLineCharge } from "@/lib/accepted-charge";
 import { placeOfSupply } from "@/lib/gst";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { LEGACY_INVOICE_CUTOFF, taxInvoiceHtml } from "@/lib/invoice";
@@ -119,6 +120,8 @@ async function loadOrders(employerId: string) {
         months: offer.months,
         startDate: offer.startDate,
         ledger,
+        // The hiring fee is inside the total; a full-time hire's whole charge is its fee.
+        feeMinor: offer.fullTime ? 0 : acceptedLineCharge(offer, "upfront").perHireMinor,
         canOfferFullTime: !offer.fullTime && !fullTimeFor.has(r.proposal.internId),
       };
     });

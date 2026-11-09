@@ -7,14 +7,16 @@ import { EmptyScene, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RowMenu } from "@/components/app/row-menu";
+import { DmyDateInput } from "@/components/app/dmy-date-input";
 import { fieldClass, labelClass, tdClass, thClass } from "@/components/employer/ui-tokens";
 import { formatDate, formatMoney } from "@/lib/format";
 import { downloadInvoice } from "@/lib/invoice";
 import { matchesQuery } from "@/lib/orders-filter";
 import { cn } from "@/lib/utils";
-import { DmyDateInput } from "@/components/app/dmy-date-input";
 import type { InvoiceRow } from "./types";
-import { SearchField, ResetButton, LiveCount } from "./shared";
+import { LiveCount, ResetButton, SearchField } from "./shared";
+
+/* ── Invoices (legacy payment history) ─────────────────────────────── */
 
 export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
   const [q, setQ] = useState("");
@@ -186,4 +188,3 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
 }
 
 const invoiceFileName = (i: Pick<InvoiceRow, "number">) => `Invoice-${i.number.replace(/\//g, "-")}.pdf`;
-

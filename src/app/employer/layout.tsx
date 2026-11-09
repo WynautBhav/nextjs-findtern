@@ -29,8 +29,9 @@ import { q } from "@/lib/college/sql";
 import { shouldShowTermsPrompt } from "@/lib/terms";
 
 // The path in order: find, shortlist, offer, interview, hire, then timesheet and pay.
-// Shortlist and Compare sit under Candidates (tabs there, and the bag in the header);
-// Interviews sit under Proposals. `also` keeps the right item lit on every sub-page.
+// Shortlist is its own step of that path (the page, its title and the hiring-steps bar all
+// say "Shortlist"), so it gets its own item and lights up alone; Compare stays under
+// Candidates; Interviews sit under Proposals. `also` keeps the right item lit on every sub-page.
 const NAV_GROUPS: ConsoleNavGroup[] = [
   {
     title: "Hiring",
@@ -40,8 +41,9 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
         href: "/employer/candidates",
         label: "Candidates",
         icon: <Users />,
-        also: ["/employer/compare", "/employer/cart", "/employer/shortlist", "/employer/intern"],
+        also: ["/employer/compare", "/employer/intern"],
       },
+      { href: "/employer/cart", label: "Shortlist", icon: <ShoppingBag />, also: ["/employer/shortlist"] },
       { href: "/employer/projects", label: "Internships", icon: <FolderKanban /> },
       {
         href: "/employer/proposals",
@@ -111,7 +113,11 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   }
 
   // Messages carries its own live unread count (MessagingLive); nothing else in the sidebar does.
-  const groups = NAV_GROUPS;
+  // The shortlist count rides on its own item, like the bag in the header.
+  const groups = NAV_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.map((i) => (i.href === "/employer/cart" && cartCount > 0 ? { ...i, badge: cartCount > 99 ? "99+" : cartCount, badgeLabel: "saved" } : i)),
+  }));
   // Phone tab bar: the five places an employer returns to (the rest stay in the menu).
   const flat = groups.flatMap((g) => g.items);
   const shortlistTab: ConsoleNavItem = {

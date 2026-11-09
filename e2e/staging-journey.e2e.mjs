@@ -1010,7 +1010,10 @@ step("employer: Orders totals equal what was charged, and both tax invoices are 
   const paidTotal = pays.reduce((s, p) => s + p.amount_minor, 0);
 
   await visit(page, "/employer/orders");
-  await page.getByText(new RegExp(`2 hires · ₹${rupees(paidTotal).replace(/[.,]/g, "\\$&")} paid`)).first().waitFor({ timeout: 20_000 });
+  // The summary band's "Total paid" is the sum of the paid orders (hiring fees included).
+  const summary = page.getByRole("region", { name: "Payment summary" });
+  await summary.getByText(`₹${rupees(paidTotal)}`, { exact: true }).first().waitFor({ timeout: 20_000 });
+  assert.match(await summary.innerText(), /Across 2 hires/);
   await shot("employer-orders");
   await page.getByRole("tab", { name: /Invoices/ }).click();
   await page.getByRole("button", { name: /tax invoice/i }).first().waitFor();

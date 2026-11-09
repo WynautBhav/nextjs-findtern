@@ -1,17 +1,21 @@
 "use client";
-import type { Tone } from "@/components/app/primitives";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 
-import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
+import { EmptyScene, Pill, Surface, type Tone } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { tdClass, thClass } from "@/components/employer/ui-tokens";
 import { formatDate, formatMoney } from "@/lib/format";
 import { filterHires } from "@/lib/orders-filter";
-import { cn } from "@/lib/utils";
 import { todayIst } from "@/lib/offer";
+import { cn } from "@/lib/utils";
 import type { HireRow } from "./types";
-import { STATUS, SearchField, ResetButton, LiveCount } from "./shared";
+import { INLINE_LINK, LiveCount, ResetButton, SearchField, STATUS } from "./shared";
+
+const payHref = (h: HireRow) => `/employer/checkout?proposal=${encodeURIComponent(h.proposalId)}`;
+
+/* ── Payment schedule (legacy "Upcoming payments") ──────────────────── */
 
 type ScheduleFilter = "all" | "partially_paid" | "fully_paid";
 
@@ -106,6 +110,7 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                 const overdue = Boolean(h.ledger.nextDue) && (h.ledger.nextDue as string) < today && h.ledger.dueMinor > 0;
                 const s = overdue ? { label: "Overdue", tone: "waiting" as Tone } : STATUS[h.ledger.status];
                 const m = (minor: number) => formatMoney(minor, h.currency, { zeroLabel: false });
+                const payable = h.ledger.dueMinor > 0 && (h.ledger.plan === "monthly" || (h.ledger.plan === "postpaid" && payableIds.includes(h.proposalId)));
                 return (
                   <tr key={h.proposalId}>
                     <td data-title className={tdClass}>
@@ -135,7 +140,17 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                       {h.ledger.nextDue ? (
                         <div>
                           {h.ledger.nextDue < today ? (
-                            <span className="font-medium text-danger">Overdue since {formatDate(h.ledger.nextDue)}</span>
+                            <>
+                              <span className="font-medium text-danger">Overdue since {formatDate(h.ledger.nextDue)}</span>
+                              {payable ? (
+                                <>
+                                  {" · "}
+                                  <Link href={payHref(h)} className={INLINE_LINK}>
+                                    Pay now
+                                  </Link>
+                                </>
+                              ) : null}
+                            </>
                           ) : h.ledger.plan === "postpaid" ? (
                             h.ledger.nextDue === today ? <span className="font-medium">Due now</span> : `Due on ${formatDate(h.ledger.nextDue)}`
                           ) : (
@@ -150,8 +165,8 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                       )}
                     </td>
                     <td className={cn(tdClass, "text-right")}>
-                      {h.ledger.dueMinor > 0 && (h.ledger.plan === "monthly" || (h.ledger.plan === "postpaid" && payableIds.includes(h.proposalId))) ? (
-                        <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(h.proposalId)}`} size="sm">
+                      {payable ? (
+                        <ButtonLink href={payHref(h)} size="sm">
                           Pay month {h.ledger.monthsPaid + 1}
                         </ButtonLink>
                       ) : null}
@@ -166,6 +181,3 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
     </div>
   );
 }
-
-/* ── Invoices (legacy payment history) ─────────────────────────────── */
-

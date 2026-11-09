@@ -15,6 +15,8 @@ export type HireRow = {
   months: number;
   startDate: string | null;
   ledger: PlacementLedger;
+  /** The one-time hiring fee inside this hire's total; 0 for a full-time hire, whose whole charge is the fee. Minor units. */
+  feeMinor: number;
   /** A paid internship that can still get a full-time offer. */
   canOfferFullTime: boolean;
 };

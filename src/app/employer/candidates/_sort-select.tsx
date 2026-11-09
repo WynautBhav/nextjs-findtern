@@ -69,13 +69,15 @@ export function SortSelect({
           if (e.key === "Enter") commit();
         }}
         onBlur={commit}
+        // A long project name ends in an ellipsis in the closed select; the full name is the tooltip.
+        title={`${prefix}${options.find((o) => o.value === (held ?? value))?.label ?? ""}`}
         onChange={(e) => {
           if (sortChangeAction(keyboard.current) === "hold") {
             pending.current = e.target.value;
             setHeld(e.target.value);
           } else apply(e.target.value);
         }}
-        className={cn(fieldClass, "min-h-11 w-auto min-w-0 max-w-full pr-8 sm:min-h-10", className)}
+        className={cn(fieldClass, "min-h-11 w-auto min-w-0 max-w-full truncate pr-8 sm:min-h-10", className)}
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
