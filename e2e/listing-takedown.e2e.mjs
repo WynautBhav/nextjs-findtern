@@ -87,7 +87,7 @@ test("non-admins get 403, bad bodies 400/422, unknown id 404; nothing is written
 test("admin takes it down: fields, audit row, employer notification, status untouched", async () => {
   const r = await td(pid, { reason: REASON });
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.deepEqual(r.body, { ok: true, takenDown: true });
+  assert.deepEqual(r.body, { ok: true, takenDown: true, withdrawnOffers: 0 });
   const p = await row(pid);
   assert.ok(p.taken_down_at);
   assert.equal(p.taken_down_by, ADMIN.id);
@@ -301,6 +301,143 @@ test("restored: the same offer can be accepted, paid for and its interview booke
   const slot = await api(P.I.page, "POST", `/api/interviews/${S.interviewId}/select-slot`, { slot: 1 });
   assert.equal(slot.status, 200, JSON.stringify(slot.body));
   assert.equal((await one(`SELECT status FROM interviews WHERE id = $1`, [S.interviewId])).status, "scheduled");
+});
+
+// ── Revision 2: a takedown withdraws the open offers on the project; no new offer goes out from it. ──
+const withdrawn = async (id) => (await one(`SELECT status, offer_details FROM proposals WHERE id = $1`, [id]));
+const startFuture = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+const SET_OFFER = `UPDATE proposals SET status = $2, currency = 'INR', offer_details = $3::jsonb WHERE id = $1 RETURNING id`;
+const offerJson = (extra = {}) => JSON.stringify({ roleTitle: "Withdraw Role", duration: "1m", monthlyAmount: 10000, startDate: startFuture, ...extra });
+
+test("takedown withdraws open offers (sent, interview, accepted-unpaid), leaves hired / open-order / full-time / other-project ones, audits, counts, notifies", async () => {
+  const wp = await mkProject(E.id, `Withdraw Role ${RUN}`);
+  const otherPid = await mkProject(E.id, `Other Role ${RUN}`);
+  const mk = async (label, status, offer = offerJson(), projectId = wp, hiredAt = false) => {
+    const intern = await mkIntern(`wd${label}`);
+    const id = await mkProposal(E.id, intern.id, projectId);
+    await one(SET_OFFER, [id, status, offer]);
+    if (hiredAt) await one(`UPDATE proposals SET hired_at = now() WHERE id = $1 RETURNING id`, [id]);
+    return { id, intern };
+  };
+  const sent = await mk("sent", "sent");
+  const interview = await mk("iv", "interview_scheduled");
+  const accepted = await mk("acc", "accepted", offerJson({ termsAcceptedAt: new Date().toISOString() }));
+  const hired = await mk("hired", "hired", offerJson(), wp, true);
+  const ordered = await mk("ord", "accepted");
+  const ftAccepted = await mk("ft", "accepted", offerJson({ fullTimeOffer: { jobTitle: "Engineer", annualCtcMinor: 60000000 } }));
+  const processing = await mk("proc", "processing");
+  const declined = await mk("rej", "rejected");
+  const elsewhere = await mk("else", "sent", offerJson(), otherPid);
+  // A checkout opened (and still open) on `ordered` before the takedown settles normally.
+  await one(`INSERT INTO employer_payments (employer_id, order_id, status, raw) VALUES ($1,$2,'created',$3::jsonb) RETURNING id`, [E.id, `order_wd_${RUN}`, JSON.stringify({ notes: { proposalIds: [ordered.id] } })]);
+
+  const r = await td(wp, { reason: `Duplicate listing ${RUN}` });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.deepEqual(r.body, { ok: true, takenDown: true, withdrawnOffers: 3 });
+
+  for (const o of [sent, interview, accepted]) {
+    const w = await withdrawn(o.id);
+    assert.equal(w.status, "withdrawn", `${o.id} withdrawn`);
+    assert.ok(w.offer_details.closedByAdminAt, "stamped as closed by staff (not a decline miss)");
+    const audit = await rows(`SELECT meta FROM admin_audit_log WHERE action = 'proposal.takedown_withdraw' AND target_id = $1`, [o.id]);
+    assert.equal(audit.length, 1, "one audit row per withdrawn offer");
+    assert.equal(audit[0].meta.projectId, wp);
+    const notes = await rows(`SELECT message FROM notifications WHERE recipient_id = $1 AND type = 'proposal_withdrawn'`, [o.intern.id]);
+    assert.equal(notes.length, 1, "intern told");
+    assert.match(notes[0].message, /closed by Findtern/);
+    assert.doesNotMatch(notes[0].message, new RegExp(`Duplicate listing`), "neutral line: no takedown reason, no blame");
+  }
+  assert.equal((await withdrawn(sent.id)).status, "withdrawn");
+  for (const [name, o, st] of [["hired", hired, "hired"], ["open order", ordered, "accepted"], ["full-time acceptance", ftAccepted, "accepted"], ["processing", processing, "processing"], ["declined", declined, "rejected"], ["other project", elsewhere, "sent"]]) {
+    assert.equal((await withdrawn(o.id)).status, st, `${name} untouched`);
+    assert.equal((await rows(`SELECT 1 FROM admin_audit_log WHERE action = 'proposal.takedown_withdraw' AND target_id = $1`, [o.id])).length, 0, `${name}: no audit row`);
+  }
+  assert.ok((await one(`SELECT hired_at FROM proposals WHERE id = $1`, [hired.id])).hired_at, "hired_at kept");
+  const sum = await rows(`SELECT meta FROM admin_audit_log WHERE action = 'project.takedown' AND target_id = $1`, [wp]);
+  assert.equal(sum[0].meta.withdrawnOffers, 3);
+  const emp = await rows(`SELECT message FROM notifications WHERE recipient_id = $1 AND type = 'project_taken_down' AND message LIKE $2`, [E.id, `%Duplicate listing ${RUN}%`]);
+  assert.match(emp[0].message, /3 open offers on it were withdrawn/);
+
+  // Restore does not revive them.
+  assert.equal((await restore(wp)).status, 200);
+  for (const o of [sent, interview, accepted]) assert.equal((await withdrawn(o.id)).status, "withdrawn", "still withdrawn after restore");
+  // And taking it down again finds nothing left to withdraw.
+  const again = await td(wp, { reason: "again" });
+  assert.deepEqual(again.body, { ok: true, takenDown: true, withdrawnOffers: 0 });
+  S.wp = wp;
+  S.wpHired = hired.id;
+});
+
+test("admin UI: the takedown confirmation says open offers are withdrawn and not revived by a restore", async () => {
+  const uiPid = await mkProject(E.id, `Confirm Role ${RUN}`);
+  const intern = await mkIntern("wdui");
+  const o = await mkProposal(E.id, intern.id, uiPid);
+  await one(SET_OFFER, [o, "sent", offerJson()]);
+  await P.A.page.goto(url(`/admin/projects?q=${encodeURIComponent(`Confirm Role ${RUN}`)}`), { waitUntil: "domcontentloaded" });
+  await P.A.page.getByRole("button", { name: "Take down…" }).first().click();
+  await P.A.page.getByLabel("Reason for the employer (required)").fill("UI withdraw");
+  await P.A.page.getByRole("button", { name: "Take down…" }).first().click();
+  const dialog = P.A.page.getByRole("dialog");
+  assert.match((await dialog.textContent()) ?? "", /open offer on it .* is withdrawn/);
+  assert.match((await dialog.textContent()) ?? "", /withdrawn offers are not revived/);
+  await dialog.getByRole("button", { name: "Take down", exact: true }).click();
+  await P.A.page.getByText(/1 open offer was withdrawn/).waitFor({ timeout: 20_000 });
+  assert.equal(await status(o), "withdrawn");
+});
+
+test("a taken-down listing sends no new offer: internship proposal and full-time offer both 409 listing_taken_down, nothing inserted", async () => {
+  assert.ok((await td(S.wp, { reason: "send block" })).status === 200);
+  const before = (await one(`SELECT count(*)::int AS n FROM proposals WHERE employer_id = $1`, [E.id])).n;
+  const start = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+  const offer = await api(P.E.page, "POST", `/api/employer/${E.id}/proposals`, {
+    internId: I.id, projectId: S.wp, flowType: "direct", agreedToPolicy: true, roleTitle: "Engineer", jd: "Build things.", mode: "remote",
+    startDate: start, duration: "1m", shiftFrom: "09:00", shiftTo: "17:00", timezone: "Asia/Kolkata", laptop: "company", skills: SKILLS.slice(0, 4),
+  });
+  assert.equal(offer.status, 409, JSON.stringify(offer.body));
+  assert.equal(offer.body.code, "listing_taken_down");
+  assert.match(offer.body.error, /took this listing down/);
+  const ft = await api(P.E.page, "POST", `/api/employer/${E.id}/full-time-offer`, {
+    proposalId: S.wpHired, jobTitle: "Engineer", jobMode: "remote", ctcCurrency: "INR", annualCtc: 600000, shiftFrom: "09:00", shiftTo: "18:00", timezone: "Asia/Kolkata",
+    offerLetterKey: `${E.id.replace(/[^a-z0-9_-]/gi, "").slice(0, 32)}/offer-letter.pdf`,
+  });
+  assert.equal(ft.status, 409, JSON.stringify(ft.body));
+  assert.equal(ft.body.code, "listing_taken_down");
+  assert.match(ft.body.error, /took this listing down/);
+  assert.equal((await one(`SELECT count(*)::int AS n FROM proposals WHERE employer_id = $1`, [E.id])).n, before, "no proposal row written");
+  // Restored, the same full-time offer goes through.
+  assert.equal((await restore(S.wp)).status, 200);
+  const ok = await api(P.E.page, "POST", `/api/employer/${E.id}/full-time-offer`, {
+    proposalId: S.wpHired, jobTitle: "Engineer", jobMode: "remote", ctcCurrency: "INR", annualCtc: 600000, shiftFrom: "09:00", shiftTo: "18:00", timezone: "Asia/Kolkata",
+    offerLetterKey: `${E.id.replace(/[^a-z0-9_-]/gi, "").slice(0, 32)}/offer-letter.pdf`,
+  });
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+});
+
+test("send race: a takedown that commits after the early check but before the insert still refuses a full-time offer", async () => {
+  const racePid = await mkProject(E.id, `Send Race ${RUN}`);
+  const intern = await mkIntern("wdrace");
+  const base = await mkProposal(E.id, intern.id, racePid);
+  await one(`UPDATE proposals SET status = 'hired', hired_at = now() WHERE id = $1 RETURNING id`, [base]);
+  const client = await db().connect();
+  let reply;
+  try {
+    await client.query("BEGIN");
+    await client.query(`UPDATE projects SET taken_down_at = now(), taken_down_by = $2, taken_down_reason = 'race' WHERE id = $1`, [racePid, ADMIN.id]);
+    const inflight = api(P.E.page, "POST", `/api/employer/${E.id}/full-time-offer`, {
+      proposalId: base, jobTitle: "Engineer", jobMode: "remote", ctcCurrency: "INR", annualCtc: 600000, shiftFrom: "09:00", shiftTo: "18:00", timezone: "Asia/Kolkata",
+      offerLetterKey: `${E.id.replace(/[^a-z0-9_-]/gi, "").slice(0, 32)}/offer-letter.pdf`,
+    });
+    const early = await Promise.race([inflight, new Promise((ok) => setTimeout(() => ok("waiting"), 2500))]);
+    assert.equal(early, "waiting", `the send should wait on the project row lock, got ${JSON.stringify(early)}`);
+    await client.query("COMMIT");
+    reply = await inflight;
+  } finally {
+    await client.query("ROLLBACK").catch(() => {});
+    client.release();
+  }
+  assert.equal(reply.status, 409, JSON.stringify(reply.body));
+  assert.equal(reply.body.code, "listing_taken_down");
+  assert.equal((await one(`SELECT count(*)::int AS n FROM proposals WHERE project_id = $1`, [racePid])).n, 1, "no full-time proposal inserted");
 });
 
 // ── Roster-import retention (WP-I part 3): the cron route against the real table. ──

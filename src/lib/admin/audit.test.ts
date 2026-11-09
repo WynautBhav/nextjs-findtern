@@ -150,6 +150,7 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "project.reject": { projectName: "x", reason: "x" },
   "project.takedown": { projectName: "x", reason: "x" },
   "project.restore": { projectName: "x" },
+  "proposal.takedown_withdraw": { projectId: "p-1", projectName: "x", internId: "i-1", previousStatus: "sent" },
   "roster_import.purge": { deleted: 3, batch: 200, retentionDays: 30, expiredBefore: "2026-11-08T00:00:00.000Z" },
   "college.admin_create": { collegeAdminId: "ca-1", name: "Asha", email: "tpo@college.test" },
   "terms.publish": { document: "Intern Terms", title: "Intern Terms" },

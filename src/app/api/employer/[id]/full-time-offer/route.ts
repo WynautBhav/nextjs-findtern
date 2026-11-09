@@ -13,6 +13,7 @@ import { sendSmtpMail } from "@/lib/mailer";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { parseOffer } from "@/lib/offer";
 import { requirePublicOrigin } from "@/lib/origin";
+import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
 
 const bodySchema = z.object({
   proposalId: z.string().min(1),
@@ -56,6 +57,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   ]);
   if (!base || base.employerId !== id) return NextResponse.json({ error: "Unknown placement" }, { status: 404 });
   if (base.status !== "hired") return NextResponse.json({ error: "Full-time offers go to interns you've hired." }, { status: 409 });
+  // A taken-down listing sends no new offers, a full-time one included.
+  if (base.projectId) {
+    const [project] = await db.select({ takenDownAt: schema.projects.takenDownAt }).from(schema.projects).where(eq(schema.projects.id, base.projectId)).limit(1);
+    const blocked = takedownBlock(project, "send");
+    if (blocked) return NextResponse.json({ error: blocked, code: "listing_taken_down" }, { status: 409 });
+  }
   if (b.ctcCurrency === "USD" && employer?.internationalFteStatus !== "approved") {
     return NextResponse.json({ error: "USD offers need International FTE approval first." }, { status: 403 });
   }
@@ -76,6 +83,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // One full-time offer per intern: checked and inserted under one lock, so two
   // requests at once (a double click gave three offers) can't both pass.
   const proposal = await withLock(`offer:${id}:${base.internId}`, async (tx) => {
+    // Re-read the takedown under a shared row lock (see the proposals route): the early check can be stale.
+    if (base.projectId) {
+      const [live] = await tx.select({ takenDownAt: schema.projects.takenDownAt }).from(schema.projects).where(eq(schema.projects.id, base.projectId)).for("share").limit(1);
+      if (takedownBlock(live, "send")) return "taken_down" as const;
+    }
     const existing = await tx
       .select({ offer: schema.proposals.offerDetails, currency: schema.proposals.currency })
       .from(schema.proposals)
@@ -123,6 +135,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .returning();
     return created;
   });
+  if (proposal === "taken_down") {
+    return NextResponse.json({ error: TAKEDOWN_BLOCKS.send, code: "listing_taken_down" }, { status: 409 });
+  }
   if (!proposal) {
     return NextResponse.json({ error: "You've already sent this intern a full-time offer." }, { status: 409 });
   }

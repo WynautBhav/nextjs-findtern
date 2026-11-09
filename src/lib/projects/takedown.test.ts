@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { planTakedown, takedownBlock, takedownCheckedLineIds, TAKEDOWN_BLOCKS } from "./takedown.ts";
+import { planTakedown, takedownBlock, takedownCheckedLineIds, takedownWithdraws, TAKEDOWN_BLOCKS, TAKEDOWN_WITHDRAW_STATUSES } from "./takedown.ts";
 
 const NOW = new Date("2026-11-08T10:00:00Z");
 const up = { takenDownAt: null };
@@ -58,4 +58,23 @@ test("a taken-down listing blocks paying a new internship hire, not a due month 
   assert.deepEqual(takedownCheckedLineIds(lines), ["new-internship"]);
   assert.deepEqual(takedownCheckedLineIds([lines[1]!, lines[2]!]), [], "nothing to check: the order goes through");
   assert.deepEqual(takedownCheckedLineIds([]), []);
+});
+
+test("sending a new offer from a taken-down listing is blocked with its own message", () => {
+  assert.equal(takedownBlock(down, "send"), TAKEDOWN_BLOCKS.send);
+  assert.match(TAKEDOWN_BLOCKS.send, /took this listing down/);
+  assert.equal(takedownBlock(up, "send"), null);
+  assert.equal(takedownBlock(null, "send"), null);
+});
+
+test("a takedown withdraws unanswered and accepted-unpaid offers, and nothing where money is moving", () => {
+  const base = { fullTime: false, hasOpenOrder: false, hiredAt: null };
+  for (const status of ["draft", "sent", "interview_scheduled"]) assert.equal(takedownWithdraws({ ...base, status }), true, status);
+  assert.equal(takedownWithdraws({ ...base, status: "accepted" }), true, "accepted, not paid");
+  assert.equal(takedownWithdraws({ ...base, status: "accepted", hasOpenOrder: true }), false, "checkout open: settles normally");
+  assert.equal(takedownWithdraws({ ...base, status: "accepted", fullTime: true }), false, "full-time acceptance is the hire");
+  assert.equal(takedownWithdraws({ ...base, status: "accepted", hiredAt: new Date() }), false, "paid");
+  for (const status of ["processing", "hired", "rejected", "withdrawn", "expired"]) assert.equal(takedownWithdraws({ ...base, status }), false, status);
+  // The statuses the transaction selects are exactly the ones that can be withdrawn.
+  assert.deepEqual([...TAKEDOWN_WITHDRAW_STATUSES].sort(), ["accepted", "draft", "interview_scheduled", "sent"]);
 });

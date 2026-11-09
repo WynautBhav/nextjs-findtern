@@ -16,6 +16,7 @@ export function TakedownAction({ id, name, takenDown }: { id: string; name: stri
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   async function send(path: "takedown" | "restore", body: Record<string, string>) {
     setBusy(true);
@@ -30,6 +31,8 @@ export function TakedownAction({ id, name, takenDown }: { id: string; name: stri
       if (!res.ok) return setError(data.error ?? "Could not save the change.");
       setOpen(false);
       setReason("");
+      const n = Number(data.withdrawnOffers ?? 0);
+      setNotice(path === "takedown" ? (n > 0 ? `Taken down. ${n === 1 ? "1 open offer was" : `${n} open offers were`} withdrawn.` : "Taken down. No open offers to withdraw.") : null);
       router.refresh();
     } catch {
       setError("Network problem. Try again.");
@@ -41,14 +44,14 @@ export function TakedownAction({ id, name, takenDown }: { id: string; name: stri
   async function takeDown() {
     const ok = await ask({
       title: "Take this listing down?",
-      body: `"${name}" disappears from candidate discovery now and the employer is told why. You can restore it later.`,
+      body: `"${name}" disappears from candidate discovery now and the employer is told why. Every open offer on it (not yet answered, or accepted but not yet paid) is withdrawn and the candidates are told. Paid and hired placements are not touched. You can restore the listing later, but withdrawn offers are not revived: the employer sends new ones.`,
       confirmLabel: "Take down",
     });
     if (ok) await send("takedown", { reason: reason.trim() });
   }
 
   async function restore() {
-    const ok = await ask({ title: "Restore this listing?", body: `"${name}" becomes visible to candidates again.`, confirmLabel: "Restore", destructive: false });
+    const ok = await ask({ title: "Restore this listing?", body: `"${name}" becomes visible to candidates again. Offers withdrawn by the takedown stay withdrawn; the employer sends new ones.`, confirmLabel: "Restore", destructive: false });
     if (ok) await send("restore", {});
   }
 
@@ -59,6 +62,7 @@ export function TakedownAction({ id, name, takenDown }: { id: string; name: stri
         <button type="button" disabled={busy} onClick={() => void restore()} className={buttonClass({ variant: "outline", size: "sm" })}>
           Restore
         </button>
+        {notice && <p role="status" className="text-xs text-ink-600">{notice}</p>}
         {error && <p role="alert" className="text-xs text-danger">{error}</p>}
       </div>
     );

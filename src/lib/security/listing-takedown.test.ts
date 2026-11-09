@@ -12,9 +12,21 @@ test("proposals route reads takenDownAt and answers 409 for a taken-down listing
   const src = read("api/employer/[id]/proposals/route.ts");
   assert.match(src, /takenDownAt: schema\.projects\.takenDownAt/);
   assert.match(src, /isProjectOpen\(project\.status, project\.takenDownAt\)/);
-  assert.match(src, /Findtern took this listing down\. Pick another project\./);
-  const at = src.indexOf("Findtern took this listing down");
-  assert.match(src.slice(at, at + 120), /status: 409/);
+  // The refusal carries the shared takedown message and code, twice: the early check and the re-check under the project lock.
+  assert.match(src, /takedownBlock\(project, "send"\)/);
+  assert.match(src, /takedownBlock\(live, "send"\)/);
+  assert.match(src, /listing_taken_down/);
+  const at = src.indexOf('takedownBlock(project, "send")');
+  assert.match(src.slice(at, at + 200), /status: 409/);
+});
+
+test("both offer routes re-check the takedown under a shared project lock before inserting", () => {
+  for (const p of ["api/employer/[id]/proposals/route.ts", "api/employer/[id]/full-time-offer/route.ts"]) {
+    const src = read(p);
+    assert.match(src, /\.for\("share"\)/, p);
+    assert.ok(src.indexOf('.for("share")') < src.indexOf(".insert(schema.proposals)"), `${p}: lock before insert`);
+    assert.match(src, /listing_taken_down/, p);
+  }
 });
 
 test("pages that offer open projects to an employer skip taken-down ones", () => {

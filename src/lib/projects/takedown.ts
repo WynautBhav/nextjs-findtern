@@ -44,14 +44,17 @@ export function planTakedown(input: {
 
 /**
  * A taken-down listing also freezes the offers already made on it: the intern can't accept one,
- * the employer can't open a payment for one, and a pending interview can't be booked. Declining
- * and withdrawing stay open, and hired placements (money already moving) are not touched.
+ * the employer can't open a payment for one, and a pending interview can't be booked; no new
+ * offer can be sent from it. Declining and withdrawing stay open, and hired placements (money
+ * already moving) are not touched. (The takedown itself also withdraws the open offers, see
+ * `takedown-withdraw.ts`; these blocks cover the gap for offers made after it.)
  * Returns the refusal text (answer 409), or null when the listing is up.
  */
 export const TAKEDOWN_BLOCKS = {
   accept: "Findtern took this listing down, so this offer can't be accepted right now. You can still turn it down.",
   pay: "Findtern took this listing down, so this offer can't be paid for right now. Contact support.",
   schedule: "Findtern took this listing down, so this interview can't be scheduled right now.",
+  send: "Findtern took this listing down, so you can't send offers on it. Pick another project.",
 } as const;
 
 export function takedownBlock(
@@ -68,4 +71,23 @@ export function takedownBlock(
  */
 export function takedownCheckedLineIds(lines: { id: string; due?: unknown; fullTime?: boolean }[]): string[] {
   return lines.filter((l) => !l.due && !l.fullTime).map((l) => l.id);
+}
+
+/**
+ * Statuses an offer can be in when a takedown withdraws it: not yet answered by the intern
+ * (draft, sent, interview_scheduled) or accepted by the intern but not yet paid. "processing"
+ * (legacy accepted-and-paying), "hired" and the terminal states are never touched.
+ */
+export const TAKEDOWN_WITHDRAW_STATUSES = ["draft", "sent", "interview_scheduled", "accepted"] as const;
+
+/**
+ * Does a takedown withdraw this offer? An accepted offer goes only while nothing is paid or being
+ * paid: no `hiredAt`, no open checkout order (an order opened before the takedown settles
+ * normally), and not a full-time offer (accepting it was the hire itself, so it is a placement
+ * and the existing withdraw path refuses it too).
+ */
+export function takedownWithdraws(p: { status: string; hiredAt?: Date | string | null; fullTime: boolean; hasOpenOrder: boolean }): boolean {
+  if (p.status === "draft" || p.status === "sent" || p.status === "interview_scheduled") return true;
+  if (p.status === "accepted") return !p.hiredAt && !p.fullTime && !p.hasOpenOrder;
+  return false;
 }

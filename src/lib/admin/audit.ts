@@ -87,6 +87,7 @@ export const AUDIT_ACTIONS = {
   "project.reject": "Rejected an internship posting",
   "project.takedown": "Took an internship posting down",
   "project.restore": "Restored a taken-down internship posting",
+  "proposal.takedown_withdraw": "Offer withdrawn because its posting was taken down",
   "roster_import.purge": "Purged expired roster uploads (automatic)",
   "college.admin_create": "Created a TPO login",
   "terms.publish": "Published terms",

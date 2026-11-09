@@ -27,6 +27,7 @@ import {
 import { employerRegion } from "@/lib/employer-pricing";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { isProjectOpen } from "@/lib/project-locations";
+import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
 import { isBlockingInterview } from "@/lib/employer-interview-rules";
 import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
 
@@ -146,7 +147,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!project) return NextResponse.json({ error: "Unknown project" }, { status: 404 });
   // Offers go out on open projects only (legacy picker; EMH-15).
   if (!isProjectOpen(project.status, project.takenDownAt)) {
-    if (project.takenDownAt) return NextResponse.json({ error: "Findtern took this listing down. Pick another project." }, { status: 409 });
+    const blocked = takedownBlock(project, "send");
+    if (blocked) return NextResponse.json({ error: blocked, code: "listing_taken_down" }, { status: 409 });
     return NextResponse.json({ error: "This project is closed. Reopen it or pick an open project." }, { status: 409 });
   }
 
@@ -266,6 +268,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // inserted under one lock, so two requests at once (a double click gave
   // three live offers) can't both pass.
   const created = await withLock(`offer:${id}:${b.internId}`, async (tx) => {
+    // The early check can be stale: an admin takedown may have committed since. Re-read the project
+    // under a shared row lock (the takedown holds FOR UPDATE), so either it is seen here or it waits
+    // for this insert and then withdraws the new offer with the rest.
+    const [live] = await tx
+      .select({ takenDownAt: schema.projects.takenDownAt })
+      .from(schema.projects)
+      .where(eq(schema.projects.id, b.projectId))
+      .for("share")
+      .limit(1);
+    if (takedownBlock(live, "send")) return { takenDown: true as const };
     const held = candidateHeld(
       await tx
         .select({
@@ -301,6 +313,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .returning();
     return row;
   });
+  if ("takenDown" in created) {
+    return NextResponse.json({ error: TAKEDOWN_BLOCKS.send, code: "listing_taken_down" }, { status: 409 });
+  }
   if ("held" in created) {
     return NextResponse.json({ error: created.held, ...(created.proposalId ? { proposalId: created.proposalId } : {}) }, { status: 409 });
   }
