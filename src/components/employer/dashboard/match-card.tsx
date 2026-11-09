@@ -116,7 +116,7 @@ export function MatchCard({ id, href, initials, photoUrl, presence, where, score
       {fit?.of ? (
         <div title={`${fit.hit} of ${fit.of} skills for ${fit.projectName}`}>
           <FitSegments hit={fit.hit} of={fit.of} />
-          <p className="mt-1.5 truncate text-sm leading-5 text-ink-600">
+          <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-ink-600">
             <span className="nums font-semibold text-ink-900">
               {fit.hit} of {fit.of}
             </span>{" "}

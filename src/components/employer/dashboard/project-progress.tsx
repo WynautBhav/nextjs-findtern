@@ -72,8 +72,8 @@ export function ProjectProgress({ id, name, closed, hired, open, declined, actio
         </div>
       )}
 
-      <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-        <p className="nums min-w-0 text-text-subtle" aria-hidden={total ? true : undefined}>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-0 text-sm">
+        <p className="nums text-text-subtle" aria-hidden={total ? true : undefined}>
           {total ? (
             parts.map((p, i) => (
               <span key={p.key} className="whitespace-nowrap">
@@ -89,14 +89,14 @@ export function ProjectProgress({ id, name, closed, hired, open, declined, actio
         </p>
         {action ? (
           same ? (
-            <span className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-medium text-ink-700">
+            <span className="ml-auto inline-flex shrink-0 items-center gap-1 whitespace-nowrap font-medium text-ink-700">
               {action.label}
               <ArrowRight className="size-3.5 transition-transform group-hover:translate-x-0.5 motion-reduce:transition-none" aria-hidden />
             </span>
           ) : (
             <Link
               href={action.href}
-              className="relative z-10 -my-3 inline-flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-md font-medium text-ink-800 outline-none transition-colors hover:text-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500"
+              className="relative z-10 -my-3 ml-auto inline-flex min-h-11 shrink-0 items-center gap-1 whitespace-nowrap rounded-md font-medium text-ink-800 outline-none transition-colors hover:text-brand-700 focus-visible:ring-2 focus-visible:ring-brand-500"
             >
               {action.label}
               <ArrowRight className="size-3.5" aria-hidden />

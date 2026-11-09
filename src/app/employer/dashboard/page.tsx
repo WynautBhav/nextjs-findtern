@@ -1,19 +1,15 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { FolderPlus, Hourglass, Search } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { FIRST_PAYMENT_EXPLAINER } from "@/lib/first-payment-copy";
-import { ButtonLink } from "@/components/ui/button";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
-import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { EmptyScene, PageHead, SURFACE_CLASS } from "@/components/app/primitives";
+import { cn } from "@/lib/utils";
 import { requireRole } from "@/lib/auth";
 import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
-import { RowAvatar } from "@/components/employer/candidate-row-parts";
-import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { rowSkills, skillBaseName } from "@/components/employer/candidate-view";
 import { requireEmployerSetup } from "@/lib/employer-setup";
@@ -25,14 +21,13 @@ import { proposalBucket } from "@/components/employer/proposal-bucket";
 import { parseOffer } from "@/lib/offer";
 import { timezoneForLocation } from "@/lib/timezones";
 import { formatSlotTime } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import { buildActivity, buildFunnel, buildProjectStats, untilLabel, type Activity as ActivityData, type DashProposal, type Funnel as FunnelData } from "@/lib/employer-dashboard";
-import { Hero } from "@/components/employer/dashboard/hero";
+import { Hero, type HeroQueueItem } from "@/components/employer/dashboard/hero";
 import { Funnel } from "@/components/employer/dashboard/funnel";
 import { Activity } from "@/components/employer/dashboard/activity";
 import { MatchCard, type MatchCardProps } from "@/components/employer/dashboard/match-card";
 import { ProjectProgress } from "@/components/employer/dashboard/project-progress";
-import { MatchHeader, MatchRow, MeetingGlyph, PipelineStrip, ProjectLine, Queue, ScoreBands, SectionHead, type PipelineStep, type QueueItem } from "./_parts";
+import { ScoreBands, SectionHead } from "./_parts";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -42,7 +37,7 @@ export const metadata: Metadata = {
 type ProjectRow = typeof schema.projects.$inferSelect;
 type InterviewRow = typeof schema.interviews.$inferSelect;
 
-type Task = QueueItem & {
+type Task = HeroQueueItem & {
   /** False when the next move is someone else's (the candidate picking a time). */
   yours?: boolean;
 };
@@ -137,9 +132,6 @@ export default async function EmployerDashboard() {
     hiredAt: p.hiredAt,
   }));
   const awaiting = bucket.filter((b) => b === "open").length;
-  const accepted = bucket.filter((b) => b === "accepted").length;
-  const hired = bucket.filter((b) => b === "hired").length;
-  const declined = bucket.filter((b) => b === "closed").length;
 
   const tasks: Task[] = (
     [
@@ -201,30 +193,7 @@ export default async function EmployerDashboard() {
   const nextAt = next ? slotDate(next) : null;
   const joinLive = Boolean(next?.meetingLink && next && isMeetingLinkLive(next));
 
-  // The pipeline, each figure opening the matching Proposals tab.
-  const pipeline: PipelineStep[] = [
-    {
-      n: awaiting,
-      label: "Awaiting a reply",
-      status: "open",
-      tone: "awaiting",
-    },
-    {
-      n: accepted,
-      label: "Accepted · to pay",
-      status: "accepted",
-      tone: "accepted",
-    },
-    { n: hired, label: "Hired", status: "hired", tone: "hired" },
-    {
-      n: declined,
-      label: "Declined or expired",
-      status: "closed",
-      tone: "closed",
-    },
-  ];
-
-  // One shape for the old rows and the new cards (WP3 swaps the rows for cards).
+  // One shape for the match cards.
   const matches: MatchCardProps[] = data.candidates.map((c) => {
     const fit = data.fit[c.id] ?? null;
     // Tint against the project the row names, so chips and "n of m" agree.
@@ -244,7 +213,6 @@ export default async function EmployerDashboard() {
     };
   });
 
-  // WP1..WP3 fill these in; until then they render nothing and the page is unchanged. WP4 places them.
   const hiredInterns = funnel.stages[3].count;
   const nextMeeting = {
     meeting:
@@ -265,194 +233,80 @@ export default async function EmployerDashboard() {
   const dateLabel = dashDate(data.timezone);
 
   return (
-    <div>
-      <Hero
-        companyName={data.companyName}
-        dateLabel={dateLabel}
-        total={total}
-        queue={mine}
-        waitingOnCandidates={waitingOnCandidates}
-        hasProposals={proposals.length > 0}
-        nextMeeting={nextMeeting}
-      />
-      <Funnel funnel={funnel} />
-      <Activity activity={activity} />
-      {matches.map((m) => (
-        <MatchCard key={m.id} {...m} />
-      ))}
-      {shownProjects.map((p, i) => {
-        const stats = byProject.get(p.id) ?? { hired: 0, open: 0, declined: 0, toPay: 0 };
-        const open = isProjectOpen(p.status, p.takenDownAt);
-        const action = stats.toPay
-          ? { label: "Pay now", href: "/employer/checkout" }
-          : !open
-            ? null
-            : stats.open
-              ? { label: "View proposals", href: "/employer/proposals" }
-              : { label: "Find candidates", href: `/employer/candidates?project=${encodeURIComponent(p.id)}` };
-        return <ProjectProgress key={p.id} id={p.id} name={p.projectName} closed={!open} hired={stats.hired} open={stats.open} declined={stats.declined} action={action} hiddenOnPhone={i >= 3} />;
-      })}
-      <PageHead
-        title="Dashboard"
-        action={
-          <>
-            <ButtonLink href="/employer/projects/new" variant="outline" size="sm" className="max-sm:flex-1">
-              <FolderPlus className="size-4" aria-hidden />
-              New project
-            </ButtonLink>
-            {/* With nothing waiting, "Find candidates" is the primary button of the empty state below: one of it per screen. */}
-            {mine.length ? (
-              <ButtonLink href="/employer/candidates" variant="outline" size="sm" className="max-sm:flex-1">
-                <Search className="size-4" aria-hidden />
-                Find candidates
-              </ButtonLink>
-            ) : null}
-          </>
-        }
-      />
-
-      {/* Phone order: queue, next meeting, pipeline, matches, projects. From xl
-          the left column is the work and the matches, the right one the meeting and projects. */}
-      <div className="flex flex-col gap-10 xl:grid xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start xl:gap-x-10">
-        <div className="contents xl:block xl:min-w-0 xl:space-y-10">
-          <section aria-labelledby="todo-h" className="order-1">
-            {mine.length ? (
-              <Queue items={mine} total={total} />
-            ) : (
-              <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-ink-200 bg-white p-5 sm:px-6">
-                <div className="min-w-0">
-                  <h2 id="todo-h" className="scroll-mt-24 text-2xl font-medium text-ink-900">
-                    {proposals.length ? "Nothing needs you right now" : "Make your first hire"}
-                  </h2>
-                  <p className="mt-1 text-sm leading-5 text-ink-600">
-                    {proposals.length
-                      ? "No payments, hours or shortlisted candidates are waiting on you."
-                      : "Shortlist candidates ranked by their Findtern Score, meet them, and send a proposal."}
-                  </p>
-                </div>
-                <ButtonLink href="/employer/candidates" variant="primary" size="sm" className="min-h-11 shadow-none hover:shadow-none">
-                  Find candidates
-                </ButtonLink>
-              </div>
-            )}
-          </section>
-
-          {proposals.length || theirs.length ? (
-            <section aria-labelledby="pipeline-h" className="order-3">
-              <SectionHead id="pipeline-h" title="Proposals" href="/employer/proposals" link="All proposals" />
-              {proposals.length ? <PipelineStrip steps={pipeline} /> : null}
-              {/* "Awaiting a reply" is the offers; this adds the meetings, the other thing on candidates. */}
-              {theirs.map((t) => (
-                <p key={t.href} className="mt-1 flex items-center gap-1.5 text-sm text-ink-600">
-                  <Hourglass className="size-4 shrink-0 text-ink-500" aria-hidden />
-                  <span>
-                    Also waiting on candidates:{" "}
-                    <Link href={t.href} className="font-medium text-ink-800 underline underline-offset-4 hover:text-ink-900 touch:inline-flex touch:min-h-11 touch:items-center">
-                      <span className="nums">{`${t.count} ${t.count === 1 ? "meeting time" : "meeting times"} to pick`}</span>
-                    </Link>
-                  </span>
-                </p>
-              ))}
-            </section>
-          ) : null}
-        </div>
-
-        <div className="contents xl:block xl:min-w-0 xl:space-y-10">
-          {next && nextAt ? (
-            <section aria-labelledby="next-h" className="order-2">
-              {/* Inside the card, so its top edge sits level with the queue card beside it. */}
-              <div className="rounded-2xl border border-ink-200 bg-white p-5">
-                <h2 id="next-h" className="scroll-mt-24 text-lg font-medium text-ink-900">
-                  Next meeting
-                </h2>
-                <div className="mt-3 flex items-center gap-3">
-                  {data.nextWith ? <RowAvatar photoUrl={data.nextWith.photoUrl} initials={data.nextWith.initials} className="size-10 text-sm sm:size-10" /> : null}
-                  <div className="min-w-0">
-                    <p className="text-base font-medium text-ink-900">
-                      {data.nextWith ? `${data.nextWith.initials} · ` : ""}
-                      <span className="nums">{formatSlotTime(nextAt, data.timezone)}</span>
-                    </p>
-                    <p className="line-clamp-2 break-words text-sm text-ink-600">{data.nextWith?.projectName ?? "No project linked"}</p>
-                  </div>
-                </div>
-                <div className={cn("mt-4 grid gap-2", joinLive && "sm:grid-cols-2")}>
-                  {joinLive && next.meetingLink ? (
-                    // Filled only when nothing else on the page is: one primary per view.
-                    <JoinMeetingButton link={next.meetingLink} size="sm" variant={mine.length ? "outline" : "primary"} block />
-                  ) : null}
-                  <ButtonLink href="/employer/schedule" variant="outline" size="sm" block>
-                    <MeetingGlyph />
-                    Open schedule
-                  </ButtonLink>
-                </div>
-              </div>
-            </section>
-          ) : null}
-
-          <section aria-labelledby="projects-h" className="order-5">
-            <SectionHead id="projects-h" title="Projects" href="/employer/projects" link="All projects" />
-            {projects.length === 0 ? (
-              <EmptyScene
-                title="No projects yet"
-                body="A project tells us the skills you need, so candidates are matched to it. It takes about five minutes."
-                next={{
-                  label: "Create a project",
-                  href: "/employer/projects/new",
-                }}
-                who="You - about five minutes"
-              />
-            ) : (
-              <>
-                <p className="mb-1 text-sm text-ink-600">
-                  {openProjects.length > shownProjects.length
-                    ? `Newest ${shownProjects.length} of ${openProjects.length} open`
-                    : `${openProjects.length} open of ${projects.length}`}
-                </p>
-                <ul className="divide-y divide-ink-100 border-t border-ink-100">
-                  {shownProjects.map((p, i) => {
-                    const stats = byProject.get(p.id) ?? {
-                      hired: 0,
-                      open: 0,
-                      declined: 0,
-                      toPay: 0,
-                    };
-                    const open = isProjectOpen(p.status, p.takenDownAt);
-                    const candidatesHref = `/employer/candidates?project=${encodeURIComponent(p.id)}`;
-                    const action = stats.toPay
-                      ? { label: "Pay now", href: "/employer/checkout" }
-                      : !open
-                        ? null
-                        : stats.open
-                          ? {
-                              label: "View proposals",
-                              href: "/employer/proposals",
-                            }
-                          : { label: "Find candidates", href: candidatesHref };
-                    // Three on a phone, so the list stays a short scroll.
-                    return <ProjectLine key={p.id} id={p.id} name={p.projectName} closed={!open} hired={stats.hired} open={stats.open} action={action} hiddenOnPhone={i >= 3} />;
-                  })}
-                </ul>
-              </>
-            )}
-          </section>
-        </div>
-        <section aria-labelledby="matches-h" className="order-4 min-w-0 xl:col-span-2">
-          <SectionHead id="matches-h" title="Top matches" href="/employer/candidates" link="All candidates" />
-          {data.candidates.length === 0 ? (
-            <p className="border-y border-ink-100 py-5 text-sm text-ink-600">No scored candidates match yet. New ones appear as they finish their AI interview.</p>
-          ) : (
-            <>
-              <MatchHeader />
-              <ul className="divide-y divide-ink-100 border-t border-ink-100">
-                {matches.map((m) => (
-                  <MatchRow key={m.id} {...m} />
-                ))}
-              </ul>
-              <ScoreBands />
-            </>
-          )}
-        </section>
+    // 12 columns from xl (1104px of content at 1440: 8 + 4 columns under the hero). Below that one column.
+    // The phone order is hero, funnel, matches, activity, projects; the next meeting lives in the hero.
+    <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-12">
+      <div className="min-w-0 xl:col-span-12">
+        <Hero
+          companyName={data.companyName}
+          dateLabel={dateLabel}
+          total={total}
+          queue={mine}
+          waitingOnCandidates={waitingOnCandidates}
+          hasProposals={proposals.length > 0}
+          nextMeeting={nextMeeting}
+        />
       </div>
+
+      <div className="min-w-0 max-xl:order-1 xl:col-span-8">
+        <Funnel funnel={funnel} />
+      </div>
+      <div className="min-w-0 max-xl:order-3 xl:col-span-4">
+        <Activity activity={activity} />
+      </div>
+
+      <section aria-labelledby="matches-h" className="flex min-w-0 flex-col max-xl:order-2 xl:col-span-8">
+        <SectionHead id="matches-h" title="Top matches" href="/employer/candidates" link="All candidates" />
+        {data.candidates.length === 0 ? (
+          <p className={cn(SURFACE_CLASS, "p-5 text-sm text-ink-600")}>No scored candidates match yet. New ones appear as they finish their AI interview.</p>
+        ) : (
+          // Four cards from sm, three on a phone so the page stays a short scroll.
+          <ul className="grid gap-4 sm:grid-cols-2 max-sm:[&>li:nth-child(n+4)]:hidden">
+            {matches.map((m) => (
+              <MatchCard key={m.id} {...m} />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="projects-h" className="flex min-w-0 flex-col max-xl:order-4 xl:col-span-4">
+        <SectionHead id="projects-h" title="Projects" href="/employer/projects" link="All projects" />
+        {projects.length === 0 ? (
+          <EmptyScene
+            title="No projects yet"
+            body="A project tells us the skills you need, so candidates are matched to it. It takes about five minutes."
+            next={{ label: "Create a project", href: "/employer/projects/new" }}
+            who="You - about five minutes"
+          />
+        ) : (
+          <div className={cn(SURFACE_CLASS, "flex-1 px-5 py-2")}>
+            <p className="pt-3 text-sm text-text-subtle">
+              {openProjects.length > shownProjects.length ? `Newest ${shownProjects.length} of ${openProjects.length} open` : `${openProjects.length} open of ${projects.length}`}
+            </p>
+            <ul className="divide-y divide-ink-100">
+              {shownProjects.map((p, i) => {
+                const stats = byProject.get(p.id) ?? { hired: 0, open: 0, declined: 0, toPay: 0 };
+                const open = isProjectOpen(p.status, p.takenDownAt);
+                const action = stats.toPay
+                  ? { label: "Pay now", href: "/employer/checkout" }
+                  : !open
+                    ? null
+                    : stats.open
+                      ? { label: "View proposals", href: "/employer/proposals" }
+                      : { label: "Find candidates", href: `/employer/candidates?project=${encodeURIComponent(p.id)}` };
+                // Three on a phone, so the list stays a short scroll.
+                return <ProjectProgress key={p.id} id={p.id} name={p.projectName} closed={!open} hired={stats.hired} open={stats.open} declined={stats.declined} action={action} hiddenOnPhone={i >= 3} />;
+              })}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      {data.candidates.length ? (
+        <div className="min-w-0 max-xl:order-5 xl:col-span-12">
+          <ScoreBands />
+        </div>
+      ) : null}
     </div>
   );
 }
