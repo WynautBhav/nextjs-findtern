@@ -185,16 +185,31 @@ export function OfferDecision({
       ) : null}
 
       <div className={cn("flex gap-3", rail ? "flex-col max-lg:sticky max-lg:bottom-[4.5rem] max-lg:z-10 max-lg:-mx-5 max-lg:border-t max-lg:border-ink-200/80 max-lg:bg-white max-lg:px-5 max-lg:py-3" : "flex-wrap")}>
+        {acceptBlocked ? (
+          <p id={`accept-blocked-${proposalId}`} className="flex w-full basis-full items-start gap-2 rounded-apple-sm bg-warning-soft px-4 py-3 text-sm text-ink-800">
+            <AlertCircle className="mt-px size-4 shrink-0" aria-hidden />
+            {acceptBlocked}
+          </p>
+        ) : null}
         <button
           type="button"
-          onClick={() => setAcceptOpen(true)}
-          disabled={busy !== null || Boolean(acceptBlocked)}
+          // aria-disabled, not disabled: the button stays in the Tab order so a keyboard or screen-reader
+          // user reaches it and hears the reason (aria-describedby). The click is ignored instead.
+          onClick={() => {
+            if (!acceptBlocked) setAcceptOpen(true);
+          }}
+          disabled={busy !== null}
+          aria-disabled={acceptBlocked ? true : undefined}
           aria-describedby={acceptBlocked ? `accept-blocked-${proposalId}` : undefined}
           className={buttonClass({
             variant: "primary",
             size: "md",
             block: rail,
-            className: cn("text-sm font-semibold", !rail && "flex-1 max-sm:basis-full sm:flex-none"),
+            className: cn(
+              "text-sm font-semibold",
+              !rail && "flex-1 max-sm:basis-full sm:flex-none",
+              acceptBlocked && "cursor-not-allowed opacity-55 hover:bg-primary hover:shadow-sm active:scale-100",
+            ),
           })}
         >
           {busy === "accept" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <Check className="size-4" aria-hidden />}
@@ -216,12 +231,6 @@ export function OfferDecision({
         </button>
         {rail ? null : aside}
       </div>
-      {acceptBlocked ? (
-        <p id={`accept-blocked-${proposalId}`} className="mt-3 flex items-start gap-2 rounded-apple-sm bg-warning-soft px-4 py-3 text-sm text-ink-800">
-          <AlertCircle className="mt-px size-4 shrink-0" aria-hidden />
-          {acceptBlocked}
-        </p>
-      ) : null}
 
       {rail ? (
         <div className="mt-4 space-y-2 text-sm leading-relaxed text-ink-600">

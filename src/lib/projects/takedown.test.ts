@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { planTakedown, takedownBlock, TAKEDOWN_BLOCKS } from "./takedown.ts";
+import { planTakedown, takedownBlock, takedownCheckedLineIds, TAKEDOWN_BLOCKS } from "./takedown.ts";
 
 const NOW = new Date("2026-11-08T10:00:00Z");
 const up = { takenDownAt: null };
@@ -47,4 +47,15 @@ test("takedownBlock refuses for a taken-down listing, per action, and passes a l
     assert.equal(takedownBlock(undefined, action), null);
   }
   assert.match(TAKEDOWN_BLOCKS.accept, /can still turn it down/);
+});
+
+test("a taken-down listing blocks paying a new internship hire, not a due month and not a full-time fee", () => {
+  const lines = [
+    { id: "new-internship", due: null, fullTime: false },
+    { id: "due-month", due: { monthsPaid: 1 }, fullTime: false },
+    { id: "full-time-fee", due: null, fullTime: true },
+  ];
+  assert.deepEqual(takedownCheckedLineIds(lines), ["new-internship"]);
+  assert.deepEqual(takedownCheckedLineIds([lines[1]!, lines[2]!]), [], "nothing to check: the order goes through");
+  assert.deepEqual(takedownCheckedLineIds([]), []);
 });

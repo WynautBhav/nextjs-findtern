@@ -13,7 +13,7 @@ import { hash } from "@node-rs/argon2";
 import { chromium } from "playwright";
 
 import { api, url } from "./lib/browser.mjs";
-import { closeDb, one, rows } from "./lib/db.mjs";
+import { closeDb, db, one, rows } from "./lib/db.mjs";
 import { RUN, SKILLS, PASSWORD, cleanup, mkEmployer, mkIntern, mkProject, mkProposal, signedIn } from "./lib/fixtures2.mjs";
 
 let browser;
@@ -186,9 +186,29 @@ test("taken down: the intern cannot accept an existing offer (409), nothing chan
   await P.I.page.goto(url(`/intern/proposals/${offerId}`), { waitUntil: "domcontentloaded" });
   const btn = P.I.page.getByRole("button", { name: /Accept this offer/ });
   await btn.waitFor({ timeout: 20_000 });
-  assert.equal(await btn.isDisabled(), true, "Accept is disabled, not a failing button");
+  assert.equal(await btn.getAttribute("aria-disabled"), "true", "Accept is marked unavailable");
+  assert.equal(await btn.getAttribute("disabled"), null, "not natively disabled, so Tab still reaches it and its reason");
+  await btn.focus();
+  assert.equal(await btn.evaluate((el) => el === document.activeElement), true, "the button takes keyboard focus");
+  const reasonId = await btn.getAttribute("aria-describedby");
+  assert.match((await P.I.page.locator(`[id="${reasonId}"]`).textContent()) ?? "", /took this listing down/, "aria-describedby points at the reason");
+  await btn.click({ force: true }); // force: Playwright otherwise waits for an enabled button
+  assert.equal(await P.I.page.getByRole("dialog").count(), 0, "clicking the unavailable Accept opens nothing");
   assert.match((await P.I.page.locator("main").textContent()) ?? "", /took this listing down/);
   assert.equal(await P.I.page.getByRole("button", { name: "Turn it down" }).isDisabled(), false, "declining stays available");
+  // On a 390 px phone the reason is in the same block as the buttons, above them, so it is on screen with the Accept button.
+  await P.I.page.setViewportSize({ width: 390, height: 844 });
+  try {
+    await P.I.page.goto(url(`/intern/proposals/${offerId}`), { waitUntil: "domcontentloaded" });
+    const reason = P.I.page.locator(`[id="${await P.I.page.getByRole("button", { name: /Accept this offer/ }).getAttribute("aria-describedby")}"]`);
+    await reason.waitFor({ timeout: 20_000 });
+    // The reason sits directly above the buttons in the same bar, so wherever the Accept button is on screen, the reason is too.
+    await P.I.page.getByRole("button", { name: /Accept this offer/ }).scrollIntoViewIfNeeded();
+    const box = await reason.boundingBox();
+    assert.ok(box && box.y >= 0 && box.y + box.height <= 844, `reason is inside the 390x844 viewport: ${JSON.stringify(box)}`);
+  } finally {
+    await P.I.page.setViewportSize({ width: 1280, height: 900 });
+  }
   S.offerId = offerId;
 });
 
@@ -229,6 +249,45 @@ test("taken down: the intern cannot book an interview slot (409); the interview 
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.equal(r.body.code, "listing_taken_down");
   assert.equal((await one(`SELECT status FROM interviews WHERE id = $1`, [iv.id])).status, "pending");
+});
+
+test("taken down: the full-time fee of an offer the intern accepted BEFORE the takedown is still payable", async () => {
+  const intern = await mkIntern("tdI5");
+  const offerId = await mkProposal(E.id, intern.id, pid);
+  await one(
+    `UPDATE proposals SET status = 'accepted', currency = 'INR', offer_details = $2::jsonb WHERE id = $1 RETURNING id`,
+    [offerId, JSON.stringify({ roleTitle: "Engineer", startDate: "2099-01-01", fullTimeOffer: { jobTitle: "Engineer", annualCtcMinor: 60000000 } })],
+  );
+  const r = await api(P.E.page, "POST", `/api/employer/${E.id}/payment/razorpay/order`, { currency: "INR", proposalIds: [offerId], mode: "upfront", paymentIndex: 0 });
+  assert.notEqual(r.body?.code, "listing_taken_down", `refused as taken down: ${JSON.stringify(r.body)}`);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(await status(offerId), "hired", "the hire the intern already made is completed");
+});
+
+test("accept race: a takedown that commits after the early check but before the write still refuses the accept", async () => {
+  const racePid = await mkProject(E.id, `Race Role ${RUN}`);
+  const intern = await mkIntern("tdI4");
+  P.I4 = await signedIn(browser, intern);
+  const offerId = await mkProposal(E.id, intern.id, racePid);
+  const client = await db().connect();
+  let reply;
+  try {
+    // An admin takedown in flight: it holds the project row and has not committed.
+    await client.query("BEGIN");
+    await client.query(`UPDATE projects SET taken_down_at = now(), taken_down_by = $2, taken_down_reason = 'race' WHERE id = $1`, [racePid, ADMIN.id]);
+    // The intern accepts now. The early read cannot see the uncommitted takedown, so it passes.
+    const inflight = api(P.I4.page, "PATCH", `/api/proposals/${offerId}/status`, { status: "accepted", agreedToTerms: true });
+    const early = await Promise.race([inflight, new Promise((ok) => setTimeout(() => ok("waiting"), 2500))]);
+    assert.equal(early, "waiting", `the accept should wait on the project row lock, got ${JSON.stringify(early)}`);
+    await client.query("COMMIT");
+    reply = await inflight;
+  } finally {
+    await client.query("ROLLBACK").catch(() => {});
+    client.release();
+  }
+  assert.equal(reply.status, 409, JSON.stringify(reply.body));
+  assert.equal(reply.body.code, "listing_taken_down");
+  assert.equal(await status(offerId), "sent", "not accepted");
 });
 
 test("restored: the same offer can be accepted, paid for and its interview booked again", async () => {

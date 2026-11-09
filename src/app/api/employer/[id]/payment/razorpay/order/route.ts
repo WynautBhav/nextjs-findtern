@@ -10,7 +10,7 @@ import { paymentIndexMismatch } from "@/lib/dues";
 import { requireMutation } from "@/lib/guards-mutation";
 import { openProposalsWithDues, payableCheckout, type PayableLine } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders, legacyOrderRaw, OPEN_ORDER_MINUTES, orderProposalIds, settleEmployerOrder } from "@/lib/payments";
-import { TAKEDOWN_BLOCKS } from "@/lib/projects/takedown";
+import { TAKEDOWN_BLOCKS, takedownCheckedLineIds } from "@/lib/projects/takedown";
 import { orderModeProblem } from "@/lib/order-mode";
 import { quotePromo } from "@/lib/promo";
 import { createOrder, paymentsAreFree, razorpayKeyId, testPayEnabled } from "@/lib/razorpay";
@@ -113,9 +113,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { lines } = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode: parsed.data.mode });
   const paying = lines.filter((l) => l.currency === currency);
   if (paying.length === 0) return NextResponse.json({ error: "There is nothing to pay on this offer right now. Refresh the page." }, { status: 400 });
-  // A taken-down listing freezes its unpaid offers. A due month on a placement already hired is not
-  // new business and still goes through.
-  const hireIds = paying.filter((l) => !l.due).map((l) => l.id);
+  // A taken-down listing freezes its unpaid internship offers. A due month, or the fee of a full-time
+  // offer the intern already accepted (that acceptance was the hire), is not new business and still goes through.
+  const hireIds = takedownCheckedLineIds(paying);
   if (hireIds.length > 0) {
     const down = await getDb()
       .select({ id: schema.proposals.id })

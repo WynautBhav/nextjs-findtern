@@ -60,3 +60,12 @@ export function takedownBlock(
 ): string | null {
   return project?.takenDownAt ? TAKEDOWN_BLOCKS[action] : null;
 }
+
+/**
+ * Which payable lines a taken-down listing blocks the employer from paying. Only a NEW internship
+ * hire: a due month (placement already hired) and a full-time fee (accepting the full-time offer
+ * was the hire, so the fee is owed on a hire that already happened) are not new business.
+ */
+export function takedownCheckedLineIds(lines: { id: string; due?: unknown; fullTime?: boolean }[]): string[] {
+  return lines.filter((l) => !l.due && !l.fullTime).map((l) => l.id);
+}

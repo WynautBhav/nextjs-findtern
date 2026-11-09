@@ -11,7 +11,7 @@ import { employerNames, internFirstName, notify, resolveOfferNotifications } fro
 import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
 import { FREE_DECLINES, offerPastStart, parseOffer, todayIst } from "@/lib/offer";
 import { hasOpenOrderFor, OPEN_ORDER_MINUTES } from "@/lib/payments";
-import { takedownBlock } from "@/lib/projects/takedown";
+import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
 
 /**
  * Which role may set which status.
@@ -211,6 +211,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   let expired: { id: string; employerId: string }[] = [];
   const updated = await db.transaction(async (tx) => {
     await tx.select({ id: schema.proposals.id }).from(schema.proposals).where(eq(schema.proposals.internId, proposal.internId)).for("update");
+    // Re-check the takedown under a shared row lock: the admin takedown holds FOR UPDATE on the project
+    // row, so it either committed before this read (seen here) or waits until this transaction ends.
+    if (recordTerms && proposal.projectId) {
+      const [live] = await tx
+        .select({ takenDownAt: schema.projects.takenDownAt })
+        .from(schema.projects)
+        .where(eq(schema.projects.id, proposal.projectId))
+        .for("share")
+        .limit(1);
+      if (takedownBlock(live, "accept")) return "taken_down" as const;
+    }
     // One internship at a time: an offer accepted elsewhere and not yet
     // closed (awaiting payment) blocks a second acceptance.
     if (status === "accepted") {
@@ -282,6 +293,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
     return row;
   });
+  if (updated === "taken_down") {
+    return NextResponse.json({ error: TAKEDOWN_BLOCKS.accept, code: "listing_taken_down" }, { status: 409 });
+  }
   if (updated === "busy") {
     return NextResponse.json({ error: "You have already accepted another offer. Only one internship at a time." }, { status: 409 });
   }

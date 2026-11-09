@@ -90,6 +90,13 @@ test("proposal status route: only an intern accepting is blocked, before any wri
   assert.ok(guardStart > 0, "guard is keyed on the intern accepting (recordTerms), so decline/withdraw never reach it");
   assert.match(src.slice(at, at + 160), /status: 409/);
   assert.match(src, /const recordTerms = session\.role === "intern" && status === "accepted"/);
+  // The same check repeats inside the transaction under a shared row lock, so a takedown committing
+  // between the early read and the write cannot slip through (e2e "accept race" shows it).
+  const tx = src.slice(src.indexOf("db.transaction("));
+  const lock = tx.indexOf('.for("share")');
+  assert.ok(lock > 0, "project re-read under FOR SHARE inside the transaction");
+  assert.ok(lock < tx.indexOf(".update(schema.proposals)"), "re-read happens before the status write");
+  assert.match(tx.slice(lock, lock + 250), /takedownBlock\(live, "accept"\)/);
 });
 
 test("interview slot booking and new-hire checkout refuse for a taken-down listing; due months do not", () => {
@@ -97,14 +104,18 @@ test("interview slot booking and new-hire checkout refuse for a taken-down listi
   assert.match(slot, /takedownBlock\(project, "schedule"\)/);
   assert.ok(slot.indexOf('takedownBlock(project, "schedule")') < slot.indexOf("createMeetEvent("), "refused before a Meet event is created");
   const order = read("api/employer/[id]/payment/razorpay/order/route.ts");
-  assert.match(order, /paying\.filter\(\(l\) => !l\.due\)/);
+  // Which lines are checked is behaviour: see takedownCheckedLineIds in projects/takedown.test.ts.
+  assert.match(order, /takedownCheckedLineIds\(paying\)/);
   assert.match(order, /isNotNull\(schema\.projects\.takenDownAt\)/);
   assert.ok(order.indexOf("TAKEDOWN_BLOCKS.pay") < order.indexOf("await openOrder("), "refused before an order is opened");
 });
 
-test("intern offer screens disable Accept with the reason; decline button is not gated", () => {
+test("intern offer screens mark Accept unavailable with the reason; decline button is not gated", () => {
   const dec = readFileSync(join(APP, "../components/app/offer-decision.tsx"), "utf8");
-  assert.match(dec, /disabled=\{busy !== null \|\| Boolean\(acceptBlocked\)\}/);
+  // Unavailable Accept stays focusable (aria-disabled, not `disabled`) and its click does nothing.
+  assert.match(dec, /aria-disabled=\{acceptBlocked \? true : undefined\}/);
+  assert.match(dec, /if \(!acceptBlocked\) setAcceptOpen\(true\)/);
+  assert.doesNotMatch(dec, /(?<!aria-)disabled=\{[^}]*acceptBlocked/);
   assert.match(dec, /onClick=\{\(\) => setDeclineOpen\(true\)\}\s+disabled=\{busy !== null\}/);
   assert.match(read("intern/proposals/page.tsx"), /acceptBlocked=\{takenDown \? TAKEDOWN_BLOCKS\.accept : null\}/);
   assert.match(read("intern/proposals/[id]/page.tsx"), /acceptBlocked=\{takedownBlock\(project\.row, "accept"\)\}/);
