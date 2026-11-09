@@ -31,6 +31,19 @@ const VIEWS = [
 
 const setSeen = (ago) =>
   one(`INSERT INTO user_presence (user_id, last_seen_at) VALUES ($1, now() - $2::interval) ON CONFLICT (user_id) DO UPDATE SET last_seen_at = now() - $2::interval RETURNING 1 AS x`, [I.id, ago]);
+/**
+ * A real heartbeat from the candidate. The server allows 6 per user per fixed 60 s window (heartbeatLimiter), and the
+ * candidate's open pages beat on every load too, so by the later tests the window is spent. The limiter stays as it is:
+ * on 429 wait for the window to roll over (it is at most 60 s) and ask again.
+ */
+const heartbeat = async (page) => {
+  const deadline = Date.now() + 70_000;
+  for (;;) {
+    const r = await api(page, "POST", "/api/presence/heartbeat");
+    if (r.status !== 429 || Date.now() > deadline) return r;
+    await new Promise((res) => setTimeout(res, 5_000));
+  }
+};
 const threadsOf = async () => {
   const r = await api(P.E.page, "GET", "/api/threads");
   assert.equal(r.status, 200);
@@ -111,7 +124,7 @@ test("toggle API: auth, role, CSRF, validation", async () => {
 });
 
 test("default: the employer sees the candidate as active now (threads API, pages)", async () => {
-  const hb = await api(P.I.page, "POST", "/api/presence/heartbeat");
+  const hb = await heartbeat(P.I.page);
   assert.equal(hb.status, 200);
   await setSeen("2 seconds");
   const t = await threadsOf();
@@ -226,7 +239,7 @@ test("the candidate sees the toggle in settings, on by default, and flips it", a
 test("hidden: the employer sees nothing, anywhere, and no timestamp leaks", async () => {
   // A REAL heartbeat after the hide: it must refresh last_seen_at without flipping show_activity back on.
   await setSeen("1 hour");
-  const hb = await api(P.I.page, "POST", "/api/presence/heartbeat");
+  const hb = await heartbeat(P.I.page);
   assert.equal(hb.status, 200, JSON.stringify(hb.body));
   const beat = await one(`SELECT show_activity, last_seen_at > now() - interval '30 seconds' AS fresh FROM user_presence WHERE user_id = $1`, [I.id]);
   assert.equal(beat.show_activity, false, "a heartbeat does not undo the hide");
