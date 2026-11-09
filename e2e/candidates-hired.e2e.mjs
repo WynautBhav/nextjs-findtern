@@ -121,11 +121,11 @@ test("employer A: the Shortlist view and its count leave the hired out", async (
 
 test("employer A: a hired intern in the compare picks is dropped from the tray", async () => {
   const r = await read(ctxA, listUrl(state.projA, `&ids=${state.hired.id},${state.fillers[1].id}`));
-  assert.match(r.picked, /^1 selected/, `tray: ${r.picked}`);
+  assert.match(r.picked, /\b1 candidate selected/, `tray: ${r.picked}`);
   assert.ok(!r.picked.includes("Compare"), "one pick is not enough to open Compare");
   // the same picks with nobody hired still count both
   const two = await read(ctxA, listUrl(state.projA, `&ids=${state.fillers[2].id},${state.fillers[1].id}`));
-  assert.match(two.picked, /^2 selected/);
+  assert.match(two.picked, /\b2 candidates selected/);
 });
 
 test("employer B (no hire): the same interns are all listed", async () => {
