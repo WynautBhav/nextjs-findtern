@@ -26,6 +26,12 @@ import { parseOffer } from "@/lib/offer";
 import { timezoneForLocation } from "@/lib/timezones";
 import { formatSlotTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { buildActivity, buildFunnel, buildProjectStats, untilLabel, type Activity as ActivityData, type DashProposal, type Funnel as FunnelData } from "@/lib/employer-dashboard";
+import { Hero } from "@/components/employer/dashboard/hero";
+import { Funnel } from "@/components/employer/dashboard/funnel";
+import { Activity } from "@/components/employer/dashboard/activity";
+import { MatchCard, type MatchCardProps } from "@/components/employer/dashboard/match-card";
+import { ProjectProgress } from "@/components/employer/dashboard/project-progress";
 import { MatchHeader, MatchRow, MeetingGlyph, PipelineStrip, ProjectLine, Queue, ScoreBands, SectionHead, type PipelineStep, type QueueItem } from "./_parts";
 
 export const metadata: Metadata = {
@@ -50,7 +56,11 @@ type Loaded = {
     projectId: string;
     internId: string;
     offerDetails: unknown;
+    createdAt: Date | null;
+    hiredAt: Date | null;
   }[];
+  /** Interns with a scheduled or completed interview (funnel: "met"). */
+  metInternIds: string[];
   submittedSheets: number;
   pendingInterviews: number;
   nextInterview: InterviewRow | null;
@@ -66,6 +76,8 @@ type Loaded = {
   fit: Record<string, Fit | null>;
   /** "projectId:internId" pairs already on the shortlist. */
   saved: string[];
+  /** Intern ids on the shortlist or checkout list (funnel: "in pipeline"). */
+  shortlistInternIds: string[];
   /** Who the next meeting is with (initials and photo only) and for which project. */
   nextWith: {
     initials: string;
@@ -116,8 +128,15 @@ export default async function EmployerDashboard() {
   // The same buckets as the Proposals tabs (an unanswered offer past its start
   // date is closed there), so every figure here matches the tab it opens.
   const bucket = proposals.map((p) => proposalBucket(p.status, offerState({ status: p.status, hiredAt: null }, parseOffer(p.offerDetails)).lapsed));
+  const dashProposals: DashProposal[] = proposals.map((p, i) => ({
+    internId: p.internId,
+    projectId: p.projectId,
+    status: p.status,
+    bucket: bucket[i],
+    createdAt: p.createdAt,
+    hiredAt: p.hiredAt,
+  }));
   const awaiting = bucket.filter((b) => b === "open").length;
-  const isToPay = (s: string) => s === "accepted" || s === "processing";
   const accepted = bucket.filter((b) => b === "accepted").length;
   const hired = bucket.filter((b) => b === "hired").length;
   const declined = bucket.filter((b) => b === "closed").length;
@@ -164,15 +183,14 @@ export default async function EmployerDashboard() {
 
   const openProjects = projects.filter((p) => isProjectOpen(p.status, p.takenDownAt));
   const shownProjects = [...openProjects, ...projects.filter((p) => !isProjectOpen(p.status, p.takenDownAt))].slice(0, 5);
-  // Per project: hires, offers still in play (awaiting a reply or accepted), and payments due.
-  const byProject = new Map<string, { hired: number; open: number; toPay: number }>();
-  proposals.forEach((p, i) => {
-    const row = byProject.get(p.projectId) ?? { hired: 0, open: 0, toPay: 0 };
-    if (bucket[i] === "hired") row.hired += 1;
-    if (bucket[i] === "open" || bucket[i] === "accepted") row.open += 1;
-    if (isToPay(p.status)) row.toPay += 1;
-    byProject.set(p.projectId, row);
+  // Per project: hires, offers still in play (awaiting a reply or accepted), declined, and payments due.
+  const byProject = buildProjectStats(dashProposals);
+  const funnel: FunnelData = buildFunnel({
+    proposals: dashProposals,
+    shortlistInternIds: data.shortlistInternIds,
+    metInternIds: data.metInternIds,
   });
+  const activity: ActivityData = buildActivity(dashProposals);
   // Your moves first; the meetings a candidate still has to pick sit with the
   // other things waiting on candidates, never in the to-do list.
   const mine = tasks.filter((t) => t.yours !== false);
@@ -206,8 +224,74 @@ export default async function EmployerDashboard() {
     },
   ];
 
+  // One shape for the old rows and the new cards (WP3 swaps the rows for cards).
+  const matches: MatchCardProps[] = data.candidates.map((c) => {
+    const fit = data.fit[c.id] ?? null;
+    // Tint against the project the row names, so chips and "n of m" agree.
+    const { shown, more, isWanted } = rowSkills(c.skills, new Set(fit?.skills ?? data.wanted), 3);
+    return {
+      id: c.id,
+      href: `/employer/intern/${encodeURIComponent(c.id)}${fit ? `?project=${encodeURIComponent(fit.projectId)}` : ""}`,
+      initials: c.initials,
+      photoUrl: c.photoUrl ?? null,
+      presence: data.presence[c.id] ?? null,
+      where: [c.city, c.workModes.includes("remote") ? "Remote" : ""].filter(Boolean).join(" · "),
+      score: c.scored ? c.score : null,
+      fit: fit ? { hit: fit.hit, of: fit.of, projectId: fit.projectId, projectName: fit.projectName } : null,
+      chips: shown.map((k) => ({ name: k, matched: isWanted(k) })),
+      more,
+      saved: fit ? data.saved.includes(`${fit.projectId}:${c.id}`) : false,
+    };
+  });
+
+  // WP1..WP3 fill these in; until then they render nothing and the page is unchanged. WP4 places them.
+  const hiredInterns = funnel.stages[3].count;
+  const nextMeeting = {
+    meeting:
+      next && nextAt
+        ? {
+            with: data.nextWith ? { initials: data.nextWith.initials, photoUrl: data.nextWith.photoUrl } : null,
+            whenLabel: formatSlotTime(nextAt, data.timezone),
+            untilLabel: untilLabel(nextAt),
+            projectName: data.nextWith?.projectName ?? null,
+            joinLink: joinLive && next.meetingLink ? next.meetingLink : null,
+            scheduleHref: "/employer/schedule",
+          }
+        : null,
+    hired: hiredInterns,
+    offersOut: awaiting,
+  };
+  const waitingOnCandidates = theirs[0] ? { count: theirs[0].count, label: theirs[0].label, href: theirs[0].href } : null;
+  const dateLabel = dashDate(data.timezone);
+
   return (
     <div>
+      <Hero
+        companyName={data.companyName}
+        dateLabel={dateLabel}
+        total={total}
+        queue={mine}
+        waitingOnCandidates={waitingOnCandidates}
+        hasProposals={proposals.length > 0}
+        nextMeeting={nextMeeting}
+      />
+      <Funnel funnel={funnel} />
+      <Activity activity={activity} />
+      {matches.map((m) => (
+        <MatchCard key={m.id} {...m} />
+      ))}
+      {shownProjects.map((p, i) => {
+        const stats = byProject.get(p.id) ?? { hired: 0, open: 0, declined: 0, toPay: 0 };
+        const open = isProjectOpen(p.status, p.takenDownAt);
+        const action = stats.toPay
+          ? { label: "Pay now", href: "/employer/checkout" }
+          : !open
+            ? null
+            : stats.open
+              ? { label: "View proposals", href: "/employer/proposals" }
+              : { label: "Find candidates", href: `/employer/candidates?project=${encodeURIComponent(p.id)}` };
+        return <ProjectProgress key={p.id} id={p.id} name={p.projectName} closed={!open} hired={stats.hired} open={stats.open} declined={stats.declined} action={action} hiddenOnPhone={i >= 3} />;
+      })}
       <PageHead
         title="Dashboard"
         action={
@@ -329,6 +413,7 @@ export default async function EmployerDashboard() {
                     const stats = byProject.get(p.id) ?? {
                       hired: 0,
                       open: 0,
+                      declined: 0,
                       toPay: 0,
                     };
                     const open = isProjectOpen(p.status, p.takenDownAt);
@@ -359,30 +444,9 @@ export default async function EmployerDashboard() {
             <>
               <MatchHeader />
               <ul className="divide-y divide-ink-100 border-t border-ink-100">
-                {data.candidates.map((c) => {
-                  const fit = data.fit[c.id] ?? null;
-                  // Tint against the project the row names, so chips and "n of m" agree.
-                  const { shown, more, isWanted } = rowSkills(c.skills, new Set(fit?.skills ?? data.wanted), 3);
-                  return (
-                    <MatchRow
-                      key={c.id}
-                      id={c.id}
-                      href={`/employer/intern/${encodeURIComponent(c.id)}${fit ? `?project=${encodeURIComponent(fit.projectId)}` : ""}`}
-                      initials={c.initials}
-                      photoUrl={c.photoUrl ?? null}
-                      presence={data.presence[c.id] ?? null}
-                      where={[c.city, c.workModes.includes("remote") ? "Remote" : ""].filter(Boolean).join(" · ")}
-                      score={c.scored ? c.score : null}
-                      fit={fit}
-                      chips={shown.map((k) => ({
-                        name: k,
-                        matched: isWanted(k),
-                      }))}
-                      more={more}
-                      saved={fit ? data.saved.includes(`${fit.projectId}:${c.id}`) : false}
-                    />
-                  );
-                })}
+                {matches.map((m) => (
+                  <MatchRow key={m.id} {...m} />
+                ))}
               </ul>
               <ScoreBands />
             </>
@@ -391,6 +455,13 @@ export default async function EmployerDashboard() {
       </div>
     </div>
   );
+}
+
+/** "Monday 9 November" in the employer's timezone. */
+function dashDate(timeZone: string, now: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat("en-GB", { weekday: "long", day: "numeric", month: "long", timeZone }).formatToParts(now);
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("weekday")} ${get("day")} ${get("month")}`;
 }
 
 /** The booked slot of an interview, if one was picked. */
@@ -403,7 +474,7 @@ function slotDate(iv: InterviewRow): Date | null {
 
 async function load(employerId: string): Promise<Loaded> {
   const db = getDb();
-  const [employerRow, projectRows, proposalRows, sheetRows, interviewRows, cartRows, payable] = await Promise.all([
+  const [employerRow, projectRows, proposalRows, sheetRows, interviewRows, cartRows, metRows, payable] = await Promise.all([
     db
       .select({ companyName: schema.employers.companyName, country: schema.employers.country, state: schema.employers.state, city: schema.employers.city })
       .from(schema.employers)
@@ -411,7 +482,14 @@ async function load(employerId: string): Promise<Loaded> {
       .limit(1),
     db.select().from(schema.projects).where(eq(schema.projects.employerId, employerId)).orderBy(desc(schema.projects.createdAt)),
     db
-      .select({ status: schema.proposals.status, projectId: schema.proposals.projectId, internId: schema.proposals.internId, offerDetails: schema.proposals.offerDetails })
+      .select({
+        status: schema.proposals.status,
+        projectId: schema.proposals.projectId,
+        internId: schema.proposals.internId,
+        offerDetails: schema.proposals.offerDetails,
+        createdAt: schema.proposals.createdAt,
+        hiredAt: schema.proposals.hiredAt,
+      })
       .from(schema.proposals)
       .where(eq(schema.proposals.employerId, employerId)),
     db
@@ -426,6 +504,10 @@ async function load(employerId: string): Promise<Loaded> {
       .select({ internId: schema.employerCartItems.internId, projectId: schema.employerCartItems.projectId })
       .from(schema.employerCartItems)
       .where(and(eq(schema.employerCartItems.employerId, employerId), inArray(schema.employerCartItems.listType, ["cart", "checkout"]))),
+    db
+      .select({ internId: schema.interviews.internId })
+      .from(schema.interviews)
+      .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.status, ["scheduled", "completed"]))),
     payableCheckout(employerId),
   ]);
 
@@ -515,6 +597,7 @@ async function load(employerId: string): Promise<Loaded> {
     timezone: timezoneForLocation(employer ?? {}),
     projects: projectRows,
     proposals: proposalRows,
+    metInternIds: Array.from(new Set(metRows.map((r) => r.internId))),
     submittedSheets: sheetRows.length,
     pendingInterviews: interviewRows.filter((i) => i.status === "pending" || i.status === "proposed").length,
     nextInterview: nextIv,
@@ -526,6 +609,7 @@ async function load(employerId: string): Promise<Loaded> {
     wanted,
     fit,
     saved: cartRows.map((c) => `${c.projectId}:${c.internId}`),
+    shortlistInternIds: Array.from(new Set(cartRows.map((c) => c.internId))),
     nextWith,
   };
 }
