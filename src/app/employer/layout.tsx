@@ -128,6 +128,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     <ToastProvider>
     <ConsoleShell
       roleLabel="Employer"
+      tone="light"
       homeHref="/employer/dashboard"
       groups={groups}
       tabs={tabs}
