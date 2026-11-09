@@ -135,6 +135,7 @@ async function main() {
       intern_document, employer_payments, intern_payouts, intern_payments,
       interviews, intern_onboarding, projects, 
       password_reset_tokens, email_otps, 
+      college_memberships, college_presence, college_consents, college_drive_meetings,
       pricing_plans, employers, users, admins, admin_roles
     CASCADE;
   `);
