@@ -113,6 +113,61 @@ export function ActiveFilters({ data, filters, className }: { data: CandidatesDa
   );
 }
 
+/**
+ * Sort and the project picker, inside the toolbar card (beside the search at lg; its own row on a phone,
+ * where the project lives in the Filters sheet). Sort is hidden on the shortlist tab, as before.
+ */
+export function ToolbarSort({ data, filters, compareIds, className }: { data: CandidatesData; filters: Filters; compareIds: string[]; className?: string }) {
+  const saved = filters.saved && Boolean(data.activeProjectId);
+  const sortValue = filters.sorts[0] ? `${filters.sorts[0]}${filters.dir === "asc" ? ":asc" : ""}` : "";
+  const projectKeep = (id: string) => {
+    const next = new URLSearchParams({ project: id });
+    if (compareIds.length > 0) next.set("ids", compareIds.join(","));
+    return `/employer/candidates?${next.toString()}`;
+  };
+  const select = "h-11 rounded-xl border-ink-200 bg-white pl-3.5 [field-sizing:content] sm:h-9 sm:min-h-9 sm:touch:h-11";
+  return (
+    <div className={cn("flex min-w-0 max-w-full items-center gap-2", className)}>
+      {data.projects.length > 1 && data.activeProjectId ? (
+        <SortSelect
+          id="results-project"
+          label="Project"
+          prefix="Project: "
+          value={data.activeProjectId}
+          options={data.projects.map((p) => ({ value: p.id, label: p.projectName, href: projectKeep(p.id) }))}
+          className={cn(select, "max-w-72 max-lg:hidden")}
+        />
+      ) : null}
+      {saved ? null : <SortSelect className={select} value={sortValue} options={sortOptions(filters)} />}
+    </div>
+  );
+}
+
+/**
+ * The real count, above the columns: "Showing 31 candidates matched to your filters". The
+ * count is the page's own total (hired candidates already left out), never a made-up figure.
+ * Phones get the short form; lg and up also carry the button that hides the filter column.
+ */
+export function StatusRow({ data, filters, className }: { data: CandidatesData; filters: Filters; className?: string }) {
+  const { total, loadFailed } = data;
+  const saved = filters.saved && Boolean(data.activeProjectId);
+  return (
+    <div className={cn("flex min-w-0 items-center gap-x-4 gap-y-2", className)}>
+      {/* lg and up: hide or show the filter column (phones have the Filters sheet). */}
+      <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(filters, data.effectiveSkills, data.projectApplied?.city ?? "")} />
+      {loadFailed ? null : (
+        <h2 className="min-w-0 text-sm text-ink-600 max-sm:text-base max-sm:font-semibold max-sm:text-ink-900">
+          <span className="max-sm:hidden">Showing </span>
+          <span role="status" className="nums font-semibold text-ink-900">
+            {total} {saved ? "shortlisted" : `candidate${total === 1 ? "" : "s"}`}
+          </span>
+          <span className="max-sm:hidden">{saved ? " for this project" : " matched to your filters"}</span>
+        </h2>
+      )}
+    </div>
+  );
+}
+
 export function Results({
   data,
   filters,
@@ -126,73 +181,28 @@ export function Results({
   const compareFull = compareIds.length >= MAX_COMPARE;
   const compareLink = (id: string) =>
     compareIds.includes(id) || !compareFull ? withFilters(filters, { ids: toggle(compareIds, id) }) : null;
-  const projectCity = data.projectApplied?.city ?? "";
   const reset = resetHref(data.activeProjectId);
   const saved = filters.saved && Boolean(data.activeProjectId);
   const firstShown = (filters.page - 1) * filters.pageSize + 1;
   const lastShown = firstShown + candidates.length - 1;
   const pageLink =
     "inline-flex h-10 items-center rounded-xl bg-ink-100 px-3.5 text-sm font-medium text-ink-700 outline-none hover:bg-ink-200 hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 touch:h-11";
-  const sortValue = filters.sorts[0] ? `${filters.sorts[0]}${filters.dir === "asc" ? ":asc" : ""}` : "";
-  const projectName = data.projects.find((p) => p.id === data.activeProjectId)?.projectName;
-  const projectKeep = (id: string) => {
-    const next = new URLSearchParams({ project: id });
-    if (compareIds.length > 0) next.set("ids", compareIds.join(","));
-    return `/employer/candidates?${next.toString()}`;
-  };
 
   return (
     <>
-      {/* One results bar: count and project, then All | Shortlist and Sort. */}
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-ink-100 pb-3 sm:pb-4 lg:border-b-0 lg:pb-5">
-        {/* lg and up: hide or show the filter column (phones have the Filters sheet). */}
-        <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(filters, data.effectiveSkills, projectCity)} />
-        {loadFailed ? null : (
-          <h2 className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-ink-900">
-            <span role="status" className="nums whitespace-nowrap">
-              {total} {saved ? "shortlisted" : `candidate${total === 1 ? "" : "s"}`}
-            </span>
-            {projectName ? (
-              data.projects.length > 1 ? (
-                <span className="flex min-w-0 items-center gap-1 font-normal text-ink-600 max-sm:hidden">
-                  for
-                  <SortSelect
-                    id="results-project"
-                    label="Project"
-                    prefix=""
-                    value={data.activeProjectId ?? ""}
-                    options={data.projects.map((p) => ({ value: p.id, label: p.projectName, href: projectKeep(p.id) }))}
-                    className="h-9 max-w-80 border-transparent bg-transparent pl-1.5 font-semibold text-ink-900 [field-sizing:content] hover:border-ink-200 sm:min-h-9"
-                  />
-                </span>
-              ) : (
-                <span className="truncate font-normal text-ink-600 max-sm:hidden">
-                  for <span className="font-semibold text-ink-900">{projectName}</span>
-                </span>
-              )
-            ) : null}
-          </h2>
-        )}
-        <div className="ml-auto flex min-w-0 max-w-full items-center justify-end gap-2 sm:gap-3">
-          {data.activeProjectId ? (
-            <nav aria-label="Show" className={cn("items-center gap-5", saved ? "flex" : "flex max-sm:hidden")}>
-              <TabLink href={withFilters(filters, { saved: false, page: "" })} active={!saved}>
-                All{saved ? null : <span className="nums font-normal text-ink-600"> {total}</span>}
-              </TabLink>
-              <TabLink href={withFilters(filters, { saved: true, page: "" })} active={saved}>
-                Shortlist <span className="nums text-ink-600">({data.savedCount})</span>
-              </TabLink>
-            </nav>
-          ) : null}
-          {saved ? null : (
-            <SortSelect
-              className="h-11 rounded-xl border-ink-200 bg-white pl-3.5 [field-sizing:content] sm:h-9 sm:min-h-9 sm:touch:h-11"
-              value={sortValue}
-              options={sortOptions(filters)}
-            />
-          )}
+      {/* All | Shortlist. The count and Sort sit above the columns now. */}
+      {data.activeProjectId ? (
+        <div className={cn("border-b border-ink-100 pb-3 sm:pb-4 lg:border-b-0 lg:pb-5", saved ? "flex" : "flex max-sm:hidden")}>
+          <nav aria-label="Show" className="flex items-center gap-5">
+            <TabLink href={withFilters(filters, { saved: false, page: "" })} active={!saved}>
+              All{saved ? null : <span className="nums font-normal text-ink-600"> {total}</span>}
+            </TabLink>
+            <TabLink href={withFilters(filters, { saved: true, page: "" })} active={saved}>
+              Shortlist <span className="nums text-ink-600">({data.savedCount})</span>
+            </TabLink>
+          </nav>
         </div>
-      </div>
+      ) : null}
 
       {loadFailed ? (
         <LoadError what="the candidate pool" retryHref={withFilters(filters)} email={SITE.adminEmail} />

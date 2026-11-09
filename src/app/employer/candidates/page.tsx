@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { FILTER_PANEL_COOKIE } from "@/lib/rail";
 import { FilterCollapse } from "@/components/employer/candidate-filter-collapse";
 import { FilterColumn } from "./_filters";
-import { ActiveFilters, CandidateSearch, Results } from "./_results";
+import { ActiveFilters, CandidateSearch, Results, StatusRow, ToolbarSort } from "./_results";
 import {
   FILTER_KEYS,
   compareHref,
@@ -100,7 +100,7 @@ export default async function CandidatesPage({
             <span className="sm:hidden">Names unlock once your hire is paid.</span>
           </>
         }
-        className="mb-3 sm:mb-4 lg:mb-5"
+        className="mb-3 sm:mb-4 lg:mb-5 [&_h1]:text-[32px] [&_h1]:leading-10"
       />
       {/* The hiring-steps strip already links Candidates and Shortlist with their counts; Compare opens from the selection bar once two are ticked. */}
       {flow ? <HireFlow counts={flow} current="candidates" currentCount={loadFailed ? null : total} /> : null}
@@ -112,11 +112,11 @@ export default async function CandidatesPage({
       {/* DOM order is the tab order: search, skills, then the filter column (row 3 at lg), then results. */}
       <FilterCollapse
         initialHidden={filtersHidden}
-        className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-x-12 lg:data-[filters=hidden]:grid-cols-[minmax(0,1fr)]"
+        className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-x-8 lg:data-[filters=hidden]:grid-cols-[minmax(0,1fr)]"
       >
-        {/* Phones: three plain rows (search, skills, chips). lg: one card, as the page's toolbar. */}
-        <div className="contents lg:col-span-full lg:row-start-1 lg:mb-6 lg:block lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-5 lg:shadow-xs">
-          <CandidateSearch filters={filters} className="col-start-1 row-start-1 lg:col-span-full lg:max-w-[44rem]" />
+        {/* Phones: plain rows (search, skills, chips, then count + Sort). lg: one card, as the page's toolbar, with Sort beside the search. */}
+        <div className="contents lg:col-span-full lg:row-start-1 lg:mb-5 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-x-3 lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-5 lg:shadow-xs">
+          <CandidateSearch filters={filters} className="col-start-1 row-start-1 lg:max-w-[44rem]" />
           <SkillFilter
             className="col-span-2 row-start-2 mt-2 mb-3 lg:col-span-full lg:mb-6"
             active={data.effectiveSkills}
@@ -130,9 +130,13 @@ export default async function CandidatesPage({
           <ActiveFilters
             data={data}
             filters={filters}
-            className="col-span-2 row-start-3 mb-1 lg:mt-3 lg:border-t lg:border-ink-100 lg:pt-3"
+            className="col-span-2 row-start-3 mb-1 lg:border-t lg:border-ink-100 lg:pt-3"
           />
+          <ToolbarSort data={data} filters={filters} compareIds={compareIds} className="col-span-2 col-start-1 row-start-4 justify-self-end lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:justify-self-auto" />
         </div>
+
+        {/* The real count above the columns. Phones: left of Sort on the same line. */}
+        <StatusRow data={data} filters={filters} className="col-span-2 col-start-1 row-start-4 justify-self-start lg:col-span-full lg:row-start-2 lg:mb-5 lg:justify-self-stretch" />
 
         <div id="candidate-filter-column" className="col-start-2 row-start-1 lg:col-span-1 lg:col-start-1 lg:row-start-3 lg:group-data-[filters=hidden]/fl:hidden">
           <FilterColumn
@@ -152,7 +156,7 @@ export default async function CandidatesPage({
         </div>
 
         {/* Phones: the compare tray sits over the bottom nav, so the last row needs room to scroll clear of it. */}
-        <div className={cn("col-span-2 row-start-4 min-w-0 lg:col-span-1 lg:col-start-2 lg:row-start-3 lg:group-data-[filters=hidden]/fl:col-start-1", compareIds.length >= 1 && "pb-24")}>
+        <div className={cn("col-span-2 row-start-5 min-w-0 lg:col-span-1 lg:col-start-2 lg:row-start-3 lg:group-data-[filters=hidden]/fl:col-start-1", compareIds.length >= 1 && "pb-24")}>
           <RememberSelection employerId={uid} project={activeProjectId} compare={compareIds} filters={loadFailed ? undefined : rememberQueryOf(filters)} />
 
           {compareIds.length >= 1 ? (
