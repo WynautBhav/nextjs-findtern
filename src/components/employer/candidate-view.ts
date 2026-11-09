@@ -77,3 +77,35 @@ export function avatarTint(seed: string): string {
   for (let i = 0; i < seed.length; i++) sum += seed.charCodeAt(i);
   return AVATAR_TINTS[sum % AVATAR_TINTS.length];
 }
+
+/** The `skills` URL value as a list: trimmed, de-duplicated without regard to case (the first spelling wins), at most `max`. */
+export function dedupeSkills(raw: string, max = MAX_SKILL_CHIPS): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const part of raw.split(",")) {
+    const skill = part.trim();
+    const key = skill.toLowerCase();
+    if (!skill || seen.has(key)) continue;
+    seen.add(key);
+    out.push(skill);
+  }
+  return out.slice(0, max);
+}
+
+/**
+ * The number on the Filters button: removable chips, required-skill chips and a
+ * project-supplied city, one each. The Shortlist view sets the search filters
+ * aside, so nothing counts there.
+ */
+export function filterCount(o: { chips: number; skills: number; projectCity: boolean; shortlistView: boolean }): number {
+  return o.shortlistView ? 0 : o.chips + o.skills + (o.projectCity ? 1 : 0);
+}
+
+/**
+ * "Clear all" resets to the project's own defaults, so the project's city chip
+ * would come straight back: offer it only when a chip of the employer's own
+ * would go.
+ */
+export function showClearAll(chipKeys: string[]): boolean {
+  return chipKeys.some((key) => key !== "project-city");
+}

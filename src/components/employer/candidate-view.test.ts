@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
 
-import { AVATAR_TINTS, avatarTint, headlineOf, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
+import { AVATAR_TINTS, avatarTint, dedupeSkills, filterCount, showClearAll, headlineOf, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
 
 test("skillBaseName drops the level", () => {
   assert.equal(skillBaseName("React · Advanced"), "React");
@@ -78,4 +80,38 @@ test("rowSkills: skip keeps the lead and the chips within seven together", () =>
   const { shown, more } = rowSkills(ten, new Set(), 7, 3);
   assert.deepEqual(shown, ["S4", "S5", "S6", "S7"]);
   assert.equal(more, 3);
+});
+
+test("dedupeSkills drops repeats in any case, keeps the first spelling and order, and caps at 7", () => {
+  assert.deepEqual(dedupeSkills("React,react,REACT, Node.js ,,node.js"), ["React", "Node.js"]);
+  assert.deepEqual(dedupeSkills(""), []);
+  assert.deepEqual(dedupeSkills("a,b,c,d,e,f,g,h,A"), ["a", "b", "c", "d", "e", "f", "g"]);
+});
+
+test("filterCount: chips, skills and a project city count once each; the Shortlist view counts none", () => {
+  assert.equal(filterCount({ chips: 0, skills: 0, projectCity: false, shortlistView: false }), 0);
+  assert.equal(filterCount({ chips: 2, skills: 3, projectCity: false, shortlistView: false }), 5);
+  assert.equal(filterCount({ chips: 1, skills: 5, projectCity: true, shortlistView: false }), 7);
+  assert.equal(filterCount({ chips: 2, skills: 3, projectCity: true, shortlistView: true }), 0);
+});
+
+test("showClearAll is off when the only chip is the project's own city (reset would bring it back)", () => {
+  assert.equal(showClearAll([]), false);
+  assert.equal(showClearAll(["project-city"]), false);
+  assert.equal(showClearAll(["project-city", "min"]), true);
+  assert.equal(showClearAll(["city"]), true);
+});
+
+// `_query.ts` and `_results.tsx` import the DB and `@/` aliases, so node:test cannot load them: pin the wiring.
+const query = readFileSync(join(import.meta.dirname, "../../app/employer/candidates/_query.ts"), "utf8");
+const results = readFileSync(join(import.meta.dirname, "../../app/employer/candidates/_results.tsx"), "utf8");
+
+test("the active count, the skills parse and the project-city chip go through the tested helpers", () => {
+  assert.match(query, /skills: dedupeSkills\(one\(params\.skills\) \?\? ""\)/);
+  assert.match(query, /filterCount\(\{ chips: activeChips\(filters\)\.length, skills: effectiveSkills\.length, projectCity: Boolean\(projectCity\), shortlistView: filters\.saved \}\)/);
+  // The chip: its label names the project as the source, and its X drops the project's defaults (pf=0) through withoutCity.
+  assert.match(results, /key: "project-city", label: `City: \$\{projectCity\} \(from project\)`, href: withoutCity\(filters, data\.effectiveSkills\)/);
+  assert.match(results, /showClearAll\(chips\.map\(\(chip\) => chip\.key\)\)/);
+  // Removing a project-supplied city pins the skills and turns the defaults off, so the chip does not come back.
+  assert.match(query, /projectDefaults: false, skills: effectiveSkills, skillsSet: true/);
 });

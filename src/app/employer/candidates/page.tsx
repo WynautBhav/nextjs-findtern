@@ -12,7 +12,6 @@ import { KeepFocusClear } from "@/components/app/keep-focus-clear";
 import { PageHead } from "@/components/app/primitives";
 import { RememberSelection } from "@/components/employer/remember-selection";
 import { HireFlow } from "@/components/employer/hire-flow";
-import { CandidateTabs } from "@/components/employer/section-tabs";
 import { hireFlowCountsFor } from "@/lib/employer-flow";
 import { cn } from "@/lib/utils";
 import { FILTER_PANEL_COOKIE } from "@/lib/rail";
@@ -95,16 +94,13 @@ export default async function CandidatesPage({
         title="Candidates"
         lede={
           <>
-            <span className="max-sm:hidden">Names and contact details unlock once your hire is paid. Photos and scores are visible now.</span>
+            <span className="max-sm:hidden">Names and contact details unlock once your hire is paid. Scores and skills are visible now.</span>
             <span className="sm:hidden">Names unlock once your hire is paid.</span>
           </>
         }
         className="mb-3 sm:mb-4 lg:mb-5"
       />
-      {/* Phones: the hiring-steps strip below already links Candidates and Shortlist (and the bottom bar has Proposals), so these tabs would repeat it. */}
-      <div className="max-sm:hidden">
-        <CandidateTabs active="candidates" shortlist={flow?.shortlisted ?? 0} compare={compareIds.length} />
-      </div>
+      {/* The hiring-steps strip already links Candidates and Shortlist with their counts; Compare opens from the selection bar once two are ticked. */}
       {flow ? <HireFlow counts={flow} current="candidates" /> : null}
 
       {/*

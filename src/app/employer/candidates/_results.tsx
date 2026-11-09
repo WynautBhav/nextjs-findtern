@@ -11,6 +11,7 @@ import { CandidateCard } from "@/components/employer/candidate-card";
 import { EmptyScene } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { buttonClass } from "@/components/ui/button";
+import { showClearAll } from "@/components/employer/candidate-view";
 import { FiltersToggle } from "@/components/employer/candidate-filter-collapse";
 import { SortSelect } from "./_sort-select";
 import {
@@ -166,11 +167,13 @@ export function Results({
               </Link>
             </li>
           ))}
-          <li>
-            <Link href={reset} className="inline-flex min-h-9 items-center px-2 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
-              Clear all
-            </Link>
-          </li>
+          {showClearAll(chips.map((chip) => chip.key)) ? (
+            <li>
+              <Link href={reset} className="inline-flex min-h-9 items-center px-2 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
+                Clear all
+              </Link>
+            </li>
+          ) : null}
         </ul>
       ) : null}
 

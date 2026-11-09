@@ -20,6 +20,7 @@ import { restorableFilters } from "@/lib/employer-filter-restore";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { savedInternIds } from "@/lib/saved-roles";
 import { rankProfiles } from "@/components/employer/candidate-rank";
+import { dedupeSkills, filterCount } from "@/components/employer/candidate-view";
 import type { FullTimeContext } from "@/components/employer/candidate-card";
 
 export type SortKey = "score" | keyof Ratings;
@@ -135,11 +136,7 @@ export function readFilters(params: SearchParams): Filters {
 
   return {
     q: (one(params.q) ?? "").trim().slice(0, 60),
-    skills: (one(params.skills) ?? "")
-      .split(",")
-      .map((skill) => skill.trim())
-      .filter(Boolean)
-      .slice(0, 7),
+    skills: dedupeSkills(one(params.skills) ?? ""),
     skillsSet: params.skills !== undefined,
     city: (one(params.city) ?? "").trim().slice(0, 160),
     mode: (one(params.mode) ?? "").trim(),
@@ -267,10 +264,11 @@ export function compareHref(filters: Filters): string {
  * The number on the Filters button: one for every removable chip in the
  * "Active filters" row (Findtern Score and the sub-score floors included), one
  * for each required-skill chip under the search box, and one for the city a
- * project brings. Sorting is not a filter. The filter sheet says so too.
+ * project brings. Sorting is not a filter. The filter sheet says so too. The
+ * Shortlist view sets the filters aside, so it counts none.
  */
 export function activeFilterCount(filters: Filters, effectiveSkills: string[], projectCity = ""): number {
-  return activeChips(filters).length + effectiveSkills.length + (projectCity ? 1 : 0);
+  return filterCount({ chips: activeChips(filters).length, skills: effectiveSkills.length, projectCity: Boolean(projectCity), shortlistView: filters.saved });
 }
 
 /** Start clean: drops the remembered filters, keeps the project. */

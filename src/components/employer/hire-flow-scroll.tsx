@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+
+const FADE_PX = 40; // the 2.5rem mask below: a focused step has to end before it starts
 
 /**
  * The hiring-steps list. Below `sm` it is one scrolling row (five steps do not
  * fit a phone, and a wrapped last step sat alone on a second line). It opens
  * with the current step in view, and the right edge fades while more steps lie
- * beyond it, so a cut-off step reads as "scroll", not as a glitch.
+ * beyond it, with a chevron, so a cut-off step reads as "scroll", not as a glitch.
+ * The parent `nav` must be `relative` (the chevron sits on its right edge).
  */
 export function FlowScroll({ className, children }: { className?: string; children: React.ReactNode }) {
   const ref = useRef<HTMLOListElement>(null);
@@ -26,7 +30,8 @@ export function FlowScroll({ className, children }: { className?: string; childr
       const el = e.target instanceof HTMLElement ? e.target : null;
       if (!el) return;
       const left = el.offsetLeft - 8;
-      const right = el.offsetLeft + el.offsetWidth + 8;
+      // Clear the right-hand fade as well as the edge, or the focused step reads half-faded.
+      const right = el.offsetLeft + el.offsetWidth + 8 + FADE_PX;
       if (left < list.scrollLeft) list.scrollLeft = left;
       else if (right > list.scrollLeft + list.clientWidth) list.scrollLeft = right - list.clientWidth;
     };
@@ -41,8 +46,11 @@ export function FlowScroll({ className, children }: { className?: string; childr
   }, []);
 
   return (
-    <ol ref={ref} className={cn(className, more && "max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)]")}>
-      {children}
-    </ol>
+    <>
+      <ol ref={ref} className={cn(className, more && "max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)]")}>
+        {children}
+      </ol>
+      {more ? <ChevronRight data-flow-cue aria-hidden className="pointer-events-none absolute right-0 top-1/2 size-4 -translate-y-1/2 text-ink-600 sm:hidden" /> : null}
+    </>
   );
 }

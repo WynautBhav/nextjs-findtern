@@ -33,7 +33,7 @@ export function HireFlow({ counts, current }: { counts: HireFlowCounts; current:
   // One line, not four cards: it says where the page sits in the flow and
   // links each stage, without competing with the page's own content.
   return (
-    <nav aria-label="Hiring steps" className="mb-3 sm:mb-6">
+    <nav aria-label="Hiring steps" className="relative mb-3 sm:mb-6">
       <FlowScroll className="relative flex items-center gap-x-0 gap-y-1 overflow-x-auto text-[13px] max-sm:-m-1.5 max-sm:p-1.5 [scrollbar-width:none] sm:flex-wrap sm:gap-x-1 sm:gap-y-2 sm:overflow-visible sm:text-sm [&::-webkit-scrollbar]:hidden">
         {STEPS.map((s, i) => {
           const active = s.key === currentKey;
