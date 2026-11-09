@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, Plus, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { Plus, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import { RATING_META } from "@/lib/employer-candidates";
 import { resolvePricing, type Currency } from "@/lib/employer-pricing";
@@ -11,13 +11,14 @@ import { CityFilter } from "@/components/employer/city-filter";
 import { RatingSlider } from "@/components/employer/candidate-filters";
 import { buttonClass } from "@/components/ui/button";
 import { fieldClass } from "@/components/employer/ui-tokens";
+import { FilterSection } from "@/components/employer/candidates/filter-parts";
 import { FilterPanel } from "./_filter-form";
 import { activeFilterCount, queryOf, resetHref, type Filters } from "./_query";
 
 const SELECT = cn(fieldClass, "mt-2");
 
 /**
- * The left column (a sheet on phones): collapsible groups, every filter the
+ * The left column (a sheet on phones): always-open labelled sections, every filter the
  * page has always had. Project is not a filter but sets the defaults below it.
  * Sorting lives in the results toolbar, not here.
  */
@@ -51,8 +52,6 @@ export function FilterColumn({
   /** "Ignore project skills" / "Match to project": on a phone it lives in the sheet, not on the page. */
   projectToggle?: React.ReactNode;
 }) {
-  // Sub-score floors and the skill-match switch live behind "More filters".
-  const moreSet = RATING_META.some((meta) => filters.minRatings[meta.key] > 0) || !filters.skillPriority;
   return (
     <aside
       aria-label="Filters"
@@ -71,7 +70,7 @@ export function FilterColumn({
         {filters.dir === "asc" ? <input type="hidden" name="dir" value="asc" /> : null}
 
         {/* lg: the card's own header. Phones get "Filters" from the sheet title. */}
-        <div className="mb-1 flex items-center justify-between border-b border-ink-100 pb-3 max-lg:hidden">
+        <div className="flex items-center justify-between pb-3 max-lg:hidden">
           <h2 className="flex items-center gap-2 text-sm font-bold text-ink-900">
             <SlidersHorizontal className="size-[18px] text-ink-600" aria-hidden />
             Filters
@@ -80,9 +79,9 @@ export function FilterColumn({
             Reset
           </Link>
         </div>
-        <div className="divide-y divide-ink-100">
+        <div>
           {/* Project: the results bar picks it from lg up; the phone sheet needs it here. */}
-          <div className="pb-4 lg:hidden">
+          <div className="lg:hidden">
             <div className="flex items-center justify-between">
               <label htmlFor="filter-project" className="text-sm font-semibold text-ink-900">
                 Project
@@ -106,7 +105,7 @@ export function FilterColumn({
             {projectToggle ? <div className="mt-1">{projectToggle}</div> : null}
           </div>
 
-          <Group title="Location" open>
+          <FilterSection title="Location">
             <CityFilter key={filters.city} defaultValue={filters.city} label="Preferred work city" autoApply />
             <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
               {/* Unchecked sends only the hidden 0; checked adds remote=1 after it. */}
@@ -120,13 +119,13 @@ export function FilterColumn({
               />
               Include remote-only candidates
             </label>
-          </Group>
+          </FilterSection>
 
-          <Group title="Findtern Score" open>
+          <FilterSection title="Findtern Score">
             <RatingSlider name="min" label="Minimum score" defaultValue={filters.minScore} />
-          </Group>
+          </FilterSection>
 
-          <Group title="Hourly price" open>
+          <FilterSection title="Hourly price">
             <label htmlFor="filter-plan" className="sr-only">
               Hourly price
             </label>
@@ -138,9 +137,9 @@ export function FilterColumn({
                 </option>
               ))}
             </select>
-          </Group>
+          </FilterSection>
 
-          <Group title="Availability" open>
+          <FilterSection title="Availability">
             <label htmlFor="filter-mode" className="text-sm text-ink-700">
               Work mode
             </label>
@@ -160,9 +159,9 @@ export function FilterColumn({
               />
               Has own laptop
             </label>
-          </Group>
+          </FilterSection>
 
-          <Group title="More filters" open={moreSet}>
+          <FilterSection title="More filters">
             <p className="mb-1 text-xs text-text-subtle">AI interview scores, each out of 10.</p>
             {RATING_META.map((meta) => (
               <RatingSlider key={meta.key} name={`r_${meta.key}`} label={meta.label} defaultValue={filters.minRatings[meta.key]} />
@@ -177,10 +176,10 @@ export function FilterColumn({
                 className="relative h-6 w-10 shrink-0 rounded-full bg-ink-300 transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:shadow-xs after:transition-transform peer-checked:bg-ink-900 peer-checked:after:translate-x-4 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-600 motion-reduce:after:transition-none"
               />
             </label>
-          </Group>
+          </FilterSection>
 
           {/* Filters apply as they change (QA-125): no Apply. On a phone "Show results" closes the sheet. */}
-          <div className="flex items-center gap-2 pt-3 lg:hidden">
+          <div className="mt-4 flex items-center gap-2 border-t border-ink-100 pt-4 lg:hidden">
             <Link href={resetHref(activeProjectId)} className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-ink-700 underline-offset-4 hover:text-ink-900 hover:underline lg:hidden">
               <RotateCcw className="size-3.5" aria-hidden />
               Reset filters
@@ -192,17 +191,5 @@ export function FilterColumn({
         </div>
       </FilterPanel>
     </aside>
-  );
-}
-
-function Group({ title, open, children }: { title: string; open?: boolean; children: React.ReactNode }) {
-  return (
-    <details open={open || undefined} className="group">
-      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 rounded-sm text-sm font-semibold text-ink-900 outline-none focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
-        <span className="flex-1">{title}</span>
-        <ChevronDown className="size-4 text-ink-500 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
-      </summary>
-      <div className="pb-4">{children}</div>
-    </details>
   );
 }

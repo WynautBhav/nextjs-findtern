@@ -1,29 +1,17 @@
-import { ChevronDown } from "lucide-react";
+import { useId } from "react";
 
 import { cn } from "@/lib/utils";
 
-/** One collapsible group of the filter rail. CSS-only (<details>), so it works without JS. */
-export function FilterSection({
-  title,
-  summary,
-  open,
-  children,
-}: {
-  title: string;
-  /** What is set, shown quietly on the right ("Any", "3 set"). */
-  summary?: string;
-  open?: boolean;
-  children: React.ReactNode;
-}) {
+/** One labelled group of the filter rail. Always open: every filter stays in view, like the mock. */
+export function FilterSection({ title, children }: { title: string; children: React.ReactNode }) {
+  const id = useId();
   return (
-    <details open={open || undefined} className="group border-t border-ink-100 first:border-t-0">
-      <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 rounded-apple-sm text-sm font-medium text-ink-900 outline-none focus-visible:ring-[3px] focus-visible:ring-brand-600/30 [&::-webkit-details-marker]:hidden">
-        <span className="flex-1">{title}</span>
-        {summary ? <span className="text-xs font-normal text-text-subtle group-open:hidden">{summary}</span> : null}
-        <ChevronDown className="size-4 text-text-subtle transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
-      </summary>
-      <div className="details-reveal pb-4">{children}</div>
-    </details>
+    <section aria-labelledby={id} className="mt-4 border-t border-ink-100 pt-4">
+      <h3 id={id} className="mb-2 text-xs font-semibold text-ink-900">
+        {title}
+      </h3>
+      {children}
+    </section>
   );
 }
 
