@@ -1,10 +1,11 @@
 import Link from "next/link";
-import { Search, X } from "lucide-react";
+import { ChevronDown, Search, X } from "lucide-react";
 
 import { redactForEmployer } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
 import { MAX_COMPARE } from "@/lib/employer-selection";
 import { SITE } from "@/lib/content/site";
+import { BANDS, PLAN_NAME } from "@/lib/score";
 import { cn } from "@/lib/utils";
 import { CandidateCard } from "@/components/employer/candidate-card";
 import { EmptyScene } from "@/components/app/primitives";
@@ -93,7 +94,7 @@ export function Results({
       {/* One results bar: count and project, then All | Shortlist and Sort. */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-b border-ink-100 pb-4">
         {/* lg and up: hide or show the filter column (phones have the Filters sheet). */}
-        <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(filters)} />
+        <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(filters, Boolean(data.projectApplied))} />
         {loadFailed ? null : (
           <h2 className="flex min-w-0 items-center gap-1.5 text-base font-semibold text-ink-900 max-sm:sr-only">
             <span role="status" className="nums whitespace-nowrap">
@@ -219,6 +220,7 @@ export function Results({
         )
       ) : (
         <>
+          <ScoreLegend />
           {/* Thin dividers, no box per row: one list. */}
           <ul className="mt-1 divide-y divide-ink-100">
             {candidates.map((candidate) => {
@@ -294,5 +296,27 @@ function TabLink({ href, active, children }: { href: string; active: boolean; ch
     >
       {children}
     </Link>
+  );
+}
+
+/** What Espresso, Cappuccino and Latte mean, once per page (the row tooltip says it for one candidate). */
+function ScoreLegend() {
+  return (
+    <details className="group/legend mt-1 border-b border-ink-100 text-sm">
+      <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-sm font-medium text-ink-700 outline-none hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
+        What the score bands mean
+        <ChevronDown className="size-4 text-ink-500 transition-transform group-open/legend:rotate-180 motion-reduce:transition-none" aria-hidden />
+      </summary>
+      <dl className="grid gap-x-6 gap-y-2 pb-4 sm:grid-cols-3">
+        {[...BANDS].reverse().map((band) => (
+          <div key={band.id}>
+            <dt className="font-semibold text-ink-900">
+              {PLAN_NAME[band.id]} <span className="nums font-normal text-ink-600">{band.max >= 10 ? `${band.min} or above` : `${band.min} to under ${band.max}`}</span>
+            </dt>
+            <dd className="text-ink-600">{band.blurb}</dd>
+          </div>
+        ))}
+      </dl>
+    </details>
   );
 }

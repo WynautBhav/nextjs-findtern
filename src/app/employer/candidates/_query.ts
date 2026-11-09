@@ -263,9 +263,14 @@ export function compareHref(filters: Filters): string {
   return `/employer/compare${queryOf({ ...filters, page: 1 })}`;
 }
 
-/** How many filters are set beyond the defaults (the rail's "Apply (N)"). */
-export function activeFilterCount(filters: Filters): number {
+/**
+ * How many filters are narrowing the list: the ones set by hand, plus the
+ * project's own skills and city when they are applied (`projectScope`), so the
+ * count matches why the list is short.
+ */
+export function activeFilterCount(filters: Filters, projectScope = false): number {
   return [
+    projectScope,
     Boolean(filters.q),
     Boolean(filters.city),
     Boolean(filters.mode),

@@ -155,10 +155,7 @@ export function FilterPanel({
         <SlidersHorizontal className="size-4" aria-hidden />
         Filters
         {activeCount > 0 ? (
-          <span className="nums grid min-w-5 place-items-center rounded-full bg-ink-900 px-1.5 text-xs font-semibold leading-5 text-white">
-            {activeCount}
-            <span className="sr-only"> active</span>
-          </span>
+          <span className="nums rounded-full bg-ink-900 px-2 text-xs font-semibold leading-5 text-white">{activeCount} active</span>
         ) : null}
       </button>
       <Sheet open={open} onOpenChange={setOpen}>

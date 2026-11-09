@@ -31,6 +31,7 @@ export function FilterColumn({
   region,
   compareIds,
   total,
+  projectScope = false,
 }: {
   filters: Filters;
   projects: { id: string; projectName: string }[];
@@ -41,6 +42,8 @@ export function FilterColumn({
   region: "IN" | null;
   compareIds: string[];
   total: number;
+  /** The project's own skills or city are narrowing the list. */
+  projectScope?: boolean;
 }) {
   // Sub-score floors and the skill-match switch live behind "More filters".
   const moreSet = RATING_META.some((meta) => filters.minRatings[meta.key] > 0) || !filters.skillPriority;
@@ -53,7 +56,7 @@ export function FilterColumn({
         "lg:[scrollbar-color:transparent_transparent] lg:[scrollbar-width:thin] lg:hover:[scrollbar-color:var(--color-ink-300)_transparent] lg:focus-within:[scrollbar-color:var(--color-ink-300)_transparent]",
       )}
     >
-      <FilterPanel key={queryOf(filters)} activeCount={activeFilterCount(filters)} total={total}>
+      <FilterPanel key={queryOf(filters)} activeCount={activeFilterCount(filters, projectScope)} total={total}>
         {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
         {!filters.projectDefaults ? <input type="hidden" name="pf" value="0" /> : null}
         {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}

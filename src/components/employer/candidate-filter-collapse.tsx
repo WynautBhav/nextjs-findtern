@@ -55,10 +55,7 @@ export function FiltersToggle({ controls, count, className }: { controls: string
       <SlidersHorizontal className="size-4" aria-hidden />
       Filters
       {count > 0 ? (
-        <span className="nums grid min-w-5 place-items-center rounded-full bg-ink-900 px-1.5 text-xs font-semibold leading-5 text-white">
-          {count}
-          <span className="sr-only"> active</span>
-        </span>
+        <span className="nums rounded-full bg-ink-900 px-2 text-xs font-semibold leading-5 text-white">{count} active</span>
       ) : null}
     </button>
   );

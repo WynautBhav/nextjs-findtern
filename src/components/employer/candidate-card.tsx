@@ -12,6 +12,7 @@ import { FullTimeOfferButton } from "@/components/employer/full-time-offer-butto
 import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
 import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
 import { Pill } from "@/components/app/primitives";
+import { skillMatch } from "@/components/app/skill-match";
 import { SendProposalHold } from "@/components/employer/send-proposal-hold";
 import { sendProposalHold } from "@/lib/proposal-guard";
 import type { PresenceLabel } from "@/lib/presence";
@@ -209,16 +210,19 @@ export function CandidateCard({
     </ButtonLink>
   );
 
+  const wanted = skillMatch(candidate.skills, wantedSkills);
+
   return (
-    <li className="group/row relative grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3.5 gap-y-3 py-6 sm:gap-x-5 sm:gap-y-3 sm:py-7">
+    <li className="group/row relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-3 py-6 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:gap-x-5 sm:py-7">
       <RowAvatar photoUrl={candidate.photoUrl} initials={candidate.initials} seed={candidate.id} presence={presence} />
 
+      {/* Who: name, then what they are (the headline is what an employer scans), where, and why they fit. */}
       <div className="min-w-0 self-center sm:self-start">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
           {/* The whole row opens the profile: this link is stretched over it; the controls sit above. */}
           <Link
             href={profileHref}
-            className="-my-2 inline-flex h-11 min-w-11 items-center text-base font-semibold text-ink-900 outline-none group-hover/row:text-brand-800 after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500 sm:text-lg"
+            className="-my-2 inline-flex h-11 min-w-11 items-center text-sm font-semibold text-ink-700 outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] group-hover/row:text-brand-800 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
           >
             {displayName}
           </Link>
@@ -231,50 +235,37 @@ export function CandidateCard({
           ) : null}
         </div>
         {headline ? (
-          <p aria-hidden className="mt-0.5 line-clamp-2 text-pretty text-base font-medium leading-snug text-ink-900 group-hover/row:text-brand-800 sm:text-lg">
+          <p className="line-clamp-2 text-pretty text-lg font-semibold leading-snug tracking-tight text-ink-900 group-hover/row:text-brand-800">
             {headline}
           </p>
         ) : null}
-        <p className="mt-0.5 inline-flex items-center gap-1 text-sm text-ink-600">
+        <p className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-ink-600">
           <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
-          {place || "City not stated"}
+          <span>{place}</span>
+          {modes ? <span>, {modes}</span> : null}
           {/* The dot alone is colour only; say it in words (a coarse label, nothing when the candidate hides it). */}
-          {presence ? <span className={cn("whitespace-nowrap", presence === PRESENCE_ONLINE && "font-medium text-success")}>· {presence}</span> : null}
+          {presence ? <span className={cn("whitespace-nowrap", presence === PRESENCE_ONLINE && "font-medium text-success")}>, {presence}</span> : null}
         </p>
+        {wanted.total > 0 ? (
+          <p className="mt-1.5 text-sm text-ink-600">
+            Matches <span className="nums font-semibold text-ink-900">{wanted.matched.length}</span> of <span className="nums">{wanted.total}</span> of your skills
+          </p>
+        ) : null}
       </div>
 
-      {/* Desktop: Save · Compare · Send proposal, top right. Phone: the heart alone, top right. */}
-      <div className="relative z-10 flex items-start gap-1 sm:gap-1.5">
-        {canSave && projectId ? <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} name={displayName} /> : null}
-        <div className="flex items-start gap-1.5 max-sm:hidden">
-          {comparable ? <CompareToggle href={compareHref} selected={selected} name={displayName} /> : null}
-          {primary}
-          {fullTimeFrom && fullTime ? (
-            <FullTimeOfferButton
-              employerId={fullTime.employerId}
-              proposalId={fullTimeFrom}
-              candidate={displayName}
-              fteStatus={fullTime.fteStatus}
-              timezone={fullTime.timezone}
-            />
-          ) : null}
-        </div>
+      {/* The numbers: the Findtern Score and the rate, right-aligned from sm up. */}
+      <div className="col-span-2 flex flex-wrap items-center gap-x-5 gap-y-1 sm:col-span-1 sm:col-start-3 sm:row-start-1 sm:flex-col sm:items-end sm:gap-y-2">
+        <ScoreBadge size="hero" score={candidate.score} scored={candidate.scored} />
+        <p className="nums text-base font-semibold text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
       </div>
 
-      {/* Stats line and skills: under the identity, running under the actions too. */}
-      <div className="col-span-3 min-w-0 sm:col-span-2 sm:col-start-2">
-        <p className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-600 sm:gap-x-5">
-          <ScoreBadge size="hero" score={candidate.score} scored={candidate.scored} />
-          <span className="nums">{formatRate(pricing.hourlyRateMinor, currency)}</span>
-          {modes ? <span>{modes}</span> : null}
-        </p>
-        <SkillChips className="mt-3.5" skills={candidate.skills} wanted={wantedSkills} />
-      </div>
+      <SkillChips className="col-span-2 sm:col-span-2 sm:col-start-2" skills={candidate.skills} wanted={wantedSkills} />
 
-      {/* Phone: Compare and the primary action as the card's last line. */}
-      <div className="relative z-10 col-span-3 flex items-start justify-between gap-2 sm:hidden">
+      {/* Actions: Compare on the left, Save and the one primary action on the right. */}
+      <div className="relative z-10 col-span-2 flex items-center justify-between gap-2 border-t border-ink-100 pt-3 sm:col-span-2 sm:col-start-2">
         {comparable ? <CompareToggle href={compareHref} selected={selected} name={displayName} /> : <span />}
         <div className="flex items-center gap-1.5">
+          {canSave && projectId ? <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} name={displayName} /> : null}
           {fullTimeFrom && fullTime ? (
             <FullTimeOfferButton
               employerId={fullTime.employerId}

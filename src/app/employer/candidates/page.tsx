@@ -128,6 +128,7 @@ export default async function CandidatesPage({
             region={data.region}
             compareIds={compareIds}
             total={total}
+            projectScope={Boolean(projectApplied)}
           />
         </div>
 
