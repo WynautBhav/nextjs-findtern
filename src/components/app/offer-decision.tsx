@@ -37,6 +37,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { formatDate } from "@/lib/format";
 import { addDays } from "@/lib/offer";
 import { cn } from "@/lib/utils";
+import { NewTabHint } from "@/components/ui/new-tab-link";
 
 type Outcome = { kind: "accepted" | "declined"; error?: string };
 
@@ -276,12 +277,14 @@ export function OfferDecision({
               />
               <span>
                 I agree to the{" "}
-                <a href="/intern-terms-and-conditions" target="_blank" className="font-medium text-brand-700 underline underline-offset-4">
+                <a href="/intern-terms-and-conditions" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-700 underline underline-offset-4">
                   intern terms
+                  <NewTabHint />
                 </a>{" "}
                 and the{" "}
-                <a href="/intern-nda" target="_blank" className="font-medium text-brand-700 underline underline-offset-4">
+                <a href="/intern-nda" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-700 underline underline-offset-4">
                   non-disclosure agreement
+                  <NewTabHint />
                 </a>
                 .
               </span>

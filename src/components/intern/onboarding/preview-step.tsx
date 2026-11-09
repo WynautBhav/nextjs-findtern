@@ -8,6 +8,7 @@ import { initialsOf } from "@/lib/employer-candidates";
 import { dateLabel, widestWorkMode } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 
+import { NewTabHint } from "@/components/ui/new-tab-link";
 import { Check } from "./fields";
 import type { StepProps } from "./types";
 
@@ -157,8 +158,9 @@ export function PreviewStep({ values, update, errors, documents, onJumpStep }: S
         <Check checked={Boolean(values.ndaAccepted)} onChange={(v) => update("ndaAccepted", v)} className="items-start">
           <span className="min-w-0 leading-relaxed [overflow-wrap:anywhere]">
             I have read and accept the{" "}
-            <a href="/intern-nda" target="_blank" rel="noopener" className="font-medium text-brand-700 underline underline-offset-4">
+            <a href="/intern-nda" target="_blank" rel="noopener noreferrer" className="font-medium text-brand-700 underline underline-offset-4">
               Internship Acceptance &amp; Non-Bypass Agreement
+              <NewTabHint />
             </a>
             . Accepting a proposal is binding, and contact with employers stays on Findtern.
           </span>

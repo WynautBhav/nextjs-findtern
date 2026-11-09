@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NewTabLink } from "@/components/ui/new-tab-link";
 
 import { Logo } from "@/components/brand/logo";
 
@@ -51,9 +52,9 @@ export function AuthShell({
 
         <p className="text-xs text-on-dark-subtle">
           © {new Date().getFullYear()} Findtern ·{" "}
-          <Link href="/terms-and-conditions" className="underline underline-offset-4 hover:text-white">
+          <NewTabLink href="/terms-and-conditions" className="underline underline-offset-4 hover:text-white">
             Terms
-          </Link>
+          </NewTabLink>
         </p>
       </aside>
 

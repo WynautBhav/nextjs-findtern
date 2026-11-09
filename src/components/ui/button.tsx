@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
+import { newTabAttrs } from "./new-tab";
+import { NewTabHint } from "./new-tab-link";
 
 /**
  * Button.
@@ -97,12 +99,14 @@ export function ButtonLink({
   variant,
   size,
   block,
+  newTab,
   children,
   ...rest
-}: ButtonStyleProps & React.ComponentProps<typeof Link>) {
+}: ButtonStyleProps & { /** Opens in a new tab (target + rel + screen-reader hint). */ newTab?: boolean } & React.ComponentProps<typeof Link>) {
   return (
-    <Link className={buttonClass({ variant, size, block, className })} {...rest}>
+    <Link className={buttonClass({ variant, size, block, className })} {...rest} {...newTabAttrs(newTab)}>
       {children}
+      {newTab ? <NewTabHint /> : null}
     </Link>
   );
 }
@@ -112,12 +116,14 @@ export function ButtonAnchor({
   variant,
   size,
   block,
+  newTab,
   children,
   ...rest
-}: ButtonStyleProps & React.ComponentProps<"a">) {
+}: ButtonStyleProps & { /** Opens in a new tab (target + rel + screen-reader hint). */ newTab?: boolean } & React.ComponentProps<"a">) {
   return (
-    <a className={buttonClass({ variant, size, block, className })} {...rest}>
+    <a className={buttonClass({ variant, size, block, className })} {...rest} {...newTabAttrs(newTab)}>
       {children}
+      {newTab ? <NewTabHint /> : null}
     </a>
   );
 }

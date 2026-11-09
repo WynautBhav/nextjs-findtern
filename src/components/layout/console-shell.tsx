@@ -48,6 +48,8 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { useUnread } from "@/hooks/use-unread";
 import { badgeText } from "@/lib/messaging/ui-logic";
 import { cn } from "@/lib/utils";
+import { newTabAttrs } from "@/components/ui/new-tab";
+import { NewTabHint } from "@/components/ui/new-tab-link";
 
 function LiveUnreadBadge({ light }: { light: boolean }) {
   const n = useUnread();
@@ -74,11 +76,13 @@ export type ConsoleNavItem = {
   also?: string[];
   /** false for links out to the marketing site: prefetching one downloads that page's scripts on every console page. */
   prefetch?: boolean;
+  /** Opens in a new tab (marketing pages linked from the console). */
+  newTab?: boolean;
 };
 
 export type ConsoleNavGroup = { title?: string; items: ConsoleNavItem[] };
 
-export type ConsoleMenuLink = { href: string; label: string; icon: React.ReactNode; prefetch?: boolean };
+export type ConsoleMenuLink = { href: string; label: string; icon: React.ReactNode; prefetch?: boolean; newTab?: boolean };
 
 // The cookie name lives in `@/lib/rail`: this file is `"use client"`, and a
 // server layout importing a constant from it would receive a client reference
@@ -191,8 +195,8 @@ export function ConsoleShell({
   const darkRing = light ? undefined : "focus-visible:outline-accent-300";
   const helpLinks: ConsoleNavItem[] = help
     ? [
-        { href: help.faqHref, label: "FAQ", icon: <CircleQuestionMark className="size-5" aria-hidden />, prefetch: false },
-        { href: help.contactHref, label: "Contact us", icon: <MessageSquareText className="size-5" aria-hidden />, prefetch: false },
+        { href: help.faqHref, label: "FAQ", icon: <CircleQuestionMark className="size-5" aria-hidden />, prefetch: false, newTab: true },
+        { href: help.contactHref, label: "Contact us", icon: <MessageSquareText className="size-5" aria-hidden />, prefetch: false, newTab: true },
         { href: `mailto:${help.email}`, label: "Email us", icon: <Mail className="size-5" aria-hidden /> },
       ]
     : [];
@@ -500,8 +504,9 @@ function RailLink({ item, active, compact, light, column = false, onNavigate }: 
       {body}
     </a>
   ) : (
-    <Link href={item.href} prefetch={item.prefetch} onClick={onNavigate} aria-current={active ? "page" : undefined} title={compact ? item.label : undefined} className={className}>
+    <Link href={item.href} prefetch={item.prefetch} onClick={onNavigate} aria-current={active ? "page" : undefined} title={compact ? item.label : undefined} className={className} {...newTabAttrs(item.newTab)}>
       {body}
+      {item.newTab ? <NewTabHint /> : null}
     </Link>
   );
 }
@@ -538,9 +543,10 @@ function AccountMenu({
         {menu.length ? <DropdownMenuSeparator /> : null}
         {menu.map((m) => (
           <DropdownMenuItem key={m.href} asChild>
-            <Link href={m.href} prefetch={m.prefetch} className="flex min-h-10 cursor-pointer items-center gap-2.5 [&_svg]:size-4 [&_svg]:text-ink-500">
+            <Link href={m.href} prefetch={m.prefetch} {...newTabAttrs(m.newTab)} className="flex min-h-10 cursor-pointer items-center gap-2.5 [&_svg]:size-4 [&_svg]:text-ink-500">
               {m.icon}
               {m.label}
+              {m.newTab ? <NewTabHint /> : null}
             </Link>
           </DropdownMenuItem>
         ))}

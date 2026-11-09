@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+import { NewTabLink } from "@/components/ui/new-tab-link";
 import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-react";
 
 import { COUNTRY_CODE_OPTIONS, isPersonalEmail } from "@/lib/employer-onboarding";
@@ -442,16 +442,16 @@ export function EmployerSignupForm({
         />
         <span>
           I agree to the{" "}
-          <Link
+          <NewTabLink
             href="/employer-terms-and-conditions"
             className="apple-spring font-medium text-brand-700 underline-offset-4 hover:underline"
           >
             employer terms
-          </Link>{" "}
+          </NewTabLink>{" "}
           and the{" "}
-          <Link href="/privacy" className="apple-spring font-medium text-brand-700 underline-offset-4 hover:underline">
+          <NewTabLink href="/privacy" className="apple-spring font-medium text-brand-700 underline-offset-4 hover:underline">
             privacy policy
-          </Link>
+          </NewTabLink>
           .
         </span>
       </label>

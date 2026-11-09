@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { NewTabLink } from "@/components/ui/new-tab-link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-react";
 
@@ -382,19 +382,19 @@ export function SignupForm({
             />
             <span>
               I agree to the{" "}
-              <Link
+              <NewTabLink
                 href="/intern-terms-and-conditions"
                 className="font-medium text-brand-700 underline-offset-4 hover:underline"
               >
                 intern terms
-              </Link>{" "}
+              </NewTabLink>{" "}
               and the{" "}
-              <Link
+              <NewTabLink
                 href="/privacy"
                 className="font-medium text-brand-700 underline-offset-4 hover:underline"
               >
                 privacy policy
-              </Link>
+              </NewTabLink>
               .
             </span>
           </label>

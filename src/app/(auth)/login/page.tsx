@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { NewTabLink } from "@/components/ui/new-tab-link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
@@ -110,9 +111,9 @@ export default async function LoginPage({
       {door === "college" ? (
         <p className="mt-7 text-sm text-text-subtle">
           Forgot your password, or need a login for a colleague?{" "}
-          <Link href="/contact?type=college" className="font-semibold text-brand-700 underline-offset-4 hover:underline">
+          <NewTabLink href="/contact?type=college" className="font-semibold text-brand-700 underline-offset-4 hover:underline">
             Ask Findtern
-          </Link>
+          </NewTabLink>
           . Placement console logins are issued and reset by our team.
         </p>
       ) : (

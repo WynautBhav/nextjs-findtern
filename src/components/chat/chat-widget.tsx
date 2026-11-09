@@ -7,6 +7,8 @@ import { motion, useReducedMotion } from "motion/react";
 
 import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { cn } from "@/lib/utils";
+import { newTabAttrs } from "@/components/ui/new-tab";
+import { NewTabHint } from "@/components/ui/new-tab-link";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
@@ -40,7 +42,8 @@ const GREETING: Msg = {
 const INLINE_RE =
   /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`|\[[^\]\n]+\]\([^)\n]+\))/g;
 
-function renderInline(text: string, keyPrefix: string): ReactNode[] {
+/** `internalNewTab`: inside the signed-in apps and forms, site paths open in a new tab so the page (and the chat) stays put. */
+function renderInline(text: string, keyPrefix: string, internalNewTab = false): ReactNode[] {
   const parts = text.split(INLINE_RE);
   return parts.map((part, i) => {
     const key = `${keyPrefix}-${i}`;
@@ -74,11 +77,11 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
           <a
             key={key}
             href={href}
-            target={href.startsWith("http") ? "_blank" : undefined}
-            rel={href.startsWith("http") ? "noreferrer" : undefined}
+            {...newTabAttrs(internalNewTab || href.startsWith("http"))}
             className="font-medium text-primary underline decoration-accent decoration-[1.5px] underline-offset-2 hover:decoration-primary"
           >
             {label}
+            {internalNewTab || href.startsWith("http") ? <NewTabHint /> : null}
           </a>
         );
       }
@@ -97,11 +100,11 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
                 {lead}
                 <a
                   href={t}
-                  target={t.startsWith("http") ? "_blank" : undefined}
-                  rel={t.startsWith("http") ? "noreferrer" : undefined}
+                  {...newTabAttrs(internalNewTab || t.startsWith("http"))}
                   className="font-medium text-primary underline decoration-accent decoration-[1.5px] underline-offset-2 hover:decoration-primary"
                 >
                   {t}
+                  {internalNewTab || t.startsWith("http") ? <NewTabHint /> : null}
                 </a>
               </span>
             );
@@ -113,7 +116,7 @@ function renderInline(text: string, keyPrefix: string): ReactNode[] {
   });
 }
 
-function BotText({ content }: { content: string }) {
+function BotText({ content, internalNewTab }: { content: string; internalNewTab?: boolean }) {
   const lines = content.split("\n");
   const blocks: ReactNode[] = [];
   let list: { ordered: boolean; items: string[] } | null = null;
@@ -141,7 +144,7 @@ function BotText({ content }: { content: string }) {
                 className="absolute left-0.5 top-[0.62em] size-1.5 rounded-full bg-accent"
               />
             )}
-            {renderInline(item, `${key}-${i}`)}
+            {renderInline(item, `${key}-${i}`, internalNewTab)}
           </li>
         ))}
       </Tag>,
@@ -165,7 +168,7 @@ function BotText({ content }: { content: string }) {
     } else {
       flush(`list-${i}`);
       blocks.push(
-        <p key={`p-${i}`}>{renderInline(line.trim(), `p-${i}`)}</p>,
+        <p key={`p-${i}`}>{renderInline(line.trim(), `p-${i}`, internalNewTab)}</p>,
       );
     }
   });
@@ -392,7 +395,7 @@ export function ChatWidget() {
               )}
             >
               {m.role === "assistant" ? (
-                <BotText content={m.content} />
+                <BotText content={m.content} internalNewTab={inApp || isForm} />
               ) : (
                 m.content
               )}

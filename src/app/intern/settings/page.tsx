@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { NewTabLink } from "@/components/ui/new-tab-link";
 import { redirect } from "next/navigation";
 import { and, desc, eq, gt, isNotNull, sql } from "drizzle-orm";
 import { ArrowRight } from "lucide-react";
@@ -253,12 +254,12 @@ export default async function InternSettings({ searchParams }: { searchParams: P
               with your Findtern ID. The team replies within one working day.
             </p>
             <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1">
-              <Link href="/faq#interns" className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline">
+              <NewTabLink href="/faq#interns" className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline">
                 Intern FAQ
-              </Link>
-              <Link href="/contact" className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline">
+              </NewTabLink>
+              <NewTabLink href="/contact" className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline">
                 Contact page
-              </Link>
+              </NewTabLink>
             </div>
           </Surface>
         </aside>
