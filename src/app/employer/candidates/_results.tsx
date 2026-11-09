@@ -246,15 +246,11 @@ export function Results({
                   region={data.region}
                   selected={compareIds.includes(candidate.id)}
                   compareHref={compareLink(candidate.id)}
-                  comparable={!rel?.hired}
                   projectId={data.activeProjectId}
                   shortlisted={data.shortlisted.has(candidate.id)}
                   nameUnlocked={data.nameUnlocked.has(candidate.id)}
-                  hired={rel?.hired}
                   pricing={resolvePricing(candidate.score, data.plans, data.currency, data.region)}
                   proposal={rel?.proposal ?? null}
-                  fullTimeFrom={rel?.fullTimeFrom ?? null}
-                  fullTime={data.fullTime}
                   wantedSkills={data.effectiveSkills}
                   presence={data.presence[candidate.id] ?? null}
                   interested={data.saved.has(candidate.id)}

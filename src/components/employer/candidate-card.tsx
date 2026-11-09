@@ -8,7 +8,6 @@ import { Check, Heart, Loader2, MapPin, Send } from "lucide-react";
 import { formatRate } from "@/lib/format";
 import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
 import { resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
-import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
 import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
 import { skillLead, studyOf } from "@/components/employer/candidate-view";
@@ -22,9 +21,6 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-/** What a hired candidate's card needs to offer a full-time role (EMH-42). */
-export type FullTimeContext = { employerId: string; fteStatus: string; timezone: string };
-
 export interface CandidateCardProps {
   candidate: CandidateProfile;
   currency: Currency;
@@ -32,21 +28,14 @@ export interface CandidateCardProps {
   selected: boolean;
   /** Toggles the compare pick; null when four are already picked (EMB-13). */
   compareHref: string | null;
-  /** False once this employer has hired them: compare leaves hires out. */
-  comparable?: boolean;
   projectId: string | null;
   shortlisted: boolean;
   /** True when this employer hired the candidate - the only case the full name shows. */
   nameUnlocked?: boolean;
-  /** Hired (on any project): the row says so, even when the live offer shown is another one. */
-  hired?: boolean;
   /** Resolved server-side against the CMS rate card; falls back to the bands. */
   pricing?: Pricing;
   /** This employer's live or hired offer to the candidate, if any. */
   proposal?: CandidateProposal | null;
-  /** Internship hire a full-time offer can follow from (EMH-42), with context. */
-  fullTimeFrom?: string | null;
-  fullTime?: FullTimeContext | null;
   /** Skills the list is filtered by: matching chips are filled and listed first. */
   wantedSkills?: string[];
   /** "Active now" / "Last seen 2h ago" / "Offline"; null when the candidate hides it. */
@@ -172,15 +161,11 @@ export function CandidateCard({
   region,
   selected,
   compareHref,
-  comparable = true,
   projectId,
   shortlisted,
   nameUnlocked = false,
-  hired = false,
   pricing: resolved,
   proposal = null,
-  fullTimeFrom = null,
-  fullTime = null,
   wantedSkills = [],
   presence = null,
   interested = false,
@@ -189,7 +174,6 @@ export function CandidateCard({
   const pricing = resolved ?? resolvePricing(candidate.score, [], currency, region);
   const displayName = displayNameOf(candidate, nameUnlocked);
   const status = candidateStatusPill(proposal);
-  const showHired = hired && status?.label !== "Hired";
   const wantedSet = new Set(wantedSkills.map((w) => w.trim().toLowerCase()));
   // Lead with the top skills (the schema has no role or headline); the degree moves to the meta line.
   const { lead, rest } = skillLead(candidate.skills, wantedSet);
@@ -231,7 +215,6 @@ export function CandidateCard({
           >
             {displayName}
           </Link>
-          {hired && proposal?.status !== "hired" ? <Pill tone="live" className="shrink-0 whitespace-nowrap">Hired</Pill> : null}
           {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
           {interested ? (
             <Pill tone="live" className="shrink-0 whitespace-nowrap">
@@ -269,18 +252,9 @@ export function CandidateCard({
 
       {/* Actions: Compare on the left, Save and the one primary action on the right. */}
       <div className="relative z-10 col-span-2 flex items-center justify-between gap-2 border-t border-ink-100 pt-3 sm:col-span-2 sm:col-start-2">
-        {comparable ? <CompareToggle href={compareHref} selected={selected} name={displayName} /> : <span />}
+        <CompareToggle href={compareHref} selected={selected} name={displayName} />
         <div className="flex items-center gap-1.5">
           {canSave && projectId ? <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} name={displayName} /> : null}
-          {fullTimeFrom && fullTime ? (
-            <FullTimeOfferButton
-              employerId={fullTime.employerId}
-              proposalId={fullTimeFrom}
-              candidate={displayName}
-              fteStatus={fullTime.fteStatus}
-              timezone={fullTime.timezone}
-            />
-          ) : null}
           {primary}
         </div>
       </div>

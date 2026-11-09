@@ -37,6 +37,7 @@ const SPECS = [
   "critical-path",
   "bio-hidden",
   "skills-limit",
+  "candidates-hired",
   "money-crons",
   // listings, messaging-presence, college-roster and refunds (integrate's
   // backend scenarios) are not on this branch: those features live on master's

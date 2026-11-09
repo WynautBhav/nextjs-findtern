@@ -57,7 +57,6 @@ export default async function CandidatesPage({
   const remembered = await rememberedSelection(uid);
   if (!filters.idsSet) filters.ids = remembered.compare;
   if (!filters.project && remembered.project) filters.project = remembered.project;
-  const compareIds = filters.ids;
 
   const [data, flow] = await Promise.all([
     loadCandidates(uid, filters, {
@@ -68,6 +67,8 @@ export default async function CandidatesPage({
   ]);
   if (data.restoreTo) redirect(data.restoreTo);
 
+  // After the load: it drops compare picks the employer has since hired (they are not on this list).
+  const compareIds = filters.ids;
   const { total, loadFailed, activeProjectId, projectApplied } = data;
   const compareFull = compareIds.length >= MAX_COMPARE;
 

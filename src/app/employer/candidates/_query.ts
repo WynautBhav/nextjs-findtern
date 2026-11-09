@@ -7,13 +7,12 @@ import {
   type CandidateProfile,
   type Ratings,
 } from "@/lib/employer-candidates";
-import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
+import { candidateRelations, hiredAmong, hiredInternIds, notHiredByEmployerSql, type CandidateRelation } from "@/lib/employer-visibility";
 import { attachPhotos, candidatePoolClauses, poolInternIds, scoreExpr } from "@/lib/employer-pool";
 import { projectCities } from "@/lib/project-locations";
 import { likePattern } from "@/lib/admin/palette-search";
 import { employerRegion, type Currency } from "@/lib/employer-pricing";
 import { BANDS, PLAN_NAME, type BandId } from "@/lib/score";
-import { timezoneForLocation } from "@/lib/timezones";
 import { parseSortFields } from "@/lib/candidate-sort";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedFilters } from "@/lib/employer-selection";
 import { restorableFilters } from "@/lib/employer-filter-restore";
@@ -21,7 +20,6 @@ import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { savedInternIds } from "@/lib/saved-roles";
 import { rankProfiles } from "@/components/employer/candidate-rank";
 import { dedupeSkills, filterCount } from "@/components/employer/candidate-view";
-import type { FullTimeContext } from "@/components/employer/candidate-card";
 
 export type SortKey = "score" | keyof Ratings;
 
@@ -346,7 +344,6 @@ export type CandidatesData = {
   nameUnlocked: Set<string>;
   plans: (typeof schema.pricingPlans.$inferSelect)[];
   relations: Map<string, CandidateRelation>;
-  fullTime: FullTimeContext | null;
   /** Presence label per candidate on this page; null = no label shown. */
   presence: Record<string, PresenceLabel | null>;
   /** Interns who saved the selected project's role (it raises them in the ranking). */
@@ -383,18 +380,25 @@ export async function loadCandidates(
     nameUnlocked: new Set(),
     plans: [],
     relations: new Map(),
-    fullTime: null,
     presence: {},
     saved: new Set(),
     savedCount: 0,
   };
-  const compareIds = filters.ids;
 
   try {
     const db = getDb();
 
     // Names stay redacted until this employer hires the intern.
     data.nameUnlocked = await hiredInternIds(db, uid);
+
+    // A hired candidate is not on this list (they live under Hired / Orders), so a compare pick
+    // that was hired since (cookie or link) is dropped here: the tray never counts someone the
+    // list cannot show. Corrected in place, like `filters.project`.
+    if (filters.ids.length > 0) {
+      const hiredPicks = await hiredAmong(db, uid, filters.ids);
+      if (hiredPicks.size > 0) filters.ids = filters.ids.filter((id) => !hiredPicks.has(id));
+    }
+    const compareIds = filters.ids;
 
     // A shortlist is keyed on (project, candidate), so the page needs a
     // project. Only open projects are offered, newest first, and the newest
@@ -449,7 +453,9 @@ export async function loadCandidates(
           ),
         );
       data.shortlisted = new Set(rows.map((r) => r.internId));
-      data.savedCount = (await poolInternIds(db, [...data.shortlisted])).size;
+      // Hired ones left every shortlist (EMB-26) and are not rows below, so they are not counted.
+      const [inPool, hiredOnList] = await Promise.all([poolInternIds(db, [...data.shortlisted]), hiredAmong(db, uid, [...data.shortlisted])]);
+      data.savedCount = [...inPool].filter((id) => !hiredOnList.has(id)).length;
     }
 
     const [employer] = await db
@@ -458,14 +464,12 @@ export async function loadCandidates(
         state: schema.employers.state,
         countryCode: schema.employers.countryCode,
         phoneNumber: schema.employers.phoneNumber,
-        fteStatus: schema.employers.internationalFteStatus,
       })
       .from(schema.employers)
       .where(eq(schema.employers.id, uid))
       .limit(1);
     data.region = employerRegion(employer ?? {});
     data.currency = data.region === "IN" ? "INR" : "USD";
-    data.fullTime = { employerId: uid, fteStatus: employer?.fteStatus ?? "none", timezone: timezoneForLocation(employer ?? {}) };
 
     // The pool rule (active, live, open to work, AI-interviewed, approved)
     // lives in lib/employer-pool so the dashboard applies the same one.
@@ -592,10 +596,15 @@ export async function loadCandidates(
       .from(schema.users)
       .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
       // The Saved tab: the pool rule and the shortlist only; the search filters are set aside.
+      // Either way, never someone this employer has hired: the list, its count, the pages and
+      // every sort are all built from these rows.
       .where(
-        savedOnly
-          ? and(...candidatePoolClauses(), data.shortlisted.size > 0 ? inArray(schema.users.id, [...data.shortlisted]) : sql`false`)
-          : and(...clauses),
+        and(
+          savedOnly
+            ? and(...candidatePoolClauses(), data.shortlisted.size > 0 ? inArray(schema.users.id, [...data.shortlisted]) : sql`false`)
+            : and(...clauses),
+          notHiredByEmployerSql(uid),
+        ),
       )
       // Newest onboarding row first, so the dedupe below keeps it (legacy
       // read only the newest row per intern); then id for a total order.

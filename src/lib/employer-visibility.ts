@@ -1,8 +1,8 @@
-import { and, desc, eq, inArray, isNotNull, or, type SQL } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, or, sql, type SQL } from "drizzle-orm";
 
 import { getSession } from "./auth";
 import { getDb } from "./db";
-import { interviews, proposals } from "./db/schema";
+import { interviews, proposals, users } from "./db/schema";
 import { isHiredProposal } from "./hire-status";
 import { parseOffer } from "./offer";
 import { LIVE_STATUSES } from "./employer-offer-status";
@@ -49,6 +49,31 @@ export async function hiredInternIds(
     .select({ internId: proposals.internId })
     .from(proposals)
     .where(and(eq(proposals.employerId, employerId), hiredProposalSql()));
+  return new Set(rows.map((row) => row.internId));
+}
+
+/**
+ * WHERE clause for a query on `users`: this employer has not hired the intern
+ * on any project. The Candidates list leaves hired interns out (they are in
+ * Hired / Orders). Real hires only, never `hiredInternIds`, which is everyone
+ * under an admin "View as".
+ */
+export function notHiredByEmployerSql(employerId: string): SQL {
+  return sql`NOT EXISTS (SELECT 1 FROM ${proposals} WHERE ${proposals.employerId} = ${employerId} AND ${proposals.internId} = ${users.id} AND (${hiredProposalSql()}))`;
+}
+
+/** Of `internIds`, the ones this employer has really hired (same rule as `notHiredByEmployerSql`). */
+export async function hiredAmong(
+  db: ReturnType<typeof getDb>,
+  employerId: string,
+  internIds: string[],
+): Promise<Set<string>> {
+  const ids = [...new Set(internIds.filter(Boolean))];
+  if (ids.length === 0) return new Set();
+  const rows = await db
+    .select({ internId: proposals.internId })
+    .from(proposals)
+    .where(and(eq(proposals.employerId, employerId), inArray(proposals.internId, ids), hiredProposalSql()));
   return new Set(rows.map((row) => row.internId));
 }
 
