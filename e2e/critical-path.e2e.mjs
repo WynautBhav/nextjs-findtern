@@ -574,6 +574,8 @@ step("intern: accepts the offer on /intern/proposals/[id] [UI]", ["proposalId"],
     '"Accept this offer" → terms → "Yes, accept"',
     async () => {
       await visit(page, `/intern/proposals/${state.proposalId}`);
+      // The page streams in behind a skeleton (proposals/loading.tsx); read it only once the offer has rendered.
+      await page.getByRole("button", { name: "Accept this offer" }).waitFor({ timeout: 20_000 });
       const text = await page.locator("body").innerText();
       assert.ok(!text.includes(EMPLOYER.companyName), "offer page hides the company before hire");
       assert.match(text, /8,000|15,000/, "the intern sees the fixed band stipend");
