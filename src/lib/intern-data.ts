@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 
 import { getDb, hasDb, schema } from "@/lib/db";
 import { realEmployers } from "@/lib/admin/scope";
@@ -140,6 +140,21 @@ export async function projectNames(ids: string[]): Promise<Record<string, string
     return out;
   } catch {
     return {};
+  }
+}
+
+/** Which of these projects Findtern has taken down; an offer on one can't be accepted. Empty on any failure (the API still refuses). */
+export async function takenDownProjectIds(ids: string[]): Promise<Set<string>> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0 || !hasDb()) return new Set();
+  try {
+    const rows = await getDb()
+      .select({ id: schema.projects.id })
+      .from(schema.projects)
+      .where(and(inArray(schema.projects.id, unique), isNotNull(schema.projects.takenDownAt)));
+    return new Set(rows.map((r) => r.id));
+  } catch {
+    return new Set();
   }
 }
 

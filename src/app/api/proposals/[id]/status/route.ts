@@ -11,6 +11,7 @@ import { employerNames, internFirstName, notify, resolveOfferNotifications } fro
 import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
 import { FREE_DECLINES, offerPastStart, parseOffer, todayIst } from "@/lib/offer";
 import { hasOpenOrderFor, OPEN_ORDER_MINUTES } from "@/lib/payments";
+import { takedownBlock } from "@/lib/projects/takedown";
 
 /**
  * Which role may set which status.
@@ -139,6 +140,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     );
   }
   const recordTerms = session.role === "intern" && status === "accepted";
+  // A taken-down listing freezes its offers: no acceptance (internship or full-time). Declining stays open.
+  if (recordTerms && proposal.projectId) {
+    const [project] = await db
+      .select({ takenDownAt: schema.projects.takenDownAt })
+      .from(schema.projects)
+      .where(eq(schema.projects.id, proposal.projectId))
+      .limit(1);
+    const blocked = takedownBlock(project, "accept");
+    if (blocked) return NextResponse.json({ error: blocked, code: "listing_taken_down" }, { status: 409 });
+  }
   if (recordTerms && !parsed.data.agreedToTerms) {
     return NextResponse.json({ error: "Agree to the intern terms and NDA to accept." }, { status: 400 });
   }

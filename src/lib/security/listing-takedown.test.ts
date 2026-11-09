@@ -78,3 +78,34 @@ test("redactForEmployer drops the onboarding edit time", async () => {
   assert.equal(redactForEmployer(profile, false).updatedAt, null);
   assert.ok(redactForEmployer(profile, true).updatedAt, "a hired candidate keeps it");
 });
+
+// ── Taken-down listing also freezes existing offers ──────────────────────
+
+test("proposal status route: only an intern accepting is blocked, before any write, and decline stays open", () => {
+  const src = read("api/proposals/[id]/status/route.ts");
+  const at = src.indexOf('takedownBlock(project, "accept")');
+  assert.ok(at > 0, "guard present");
+  assert.ok(at < src.indexOf("db.transaction("), "guard runs before the transaction");
+  const guardStart = src.lastIndexOf("if (recordTerms", at);
+  assert.ok(guardStart > 0, "guard is keyed on the intern accepting (recordTerms), so decline/withdraw never reach it");
+  assert.match(src.slice(at, at + 160), /status: 409/);
+  assert.match(src, /const recordTerms = session\.role === "intern" && status === "accepted"/);
+});
+
+test("interview slot booking and new-hire checkout refuse for a taken-down listing; due months do not", () => {
+  const slot = read("api/interviews/[id]/select-slot/route.ts");
+  assert.match(slot, /takedownBlock\(project, "schedule"\)/);
+  assert.ok(slot.indexOf('takedownBlock(project, "schedule")') < slot.indexOf("createMeetEvent("), "refused before a Meet event is created");
+  const order = read("api/employer/[id]/payment/razorpay/order/route.ts");
+  assert.match(order, /paying\.filter\(\(l\) => !l\.due\)/);
+  assert.match(order, /isNotNull\(schema\.projects\.takenDownAt\)/);
+  assert.ok(order.indexOf("TAKEDOWN_BLOCKS.pay") < order.indexOf("await openOrder("), "refused before an order is opened");
+});
+
+test("intern offer screens disable Accept with the reason; decline button is not gated", () => {
+  const dec = readFileSync(join(APP, "../components/app/offer-decision.tsx"), "utf8");
+  assert.match(dec, /disabled=\{busy !== null \|\| Boolean\(acceptBlocked\)\}/);
+  assert.match(dec, /onClick=\{\(\) => setDeclineOpen\(true\)\}\s+disabled=\{busy !== null\}/);
+  assert.match(read("intern/proposals/page.tsx"), /acceptBlocked=\{takenDown \? TAKEDOWN_BLOCKS\.accept : null\}/);
+  assert.match(read("intern/proposals/[id]/page.tsx"), /acceptBlocked=\{takedownBlock\(project\.row, "accept"\)\}/);
+});

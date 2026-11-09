@@ -51,6 +51,7 @@ export function OfferDecision({
   freeDeclines = 3,
   guaranteeEnded = false,
   bonusLabel = null,
+  acceptBlocked = null,
   layout = "rail",
   aside,
 }: {
@@ -69,6 +70,8 @@ export function OfferDecision({
   guaranteeEnded?: boolean;
   /** e.g. "+ ₹2,500 completion bonus when you finish", worked out on the server; null when none is promised. */
   bonusLabel?: string | null;
+  /** Why this offer can't be accepted right now (Findtern took its listing down). Accept is disabled and says why; turning it down stays open. */
+  acceptBlocked?: string | null;
   /** "rail": the offer page's decision card. "row": a list card's footer. */
   layout?: "rail" | "row";
   /** Row layout only: a quiet link that sits after the two buttons (and beside "Turn it down" on a phone). */
@@ -185,7 +188,8 @@ export function OfferDecision({
         <button
           type="button"
           onClick={() => setAcceptOpen(true)}
-          disabled={busy !== null}
+          disabled={busy !== null || Boolean(acceptBlocked)}
+          aria-describedby={acceptBlocked ? `accept-blocked-${proposalId}` : undefined}
           className={buttonClass({
             variant: "primary",
             size: "md",
@@ -212,6 +216,12 @@ export function OfferDecision({
         </button>
         {rail ? null : aside}
       </div>
+      {acceptBlocked ? (
+        <p id={`accept-blocked-${proposalId}`} className="mt-3 flex items-start gap-2 rounded-apple-sm bg-warning-soft px-4 py-3 text-sm text-ink-800">
+          <AlertCircle className="mt-px size-4 shrink-0" aria-hidden />
+          {acceptBlocked}
+        </p>
+      ) : null}
 
       {rail ? (
         <div className="mt-4 space-y-2 text-sm leading-relaxed text-ink-600">

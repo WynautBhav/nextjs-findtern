@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { planTakedown } from "./takedown.ts";
+import { planTakedown, takedownBlock, TAKEDOWN_BLOCKS } from "./takedown.ts";
 
 const NOW = new Date("2026-11-08T10:00:00Z");
 const up = { takenDownAt: null };
@@ -36,4 +36,15 @@ test("restore clears all three fields; restoring a live listing is a no-op", () 
 test("reason is capped at 500 characters", () => {
   const p = planTakedown({ project: up, action: "takedown", adminId: "a1", reason: "x".repeat(900), now: NOW });
   assert.ok(p.ok && !p.noop && p.set.takenDownReason?.length === 500);
+});
+
+test("takedownBlock refuses for a taken-down listing, per action, and passes a live or missing one", () => {
+  for (const action of ["accept", "pay", "schedule"] as const) {
+    assert.equal(takedownBlock(down, action), TAKEDOWN_BLOCKS[action]);
+    assert.equal(takedownBlock({ takenDownAt: "2026-11-01T00:00:00Z" }, action), TAKEDOWN_BLOCKS[action], "string timestamps count too");
+    assert.equal(takedownBlock(up, action), null);
+    assert.equal(takedownBlock(null, action), null, "no project row: nothing to block on");
+    assert.equal(takedownBlock(undefined, action), null);
+  }
+  assert.match(TAKEDOWN_BLOCKS.accept, /can still turn it down/);
 });

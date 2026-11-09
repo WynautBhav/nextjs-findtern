@@ -18,7 +18,8 @@ import { RUN, SKILLS, PASSWORD, cleanup, mkEmployer, mkIntern, mkProject, mkProp
 
 let browser;
 const P = {};
-let E, I, ADMIN, pid, hiredPid;
+const S = {}; // ids shared between tests (P holds browser sessions only)
+let E, I, I2, ADMIN, pid, hiredPid;
 const NAME = `Takedown Role ${RUN}`;
 const REASON = `Misleading stipend ${RUN}`;
 const td = (id, body) => api(P.A.page, "POST", `/api/admin/projects/${id}/takedown`, body);
@@ -38,6 +39,7 @@ before(async () => {
   browser = await chromium.launch({ headless: process.env.E2E_HEADED !== "1" });
   E = await mkEmployer("tdE");
   I = await mkIntern("tdI");
+  I2 = await mkIntern("tdI2");
   ADMIN = { key: "td-admin", role: "admin", email: `td-admin-${RUN}@findtern.test`, password: PASSWORD };
   const a = await one(`INSERT INTO admins (email, password, name, role) VALUES ($1,$2,'Takedown Admin','super_admin') RETURNING id`, [ADMIN.email, await hash(PASSWORD)]);
   ADMIN.id = a.id;
@@ -49,11 +51,14 @@ before(async () => {
   P.E = await signedIn(browser, E);
   P.I = await signedIn(browser, I);
   P.A = await signedIn(browser, ADMIN);
+  P.I2 = await signedIn(browser, I2);
 });
 
 after(async () => {
   for (const p of Object.values(P)) await p.ctx.close().catch(() => {});
   await browser?.close();
+  await rows(`DELETE FROM interviews WHERE employer_id = $1`, [E?.id]).catch(() => {});
+  await rows(`DELETE FROM employer_payments WHERE employer_id = $1`, [E?.id]).catch(() => {});
   await rows(`DELETE FROM admin_audit_log WHERE admin_id = $1`, [ADMIN?.id]).catch(() => {});
   await rows(`DELETE FROM admins WHERE id = $1`, [ADMIN?.id]).catch(() => {});
   await cleanup();
@@ -162,6 +167,81 @@ test("admin UI: take down through the dialog", async () => {
   await P.A.page.getByRole("dialog").getByRole("button", { name: "Take down", exact: true }).click();
   await P.A.page.getByText("Taken down", { exact: true }).waitFor({ timeout: 20_000 });
   assert.equal((await row(pid)).taken_down_reason, "UI reason");
+});
+
+// ── A taken-down listing also freezes offers already made on it. The listing is down here (UI test above). ──
+const accept = (who, proposalId) => api(P[who].page, "PATCH", `/api/proposals/${proposalId}/status`, { status: "accepted", agreedToTerms: true });
+const decline = (who, proposalId) => api(P[who].page, "PATCH", `/api/proposals/${proposalId}/status`, { status: "rejected" });
+const status = async (id) => (await one(`SELECT status FROM proposals WHERE id = $1`, [id])).status;
+
+test("taken down: the intern cannot accept an existing offer (409), nothing changes, and the UI shows it as unavailable", async () => {
+  assert.ok((await row(pid)).taken_down_at, "precondition: listing is down");
+  const offerId = await mkProposal(E.id, I.id, pid);
+  const r = await accept("I", offerId);
+  assert.equal(r.status, 409, JSON.stringify(r.body));
+  assert.match(r.body.error, /took this listing down/);
+  assert.equal(await status(offerId), "sent", "still open, not accepted");
+  assert.equal(await one(`SELECT 1 AS x FROM proposals WHERE id = $1 AND offer_details ? 'termsAcceptedAt'`, [offerId]), null, "no terms stamp");
+
+  await P.I.page.goto(url(`/intern/proposals/${offerId}`), { waitUntil: "domcontentloaded" });
+  const btn = P.I.page.getByRole("button", { name: /Accept this offer/ });
+  await btn.waitFor({ timeout: 20_000 });
+  assert.equal(await btn.isDisabled(), true, "Accept is disabled, not a failing button");
+  assert.match((await P.I.page.locator("main").textContent()) ?? "", /took this listing down/);
+  assert.equal(await P.I.page.getByRole("button", { name: "Turn it down" }).isDisabled(), false, "declining stays available");
+  S.offerId = offerId;
+});
+
+test("taken down: the intern can still decline an offer on it", async () => {
+  const other = await mkProposal(E.id, I2.id, pid);
+  const r = await decline("I2", other);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(await status(other), "rejected");
+});
+
+const order = (proposalId) =>
+  api(P.E.page, "POST", `/api/employer/${E.id}/payment/razorpay/order`, { currency: "INR", proposalIds: [proposalId], mode: "upfront", paymentIndex: 0 });
+
+test("taken down: the employer cannot open a payment for an accepted offer (409), and nothing is written", async () => {
+  const intern = await mkIntern("tdI3");
+  const offerId = await mkProposal(E.id, intern.id, pid);
+  await one(
+    `UPDATE proposals SET status = 'accepted', currency = 'INR', offer_details = $2::jsonb WHERE id = $1 RETURNING id`,
+    [offerId, JSON.stringify({ roleTitle: "Role", duration: "1m", monthlyAmount: 10000, startDate: "2099-01-01" })],
+  );
+  const r = await order(offerId);
+  assert.equal(r.status, 409, JSON.stringify(r.body));
+  assert.equal(r.body.code, "listing_taken_down");
+  assert.match(r.body.error, /took this listing down/);
+  assert.equal(await status(offerId), "accepted", "not hired");
+  assert.equal((await one(`SELECT count(*)::int AS n FROM employer_payments WHERE employer_id = $1`, [E.id])).n, 0, "no order row opened");
+  S.payOfferId = offerId;
+});
+
+test("taken down: the intern cannot book an interview slot (409); the interview stays pending", async () => {
+  const day = (n) => new Date(Date.now() + n * 86_400_000).toISOString();
+  const iv = await one(
+    `INSERT INTO interviews (employer_id, intern_id, project_id, status, slot1, slot2, slot3, timezone) VALUES ($1,$2,$3,'pending',$4,$5,$6,'Asia/Kolkata') RETURNING id`,
+    [E.id, I.id, pid, day(3), day(4), day(5)],
+  );
+  S.interviewId = iv.id;
+  const r = await api(P.I.page, "POST", `/api/interviews/${iv.id}/select-slot`, { slot: 1 });
+  assert.equal(r.status, 409, JSON.stringify(r.body));
+  assert.equal(r.body.code, "listing_taken_down");
+  assert.equal((await one(`SELECT status FROM interviews WHERE id = $1`, [iv.id])).status, "pending");
+});
+
+test("restored: the same offer can be accepted, paid for and its interview booked again", async () => {
+  assert.equal((await restore(pid)).status, 200);
+  const r = await accept("I", S.offerId);
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(await status(S.offerId), "accepted");
+  const paid = await order(S.payOfferId);
+  assert.equal(paid.status, 200, JSON.stringify(paid.body));
+  assert.equal(await status(S.payOfferId), "hired");
+  const slot = await api(P.I.page, "POST", `/api/interviews/${S.interviewId}/select-slot`, { slot: 1 });
+  assert.equal(slot.status, 200, JSON.stringify(slot.body));
+  assert.equal((await one(`SELECT status FROM interviews WHERE id = $1`, [S.interviewId])).status, "scheduled");
 });
 
 // ── Roster-import retention (WP-I part 3): the cron route against the real table. ──

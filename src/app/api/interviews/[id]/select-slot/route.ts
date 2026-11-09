@@ -10,6 +10,7 @@ import { CALENDAR_TOKEN_OWNER, createMeetEvent, deleteMeetEvent } from "@/lib/go
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, notify, resolveInterviewNotifications } from "@/lib/notify";
 import { hiredProposalSql } from "@/lib/employer-visibility";
+import { takedownBlock } from "@/lib/projects/takedown";
 
 const bodySchema = z.object({ slot: z.number().int().min(1).max(3) });
 const MEETING_MS = 30 * 60 * 1000;
@@ -29,6 +30,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (interview.internId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (interview.status !== "pending") {
     return NextResponse.json({ error: `This interview is already ${interview.status}` }, { status: 409 });
+  }
+  if (interview.projectId) {
+    const [project] = await db
+      .select({ takenDownAt: schema.projects.takenDownAt })
+      .from(schema.projects)
+      .where(eq(schema.projects.id, interview.projectId))
+      .limit(1);
+    const blocked = takedownBlock(project, "schedule");
+    if (blocked) return NextResponse.json({ error: blocked, code: "listing_taken_down" }, { status: 409 });
   }
   const start = [interview.slot1, interview.slot2, interview.slot3][parsed.data.slot - 1];
   if (!start) return NextResponse.json({ error: "That slot wasn't offered" }, { status: 400 });

@@ -18,12 +18,13 @@ import {
 } from "@/components/intern/offer/offer-facts";
 import { requireRole } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
-import { loadInternData, projectNames } from "@/lib/intern-data";
+import { loadInternData, projectNames, takenDownProjectIds } from "@/lib/intern-data";
 import { cn } from "@/lib/utils";
 import { canDecide, offerGroup } from "@/lib/intern-offer-view";
 import type { ProposalRow } from "@/lib/journey";
 import { guaranteeEnded as isGuaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
 import { FREE_DECLINES } from "@/lib/offer";
+import { TAKEDOWN_BLOCKS } from "@/lib/projects/takedown";
 
 export const metadata: Metadata = {
   title: "Offers",
@@ -52,9 +53,8 @@ export default async function InternProposals({ searchParams }: { searchParams: 
   const show = Array.isArray(rawShow) ? rawShow[0] : rawShow;
 
   const data = await loadInternData(session.uid);
-  const projects = await projectNames(
-    data.proposals.map((p) => p.projectId ?? ""),
-  );
+  const projectIds = data.proposals.map((p) => p.projectId ?? "");
+  const [projects, takenDown] = await Promise.all([projectNames(projectIds), takenDownProjectIds(projectIds)]);
 
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
   const score = Number(extra.findternScore ?? 0) || 0;
@@ -69,6 +69,7 @@ export default async function InternProposals({ searchParams }: { searchParams: 
       p,
       facts: offerFacts(p, { score, names: data.names }),
       project: p.projectId ? (projects[p.projectId] ?? null) : null,
+      takenDown: Boolean(p.projectId && takenDown.has(p.projectId)),
     }));
   const groups: Record<GroupKey, Row[]> = {
     open: rows.filter((r) => offerGroup(r.facts.key) === "open"),
@@ -154,7 +155,7 @@ export default async function InternProposals({ searchParams }: { searchParams: 
   );
 }
 
-type Row = { p: ProposalRow; facts: OfferFacts; project: string | null };
+type Row = { p: ProposalRow; facts: OfferFacts; project: string | null; takenDown?: boolean };
 
 function Group({
   title,
@@ -192,6 +193,7 @@ function OfferRow({
   p,
   facts,
   project,
+  takenDown,
   decision,
   compact,
   hideStatus,
@@ -257,6 +259,7 @@ function OfferRow({
             declinesUsed={decision.declinesUsed}
             freeDeclines={FREE_DECLINES}
             guaranteeEnded={decision.guaranteeEnded}
+            acceptBlocked={takenDown ? TAKEDOWN_BLOCKS.accept : null}
             aside={
               <Link
                 href={href}

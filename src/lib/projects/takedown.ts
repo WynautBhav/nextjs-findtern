@@ -41,3 +41,22 @@ export function planTakedown(input: {
     set: { takenDownAt: input.now ?? new Date(), takenDownBy: input.adminId, takenDownReason: reason.slice(0, TAKEDOWN_REASON_MAX) },
   };
 }
+
+/**
+ * A taken-down listing also freezes the offers already made on it: the intern can't accept one,
+ * the employer can't open a payment for one, and a pending interview can't be booked. Declining
+ * and withdrawing stay open, and hired placements (money already moving) are not touched.
+ * Returns the refusal text (answer 409), or null when the listing is up.
+ */
+export const TAKEDOWN_BLOCKS = {
+  accept: "Findtern took this listing down, so this offer can't be accepted right now. You can still turn it down.",
+  pay: "Findtern took this listing down, so this offer can't be paid for right now. Contact support.",
+  schedule: "Findtern took this listing down, so this interview can't be scheduled right now.",
+} as const;
+
+export function takedownBlock(
+  project: { takenDownAt: Date | string | null } | null | undefined,
+  action: keyof typeof TAKEDOWN_BLOCKS,
+): string | null {
+  return project?.takenDownAt ? TAKEDOWN_BLOCKS[action] : null;
+}

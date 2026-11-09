@@ -26,6 +26,7 @@ import { toArray } from "@/lib/journey";
 import { sanitizeRichText } from "@/lib/richtext";
 import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
 import { FREE_DECLINES, WEEKLY_SCHEDULES } from "@/lib/offer";
+import { takedownBlock } from "@/lib/projects/takedown";
 
 export const metadata: Metadata = {
   title: "Offer",
@@ -91,7 +92,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
     ? `+ ${formatMoney(bonusMinor, "INR", { zeroLabel: false })} completion bonus ${scheduledMinor ? "scheduled" : "when you finish"}`
     : null;
 
-  let project: Loaded<{ projectName: string; skills: string[] | null; scopeOfWork: string | null }> = { ok: true, row: null };
+  let project: Loaded<{ projectName: string; skills: string[] | null; scopeOfWork: string | null; takenDownAt: Date | null }> = { ok: true, row: null };
   let employer: Loaded<{
     companySize: string | null;
     primaryContactName: string | null;
@@ -104,7 +105,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
       proposal.projectId
         ? load(
             db
-              .select({ projectName: schema.projects.projectName, skills: schema.projects.skills, scopeOfWork: schema.projects.scopeOfWork })
+              .select({ projectName: schema.projects.projectName, skills: schema.projects.skills, scopeOfWork: schema.projects.scopeOfWork, takenDownAt: schema.projects.takenDownAt })
               .from(schema.projects)
               .where(eq(schema.projects.id, proposal.projectId))
               .limit(1),
@@ -240,6 +241,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                   freeDeclines={FREE_DECLINES}
                   guaranteeEnded={guaranteeEnded(extra, misses)}
                   bonusLabel={bonusLabel}
+                  acceptBlocked={takedownBlock(project.row, "accept")}
                 />
               ) : (
                 <div className="space-y-4">

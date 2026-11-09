@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, eq, gte, inArray } from "drizzle-orm";
+import { and, eq, gte, inArray, isNotNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -10,6 +10,7 @@ import { paymentIndexMismatch } from "@/lib/dues";
 import { requireMutation } from "@/lib/guards-mutation";
 import { openProposalsWithDues, payableCheckout, type PayableLine } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders, legacyOrderRaw, OPEN_ORDER_MINUTES, orderProposalIds, settleEmployerOrder } from "@/lib/payments";
+import { TAKEDOWN_BLOCKS } from "@/lib/projects/takedown";
 import { orderModeProblem } from "@/lib/order-mode";
 import { quotePromo } from "@/lib/promo";
 import { createOrder, paymentsAreFree, razorpayKeyId, testPayEnabled } from "@/lib/razorpay";
@@ -112,6 +113,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { lines } = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode: parsed.data.mode });
   const paying = lines.filter((l) => l.currency === currency);
   if (paying.length === 0) return NextResponse.json({ error: "There is nothing to pay on this offer right now. Refresh the page." }, { status: 400 });
+  // A taken-down listing freezes its unpaid offers. A due month on a placement already hired is not
+  // new business and still goes through.
+  const hireIds = paying.filter((l) => !l.due).map((l) => l.id);
+  if (hireIds.length > 0) {
+    const down = await getDb()
+      .select({ id: schema.proposals.id })
+      .from(schema.proposals)
+      .innerJoin(schema.projects, eq(schema.projects.id, schema.proposals.projectId))
+      .where(and(inArray(schema.proposals.id, hireIds), isNotNull(schema.projects.takenDownAt)))
+      .limit(1);
+    if (down[0]) return NextResponse.json({ error: TAKEDOWN_BLOCKS.pay, code: "listing_taken_down" }, { status: 409 });
+  }
   // Never re-price a repeat submit as the next month: refuse when the month asked for is not the one due.
   if (paymentIndexMismatch(paying, parsed.data.paymentIndex)) {
     return NextResponse.json({ error: "This month is already paid. Refresh the page to see it under Orders." }, { status: 409 });
