@@ -57,7 +57,7 @@ const payHref = (h: HireRow) => `/employer/checkout?proposal=${encodeURIComponen
  * Hire is the flexible column; the rest are fixed, so every row lines up
  * under its heading and a date range never has to wrap; below lg each hire is a card with the same fields labelled.
  */
-const COLS = "lg:grid lg:grid-cols-[minmax(280px,1fr)_120px_220px_140px_140px_9.5rem] lg:items-center lg:gap-x-6";
+const COLS = "lg:grid lg:grid-cols-[minmax(230px,1fr)_104px_200px_130px_130px_8.5rem] lg:items-center lg:gap-x-4";
 
 /** A field's label: visible on the card, a screen-reader label in the table. */
 const FIELD_LABEL = "mb-0.5 block text-xs font-medium text-ink-600 lg:sr-only";
@@ -157,7 +157,8 @@ export function HiresPanel({
           ) : null}
 
           {/* Column headings: the table's header row from lg; below it each card labels its own fields. */}
-          <div className="lg:overflow-hidden lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:shadow-[0_1px_2px_rgba(16,24,20,0.04)]">
+          <div className="lg:overflow-x-auto lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:shadow-[0_1px_2px_rgba(16,24,20,0.04)]">
+          <div className="lg:min-w-[1010px]">
           <div aria-hidden className={cn(COLS, "hidden border-b border-ink-200 bg-ink-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-600")}>
             <span>Hire</span>
             <span>Monthly</span>
@@ -329,6 +330,7 @@ export function HiresPanel({
               );
             })}
           </ul>
+          </div>
           </div>
         </>
       )}
