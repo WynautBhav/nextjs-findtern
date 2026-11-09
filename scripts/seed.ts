@@ -114,6 +114,22 @@ const COMPANIES = [
   { name: "Ather Energy IoT", email: "ev-interns@atherenergy-iot.dev", city: "Bengaluru", state: "Karnataka", size: "500+", industry: "Clean Mobility & IoT" },
 ];
 
+/**
+ * The seed TRUNCATEs users and everything under them: it only ever runs against a database on this machine
+ * (same rule as e2e/lib/env.mjs). No override: point DATABASE_URL at a local copy.
+ */
+function assertLocalDatabase(url: string): void {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    throw new Error("Refusing to seed: DATABASE_URL is not a valid URL");
+  }
+  if (!["localhost", "127.0.0.1", "::1", "[::1]"].includes(host)) {
+    throw new Error(`Refusing to seed: DATABASE_URL host "${host}" is not localhost/127.0.0.1/::1`);
+  }
+}
+
 async function main() {
   if (process.env.NODE_ENV === "production") {
     throw new Error("Refusing to seed demo accounts in production");
@@ -121,6 +137,7 @@ async function main() {
 
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set - run via `npm run db:seed`");
+  assertLocalDatabase(url);
 
   const client = new pg.Client({ connectionString: url });
   await client.connect();
@@ -136,6 +153,7 @@ async function main() {
       interviews, intern_onboarding, projects, 
       password_reset_tokens, email_otps, 
       college_memberships, college_presence, college_consents, college_drive_meetings,
+      college_drive_shortlist, college_nudges,
       pricing_plans, employers, users, admins, admin_roles
     CASCADE;
   `);
