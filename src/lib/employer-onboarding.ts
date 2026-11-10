@@ -4,8 +4,8 @@ import {
   timezones,
   type employers,
   type projects,
-} from "@/lib/db/schema";
-import { DIAL_CODES } from "@/lib/data/dial-codes";
+} from "./db/schema.ts";
+import { DIAL_CODES } from "./data/dial-codes.ts";
 
 /**
  * Employer onboarding shape.
