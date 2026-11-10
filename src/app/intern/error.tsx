@@ -8,11 +8,13 @@ import { SURFACE_CLASS } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { SITE } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
+import { recoverFromChunkError, retryOrReload } from "@/lib/chunk-error";
 
 /** A failed read anywhere in the intern console lands here, inside the shell. No stack trace, only a reference code. */
 export default function InternError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
     console.error(error);
+    recoverFromChunkError(error);
   }, [error]);
 
   return (
@@ -29,7 +31,7 @@ export default function InternError({ error, retry }: { error: Error & { digest?
         {error.digest ? <> and quote reference <span className="nums font-medium text-ink-800">{error.digest}</span></> : null}.
       </p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">
-        <button type="button" onClick={() => retry()} className={buttonClass({})}>
+        <button type="button" onClick={() => retryOrReload(error, retry)} className={buttonClass({})}>
           <RotateCw className="size-4" aria-hidden />
           Try again
         </button>

@@ -5,6 +5,7 @@ import { AlertCircle, RotateCw } from "lucide-react";
 
 import { Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
+import { recoverFromChunkError, retryOrReload } from "@/lib/chunk-error";
 import { SITE } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +36,10 @@ export function LoadError({
   className?: string;
 }) {
   useEffect(() => {
-    if (error) console.error(error);
+    if (error) {
+      console.error(error);
+      recoverFromChunkError(error);
+    }
   }, [error]);
 
   const retryClass = buttonClass({ variant: "primary", size: "md" });
@@ -60,7 +64,7 @@ export function LoadError({
         {error?.digest ? <p className="mt-2 text-xs text-ink-600">Reference {error.digest}</p> : null}
       </div>
       {onRetry ? (
-        <button type="button" onClick={() => onRetry()} className={retryClass}>
+        <button type="button" onClick={() => retryOrReload(error, onRetry)} className={retryClass}>
           <RotateCw className="size-4" aria-hidden />
           Try again
         </button>
