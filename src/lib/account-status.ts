@@ -25,10 +25,28 @@ const store = globalThis as typeof globalThis & {
 };
 const cache = (store.__ftAccountStatus ??= new Map());
 
-async function readStatus(role: string, uid: string): Promise<{ active: boolean; pv: string | null; terms?: string | null } | undefined> {
+type Status = { active: boolean; pv: string | null; terms?: string | null };
+
+/**
+ * getSession asks "active?" and "password current?" in the same tick; both need
+ * the same row, so concurrent callers for one account share a single query.
+ */
+const inflight = new Map<string, Promise<Status | undefined>>();
+
+function readStatus(role: string, uid: string): Promise<Status | undefined> {
   const key = `${role}:${uid}`;
   const hit = cache.get(key);
-  if (hit && Date.now() - hit.at < TTL_MS) return hit;
+  if (hit && Date.now() - hit.at < TTL_MS) return Promise.resolve(hit);
+  const pending = inflight.get(key);
+  if (pending) return pending;
+  const p: Promise<Status | undefined> = loadStatus(role, uid, key).finally(() => {
+    if (inflight.get(key) === p) inflight.delete(key);
+  });
+  inflight.set(key, p);
+  return p;
+}
+
+async function loadStatus(role: string, uid: string, key: string): Promise<Status | undefined> {
   let status: { active: boolean; pv: string | null; terms?: string | null };
   try {
     if (role === "admin") {
@@ -94,6 +112,7 @@ export async function isTermsCurrent(role: string, uid: string): Promise<boolean
 
 export function forgetAccountStatus(role: string, uid: string) {
   cache.delete(`${role}:${uid}`);
+  inflight.delete(`${role}:${uid}`); // a read already in flight may predate the change
 }
 
 const adminCache = (store.__ftAdminPerms ??= new Map());
