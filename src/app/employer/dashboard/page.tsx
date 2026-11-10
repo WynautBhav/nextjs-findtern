@@ -13,6 +13,7 @@ import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-po
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { rowSkills, skillBaseName } from "@/components/employer/candidate-view";
 import { requireEmployerSetup } from "@/lib/employer-setup";
+import { gated } from "@/lib/request-gate";
 import { isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { payableCheckout } from "@/lib/employer-payable";
 import { isProjectOpen } from "@/lib/project-locations";
@@ -331,13 +332,13 @@ function slotDate(iv: InterviewRow): Date | null {
 async function load(employerId: string): Promise<Loaded> {
   const db = getDb();
   const [employerRow, projectRows, proposalRows, sheetRows, interviewRows, cartRows, metRows, payable, pool] = await Promise.all([
-    db
+    gated(() => db
       .select({ companyName: schema.employers.companyName, country: schema.employers.country, state: schema.employers.state, city: schema.employers.city })
       .from(schema.employers)
       .where(eq(schema.employers.id, employerId))
-      .limit(1),
-    db.select().from(schema.projects).where(eq(schema.projects.employerId, employerId)).orderBy(desc(schema.projects.createdAt)),
-    db
+      .limit(1)),
+    gated(() => db.select().from(schema.projects).where(eq(schema.projects.employerId, employerId)).orderBy(desc(schema.projects.createdAt))),
+    gated(() => db
       .select({
         status: schema.proposals.status,
         projectId: schema.proposals.projectId,
@@ -347,33 +348,33 @@ async function load(employerId: string): Promise<Loaded> {
         hiredAt: schema.proposals.hiredAt,
       })
       .from(schema.proposals)
-      .where(eq(schema.proposals.employerId, employerId)),
-    db
+      .where(eq(schema.proposals.employerId, employerId))),
+    gated(() => db
       .select({ id: schema.timesheets.id })
       .from(schema.timesheets)
-      .where(and(eq(schema.timesheets.employerId, employerId), eq(schema.timesheets.status, "submitted"))),
-    db
+      .where(and(eq(schema.timesheets.employerId, employerId), eq(schema.timesheets.status, "submitted")))),
+    gated(() => db
       .select()
       .from(schema.interviews)
-      .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.status, ["pending", "proposed", "scheduled"]))),
-    db
+      .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.status, ["pending", "proposed", "scheduled"])))),
+    gated(() => db
       .select({ internId: schema.employerCartItems.internId, projectId: schema.employerCartItems.projectId })
       .from(schema.employerCartItems)
-      .where(and(eq(schema.employerCartItems.employerId, employerId), inArray(schema.employerCartItems.listType, ["cart", "checkout"]))),
-    db
+      .where(and(eq(schema.employerCartItems.employerId, employerId), inArray(schema.employerCartItems.listType, ["cart", "checkout"])))),
+    gated(() => db
       .select({ internId: schema.interviews.internId })
       .from(schema.interviews)
-      .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.status, ["scheduled", "completed"]))),
-    payableCheckout(employerId),
+      .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.status, ["scheduled", "completed"])))),
+    gated(() => payableCheckout(employerId)),
     // Candidates who match the skills this employer is hiring for, best score first; the top of the pool when
     // no open project lists skills. Same pool rule as the candidate browser. Independent of the other reads.
-    db
+    gated(() => db
       .select({ user: schema.users, onboarding: schema.internOnboarding })
       .from(schema.users)
       .innerJoin(schema.internOnboarding, eq(schema.users.id, schema.internOnboarding.userId))
       .where(and(...candidatePoolClauses()))
       .orderBy(desc(scoreExpr()), desc(schema.internOnboarding.updatedAt))
-      .limit(60),
+      .limit(60)),
   ]);
 
   const employer = employerRow[0];
@@ -428,7 +429,7 @@ async function load(employerId: string): Promise<Loaded> {
   // Three independent reads (the next meeting's candidate, the matches' photos, their presence), started together.
   const [nextWith, , presence] = await Promise.all([
     nextIv
-      ? (async (): Promise<Loaded["nextWith"]> => {
+      ? gated(async (): Promise<Loaded["nextWith"]> => {
           const [row] = await db
             .select({ user: schema.users, onboarding: schema.internOnboarding })
             .from(schema.users)
@@ -443,10 +444,10 @@ async function load(employerId: string): Promise<Loaded> {
             photoUrl: person.photoUrl ?? null,
             projectName: projectRows.find((p) => p.id === nextIv.projectId)?.projectName ?? null,
           };
-        })()
+        })
       : null,
-    attachPhotos(db, candidates),
-    presenceOf(candidates.map((c) => c.id)).catch((err) => {
+    gated(() => attachPhotos(db, candidates)),
+    gated(() => presenceOf(candidates.map((c) => c.id))).catch((err) => {
       console.error("[employer/dashboard] presence", err);
       return {} as Record<string, PresenceLabel | null>;
     }),
