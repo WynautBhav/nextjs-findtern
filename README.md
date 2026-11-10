@@ -22,10 +22,8 @@ the college (TPO) console and the admin console, in one Next.js codebase.
 
 ## Read this first
 
-- `AGENTS.md` and `CLAUDE.md`: the working rules for this repo (this is **not** the Next.js you know; read
-  `node_modules/next/dist/docs/` before changing framework-level code).
-- `ARCHITECTURE.md` and `SPECS.md`: the locked plan. `SPECS.md` replaced `DESIGN.md`. Read both before changing code.
-- `docs/`: audits, QA reports, launch checklist, owner questions. `docs/qa/README.md` describes the QA harness.
+- This is **not** the Next.js you know: read `node_modules/next/dist/docs/` before changing framework-level code.
+- `docs/`: launch checklist, cron activation, college-partner notes, plans.
 
 **Hard rule for anyone touching data:** never point a script, test or dev server at the live production database
 (the `DATABASE_URL` in the main checkout's `.env`). Use a local Postgres or the Neon staging database, and pass
@@ -270,7 +268,7 @@ Add `npm run test:security` and `npm run build` when you touch auth, sessions or
   Pure rules live in files with no database import so `node --test` can run them.
 - **CI** (`.github/workflows/ci.yml`): typecheck, lint, tests, security tests, migrate, seed, build and the e2e critical path on a Postgres service.
 - **E2E and QA** (`e2e/`): browser suites with Playwright and `node:test`. `e2e/README.md` documents the critical path and the
-  safety rules; `docs/qa/README.md` the QA harness. All of them refuse a non-local database, except the staging journey, which
+  safety rules. All of them refuse a non-local database, except the staging journey, which
   is limited to the Neon staging host and a Vercel preview URL.
 
 ## Environment variables
@@ -365,7 +363,7 @@ docs/                   audits, QA, plans     vercel.json crons and build comman
 
 ## Working on it
 
-1. Read `ARCHITECTURE.md` and `SPECS.md`, then the code.
+1. Read the code and `e2e/README.md` first.
 2. New write endpoint? Start it with `requireMutation`. Never hand-roll auth checks.
 3. Marketing pages read through `src/lib/content` accessors, not the data files directly.
 4. Colours and spacing come from tokens in `src/app/globals.css`; use `container-page` and `section-y`; add UI primitives from the Watermelon registry.

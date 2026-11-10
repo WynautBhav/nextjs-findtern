@@ -41,3 +41,26 @@ scripts/seed-category-students.ts
 
 # Throwaway probes (WORKFLOW.md)
 scratch/
+
+# Agent tooling and generated agent docs (declutter 2026-11-10)
+.agents/
+.claude/
+.freebuff/
+.gg/
+.impeccable/
+.taste-skill/
+.opencode/
+.playwright-mcp/
+.planning/
+graphify-out/
+scratch/
+.graphifyignore
+opencode.json
+skills-lock.json
+AGENTS.md
+CLAUDE.md
+docs/qa/
+docs/design/
+docs/handoff/
+docs/screenshots/
+e2e/.artifacts/
