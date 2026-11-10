@@ -3,7 +3,7 @@ import { Poppins } from "next/font/google";
 import { NavigationProgress } from "@/components/layout/navigation-progress";
 import { Suspense } from "react";
 import { AnalyticsGate } from "@/components/marketing/analytics-gate";
-import { ChatWidget } from "@/components/chat/chat-widget";
+import { ChatWidgetLoader } from "@/components/chat/chat-widget-loader";
 import { JsonLd } from "@/components/seo/json-ld";
 import { SITE_URL, isStagingHost, siteGraph } from "@/lib/seo";
 import "./globals.css";
@@ -100,7 +100,7 @@ export default function RootLayout({
         {/* Organization + WebSite once, site-wide. Pages add their own graphs. */}
         <JsonLd data={siteGraph()} />
         <AnalyticsGate enabled={!isStagingHost()} />
-        <ChatWidget />
+        <ChatWidgetLoader />
       </body>
     </html>
   );
