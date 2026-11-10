@@ -422,7 +422,9 @@ export const projects = pgTable("projects", {
   takenDownReason: text("taken_down_reason"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  projectsEmployerIdx: index("projects_employer_id_idx").on(t.employerId),
+}));
 
 export type Project = typeof projects.$inferSelect;
 
@@ -619,6 +621,7 @@ export const interviews = pgTable("interviews", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
   interviewsInternIdx: index("interviews_intern_id_idx").on(t.internId),
+  interviewsEmployerIdx: index("interviews_employer_id_idx").on(t.employerId),
 }));
 
 export type Interview = typeof interviews.$inferSelect;
@@ -717,7 +720,9 @@ export const employerPayments = pgTable("employer_payments", {
   invoiceNumber: text("invoice_number").unique(),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  employerPaymentsEmployerIdx: index("employer_payments_employer_id_idx").on(t.employerId),
+}));
 
 export type EmployerPayment = typeof employerPayments.$inferSelect;
 
@@ -792,6 +797,8 @@ export const proposals = pgTable("proposals", {
   endedReason: text("ended_reason"),
 }, (t) => ({
   proposalsInternIdx: index("proposals_intern_id_idx").on(t.internId),
+  proposalsEmployerIdx: index("proposals_employer_id_idx").on(t.employerId),
+  proposalsProjectIdx: index("proposals_project_id_idx").on(t.projectId),
 }));
 
 export type Proposal = typeof proposals.$inferSelect;
@@ -812,7 +819,9 @@ export const timesheets = pgTable("timesheets", {
   managerNote: text("manager_note"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  timesheetsProposalIdx: index("timesheets_proposal_id_idx").on(t.proposalId),
+}));
 
 export type Timesheet = typeof timesheets.$inferSelect;
 
@@ -834,6 +843,7 @@ export const notifications = pgTable("notifications", {
   notificationsDedupeUniq: uniqueIndex("notifications_dedupe_uniq")
     .on(t.recipientType, t.recipientId, t.dedupeKey)
     .where(sql`${t.dedupeKey} is not null`),
+  notificationsRecipientIdx: index("notifications_recipient_idx").on(t.recipientId, t.recipientType, t.createdAt),
 }));
 
 export type Notification = typeof notifications.$inferSelect;
