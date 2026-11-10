@@ -79,7 +79,21 @@ function createDb() {
   // set to Asia/Kolkata that stored local wall time, read back 5h30 late (an
   // OTP cooldown of ~19,850 s). Pinning the session to UTC at connection
   // startup makes now() and JS agree, with no per-connection query to race.
-  const pool = new pg.Pool({ connectionString, ssl, max: 10, options: "-c TimeZone=UTC", types: utcTypes });
+  // Serverless: each instance holds its own pool, so `max` stays small enough
+  // that N instances cannot exhaust the server. A pool waits forever by default
+  // for a free connection, which shows up as a hung page when the database is
+  // slow or unreachable; fail after a few seconds instead. Idle connections
+  // are kept 30 s (pg's default is 10 s) so a visit a few seconds after the
+  // last one reuses a connection rather than paying TCP + TLS + auth again.
+  const pool = new pg.Pool({
+    connectionString,
+    ssl,
+    max: 10,
+    connectionTimeoutMillis: 5_000,
+    idleTimeoutMillis: 30_000,
+    options: "-c TimeZone=UTC",
+    types: utcTypes,
+  });
   return drizzle(pool, { schema });
 }
 
