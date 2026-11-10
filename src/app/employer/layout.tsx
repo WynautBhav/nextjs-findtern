@@ -72,17 +72,16 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   let cartCount = 0;
   // Unknown (a failed read) must not trap someone behind a pop-up they may have already accepted.
   let termsVersion: string | null | undefined;
-  try {
-    const db = getDb();
-    const [emp] = await db
+  // Three independent reads, started together. Each result is kept or dropped on its own, so one failed read
+  // leaves the others (and the fallbacks above) as they were.
+  const db = getDb();
+  const [empRes, unreadRes, cartRes] = await Promise.allSettled([
+    db
       .select({ companyName: schema.employers.companyName, termsVersion: schema.employers.termsAcceptedVersion })
       .from(schema.employers)
       .where(eq(schema.employers.id, session.uid))
-      .limit(1);
-    if (emp?.companyName) companyName = emp.companyName;
-    termsVersion = emp?.termsVersion ?? null;
-
-    const [unread] = await db
+      .limit(1),
+    db
       .select({ value: count() })
       .from(schema.notifications)
       .where(
@@ -91,10 +90,8 @@ export default async function EmployerLayout({ children }: { children: React.Rea
           eq(schema.notifications.recipientId, session.uid),
           eq(schema.notifications.isRead, false),
         ),
-      );
-    unreadAlerts = Number(unread?.value ?? 0);
-
-    const [cart] = await db
+      ),
+    db
       // Distinct people, not cart lines: one candidate saved to two projects is one.
       .select({ value: countDistinct(schema.employerCartItems.internId) })
       .from(schema.employerCartItems)
@@ -106,11 +103,15 @@ export default async function EmployerLayout({ children }: { children: React.Rea
           inArray(schema.employerCartItems.listType, ["cart", "checkout"]),
           sql`NOT EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.employer_id = ${q(schema.employerCartItems, schema.employerCartItems.employerId)} AND p.intern_id = ${q(schema.employerCartItems, schema.employerCartItems.internId)} AND p.status NOT IN ('rejected', 'withdrawn', 'expired'))`,
         ),
-      );
-    cartCount = Number(cart?.value ?? 0);
-  } catch {
-    // Keep fallback
+      ),
+  ]);
+  if (empRes.status === "fulfilled") {
+    const [emp] = empRes.value;
+    if (emp?.companyName) companyName = emp.companyName;
+    termsVersion = emp?.termsVersion ?? null;
   }
+  if (unreadRes.status === "fulfilled") unreadAlerts = Number(unreadRes.value[0]?.value ?? 0);
+  if (cartRes.status === "fulfilled") cartCount = Number(cartRes.value[0]?.value ?? 0);
 
   // Messages carries its own live unread count (MessagingLive); nothing else in the sidebar does.
   // The shortlist count rides on its own item, like the bag in the header.

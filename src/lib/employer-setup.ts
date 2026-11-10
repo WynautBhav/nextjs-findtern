@@ -13,18 +13,12 @@ import { isAdminViewing } from "./employer-visibility";
  */
 export async function employerSetupStep(employerId: string): Promise<"company" | "project" | null> {
   const db = getDb();
-  const [employer] = await db
-    .select()
-    .from(schema.employers)
-    .where(eq(schema.employers.id, employerId))
-    .limit(1);
+  // Independent reads, started together (the project one is simply unused when the company step is unfinished).
+  const [[employer], [project]] = await Promise.all([
+    db.select().from(schema.employers).where(eq(schema.employers.id, employerId)).limit(1),
+    db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.employerId, employerId)).limit(1),
+  ]);
   if (!employer || missingCompanyFields(employer).length > 0) return "company";
-
-  const [project] = await db
-    .select({ id: schema.projects.id })
-    .from(schema.projects)
-    .where(eq(schema.projects.employerId, employerId))
-    .limit(1);
   return project ? null : "project";
 }
 

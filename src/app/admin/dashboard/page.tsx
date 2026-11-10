@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 
 import { AiLinkCard } from "@/components/admin/dashboard/ai-link-card";
@@ -21,7 +20,6 @@ import { TriageDesk } from "@/components/admin/triage/triage-desk";
 import { WorkQueueButton } from "@/components/admin/triage/work-queue-button";
 import { ButtonLink } from "@/components/ui/button";
 import { getSession } from "@/lib/auth";
-import { getDb, schema } from "@/lib/db";
 import { cn } from "@/lib/utils";
 import { buildActivity, buildKpis } from "@/lib/admin/dashboard-overview-pure";
 import { loadActivityAndCounts, loadOverview } from "@/lib/admin/dashboard-overview";
@@ -31,6 +29,7 @@ import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { allows, canWrite as mayWrite, requiredPermissions } from "@/lib/admin/permissions";
 import { pickQueue } from "@/lib/admin/ai-link-queue";
 import { loadAiLinkRows } from "@/lib/admin/ai-link-queue-load";
+import { adminFullName } from "@/lib/admin/admin-name";
 
 /**
  * Admin home. The default view is the overview: a greeting with one line of figures, four KPI tiles
@@ -63,12 +62,15 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
   let queues: Awaited<ReturnType<typeof loadDashboardQueues>>;
   let overview: Awaited<ReturnType<typeof loadOverview>> | null;
   let name: string;
+  let aiQueue: { waiting: Awaited<ReturnType<typeof loadAiLinkRows>>; unpaid: number } | null;
   try {
-    [base, queues, overview, name] = await Promise.all([
+    [base, queues, overview, name, aiQueue] = await Promise.all([
       loadActivityAndCounts(now),
       loadDashboardQueues(now),
       desk ? null : loadOverview(now),
       desk ? "" : adminFirstName(session?.uid, session?.email),
+      // Its own read: a failure hides the card (logged) and never the dashboard. Started with the rest, not after them.
+      loadAiLinkRows().then(pickQueue).catch((e) => (console.error("[admin/dashboard] ai link queue", e), null)),
     ]);
   } catch (error) {
     console.error("[admin/dashboard] load failed", error);
@@ -79,8 +81,6 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     );
   }
 
-  // Its own read: a failure hides the card (logged) and never the dashboard.
-  const aiQueue = await loadAiLinkRows().then(pickQueue).catch((e) => (console.error("[admin/dashboard] ai link queue", e), null));
   const { groups, money, total, fresh } = queues;
   const finding = findingSentence(money, total, fresh);
 
@@ -216,15 +216,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
 
 /** The signed-in admin's first name for the greeting: `admins.name`, else the email's local part. */
 async function adminFirstName(uid: string | undefined, email: string | undefined): Promise<string> {
-  let full: string | null = null;
-  if (uid) {
-    try {
-      const [row] = await getDb().select({ name: schema.admins.name }).from(schema.admins).where(eq(schema.admins.id, uid)).limit(1);
-      full = row?.name?.trim() || null;
-    } catch {
-      full = null;
-    }
-  }
+  const full = uid ? await adminFullName(uid) : null;
   const first = (full ?? email?.split("@")[0] ?? "").split(/\s+/)[0];
   return first || "there";
 }
