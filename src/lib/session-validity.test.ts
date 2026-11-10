@@ -57,9 +57,9 @@ test("an admin gets their current permissions", async () => {
   assert.deepEqual(out?.permissions, ["orders.read"]);
 });
 
-test("a removed admin fails, a failed permission lookup keeps the session's own list", async () => {
+test("a removed admin fails, and so does one whose permission lookup failed", async () => {
   assert.equal(await validateSession(admin, checks({ adminPermissions: async () => null })), null);
-  assert.equal(await validateSession(admin, checks({ adminPermissions: async () => undefined })), admin);
+  assert.equal(await validateSession(admin, checks({ adminPermissions: async () => undefined })), null);
 });
 
 test("a revoked admin session fails even though the permission lookup succeeds", async () => {
@@ -72,4 +72,22 @@ test("an impersonating admin session does not look up admin permissions", async 
   const out = await validateSession(imp, checks({ adminPermissions: async () => { called = true; return ["*"]; } }));
   assert.equal(out, imp);
   assert.equal(called, false);
+});
+
+// A check that cannot answer (pool timeout, outage) must not let the session through.
+test("a check that throws signs the session out", async () => {
+  for (const name of ["isRevoked", "isActive", "isPasswordCurrent"] as const) {
+    const out = await validateSession(session, checks({ [name]: async () => { throw new Error("timeout exceeded when trying to connect"); } }));
+    assert.equal(out, null, `${name} failing must fail closed`);
+  }
+});
+
+test("an admin whose permissions could not be read is signed out", async () => {
+  const admin = { ...session, role: "admin" } as typeof session;
+  assert.equal(await validateSession(admin, checks({ adminPermissions: async () => undefined })), null);
+});
+
+test("an impersonated admin session never needs the permission read", async () => {
+  const viewing = { ...session, role: "admin", impersonator: "root" } as unknown as typeof session;
+  assert.equal(await validateSession(viewing, checks({ adminPermissions: async () => undefined })), viewing);
 });
