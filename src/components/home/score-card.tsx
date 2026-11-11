@@ -159,11 +159,11 @@ export function ScoreCard({ audience = "employer" }: { audience?: "employer" | "
             />
           </div>
 
-          <div className="mt-1 flex justify-between text-2xs text-text-subtle select-none">
+          <div className="relative mt-1 h-7 text-2xs text-text-subtle select-none">
             <button
               type="button"
               onClick={() => setScore(0)}
-              className="cursor-pointer py-1 px-2.5 -mx-1 rounded-md transition-colors hover:bg-ink-100 hover:text-ink-900"
+              className="absolute left-0 cursor-pointer py-1 px-2.5 rounded-md transition-colors hover:bg-ink-100 hover:text-ink-900"
               aria-label="Set score to 0"
             >
               0
@@ -171,7 +171,7 @@ export function ScoreCard({ audience = "employer" }: { audience?: "employer" | "
             <button
               type="button"
               onClick={() => setScore(6.0)}
-              className="cursor-pointer py-1 px-2.5 -mx-1 rounded-md transition-colors hover:bg-ink-100 hover:text-ink-900"
+              className="absolute left-[60%] -translate-x-1/2 cursor-pointer py-1 px-2.5 rounded-md transition-colors hover:bg-ink-100 hover:text-ink-900"
               aria-label="Set score to 6.0 (Skilled threshold)"
             >
               6
@@ -179,7 +179,7 @@ export function ScoreCard({ audience = "employer" }: { audience?: "employer" | "
             <button
               type="button"
               onClick={() => setScore(10.0)}
-              className="cursor-pointer py-1 px-2.5 -mx-1 rounded-md transition-colors hover:bg-ink-100 hover:text-ink-900"
+              className="absolute right-0 cursor-pointer py-1 px-2.5 rounded-md transition-colors hover:bg-ink-100 hover:text-ink-900"
               aria-label="Set score to 10.0"
             >
               10
@@ -277,7 +277,7 @@ export function ScoreCard({ audience = "employer" }: { audience?: "employer" | "
               onClick={() => setScore(b.min === 0 ? 3.0 : b.min === 6 ? 7.0 : 9.0)}
               className={cn(
                 "cursor-pointer py-1 px-2 -mx-1 rounded-md transition-colors hover:bg-ink-100 hover:text-ink-900",
-                b.id === band.id ? "font-semibold text-on-dark-accent" : "text-text-subtle",
+                b.id === band.id ? "font-semibold text-primary" : "text-text-subtle",
               )}
             >
               {b.name}

@@ -133,7 +133,7 @@ export function HeroSplit() {
         very tall display an uncapped 100svh hero pushes every other section
         off the screen entirely.
       */}
-      <div className="container-page relative flex min-h-[calc(100svh-4rem)] flex-col justify-start pt-6 pb-12 sm:py-14 lg:justify-center lg:py-20 lg:min-h-[calc(100svh-5rem)] lg:max-h-[1100px]">
+      <div className="container-page relative flex min-h-[calc(100svh-4rem)] flex-col justify-start pt-6 pb-12 sm:py-14 lg:justify-center lg:py-20 lg:min-h-[min(calc(100svh-5rem),1100px)]">
         <div className="grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.9fr)] lg:gap-16">
           {/* ── Copy ────────────────────────────────────────────── */}
           <div>
