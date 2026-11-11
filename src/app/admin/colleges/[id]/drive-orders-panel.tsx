@@ -36,6 +36,8 @@ export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, colleg
   const [attempt, setAttempt] = useState(newKey);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // The reason is shown plainly until the first submit, so an untouched form does not open on a red error.
+  const [tried, setTried] = useState(false);
   const [paying, setPaying] = useState<OrderDto | null>(null);
   const [method, setMethod] = useState("bank");
   const [reference, setReference] = useState("");
@@ -75,6 +77,7 @@ export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, colleg
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
+    setTried(true);
     if (formProblem || feeMinor === null || creditMinor === null || !untilDate) return;
     const ok = await send(`/api/admin/colleges/${collegeId}/drive-orders`, { slots: slotsN, feePerStudentMinor: feeMinor, creditMinor, codeValidUntil: untilDate.toISOString() }, attempt);
     if (ok) {
@@ -96,23 +99,21 @@ export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, colleg
   return (
     <div className="space-y-4">
       {canWrite ? (
-        <form onSubmit={create} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="New drive order">
+        <form onSubmit={create} className="grid items-end gap-x-3 gap-y-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="New drive order">
           <label className="text-sm">Slots (students)
             <input className={field} inputMode="numeric" value={slots} onChange={(e) => setSlots(e.target.value)} />
           </label>
           <label className="text-sm">Fee per student (₹)
             <input className={field} inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} />
           </label>
-          <label className="text-sm">Carried-over credit (₹, optional)
-            <input className={field} inputMode="decimal" value={credit} onChange={(e) => setCredit(e.target.value)} placeholder="0" />
+          <label className="text-sm">Carried-over credit (₹)
+            <input className={field} inputMode="decimal" value={credit} onChange={(e) => setCredit(e.target.value)} placeholder="Optional" />
           </label>
           <label className="text-sm">Codes valid until
             <input className={field} type="date" min={today} value={until} onChange={(e) => setUntil(e.target.value)} />
           </label>
-          <div className="flex items-end">
-            <button type="submit" disabled={busy || !!formProblem} className={buttonClass({ variant: "primary", size: "sm", block: true })}>{busy ? "Saving…" : "Create order"}</button>
-          </div>
-          <p className={`text-xs sm:col-span-2 lg:col-span-5 ${formProblem ? "text-danger" : "text-ink-500"}`} role="status">
+          <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "sm", block: true })}>{busy ? "Saving…" : "Create order"}</button>
+          <p className={`text-xs sm:col-span-2 lg:col-span-5 ${formProblem && tried ? "text-danger" : "text-ink-500"}`} role="status">
             {formProblem ?? `Total ${money(slotsN * (feeMinor ?? 0))}${creditMinor ? `, less credit ${money(creditMinor)} = payable ${money(slotsN * (feeMinor ?? 0) - creditMinor)}` : ""}.`}
           </p>
         </form>
