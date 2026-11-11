@@ -27,6 +27,7 @@ import { getDb, schema } from "@/lib/db";
 import { SITE } from "@/lib/content/site";
 import { q } from "@/lib/college/sql";
 import { shouldShowTermsPrompt } from "@/lib/terms";
+import { gated } from "@/lib/request-gate";
 
 // The path in order: find, shortlist, offer, interview, hire, then timesheet and pay.
 // Shortlist is its own step of that path (the page, its title and the hiring-steps bar all
@@ -72,45 +73,52 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   let cartCount = 0;
   // Unknown (a failed read) must not trap someone behind a pop-up they may have already accepted.
   let termsVersion: string | null | undefined;
-  try {
-    const db = getDb();
-    const [emp] = await db
-      .select({ companyName: schema.employers.companyName, termsVersion: schema.employers.termsAcceptedVersion })
-      .from(schema.employers)
-      .where(eq(schema.employers.id, session.uid))
-      .limit(1);
+  // Three independent reads, started together (through the per-request gate, so the page's other reads share the pool fairly). Each result is kept or dropped on its own, so one failed read
+  // leaves the others (and the fallbacks above) as they were.
+  const db = getDb();
+  const [empRes, unreadRes, cartRes] = await Promise.allSettled([
+    gated(() =>
+      db
+        .select({ companyName: schema.employers.companyName, termsVersion: schema.employers.termsAcceptedVersion })
+        .from(schema.employers)
+        .where(eq(schema.employers.id, session.uid))
+        .limit(1),
+    ),
+    gated(() =>
+      db
+        .select({ value: count() })
+        .from(schema.notifications)
+        .where(
+          and(
+            eq(schema.notifications.recipientType, "employer"),
+            eq(schema.notifications.recipientId, session.uid),
+            eq(schema.notifications.isRead, false),
+          ),
+        ),
+    ),
+    gated(() =>
+      db
+        // Distinct people, not cart lines: one candidate saved to two projects is one.
+        .select({ value: countDistinct(schema.employerCartItems.internId) })
+        .from(schema.employerCartItems)
+        // Same set as the Shortlist page and its steps strip: saved, legacy
+        // "checkout" rows included, and no live proposal yet (QA-124).
+        .where(
+          and(
+            eq(schema.employerCartItems.employerId, session.uid),
+            inArray(schema.employerCartItems.listType, ["cart", "checkout"]),
+            sql`NOT EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.employer_id = ${q(schema.employerCartItems, schema.employerCartItems.employerId)} AND p.intern_id = ${q(schema.employerCartItems, schema.employerCartItems.internId)} AND p.status NOT IN ('rejected', 'withdrawn', 'expired'))`,
+          ),
+        ),
+    ),
+  ]);
+  if (empRes.status === "fulfilled") {
+    const [emp] = empRes.value;
     if (emp?.companyName) companyName = emp.companyName;
     termsVersion = emp?.termsVersion ?? null;
-
-    const [unread] = await db
-      .select({ value: count() })
-      .from(schema.notifications)
-      .where(
-        and(
-          eq(schema.notifications.recipientType, "employer"),
-          eq(schema.notifications.recipientId, session.uid),
-          eq(schema.notifications.isRead, false),
-        ),
-      );
-    unreadAlerts = Number(unread?.value ?? 0);
-
-    const [cart] = await db
-      // Distinct people, not cart lines: one candidate saved to two projects is one.
-      .select({ value: countDistinct(schema.employerCartItems.internId) })
-      .from(schema.employerCartItems)
-      // Same set as the Shortlist page and its steps strip: saved, legacy
-      // "checkout" rows included, and no live proposal yet (QA-124).
-      .where(
-        and(
-          eq(schema.employerCartItems.employerId, session.uid),
-          inArray(schema.employerCartItems.listType, ["cart", "checkout"]),
-          sql`NOT EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.employer_id = ${q(schema.employerCartItems, schema.employerCartItems.employerId)} AND p.intern_id = ${q(schema.employerCartItems, schema.employerCartItems.internId)} AND p.status NOT IN ('rejected', 'withdrawn', 'expired'))`,
-        ),
-      );
-    cartCount = Number(cart?.value ?? 0);
-  } catch {
-    // Keep fallback
   }
+  if (unreadRes.status === "fulfilled") unreadAlerts = Number(unreadRes.value[0]?.value ?? 0);
+  if (cartRes.status === "fulfilled") cartCount = Number(cartRes.value[0]?.value ?? 0);
 
   // Messages carries its own live unread count (MessagingLive); nothing else in the sidebar does.
   // The shortlist count rides on its own item, like the bag in the header.

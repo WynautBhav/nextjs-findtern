@@ -6,6 +6,7 @@ import { RotateCw } from "lucide-react";
 
 import { Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
+import { recoverFromChunkError, retryOrReload } from "@/lib/chunk-error";
 
 /**
  * A failed read on any college screen lands here, inside the shell, instead of
@@ -14,6 +15,7 @@ import { buttonClass } from "@/components/ui/button";
 export default function CollegeError({ error, retry }: { error: Error & { digest?: string }; retry: () => void }) {
   useEffect(() => {
     console.error(error);
+    recoverFromChunkError(error);
   }, [error]);
 
   return (
@@ -26,7 +28,7 @@ export default function CollegeError({ error, retry }: { error: Error & { digest
         communicate@findtern.in{error.digest ? ` and mention code ${error.digest}` : ""}.
       </p>
       <div className="mt-7 flex flex-wrap justify-center gap-3">
-        <button type="button" onClick={() => retry()} className={buttonClass({})}>
+        <button type="button" onClick={() => retryOrReload(error, retry)} className={buttonClass({})}>
           <RotateCw className="size-4" aria-hidden />
           Try again
         </button>

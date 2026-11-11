@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import { Panel } from "@/components/admin/panel";
+import { recoverFromChunkError, retryOrReload } from "@/lib/chunk-error";
 
 /**
  * An unexpected failure inside the admin console. It keeps the rail and the top
@@ -13,6 +14,7 @@ import { Panel } from "@/components/admin/panel";
 export default function AdminError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   useEffect(() => {
     console.error(error);
+    recoverFromChunkError(error);
   }, [error]);
 
   return (
@@ -24,7 +26,7 @@ export default function AdminError({ error, reset }: { error: Error & { digest?:
       </p>
       <button
         type="button"
-        onClick={reset}
+        onClick={() => retryOrReload(error, reset)}
         className="apple-spring mt-6 inline-flex min-h-11 items-center rounded-full bg-primary px-5 text-sm font-medium text-white hover:bg-primary-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         Try again

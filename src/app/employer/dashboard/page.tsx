@@ -13,6 +13,7 @@ import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-po
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { rowSkills, skillBaseName } from "@/components/employer/candidate-view";
 import { requireEmployerSetup } from "@/lib/employer-setup";
+import { gated } from "@/lib/request-gate";
 import { isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { payableCheckout } from "@/lib/employer-payable";
 import { isProjectOpen } from "@/lib/project-locations";
@@ -103,12 +104,14 @@ export default async function EmployerDashboard() {
   const session = await requireRole("employer");
   const employerId = session.uid;
   // No company profile or no project yet: finish onboarding first.
-  await requireEmployerSetup(employerId);
-
-  const data = await load(employerId).catch((err) => {
-    console.error("Failed to load employer dashboard:", err);
-    return null;
-  });
+  // The setup check redirects if setup is unfinished; the load does not depend on it, so they run together.
+  const [, data] = await Promise.all([
+    requireEmployerSetup(employerId),
+    load(employerId).catch((err) => {
+      console.error("Failed to load employer dashboard:", err);
+      return null;
+    }),
+  ]);
 
   if (!data) {
     return (
@@ -328,14 +331,14 @@ function slotDate(iv: InterviewRow): Date | null {
 
 async function load(employerId: string): Promise<Loaded> {
   const db = getDb();
-  const [employerRow, projectRows, proposalRows, sheetRows, interviewRows, cartRows, metRows, payable] = await Promise.all([
-    db
+  const [employerRow, projectRows, proposalRows, sheetRows, interviewRows, cartRows, metRows, payable, pool] = await Promise.all([
+    gated(() => db
       .select({ companyName: schema.employers.companyName, country: schema.employers.country, state: schema.employers.state, city: schema.employers.city })
       .from(schema.employers)
       .where(eq(schema.employers.id, employerId))
-      .limit(1),
-    db.select().from(schema.projects).where(eq(schema.projects.employerId, employerId)).orderBy(desc(schema.projects.createdAt)),
-    db
+      .limit(1)),
+    gated(() => db.select().from(schema.projects).where(eq(schema.projects.employerId, employerId)).orderBy(desc(schema.projects.createdAt))),
+    gated(() => db
       .select({
         status: schema.proposals.status,
         projectId: schema.proposals.projectId,
@@ -345,24 +348,33 @@ async function load(employerId: string): Promise<Loaded> {
         hiredAt: schema.proposals.hiredAt,
       })
       .from(schema.proposals)
-      .where(eq(schema.proposals.employerId, employerId)),
-    db
+      .where(eq(schema.proposals.employerId, employerId))),
+    gated(() => db
       .select({ id: schema.timesheets.id })
       .from(schema.timesheets)
-      .where(and(eq(schema.timesheets.employerId, employerId), eq(schema.timesheets.status, "submitted"))),
-    db
+      .where(and(eq(schema.timesheets.employerId, employerId), eq(schema.timesheets.status, "submitted")))),
+    gated(() => db
       .select()
       .from(schema.interviews)
-      .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.status, ["pending", "proposed", "scheduled"]))),
-    db
+      .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.status, ["pending", "proposed", "scheduled"])))),
+    gated(() => db
       .select({ internId: schema.employerCartItems.internId, projectId: schema.employerCartItems.projectId })
       .from(schema.employerCartItems)
-      .where(and(eq(schema.employerCartItems.employerId, employerId), inArray(schema.employerCartItems.listType, ["cart", "checkout"]))),
-    db
+      .where(and(eq(schema.employerCartItems.employerId, employerId), inArray(schema.employerCartItems.listType, ["cart", "checkout"])))),
+    gated(() => db
       .select({ internId: schema.interviews.internId })
       .from(schema.interviews)
-      .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.status, ["scheduled", "completed"]))),
-    payableCheckout(employerId),
+      .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.status, ["scheduled", "completed"])))),
+    gated(() => payableCheckout(employerId)),
+    // Candidates who match the skills this employer is hiring for, best score first; the top of the pool when
+    // no open project lists skills. Same pool rule as the candidate browser. Independent of the other reads.
+    gated(() => db
+      .select({ user: schema.users, onboarding: schema.internOnboarding })
+      .from(schema.users)
+      .innerJoin(schema.internOnboarding, eq(schema.users.id, schema.internOnboarding.userId))
+      .where(and(...candidatePoolClauses()))
+      .orderBy(desc(scoreExpr()), desc(schema.internOnboarding.updatedAt))
+      .limit(60)),
   ]);
 
   const employer = employerRow[0];
@@ -388,13 +400,6 @@ async function load(employerId: string): Promise<Loaded> {
   const wanted = Array.from(
     new Set(projectRows.filter((p) => isProjectOpen(p.status, p.takenDownAt)).flatMap((p) => (p.skills as string[]) ?? [])),
   ).map((s) => s.toLowerCase());
-  const pool = await db
-    .select({ user: schema.users, onboarding: schema.internOnboarding })
-    .from(schema.users)
-    .innerJoin(schema.internOnboarding, eq(schema.users.id, schema.internOnboarding.userId))
-    .where(and(...candidatePoolClauses()))
-    .orderBy(desc(scoreExpr()), desc(schema.internOnboarding.updatedAt))
-    .limit(60);
   // `intern_onboarding.user_id` is not unique; one row per intern.
   const seen = new Set<string>();
   const profiles = pool
@@ -421,30 +426,32 @@ async function load(employerId: string): Promise<Loaded> {
 
   // The next meeting's candidate: initials and photo only, as everywhere before a hire.
   const nextIv = upcoming[0]?.iv ?? null;
-  let nextWith: Loaded["nextWith"] = null;
-  if (nextIv) {
-    const [row] = await db
-      .select({ user: schema.users, onboarding: schema.internOnboarding })
-      .from(schema.users)
-      .leftJoin(schema.internOnboarding, eq(schema.users.id, schema.internOnboarding.userId))
-      .where(eq(schema.users.id, nextIv.internId))
-      .limit(1);
-    if (row) {
-      const person = toCandidateProfile(row.user, row.onboarding);
-      await attachPhotos(db, [person]);
-      nextWith = {
-        initials: person.initials,
-        photoUrl: person.photoUrl ?? null,
-        projectName: projectRows.find((p) => p.id === nextIv.projectId)?.projectName ?? null,
-      };
-    }
-  }
-
-  await attachPhotos(db, candidates);
-  const presence = await presenceOf(candidates.map((c) => c.id)).catch((err) => {
-    console.error("[employer/dashboard] presence", err);
-    return {} as Record<string, PresenceLabel | null>;
-  });
+  // Three independent reads (the next meeting's candidate, the matches' photos, their presence), started together.
+  const [nextWith, , presence] = await Promise.all([
+    nextIv
+      ? gated(async (): Promise<Loaded["nextWith"]> => {
+          const [row] = await db
+            .select({ user: schema.users, onboarding: schema.internOnboarding })
+            .from(schema.users)
+            .leftJoin(schema.internOnboarding, eq(schema.users.id, schema.internOnboarding.userId))
+            .where(eq(schema.users.id, nextIv.internId))
+            .limit(1);
+          if (!row) return null;
+          const person = toCandidateProfile(row.user, row.onboarding);
+          await attachPhotos(db, [person]);
+          return {
+            initials: person.initials,
+            photoUrl: person.photoUrl ?? null,
+            projectName: projectRows.find((p) => p.id === nextIv.projectId)?.projectName ?? null,
+          };
+        })
+      : null,
+    gated(() => attachPhotos(db, candidates)),
+    gated(() => presenceOf(candidates.map((c) => c.id))).catch((err) => {
+      console.error("[employer/dashboard] presence", err);
+      return {} as Record<string, PresenceLabel | null>;
+    }),
+  ]);
 
   return {
     companyName: employer?.companyName ?? "",

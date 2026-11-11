@@ -37,6 +37,7 @@ import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { badgeFor, settleCount } from "@/lib/admin/queue-badge";
 import { loadQueueCounts } from "@/lib/admin/queue-counts";
+import { adminFullName } from "@/lib/admin/admin-name";
 
 /**
  * The admin console is per-request (session-gated, live counts) and must
@@ -149,15 +150,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         })
       : null,
     // The name on the account menu is `admins.name`; the email's local part is the fallback.
-    db && session.uid
-      ? db
-          .select({ name: schema.admins.name })
-          .from(schema.admins)
-          .where(eq(schema.admins.id, session.uid))
-          .limit(1)
-          .then((rows) => rows[0]?.name?.trim() || null)
-          .catch(() => null)
-      : null,
+    db && session.uid ? adminFullName(session.uid) : null,
     loadQueueCounts({
       payouts: hasItem("/admin/payouts"),
       candidates: hasItem("/admin/interns"),

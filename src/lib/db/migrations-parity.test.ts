@@ -17,7 +17,7 @@ const KNOWN_MISMATCHES: Record<string, string> = {
     "Named UNIQUE constraint in 0021 is produced by drizzle's implicit .unique() on idempotencyKey (default name matches).",
 };
 
-/** Exact (whitespace-normalised) UPDATE/DELETE statements permitted in 0018-0027. */
+/** Exact (whitespace-normalised) UPDATE/DELETE statements permitted in 0018-0034. */
 const ALLOWED_DML = new Set([
   `UPDATE "projects" SET "status" = 'published', "published_at" = COALESCE("published_at", "created_at") WHERE "status" = 'active';`,
   `UPDATE "projects" SET "status" = 'paused' WHERE "status" = 'inactive';`,
@@ -28,7 +28,7 @@ const ALLOWED_DML = new Set([
 const files = readdirSync(SQL_DIR).filter((f) => f.endsWith(".sql")).sort();
 const NEW = files.filter((f) => {
   const n = Number(f.slice(0, 4));
-  return n >= 18 && n <= 27;
+  return n >= 18 && n <= 34;
 });
 
 // Same split/strip as scripts/migrate.ts statements().
@@ -82,8 +82,8 @@ function sqlTables(sql: string) {
   return out;
 }
 
-describe("migration files 0018-0027", () => {
-  it("are present", () => assert.equal(NEW.length, 10));
+describe("migration files 0018-0034", () => {
+  it("are present", () => assert.equal(NEW.length, 17));
 
   for (const f of NEW) {
     const sql = read(join(SQL_DIR, f));
@@ -170,10 +170,21 @@ describe("migration files 0018-0027", () => {
     assert.match(down, /DROP COLUMN IF EXISTS "show_activity"/);
   });
 
-  it("every 0018-0027 migration after 0024 has a rollback file", () => {
+  it("every 0018-0034 migration after 0024 has a rollback file", () => {
     for (const f of NEW.filter((x) => Number(x.slice(0, 4)) >= 25)) {
       const down = join(SQL_DIR, "rollback", f.replace(/\.sql$/, ".down.sql"));
       assert.ok(readFileSync(down, "utf8").includes(`DELETE FROM "_ft_migrations" WHERE "name" = '${f}'`), down);
+    }
+  });
+
+  it("each index migration (0028+) creates exactly one index, so no transaction holds locks on several tables", () => {
+    const indexFiles = NEW.filter((x) => Number(x.slice(0, 4)) >= 28);
+    assert.equal(indexFiles.length, 7);
+    for (const f of indexFiles) {
+      const stmts = split(read(join(SQL_DIR, f)));
+      assert.equal(stmts.length, 2, `${f}: expected lock_timeout + one CREATE INDEX`);
+      assert.match(stmts[1], /^CREATE INDEX IF NOT EXISTS "\w+" ON "\w+" \(/, f);
+      assert.doesNotMatch(read(join(SQL_DIR, f)).replace(/^\s*--.*$/gm, ""), /CONCURRENTLY/i, `${f}: CONCURRENTLY cannot run in the runner's transaction`);
     }
   });
 
@@ -205,7 +216,7 @@ describe("migration numbering and schema exports", () => {
   });
 });
 
-describe("rollback files for 0018-0027", () => {
+describe("rollback files for 0018-0034", () => {
   const RB_DIR = join(SQL_DIR, "rollback");
   const rbFiles = readdirSync(RB_DIR).filter((f) => f.endsWith(".down.sql"));
 
@@ -227,7 +238,7 @@ describe("rollback files for 0018-0027", () => {
       assert.ok(code.includes(`DELETE FROM "_ft_migrations" WHERE "name" = '${up}';`), `${r} does not unregister ${up}`);
     });
 
-    // 0018-0024 destroy data; the earlier 0025-0027 files carry their own warnings.
+    // 0018-0024 destroy data; the later 0025-0034 files carry their own warnings.
     if (Number(r.slice(0, 4)) <= 24) {
       it(`${r}: header warns that it destroys data`, () => {
         assert.match(sql, /^-- DESTROYS DATA:/m);
