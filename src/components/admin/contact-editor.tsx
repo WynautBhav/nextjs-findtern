@@ -19,8 +19,10 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
 import { DIAL_CODE_VALUES } from "@/lib/data/dial-codes";
 
-const inputClass =
-  "mt-1.5 h-11 w-full rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle";
+const fieldBase =
+  "mt-1.5 h-11 rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle";
+// Width is decided per use: the phone row mixes a fixed-width select with a flexible input, and two width classes on one element do not reliably resolve.
+const inputClass = `${fieldBase} w-full`;
 
 const CODES = DIAL_CODE_VALUES;
 
@@ -125,7 +127,7 @@ export function ContactEditor({
                   aria-label="Country code"
                   value={draft.countryCode}
                   onChange={(e) => set({ countryCode: e.target.value })}
-                  className={`${inputClass} w-28 shrink-0`}
+                  className={`${fieldBase} w-28 shrink-0`}
                 >
                   {(CODES.includes(draft.countryCode) ? CODES : [draft.countryCode, ...CODES]).map((c) => (
                     <option key={c} value={c}>
@@ -139,7 +141,7 @@ export function ContactEditor({
                   value={draft.phoneNumber}
                   onChange={(e) => set({ phoneNumber: e.target.value.replace(/\D/g, "") })}
                   aria-invalid={!phoneOk || undefined}
-                  className={inputClass}
+                  className={`${fieldBase} min-w-0 flex-1`}
                 />
               </div>
               <p className={`mt-1 text-xs ${phoneOk ? "text-text-subtle" : "text-danger"}`}>
