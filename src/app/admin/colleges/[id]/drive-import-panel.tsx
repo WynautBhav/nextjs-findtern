@@ -79,7 +79,7 @@ export function DriveImportPanel({ order }: { order: OrderDto }) {
       const res = await csrfFetch(`/api/admin/imports/${preview.importId}/confirm`, { method: "POST", headers: { "idempotency-key": attempt } });
       const data = (await res.json().catch(() => null)) as { error?: string; result?: { linked: number; reviews: number; codesIssued: number } } | null;
       if (!res.ok || !data?.result) return setError(data?.error ?? "That did not work. Try again.");
-      setDone(`${data.result.codesIssued} codes issued, ${data.result.linked} students linked, ${data.result.reviews} suggestions to review.`);
+      setDone(`Done. ${data.result.linked} students already have an account: they were told and can accept in one click. The other ${data.result.codesIssued - data.result.linked} were emailed a code. ${data.result.reviews} need a quick check in Identity review.`);
       setPreview({ ...preview, status: "confirmed" });
       router.refresh();
     } catch {

@@ -2,9 +2,9 @@ import { NextResponse } from "next/server";
 
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb } from "@/lib/db";
-import { withPgTransaction } from "@/lib/db/pg-tx";
 import { requireMutation } from "@/lib/guards-mutation";
-import { buildOutboxRows, insertRows, redactError } from "@/lib/outbox";
+import { redactError } from "@/lib/outbox";
+import { queueCodeEmails } from "@/lib/drives/campaign";
 import { maskEmail, planRecipients, shapeCounts } from "@/lib/outbox/run";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -16,36 +16,7 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!g.ok) return g.response;
   const orderId = (await ctx.params).id;
   try {
-    const out = await withPgTransaction(async (c) => {
-      await c.query("SELECT pg_advisory_xact_lock(hashtext($1))", [`campaign:${orderId}`]);
-      const o = await c.query("SELECT status FROM college_drive_orders WHERE id = $1", [orderId]);
-      if (!o.rows[0]) return { status: 404 as const, error: "Not found" };
-      if (o.rows[0].status !== "paid") return { status: 409 as const, error: "Record the payment before emailing codes." };
-      const ents = await c.query(
-        `SELECT e.id AS entry_id, e.college_email_norm AS email, dc.id AS code_id, dc.status AS code_status
-           FROM drive_roster_entries e LEFT JOIN drive_codes dc ON dc.entry_id = e.id
-          WHERE e.order_id = $1 ORDER BY e.row_no`,
-        [orderId],
-      );
-      const ex = await c.query(
-        `SELECT ob.entry_id, ob.status FROM email_outbox ob JOIN email_campaigns ca ON ca.id::text = ob.campaign_id
-          WHERE ca.order_id = $1 AND ca.kind = 'drive_code'`,
-        [orderId],
-      );
-      const plan = planRecipients(
-        ents.rows.map((r) => ({ entryId: String(r.entry_id), email: String(r.email), codeId: (r.code_id as string | null) ?? null, codeStatus: (r.code_status as string | null) ?? null })),
-        ex.rows.map((r) => ({ entryId: String(r.entry_id), status: String(r.status) })),
-      );
-      if (plan.length === 0) return { status: 200 as const, campaignId: null, queued: 0 };
-      const camp = await c.query(
-        "INSERT INTO email_campaigns (order_id, kind, created_by, status) VALUES ($1,'drive_code',$2,'running') RETURNING id",
-        [orderId, g.session.uid],
-      );
-      const campaignId = String(camp.rows[0].id);
-      const rows = buildOutboxRows(campaignId, plan.map((p) => ({ entryId: p.entryId, toEmail: p.toEmail, template: "drive_code", payload: { codeId: p.codeId, orderId } })));
-      const queued = await insertRows({ query: async <T,>(t: string, p?: unknown[]) => (await c.query(t, p)).rows as T[] }, rows);
-      return { status: 200 as const, campaignId, queued };
-    });
+    const out = await queueCodeEmails(orderId, g.session.uid);
     if ("error" in out) return NextResponse.json({ error: out.error }, { status: out.status });
     if (out.queued > 0) await recordAdminAudit(getDb(), { adminId: g.session.uid, action: "campaign.send", targetType: "drive_order", targetId: orderId, meta: { orderId, campaignId: out.campaignId, recipients: out.queued } });
     return NextResponse.json({ ok: true, campaignId: out.campaignId, queued: out.queued });

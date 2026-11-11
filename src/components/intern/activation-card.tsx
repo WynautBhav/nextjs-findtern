@@ -20,6 +20,7 @@ import { useRouter } from "next/navigation";
 import { BadgeIndianRupee, Check, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
+import { CollegeClaim } from "@/components/intern/college-claim";
 import { CollegeCodeRedeem } from "@/components/intern/college-code-redeem";
 import { AiInterviewAction } from "@/components/intern/ai-interview-join-card";
 import { coverMessage, type CollegeCover } from "@/lib/college/labels";
@@ -42,7 +43,10 @@ export function ActivationCard({
   testMode = false,
   testPay = false,
   collegeCover = null,
+  claim = null,
 }: {
+  /** The sheet matched this student and their college paid: they accept in one click. */
+  claim?: { collegeName: string } | null;
   /** From `collegeCoverFor(userId)`: says before payment whether the student's college covers this interview. */
   collegeCover?: CollegeCover | null;
   /** PAYMENTS_TEST_BUTTON=1: a second button settles at the real amount without Razorpay. */
@@ -189,6 +193,8 @@ export function ActivationCard({
         One payment covers the AI interview and your Findtern Score. No subscription, nothing recurring, and if
         you are not placed within 6 months of your AI interview, the full fee comes back.
       </p>
+
+      {claim ? <CollegeClaim collegeName={claim.collegeName} onClaimed={markPaid} /> : null}
 
       {cover ? (
         <p

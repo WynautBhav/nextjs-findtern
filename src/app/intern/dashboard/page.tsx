@@ -19,6 +19,8 @@ import { pickNextUp } from "@/components/intern/home/next-up";
 import { parseOffer } from "@/lib/offer";
 import { formatPeriodDays, isoDay, todayIst } from "@/lib/timesheet-days";
 import { getDb, schema } from "@/lib/db";
+import { pendingClaimFor } from "@/lib/drives/claim";
+import { driveCodeSecret } from "@/lib/drives/code-derive";
 import { eq } from "drizzle-orm";
 import { loadInternData, openProjects } from "@/lib/intern-data";
 import { isMeetingLinkLive } from "@/lib/employer-interview-rules";
@@ -124,6 +126,10 @@ export default async function InternHome() {
     college?.isPartner && !activated
       ? await paidSeatTotal(getDb(), college.collegeId).then((r) => r.seats > 0, () => false)
       : false;
+  // A matched student whose college paid accepts in one click. Never breaks the dashboard if this lookup fails.
+  const claim = activated
+    ? null
+    : await (async () => pendingClaimFor(getDb().$client, session.uid, driveCodeSecret()))().catch(() => null);
   const action = nextAction(data.thread);
   const working = data.stage === "working";
   const open = working ? [] : await openProjects(6, { strict: true });
@@ -542,6 +548,7 @@ export default async function InternHome() {
             payment={
               <ActivationCard
                 alreadyPaid={activated}
+                claim={claim}
                 testMode={paymentsAreFree()}
                 testPay={testPayEnabled()}
                 feeMinor={activationFeeMinor}
