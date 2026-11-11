@@ -18,6 +18,8 @@ import { getDb, schema, hasDb } from "@/lib/db";
 import { eq, desc, asc, sql } from "drizzle-orm";
 import { inrMinorToUsdMinor } from "@/lib/currency";
 import { cmsImageSrc } from "./image-response";
+import { unstable_cache } from "next/cache";
+import { loadPublicStudents, studentsForSkill } from "@/lib/skill-benches";
 
 /* ==========================================================================
    Content accessors - the seam for the data layer
@@ -88,9 +90,16 @@ export async function getFeaturedSkills() {
   return tryDb(async () => {
     const db = getDb();
     const rows = await db.select().from(schema.websiteFeaturedSkills).where(eq(schema.websiteFeaturedSkills.isActive, true)).orderBy(asc(schema.websiteFeaturedSkills.sortOrder));
-    return rows.length ? (rows as unknown as typeof FEATURED_SKILLS) : FEATURED_SKILLS;
+    if (!rows.length) return FEATURED_SKILLS;
+    // The stored resource_count is a hand-typed number; the card must show the
+    // live bench size. If the candidate query fails, keep the stored number.
+    const pool = await liveBenchPool().catch(() => null);
+    return rows.map((r) => (pool ? { ...r, resourceCount: studentsForSkill(pool, r.title).length } : r)) as unknown as typeof FEATURED_SKILLS;
   }, FEATURED_SKILLS);
 }
+
+// Cached 5 min so the home page does not scan the candidate pool on every view.
+const liveBenchPool = unstable_cache(loadPublicStudents, ["live-bench-pool"], { revalidate: 300 });
 
 export async function getHappyFaces() {
   return tryDb(async () => {
