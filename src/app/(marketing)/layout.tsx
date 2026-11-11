@@ -23,7 +23,7 @@ export default function MarketingLayout({
     <SmoothScroll>
       <div className="flex min-h-dvh flex-col">
         <SiteHeader />
-        <main id="main" tabIndex={-1} className="outline-none flex-1">
+        <main id="main" data-site tabIndex={-1} className="outline-none flex-1">
           {children}
         </main>
         <SiteFooter />

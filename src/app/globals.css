@@ -1822,11 +1822,11 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
    rhythm). Inside the console shell `#main` already supplies the gutter,
    the max width and the top padding, so the wrapper must not add a second
    gutter or ~100px of blank space above the page title. */
-#main > :is(.container-page, .container-wide) {
+#main:not([data-site]) > :is(.container-page, .container-wide) {
   max-width: none;
   padding-inline: 0;
 }
-#main > .section-y {
+#main:not([data-site]) > .section-y {
   padding-top: 0;
   padding-bottom: 1rem;
 }
