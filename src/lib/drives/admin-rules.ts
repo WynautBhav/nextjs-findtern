@@ -1,5 +1,5 @@
 /** Pure decisions for the admin drive-order, import and identity-review routes (no DB, no Next). */
-import { isXlsx } from "../xlsx.ts";
+import { isXlsx } from "../xlsx-sniff.ts";
 import type { Mapping, RosterField } from "./import/headers.ts";
 import type { EntryState, RosterRow } from "./import/validate.ts";
 

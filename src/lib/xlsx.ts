@@ -181,10 +181,7 @@ export const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsh
 
 const MAX_ENTRY_BYTES = 20 * 1024 * 1024;
 
-/** A ZIP local-file signature ("PK\x03\x04") - how an .xlsx upload is told from CSV. */
-export function isXlsx(bytes: Uint8Array): boolean {
-  return bytes.length > 4 && bytes[0] === 0x50 && bytes[1] === 0x4b && bytes[2] === 0x03 && bytes[3] === 0x04;
-}
+export { isXlsx } from "./xlsx-sniff.ts";
 
 function readZip(bytes: Uint8Array): Map<string, () => Buffer> {
   const buf = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
