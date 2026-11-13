@@ -606,7 +606,7 @@ step("employer: checks out with the month-end stipend plan in free mode → prop
       const main = await page.locator("main").innerText();
       assert.match(main, /Hiring charge \(one-time\)/, "the hiring charge is part of the amount due now");
       assert.match(main, /Month 1 charge/, "the Month 1 charge is paid with it");
-      assert.match(main, /Month 2 · due /, "month 2 is the first month listed with a due date");
+      assert.match(main, /Then\b.*\bmore months? · next due \d{1,2} \w{3}/, "the later months are one line naming the next due date");
       const res = await clickFor(page, page.getByRole("button", { name: /complete for free/i }), { path, method: "POST" });
       expectOk(`POST ${path}`, res);
       assert.equal(res.body?.free, true);
