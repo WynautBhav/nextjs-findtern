@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
+import { CheckCircle2, XCircle } from "lucide-react";
 
 import { PageHead, Surface } from "@/components/app/primitives";
 import { Tile } from "@/components/app/tiles";
@@ -25,13 +24,6 @@ export default async function InternGuarantee() {
 
   return (
     <div>
-      <Link
-        href="/intern/dashboard"
-        className="mb-3 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm text-sm font-medium text-brand-700 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40"
-      >
-        <ArrowLeft className="size-4" aria-hidden />
-        Home
-      </Link>
       <PageHead
         title="How the 6-month guarantee works"
         lede={`Placed within 6 months of your AI interview, or the ₹${fee.toLocaleString("en-IN")} fee comes back in full.`}
