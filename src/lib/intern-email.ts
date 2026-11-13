@@ -1,4 +1,4 @@
-import { isPersonalEmail } from "./employer-onboarding";
+import { isPersonalEmail } from "./employer-onboarding.ts";
 
 /**
  * Which addresses an intern may sign up with. Pure, so the signup form and the

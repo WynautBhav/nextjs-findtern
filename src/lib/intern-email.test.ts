@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { isAcademicEmail, isInternEmail } from "./intern-email";
+import { isAcademicEmail, isInternEmail } from "./intern-email.ts";
 
 const ACCEPT = [
   "a@gmail.com",
