@@ -46,7 +46,7 @@ test("payButtonState: the old monthly plan is always enabled; a due month crossi
   assert.equal((payButtonState(ledger({ nextDue: "2027-01-10" }), [], "2026-12-01") as { payableFrom: string | null }).payableFrom, "2026-12-26");
 });
 
-test("payButtonState: an unpaid hire in payableIds says Pay; one with no due day is disabled with no date", () => {
-  assert.deepEqual(payButtonState(ledger({ plan: "unpaid", monthsPaid: 0, nextDue: null }), ["p1"], "2026-12-01"), { show: true, enabled: true, label: "Pay", payableFrom: null });
+test("payButtonState: a row checkout does not bill stays disabled even if listed; no due day means no date", () => {
+  assert.deepEqual(payButtonState(ledger({ plan: "unpaid", monthsPaid: 0, nextDue: null }), ["p1"], "2026-12-01"), { show: true, enabled: false, label: "Pay", payableFrom: null });
   assert.deepEqual(payButtonState(ledger({ plan: "unpaid", monthsPaid: 0, nextDue: null }), [], "2026-12-01"), { show: true, enabled: false, label: "Pay", payableFrom: null });
 });

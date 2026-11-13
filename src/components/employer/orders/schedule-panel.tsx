@@ -111,7 +111,6 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                 const overdue = Boolean(h.ledger.nextDue) && (h.ledger.nextDue as string) < today && h.ledger.dueMinor > 0;
                 const s = overdue ? { label: "Overdue", tone: "waiting" as Tone } : STATUS[h.ledger.status];
                 const m = (minor: number) => formatMoney(minor, h.currency, { zeroLabel: false });
-                const payable = h.ledger.dueMinor > 0 && (h.ledger.plan === "monthly" || (h.ledger.plan === "postpaid" && payableIds.includes(h.proposalId)));
                 const pay = payButtonState(h.ledger, payableIds, today);
                 return (
                   <tr key={h.proposalId}>

@@ -50,14 +50,14 @@ function minusDays(day: string, days: number): string {
 
 /**
  * Orders > Payment schedule: a Pay button on every row that still owes money.
- * Enabled when checkout can bill the row (the old monthly plan, or the row is in
- * `payableIds`, i.e. the server's list of lines checkout accepts); otherwise it is
+ * Enabled exactly where it always was: the old monthly plan, or a post-paid row that is in
+ * `payableIds` (the server's list of lines checkout accepts); otherwise it is
  * disabled and, when a next-due day is known, names the day it opens (due - 15 days).
  */
 export function payButtonState(ledger: Pick<PlacementLedger, "proposalId" | "plan" | "dueMinor" | "monthsPaid" | "nextDue">, payableIds: readonly string[], todayIst: string): PayButtonState {
   if (!(ledger.dueMinor > 0)) return { show: false };
   const label = ledger.plan === "monthly" || ledger.plan === "postpaid" ? `Pay month ${ledger.monthsPaid + 1}` : "Pay";
-  const enabled = ledger.plan === "monthly" || payableIds.includes(ledger.proposalId);
+  const enabled = ledger.plan === "monthly" || (ledger.plan === "postpaid" && payableIds.includes(ledger.proposalId));
   if (enabled) return { show: true, enabled: true, label, payableFrom: null };
   const from = ledger.nextDue ? minusDays(ledger.nextDue, WINDOW_DAYS) : null;
   return { show: true, enabled: false, label, payableFrom: from && todayIst < from ? from : null };
