@@ -185,7 +185,7 @@ export function InterviewActions({
             interviewId={interviewId}
             link={meetingLink}
             ready={Boolean(meetingLink)}
-            {...(soon ? {} : { variant: "outline" as const, label: "Meeting link" })}
+            {...(soon ? {} : { variant: "outline" as const })}
           />
         ) : null}
         {canMarkCompleted && stage === "live" ? (
