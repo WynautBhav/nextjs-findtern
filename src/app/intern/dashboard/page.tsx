@@ -519,6 +519,7 @@ export default async function InternHome() {
       <div className="space-y-4">
         {openToWork ? null : <HiddenProfileBanner />}
         <PresenceNotice userId={session.uid} on={presenceRow?.show ?? true} />
+        <MilestoneNote data={data} userId={session.uid} now={now} />
         {gettingStarted ? (
           <GettingStarted
             completion={completion}
@@ -572,8 +573,6 @@ export default async function InternHome() {
             ) : null}
           </div>
         ) : null}
-
-        <MilestoneNote data={data} userId={session.uid} now={now} />
 
         {/* The key numbers follow what needs you: the action is the reason to open Home. */}
         {stats.length > 0 ? (
