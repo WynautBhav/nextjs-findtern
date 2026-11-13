@@ -54,7 +54,7 @@ const CONTROLS = [
     path: "/intern/settings",
     api: "**/api/intern/presence-visibility",
     sw: (page) => page.getByRole("switch", { name: /Show when I.m active to employers/ }).first(),
-    errorRe: /Visibility is unavailable right now\./,
+    errorRe: /Visibility is unavailable right now\.|Could not save\. Try again\./, // the server message (500) or the generic one (aborted)
     reject: { error: "Visibility is unavailable right now." },
     read: async () => (await one(`SELECT COALESCE((SELECT show_activity FROM user_presence WHERE user_id = $1), true) AS v`, [S.I.id])).v,
     write: (on) => db().query(`INSERT INTO user_presence (user_id, show_activity) VALUES ($1,$2) ON CONFLICT (user_id) DO UPDATE SET show_activity = $2`, [S.I.id, on]),
