@@ -100,10 +100,12 @@ test("row 24: the intern cannot send until the employer has written in the threa
   assert.equal(view.body.closed, false);
   const list = await api(P.I.page, "GET", "/api/threads");
   assert.equal(list.body.threads.find((t) => t.id === threadId).sendBlock, "employer_first");
-  // The composer is replaced by the waiting note.
+  // The composer is replaced by the waiting note. (Heartbeats are blocked here: the limiter allows 6 a minute and the presence test needs its share.)
+  await P.I.page.route("**/api/presence/heartbeat", (r) => r.abort());
   await P.I.page.goto(url(`/intern/messages/${threadId}`), { waitUntil: "domcontentloaded" });
   await P.I.page.getByText("You can reply once the company has sent you a message.").waitFor({ timeout: 20_000 });
   assert.equal(await P.I.page.getByLabel(/message to/i).count(), 0, "no composer");
+  await P.I.page.unroute("**/api/presence/heartbeat");
 });
 
 test("messages flow both ways", async () => {
@@ -192,7 +194,12 @@ test("unread badge rises WITHOUT reload for the recipient, clears on opening; se
 
 test("presence: Online after a heartbeat, Offline after more than 90 s of silence", async () => {
   await P.I.page.goto(url("/intern/dashboard"), { waitUntil: "domcontentloaded" });
-  const beat = await api(P.I.page, "POST", "/api/presence/heartbeat");
+  // The heartbeat limiter is 6 a minute and every page load beats twice, so the earlier tests may have used it up: wait it out.
+  let beat = await api(P.I.page, "POST", "/api/presence/heartbeat");
+  for (let i = 0; i < 14 && beat.status === 429; i++) {
+    await new Promise((r) => setTimeout(r, 5_000));
+    beat = await api(P.I.page, "POST", "/api/presence/heartbeat");
+  }
   assert.equal(beat.status, 200, JSON.stringify(beat.body));
   const online = await api(P.E.page, "GET", "/api/threads");
   assert.equal(online.body.threads.find((t) => t.id === threadId).counterpartOnline, true, "API says online");
