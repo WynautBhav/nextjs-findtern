@@ -12,7 +12,7 @@ test("each project keeps its own picks", () => {
   const back: Record<string, string[] | undefined> = readCompareMap(serializeCompareMap(E, map), E);
   assert.deepEqual(back, map);
   assert.deepEqual(back.p1, ["a", "b"]);
-  assert.equal(back.p3, undefined);
+  assert.equal(Object.hasOwn(back, "p3"), false);
 });
 
 test("an empty list clears that project only, and an empty map clears the cookie", () => {
