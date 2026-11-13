@@ -7,7 +7,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { timezoneForLocation } from "@/lib/timezones";
 import { ProjectForm } from "../project-form";
 
-export const metadata: Metadata = { title: "Post an internship", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Post a project", robots: { index: false, follow: false } };
 
 export default async function NewProjectPage() {
   const session = await requireRole("employer");
@@ -18,7 +18,7 @@ export default async function NewProjectPage() {
     .limit(1);
   return (
     <div className="container-page section-y space-y-6">
-      <PageHeader title="Post an internship" subtitle="Save a draft any time. Submit when the checklist is complete." />
+      <PageHeader title="Post a project" subtitle="Save a draft any time. Submit when the checklist is complete and it goes live." />
       <ProjectForm
         employerId={session.uid}
         companyName={company?.companyName}

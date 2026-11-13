@@ -93,7 +93,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       city: remote ? null : d.city?.trim() || null,
       state: remote ? null : d.state?.trim() || null,
       preferredLocations: remote ? [] : (d.preferredLocations ?? []),
-      // Self-service posting starts as a draft; it goes live only after admin review.
+      // Self-service posting starts as a draft; the employer publishes it with Submit (no admin review).
       status: "draft",
     })
     .returning();

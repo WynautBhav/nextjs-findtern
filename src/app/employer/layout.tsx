@@ -14,6 +14,7 @@ import {
   KeyRound,
   MessageSquare,
   Receipt,
+  CalendarClock,
 } from "lucide-react";
 
 import { ConsoleShell, type ConsoleNavGroup, type ConsoleNavItem } from "@/components/layout/console-shell";
@@ -32,7 +33,7 @@ import { gated } from "@/lib/request-gate";
 // The path in order: find, shortlist, offer, interview, hire, then timesheet and pay.
 // Shortlist is its own step of that path (the page, its title and the hiring-steps bar all
 // say "Shortlist"), so it gets its own item and lights up alone; Compare stays under
-// Candidates; Interviews sit under Proposals. `also` keeps the right item lit on every sub-page.
+// Candidates; Interviews have their own item. `also` keeps the right item lit on every sub-page.
 const NAV_GROUPS: ConsoleNavGroup[] = [
   {
     title: "Hiring",
@@ -45,13 +46,14 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
         also: ["/employer/compare", "/employer/intern"],
       },
       { href: "/employer/cart", label: "Shortlist", icon: <ShoppingBag />, also: ["/employer/shortlist"] },
-      { href: "/employer/projects", label: "Internships", icon: <FolderKanban /> },
+      { href: "/employer/projects", label: "Projects", icon: <FolderKanban /> },
       {
         href: "/employer/proposals",
         label: "Proposals",
         icon: <FileText />,
-        also: ["/employer/proposal", "/employer/send-proposal", "/employer/schedule"],
+        also: ["/employer/proposal", "/employer/send-proposal"],
       },
+      { href: "/employer/schedule", label: "Interviews", icon: <CalendarClock /> },
       { href: "/employer/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
     ],
   },

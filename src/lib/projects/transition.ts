@@ -44,7 +44,7 @@ export function planTransition(input: {
   const now = input.now ?? new Date();
   const from = normalizeStatus(project.status);
   const to = normalizeStatus(input.to);
-  const err = transitionError(project.status ?? "", input.to, actorRole, { reason: input.reason });
+  const err = transitionError(project.status ?? "", input.to, actorRole);
   if (err || !from || !to) return { ok: false, status: from && to ? 403 : 400, error: err ?? "Unknown status." };
 
   if (to === "pending_review") {
@@ -55,39 +55,21 @@ export function planTransition(input: {
     return { ok: true, from, to, set: { status: to, submittedAt: now, rejectionReason: null } };
   }
   if (to === "published") {
-    // Approval stamps the first publish; a resume from paused keeps it.
+    // A draft going live is the employer's own Submit: it must be complete first.
+    if (from === "draft") {
+      const missing = submitReadiness(project);
+      if (missing.length) {
+        return { ok: false, status: 422, error: `Complete these before publishing: ${missing.join(", ")}.`, missing };
+      }
+      return {
+        ok: true, from, to,
+        set: { status: to, submittedAt: now, publishedAt: project.publishedAt ?? now, rejectionReason: null },
+      };
+    }
+    // A backlog or admin approval stamps the first publish; a resume from paused keeps it.
     return { ok: true, from, to, set: { status: to, publishedAt: project.publishedAt ?? now, rejectionReason: null } };
   }
-  if (to === "rejected") {
-    return { ok: true, from, to, set: { status: to, rejectionReason: (input.reason ?? "").trim() } };
-  }
   return { ok: true, from, to, set: { status: to } };
-}
-
-export type ReviewPlan =
-  | { ok: true; to: "published" | "rejected"; set: TransitionSet }
-  | { ok: false; status: 400 | 403 | 409 | 422; error: string };
-
-/** Admin moderation: only a project in pending_review can be approved or rejected. */
-export function planReview(input: {
-  project: TransitionProject;
-  decision: string;
-  reason?: string | null;
-  now?: Date;
-}): ReviewPlan {
-  if (input.decision !== "approve" && input.decision !== "reject") {
-    return { ok: false, status: 400, error: "Decision must be approve or reject." };
-  }
-  if (normalizeStatus(input.project.status) !== "pending_review") {
-    return { ok: false, status: 409, error: "This project is not waiting for review." };
-  }
-  const to = input.decision === "approve" ? "published" : "rejected";
-  if (to === "rejected" && !input.reason?.trim()) {
-    return { ok: false, status: 422, error: "A rejection needs a reason." };
-  }
-  const plan = planTransition({ project: input.project, to, actorRole: "admin", reason: input.reason, now: input.now });
-  if (!plan.ok) return { ok: false, status: plan.status === 400 ? 400 : plan.status === 403 ? 403 : 422, error: plan.error };
-  return { ok: true, to, set: plan.set };
 }
 
 /** Conditional UPDATE `WHERE status = current` touching 0 rows means someone else moved it first. */

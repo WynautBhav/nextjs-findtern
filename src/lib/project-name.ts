@@ -42,12 +42,17 @@ export function projectNameIssue(projectName: string, companyName: string | null
 
   // Whole words only: a run of project words that, joined, spells the company core
   // ("Zentrova Labs", "zentrova-labs", "ZentrovaLabs"). "Nova" never trips "Innovation".
+  // A plural or possessive tail still names the company: "Acmes", "Acme's" (which splits
+  // into "acme" + "s"), "Acmes'", "Boxes" for "Box". The tail must end the run, so it never
+  // matches inside a longer word ("Novas" is blocked, "Novara" is not).
   const coreKey = coreWords.join("");
+  const hits = new Set([coreKey, `${coreKey}s`, `${coreKey}es`]);
+  const maxLen = coreKey.length + 2;
   for (let i = 0; i < project.length; i++) {
     let run = "";
-    for (let j = i; j < project.length && run.length < coreKey.length; j++) {
+    for (let j = i; j < project.length && run.length < maxLen; j++) {
       run += project[j];
-      if (run === coreKey) return `Leave your company name out of the project name. ${TAIL}`;
+      if (hits.has(run)) return `Leave your company name out of the project name. ${TAIL}`;
     }
   }
 

@@ -12,7 +12,7 @@ import { proposalOutcome } from "@/lib/proposals";
 import { ProjectList, type ListProject } from "./project-list";
 
 export const metadata: Metadata = {
-  title: "Internships",
+  title: "Projects",
   robots: { index: false, follow: false },
 };
 
@@ -60,8 +60,8 @@ export default async function EmployerProjectsPage() {
     console.error("Failed to load employer projects:", err);
     return (
       <div className="container-page section-y">
-        <PageHeader title="Internships" />
-        <LoadError what="your internships" retryHref="/employer/projects" email={SITE.adminEmail} />
+        <PageHeader title="Projects" />
+        <LoadError what="your projects" retryHref="/employer/projects" email={SITE.adminEmail} />
       </div>
     );
   }
@@ -69,11 +69,11 @@ export default async function EmployerProjectsPage() {
   return (
     <div className="container-page section-y space-y-6">
       <PageHeader
-        title="Internships"
-        subtitle="Post a role, send it for review, and manage it once it is live."
+        title="Projects"
+        subtitle="Post a project and it goes live as soon as you submit. Pause or close it any time."
         action={
           <ButtonLink href="/employer/projects/new" className="max-sm:hidden">
-            <Plus className="size-4" aria-hidden /> Post an internship
+            <Plus className="size-4" aria-hidden /> Post a project
           </ButtonLink>
         }
       />

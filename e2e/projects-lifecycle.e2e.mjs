@@ -1,5 +1,6 @@
 /**
  * Employer project posting lifecycle end to end (Chromium, QA stack). WRITTEN, NOT YET RUN.
+ * No admin review: the employer's Submit publishes (draft > published); a leftover pending_review row self-publishes.
  *
  *   E2E_BASE_URL=http://localhost:3500 DATABASE_URL=postgresql://findtern@127.0.0.1:5435/findtern_qa \
  *     node --test --test-concurrency=1 e2e/projects-lifecycle.e2e.mjs      (npm run test:e2e:projects)
@@ -38,7 +39,6 @@ const body7 = (name, skills) => ({
 });
 const status = async (id) => (await one(`SELECT status, rejection_reason FROM projects WHERE id = $1`, [id]));
 const move = (page, id, to, reason) => api(page, "POST", `/api/employer/projects/${id}/transition`, { to, reason });
-const review = (id, decision, reason) => api(P.A.page, "POST", `/api/admin/projects/${id}/review`, { decision, reason });
 /** Is the project on the signed-in intern's open-roles list? Filters by name so the 60-row cap cannot hide it. */
 async function internSees(name) {
   await P.I.page.goto(url(`/intern/opportunities?q=${encodeURIComponent(name)}`), { waitUntil: "domcontentloaded" });
@@ -86,60 +86,61 @@ test("a draft is not visible to interns", async () => {
   assert.equal(await internSees(NAME), false);
 });
 
-test("submit with missing fields → 422 listing them", async () => {
+test("publish with missing fields → 422 listing them, and it stays a draft", async () => {
   const bare = await mkProject(E.id, `Bare draft ${RUN}`, { status: "draft", complete: false });
-  const r = await move(P.E.page, bare, "pending_review");
+  const r = await move(P.E.page, bare, "published");
   assert.equal(r.status, 422, JSON.stringify(r.body));
   for (const f of ["description", "skills", "locationType"]) assert.ok(r.body.missing.includes(f), `missing lists ${f}: ${r.body.missing}`);
   assert.equal((await status(bare)).status, "draft", "still a draft");
 });
 
-test("submit → pending_review, still hidden from interns", async () => {
-  const r = await move(P.E.page, pid, "pending_review");
+test("a project name with the company name is refused, also with a plural or possessive tail", async () => {
+  for (const name of [E.company, `${E.company}s`, `${E.company}'s`]) {
+    const r = await api(P.E.page, "POST", `/api/employer/${E.id}/projects`, body7(name, SKILLS.slice(0, 3)));
+    assert.equal(r.status, 400, `${name} → ${r.status} ${JSON.stringify(r.body)}`);
+    assert.match(r.body.error, /company name/i);
+  }
+});
+
+test("Submit publishes directly: live for interns, no review step", async () => {
+  const r = await move(P.E.page, pid, "published");
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.equal(r.body.status, "pending_review");
-  assert.ok((await one(`SELECT submitted_at FROM projects WHERE id = $1`, [pid])).submitted_at);
-  assert.equal(await internSees(NAME), false);
-  const edit = await api(P.E.page, "PUT", `/api/employer/projects/${pid}`, { scopeOfWork: "long-term" });
-  assert.equal(edit.status, 409, "a project in review cannot be edited");
-});
-
-test("admin rejects without a reason (refused), then with a reason; the employer sees it and 'Edit and resubmit'", async () => {
-  const none = await review(pid, "reject");
-  // planReview answers 422 for a missing reason (the brief said 400): any 4xx refusal, and nothing changes.
-  assert.ok([400, 422].includes(none.status), `reject without reason → ${none.status}`);
-  assert.equal((await status(pid)).status, "pending_review");
-  const blank = await review(pid, "reject", "   ");
-  assert.ok([400, 422].includes(blank.status));
-
-  const reason = `Scope is too vague ${RUN}`;
-  const ok = await review(pid, "reject", reason);
-  assert.equal(ok.status, 200, JSON.stringify(ok.body));
-  assert.deepEqual(await status(pid), { status: "rejected", rejection_reason: reason });
-  assert.equal(await internSees(NAME), false);
-
-  await P.E.page.goto(url("/employer/projects"), { waitUntil: "domcontentloaded" });
-  await P.E.page.getByText(reason).waitFor({ timeout: 15_000 });
-  await P.E.page.getByRole("button", { name: "Edit and resubmit" }).waitFor();
-});
-
-test("the employer resubmits through the button; admin approves → published and on the intern list", async () => {
-  // "Edit and resubmit" reopens the rejected project as a draft and opens the edit form (project-list.tsx resubmit()).
-  await P.E.page.getByRole("button", { name: "Edit and resubmit" }).first().click();
-  await P.E.page.waitForURL(new RegExp(`/employer/projects/${pid}/edit`), { timeout: 20_000 });
-  assert.equal((await status(pid)).status, "draft");
-  const submit = await move(P.E.page, pid, "pending_review");
-  assert.equal(submit.status, 200, JSON.stringify(submit.body));
-  assert.equal((await status(pid)).status, "pending_review");
-  assert.equal((await status(pid)).rejection_reason, null, "the old reason is cleared on resubmit");
-
-  const approved = await review(pid, "approve");
-  assert.equal(approved.status, 200, JSON.stringify(approved.body));
-  assert.equal((await status(pid)).status, "published");
-  assert.ok((await one(`SELECT published_at FROM projects WHERE id = $1`, [pid])).published_at);
+  assert.equal(r.body.status, "published");
+  const row = await one(`SELECT status, submitted_at, published_at FROM projects WHERE id = $1`, [pid]);
+  assert.equal(row.status, "published");
+  assert.ok(row.submitted_at && row.published_at);
   assert.equal(await internSees(NAME), true, "published → visible");
-  const audit = await one(`SELECT 1 AS x FROM admin_audit_log WHERE target_id = $1 AND action = 'project.approve'`, [pid]);
-  assert.ok(audit, "approval audited");
+  const edit = await api(P.E.page, "PUT", `/api/employer/projects/${pid}`, { skills: SKILLS.slice(0, 3) });
+  assert.equal(edit.status, 409, "while live only the scope, locations and full-time offer can change");
+  // The admin review route is gone.
+  const gone = await api(P.A.page, "POST", `/api/admin/projects/${pid}/review`, { decision: "approve" });
+  assert.ok([404, 405].includes(gone.status), `admin review route removed (${gone.status})`);
+});
+
+test("a leftover pending_review project self-publishes; a closed or rejected one cannot be published directly", async () => {
+  const backlog = await mkProject(E.id, `Backlog ${RUN}`, { status: "pending_review" });
+  assert.equal(await internSees(`Backlog ${RUN}`), false, "in the backlog → hidden");
+  const r = await move(P.E.page, backlog, "published");
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.ok((await one(`SELECT published_at FROM projects WHERE id = $1`, [backlog])).published_at);
+  assert.equal(await internSees(`Backlog ${RUN}`), true, "self-published → visible");
+
+  const rejected = await mkProject(E.id, `Rejected ${RUN}`, { status: "rejected" });
+  assert.equal((await move(P.E.page, rejected, "published")).status, 403);
+  const closed = await mkProject(E.id, `Closed ${RUN}`, { status: "closed" });
+  assert.equal((await move(P.E.page, closed, "published")).status, 403);
+  assert.equal((await status(rejected)).status, "rejected");
+});
+
+test("a rejected (old) project: 'Edit and publish' reopens it as a draft and opens the edit form", async () => {
+  const rej = await mkProject(E.id, `Rejected UI ${RUN}`, { status: "rejected" });
+  await P.E.page.goto(url("/employer/projects"), { waitUntil: "domcontentloaded" });
+  await P.E.page.getByRole("button", { name: "Edit and publish" }).first().click();
+  await P.E.page.waitForURL(new RegExp(`/employer/projects/${rej}/edit`), { timeout: 20_000 });
+  assert.equal((await status(rej)).status, "draft");
+  const r = await move(P.E.page, rej, "published");
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal((await status(rej)).rejection_reason, null);
 });
 
 test("pause hides, resume shows, close is terminal for the employer", async () => {
@@ -158,15 +159,15 @@ test("pause hides, resume shows, close is terminal for the employer", async () =
 });
 
 test("concurrent double transition: exactly one winner", async () => {
-  // Admin approve x2 on a pending project: the loser is always 409.
-  const a = await mkProject(E.id, `Race review ${RUN}`, { status: "pending_review" });
-  const rs = await Promise.all([review(a, "approve"), review(a, "approve")]);
-  const codes = rs.map((r) => r.status).sort();
-  assert.deepEqual(codes, [200, 409], `review race: ${codes}`);
+  // Employer publish x2 on a leftover pending_review project: the loser is 409 (lost the conditional UPDATE)
+  // or 403 (it read the row after the winner and published→published is not an edge).
+  const a = await mkProject(E.id, `Race publish ${RUN}`, { status: "pending_review" });
+  const rs0 = await Promise.all([move(P.E.page, a, "published"), move(P.E.page, a, "published")]);
+  assert.equal(rs0.filter((r) => r.status === 200).length, 1, `publish race: ${rs0.map((r) => r.status)}`);
+  assert.ok(rs0.every((r) => [200, 409, 403].includes(r.status)));
   assert.equal((await status(a)).status, "published");
 
-  // Employer pause x2 on a published project: one 200; the loser is 409 (lost the conditional UPDATE)
-  // or 403 (it read the row after the winner and paused→paused is not an edge).
+  // Employer pause x2 on the published project: same rule.
   const rs2 = await Promise.all([move(P.E.page, a, "paused"), move(P.E.page, a, "paused")]);
   const wins = rs2.filter((r) => r.status === 200);
   const losers = rs2.filter((r) => r.status !== 200);

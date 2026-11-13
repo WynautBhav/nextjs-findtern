@@ -22,6 +22,20 @@ describe("projectNameIssue", () => {
     assert.ok(issue("ZentrovaLabs CRM", "Zentrova Labs"));
     assert.ok(issue("Workspace by Ace", "Ace"));
   });
+  it("blocks the company name with a plural or possessive tail", () => {
+    for (const p of ["Zentrova", "Zentrovas", "Zentrovaes", "Zentrova's", "Zentrovas'", "Zentrova\u2019s", "ZENTROVAS portal"]) {
+      assert.match(issue(p, "Zentrova")!, /company name/, p);
+    }
+    assert.match(issue("Acme's", "Acme")!, /company name/);
+    assert.match(issue("Zentrova Labss", "Zentrova Labs")!, /company name/);
+    assert.match(issue("Zentrovalabs's", "Zentrova Labs Pvt Ltd")!, /company name/);
+    // Not the company: longer words that merely start with it, and unrelated words.
+    assert.equal(issue("Innovation", "Nova"), null);
+    assert.equal(issue("Innovations", "Nova"), null);
+    assert.equal(issue("Novara dashboard", "Nova"), null);
+    assert.equal(issue("Zentrovan tools", "Zentrova"), null);
+    assert.equal(issue("Acmestore", "Acme"), null);
+  });
   it("blocks initials as whole tokens", () => {
     for (const p of ["AR portal", "A.R. portal", "AR-VR app"]) assert.match(issue(p, "Alpha Robotics")!, /"AR" looks like/);
     assert.equal(issue("Arena revamp", "Alpha Robotics"), null);

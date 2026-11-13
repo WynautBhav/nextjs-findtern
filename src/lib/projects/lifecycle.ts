@@ -19,7 +19,13 @@ export function normalizeStatus(s: string | null | undefined): CanonicalProjectS
   return Object.hasOwn(LEGACY, s) ? LEGACY[s as LegacyProjectStatus] : null;
 }
 
+// Employers publish their own postings: Submit goes draft>published (gated by
+// submitReadiness in planTransition). pending_review>published lets the existing
+// backlog self-publish. The draft>pending_review edge stays for old clients only;
+// no screen uses it.
 const EMPLOYER_EDGES: ReadonlySet<string> = new Set([
+  "draft>published",
+  "pending_review>published",
   "draft>pending_review",
   "pending_review>draft",
   "published>paused",
@@ -28,9 +34,8 @@ const EMPLOYER_EDGES: ReadonlySet<string> = new Set([
   "paused>closed",
   "rejected>draft",
 ]);
+// No admin review: admins only take postings down (anything to closed).
 const ADMIN_EDGES: ReadonlySet<string> = new Set([
-  "pending_review>published",
-  "pending_review>rejected",
   "published>closed",
   "paused>closed",
 ]);
@@ -49,14 +54,12 @@ export function transitionError(
   from: string,
   to: string,
   role: LifecycleRole,
-  opts: { reason?: string | null } = {},
 ): string | null {
   const f = normalizeStatus(from);
   const t = normalizeStatus(to);
   if (!f) return `Unknown current status "${from}".`;
   if (!t) return `Unknown target status "${to}".`;
   if (!canTransition(f, t, role)) return `A ${role} cannot move a project from ${f} to ${t}.`;
-  if (role === "admin" && t === "rejected" && !opts.reason?.trim()) return "A rejection needs a reason.";
   return null;
 }
 
@@ -79,7 +82,7 @@ export interface SubmitReadinessInput {
   locationType?: string | null;
 }
 
-/** Missing or invalid fields blocking submit for review. Empty array means ready. */
+/** Missing or invalid fields blocking submit (publish). Empty array means ready. */
 export function submitReadiness(p: SubmitReadinessInput): string[] {
   const missing: string[] = [];
   if (!p.projectName?.trim()) missing.push("title");
