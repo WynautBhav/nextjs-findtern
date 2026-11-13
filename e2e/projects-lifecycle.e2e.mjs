@@ -1,5 +1,5 @@
 /**
- * Employer project posting lifecycle end to end (Chromium, QA stack). WRITTEN, NOT YET RUN.
+ * Employer project posting lifecycle end to end (Chromium, QA stack).
  * No admin review: the employer's Submit publishes (draft > published); a leftover pending_review row self-publishes.
  *
  *   E2E_BASE_URL=http://localhost:3500 DATABASE_URL=postgresql://findtern@127.0.0.1:5435/findtern_qa \
@@ -96,7 +96,7 @@ test("publish with missing fields → 422 listing them, and it stays a draft", a
 
 test("a project name with the company name is refused, also with a plural or possessive tail", async () => {
   for (const name of [E.company, `${E.company}s`, `${E.company}'s`]) {
-    const r = await api(P.E.page, "POST", `/api/employer/${E.id}/projects`, body7(name, SKILLS.slice(0, 3)));
+    const r = await api(P.E.page, "POST", `/api/employer/${E.id}/projects`, body7(name, SKILLS.slice(0, 4)));
     assert.equal(r.status, 400, `${name} → ${r.status} ${JSON.stringify(r.body)}`);
     assert.match(r.body.error, /company name/i);
   }
