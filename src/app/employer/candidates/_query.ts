@@ -50,7 +50,7 @@ export type Filters = {
   remote: boolean | null;
   /** Legacy "Maximum skill match": rank candidates with more of the chosen skills first. */
   skillPriority: boolean;
-  /** "list" is the full-width cards (the default); "grid" the compact ones, two or three across. */
+  /** "list" is the full-width cards (the default); "grid" the compact ones, two across, three on wide screens. */
   view: ListView;
   pageSize: number;
   page: number;

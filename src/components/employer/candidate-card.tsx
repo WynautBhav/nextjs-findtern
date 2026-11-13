@@ -46,7 +46,7 @@ export interface CandidateCardProps {
   interested?: boolean;
   /** ISO time of a booked meeting that still holds the candidate: "Send proposal" waits for it. */
   pendingMeetingAt?: string | null;
-  /** "list" (default): the full-width card. "grid": the compact one, two or three across. */
+  /** "list" (default): the full-width card. "grid": the compact one, two across, three on wide screens. */
   layout?: ListView;
 }
 

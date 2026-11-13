@@ -145,7 +145,7 @@ export function ToolbarSort({ data, filters, className }: { data: CandidatesData
 }
 
 /**
- * List (the full-width cards) or Grid (compact cards, two or three across). The choice rides in
+ * List (the full-width cards) or Grid (compact cards, two across, three on wide screens). The choice rides in
  * the URL (`view=grid`), so every link on the page keeps it; it is a display choice, not a filter.
  */
 function ViewToggle({ filters }: { filters: Filters }) {
@@ -295,7 +295,7 @@ export function Results({
           <ScoreLegend />
           <ul
             aria-label="Candidates"
-            className={cn("mt-3 lg:mt-1", filters.view === "grid" ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3" : "flex flex-col gap-4 lg:gap-5")}
+            className={cn("mt-3 lg:mt-1", filters.view === "grid" ? "grid gap-4 sm:grid-cols-2 2xl:grid-cols-3" : "flex flex-col gap-4 lg:gap-5")}
           >
             {candidates.map((candidate) => {
               const rel = data.relations.get(candidate.id);
