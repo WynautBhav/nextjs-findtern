@@ -93,11 +93,11 @@ export function FilterPanel({
     // The skill-match switch is on by default: only its "off" goes in the URL.
     if (next.getAll("sm").includes("1")) next.delete("sm");
     // A new project brings its own skills and its own remembered filters
-    // (EMB-05): only the project and the compare picks travel.
+    // (EMB-05) and its own compare picks (12 Nov row 8): only the project, the view and the page size travel.
     if (projectChanged.current) {
       projectChanged.current = false;
       const clean = new URLSearchParams();
-      for (const key of ["project", "ids", "view", "pageSize"]) {
+      for (const key of ["project", "view", "pageSize"]) {
         const value = next.get(key);
         if (value) clean.set(key, value);
       }

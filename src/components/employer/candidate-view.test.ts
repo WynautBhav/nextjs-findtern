@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { AVATAR_TINTS, avatarTint, dedupeSkills, filterCount, showClearAll, headlineOf, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
+import { AVATAR_TINTS, avatarTint, dedupeSkills, filterCount, showClearAll, headlineOf, parseView, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
 
 test("skillBaseName drops the level", () => {
   assert.equal(skillBaseName("React · Advanced"), "React");
@@ -114,4 +114,15 @@ test("the active count, the skills parse and the project-city chip go through th
   assert.match(results, /showClearAll\(chips\.map\(\(chip\) => chip\.key\)\)/);
   // Removing a project-supplied city pins the skills and turns the defaults off, so the chip does not come back.
   assert.match(query, /projectDefaults: false, skills: effectiveSkills, skillsSet: true/);
+});
+
+test("parseView: grid is the compact cards, anything else falls back to the list", () => {
+  assert.equal(parseView("grid"), "grid");
+  assert.equal(parseView(" Grid "), "grid");
+  assert.equal(parseView("list"), "list");
+  assert.equal(parseView("table"), "list");
+  assert.equal(parseView("nonsense"), "list");
+  assert.equal(parseView(""), "list");
+  assert.equal(parseView(undefined), "list");
+  assert.equal(parseView(null), "list");
 });

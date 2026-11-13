@@ -4,7 +4,8 @@
  * "Add to compare" on a candidate's profile (EMB-12, legacy "Add to Compare /
  * In Compare"). The picks live in the same cookie the candidates page writes
  * (ft_emp_compare, see lib/employer-selection), so the candidate shows up
- * ticked there and on the compare page.
+ * ticked there and on the compare page. Picks are kept per project, so this
+ * one goes to `projectId`, and the compare link opens that project's picks.
  */
 
 import { useState } from "react";
@@ -13,20 +14,23 @@ import { useRouter } from "next/navigation";
 import { Check, Scale } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
+import { saveComparePicks } from "@/components/employer/remember-selection";
 import { cn } from "@/lib/utils";
 
 const MAX = 4;
-const MAX_AGE = 60 * 60 * 24 * 30;
 
 export function CompareToggle({
   employerId,
   internId,
+  projectId,
   picked: initial,
   disabledReason,
 }: {
   employerId: string;
   internId: string;
-  /** Current compare picks, read server-side from the cookie. */
+  /** The project these picks belong to; null when the employer has no open project. */
+  projectId: string | null;
+  /** This project's compare picks, read server-side from the cookie. */
   picked: string[];
   /** Why this candidate can't be compared (hired, full-time offer), if so. */
   disabledReason?: string | null;
@@ -38,9 +42,7 @@ export function CompareToggle({
 
   function save(next: string[]) {
     setPicked(next);
-    document.cookie = next.length
-      ? `ft_emp_compare=${encodeURIComponent(`${employerId}:${next.join(",")}`)}; path=/employer; max-age=${MAX_AGE}; samesite=lax`
-      : `ft_emp_compare=; path=/employer; max-age=0; samesite=lax`;
+    if (projectId) saveComparePicks(employerId, projectId, next);
     router.refresh();
   }
 
@@ -57,7 +59,7 @@ export function CompareToggle({
     <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
       <button
         type="button"
-        disabled={full}
+        disabled={full || !projectId}
         aria-pressed={inCompare}
         title={full ? "Compare holds four candidates. Remove one first." : undefined}
         onClick={() => save(inCompare ? picked.filter((id) => id !== internId) : [...picked, internId])}
@@ -67,7 +69,7 @@ export function CompareToggle({
         {inCompare ? "In compare" : full ? "Compare full (4)" : "Add to compare"}
       </button>
       {picked.length >= 2 && inCompare ? (
-        <Link href="/employer/compare" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
+        <Link href={`/employer/compare${projectId ? `?project=${encodeURIComponent(projectId)}` : ""}`} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
           Compare {picked.length} now
         </Link>
       ) : null}

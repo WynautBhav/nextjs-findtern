@@ -9,6 +9,8 @@
 
 import { useEffect } from "react";
 
+import { readCompareMap, serializeCompareMap, writeCompareMap } from "@/lib/compare-map";
+
 const MAX_AGE = 60 * 60 * 24 * 30;
 /** At most this many projects keep their filters; the oldest drop first. */
 const MAX_PROJECTS = 5;
@@ -50,6 +52,18 @@ function writeFilters(employerId: string, project: string, query: string) {
   write("ft_emp_filters", keys.length ? `${prefix}${JSON.stringify(kept)}` : null);
 }
 
+/**
+ * Save `ids` as the compare picks for `project`, leaving every other project's
+ * picks as the cookie holds them (read at write time, so two tabs do not clobber
+ * each other more than they must).
+ */
+export function saveComparePicks(employerId: string, project: string, ids: string[]) {
+  const prefix = `${employerId}:`;
+  const stored = read("ft_emp_project");
+  const current = readCompareMap(read("ft_emp_compare"), employerId, stored.startsWith(prefix) ? stored.slice(prefix.length) : null);
+  write("ft_emp_compare", serializeCompareMap(employerId, writeCompareMap(current, project, ids)));
+}
+
 export function RememberSelection({
   employerId,
   project,
@@ -67,8 +81,10 @@ export function RememberSelection({
   useEffect(() => {
     // Names match PROJECT_COOKIE / COMPARE_COOKIE / FILTERS_COOKIE in
     // lib/employer-selection, which is server-only (next/headers).
+    // Picks first: an old one-list cookie goes to the project that was stored, before this one replaces it.
+    // Picks belong to a project: with none, there is nowhere to keep them.
+    if (compareKey !== undefined && project) saveComparePicks(employerId, project, compareKey ? compareKey.split(",") : []);
     if (project !== undefined) write("ft_emp_project", project ? `${employerId}:${project}` : null);
-    if (compareKey !== undefined) write("ft_emp_compare", compareKey ? `${employerId}:${compareKey}` : null);
     if (project && filters !== undefined) writeFilters(employerId, project, filters);
   }, [employerId, project, compareKey, filters]);
   return null;

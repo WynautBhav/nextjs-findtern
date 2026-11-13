@@ -14,36 +14,34 @@
 
 import { cookies } from "next/headers";
 
+import { readCompareMap, type CompareMap } from "@/lib/compare-map";
 import { isProjectOpen } from "@/lib/project-locations";
 
 export const PROJECT_COOKIE = "ft_emp_project";
 export const COMPARE_COOKIE = "ft_emp_compare";
 /** Last filter query per project (EMB-05). Written by RememberSelection. */
 export const FILTERS_COOKIE = "ft_emp_filters";
-/** Compare shows at most four columns. */
-export const MAX_COMPARE = 4;
+export { MAX_COMPARE, parseIds } from "@/lib/compare-map";
 
-export function parseIds(raw: string | string[] | undefined | null): string[] {
-  const joined = Array.isArray(raw) ? raw.join(",") : (raw ?? "");
-  return Array.from(
-    new Set(
-      joined
-        .split(",")
-        .map((id) => id.trim())
-        .filter(Boolean),
-    ),
-  ).slice(0, MAX_COMPARE);
-}
-
-/** This employer's remembered project id and compare ids, if any. */
-export async function rememberedSelection(employerId: string): Promise<{ project: string | null; compare: string[] }> {
+/**
+ * This employer's remembered project id and the compare picks held for a
+ * project: `forProject` when given, else the remembered one. Picks are kept
+ * per project (lib/compare-map); `compareByProject` is the whole map.
+ */
+export async function rememberedSelection(
+  employerId: string,
+  forProject?: string | null,
+): Promise<{ project: string | null; compare: string[]; compareByProject: CompareMap }> {
   const jar = await cookies();
   const own = (name: string) => {
     const value = jar.get(name)?.value ?? "";
     const prefix = `${employerId}:`;
     return value.startsWith(prefix) ? value.slice(prefix.length) : "";
   };
-  return { project: own(PROJECT_COOKIE) || null, compare: parseIds(own(COMPARE_COOKIE)) };
+  const project = own(PROJECT_COOKIE) || null;
+  const compareByProject = readCompareMap(jar.get(COMPARE_COOKIE)?.value, employerId, project);
+  const key = forProject || project;
+  return { project, compare: (key && compareByProject[key]) || [], compareByProject };
 }
 
 /**

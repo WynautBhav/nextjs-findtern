@@ -19,7 +19,7 @@ import { restorableFilters } from "@/lib/employer-filter-restore";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { savedInternIds } from "@/lib/saved-roles";
 import { rankProfiles } from "@/components/employer/candidate-rank";
-import { dedupeSkills, filterCount } from "@/components/employer/candidate-view";
+import { dedupeSkills, filterCount, parseView, type ListView } from "@/components/employer/candidate-view";
 
 export type SortKey = "score" | keyof Ratings;
 
@@ -50,8 +50,8 @@ export type Filters = {
   remote: boolean | null;
   /** Legacy "Maximum skill match": rank candidates with more of the chosen skills first. */
   skillPriority: boolean;
-  /** "grid" is the cards (the default); "table" the dense ranked rows. */
-  view: "grid" | "table";
+  /** "list" is the full-width cards (the default); "grid" the compact ones, two across, three on wide screens. */
+  view: ListView;
   pageSize: number;
   page: number;
   project?: string;
@@ -120,10 +120,7 @@ export function readFilters(params: SearchParams): Filters {
   const page = Number(one(params.page) ?? "1");
   const ps = Number(one(params.pageSize) ?? "24");
   const pageSize = ps === 12 || ps === 48 ? ps : 24;
-  const viewRaw = (one(params.view) ?? "").trim().toLowerCase();
-  // Cards by default (client QA, 2 Nov). Rows stay one click away; "table" and
-  // the old "list" both mean rows.
-  const view: "grid" | "table" = viewRaw === "table" || viewRaw === "list" ? "table" : "grid";
+  const view = parseView(one(params.view));
   const planRaw = (one(params.plan) ?? "").trim();
   const floor = (raw: string | string[] | undefined) => {
     const n = Number(one(raw) ?? "0");
@@ -212,8 +209,10 @@ export function queryOf(merged: Filters): string {
   const next = new URLSearchParams(filters);
   // A link with no filter at all looks like a bare visit and restores the remembered
   // filters, so clearing the last chip could never stick: say "start clean" instead.
-  if (!filters.toString() && !merged.q && !merged.saved && merged.page <= 1) next.set("fresh", "1");
+  if (!filters.toString() && !merged.q && !merged.saved && merged.view === "list" && merged.page <= 1) next.set("fresh", "1");
   if (merged.project) next.set("project", merged.project);
+  // The view is a display choice: carried on links, never remembered with the filters.
+  if (merged.view === "grid") next.set("view", "grid");
   // The Saved tab is a view, not a filter: carried on links, never remembered.
   if (merged.saved) next.set("saved", "1");
   if (merged.ids.length > 0 || merged.idsSet) next.set("ids", merged.ids.join(","));

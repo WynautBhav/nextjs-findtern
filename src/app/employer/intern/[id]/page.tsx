@@ -116,7 +116,6 @@ export default async function EmployerInternDetail({
     if (user && (adminViewing || (await canEmployerSeeIntern(db, employerId, id)))) {
       visible = true;
       const remembered = await rememberedSelection(employerId);
-      comparePicks = remembered.compare;
       // `?project=` keeps the shortlist on the project the employer was
       // browsing; then the one picked on the candidates page; then the
       // newest open one (EMH-15).
@@ -146,6 +145,8 @@ export default async function EmployerInternDetail({
           )
           .limit(1);
         shortlist = { projectId: project.id, on: Boolean(item) };
+        // Compare picks are kept per project: this project's, the one the shortlist and Compare act on.
+        comparePicks = remembered.compareByProject[project.id] ?? [];
       }
       // One view per employer per day feeds the intern's monthly views summary,
       // and tells the intern (legacy "Spotlight" notice, once per employer/day).
@@ -327,7 +328,7 @@ export default async function EmployerInternDetail({
   const sendHref = `/employer/send-proposal?intern=${encodeURIComponent(profile.id)}${shortlist ? `&project=${encodeURIComponent(shortlist.projectId)}` : ""}`;
   /** Free text with contact details hidden until hire. */
   const t = (value: string | null | undefined) => (value ? profileText(value, nameUnlocked) : "");
-  const SECTION = "border-t border-ink-100 py-8";
+  const SECTION = "rounded-2xl border border-ink-200 bg-white p-5 shadow-xs sm:p-6";
   const H2 = "text-lg font-semibold tracking-[-0.01em] text-ink-900";
 
   return (
@@ -404,8 +405,8 @@ export default async function EmployerInternDetail({
           </div>
 
           {/* The stats line, as on the candidate list: score and band, rate, how they work. */}
-          <dl className="mt-6 grid grid-cols-[auto_auto_auto] justify-start gap-x-8 gap-y-4 sm:flex sm:flex-wrap sm:gap-x-12 sm:pl-30">
-            <div>
+          <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-xs">
               <dt className="text-sm text-ink-600">Findtern Score</dt>
               <dd className="nums mt-0.5 text-4xl font-semibold leading-none tracking-[-0.02em] text-ink-900">
                 {profile.scored ? (
@@ -418,11 +419,11 @@ export default async function EmployerInternDetail({
                 )}
               </dd>
             </div>
-            <div>
+            <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-xs">
               <dt className="text-sm text-ink-600">Works</dt>
               <dd className="mt-1.5 text-base font-medium text-ink-900">{profile.workModes.join(" / ") || "Not stated"}</dd>
             </div>
-            <div>
+            <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-xs">
               <dt className="text-sm text-ink-600">Laptop</dt>
               <dd className="mt-1.5 text-base font-medium text-ink-900">
                 {profile.hasLaptop === null ? "Not stated" : profile.hasLaptop ? "Own" : "Needs one"}
@@ -431,7 +432,7 @@ export default async function EmployerInternDetail({
           </dl>
           {profile.scored ? (
             // The band's own published meaning (lib/score BANDS), not a made-up label.
-            <p className="mt-3 text-sm text-ink-600 sm:pl-30">
+            <p className="mt-3 text-sm text-ink-600">
               <span className="mr-2 inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-sm font-medium text-brand-800 ring-1 ring-inset ring-brand-200/70">
                 {plan}
               </span>
@@ -484,7 +485,7 @@ export default async function EmployerInternDetail({
                 <ShortlistToggle internId={profile.id} projectId={shortlist.projectId} shortlisted={shortlist.on} />
               ) : null}
               {/* EMB-12: hires and full-time offers are not compared (legacy). */}
-              {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} picked={comparePicks} />}
+              {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} projectId={shortlist?.projectId ?? null} picked={comparePicks} />}
             </div>
 
             {appliedProjects.length > 0 ? (
@@ -513,7 +514,7 @@ export default async function EmployerInternDetail({
           </div>
         </aside>
 
-        <div className="min-w-0 lg:col-start-1">
+        <div className="min-w-0 space-y-4 lg:col-start-1">
           {skills.length > 0 ? (
             <section aria-labelledby="skills-h" className={SECTION}>
               <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">

@@ -18,6 +18,16 @@ export function rowSkills(skills: string[], wanted: Set<string>, max = MAX_SKILL
   return { shown: ordered.slice(skip, max), more: Math.max(0, ordered.length - max), isWanted };
 }
 
+export type ListView = "list" | "grid";
+
+/**
+ * The `view` URL value: "grid" is the compact cards, anything else (missing,
+ * misspelt, the retired "table") is the full-width list.
+ */
+export function parseView(raw: string | null | undefined): ListView {
+  return (raw ?? "").trim().toLowerCase() === "grid" ? "grid" : "list";
+}
+
 /** `HIDDEN_UNTIL_HIRE` in lib/contact-scrub (inlined: this module stays import-free for the node tests). */
 const MASKED = "[hidden until hire]";
 

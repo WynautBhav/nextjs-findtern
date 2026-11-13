@@ -28,8 +28,8 @@ import { hireFlowCounts } from "@/lib/employer-flow";
 import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
-import { cn } from "@/lib/utils";
 import { Cell, LeaderMark, MatrixRow, NumericRow, leaders } from "@/components/employer/compare/matrix";
+import { skillAlignment } from "@/components/employer/compare/skill-rows";
 
 export const metadata: Metadata = {
   title: "Compare candidates",
@@ -57,7 +57,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   const sp = await searchParams;
   // Opened from the sidebar (no `ids`), compare shows the candidates ticked
   // on the candidates page, and benchmarks against the project picked there.
-  const remembered = await rememberedSelection(session.uid);
+  const remembered = await rememberedSelection(session.uid, one(sp.project));
   const projectParam = one(sp.project) || remembered.project || undefined;
   const ids = (sp.ids !== undefined ? parseIds(sp.ids) : remembered.compare).slice(0, MAX_COMPARE);
   const skillsSet = sp.skills !== undefined;
@@ -208,7 +208,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   if (candidates.length === 0) {
     return (
       <div>
-        <RememberSelection employerId={session.uid} compare={ids} />
+        <RememberSelection employerId={session.uid} compare={ids} project={activeProject?.id ?? null} />
         <PageHead title="Compare candidates" lede={`Put up to ${MAX_COMPARE} candidates side by side.`} className="mb-4 lg:mb-5" />
         <CandidateTabs active="compare" shortlist={shortlistCount} compare={0} />
         <EmptyScene
@@ -221,9 +221,9 @@ export default async function CompareCandidates({ searchParams }: { searchParams
     );
   }
 
-  // Switching project re-benchmarks: its own skills apply, so typed ones are dropped.
+  // Switching project shows that project's own picks and its own skills (typed ones are dropped).
   function projectHref(projectId: string): string {
-    return `/employer/compare?${new URLSearchParams({ ids: ids.join(","), project: projectId }).toString()}`;
+    return `/employer/compare?${new URLSearchParams({ project: projectId }).toString()}`;
   }
 
   function removeHref(idToRemove: string): string {
@@ -236,7 +236,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   }
 
   const pricing = new Map(candidates.map((c) => [c.id, resolvePricing(c.score, plans, currency, region)]));
-  const wanted = new Set(requiredSkills.map((s) => s.trim().toLowerCase()).filter(Boolean));
+  const skillGrid = skillAlignment(requiredSkills, candidates);
   const nameOf = (skill: string) => skill.split(" · ")[0].trim();
   const fit = new Map(
     candidates.map((c) => {
@@ -480,32 +480,44 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               />
             ))}
 
-            <MatrixRow label="Skills" hint={wanted.size > 0 ? "Matches first, ticked" : "From their profile"}>
-              {candidates.map((c) => {
-                const skills = Array.from(new Set(c.skills.map(nameOf).filter(Boolean)));
-                const isMatch = (s: string) => wanted.has(s.toLowerCase());
-                // Matches first; a profile holds at most seven skills, so an older, longer list is cut to seven (+N).
-                const all = [...skills.filter(isMatch), ...skills.filter((s) => !isMatch(s))];
-                const ordered = all.slice(0, 7);
+            {/* One row per skill asked for, so a skill sits at the same height in every column; then whatever else each lists. */}
+            {skillGrid.rows.map((row, r) => (
+              <MatrixRow key={row.skill} label={row.skill} hint={r === 0 ? "Skill you asked for" : undefined}>
+                {candidates.map((c, i) => (
+                  <Cell key={c.id}>
+                    {row.has[i] ? (
+                      <span className="inline-flex items-center gap-1.5 font-medium text-ink-900">
+                        <Check className="size-4 shrink-0 text-brand-700" aria-hidden />
+                        Has it
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 text-text-subtle">
+                        <Minus className="size-4 shrink-0 text-ink-300" aria-hidden />
+                        Not listed
+                      </span>
+                    )}
+                  </Cell>
+                ))}
+              </MatrixRow>
+            ))}
+
+            <MatrixRow label={skillGrid.rows.length > 0 ? "Other skills" : "Skills"} hint={skillGrid.rows.length > 0 ? undefined : "From their profile"}>
+              {candidates.map((c, i) => {
+                const { skills, more } = skillGrid.other[i];
                 return (
                   <Cell key={c.id}>
-                    {ordered.length === 0 ? (
-                      <span className="text-text-subtle">None listed</span>
+                    {skills.length === 0 ? (
+                      <span className="text-text-subtle">{skillGrid.rows.length > 0 ? "None" : "None listed"}</span>
                     ) : (
                       <ul className="space-y-1">
-                        {ordered.map((skill) => (
-                          <li key={skill} className={cn("flex items-center gap-1.5", isMatch(skill) ? "font-medium text-ink-900" : "text-ink-700")}>
-                            {isMatch(skill) ? (
-                              <Check className="size-3.5 shrink-0 text-brand-700" aria-label="Matches" />
-                            ) : (
-                              <Minus className="size-3.5 shrink-0 text-ink-300" aria-hidden />
-                            )}
+                        {skills.map((skill) => (
+                          <li key={skill} className="text-ink-700">
                             {skill}
                           </li>
                         ))}
-                        {all.length > ordered.length ? (
+                        {more > 0 ? (
                           <li className="text-ink-700">
-                            +{all.length - ordered.length}
+                            +{more}
                             <span className="sr-only"> more skills</span>
                           </li>
                         ) : null}
