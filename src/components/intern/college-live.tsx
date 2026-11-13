@@ -10,6 +10,8 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { HEARTBEAT_MS } from "@/lib/college/constants";
 import { cn } from "@/lib/utils";
 import { PushToggle } from "./college-push";
+import { useDismissed } from "@/hooks/use-dismissed";
+import { driveBannerKey } from "@/lib/dismissed-keys";
 import { formatIstClock, shortDate } from "@/lib/format";
 
 /**
@@ -39,8 +41,9 @@ function whenLabel(startsAt: string, now: number): string {
   return `in ${mins} min`;
 }
 
-export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; vapidKey: string }) {
-  const [drive, setDrive] = useState<Drive | null>(null);
+export function CollegeLive({ collegeName, vapidKey, initialDrive = null }: { collegeName: string; vapidKey: string; initialDrive?: Drive | null }) {
+  // `initialDrive` is what the server saw; the first heartbeat confirms or replaces it.
+  const [drive, setDrive] = useState<Drive | null>(initialDrive);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const [now, setNow] = useState(() => Date.now());
@@ -97,31 +100,12 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
   // offer below the fold (QA-153).
   const full = /^\/intern\/college(\/|$)/.test(pathname ?? "");
   const onDriveRoute = /^\/intern\/(dashboard|opportunities)(\/|$)/.test(pathname ?? "");
-  // Per-session dismissal. `null` = client has not read storage yet, so the
-  // banner stays hidden (no flash, no layout shift after hydration).
-  const [bannerGone, setBannerGone] = useState<boolean | null>(null);
+  // Per-session dismissal (sessionStorage). The server renders the banner, so it is there from the first paint;
+  // DismissedGuard hides a dismissed one before paint and useDismissed removes it once hydrated.
   const driveId = drive?.id ?? null;
-  useEffect(() => {
-    if (!driveId) return;
-    let gone = false;
-    try {
-      gone = sessionStorage.getItem(`findtern:drive-banner:${driveId}`) === "1";
-    } catch {
-      /* storage blocked: show it */
-    }
-    const t = setTimeout(() => setBannerGone(gone), 0);
-    return () => clearTimeout(t);
-  }, [driveId]);
-  function closeBanner() {
-    setBannerGone(true);
-    try {
-      if (driveId) sessionStorage.setItem(`findtern:drive-banner:${driveId}`, "1");
-    } catch {
-      /* private mode: dismissed for this view only */
-    }
-  }
+  const [bannerGone, closeBanner] = useDismissed("session", driveId ? driveBannerKey(driveId) : null);
   // The College page keeps its full card (call alerts live there), never dismissed.
-  const showBanner = !!drive && (full || (bannerGone === false && onDriveRoute));
+  const showBanner = !!drive && (full || (!bannerGone && onDriveRoute));
   const visible = meetings.filter((m) => !dismissed.has(m.id));
   const current = visible[0] ?? null;
 
@@ -146,7 +130,7 @@ export function CollegeLive({ collegeName, vapidKey }: { collegeName: string; va
             <PushToggle vapidKey={vapidKey} className="shrink-0" />
           </div>
         ) : (
-          <div className="mb-6 flex items-center gap-1 rounded-apple-sm border border-brand-200 bg-brand-50 pl-4 text-sm text-brand-950">
+          <div data-dismiss="drive" suppressHydrationWarning className="mb-6 flex items-center gap-1 rounded-apple-sm border border-brand-200 bg-brand-50 pl-4 text-sm text-brand-950">
           <p className="flex min-h-11 min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-0.5 py-2">
             <span className="flex min-w-0 items-center gap-2 font-semibold">
               <span aria-hidden className="size-2 shrink-0 rounded-full bg-brand-600" />

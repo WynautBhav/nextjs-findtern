@@ -6,6 +6,7 @@ import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { ActivityList, ScoreScale, STAT_ROW, StatTile, Tile } from "@/components/app/tiles";
 import { buttonClass } from "@/components/ui/button";
 import { ActivationCard } from "@/components/intern/activation-card";
+import { DismissedGuard } from "@/components/dismissed-guard";
 import { GettingStarted } from "@/components/intern/getting-started";
 import { HiddenProfileBanner } from "@/components/intern/hidden-profile-banner";
 import { JoinGate } from "@/components/intern/ai-interview-join-card";
@@ -34,6 +35,7 @@ import { paymentsAreFree, testPayEnabled } from "@/lib/razorpay";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { profileCompletion } from "@/lib/onboarding";
 import { membershipOf } from "@/lib/college/membership";
+import { presenceNoticeKey } from "@/lib/dismissed-keys";
 import { paidSeatTotal } from "@/lib/college/seat-gate";
 import { listThreads } from "@/lib/messaging/store";
 
@@ -138,6 +140,7 @@ export default async function InternHome() {
 
   const openRoles = open.filter((p) => !data.proposals.some((mine) => mine.projectId === p.id));
 
+  const presenceOn = presenceRow?.show ?? true;
   const extra = data.onboarding?.extraData;
   const openToWork =
     !extra || typeof extra !== "object" || (extra as Record<string, unknown>).openToWork !== false;
@@ -517,7 +520,9 @@ export default async function InternHome() {
 
       <div className="space-y-4">
         {openToWork ? null : <HiddenProfileBanner />}
-        <PresenceNotice userId={session.uid} on={presenceRow?.show ?? true} />
+        <PresenceNotice userId={session.uid} on={presenceOn} />
+        {/* Hides a dismissed notice before first paint on a hard load (the notice is server-rendered). */}
+        {presenceOn ? <DismissedGuard store="local" storageKey={presenceNoticeKey(session.uid)} name="presence" /> : null}
         {gettingStarted ? (
           <GettingStarted
             completion={completion}

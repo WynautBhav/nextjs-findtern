@@ -23,6 +23,9 @@ import { MessagingLive } from "@/components/messaging";
 import { TermsGate } from "@/components/app/terms-gate";
 import { ToastProvider } from "@/components/app/toast";
 import { CollegeLive } from "@/components/intern/college-live";
+import { DismissedGuard } from "@/components/dismissed-guard";
+import { driveBannerKey } from "@/lib/dismissed-keys";
+import { liveDriveFor } from "@/lib/college/live-drive";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { membershipOf } from "@/lib/college/membership";
@@ -106,6 +109,8 @@ export default async function InternLayout({ children }: { children: React.React
     // Only college members heartbeat; "View as" must not mark the student online.
     session.impersonator ? null : membershipOf(session.uid).catch(() => null),
   ]);
+  // The drive banner is rendered by the server too, so it is in the first paint instead of arriving with the first heartbeat.
+  const liveDrive = college?.isPartner ? await liveDriveFor(college.collegeId).catch(() => null) : null;
   const action = nextAction(data.thread);
   const attentionHrefs = action ? [action.href ?? "/intern/dashboard"] : [];
 
@@ -151,8 +156,10 @@ export default async function InternLayout({ children }: { children: React.React
         <CollegeLive
           collegeName={college.name}
           vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
+          initialDrive={liveDrive ? { id: liveDrive.id, title: liveDrive.title, endsAt: liveDrive.endsAt.toISOString() } : null}
         />
       ) : null}
+      {liveDrive ? <DismissedGuard store="session" storageKey={driveBannerKey(liveDrive.id)} name="drive" /> : null}
       <MessagingLive />
       {children}
       <TermsGate role="intern" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />

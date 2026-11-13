@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { requireMutation } from "@/lib/guards-mutation";
+import { liveDriveFor } from "@/lib/college/live-drive";
 import { meetingsForStudent } from "@/lib/college/meetings";
 import { getDb, schema } from "@/lib/db";
 
@@ -30,25 +31,10 @@ export async function POST(req: Request) {
     .values({ userId: uid, collegeId: m.collegeId, lastSeenAt: sql`now()` })
     .onConflictDoUpdate({ target: schema.collegePresence.userId, set: { lastSeenAt: sql`now()`, collegeId: m.collegeId } });
 
-  const [drive] = await db
-    .select({ id: schema.collegeDrives.id, title: schema.collegeDrives.title, endsAt: schema.collegeDrives.endsAt })
-    .from(schema.collegeDrives)
-    // A switched-off college announces no drive (QA-201).
-    .innerJoin(schema.colleges, and(eq(schema.colleges.id, schema.collegeDrives.collegeId), eq(schema.colleges.isActive, true)))
-    .where(
-      and(
-        eq(schema.collegeDrives.collegeId, m.collegeId),
-        isNull(schema.collegeDrives.revokedAt),
-        // timestamp columns hold UTC wall time; a bare now() would read them in the DB session zone.
-        lte(schema.collegeDrives.startsAt, sql`(now() AT TIME ZONE 'UTC')`),
-        gt(schema.collegeDrives.endsAt, sql`(now() AT TIME ZONE 'UTC')`),
-      ),
-    )
-    .orderBy(schema.collegeDrives.endsAt)
-    .limit(1);
+  const drive = await liveDriveFor(m.collegeId);
 
   return NextResponse.json(
-    { college: m.collegeId, drive: drive ?? null, meetings: await meetingsForStudent(uid) },
+    { college: m.collegeId, drive, meetings: await meetingsForStudent(uid) },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
