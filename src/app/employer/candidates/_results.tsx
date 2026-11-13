@@ -125,7 +125,7 @@ export function ToolbarSort({ data, filters, className }: { data: CandidatesData
     const next = new URLSearchParams({ project: id });
     return `/employer/candidates?${next.toString()}`;
   };
-  const select = "h-11 rounded-xl border-ink-200 bg-white pl-3.5 [field-sizing:content] sm:h-9 sm:min-h-9 sm:touch:h-11";
+  const select = "h-11 min-w-0 rounded-xl border-ink-200 bg-white pl-3.5 max-sm:max-w-[9rem] [field-sizing:content] sm:h-9 sm:min-h-9 sm:touch:h-11";
   return (
     <div className={cn("flex min-w-0 max-w-full items-center gap-2", className)}>
       {data.projects.length > 1 && data.activeProjectId ? (
