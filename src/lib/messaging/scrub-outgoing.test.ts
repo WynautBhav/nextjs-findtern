@@ -148,3 +148,11 @@ test("deny list: company without its legal suffix, short words skipped, common-w
   assert.ok(!t.includes("ng") && !t.includes("al") && !t.includes("pi"), "one- and two-letter parts are skipped");
   assert.equal(scrubOutgoing("I will start Monday", t).changed, false);
 });
+
+test("digits in a company name never mask plain numbers in chat", () => {
+  const t = denyTermsFor({ company: "Acme 2026 Labs", internFirst: "Asha", internLast: "Rao" });
+  assert.ok(t.includes("acme 2026 labs"));
+  assert.ok(!t.includes("2026"));
+  assert.equal(scrubOutgoing("Start date is 2026-12-01, 3 months", t).changed, false);
+  assert.ok(scrubOutgoing("I work at Acme 2026 Labs", t).changed);
+});

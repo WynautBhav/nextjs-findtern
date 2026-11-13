@@ -213,7 +213,8 @@ const foldName = (s: string): string =>
     .replace(/\s+/g, " ")
     .trim();
 
-const nameTokens = (s: string): string[] => foldName(s).split(/[^\p{L}\p{N}]+/u).filter((t) => t.length >= 3);
+// Single words are letters only: "2026" or "3m" in a company name must not mask ordinary numbers in chat (the whole phrase still does).
+const nameTokens = (s: string): string[] => foldName(s).split(/[^\p{L}\p{N}]+/u).filter((t) => t.length >= 3 && /^\p{L}+$/u.test(t));
 
 // Words in a company name that say what it does, not who it is, plus first names that are also plain English.
 const GENERIC_COMPANY_WORDS = new Set(
@@ -246,7 +247,7 @@ export function denyTermsFor(input: { company?: string | null; employerNames?: (
     .filter((w) => w && !LEGAL_SUFFIXES.has(w));
   if (coreWords.join(" ").length >= 3) out.add(coreWords.join(" "));
   // The distinctive word of a multi-word name on its own ("Acme" of "Acme Technologies").
-  for (const w of coreWords) if (w.length >= 4 && !GENERIC_COMPANY_WORDS.has(w)) out.add(w);
+  for (const w of coreWords) if (w.length >= 4 && /^\p{L}+$/u.test(w) && !GENERIC_COMPANY_WORDS.has(w)) out.add(w);
   for (const n of input.employerNames ?? []) person(n);
   person(input.internFirst);
   person(input.internLast);
