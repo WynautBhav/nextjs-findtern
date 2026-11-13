@@ -143,7 +143,7 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                           {h.ledger.nextDue < today ? (
                             <>
                               <span className="font-medium text-danger">Overdue since {formatDate(h.ledger.nextDue)}</span>
-                              {payable ? (
+                              {pay.show && pay.enabled ? (
                                 <>
                                   {" · "}
                                   <Link href={payHref(h)} className={INLINE_LINK}>
