@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, Search, X } from "lucide-react";
+import { ChevronDown, LayoutGrid, List, Search, X } from "lucide-react";
 
 import { redactForEmployer } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
@@ -139,7 +139,42 @@ export function ToolbarSort({ data, filters, className }: { data: CandidatesData
         />
       ) : null}
       {saved ? null : <SortSelect className={select} value={sortValue} options={sortOptions(filters)} />}
+      <ViewToggle filters={filters} />
     </div>
+  );
+}
+
+/**
+ * List (the full-width cards) or Grid (compact cards, two or three across). The choice rides in
+ * the URL (`view=grid`), so every link on the page keeps it; it is a display choice, not a filter.
+ */
+function ViewToggle({ filters }: { filters: Filters }) {
+  const options = [
+    { view: "list" as const, label: "List view", Icon: List },
+    { view: "grid" as const, label: "Grid view", Icon: LayoutGrid },
+  ];
+  return (
+    <nav aria-label="Layout" className="flex shrink-0 items-center gap-0.5 rounded-xl border border-ink-200 bg-white p-0.5">
+      {options.map(({ view, label, Icon }) => {
+        const active = filters.view === view;
+        return (
+          <Link
+            key={view}
+            href={withFilters(filters, { view, page: "" })}
+            scroll={false}
+            aria-label={label}
+            aria-current={active ? "true" : undefined}
+            title={label}
+            className={cn(
+              "grid size-10 place-items-center rounded-[10px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 sm:size-8 sm:touch:size-11",
+              active ? "bg-ink-900 text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
+            )}
+          >
+            <Icon className="size-4" aria-hidden />
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -258,7 +293,10 @@ export function Results({
       ) : (
         <>
           <ScoreLegend />
-          <ul aria-label="Candidates" className="mt-3 flex flex-col gap-4 lg:mt-1 lg:gap-5">
+          <ul
+            aria-label="Candidates"
+            className={cn("mt-3 lg:mt-1", filters.view === "grid" ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-3" : "flex flex-col gap-4 lg:gap-5")}
+          >
             {candidates.map((candidate) => {
               const rel = data.relations.get(candidate.id);
               return (
@@ -281,6 +319,7 @@ export function Results({
                   presence={data.presence[candidate.id] ?? null}
                   interested={data.saved.has(candidate.id)}
                   pendingMeetingAt={rel?.pendingMeetingAt ?? null}
+                  layout={filters.view}
                 />
               );
             })}

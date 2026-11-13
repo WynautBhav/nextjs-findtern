@@ -11,7 +11,8 @@ import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates"
 import { resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
 import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
-import { skillLead, studyOf } from "@/components/employer/candidate-view";
+import { skillLead, studyOf, type ListView } from "@/components/employer/candidate-view";
+import { CandidateQuickView } from "@/components/employer/candidate-quick-view";
 import { Pill } from "@/components/app/primitives";
 import { skillMatch } from "@/components/app/skill-match";
 import { SendProposalHold } from "@/components/employer/send-proposal-hold";
@@ -45,6 +46,8 @@ export interface CandidateCardProps {
   interested?: boolean;
   /** ISO time of a booked meeting that still holds the candidate: "Send proposal" waits for it. */
   pendingMeetingAt?: string | null;
+  /** "list" (default): the full-width card. "grid": the compact one, two or three across. */
+  layout?: ListView;
 }
 
 /**
@@ -127,7 +130,7 @@ function CompareToggle({ href, selected, name }: { href: string | null; selected
     </span>
   );
   const cls =
-    "relative z-10 inline-flex h-11 shrink-0 items-center gap-2 rounded-xl border px-3 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:h-10 sm:touch:h-11";
+    "relative z-10 inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:h-10 sm:touch:h-11";
   if (!href) {
     return (
       <span aria-disabled="true" title="Compare holds four. Remove one to add another." className={cn(cls, "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-500")}>
@@ -172,6 +175,7 @@ export function CandidateCard({
   presence = null,
   interested = false,
   pendingMeetingAt = null,
+  layout = "list",
 }: CandidateCardProps) {
   const pricing = resolved ?? resolvePricing(candidate.score, [], currency, region);
   const displayName = displayNameOf(candidate, nameUnlocked);
@@ -205,6 +209,90 @@ export function CandidateCard({
 
   const wanted = skillMatch(candidate.skills, wantedSkills);
   const cellLabel = "text-[11px] font-semibold uppercase tracking-wider text-text-subtle";
+  const quickView = (
+    <CandidateQuickView candidate={candidate} displayName={displayName} place={place} currency={currency} pricing={pricing} wantedSkills={wantedSkills} profileHref={profileHref} />
+  );
+
+  if (layout === "grid") {
+    // The compact card: who, the two numbers that decide a shortlist, the skills, then the actions.
+    return (
+      <li className="group/row relative flex min-w-0 flex-col gap-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-xs transition-colors hover:border-ink-300">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-3">
+            <RowAvatar square photoUrl={candidate.photoUrl} initials={candidate.initials} seed={candidate.id} presence={presence} />
+            <div className="min-w-0">
+              <h3 className="break-words text-base font-bold leading-6 text-ink-900">{displayName}</h3>
+              <p className="mt-0.5 flex items-center gap-1 text-sm text-ink-600">
+                <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+                <span className="min-w-0 truncate">{place}</span>
+              </p>
+            </div>
+          </div>
+          {canSave && projectId ? (
+            <div className="relative z-10 shrink-0">
+              <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} name={displayName} />
+            </div>
+          ) : null}
+        </div>
+
+        {status || interested ? (
+          <div className="flex flex-wrap gap-1.5">
+            {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
+            {interested ? (
+              <Pill tone="live" className="shrink-0 whitespace-nowrap">
+                Interested in this role
+              </Pill>
+            ) : null}
+          </div>
+        ) : null}
+
+        {headline ? <p className="line-clamp-2 text-pretty text-sm font-semibold leading-snug text-ink-900">{headline}</p> : null}
+        {wanted.total > 0 ? (
+          <p className="-mt-1.5 text-xs text-ink-600">
+            <span className="nums font-medium text-ink-900">{wanted.matched.length} of {wanted.total}</span> skills you asked for
+          </p>
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-3 rounded-xl border border-ink-200 bg-ink-50 p-3">
+          <div className="flex flex-col gap-1">
+            <span className={cellLabel}>Findtern Score</span>
+            <ScoreBadge size="cell" score={candidate.score} scored={candidate.scored} />
+          </div>
+          <div className="flex flex-col gap-1 border-l border-ink-200 pl-3">
+            <span className={cn(cellLabel, "whitespace-nowrap")}>Hourly rate</span>
+            <p className="nums flex items-baseline gap-1 text-lg font-bold leading-7 text-ink-900">
+              {formatMoney(pricing.hourlyRateMinor, currency)}
+              <span className="text-xs font-normal text-text-subtle">/ hr</span>
+            </p>
+          </div>
+        </div>
+
+        <SkillChips skills={candidate.skills} wanted={wantedSkills} skip={lead ? candidate.skills.length - rest.length : 0} />
+
+        <div className="mt-auto flex flex-col gap-2 border-t border-ink-100 pt-3">
+          <div className="flex flex-wrap items-center gap-2 [&>*]:flex-1">
+            <CompareToggle href={compareHref} selected={selected} name={displayName} />
+            {quickView}
+          </div>
+          <div className="flex flex-wrap items-center gap-2 [&>*]:flex-1">
+            <Link
+              href={profileHref}
+              aria-label={`View profile of ${displayName}`}
+              className={buttonClass({
+                variant: "outline",
+                size: "sm",
+                className:
+                  "h-11 rounded-xl sm:h-10 sm:touch:h-11 after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500",
+              })}
+            >
+              View profile
+            </Link>
+            {primary}
+          </div>
+        </div>
+      </li>
+    );
+  }
 
   return (
     <li className="group/row relative flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-4 shadow-xs transition-colors hover:border-ink-300 sm:gap-5 sm:p-6">
@@ -290,7 +378,8 @@ export function CandidateCard({
         ) : (
           <span />
         )}
-        <div className="flex items-center gap-2 max-sm:w-full max-sm:justify-end">
+        <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:justify-end">
+          {quickView}
           <Link
             href={profileHref}
             aria-label={`View profile of ${displayName}`}
