@@ -84,8 +84,15 @@ const STYLE = `
 .btn{width:100%!important}
 .code{font-size:32px!important}
 }
+/* Phones only: facts stack label over value (a right-aligned value that wraps reads as a ragged edge). */
+@media (max-width:480px){
+.fr{display:block!important;border-bottom:1px solid #dee6e2!important}
+.fk{display:block!important;width:auto!important;padding:12px 0 0!important;border-bottom:0!important}
+.fv{display:block!important;width:auto!important;text-align:left!important;padding:2px 0 12px!important;border-bottom:0!important}
+}
 .logo-dark{display:none;max-height:0;overflow:hidden;mso-hide:all}
 @media (prefers-color-scheme:dark){
+.fr{border-color:#0a4a39!important}
 .bg-page{background-color:#041d17!important}
 .bg-card{background-color:#072f24!important;border-color:#0a4a39!important}
 .t-ink{color:#f7faf9!important}
@@ -126,11 +133,11 @@ export function renderEmail(c: EmailContent): { subject: string; text: string; h
   ].join("\n");
 
   const p = (s: string, strong = false) =>
-    `<p class="${strong ? "t-ink" : "t-body"}" style="margin:16px 0 0;font-size:16px;line-height:26px;color:${strong ? INK : BODY};">${esc(s)}</p>`;
+    `<p class="${strong ? "t-ink" : "t-body"}" style="margin:16px 0 0;font-size:16px;line-height:26px;color:${strong ? INK : BODY};word-break:break-word;overflow-wrap:anywhere;">${esc(s)}</p>`;
 
   const bullets = c.bullets?.length
     ? `<ul class="t-body" style="margin:16px 0 0;padding:0 0 0 22px;font-size:16px;line-height:26px;color:${BODY};">${c.bullets
-        .map((b) => `<li style="margin:0 0 6px;padding:0;">${esc(b)}</li>`)
+        .map((b) => `<li style="margin:0 0 6px;padding:0;word-break:break-word;overflow-wrap:anywhere;">${esc(b)}</li>`)
         .join("")}</ul>`
     : "";
 
@@ -149,7 +156,7 @@ export function renderEmail(c: EmailContent): { subject: string; text: string; h
             : isMoney(v)
               ? `<span class="amt" style="font-size:18px;line-height:26px;color:${BRAND};">${esc(v)}</span>`
               : esc(v);
-          return `<tr><td class="line t-muted" valign="top" style="width:38%;padding:12px 16px 12px 0;border-bottom:1px solid ${LINE};font-size:15px;line-height:24px;color:${MUTED};">${esc(k)}</td><td class="line t-ink" align="right" valign="top" style="padding:12px 0;border-bottom:1px solid ${LINE};font-size:15px;line-height:24px;font-weight:600;color:${INK};text-align:right;word-break:break-word;font-variant-numeric:tabular-nums;">${value}</td></tr>`;
+          return `<tr class="fr"><td class="fk line t-muted" valign="top" style="width:38%;padding:12px 16px 12px 0;word-break:break-word;overflow-wrap:anywhere;border-bottom:1px solid ${LINE};font-size:15px;line-height:24px;color:${MUTED};">${esc(k)}</td><td class="fv line t-ink" align="right" valign="top" style="padding:12px 0;border-bottom:1px solid ${LINE};font-size:15px;line-height:24px;font-weight:600;color:${INK};text-align:right;word-break:break-word;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;">${value}</td></tr>`;
         })
         .join("")}</table>`
     : "";
@@ -170,6 +177,12 @@ export function renderEmail(c: EmailContent): { subject: string; text: string; h
     ? `<div style="display:none;font-size:1px;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;">${esc(preheaderText)}${"&#847;&zwnj;&nbsp;".repeat(40)}</div>`
     : "";
 
+  // "...in your notification settings: <url>" reads as a link, not a pasted address. The text part keeps the full URL.
+  const settings = reason.match(/^([\s\S]*?)\bnotification settings:\s*(https?:\/\/\S+)$/);
+  const reasonHtml = settings
+    ? `${esc(settings[1])}<a class="t-link" href="${esc(settings[2])}" style="color:${BRAND};text-decoration:underline;">notification settings</a>.`
+    : esc(reason);
+
   const logoStyle = `display:block;border:0;outline:none;text-decoration:none;font-family:${FONT};font-size:24px;line-height:42px;font-weight:600;color:${BRAND};`;
   const html = `<!doctype html>
 <html lang="en" xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark"><meta name="x-apple-disable-message-reformatting"><meta http-equiv="X-UA-Compatible" content="IE=edge"><title>${esc(c.subject)}</title>
@@ -178,12 +191,12 @@ export function renderEmail(c: EmailContent): { subject: string; text: string; h
 <style>${STYLE}</style></head>
 <body class="bg-page" style="margin:0;padding:0;background-color:#edf2ef;font-family:${FONT};-webkit-text-size-adjust:100%;">
 ${preheader}
-<table role="presentation" class="bg-page" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#edf2ef;"><tr><td align="center" style="padding:28px 12px;">
+<table role="presentation" class="bg-page" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color:#edf2ef;"><tr><td align="center" style="padding:28px 12px;font-family:${FONT};">
 <!--[if mso]><table role="presentation" width="600" align="center" cellspacing="0" cellpadding="0" border="0"><tr><td><![endif]-->
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width:600px;">
 <tr><td style="padding:0 4px 20px;"><a href="${site}" style="text-decoration:none;"><img class="logo-light" src="${site}/media/findtern-email-logo.png" width="140" height="42" alt="Findtern" style="${logoStyle}"><img class="logo-dark" src="${site}/media/findtern-email-logo-white.png" width="140" height="42" alt="Findtern" style="display:none;max-height:0;overflow:hidden;mso-hide:all;border:0;font-family:${FONT};font-size:24px;line-height:42px;font-weight:600;color:#f7faf9;"></a></td></tr>
 <tr><td class="bg-card px" align="left" bgcolor="#ffffff" style="background-color:#ffffff;border:1px solid ${LINE};border-radius:16px;padding:36px 32px;font-family:${FONT};">
-<h1 class="h1 t-ink" style="margin:0;font-size:24px;line-height:32px;font-weight:600;color:${INK};">${esc(c.heading)}</h1>
+<h1 class="h1 t-ink" style="margin:0;font-size:24px;line-height:32px;font-weight:600;color:${INK};word-break:break-word;overflow-wrap:anywhere;">${esc(c.heading)}</h1>
 ${p(c.greeting, true)}
 ${c.lines.map((l) => p(l)).join("\n")}
 ${bullets}
@@ -193,7 +206,7 @@ ${status}
 ${cta}
 <p class="t-body" style="margin:32px 0 0;font-size:16px;line-height:26px;color:${BODY};">Best,<br>Team Findtern</p>
 </td></tr>
-<tr><td class="t-muted" style="padding:20px 4px 0;font-size:13px;line-height:20px;color:${MUTED};"><strong class="t-ink" style="color:${INK};font-weight:600;">Findtern</strong><br>${esc(reason)}<br><a class="t-link" href="${site}/contact" style="color:${BRAND};text-decoration:underline;">Contact us</a> &nbsp;·&nbsp; <a class="t-link" href="${site}" style="color:${BRAND};text-decoration:underline;">${esc(host)}</a></td></tr>
+<tr><td class="t-muted" style="padding:20px 4px 0;font-family:${FONT};font-size:13px;line-height:20px;color:${MUTED};"><strong class="t-ink" style="color:${INK};font-weight:600;">Findtern</strong><br>${reasonHtml}<br><a class="t-link" href="${site}/contact" style="color:${BRAND};text-decoration:underline;">Contact us</a> &nbsp;·&nbsp; <a class="t-link" href="${site}" style="color:${BRAND};text-decoration:underline;">${esc(host)}</a></td></tr>
 </table>
 <!--[if mso]></td></tr></table><![endif]-->
 </td></tr></table></body></html>`;
@@ -540,8 +553,8 @@ export const emails = {
       ["Timezone", o.timezone],
       ["Shift", `${o.shiftFrom} - ${o.shiftTo}`],
       ["Annual CTC", `${o.ctcCurrency} ${o.annualCtc}`],
-      ["Offer letter", o.offerLetterUrl],
     ],
+    cta: { label: "Open offer letter", url: o.offerLetterUrl },
     reason: INTERNAL_REASON,
   }),
 
