@@ -116,7 +116,6 @@ export default async function EmployerInternDetail({
     if (user && (adminViewing || (await canEmployerSeeIntern(db, employerId, id)))) {
       visible = true;
       const remembered = await rememberedSelection(employerId);
-      comparePicks = remembered.compare;
       // `?project=` keeps the shortlist on the project the employer was
       // browsing; then the one picked on the candidates page; then the
       // newest open one (EMH-15).
@@ -146,6 +145,8 @@ export default async function EmployerInternDetail({
           )
           .limit(1);
         shortlist = { projectId: project.id, on: Boolean(item) };
+        // Compare picks are kept per project: this project's, the one the shortlist and Compare act on.
+        comparePicks = remembered.compareByProject[project.id] ?? [];
       }
       // One view per employer per day feeds the intern's monthly views summary,
       // and tells the intern (legacy "Spotlight" notice, once per employer/day).
@@ -484,7 +485,7 @@ export default async function EmployerInternDetail({
                 <ShortlistToggle internId={profile.id} projectId={shortlist.projectId} shortlisted={shortlist.on} />
               ) : null}
               {/* EMB-12: hires and full-time offers are not compared (legacy). */}
-              {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} picked={comparePicks} />}
+              {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} projectId={shortlist?.projectId ?? null} picked={comparePicks} />}
             </div>
 
             {appliedProjects.length > 0 ? (

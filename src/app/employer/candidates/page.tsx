@@ -53,14 +53,15 @@ export default async function CandidatesPage({
 
   const filters = readFilters(params);
   // The project and compare picks carry over from the last visit (cookie)
-  // unless the URL names them.
-  const remembered = await rememberedSelection(uid);
+  // unless the URL names them. Picks belong to a project: this project's own.
+  const remembered = await rememberedSelection(uid, filters.project);
   if (!filters.idsSet) filters.ids = remembered.compare;
   if (!filters.project && remembered.project) filters.project = remembered.project;
 
   const [data, flow] = await Promise.all([
     loadCandidates(uid, filters, {
-      hasFilterParams: FILTER_KEYS.some((key) => params[key as keyof SearchParams] !== undefined),
+      // A link that names the view is not a bare visit: restoring the remembered filters would drop it.
+      hasFilterParams: params.view !== undefined || FILTER_KEYS.some((key) => params[key as keyof SearchParams] !== undefined),
       fresh: one(params.fresh) === "1",
     }),
     hireFlowCountsFor(uid),
@@ -132,7 +133,7 @@ export default async function CandidatesPage({
             filters={filters}
             className="col-span-2 row-start-3 mb-1 lg:border-t lg:border-ink-100 lg:pt-3"
           />
-          <ToolbarSort data={data} filters={filters} compareIds={compareIds} className="col-span-2 col-start-1 row-start-4 justify-self-end lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:justify-self-auto" />
+          <ToolbarSort data={data} filters={filters} className="col-span-2 col-start-1 row-start-4 justify-self-end lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:justify-self-auto" />
         </div>
 
         {/* The real count above the columns. Phones: left of Sort on the same line. */}

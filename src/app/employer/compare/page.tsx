@@ -57,7 +57,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   const sp = await searchParams;
   // Opened from the sidebar (no `ids`), compare shows the candidates ticked
   // on the candidates page, and benchmarks against the project picked there.
-  const remembered = await rememberedSelection(session.uid);
+  const remembered = await rememberedSelection(session.uid, one(sp.project));
   const projectParam = one(sp.project) || remembered.project || undefined;
   const ids = (sp.ids !== undefined ? parseIds(sp.ids) : remembered.compare).slice(0, MAX_COMPARE);
   const skillsSet = sp.skills !== undefined;
@@ -208,7 +208,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   if (candidates.length === 0) {
     return (
       <div>
-        <RememberSelection employerId={session.uid} compare={ids} />
+        <RememberSelection employerId={session.uid} compare={ids} project={activeProject?.id ?? null} />
         <PageHead title="Compare candidates" lede={`Put up to ${MAX_COMPARE} candidates side by side.`} className="mb-4 lg:mb-5" />
         <CandidateTabs active="compare" shortlist={shortlistCount} compare={0} />
         <EmptyScene
@@ -221,9 +221,9 @@ export default async function CompareCandidates({ searchParams }: { searchParams
     );
   }
 
-  // Switching project re-benchmarks: its own skills apply, so typed ones are dropped.
+  // Switching project shows that project's own picks and its own skills (typed ones are dropped).
   function projectHref(projectId: string): string {
-    return `/employer/compare?${new URLSearchParams({ ids: ids.join(","), project: projectId }).toString()}`;
+    return `/employer/compare?${new URLSearchParams({ project: projectId }).toString()}`;
   }
 
   function removeHref(idToRemove: string): string {

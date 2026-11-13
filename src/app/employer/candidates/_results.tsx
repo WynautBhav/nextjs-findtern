@@ -117,12 +117,12 @@ export function ActiveFilters({ data, filters, className }: { data: CandidatesDa
  * Sort and the project picker, inside the toolbar card (beside the search at lg; its own row on a phone,
  * where the project lives in the Filters sheet). Sort is hidden on the shortlist tab, as before.
  */
-export function ToolbarSort({ data, filters, compareIds, className }: { data: CandidatesData; filters: Filters; compareIds: string[]; className?: string }) {
+export function ToolbarSort({ data, filters, className }: { data: CandidatesData; filters: Filters; className?: string }) {
   const saved = filters.saved && Boolean(data.activeProjectId);
   const sortValue = filters.sorts[0] ? `${filters.sorts[0]}${filters.dir === "asc" ? ":asc" : ""}` : "";
   const projectKeep = (id: string) => {
+    // No `ids`: each project keeps its own compare picks, so the new project shows its own.
     const next = new URLSearchParams({ project: id });
-    if (compareIds.length > 0) next.set("ids", compareIds.join(","));
     return `/employer/candidates?${next.toString()}`;
   };
   const select = "h-11 rounded-xl border-ink-200 bg-white pl-3.5 [field-sizing:content] sm:h-9 sm:min-h-9 sm:touch:h-11";

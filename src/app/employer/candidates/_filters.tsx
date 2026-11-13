@@ -63,6 +63,7 @@ export function FilterColumn({
     >
       <FilterPanel key={queryOf(filters)} activeCount={activeFilterCount(filters, effectiveSkills, projectCity)} total={total}>
         {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
+        {filters.view === "grid" ? <input type="hidden" name="view" value="grid" /> : null}
         {!filters.projectDefaults ? <input type="hidden" name="pf" value="0" /> : null}
         {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}
         {filters.skillsSet ? <input type="hidden" name="skills" value={filters.skills.join(",")} /> : null}
