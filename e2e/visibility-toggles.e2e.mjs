@@ -154,6 +154,22 @@ for (const name of browsers) {
             assert.equal(await sw.getAttribute("aria-busy"), null);
           });
 
+          test("(b) aria-checked and the switch's data-state do not show the new state before the response", async () => {
+            let responded = false;
+            const sw = await open(async (route) => {
+              if (route.request().method() !== "POST") return route.continue();
+              await new Promise((r) => setTimeout(r, HOLD_MS));
+              responded = true;
+              await route.continue();
+            });
+            await sw.click();
+            await page.waitForTimeout(PENDING_BUDGET_MS + 100);
+            assert.equal(responded, false, "the response is still being held");
+            assert.equal(await sw.getAttribute("aria-checked"), String(start), "aria-checked is still the stored state");
+            assert.equal(await sw.getAttribute("data-state"), start ? "checked" : "unchecked", "data-state is still the stored state");
+            await page.waitForTimeout(HOLD_MS + 600);
+          });
+
           for (const [kind, handler] of [
             ["rejected (500)", async (route) => { if (route.request().method() !== "POST") return route.continue(); await new Promise((r) => setTimeout(r, 600)); await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify(c.reject) }); }],
             ["offline (aborted)", async (route) => { if (route.request().method() !== "POST") return route.continue(); await new Promise((r) => setTimeout(r, 600)); await route.abort("failed"); }],
