@@ -592,7 +592,7 @@
   }
   .admin-arrive {
     animation: admin-arrive var(--duration-admin-base) var(--ease-out-soft) backwards;
-    animation-delay: calc(min(var(--i, 0), 8) * 30ms);
+    animation-delay: calc(min(var(--i, 0), 4) * 30ms);
   }
   @media (prefers-reduced-motion: reduce) {
     .admin-arrive {
@@ -624,7 +624,7 @@
     animation-duration: var(--duration-admin-slow);
     animation-timing-function: var(--ease-out-soft);
     animation-fill-mode: backwards;
-    animation-delay: calc(min(var(--i, 0), 8) * 40ms);
+    animation-delay: calc(min(var(--i, 0), 3) * 40ms);
   }
   .admin-reveal[data-axis="x"] {
     transform-origin: left center;
@@ -1877,7 +1877,7 @@ html {
   /* Stagger: set --i on each item. 42ms apart, capped by the caller. */
   .rise {
     animation: rise-in 300ms var(--ease-out-soft, cubic-bezier(0.22, 1, 0.36, 1)) both;
-    animation-delay: calc(var(--i, 0) * 42ms);
+    animation-delay: calc(min(var(--i, 0), 3) * 42ms);
   }
   .glow-drift {
     animation: glow-drift 14s ease-in-out infinite;

@@ -135,6 +135,10 @@ function parseDecls(text) {
       items.push({ kind: m[1] === "transition" ? "css transition" : "css animation", ms: all[0], delay: all[1] ?? 0, easing: part, text: `${m[1]}: ${part.trim()}`, index: m.index });
     }
   }
+  // animation-delay: calc(min(var(--i, 0), N) * Tms) is a stagger capped at N steps; calc(var(--i, 0) * Tms) is uncapped (counted as 8).
+  for (const m of text.matchAll(/animation-delay\s*:\s*calc\(\s*(min\(\s*var\(--i[^)]*\)\s*,\s*(\d+)\s*\)|var\(--i[^)]*\))\s*\*\s*([\d.]+)(ms|s)\s*\)/g)) {
+    items.push({ kind: "css stagger", ms: 0, delay: (m[2] ? Number(m[2]) : 8) * msOf(m[3], m[4]), text: m[0], index: m.index });
+  }
   for (const m of text.matchAll(/(?:animation-delay|animationDelay)\s*:\s*["'`]?\s*([\d.]+)(ms|s)/g)) items.push({ kind: "css delay", ms: 0, delay: msOf(m[1], m[2]), text: m[0], index: m.index });
   return items;
 }
