@@ -1,40 +1,44 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
-import { ArrowLeft, Check, Minus, Send, X } from "lucide-react";
+import { ArrowLeft, Check, Minus, Plus } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
-import { formatDate, formatMoney, formatRate } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { RATING_META, displayNameOf, preferredCities, redactForEmployer, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { shortlistProjectsByIntern } from "@/lib/employer-shortlist";
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
 import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
-import { RowAvatar } from "@/components/employer/candidate-row-parts";
-import { SendProposalHold } from "@/components/employer/send-proposal-hold";
-import { planNameFor } from "@/lib/score";
-import { SaveToggle } from "@/components/employer/candidate-card";
+import { HOURS_PER_MONTH } from "@/lib/plan-offer";
+import { bandFor, planNameFor } from "@/lib/score";
 import { studyOf } from "@/components/employer/candidate-view";
 import { SortSelect } from "../candidates/_sort-select";
-import { candidateStatusPill, proposalActionLabel } from "@/components/employer/candidate-status";
+import { candidateStatusPill } from "@/components/employer/candidate-status";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
 import { SkillFilter } from "@/components/employer/skill-filter";
 import { RememberSelection } from "@/components/employer/remember-selection";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedSelection } from "@/lib/employer-selection";
-import { ButtonLink } from "@/components/ui/button";
-import { CandidateTabs } from "@/components/employer/section-tabs";
+import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { hireFlowCounts } from "@/lib/employer-flow";
-import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
+import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
-import { Cell, LeaderMark, MatrixRow, NumericRow, leaders } from "@/components/employer/compare/matrix";
+import { BestBadge, Cell, MatrixRow, MetricCell, SectionRow } from "@/components/employer/compare/matrix";
+import { CompareHeadCell } from "@/components/employer/compare/head-cell";
+import { CompareTabs } from "@/components/employer/compare/compare-tabs";
+import { isLevel, leaders } from "@/components/employer/compare/leaders";
+import { ScrollRegion } from "./scroll-region";
 import { skillAlignment } from "@/components/employer/compare/skill-rows";
 
 export const metadata: Metadata = {
   title: "Compare candidates",
   robots: { index: false, follow: false },
 };
+
+/** The same heading size and spacing as the Candidates page. */
+const HEAD_CLASS = "mb-3 sm:mb-4 lg:mb-5 [&_h1]:text-[32px] [&_h1]:leading-10";
 
 type Search = { ids?: string | string[]; project?: string | string[]; skills?: string | string[] };
 
@@ -209,8 +213,8 @@ export default async function CompareCandidates({ searchParams }: { searchParams
     return (
       <div>
         <RememberSelection employerId={session.uid} compare={ids} project={activeProject?.id ?? null} />
-        <PageHead title="Compare candidates" lede={`Put up to ${MAX_COMPARE} candidates side by side.`} className="mb-4 lg:mb-5" />
-        <CandidateTabs active="compare" shortlist={shortlistCount} compare={0} />
+        <PageHead title="Compare candidates" lede={`Put up to ${MAX_COMPARE} candidates side by side.`} className={HEAD_CLASS} />
+        <CompareTabs shortlist={shortlistCount} compare={0} />
         <EmptyScene
           title="Nothing to compare yet"
           body="Tick Compare on two to four candidates in the candidate list, then open them here side by side."
@@ -245,35 +249,41 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       return [c.id, { matched, pct: requiredSkills.length ? Math.round((matched.length / requiredSkills.length) * 100) : 0 }];
     }),
   );
-  // The lede promises marked leaders only when some row has one (all-tied values mark nobody).
+  // The lede promises marked leaders only when some row has one (an all-level board marks nobody).
+  const scoreValues = candidates.map((c) => (c.scored ? c.score : 0));
+  const fitValues = candidates.map((c) => fit.get(c.id)!.pct);
+  const rateValues = candidates.map((c) => pricing.get(c.id)!.hourlyRateMinor);
+  const hireValues = candidates.map((c) => pricing.get(c.id)!.perHireMinor);
   const anyLeader =
-    (requiredSkills.length > 0 && leaders(candidates.map((c) => fit.get(c.id)!.pct)).size > 0) ||
-    leaders(candidates.map((c) => (c.scored ? c.score : 0))).size > 0 ||
+    (requiredSkills.length > 0 && leaders(fitValues).size > 0) ||
+    leaders(scoreValues).size > 0 ||
     RATING_META.some((m) => leaders(candidates.map((c) => c.ratings[m.key])).size > 0);
-  const slotsLine = (
-    <>
-      <span className="nums block">{candidates.length} of {MAX_COMPARE} slots</span>
-      {candidates.length < MAX_COMPARE ? (
-        <Link href={backHref} className="-mx-1 inline-flex min-h-11 items-center px-1 text-sm font-medium text-ink-800 underline underline-offset-4 hover:text-ink-900 sm:mt-1">
-          Add a candidate
-        </Link>
-      ) : null}
-    </>
-  );
   const anyPerHire = candidates.some((c) => (pricing.get(c.id)?.perHireMinor ?? 0) > 0);
+  // Label column + one column per candidate: the width a section band spans.
+  const span = candidates.length + 1;
+  const chip = "inline-flex min-h-7 items-center gap-1 rounded-lg px-2.5 py-0.5 text-[13px] font-medium";
+  const chipHit = `${chip} bg-brand-100 text-brand-900`;
+  const chipOther = `${chip} bg-ink-50 text-ink-700 ring-1 ring-inset ring-ink-200`;
+  const muted = "text-sm text-ink-600";
 
   return (
     <div>
       <RememberSelection employerId={session.uid} compare={ids} project={activeProject?.id ?? null} />
-      <ButtonLink href={backHref} variant="ghost" size="sm" className="mb-4 min-h-11">
+      <ButtonLink href={backHref} variant="ghost" size="sm" className="-ml-3.5 mb-4 min-h-11">
         <ArrowLeft className="size-4" aria-hidden />
         Back to candidates
       </ButtonLink>
 
       <PageHead
-        className="mb-4 lg:mb-5"
+        className={HEAD_CLASS}
         title={`Comparing ${candidates.length} candidate${candidates.length === 1 ? "" : "s"}`}
-        lede={candidates.length === 1 ? "Add one more from the candidate list to see who leads each row." : anyLeader ? "The leader of each row is marked." : undefined}
+        lede={
+          candidates.length === 1
+            ? "Add one more from the candidate list to see who leads each row."
+            : anyLeader
+              ? "The best value in each row is marked. A row where everyone is level has no mark."
+              : undefined
+        }
         action={
           projects.length > 0 ? (
             // Applies on choice, like the project picker on Candidates: no Apply button.
@@ -291,9 +301,10 @@ export default async function CompareCandidates({ searchParams }: { searchParams
           ) : null
         }
       />
-      <CandidateTabs active="compare" shortlist={shortlistCount} compare={candidates.length} />
+      <CompareTabs shortlist={shortlistCount} compare={candidates.length} />
 
       <SkillFilter
+        className="mb-4 lg:mb-5"
         title="Skills to match"
         active={requiredSkills}
         projectSkills={projectSkills}
@@ -301,198 +312,174 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         note="Up to 7. Add or remove skills to re-score the project fit below."
       />
 
-      {/* Phone: the label column is hidden, so the slot count sits here once. */}
-      <div className="mb-1 flex items-center justify-between gap-3 text-sm text-ink-600 sm:hidden">{slotsLine}</div>
+      {/* The count and the one way to add, above the card: the same place Candidates keeps its result count. */}
+      <div className="mb-3 flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h2 className="min-w-0 text-sm text-ink-600">
+          <span role="status" className="nums font-semibold text-ink-900">
+            {candidates.length} of {MAX_COMPARE} slots used
+          </span>
+        </h2>
+        {candidates.length < MAX_COMPARE ? (
+          <Link href={backHref} className={buttonClass({ variant: "outline", size: "sm", className: "h-11 rounded-xl sm:h-10 sm:touch:h-11" })}>
+            <Plus className="size-4" aria-hidden />
+            Add a candidate
+          </Link>
+        ) : null}
+      </div>
 
-      {/* The page scrolls vertically; only the width scrolls here, with the label column pinned (sm up). */}
-      <div
-        tabIndex={0}
-        role="region"
-        aria-label="Candidate comparison"
-        className="relative -mx-4 overflow-x-auto border-y border-ink-100 max-sm:snap-x max-sm:snap-mandatory focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:mx-0"
-      >
-        <table className="w-full border-separate border-spacing-0 text-left text-sm">
-          <caption className="sr-only">Candidates compared side by side; the leader of each row is marked.</caption>
+      {/* The page scrolls down; only the width scrolls here, with the label column pinned at every width. */}
+      <ScrollRegion label="Candidate comparison" className="rounded-2xl border border-ink-200 bg-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+        {/* Fixed layout: every candidate column is the same width. The minimum width (label column + n columns) is what makes the region scroll sideways instead of squeezing. */}
+        <table
+          style={{ "--n": candidates.length } as React.CSSProperties}
+          className="w-full table-fixed border-separate border-spacing-0 text-left text-sm min-w-[calc(6rem+var(--n)*11rem)] sm:min-w-[calc(9rem+var(--n)*13rem)] xl:min-w-[calc(11rem+var(--n)*13rem)]"
+        >
+          <caption className="sr-only">Candidates compared side by side; the best value in each row is marked Best.</caption>
           <thead>
             <tr>
               <th
                 scope="col"
-                className="sticky left-0 z-20 w-48 min-w-48 border-b border-r border-ink-100 bg-surface p-4 align-bottom text-xs font-medium text-ink-600 max-sm:hidden"
+                className="sticky left-0 z-20 w-24 min-w-24 border-b border-r border-ink-200 bg-white p-3 text-left align-bottom text-[11px] font-semibold uppercase tracking-wider text-ink-700 sm:w-36 sm:min-w-36 sm:p-4 xl:w-44 xl:min-w-44 xl:p-5"
               >
-                {slotsLine}
+                Compared on
               </th>
               {candidates.map((c) => {
                 const rel = relations.get(c.id);
-                const status = candidateStatusPill(rel?.proposal ?? null);
-                const name = displayNameOf(c, nameUnlocked.has(c.id));
                 const savedTo = shortlistedFor.get(c.id) ?? [];
-                const onActive = Boolean(activeProject && shortlisted.has(c.id));
-                const others = savedTo.filter((n) => n !== activeProject?.projectName);
+                const q = activeProject ? `?project=${encodeURIComponent(activeProject.id)}` : "";
                 return (
-                  <th
+                  <CompareHeadCell
                     key={c.id}
-                    scope="col"
-                    className="relative border-b border-r border-ink-100 p-3 align-top font-normal last:border-r-0 max-sm:w-[calc((100vw-2rem)/2)] max-sm:min-w-[calc((100vw-2rem)/2)] max-sm:snap-start sm:min-w-60 sm:p-4"
-                  >
-                    {/* Photo, name and city are one link to the profile: a big target on a phone. */}
-                    <Link
-                      href={`/employer/intern/${encodeURIComponent(c.id)}${activeProject ? `?project=${encodeURIComponent(activeProject.id)}` : ""}`}
-                      className="group/id flex items-center gap-3 rounded-lg max-sm:flex-col max-sm:items-start max-sm:gap-1.5 sm:mr-8 outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
-                    >
-                      <RowAvatar photoUrl={c.photoUrl} initials={c.initials} seed={c.id} className="size-10 sm:size-14" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block break-words text-base font-semibold text-ink-900 underline-offset-4 group-hover/id:underline">{name}</span>
-                        <span className="block break-words text-sm text-ink-600">{c.city || c.location || "City not stated"}</span>
-                      </span>
-                    </Link>
-                    <Link
-                      href={removeHref(c.id)}
-                      aria-label={`Remove ${name} from the comparison`}
-                      title="Remove from the comparison"
-                      className="absolute right-1 top-1 grid size-11 place-items-center rounded-full text-ink-500 outline-none hover:bg-ink-100 hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 sm:right-2 sm:top-2"
-                    >
-                      <X className="size-4" aria-hidden />
-                    </Link>
-                    {/* EMB-08: the action follows what already exists with them. One filled button per column. */}
-                    <div className="relative mt-3 flex items-center gap-2">
-                      {rel?.proposal ? (
-                        <ButtonLink href={`/employer/proposal/${encodeURIComponent(rel.proposal.id)}`} variant="outline" size="sm" className="min-h-11 min-w-0 flex-1 rounded-full sm:min-h-9 sm:touch:min-h-11">
-                          {proposalActionLabel(rel.proposal)}
-                        </ButtonLink>
-                      ) : (
-                        <>
-                          {/* Phone: the heart joins the remove button on the top line. */}
-                          {activeProject ? (
-                            <span className="max-sm:absolute max-sm:right-12 max-sm:top-1">
-                              <SaveToggle internId={c.id} projectId={activeProject.id} shortlisted={shortlisted.has(c.id)} name={name} />
-                            </span>
-                          ) : null}
-{rel?.pendingMeetingAt ? (
-                            <SendProposalHold pendingMeetingAt={rel.pendingMeetingAt} className="min-w-0 flex-1 items-stretch" controlClassName="w-full justify-center" />
-                          ) : (
-                                                      <ButtonLink
-                              href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}${activeProject ? `&project=${encodeURIComponent(activeProject.id)}` : ""}`}
-                              variant="primary"
-                              size="sm"
-                              className="min-h-11 w-full min-w-0 flex-1 rounded-full max-sm:px-3 max-sm:[&>svg]:hidden sm:min-h-9 sm:touch:min-h-11"
-                            >
-                              <Send className="size-4" aria-hidden />
-                              Send proposal
-                            </ButtonLink>
-                          )}
-                        </>
-                      )}
-                    </div>
-                    {status || others.length > 0 ? (
-                      <p className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-ink-600">
-                        {status ? <Pill tone={status.tone}>{status.label}</Pill> : null}
-                        {others.length > 0 ? (
-                          <span title={others.join(", ")}>
-                            {onActive ? "Also on" : "On"} {others.length === 1 ? `the ${others[0]} shortlist` : `${others.length} ${onActive ? "other " : ""}shortlists`}
-                          </span>
-                        ) : null}
-                      </p>
-                    ) : null}
-                  </th>
+                    c={c}
+                    name={displayNameOf(c, nameUnlocked.has(c.id))}
+                    profileHref={`/employer/intern/${encodeURIComponent(c.id)}${q}`}
+                    removeHref={removeHref(c.id)}
+                    status={candidateStatusPill(rel?.proposal ?? null)}
+                    proposal={rel?.proposal ?? null}
+                    pendingMeetingAt={rel?.pendingMeetingAt ?? null}
+                    sendHref={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}${activeProject ? `&project=${encodeURIComponent(activeProject.id)}` : ""}`}
+                    projectId={activeProject?.id ?? null}
+                    shortlisted={shortlisted.has(c.id)}
+                    otherShortlists={savedTo.filter((n) => n !== activeProject?.projectName)}
+                    alsoOn={Boolean(activeProject && shortlisted.has(c.id))}
+                  />
                 );
               })}
             </tr>
           </thead>
 
           <tbody>
+            <SectionRow label="Fit and score" span={span} />
             {requiredSkills.length > 0 ? (
-              <MatrixRow label="Project fit" hint={`${activeProject && !skillsSet ? activeProject.projectName : "Your skills"} · ${requiredSkills.length} skill${requiredSkills.length === 1 ? "" : "s"}`} accent>
-                {candidates.map((c) => {
+              <MatrixRow
+                label="Project fit"
+                hint={`${activeProject && !skillsSet ? activeProject.projectName : "Your skills"} · ${requiredSkills.length} skill${requiredSkills.length === 1 ? "" : "s"}`}
+                level={isLevel(fitValues)}
+              >
+                {candidates.map((c, i) => {
                   const f = fit.get(c.id)!;
-                  const best = leaders(candidates.map((x) => fit.get(x.id)!.pct)).has(candidates.indexOf(c));
+                  const best = leaders(fitValues).has(i);
                   return (
                     <Cell key={c.id} leader={best}>
-                      <div className="flex items-baseline justify-between gap-2">
-                        <span className="nums text-lg font-semibold text-brand-800">{f.pct}%</span>
-                        <span className="nums text-sm text-ink-600">
-                          {f.matched.length} of {requiredSkills.length}
-                        </span>
-                      </div>
-                      <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-ink-100" aria-hidden>
-                        <span className="block h-full rounded-full bg-brand-600" style={{ width: `${f.pct}%` }} />
-                      </span>
-                      {best ? <LeaderMark /> : null}
+                      <MetricCell value={f.pct} max={100} unit="%" leader={best} empty="" note={`${f.matched.length} of ${requiredSkills.length} skills`} />
                     </Cell>
                   );
                 })}
               </MatrixRow>
             ) : null}
 
-            <NumericRow
-              label="Findtern Score"
-              values={candidates.map((c) => (c.scored ? c.score : 0))}
-              candidates={candidates}
-              render={(c) => (
-                <>
-                  <span className="nums text-2xl font-semibold text-brand-700">{c.scored ? c.score.toFixed(1) : "-"}</span>
-                  <span className="text-sm text-text-subtle">/10</span>
-                  {c.scored ? <span className="ml-1 text-sm font-medium text-ink-700">{planNameFor(c.score)}</span> : null}
-                </>
-              )}
-            />
+            <MatrixRow label="Findtern Score" level={isLevel(scoreValues)}>
+              {candidates.map((c, i) => {
+                const best = leaders(scoreValues).has(i);
+                return (
+                  <Cell key={c.id} leader={best}>
+                    <MetricCell
+                      value={c.scored ? Math.round(c.score * 10) / 10 : null}
+                      max={10}
+                      unit="/ 10"
+                      leader={best}
+                      empty="Not scored yet"
+                      note={`${planNameFor(c.score)} · ${bandFor(c.score).name}`}
+                    />
+                  </Cell>
+                );
+              })}
+            </MatrixRow>
 
-            <MatrixRow label="Hourly price">
-              {candidates.map((c) => (
-                <Cell key={c.id}>
-                  <span className="nums text-base font-semibold text-ink-900">{formatRate(pricing.get(c.id)!.hourlyRateMinor, currency)}</span>
-                </Cell>
-              ))}
+            <SectionRow label="Price" span={span} />
+            <MatrixRow label="Hourly price" hint="Lowest is marked" level={isLevel(rateValues)}>
+              {candidates.map((c, i) => {
+                const minor = pricing.get(c.id)!.hourlyRateMinor;
+                const lowest = leaders(rateValues, { lowerIsBetter: true }).has(i);
+                return (
+                  <Cell key={c.id} leader={lowest}>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                        <span className="nums flex items-baseline gap-1 text-[22px] font-semibold leading-none text-ink-900 sm:text-2xl">
+                          {formatMoney(minor, currency)}
+                          <span className="text-xs font-normal text-text-subtle">/ hr</span>
+                        </span>
+                        {lowest ? <BestBadge label="Lowest" /> : null}
+                      </div>
+                      {minor > 0 ? (
+                        <p className="nums text-xs leading-4 text-text-subtle" title={`${formatMoney(minor, currency)} x ${HOURS_PER_MONTH} hours a month (Mon-Fri)`}>
+                          <span aria-hidden>≈ {formatMoney(minor * HOURS_PER_MONTH, currency)}/mo</span>
+                          <span className="sr-only">About {formatMoney(minor * HOURS_PER_MONTH, currency)} a month at {HOURS_PER_MONTH} hours</span>
+                        </p>
+                      ) : null}
+                    </div>
+                  </Cell>
+                );
+              })}
             </MatrixRow>
 
             {/* A zero per-hire charge is not worth a row (bug sheet r96). */}
             {anyPerHire ? (
-              <MatrixRow label="Per-hire charge">
-                {candidates.map((c) => {
+              <MatrixRow label="Per-hire charge" hint="One-time charge" level={isLevel(hireValues)}>
+                {candidates.map((c, i) => {
                   const minor = pricing.get(c.id)!.perHireMinor;
+                  const lowest = leaders(hireValues, { lowerIsBetter: true }).has(i);
                   return (
-                    <Cell key={c.id}>
-                      <span className="nums font-medium text-ink-900">{minor > 0 ? formatMoney(minor, currency) : "-"}</span>
+                    <Cell key={c.id} leader={lowest}>
+                      <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
+                        <span className="nums text-lg font-semibold leading-none text-ink-900">{minor > 0 ? formatMoney(minor, currency) : "None"}</span>
+                        {lowest ? <BestBadge label="Lowest" /> : null}
+                      </div>
                     </Cell>
                   );
                 })}
               </MatrixRow>
             ) : null}
 
-            {RATING_META.map((meta) => (
-              <NumericRow
-                key={meta.key}
-                label={meta.label}
-                values={candidates.map((c) => c.ratings[meta.key])}
-                candidates={candidates}
-                render={(c) =>
-                  c.ratings[meta.key] > 0 ? (
-                    <>
-                      <span className="nums text-base font-semibold text-ink-900">{c.ratings[meta.key].toFixed(1)}</span>
-                      <span className="text-sm text-text-subtle">/10</span>
-                      <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-ink-100" aria-hidden>
-                        <span className="block h-full rounded-full bg-brand-600" style={{ width: `${c.ratings[meta.key] * 10}%` }} />
-                      </span>
-                    </>
-                  ) : (
-                    <span className="text-text-subtle">Not rated</span>
-                  )
-                }
-              />
-            ))}
+            <SectionRow label="Ratings" span={span} />
+            {RATING_META.map((meta) => {
+              const values = candidates.map((c) => c.ratings[meta.key]);
+              const lead = leaders(values);
+              return (
+                <MatrixRow key={meta.key} label={meta.label} level={isLevel(values)}>
+                  {candidates.map((c, i) => (
+                    <Cell key={c.id} leader={lead.has(i)}>
+                      <MetricCell value={c.ratings[meta.key] > 0 ? c.ratings[meta.key] : null} max={10} unit="/ 10" leader={lead.has(i)} empty="Not rated" />
+                    </Cell>
+                  ))}
+                </MatrixRow>
+              );
+            })}
 
+            <SectionRow label="Skills" span={span} />
             {/* One row per skill asked for, so a skill sits at the same height in every column; then whatever else each lists. */}
             {skillGrid.rows.map((row, r) => (
               <MatrixRow key={row.skill} label={row.skill} hint={r === 0 ? "Skill you asked for" : undefined}>
                 {candidates.map((c, i) => (
                   <Cell key={c.id}>
                     {row.has[i] ? (
-                      <span className="inline-flex items-center gap-1.5 font-medium text-ink-900">
-                        <Check className="size-4 shrink-0 text-brand-700" aria-hidden />
+                      <span className={chipHit}>
+                        <Check className="size-3.5 text-brand-700" strokeWidth={2.5} aria-hidden />
                         Has it
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1.5 text-text-subtle">
-                        <Minus className="size-4 shrink-0 text-ink-300" aria-hidden />
+                      <span className={`${chipOther} text-ink-700`}>
+                        <Minus className="size-3.5 text-ink-600" aria-hidden />
                         Not listed
                       </span>
                     )}
@@ -507,16 +494,16 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                 return (
                   <Cell key={c.id}>
                     {skills.length === 0 && more === 0 ? (
-                      <span className="text-text-subtle">{skillGrid.rows.length > 0 ? "None" : "None listed"}</span>
+                      <span className={muted}>{skillGrid.rows.length > 0 ? "None" : "None listed"}</span>
                     ) : (
-                      <ul className="space-y-1">
+                      <ul className="flex flex-wrap gap-1.5" aria-label="Skills">
                         {skills.map((skill) => (
-                          <li key={skill} className="text-ink-700">
+                          <li key={skill} className={chipOther}>
                             {skill}
                           </li>
                         ))}
                         {more > 0 ? (
-                          <li className="text-ink-700">
+                          <li className="inline-flex min-h-7 items-center px-2 text-[13px] font-medium text-ink-600">
                             +{more}
                             <span className="sr-only"> more skills</span>
                           </li>
@@ -528,9 +515,12 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               })}
             </MatrixRow>
 
+            <SectionRow label="Availability" span={span} />
             <MatrixRow label="Work mode">
               {candidates.map((c) => (
-                <Cell key={c.id}>{c.workModes.join(", ") || <span className="text-text-subtle">Not stated</span>}</Cell>
+                <Cell key={c.id}>
+                  {c.workModes.length > 0 ? <span className="font-medium text-ink-900">{c.workModes.join(", ")}</span> : <span className={muted}>Not stated</span>}
+                </Cell>
               ))}
             </MatrixRow>
 
@@ -538,9 +528,9 @@ export default async function CompareCandidates({ searchParams }: { searchParams
               {candidates.map((c) => (
                 <Cell key={c.id}>
                   {c.preferredLocations.length > 0 ? (
-                    preferredCities(c.preferredLocations).join(", ")
+                    <span className="text-ink-900">{preferredCities(c.preferredLocations).join(", ")}</span>
                   ) : (
-                    <span className="text-text-subtle">{c.workModes.length === 1 && c.workModes[0] === "Remote" ? "Remote only" : "Not stated"}</span>
+                    <span className={muted}>{c.workModes.length === 1 && c.workModes[0] === "Remote" ? "Remote only" : "Not stated"}</span>
                   )}
                 </Cell>
               ))}
@@ -549,18 +539,17 @@ export default async function CompareCandidates({ searchParams }: { searchParams
             <MatrixRow label="Laptop">
               {candidates.map((c) => (
                 <Cell key={c.id}>
-                  {c.hasLaptop === null ? <span className="text-text-subtle">Not stated</span> : c.hasLaptop ? "Has a laptop" : "Needs one provided"}
+                  {c.hasLaptop === null ? <span className={muted}>Not stated</span> : <span className={c.hasLaptop ? "font-medium text-ink-900" : "text-ink-800"}>{c.hasLaptop ? "Has a laptop" : "Needs one provided"}</span>}
                 </Cell>
               ))}
             </MatrixRow>
 
+            <SectionRow label="Background" span={span} />
             <MatrixRow label="Education">
               {candidates.map((c) => (
                 <Cell key={c.id}>
-                  <p className="font-medium text-ink-900">{c.academics?.institution || "-"}</p>
-                  <p className="mt-0.5 text-ink-600">
-                    {studyOf(c.academics) || "Degree not stated"}
-                  </p>
+                  <p className="break-words font-medium text-ink-900">{c.academics?.institution || "-"}</p>
+                  <p className="mt-0.5 break-words text-ink-600">{studyOf(c.academics) || "Degree not stated"}</p>
                   {c.academics?.score ? (
                     <p className="nums mt-0.5 text-ink-600">
                       {c.academics.scoreType === "percentage" ? "Percentage" : "CGPA"} {c.academics.score}
@@ -572,18 +561,14 @@ export default async function CompareCandidates({ searchParams }: { searchParams
 
             <MatrixRow label="Profile updated" last>
               {candidates.map((c) => (
-                <Cell key={c.id}>
-                  <span className="nums">
-                    {profileUpdated.get(c.id)
-                      ? formatDate(profileUpdated.get(c.id)!)
-                      : "Never"}
-                  </span>
+                <Cell key={c.id} last>
+                  <span className="nums text-ink-800">{profileUpdated.get(c.id) ? formatDate(profileUpdated.get(c.id)!) : "Never"}</span>
                 </Cell>
               ))}
             </MatrixRow>
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
     </div>
   );
 }

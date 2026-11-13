@@ -49,7 +49,7 @@ export function ScrollRegion({ label, className, children }: { label: string; cl
         {more ? (
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-y-px right-px w-10 rounded-r-apple-xl bg-gradient-to-l from-white via-white/70 to-transparent sm:hidden"
+            className="pointer-events-none absolute inset-y-px right-px w-10 rounded-r-2xl bg-gradient-to-l from-white via-white/70 to-transparent sm:hidden"
           />
         ) : null}
       </div>
