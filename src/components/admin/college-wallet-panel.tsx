@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { EmptyScene } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -113,7 +114,7 @@ export function CollegeWalletPanel({ collegeId, summary, ledger, bank, canMoney 
             <span className="nums shrink-0 font-medium">{inr(r.amountMinor)}</span>
           </li>
         ))}
-        {ledger.length === 0 ? <li className="py-2 text-text-subtle">No activity yet.</li> : null}
+        {ledger.length === 0 ? <li><EmptyScene compact title="No wallet activity" body="Credits, withdrawals and adjustments for this college are listed here as they happen." /></li> : null}
       </ul>
       {dialog}
     </section>

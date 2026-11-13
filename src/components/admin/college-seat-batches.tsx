@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { EmptyScene } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 import { buttonClass } from "@/components/ui/button";
 import { seatBatchAmount, seatBatchProblem } from "@/lib/college/money";
@@ -100,7 +101,7 @@ export function CollegeSeatBatches({ collegeId, batches, seat, canMoney }: Colle
       ) : null}
       {error ? <p role="alert" className="text-sm text-red-600">{error}</p> : null}
       {batches.length === 0 ? (
-        <p className="text-sm text-ink-600">No seat batches yet.</p>
+        <EmptyScene compact title="No seat batches" body="A batch is a set of seats this college has bought. None has been added." />
       ) : (
         <ul className="divide-y divide-ink-200 rounded-md border border-ink-200">
           {batches.map((b) => (

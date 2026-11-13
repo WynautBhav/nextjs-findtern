@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Pill, Surface, type Tone } from "@/components/app/primitives";
+import { EmptyScene, Pill, Surface, type Tone } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -120,7 +120,13 @@ export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, colleg
       ) : null}
       {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
 
-      {orders.length === 0 ? <p className="text-sm text-ink-500">No drive orders yet.</p> : (
+      {orders.length === 0 ? (
+        <EmptyScene
+          compact
+          title="No drive orders"
+          body={canWrite ? "An order sets how many student slots this college has and what each costs. Add one with the form above." : "An order sets how many student slots this college has and what each costs. None has been added."}
+        />
+      ) : (
         <ul className="space-y-3">
           {orders.map((o) => {
             const s = STATUS[o.status] ?? { label: o.status, tone: "neutral" as Tone };

@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
-import { PageHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
 import { RosterRemove } from "@/components/college/roster-remove";
 import { RosterImport } from "@/components/college/roster-import";
 import { CopyText } from "@/components/college/copy-text";
@@ -100,7 +100,16 @@ export default async function RosterPage({ searchParams }: { searchParams?: Prom
         />
         {coverage.notJoined.length === 0 ? (
           <PanelBody>
-            <p className="text-sm text-text-subtle">{coverage.rosterSize ? "Everyone on your roster has joined." : "No roster uploaded yet."}</p>
+            {coverage.rosterSize ? (
+              <p className="text-sm text-text-subtle">Everyone on your roster has joined.</p>
+            ) : (
+              <EmptyScene
+                compact
+                title="No student list yet"
+                body="Once you upload your list, the students who have not joined Findtern appear here so you can remind them."
+                who="You - upload the list in the panel above"
+              />
+            )}
           </PanelBody>
         ) : (
           // A table of who to chase: name, roll, year, branch, email in aligned

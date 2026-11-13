@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, IndianRupee, Loader2, Plus, Save, Star, Trash2 } from "lucide-react";
 
+import { EmptyScene } from "@/components/app/primitives";
 import { Panel, PanelHeader } from "@/components/admin/panel";
 import { buttonClass } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -125,7 +126,7 @@ function RateCardSummary({ plans }: { plans: EditablePlan[] }) {
     <Panel>
       <PanelHeader title="Rate card" description="As saved: what the public pricing page shows." icon={IndianRupee} />
       {plans.length === 0 ? (
-        <p className="px-5 py-4 text-sm text-ink-600">No plans yet.</p>
+        <EmptyScene compact title="No plans on the rate card" body="Plans show here, and on the public pricing page, once one is saved in the editor." />
       ) : (
         <ul className="divide-y divide-[color:var(--admin-rule)] px-5 pb-2 text-sm">
           {plans.map((p) => (

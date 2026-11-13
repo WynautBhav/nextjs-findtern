@@ -10,6 +10,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
 import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
+import { EmptyScene } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -240,7 +241,7 @@ export function CollegeLogins({ collegeId, officers, hasPaidBatch, canEdit }: { 
           ))}
         </ul>
       ) : (
-        <p className="text-sm text-text-subtle">No placement officer login yet.</p>
+        <EmptyScene compact title="No placement officer login" body="Nobody at this college can sign in to its portal until a login is issued." />
       )}
       {!canEdit ? null : !hasPaidBatch && officers.length === 0 ? (
         <p className="text-sm text-text-subtle">Awaiting first payment. The login can be issued once the first seat batch is paid (Seats tab).</p>

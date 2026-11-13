@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, ArrowDown, ChevronRight, SendHorizontal } from "lucide-react";
 
 import { Avatar } from "@/components/app/avatar";
+import { EmptyScene } from "@/components/app/primitives";
 import { Skeleton } from "@/components/ui/skeleton";
 import { csrfFetch } from "@/lib/client-fetch";
 import { MAX_BODY, SEND_BLOCK_TEXT, type SendBlock } from "@/lib/messaging/logic";
@@ -280,7 +281,13 @@ export function Conversation({ base, threadId, proposal = null }: { base: "emplo
           ) : null}
           {status === "missing" ? <p className="text-sm text-text-subtle">This conversation was not found. It may have been closed.</p> : null}
           {status === "ready" && msgs.length === 0 ? (
-            <p className="py-8 text-center text-sm text-text-subtle">{activeBlock === "employer_first" ? "No messages yet. The company writes first." : activeBlock === "closed" ? "No messages in this conversation." : "No messages yet. Write the first one below."}</p>
+            activeBlock === "employer_first" ? (
+              <EmptyScene compact title="No messages yet" body="The company writes first. You can reply as soon as their message arrives." />
+            ) : activeBlock === "closed" ? (
+              <EmptyScene compact title="No messages here" body="Nothing was said before this proposal was withdrawn, so the conversation is closed." />
+            ) : (
+              <EmptyScene compact title="No messages yet" body="Write the first one in the box below." />
+            )
           ) : null}
           {groups.map((g) => (
             <div key={g.key} className="space-y-3">

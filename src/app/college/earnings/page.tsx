@@ -1,4 +1,4 @@
-import { PageHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
 import { BankForm } from "@/components/college/bank-form";
 import { WithdrawForm } from "@/components/college/withdraw-form";
 import { collegeBank } from "@/lib/college/bank-read";
@@ -50,7 +50,12 @@ export default async function EarningsPage() {
       </Surface>
       <Surface className="divide-y divide-ink-200/80">
         {rows.length === 0 ? (
-          <p className="p-5 text-sm text-text-subtle">No activity yet.</p>
+          <EmptyScene
+            compact
+            title="No earnings activity"
+            body="A credit shows up here when a verified student of your college completes an internship. Withdrawals you request show up here too."
+            next={{ label: "Go to your students", href: "/college" }}
+          />
         ) : (
           rows.map((r) => (
             <div key={r.id} className="flex items-start justify-between gap-3 p-4">
