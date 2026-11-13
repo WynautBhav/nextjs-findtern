@@ -9,7 +9,7 @@ import { sendSmtpMail } from "@/lib/mailer";
 import { bucketKey, generateOtp, hashOtp, limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
 import { phoneInUseAnywhere } from "@/lib/phone-owner";
 import { isPersonalEmail } from "@/lib/employer-onboarding";
-import { INTERN_EMAIL_MESSAGE, isInternEmail, SIGNUP_OTP_SUBJECTS } from "@/lib/signup-otp";
+import { INTERN_EMAIL_MESSAGE, internEmailAllowed, SIGNUP_OTP_SUBJECTS } from "@/lib/signup-otp";
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -56,7 +56,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Phone number already in use" }, { status: 409 });
   }
 
-  if (purpose === "signup" && subjectType === "intern" && !isInternEmail(email)) {
+  if (purpose === "signup" && subjectType === "intern" && !(await internEmailAllowed(email))) {
     return NextResponse.json({ error: INTERN_EMAIL_MESSAGE }, { status: 400 });
   }
 

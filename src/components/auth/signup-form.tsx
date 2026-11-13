@@ -7,7 +7,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-r
 
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
 import { DIAL_CODES } from "@/lib/data/dial-codes";
-import { isPersonalEmail } from "@/lib/employer-onboarding";
+import { isInternEmail } from "@/lib/intern-email";
 import { PASSWORD_RULES } from "@/lib/password-policy";
 import { PasswordInput } from "@/components/auth/password-input";
 
@@ -79,13 +79,13 @@ export function SignupForm({
 
   const passwordOk = PASSWORD_RULES.every((rule) => rule.test(password));
   const emailShapeOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
-  // Interns sign up with a personal address (INT-06); googlemail.com is Gmail.
-  const emailPersonal = isPersonalEmail(email) || email.trim().toLowerCase().endsWith("@googlemail.com");
+  // Interns sign up with a personal or a college address. A college with its own domain is only known
+  // to the server, so this just warns; send-otp has the last word and its message is shown on refusal.
+  const emailUnrecognised = !isInternEmail(email);
   const detailsOk =
     firstName.trim().length >= 2 &&
     lastName.trim().length >= 2 &&
     emailShapeOk &&
-    emailPersonal &&
     isValidPhone(countryCode, phoneNumber) &&
     !phoneTaken &&
     passwordOk &&
@@ -270,10 +270,10 @@ export function SignupForm({
               placeholder="you@gmail.com"
             />
           )}
-          {!google && emailShapeOk && !emailPersonal ? (
-            <p role="alert" className="-mt-3 text-xs text-danger">
-              Use a personal email (Gmail, Yahoo, Outlook and the like). College and work
-              addresses are not accepted.
+          {!google && emailShapeOk && emailUnrecognised ? (
+            <p className="-mt-3 text-xs text-ink-500">
+              Use a personal email (Gmail, Yahoo, Outlook and the like) or your college email. Work addresses
+              are not accepted.
             </p>
           ) : null}
 

@@ -7,7 +7,7 @@ import { hashPassword, isStrongPassword, WEAK_PASSWORD_MESSAGE } from "@/lib/sec
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
 import { normalizePhone, phoneError, phoneLockKey } from "@/lib/phone";
-import { hasVerifiedSignupOtp, INTERN_EMAIL_MESSAGE, isInternEmail } from "@/lib/signup-otp";
+import { hasVerifiedSignupOtp, INTERN_EMAIL_MESSAGE, internEmailAllowed } from "@/lib/signup-otp";
 import { phoneInUseAnywhere } from "@/lib/phone-owner";
 import { isUniqueViolation, uniqueMessage } from "@/lib/promo";
 import { acceptanceValues } from "@/lib/terms";
@@ -34,10 +34,9 @@ export async function POST(req: Request) {
   if (!isStrongPassword(parsed.data.password)) {
     return NextResponse.json({ error: WEAK_PASSWORD_MESSAGE }, { status: 400 });
   }
-  // Interns register with a personal address (INT-06, legacy shared/schema.ts:
-  // "Please use a personal email address"), so the account outlives a
-  // college or employer mailbox.
-  if (!isInternEmail(parsed.data.email)) {
+  // Interns register with a personal or a college address (the college is
+  // verified later from the domain); work addresses are refused.
+  if (!(await internEmailAllowed(parsed.data.email))) {
     return NextResponse.json({ error: INTERN_EMAIL_MESSAGE }, { status: 400 });
   }
   const phoneProblem = phoneError(parsed.data.countryCode, parsed.data.phoneNumber);

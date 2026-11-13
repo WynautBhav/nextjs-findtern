@@ -112,7 +112,7 @@ export function checkDriveAccess(input: {
 }
 
 /** Whether `email`'s domain is `domain` or a subdomain of it. */
-function onDomain(email: string, domain: string): boolean {
+export function onDomain(email: string, domain: string): boolean {
   const at = email.lastIndexOf("@");
   if (at < 0) return false;
   const host = email.slice(at + 1).trim().toLowerCase();

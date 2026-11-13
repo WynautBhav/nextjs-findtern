@@ -3,7 +3,8 @@ import type { NextResponse } from "next/server";
 
 import { isHttps } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
-import { isPersonalEmail } from "@/lib/employer-onboarding";
+import { onDomain } from "@/lib/college/access";
+import { isInternEmail } from "@/lib/intern-email";
 import { readCookie } from "@/lib/security/session";
 import { sign, verify } from "@/lib/security/sign";
 
@@ -21,16 +22,21 @@ import { sign, verify } from "@/lib/security/sign";
 
 export const SIGNUP_OTP_SUBJECTS = ["intern", "employer"] as const;
 
+export { INTERN_EMAIL_MESSAGE, isAcademicEmail, isInternEmail } from "@/lib/intern-email";
+
 /**
- * Interns register with a personal mailbox (INT-06; legacy insertUserSchema
- * refused anything else), so the account outlives a college or employer
- * address. googlemail.com is Gmail, which the Google sign-in accepts too.
+ * `isInternEmail`, plus any domain an active college has registered
+ * (colleges.email_domains), for colleges whose domain is not .edu/.ac.xx such
+ * as christuniversity.in. DB lookup, so server routes only.
  */
-export function isInternEmail(email: string): boolean {
-  return isPersonalEmail(email) || email.trim().toLowerCase().endsWith("@googlemail.com");
+export async function internEmailAllowed(email: string): Promise<boolean> {
+  if (isInternEmail(email)) return true;
+  const rows = await getDb()
+    .select({ domains: schema.colleges.emailDomains })
+    .from(schema.colleges)
+    .where(eq(schema.colleges.isActive, true));
+  return rows.some((r) => (r.domains ?? []).some((d) => onDomain(email, d)));
 }
-export const INTERN_EMAIL_MESSAGE =
-  "Please use a personal email address (Gmail, Yahoo, Outlook and the like). College and work addresses are not accepted.";
 export type SignupOtpSubject = (typeof SIGNUP_OTP_SUBJECTS)[number];
 
 /** How long after verifying the code the account must be created (legacy: 15 min). */

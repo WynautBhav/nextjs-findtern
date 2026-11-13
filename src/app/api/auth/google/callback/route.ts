@@ -101,12 +101,13 @@ export async function GET(req: Request) {
     return withSession(res, { uid: employer.id, role: "employer", email: employer.companyEmail, password: employer.password });
   }
 
-  // Interns sign in with Gmail only (legacy rule).
-  // googlemail.com is the same Gmail service (legacy routes.ts:3166 accepted both).
-  if (!email.endsWith("@gmail.com") && !email.endsWith("@googlemail.com")) return fail(req, "/login?as=intern", "gmail_only");
   // Case-insensitive, like the password sign in (INT-35).
   const [user] = await db.select().from(schema.users).where(sql`lower(${schema.users.email}) = ${email}`).limit(1);
   if (!user) {
+    // Starting a NEW account through Google stays Gmail-only (legacy rule; googlemail.com is the same
+    // service, legacy routes.ts:3166). An existing intern may sign in with whatever address they
+    // registered, including a college one.
+    if (!email.endsWith("@gmail.com") && !email.endsWith("@googlemail.com")) return fail(req, "/login?as=intern", "gmail_only");
     /* New candidate. The account is not created here: `users.phone_number` is
      * NOT NULL and unique per country code, and Google does not give us a
      * phone. (The legacy app wrote "0000000000", which collides from the
