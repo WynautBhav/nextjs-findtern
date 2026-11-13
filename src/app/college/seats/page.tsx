@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 
-import { PageHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
 import { InvoiceDownload } from "@/components/college/invoice-download";
 import { seatInvoiceInput } from "@/lib/college/seat-invoice";
 import { requireCollegeContext } from "@/lib/college/scope";
@@ -43,7 +43,12 @@ export default async function SeatsPage() {
       ) : null}
       <Surface className="divide-y divide-ink-200/80">
         {visible.length === 0 ? (
-          <p className="p-5 text-sm text-text-subtle">No seat batches yet. Findtern adds them when your college buys seats.</p>
+          <EmptyScene
+            compact
+            title="No seat batches"
+            body="A batch appears here when your college buys seats, with its invoice once it is paid."
+            who="Findtern - adds a batch when your college buys seats"
+          />
         ) : (
           visible.map((b) => (
             <div key={b.id} className="flex flex-wrap items-start justify-between gap-3 p-4">

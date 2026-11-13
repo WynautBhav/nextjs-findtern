@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Download } from "lucide-react";
 
 import { IdentityCell } from "@/components/admin/data-table";
+import { EmptyScene } from "@/components/app/primitives";
 import { AdminLoadError, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { ChipLinks, DateRangeForm } from "@/components/admin/report-range";
@@ -185,7 +186,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
             head={["Month", "Offers", "Hires", "Success", "Interview rate"]}
             right={[1, 2, 3, 4]}
             rows={a.trend.map((t) => [t.month, String(t.proposals), String(t.hires), `${t.successRate}%`, `${t.interviewRate}%`])}
-            empty="No months in this range."
+            empty={{ title: "No months to show", body: "There is no activity between these dates. Choose a wider range to see more." }}
           />
         </details>
       </div>
@@ -228,7 +229,10 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
               `${c.internshipHires} / ${c.fullTimeHires}`,
               `${c.conversion}%`,
             ])}
-            empty={companyStatus ? `No ${companyStatus} companies with activity in this range.` : "No company activity in this range."}
+            empty={{
+              title: companyStatus ? `No ${companyStatus} companies` : "No company activity",
+              body: companyStatus ? "No company with this status was active between these dates. Choose another status or a wider range." : "No company sent offers or hired between these dates. Choose a wider range to see more.",
+            }}
           />
         </Panel>
 
@@ -245,7 +249,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
               String(i.offers),
               <StatusBadge key="s" value={i.status === "placed" ? "hired" : i.status === "interviewing" ? "scheduled" : "sent"} label={i.status[0].toUpperCase() + i.status.slice(1)} />,
             ])}
-            empty="No candidate activity yet."
+            empty={{ title: "No candidate activity", body: "Candidates appear here once they apply, interview or receive an offer in the range you chose." }}
           />
         </Panel>
       </div>
@@ -295,7 +299,11 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
             h.kind === "full-time" ? "Full-time" : "Internship",
             formatDate(h.hiredAt),
           ])}
-          empty={a.hiredList.length ? "No hires match these filters." : "No hires in this range."}
+          empty={
+            a.hiredList.length
+              ? { title: "No hires match", body: "No hire fits these filters. Clear a filter to see them all." }
+              : { title: "No hires in this range", body: "No hire was made between these dates. Choose a wider range to see more." }
+          }
         />
       </Panel>
     </div>
@@ -323,10 +331,10 @@ function SimpleTable({
   head: string[];
   rows: React.ReactNode[][];
   right?: number[];
-  empty: string;
+  empty: { title: string; body: string };
   minWidth: string;
 }) {
-  if (rows.length === 0) return <p className="px-[var(--admin-pad-panel)] py-8 text-center text-sm text-text-subtle">{empty}</p>;
+  if (rows.length === 0) return <EmptyScene compact title={empty.title} body={empty.body} />;
   return (
     // Focusable, so the inner scroll can be reached from the keyboard (axe scrollable-region-focusable).
     <div tabIndex={0} role="region" aria-label={`${head[0]} table`} data-stack className="max-h-[32rem] overflow-y-auto lg:overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">

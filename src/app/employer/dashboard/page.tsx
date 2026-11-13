@@ -262,7 +262,11 @@ export default async function EmployerDashboard() {
       <section aria-labelledby="matches-h" className="flex min-w-0 flex-col max-xl:order-2 xl:col-span-8">
         <SectionHead id="matches-h" title="Top matches" href="/employer/candidates" link="All candidates" />
         {data.candidates.length === 0 ? (
-          <p className={cn(SURFACE_CLASS, "p-5 text-sm text-ink-600")}>No scored candidates match yet. New ones appear as they finish their AI interview.</p>
+          <EmptyScene
+            title="No matches to show"
+            body="Top matches are candidates who have finished their AI interview and fit your projects. New ones appear here as they finish."
+            next={{ label: "Browse all candidates", href: "/employer/candidates" }}
+          />
         ) : (
           // Four cards from sm, three on a phone so the page stays a short scroll.
           <ul className="grid gap-4 sm:grid-cols-2 max-sm:[&>li:nth-child(n+4)]:hidden">

@@ -2,6 +2,7 @@
 
 import { useState, type KeyboardEvent, type PointerEvent } from "react";
 
+import { EmptyScene } from "@/components/app/primitives";
 import { monotonePath, nearestIndex, niceTicks, thinLabelIndices } from "@/lib/admin/chart-geometry";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +58,7 @@ export function LineDuo({
   const yAt = (v: number) => PAD.top + plotH - (finite(v) / top) * plotH;
 
   if (n === 0) {
-    return <p className="py-10 text-center text-sm text-muted-foreground">No data for this period yet.</p>;
+    return <EmptyScene compact title="No data for this period" body="Nothing was recorded between these dates. Choose a wider range to see more." />;
   }
 
   const labelPx = Math.max(...labels.map((l) => l.length)) * 6.5 + 14;

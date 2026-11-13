@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, Eye } from "lucide-react";
 
+import { EmptyScene } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { formatDate, formatMoney } from "@/lib/format";
 import { downloadInvoice } from "@/lib/invoice";
@@ -12,7 +13,16 @@ import type { InternInvoice } from "@/lib/intern-invoice";
 export function InvoiceList({ invoices }: { invoices: InternInvoice[] }) {
   const [error, setError] = useState<string | null>(null);
 
-  if (!invoices.length) return <p className="text-sm text-text-subtle">No invoices yet. Your activation fee invoice appears here once the payment is received.</p>;
+  if (!invoices.length) {
+    return (
+      <EmptyScene
+        compact
+        title="No invoices"
+        body="Your activation fee invoice appears here once your payment is received."
+        who="Findtern - issues it when the payment arrives"
+      />
+    );
+  }
 
   async function download(i: InternInvoice) {
     setError(null);

@@ -13,6 +13,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+import { EmptyScene } from "@/components/app/primitives";
 import { AdminAvatar } from "@/components/admin/avatar";
 import { humanizeStatus } from "@/components/admin/status-badge";
 import type { ActivityEntry, ActivityKind } from "@/lib/admin/record-activity.types";
@@ -60,12 +61,7 @@ export function ActivityTimeline({ entries }: { entries: ActivityEntry[] | null 
   }
   if (entries.length === 0) {
     return (
-      <div className="px-1 py-6">
-        <p className="text-sm font-semibold text-foreground">No activity yet</p>
-        <p className="mt-1 text-sm leading-relaxed text-text-subtle">
-          Proposals, interviews, payments and reviews show up here as they happen.
-        </p>
-      </div>
+      <EmptyScene compact title="No activity recorded" body="Proposals, interviews, payments and reviews show up here as they happen." />
     );
   }
   return (

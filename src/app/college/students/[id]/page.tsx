@@ -5,7 +5,7 @@ import { FileText, PlayCircle, ShieldCheck } from "lucide-react";
 
 import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
 import { NudgeButton } from "@/components/college/nudge-button";
-import { PageHead, Pill } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { humanizeStatus } from "@/components/app/status";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { aiStatusLabel, cohortGoal, membershipLabel, yearLabel, ago } from "@/lib/college/labels";
@@ -190,7 +190,12 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                 </dl>
               </>
             ) : (
-              <p className="text-sm text-text-subtle">No score yet. Employers in drives filter on this score, so it&apos;s worth chasing.</p>
+              <EmptyScene
+                compact
+                title="No AI interview score"
+                body="This student has not taken the AI interview. Employers in drives filter on this score, so a nudge is worth sending."
+                who="You - use the nudge button above"
+              />
             )}
 
             <div className="flex flex-wrap gap-2">
@@ -243,7 +248,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
         </Panel>
 
       {/* One card for what employers have done with this student (two cards
-          each said "No … yet"); a Pill per row for the state. */}
+          each had its own empty line); a Pill per row for the state. */}
       <Panel>
         <PanelHeader
           title="Offers and meetings"
@@ -252,7 +257,12 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
         />
         {proposals.length + interviews.length + calls.length === 0 ? (
           <PanelBody>
-            <p className="text-sm text-text-subtle">No offers or meetings yet.</p>
+            <EmptyScene
+              compact
+              title="No offers or meetings"
+              body="Offers, interview invitations and drive calls from employers appear here once they reach out to this student."
+              next={{ label: "See your drives", href: "/college/drives" }}
+            />
           </PanelBody>
         ) : (
           <ul className="divide-y divide-ink-100">

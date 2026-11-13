@@ -267,7 +267,7 @@ export default async function AdminReportsPage({
           { title: "Candidates by state", note: "Top six", rows: states },
           { title: "Projects by work mode", note: "Remote, hybrid or on-site", rows: formats, capitalize: true },
         ]}
-        empty="No data yet."
+        empty="Candidates add their home state when they sign up and employers pick a work mode when they post a project. Both fill in as that happens."
       />
 
       <ExportList items={exports} />

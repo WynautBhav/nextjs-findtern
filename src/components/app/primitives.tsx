@@ -219,6 +219,7 @@ export function EmptyScene({
   next,
   who,
   art,
+  compact,
   as: Title = "p",
   className,
 }: {
@@ -237,22 +238,35 @@ export function EmptyScene({
    * scales to a 20 pixel tab bar without turning to mush.
    */
   art?: boolean;
+  /**
+   * For use inside a table, a small card or a side panel: no dashed box of its own (the container already has
+   * an edge), tighter padding, a smaller title and button. Same copy rule, same single action.
+   */
+  compact?: boolean;
   className?: string;
 }) {
   return (
     <div
       className={cn(
-        "flex flex-col items-center rounded-apple-xl border border-dashed border-ink-200 bg-white/60 px-6 py-12 text-center",
+        "flex flex-col items-center text-center",
+        compact ? "px-4 py-8" : "rounded-apple-xl border border-dashed border-ink-200 bg-white/60 px-6 py-12",
         className,
       )}
     >
-      {art ? <ThreadMark className="mb-4" /> : null}
-      <Title className="text-balance text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</Title>
-      <p className="mt-2 max-w-md text-pretty text-sm leading-relaxed text-ink-600">{body}</p>
+      {art ? <ThreadMark className={compact ? "mb-3 scale-90" : "mb-4"} /> : null}
+      <Title
+        className={cn(
+          "text-balance font-semibold tracking-[-0.01em] text-ink-900",
+          compact ? "text-base" : "text-lg",
+        )}
+      >
+        {title}
+      </Title>
+      <p className={cn("max-w-md text-pretty text-sm leading-relaxed text-ink-600", compact ? "mt-1.5" : "mt-2")}>{body}</p>
       {who ? (
         // "You - send the first offer" reads as "You: send the first offer";
         // plain meta, not one more pill.
-        <p className="mt-3 text-xs text-text-subtle">
+        <p className={cn("text-xs text-text-subtle", compact ? "mt-2" : "mt-3")}>
           {who.includes(" - ") ? (
             <>
               <span className="font-semibold text-ink-700">{who.split(" - ")[0]}:</span> {who.split(" - ").slice(1).join(" - ")}
@@ -263,7 +277,10 @@ export function EmptyScene({
         </p>
       ) : null}
       {next ? (
-        <Link href={next.href} className={buttonClass({ className: "mt-6" })}>
+        <Link
+          href={next.href}
+          className={buttonClass(compact ? { size: "sm", className: "mt-4" } : { className: "mt-6" })}
+        >
           {next.label}
           <ArrowRight className="size-4" aria-hidden />
         </Link>
