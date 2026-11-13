@@ -20,9 +20,37 @@ test("submit lists missing fields with 422", () => {
   assert.equal(p.status, 422);
   assert.deepEqual(p.missing, ["description", "skills", "locationType"]);
 });
-test("employer cannot publish or leave closed", () => {
-  const a = planTransition({ project: { status: "pending_review", ...ready }, to: "published", actorRole: "employer" });
+test("draft -> published: the employer's Submit goes live and stamps both times", () => {
+  const now = new Date(7);
+  const p = planTransition({ project: { status: "draft", ...ready }, to: "published", actorRole: "employer", now });
+  assert.ok(p.ok);
+  assert.equal(p.set.status, "published");
+  assert.equal(p.set.publishedAt, now);
+  assert.equal(p.set.submittedAt, now);
+  assert.equal(p.set.rejectionReason, null);
+});
+test("draft -> published lists missing fields with 422 and stays a draft", () => {
+  const p = planTransition({ project: { status: "draft", projectName: "x" }, to: "published", actorRole: "employer" });
+  assert.ok(!p.ok);
+  assert.equal(p.status, 422);
+  assert.deepEqual(p.missing, ["description", "skills", "locationType"]);
+  const over = planTransition({
+    project: { status: "draft", ...ready, skills: Array.from({ length: 8 }, (_, i) => `s${i}`) }, to: "published", actorRole: "employer",
+  });
+  assert.ok(!over.ok && over.missing?.[0] === "skills (at most 7)");
+});
+test("backlog pending_review -> published by the employer keeps an earlier publishedAt", () => {
+  const first = new Date(2);
+  const a = planTransition({ project: { status: "pending_review", ...ready }, to: "published", actorRole: "employer", now: new Date(9) });
+  assert.ok(a.ok && a.from === "pending_review" && a.set.publishedAt?.getTime() === 9);
+  const b = planTransition({ project: { status: "pending_review", ...ready, publishedAt: first }, to: "published", actorRole: "employer" });
+  assert.ok(b.ok && b.set.publishedAt === first);
+});
+test("employer cannot publish a rejected or closed project, or leave closed", () => {
+  const a = planTransition({ project: { status: "rejected", ...ready }, to: "published", actorRole: "employer" });
   assert.ok(!a.ok && a.status === 403);
+  const a2 = planTransition({ project: { status: "closed", ...ready }, to: "published", actorRole: "employer" });
+  assert.ok(!a2.ok && a2.status === 403);
   const b = planTransition({ project: { status: "closed", ...ready }, to: "draft", actorRole: "employer" });
   assert.ok(!b.ok);
   const c = planTransition({ project: { status: "draft" }, to: "nope", actorRole: "employer" });

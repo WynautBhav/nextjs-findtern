@@ -55,7 +55,18 @@ export function planTransition(input: {
     return { ok: true, from, to, set: { status: to, submittedAt: now, rejectionReason: null } };
   }
   if (to === "published") {
-    // Approval stamps the first publish; a resume from paused keeps it.
+    // A draft going live is the employer's own Submit: it must be complete first.
+    if (from === "draft") {
+      const missing = submitReadiness(project);
+      if (missing.length) {
+        return { ok: false, status: 422, error: `Complete these before publishing: ${missing.join(", ")}.`, missing };
+      }
+      return {
+        ok: true, from, to,
+        set: { status: to, submittedAt: now, publishedAt: project.publishedAt ?? now, rejectionReason: null },
+      };
+    }
+    // A backlog or admin approval stamps the first publish; a resume from paused keeps it.
     return { ok: true, from, to, set: { status: to, publishedAt: project.publishedAt ?? now, rejectionReason: null } };
   }
   if (to === "rejected") {

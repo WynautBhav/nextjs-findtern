@@ -19,7 +19,13 @@ export function normalizeStatus(s: string | null | undefined): CanonicalProjectS
   return Object.hasOwn(LEGACY, s) ? LEGACY[s as LegacyProjectStatus] : null;
 }
 
+// Employers publish their own postings: Submit goes draft>published (gated by
+// submitReadiness in planTransition). pending_review>published lets the existing
+// backlog self-publish. The draft>pending_review edge stays for old clients only;
+// no screen uses it.
 const EMPLOYER_EDGES: ReadonlySet<string> = new Set([
+  "draft>published",
+  "pending_review>published",
   "draft>pending_review",
   "pending_review>draft",
   "published>paused",
@@ -79,7 +85,7 @@ export interface SubmitReadinessInput {
   locationType?: string | null;
 }
 
-/** Missing or invalid fields blocking submit for review. Empty array means ready. */
+/** Missing or invalid fields blocking submit (publish). Empty array means ready. */
 export function submitReadiness(p: SubmitReadinessInput): string[] {
   const missing: string[] = [];
   if (!p.projectName?.trim()) missing.push("title");

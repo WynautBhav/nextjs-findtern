@@ -8,6 +8,7 @@ import {
 const employerOk: [string, string][] = [
   ["draft", "pending_review"], ["pending_review", "draft"], ["published", "paused"],
   ["paused", "published"], ["published", "closed"], ["paused", "closed"], ["rejected", "draft"],
+  ["draft", "published"], ["pending_review", "published"],
 ];
 const adminOk: [string, string][] = [
   ["pending_review", "published"], ["pending_review", "rejected"], ["published", "closed"],
@@ -22,8 +23,8 @@ test("admin allowed edges", () => {
 });
 test("denied edges", () => {
   const denied: [string, string, "employer" | "admin"][] = [
-    ["closed", "draft", "employer"], ["closed", "published", "employer"], ["draft", "published", "employer"],
-    ["pending_review", "published", "employer"], ["rejected", "pending_review", "employer"],
+    ["closed", "draft", "employer"], ["closed", "published", "employer"], ["rejected", "published", "employer"],
+    ["rejected", "pending_review", "employer"], ["published", "pending_review", "employer"],
     ["draft", "closed", "employer"], ["published", "draft", "employer"], ["published", "published", "employer"],
     ["draft", "published", "admin"], ["closed", "published", "admin"], ["closed", "closed", "admin"],
     ["published", "rejected", "admin"], ["x", "closed", "admin"], ["draft", "bogus", "admin"],
