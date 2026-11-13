@@ -193,3 +193,119 @@ export function scrubContact(text: string): { text: string; redacted: boolean } 
   const value = String(text ?? "");
   return findContact(value).kinds.length > 0 ? { text: HIDDEN_MESSAGE, redacted: true } : { text: value, redacted: false };
 }
+
+/* ── outgoing chat messages (row 10) ───────────────────────────────────── */
+
+export const NAME_MASK = "[name removed]";
+export const CONTACT_MASK = "[contact details removed]";
+export const OUTGOING_HIDDEN =
+  "[Message removed: it contained contact details or names, which can be shared only after the hire is paid.]";
+export const SCRUBBED_NOTICE =
+  "We removed contact details or names from your message. They can be shared only after the hire is paid.";
+
+const LEGAL_SUFFIXES = new Set(["pvt", "private", "ltd", "limited", "llp", "llc", "inc", "incorporated", "corp", "corporation", "co", "company", "opc", "plc", "gmbh", "the"]);
+
+const foldName = (s: string): string =>
+  String(s ?? "")
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+
+// Single words are letters only: "2026" or "3m" in a company name must not mask ordinary numbers in chat (the whole phrase still does).
+const nameTokens = (s: string): string[] => foldName(s).split(/[^\p{L}\p{N}]+/u).filter((t) => t.length >= 3 && /^\p{L}+$/u.test(t));
+
+// Words in a company name that say what it does, not who it is, plus first names that are also plain English.
+const GENERIC_COMPANY_WORDS = new Set(
+  ("technologies technology tech solutions labs lab systems system services service software group consulting consultancy global india digital infotech enterprises enterprise industries " +
+    "ventures studio studios works innovations networks media design agency partners holdings international web cloud data analytics").split(" "),
+);
+const COMMON_ENGLISH_NAMES = new Set(
+  "will mark may grant hope rose dawn bill chase joy sunny river art pat ray rob sam max jack july april june faith summer".split(" "),
+);
+
+/**
+ * Names that must not pass between the two sides before the hire is paid:
+ * the company (full name and the name without "Pvt Ltd"), every contact name
+ * of the employer, and the intern's first and last name. Whole phrases of any
+ * length, single words of three letters or more.
+ */
+export function denyTermsFor(input: { company?: string | null; employerNames?: (string | null | undefined)[]; internFirst?: string | null; internLast?: string | null }): string[] {
+  const out = new Set<string>();
+  const phrase = (s: string | null | undefined) => {
+    const f = foldName(s ?? "");
+    if (f.length >= 3) out.add(f);
+  };
+  const person = (s: string | null | undefined) => {
+    if (!COMMON_ENGLISH_NAMES.has(foldName(s ?? ""))) phrase(s);
+    for (const t of nameTokens(s ?? "")) if (!COMMON_ENGLISH_NAMES.has(t)) out.add(t);
+  };
+  phrase(input.company);
+  const coreWords = foldName(input.company ?? "")
+    .split(/[^\p{L}\p{N}]+/u)
+    .filter((w) => w && !LEGAL_SUFFIXES.has(w));
+  if (coreWords.join(" ").length >= 3) out.add(coreWords.join(" "));
+  // The distinctive word of a multi-word name on its own ("Acme" of "Acme Technologies").
+  for (const w of coreWords) if (w.length >= 4 && /^\p{L}+$/u.test(w) && !GENERIC_COMPANY_WORDS.has(w)) out.add(w);
+  for (const n of input.employerNames ?? []) person(n);
+  person(input.internFirst);
+  person(input.internLast);
+  person(`${input.internFirst ?? ""} ${input.internLast ?? ""}`);
+  return [...out];
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+function denyRegex(terms: string[]): RegExp | null {
+  const parts = terms.filter((t) => t.length >= 3).sort((a, b) => b.length - a.length).map((t) => escapeRe(t).replace(/\s+/g, "\\s+"));
+  return parts.length ? new RegExp(String.raw`(?<![\p{L}\p{N}])(?:${parts.join("|")})(?![\p{L}\p{N}])`, "giu") : null;
+}
+
+/** True when the text mentions a denied name, however it is cased, accented or spaced out ("r a h u l"). */
+export function hasDeniedName(text: string, terms: string[]): boolean {
+  const re = denyRegex(terms);
+  if (!re) return false;
+  const folded = foldName(normalizeForDetection(text)).replace(/\p{Cf}/gu, "");
+  if (re.test(folded)) return true;
+  // "R a h u l", "r.a.h.u.l": a deliberately spelled-out run is squashed and compared as one word.
+  const squashed = terms.map((t) => t.replace(/[^\p{L}\p{N}]/gu, "")).filter((t) => t.length >= 4);
+  for (const run of String(text ?? "").normalize("NFKC").matchAll(/(?<![\p{L}\p{N}])(?:[\p{L}\p{N}][\s.\-_*]+){3,}[\p{L}\p{N}](?![\p{L}\p{N}])/gu)) {
+    const flat = foldName(run[0]).replace(/[^\p{L}\p{N}]/gu, "");
+    if (squashed.some((t) => flat.includes(t))) return true;
+  }
+  return false;
+}
+
+/**
+ * What a chat message becomes before it is stored while contact is locked.
+ * Denied names are masked in place. Then each sentence or line that still
+ * carries a contact detail (or a name only the normalised copy exposes) is
+ * replaced on its own, so the rest of the message survives. If the whole
+ * message still trips the detector (digits split across sentences), all of it
+ * is replaced. The result never carries what the detector would flag.
+ */
+export function scrubOutgoing(body: string, terms: string[]): { text: string; changed: boolean; kinds: ContactKind[]; names: boolean } {
+  const original = String(body ?? "");
+  const kinds = new Set<ContactKind>(findContact(original).kinds);
+  const re = denyRegex(terms);
+  let names = false;
+  let text = original;
+  if (re) {
+    text = text.replace(re, () => {
+      names = true;
+      return NAME_MASK;
+    });
+  }
+  const bad = (s: string) => findContact(s).kinds.length > 0 || hasDeniedName(s, terms);
+  text = text
+    .split(/(\n+|(?<=[.!?])\s+)/)
+    .map((part, i) => {
+      if (i % 2 === 1 || !part.trim() || !bad(part)) return part;
+      for (const k of findContact(part).kinds) kinds.add(k);
+      if (findContact(part).kinds.length === 0) names = true;
+      return findContact(part).kinds.length > 0 ? CONTACT_MASK : NAME_MASK;
+    })
+    .join("");
+  if (bad(text)) text = OUTGOING_HIDDEN;
+  return { text, changed: text !== original, kinds: [...kinds], names };
+}

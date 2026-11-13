@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { applyThreadEvent, badgeText, failSent, groupByDay, markMineRead, mergeMessages, reconcileSent, relativeTime, statusText, truncatePreview, type Msg, type ThreadRow } from "./ui-logic.ts";
 
 const NOW = new Date(2026, 10, 7, 12, 0, 0).getTime();
-const th = (id: string, unread = 0, at: string | null = null): ThreadRow => ({ id, proposalId: null, counterpartId: "x", counterpartOnline: false, counterpartPresence: null, lastMessage: null, lastMessageAt: at, unread });
+const th = (id: string, unread = 0, at: string | null = null): ThreadRow => ({ id, proposalId: null, counterpartId: "x", counterpartOnline: false, counterpartPresence: null, lastMessage: null, lastMessageAt: at, unread, counterpartName: null, projectName: null, sendBlock: null });
 const msg = (id: string, createdAt: string, extra: Partial<Msg> = {}): Msg => ({ id, mine: true, body: "hi", createdAt, deliveredAt: null, readAt: null, ...extra });
 
 test("relative time", () => {
@@ -88,4 +88,17 @@ test("proposal card labels", () => {
   assert.equal(durationLabel("1m"), "1 month");
   assert.equal(durationLabel("soon"), null);
   assert.equal(durationLabel(undefined), null);
+});
+
+import { threadTitle } from "./ui-logic.ts";
+
+test("thread title: server names first, project for an intern before hire, id label only as fallback", () => {
+  assert.equal(threadTitle("employer", { counterpartId: "ab12C68E", counterpartName: "RS", projectName: "Billing app" }).title, "RS");
+  assert.equal(threadTitle("employer", { counterpartId: "ab12C68E", counterpartName: "RS", projectName: "Billing app" }).subtitle, "Billing app");
+  assert.equal(threadTitle("employer", { counterpartId: "ab12C68E", counterpartName: "Rahul Sharma", projectName: null }).title, "Rahul Sharma");
+  assert.equal(threadTitle("intern", { counterpartId: "ab12C68E", counterpartName: null, projectName: "Billing app" }).title, "Billing app");
+  const hired = threadTitle("intern", { counterpartId: "ab12C68E", counterpartName: "Qorvex Labs", projectName: "Billing app" });
+  assert.deepEqual([hired.title, hired.subtitle], ["Qorvex Labs", "Billing app"]);
+  assert.equal(threadTitle("intern", { counterpartId: "ab12C68E" }).title, "Company C68E");
+  assert.equal(threadTitle("employer", { counterpartId: "ab12C68E" }).title, "Candidate C68E");
 });

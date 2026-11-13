@@ -1,7 +1,11 @@
 /**
- * Messaging + presence end to end (Chromium, QA stack). WRITTEN, NOT YET RUN.
+ * Messaging + presence end to end (Chromium, local e2e stack, loopback DB only).
  *
- *   E2E_BASE_URL=http://localhost:3500 DATABASE_URL=postgresql://findtern@127.0.0.1:5435/findtern_qa \
+ * Send rules covered here: the intern cannot write first (409), contact details and names are removed from
+ * what is stored until the hire is paid and pass afterwards, a withdrawn proposal closes the thread (409 and
+ * `closed`), and thread names (employer: initials, then full name; intern: project, company after hire).
+ *
+ *   E2E_BASE_URL=http://localhost:3500 DATABASE_URL=postgresql://findtern@127.0.0.1:5435/findtern_e2e \
  *     node --test --test-concurrency=1 e2e/messaging.e2e.mjs        (npm run test:e2e:messaging)
  *
  * Needs a migrated DB (drizzle/0023_messaging) and a server started with TRUST_PROXY=1 (per-login
@@ -86,6 +90,24 @@ test("the employer creates the thread from the proposal (idempotent)", async () 
   assert.equal(bad.status, 404, "a proposal id that is not this pair's is a 404");
 });
 
+test("row 24: the intern cannot send until the employer has written in the thread", async () => {
+  const early = await api(P.I.page, "POST", `/api/threads/${threadId}/messages`, { body: "Hello, may I ask a question?" });
+  assert.equal(early.status, 409, JSON.stringify(early.body));
+  assert.equal(early.body.code, "employer_first");
+  assert.equal((await one(`SELECT count(*)::int AS n FROM messages WHERE thread_id = $1`, [threadId])).n, 0, "nothing stored");
+  const view = await api(P.I.page, "GET", `/api/threads/${threadId}/messages`);
+  assert.equal(view.body.sendBlock, "employer_first");
+  assert.equal(view.body.closed, false);
+  const list = await api(P.I.page, "GET", "/api/threads");
+  assert.equal(list.body.threads.find((t) => t.id === threadId).sendBlock, "employer_first");
+  // The composer is replaced by the waiting note. (Heartbeats are blocked here: the limiter allows 6 a minute and the presence test needs its share.)
+  await P.I.page.route("**/api/presence/heartbeat", (r) => r.abort());
+  await P.I.page.goto(url(`/intern/messages/${threadId}`), { waitUntil: "domcontentloaded" });
+  await P.I.page.getByText("You can reply once the company has sent you a message.").waitFor({ timeout: 20_000 });
+  assert.equal(await P.I.page.getByLabel(/message to/i).count(), 0, "no composer");
+  await P.I.page.unroute("**/api/presence/heartbeat");
+});
+
 test("messages flow both ways", async () => {
   const a = await api(P.E.page, "POST", `/api/threads/${threadId}/messages`, { body: "Hi from the employer" });
   assert.equal(a.status, 201, JSON.stringify(a.body));
@@ -99,6 +121,8 @@ test("messages flow both ways", async () => {
   const empView = await api(P.E.page, "GET", `/api/threads/${threadId}/messages`);
   assert.ok(empView.body.messages.some((m) => m.body === "Hello back from the intern" && m.mine === false));
   assert.equal((await one(`SELECT count(*)::int AS n FROM messages WHERE thread_id = $1`, [threadId])).n, 2);
+  const after = await api(P.I.page, "GET", `/api/threads/${threadId}/messages`);
+  assert.equal(after.body.sendBlock, null, "the intern may write now");
 });
 
 test("a third user gets 404 on GET, POST and read; unauthenticated gets 401", async () => {
@@ -170,7 +194,12 @@ test("unread badge rises WITHOUT reload for the recipient, clears on opening; se
 
 test("presence: Online after a heartbeat, Offline after more than 90 s of silence", async () => {
   await P.I.page.goto(url("/intern/dashboard"), { waitUntil: "domcontentloaded" });
-  const beat = await api(P.I.page, "POST", "/api/presence/heartbeat");
+  // The heartbeat limiter is 6 a minute and every page load beats twice, so the earlier tests may have used it up: wait it out.
+  let beat = await api(P.I.page, "POST", "/api/presence/heartbeat");
+  for (let i = 0; i < 14 && beat.status === 429; i++) {
+    await new Promise((r) => setTimeout(r, 5_000));
+    beat = await api(P.I.page, "POST", "/api/presence/heartbeat");
+  }
   assert.equal(beat.status, 200, JSON.stringify(beat.body));
   const online = await api(P.E.page, "GET", "/api/threads");
   assert.equal(online.body.threads.find((t) => t.id === threadId).counterpartOnline, true, "API says online");
@@ -227,7 +256,7 @@ test("thread list and messages carry no email, phone or company before hire", as
     one(`SELECT company_email, phone_number, company_name, name FROM employers WHERE id = $1`, [E.id]),
   ]);
   const forbidden = [ie.email, ie.phone_number, ee.company_email, ee.phone_number, ee.company_name, ee.name];
-  const ALLOWED = ["counterpartId", "counterpartOnline", "counterpartPresence", "id", "lastMessage", "lastMessageAt", "proposalId", "unread"];
+  const ALLOWED = ["counterpartId", "counterpartName", "counterpartOnline", "counterpartPresence", "id", "lastMessage", "lastMessageAt", "projectName", "proposalId", "sendBlock", "unread"];
   for (const [who, side] of [["intern", P.I], ["employer", P.E]]) {
     const list = await api(side.page, "GET", "/api/threads");
     assert.equal(list.status, 200);
@@ -237,10 +266,112 @@ test("thread list and messages carry no email, phone or company before hire", as
     for (const m of msgs.body.messages) assert.deepEqual(Object.keys(m).sort(), ["body", "createdAt", "deliveredAt", "id", "mine", "readAt"], "message keys");
     const blob = JSON.stringify([list.body, msgs.body]);
     for (const v of forbidden) assert.ok(!blob.includes(v), `${who} payload leaks ${v}`);
+    // Neither side gets the other's real name before the hire (initials only for the employer's view of the intern).
+    assert.ok(!blob.includes(`Wpt${RUN}`), `${who} payload leaks the intern's last name`);
+    assert.ok(!blob.includes(`Intern${"msgI"}`), `${who} payload leaks the intern's first name`);
   }
   // The pages themselves (intern side) do not print the company before hire.
   await P.I.page.goto(url("/intern/messages"), { waitUntil: "domcontentloaded" });
   await P.I.page.getByRole("list", { name: "Conversations" }).waitFor({ timeout: 15_000 });
   const body = await P.I.page.locator("main").textContent();
   for (const v of [ee.company_name, ee.company_email, ee.phone_number]) assert.ok(!body.includes(v), `messages page leaks ${v}`);
+});
+
+const bodies = async () => (await rows(`SELECT body FROM messages WHERE thread_id = $1 ORDER BY created_at`, [threadId])).map((r) => r.body);
+
+test("row 25: the employer sees the candidate's initials and the project; the intern sees the project, not the company", async () => {
+  const initials = `${I.name.split(" ")[0][0]}${I.name.split(" ")[1][0]}`.toUpperCase();
+  const emp = (await api(P.E.page, "GET", "/api/threads")).body.threads.find((t) => t.id === threadId);
+  assert.equal(emp.counterpartName, initials);
+  assert.equal(emp.projectName, `Messaging project ${RUN}`);
+  const int = (await api(P.I.page, "GET", "/api/threads")).body.threads.find((t) => t.id === threadId);
+  assert.equal(int.counterpartName, null, "no company name before hire");
+  assert.equal(int.projectName, `Messaging project ${RUN}`);
+
+  await P.I.page.goto(url("/intern/messages"), { waitUntil: "domcontentloaded" });
+  const list = P.I.page.getByRole("list", { name: "Conversations" });
+  await list.getByText(`Messaging project ${RUN}`).first().waitFor({ timeout: 15_000 });
+  assert.ok(!/Company [0-9A-Z]{4}\b/.test(await list.textContent()), "no Company C68E style label");
+  await P.E.page.goto(url("/employer/messages"), { waitUntil: "domcontentloaded" });
+  const elist = P.E.page.getByRole("list", { name: "Conversations" });
+  await elist.getByText(initials, { exact: true }).first().waitFor({ timeout: 15_000 });
+  assert.ok(!/Candidate [0-9A-Z]{4}\b/.test(await elist.textContent()), "no Candidate 1F2E style label");
+});
+
+test("row 10: until the hire is paid, contact details and names are removed before storing, and the sender is told", async () => {
+  const tryThem = [
+    [P.E, "Email me at meera.k@gmail.com please", /@gmail|meera\.k/],
+    [P.E, "Call me on 98765 43210", /98765|43210/],
+    [P.E, "nine eight seven six five four three two one zero", /nine eight/],
+    [P.E, "Join https://wa.me/919876543210 or t.me/meera_k", /wa\.me|t\.me/],
+    [P.E, "Ping me @meera_k or insta: meera_k22", /meera_k/],
+    [P.E, `We are ${E.company}, a nice team`, new RegExp(E.company.split(" ")[0], "i")],
+    [P.E, "I am Emp msgE, nice to meet you", /Emp msgE/i],
+    [P.I, `My name is Intern${"msgI"} Wpt${RUN}`, new RegExp(`Intern${"msgI"}|Wpt${RUN}`, "i")],
+    [P.I, "my mail is a [at] gmail [dot] com and number 9876543210", /gmail|9876543210/],
+    [P.I, `Call ${E.company.toUpperCase()}`, new RegExp(E.company.split(" ")[0], "i")],
+  ];
+  for (const [who, text, bad] of tryThem) {
+    const r = await api(who.page, "POST", `/api/threads/${threadId}/messages`, { body: text });
+    assert.equal(r.status, 201, `${text} -> ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.scrubbed, true, `sender told: ${text}`);
+    assert.ok(r.body.notice, "notice text present");
+    assert.ok(!bad.test(r.body.message.body), `returned body still has it: ${r.body.message.body}`);
+    const stored = await one(`SELECT body FROM messages WHERE id = $1`, [r.body.message.id]);
+    assert.ok(!bad.test(stored.body), `stored body still has it: ${stored.body}`);
+  }
+  // The other side reads the scrubbed text only.
+  const seen = JSON.stringify((await api(P.I.page, "GET", `/api/threads/${threadId}/messages`)).body);
+  for (const bad of [/98765/, /@gmail/, /wa\.me/, /meera_k/]) assert.ok(!bad.test(seen), `intern sees ${bad}`);
+  // A clean message is stored as written and carries no notice.
+  const ok = await api(P.E.page, "POST", `/api/threads/${threadId}/messages`, { body: "Can you start on Monday for 3 months?" });
+  assert.equal(ok.status, 201);
+  assert.equal(ok.body.scrubbed, false);
+  assert.equal(ok.body.message.body, "Can you start on Monday for 3 months?");
+  // Rows stored before the rule are scrubbed on read too.
+  const old = await one(`INSERT INTO messages (thread_id, sender_id, body) VALUES ($1,$2,$3) RETURNING id`, [threadId, E.id, "legacy: call 9876501234 now"]);
+  const read = (await api(P.I.page, "GET", `/api/threads/${threadId}/messages`)).body.messages.find((m) => m.id === old.id);
+  assert.ok(read && !/9876501234/.test(read.body), `legacy row hidden on read: ${read?.body}`);
+  assert.ok(!(await bodies()).slice(0, -1).some((b) => /meera\.k@gmail|wa\.me\/9198/.test(b)), "nothing leaked in earlier rows");
+});
+
+test("row 10: once the hire is paid, contact details and names pass", async () => {
+  await rows(`UPDATE proposals SET status = 'hired', hired_at = now() WHERE employer_id = $1 AND intern_id = $2`, [E.id, I.id]);
+  const mail = `hire.contact.${RUN}@gmail.com`;
+  const r = await api(P.E.page, "POST", `/api/threads/${threadId}/messages`, { body: `Welcome aboard. Mail ${mail} or call 98765 43210. This is ${E.company}.` });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(r.body.scrubbed, false);
+  assert.ok(r.body.message.body.includes(mail) && r.body.message.body.includes(E.company), r.body.message.body);
+  const seen = await api(P.I.page, "GET", `/api/threads/${threadId}/messages`);
+  assert.ok(seen.body.messages.some((m) => m.body.includes(mail)), "intern reads it after the hire");
+
+  // Row 25: after the hire the intern sees the company name and the employer the full name.
+  const int = (await api(P.I.page, "GET", "/api/threads")).body.threads.find((t) => t.id === threadId);
+  assert.equal(int.counterpartName, E.company);
+  const emp = (await api(P.E.page, "GET", "/api/threads")).body.threads.find((t) => t.id === threadId);
+  assert.equal(emp.counterpartName, I.name);
+});
+
+test("row 11: a withdrawn proposal closes the thread for both sides; rejected does not", async () => {
+  await rows(`UPDATE proposals SET status = 'rejected' WHERE employer_id = $1 AND intern_id = $2`, [E.id, I.id]);
+  assert.equal((await api(P.E.page, "POST", `/api/threads/${threadId}/messages`, { body: "still open after rejected" })).status, 201);
+  assert.equal((await api(P.I.page, "GET", `/api/threads/${threadId}/messages`)).body.closed, false);
+
+  await rows(`UPDATE proposals SET status = 'withdrawn' WHERE employer_id = $1 AND intern_id = $2`, [E.id, I.id]);
+  const before = (await one(`SELECT count(*)::int AS n FROM messages WHERE thread_id = $1`, [threadId])).n;
+  for (const who of [P.E, P.I]) {
+    const r = await api(who.page, "POST", `/api/threads/${threadId}/messages`, { body: "can I still write?" });
+    assert.equal(r.status, 409, JSON.stringify(r.body));
+    assert.equal(r.body.code, "closed");
+    const g = await api(who.page, "GET", `/api/threads/${threadId}/messages`);
+    assert.equal(g.status, 200);
+    assert.equal(g.body.closed, true);
+    assert.ok(g.body.messages.length > 0, "history stays readable");
+  }
+  assert.equal((await one(`SELECT count(*)::int AS n FROM messages WHERE thread_id = $1`, [threadId])).n, before, "nothing stored");
+  for (const [who, base] of [[P.E, "employer"], [P.I, "intern"]]) {
+    await who.page.goto(url(`/${base}/messages/${threadId}`), { waitUntil: "domcontentloaded" });
+    await who.page.getByText("Closed: the proposal was withdrawn").waitFor({ timeout: 20_000 });
+    assert.equal(await who.page.getByLabel(/message to/i).count(), 0, `${base}: no composer`);
+  }
 });

@@ -47,3 +47,23 @@ export function canStartThread(input: {
   if (input.role === "employer") return input.hasProposal;
   return input.hasProposal || input.employerAlreadyMessaged;
 }
+
+export type SendBlock = "closed" | "employer_first";
+
+export const SEND_BLOCK_TEXT: Record<SendBlock, { employer: string; intern: string }> = {
+  closed: { employer: "Closed: the proposal was withdrawn", intern: "Closed: the proposal was withdrawn" },
+  employer_first: { employer: "The candidate can reply once you have sent a message.", intern: "You can reply once the company has sent you a message." },
+};
+
+/** Rows 11 and 24. A thread is closed once its proposal is withdrawn (rejected and expired stay open); an intern may send only after the employer has. */
+export function canSend(input: {
+  role: "employer" | "intern";
+  employerHasMessaged: boolean;
+  proposalStatus: string | null | undefined;
+}): { ok: true } | { ok: false; reason: SendBlock } {
+  if ((input.proposalStatus ?? "").toLowerCase() === "withdrawn") return { ok: false, reason: "closed" };
+  if (input.role === "intern" && !input.employerHasMessaged) return { ok: false, reason: "employer_first" };
+  return { ok: true };
+}
+
+export const isThreadClosed = (proposalStatus: string | null | undefined): boolean => (proposalStatus ?? "").toLowerCase() === "withdrawn";

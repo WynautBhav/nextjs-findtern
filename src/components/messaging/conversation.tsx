@@ -7,7 +7,7 @@ import { ArrowLeft, ArrowDown, ChevronRight, SendHorizontal } from "lucide-react
 import { Avatar } from "@/components/app/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { csrfFetch } from "@/lib/client-fetch";
-import { MAX_BODY } from "@/lib/messaging/logic";
+import { MAX_BODY, SEND_BLOCK_TEXT, type SendBlock } from "@/lib/messaging/logic";
 import {
   failSent,
   counterpartIdentity,
@@ -20,6 +20,7 @@ import {
   durationLabel,
   proposalStatusLabel,
   statusText,
+  threadTitle,
   type Msg,
   type ProposalCardData,
 } from "@/lib/messaging/ui-logic";
@@ -33,13 +34,18 @@ export function Conversation({ base, threadId, proposal = null }: { base: "emplo
   const { threads } = useThreads();
   const thread = threads.find((t) => t.id === threadId);
   const ident = counterpartIdentity(base, thread?.counterpartId ?? threadId);
-  const who = thread ? ident.label : ident.word;
+  const head = threadTitle(base, thread, threadId);
+  const who = thread ? head.title : ident.word;
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "missing">("loading");
   const [offline, setOffline] = useState(false);
   const [announce, setAnnounce] = useState("");
   const [atBottom, setAtBottom] = useState(true);
   const [text, setText] = useState("");
+  // Rows 11 and 24: the server decides whether this side may send; the thread list carries the same answer until messages load.
+  const [block, setBlock] = useState<SendBlock | null | undefined>(undefined);
+  const [notice, setNotice] = useState<string | null>(null);
+  const activeBlock = block === undefined ? (thread?.sendBlock ?? null) : block;
   const [sending, setSending] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const heading = useRef<HTMLHeadingElement>(null);
@@ -60,7 +66,8 @@ export function Conversation({ base, threadId, proposal = null }: { base: "emplo
       const r = await csrfFetch(`/api/threads/${encodeURIComponent(threadId)}/messages`, { cache: "no-store" });
       if (r.status === 404) return setStatus("missing");
       if (!r.ok) throw new Error();
-      const j = (await r.json()) as { messages: Msg[] };
+      const j = (await r.json()) as { messages: Msg[]; sendBlock?: SendBlock | null };
+      setBlock(j.sendBlock ?? null);
       if (!seenFirstLoad.current) {
         seenFirstLoad.current = true;
         setNewFromId(j.messages.find((m) => !m.mine && !m.readAt)?.id ?? null);
@@ -169,8 +176,15 @@ export function Conversation({ base, threadId, proposal = null }: { base: "emplo
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ body }),
         });
+        if (r.status === 409) {
+          const j = (await r.json().catch(() => null)) as { code?: SendBlock } | null;
+          if (j?.code === "closed" || j?.code === "employer_first") setBlock(j.code);
+          setMsgs((cur) => removeMsg(cur, tempId));
+          return;
+        }
         if (!r.ok) throw new Error();
-        const j = (await r.json()) as { message: Msg };
+        const j = (await r.json()) as { message: Msg; notice?: string | null };
+        setNotice(j.notice ?? null);
         setMsgs((cur) => reconcileSent(cur, tempId, j.message));
       } catch {
         setMsgs((cur) => failSent(cur, tempId));
@@ -193,6 +207,7 @@ export function Conversation({ base, threadId, proposal = null }: { base: "emplo
   const proposalHref = proposal ? (base === "employer" ? `/employer/proposal/${encodeURIComponent(proposal.id)}` : `/intern/proposals/${encodeURIComponent(proposal.id)}`) : null;
   const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700";
   const canSend = !!text.trim() && !sending;
+  const blockText = activeBlock ? SEND_BLOCK_TEXT[activeBlock][base] : null;
 
   return (
     <section aria-label="Conversation" className="flex h-full min-h-0 flex-col bg-white">
@@ -200,12 +215,13 @@ export function Conversation({ base, threadId, proposal = null }: { base: "emplo
         <Link href={`/${base}/messages`} className={cn("grid size-11 shrink-0 place-items-center rounded-apple-sm text-ink-700 hover:bg-ink-100 md:hidden", focusRing)} aria-label="Back to conversations">
           <ArrowLeft className="size-5" aria-hidden />
         </Link>
-        <Avatar masked={base === "employer"} initials={ident.initials} name={who} label={who} size="sm" />
+        <Avatar masked={base === "employer"} initials={thread ? head.initials : ident.initials} name={who} label={who} size="sm" />
         <div className="min-w-0 flex-1">
           <h1 ref={heading} tabIndex={-1} className="truncate text-base font-semibold leading-tight text-ink-900 outline-none">
             {who}
           </h1>
           <div className="flex min-h-4 items-center gap-2">
+            {thread && head.subtitle ? <span className="truncate text-xs text-text-subtle">{head.subtitle}</span> : null}
             {thread ? <PresenceDot online={thread.counterpartOnline} label={thread.counterpartPresence} /> : null}
             {offline ? (
               <span role="status" className="text-xs text-text-subtle">
@@ -263,7 +279,9 @@ export function Conversation({ base, threadId, proposal = null }: { base: "emplo
             </div>
           ) : null}
           {status === "missing" ? <p className="text-sm text-text-subtle">This conversation was not found. It may have been closed.</p> : null}
-          {status === "ready" && msgs.length === 0 ? <p className="py-8 text-center text-sm text-text-subtle">No messages yet. Write the first one below.</p> : null}
+          {status === "ready" && msgs.length === 0 ? (
+            <p className="py-8 text-center text-sm text-text-subtle">{activeBlock === "employer_first" ? "No messages yet. The company writes first." : activeBlock === "closed" ? "No messages in this conversation." : "No messages yet. Write the first one below."}</p>
+          ) : null}
           {groups.map((g) => (
             <div key={g.key} className="space-y-3">
               <p className="text-center">
@@ -330,6 +348,11 @@ export function Conversation({ base, threadId, proposal = null }: { base: "emplo
         {announce}
       </div>
 
+      {blockText ? (
+        <div role="status" className="border-t border-ink-200 bg-ink-50 px-4 py-4 text-center text-sm font-medium text-ink-700">
+          {blockText}
+        </div>
+      ) : (
       <form
         className="border-t border-ink-200 bg-white p-2 sm:p-3"
         onSubmit={(e) => {
@@ -347,7 +370,10 @@ export function Conversation({ base, threadId, proposal = null }: { base: "emplo
             rows={1}
             maxLength={MAX_BODY}
             disabled={status === "missing"}
-            onChange={(e) => setText(e.target.value)}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (notice) setNotice(null);
+            }}
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                 e.preventDefault();
@@ -374,7 +400,13 @@ export function Conversation({ base, threadId, proposal = null }: { base: "emplo
         <p id="msg-hint" className="nums mt-1.5 hidden text-xs text-text-subtle sm:block">
           Enter to send, Shift+Enter for a new line{text.length > MAX_BODY * 0.9 ? ` · ${text.length}/${MAX_BODY}` : ""}
         </p>
+        {notice ? (
+          <p role="status" className="mt-1.5 text-xs font-medium text-ink-700">
+            {notice}
+          </p>
+        ) : null}
       </form>
+      )}
     </section>
   );
 }
