@@ -40,7 +40,7 @@ export function LockedRoles({ complete, activated, done, total }: { complete: bo
       label: "Activate your profile",
       detail: activated ? "Done." : "The one-time activation fee, paid from your dashboard once the profile is complete.",
       done: activated,
-      href: "/intern/dashboard",
+      href: "/intern/dashboard#activation",
       cta: "Go to activation",
     },
   ];

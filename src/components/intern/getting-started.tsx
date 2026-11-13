@@ -7,6 +7,7 @@ import { AiInterviewAction } from "@/components/intern/ai-interview-join-card";
 import { buttonClass } from "@/components/ui/button";
 import type { AiInterviewPhase } from "@/lib/ai-interview";
 import { formatMoney } from "@/lib/format";
+import { gettingStartedStage, showFee } from "@/lib/intern-stage";
 import type { CompletionItem } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 import { completionWhy } from "./completion-why";
@@ -33,6 +34,7 @@ export function GettingStarted({
   aiPhase,
   aiLink,
   hidden = false,
+  collegeName = null,
   aside,
 }: {
   completion: Completion;
@@ -45,15 +47,15 @@ export function GettingStarted({
   aiLink: string | null;
   /** Open to work is off: the profile stays hidden even once it is live. */
   hidden?: boolean;
+  /** A college that has paid for a batch: its code can waive the fee (shown on top, once the profile is complete). */
+  collegeName?: string | null;
   aside?: React.ReactNode;
 }) {
   const scored = aiPhase === "scored";
   const fee = formatMoney(feeMinor, "INR");
-  // A candidate who has paid can always take the interview. Profile rules
-  // tightened after some candidates paid (Aadhaar, PAN image, emergency
-  // contact); they still owe those fields, but that must never hide the
-  // interview they already paid for.
-  const stage: 0 | 1 | 2 = activated && !scored ? 2 : !completion.complete ? 0 : !activated ? 1 : 2;
+  const stage = gettingStartedStage({ profileComplete: completion.complete, activated, scored });
+  // The price stays out of sight until the profile is complete (bug sheet 12 Nov, row 17).
+  const feeVisible = showFee(stage);
   const done = [completion.complete, activated, scored];
   const doneCount = done.filter(Boolean).length;
   const stateOf = (i: number): StopState => (i === stage ? "current" : done[i] ? "done" : "todo");
@@ -73,7 +75,12 @@ export function GettingStarted({
       // The profile connector fills section by section, so progress shows before the stage is done.
       fill: completion.done / Math.max(1, completion.total),
     },
-    { title: "Activation", status: activated ? "Paid" : `${fee}, one-time`, unlocks: "Opens the AI interview", fill: activated ? 1 : 0 },
+    {
+      title: "Activation",
+      status: activated ? "Paid" : feeVisible ? `${fee}, one-time` : "After your profile",
+      unlocks: "Opens the AI interview",
+      fill: activated ? 1 : 0,
+    },
     {
       title: "AI interview",
       status: activated || scored ? interviewStatus[aiPhase] : "After activation",
@@ -88,6 +95,7 @@ export function GettingStarted({
 
   return (
     <div className="grid gap-4 xl:grid-cols-3">
+      {collegeName && stage === 1 && !activated ? <CollegeCodeNotice collegeName={collegeName} /> : null}
       {/* ── The current stage, opened. ── */}
       {stage === 0 ? (
         <Tile
@@ -110,13 +118,12 @@ export function GettingStarted({
           </div>
         </Tile>
       ) : stage === 1 ? (
-        <Tile
-          title="Activate your profile"
-          description="Your profile is complete. Activation is the only payment you make on Findtern."
-          className="xl:col-span-2"
-        >
-          {payment}
-        </Tile>
+        // The anchor "Go to activation" lands on; the wrapper keeps the tile's grid slot and height.
+        <div id="activation" className="scroll-mt-24 xl:col-span-2 [&>section]:h-full">
+          <Tile title="Activate your profile" description="Your profile is complete. Activation is the only payment you make on Findtern.">
+            {payment}
+          </Tile>
+        </div>
       ) : (
         <Tile title="Take the AI interview" description="It produces your Findtern Score, the number employers shortlist on." className="xl:col-span-2">
           <AiInterviewAction internId={internId} initialPhase={aiPhase} initialLink={aiLink} />
@@ -134,7 +141,7 @@ export function GettingStarted({
       )}
 
       <div className="grid min-w-0 content-start gap-4 md:grid-cols-2 md:[&>:last-child:nth-child(odd)]:col-span-2 xl:grid-cols-1 xl:[&>:last-child:nth-child(odd)]:col-span-1">
-        <FeeTile fee={fee} activated={activated} />
+        {feeVisible ? <FeeTile fee={fee} activated={activated} /> : null}
         {aside}
       </div>
       {/* ── The journey: the screen's one brand tile. ── */}
@@ -287,12 +294,32 @@ function FeeTile({ fee, activated }: { fee: string; activated: boolean }) {
           : "No subscription. The fee pays for the assessment; it never buys a higher score."}
       </p>
       <Link
-        href="/guaranteed-internship-program"
-        prefetch={false}
+        href="/intern/guarantee"
         className="mt-1 inline-flex min-h-11 items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
       >
         How the 6-month guarantee works
       </Link>
     </Tile>
+  );
+}
+
+/** After the profile is built, before the fee: the college's code can cover it. First thing on the page. */
+function CollegeCodeNotice({ collegeName }: { collegeName: string }) {
+  return (
+    <section
+      aria-label="College code"
+      className="flex flex-col gap-3 rounded-apple-sm border border-brand-200 bg-brand-50 px-4 py-3.5 text-sm text-brand-950 sm:flex-row sm:items-center sm:justify-between sm:gap-4 xl:col-span-3"
+    >
+      <div className="min-w-0">
+        <p className="font-semibold">{collegeName} is on Findtern</p>
+        <p className="mt-0.5 leading-relaxed text-pretty">
+          Have your placement officer&apos;s code ready: it can waive the interview fee when you activate.
+        </p>
+      </div>
+      <a href="#activation" className={buttonClass({ variant: "primary", className: "shrink-0 max-sm:w-full" })}>
+        Go to activation
+        <ArrowRight className="size-4" aria-hidden />
+      </a>
+    </section>
   );
 }
