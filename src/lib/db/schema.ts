@@ -617,6 +617,8 @@ export const interviews = pgTable("interviews", {
   meetingLink: text("meeting_link"),
   calendarEventId: text("calendar_event_id"),
   notes: text("notes"),
+  /** First time the employer pressed Join in the app; null for legacy rows and until then. */
+  employerJoinedAt: timestamp("employer_joined_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({

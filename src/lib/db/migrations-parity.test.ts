@@ -17,7 +17,7 @@ const KNOWN_MISMATCHES: Record<string, string> = {
     "Named UNIQUE constraint in 0021 is produced by drizzle's implicit .unique() on idempotencyKey (default name matches).",
 };
 
-/** Exact (whitespace-normalised) UPDATE/DELETE statements permitted in 0018-0034. */
+/** Exact (whitespace-normalised) UPDATE/DELETE statements permitted in 0018-0035. */
 const ALLOWED_DML = new Set([
   `UPDATE "projects" SET "status" = 'published', "published_at" = COALESCE("published_at", "created_at") WHERE "status" = 'active';`,
   `UPDATE "projects" SET "status" = 'paused' WHERE "status" = 'inactive';`,
@@ -28,7 +28,7 @@ const ALLOWED_DML = new Set([
 const files = readdirSync(SQL_DIR).filter((f) => f.endsWith(".sql")).sort();
 const NEW = files.filter((f) => {
   const n = Number(f.slice(0, 4));
-  return n >= 18 && n <= 34;
+  return n >= 18 && n <= 35;
 });
 
 // Same split/strip as scripts/migrate.ts statements().
@@ -82,8 +82,8 @@ function sqlTables(sql: string) {
   return out;
 }
 
-describe("migration files 0018-0034", () => {
-  it("are present", () => assert.equal(NEW.length, 17));
+describe("migration files 0018-0035", () => {
+  it("are present", () => assert.equal(NEW.length, 18));
 
   for (const f of NEW) {
     const sql = read(join(SQL_DIR, f));
@@ -170,15 +170,24 @@ describe("migration files 0018-0034", () => {
     assert.match(down, /DROP COLUMN IF EXISTS "show_activity"/);
   });
 
-  it("every 0018-0034 migration after 0024 has a rollback file", () => {
+  it("every 0018-0035 migration after 0024 has a rollback file", () => {
     for (const f of NEW.filter((x) => Number(x.slice(0, 4)) >= 25)) {
       const down = join(SQL_DIR, "rollback", f.replace(/\.sql$/, ".down.sql"));
       assert.ok(readFileSync(down, "utf8").includes(`DELETE FROM "_ft_migrations" WHERE "name" = '${f}'`), down);
     }
   });
 
-  it("each index migration (0028+) creates exactly one index, so no transaction holds locks on several tables", () => {
-    const indexFiles = NEW.filter((x) => Number(x.slice(0, 4)) >= 28);
+  it("0035 adds interviews.employer_joined_at: nullable timestamp, additive, matching drizzle", () => {
+    const stmts = split(read(join(SQL_DIR, "0035_interviews_employer_joined_at.sql")));
+    assert.equal(stmts.length, 2);
+    assert.equal(norm(stmts[1]), 'ALTER TABLE "interviews" ADD COLUMN IF NOT EXISTS "employer_joined_at" timestamp;');
+    assert.match(DRIZZLE_FILES["schema.ts"], /employerJoinedAt: timestamp\("employer_joined_at"\)/);
+    assert.equal(drizzleColumns("interviews").get("employer_joined_at"), false);
+    assert.match(read(join(SQL_DIR, "rollback", "0035_interviews_employer_joined_at.down.sql")), /DROP COLUMN IF EXISTS "employer_joined_at"/);
+  });
+
+  it("each index migration (0028-0034) creates exactly one index, so no transaction holds locks on several tables", () => {
+    const indexFiles = NEW.filter((x) => Number(x.slice(0, 4)) >= 28 && Number(x.slice(0, 4)) <= 34);
     assert.equal(indexFiles.length, 7);
     for (const f of indexFiles) {
       const stmts = split(read(join(SQL_DIR, f)));
@@ -216,7 +225,7 @@ describe("migration numbering and schema exports", () => {
   });
 });
 
-describe("rollback files for 0018-0034", () => {
+describe("rollback files for 0018-0035", () => {
   const RB_DIR = join(SQL_DIR, "rollback");
   const rbFiles = readdirSync(RB_DIR).filter((f) => f.endsWith(".down.sql"));
 
