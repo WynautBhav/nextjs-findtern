@@ -76,7 +76,7 @@ export function CandidateRow({
       {/* Spine: fills from the bottom to the score. */}
       <span aria-hidden className="absolute inset-y-3 left-2 w-1 overflow-hidden rounded-full bg-ink-100">
         <span
-          className="absolute inset-x-0 bottom-0 rounded-full bg-[linear-gradient(to_top,var(--color-brand-700),var(--color-brand-400))] transition-[height] duration-500"
+          className="absolute inset-x-0 bottom-0 rounded-full bg-[linear-gradient(to_top,var(--color-brand-700),var(--color-brand-400))] transition-[height] duration-300"
           style={{ height: c.scored ? `${Math.min(100, c.score * 10)}%` : "0%" }}
         />
       </span>
@@ -190,7 +190,7 @@ export function CandidateRow({
               return (
                 <li key={m.key} title={`${m.label} ${v > 0 ? v.toFixed(1) : "not rated"}`} className="flex flex-col items-center gap-1">
                   <span aria-hidden className="relative flex h-9 w-2.5 items-end overflow-hidden rounded-full bg-ink-100">
-                    <span className="w-full rounded-full bg-[linear-gradient(to_top,var(--color-brand-700),var(--color-brand-400))] transition-[height] duration-500 group-hover:brightness-110" style={{ height: `${Math.min(100, v * 10)}%` }} />
+                    <span className="w-full rounded-full bg-[linear-gradient(to_top,var(--color-brand-700),var(--color-brand-400))] transition-[height] duration-300 group-hover:brightness-110" style={{ height: `${Math.min(100, v * 10)}%` }} />
                   </span>
                   <span aria-hidden className="text-[10px] font-medium leading-none text-text-subtle">{INITIAL[m.key]}</span>
                   <span className="sr-only">{m.label} {v > 0 ? v.toFixed(1) : "not rated"}</span>

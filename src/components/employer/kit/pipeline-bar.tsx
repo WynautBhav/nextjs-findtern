@@ -35,7 +35,7 @@ export function PipelineBar({ stages }: { stages: PipelineStage[] }) {
                 style={{ flexGrow: s.count, flexBasis: 0 }}
                 initial={{ scaleX: 0, opacity: 0 }}
                 animate={{ scaleX: 1, opacity: 1 }}
-                transition={{ duration: 0.4, delay: 0.08 * i, ease: [0.22, 1, 0.36, 1] }}
+                transition={{ duration: 0.3, delay: Math.min(i, 3) * 0.04, ease: [0.22, 1, 0.36, 1] }}
               />
             ))}
           </div>

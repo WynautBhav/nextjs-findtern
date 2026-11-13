@@ -37,9 +37,12 @@ export function StipendGauge({ plan, id }: { plan: StipendPlan; id: string }) {
         <svg viewBox="0 0 200 112" className="block w-full" aria-hidden>
           <style>{`
             @media (prefers-reduced-motion: no-preference) {
-              .stipend-arc { animation: stipend-draw 1100ms cubic-bezier(0.2, 0.7, 0.3, 1) 120ms both; }
+              .stipend-arc { animation: stipend-draw 500ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+              .stipend-arc-pending { animation-name: stipend-draw-pending; }
             }
             @keyframes stipend-draw { from { stroke-dashoffset: var(--from); } }
+            /* The pending arc grows out of the end of the paid arc in the same sweep (no delay): its start and its length both go from 0. */
+            @keyframes stipend-draw-pending { from { stroke-dasharray: 0 200; stroke-dashoffset: 0; } }
           `}</style>
           <defs>
             <pattern id={hatch} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -55,11 +58,10 @@ export function StipendGauge({ plan, id }: { plan: StipendPlan; id: string }) {
               fill="none"
               strokeWidth="24"
               strokeLinecap="round"
-              className="stipend-arc stroke-brand-300"
+              className="stipend-arc stipend-arc-pending stroke-brand-300"
               strokeDasharray={`${pending} 200`}
               strokeDashoffset={-paid}
-              // Starts hidden under the paid arc and slides out once that has drawn.
-              style={{ "--from": `${pending - paid}`, animationDelay: "700ms" } as React.CSSProperties}
+              // Grows out of the end of the paid arc in the same sweep (stipend-draw-pending below), no delay.
             />
           ) : null}
           {paid > 0 ? (

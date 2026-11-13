@@ -20,7 +20,7 @@ import { useReducedMotion } from "motion/react";
 export function CountUp({
   value,
   currency,
-  duration = 0.6,
+  duration = 0.5,
 }: {
   value: number;
   /** When set, render as currency in this ISO code instead of a plain number. */

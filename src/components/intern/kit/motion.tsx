@@ -22,7 +22,7 @@ export function Stagger({ children, className, step = 0.06 }: { children: React.
             className="min-w-0"
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4, ease: EASE, delay: Math.min(i, 8) * step }}
+            transition={{ duration: 0.3, ease: EASE, delay: Math.min(i, 3) * step }}
           >
             {child}
           </motion.div>

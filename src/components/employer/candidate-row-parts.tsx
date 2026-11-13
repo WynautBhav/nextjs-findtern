@@ -87,7 +87,7 @@ export function ScoreBadge({ score, scored, size = "inline" }: { score: number; 
           {plan}
           {/* One word of meaning beside the coffee name, so the tier is never a bare label. */}
           <span className="font-normal text-ink-600">· {band.name}</span>
-          <Info className="size-3.5 text-ink-400" aria-hidden />
+          <Info className="size-3.5 text-ink-500" aria-hidden />
           <span className="sr-only">: what this means</span>
         </button>
       </TooltipTrigger>

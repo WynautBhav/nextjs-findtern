@@ -62,7 +62,7 @@ export function ProjectProgress({ id, name, closed, hired, open, declined, actio
             <div
               key={p.key}
               className={cn(
-                "h-full min-w-1.5 origin-left rounded-full transition-transform duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)] starting:scale-x-0 motion-reduce:transition-none",
+                "h-full min-w-1.5 origin-left rounded-full transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] starting:scale-x-0 motion-reduce:transition-none",
                 p.bar,
                 closed && "opacity-60",
               )}

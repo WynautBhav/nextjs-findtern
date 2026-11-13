@@ -38,7 +38,7 @@ export function ScoreRing({ score, size = 56, strokeWidth = 4, className }: Scor
       aria-label={label}
       title={label}
       className={cn(
-        "relative inline-grid shrink-0 place-items-center transition-[opacity,transform] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)] starting:scale-[0.96] starting:opacity-0 motion-reduce:transition-none",
+        "relative inline-grid shrink-0 place-items-center transition-[opacity,transform] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] starting:scale-[0.96] starting:opacity-0 motion-reduce:transition-none",
         className,
       )}
       style={{ width: size, height: size }}
