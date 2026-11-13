@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  canTransition, normalizeStatus, transitionError, isVisibleToInterns, isEditableByEmployer,
+  canTransition, normalizeStatus, isVisibleToInterns, isEditableByEmployer,
   submitReadiness, MAX_SKILLS_PER_PROJECT, EDITABLE_WHILE_PUBLISHED,
 } from "./lifecycle.ts";
 
@@ -11,7 +11,7 @@ const employerOk: [string, string][] = [
   ["draft", "published"], ["pending_review", "published"],
 ];
 const adminOk: [string, string][] = [
-  ["pending_review", "published"], ["pending_review", "rejected"], ["published", "closed"],
+  ["published", "closed"],
   ["paused", "closed"], ["draft", "closed"], ["rejected", "closed"], ["pending_review", "closed"],
 ];
 
@@ -27,7 +27,7 @@ test("denied edges", () => {
     ["rejected", "pending_review", "employer"], ["published", "pending_review", "employer"],
     ["draft", "closed", "employer"], ["published", "draft", "employer"], ["published", "published", "employer"],
     ["draft", "published", "admin"], ["closed", "published", "admin"], ["closed", "closed", "admin"],
-    ["published", "rejected", "admin"], ["x", "closed", "admin"], ["draft", "bogus", "admin"],
+    ["published", "rejected", "admin"], ["pending_review", "published", "admin"], ["pending_review", "rejected", "admin"], ["x", "closed", "admin"], ["draft", "bogus", "admin"],
   ];
   for (const [f, t, r] of denied) assert.equal(canTransition(f, t, r), false, `${r} ${f}>${t}`);
   assert.equal(canTransition("draft", "closed", "nobody" as never), false);
@@ -40,13 +40,6 @@ test("legacy aliases", () => {
   assert.equal(normalizeStatus("toString"), null);
   assert.equal(normalizeStatus(null), null);
   assert.equal(canTransition("active", "paused", "employer"), true);
-});
-test("reject needs a reason", () => {
-  assert.match(transitionError("pending_review", "rejected", "admin")!, /reason/);
-  assert.match(transitionError("pending_review", "rejected", "admin", { reason: "  " })!, /reason/);
-  assert.equal(transitionError("pending_review", "rejected", "admin", { reason: "Unclear scope" }), null);
-  assert.ok(transitionError("closed", "draft", "employer"));
-  assert.ok(transitionError("zzz", "draft", "employer"));
 });
 test("visibility and editability", () => {
   assert.equal(isVisibleToInterns("published"), true);

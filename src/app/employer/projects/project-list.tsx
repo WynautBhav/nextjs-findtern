@@ -35,14 +35,17 @@ export type ListProject = {
 type Action = { to: string; label: string; confirm?: { title: string; body: string; destructive?: boolean } };
 
 const ACTIONS: Record<string, Action[]> = {
-  pending_review: [{ to: "draft", label: "Withdraw to draft", confirm: { title: "Withdraw from review?", body: "It goes back to a draft. You can submit it again." } }],
+  pending_review: [
+    { to: "published", label: "Publish now" },
+    { to: "draft", label: "Back to draft", confirm: { title: "Move back to draft?", body: "It goes back to a draft. You can publish it from the edit page." } },
+  ],
   published: [
-    { to: "paused", label: "Pause", confirm: { title: "Pause this internship?", body: "Candidates stop seeing it until you resume." } },
-    { to: "closed", label: "Close", confirm: { title: "Close this internship?", body: "This can't be undone. Candidates will no longer see it.", destructive: true } },
+    { to: "paused", label: "Pause", confirm: { title: "Pause this project?", body: "Candidates stop seeing it until you resume." } },
+    { to: "closed", label: "Close", confirm: { title: "Close this project?", body: "This can't be undone. Candidates will no longer see it.", destructive: true } },
   ],
   paused: [
     { to: "published", label: "Resume" },
-    { to: "closed", label: "Close", confirm: { title: "Close this internship?", body: "This can't be undone.", destructive: true } },
+    { to: "closed", label: "Close", confirm: { title: "Close this project?", body: "This can't be undone.", destructive: true } },
   ],
 };
 
@@ -105,10 +108,10 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
     return (
       <EmptyScene
         as="h2"
-        title="Post your first internship"
-        body="Describe the role and the skills you need. Findtern reviews it, then matching candidates can see it."
-        next={{ label: "Post an internship", href: "/employer/projects/new" }}
-        who="You start; we review within one working day."
+        title="Post your first project"
+        body="Describe the work and the skills you need. It goes live when you submit, and matching candidates can see it right away."
+        next={{ label: "Post a project", href: "/employer/projects/new" }}
+        who="You post it; it goes live straight away."
       />
     );
   }
@@ -118,8 +121,8 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
       {dialog}
       <dl className="grid grid-cols-3 gap-4 rounded-apple-xl border border-ink-200/80 bg-white p-4 sm:p-5">
         <Figure label="Live" value={counts.get("published") ?? 0} empty="None" hint="Candidates can see these" />
-        <Figure label="Drafts" value={counts.get("draft") ?? 0} empty="None" hint="Not yet sent to us" />
-        <Figure label="In review" value={counts.get("pending_review") ?? 0} empty="None" hint="With Findtern" />
+        <Figure label="Drafts" value={counts.get("draft") ?? 0} empty="None" hint="Not yet published" />
+        <Figure label="Paused" value={counts.get("paused") ?? 0} empty="None" hint="Hidden until you resume" />
       </dl>
       <FilterTabs tabs={tabs} value={filter} onChange={setFilter} label="Filter projects by status" />
       {error && <FormNotice tone="error">{error}</FormNotice>}
@@ -187,7 +190,7 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
                     )}
                     {resume && (
                       <button type="button" disabled={busy} onClick={() => void move(p, resume)} className={buttonClass({ size: "sm", className: "min-h-11" })}>
-                        <Play className="size-4" aria-hidden /> Resume
+                        <Play className="size-4" aria-hidden /> {resume.label}
                       </button>
                     )}
                     {meta.key === "closed" && (
@@ -203,7 +206,7 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
                   <p className="mt-0.5 break-words">{p.takenDownReason || "No reason was recorded."} Contact support if you think this is a mistake.</p>
                 </div>
               )}
-              {meta.key === "pending_review" && <p className="text-sm text-text-subtle">With Findtern. We review within one working day; you can still withdraw it to a draft.</p>}
+              {meta.key === "pending_review" && <p className="text-sm text-text-subtle">Not shown to candidates yet. Publish it now, or move it back to a draft to edit it.</p>}
               {meta.key === "rejected" && (
                 <div role="note" className="rounded-apple-md bg-danger-soft p-3 text-sm text-ink-900">
                   <p className="font-semibold">Not approved{p.rejectionReason ? "" : ": no reason was recorded"}</p>
@@ -216,15 +219,15 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
                   <ButtonLink href={`/employer/candidates?project=${encodeURIComponent(p.id)}`} size="sm" block className="min-h-11">View candidates</ButtonLink>
                 )}
                 {meta.key === "draft" && (
-                  <ButtonLink href={edit} size="sm" block className="min-h-11">Edit and submit</ButtonLink>
+                  <ButtonLink href={edit} size="sm" block className="min-h-11">Edit and publish</ButtonLink>
                 )}
                 {resume && (
-                  <button type="button" disabled={busy} onClick={() => void move(p, resume)} className={buttonClass({ size: "sm", block: true, className: "min-h-11" })}>Resume</button>
+                  <button type="button" disabled={busy} onClick={() => void move(p, resume)} className={buttonClass({ size: "sm", block: true, className: "min-h-11" })}>{resume.label}</button>
                 )}
               </div>
               {meta.key === "rejected" && (
                 <button type="button" disabled={busy} onClick={() => void resubmit(p)} className={buttonClass({ size: "sm", className: "min-h-11 max-sm:w-full" })}>
-                  <Wrench className="size-4" aria-hidden /> Edit and resubmit
+                  <Wrench className="size-4" aria-hidden /> Edit and publish
                 </button>
               )}
             </li>
@@ -233,7 +236,7 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
       </ul>
       {shown.length === 0 && <p className="text-sm text-ink-600">Nothing here under this status. Pick another tab above.</p>}
       <ButtonLink href="/employer/projects/new" className="sm:hidden" block>
-        <Plus className="size-4" aria-hidden /> Post an internship
+        <Plus className="size-4" aria-hidden /> Post a project
       </ButtonLink>
     </div>
   );

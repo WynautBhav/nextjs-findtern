@@ -34,9 +34,8 @@ const EMPLOYER_EDGES: ReadonlySet<string> = new Set([
   "paused>closed",
   "rejected>draft",
 ]);
+// No admin review: admins only take postings down (anything to closed).
 const ADMIN_EDGES: ReadonlySet<string> = new Set([
-  "pending_review>published",
-  "pending_review>rejected",
   "published>closed",
   "paused>closed",
 ]);
@@ -55,14 +54,12 @@ export function transitionError(
   from: string,
   to: string,
   role: LifecycleRole,
-  opts: { reason?: string | null } = {},
 ): string | null {
   const f = normalizeStatus(from);
   const t = normalizeStatus(to);
   if (!f) return `Unknown current status "${from}".`;
   if (!t) return `Unknown target status "${to}".`;
   if (!canTransition(f, t, role)) return `A ${role} cannot move a project from ${f} to ${t}.`;
-  if (role === "admin" && t === "rejected" && !opts.reason?.trim()) return "A rejection needs a reason.";
   return null;
 }
 

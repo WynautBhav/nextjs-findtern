@@ -4,7 +4,7 @@ export type PillTone = "live" | "waiting" | "closed" | "new" | "paid" | "neutral
 
 export const STATUS_META: Record<CanonicalProjectStatus, { label: string; tone: PillTone }> = {
   draft: { label: "Draft", tone: "neutral" },
-  pending_review: { label: "In review", tone: "waiting" },
+  pending_review: { label: "Ready to publish", tone: "waiting" },
   published: { label: "Live", tone: "live" },
   paused: { label: "Paused", tone: "closed" },
   closed: { label: "Closed", tone: "closed" },

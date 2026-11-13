@@ -9,7 +9,7 @@ import { projectFromRecord } from "@/lib/employer-onboarding";
 import { isEditableByEmployer, normalizeStatus } from "@/lib/projects/lifecycle";
 import { ProjectForm } from "../../project-form";
 
-export const metadata: Metadata = { title: "Edit internship", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: "Edit project", robots: { index: false, follow: false } };
 
 export default async function EditProjectPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole("employer");
@@ -28,7 +28,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
   if (!published && !isEditableByEmployer(project.status)) notFound();
   return (
     <div className="container-page section-y space-y-6">
-      <PageHeader title="Edit internship" />
+      <PageHeader title="Edit project" />
       <ProjectForm
         employerId={session.uid}
         projectId={project.id}

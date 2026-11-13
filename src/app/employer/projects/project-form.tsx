@@ -70,10 +70,10 @@ export function ProjectForm({
         const t = await csrfFetch(`/api/employer/projects/${id}/transition`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ to: "pending_review" }),
+          body: JSON.stringify({ to: "published" }),
         });
         const tb = await t.json().catch(() => ({}));
-        if (!t.ok) return setError(tb.error ?? "Saved as a draft, but it could not be submitted.");
+        if (!t.ok) return setError(tb.error ?? "Saved as a draft, but it could not be published.");
       }
       router.push("/employer/projects");
       router.refresh();
@@ -157,7 +157,7 @@ export function ProjectForm({
                 );
               })}
             </ul>
-            <p className="text-sm text-text-subtle">Findtern reviews every posting, usually within one working day, before candidates see it.</p>
+            <p className="text-sm text-text-subtle">Submit publishes the project right away, so matching candidates can see it. You can pause or close it any time.</p>
           </Surface>
         )}
         {error && <FormNotice tone="error">{error}</FormNotice>}
@@ -166,7 +166,7 @@ export function ProjectForm({
       <div className="sticky bottom-0 z-20 mt-5 border-t border-ink-200 bg-white/85 backdrop-blur-md">
         <div className="flex items-center justify-end gap-2 py-3 sm:justify-between">
           <p className="text-sm text-text-subtle max-sm:hidden">
-            {lockedFields ? "Changes apply right away." : missing.length ? `${missing.length} to finish before you can submit.` : "Ready to submit."}
+            {lockedFields ? "Changes apply right away." : missing.length ? `${missing.length} to finish before you can publish.` : "Ready to publish."}
           </p>
           <div className="flex w-full gap-2 sm:w-auto">
             <button type="submit" disabled={busy !== null} className={buttonClass({ variant: "outline", className: "min-h-11 max-sm:flex-1" })}>
@@ -174,7 +174,7 @@ export function ProjectForm({
             </button>
             {!lockedFields && (
               <button type="button" disabled={busy !== null} aria-disabled={missing.length > 0} onClick={() => void save(true)} className={buttonClass({ className: "min-h-11 max-sm:flex-1" })}>
-                {busy === "submit" ? "Submitting…" : "Submit for review"}
+                {busy === "submit" ? "Publishing…" : "Submit and publish"}
               </button>
             )}
           </div>

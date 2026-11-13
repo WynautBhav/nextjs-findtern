@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  INTERN_VISIBLE_STATUSES, editBlockedReason, isTransitionConflict, planReview, planTransition,
+  INTERN_VISIBLE_STATUSES, editBlockedReason, isTransitionConflict, planTransition,
 } from "./transition.ts";
 import { isVisibleToInterns } from "./lifecycle.ts";
 
@@ -66,18 +66,6 @@ test("resume keeps the first publishedAt", () => {
   const p = planTransition({ project: { status: "paused", publishedAt: first }, to: "published", actorRole: "employer", now: new Date(9) });
   assert.ok(p.ok);
   assert.equal(p.set.publishedAt, first);
-});
-test("admin review", () => {
-  const pr = { status: "pending_review", ...ready };
-  const ok = planReview({ project: pr, decision: "approve", now: new Date(3) });
-  assert.ok(ok.ok && ok.to === "published" && ok.set.publishedAt?.getTime() === 3);
-  const noReason = planReview({ project: pr, decision: "reject", reason: "  " });
-  assert.ok(!noReason.ok && noReason.status === 422);
-  const rej = planReview({ project: pr, decision: "reject", reason: " Too vague " });
-  assert.ok(rej.ok && rej.set.rejectionReason === "Too vague");
-  const wrong = planReview({ project: { status: "draft" }, decision: "approve" });
-  assert.ok(!wrong.ok && wrong.status === 409);
-  assert.ok(!planReview({ project: pr, decision: "maybe" }).ok);
 });
 test("concurrent transition: zero affected rows is a conflict", () => {
   assert.equal(isTransitionConflict(0), true);
