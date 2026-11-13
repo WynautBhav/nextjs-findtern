@@ -22,15 +22,21 @@ export async function csrfFetch(
   if (csrf) headers.set("x-csrf-token", csrf);
 
   const res = await fetch(input, { ...init, headers });
-  // Terms moved on mid-session: open the pop-up in place (TermsGate listens); a reload would drop unsaved input.
-  if (res.status === 403 && typeof window !== "undefined") {
-    const body = await res.clone().json().catch(() => null);
-    if (body?.code === "terms_required") window.dispatchEvent(new CustomEvent("findtern:terms-required"));
-  }
+  if (res.status === 403) announceTermsRequired(await res.clone().json().catch(() => null));
   return res;
 }
 
-function readCsrfCookie(): string | null {
+/**
+ * Terms moved on mid-session: open the pop-up in place (TermsGate listens); a reload would drop unsaved input.
+ * Call with the parsed body of a 403 response. Shared with the upload's XHR path (file-upload.tsx).
+ */
+export function announceTermsRequired(body: unknown): void {
+  if (typeof window !== "undefined" && (body as { code?: string } | null)?.code === "terms_required") {
+    window.dispatchEvent(new CustomEvent("findtern:terms-required"));
+  }
+}
+
+export function readCsrfCookie(): string | null {
   if (typeof document === "undefined") return null;
   const match = document.cookie.match(/(?:^|;\s*)ft_csrf=([^;]+)/);
   return match ? decodeURIComponent(match[1]) : null;
