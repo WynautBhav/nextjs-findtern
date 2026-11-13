@@ -2,7 +2,8 @@
 
 import { Check, Columns3 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { DropdownMenu } from "radix-ui";
 
 import { DEFAULT_COLS, INTERN_COLUMNS, type ColGroup, type InternColKey } from "@/lib/admin/intern-columns";
@@ -21,7 +22,7 @@ function rememberCols(uid: string, list: string) {
  * the next visit renders it in one pass (no flash of the default set).
  */
 export function InternColumnsMenu({ visible, adminUid }: { visible: InternColKey[]; adminUid: string }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const pathname = usePathname();
   const search = useSearchParams();
   // Local copy so clicks faster than the router round-trip build on each other.

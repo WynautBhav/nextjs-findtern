@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { NewTabLink } from "@/components/ui/new-tab-link";
 import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-react";
 
@@ -44,7 +44,7 @@ export function EmployerSignupForm({
   /** Where to go once the account exists (from ?next=, e.g. a college drive link), else onboarding. */
   next?: string;
 } = {}) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [name, setName] = useState(google?.name ?? "");
   const [companyName, setCompanyName] = useState("");
   const [companyEmail, setCompanyEmail] = useState(google?.email ?? "");

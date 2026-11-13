@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Check, Clock, Loader2, MapPin, Send, Sparkles, Star } from "lucide-react";
 
 import { formatMoney } from "@/lib/format";
@@ -56,7 +56,7 @@ export interface CandidateCardProps {
  * focus. An offer already out goes to it.
  */
 export function SaveToggle({ internId, projectId, shortlisted, name }: { internId: string; projectId: string; shortlisted: boolean; name?: string }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [on, setOn] = useState(shortlisted);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

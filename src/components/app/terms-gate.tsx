@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { ExternalLink, Loader2 } from "lucide-react";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -25,7 +25,7 @@ const SIGN_OUT_TO: Record<TermsRole, string> = {
  * outside clicks are ignored. Focus is trapped inside by the dialog primitive.
  */
 export function TermsGate({ role, initialOpen = true }: { role: TermsRole; initialOpen?: boolean }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [open, setOpen] = useState(initialOpen);
   const [agreed, setAgreed] = useState(false);
   const [saving, setSaving] = useState(false);

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useTransition } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 
 import {
   clearFilters,
@@ -15,7 +16,7 @@ import {
  * (no history entry per keystroke) that resets the table's own page key.
  */
 export function useUrlTableState(keyOverrides?: Partial<TableKeys>) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [pending, startTransition] = useTransition();

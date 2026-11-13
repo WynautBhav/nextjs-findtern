@@ -10,7 +10,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Loader2, Search, Send } from "lucide-react";
 
 import { AdminTabs } from "@/components/admin/admin-tabs";
@@ -43,7 +43,7 @@ export function NotificationComposer({
   /** The search the roster was loaded with (`?q=`). */
   query?: string;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const { ask, dialog } = useConfirm();
   const [audience, setAudience] = useState<"intern" | "employer" | "both">("intern");
   const [viewing, setViewing] = useState<Side>("intern");

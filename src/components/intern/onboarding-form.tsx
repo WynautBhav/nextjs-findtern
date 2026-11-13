@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { motion, useReducedMotion } from "motion/react";
 import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
 
@@ -93,7 +93,7 @@ export function OnboardingForm({
   /** Submitted once before (or past the AI interview): steps that pass stay open. */
   submittedBefore?: boolean;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const reduce = useReducedMotion();
   const [chosenStep, setChosenStep] = useState<number | null>(null);
   const [edits, setEdits] = useState<Partial<OnboardingDraft>>({});

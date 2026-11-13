@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Loader2 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
@@ -25,7 +25,7 @@ export function DeleteSheetButton({
   redirectTo?: string;
   size?: "sm" | "md";
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const { ask: askConfirm, dialog } = useConfirm();

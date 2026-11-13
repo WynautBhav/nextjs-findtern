@@ -20,7 +20,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { AlertCircle, Check, CloudUpload, Loader2 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
@@ -62,7 +62,7 @@ export function TimesheetGrid({
   /** Where to go after the sheet is sent or deleted. */
   backHref: string;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const todayIso = useMemo(() => todayIst(), []);
   const dates = useMemo(() => periodDays(periodStart, periodEnd), [periodStart, periodEnd]);
 
