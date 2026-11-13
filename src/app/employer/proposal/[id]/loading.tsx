@@ -55,40 +55,49 @@ export default function EmployerProposalLoading() {
               i === 2 ? "sm:border-l sm:pl-6" : "",
             ].join(" ")}
           >
-            <Skeleton className="h-5 w-24 rounded-apple-sm" />
-            <Skeleton className="mt-1 h-8 w-28 rounded-apple-sm" />
+            <Skeleton className="h-6 w-24 rounded-apple-sm" />
+            <Skeleton className="mt-1 h-[2.1875rem] w-28 rounded-apple-sm" />
           </div>
         ))}
       </div>
 
       <div className="mt-10 grid gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="min-w-0 space-y-10">
-          <TermsSkeleton rows={4} />
-          <TermsSkeleton rows={7} />
-          <div>
-            <Skeleton className="h-6 w-48 rounded-apple-sm" />
-            <div className="mt-3 max-w-prose space-y-2">
-              <Skeleton className="h-4 w-full rounded-apple-sm" />
-              <Skeleton className="h-4 w-full rounded-apple-sm" />
-              <Skeleton className="h-4 w-2/3 rounded-apple-sm" />
-            </div>
+          <div className="min-h-[32.5rem] space-y-10">
+            <TermsSkeleton rows={4} />
+            <TermsSkeleton rows={5} />
           </div>
+          <div className="min-h-[4.3rem]">
+            <Skeleton className="h-6 w-48 rounded-apple-sm" />
+            <Skeleton className="mt-3 h-4 w-2/3 rounded-apple-sm" />
+          </div>
+          <Skeleton className="h-12 w-full rounded-apple-sm" />
         </div>
 
-        <div className="order-first lg:order-none">
-          <Skeleton className="h-6 w-36 rounded-apple-sm" />
-          <div className="mt-4 space-y-6">
-            {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="flex gap-3.5">
-                <Skeleton className="mt-0.5 size-6 shrink-0 rounded-full" />
-                <div className="min-w-0 flex-1 space-y-1.5">
-                  <Skeleton className="h-4 w-32 rounded-apple-sm" />
-                  <Skeleton className="h-4 w-24 rounded-apple-sm" />
+        <aside className="order-first space-y-10 lg:order-none">
+          <div className="min-h-[21.25rem]">
+            <Skeleton className="h-7 w-36 rounded-apple-sm" />
+            <div className="mt-4 space-y-6">
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="flex gap-3.5">
+                  <Skeleton className="mt-0.5 size-6 shrink-0 rounded-full" />
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Skeleton className="h-4 w-32 rounded-apple-sm" />
+                    <Skeleton className="h-4 w-24 rounded-apple-sm" />
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+          <div className="min-h-44 border-t border-ink-100 pt-8">
+            <Skeleton className="h-7 w-44 rounded-apple-sm" />
+            <Skeleton className="mt-4 h-11 w-full rounded-apple-md" />
+          </div>
+          <div className="min-h-[13.375rem] border-t border-ink-100 pt-8 max-lg:hidden">
+            <Skeleton className="h-7 w-32 rounded-apple-sm" />
+            <Skeleton className="mt-4 h-4 w-full rounded-apple-sm" />
+          </div>
+        </aside>
       </div>
     </div>
   );

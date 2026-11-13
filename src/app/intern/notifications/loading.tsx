@@ -25,13 +25,13 @@ export default function InternNotificationsLoading() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4 lg:mb-8">
         <div className="min-w-0 max-w-3xl space-y-1">
           <Skeleton className="h-8 w-48 rounded-apple-sm lg:h-[2.625rem]" />
-          <Skeleton className="h-6 w-80 max-w-full rounded-apple-sm" />
+          <Skeleton className="h-12 w-80 max-w-full rounded-apple-sm sm:h-6" />
         </div>
         <Skeleton className="h-11 w-full rounded-apple-md sm:w-48" />
       </div>
 
       <div className="space-y-8">
-        {[4, 3].map((rows, g) => (
+        {[5, 4].map((rows, g) => (
           <section key={g}>
             <Skeleton className="mb-2 ml-3 h-4 w-24 rounded-apple-sm" />
             <ul className="divide-y divide-ink-200 border-y border-ink-200">

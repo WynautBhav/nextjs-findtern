@@ -20,10 +20,10 @@ export default function EmployerDashboardLoading() {
   return (
     <div role="status" aria-busy="true" className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-12">
       <span className="sr-only">Loading your dashboard</span>
-      <Skeleton className="h-[30rem] rounded-apple-xl sm:h-[29.5rem] xl:col-span-12" />
+      <Skeleton className="h-[47.875rem] rounded-apple-xl sm:h-[29.5rem] xl:col-span-12" />
 
       <div className="min-w-0 max-xl:order-1 xl:col-span-8">
-        <div className={`${SURFACE_CLASS} h-full min-h-[30rem] p-5 sm:min-h-[24.5rem] lg:p-6`}>
+        <div className={`${SURFACE_CLASS} h-full min-h-[36rem] p-5 sm:min-h-[24.5rem] lg:p-6`}>
           <Skeleton className="h-5 w-40 rounded-apple-sm" />
           <Skeleton className="mt-2 h-4 w-56 max-w-full rounded-apple-sm" />
           <div className="mt-8 space-y-6">

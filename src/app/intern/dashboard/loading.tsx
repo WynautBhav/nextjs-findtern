@@ -34,20 +34,20 @@ export default function InternDashboardLoading() {
       <div className="space-y-4">
         <div className="grid gap-4 xl:grid-cols-3">
           <div className="grid min-w-0 gap-4 md:max-xl:grid-cols-2">
-            <TileSkeleton lines={4} className="min-h-56" />
-            <TileSkeleton lines={3} className="min-h-40" />
+            <TileSkeleton lines={4} className="min-h-[27rem]" />
+            <TileSkeleton lines={3} className="min-h-[20.5rem]" />
           </div>
           <div className={`${SURFACE_CLASS} min-w-0 self-start p-5 lg:p-6 xl:col-span-2`}>
             <div className="mb-4 flex min-h-9 items-center">
               <Skeleton className="h-5 w-40 rounded-apple-sm" />
             </div>
-            <Skeleton className="h-52 w-full rounded-apple-md" />
+            <Skeleton className="h-60 w-full rounded-apple-md" />
           </div>
         </div>
 
         <div className={STAT_ROW}>
           {[0, 1, 2].map((i) => (
-            <div key={i} className={`${SURFACE_CLASS} min-w-0 p-4 sm:p-5 ${i === 0 ? "max-sm:col-span-2" : ""}`}>
+            <div key={i} className={`${SURFACE_CLASS} min-w-0 p-4 sm:min-h-[10.3rem] sm:p-5 ${i === 0 ? "min-h-[10.5rem] max-sm:col-span-2" : "min-h-36"}`}>
               <Skeleton className="h-4 w-24 rounded-apple-sm" />
               <Skeleton className="mt-3 h-9 w-20 rounded-apple-sm" />
               <Skeleton className="mt-3 h-4 w-32 max-w-full rounded-apple-sm" />
@@ -56,10 +56,10 @@ export default function InternDashboardLoading() {
         </div>
 
         <div className="grid gap-4 xl:grid-cols-3">
-          <TileSkeleton lines={6} className="min-h-64 xl:col-span-2" />
+          <TileSkeleton lines={6} className="min-h-[28.5rem] xl:col-span-2 xl:min-h-[34.5rem]" />
           <div className="grid min-w-0 content-start gap-4 md:grid-cols-2 xl:grid-cols-1">
-            <TileSkeleton lines={3} className="min-h-40" />
-            <TileSkeleton lines={3} className="min-h-40" />
+            <TileSkeleton lines={3} className="min-h-[16.75rem]" />
+            <TileSkeleton lines={3} className="min-h-[16.75rem]" />
           </div>
         </div>
       </div>

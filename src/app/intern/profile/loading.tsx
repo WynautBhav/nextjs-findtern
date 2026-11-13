@@ -1,9 +1,9 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** A profile section: a title and a few detail rows, under the same hairline and padding as the page. */
-function SectionSkeleton({ rows = 3 }: { rows?: number }) {
+function SectionSkeleton({ rows = 3, className }: { rows?: number; className: string }) {
   return (
-    <div className="border-t border-ink-200/70 py-6">
+    <div className={`border-t border-ink-200/70 py-6 ${className}`}>
       <Skeleton className="h-5 w-40 rounded-apple-sm" />
       <div className="mt-3 divide-y divide-ink-100">
         {Array.from({ length: rows }, (_, i) => (
@@ -43,15 +43,15 @@ export default function InternProfileLoading() {
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4 lg:mb-8">
         <div className="min-w-0 max-w-3xl space-y-1">
           <Skeleton className="h-8 w-44 rounded-apple-sm lg:h-[2.625rem]" />
-          <Skeleton className="h-6 w-80 max-w-full rounded-apple-sm" />
+          <Skeleton className="h-12 w-80 max-w-full rounded-apple-sm sm:h-6" />
         </div>
         <Skeleton className="h-11 w-full rounded-apple-md sm:w-36" />
       </div>
 
       <div className="grid gap-x-12 xl:grid-cols-[minmax(0,1fr)_19rem]">
-        <CompletionSkeleton className="mb-6 xl:hidden" />
+        <CompletionSkeleton className="mb-6 min-h-[10.875rem] xl:hidden" />
         <div className="min-w-0">
-          <div className="pb-6">
+          <div className="min-h-[24rem] pb-6">
             <div className="flex items-center justify-between gap-4">
               <Skeleton className="h-5 w-40 rounded-apple-sm" />
               <Skeleton className="h-6 w-24 rounded-full" />
@@ -73,18 +73,20 @@ export default function InternProfileLoading() {
               </div>
             </div>
           </div>
-          <SectionSkeleton rows={4} />
-          <SectionSkeleton rows={3} />
-          <SectionSkeleton rows={3} />
+          <SectionSkeleton rows={4} className="min-h-[15.5rem]" />
+          <SectionSkeleton rows={4} className="min-h-[14.5rem]" />
+          <SectionSkeleton rows={2} className="min-h-36" />
+          <SectionSkeleton rows={2} className="min-h-36" />
+          <SectionSkeleton rows={2} className="min-h-36" />
         </div>
 
         <aside className="min-w-0 border-t border-ink-200/70 xl:border-t-0 xl:border-l xl:pl-8">
-          <CompletionSkeleton className="border-b border-ink-200/70 pb-6 max-xl:hidden" />
-          <div className="border-b border-ink-200/70 py-6">
+          <CompletionSkeleton className="min-h-[11.875rem] border-b border-ink-200/70 pb-6 max-xl:hidden" />
+          <div className="min-h-[10.7rem] border-b border-ink-200/70 py-6">
             <Skeleton className="h-5 w-28 rounded-apple-sm" />
             <Skeleton className="mt-3 h-8 w-full rounded-apple-md" />
           </div>
-          <div className="space-y-3 py-6">
+          <div className="min-h-96 space-y-3 py-6">
             <Skeleton className="h-5 w-48 rounded-apple-sm" />
             <Skeleton className="h-4 w-full rounded-apple-sm" />
             <Skeleton className="h-4 w-5/6 rounded-apple-sm" />

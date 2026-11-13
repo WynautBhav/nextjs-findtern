@@ -12,7 +12,7 @@ export default function EmployerScheduleLoading() {
       <div className="mb-4 flex flex-wrap items-end justify-between gap-4 lg:mb-5">
         <div className="min-w-0 max-w-3xl space-y-1">
           <Skeleton className="h-8 w-40 rounded-apple-sm lg:h-[2.625rem]" />
-          <Skeleton className="h-6 w-96 max-w-full rounded-apple-sm" />
+          <Skeleton className="h-12 w-96 max-w-full rounded-apple-sm sm:h-6" />
         </div>
         <Skeleton className="h-11 w-full rounded-apple-md sm:h-9 sm:w-56" />
       </div>
