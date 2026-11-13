@@ -17,7 +17,11 @@ function baseName(skill: string): string {
 export type SkillAlignment = {
   /** One per required skill, in the order given; `has[i]` is for candidate `i`. */
   rows: { skill: string; has: boolean[] }[];
-  /** One per candidate: skills outside `required` (first spelling, no repeats), at most `max`, and how many were cut. */
+  /**
+   * One per candidate: skills outside `required` (first spelling, no repeats) and how many were cut.
+   * `max` is the most skills shown for a candidate in all (ticked required ones count), so employers
+   * never see more than seven of a candidate's skills (+N for the rest).
+   */
   other: { skills: string[]; more: number }[];
 };
 
@@ -29,7 +33,7 @@ export function skillAlignment(required: string[], candidates: { skills: string[
   }
   const owned = candidates.map((c) => new Set(c.skills.map((s) => baseName(s).toLowerCase()).filter(Boolean)));
   const rows = [...wanted].map(([key, skill]) => ({ skill, has: owned.map((set) => set.has(key)) }));
-  const other = candidates.map((c) => {
+  const other = candidates.map((c, idx) => {
     const seen = new Set<string>();
     const names: string[] = [];
     for (const raw of c.skills) {
@@ -39,7 +43,8 @@ export function skillAlignment(required: string[], candidates: { skills: string[
       seen.add(key);
       names.push(name);
     }
-    return { skills: names.slice(0, max), more: Math.max(0, names.length - max) };
+    const room = Math.max(0, max - rows.filter((row) => owned[idx].has(row.skill.toLowerCase())).length);
+    return { skills: names.slice(0, room), more: Math.max(0, names.length - room) };
   });
   return { rows, other };
 }

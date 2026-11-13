@@ -506,7 +506,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                 const { skills, more } = skillGrid.other[i];
                 return (
                   <Cell key={c.id}>
-                    {skills.length === 0 ? (
+                    {skills.length === 0 && more === 0 ? (
                       <span className="text-text-subtle">{skillGrid.rows.length > 0 ? "None" : "None listed"}</span>
                     ) : (
                       <ul className="space-y-1">
