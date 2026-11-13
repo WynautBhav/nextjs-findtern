@@ -64,6 +64,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       selectedSlot: null,
       meetingLink: null,
       calendarEventId: null,
+      // A fresh booking starts with nobody having joined.
+      employerJoinedAt: null,
       updatedAt: new Date(),
     })
     .where(and(eq(schema.interviews.id, id), inArray(schema.interviews.status, ["pending", "scheduled"])))

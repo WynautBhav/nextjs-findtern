@@ -13,7 +13,7 @@ import { ScoreReport } from "@/components/intern/interviews/score-report";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { requireRole } from "@/lib/auth";
 import { SITE } from "@/lib/content/site";
-import { isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
+import { employerNoShow, isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
 import { formatIst } from "@/lib/format";
 import { HIDDEN_COMPANY, loadInternData, projectNames } from "@/lib/intern-data";
 import { feedbackForIntern } from "@/lib/interview-feedback";
@@ -50,9 +50,9 @@ export default async function InternInterviews() {
   // A booked meeting stays upcoming, with its Join button, until the link
   // window closes (legacy: slot + 60 min), not the moment it starts. An open
   // invite whose times have all passed is over.
-  const joinable = (i: InterviewRow) => Boolean(i.selectedSlot) && isMeetingLinkLive(i);
+  const joinable = (i: InterviewRow) => Boolean(i.selectedSlot) && isMeetingLinkLive(i) && !employerNoShow(i);
   const upcoming = company.filter(
-    (i) => (i.status === "scheduled" || i.status === "pending") && (!isStaleInterview(i) || joinable(i)),
+    (i) => (i.status === "scheduled" || i.status === "pending") && !employerNoShow(i) && (!isStaleInterview(i) || joinable(i)),
   );
   const past = company.filter((i) => !upcoming.includes(i) && i.status !== "draft");
 
@@ -282,6 +282,13 @@ function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: Reac
     };
   }
   if (status === "cancelled") return { label: "Cancelled", tone: "neutral", detail: "This interview was cancelled." };
+  if (employerNoShow(i)) {
+    return {
+      label: "Employer didn't join",
+      tone: "closed",
+      detail: "The company did not join within 30 minutes of the start, so this round expired. It does not count against you.",
+    };
+  }
   if (status === "completed" || i.selectedSlot) {
     return { label: "Interview done", tone: "paid", detail: "No written feedback yet. Any offer that follows lands in Offers." };
   }

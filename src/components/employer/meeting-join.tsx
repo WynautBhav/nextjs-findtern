@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import { ShieldAlert, Video } from "lucide-react";
+import { Loader2, ShieldAlert, Video } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import {
@@ -13,6 +13,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { MeetingRulesList } from "@/components/employer/meeting-rules";
+import { csrfFetch } from "@/lib/client-fetch";
 import { normalizeMeetingLink } from "@/lib/employer-interview-rules";
 
 /**
@@ -20,15 +21,28 @@ import { normalizeMeetingLink } from "@/lib/employer-interview-rules";
  * box, as legacy did every time (employer-schedule.tsx:1555; EMB-10). The
  * link opens in a new tab only after "I agree"; a link typed without a
  * scheme opens as https.
+ *
+ * With `interviewId` the click goes through POST /api/interviews/[id]/join,
+ * which records that the employer joined (an interview nobody joins within 30
+ * minutes of its start expires, bug sheet 12 Nov row 13) and returns the link.
+ * With `ready={false}` (the booking has no link yet, bug sheet row 12) the
+ * button is shown disabled with the reason beside it.
  */
 export function JoinMeetingButton({
-  link,
+  link = null,
+  interviewId,
+  ready = true,
   size = "sm",
   variant = "primary",
   block = false,
   label = "Join meeting",
 }: {
-  link: string;
+  /** The link to open. With `interviewId` the server's answer wins and this only decides whether to show the button. */
+  link?: string | null;
+  /** The interview being joined; its join is recorded server-side. */
+  interviewId?: string;
+  /** False: the booking has no link yet. Shown disabled, with the reason. */
+  ready?: boolean;
   size?: "sm" | "md";
   variant?: "primary" | "outline";
   block?: boolean;
@@ -36,9 +50,59 @@ export function JoinMeetingButton({
 }) {
   const [open, setOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const id = useId();
   const href = normalizeMeetingLink(link);
-  if (!href) return null;
+
+  if (!ready) {
+    return (
+      <span className={block ? "grid gap-1" : "inline-flex flex-col items-start gap-1"}>
+        <button type="button" disabled aria-describedby={`${id}-wait`} className={buttonClass({ variant: "outline", size, block })}>
+          <Video className="size-4" aria-hidden />
+          {label}
+        </button>
+        <span id={`${id}-wait`} className="text-xs text-text-subtle">
+          Link not ready, we&apos;ll email it
+        </span>
+      </span>
+    );
+  }
+  if (!href && !interviewId) return null;
+
+  async function proceed() {
+    if (!interviewId) {
+      window.open(href!, "_blank", "noopener,noreferrer");
+      setOpen(false);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    // Opened first, inside the click, so the pop-up blocker lets it through; pointed at the link once the join is recorded.
+    const tab = window.open("about:blank", "_blank");
+    try {
+      const res = await csrfFetch(`/api/interviews/${encodeURIComponent(interviewId)}/join`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: "{}",
+      });
+      const data = await res.json().catch(() => ({}));
+      const target = normalizeMeetingLink(data.link);
+      if (!res.ok || !target) throw new Error(data.error ?? "Couldn't join. Try again.");
+      if (tab) {
+        tab.opener = null;
+        tab.location.href = target;
+      } else {
+        window.open(target, "_blank", "noopener,noreferrer");
+      }
+      setOpen(false);
+    } catch (e) {
+      tab?.close();
+      setError(e instanceof TypeError || !(e instanceof Error) ? "Couldn't reach the server. Check your connection and try again." : e.message);
+    } finally {
+      setBusy(false);
+    }
+  }
 
   return (
     <>
@@ -46,6 +110,7 @@ export function JoinMeetingButton({
         type="button"
         onClick={() => {
           setAgreed(false);
+          setError(null);
           setOpen(true);
         }}
         className={buttonClass({ variant, size, block })}
@@ -75,19 +140,17 @@ export function JoinMeetingButton({
             />
             I have read the rules and I agree to comply.
           </label>
+          {error ? (
+            <p role="alert" className="text-sm text-danger">
+              {error}
+            </p>
+          ) : null}
           <DialogFooter className="gap-2">
             <button type="button" onClick={() => setOpen(false)} className={buttonClass({ variant: "outline", size: "sm" })}>
               Cancel
             </button>
-            <button
-              type="button"
-              disabled={!agreed}
-              onClick={() => {
-                window.open(href, "_blank", "noopener,noreferrer");
-                setOpen(false);
-              }}
-              className={buttonClass({ size: "sm" })}
-            >
+            <button type="button" disabled={!agreed || busy} onClick={proceed} className={buttonClass({ size: "sm" })}>
+              {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
               Proceed to meeting
             </button>
           </DialogFooter>

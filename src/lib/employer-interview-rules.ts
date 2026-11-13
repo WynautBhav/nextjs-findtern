@@ -13,6 +13,10 @@ type SlotLike = {
   slot2: Date | string | null;
   slot3: Date | string | null;
   selectedSlot?: number | null;
+  /** Set by POST /api/interviews/[id]/join; absent on legacy rows. */
+  employerJoinedAt?: Date | string | null;
+  createdAt?: Date | string | null;
+  employerId?: string | null;
 };
 
 const OPEN_STATUSES = ["pending", "scheduled", "waiting"];
@@ -23,6 +27,18 @@ export const MISSED_GRACE_MINUTES = 15;
 export const LINK_VISIBLE_MINUTES = 60;
 /** How long a meeting runs (legacy employer-schedule.tsx:898, start + 30 min). */
 export const MEETING_MINUTES = 30;
+
+/** How long after the start the employer has to join before the interview expires (bug sheet 12 Nov, row 13). */
+export const NO_SHOW_MINUTES = 30;
+/** Join counts toward the no-show rule from this long before the start; an earlier click only opens the link. */
+export const JOIN_EARLY_MINUTES = 15;
+/**
+ * The no-show rule applies only to interviews created on or after this instant, so rows booked before join
+ * tracking existed (they all have no `employerJoinedAt`) are not flipped to expired. Set to the deploy date.
+ */
+export const NO_SHOW_RULE_FROM = Date.parse("2026-11-14T00:00:00Z");
+/** The AI interviewer's employer id (src/lib/ai-interview.ts); kept here so this file stays alias-free. */
+const AI_EMPLOYER_ID = "admin";
 
 function toTime(value: Date | string | null | undefined): number | null {
   if (!value) return null;
@@ -69,6 +85,27 @@ export function meetingEndsAt(iv: SlotLike): number | null {
 }
 
 /**
+ * A booked interview the employer never joined: 30 minutes past the start with no in-app Join. Derived, not
+ * stored, so it needs no scheduler. Exempt: the AI interview, anything created before NO_SHOW_RULE_FROM, and
+ * a missing or unreadable creation date (cannot prove it is newer than the rule).
+ */
+export function employerNoShow(iv: SlotLike, now: number = Date.now()): boolean {
+  if ((iv.status ?? "").toLowerCase() !== "scheduled" || !iv.selectedSlot) return false;
+  if (iv.employerId === AI_EMPLOYER_ID) return false;
+  if (toTime(iv.employerJoinedAt) !== null) return false;
+  const created = toTime(iv.createdAt);
+  if (created === null || created < NO_SHOW_RULE_FROM) return false;
+  const start = meetingTime(iv);
+  return start !== null && now >= start + NO_SHOW_MINUTES * 60_000;
+}
+
+/** Whether pressing Join now counts as the employer being there (not days early). */
+export function joinCounts(iv: SlotLike, now: number = Date.now()): boolean {
+  const start = meetingTime(iv);
+  return start !== null && now >= start - JOIN_EARLY_MINUTES * 60_000;
+}
+
+/**
  * Open and not over yet: the interview still holds the candidate, so a new
  * meeting can't be booked until this one's time has run out (bug sheet 26 Oct).
  */
@@ -86,6 +123,8 @@ export function isMeetingOver(iv: SlotLike, now: number = Date.now()): boolean {
   const status = (iv.status ?? "").toLowerCase();
   if (status === "completed") return true;
   if (status !== "scheduled" || !iv.selectedSlot) return false;
+  // A meeting the employer never joined did not happen.
+  if (employerNoShow(iv, now)) return false;
   const end = meetingEndsAt(iv);
   return end !== null && now >= end;
 }
@@ -96,6 +135,7 @@ export function isMeetingOver(iv: SlotLike, now: number = Date.now()): boolean {
  * slots all passed unpicked reads "expired".
  */
 export function displayInterviewStatus(iv: SlotLike, now: number = Date.now()): string {
+  if (employerNoShow(iv, now)) return "expired";
   if ((iv.status ?? "") === "scheduled" && isMeetingOver(iv, now)) return "completed";
   return isStaleInterview(iv, now) ? "expired" : (iv.status ?? "");
 }
@@ -108,6 +148,7 @@ export function isMeetingLinkLive(iv: SlotLike, now: number = Date.now()): boole
 
 /** "Mark missed" is allowed only once the slot plus the grace period passed. */
 export function canMarkMissed(iv: SlotLike, now: number = Date.now()): boolean {
+  if (employerNoShow(iv, now)) return false;
   const t = meetingTime(iv);
   return t !== null && now >= t + MISSED_GRACE_MINUTES * 60_000;
 }
@@ -115,6 +156,7 @@ export function canMarkMissed(iv: SlotLike, now: number = Date.now()): boolean {
 /** "Mark completed" ends a booked meeting early, once its start time has come (bug sheet 8). */
 export function canMarkCompleted(iv: SlotLike, now: number = Date.now()): boolean {
   if ((iv.status ?? "").toLowerCase() !== "scheduled" || !iv.selectedSlot) return false;
+  if (employerNoShow(iv, now)) return false;
   const t = meetingTime(iv);
   return t !== null && now >= t;
 }
@@ -187,13 +229,14 @@ export function suggestedSlots(now: number, timeZone: string): [string, string, 
  *
  *   awaiting_pick  invite sent, candidate hasn't picked  → remind, reschedule
  *   expired        every offered slot passed unpicked     → reschedule
+ *   employer_no_show  booked, 30 min past start, employer never joined → reschedule
  *   upcoming       a slot is booked and still ahead       → join, remind, reschedule
  *   live           the booked half hour is running         → join, mark missed (after grace)
  *   over           the meeting is done                     → feedback, mark missed
  *   missed         marked missed                           → feedback (legacy allowed it, EMB-22)
  *   closed         cancelled or otherwise finished         → read feedback only
  */
-export type InterviewStage = "awaiting_pick" | "expired" | "upcoming" | "live" | "over" | "missed" | "closed";
+export type InterviewStage = "awaiting_pick" | "expired" | "employer_no_show" | "upcoming" | "live" | "over" | "missed" | "closed";
 
 export function interviewStage(iv: SlotLike, now: number = Date.now()): InterviewStage {
   const status = (iv.status ?? "").toLowerCase();
@@ -201,6 +244,7 @@ export function interviewStage(iv: SlotLike, now: number = Date.now()): Intervie
   if (status === "completed") return "over";
   if (status === "pending" || status === "waiting") return isStaleInterview(iv, now) ? "expired" : "awaiting_pick";
   if (status === "scheduled") {
+    if (employerNoShow(iv, now)) return "employer_no_show";
     const t = meetingTime(iv);
     if (!iv.selectedSlot || t === null) return "upcoming";
     if (now < t) return "upcoming";
@@ -218,6 +262,7 @@ export function stageRank(stage: InterviewStage): number {
     case "awaiting_pick":
       return 1;
     case "expired":
+    case "employer_no_show":
       return 2;
     case "over":
     case "missed":

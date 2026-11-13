@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
-import { canMarkCompleted } from "@/lib/employer-interview-rules";
+import { canMarkCompleted, employerNoShow } from "@/lib/employer-interview-rules";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -17,6 +17,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // Only a booked meeting whose start time has come (bug sheet 8): a finished
   // call stops holding the candidate, so a proposal can follow straight away.
+  // An interview the employer never joined expired; it is not completed.
+  if (employerNoShow(interview)) return NextResponse.json({ error: "This interview expired: the employer did not join within 30 minutes of the start. Offer new times instead." }, { status: 409 });
   if (!canMarkCompleted(interview)) {
     if (interview.status === "completed") return NextResponse.json({ error: "This meeting is already marked completed." }, { status: 409 });
     if (interview.status === "missed") return NextResponse.json({ error: "This meeting is already marked missed." }, { status: 409 });

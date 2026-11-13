@@ -126,7 +126,7 @@ export function CartLine({
               Send proposal
             </ButtonLink>
           )}
-          {line.meetingLink ? <JoinMeetingButton link={line.meetingLink} variant="outline" /> : null}
+          {line.meetingLink ? <JoinMeetingButton link={line.meetingLink} interviewId={line.meetingInterviewId ?? undefined} variant="outline" /> : null}
           {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none text-text-subtle" aria-label="Removing" /> : null}
           <RowMenu
             label={`More actions for ${name}`}

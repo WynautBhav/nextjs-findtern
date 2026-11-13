@@ -14,6 +14,12 @@ import {
   hasNoSlotsToPick,
   isStaleInterview,
   meetingTime,
+  employerNoShow,
+  interviewStage,
+  joinCounts,
+  canLeaveFeedback,
+  stageRank,
+  NO_SHOW_RULE_FROM,
 } from "./employer-interview-rules.ts";
 
 const NOW = Date.parse("2026-10-19T12:00:00Z");
@@ -151,4 +157,87 @@ test("a pending interview with no slots left has nothing to remind about", () =>
   assert.equal(hasNoSlotsToPick({ status: "pending", slot1: null, slot2: null, slot3: null }), true);
   assert.equal(hasNoSlotsToPick({ status: "pending", slot1: h(3), slot2: null, slot3: null }), false);
   assert.equal(hasNoSlotsToPick({ status: "scheduled", slot1: null, slot2: null, slot3: null }), false);
+});
+
+// ---- Employer no-show (bug sheet 12 Nov, row 13) ----
+const AFTER_CUTOVER = NO_SHOW_RULE_FROM + 86_400_000;
+const min = (t0: number, m: number) => t0 + m * 60_000;
+const booked = (start: number, extra: Record<string, unknown> = {}) => ({
+  status: "scheduled",
+  slot1: new Date(start),
+  slot2: null,
+  slot3: null,
+  selectedSlot: 1,
+  employerId: "emp-1",
+  employerJoinedAt: null,
+  createdAt: new Date(NO_SHOW_RULE_FROM + 3_600_000),
+  ...extra,
+});
+
+test("employer no-show: 29 minutes after the start is not yet, 30 and 31 are", () => {
+  const start = AFTER_CUTOVER;
+  const iv = booked(start);
+  assert.equal(employerNoShow(iv, min(start, -5)), false);
+  assert.equal(employerNoShow(iv, min(start, 29)), false);
+  assert.equal(employerNoShow(iv, min(start, 30)), true);
+  assert.equal(employerNoShow(iv, min(start, 31)), true);
+});
+
+test("employer no-show: stage, status and actions follow it, and it is not 'completed'", () => {
+  const start = AFTER_CUTOVER;
+  const iv = booked(start);
+  assert.equal(interviewStage(iv, min(start, 29)), "live");
+  assert.equal(interviewStage(iv, min(start, 31)), "employer_no_show");
+  assert.equal(displayInterviewStatus(iv, min(start, 31)), "expired");
+  assert.equal(isMeetingOver(iv, min(start, 31)), false);
+  assert.equal(canLeaveFeedback(iv, min(start, 31)), false);
+  assert.equal(canMarkMissed(iv, min(start, 31)), false);
+  assert.equal(canMarkCompleted(iv, min(start, 31)), false);
+  assert.equal(stageRank("employer_no_show"), stageRank("expired"));
+});
+
+test("employer no-show: an interview the employer joined is never a no-show", () => {
+  const start = AFTER_CUTOVER;
+  const iv = booked(start, { employerJoinedAt: new Date(min(start, 2)) });
+  assert.equal(employerNoShow(iv, min(start, 90)), false);
+  assert.equal(interviewStage(iv, min(start, 90)), "over");
+  assert.equal(displayInterviewStatus(iv, min(start, 90)), "completed");
+  assert.equal(canMarkMissed(iv, min(start, 90)), true);
+});
+
+test("employer no-show: interviews created before the cutover are exempt", () => {
+  const start = NO_SHOW_RULE_FROM - 2 * 86_400_000;
+  const legacy = booked(start, { createdAt: new Date(start - 86_400_000) });
+  assert.equal(employerNoShow(legacy, min(start, 300)), false);
+  assert.equal(interviewStage(legacy, min(start, 300)), "over");
+  // A legacy interview booked for after the cutover is still exempt: createdAt decides.
+  const late = booked(AFTER_CUTOVER, { createdAt: new Date(NO_SHOW_RULE_FROM - 1) });
+  assert.equal(employerNoShow(late, min(AFTER_CUTOVER, 60)), false);
+  // Exactly at the cutover counts; an unreadable creation date does not.
+  assert.equal(employerNoShow(booked(AFTER_CUTOVER, { createdAt: new Date(NO_SHOW_RULE_FROM) }), min(AFTER_CUTOVER, 31)), true);
+  assert.equal(employerNoShow(booked(AFTER_CUTOVER, { createdAt: null }), min(AFTER_CUTOVER, 31)), false);
+});
+
+test("employer no-show: AI interviews, unbooked and non-scheduled rows are excluded", () => {
+  const start = AFTER_CUTOVER;
+  const now = min(start, 45);
+  assert.equal(employerNoShow(booked(start, { employerId: "admin" }), now), false);
+  assert.equal(employerNoShow(booked(start, { selectedSlot: null }), now), false);
+  assert.equal(employerNoShow(booked(start, { status: "pending" }), now), false);
+  assert.equal(employerNoShow(booked(start, { status: "completed" }), now), false);
+  assert.equal(employerNoShow(booked(start, { status: "missed" }), now), false);
+});
+
+test("employer no-show: the chosen slot decides, not the first offered one", () => {
+  const start = AFTER_CUTOVER;
+  const iv = booked(start, { slot2: new Date(min(start, 120)), selectedSlot: 2 });
+  assert.equal(employerNoShow(iv, min(start, 31)), false);
+  assert.equal(employerNoShow(iv, min(start, 151)), true);
+});
+
+test("joinCounts: a click days early only opens the link; from 15 minutes before it counts", () => {
+  const iv = booked(AFTER_CUTOVER);
+  assert.equal(joinCounts(iv, min(AFTER_CUTOVER, -16)), false);
+  assert.equal(joinCounts(iv, min(AFTER_CUTOVER, -15)), true);
+  assert.equal(joinCounts(iv, min(AFTER_CUTOVER, 10)), true);
 });

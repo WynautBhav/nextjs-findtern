@@ -49,6 +49,8 @@ export type CartLineItem = {
   meetingAt?: string | null;
   /** The booked meeting's link while it is live, for "Join meeting". */
   meetingLink?: string | null;
+  /** The booked interview behind `meetingLink`; Join records through it. */
+  meetingInterviewId?: string | null;
 };
 
 export function CartManager({
@@ -505,7 +507,7 @@ function CartLine({
               Book meeting
             </button>
           ) : null}
-          {line.meetingLink ? <JoinMeetingButton link={line.meetingLink} variant="outline" /> : null}
+          {line.meetingLink ? <JoinMeetingButton link={line.meetingLink} interviewId={line.meetingInterviewId ?? undefined} variant="outline" /> : null}
         </div>
 
         {/* Profile and remove stay in the menu (QA-124). */}

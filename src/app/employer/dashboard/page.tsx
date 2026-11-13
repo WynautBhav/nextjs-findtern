@@ -226,6 +226,7 @@ export default async function EmployerDashboard() {
             untilLabel: untilLabel(nextAt),
             projectName: data.nextWith?.projectName ?? null,
             joinLink: joinLive && next.meetingLink ? next.meetingLink : null,
+            interviewId: next.id,
             scheduleHref: "/employer/schedule",
           }
         : null,

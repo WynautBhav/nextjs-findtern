@@ -7,7 +7,7 @@ import { emails } from "@/lib/emails";
 import { formatSlotTime } from "@/lib/format";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
-import { hasNoSlotsToPick, isMeetingOver, isStaleInterview, normalizeMeetingLink, reminderWindow } from "@/lib/employer-interview-rules";
+import { employerNoShow, hasNoSlotsToPick, isMeetingOver, isStaleInterview, normalizeMeetingLink, reminderWindow } from "@/lib/employer-interview-rules";
 import { limiters } from "@/lib/security/rate-limit";
 
 /**
@@ -28,6 +28,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: `This interview is already ${interview.status}` }, { status: 409 });
   }
 
+  if (employerNoShow(interview)) return NextResponse.json({ error: "This interview expired: the employer did not join within 30 minutes of the start. Offer new times instead." }, { status: 409 });
   if (hasNoSlotsToPick(interview)) return NextResponse.json({ error: "There are no times left to pick. Offer new times first." }, { status: 409 });
 
   // A meeting that is running now can still be nudged; one that is over, or an invite whose slots all passed, cannot.

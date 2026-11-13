@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull } from "drizzle-orm";
 import { ArrowLeft, Check, ChevronDown, Clock, CreditCard, Download, X } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
@@ -9,7 +9,9 @@ import { requireRole } from "@/lib/auth";
 import { canAccess } from "@/lib/security/guards";
 import { initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
-import { formatDate as formatWords, formatMoney } from "@/lib/format";
+import { formatDate as formatWords, formatMoney, formatSlotTime } from "@/lib/format";
+import { interviewStage, meetingTime } from "@/lib/employer-interview-rules";
+import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { fullTimeFeeMinor } from "@/lib/checkout";
 import { laptopLabel, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
 import { shiftInIst } from "@/lib/timezones";
@@ -130,6 +132,29 @@ export default async function EmployerProposalDetail({
     presence = (await presenceOf([proposal.internId]))[proposal.internId] ?? null;
   } catch (err) {
     console.error("[employer/proposal] names", err);
+  }
+
+  // The booked interview with this candidate that is still ahead or running, so it can be joined from here (bug sheet 12 Nov, row 12).
+  let interview: typeof schema.interviews.$inferSelect | null = null;
+  try {
+    const rows = await getDb()
+      .select()
+      .from(schema.interviews)
+      .where(
+        and(
+          eq(schema.interviews.employerId, proposal.employerId),
+          eq(schema.interviews.internId, proposal.internId),
+          eq(schema.interviews.status, "scheduled"),
+        ),
+      )
+      .orderBy(desc(schema.interviews.createdAt));
+    interview =
+      rows.find(
+        (iv) =>
+          (!iv.projectId || !proposal.projectId || iv.projectId === proposal.projectId) && ["upcoming", "live"].includes(interviewStage(iv)),
+      ) ?? null;
+  } catch (err) {
+    console.error("[employer/proposal] interview", err);
   }
 
   const raw = (proposal.offerDetails ?? {}) as Record<string, unknown>;
@@ -366,6 +391,20 @@ export default async function EmployerProposalDetail({
             </section>
           ) : null}
 
+          {interview ? (
+            <section className="border-t border-ink-100 pt-8" aria-labelledby="proposal-interview-h">
+              <h2 id="proposal-interview-h" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
+                Interview
+              </h2>
+              <p className="nums mt-1 text-sm text-ink-600">{formatSlotTime(new Date(meetingTime(interview) ?? 0), interview.timezone || "Asia/Kolkata")}</p>
+              <div className="mt-3">
+                <JoinMeetingButton interviewId={interview.id} link={interview.meetingLink} ready={Boolean(interview.meetingLink)} variant="outline" />
+              </div>
+            </section>
+          ) : null}
+
+          {/* Meeting rules are for interviews; a full-time offer is not one (bug sheet 12 Nov, row 16). */}
+          {!ft ? (
           <details className="group border-t border-ink-100 pt-2">
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-sm text-lg font-semibold tracking-[-0.01em] text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 [&::-webkit-details-marker]:hidden">
               Meeting rules
@@ -374,6 +413,7 @@ export default async function EmployerProposalDetail({
             <p className="mt-1 text-sm text-text-subtle">By joining any meeting scheduled through Findtern, you agree to this conduct policy.</p>
             <MeetingRulesList className="mt-4" />
           </details>
+          ) : null}
         </div>
 
         <aside className="order-first space-y-10 lg:order-none lg:sticky lg:top-24 lg:self-start">

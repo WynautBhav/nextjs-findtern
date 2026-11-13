@@ -21,6 +21,7 @@ export type CartLineItem = {
   meetingUntil?: string | null;
   /** The booked meeting's link while it is live, for "Join meeting". */
   meetingLink?: string | null;
+  meetingInterviewId?: string | null;
 };
 
 /** The clock, read in event handlers only. */
