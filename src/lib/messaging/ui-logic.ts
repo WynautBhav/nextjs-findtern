@@ -11,6 +11,12 @@ export type ThreadRow = {
   lastMessage: { body: string; mine: boolean; createdAt: string } | null;
   lastMessageAt: string | null;
   unread: number;
+  /** Row 25. Employer view: initials, or the full name after hire. Intern view: the company name after hire, else null. */
+  counterpartName: string | null;
+  /** The project the thread's proposal is for. */
+  projectName: string | null;
+  /** Rows 11 and 24: why the viewer cannot send right now, or null. */
+  sendBlock: "closed" | "employer_first" | null;
 };
 
 export type Msg = {
@@ -191,4 +197,26 @@ export function durationLabel(raw: unknown): string | null {
   if (!m) return null;
   const n = Number(m[1]);
   return n > 0 ? `${n} ${n === 1 ? "month" : "months"}` : null;
+}
+
+/**
+ * What to call the other side in a thread (row 25). The server sends `counterpartName` (employer view: initials,
+ * or the full name after hire) and `projectName` (intern view, company name only after hire). The id-based
+ * label is the fallback when the server had nothing.
+ */
+export function threadTitle(
+  base: "employer" | "intern",
+  t: { counterpartId: string; counterpartName?: string | null; projectName?: string | null } | null | undefined,
+  fallbackId = "",
+): { title: string; subtitle: string | null; initials: string } {
+  const ident = counterpartIdentity(base, t?.counterpartId ?? fallbackId);
+  const name = t?.counterpartName?.trim() || null;
+  const project = t?.projectName?.trim() || null;
+  if (base === "employer") {
+    const title = name ?? ident.label;
+    return { title, subtitle: project, initials: name ? name.replace(/[^\p{L}]/gu, "").slice(0, 2).toUpperCase() || ident.initials : ident.initials };
+  }
+  const title = name ?? project ?? ident.label;
+  const subtitle = name && project ? project : null;
+  return { title, subtitle, initials: (title.replace(/[^\p{L}\p{N}]/gu, "").slice(0, 2) || ident.initials).toUpperCase() };
 }

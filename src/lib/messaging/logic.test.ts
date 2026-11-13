@@ -43,3 +43,25 @@ test("who may start a thread", () => {
   assert.ok(canStartThread({ role: "intern", ...base, employerAlreadyMessaged: true }));
   assert.ok(!canStartThread({ role: "employer", ...base, hasProposal: true, proposalMatchesPair: false }));
 });
+
+import { canSend, isThreadClosed } from "./logic.ts";
+
+test("canSend: employer may always send on an open thread; intern only after the employer has", () => {
+  assert.deepEqual(canSend({ role: "employer", employerHasMessaged: false, proposalStatus: "sent" }), { ok: true });
+  assert.deepEqual(canSend({ role: "intern", employerHasMessaged: false, proposalStatus: "sent" }), { ok: false, reason: "employer_first" });
+  assert.deepEqual(canSend({ role: "intern", employerHasMessaged: true, proposalStatus: "sent" }), { ok: true });
+  assert.deepEqual(canSend({ role: "intern", employerHasMessaged: false, proposalStatus: null }), { ok: false, reason: "employer_first" });
+});
+test("canSend: withdrawn closes the thread for both sides; rejected, expired and hired stay open", () => {
+  for (const role of ["employer", "intern"] as const) {
+    assert.deepEqual(canSend({ role, employerHasMessaged: true, proposalStatus: "withdrawn" }), { ok: false, reason: "closed" });
+    assert.deepEqual(canSend({ role, employerHasMessaged: true, proposalStatus: "WITHDRAWN" }), { ok: false, reason: "closed" });
+    for (const s of ["rejected", "expired", "hired", "accepted", "draft"]) {
+      assert.deepEqual(canSend({ role, employerHasMessaged: true, proposalStatus: s }), { ok: true }, `${role} ${s}`);
+    }
+  }
+  assert.ok(isThreadClosed("withdrawn") && !isThreadClosed("rejected") && !isThreadClosed(null));
+});
+test("canSend: closed wins over the employer-first rule", () => {
+  assert.deepEqual(canSend({ role: "intern", employerHasMessaged: false, proposalStatus: "withdrawn" }), { ok: false, reason: "closed" });
+});

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/app/avatar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useThreads } from "@/hooks/use-unread";
-import { badgeText, counterpartIdentity, relativeTime, truncatePreview } from "@/lib/messaging/ui-logic";
+import { badgeText, counterpartIdentity, relativeTime, threadTitle, truncatePreview } from "@/lib/messaging/ui-logic";
 import { cn } from "@/lib/utils";
 
 export function ThreadList({ base, activeId }: { base: "employer" | "intern"; activeId?: string }) {
@@ -48,8 +48,9 @@ export function ThreadList({ base, activeId }: { base: "employer" | "intern"; ac
     <ul aria-label="Conversations" className="divide-y divide-ink-100">
       {threads.map((t) => {
         const id = counterpartIdentity(base, t.counterpartId);
-        // Ids only: show the short ref just when several threads would otherwise read the same.
-        const title = threads.length > 1 ? id.label : id.word;
+        // Names from the server (row 25); the id-based label is only the fallback.
+        const head = threadTitle(base, t);
+        const title = t.counterpartName || t.projectName ? head.title : threads.length > 1 ? id.label : id.word;
         const preview = t.lastMessage ? `${t.lastMessage.mine ? "You: " : ""}${truncatePreview(t.lastMessage.body)}` : "No messages yet";
         const active = t.id === activeId;
         const unread = t.unread > 0;
@@ -63,7 +64,7 @@ export function ThreadList({ base, activeId }: { base: "employer" | "intern"; ac
                 active && "bg-brand-50 before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-brand-700",
               )}
             >
-              <Avatar masked={base === "employer"} initials={id.initials} name={title} label={title} online={t.counterpartPresence ? t.counterpartOnline : null} />
+              <Avatar masked={base === "employer"} initials={t.counterpartName || t.projectName ? head.initials : id.initials} name={title} label={title} online={t.counterpartPresence ? t.counterpartOnline : null} />
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline justify-between gap-2">
                   <span className={cn("truncate text-sm text-ink-900", unread ? "font-semibold" : "font-medium")}>{title}</span>
