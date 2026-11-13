@@ -37,7 +37,12 @@ const describeFocus = () => {
   if (!el || el === document.body || el === document.documentElement) return null;
   const cs = getComputedStyle(el);
   const outline = cs.outlineStyle !== "none" && parseFloat(cs.outlineWidth) > 0 && cs.outlineColor !== "rgba(0, 0, 0, 0)";
-  const shadow = cs.boxShadow && cs.boxShadow !== "none";
+  // A stretched link (`after:absolute after:inset-0`) draws its ring on the ::after box so the whole card lights up; that is a visible indicator.
+  const pseudoRing = ["::after", "::before"].some((p) => {
+    const ps = getComputedStyle(el, p);
+    return ps.content !== "none" && ps.position === "absolute" && ((ps.boxShadow && ps.boxShadow !== "none") || (ps.outlineStyle !== "none" && parseFloat(ps.outlineWidth) > 0));
+  });
+  const shadow = (cs.boxShadow && cs.boxShadow !== "none") || pseudoRing;
   const label =
     el.getAttribute("aria-label") ||
     (el.getAttribute("aria-labelledby") && document.getElementById(el.getAttribute("aria-labelledby"))?.textContent) ||

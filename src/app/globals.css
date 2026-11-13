@@ -1700,6 +1700,16 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
 [data-console="admin"][data-admin-theme="dark"] .text-white\/70 {
   color: #fff;
 }
+/* Focus ring, root cause. Tailwind 4's `outline-none` sets `--tw-outline-style: none`, and the `focus-visible:outline-2`
+   utility draws its line with `outline-style: var(--tw-outline-style)`. So `outline-none focus-visible:outline-2
+   focus-visible:outline-ring` (the pattern in 17 files: every admin dashboard row and action link, among others)
+   resolved to `outline-style: none` and the ring never showed (the keyboard walk found 9 on /admin/dashboard alone).
+   Restoring the variable on :focus-visible, unlayered so it beats the utilities layer, makes those utilities work as
+   written. An element that only has `outline-none` plus its own ring or border still shows no outline of its own. */
+:focus-visible {
+  --tw-outline-style: solid;
+}
+
 
 /* ── Admin permanent rules (not shims) ─────────────────────────────────────── */
 /* WCAG 1.4.11: a text field's edge needs 3:1; ink-200 on the card is 1.2:1. */

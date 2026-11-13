@@ -85,7 +85,7 @@ export function ScoreCard({ audience = "employer" }: { audience?: "employer" | "
           {/* ── The interactive control track ─────────────────────── */}
           <div
             ref={trackRef}
-            className="group relative mt-6 h-10 w-full cursor-pointer select-none rounded-lg"
+            className="group relative mt-6 h-10 w-full cursor-pointer select-none rounded-lg has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-4 has-[:focus-visible]:outline-primary"
           >
             {/* Native range input overlay: 100% reliable clicks anywhere on the track & smooth sliding */}
             <input
@@ -256,7 +256,7 @@ export function ScoreCard({ audience = "employer" }: { audience?: "employer" | "
                 key={i}
                 onClick={() => setScore(mid)}
                 aria-label={`Jump to score ${mid}`}
-                className="group flex h-full w-full cursor-pointer flex-col justify-end rounded-[2px] focus:outline-hidden"
+                className="group flex h-full w-full cursor-pointer flex-col justify-end rounded-[2px]"
               >
                 <div
                   style={{ height: `${Math.max(8, (n / 388) * 100)}%` }}
