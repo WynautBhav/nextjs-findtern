@@ -384,7 +384,7 @@ export function SendProposalForm({
               <span>{formatPerHire(rate.perHireMinor, currency)}</span> one-time hiring fee
             </p>
             <p className="flex w-full items-start gap-1.5 text-sm text-ink-600">
-              <Info className="mt-0.5 size-3.5 shrink-0 text-ink-400" aria-hidden />
+              <Info className="mt-0.5 size-3.5 shrink-0 text-ink-500" aria-hidden />
               {rateCardSource === "plan" ? "Rates come from your plan." : "Standard published rates apply."}{" "}
               {rate.bandBlurb}
             </p>

@@ -232,7 +232,7 @@ export function TimesheetReview({
         <details className="group mt-6" open={notes.length <= 5}>
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink-900 [&::-webkit-details-marker]:hidden">
             Day notes from the intern <span className="nums font-normal text-text-subtle">({notes.length})</span>
-            <span aria-hidden className="text-ink-400 transition-transform group-open:rotate-90 motion-reduce:transition-none">›</span>
+            <span aria-hidden className="text-ink-500 transition-transform group-open:rotate-90 motion-reduce:transition-none">›</span>
           </summary>
           <ul className="mt-1 divide-y divide-ink-100 rounded-apple-lg border border-ink-200/80">
             {notes.map((d) => (

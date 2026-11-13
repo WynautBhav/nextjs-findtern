@@ -221,7 +221,7 @@ export function CandidateCard({
             <div className="min-w-0">
               <h3 className="break-words text-base font-bold leading-6 text-ink-900">{displayName}</h3>
               <p className="mt-0.5 flex items-center gap-1 text-sm text-ink-600">
-                <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+                <MapPin className="size-3.5 shrink-0 text-ink-500" aria-hidden />
                 <span className="min-w-0 truncate">{place}</span>
               </p>
             </div>
@@ -309,7 +309,7 @@ export function CandidateCard({
               ) : null}
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-ink-600">
-              <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+              <MapPin className="size-3.5 shrink-0 text-ink-500" aria-hidden />
               {study ? <span className="max-sm:hidden">{study} ·</span> : null}
               <span>{place}</span>
               {/* The dot alone is colour only; say it in words (a coarse label, nothing when the candidate hides it). */}

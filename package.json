@@ -35,7 +35,9 @@
     "test:e2e:limits": "node --test --test-concurrency=1 e2e/profile-limits.e2e.mjs",
     "qa": "node e2e/qa.mjs",
     "qa:serve": "node e2e/qa-serve.mjs",
-    "qa:seed": "node e2e/seed-situations.mjs"
+    "qa:seed": "node e2e/seed-situations.mjs",
+    "check:motion": "node scripts/check-motion-budget.mjs",
+    "check:contrast": "node scripts/check-contrast.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",

@@ -276,7 +276,7 @@ export function ProjectsManager({
             />
 
             <div className="relative min-w-0 sm:w-72">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-500" aria-hidden />
               <input
                 type="search"
                 value={query}

@@ -68,7 +68,7 @@ export function CompareHeadCell({
       <Link href={profileHref} className="group/id mt-3 block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
         <span className="block break-words text-base font-bold leading-6 text-ink-900 underline-offset-4 group-hover/id:underline sm:text-lg">{name}</span>
         <span className="mt-0.5 flex items-start gap-1 text-sm font-normal text-ink-600">
-          <MapPin className="mt-[3px] size-3.5 shrink-0 text-ink-400" aria-hidden />
+          <MapPin className="mt-[3px] size-3.5 shrink-0 text-ink-500" aria-hidden />
           <span className="min-w-0 break-words">{place}</span>
         </span>
       </Link>

@@ -67,7 +67,7 @@ export function CandidateQuickView({
             <div className="min-w-0">
               <DialogTitle className="text-lg font-bold leading-6 text-ink-900">{displayName}</DialogTitle>
               <DialogDescription className="mt-1 flex items-center gap-1 text-sm text-ink-600">
-                <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+                <MapPin className="size-3.5 shrink-0 text-ink-500" aria-hidden />
                 {place}
               </DialogDescription>
             </div>

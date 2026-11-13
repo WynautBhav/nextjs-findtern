@@ -273,7 +273,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
               {sp.status !== undefined || statusFilter ? <input type="hidden" name="status" value={statusFilter?.value ?? "all"} /> : null}
               <label className="relative col-span-2 block lg:col-span-1">
                 <span className="sr-only">Search by initials or project</span>
-                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-500" aria-hidden />
                 <input name="q" defaultValue={sp.q ?? ""} placeholder="Initials or project" className={cn(field, "pl-9")} />
               </label>
               <label className="block">

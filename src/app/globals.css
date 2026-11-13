@@ -104,9 +104,11 @@
   --color-success-soft: #e6f5ed;
   /* Warning was #b57516, measured at 3.80:1 on white and 3.45:1 on its own
      soft fill. Both fail WCAG AA for text, and every warning badge in the
-     admin puts this colour on text. Darkened to #94600f: 5.33:1 on white,
-     4.84:1 on warning-soft. Same hue family, still clearly amber. */
-  --color-warning: #94600f;
+     admin puts this colour on text. Darkened to #94600f, then to #8e5c0e
+     because #94600f was 4.48:1 on the app canvas and 4.33:1 on brand-100.
+     #8e5c0e: 4.79 canvas, 5.70 white, 4.63 brand-100, 5.17 warning-soft
+     (scripts/check-contrast.mjs). Same hue, still clearly amber. */
+  --color-warning: #8e5c0e;
   --color-warning-soft: #fdf3e0;
   --color-danger: #b3261e;
   --color-danger-soft: #fdeceb;
@@ -676,7 +678,7 @@
       --color-popover-foreground: #0f1a17;
       --color-success: #0e7a4a;
       --color-success-soft: #e6f5ed;
-      --color-warning: #94600f;
+      --color-warning: #8e5c0e;
       --color-warning-soft: #fdf3e0;
       --color-danger: #b3261e;
       --color-danger-soft: #fdeceb;

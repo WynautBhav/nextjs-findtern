@@ -90,7 +90,7 @@ export function RoleCard({
           <span className="ml-auto text-xs font-semibold text-brand-700">Already considered</span>
         ) : (
           <ArrowRight
-            className="ml-auto size-4 text-ink-400 transition-[transform,color] duration-[var(--dur-instant)] group-hover:translate-x-0.5 group-hover:text-primary"
+            className="ml-auto size-4 text-ink-500 transition-[transform,color] duration-[var(--dur-instant)] group-hover:translate-x-0.5 group-hover:text-primary"
             aria-hidden
           />
         )}

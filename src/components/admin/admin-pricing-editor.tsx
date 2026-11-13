@@ -133,7 +133,7 @@ function RateCardSummary({ plans }: { plans: EditablePlan[] }) {
             <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
               <span className="min-w-0 truncate font-medium text-ink-800">
                 {p.displayName}
-                {p.isFeatured ? <Star className="ml-1.5 inline size-3.5 text-accent-500" aria-label="Most popular" /> : null}
+                {p.isFeatured ? <Star className="ml-1.5 inline size-3.5 text-accent-700" aria-label="Most popular" /> : null}
                 {!p.isActive ? <span className="ml-2 text-xs font-normal text-text-subtle">off</span> : null}
               </span>
               <span className="nums shrink-0 text-ink-600">
@@ -488,7 +488,7 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
             onChange={(e) => setFeatured(e.target.checked)}
             className="size-4 accent-brand-700"
           />
-          <Star className="size-4 text-accent-500" aria-hidden />
+          <Star className="size-4 text-accent-700" aria-hidden />
           Mark as &ldquo;Most popular&rdquo;
         </label>
 

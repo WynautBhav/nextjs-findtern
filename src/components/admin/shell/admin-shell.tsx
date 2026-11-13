@@ -317,7 +317,7 @@ export function AdminShell({
                     const here = crumb.href === pathname;
                     return (
                       <span key={crumb.href} className="flex min-w-0 items-center gap-2">
-                        <span aria-hidden className="text-ink-400">/</span>
+                        <span aria-hidden className="text-ink-500">/</span>
                         {here ? (
                           <span aria-current="page" className="truncate font-semibold text-ink-900">{crumb.label}</span>
                         ) : crumb.link ? (

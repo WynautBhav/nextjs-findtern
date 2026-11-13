@@ -204,14 +204,14 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
               className="apple-spring flex min-h-11 items-center justify-between gap-2 rounded-apple-xl border border-dashed border-ink-200 px-5 py-3.5 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
             >
               {name}&apos;s profile
-              <ArrowUpRight className="size-4 text-ink-400" aria-hidden />
+              <ArrowUpRight className="size-4 text-ink-500" aria-hidden />
             </Link>
             <Link
               href={`/employer/proposal/${encodeURIComponent(timesheet.proposalId)}`}
               className="apple-spring flex min-h-11 items-center justify-between gap-2 rounded-apple-xl border border-dashed border-ink-200 px-5 py-3.5 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
             >
               The offer this bills against
-              <ArrowUpRight className="size-4 text-ink-400" aria-hidden />
+              <ArrowUpRight className="size-4 text-ink-500" aria-hidden />
             </Link>
           </div>
         </aside>

@@ -193,7 +193,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
         </label>
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Tag className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-400" aria-hidden />
+            <Tag className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-ink-500" aria-hidden />
             <input
               id={`promo-${currency}`}
               value={code}

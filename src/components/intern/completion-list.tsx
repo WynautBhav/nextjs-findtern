@@ -40,7 +40,7 @@ export function CompletionList({
             <Link href={item.href} className="group flex min-h-11 items-center gap-3 py-1.5 text-sm font-medium text-ink-900 hover:text-brand-700">
               <span aria-hidden className="size-5 shrink-0 rounded-full border-2 border-ink-300" />
               <span className="flex-1">{item.label}</span>
-              <ArrowRight className="size-4 text-ink-400 group-hover:text-brand-700" aria-hidden />
+              <ArrowRight className="size-4 text-ink-500 group-hover:text-brand-700" aria-hidden />
             </Link>
           </li>
         ))}

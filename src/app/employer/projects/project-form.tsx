@@ -150,7 +150,7 @@ export function ProjectForm({
                 const bad = missing.some((m) => m === key || m.startsWith(key));
                 return (
                   <li key={key} className="flex items-center gap-2 text-ink-700">
-                    {bad ? <Circle className="size-4 text-ink-400" aria-hidden /> : <CheckCircle2 className="size-4 text-brand-700" aria-hidden />}
+                    {bad ? <Circle className="size-4 text-ink-500" aria-hidden /> : <CheckCircle2 className="size-4 text-brand-700" aria-hidden />}
                     <span>{label}</span>
                     <span className="sr-only">{bad ? "missing" : "done"}</span>
                   </li>

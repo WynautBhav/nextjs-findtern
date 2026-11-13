@@ -160,7 +160,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
         <div className="mb-4 flex gap-2">
           <label className="relative min-w-0 flex-1 sm:max-w-xl">
             <span className="sr-only">Search proposals</span>
-            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ink-500" aria-hidden />
             <input
               ref={searchRef}
               type="search"
