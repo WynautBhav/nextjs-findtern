@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { NewTabLink } from "@/components/ui/new-tab-link";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-react";
 
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
@@ -44,7 +44,7 @@ export function SignupForm({
   /** Where to go after the account exists (from ?next=), else onboarding. */
   next?: string;
 } = {}) {
-  const router = useRouter();
+  const router = useProgressRouter();
 
   const [stage, setStage] = useState<Stage>("details");
   const [firstName, setFirstName] = useState(google?.firstName ?? "");

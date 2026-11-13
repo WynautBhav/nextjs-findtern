@@ -13,7 +13,7 @@
  */
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Heart, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
@@ -40,7 +40,7 @@ export function ShortlistToggle({
   /** Applied to the wrapper; the button always fills it. */
   className?: string;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [state, setState] = useState(shortlisted);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

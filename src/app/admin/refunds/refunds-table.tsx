@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Loader2 } from "lucide-react";
 
 import { AdminEmpty } from "@/components/admin/panel";
@@ -15,7 +15,7 @@ import type { RefundListRow } from "@/lib/refunds/refunds-db";
 const select = "h-9 rounded-apple-sm border border-ink-200 bg-surface px-3 text-sm text-ink-900";
 
 export function RefundsTable(props: { rows: RefundListRow[]; total: number; page: number; perPage: number; status: string; reason: string; statuses: string[] }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [target, setTarget] = useState<RefundListRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);

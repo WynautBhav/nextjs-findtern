@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { ArrowRight, Loader2 } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
@@ -9,7 +9,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 
 /** Trades the share-link token for the employer's pass into the drive. */
 export function DriveEnterButton({ token }: { token: string }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

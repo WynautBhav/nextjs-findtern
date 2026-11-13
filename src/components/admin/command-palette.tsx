@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import {
   ArrowLeftRight,
   BarChart3,
@@ -137,7 +137,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [search, setSearch] = useState<SearchState | null>(null);
-  const router = useRouter();
+  const router = useProgressRouter();
   // The palette is not a DialogTrigger child, so Radix cannot restore focus itself: remember where it was opened from.
   const triggerRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);

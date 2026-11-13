@@ -13,7 +13,8 @@
  */
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { SlidersHorizontal } from "lucide-react";
 
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -42,7 +43,7 @@ export function FilterPanel({
   /** The live result count, for the sheet's "Show" button. */
   total: number;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const pathname = usePathname();
   const form = useRef<HTMLFormElement>(null);
   const timer = useRef<number | undefined>(undefined);

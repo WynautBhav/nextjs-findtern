@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { CircleGauge, Info, Send, TriangleAlert } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
@@ -117,7 +117,7 @@ export function SendProposalForm({
   /** Where the company is taxed; null when its profile can't say, and the GST line is left out. */
   place?: PlaceOfSupply | null;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   // The project the employer came from, not just the first one in the list:
   // the cart and profile links pass `?project=`, and ignoring it filed the
   // proposal under another project.
