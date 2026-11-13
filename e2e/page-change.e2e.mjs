@@ -194,8 +194,15 @@ async function runCase(browserType, browser, vp, c, fast = false) {
   });
   const page = await ctx.newPage();
   const errors = [];
-  page.on("console", (m) => m.type() === "error" && errors.push(m.text().slice(0, 200)));
+  // "Failed to load resource" has no URL; a failed request is judged below instead (ours only: the analytics scripts on the marketing pages are third-party and the sandbox's network resets them).
+  page.on("console", (m) => m.type() === "error" && !/^Failed to load resource/.test(m.text()) && errors.push(m.text().slice(0, 200)));
   page.on("pageerror", (e) => errors.push(String(e.message).slice(0, 200)));
+  page.on("requestfailed", (r) => {
+    if (new URL(r.url()).origin === new URL(baseUrl()).origin && !/ABORTED/.test(r.failure()?.errorText ?? "")) errors.push(`${r.failure()?.errorText} ${r.url()}`.slice(0, 200));
+  });
+  page.on("response", (r) => {
+    if (new URL(r.url()).origin === new URL(baseUrl()).origin && r.status() >= 500) errors.push(`${r.status()} ${r.url()}`.slice(0, 200));
+  });
   await page.addInitScript(sampler);
   if (browserType === "chromium") {
     const cdp = await ctx.newCDPSession(page);
@@ -218,8 +225,13 @@ async function runCase(browserType, browser, vp, c, fast = false) {
   const findings = [];
   const where = `${browserType} ${vp.name} ${c.key}`;
   try {
-    await page.goto(new URL(c.start, baseUrl()).toString(), { waitUntil: "load" });
+    // Not "load": third-party scripts on the marketing pages can stall it, and the click must land while the held prefetch is still held.
+    await page.goto(new URL(c.start, baseUrl()).toString(), { waitUntil: "domcontentloaded" });
     await page.locator("main h1, h1").first().waitFor({ timeout: 15_000 });
+    await page.waitForFunction(() => {
+      const els = [...document.querySelectorAll("a[href], button")];
+      return els.length > 0 && els.every((el) => Object.keys(el).some((k) => k.startsWith("__reactFiber")));
+    }, null, { timeout: 15_000 }); // every link and button hydrated: before that a click is a full page load
     // Fast case: give the viewport prefetch time to land. Held cases: click soon, while the prefetch is still held.
     await page.waitForTimeout(fast ? 3000 : 400);
     // Phones keep the links behind a menu button; opening it is not the click under test.
@@ -288,8 +300,12 @@ async function shoot(browserType, browser, vp, c) {
     if (hit && !u.pathname.startsWith("/api/") && !u.pathname.startsWith("/_next/")) await new Promise((r) => setTimeout(r, HOLD_MS));
     await route.continue().catch(() => {});
   });
-  await page.goto(new URL(c.start, baseUrl()).toString(), { waitUntil: "load" });
+  await page.goto(new URL(c.start, baseUrl()).toString(), { waitUntil: "domcontentloaded" });
   await page.locator("main h1, h1").first().waitFor({ timeout: 15_000 });
+  await page.waitForFunction(() => {
+    const els = [...document.querySelectorAll("a[href], button")];
+    return els.length > 0 && els.every((el) => Object.keys(el).some((k) => k.startsWith("__reactFiber")));
+  }, null, { timeout: 15_000 }); // every link and button hydrated: before that a click is a full page load
   await page.waitForTimeout(400);
   if (vp.width < 640 && c.menu) {
     await page.getByRole("button", { name: c.menu }).first().click();
