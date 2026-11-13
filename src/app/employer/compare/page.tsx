@@ -332,14 +332,14 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         {/* Fixed layout: every candidate column is the same width. The minimum width (label column + n columns) is what makes the region scroll sideways instead of squeezing. */}
         <table
           style={{ "--n": candidates.length } as React.CSSProperties}
-          className="w-full table-fixed border-separate border-spacing-0 text-left text-sm min-w-[calc(6rem+var(--n)*11rem)] sm:min-w-[calc(9rem+var(--n)*13rem)] xl:min-w-[calc(11rem+var(--n)*13rem)]"
+          className="w-full table-fixed border-separate border-spacing-0 text-left text-sm min-w-[calc(8rem+var(--n)*11rem)] sm:min-w-[calc(10rem+var(--n)*13rem)] xl:min-w-[calc(11rem+var(--n)*13rem)]"
         >
           <caption className="sr-only">Candidates compared side by side; the best value in each row is marked Best.</caption>
           <thead>
             <tr>
               <th
                 scope="col"
-                className="sticky left-0 z-20 w-24 min-w-24 border-b border-r border-ink-200 bg-white p-3 text-left align-bottom text-[11px] font-semibold uppercase tracking-wider text-ink-700 sm:w-36 sm:min-w-36 sm:p-4 xl:w-44 xl:min-w-44 xl:p-5"
+                className="sticky left-0 z-20 w-32 min-w-32 border-b border-r border-ink-200 bg-white px-2.5 py-3 text-left align-bottom text-[11px] font-semibold uppercase tracking-wider text-ink-700 sm:w-40 sm:min-w-40 sm:p-4 xl:w-44 xl:min-w-44 xl:p-5"
               >
                 Compared on
               </th>

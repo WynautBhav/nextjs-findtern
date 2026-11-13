@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
  */
 
 /** Width of the pinned label column, shared by the header corner, rows and section bands. */
-const LABEL_COL = "w-24 min-w-24 sm:w-36 sm:min-w-36 xl:w-44 xl:min-w-44";
+const LABEL_COL = "w-32 min-w-32 sm:w-40 sm:min-w-40 xl:w-44 xl:min-w-44";
 
 export function SectionRow({ label, span }: { label: string; span: number }) {
   return (
@@ -46,12 +46,12 @@ export function MatrixRow({
       <th
         scope="row"
         className={cn(
-          "sticky left-0 z-10 border-r border-ink-200 bg-white p-3 text-left align-top text-[13px] font-semibold leading-5 text-ink-900 sm:p-4 sm:text-sm xl:p-5",
+          "sticky left-0 z-10 border-r border-ink-200 bg-white px-2.5 py-3 text-left align-top text-xs font-semibold leading-5 text-ink-900 sm:p-4 sm:text-sm xl:p-5",
           LABEL_COL,
           !last && "border-b",
         )}
       >
-        <span className="break-words">{label}</span>
+        <span className="[overflow-wrap:normal] hyphens-none">{label}</span>
         {hint ? <span className="mt-0.5 block break-words text-xs font-normal leading-4 text-text-subtle">{hint}</span> : null}
         {level ? <span className="mt-0.5 block text-xs font-normal leading-4 text-text-subtle">All level</span> : null}
       </th>
