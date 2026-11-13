@@ -33,6 +33,8 @@ import { useEffect, useRef, useState } from "react";
 import { motion, useInView, useReducedMotion } from "motion/react";
 import { ArrowRight, Check } from "lucide-react";
 
+import { currentMilestone } from "@/lib/milestone-pick";
+
 import type { ThreadNode, ThreadTone } from "@/lib/journey";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -300,4 +302,60 @@ export function useSeenIds(key: string): [Set<string> | null, (id: string) => vo
   };
 
   return [seen, mark];
+}
+
+/**
+ * One dated note: a stored fact, its date and one next step, shown until it is dismissed.
+ *
+ * Dismissal is remembered per browser (see `useSeenIds`), never asked of the server. Nothing renders until storage
+ * has been read, so a dismissed note never flashes, and when several are due only the first not-yet-dismissed one
+ * shows. The only motion is a 200 ms ease-out fade, skipped under reduced motion.
+ */
+export function DatedNote({
+  storageKey,
+  label,
+  notes,
+  className,
+}: {
+  storageKey: string;
+  label: string;
+  /** In priority order. */
+  notes: { id: string; fact: string; next: { label: string; href: string } }[];
+  className?: string;
+}) {
+  const [seen, dismiss] = useSeenIds(storageKey);
+  const reduce = useReducedMotion();
+  const note = seen ? currentMilestone(notes, seen) : null;
+  if (!note) return null;
+  return (
+    <motion.section
+      key={note.id}
+      aria-label={label}
+      initial={reduce ? false : { opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: reduce ? 0 : 0.2, ease: "easeOut" }}
+      className={cn(
+        "flex flex-col gap-1 rounded-apple-sm border border-ink-200 bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4",
+        className,
+      )}
+    >
+      <p className="min-w-0 text-pretty leading-relaxed text-ink-800">
+        {note.fact}{" "}
+        <Link
+          href={note.next.href}
+          className="font-medium text-brand-700 underline underline-offset-4 hover:text-brand-800 focus-visible:outline-2 focus-visible:outline-brand-600"
+        >
+          {note.next.label}
+        </Link>
+        .
+      </p>
+      <button
+        type="button"
+        onClick={() => dismiss(note.id)}
+        className="-mx-2 inline-flex min-h-11 shrink-0 items-center self-start rounded-apple-sm px-2 font-medium text-ink-700 underline-offset-4 hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-brand-600 sm:mx-0 sm:self-auto"
+      >
+        Dismiss
+      </button>
+    </motion.section>
+  );
 }

@@ -16,6 +16,7 @@ import { aiInterviewPhase, isAiInterview, isScored, joinableLink, latestAiInterv
 import { requireRole } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { HoursPills } from "@/components/intern/home/hours-pills";
+import { MilestoneNote } from "@/components/intern/home/milestone-note";
 import { NextUpTile } from "@/components/intern/home/next-up-tile";
 import { pickNextUp } from "@/components/intern/home/next-up";
 import { parseOffer } from "@/lib/offer";
@@ -571,6 +572,8 @@ export default async function InternHome() {
             ) : null}
           </div>
         ) : null}
+
+        <MilestoneNote data={data} userId={session.uid} now={now} />
 
         {/* The key numbers follow what needs you: the action is the reason to open Home. */}
         {stats.length > 0 ? (

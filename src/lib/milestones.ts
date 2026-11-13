@@ -2,6 +2,8 @@ import { formatMoney, shortDate } from "./format.ts";
 import { companyIn, hoursIn, isAcceptedStatus, periodLabel, roleOf, type PayoutRow, type ProposalRow, type TimesheetRow } from "./journey.ts";
 import { isHiredProposal } from "./hire-status.ts";
 
+export { currentMilestone } from "./milestone-pick.ts";
+
 /**
  * Milestone notes.
  *
@@ -119,12 +121,6 @@ export function milestonesFor(events: MilestoneEvents, now: Date): Milestone[] {
       return Number.isFinite(age) && age >= 0 && age < MILESTONE_DAYS * DAY;
     })
     .sort((a, b) => MILESTONE_PRIORITY.indexOf(a.kind) - MILESTONE_PRIORITY.indexOf(b.kind));
-}
-
-/** The one note to show: the highest-priority one in its week that has not been dismissed. */
-export function currentMilestone(milestones: readonly Milestone[], dismissed: ReadonlySet<string> | readonly string[]): Milestone | null {
-  const gone = dismissed instanceof Set ? dismissed : new Set(dismissed);
-  return milestones.find((m) => !gone.has(m.id)) ?? null;
 }
 
 /* ── From the rows the intern already owns ─────────────────────────────── */
