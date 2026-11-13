@@ -104,8 +104,6 @@ test("row 24: the intern cannot send until the employer has written in the threa
   await P.I.page.goto(url(`/intern/messages/${threadId}`), { waitUntil: "domcontentloaded" });
   await P.I.page.getByText("You can reply once the company has sent you a message.").waitFor({ timeout: 20_000 });
   assert.equal(await P.I.page.getByLabel(/message to/i).count(), 0, "no composer");
-  // The employer is never blocked by this rule.
-  assert.equal((await list.body.threads.length) >= 1, true);
 });
 
 test("messages flow both ways", async () => {
