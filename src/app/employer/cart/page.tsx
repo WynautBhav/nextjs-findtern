@@ -194,9 +194,9 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
       : [];
     const meetingUntil = new Map<string, string>();
     // A booked meeting's link, while it is live, so the cart can join it (bug sheet 8).
-    const meetingLinks = new Map<string, string>();
+    const meetingLinks = new Map<string, { id: string; link: string }>();
     for (const iv of meetingRows) {
-      if (iv.status === "scheduled" && iv.selectedSlot && iv.meetingLink && isMeetingLinkLive(iv)) meetingLinks.set(iv.internId, iv.meetingLink);
+      if (iv.status === "scheduled" && iv.selectedSlot && iv.meetingLink && isMeetingLinkLive(iv)) meetingLinks.set(iv.internId, { id: iv.id, link: iv.meetingLink });
       const end = meetingEndsAt(iv);
       if (!isBlockingInterview(iv) || end === null) continue;
       const prev = meetingUntil.get(iv.internId);
@@ -242,7 +242,8 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
         acceptedProposalId: acceptedFor.get(item.internId) ?? null,
         meetingUntil: meetingUntil.get(item.internId) ?? null,
         meetingAt: pendingMeetingAtFor(meetingRows.filter((iv) => iv.internId === item.internId), { projectId: item.projectId }),
-        meetingLink: meetingLinks.get(item.internId) ?? null,
+        meetingLink: meetingLinks.get(item.internId)?.link ?? null,
+        meetingInterviewId: meetingLinks.get(item.internId)?.id ?? null,
       });
     }
   }

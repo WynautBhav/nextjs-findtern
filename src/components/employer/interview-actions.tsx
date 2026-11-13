@@ -9,6 +9,7 @@
  *
  *   awaiting_pick → Send reminder · Offer new times
  *   expired       → Offer new times
+ *   employer_no_show → Offer new times (the employer didn't join within 30 minutes)
  *   upcoming      → Join meeting (Meeting link until 15 minutes before) · Send reminder · Reschedule
  *   live          → Join meeting · Mark completed · Mark missed (after the grace period)
  *   over          → Leave feedback · Mark missed
@@ -157,14 +158,15 @@ export function InterviewActions({
   }
 
   const canRemind = stage === "awaiting_pick" || stage === "upcoming";
-  const canReschedule = stage === "awaiting_pick" || stage === "expired" || stage === "upcoming";
+  const canReschedule = stage === "awaiting_pick" || stage === "expired" || stage === "employer_no_show" || stage === "upcoming";
   const missedShown = canMarkMissed && (stage === "live" || stage === "over");
-  const linkShown = Boolean(meetingLink) && (stage === "upcoming" || stage === "live");
+  // Join is offered on every booked row; with no link yet it is disabled and says why (bug sheet 12 Nov, row 12).
+  const linkShown = stage === "upcoming" || stage === "live";
   const primary: "join" | "feedback" | "remind" | "reschedule" | null = linkShown
     ? "join"
     : canFeedback
       ? "feedback"
-      : stage === "expired"
+      : stage === "expired" || stage === "employer_no_show"
         ? "reschedule"
         : canRemind
           ? "remind"
@@ -179,7 +181,12 @@ export function InterviewActions({
           buttons a card). Panels still open inline under the card. */}
       <div className="flex flex-wrap items-center gap-2 sm:justify-self-end">
         {primary === "join" ? (
-          soon ? <JoinMeetingButton link={meetingLink!} /> : <JoinMeetingButton link={meetingLink!} variant="outline" label="Meeting link" />
+          <JoinMeetingButton
+            interviewId={interviewId}
+            link={meetingLink}
+            ready={Boolean(meetingLink)}
+            {...(soon ? {} : { variant: "outline" as const, label: "Meeting link" })}
+          />
         ) : null}
         {canMarkCompleted && stage === "live" ? (
           <button type="button" onClick={markCompleted} disabled={busy !== null} className={buttonClass({ variant: "outline", size: "sm" })}>
@@ -210,7 +217,7 @@ export function InterviewActions({
             onClick={() => toggle("reschedule")}
             aria-expanded={panel === "reschedule"}
             disabled={busy !== null}
-            className={buttonClass({ variant: stage === "expired" ? "primary" : "outline", size: "sm" })}
+            className={buttonClass({ variant: stage === "expired" || stage === "employer_no_show" ? "primary" : "outline", size: "sm" })}
           >
             <CalendarClock className="size-4" aria-hidden />
             {stage === "upcoming" ? "Reschedule" : "Offer new times"}

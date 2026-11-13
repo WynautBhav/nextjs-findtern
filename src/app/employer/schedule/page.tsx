@@ -40,7 +40,8 @@ export const metadata: Metadata = {
 const STAGE: Record<InterviewStage, { label: string; tone: Tone }> = {
   awaiting_pick: { label: "Waiting on candidate", tone: "waiting" },
   expired: { label: "Expired", tone: "closed" },
-  upcoming: { label: "Booked", tone: "live" },
+  employer_no_show: { label: "Expired: employer didn't join", tone: "closed" },
+  upcoming: { label: "Scheduled", tone: "live" },
   live: { label: "Happening now", tone: "new" },
   over: { label: "Completed", tone: "paid" },
   missed: { label: "Missed", tone: "closed" },
@@ -52,9 +53,9 @@ const PAST_PAGE = 5;
 
 /** Status filter, in legacy's vocabulary (employer-schedule.tsx:331). */
 const STATUS_FILTERS: { value: string; label: string; stages: InterviewStage[] }[] = [
-  { value: "scheduled", label: "Booked", stages: ["upcoming", "live"] },
+  { value: "scheduled", label: "Scheduled", stages: ["upcoming", "live"] },
   { value: "sent", label: "Waiting on candidate", stages: ["awaiting_pick"] },
-  { value: "expired", label: "Expired", stages: ["expired"] },
+  { value: "expired", label: "Expired", stages: ["expired", "employer_no_show"] },
   { value: "completed", label: "Completed", stages: ["over"] },
   { value: "missed", label: "Missed", stages: ["missed"] },
 ];
@@ -81,7 +82,8 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
   const dateTyped = (sp.date ?? "").trim();
   const dmy = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(dateTyped);
   const dateFilter = dmy ? `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}` : /^\d{4}-\d{2}-\d{2}$/.test(dateTyped) ? dateTyped : "";
-  const statusFilter = STATUS_FILTERS.find((s) => s.value === sp.status) ?? null;
+  // "All" is its own value so that, with no choice made, the Scheduled tab opens (bug sheet 12 Nov, row 9).
+  const scheduledFilter = STATUS_FILTERS[0];
   const projectFilter = (sp.project ?? "").trim();
   const tzFilter = (sp.tz ?? "").trim();
 
@@ -152,6 +154,10 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
     };
   });
 
+  // No tab chosen: Scheduled, unless nothing is scheduled (then an empty default would hide everything).
+  const chosen = STATUS_FILTERS.find((s) => s.value === sp.status) ?? null;
+  const statusFilter =
+    chosen ?? (sp.status === undefined && all.some((r) => scheduledFilter.stages.includes(r.stage)) ? scheduledFilter : null);
   const timezones = Array.from(new Set(all.map((r) => r.tz))).sort();
   const projectOptions = Array.from(new Set(all.map((r) => r.project).filter((p): p is string => Boolean(p)))).sort();
 
@@ -199,14 +205,14 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
     days.set(label, [...(days.get(label) ?? []), r]);
   }
   const waiting = shown.filter((x) => x.stage === "awaiting_pick").sort(bySoonest);
-  const past = shown.filter((x) => x.stage === "over" || x.stage === "missed" || x.stage === "expired" || x.stage === "closed").sort((a, b) => (b.sortAt ?? 0) - (a.sortAt ?? 0));
+  const past = shown.filter((x) => x.stage === "over" || x.stage === "missed" || x.stage === "expired" || x.stage === "employer_no_show" || x.stage === "closed").sort((a, b) => (b.sortAt ?? 0) - (a.sortAt ?? 0));
   const pastShown = sp.past === "all" ? past : past.slice(0, PAST_PAGE);
   const sections: { title: string; rows: Row[]; past?: boolean; more: number }[] = [
     ...Array.from(days, ([title, rows]) => ({ title, rows, more: 0 })),
     ...(waiting.length ? [{ title: "Waiting on the candidate to pick", rows: waiting, more: 0 }] : []),
     ...(past.length ? [{ title: "Past", rows: pastShown, past: true, more: past.length - pastShown.length }] : []),
   ];
-  const filtering = Boolean(q || dateFilter || statusFilter || projectFilter || tzFilter);
+  const filtering = Boolean(q || dateFilter || chosen || projectFilter || tzFilter);
   const field = fieldClass;
 
   return (
@@ -239,12 +245,12 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
           <div className="mb-5 flex flex-col gap-3">
             <nav aria-label="Show interviews" className="flex flex-wrap gap-x-3 border-b border-ink-100 sm:gap-x-7">
               {[
-                { key: "", label: "All", count: all.length },
+                { key: "all", label: "All", count: all.length },
                 ...STATUS_FILTERS.map((f) => ({ key: f.value, label: f.label, count: all.filter((r) => f.stages.includes(r.stage)).length })).filter(
                   (t) => t.count > 0 || t.key === statusFilter?.value,
                 ),
               ].map((t) => {
-                const on = (statusFilter?.value ?? "") === t.key;
+                const on = (statusFilter?.value ?? "all") === t.key;
                 return (
                   <Link
                     key={t.key}
@@ -264,7 +270,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
               })}
             </nav>
             <AutoSubmitForm className="grid grid-cols-2 gap-2 lg:grid-cols-[minmax(0,1.4fr)_10rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
-              {statusFilter ? <input type="hidden" name="status" value={statusFilter.value} /> : null}
+              {sp.status !== undefined || statusFilter ? <input type="hidden" name="status" value={statusFilter?.value ?? "all"} /> : null}
               <label className="relative col-span-2 block lg:col-span-1">
                 <span className="sr-only">Search by initials or project</span>
                 <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />

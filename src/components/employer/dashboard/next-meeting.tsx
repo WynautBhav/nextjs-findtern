@@ -16,6 +16,8 @@ export type NextMeetingData = {
   projectName: string | null;
   /** Set only when the meeting link is live (`isMeetingLinkLive`); render `JoinMeetingButton` with it. */
   joinLink: string | null;
+  /** The interview, so Join records that the employer joined. */
+  interviewId: string;
   /** "/employer/schedule". */
   scheduleHref: string;
 };
@@ -39,7 +41,7 @@ const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-accent focus
  */
 export function NextMeeting({ meeting, hired, offersOut }: NextMeetingProps) {
   if (!meeting) return <Fallback hired={hired} offersOut={offersOut} />;
-  const { with: who, whenLabel, untilLabel, projectName, joinLink, scheduleHref } = meeting;
+  const { with: who, whenLabel, untilLabel, projectName, joinLink, interviewId, scheduleHref } = meeting;
   return (
     <section aria-labelledby="next-meeting-h" className={CARD}>
       <div className="flex items-center justify-between gap-3">
@@ -75,7 +77,7 @@ export function NextMeeting({ meeting, hired, offersOut }: NextMeetingProps) {
         {/* The page's one amber button is the queue's; the join button is solid white on the dark card. The wrapper restyles the trigger only (the rules dialog is portaled out of it). */}
         {joinLink ? (
           <div className="[&_button]:border-transparent [&_button]:bg-white [&_button]:text-brand-950 [&_button]:shadow-sm [&_button:hover]:bg-brand-50">
-            <JoinMeetingButton link={joinLink} size="sm" variant="outline" block />
+            <JoinMeetingButton link={joinLink} interviewId={interviewId} size="sm" variant="outline" block />
           </div>
         ) : null}
         <ButtonLink href={scheduleHref} variant="outlineLight" size="sm" block className={FOCUS}>
