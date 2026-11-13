@@ -7,6 +7,8 @@ import { ActivityList, ScoreScale, STAT_ROW, StatTile, Tile } from "@/components
 import { buttonClass } from "@/components/ui/button";
 import { ActivationCard } from "@/components/intern/activation-card";
 import { GettingStarted } from "@/components/intern/getting-started";
+import { HiddenProfileBanner } from "@/components/intern/hidden-profile-banner";
+import { JoinGate } from "@/components/intern/ai-interview-join-card";
 import { MeetingJoinButton } from "@/components/intern/meeting-join";
 import { OpenToWorkToggle } from "@/components/intern/open-to-work-toggle";
 import { PresenceNotice } from "@/components/intern/presence-notice";
@@ -291,7 +293,7 @@ export default async function InternHome() {
 
   // What needs this person next, in one fixed order: messages, an offer waiting,
   // the AI interview, the college's cover, the profile. Each line has one action.
-  const nextSteps: { key: string; title: string; detail?: string; href?: string; label?: string; external?: boolean }[] = [];
+  const nextSteps: { key: string; title: string; detail?: string; href?: string; label?: string; joinLink?: string }[] = [];
   if (counts && counts.messages > 0) {
     nextSteps.push({
       key: "messages",
@@ -321,20 +323,11 @@ export default async function InternHome() {
         key: "ai-interview",
         title: "Your AI interview is ready",
         detail: "It is the last step before employers can find you.",
-        href: link,
+        // Never the raw link: the terms and instructions gate opens first (bug sheet 12 Nov, row 20).
         label: "Start the interview",
-        external: true,
+        joinLink: link,
       });
     }
-  }
-  if (collegePaid && college) {
-    nextSteps.push({
-      key: "college",
-      title: `${college.name} is on Findtern`,
-      detail: "Have your placement officer's code ready: it can waive the interview fee when you activate.",
-      href: "/intern/dashboard#journey-title",
-      label: "Go to activation",
-    });
   }
   if (!completion.complete) {
     const missing = completion.items.filter((i) => !i.done);
@@ -359,7 +352,7 @@ export default async function InternHome() {
         ? "Activation is done. The AI interview is the last step before employers can find you."
         : completion.complete
           ? "Your profile is complete. Activation is next, and it is the only payment."
-          : "Build your profile, activate once, take the AI interview. Then employers shortlist you on your score."
+          : "Build your profile first. It is free, and employers shortlist you on your score once the AI interview is done."
       : pending
         ? undefined
         : openToWork
@@ -375,23 +368,13 @@ export default async function InternHome() {
             <li key={step.key} className="py-3 first:pt-0 last:pb-0">
               <p className={cn("text-pretty font-medium leading-snug text-ink-900", i === 0 ? "text-lg" : "text-base")}>{step.title}</p>
               {step.detail ? <p className="mt-1 text-sm text-text-subtle">{step.detail}</p> : null}
-              {step.href ? (
-                step.external ? (
-                  <a
-                    href={step.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={buttonClass({ variant: i === 0 ? "primary" : "outline", className: "mt-3 w-full" })}
-                  >
-                    {step.label}
-                    <ArrowRight className="size-4" aria-hidden />
-                  </a>
-                ) : (
-                  <Link href={step.href} className={buttonClass({ variant: i === 0 ? "primary" : "outline", className: "mt-3 w-full" })}>
-                    {step.label}
-                    <ArrowRight className="size-4" aria-hidden />
-                  </Link>
-                )
+              {step.joinLink ? (
+                <JoinGate link={step.joinLink} label={step.label} variant={i === 0 ? "primary" : "outline"} className="mt-3 w-full" />
+              ) : step.href ? (
+                <Link href={step.href} className={buttonClass({ variant: i === 0 ? "primary" : "outline", className: "mt-3 w-full" })}>
+                  {step.label}
+                  <ArrowRight className="size-4" aria-hidden />
+                </Link>
               ) : null}
             </li>
           ))}
@@ -533,6 +516,7 @@ export default async function InternHome() {
       />
 
       <div className="space-y-4">
+        {openToWork ? null : <HiddenProfileBanner />}
         <PresenceNotice userId={session.uid} on={presenceRow?.show ?? true} />
         {gettingStarted ? (
           <GettingStarted
@@ -544,6 +528,7 @@ export default async function InternHome() {
             aiPhase={aiPhase}
             aiLink={aiPhase === "ready" ? joinableLink(aiRow?.meetingLink) : null}
             hidden={!openToWork}
+            collegeName={collegePaid && college ? college.name : null}
             aside={asideTiles}
             payment={
               <ActivationCard

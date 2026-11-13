@@ -78,11 +78,24 @@ function useAiState(internId: string | null, initial: State) {
   return [state, setState, refresh] as const;
 }
 
-function JoinGate({ link, block, label = "Start AI interview" }: { link: string; block?: boolean; label?: string }) {
+/** The only way into the raw interview link: the terms and instructions come first. */
+export function JoinGate({
+  link,
+  block,
+  label = "Start AI interview",
+  variant = "primary",
+  className,
+}: {
+  link: string;
+  block?: boolean;
+  label?: string;
+  variant?: "primary" | "outline";
+  className?: string;
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "primary", block })}>
+      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant, block, className })}>
         <Video className="size-4" aria-hidden />
         {label}
       </button>
