@@ -17,6 +17,7 @@ import { aiInterviewPhase, isAiInterview, isScored, joinableLink, latestAiInterv
 import { requireRole } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { HoursPills } from "@/components/intern/home/hours-pills";
+import { MilestoneNote } from "@/components/intern/home/milestone-note";
 import { NextUpTile } from "@/components/intern/home/next-up-tile";
 import { pickNextUp } from "@/components/intern/home/next-up";
 import { parseOffer } from "@/lib/offer";
@@ -523,6 +524,7 @@ export default async function InternHome() {
         <PresenceNotice userId={session.uid} on={presenceOn} />
         {/* Hides a dismissed notice before first paint on a hard load (the notice is server-rendered). */}
         {presenceOn ? <DismissedGuard store="local" storageKey={presenceNoticeKey(session.uid)} name="presence" /> : null}
+        <MilestoneNote data={data} userId={session.uid} now={now} />
         {gettingStarted ? (
           <GettingStarted
             completion={completion}
