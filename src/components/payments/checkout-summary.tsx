@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 
 import { Pill } from "@/components/app/primitives";
+import { scheduleSummary } from "@/lib/dues-display";
 import { formatDate, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CheckoutPay } from "./checkout-pay";
@@ -233,16 +234,8 @@ export function CheckoutSummary({
 
           {mode === "postpaid" && line.schedule.length > 0 ? (
             <div className="mt-4 border-t border-ink-100 pt-4 text-sm">
-              <p className="font-medium text-ink-800">Then, month by month</p>
+              <p className="font-medium text-ink-800">{scheduleSummary(line.schedule, line.monthlyRateMinor, (n) => m(n, line.currency))}</p>
               <p className="mt-0.5 text-xs text-text-subtle">Each month is due 2 days before the intern&apos;s pay day. You can pay up to 15 days early.</p>
-              <ul className="mt-2 space-y-1.5">
-                {line.schedule.map((d, i) => (
-                  <li key={d} className="flex flex-wrap items-baseline justify-between gap-x-3 text-ink-600">
-                    <span>Month {i + 2} · due {formatDate(d)}</span>
-                    <span className="nums font-medium text-ink-900">{line.monthlyRateMinor != null ? m(line.monthlyRateMinor, line.currency) : ""}</span>
-                  </li>
-                ))}
-              </ul>
             </div>
           ) : null}
 

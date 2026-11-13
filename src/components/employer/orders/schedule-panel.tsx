@@ -4,9 +4,10 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 
 import { EmptyScene, Pill, Surface, type Tone } from "@/components/app/primitives";
-import { ButtonLink } from "@/components/ui/button";
+import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { tdClass, thClass } from "@/components/employer/ui-tokens";
 import { formatDate, formatMoney } from "@/lib/format";
+import { payButtonState } from "@/lib/dues-display";
 import { filterHires } from "@/lib/orders-filter";
 import { todayIst } from "@/lib/offer";
 import { cn } from "@/lib/utils";
@@ -111,6 +112,7 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                 const s = overdue ? { label: "Overdue", tone: "waiting" as Tone } : STATUS[h.ledger.status];
                 const m = (minor: number) => formatMoney(minor, h.currency, { zeroLabel: false });
                 const payable = h.ledger.dueMinor > 0 && (h.ledger.plan === "monthly" || (h.ledger.plan === "postpaid" && payableIds.includes(h.proposalId)));
+                const pay = payButtonState(h.ledger, payableIds, today);
                 return (
                   <tr key={h.proposalId}>
                     <td data-title className={tdClass}>
@@ -165,10 +167,21 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                       )}
                     </td>
                     <td className={cn(tdClass, "text-right")}>
-                      {payable ? (
-                        <ButtonLink href={payHref(h)} size="sm">
-                          Pay month {h.ledger.monthsPaid + 1}
-                        </ButtonLink>
+                      {pay.show ? (
+                        pay.enabled ? (
+                          <ButtonLink href={payHref(h)} size="sm">
+                            {pay.label}
+                          </ButtonLink>
+                        ) : (
+                          <div className="inline-flex flex-col items-end gap-1">
+                            <button type="button" disabled aria-describedby={`pay-hint-${h.proposalId}`} className={buttonClass({ size: "sm" })}>
+                              {pay.label}
+                            </button>
+                            <span id={`pay-hint-${h.proposalId}`} className="text-xs text-text-subtle">
+                              {pay.payableFrom ? `Payable from ${formatDate(pay.payableFrom)}` : "Not payable online yet"}
+                            </span>
+                          </div>
+                        )
                       ) : null}
                     </td>
                   </tr>
