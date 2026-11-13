@@ -29,7 +29,7 @@
  */
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useSyncExternalStore } from "react";
 import { motion, useInView, useReducedMotion } from "motion/react";
 import { ArrowRight, Check } from "lucide-react";
 
@@ -267,39 +267,79 @@ export function StatusStrip({
   );
 }
 
+const seenListeners = new Set<() => void>();
+// Storage blocked (private mode, quota): a dismissal still holds for this page view.
+const seenMemory = new Map<string, Set<string>>();
+
+function parseSeen(raw: string): string[] {
+  try {
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function readSeenRaw(key: string): string {
+  try {
+    return window.localStorage.getItem(key) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+function subscribeSeen(onChange: () => void) {
+  seenListeners.add(onChange);
+  window.addEventListener("storage", onChange);
+  return () => {
+    seenListeners.delete(onChange);
+    window.removeEventListener("storage", onChange);
+  };
+}
+
 /**
  * Records which cards the person has already seen, so a card that arrives can
  * be marked once without ever asking the server what is new.
  *
  * Local storage, best effort, and it never blocks rendering. A candidate on a
- * locked down browser simply sees every card draw itself in, which is a
- * slightly louder first run rather than a broken one.
+ * locked down browser simply sees the first card again on the next visit,
+ * which is a slightly louder first run rather than a broken one.
+ *
+ * The server cannot read storage, so on the server and while hydrating the set
+ * is `null` ("not read yet"); on a client navigation storage is read on the very
+ * first render, so a card is never mounted and then removed (or the reverse) a
+ * moment after paint.
  */
 export function useSeenIds(key: string): [Set<string> | null, (id: string) => void] {
-  const [seen, setSeen] = useState<Set<string> | null>(null);
-  const ref = useRef<Set<string>>(new Set());
+  const snapshot = useSyncExternalStore(
+    subscribeSeen,
+    () => {
+      const mem = seenMemory.get(key);
+      return mem && mem.size > 0 ? `${readSeenRaw(key)}\u0000${[...mem].join("\u0000")}` : readSeenRaw(key);
+    },
+    () => null,
+  );
+  const seen = useMemo(() => {
+    if (snapshot === null) return null;
+    const [raw, ...mem] = snapshot.split("\u0000");
+    return new Set([...parseSeen(raw), ...mem]);
+  }, [snapshot]);
 
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(key);
-      const parsed = raw ? (JSON.parse(raw) as string[]) : [];
-      ref.current = new Set(Array.isArray(parsed) ? parsed : []);
-    } catch {
-      ref.current = new Set();
-    }
-    setSeen(new Set(ref.current));
-  }, [key]);
-
-  const mark = (id: string) => {
-    if (ref.current.has(id)) return;
-    ref.current.add(id);
-    try {
-      window.localStorage.setItem(key, JSON.stringify([...ref.current].slice(-80)));
-    } catch {
-      /* private mode, quota, or storage disabled. Not worth a message. */
-    }
-    setSeen(new Set(ref.current));
-  };
+  const mark = useCallback(
+    (id: string) => {
+      const ids = new Set([...parseSeen(readSeenRaw(key)), ...(seenMemory.get(key) ?? [])]);
+      if (ids.has(id)) return;
+      ids.add(id);
+      seenMemory.set(key, new Set([...(seenMemory.get(key) ?? []), id]));
+      try {
+        window.localStorage.setItem(key, JSON.stringify([...ids].slice(-80)));
+      } catch {
+        /* private mode, quota, or storage disabled. Not worth a message. */
+      }
+      seenListeners.forEach((l) => l());
+    },
+    [key],
+  );
 
   return [seen, mark];
 }
@@ -307,9 +347,13 @@ export function useSeenIds(key: string): [Set<string> | null, (id: string) => vo
 /**
  * One dated note: a stored fact, its date and one next step, shown until it is dismissed.
  *
- * Dismissal is remembered per browser (see `useSeenIds`), never asked of the server. Nothing renders until storage
- * has been read, so a dismissed note never flashes, and when several are due only the first not-yet-dismissed one
- * shows. The only motion is a 200 ms ease-out fade, skipped under reduced motion.
+ * Dismissal is remembered per browser (see `useSeenIds`), never asked of the server. The server cannot know it, so
+ * it renders every due note (the first visible, the rest `hidden`) and a tiny inline script from the server
+ * (`DatedNoteGuard`, placed right after) hides the dismissed ones before first paint; the note therefore takes its
+ * space from the start and nothing below it is pushed down. Once the client has read storage only the first
+ * not-yet-dismissed one is rendered: one note at a time, the next due one after a dismissal. The only motion is a
+ * 200 ms ease-out fade for a note that appears after hydration (a client navigation, or the next one after a
+ * dismissal), skipped under reduced motion.
  */
 export function DatedNote({
   storageKey,
@@ -325,37 +369,46 @@ export function DatedNote({
 }) {
   const [seen, dismiss] = useSeenIds(storageKey);
   const reduce = useReducedMotion();
-  const note = seen ? currentMilestone(notes, seen) : null;
-  if (!note) return null;
+  const current = seen ? currentMilestone(notes, seen) : notes[0];
+  // `seen === null` is the server and hydration: render them all, as the server did (the script has hidden the
+  // dismissed ones). `reduce` is never read for that case, so server and client agree (QA-002b).
+  const shown = seen === null ? notes : current ? [current] : [];
   return (
-    <motion.section
-      key={note.id}
-      aria-label={label}
-      initial={reduce ? false : { opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: reduce ? 0 : 0.2, ease: "easeOut" }}
-      className={cn(
-        "flex flex-col gap-1 rounded-apple-sm border border-ink-200 bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4",
-        className,
-      )}
-    >
-      <p className="min-w-0 text-pretty leading-relaxed text-ink-800">
-        {note.fact}{" "}
-        <Link
-          href={note.next.href}
-          className="font-medium text-brand-700 underline underline-offset-4 hover:text-brand-800 focus-visible:outline-2 focus-visible:outline-brand-600"
+    <>
+      {shown.map((note, i) => (
+        <motion.section
+          key={note.id}
+          aria-label={label}
+          data-note-for={label}
+          data-note-id={note.id}
+          initial={seen === null || reduce ? false : { opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: reduce ? 0 : 0.2, ease: "easeOut" }}
+          className={cn(
+            "flex flex-col gap-1 rounded-apple-sm border border-ink-200 bg-white px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4",
+            seen === null && i > 0 && "hidden",
+            className,
+          )}
         >
-          {note.next.label}
-        </Link>
-        .
-      </p>
-      <button
-        type="button"
-        onClick={() => dismiss(note.id)}
-        className="-mx-2 inline-flex min-h-11 shrink-0 items-center self-start rounded-apple-sm px-2 font-medium text-ink-700 underline-offset-4 hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-brand-600 sm:mx-0 sm:self-auto"
-      >
-        Dismiss
-      </button>
-    </motion.section>
+          <p className="min-w-0 text-pretty leading-relaxed text-ink-800">
+            {note.fact}{" "}
+            <Link
+              href={note.next.href}
+              className="font-medium text-brand-700 underline underline-offset-4 hover:text-brand-800 focus-visible:outline-2 focus-visible:outline-brand-600"
+            >
+              {note.next.label}
+            </Link>
+            .
+          </p>
+          <button
+            type="button"
+            onClick={() => dismiss(note.id)}
+            className="-mx-2 inline-flex min-h-11 shrink-0 items-center self-start rounded-apple-sm px-2 font-medium text-ink-700 underline-offset-4 hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-brand-600 sm:mx-0 sm:self-auto"
+          >
+            Dismiss
+          </button>
+        </motion.section>
+      ))}
+    </>
   );
 }

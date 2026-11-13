@@ -5,6 +5,21 @@ import { isHiredProposal } from "./hire-status.ts";
 export { currentMilestone } from "./milestone-pick.ts";
 
 /**
+ * The inline script that runs right after the server-rendered notes, before first paint: it keeps only the first note
+ * whose id is not in the browser's dismissed list (a JSON array in localStorage under `storageKey`, written by the
+ * client note) and hides the rest. The result is embedded in a <script>, so it must stay free of "<" (the caller
+ * escapes it, which would break the code); the test runs it against a fake page.
+ */
+export function noteGuardScript(storageKey: string, label: string): string {
+  return (
+    `try{var d=JSON.parse(localStorage.getItem(${JSON.stringify(storageKey)})||"[]");if(!Array.isArray(d))d=[];` +
+    `var s=document.querySelectorAll('section[data-note-for="'+${JSON.stringify(label)}+'"]'),f=0;` +
+    `for(var i=0;s.length>i;i++){if(!f&&d.indexOf(s[i].getAttribute("data-note-id"))===-1){f=1;s[i].classList.remove("hidden")}` +
+    `else s[i].style.display="none"}}catch(_){}`
+  );
+}
+
+/**
  * Milestone notes.
  *
  * For a week after a real event the intern sees one quiet, dated note: the stored fact and the next step. It is a

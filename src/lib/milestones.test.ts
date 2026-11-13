@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import vm from "node:vm";
 
-import { MILESTONE_DAYS, currentMilestone, milestoneEvents, milestonesFor, type MilestoneEvents, type MilestoneSource } from "./milestones.ts";
+import { MILESTONE_DAYS, currentMilestone, milestoneEvents, milestonesFor, noteGuardScript, type MilestoneEvents, type MilestoneSource } from "./milestones.ts";
 
 const DAY = 86_400_000;
 const NOW = new Date("2026-11-13T06:00:00Z");
@@ -157,4 +158,30 @@ test("an accepted offer that is not yet paid points at the offer, a hired one at
   assert.deepEqual(accepted.next, { label: "Open the offer", href: "/intern/proposals/p1" });
   const hired = milestonesFor(milestoneEvents(source({ proposals: [proposal({ status: "hired", hiredAt: ago(1) })] })), NOW)[0];
   assert.deepEqual(hired.next, { label: "Open Timesheets", href: "/intern/timesheets" });
+});
+
+// The guard goes into a <script>, where "<" is escaped as \u003c: it must still parse and behave, and must not need "<".
+function runGuard(stored: string | null, ids: string[]) {
+  const code = noteGuardScript("findtern:milestones:u1", "Milestone");
+  assert.ok(!code.includes("<"), "no < in the script");
+  const notes = ids.map((id, i) => {
+    const classes = new Set(i > 0 ? ["hidden"] : []);
+    return { id, style: { display: "" }, classes, getAttribute: () => id, classList: { remove: (c: string) => classes.delete(c) } };
+  });
+  const sandbox = {
+    localStorage: { getItem: (k: string) => (k === "findtern:milestones:u1" ? stored : null) },
+    document: { querySelectorAll: (sel: string) => (sel === 'section[data-note-for="Milestone"]' ? notes : []) },
+  };
+  vm.runInNewContext(code.replace(/</g, "\\u003c"), sandbox);
+  return notes.filter((n) => n.style.display !== "none" && !n.classes.has("hidden")).map((n) => n.id);
+}
+
+test("the guard keeps the first note that is not dismissed, whatever is in storage", () => {
+  assert.deepEqual(runGuard(null, ["a", "b", "c"]), ["a"]);
+  assert.deepEqual(runGuard('["a"]', ["a", "b", "c"]), ["b"]);
+  assert.deepEqual(runGuard('["a","b"]', ["a", "b", "c"]), ["c"]);
+  assert.deepEqual(runGuard('["a","b","c"]', ["a", "b", "c"]), []);
+  assert.deepEqual(runGuard('["b"]', ["a", "b", "c"]), ["a"]);
+  assert.deepEqual(runGuard("not json", ["a", "b"]), ["a"], "broken storage shows the first note");
+  assert.deepEqual(runGuard('{"a":1}', ["a", "b"]), ["a"], "a non-array shows the first note");
 });
