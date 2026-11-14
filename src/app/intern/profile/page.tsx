@@ -13,6 +13,7 @@ import { loadInternData } from "@/lib/intern-data";
 import { initialsOf } from "@/lib/employer-candidates";
 import { draftFromRecord, emptyDraft, profileCompletion, type OnboardingDraft } from "@/lib/onboarding";
 import { isInternPaid } from "@/lib/payments";
+import { guardPrecomplete } from "@/lib/intern-precomplete";
 
 export const metadata: Metadata = {
   title: "Your profile",
@@ -37,6 +38,8 @@ const RATING_LABELS: [key: string, label: string][] = [
  */
 export default async function InternProfile() {
   const session = await requireRole("intern");
+  // Closed until the profile is complete (unpaid interns only); the layout's check does not run on a client-side move.
+  await guardPrecomplete(session.uid, "/intern/profile");
 
   const data = await loadInternData(session.uid);
   const [user] = await getDb()

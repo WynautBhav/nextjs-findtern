@@ -12,6 +12,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
 import { DocImagePreview } from "@/components/intern/doc-preview";
 import { certificateFiles } from "@/lib/onboarding";
+import { guardPrecomplete } from "@/lib/intern-precomplete";
 
 export const metadata: Metadata = {
   title: "Documents",
@@ -37,6 +38,8 @@ type DocumentRow = {
 
 export default async function InternDocuments() {
   const session = await requireRole("intern");
+  // Closed until the profile is complete (unpaid interns only); the layout's check does not run on a client-side move.
+  await guardPrecomplete(session.uid, "/intern/documents");
   // No try/catch: a failed read shows the error state (app/intern/error.tsx),
   // never "No documents uploaded".
   const db = getDb();

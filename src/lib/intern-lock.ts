@@ -7,6 +7,9 @@
  * Settings and Notifications (plus what the pay flow itself needs) are open.
  * Everything else is locked, on the server. "Paid" and "grandfathered" are
  * both "unlocked": see `unlockReason`.
+ *
+ * Before the profile is complete the set shrinks further (`precompleteVerdict`):
+ * Documents and Your profile close and send the intern to onboarding.
  */
 
 /** What the database says about one intern (internUnlockFacts in intern-unlock.ts). */
@@ -85,6 +88,43 @@ export const OPEN_INTERN_PAGES = [
   "/intern/bank-details", // redirects to Settings
   "/intern/locked", // the explanation itself
 ] as const;
+
+/**
+ * Pages open to a locked intern whose profile is NOT complete yet: Home, the
+ * onboarding form, Settings, Notifications and the explanation page. Each also
+ * opens its sub-paths. `/intern/college` and `/intern/bank-details` only
+ * redirect to Settings, so they stay reachable. Documents, Your profile and the
+ * guarantee page are closed here and send the intern to onboarding.
+ */
+export const PRECOMPLETE_OPEN_PAGES = [
+  "/intern/dashboard",
+  "/intern/onboarding", // must stay reachable always: it is where the redirect lands
+  "/intern/settings",
+  "/intern/notifications",
+  "/intern/locked",
+  "/intern/college", // redirects to Settings
+  "/intern/bank-details", // redirects to Settings
+] as const;
+
+export type PrecompleteVerdict = "allow" | "redirect_onboarding";
+
+/**
+ * The pre-completion rule, for a signed-in intern. `locked` = unpaid and not
+ * grandfathered (the payment lock applies); `complete` = the profile checklist
+ * is done, or null when it could not be read. Only a locked intern with a
+ * profile known to be incomplete is restricted: paid and grandfathered interns
+ * are never affected, and an unreadable checklist fails OPEN (never shut
+ * someone out of onboarding). Onboarding itself is always allowed, so the
+ * redirect cannot loop. Pages the payment lock already closes are not this
+ * function's business: callers apply the payment lock first.
+ */
+export function precompleteVerdict(input: { pathname: string; complete: boolean | null; locked: boolean }): PrecompleteVerdict {
+  if (!input.locked || input.complete !== false) return "allow";
+  const p = normalizePath(input.pathname);
+  if (!p) return "redirect_onboarding";
+  if (p === "/intern") return "allow";
+  return PRECOMPLETE_OPEN_PAGES.some((open) => p === open || p.startsWith(`${open}/`)) ? "allow" : "redirect_onboarding";
+}
 
 /** The pages whose nav entries stay open (lowercase hrefs from the intern layout). */
 export function isOpenInternPage(pathname: string): boolean {
@@ -179,3 +219,5 @@ export function isNavLocked(href: string, unlocked: boolean): boolean {
 }
 
 export const LOCK_TEXT = "Unlocks after payment";
+/** The nav's lock note for Documents and Your profile before the profile is complete. */
+export const PRECOMPLETE_LOCK_TEXT = "Complete your profile first";

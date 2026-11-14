@@ -17,6 +17,10 @@ test("the intern nav (stage, locked and More lists) has no Open roles entry", ()
   const locked = layout.slice(layout.indexOf("const LOCKED_STAGE_NAV"), layout.indexOf("const MORE_NAV"));
   assert.equal((locked.match(/href: "/g) ?? []).length, 5);
   assert.match(locked, /\/intern\/messages/);
+  // Before the profile is complete: Home, Complete profile, Documents, Your profile, Offers (Documents and Your profile locked).
+  const pre = layout.slice(layout.indexOf("const PRECOMPLETE_STAGE_NAV"), layout.indexOf("/**\n * The intern shell."));
+  assert.equal((pre.match(/href: "/g) ?? []).length, 5);
+  assert.match(pre, /\/intern\/onboarding/);
 });
 
 test("/intern/opportunities and its detail route are redirect stubs to the dashboard", () => {
