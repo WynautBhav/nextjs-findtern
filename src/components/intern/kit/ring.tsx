@@ -24,7 +24,7 @@ export function MatchRing({ have, total, size = 56, label, tone = "light", class
           className={dark ? "stroke-data-on-dark" : "stroke-brand-600"}
           initial={{ pathLength: reduce ? frac : 0 }}
           animate={{ pathLength: frac }}
-          transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         />
       </svg>
       <span className={cn("nums relative text-xs font-semibold", dark ? "text-white" : "text-ink-900")}>

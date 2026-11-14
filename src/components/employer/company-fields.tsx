@@ -48,7 +48,7 @@ export function NativeSelect({
       <select {...rest} className={controlClass(error, cn("appearance-none pr-10", className))}>
         {children}
       </select>
-      <ChevronDown aria-hidden className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
+      <ChevronDown aria-hidden className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-500" />
     </div>
   );
 }

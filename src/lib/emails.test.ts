@@ -143,3 +143,37 @@ test("production with PUBLIC_ORIGIN unset: building any template never throws (t
     else env.NODE_ENV = was.node;
   }
 });
+
+test("the notification-settings address in the unread mails is a link in the html and still a full URL in the text", () => {
+  const settingsUrl = "https://example.com/intern/settings#notifications";
+  for (const c of [
+    emails.unreadMessages({ name: "A", count: 2, from: "an employer", url: "https://example.com/m", settingsUrl }),
+    emails.unreadOffer({ name: "A", url: "https://example.com/p", settingsUrl }),
+  ]) {
+    const { html, text } = renderEmail(c);
+    assert.match(html, new RegExp(`<a [^>]*href="${settingsUrl}"[^>]*>notification settings</a>`));
+    assert.ok(!html.includes(`settings: ${settingsUrl}`), "the raw address is not pasted into the html");
+    assert.ok(text.includes(`notification settings: ${settingsUrl}`));
+  }
+});
+
+test("the internal offer alert has one primary action: the offer letter", () => {
+  const c = emails.fullTimeOfferAdminAlert({ companyName: "Acme", employerId: "e1", internName: "A", internId: "i1", proposalId: "p2", jobTitle: "Engineer", jobMode: "hybrid", timezone: "IST", shiftFrom: "09:00", shiftTo: "18:00", ctcCurrency: "INR", annualCtc: 900000, offerLetterUrl: "https://example.com/offer.pdf" });
+  assert.deepEqual(c.cta, { label: "Open offer letter", url: "https://example.com/offer.pdf" });
+  const { html, text } = renderEmail(c);
+  assert.ok(html.includes('href="https://example.com/offer.pdf"'));
+  assert.ok(text.includes("Open offer letter: https://example.com/offer.pdf"));
+});
+
+test("an unbroken long string wraps inside the card: every block that holds user text can break anywhere", () => {
+  const n = "X".repeat(60);
+  let checked = 0;
+  for (const [name, content] of samples(n)) {
+    const { html } = renderEmail(content);
+    for (const m of html.matchAll(new RegExp(`<(h1|p|li|td)\\b([^>]*)>(?:<[^>]+>)*[^<]*${n}`, "g"))) {
+      assert.match(m[2], /overflow-wrap:anywhere/, `${name}: <${m[1]}>`);
+      checked++;
+    }
+  }
+  assert.ok(checked > 20, `only ${checked} blocks checked`);
+});

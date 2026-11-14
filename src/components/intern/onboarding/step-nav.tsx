@@ -34,7 +34,7 @@ export function Progress({ step, done, total }: { step: number; done: number; to
               strokeDasharray={C}
               initial={reduce ? false : { strokeDashoffset: C }}
               animate={{ strokeDashoffset: C * (1 - pct / 100) }}
-              transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
             />
           </svg>
           <span className="nums absolute inset-0 grid place-items-center text-sm font-medium">{pct}%</span>

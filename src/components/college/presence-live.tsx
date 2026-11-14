@@ -108,7 +108,7 @@ export function PresenceLive({
             aria-valuenow={snap.online}
             aria-label="Students online"
           >
-            <div className="h-full rounded-full bg-brand-600 transition-[width] duration-500 motion-reduce:transition-none" style={{ width: `${pct}%` }} />
+            <div className="h-full rounded-full bg-brand-600 transition-[width] duration-300 motion-reduce:transition-none" style={{ width: `${pct}%` }} />
           </div>
           {snap.offline.length > 0 ? (
             <p className="mt-3 text-sm text-ink-700">

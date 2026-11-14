@@ -2,7 +2,7 @@
 
 import { Video, X } from "lucide-react";
 
-import { Pill, type Tone } from "@/components/app/primitives";
+import { EmptyScene, Pill, type Tone } from "@/components/app/primitives";
 import { CALL_STATUS, clock } from "@/components/employer/drive/shared";
 import type { MeetingView } from "@/lib/college/meetings";
 
@@ -30,9 +30,11 @@ export function CallsPanel({
         </p>
       </div>
       {meetings.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-ink-600">
-          No calls yet. Use <span className="font-medium text-ink-800">Call</span> on a student to ask for a quick video chat.
-        </p>
+        <EmptyScene
+          compact
+          title="No calls yet"
+          body="A call is a quick video chat with a student. Press Call on a student in the list to ask for one."
+        />
       ) : (
         <ul className="max-h-[28rem] divide-y divide-ink-100 overflow-y-auto">
           {meetings.map((m) => {

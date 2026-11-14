@@ -101,7 +101,7 @@ export function ProfileView({
               <p className="text-[15px] font-semibold text-ink-900">{initials}</p>
               {headline ? <p className="mt-0.5 line-clamp-2 text-pretty text-base font-medium leading-snug text-ink-900 sm:text-lg">{headline}</p> : null}
               <p className="mt-0.5 inline-flex items-center gap-1 text-sm text-ink-600">
-                <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+                <MapPin className="size-3.5 shrink-0 text-ink-500" aria-hidden />
                 {draft.city || "City not stated"}
               </p>
             </div>
@@ -111,7 +111,7 @@ export function ProfileView({
                 {modes ? <span>{modes}</span> : null}
                 {draft.hasLaptop !== null ? (
                   <span className="inline-flex items-center gap-1.5">
-                    <Laptop className="size-4 shrink-0 text-ink-400" aria-hidden />
+                    <Laptop className="size-4 shrink-0 text-ink-500" aria-hidden />
                     {draft.hasLaptop ? "Own laptop" : "Needs a laptop"}
                   </span>
                 ) : null}
@@ -121,7 +121,7 @@ export function ProfileView({
           </div>
         </div>
         <p className="mt-3 flex max-w-prose items-start gap-2 text-pretty text-sm text-ink-600">
-          <EyeOff className="mt-0.5 size-4 shrink-0 text-ink-400" aria-hidden />
+          <EyeOff className="mt-0.5 size-4 shrink-0 text-ink-500" aria-hidden />
           Until a company hires you it sees your initials, photo, city, score and up to {MAX_SKILL_CHIPS} skills. Your name, contact details and LinkedIn stay hidden.
         </p>
       </section>

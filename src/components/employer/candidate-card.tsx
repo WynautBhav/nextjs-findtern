@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Check, Clock, Loader2, MapPin, Send, Sparkles, Star } from "lucide-react";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
+import { Check, Clock, MapPin, Send, Sparkles, Star } from "lucide-react";
 
 import { formatMoney } from "@/lib/format";
 import { HOURS_PER_MONTH } from "@/lib/plan-offer";
@@ -20,6 +20,8 @@ import { sendProposalHold } from "@/lib/proposal-guard";
 import type { PresenceLabel } from "@/lib/presence";
 import { PRESENCE_ONLINE } from "@/lib/presence-logic";
 import { csrfFetch } from "@/lib/client-fetch";
+import { useOptimisticToggle } from "@/hooks/use-optimistic-toggle";
+import { saveFailureMessage } from "@/lib/fetch-error";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -56,34 +58,33 @@ export interface CandidateCardProps {
  * focus. An offer already out goes to it.
  */
 export function SaveToggle({ internId, projectId, shortlisted, name }: { internId: string; projectId: string; shortlisted: boolean; name?: string }) {
-  const router = useRouter();
-  const [on, setOn] = useState(shortlisted);
-  const [busy, setBusy] = useState(false);
+  const router = useProgressRouter();
+  // Flips the instant it is pressed; back to the true state if the server says no.
+  const { value: on, pending: busy, toggle: flip } = useOptimisticToggle(shortlisted);
   const [error, setError] = useState<string | null>(null);
 
-  async function toggle() {
-    if (busy) return;
-    setBusy(true);
+  function toggle() {
     setError(null);
-    try {
-      const res = await csrfFetch("/api/employer/cart", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ action: on ? "remove" : "add", projectId, internId, listType: "cart" }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 409 && typeof data.proposalId === "string") {
-        router.push(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
-        return;
+    flip(async (next) => {
+      try {
+        const res = await csrfFetch("/api/employer/cart", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ action: next ? "add" : "remove", projectId, internId, listType: "cart" }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 409 && typeof data.proposalId === "string") {
+          router.push(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
+          return false;
+        }
+        if (!res.ok) throw new Error(data.error ?? "Couldn't update your saved list. Try again.");
+        router.refresh();
+        return true;
+      } catch (e) {
+        setError(saveFailureMessage(e));
+        return false;
       }
-      if (!res.ok) throw new Error(data.error ?? "Couldn't update your saved list. Try again.");
-      setOn(!on);
-      router.refresh();
-    } catch (e) {
-      setError(e instanceof TypeError || !(e instanceof Error) ? "Couldn't reach the server. Check your connection and try again." : e.message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   return (
@@ -92,6 +93,7 @@ export function SaveToggle({ internId, projectId, shortlisted, name }: { internI
         type="button"
         onClick={toggle}
         aria-disabled={busy || undefined}
+        aria-busy={busy || undefined}
         aria-pressed={on}
         // An icon alone, named for screen readers, its state in aria-pressed.
         aria-label={name ? `Shortlist ${name}` : "Shortlist"}
@@ -101,11 +103,7 @@ export function SaveToggle({ internId, projectId, shortlisted, name }: { internI
           on ? "text-brand-700 hover:bg-brand-50" : "text-text-subtle hover:bg-ink-100 hover:text-ink-900",
         )}
       >
-        {busy ? (
-          <Loader2 className="size-[18px] animate-spin motion-reduce:animate-none" aria-hidden />
-        ) : (
-          <Star className={cn("size-5", on && "fill-brand-700 text-brand-700")} aria-hidden />
-        )}
+        <Star className={cn("size-5", on && "fill-brand-700 text-brand-700")} aria-hidden />
       </button>
       {error ? (
         <span role="alert" className="absolute right-4 top-full z-20 mt-1 max-w-64 rounded-md bg-white px-2 py-1 text-xs text-danger shadow-md ring-1 ring-danger/30">
@@ -223,7 +221,7 @@ export function CandidateCard({
             <div className="min-w-0">
               <h3 className="break-words text-base font-bold leading-6 text-ink-900">{displayName}</h3>
               <p className="mt-0.5 flex items-center gap-1 text-sm text-ink-600">
-                <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+                <MapPin className="size-3.5 shrink-0 text-ink-500" aria-hidden />
                 <span className="min-w-0 truncate">{place}</span>
               </p>
             </div>
@@ -311,7 +309,7 @@ export function CandidateCard({
               ) : null}
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-ink-600">
-              <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+              <MapPin className="size-3.5 shrink-0 text-ink-500" aria-hidden />
               {study ? <span className="max-sm:hidden">{study} ·</span> : null}
               <span>{place}</span>
               {/* The dot alone is colour only; say it in words (a coarse label, nothing when the candidate hides it). */}

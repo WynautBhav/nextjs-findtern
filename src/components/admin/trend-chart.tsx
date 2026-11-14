@@ -82,7 +82,7 @@ export function PipelineBars({
             <div
               className={cn(
                 "h-full rounded-full bg-[color:var(--admin-tile)]",
-                "motion-safe:transition-[width] motion-safe:duration-500",
+                "motion-safe:transition-[width] motion-safe:duration-300",
               )}
               style={{ width: `${(item.count / max) * 100}%` }}
             />

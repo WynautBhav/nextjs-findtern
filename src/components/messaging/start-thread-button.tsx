@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
@@ -20,7 +20,7 @@ export function StartThreadButton({
   className?: string;
   children?: React.ReactNode;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 

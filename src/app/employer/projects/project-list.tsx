@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Briefcase, MapPin, Pencil, Pause, Play, Plus, Users, XCircle, Wrench, Undo2 } from "lucide-react";
 
 import { EmptyScene, Figure, FilterTabs } from "@/components/app/primitives";
@@ -50,7 +50,7 @@ const ACTIONS: Record<string, Action[]> = {
 };
 
 export function ProjectList({ projects }: { projects: ListProject[] }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const { ask, dialog } = useConfirm();
   const [filter, setFilter] = useState("all");
   const [busyId, setBusyId] = useState<string | null>(null);

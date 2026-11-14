@@ -24,7 +24,7 @@ export function ScoreBar({ value, max = 10 }: { value: number; max?: number }) {
         data-reveal
         initial={{ scaleX: 0 }}
         animate={{ scaleX: 1 }}
-        transition={{ duration: reduce ? 0 : 0.7, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: reduce ? 0 : 0.3, ease: [0.16, 1, 0.3, 1] }}
         style={{ width: `${pct}%`, transformOrigin: "left" }}
         className="h-full rounded-full bg-brand-600"
       />

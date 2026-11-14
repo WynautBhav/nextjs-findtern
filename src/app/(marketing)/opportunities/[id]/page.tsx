@@ -140,7 +140,7 @@ export default async function PublicRoleDetail({ params }: { params: Promise<{ i
                   <dd className="flex items-center gap-1.5 text-right text-sm font-medium text-ink-900">
                     {role.locationType ? (
                       <>
-                        <MapPin className="size-3.5 shrink-0 text-ink-400" aria-hidden />
+                        <MapPin className="size-3.5 shrink-0 text-ink-500" aria-hidden />
                         {role.locationType}
                       </>
                     ) : (

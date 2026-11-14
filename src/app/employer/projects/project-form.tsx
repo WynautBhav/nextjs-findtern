@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { CheckCircle2, Circle } from "lucide-react";
 
 import { Surface } from "@/components/app/primitives";
@@ -38,7 +38,7 @@ export function ProjectForm({
   /** Published: only scope, preferred locations and the full-time flag may change. */
   lockedFields?: boolean;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [form, setForm] = useState<ProjectDraft>(initial ?? { ...emptyProject(), timezone: defaultTimezone ?? "Asia/Kolkata" });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
@@ -150,7 +150,7 @@ export function ProjectForm({
                 const bad = missing.some((m) => m === key || m.startsWith(key));
                 return (
                   <li key={key} className="flex items-center gap-2 text-ink-700">
-                    {bad ? <Circle className="size-4 text-ink-400" aria-hidden /> : <CheckCircle2 className="size-4 text-brand-700" aria-hidden />}
+                    {bad ? <Circle className="size-4 text-ink-500" aria-hidden /> : <CheckCircle2 className="size-4 text-brand-700" aria-hidden />}
                     <span>{label}</span>
                     <span className="sr-only">{bad ? "missing" : "done"}</span>
                   </li>

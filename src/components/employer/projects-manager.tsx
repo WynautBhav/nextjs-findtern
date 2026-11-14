@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Briefcase, FolderPlus, Pencil, Search, Trash2, Users, X } from "lucide-react";
 
 import { EmptyScene, FilterTabs, Pill, Surface } from "@/components/app/primitives";
@@ -50,7 +50,7 @@ export function ProjectsManager({
   /** Open the "New project" drawer on arrival (`?new=1`). */
   openNew?: boolean;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [projects, setProjects] = useState<Project[]>(initialProjects);
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -276,7 +276,7 @@ export function ProjectsManager({
             />
 
             <div className="relative min-w-0 sm:w-72">
-              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-400" aria-hidden />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-500" aria-hidden />
               <input
                 type="search"
                 value={query}

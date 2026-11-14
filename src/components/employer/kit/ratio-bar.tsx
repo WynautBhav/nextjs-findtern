@@ -23,7 +23,7 @@ export function RatioBar({ sent, accepted, className }: { sent: number; accepted
         role="img"
         aria-label={sent > 0 ? `${accepted} of ${sent} accepted` : "Nothing sent yet"}
       >
-        <div className="h-full rounded-full bg-brand-600 transition-[width] duration-500" style={{ width: `${pct}%` }} />
+        <div className="h-full rounded-full bg-brand-600 transition-[width] duration-300" style={{ width: `${pct}%` }} />
       </div>
     </div>
   );

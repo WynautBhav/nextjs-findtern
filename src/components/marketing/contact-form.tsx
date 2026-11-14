@@ -328,7 +328,7 @@ export function ContactForm({ initialType = "general" }: { initialType?: Contact
 }
 
 const inputCls =
-  "h-12 w-full rounded-xl border border-ink-200 bg-white px-4 text-base text-ink-900 shadow-sm transition-colors duration-200 placeholder:text-ink-400 hover:border-ink-300 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
+  "h-12 w-full rounded-xl border border-ink-200 bg-white px-4 text-base text-ink-900 shadow-sm transition-colors duration-200 placeholder:text-ink-500 hover:border-ink-300 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20";
 
 function Field({
   id,

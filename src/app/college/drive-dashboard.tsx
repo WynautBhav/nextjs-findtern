@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { Pill, Surface, type Tone } from "@/components/app/primitives";
+import { EmptyScene, Pill, Surface, type Tone } from "@/components/app/primitives";
 import { DRIVE_STATUSES, DRIVE_STATUS_LABEL, type DriveStatus } from "@/lib/college/drive-dashboard";
 
 type Metrics = {
@@ -63,7 +63,16 @@ export function DriveDashboard() {
   }
   const { totals } = data.metrics;
   if (data.metrics.orders.length === 0) {
-    return <Surface className="p-5"><p className="font-medium">No drive order yet</p><p className="text-sm text-text-subtle">Findtern sets up your drive once the order is paid.</p></Surface>;
+    return (
+      <Surface>
+        <EmptyScene
+          compact
+          title="Your drive is not set up yet"
+          body="A drive starts once its order is paid. After that, your slots, codes and student progress show here."
+          who="Findtern - sets up your drive once the order is paid"
+        />
+      </Surface>
+    );
   }
   const done = data.metrics.orders.reduce((a, o) => a + (o.interviews.completed ?? 0), 0);
   const pct = totals.slots ? Math.round((totals.redeemed / totals.slots) * 100) : 0;
@@ -123,9 +132,20 @@ export function DriveDashboard() {
         </div>
         {error ? <p className="mt-2 text-sm text-red-700" role="alert">Could not refresh. Showing the last results.</p> : null}
         {data.students.total === 0 ? (
-          <p className="py-6 text-sm text-text-subtle">
-            {term || status ? "No students match." : "No students yet. Findtern will upload your roster; students appear here once it is confirmed, and you can then share their codes."}
-          </p>
+          term || status ? (
+            <EmptyScene
+              compact
+              title="No students match"
+              body="No student fits this search and status. Clear the search or choose All statuses to see everyone."
+            />
+          ) : (
+            <EmptyScene
+              compact
+              title="No students in this drive yet"
+              body="Students appear here once your roster is confirmed. You can then share their codes."
+              who="Findtern - uploads and confirms your roster"
+            />
+          )
         ) : (
           <>
           <ul className="mt-3 space-y-2 md:hidden" aria-label="Student drive status">

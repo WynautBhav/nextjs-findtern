@@ -11,7 +11,8 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { SlidersHorizontal } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
@@ -39,7 +40,7 @@ export function FilterForm({
   activeCount: number;
   className?: string;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const pathname = usePathname();
   const form = useRef<HTMLFormElement>(null);
   const timer = useRef<number | undefined>(undefined);

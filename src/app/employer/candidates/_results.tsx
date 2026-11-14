@@ -42,7 +42,7 @@ export function CandidateSearch({ filters, className }: { filters: Filters; clas
       <label htmlFor="candidate-search" className="sr-only">
         Search by skill or city
       </label>
-      <Search className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-ink-400" aria-hidden />
+      <Search className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-ink-500" aria-hidden />
       <input
         id="candidate-search"
         name="q"
@@ -341,7 +341,7 @@ export function Results({
                   .filter((page) => page === 1 || page === pages || Math.abs(page - filters.page) <= 1)
                   .map((page, i, visible) => (
                     <span key={page} className="flex items-center gap-1.5">
-                      {i > 0 && visible[i - 1] !== page - 1 ? <span className="px-1 text-ink-400">…</span> : null}
+                      {i > 0 && visible[i - 1] !== page - 1 ? <span className="px-1 text-ink-500">…</span> : null}
                       <Link
                         href={withFilters(filters, { page: page === 1 ? "" : page })}
                         aria-current={page === filters.page ? "page" : undefined}

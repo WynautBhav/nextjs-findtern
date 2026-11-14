@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import {
   ArrowLeftRight,
   BarChart3,
@@ -129,6 +129,16 @@ function sections(items: PaletteItem[], q: string, search: SearchState | null): 
   return out;
 }
 
+/** Shortcuts that exist today in the admin (palette, dashboard triage desk, keyboard lists). Keep in step with those handlers. */
+const SHORTCUTS = (mod: string): [string[], string][] => [
+  [[mod, "K"], "Open or close this search, from any admin page"],
+  [["↑", "↓", "Enter"], "Move through results and open one"],
+  [["J", "K"], "Next or previous item (dashboard to-do list, Colleges)"],
+  [["E"], "Act on the selected dashboard item"],
+  [["X"], "Tick a row (Colleges)"],
+  [["Esc"], "Close"],
+];
+
 const noopSubscribe = () => () => {};
 const isMacNow = () => /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent);
 
@@ -137,7 +147,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(0);
   const [search, setSearch] = useState<SearchState | null>(null);
-  const router = useRouter();
+  const router = useProgressRouter();
   // The palette is not a DialogTrigger child, so Radix cannot restore focus itself: remember where it was opened from.
   const triggerRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef<HTMLElement | null>(null);
@@ -150,6 +160,8 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
   // null on the server and during hydration, so the hint is a neutral "K" until the browser is known.
   const mac = useSyncExternalStore(noopSubscribe, isMacNow, () => null);
   const hint = mac === null ? "K" : mac ? "⌘K" : "Ctrl K";
+  const mod = mac ? "⌘" : "Ctrl";
+  const [showKeys, setShowKeys] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -212,6 +224,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
     setOpen(next);
     // A fresh search each time; Radix returns focus to the trigger on close.
     if (!next) {
+      setShowKeys(false);
       setQuery("");
       setActive(0);
       setSearch(null);
@@ -262,6 +275,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
         ref={triggerRef}
         type="button"
         aria-haspopup="dialog"
+        aria-keyshortcuts="Control+K Meta+K"
         onClick={openPalette}
         className="apple-spring flex min-h-11 w-full items-center gap-2.5 rounded-full border border-[var(--admin-panel-edge)] bg-[var(--admin-panel)] px-4 py-2 text-sm text-text-subtle hover:text-foreground md:max-w-[26rem]"
       >
@@ -312,7 +326,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             />
           </div>
 
-          <div className="max-h-80 overflow-y-auto p-2">
+          <div className={cn("overflow-y-auto p-2", showKeys ? "max-h-44" : "max-h-80")}>
             <div id="admin-command-list" role="listbox" aria-label="Results">
               {list.map((section, n) => (
                 <div key={section.key} role="group" aria-labelledby={`admin-command-group-${section.key}`} className="pb-2">
@@ -356,9 +370,37 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             ) : null}
           </div>
 
-          <div aria-hidden className="flex items-center justify-between border-t border-ink-200 px-3 py-2 text-xs text-text-subtle">
-            <span>↑↓ to move · Enter to open</span>
-            <span>Esc to close</span>
+          {/* A real button, so the shortcut list is reachable by keyboard and screen reader (the hint bar above is not). */}
+          {showKeys ? (
+            <dl id="admin-command-shortcuts" aria-label="Keyboard shortcuts" className="grid grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1.5 border-t border-ink-200 px-4 py-3 text-xs text-ink-700">
+              {SHORTCUTS(mod).map(([keys, what]) => (
+                <div key={what} className="contents">
+                  <dt className="flex gap-1">
+                    {keys.map((k) => (
+                      <kbd key={k} className="rounded-md bg-ink-100 px-1.5 py-0.5 font-sans text-2xs font-semibold text-ink-700">
+                        {k}
+                      </kbd>
+                    ))}
+                  </dt>
+                  <dd>{what}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+          <div className="flex items-center justify-between border-t border-ink-200 px-3 py-1.5 text-xs text-text-subtle">
+            <span aria-hidden className="hidden sm:inline">↑↓ to move · Enter to open</span>
+            <span className="ml-auto flex items-center gap-3">
+              <button
+                type="button"
+                aria-expanded={showKeys}
+                aria-controls="admin-command-shortcuts"
+                onClick={() => setShowKeys((v) => !v)}
+                className="-my-0.5 min-h-8 whitespace-nowrap rounded-apple-sm px-2 font-medium text-ink-700 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+              >
+                Keyboard shortcuts
+              </button>
+              <span aria-hidden className="hidden whitespace-nowrap sm:inline">Esc to close</span>
+            </span>
           </div>
         </DialogContent>
       </Dialog>

@@ -1,9 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
 
-import { PageHead } from "@/components/app/primitives";
+import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { useThreads } from "@/hooks/use-unread";
 import { totalUnread } from "@/lib/messaging/ui-logic";
 import { cn } from "@/lib/utils";
@@ -95,16 +94,15 @@ export function MessagesShell({
         )}
       >
         {empty ? (
-          <div className="w-full max-w-md px-6 py-16 text-center">
-            <h2 className="text-base font-semibold text-ink-900">No conversations yet</h2>
-            <p className="mt-1 text-sm text-text-subtle">{next.body}</p>
-            <Link
-              href={next.href}
-              className="mt-4 inline-flex min-h-11 items-center rounded-apple-sm bg-brand-700 px-5 text-sm font-semibold text-white hover:bg-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
-            >
-              {next.label}
-            </Link>
-          </div>
+          <EmptyScene
+            compact
+            art
+            as="h2"
+            title="No conversations yet"
+            body={next.body}
+            next={{ href: next.href, label: next.label }}
+            className="w-full max-w-md py-16"
+          />
         ) : (
           <>
             <section

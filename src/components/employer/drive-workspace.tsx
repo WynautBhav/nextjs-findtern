@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Surface } from "@/components/app/primitives";
+import { EmptyScene, Surface } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 import { CallsPanel } from "@/components/employer/drive/calls-panel";
 import { CandidateRow } from "@/components/employer/drive/candidate-row";
@@ -247,16 +247,21 @@ export function DriveWorkspace({
         </p>
 
         {candidates.length === 0 ? (
-          <Surface className="mt-4 rounded-[24px] p-8">
-            <p className="font-semibold text-ink-900">No students are in this drive yet</p>
-            <p className="mx-auto mt-1 max-w-md text-sm text-ink-600">
-              The college decides who is eligible. Students appear here as they join Findtern and agree to be shown in drives.
-            </p>
+          <Surface className="mt-4 rounded-[24px]">
+            <EmptyScene
+              compact
+              title="No students in this drive yet"
+              body="Students appear here as they join Findtern and agree to be shown in drives."
+              who="The college - decides who is eligible"
+            />
           </Surface>
         ) : visible.length === 0 ? (
-          <Surface className="mt-4 rounded-[24px] p-8">
-            <p className="font-semibold text-ink-900">No students match these filters</p>
-            <p className="mt-1 text-sm text-ink-600">Loosen a filter or clear them to see everyone in the drive.</p>
+          <Surface className="mt-4 rounded-[24px]">
+            <EmptyScene
+              compact
+              title="No students match these filters"
+              body="Loosen a filter or clear them to see everyone in the drive."
+            />
           </Surface>
         ) : (
           // One column beside the 20rem aside at xl: two left ~86px for the name next to Shortlist.

@@ -13,12 +13,14 @@
  */
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Heart, Loader2 } from "lucide-react";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
+import { Heart } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
+import { useOptimisticToggle } from "@/hooks/use-optimistic-toggle";
+import { saveFailureMessage } from "@/lib/fetch-error";
 
 export function ShortlistToggle({
   internId,
@@ -40,42 +42,40 @@ export function ShortlistToggle({
   /** Applied to the wrapper; the button always fills it. */
   className?: string;
 }) {
-  const router = useRouter();
-  const [state, setState] = useState(shortlisted);
-  const [busy, setBusy] = useState(false);
+  const router = useProgressRouter();
+  // Flips the instant it is pressed; back to the true state if the server says no.
+  const { value: state, pending: busy, toggle: flip } = useOptimisticToggle(shortlisted);
   const [error, setError] = useState<string | null>(null);
 
-  async function toggle() {
-    if (busy) return;
-    setBusy(true);
+  function toggle() {
     setError(null);
-    try {
-      const res = await csrfFetch("/api/employer/cart", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          action: state ? "remove" : "add",
-          projectId,
-          internId,
-          listType: "cart",
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      // An offer is already out (or they are hired): go to it, as legacy did
-      // from compare (employer-compare.tsx:457).
-      if (res.status === 409 && typeof data.proposalId === "string") {
-        router.push(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
-        return;
+    flip(async (next) => {
+      try {
+        const res = await csrfFetch("/api/employer/cart", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            action: next ? "add" : "remove",
+            projectId,
+            internId,
+            listType: "cart",
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        // An offer is already out (or they are hired): go to it, as legacy did
+        // from compare (employer-compare.tsx:457).
+        if (res.status === 409 && typeof data.proposalId === "string") {
+          router.push(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
+          return false;
+        }
+        if (!res.ok) throw new Error(data.error ?? "Couldn't update the shortlist. Try again.");
+        router.refresh();
+        return true;
+      } catch (e) {
+        setError(saveFailureMessage(e));
+        return false;
       }
-      if (!res.ok) throw new Error(data.error ?? "Couldn't update the shortlist. Try again.");
-      setState(!state);
-      router.refresh();
-    } catch (e) {
-      // fetch rejects with a TypeError ("Failed to fetch") when offline; never show that raw.
-      setError(e instanceof TypeError || !(e instanceof Error) ? "Couldn't reach the server. Check your connection and try again." : e.message);
-    } finally {
-      setBusy(false);
-    }
+    });
   }
 
   const variant = state ? "outline" : emphasis === "primary" ? "primary" : "outline";
@@ -87,16 +87,13 @@ export function ShortlistToggle({
         onClick={toggle}
         // Not `disabled`: that drops keyboard focus to the page while it saves.
         aria-disabled={busy || undefined}
+        aria-busy={busy || undefined}
         aria-pressed={state}
         title={state ? "Remove from your shortlist" : "Add to your shortlist for this project"}
         className={buttonClass({ variant, size: size === "sm" ? "sm" : "md", block: true, className: size === "sm" ? "min-h-11" : undefined })}
       >
-        {busy ? (
-          <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
-        ) : (
-          // The heart the candidate list uses for the same shortlist.
-          <Heart className={cn("size-4", state && "fill-current")} aria-hidden />
-        )}
+        {/* The heart the candidate list uses for the same shortlist. */}
+        <Heart className={cn("size-4", state && "fill-current")} aria-hidden />
         {state ? "Shortlisted" : "Shortlist"}
       </button>
       {alsoOn && alsoOn.length > 0 ? (

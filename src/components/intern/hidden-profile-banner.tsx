@@ -43,7 +43,7 @@ export function HiddenProfileBanner() {
   return (
     <section
       aria-label="Profile hidden"
-      className="flex flex-col gap-3 rounded-apple-sm border border-warning/40 bg-warning-soft px-4 py-3.5 text-sm text-ink-900 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+      className="flex flex-col gap-2 rounded-apple-sm border border-warning/40 bg-warning-soft px-4 py-3 text-sm text-ink-900 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:py-3.5"
     >
       <div className="flex min-w-0 items-start gap-3">
         <span className="relative mt-1 grid size-3 shrink-0 place-items-center" aria-hidden>
@@ -55,7 +55,7 @@ export function HiddenProfileBanner() {
             <EyeOff className="size-4 shrink-0" aria-hidden />
             Your profile is hidden from employers
           </p>
-          <p className="mt-0.5 leading-relaxed text-pretty text-ink-700">
+          <p className="leading-snug text-pretty text-ink-700 sm:mt-0.5 sm:leading-relaxed">
             No one can find you, book an interview or send an offer until you turn Open to work back on.
           </p>
           {error ? (

@@ -384,7 +384,7 @@ export default async function EmployerInternDetail({
               {headline ? <p className="mt-1 break-words text-lg leading-snug text-ink-800 sm:text-xl">{headline}</p> : null}
               <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
                 <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="size-4 shrink-0 text-ink-400" aria-hidden />
+                  <MapPin className="size-4 shrink-0 text-ink-500" aria-hidden />
                   {profile.location || "Location not stated"}
                 </span>
                 {prefers.length > 0 ? <span>Also works in {prefers.join(", ")}</span> : null}

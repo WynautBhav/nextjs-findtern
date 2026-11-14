@@ -269,7 +269,7 @@ export async function notificationsFor(uid: string, limit = 60) {
 export { toArray };
 
 /** The current Findtern Score from extra_data, as Home and Profile read it (QA-004). */
-function currentScore(extraData: unknown): ProofSource["score"] {
+export function currentScore(extraData: unknown): ProofSource["score"] {
   const extra = (extraData && typeof extraData === "object" ? extraData : {}) as Record<string, unknown>;
   const overall = rawScore(extra);
   if (overall === null) return null;

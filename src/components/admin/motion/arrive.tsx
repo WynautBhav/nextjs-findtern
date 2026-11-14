@@ -1,6 +1,6 @@
 /**
  * Staggered arrival for rows and cards: opacity and a 8px rise, 30ms apart
- * (capped at 8 steps so a long list never waits). Pure CSS (`.admin-arrive`
+ * (capped at 4 steps, 120 ms, so a long list never waits). Pure CSS (`.admin-arrive`
  * in globals.css) so it renders in the server HTML and the content is never
  * hidden if script fails; the reduced-motion rule there turns it off.
  */

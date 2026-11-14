@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
@@ -28,7 +28,7 @@ export function SortSelect({
   /** Shown before each option ("Sort: Best match"). */
   prefix?: string;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   // A keyboard choice waits here for Enter or blur; the select shows it meanwhile.
   const [held, setHeld] = useState<string | null>(null);
   const keyboard = useRef(false);

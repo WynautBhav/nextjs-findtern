@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { ArrowLeft, ArrowRight, Save } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
@@ -60,7 +60,7 @@ export function EmployerOnboardingForm({
   existingProjectId,
   initialStage = 0,
 }: Props) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [stage, setStage] = useState<StageIndex>(initialStage);
   const [busy, setBusy] = useState(false);
   const [edits, setEdits] = useState<{ company?: CompanyDraft; project?: ProjectDraft }>({});

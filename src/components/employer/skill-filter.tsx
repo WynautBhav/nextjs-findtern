@@ -17,7 +17,8 @@
 
 import { useId, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Check, Plus, X } from "lucide-react";
 
 import { suggestSkills } from "@/lib/data/skills";
@@ -46,7 +47,7 @@ export function SkillFilter({
   /** Trailing quiet links (e.g. "Show everyone"). */
   children?: React.ReactNode;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const pathname = usePathname();
   const params = useSearchParams();
   const [query, setQuery] = useState("");

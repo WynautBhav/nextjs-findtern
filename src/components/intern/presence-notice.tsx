@@ -1,45 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { X } from "lucide-react";
+
+import { useDismissed } from "@/hooks/use-dismissed";
+import { presenceNoticeKey } from "@/lib/dismissed-keys";
 
 /**
  * One-time heads-up that employers can now see when a student is active. Shown only while the setting is still on
  * (the server passes `on`) and not yet dismissed. Dismissal is remembered per user in this browser's localStorage:
- * the repo has no per-user dismissed-notice store, and adding one needs a migration. Until storage has been read
- * the notice stays hidden, so there is no flash and no layout shift after hydration.
+ * the repo has no per-user dismissed-notice store, and adding one needs a migration. The server renders the notice
+ * (see useDismissed + DismissedGuard), so it is in the first paint and never pushes the page down afterwards.
  */
 export function PresenceNotice({ userId, on }: { userId: string; on: boolean }) {
-  const key = `findtern:presence-notice:${userId}`;
-  const [gone, setGone] = useState<boolean | null>(null);
+  const [gone, dismiss] = useDismissed("local", presenceNoticeKey(userId));
 
-  useEffect(() => {
-    let dismissed = false;
-    try {
-      dismissed = window.localStorage.getItem(key) === "1";
-    } catch {
-      /* storage blocked: show it, it can still be dismissed for this view */
-    }
-    const t = setTimeout(() => setGone(dismissed), 0);
-    return () => clearTimeout(t);
-  }, [key]);
-
-  function dismiss() {
-    setGone(true);
-    try {
-      window.localStorage.setItem(key, "1");
-    } catch {
-      /* private mode: dismissed for this view only */
-    }
-  }
-
-  if (!on || gone !== false) return null;
+  if (!on || gone) return null;
   return (
     <section
       aria-label="Activity visibility"
-      className="flex flex-col gap-1 rounded-apple-sm border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-950 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+      data-dismiss="presence"
+      suppressHydrationWarning
+      className="flex items-start justify-between gap-2 rounded-apple-sm border border-brand-200 bg-brand-50 py-1.5 pl-4 pr-1.5 text-sm text-brand-950 sm:items-center sm:gap-4 sm:py-3 sm:pr-4"
     >
-      <p className="min-w-0 leading-relaxed text-pretty">
+      <p className="min-w-0 py-1.5 leading-snug text-pretty sm:py-0 sm:leading-relaxed">
         Employers can now see when you&apos;re active. Change this anytime in{" "}
         <Link
           href="/intern/settings#privacy"
@@ -49,12 +33,15 @@ export function PresenceNotice({ userId, on }: { userId: string; on: boolean }) 
         </Link>
         .
       </p>
+      {/* A 44 px icon button beside the text below sm (it was a full row under it); the word "Dismiss" returns from sm up. */}
       <button
         type="button"
         onClick={dismiss}
-        className="-mx-2 inline-flex min-h-11 shrink-0 items-center self-start rounded-apple-sm px-2 font-medium text-brand-800 underline-offset-4 hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-brand-600 sm:mx-0 sm:self-auto"
+        aria-label="Dismiss"
+        className="grid size-11 shrink-0 place-items-center rounded-apple-sm text-brand-800 hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-brand-600 sm:inline-flex sm:size-auto sm:min-h-11 sm:items-center sm:px-2 sm:font-medium sm:underline-offset-4"
       >
-        Dismiss
+        <X aria-hidden className="size-4 sm:hidden" />
+        <span className="max-sm:hidden">Dismiss</span>
       </button>
     </section>
   );

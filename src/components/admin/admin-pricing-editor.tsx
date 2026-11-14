@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, IndianRupee, Loader2, Plus, Save, Star, Trash2 } from "lucide-react";
 
+import { EmptyScene } from "@/components/app/primitives";
 import { Panel, PanelHeader } from "@/components/admin/panel";
 import { buttonClass } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -125,14 +126,14 @@ function RateCardSummary({ plans }: { plans: EditablePlan[] }) {
     <Panel>
       <PanelHeader title="Rate card" description="As saved: what the public pricing page shows." icon={IndianRupee} />
       {plans.length === 0 ? (
-        <p className="px-5 py-4 text-sm text-ink-600">No plans yet.</p>
+        <EmptyScene compact title="No plans on the rate card" body="Plans show here, and on the public pricing page, once one is saved in the editor." />
       ) : (
         <ul className="divide-y divide-[color:var(--admin-rule)] px-5 pb-2 text-sm">
           {plans.map((p) => (
             <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
               <span className="min-w-0 truncate font-medium text-ink-800">
                 {p.displayName}
-                {p.isFeatured ? <Star className="ml-1.5 inline size-3.5 text-accent-500" aria-label="Most popular" /> : null}
+                {p.isFeatured ? <Star className="ml-1.5 inline size-3.5 text-accent-700" aria-label="Most popular" /> : null}
                 {!p.isActive ? <span className="ml-2 text-xs font-normal text-text-subtle">off</span> : null}
               </span>
               <span className="nums shrink-0 text-ink-600">
@@ -487,7 +488,7 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
             onChange={(e) => setFeatured(e.target.checked)}
             className="size-4 accent-brand-700"
           />
-          <Star className="size-4 text-accent-500" aria-hidden />
+          <Star className="size-4 text-accent-700" aria-hidden />
           Mark as &ldquo;Most popular&rdquo;
         </label>
 

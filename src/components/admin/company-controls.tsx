@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Trash2 } from "lucide-react";
 
 import { InlineSelect, InlineToggle, sendInline } from "@/components/admin/inline-control";
@@ -60,7 +60,7 @@ export function CompanyActiveToggle({ id, isActive, refresh = false, compact = f
 
 /** Delete, only for an employer with no proposals, interviews or payments (the API refuses otherwise). */
 export function CompanyDeleteButton({ id }: { id: string }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

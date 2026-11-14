@@ -104,9 +104,11 @@
   --color-success-soft: #e6f5ed;
   /* Warning was #b57516, measured at 3.80:1 on white and 3.45:1 on its own
      soft fill. Both fail WCAG AA for text, and every warning badge in the
-     admin puts this colour on text. Darkened to #94600f: 5.33:1 on white,
-     4.84:1 on warning-soft. Same hue family, still clearly amber. */
-  --color-warning: #94600f;
+     admin puts this colour on text. Darkened to #94600f, then to #8e5c0e
+     because #94600f was 4.48:1 on the app canvas and 4.33:1 on brand-100.
+     #8e5c0e: 4.79 canvas, 5.70 white, 4.63 brand-100, 5.17 warning-soft
+     (scripts/check-contrast.mjs). Same hue, still clearly amber. */
+  --color-warning: #8e5c0e;
   --color-warning-soft: #fdf3e0;
   --color-danger: #b3261e;
   --color-danger-soft: #fdeceb;
@@ -315,7 +317,6 @@
      decoration. */
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
-  --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
   --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
 
   /* Durations, named for what they are for rather than how long they are, so
@@ -388,8 +389,8 @@
   --animate-nav-progress: nav-progress 4s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
   /* Dashboard tiles settle in; chart bars grow from the baseline. Used under
      `motion-safe:` only, so reduced motion never sits through a delay. */
-  --animate-tile-in: tile-in 520ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
-  --animate-bar-grow: bar-grow 760ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  --animate-tile-in: tile-in 260ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  --animate-bar-grow: bar-grow 300ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
 }
 
 /* ==========================================================================
@@ -591,7 +592,7 @@
   }
   .admin-arrive {
     animation: admin-arrive var(--duration-admin-base) var(--ease-out-soft) backwards;
-    animation-delay: calc(min(var(--i, 0), 8) * 30ms);
+    animation-delay: calc(min(var(--i, 0), 4) * 30ms);
   }
   @media (prefers-reduced-motion: reduce) {
     .admin-arrive {
@@ -623,7 +624,7 @@
     animation-duration: var(--duration-admin-slow);
     animation-timing-function: var(--ease-out-soft);
     animation-fill-mode: backwards;
-    animation-delay: calc(min(var(--i, 0), 8) * 40ms);
+    animation-delay: calc(min(var(--i, 0), 3) * 40ms);
   }
   .admin-reveal[data-axis="x"] {
     transform-origin: left center;
@@ -676,7 +677,7 @@
       --color-popover-foreground: #0f1a17;
       --color-success: #0e7a4a;
       --color-success-soft: #e6f5ed;
-      --color-warning: #94600f;
+      --color-warning: #8e5c0e;
       --color-warning-soft: #fdf3e0;
       --color-danger: #b3261e;
       --color-danger-soft: #fdeceb;
@@ -1469,7 +1470,7 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
   /* Spring motion + tactile press. Resting rows never bounce. */
   .apple-spring {
     transition:
-      transform 0.35s var(--ease-apple-spring),
+      transform 0.3s var(--ease-apple-spring),
       background-color 0.18s ease,
       border-color 0.18s ease,
       box-shadow 0.25s ease,
@@ -1699,6 +1700,16 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
   color: #fff;
 }
 
+/* Focus ring, root cause. Tailwind 4's `outline-none` sets `--tw-outline-style: none`, and the `focus-visible:outline-2`
+   utility draws its line with `outline-style: var(--tw-outline-style)`. So `outline-none focus-visible:outline-2
+   focus-visible:outline-ring` (the pattern in 17 files: every admin dashboard row and action link, among others)
+   resolved to `outline-style: none` and the ring never showed (the keyboard walk found 9 on /admin/dashboard alone).
+   Restoring the variable on :focus-visible, unlayered so it beats the utilities layer, makes those utilities work as
+   written. An element that only has `outline-none` plus its own ring or border still shows no outline of its own. */
+:focus-visible {
+  --tw-outline-style: solid;
+}
+
 /* ── Admin permanent rules (not shims) ─────────────────────────────────────── */
 /* WCAG 1.4.11: a text field's edge needs 3:1; ink-200 on the card is 1.2:1. */
 [data-console="admin"] :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [aria-invalid="true"]):not(:focus-visible) {
@@ -1782,7 +1793,7 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
    only; nothing moves for people who ask for reduced motion. */
 @media (prefers-reduced-motion: no-preference) {
   [data-console="admin"] .payout-bar {
-    animation: payout-bar-grow 400ms var(--ease-out-soft, cubic-bezier(0.22, 1, 0.36, 1)) 200ms both;
+    animation: payout-bar-grow 300ms var(--ease-out-soft, cubic-bezier(0.22, 1, 0.36, 1)) both;
   }
   @keyframes payout-bar-grow {
     from { transform: scaleX(0); }
@@ -1792,12 +1803,12 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
 /* ---- Admin reports: staggered card rise (transform and opacity only) ---- */
 @media (prefers-reduced-motion: no-preference) {
   [data-console="admin"] [data-rp="page"] > * {
-    animation: rp-rise 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation: rp-rise 300ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
   [data-console="admin"] [data-rp="page"] > *:nth-child(2) { animation-delay: 40ms; }
   [data-console="admin"] [data-rp="page"] > *:nth-child(3) { animation-delay: 80ms; }
   [data-console="admin"] [data-rp="page"] > *:nth-child(4) { animation-delay: 120ms; }
-  [data-console="admin"] [data-rp="page"] > *:nth-child(n+5) { animation-delay: 160ms; }
+  [data-console="admin"] [data-rp="page"] > *:nth-child(n+5) { animation-delay: 120ms; }
   @keyframes rp-rise {
     from { opacity: 0; transform: translateY(8px); }
     to { opacity: 1; transform: none; }
@@ -1843,7 +1854,7 @@ html {
   to { stroke-dasharray: var(--dial-len) calc(var(--dial-circ) - var(--dial-len)); }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .score-dial-fill { animation: score-dial-in 500ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+  .score-dial-fill { animation: score-dial-in 300ms cubic-bezier(0.22, 1, 0.36, 1) both; }
 }
 
 /* ==========================================================================
@@ -1865,8 +1876,8 @@ html {
 @media (prefers-reduced-motion: no-preference) {
   /* Stagger: set --i on each item. 42ms apart, capped by the caller. */
   .rise {
-    animation: rise-in 560ms var(--ease-out-soft, cubic-bezier(0.22, 1, 0.36, 1)) both;
-    animation-delay: calc(var(--i, 0) * 42ms);
+    animation: rise-in 300ms var(--ease-out-soft, cubic-bezier(0.22, 1, 0.36, 1)) both;
+    animation-delay: calc(min(var(--i, 0), 3) * 42ms);
   }
   .glow-drift {
     animation: glow-drift 14s ease-in-out infinite;
@@ -1878,7 +1889,7 @@ html {
   box-shadow:
     0 1px 2px rgb(7 47 36 / 0.04),
     0 10px 28px -14px rgb(7 47 36 / 0.14);
-  transition: box-shadow 0.28s var(--ease-out-soft, ease), transform 0.35s var(--ease-apple-spring, ease);
+  transition: box-shadow 0.28s var(--ease-out-soft, ease), transform 0.3s var(--ease-apple-spring, ease);
 }
 .tile-lift:hover {
   box-shadow:

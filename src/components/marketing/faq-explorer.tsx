@@ -75,7 +75,7 @@ export function FaqExplorer({
           {showSearch ? (
             <div className="relative">
               <Search
-                className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ink-400"
+                className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ink-500"
                 aria-hidden
               />
               <input
@@ -84,7 +84,7 @@ export function FaqExplorer({
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search questions and answers"
                 aria-label="Search frequently asked questions"
-                className="h-12 w-full rounded-xl border border-ink-200 bg-white pl-11 pr-11 text-base text-ink-900 shadow-sm transition-colors duration-200 placeholder:text-ink-400 hover:border-ink-300 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                className="h-12 w-full rounded-xl border border-ink-200 bg-white pl-11 pr-11 text-base text-ink-900 shadow-sm transition-colors duration-200 placeholder:text-ink-500 hover:border-ink-300 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
               />
               {query ? (
                 <button

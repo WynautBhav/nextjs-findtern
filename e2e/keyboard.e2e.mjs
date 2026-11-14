@@ -11,16 +11,19 @@
  *   3. Enter on the first navigation link inside <nav> goes somewhere else.
  *   4. Shift+Tab walks back one stop.
  * Public: the marketing home page gets 2 and 3 (header link Enter).
+ * Admin palette (Chromium and Firefox, desktop width): the top bar shows a visible Ctrl K / ⌘K hint,
+ * Ctrl+K opens the palette, and the palette has a keyboard-reachable "Keyboard shortcuts" list.
+ * `--palette` runs only that check.
  *
  * Output: e2e/.artifacts/qa/keyboard/{results.json,report.md}; exit 1 on any finding.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { chromium } from "playwright";
+import { chromium, firefox } from "playwright";
 
 import { ARTIFACTS, baseUrl } from "./lib/env.mjs";
 import { LOGIN } from "./lib/personas.mjs";
-import { DASHBOARDS, nextIp, persona } from "./lib/session.mjs";
+import { DASHBOARDS, loginState, nextIp, persona } from "./lib/session.mjs";
 
 const OUT = join(ARTIFACTS, "qa", "keyboard");
 const MAX_STOPS = 200;
@@ -34,7 +37,12 @@ const describeFocus = () => {
   if (!el || el === document.body || el === document.documentElement) return null;
   const cs = getComputedStyle(el);
   const outline = cs.outlineStyle !== "none" && parseFloat(cs.outlineWidth) > 0 && cs.outlineColor !== "rgba(0, 0, 0, 0)";
-  const shadow = cs.boxShadow && cs.boxShadow !== "none";
+  // A stretched link (`after:absolute after:inset-0`) draws its ring on the ::after box so the whole card lights up; that is a visible indicator.
+  const pseudoRing = ["::after", "::before"].some((p) => {
+    const ps = getComputedStyle(el, p);
+    return ps.content !== "none" && ps.position === "absolute" && ((ps.boxShadow && ps.boxShadow !== "none") || (ps.outlineStyle !== "none" && parseFloat(ps.outlineWidth) > 0));
+  });
+  const shadow = (cs.boxShadow && cs.boxShadow !== "none") || pseudoRing;
   const label =
     el.getAttribute("aria-label") ||
     (el.getAttribute("aria-labelledby") && document.getElementById(el.getAttribute("aria-labelledby"))?.textContent) ||
@@ -125,8 +133,81 @@ async function enterOnFirstNavLink(page, where) {
   else notes.push(`${where}: Enter on ${target} → ${after}`);
 }
 
+/** The admin palette: findable (visible key hint) and explained (a shortcuts list). Both browsers; Windows/Linux and Mac labels. */
+async function paletteCheck(type, name) {
+  const browser = await type.launch();
+  const where = `admin palette (${name})`;
+  const admin = persona("admin");
+  try {
+    for (const mac of [false, true]) {
+      const tag = `${where}${mac ? " on Mac" : ""}`;
+      const state = await loginState(browser, admin);
+      const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, storageState: state, extraHTTPHeaders: { "x-forwarded-for": nextIp() } });
+      if (mac) await ctx.addInitScript(() => Object.defineProperty(navigator, "platform", { get: () => "MacIntel" }));
+      const page = await ctx.newPage();
+      await page.goto(new URL("/admin/dashboard", baseUrl()).toString(), { waitUntil: "load" });
+      await page.waitForLoadState("networkidle", { timeout: 4000 }).catch(() => {});
+      const trigger = page.locator("header").getByRole("button", { name: /Command K/ });
+      const hint = trigger.locator("kbd");
+      const want = mac ? "⌘K" : "Ctrl K";
+      // Hydration swaps the neutral "K" for the platform label, so wait for it.
+      await page.waitForFunction((w) => [...document.querySelectorAll("header button[aria-haspopup=dialog]:not([data-slot=sheet-trigger]) kbd")].some((k) => k.textContent?.trim() === w), want, { timeout: 5000 }).catch(() => {});
+      const shown = (await hint.count()) > 0 && (await hint.first().isVisible());
+      const got = (await hint.count()) ? (await hint.first().textContent())?.trim() : null;
+      if (!shown || got !== want) add(tag, "no-visible-key-hint", `expected a visible <kbd>${want}</kbd> in the top bar search button, found ${got === null ? "none" : `"${got}"${shown ? "" : " (hidden)"}`}`);
+      else notes.push(`${tag}: visible hint "${want}"`);
+      if (!(await trigger.getAttribute("aria-keyshortcuts"))) add(tag, "no-aria-keyshortcuts", "the search button does not declare its shortcut (aria-keyshortcuts)");
+
+      const dialog = page.getByRole("dialog", { name: "Search the admin portal" });
+      await page.keyboard.press(mac ? "Meta+k" : "Control+k");
+      const opened = await dialog.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false);
+      if (!opened) add(tag, "shortcut-did-not-open", `${mac ? "Meta" : "Control"}+K did not open the palette`);
+      else {
+        const focused = await page.evaluate(() => document.activeElement?.getAttribute("role") === "combobox");
+        if (!focused) add(tag, "palette-input-not-focused", "the search field is not focused after opening");
+        // The shortcut list: a real button inside the dialog, reached with Tab from the search field.
+        const toggle = dialog.getByRole("button", { name: "Keyboard shortcuts" });
+        if (!(await toggle.count())) add(tag, "no-shortcut-list", 'the palette has no "Keyboard shortcuts" control');
+        else {
+          // The scrollable results box may take a Tab stop of its own first (browser behaviour), so allow up to 3.
+          let onToggle = false;
+          for (let i = 0; i < 3 && !onToggle; i++) {
+            await page.keyboard.press("Tab");
+            onToggle = await toggle.evaluate((el) => el === document.activeElement);
+          }
+          if (!onToggle) add(tag, "shortcut-list-not-keyboard-reachable", "3 Tabs from the search field do not reach the Keyboard shortcuts button");
+          await page.keyboard.press("Enter");
+          const list = dialog.getByRole("term");
+          const shown = await list.first().waitFor({ state: "visible", timeout: 3000 }).then(() => true).catch(() => false);
+          const text = shown ? (await dialog.locator("dl").first().innerText()) : "";
+          if (!shown || !text.includes(mac ? "⌘" : "Ctrl")) add(tag, "shortcut-list-empty", `the list did not open with the ${mac ? "⌘" : "Ctrl"} + K entry (got "${text.replace(/\s+/g, " ").slice(0, 80)}")`);
+          else notes.push(`${tag}: shortcut list shows ${await dialog.locator("dt").count()} entries`);
+          if ((await toggle.getAttribute("aria-expanded")) !== "true") add(tag, "shortcut-list-aria", "aria-expanded is not true while the list is open");
+        }
+        if (!mac) await page.screenshot({ path: join(OUT, `palette-${name}.png`) }).catch(() => {});
+        await page.keyboard.press("Escape");
+        const closed = await dialog.waitFor({ state: "hidden", timeout: 5000 }).then(() => true).catch(() => false);
+        if (!closed) add(tag, "escape-did-not-close", "Escape did not close the palette");
+      }
+      await ctx.close();
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
 async function main() {
   mkdirSync(OUT, { recursive: true });
+  const paletteOnly = process.argv.includes("--palette");
+  if (!paletteOnly) await mainWalk();
+  log("admin palette: Chromium");
+  await paletteCheck(chromium, "chromium");
+  log("admin palette: Firefox");
+  await paletteCheck(firefox, "firefox");
+  finish();
+}
+
+async function mainWalk() {
   const browser = await chromium.launch();
   for (const d of DASHBOARDS) {
     const p = persona(d.key);
@@ -155,7 +236,9 @@ async function main() {
     await ctx.close();
   }
   await browser.close();
+}
 
+function finish() {
   writeFileSync(join(OUT, "results.json"), JSON.stringify({ findings, notes }, null, 2));
   const groups = new Map();
   for (const f of findings) groups.set(`${f.where}|${f.kind}`, [...(groups.get(`${f.where}|${f.kind}`) ?? []), f.detail]);

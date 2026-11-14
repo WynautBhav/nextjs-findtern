@@ -4,8 +4,10 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Check, FileUp, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { csrfFetch } from "@/lib/client-fetch";
+import { announceTermsRequired, readCsrfCookie } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
+
+import { PROGRESS_DELAY_MS, nextPercent } from "./upload-progress";
 
 export type UploadResult = { key: string; url: string; contentType: string; bytes: number; name: string };
 
@@ -42,10 +44,55 @@ function typeOf(file: File): string {
   return BY_EXTENSION[ext] ?? "";
 }
 
+type PostResult = { ok: boolean; data: Partial<UploadResult> & { error?: string } };
+
+/**
+ * POST the raw file to /api/uploads. XMLHttpRequest rather than fetch(), because fetch cannot report
+ * how much of a request body has gone out; everything else (endpoint, headers, CSRF token, cookies,
+ * the terms pop-up on a 403) is what csrfFetch sent before. A network failure rejects with a
+ * TypeError, as fetch does, so the caller's error message is unchanged.
+ */
+function postFile(
+  file: File,
+  type: string,
+  kind: string,
+  onProgress: (loaded: number, total: number) => void,
+  onSent: () => void,
+): Promise<PostResult> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "/api/uploads");
+    xhr.setRequestHeader("Content-Type", type);
+    xhr.setRequestHeader("x-document-kind", kind);
+    xhr.setRequestHeader("x-file-name", encodeURIComponent(file.name));
+    const csrf = readCsrfCookie();
+    if (csrf) xhr.setRequestHeader("x-csrf-token", csrf);
+    xhr.responseType = "text";
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) onProgress(e.loaded, e.total);
+    };
+    xhr.upload.onload = onSent;
+    xhr.onerror = () => reject(new TypeError("Network request failed"));
+    xhr.onabort = () => reject(new TypeError("Network request aborted"));
+    xhr.onload = () => {
+      let data: PostResult["data"] = {};
+      try {
+        data = JSON.parse(xhr.responseText) as PostResult["data"];
+      } catch {
+        // not JSON: the caller falls back to the generic message
+      }
+      if (xhr.status === 403) announceTermsRequired(data);
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, data });
+    };
+    xhr.send(file);
+  });
+}
+
 /**
  * One file input for every upload in the app. Posts the raw file to
  * /api/uploads with its kind; the server checks type and size, stores it and
- * links it to the right record.
+ * links it to the right record. An upload still running after a second gets
+ * a progress bar with the real share of bytes sent.
  */
 export function FileUpload({
   kind,
@@ -80,6 +127,11 @@ export function FileUpload({
   const [name, setName] = useState<string | null>(current ?? null);
   const [error, setError] = useState<string | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  // `percent` is bytes sent; `showBar` flips on only if the upload outlasts PROGRESS_DELAY_MS;
+  // `sent` means every byte is out and the server is re-encoding / storing.
+  const [percent, setPercent] = useState(0);
+  const [showBar, setShowBar] = useState(false);
+  const [sent, setSent] = useState(false);
   const word = noun ?? label.toLowerCase();
 
   // Object URLs hold the file in memory until revoked.
@@ -104,14 +156,22 @@ export function FileUpload({
     }
     setState("busy");
     setError(null);
+    setPercent(0);
+    setSent(false);
+    setShowBar(false);
+    const barTimer = setTimeout(() => setShowBar(true), PROGRESS_DELAY_MS);
     try {
-      const res = await csrfFetch("/api/uploads", {
-        method: "POST",
-        headers: { "Content-Type": type, "x-document-kind": kind, "x-file-name": encodeURIComponent(file.name) },
-        body: file,
-      });
-      const data = (await res.json().catch(() => ({}))) as Partial<UploadResult> & { error?: string };
-      if (!res.ok || !data.key) throw new Error(data.error ?? "Upload failed. Try again.");
+      const { ok, data } = await postFile(
+        file,
+        type,
+        kind,
+        (loaded, total) => setPercent((prev) => nextPercent(prev, loaded, total)),
+        () => {
+          setPercent(100);
+          setSent(true);
+        },
+      );
+      if (!ok || !data.key) throw new Error(data.error ?? "Upload failed. Try again.");
       setName(file.name);
       setState("done");
       if (preview) setPreviewUrl(URL.createObjectURL(file));
@@ -120,6 +180,8 @@ export function FileUpload({
       setState("error");
       setError(e instanceof TypeError || !(e instanceof Error) ? "Couldn't reach the server. Check your connection and try again." : e.message);
     } finally {
+      clearTimeout(barTimer);
+      setShowBar(false);
       if (input.current) input.current.value = "";
     }
   }
@@ -129,32 +191,51 @@ export function FileUpload({
       {/* The file name sits on its own line under the button, so two uploads
           side by side keep the same shape whatever the name's length. */}
       <div className="flex flex-col items-start gap-2">
-        <label
-          htmlFor={id}
-          className={buttonClass({
-            variant: "outline",
-            size: "sm",
-            className: cn(
-              "min-h-11 cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-600",
-              state === "busy" && "pointer-events-none opacity-60",
-            ),
-          })}
-        >
-          {state === "busy" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <FileUp className="size-4" aria-hidden />}
-          {state === "busy" ? "Uploading…" : name ? `Replace ${word}` : `Upload ${word}`}
-          <input
-            ref={input}
-            id={id}
-            type="file"
-            accept={accept}
-            className="sr-only"
-            disabled={state === "busy"}
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) void upload(f);
-            }}
-          />
-        </label>
+        {/* The bar sits on the button's bottom edge, so it adds no height. */}
+        <div className="relative inline-flex">
+          <label
+            htmlFor={id}
+            className={buttonClass({
+              variant: "outline",
+              size: "sm",
+              className: cn(
+                "min-h-11 cursor-pointer tabular-nums has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-600",
+                state === "busy" && "pointer-events-none opacity-60",
+              ),
+            })}
+          >
+            {state === "busy" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <FileUp className="size-4" aria-hidden />}
+            {state === "busy" ? (showBar ? (sent ? "Saving…" : `Uploading ${percent}%`) : "Uploading…") : name ? `Replace ${word}` : `Upload ${word}`}
+            <input
+              ref={input}
+              id={id}
+              type="file"
+              accept={accept}
+              className="sr-only"
+              disabled={state === "busy"}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void upload(f);
+              }}
+            />
+          </label>
+          {state === "busy" && showBar ? (
+            <span
+              role="progressbar"
+              aria-label={`Uploading ${word}`}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={percent}
+              aria-valuetext={sent ? "Sent, saving" : `${percent}%`}
+              className="pointer-events-none absolute inset-x-2 bottom-1 h-1 overflow-hidden rounded-full bg-brand-100"
+            >
+              <span
+                className="block h-full rounded-full bg-primary transition-[width] duration-200 ease-out motion-reduce:transition-none"
+                style={{ width: `${percent}%` }}
+              />
+            </span>
+          ) : null}
+        </div>
         {/* Always mounted, so the success is announced when it fills in. */}
         <span role="status" className="inline-flex min-w-0 max-w-full items-center gap-1.5 text-sm text-ink-700 empty:-mt-2">
           {name ? (

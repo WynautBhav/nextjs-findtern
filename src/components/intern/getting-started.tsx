@@ -206,7 +206,7 @@ function Connector({ fill }: { fill: number }) {
       className="absolute top-10 bottom-1 left-4 w-0.5 -translate-x-1/2 overflow-hidden rounded-full bg-ink-200 md:top-4 md:right-0 md:bottom-auto md:left-11 md:h-0.5 md:w-auto md:-translate-x-0 md:-translate-y-1/2"
     >
       <span
-        className="block size-full origin-top-left bg-brand-700 transition-transform duration-500 max-md:scale-y-(--fill) md:scale-x-(--fill)"
+        className="block size-full origin-top-left bg-brand-700 transition-transform duration-300 max-md:scale-y-(--fill) md:scale-x-(--fill)"
         style={{ "--fill": Math.max(0, Math.min(1, fill)) } as React.CSSProperties}
       />
     </span>

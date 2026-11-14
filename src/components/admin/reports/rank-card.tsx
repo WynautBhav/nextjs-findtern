@@ -1,3 +1,4 @@
+import { EmptyScene } from "@/components/app/primitives";
 import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -21,7 +22,7 @@ export function RankCard({ title, description, groups, empty = "Nothing in this 
                 <h3 className="text-sm font-semibold text-foreground">{g.title}</h3>
                 {g.note ? <p className="text-xs text-text-subtle">{g.note}</p> : null}
                 {g.rows.length === 0 ? (
-                  <p className="mt-3 text-sm text-text-subtle">{empty}</p>
+                  <EmptyScene compact title={`Nothing in ${g.title.toLowerCase()}`} body={empty} />
                 ) : (
                   <ul className="mt-3 space-y-3">
                     {g.rows.map((r) => (

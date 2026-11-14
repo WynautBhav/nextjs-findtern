@@ -186,7 +186,7 @@ export default async function EmployersPage() {
                 key={problem}
                 className="rounded-2xl border border-ink-200 bg-white p-5"
               >
-                <Icon className="size-5 text-ink-400" aria-hidden />
+                <Icon className="size-5 text-ink-500" aria-hidden />
                 <h3 className="mt-3 text-base font-semibold text-ink-900">{problem}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-ink-600">{detail}</p>
               </article>
@@ -228,7 +228,7 @@ export default async function EmployersPage() {
                 key={problem}
                 className="rounded-2xl border border-ink-200 bg-white p-5"
               >
-                <Icon className="size-5 text-ink-400" aria-hidden />
+                <Icon className="size-5 text-ink-500" aria-hidden />
                 <h3 className="mt-3 text-base font-semibold text-ink-900">{problem}</h3>
                 <p className="mt-1.5 text-sm leading-relaxed text-ink-600">{detail}</p>
               </article>

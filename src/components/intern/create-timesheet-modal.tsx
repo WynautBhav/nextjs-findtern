@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { AlertCircle, CalendarPlus, Loader2 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
@@ -37,7 +37,7 @@ export function CreateTimesheetModal({
   period: string;
   className?: string;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");

@@ -20,7 +20,7 @@
  */
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { AnimatePresence } from "motion/react";
 
@@ -75,7 +75,7 @@ export function TriageDesk({
   /** Opens on one queue (the dashboard's "Needs you" rows link here); falls back to all when it is empty. */
   initialFilter?: QueueKey;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const isDesktop = useIsDesktop();
   const { moveFocus, exit } = useExitFocus();
 

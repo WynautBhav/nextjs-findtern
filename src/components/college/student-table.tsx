@@ -7,7 +7,7 @@ import { Search } from "lucide-react";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { COHORTS, aiStatusLabel, ago, yearLabel } from "@/lib/college/labels";
 import { cn } from "@/lib/utils";
-import { Pill, SURFACE_CLASS, pillTabClass } from "@/components/app/primitives";
+import { EmptyScene, Pill, SURFACE_CLASS, pillTabClass } from "@/components/app/primitives";
 import { NudgeButton } from "./nudge-button";
 import type { StudentRow } from "./types";
 
@@ -129,11 +129,20 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
       </header>
 
       {rows.length === 0 ? (
-        <p className="px-5 py-12 text-center text-sm text-text-subtle">
-          {students.length === 0
-            ? "No students have joined yet. Share the invite from the Roster page."
-            : "No students match these filters."}
-        </p>
+        students.length === 0 ? (
+          <EmptyScene
+            compact
+            title="No students have joined"
+            body="Students show up here once they sign up and pick your college. The invite message is on the Roster page."
+            next={{ label: "Open the roster", href: "/college/roster" }}
+          />
+        ) : (
+          <EmptyScene
+            compact
+            title="No students match"
+            body="No student fits these filters. Clear a filter or the search to see everyone."
+          />
+        )
       ) : (
         <>
           {/* Desktop table */}

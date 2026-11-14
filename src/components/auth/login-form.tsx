@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 
 import { ButtonAnchor, buttonClass } from "@/components/ui/button";
@@ -31,7 +31,7 @@ export function LoginForm({
   rememberAs?: string;
   emailPlaceholder?: string;
 }) {
-  const router = useRouter();
+  const router = useProgressRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);

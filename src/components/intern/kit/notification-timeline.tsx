@@ -160,7 +160,7 @@ export function NotificationTimeline({
                     key={n.id}
                     initial={reduce ? false : { opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: reduce ? 0 : Math.min(idx, 8) * 0.04, duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                    transition={{ delay: reduce ? 0 : Math.min(idx, 3) * 0.04, duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
                     className="group/row relative flex items-center"
                   >
                     <span
