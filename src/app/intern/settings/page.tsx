@@ -125,8 +125,6 @@ export default async function InternSettings({ searchParams }: { searchParams: P
   const { accountNumber, ...bankRest } = (extra.bankDetails ?? extra.bank ?? {}) as { accountNumber?: unknown } & BankDetails;
   const initialBank: BankDetails = { ...bankRest, accountLast4: String(accountNumber ?? "").replace(/\D/g, "").slice(-4) };
 
-  const institution = String((extra.academics as { institution?: unknown } | undefined)?.institution ?? extra.college ?? "");
-
   const contact = user
     ? { firstName: user.f, lastName: user.l, countryCode: user.cc, phoneNumber: user.p }
     : { firstName: "", lastName: "", countryCode: "+91", phoneNumber: "" };
@@ -168,11 +166,10 @@ export default async function InternSettings({ searchParams }: { searchParams: P
           <section id="college" className="scroll-mt-24">
             <SectionHead
               title="College"
-              hint="Join your college so its placement team and virtual drives can find you. Your profile itself doesn't change."
+              hint="Enter the code your college's placement cell gave you, so its placement team and virtual drives can find you. Your profile itself doesn't change."
             />
             <CollegeForm
               initial={college}
-              institution={institution}
               vapidKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ""}
             />
           </section>

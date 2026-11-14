@@ -155,6 +155,8 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "college.admin_create": { collegeAdminId: "ca-1", name: "Asha", email: "tpo@college.test" },
   "terms.publish": { document: "Intern Terms", title: "Intern Terms" },
   "account.password_change": {},
+  "college_code.attempt": { outcome: "no_match", codeMask: "FT7•••••", shapeOk: true, ip: "203.0.113.9" },
+  "college_code.joined": { outcome: "joined", codeMask: "FT7•••••", shapeOk: true, ip: "203.0.113.9" },
 };
 
 test("every call site's meta passes the redaction check: nothing sensitive leaks, nothing readable is lost", () => {

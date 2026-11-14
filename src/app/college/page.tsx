@@ -78,7 +78,7 @@ export default async function CollegeDashboard() {
     <div className="space-y-6">
       <PageHead
         title={ctx.college.name}
-        lede={`Placement console${ctx.college.city ? ` · ${ctx.college.city}` : ""}.${ctx.college.code && !hasDriveOrder ? ` College code ${ctx.college.code}: students find your college by name or this code.` : ""}`}
+        lede={`Placement console${ctx.college.city ? ` · ${ctx.college.city}` : ""}.${ctx.college.code ? ` Your college code is ${ctx.college.code}. Give it only to your own students: it is the only way they join your college.` : ""}`}
       />
 
       {liveDrive && presence ? (

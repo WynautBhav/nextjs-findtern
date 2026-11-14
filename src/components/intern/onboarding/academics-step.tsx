@@ -4,7 +4,7 @@ import { useState } from "react";
 import { FileText } from "lucide-react";
 
 import { FileUpload } from "@/components/app/file-upload";
-import { CollegeLink } from "@/components/intern/college-form";
+import { AccountTypeChoice } from "@/components/intern/college-form";
 import {
   DEGREES_BY_LEVEL,
   MAX_CERTIFICATE_UPLOADS,
@@ -83,7 +83,7 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
           value={a.institution}
           error={errors.institution}
           autoComplete="off"
-          hint="Type the full name. To be included in your college's drives, join them at the end of this section."
+          hint="Type the full name. It does not give access to anything: for your college's drives, choose College account at the end of this section."
           onChange={(v) => set({ institution: v })}
         />
 
@@ -189,7 +189,7 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
           </Grid>
         )}
 
-        <CollegeLink college={college} institution={a.institution} branch={a.branch} onPicked={(name) => set({ institution: name })} />
+        <AccountTypeChoice value={values.accountType} onChange={(t) => update("accountType", t)} error={errors.accountType} college={college} defaultBranch={a.branch} />
       </Section>
 
       <Section title={phd ? "Certificates" : "Marksheets"} hint="Your latest semester or final marksheet. Optional - you can add several.">

@@ -22,6 +22,9 @@ import {
   type OnboardingDraft,
   workModes,
 } from "@/lib/onboarding";
+import { hasCodeVerifiedMembership } from "@/lib/college/membership";
+import { decideAccountType, getAccountType } from "@/lib/intern-account";
+import { isInternPaid } from "@/lib/payments";
 import { contactPhoneTaken, employerHasPhone } from "@/lib/onboarding-phone";
 import { openToWorkPatch } from "@/lib/open-to-work";
 import { sameSkills, skillsLocked } from "@/lib/skills-lock";
@@ -162,6 +165,8 @@ const bodySchema = z.object({
     .optional(),
   previewSummary: z.string().max(2000).optional(),
   ndaAccepted: z.boolean().optional(),
+  /** A request, never proof: "college" is stored only while a college code backs the membership (below). */
+  accountType: z.enum(["individual", "college", ""]).optional(),
   /** "Complete & Submit": every step's rules apply, not just format checks. */
   final: z.boolean().optional(),
 });
@@ -170,7 +175,7 @@ type Body = z.infer<typeof bodySchema>;
 
 /** Keys that are not part of the profile an employer sees: saving only these
  *  (Settings bank form, open-to-work switch) never needs the full rules. */
-const NON_PROFILE_KEYS = new Set<keyof Body>(["bank", "openToWork", "final"]);
+const NON_PROFILE_KEYS = new Set<keyof Body>(["bank", "openToWork", "final", "accountType"]);
 
 /**
  * A schema issue in words a candidate can act on. Zod's own text ("Invalid
@@ -341,6 +346,8 @@ export async function POST(req: Request) {
     const failed = validateProfile(full, {
       ...docs,
       storedAadhaar: existing?.aadhaarNumber ?? "",
+      // "College account" has to be backed by a code; the choice itself is required further down.
+      collegeVerified: await hasCodeVerifiedMembership(session.uid),
       // INT-39: the account's own number has to be a real one to submit.
       ownPhone: account?.phoneNumber ? { countryCode: account.countryCode || "+91", phoneNumber: account.phoneNumber } : null,
     });
@@ -363,10 +370,36 @@ export async function POST(req: Request) {
   }
 
   const previousExtra = (existing?.extraData ?? {}) as Record<string, unknown>;
+
+  // Individual or college account. The browser only asks: "college" sticks only while a college code backs the
+  // membership, checked here, so a hand-made request cannot claim it. The first submission needs a choice;
+  // a profile submitted before the choice existed is never sent back to it.
+  let accountType = getAccountType(previousExtra);
+  if (body.accountType) {
+    const asked = body.accountType === "college";
+    const decision = decideAccountType({
+      requested: body.accountType,
+      current: accountType,
+      codeVerified: asked && (await hasCodeVerifiedMembership(session.uid)),
+      paid: asked && (await isInternPaid(session.uid)),
+    });
+    if (decision.ok) accountType = decision.type;
+    // A draft with "college" picked but no code yet keeps what was stored; only the final submit refuses.
+    else if (body.final) return NextResponse.json({ error: decision.error, step: 1, fields: { accountType: decision.error } }, { status: 400 });
+  }
+  if (body.final && accountType === "college" && !(await hasCodeVerifiedMembership(session.uid))) {
+    const error = "Enter your college code and join, or choose Individual account.";
+    return NextResponse.json({ error, step: 1, fields: { accountType: error } }, { status: 400 });
+  }
+  if (body.final && !onboarded && !accountType) {
+    const error = "Choose Individual account or College account.";
+    return NextResponse.json({ error, step: 1, fields: { accountType: error } }, { status: 400 });
+  }
   const stored = storedFromDraft(input, existing ?? null);
   const extraData = {
     ...previousExtra,
     ...stored.extraPatch,
+    ...(accountType ? { accountType } : {}),
     // First acceptance is the one that counts; it is never cleared by a later save.
     ...(body.ndaAccepted && !previousExtra.ndaAcceptedAt ? { ndaAcceptedAt: new Date().toISOString() } : {}),
     // Marks the profile as submitted, so later saves keep it complete (INT-04).
