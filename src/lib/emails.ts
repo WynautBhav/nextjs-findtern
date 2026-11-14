@@ -291,7 +291,7 @@ export const emails = {
     heading: "A proposal was withdrawn",
     greeting: hi(o.internName),
     lines: [`The company withdrew its proposal for ${o.role}. Nothing is needed from you.`, "Your profile stays visible to other employers."],
-    cta: ctaTo("See open roles", "/intern/opportunities"),
+    cta: ctaTo("Open your dashboard", "/intern/dashboard"),
   }),
 
   /** Staff closed an offer. Neutral: it was not the company withdrawing. */

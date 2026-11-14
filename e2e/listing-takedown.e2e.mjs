@@ -28,12 +28,10 @@ const td = (id, body) => api(P.A.page, "POST", `/api/admin/projects/${id}/takedo
 const restore = (id) => api(P.A.page, "POST", `/api/admin/projects/${id}/restore`, {});
 const row = (id) => one(`SELECT taken_down_at, taken_down_by, taken_down_reason, status FROM projects WHERE id = $1`, [id]);
 
-/** Is the project on the signed-in intern's open-roles list? Filters by name so the 60-row cap cannot hide it. */
+/** Is the project on the public open-roles list (/opportunities)? The list is capped at 60 rows, newest first, so a fresh test role is on it. */
 async function internSees(name) {
-  await P.I.page.goto(url(`/intern/opportunities?q=${encodeURIComponent(name)}`), { waitUntil: "domcontentloaded" });
-  await P.I.page.locator("main").waitFor();
-  await P.I.page.getByRole("search").waitFor({ timeout: 20_000 });
-  return ((await P.I.page.locator("main").textContent()) ?? "").includes(name);
+  const res = await fetch(url("/opportunities"), { cache: "no-store" });
+  return (await res.text()).includes(name);
 }
 const publicStatus = async (id) => (await fetch(url(`/opportunities/${id}`), { redirect: "manual" })).status;
 
@@ -46,7 +44,6 @@ before(async () => {
   const a = await one(`INSERT INTO admins (email, password, name, role) VALUES ($1,$2,'Takedown Admin','super_admin') RETURNING id`, [ADMIN.email, await hash(PASSWORD)]);
   ADMIN.id = a.id;
   pid = await mkProject(E.id, NAME);
-  // The intern reaches /intern/opportunities once hired somewhere (stage "working").
   hiredPid = await mkProject(E.id, `Hired Role ${RUN}`);
   const proposalId = await mkProposal(E.id, I.id, hiredPid);
   await one(`UPDATE proposals SET status = 'hired', hired_at = now() WHERE id = $1 RETURNING id`, [proposalId]);
@@ -67,7 +64,7 @@ after(async () => {
   await closeDb();
 });
 
-test("before the takedown the listing is public and on the intern's list", async () => {
+test("before the takedown the listing is public and on the public list", async () => {
   assert.equal(await publicStatus(pid), 200);
   assert.equal(await internSees(NAME), true);
 });
@@ -115,11 +112,9 @@ test("taking down again is a no-op 200: no second audit row, no second notificat
   assert.equal((await rows(`SELECT 1 FROM notifications WHERE recipient_id = $1 AND type = 'project_taken_down'`, [E.id])).length, 1);
 });
 
-test("the listing is gone for candidates at once: public page 404, not on the intern's list", async () => {
+test("the listing is gone for candidates at once: public page 404, not on the public list", async () => {
   assert.equal(await publicStatus(pid), 404);
   assert.equal(await internSees(NAME), false);
-  await P.I.page.goto(url(`/intern/opportunities/${pid}`), { waitUntil: "domcontentloaded" });
-  assert.doesNotMatch((await P.I.page.locator("main").textContent()) ?? "", new RegExp(NAME));
 });
 
 test("the employer sees why, cannot send an offer (409) and cannot delete it (409)", async () => {

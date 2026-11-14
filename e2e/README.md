@@ -175,7 +175,7 @@ have **not been run yet**; expect to adjust selectors on the first run.
 | `npm run test:e2e:limits` | `profile-limits.e2e.mjs` | `bio` accepted but not stored/shown, 8 skills refused, legacy 9-skill rows (unchanged ok, swap refused, reduce ok), admin skills route |
 
 Run with the QA stack env (`E2E_BASE_URL`, `DATABASE_URL`) and a server started with `TRUST_PROXY=1`.
-`projects` also needs the seeded `admin` and `intern-hired` personas. Accounts and rows are created by
+`projects` also needs the seeded `admin` persona. Accounts and rows are created by
 `lib/fixtures2.mjs` (SQL inserts, tagged with the run id) and removed in `after()`.
 
 ## Drive journey (`npm run test:e2e:drive`)

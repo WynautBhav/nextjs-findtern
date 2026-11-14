@@ -11,9 +11,3 @@ export async function savedInternIds(projectId: string): Promise<Set<string>> {
   const rows = await getDb().select({ id: s.internId }).from(s).where(eq(s.projectId, projectId));
   return new Set(rows.map((r) => r.id));
 }
-
-export async function savedProjectIds(internId: string): Promise<Set<string>> {
-  const s = schema.internSavedProjects;
-  const rows = await getDb().select({ id: s.projectId }).from(s).where(eq(s.internId, internId));
-  return new Set(rows.map((r) => r.id));
-}

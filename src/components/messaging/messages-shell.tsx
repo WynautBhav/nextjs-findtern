@@ -76,7 +76,7 @@ export function MessagesShell({
   const next =
     base === "employer"
       ? { href: "/employer/candidates", label: "Browse candidates", body: "Send a proposal to a candidate and the conversation opens here, for both of you." }
-      : { href: "/intern/opportunities", label: "See open roles", body: "When a company sends you a proposal or an offer, you can talk to them here." };
+      : { href: "/intern/profile", label: "Check your profile", body: "When a company sends you a proposal or an offer, you can talk to them here." };
 
   return (
     <>

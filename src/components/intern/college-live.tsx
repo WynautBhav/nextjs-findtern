@@ -99,7 +99,7 @@ export function CollegeLive({ collegeName, vapidKey, initialDrive = null }: { co
   // else, Home included: on a phone the Home card pushed the intern's own
   // offer below the fold (QA-153).
   const full = /^\/intern\/college(\/|$)/.test(pathname ?? "");
-  const onDriveRoute = /^\/intern\/(dashboard|opportunities)(\/|$)/.test(pathname ?? "");
+  const onDriveRoute = /^\/intern\/dashboard(\/|$)/.test(pathname ?? "");
   // Per-session dismissal (sessionStorage). The server renders the banner, so it is there from the first paint;
   // DismissedGuard hides a dismissed one before paint and useDismissed removes it once hydrated.
   const driveId = drive?.id ?? null;

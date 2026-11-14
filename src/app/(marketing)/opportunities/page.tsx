@@ -105,10 +105,10 @@ export default async function PublicOpportunities() {
             <p className="mt-6 text-center text-sm text-ink-600">
               Already have an account?{" "}
               <Link
-                href="/intern/opportunities"
+                href="/intern/dashboard"
                 className="inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline"
               >
-                See the roles you have been considered for
+                Go to your dashboard
               </Link>
               .
             </p>

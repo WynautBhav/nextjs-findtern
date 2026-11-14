@@ -5,8 +5,7 @@
  *   E2E_BASE_URL=http://localhost:3500 DATABASE_URL=postgresql://findtern@127.0.0.1:5435/findtern_qa \
  *     node --test --test-concurrency=1 e2e/projects-lifecycle.e2e.mjs      (npm run test:e2e:projects)
  *
- * Preconditions: QA seed (lib/personas.mjs "admin" and "intern-hired": the intern is unlocked for
- * /intern/opportunities), server with TRUST_PROXY=1. Creates two employers by SQL, removes them after.
+ * Preconditions: QA seed (lib/personas.mjs "admin"), server with TRUST_PROXY=1. Creates two employers by SQL, removes them after.
  * Tests run in order on one project (P1).
  */
 import { test, before, after } from "node:test";
@@ -39,13 +38,10 @@ const body7 = (name, skills) => ({
 });
 const status = async (id) => (await one(`SELECT status, rejection_reason FROM projects WHERE id = $1`, [id]));
 const move = (page, id, to, reason) => api(page, "POST", `/api/employer/projects/${id}/transition`, { to, reason });
-/** Is the project on the signed-in intern's open-roles list? Filters by name so the 60-row cap cannot hide it. */
+/** Is the project on the public open-roles list (/opportunities)? The list is capped at 60 rows, newest first, so a fresh test role is on it. */
 async function internSees(name) {
-  await P.I.page.goto(url(`/intern/opportunities?q=${encodeURIComponent(name)}`), { waitUntil: "domcontentloaded" });
-  await P.I.page.locator("main").waitFor();
-  // loading.tsx renders a skeleton inside <main> first; read the list only once the page itself has streamed in.
-  await P.I.page.getByRole("search").waitFor({ timeout: 20_000 });
-  return ((await P.I.page.locator("main").textContent()) ?? "").includes(name);
+  const res = await fetch(url("/opportunities"), { cache: "no-store" });
+  return (await res.text()).includes(name);
 }
 
 before(async () => {
@@ -55,7 +51,6 @@ before(async () => {
   P.E = await signedIn(browser, E);
   P.O = await signedIn(browser, O);
   P.A = await signedIn(browser, persona("admin"));
-  P.I = await signedIn(browser, persona("intern-hired"));
 });
 
 after(async () => {

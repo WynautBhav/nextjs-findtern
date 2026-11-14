@@ -70,7 +70,6 @@ export async function dynamicValues(route, persona, ids) {
       return employerId ? col(`SELECT id AS v FROM timesheets WHERE employer_id = $1 ORDER BY created_at LIMIT 2`, [employerId]) : [];
     case "/intern/proposals/[id]":
       return internId ? col(`SELECT id AS v FROM proposals WHERE intern_id = $1 ORDER BY created_at LIMIT 2`, [internId]) : [];
-    case "/intern/opportunities/[id]":
     case "/opportunities/[id]":
       return col(`SELECT id AS v FROM projects WHERE status = 'active' ORDER BY created_at DESC LIMIT 2`);
     case "/college/drives/[id]":

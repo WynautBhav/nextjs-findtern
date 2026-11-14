@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import { EmptyScene, Surface } from "@/components/app/primitives";
 import { HoursBars, type HoursMonth } from "@/components/intern/kit/hours-bars";
-import { Lift } from "@/components/intern/kit/motion";
 import { relativeDay } from "@/components/intern/home/relative-time";
 import type { ThreadNode } from "@/lib/journey";
 
@@ -23,7 +22,7 @@ export function ActivityCard({ thread, history, now, openToWork }: { thread: Thr
               ? "When a company books an interview or sends an offer, it lands here, then your timesheets and payments."
               : "Your profile is hidden, so no one can book an interview or send an offer. Switch on Open to work to be found."
           }
-          next={openToWork ? { label: "See open roles", href: "/intern/opportunities" } : { label: "Open your profile", href: "/intern/profile" }}
+          next={openToWork ? undefined : { label: "Open your profile", href: "/intern/profile" }}
           who={openToWork ? "Waiting on employers" : "Waiting on you"}
         />
       ) : history.length === 0 ? (
@@ -50,29 +49,6 @@ export function ActivityCard({ thread, history, now, openToWork }: { thread: Thr
           })}
         </ol>
       )}
-    </Surface>
-  );
-}
-
-export function OpenRolesCard({ roles }: { roles: { id: string; projectName: string; scopeOfWork: string | null }[] }) {
-  return (
-    <Surface as="section" aria-labelledby="roles-title" className="p-5 lg:p-6">
-      <div className="flex items-center justify-between gap-3">
-        <h2 id="roles-title" className="text-base font-semibold text-ink-900">Open roles</h2>
-        <Link href="/intern/opportunities" className={LINK}>See all</Link>
-      </div>
-      <ul className="mt-1 grid gap-1">
-        {roles.slice(0, 5).map((p) => (
-          <li key={p.id}>
-            <Lift>
-              <Link href={`/intern/opportunities/${p.id}`} className="group block min-h-14 rounded-apple-sm px-2 py-3 transition-colors hover:bg-ink-50">
-                <span className="block break-words text-sm font-medium text-ink-900 group-hover:text-brand-700">{p.projectName}</span>
-                <span className="block truncate text-sm text-text-subtle">{p.scopeOfWork}</span>
-              </Link>
-            </Lift>
-          </li>
-        ))}
-      </ul>
     </Surface>
   );
 }

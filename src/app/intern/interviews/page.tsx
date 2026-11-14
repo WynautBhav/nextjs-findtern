@@ -213,7 +213,7 @@ export default async function InternInterviews() {
             title="No company interviews yet"
             body="When a company wants to talk before sending an offer, it sends up to three times here. You pick one and join from this page."
             who="Companies invite you"
-            next={{ label: "Look at open roles", href: "/intern/opportunities" }}
+            next={{ label: "Check your profile", href: "/intern/profile" }}
           />
         )
       ) : null}

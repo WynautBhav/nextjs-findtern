@@ -29,7 +29,7 @@ import { getDb, schema } from "@/lib/db";
 import { pendingClaimFor } from "@/lib/drives/claim";
 import { driveCodeSecret } from "@/lib/drives/code-derive";
 import { eq } from "drizzle-orm";
-import { loadInternData, openProjects } from "@/lib/intern-data";
+import { loadInternData } from "@/lib/intern-data";
 import { isMeetingLinkLive } from "@/lib/employer-interview-rules";
 import { companyIn, hoursByMonth, hoursIn, nextAction, roleOf, slotOf } from "@/lib/journey";
 import { formatMoney, formatSlotTime, shortDate } from "@/lib/format";
@@ -153,10 +153,6 @@ export default async function InternHome() {
     : await (async () => pendingClaimFor(getDb().$client, session.uid, driveCodeSecret()))().catch(() => null);
   const action = nextAction(data.thread);
   const working = data.stage === "working";
-  const open = working ? [] : await openProjects(6, { strict: true });
-
-  const openRoles = open.filter((p) => !data.proposals.some((mine) => mine.projectId === p.id));
-
   const presenceOn = presenceRow?.show ?? true;
   const extra = data.onboarding?.extraData;
   const openToWork =
@@ -419,7 +415,7 @@ export default async function InternHome() {
               ? "Your profile is in front of employers. When a company books an interview or sends an offer, it lands here, then your timesheets and payments."
               : "Your profile is hidden from employers, so no one can book an interview or send an offer. Switch on Open to work in your profile to be found."
           }
-          next={!openToWork ? { label: "Open your profile", href: "/intern/profile" } : canOpen ? { label: "See open roles", href: "/intern/opportunities" } : undefined}
+          next={openToWork ? undefined : { label: "Open your profile", href: "/intern/profile" }}
           who={openToWork ? "Waiting on employers" : "Waiting on you"}
         />
       ) : history.length === 0 ? (
@@ -429,31 +425,6 @@ export default async function InternHome() {
       )}
     </Tile>
   );
-
-  // Roles open up once activation is paid (payment needs a complete profile).
-  const openRolesTile = openRoles.length > 0 ? (
-    <Tile title="Open roles" action={{ href: "/intern/opportunities", label: "See all open roles" }}>
-      <ul className="-mx-2 divide-y divide-ink-100">
-        {openRoles.slice(0, 5).map((p) => (
-          <li key={p.id}>
-            <Link
-              href={`/intern/opportunities/${p.id}`}
-              className="group grid min-h-14 grid-cols-[minmax(0,1fr)_auto] items-center gap-3 rounded-apple-sm px-2 py-3 transition-colors hover:bg-ink-50"
-            >
-              {/* No company mark before a hire (bug sheet 7, S1 r27/r67). */}
-              <span className="min-w-0">
-                <span className="block break-words text-sm font-medium text-ink-900 group-hover:text-brand-700">
-                  {p.projectName}
-                </span>
-                <span className="block truncate text-xs text-text-subtle">{p.scopeOfWork}</span>
-              </span>
-              <ArrowRight className="size-4 text-ink-300 group-hover:text-brand-700" aria-hidden />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </Tile>
-  ) : null;
 
   // The glanceable facts: the narrow column on every state of Home.
   const asideTiles = (
@@ -528,11 +499,6 @@ export default async function InternHome() {
           ) : working ? (
             <Link href="/intern/timesheets" className={buttonClass({ variant: "outline" })}>
               Timesheets
-              <ArrowRight className="size-4" aria-hidden />
-            </Link>
-          ) : !gettingStarted ? (
-            <Link href="/intern/opportunities" className={buttonClass({ variant: "outline" })}>
-              See open roles
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           ) : null
@@ -616,17 +582,11 @@ export default async function InternHome() {
         {/* Before the profile is live the glanceable facts sit beside the current
             stage, and Activity shows only once there is some. */}
         {gettingStarted ? (
-          history.length > 0 || (activated && openRolesTile) ? (
-            <div className="grid gap-4 xl:grid-cols-2 xl:[&>:only-child]:col-span-2">
-              {history.length > 0 ? activity : null}
-              {activated ? openRolesTile : null}
-            </div>
-          ) : null
+          history.length > 0 ? <div className="grid gap-4">{activity}</div> : null
         ) : (
           <div className="grid gap-4 xl:grid-cols-3">
             <div className="grid min-w-0 content-start gap-4 xl:col-span-2">
               {activity}
-              {!working && activated ? openRolesTile : null}
             </div>
 
             {/* ── Narrow column: glanceable facts. ── */}

@@ -5,11 +5,6 @@ import { join } from "node:path";
 
 const read = (p: string) => readFileSync(join(import.meta.dirname, "..", "..", p), "utf8");
 
-test("intern role detail: without an offer, the role must pass the strict (active, real employer, live) load", () => {
-  const page = read("app/intern/opportunities/[id]/page.tsx");
-  assert.match(page, /if \(!existing && !\(await projectById\(id, \{ strict: true \}\)\)\) notFound\(\);/);
-});
-
 test("projectById without anyStatus filters inactive and test employers and non-live listings", () => {
   const src = read("lib/intern-data.ts");
   const fn = src.slice(src.indexOf("export async function projectById("), src.indexOf("export async function notificationsFor("));
