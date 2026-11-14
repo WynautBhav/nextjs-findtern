@@ -2,8 +2,10 @@ import Link from "next/link";
 import { ArrowRight, Check, ChevronDown, GraduationCap, MapPin } from "lucide-react";
 
 import { ScoreDial } from "@/components/app/score-dial";
-import { Pill, type Tone } from "@/components/app/primitives";
+import type { Tone } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
+import { VisibilityPill } from "@/components/intern/visibility-pill";
+import { visibilityState } from "@/components/intern/visibility-state";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { bandFor, planNameFor } from "@/lib/score";
 import { cn } from "@/lib/utils";
@@ -101,9 +103,9 @@ export function ProfileSummary({
           </ul>
           {meta}
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <Pill tone={status.tone} size="md">
+            <VisibilityPill state={visibilityState(status.tone)} className="text-sm">
               {status.label}
-            </Pill>
+            </VisibilityPill>
             {badges}
           </div>
         </div>
