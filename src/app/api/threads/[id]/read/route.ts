@@ -5,6 +5,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { getDb, schema } from "@/lib/db";
 import { isParticipant, otherParticipant } from "@/lib/messaging/logic";
 import { getThread, pushEvent } from "@/lib/messaging/store";
+import { internLockResponse } from "@/lib/intern-unlock";
 
 export const dynamic = "force-dynamic";
 
@@ -13,6 +14,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params;
   const guard = await requireMutation({ req, roles: ["employer", "intern"] });
   if (!guard.ok) return guard.response;
+  const locked = await internLockResponse(guard.session);
+  if (locked) return locked;
   const uid = guard.session.uid;
   const thread = await getThread(id);
   if (!thread || !isParticipant(thread, uid)) return NextResponse.json({ error: "Not found" }, { status: 404 });

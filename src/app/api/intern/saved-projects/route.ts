@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { loadInternData, projectById } from "@/lib/intern-data";
 import { rolesGate } from "@/app/intern/opportunities/_gate";
+import { internLockResponse } from "@/lib/intern-unlock";
 
 /** Saving raises a student in that employer's matches, so it is a short list, not every listing. */
 const MAX_SAVED_ROLES = 10;
@@ -21,6 +22,8 @@ const bodySchema = z.object({ projectId: z.string({ error: "Pick a role." }).tri
 export async function POST(req: Request) {
   const guard = await requireMutation({ req, roles: ["intern"] });
   if (!guard.ok) return guard.response;
+  const locked = await internLockResponse(guard.session);
+  if (locked) return locked;
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Pick a role." }, { status: 400 });
 
@@ -46,6 +49,8 @@ export async function POST(req: Request) {
 export async function DELETE(req: Request) {
   const guard = await requireMutation({ req, roles: ["intern"] });
   if (!guard.ok) return guard.response;
+  const locked = await internLockResponse(guard.session);
+  if (locked) return locked;
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Pick a role." }, { status: 400 });
 

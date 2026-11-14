@@ -6,6 +6,7 @@ import { hasAnyPermission } from "@/lib/security/guards";
 import { getDb, schema } from "@/lib/db";
 import { parseOffer } from "@/lib/offer";
 import { readAny } from "@/lib/security/store";
+import { internLockResponse } from "@/lib/intern-unlock";
 
 export const runtime = "nodejs";
 
@@ -14,6 +15,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Sign in" }, { status: 401 });
+  const locked = await internLockResponse(session);
+  if (locked) return locked;
 
   const [p] = await getDb().select().from(schema.proposals).where(eq(schema.proposals.id, id)).limit(1);
   if (!p) return NextResponse.json({ error: "Not found" }, { status: 404 });

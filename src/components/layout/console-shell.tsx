@@ -80,7 +80,21 @@ export type ConsoleNavItem = {
   prefetch?: boolean;
   /** Opens in a new tab (marketing pages linked from the console). */
   newTab?: boolean;
+  /** Not open yet (intern before payment): lock icon, "Unlocks after payment", and the href points at the page that explains it. */
+  locked?: boolean;
 };
+
+/** lucide's Lock, inline: a nav lock icon without touching the import block. */
+function LockGlyph({ className }: { className?: string }) {
+  return (
+    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
+      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+    </svg>
+  );
+}
+
+const LOCKED_TEXT = "Unlocks after payment";
 
 export type ConsoleNavGroup = { title?: string; items: ConsoleNavItem[] };
 
@@ -469,6 +483,7 @@ function RailLink({ item, active, compact, light, column = false, onNavigate }: 
       : cn("focus-visible:outline-accent-300", active ? "bg-white/[0.12] font-semibold text-white" : "text-on-dark-subtle hover:bg-white/[0.06] hover:text-white"),
     compact && "justify-center px-0",
   );
+  const locked = Boolean(item.locked);
   const body = (
     <>
       {active ? <span aria-hidden className={cn("absolute inset-y-2 left-0 w-[3px] rounded-full", light ? (column ? "bg-brand-700" : "bg-brand-600") : "bg-accent-400")} /> : null}
@@ -481,16 +496,22 @@ function RailLink({ item, active, compact, light, column = false, onNavigate }: 
         )}
       >
         {item.icon}
-        {compact && (item.attention || item.badge) ? (
+        {compact && locked ? (
+          <LockGlyph className={cn("absolute -right-1.5 -top-1.5 !size-3.5 rounded-full p-px", light ? "bg-white text-ink-700" : "bg-brand-950 text-on-dark-subtle")} />
+        ) : null}
+        {compact && !locked && (item.attention || item.badge) ? (
           <span aria-hidden className={cn("absolute -right-1 -top-1 size-2 rounded-full ring-2", item.attention ? "bg-accent-400" : light ? "bg-brand-700" : "bg-accent-400", column ? "ring-rail" : light ? "ring-white" : "ring-brand-950")} />
         ) : null}
       </span>
       <span className={cn("min-w-0 flex-1 truncate", compact && "sr-only")}>
         {item.label}
+        {locked ? `, locked. ${LOCKED_TEXT}` : ""}
         {compact && item.attention ? ", needs you" : ""}
         {compact && item.badge ? `, ${item.badge} ${item.badgeLabel ?? "unread"}` : ""}
       </span>
-      {!compact && item.liveUnread ? (
+      {!compact && locked ? (
+        <LockGlyph className={cn("size-4 shrink-0", light ? "text-ink-600" : "text-on-dark-subtle")} />
+      ) : !compact && item.liveUnread ? (
         <LiveUnreadBadge light={light} />
       ) : !compact && item.badge ? (
         <span className={cn("nums rounded-full px-2 py-0.5 text-2xs font-semibold", light ? "bg-brand-700 text-white" : "bg-accent-500/20 text-accent-300")}>{item.badge}</span>
@@ -506,7 +527,16 @@ function RailLink({ item, active, compact, light, column = false, onNavigate }: 
       {body}
     </a>
   ) : (
-    <Link href={item.href} prefetch={item.prefetch} onClick={onNavigate} aria-current={active ? "page" : undefined} title={compact ? item.label : undefined} className={className} {...newTabAttrs(item.newTab)}>
+    <Link
+      href={item.href}
+      prefetch={item.prefetch}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      aria-disabled={locked ? true : undefined}
+      title={locked ? `${item.label}: ${LOCKED_TEXT}` : compact ? item.label : undefined}
+      className={className}
+      {...newTabAttrs(item.newTab)}
+    >
       {body}
       {item.newTab ? <NewTabHint /> : null}
     </Link>
@@ -573,6 +603,8 @@ function TabBar({ tabs, pathname }: { tabs: ConsoleNavItem[]; pathname: string }
               <Link
                 href={item.href}
                 aria-current={active ? "page" : undefined}
+                aria-disabled={item.locked ? true : undefined}
+                title={item.locked ? `${item.label}: ${LOCKED_TEXT}` : undefined}
                 className={cn(
                   "apple-spring relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-[0.6875rem] font-medium [&_svg]:size-5",
                   active ? "text-brand-700" : "text-ink-600 hover:text-ink-800",
@@ -580,6 +612,7 @@ function TabBar({ tabs, pathname }: { tabs: ConsoleNavItem[]; pathname: string }
               >
                 <span className="relative">
                   {item.icon}
+                  {item.locked ? <LockGlyph className="absolute -right-2 -top-1 !size-3.5 rounded-full bg-white p-px text-ink-700" /> : null}
                   {item.attention ? (
                     <span className="absolute -right-1.5 -top-0.5 size-2 rounded-full bg-accent-500 ring-2 ring-white">
                       <span className="sr-only">, needs you</span>
@@ -587,6 +620,7 @@ function TabBar({ tabs, pathname }: { tabs: ConsoleNavItem[]; pathname: string }
                   ) : null}
                 </span>
                 <span className="max-w-full truncate">{item.label}</span>
+                {item.locked ? <span className="sr-only">, locked. {LOCKED_TEXT}</span> : null}
                 {active ? (
                   <motion.span
                     layoutId="tab-indicator"
