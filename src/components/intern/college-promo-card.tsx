@@ -124,7 +124,7 @@ export function CollegePromoCard({ collegeName, feeLabel }: { collegeName: strin
             aria-invalid={error ? true : undefined}
             aria-describedby={msgId}
             className={cn(
-              "h-11 min-w-0 flex-1 rounded-lg border bg-white px-3.5 text-base text-ink-900 placeholder:text-ink-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40",
+              "h-11 min-w-0 flex-1 rounded-lg border bg-white px-3.5 text-base text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500/40",
               error ? "border-danger" : "border-ink-300",
             )}
           />
