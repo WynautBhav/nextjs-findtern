@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
 import { scheduledMonthlyHours } from "./offer.ts";
-import { HOURS_PER_MONTH, planHasOffer } from "./plan-offer.ts";
+import { HOURS_PER_MONTH, perHireFreeForNow, planHasOffer } from "./plan-offer.ts";
 
 describe("plan offer", () => {
   it("is on when a compare-at price sits above the current price", () => {
@@ -27,5 +27,17 @@ describe("monthly arithmetic", () => {
     assert.equal(HOURS_PER_MONTH, 176);
     assert.equal(HOURS_PER_MONTH, scheduledMonthlyHours("mon_fri", 0));
     assert.equal(scheduledMonthlyHours("mon_sat", 0), 208);
+  });
+});
+
+describe("per-hire free for now (display only)", () => {
+  it("applies to Cappuccino and Latte, never Espresso", () => {
+    assert.equal(perHireFreeForNow("cappuccino"), true);
+    assert.equal(perHireFreeForNow("latte"), true);
+    assert.equal(perHireFreeForNow("skilled"), true);
+    assert.equal(perHireFreeForNow("assured"), true);
+    assert.equal(perHireFreeForNow("espresso"), false);
+    assert.equal(perHireFreeForNow("standard"), false);
+    assert.equal(perHireFreeForNow(undefined), false);
   });
 });

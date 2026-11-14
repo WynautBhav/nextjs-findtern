@@ -8,7 +8,7 @@ import { formatMoney } from "@/lib/format";
 import { CurrencyNote, CurrencyPicker, useCurrency } from "@/components/marketing/region-rates";
 import type { PriceCurrency } from "@/lib/currency";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
-import { OfferNote, PlanPrice } from "@/components/marketing/plan-price";
+import { OfferNote, PerHireCharge, PlanPrice } from "@/components/marketing/plan-price";
 import type { CmsPlan } from "@/lib/content/types";
 import { planHasOffer } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
@@ -64,11 +64,11 @@ function rowsFor(currency: PriceCurrency): PlanRow[] {
     {
       label: "Per hiring charge",
       value: (p) => (
-        <PlanPrice
+        <PerHireCharge
+          slug={p.slug}
           nowMinor={p.perHireChargeMinor}
           wasMinor={p.compareAtPerHireMinor}
           currency={currency}
-          kind="money"
           tone="dark"
         />
       ),
@@ -267,8 +267,8 @@ export function PricingTable({
           <div className="mt-8 hidden lg:block">
             <table className="w-full border-collapse text-left">
               <caption className="sr-only">
-                Findtern hiring plans compared across six attributes. Every plan carries
-                a fixed per-hiring charge to cover verified screening and talent matching.
+                Findtern hiring plans compared across six attributes. Espresso carries
+                a fixed per-hiring charge to cover verified screening and talent matching; it is free for now on Cappuccino and Latte.
               </caption>
               <thead>
                 <tr>
@@ -354,7 +354,7 @@ export function PricingTable({
         <div className="mt-10 flex flex-col items-center gap-5">
           <p className="flex items-center gap-2 text-sm text-on-dark-subtle">
             <Check className="size-4 text-accent" aria-hidden />
-            Fixed {formatMoney(plans[0].perHireChargeMinor, currency)} per hiring on every placement
+            {formatMoney(plans[0].perHireChargeMinor, currency)} per hiring on Espresso; free for now on Cappuccino and Latte
           </p>
           <CurrencyNote tone="dark" className="text-xs" />
 

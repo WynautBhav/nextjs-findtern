@@ -14,9 +14,9 @@ import { breadcrumbJsonLd, faqJsonLd, pricingJsonLd, webPageJsonLd } from "@/lib
 import { CurrencyPicker } from "@/components/marketing/region-rates";
 
 export const metadata: Metadata = {
-  title: "Intern Hiring Pricing: Free to ₹200/hr + ₹5,000 Per Hire",
+  title: "Intern Hiring Pricing: Free to ₹200/hr, Per-Hire Fee Free for Now",
   description:
-    "Findtern's published rate card for hiring interns in India. Three plans named after coffee (Espresso, Cappuccino, Latte) priced by Findtern Score band, a flat ₹5,000 per-hire fee, GST included, and a monthly cost calculator.",
+    "Findtern's published rate card for hiring interns in India. Three plans named after coffee (Espresso, Cappuccino, Latte) priced by Findtern Score band, a ₹5,000 per-hire fee on Espresso (free for now on Cappuccino and Latte), GST included, and a monthly cost calculator.",
   alternates: { canonical: "/pricing" },
 };
 

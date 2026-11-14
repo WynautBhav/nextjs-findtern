@@ -17,6 +17,17 @@ export function planHasOffer(plan: Pick<CmsPlan, "priceHourlyMinor" | "compareAt
   );
 }
 
+/**
+ * The per-hire charge is shown as "free for now" on Cappuccino (6-8) and
+ * Latte (8+); Espresso keeps its charge. DISPLAY ONLY: the stored charge,
+ * checkout and invoices are untouched, so this must not be used for billing.
+ * Takes a plan slug or, where no plan row loaded, the score band id.
+ */
+const PER_HIRE_FREE_FOR_NOW = new Set(["cappuccino", "latte", "skilled", "assured"]);
+export function perHireFreeForNow(slugOrBand: string | null | undefined): boolean {
+  return PER_HIRE_FREE_FOR_NOW.has((slugOrBand ?? "").toLowerCase());
+}
+
 /* ── Monthly arithmetic ────────────────────────────────────────────────
  * Marketing figures use the same billed month as a real offer (offer.ts):
  * Mon–Fri is 22 working days × 8 h = 176 h, Mon–Sat 26 × 8 = 208 h. */

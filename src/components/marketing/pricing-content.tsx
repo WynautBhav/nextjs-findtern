@@ -9,7 +9,7 @@ import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { formatMoney } from "@/lib/format";
 import { CurrencyNote, useRegionBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
-import { OfferNote, PlanPrice } from "@/components/marketing/plan-price";
+import { OfferNote, PerHireCharge, PlanPrice } from "@/components/marketing/plan-price";
 import { PricingCalculator } from "@/components/marketing/pricing-calculator";
 import { pricingFaq } from "@/lib/content/pricing-faq";
 import type { CmsPlan } from "@/lib/content/types";
@@ -45,11 +45,11 @@ export function PricingContent({
     {
       label: "Per hiring charge",
       get: (p: CmsPlan) => (
-        <PlanPrice
+        <PerHireCharge
+          slug={p.slug}
           nowMinor={p.perHireChargeMinor}
           wasMinor={p.compareAtPerHireMinor}
           currency={currency}
-          kind="money"
         />
       ),
     },
@@ -120,11 +120,11 @@ export function PricingContent({
                   <p className="mt-4 text-sm text-ink-600">{band.blurb}</p>
                   <p className="mt-5 flex items-center gap-2 border-t pt-4 text-sm text-ink-700">
                     <Check className="size-4 shrink-0 text-primary" aria-hidden />
-                    <PlanPrice
+                    <PerHireCharge
+                      slug={plan?.slug ?? band.id}
                       nowMinor={plan?.perHireChargeMinor ?? band.perHireMinor}
                       wasMinor={plan?.compareAtPerHireMinor}
                       currency={currency}
-                      kind="money"
                     />
                     <span>per hire</span>
                   </p>
@@ -188,8 +188,8 @@ export function PricingContent({
           <div className="min-w-0 overflow-x-auto [scrollbar-width:thin]">
             <table className="w-full min-w-[42rem] border-collapse text-left">
               <caption className="sr-only">
-                Findtern hiring plans compared across six attributes. Every plan carries
-                a fixed per-hiring charge to cover verified screening and talent matching.
+                Findtern hiring plans compared across six attributes. Espresso carries
+                a fixed per-hiring charge to cover verified screening and talent matching; it is free for now on Cappuccino and Latte.
               </caption>
               <thead>
                 <tr className="border-b border-ink-200">
@@ -307,9 +307,9 @@ export function PricingContent({
                 {formatMoney(perHireMinor, currency)}
               </p>
               <p className="text-sm text-ink-600">
-                fixed per-hire fee
+per-hire fee on Espresso
                 <br />
-                on every plan
+                free for now on Cappuccino and Latte
               </p>
             </div>
           </div>

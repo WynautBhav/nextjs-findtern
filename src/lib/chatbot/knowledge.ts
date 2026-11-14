@@ -4,6 +4,7 @@ import {
   getPlans,
 } from "@/lib/content";
 import { ABOUT_COPY, HOME_COPY, SITE } from "@/lib/content/site";
+import { perHireFreeForNow } from "@/lib/plan-offer";
 
 /**
  * Chatbot knowledge layer.
@@ -85,7 +86,7 @@ export function brandContext(): string {
     "Intern path: free profile → ₹2,499 one-time AI interview (30–60 min, laptop + webcam + mic required, English compulsory, one sitting) → Findtern Score (technical + soft skills, 0–10; 6+ earns a fixed monthly stipend, below 6 a completion bonus) → companies discover you (interns cannot apply directly) → stipend + certificate issued by Findtern, not the company.",
     "Placement promise: an internship within 6 months of the AI interview, or a full refund of the AI interview fee after the 6-month window closes, within 7 working days (full terms in /intern-terms-and-conditions). Age 18+. No practice test currently. Retakes: one free retake after 6 months, then ₹2,499 for each later attempt, requested via support; a genuine technical issue gets a fresh interview link.",
     "Employer path: sign up as employer → verified → define project (name, scope, location, skills) → AI-matched pre-vetted interns → shortlist via dashboard → hire in hours. Durations fixed: 1, 2, 3 or 6 months. Remote/hybrid/on-site supported. No direct contact details exchange - all comms on platform. Conversion to full-time allowed (8.33% of annual CTC).",
-    "Employer pricing (India): Espresso free + ₹5,000 per hire (score <6, short roles up to 2 months) / Cappuccino ₹100/hr + ₹5,000 per hire (score 6–8) / Latte ₹200/hr + ₹5,000 per hire (score 8+). Fixed ₹5,000 per hiring on all plans. USD mirrors: $50 per-hire across all tiers + $0 / $1/hr / $2/hr equivalents via CMS (check live /pricing). No hidden fees. GST applies in India.",
+    "Employer pricing (India): Espresso free + ₹5,000 per hire (score <6, short roles up to 2 months) / Cappuccino ₹100/hr (score 6–8) / Latte ₹200/hr (score 8+). The ₹5,000 per-hire charge is shown struck through as free for now on Cappuccino and Latte; Espresso still carries ₹5,000 per hire. USD mirrors: $50 per-hire across all tiers + $0 / $1/hr / $2/hr equivalents via CMS (check live /pricing). No hidden fees. GST applies in India.",
   ].join("\n");
 }
 
@@ -98,7 +99,7 @@ export async function pricingContext(): Promise<string> {
       plans
         .map(
           (p) =>
-            `- ${p.displayName}: ${(p.priceHourlyMinor / 100).toFixed(0)} ${p.currency}/hr${p.perHireChargeMinor ? ` + ${(p.perHireChargeMinor / 100).toFixed(0)} ${p.currency} per hire` : ""} (${p.internshipDuration}; ${p.features.join("; ")})`,
+            `- ${p.displayName}: ${(p.priceHourlyMinor / 100).toFixed(0)} ${p.currency}/hr${p.perHireChargeMinor ? (perHireFreeForNow(p.slug) ? ` (per-hire charge of ${(p.perHireChargeMinor / 100).toFixed(0)} ${p.currency} shown struck through, free for now)` : ` + ${(p.perHireChargeMinor / 100).toFixed(0)} ${p.currency} per hire`) : ""} (${p.internshipDuration}; ${p.features.join("; ")})`,
         )
         .join("\n")
     );

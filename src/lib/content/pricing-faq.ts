@@ -11,7 +11,7 @@ export function pricingFaq(perHire: string): CmsFaqItem[] {
       id: "p1",
       category: "Pricing",
       question: "What is the per-hire fee?",
-      answer: `Every plan carries a fixed ${perHire} per-hire charge that covers candidate screening, testing, rubric scoring, and ongoing placement management.`,
+      answer: `Espresso carries a fixed ${perHire} per-hire charge that covers candidate screening, testing, rubric scoring, and ongoing placement management. On Cappuccino and Latte the per-hire charge is free for now.`,
       sortOrder: 0,
       isActive: true,
     },
@@ -38,7 +38,7 @@ export function pricingFaq(perHire: string): CmsFaqItem[] {
       category: "Pricing",
       question: "How much does an intern cost per month?",
       answer:
-        "Multiply the hourly rate by the hours you need. A Monday-to-Friday month is billed as 22 working days of 8 hours, 176 hours: ₹17,600 a month on Cappuccino (₹100/hr) and ₹35,200 on Latte (₹200/hr), plus the one-time per-hire fee. The calculator on the pricing page does this for your own schedule.",
+        "Multiply the hourly rate by the hours you need. A Monday-to-Friday month is billed as 22 working days of 8 hours, 176 hours: ₹17,600 a month on Cappuccino (₹100/hr) and ₹35,200 on Latte (₹200/hr), plus the one-time per-hire fee on Espresso (free for now on Cappuccino and Latte). The calculator on the pricing page does this for your own schedule.",
       sortOrder: 3,
       isActive: true,
     },

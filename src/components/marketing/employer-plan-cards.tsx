@@ -6,7 +6,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { useRegionBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
-import { OfferNote, PlanPrice } from "@/components/marketing/plan-price";
+import { OfferNote, PerHireCharge, PlanPrice } from "@/components/marketing/plan-price";
 import type { CmsPlan } from "@/lib/content/types";
 import { planHasOffer } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
@@ -73,11 +73,11 @@ export function EmployerPlanCards({
                 Score {b.min}–{b.max}/10
               </p>
               <p className="mt-2 flex flex-wrap items-baseline gap-1.5 text-sm text-ink-600">
-                <PlanPrice
+                <PerHireCharge
+                  slug={plan?.slug ?? b.id}
                   nowMinor={plan?.perHireChargeMinor ?? b.perHireMinor}
                   wasMinor={plan?.compareAtPerHireMinor}
                   currency={currency}
-                  kind="money"
                 />
                 per hire
               </p>

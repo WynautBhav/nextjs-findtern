@@ -1,6 +1,7 @@
 import { getBlogPosts, getFaqItems, getPlans } from "@/lib/content";
 import { SITE } from "@/lib/content/site";
 import { formatMoney, formatRate } from "@/lib/format";
+import { perHireFreeForNow } from "@/lib/plan-offer";
 import { plainTextExcerpt } from "@/lib/richtext";
 import { SITE_URL } from "@/lib/seo";
 import { tidyText } from "@/lib/text";
@@ -44,7 +45,7 @@ export async function GET() {
   for (const p of plans) {
     const was = p.priceHourlyMinor === 0 && p.compareAtHourlyMinor && p.compareAtHourlyMinor > 0 ? ` (shown as ${formatRate(p.compareAtHourlyMinor, "INR")}, currently discounted to free)` : "";
     lines.push(
-      `- **${p.displayName}** - ${p.features[1] ?? ""}: ${formatRate(p.priceHourlyMinor, "INR")}${was}, ${formatMoney(p.perHireChargeMinor, "INR")} per hire, ${p.internshipDuration}. ${p.features[0] ?? ""}.`,
+      `- **${p.displayName}** - ${p.features[1] ?? ""}: ${formatRate(p.priceHourlyMinor, "INR")}${was}, ${perHireFreeForNow(p.slug) && p.perHireChargeMinor > 0 ? `per-hire charge ${formatMoney(p.perHireChargeMinor, "INR")}, free for now` : `${formatMoney(p.perHireChargeMinor, "INR")} per hire`}, ${p.internshipDuration}. ${p.features[0] ?? ""}.`,
     );
   }
 

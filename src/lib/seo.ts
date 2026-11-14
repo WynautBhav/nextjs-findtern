@@ -1,5 +1,6 @@
 import type { CmsBlogPost, CmsFaqItem, CmsPlan } from "@/lib/content/types";
 import { SITE } from "@/lib/content/site";
+import { perHireFreeForNow } from "@/lib/plan-offer";
 import { isStagingOrigin } from "@/lib/origin";
 import { plainTextExcerpt } from "@/lib/richtext";
 import { tidyText } from "@/lib/text";
@@ -204,7 +205,8 @@ export function pricingJsonLd(plans: CmsPlan[]) {
           {
             "@type": "PriceSpecification",
             name: "Per-hire charge",
-            price: rupees(p.perHireChargeMinor),
+            // Display offer: free for now on Cappuccino and Latte.
+            price: rupees(perHireFreeForNow(p.slug) ? 0 : p.perHireChargeMinor),
             priceCurrency: "INR",
             valueAddedTaxIncluded: p.gstApplicable,
           },

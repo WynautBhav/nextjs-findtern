@@ -11,7 +11,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { ButtonLink } from "@/components/ui/button";
+import { PerHireCharge } from "@/components/marketing/plan-price";
 import { useCurrency } from "@/components/marketing/region-rates";
+import { perHireFreeForNow } from "@/lib/plan-offer";
 import { formatMoney, formatNumber, formatRate } from "@/lib/format";
 import { HOURS_PER_DAY, WEEKLY_SCHEDULES, scheduledMonthlyHours } from "@/lib/offer";
 import type { CmsPlan } from "@/lib/content/types";
@@ -62,6 +64,8 @@ export function PricingCalculator({
   const hoursMonth = scheduledMonthlyHours(SCHEDULE[days], 0);
   const monthly = plan.priceHourlyMinor * hoursMonth;
   const money = (minor: number) => formatMoney(minor, currency, { zeroLabel: false });
+  // Display only: Cappuccino and Latte show the charge struck through as free for now.
+  const perHireFree = perHireFreeForNow(plan.slug) && plan.perHireChargeMinor > 0;
 
   return (
     <div
@@ -100,7 +104,7 @@ export function PricingCalculator({
         </p>
 
         <p className="mt-5 max-w-sm text-sm leading-relaxed text-ink-600">
-          The first month is paid at hire with the per-hire charge; each later month is billed against the timesheets you approve, due 2 days before the intern&apos;s pay day (you can pay up to 15 days early).{" "}
+          The first month is paid at hire{perHireFree ? " (the per-hire charge is free for now on this plan)" : " with the per-hire charge"}; each later month is billed against the timesheets you approve, due 2 days before the intern&apos;s pay day (you can pay up to 15 days early).{" "}
           {isIndia ? "Prices include GST." : currency === "USD" ? "Billed in US dollars." : `Billed in US dollars; ${currency} shown at a reference rate.`}
         </p>
       </div>
@@ -117,9 +121,11 @@ export function PricingCalculator({
           >
             {money(monthly)}
           </Row>
-          <Row label="Per-hire charge, once">{money(plan.perHireChargeMinor)}</Row>
+          <Row label="Per-hire charge, once">
+            <PerHireCharge slug={plan.slug} nowMinor={plan.perHireChargeMinor} currency={currency} className="justify-end" />
+          </Row>
           <Row label="First month" strong>
-            {money(monthly + plan.perHireChargeMinor)}
+            {money(monthly + (perHireFree ? 0 : plan.perHireChargeMinor))}
           </Row>
           <Row label="Each month after" last>
             {money(monthly)}

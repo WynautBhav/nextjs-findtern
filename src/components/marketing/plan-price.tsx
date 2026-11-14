@@ -1,6 +1,7 @@
 import type { PriceCurrency } from "@/lib/currency";
 import { savingsPercent } from "@/lib/currency";
 import { formatMoney, formatRate } from "@/lib/format";
+import { perHireFreeForNow } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
 
 /**
@@ -104,5 +105,40 @@ export function OfferNote({
     <p className={cn("text-[13px] leading-relaxed", tone === "dark" ? "text-on-dark-subtle" : "text-ink-600", className)}>
       {formatRate(wasMinor, currency)}, currently discounted to free.
     </p>
+  );
+}
+
+/**
+ * The per-hire charge. Cappuccino and Latte show the charge struck through
+ * with "Free for now" beside it; Espresso renders as a plain PlanPrice.
+ * Display only: the stored charge is unchanged (see perHireFreeForNow).
+ */
+export function PerHireCharge({
+  slug,
+  nowMinor,
+  wasMinor,
+  currency,
+  tone = "light",
+  className,
+}: {
+  /** Plan slug, or the score band id where no plan row loaded. */
+  slug: string | null | undefined;
+  nowMinor: number;
+  wasMinor?: number | null;
+  currency: PriceCurrency;
+  tone?: "light" | "dark";
+  className?: string;
+}) {
+  if (!perHireFreeForNow(slug) || nowMinor <= 0) {
+    return <PlanPrice nowMinor={nowMinor} wasMinor={wasMinor} currency={currency} kind="money" tone={tone} className={className} />;
+  }
+  return (
+    <span className={cn("inline-flex flex-wrap items-baseline gap-x-2 gap-y-1 tabular-nums", className)}>
+      <del className={cn("text-sm font-medium decoration-[1.5px]", tone === "dark" ? "text-on-dark-subtle" : "text-ink-600")}>
+        <span className="sr-only">Was </span>
+        {formatMoney(nowMinor, currency)}
+      </del>
+      <span>Free for now</span>
+    </span>
   );
 }

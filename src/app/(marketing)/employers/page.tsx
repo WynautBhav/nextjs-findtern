@@ -31,7 +31,7 @@ import { CurrencyPicker } from "@/components/marketing/region-rates";
 export const metadata: Metadata = {
   title: "Hire Pre-Screened Interns in India | For Employers",
   description:
-    "Hire interns in India who are already interviewed, tested and scored. Three published plans from free to ₹200/hr, a flat ₹5,000 per-hire fee, and hiring from abroad without a visa or local entity.",
+    "Hire interns in India who are already interviewed, tested and scored. Three published plans from free to ₹200/hr, a ₹5,000 per-hire fee on Espresso (free for now on Cappuccino and Latte), and hiring from abroad without a visa or local entity.",
   alternates: { canonical: "/employers" },
 };
 
@@ -99,7 +99,7 @@ const EMPLOYER_FAQ = [
       category: "Payment",
       question: "When do I pay?",
       answer:
-        "The fixed ₹5,000 (or $50) per-hire charge is paid when the intern is hired. On Cappuccino and Latte the first month's charge is paid with it; each later month is billed against the timesheets you approve, due 2 days before the intern's pay day (you can pay up to 15 days early).",
+        "The fixed ₹5,000 (or $50) per-hire charge on Espresso is paid when the intern is hired; on Cappuccino and Latte the per-hire charge is free for now. On Cappuccino and Latte the first month's charge is paid at hire; each later month is billed against the timesheets you approve, due 2 days before the intern's pay day (you can pay up to 15 days early).",
     },
     {
       id: "e4",
