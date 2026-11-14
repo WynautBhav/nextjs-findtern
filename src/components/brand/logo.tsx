@@ -22,7 +22,7 @@ const SRC = {
 
 /** Intrinsic size of both masters, so the browser reserves the right box. */
 const WIDTH = 1200;
-const HEIGHT = 361;
+const HEIGHT = 366;
 
 export function Logo({
   variant = "green",
