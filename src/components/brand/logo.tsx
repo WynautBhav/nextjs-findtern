@@ -73,3 +73,26 @@ export function LogoMark({
     />
   );
 }
+
+/**
+ * The original FTLOGO-HQ.png, byte for byte (transparent background, no processing). The file has a wide empty
+ * margin around the artwork (3877x1998 canvas, artwork at x 57-3506, y 499-1551), so the box is cropped to the
+ * artwork with CSS: the layout box is the artwork's aspect ratio and the image is offset inside it.
+ */
+export function LogoHQ({ className, priority, alt = "Findtern" }: { className?: string; priority?: boolean; alt?: string }) {
+  return (
+    <span className={cn("relative block shrink-0 overflow-hidden", className)} style={{ aspectRatio: "3449 / 1052" }}>
+      <img
+        src="/media/FTLOGO-HQ.png"
+        alt={alt}
+        width={3877}
+        height={1998}
+        decoding="async"
+        loading={priority ? "eager" : "lazy"}
+        fetchPriority={priority ? "high" : undefined}
+        className="absolute max-w-none"
+        style={{ width: "112.41%", left: "-1.653%", top: "-47.43%" }}
+      />
+    </span>
+  );
+}

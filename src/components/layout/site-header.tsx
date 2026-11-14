@@ -10,7 +10,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { GetStartedMenu } from "@/components/layout/get-started-menu";
 import { NAV_LINKS } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
-import { Logo } from "@/components/brand/logo";
+import { LogoHQ } from "@/components/brand/logo";
 import { ContactEmailLink } from "@/components/marketing/email-link";
 
 /**
@@ -104,7 +104,7 @@ export function SiteHeader() {
           aria-label="Findtern - home"
           className="group flex shrink-0 items-center transition-opacity duration-200 hover:opacity-90"
         >
-          <Logo
+          <LogoHQ
             alt="Findtern - Internship Simplified"
             priority
             className={cn("transition-all duration-200", scrolled ? "h-11 sm:h-12" : "h-12 sm:h-14")}
