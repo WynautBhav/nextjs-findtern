@@ -206,9 +206,10 @@ Demo logins (password `Findtern@2026`; local seed data only):
 The officer login exists after `npm run db:seed-colleges`, which adds the college demo data on top of `db:seed`.
 
 Locally, emails are written to `logs/mail/` (not sent), schedulers stay off, and Razorpay is off unless you add test keys.
-`PAYMENTS_MODE=free` completes activation and checkout without Razorpay; `PAYMENTS_TEST_BUTTON=1` adds a "mark as paid" button
-that settles at the real amount. Both stay off with a live Razorpay key unless the host is a known test host (localhost, a
-`*.vercel.app` deployment, or one listed in `STAGING_HOSTS`). Never set either on the real domain.
+`PAYMENTS_MODE=free` completes activation and checkout without Razorpay; `PAYMENTS_TEST_BUTTON=1` lets the order APIs accept a
+`testPay` request flag (no page has a button for it; the e2e suites use it) that settles at the real amount. The flag
+works only on a known test host (localhost, a `*.vercel.app` deployment, or one listed in `STAGING_HOSTS`), whatever the
+Razorpay key; elsewhere the API answers 403. `PAYMENTS_MODE=free` refuses a live key off a test host. Never set either on the real domain.
 
 ## Scripts
 

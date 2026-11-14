@@ -111,7 +111,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     });
   }
 
-  // The test button (PAYMENTS_TEST_BUTTON=1): the real amount through the
+  // The testPay flag (already checked against testPayEnabled() above): the real amount through the
   // real settlement (invoice number, promo use, notification), no Razorpay.
   if (parsed.data.testPay) {
     return settleNow(id, { internId: id, orderId: `test_${randomUUID()}`, gateway: "test", amountMinor, currency: "INR", status: "created", raw });

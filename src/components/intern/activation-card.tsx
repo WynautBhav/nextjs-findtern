@@ -41,7 +41,6 @@ export function ActivationCard({
   prefill,
   alreadyPaid = false,
   testMode = false,
-  testPay = false,
   collegeCover = null,
   claim = null,
 }: {
@@ -49,8 +48,6 @@ export function ActivationCard({
   claim?: { collegeName: string } | null;
   /** From `collegeCoverFor(userId)`: says before payment whether the student's college covers this interview. */
   collegeCover?: CollegeCover | null;
-  /** PAYMENTS_TEST_BUTTON=1: a second button settles at the real amount without Razorpay. */
-  testPay?: boolean;
   /** PAYMENTS_MODE=free: activation completes without Razorpay. */
   testMode?: boolean;
   internId: string;
@@ -103,7 +100,7 @@ export function ActivationCard({
     }
   }
 
-  async function pay(asTest = false) {
+  async function pay() {
     setState("busy");
     setError(null);
     setNotice(null);
@@ -111,7 +108,7 @@ export function ActivationCard({
       const orderRes = await csrfFetch(`/api/intern/${encodeURIComponent(internId)}/payment/razorpay/order`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ ...(promo ? { promoCode: promo.code, ...(promo.collegeName ? { declaredAdult: adult } : {}) } : {}), ...(asTest ? { testPay: true } : {}) }),
+        body: JSON.stringify({ ...(promo ? { promoCode: promo.code, ...(promo.collegeName ? { declaredAdult: adult } : {}) } : {}) }),
       });
       const order = await orderRes.json().catch(() => ({}));
       // 409 with alreadyPaid: the server already has this profile as paid. That is
@@ -290,16 +287,6 @@ export function ActivationCard({
             ? "Activate free with code"
             : `Pay ${formatMoney(payable, "INR")} and go live`}
       </button>
-      {testPay && payable > 0 ? (
-        <button
-          type="button"
-          onClick={() => pay(true)}
-          disabled={state === "busy"}
-          className={buttonClass({ variant: "light", size: "sm", block: true, className: "mt-2" })}
-        >
-          Test: mark as paid, no charge ({formatMoney(payable, "INR")})
-        </button>
-      ) : null}
 
       <CollegeCodeRedeem onRedeemed={markPaid} />
 

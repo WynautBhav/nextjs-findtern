@@ -58,19 +58,20 @@ function hasLiveKey(env: Record<string, string | undefined>): boolean {
 }
 
 /**
- * PAYMENTS_TEST_BUTTON=1 adds a "Test: mark as paid, no charge" button beside
- * Pay: the real amount, promo use and invoice number go through the real
- * settlement, only Razorpay is skipped. For a test database; never set it on
- * the live site. With a live Razorpay key it stays off unless this deployment
- * is a known test host (localhost, a *.vercel.app deployment, or a host listed in
- * STAGING_HOSTS), so a leaked flag can't mark orders paid, or burn GST invoice
- * numbers, on the real domain, and an unset PUBLIC_ORIGIN fails closed.
- * REMOVE this switch, both buttons and the `testPay` order-route branches
- * before launch (docs/launch-2026-10-28.md).
+ * The `testPay` request flag settles an order at the real amount with no
+ * Razorpay call (the real promo use and GST invoice number are still spent).
+ * No page offers it any more; it stays server-side only for the e2e suites,
+ * which post it to the order APIs on a test database.
+ *
+ * Accepted only when PAYMENTS_TEST_BUTTON=1 AND isTestHost(env) (localhost,
+ * a *.vercel.app deployment, or a host in STAGING_HOSTS), whatever the
+ * Razorpay key. Never on findtern.in or any unknown host; an unset
+ * PUBLIC_ORIGIN fails closed. Off by default. The order routes answer 403
+ * when a request carries testPay and this is false.
  */
 export function testPayEnabled(env: Record<string, string | undefined> = process.env): boolean {
   if ((env.PAYMENTS_TEST_BUTTON ?? "").trim() !== "1") return false;
-  return !hasLiveKey(env) || isTestHost(env);
+  return isTestHost(env);
 }
 
 export function razorpayKeyId(): string | undefined {

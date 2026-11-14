@@ -58,11 +58,9 @@ export function CheckoutSummary({
   prefill,
   initialId,
   testMode = false,
-  testPay = false,
 }: {
   employerId: string;
   testMode?: boolean;
-  testPay?: boolean;
   lines: SummaryLine[];
   prefill: { name?: string; email?: string; contact?: string };
   /** Preselected line (?proposal=). */
@@ -250,7 +248,6 @@ export function CheckoutSummary({
               mode={mode}
               paymentIndex={line.monthsPaid}
               testMode={testMode}
-              testPay={testPay}
               onPromoChange={setPromoApplied}
             />
           </div>
