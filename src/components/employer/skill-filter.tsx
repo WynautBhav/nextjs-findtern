@@ -23,6 +23,7 @@ import { Check, Plus, X } from "lucide-react";
 
 import { suggestSkills } from "@/lib/data/skills";
 import { MAX_SKILLS } from "@/lib/onboarding";
+import { arrowKey, limitNote } from "@/components/employer/skill-combobox";
 import { cn } from "@/lib/utils";
 
 export function SkillFilter({
@@ -62,8 +63,11 @@ export function SkillFilter({
   const options = typed ? suggestSkills(typed, 8).filter((s) => !active.includes(s)) : [];
   // Legacy let an employer add a skill outside the list ("Add "X" (Press Enter)").
   const custom = typed && !options.some((o) => o.toLowerCase() === typed.toLowerCase()) ? typed : null;
-  // What the arrow keys walk: the suggestions, then the "Add …" row.
-  const items = open ? (custom ? [...options, custom] : options) : [];
+  // The suggestions, then the "Add …" row; the arrow keys walk these.
+  const rows = custom ? [...options, custom] : options;
+  // What is on screen: nothing while the list is closed.
+  const items = open ? rows : [];
+  const limit = limitNote(active.length, MAX_SKILLS, "skills");
 
   /**
    * `skills` in the URL - even empty - is the employer's own pick and wins
@@ -117,6 +121,11 @@ export function SkillFilter({
         {active.length === 0 ? <li className="inline-flex min-h-9 items-center text-[13px] text-text-subtle">None</li> : null}
       </ul>
 
+      {/* Always mounted so the screen reader hears the note appear; empty it takes no room. */}
+      <p aria-live="polite" className={limit ? "inline-flex min-h-9 items-center text-[13px] text-ink-700 touch:min-h-11" : "sr-only"}>
+        {limit}
+      </p>
+
       {full ? null : showAdd ? (
         <div className="relative w-56">
           <input
@@ -142,10 +151,12 @@ export function SkillFilter({
               }, 120)
             }
             onKeyDown={(e) => {
-              if ((e.key === "ArrowDown" || e.key === "ArrowUp") && items.length) {
+              const arrow = arrowKey(e.key, { open: items.length > 0, count: rows.length, highlight });
+              if (arrow) {
+                // Also reopens a list closed by Escape, with the current query.
                 e.preventDefault();
-                const step = e.key === "ArrowDown" ? 1 : -1;
-                setHighlight((i) => (i < 0 && step < 0 ? items.length - 1 : (i + step + items.length) % items.length));
+                setOpen(arrow.open);
+                setHighlight(arrow.highlight);
               } else if (e.key === "Escape") {
                 setOpen(false);
                 setHighlight(-1);
@@ -160,7 +171,14 @@ export function SkillFilter({
             className="h-9 w-full rounded-xl border border-ink-200 bg-white px-3.5 text-base text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm touch:h-11"
           />
           {open && (options.length > 0 || custom) ? (
-            <ul id={listId} role="listbox" aria-label="Skill suggestions" className="absolute left-0 z-30 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-ink-200 bg-white py-1 shadow-lg">
+            <ul
+              id={listId}
+              role="listbox"
+              aria-label="Skill suggestions"
+              // The scrollbar and padding are part of the list: a press there must not blur the input and close it.
+              onMouseDown={(e) => e.preventDefault()}
+              className="absolute left-0 z-30 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-ink-200 bg-white py-1 shadow-lg"
+            >
               {options.map((skill, i) => (
                 <li
                   key={skill}

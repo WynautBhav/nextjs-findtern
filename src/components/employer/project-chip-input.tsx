@@ -5,6 +5,7 @@ import { Plus, X } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { controlClass, FieldError, FieldHint, FieldLabel } from "@/components/employer/company-fields";
+import { arrowKey, limitNote } from "@/components/employer/skill-combobox";
 import { cn } from "@/lib/utils";
 
 /**
@@ -46,11 +47,14 @@ export function ChipInput({
   required?: boolean;
 }) {
   const [draft, setDraft] = useState("");
-  const [focused, setFocused] = useState(false);
+  // The suggestion list is showing: set by focus and typing, cleared by Escape or blur.
+  const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const full = entries.length >= max;
   const has = (v: string) => entries.some((e) => e.toLowerCase() === v.toLowerCase());
-  const options = suggest && focused && !full && draft.trim() ? suggest(draft).filter((o) => !has(o)).slice(0, 8) : [];
+  // What the current query offers, whether or not the list is showing (the arrow keys reopen it).
+  const offered = suggest && !full && draft.trim() ? suggest(draft).filter((o) => !has(o)).slice(0, 8) : [];
+  const options = open ? offered : [];
   const listId = `${id}-suggestions`;
   const [notOnList, setNotOnList] = useState("");
 
@@ -74,11 +78,8 @@ export function ChipInput({
   }
 
   const counter =
-    entries.length > max
-      ? `Saved under an older limit. Remove ${entries.length - max + 1} to add a new one.`
-      : min && entries.length < min
-        ? `${entries.length} of at least ${min} added.`
-        : `${entries.length} of ${max} added.`;
+    limitNote(entries.length, max, "added") ??
+    (min && entries.length < min ? `${entries.length} of at least ${min} added.` : `${entries.length} of ${max} added.`);
 
   return (
     <div>
@@ -104,22 +105,24 @@ export function ChipInput({
             setDraft(e.target.value);
             setNotOnList("");
             setActive(-1);
+            setOpen(true);
           }}
-          onFocus={() => setFocused(true)}
-          onBlur={() => window.setTimeout(() => setFocused(false), 120)}
+          onFocus={() => setOpen(true)}
+          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
           onKeyDown={(e) => {
-            if (e.key === "ArrowDown" && options.length) {
+            const arrow = arrowKey(e.key, { open: options.length > 0, count: offered.length, highlight: active });
+            if (arrow) {
+              // Also reopens a list closed by Escape, with the current query.
               e.preventDefault();
-              setActive((i) => (i + 1) % options.length);
-            } else if (e.key === "ArrowUp" && options.length) {
-              e.preventDefault();
-              setActive((i) => (i <= 0 ? options.length - 1 : i - 1));
+              setOpen(arrow.open);
+              setActive(arrow.highlight);
             } else if (e.key === "Enter") {
               // Otherwise Enter submits the surrounding form.
               e.preventDefault();
               commit(active >= 0 ? options[active] : undefined);
             } else if (e.key === "Escape") {
-              setFocused(false);
+              setOpen(false);
+              setActive(-1);
             }
           }}
           className={controlClass(Boolean(error), "min-w-0 flex-1")}
@@ -138,6 +141,8 @@ export function ChipInput({
             id={listId}
             role="listbox"
             aria-label={`${label} suggestions`}
+            // The scrollbar and padding are part of the list: a press there must not blur the input and close it.
+            onMouseDown={(e) => e.preventDefault()}
             className="absolute inset-x-0 top-full z-30 mt-1 max-h-60 overflow-auto rounded-apple-md border border-ink-200 bg-white py-1 shadow-md"
           >
             {options.map((option, i) => (
@@ -187,7 +192,7 @@ export function ChipInput({
       {error || notOnList ? (
         <FieldError id={`${id}-error`}>{error || notOnList}</FieldError>
       ) : (
-        <p id={`${id}-count`} className="nums mt-1.5 text-xs text-ink-600">
+        <p id={`${id}-count`} aria-live="polite" className="nums mt-1.5 text-xs text-ink-600">
           {counter}
         </p>
       )}
