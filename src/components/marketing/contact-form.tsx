@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { EmailLink } from "@/components/marketing/email-link";
 import { INDIA_CODE, phoneError, phoneHint } from "@/lib/phone";
 import { DIAL_CODES } from "@/lib/data/dial-codes";
+import { setContactSent } from "@/components/marketing/contact-owl";
 
 /**
  * Contact form.
@@ -145,6 +146,7 @@ export function ContactForm({ initialType = "general" }: { initialType?: Contact
       }
       if (!res.ok) throw new Error(String(res.status));
       setStatus("sent");
+      setContactSent(true);
     } catch {
       setStatus("error");
       setError(

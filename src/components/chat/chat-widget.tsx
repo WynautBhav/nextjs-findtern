@@ -2,22 +2,22 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
-import { MessageCircle, Send, X } from "lucide-react";
+import { Send, X } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
 import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { cn } from "@/lib/utils";
 import { newTabAttrs } from "@/components/ui/new-tab";
 import { NewTabHint } from "@/components/ui/new-tab-link";
+import { Mascot, MascotAvatar, MASCOT_STAGE_BG } from "./mascot";
+import { busyState, replyState, SLEEPY_AFTER_MS, TYPING_AFTER_MS, type MascotState } from "./mascot-state";
 
 type Msg = { role: "user" | "assistant"; content: string };
 
 const QUICK_PROMPTS = [
   "How does the AI interview work?",
-  "Help me use the platform",
-  "What is the Findtern Score?",
   "What does it cost for employers?",
-  "Is placement guaranteed?",
+  "Help me use the platform",
 ];
 
 const TEASER_KEY = "findtern:chat-teaser-seen";
@@ -30,7 +30,7 @@ const TEASER_MS = 12_000;
 const GREETING: Msg = {
   role: "assistant",
   content:
-    "Hi, I'm Findtern - Findtern's assistant. Ask me anything about Findtern, or tell me where you're stuck and I'll walk you through the platform step by step.",
+    "Hi, I'm Findy. Ask me anything about Findtern, or tell me where you're stuck.",
 };
 
 /* ── Tiny safe markdown for bot replies ────────────────────────────────
@@ -178,7 +178,7 @@ function BotText({ content, internalNewTab }: { content: string; internalNewTab?
 }
 
 /**
- * Findtern - always-visible chatbot.
+ * Findy - Findtern's always-visible chatbot.
  *
  * Fixed bottom-right launcher + panel, rendered from the root layout so it
  * survives every navigation. Brand green header, theme tokens only, keyboard
@@ -194,11 +194,26 @@ export function ChatWidget() {
   const [error, setError] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const launcherRef = useRef<HTMLButtonElement>(null);
+  const wasOpenRef = useRef(false);
   const [teaser, setTeaser] = useState(false);
   // A field outside the chat has focus (the phone keyboard is up): the
   // launcher steps aside so it never covers what is being typed (QA-136).
   const [typing, setTyping] = useState(false);
   const reduceMotion = useReducedMotion();
+  // What the owl is doing: waves when the panel opens, thinks (or searches) while a reply is pending.
+  const [mood, setMood] = useState<MascotState>("idle");
+  const celebrated = useRef(false);
+  // The launcher owl waves goodbye (once) after a panel that saw a conversation is closed; closing is never delayed.
+  const [launcherMood, setLauncherMood] = useState<MascotState>("idle");
+  // Bumped on any interaction inside the panel; restarts the sleepy countdown.
+  const [activity, setActivity] = useState(0);
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    setMood(open ? "greeting" : "idle");
+    setLauncherMood(!open && messages.length > 1 ? "bye" : "idle");
+  }
 
   // A one-time "Questions? Ask me" nudge a few seconds after load. Dismissed
   // (or the chat opened) once per browser session; storage can throw in a
@@ -260,13 +275,35 @@ export function ChatWidget() {
     return () => window.removeEventListener(OPEN_CHAT_EVENT, openChat);
   }, []);
 
+  // Still waiting after a few seconds: the owl switches to typing (the clip swap crossfades).
+  useEffect(() => {
+    if (!busy) return;
+    const t = window.setTimeout(() => setMood("typing"), TYPING_AFTER_MS);
+    return () => window.clearTimeout(t);
+  }, [busy]);
+
+  // Open, resting and untouched for a while: the owl dozes (any interaction wakes it).
+  useEffect(() => {
+    if (!open || busy || mood !== "idle") return;
+    const t = window.setTimeout(() => setMood("sleepy"), SLEEPY_AFTER_MS);
+    return () => window.clearTimeout(t);
+  }, [open, busy, mood, activity]);
+
+  function wake() {
+    setActivity((n) => n + 1);
+    setMood((m) => (m === "sleepy" ? "idle" : m));
+  }
+
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, busy, open]);
 
   useEffect(() => {
     if (open) inputRef.current?.focus();
-  }, [open ]);
+    // The launcher is hidden while the panel is open; hand focus back to it on close.
+    else if (wasOpenRef.current) launcherRef.current?.focus();
+    wasOpenRef.current = open;
+  }, [open]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -284,6 +321,8 @@ export function ChatWidget() {
     setMessages(next);
     setInput("");
     setBusy(true);
+    setMood(busyState(content));
+    let nextMood: MascotState = "idle";
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -298,10 +337,15 @@ export function ChatWidget() {
         throw new Error(json?.error ?? "Chat failed");
       }
       setMessages([...next, { role: "assistant", content: json.reply }]);
+      // Thumbs-up for a thanks; otherwise a short cheer on the first answer only.
+      nextMood = replyState(content, !celebrated.current);
+      celebrated.current = true;
     } catch {
-      setError("Couldn't reach Findtern just now. Try again or write to communicate@findtern.in.");
+      nextMood = "oops";
+      setError("Couldn't reach Findy just now. Try again or write to communicate@findtern.in.");
     } finally {
       setBusy(false);
+      setMood(nextMood);
     }
   }
 
@@ -336,32 +380,43 @@ export function ChatWidget() {
         "pointer-events-none fixed z-[80] flex flex-col items-end gap-3",
         isForm && "max-lg:hidden",
         typing && !open && "max-lg:hidden",
-        hasBottomNav ? "bottom-20 right-4" : "bottom-5 right-4",
+        hasBottomNav ? "bottom-20 right-4" : "bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))]",
         inApp ? "lg:bottom-auto lg:right-6 lg:top-[4.5rem]" : "lg:bottom-6 lg:right-6",
       )}
     >
       {/* ── Panel ─────────────────────────────────────────── */}
       <div
         role="dialog"
-        aria-label="Chat with Findtern"
+        aria-label="Chat with Findy"
         aria-hidden={!open}
         inert={!open}
+        onPointerDownCapture={wake}
+        onKeyDownCapture={wake}
         className={cn(
-          "flex w-[min(92vw,380px)] max-h-[calc(100dvh-5.5rem)] flex-col overflow-hidden rounded-2xl border border-ink-200 bg-white shadow-xl transition-all duration-[260ms] ease-out-expo",
+          "flex w-[min(92vw,380px)] max-h-[min(calc(100dvh-2.5rem),42rem)] flex-col overflow-hidden rounded-[20px] border border-ink-200/70 bg-white shadow-[0_16px_48px_-12px_rgb(4_29_23/0.28)] transition-all duration-[260ms] ease-out-expo",
           open
             ? "pointer-events-auto translate-y-0 opacity-100"
             : "pointer-events-none translate-y-4 opacity-0 hidden",
         )}
       >
-        {/* Header */}
-        <div className="flex items-center gap-3 bg-brand-950 px-4 py-3.5 text-white">
-          <span className="flex size-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-brand-900 text-lg font-bold shadow-sm">
-            F
-          </span>
+        {/* One header: owl tile (the stage colour is baked into the MP4 fallback, so the tile keeps it), name + status, close. */}
+        <div className="flex shrink-0 items-center gap-3 border-b border-ink-100 py-2 pl-3 pr-3">
+          <div
+            aria-hidden
+            className="size-28 shrink-0 overflow-hidden rounded-2xl [@media(max-height:700px)]:size-20"
+            style={{ backgroundColor: MASCOT_STAGE_BG }}
+          >
+            <Mascot
+              state={mood}
+              active={open}
+              onDone={() => setMood("idle")}
+              className="size-full"
+            />
+          </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold leading-tight">Findtern</p>
-            <p className="flex items-center gap-1.5 text-xs text-on-dark-subtle">
-              <span className="size-1.5 rounded-full bg-brand-300" aria-hidden />
+            <p className="text-[17px] font-semibold leading-tight text-ink-900">Findy</p>
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-ink-600">
+              <span className="size-1.5 rounded-full bg-brand-500" aria-hidden />
               Online · replies instantly
             </p>
           </div>
@@ -369,9 +424,9 @@ export function ChatWidget() {
             type="button"
             onClick={() => setOpen(false)}
             aria-label="Close chat"
-            className="inline-flex size-8 items-center justify-center rounded-lg text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+            className="inline-flex size-9 shrink-0 items-center justify-center self-start rounded-lg text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900"
           >
-            <X className="size-4" aria-hidden />
+            <X className="size-[18px]" aria-hidden />
           </button>
         </div>
 
@@ -382,16 +437,16 @@ export function ChatWidget() {
           ref={listRef}
           aria-live="polite"
           data-lenis-prevent
-          className="flex max-h-[46vh] min-h-[280px] flex-col gap-2.5 overflow-y-auto overscroll-contain bg-ink-50 px-3.5 py-4"
+          className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain bg-white px-4 py-3"
         >
           {messages.map((m, i) => (
             <div
               key={i}
               className={cn(
-                "max-w-[85%] rounded-xl px-3 py-2 text-sm leading-relaxed",
+                "max-w-[88%] rounded-2xl px-3 py-2 text-sm leading-relaxed",
                 m.role === "user"
-                  ? "self-end bg-primary text-white"
-                  : "self-start border border-ink-200 bg-white text-ink-800 shadow-xs",
+                  ? "self-end rounded-br-md bg-primary text-white"
+                  : "self-start rounded-bl-md bg-ink-100 text-ink-800",
               )}
             >
               {m.role === "assistant" ? (
@@ -401,12 +456,27 @@ export function ChatWidget() {
               )}
             </div>
           ))}
+          {/* Quick prompts: only before the conversation starts. */}
+          {messages.length === 1 && !busy ? (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {QUICK_PROMPTS.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => void send(q)}
+                  className="rounded-full bg-brand-100 px-3 py-1.5 text-left text-[13px] font-medium text-brand-800 transition-colors hover:bg-brand-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  {q}
+                </button>
+              ))}
+            </div>
+          ) : null}
           {busy && (
-            <div className="flex items-center gap-1.5 self-start rounded-xl border border-ink-200 bg-white px-3 py-2.5 shadow-xs" aria-label="Findtern is typing">
+            <div className="flex items-center gap-1.5 self-start rounded-2xl rounded-bl-md bg-ink-100 px-3 py-3" aria-label="Findy is typing">
               {[0, 1, 2].map((d) => (
                 <span
                   key={d}
-                  className="size-1.5 rounded-full bg-ink-400 animate-pulse-dot"
+                  className="size-1.5 rounded-full bg-ink-500 animate-pulse-dot"
                   style={{ animationDelay: `${d * 0.3}s` }}
                   aria-hidden
                 />
@@ -420,31 +490,16 @@ export function ChatWidget() {
           )}
         </div>
 
-        {/* Quick prompts */}
-        <div className="flex flex-wrap gap-1.5 border-t border-ink-100 bg-white px-3.5 pt-2.5">
-          {QUICK_PROMPTS.map((q) => (
-            <button
-              key={q}
-              type="button"
-              onClick={() => void send(q)}
-              disabled={busy}
-              className="rounded-full border border-ink-200 bg-ink-50 px-2.5 py-1 text-xs font-medium text-ink-700 transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
-
         {/* Input */}
         <form
-          className="flex items-center gap-2 bg-white p-3"
+          className="flex shrink-0 items-center gap-2 border-t border-ink-100 bg-white p-3"
           onSubmit={(e) => {
             e.preventDefault();
             void send();
           }}
         >
           <label htmlFor="fintern-input" className="sr-only">
-            Ask Findtern anything
+            Ask Findy anything
           </label>
           <input
             id="fintern-input"
@@ -454,13 +509,13 @@ export function ChatWidget() {
             placeholder="Ask about interviews, pricing…"
             maxLength={2000}
             autoComplete="off"
-            className="h-10 min-w-0 flex-1 rounded-xl border border-ink-200 bg-ink-50 px-3 text-sm text-ink-900 placeholder:text-text-subtle focus:border-primary focus:outline-none"
+            className="h-11 min-w-0 flex-1 rounded-xl border border-ink-200 bg-white px-3 text-sm text-ink-900 placeholder:text-ink-600 transition-shadow focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/25"
           />
           <button
             type="submit"
             disabled={busy || !input.trim()}
             aria-label="Send message"
-            className="inline-flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-white shadow-sm transition-all hover:bg-primary-hover disabled:opacity-40"
+            className="inline-flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary text-white transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:bg-brand-100 disabled:text-brand-700 disabled:hover:bg-brand-100"
           >
             <Send className="size-4" aria-hidden />
           </button>
@@ -485,7 +540,7 @@ export function ChatWidget() {
             }}
             className="rounded-lg py-1 text-left hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
-            {inApp ? "Stuck somewhere? Ask me" : "Questions about Findtern? Ask me"}
+            {inApp ? "Stuck somewhere? Ask Findy" : "Questions about Findtern? Ask Findy"}
           </button>
           <button
             type="button"
@@ -508,33 +563,29 @@ export function ChatWidget() {
 
       {/* ── Launcher (always visible) ─────────────────────── */}
       <button
+        ref={launcherRef}
         type="button"
         onClick={() => {
           if (teaser) dismissTeaser();
           setOpen((v) => !v);
         }}
         aria-expanded={open}
-        aria-label={open ? "Hide Findtern chat" : "Ask me - chat with Findtern"}
+        aria-label={open ? "Hide Findy chat" : "Ask Findy - chat with Findy"}
         className={cn(
           "relative pointer-events-auto group flex items-center justify-center rounded-full font-semibold text-white shadow-md transition-colors duration-[180ms] ease-out-expo motion-reduce:transition-none",
           "bg-brand-800 hover:bg-brand-900",
           // Labelled on every screen size (bug sheet 7, NC r30/r40: the
           // icon-only launcher was too small to notice).
-          // 44px and labelled: big enough to notice and tap, small enough not
+          // The owl avatar (idle loop) sits in the pill; 48px tall, small enough not
           // to sit over a whole row of the page beneath it.
-          open ? "size-11" : "h-11 min-w-11 gap-1.5 pl-3 pr-4 text-sm",
+          "h-12 min-w-12 gap-2 py-1 pl-1 pr-4 text-sm",
+          open && "hidden",
           inApp && "lg:hidden",
           headerOnly && "hidden",
         )}
       >
-        {open ? (
-          <X className="size-5 shrink-0" aria-hidden />
-        ) : (
-          <div className="relative flex shrink-0 items-center justify-center">
-            <MessageCircle className="size-5 shrink-0" aria-hidden />
-          </div>
-        )}
-        <span className={cn(open ? "hidden" : "font-semibold")}>Ask me</span>
+        <MascotAvatar className="size-10" state={launcherMood} onDone={() => setLauncherMood("idle")} />
+        <span className="font-semibold">Ask Findy</span>
       </button>
     </div>
   );
