@@ -1,6 +1,7 @@
 import type { CmsBlogPost, CmsFaqItem, CmsPlan } from "@/lib/content/types";
 import { SITE } from "@/lib/content/site";
 import { perHireFreeForNow } from "@/lib/plan-offer";
+import type { PerHireFeeSetting } from "@/lib/per-hire-fee";
 import { isStagingOrigin } from "@/lib/origin";
 import { plainTextExcerpt } from "@/lib/richtext";
 import { tidyText } from "@/lib/text";
@@ -173,7 +174,7 @@ export function howToJsonLd(opts: {
  * The rate card as an OfferCatalog on the Service. Prices are INR, the
  * authored currency; USD is derived at ₹100 = $1 on the page, not here.
  */
-export function pricingJsonLd(plans: CmsPlan[]) {
+export function pricingJsonLd(plans: CmsPlan[], feeSetting: PerHireFeeSetting) {
   const rupees = (minor: number) => (minor / 100).toFixed(2);
   return {
     "@context": "https://schema.org",
@@ -205,8 +206,8 @@ export function pricingJsonLd(plans: CmsPlan[]) {
           {
             "@type": "PriceSpecification",
             name: "Per-hire charge",
-            // Display offer: free for now on Cappuccino and Latte.
-            price: rupees(perHireFreeForNow(p.slug) ? 0 : p.perHireChargeMinor),
+            // Follows the admin hiring-fee setting, the same one billing reads.
+            price: rupees(perHireFreeForNow(p.slug, feeSetting) ? 0 : p.perHireChargeMinor),
             priceCurrency: "INR",
             valueAddedTaxIncluded: p.gstApplicable,
           },

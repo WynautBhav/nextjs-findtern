@@ -7,6 +7,7 @@ import { TiltCard } from "@/components/motion/tilt-card";
 import { useRegionBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
 import { OfferNote, PerHireCharge, PlanPrice } from "@/components/marketing/plan-price";
+import { usePerHireFee } from "@/components/marketing/per-hire-fee-context";
 import type { CmsPlan } from "@/lib/content/types";
 import { planHasOffer } from "@/lib/plan-offer";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ export function EmployerPlanCards({
   plansUsd: CmsPlan[];
 }) {
   const { isIndia, bands, currency } = useRegionBands();
+  const feeSetting = usePerHireFee();
   const plans = isIndia ? plansInr : plansUsd;
 
   return (
@@ -78,6 +80,7 @@ export function EmployerPlanCards({
                   nowMinor={plan?.perHireChargeMinor ?? b.perHireMinor}
                   wasMinor={plan?.compareAtPerHireMinor}
                   currency={currency}
+                  feeSetting={feeSetting}
                 />
                 per hire
               </p>

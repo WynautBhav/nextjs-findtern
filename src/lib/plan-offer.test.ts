@@ -30,7 +30,7 @@ describe("monthly arithmetic", () => {
   });
 });
 
-describe("per-hire free for now (display only)", () => {
+describe("per-hire free for now (follows the admin setting)", () => {
   it("applies to Cappuccino and Latte, never Espresso", () => {
     assert.equal(perHireFreeForNow("cappuccino"), true);
     assert.equal(perHireFreeForNow("latte"), true);
@@ -39,5 +39,8 @@ describe("per-hire free for now (display only)", () => {
     assert.equal(perHireFreeForNow("espresso"), false);
     assert.equal(perHireFreeForNow("standard"), false);
     assert.equal(perHireFreeForNow(undefined), false);
+    // Follows the setting passed in, not a fixed list.
+    assert.equal(perHireFreeForNow("latte", { standard: true, skilled: true, assured: true }), false);
+    assert.equal(perHireFreeForNow("espresso", { standard: false, skilled: false, assured: false }), true);
   });
 });

@@ -84,8 +84,8 @@ export const POPULAR_STEPS: PopularStep[] = [
    price sets - the Home section used $5/$10, the Pricing page used $1/$2 -
    and both disagreed with the Employers page. One table now, one source.
 
-   2026 pricing (decided 2026-10-18): the per-hire charge is ₹5,000 on
-   every plan with nothing struck through. Hourly rates are ₹50 / ₹100 / ₹200,
+   2026 pricing (decided 2026-10-18): the per-hire charge is ₹5,000 with
+   nothing struck through (which plans pay it is now the admin setting, per-hire-fee.ts). Hourly rates are ₹50 / ₹100 / ₹200,
    and only the Espresso rate is discounted - ₹50 struck through to free - so
    the one strikethrough on the page is the one real offer. The earlier
    "₹7,500 → ₹5,000" per-hire strike and the ₹150/₹300 hourly strikes were

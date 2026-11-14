@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     template: "%s | Findtern",
   },
   description:
-    "Findtern screens, interviews and scores interns before you see them. Hire a verified intern in India from free to ₹200/hr with one flat per-hire fee, or get placed in an internship.",
+    "Findtern screens, interviews and scores interns before you see them. Hire a verified intern in India from free to ₹200/hr with a per-hire fee on Espresso only (free for now on the other plans), or get placed in an internship.",
   applicationName: "Findtern",
   authors: [{ name: "Findtern", url: SITE_URL }],
   creator: "Findtern",

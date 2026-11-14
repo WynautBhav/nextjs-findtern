@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { PageHero } from "@/components/marketing/page-hero";
 import { ButtonLink } from "@/components/ui/button";
 import { PricingCta, PricingContent } from "@/components/marketing/pricing-content";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getHappyFaces, getPlans } from "@/lib/content";
 import { PageSection } from "@/components/marketing/page-hero";
@@ -26,7 +27,7 @@ export const metadata: Metadata = {
    visitors abroad. Exactly three plans per region, never six. */
 
 export default async function PricingPage() {
-  const [plansInr, plansUsd, faces] = await Promise.all([getPlans(true), getPlans(false), getHappyFaces()]);
+  const [plansInr, plansUsd, faces, feeSetting] = await Promise.all([getPlans(true), getPlans(false), getHappyFaces(), getPerHireFeeSetting()]);
   const perHire = formatMoney(plansInr[0]?.perHireChargeMinor ?? 500000, "INR");
 
   return (
@@ -35,8 +36,8 @@ export default async function PricingPage() {
         data={[
           webPageJsonLd({ path: "/pricing", name: "Findtern pricing", description: String(metadata.description) }),
           breadcrumbJsonLd([{ name: "Pricing", path: "/pricing" }]),
-          pricingJsonLd(plansInr),
-          faqJsonLd(pricingFaq(perHire)),
+          pricingJsonLd(plansInr, feeSetting),
+          faqJsonLd(pricingFaq(perHire, feeSetting)),
         ]}
       />
       <PageHero

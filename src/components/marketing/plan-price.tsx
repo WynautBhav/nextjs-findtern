@@ -2,6 +2,7 @@ import type { PriceCurrency } from "@/lib/currency";
 import { savingsPercent } from "@/lib/currency";
 import { formatMoney, formatRate } from "@/lib/format";
 import { perHireFreeForNow } from "@/lib/plan-offer";
+import { PER_HIRE_FEE_DEFAULT, type PerHireFeeSetting } from "@/lib/per-hire-fee";
 import { cn } from "@/lib/utils";
 
 /**
@@ -111,7 +112,8 @@ export function OfferNote({
 /**
  * The per-hire charge. Cappuccino and Latte show the charge struck through
  * with "Free for now" beside it; Espresso renders as a plain PlanPrice.
- * Display only: the stored charge is unchanged (see perHireFreeForNow).
+ * Which plans are free comes from the admin setting (`feeSetting`, lib/per-hire-fee.ts),
+ * the same one billing reads. The stored charge is unchanged.
  */
 export function PerHireCharge({
   slug,
@@ -120,7 +122,10 @@ export function PerHireCharge({
   currency,
   tone = "light",
   className,
+  feeSetting = PER_HIRE_FEE_DEFAULT,
 }: {
+  /** The live setting; client callers pass `usePerHireFee()`. */
+  feeSetting?: PerHireFeeSetting;
   /** Plan slug, or the score band id where no plan row loaded. */
   slug: string | null | undefined;
   nowMinor: number;
@@ -129,7 +134,7 @@ export function PerHireCharge({
   tone?: "light" | "dark";
   className?: string;
 }) {
-  if (!perHireFreeForNow(slug) || nowMinor <= 0) {
+  if (!perHireFreeForNow(slug, feeSetting) || nowMinor <= 0) {
     return <PlanPrice nowMinor={nowMinor} wasMinor={wasMinor} currency={currency} kind="money" tone={tone} className={className} />;
   }
   return (

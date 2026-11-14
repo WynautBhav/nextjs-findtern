@@ -1,17 +1,19 @@
 import type { CmsFaqItem } from "./types";
+import { perHireAnswer } from "../per-hire-copy.ts";
+import { PER_HIRE_FEE_DEFAULT, type PerHireFeeSetting } from "../per-hire-fee.ts";
 
 /**
  * The pricing page's short FAQ. Shared between the accordion (client, with the
  * visitor's currency) and the FAQPage structured data (server, INR), so the
  * answers Google indexes are the answers a visitor reads.
  */
-export function pricingFaq(perHire: string): CmsFaqItem[] {
+export function pricingFaq(perHire: string, feeSetting: PerHireFeeSetting = PER_HIRE_FEE_DEFAULT): CmsFaqItem[] {
   return [
     {
       id: "p1",
       category: "Pricing",
       question: "What is the per-hire fee?",
-      answer: `Espresso carries a fixed ${perHire} per-hire charge that covers candidate screening, testing, rubric scoring, and ongoing placement management. On Cappuccino and Latte the per-hire charge is free for now.`,
+      answer: perHireAnswer(perHire, feeSetting),
       sortOrder: 0,
       isActive: true,
     },
@@ -29,7 +31,9 @@ export function pricingFaq(perHire: string): CmsFaqItem[] {
       category: "Pricing",
       question: "What happens if an intern scores below 6?",
       answer:
-        "They still get scored and still appear in the pool. They sit in the Espresso band, which is free to browse with a per-hire charge on anyone you go on to hire.",
+        feeSetting.standard
+          ? "They still get scored and still appear in the pool. They sit in the Espresso band, which is free to browse with a per-hire charge on anyone you go on to hire."
+          : "They still get scored and still appear in the pool. They sit in the Espresso band, which is free to browse and, for now, carries no per-hire charge.",
       sortOrder: 2,
       isActive: true,
     },

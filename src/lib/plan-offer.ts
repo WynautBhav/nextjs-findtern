@@ -1,5 +1,6 @@
 import type { CmsPlan } from "@/lib/content/types";
 import { scheduledMonthlyHours } from "./offer.ts";
+import { PER_HIRE_FEE_DEFAULT, perHireChargedFor, type PerHireFeeSetting } from "./per-hire-fee.ts";
 
 /**
  * The 2026 offer and the monthly arithmetic, in one place.
@@ -18,14 +19,14 @@ export function planHasOffer(plan: Pick<CmsPlan, "priceHourlyMinor" | "compareAt
 }
 
 /**
- * The per-hire charge is shown as "free for now" on Cappuccino (6-8) and
- * Latte (8+); Espresso keeps its charge. DISPLAY ONLY: the stored charge,
- * checkout and invoices are untouched, so this must not be used for billing.
- * Takes a plan slug or, where no plan row loaded, the score band id.
+ * Whether the one-time hiring fee is waived ("free for now") for a plan slug
+ * or score band id, under the admin setting (lib/per-hire-fee.ts). The setting
+ * is the one source: billing, offers and every public price line read it, so
+ * this can no longer drift from what is charged. Without a setting the
+ * defaults apply (Espresso charged, Cappuccino and Latte free).
  */
-const PER_HIRE_FREE_FOR_NOW = new Set(["cappuccino", "latte", "skilled", "assured"]);
-export function perHireFreeForNow(slugOrBand: string | null | undefined): boolean {
-  return PER_HIRE_FREE_FOR_NOW.has((slugOrBand ?? "").toLowerCase());
+export function perHireFreeForNow(slugOrBand: string | null | undefined, setting: PerHireFeeSetting = PER_HIRE_FEE_DEFAULT): boolean {
+  return !perHireChargedFor(slugOrBand, setting);
 }
 
 /* ── Monthly arithmetic ────────────────────────────────────────────────

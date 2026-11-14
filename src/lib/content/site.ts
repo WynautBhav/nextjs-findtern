@@ -93,7 +93,7 @@ export const HOME_COPY = {
    *  pricing table all speak to the company hiring, so the candidate pitch
    *  lives on /interns rather than being mixed into this line. */
   subhead:
-    "Interviewed, tested and scored before you see a profile. One published rate card, one flat per-hire fee, then billed monthly on the timesheets you approve.",
+    "Interviewed, tested and scored before you see a profile. One published rate card, a one-time per-hire fee on Espresso (free for now on Cappuccino and Latte), then billed monthly on the timesheets you approve.",
 } as const;
 
 /** The same hero, for a student who flips the home audience switch. The
@@ -121,7 +121,7 @@ export const PROOF_STATS = [
   { value: 100, prefix: "", suffix: "%", label: "Screened before you see them" },
   { value: 3, prefix: "", suffix: "", label: "Plans to pick from" },
   // Shown in the visitor's currency (PerHireFigure); these are the INR defaults.
-  { value: 5000, prefix: "₹", suffix: "", label: "Fixed per-hire fee", perHire: true },
+  { value: 5000, prefix: "₹", suffix: "", label: "Per-hire fee on Espresso", perHire: true },
 ] as const;
 
 export const ABOUT_COPY = {

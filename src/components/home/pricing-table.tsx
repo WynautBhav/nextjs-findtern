@@ -10,7 +10,11 @@ import type { PriceCurrency } from "@/lib/currency";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
 import { OfferNote, PerHireCharge, PlanPrice } from "@/components/marketing/plan-price";
 import type { CmsPlan } from "@/lib/content/types";
+import type { PerHireFeeSetting } from "@/lib/per-hire-fee";
 import { planHasOffer } from "@/lib/plan-offer";
+import { usePerHireFee } from "@/components/marketing/per-hire-fee-context";
+import { perHireCaption, perHireFootnote } from "@/lib/per-hire-copy";
+
 import { cn } from "@/lib/utils";
 
 /* ==========================================================================
@@ -57,7 +61,7 @@ type PlanRow = {
   strong?: boolean;
 };
 
-function rowsFor(currency: PriceCurrency): PlanRow[] {
+function rowsFor(currency: PriceCurrency, feeSetting: PerHireFeeSetting): PlanRow[] {
   return [
     { label: "Who is it for", value: (p) => p.features[0] ?? "-" },
     { label: "Findtern Score", value: (p) => p.features[1] ?? "-", strong: true },
@@ -70,6 +74,7 @@ function rowsFor(currency: PriceCurrency): PlanRow[] {
           wasMinor={p.compareAtPerHireMinor}
           currency={currency}
           tone="dark"
+          feeSetting={feeSetting}
         />
       ),
       strong: true,
@@ -97,7 +102,8 @@ export function PricingTable({
   const currency = useCurrency();
   const isIndia = currency === "INR";
   const plans = isIndia ? plansInr : plansUsd;
-  const ROWS = rowsFor(currency);
+  const feeSetting = usePerHireFee();
+  const ROWS = rowsFor(currency, feeSetting);
   const featuredIdx = Math.max(
     0,
     plans.findIndex((p) => p.isFeatured),
@@ -267,8 +273,7 @@ export function PricingTable({
           <div className="mt-8 hidden lg:block">
             <table className="w-full border-collapse text-left">
               <caption className="sr-only">
-                Findtern hiring plans compared across six attributes. Espresso carries
-                a fixed per-hiring charge to cover verified screening and talent matching; it is free for now on Cappuccino and Latte.
+                Findtern hiring plans compared across six attributes. {perHireCaption(feeSetting)}
               </caption>
               <thead>
                 <tr>
@@ -354,7 +359,7 @@ export function PricingTable({
         <div className="mt-10 flex flex-col items-center gap-5">
           <p className="flex items-center gap-2 text-sm text-on-dark-subtle">
             <Check className="size-4 text-accent" aria-hidden />
-            {formatMoney(plans[0].perHireChargeMinor, currency)} per hiring on Espresso; free for now on Cappuccino and Latte
+            {perHireFootnote(feeSetting, formatMoney(plans[0].perHireChargeMinor, currency))}
           </p>
           <CurrencyNote tone="dark" className="text-xs" />
 

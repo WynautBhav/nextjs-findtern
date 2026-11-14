@@ -3,7 +3,7 @@
  *
  * This is the artifact the hero is built around, so the numbers have to be
  * the real ones. They are the same constants the legacy Terms page publishes:
- * a score out of 10, and a fixed per-hire charge across all tiers.
+ * a score out of 10, and a fixed per-hire charge (which tiers pay it is the admin setting, per-hire-fee.ts).
  *
  * Boundaries are half-open - a score of exactly 6.0 is Skilled, exactly 8.0 is
  * Assured - which is how the rate card states it and how the "what you get"
@@ -23,13 +23,13 @@ export type Band = {
   max: number;
   /** Hourly rate in minor units (paise). */
   rateMinor: number;
-  /** Flat per-hire charge in minor units across all tiers. */
+  /** Per-hire charge in minor units when this band is charged (admin setting, per-hire-fee.ts); not what is billed on its own. */
   perHireMinor: number;
   /** One line on what this band means, used in the card. */
   blurb: string;
 };
 
-/** Fixed per-hire charge across all tiers (₹5,000 INR / $50 USD). */
+/** The per-hire charge where it applies (₹5,000 INR / $50 USD); which bands pay it is the admin setting (per-hire-fee.ts). */
 export const PER_HIRE_CHARGE_INR = 500000;
 export const PER_HIRE_CHARGE_USD = inrMinorToUsdMinor(PER_HIRE_CHARGE_INR);
 export const PER_HIRE_CUTOFF = 6;
@@ -83,7 +83,7 @@ export function planNameFor(score: number): string {
 
 /* ── Regional rates ────────────────────────────────────────────────────
  * INR is the authored rate card (paise). USD is derived at ₹100 = $1 -
- * $0 / $1 / $2 hourly and a $50 fixed per-hire charge. Geometry (min/max)
+ * $0 / $1 / $2 hourly and a $50 per-hire charge where it applies. Geometry (min/max)
  * is identical across regions; only money moves. */
 
 /** Same bands, USD money, at the fixed ₹100 = $1 rule (lib/currency). */

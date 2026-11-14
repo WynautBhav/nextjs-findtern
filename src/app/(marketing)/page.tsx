@@ -23,11 +23,12 @@ import {
 } from "@/lib/content";
 import { JsonLd } from "@/components/seo/json-ld";
 import { howToJsonLd, pricingJsonLd, webPageJsonLd } from "@/lib/seo";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
 
 export const metadata: Metadata = {
   title: { absolute: "Findtern | Hire Pre-Screened Interns in India for the Price of a Coffee" },
   description:
-    "Hire interns in India who are already interviewed, tested and scored. Three published plans from free to ₹200/hr, one flat ₹5,000 per-hire fee, then billed monthly on approved timesheets. Students: get assessed and placed in an internship.",
+    "Hire interns in India who are already interviewed, tested and scored. Three published plans from free to ₹200/hr, a ₹5,000 per-hire fee on Espresso (free for now on Cappuccino and Latte), then billed monthly on approved timesheets. Students: get assessed and placed in an internship.",
   alternates: { canonical: "/" },
 };
 
@@ -46,7 +47,7 @@ const HOME_HOWTO = howToJsonLd({
 });
 
 export default async function HomePage() {
-  const [partners, skills, faces, steps, plansInr, plansUsd, colleges] = await Promise.all([
+  const [partners, skills, faces, steps, plansInr, plansUsd, colleges, feeSetting] = await Promise.all([
     getPartners(),
     getFeaturedSkills(),
     getHappyFaces(),
@@ -58,6 +59,7 @@ export default async function HomePage() {
     getPlans(true),
     getPlans(false),
     getCollegePartners(),
+    getPerHireFeeSetting(),
   ]);
 
   return (
@@ -70,7 +72,7 @@ export default async function HomePage() {
             description: String(metadata.description),
           }),
           HOME_HOWTO,
-          pricingJsonLd(plansInr),
+          pricingJsonLd(plansInr, feeSetting),
         ]}
       />
 

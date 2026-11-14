@@ -10,7 +10,7 @@ import { PROOF_STATS as STATS } from "@/lib/content/site";
  *   - 100% of profiles are verified, interviewed and tested before an
  *     employer sees them.
  *   - 3 pricing plans (Espresso, Cappuccino, Latte) come from the pricing
- *   - ₹5,000 fixed per-hire fee applies across all plans.
+ *   - ₹5,000 fixed per-hire fee applies on Espresso; free for now on Cappuccino and Latte (admin setting).
  *
  * The candidate guarantee ("refund if not placed") used to sit here between
  * two employer terms; it now lives on /interns with the rest of the

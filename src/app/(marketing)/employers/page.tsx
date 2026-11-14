@@ -19,6 +19,9 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { EmployerPlanCards } from "@/components/marketing/employer-plan-cards";
 import { PricingCalculator } from "@/components/marketing/pricing-calculator";
 import { getHappyFaces, getPlans } from "@/lib/content";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
+import type { PerHireFeeSetting } from "@/lib/per-hire-fee";
+import { perHireEmployerPayAnswer as perHireFeeAnswerE3 } from "@/lib/per-hire-copy";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { CountUp } from "@/components/motion/count-up";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
@@ -79,7 +82,7 @@ const STEPS = [
   },
 ];
 
-const EMPLOYER_FAQ = [
+const employerFaq = (feeSetting: PerHireFeeSetting) => [
     {
       id: "e1",
       category: "Hiring",
@@ -99,7 +102,7 @@ const EMPLOYER_FAQ = [
       category: "Payment",
       question: "When do I pay?",
       answer:
-        "The fixed ₹5,000 (or $50) per-hire charge on Espresso is paid when the intern is hired; on Cappuccino and Latte the per-hire charge is free for now. On Cappuccino and Latte the first month's charge is paid at hire; each later month is billed against the timesheets you approve, due 2 days before the intern's pay day (you can pay up to 15 days early).",
+        `${perHireFeeAnswerE3(feeSetting)} The first month's charge is paid at hire; each later month is billed against the timesheets you approve, due 2 days before the intern's pay day (you can pay up to 15 days early).`,
     },
     {
       id: "e4",
@@ -125,6 +128,8 @@ const EMPLOYER_FAQ = [
 ];
 
 export default async function EmployersPage() {
+  const feeSetting = await getPerHireFeeSetting();
+  const faq = employerFaq(feeSetting);
   const [plansInr, plansUsd, faces] = await Promise.all([getPlans(true), getPlans(false), getHappyFaces()]);
   return (
     <>
@@ -138,7 +143,7 @@ export default async function EmployersPage() {
             totalTime: "P7D",
             steps: STEPS.map((s) => ({ name: s.title, text: s.body })),
           }),
-          faqJsonLd(EMPLOYER_FAQ),
+          faqJsonLd(faq),
         ]}
       />
       <PageHero
@@ -381,7 +386,7 @@ export default async function EmployersPage() {
           <FaqExplorer
             showSearch={false}
             showChips={false}
-            items={EMPLOYER_FAQ}
+            items={faq}
             email={SITE.adminEmail}
           />
         </div>

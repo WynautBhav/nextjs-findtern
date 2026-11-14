@@ -2,6 +2,7 @@ import { getBlogPosts, getFaqItems, getPlans } from "@/lib/content";
 import { SITE } from "@/lib/content/site";
 import { formatMoney, formatRate } from "@/lib/format";
 import { perHireFreeForNow } from "@/lib/plan-offer";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { plainTextExcerpt } from "@/lib/richtext";
 import { SITE_URL } from "@/lib/seo";
 import { tidyText } from "@/lib/text";
@@ -16,7 +17,7 @@ export const revalidate = 3600;
  * the pages it links to.
  */
 export async function GET() {
-  const [plans, posts, faqs] = await Promise.all([getPlans(true), getBlogPosts().catch(() => []), getFaqItems()]);
+  const [plans, posts, faqs, feeSetting] = await Promise.all([getPlans(true), getBlogPosts().catch(() => []), getFaqItems(), getPerHireFeeSetting()]);
   const isEmployerFaq = (f: (typeof faqs)[number]) => f.category.trim().toLowerCase().startsWith("employer");
   const employerFaqs = faqs.filter(isEmployerFaq);
   const internFaqs = faqs.filter((f) => !isEmployerFaq(f));
@@ -34,7 +35,7 @@ export async function GET() {
     "- Audience: companies hiring interns (in India or from abroad) and students looking for internships",
     "- Screening: academic verification, structured AI interview, aptitude test, coding test for technical tracks",
     "- Findtern Score: one number out of 10 across communication, aptitude, role depth, coding and academics; the score band sets the rate",
-    "- Billing: hourly rate against approved monthly timesheets (one per month, sent on the period's last day), plus one fixed per-hire charge; prices in INR include GST; USD is derived at ₹100 = $1",
+    "- Billing: hourly rate against approved monthly timesheets (one per month, sent on the period's last day), plus a one-time per-hire charge on the plans where it applies (see Plans below); prices in INR include GST; USD is derived at ₹100 = $1",
     "- Overseas employers: contract with Findtern for the service and pay in USD; Findtern engages and pays the intern in India (no visa, no local entity)",
     "- Candidate guarantee: an internship within 6 months of the AI interview or the fee is refunded in full, after the window closes (terms at /guaranteed-internship-program)",
     "",
@@ -45,7 +46,7 @@ export async function GET() {
   for (const p of plans) {
     const was = p.priceHourlyMinor === 0 && p.compareAtHourlyMinor && p.compareAtHourlyMinor > 0 ? ` (shown as ${formatRate(p.compareAtHourlyMinor, "INR")}, currently discounted to free)` : "";
     lines.push(
-      `- **${p.displayName}** - ${p.features[1] ?? ""}: ${formatRate(p.priceHourlyMinor, "INR")}${was}, ${perHireFreeForNow(p.slug) && p.perHireChargeMinor > 0 ? `per-hire charge ${formatMoney(p.perHireChargeMinor, "INR")}, free for now` : `${formatMoney(p.perHireChargeMinor, "INR")} per hire`}, ${p.internshipDuration}. ${p.features[0] ?? ""}.`,
+      `- **${p.displayName}** - ${p.features[1] ?? ""}: ${formatRate(p.priceHourlyMinor, "INR")}${was}, ${perHireFreeForNow(p.slug, feeSetting) && p.perHireChargeMinor > 0 ? `per-hire charge ${formatMoney(p.perHireChargeMinor, "INR")}, free for now` : `${formatMoney(p.perHireChargeMinor, "INR")} per hire`}, ${p.internshipDuration}. ${p.features[0] ?? ""}.`,
     );
   }
 

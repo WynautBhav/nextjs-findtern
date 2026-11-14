@@ -10,6 +10,8 @@ import { formatMoney } from "@/lib/format";
 import { CurrencyNote, useRegionBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
 import { OfferNote, PerHireCharge, PlanPrice } from "@/components/marketing/plan-price";
+import { usePerHireFee } from "@/components/marketing/per-hire-fee-context";
+import { perHireCaption, perHireStatLines } from "@/lib/per-hire-copy";
 import { PricingCalculator } from "@/components/marketing/pricing-calculator";
 import { pricingFaq } from "@/lib/content/pricing-faq";
 import type { CmsPlan } from "@/lib/content/types";
@@ -32,6 +34,7 @@ export function PricingContent({
   beforeFaq?: React.ReactNode;
 }) {
   const { isIndia, currency, bands } = useRegionBands();
+  const feeSetting = usePerHireFee();
   const plans = isIndia ? plansInr : plansUsd;
   const featuredIdx = Math.max(
     0,
@@ -50,6 +53,7 @@ export function PricingContent({
           nowMinor={p.perHireChargeMinor}
           wasMinor={p.compareAtPerHireMinor}
           currency={currency}
+          feeSetting={feeSetting}
         />
       ),
     },
@@ -125,6 +129,7 @@ export function PricingContent({
                       nowMinor={plan?.perHireChargeMinor ?? band.perHireMinor}
                       wasMinor={plan?.compareAtPerHireMinor}
                       currency={currency}
+                      feeSetting={feeSetting}
                     />
                     <span>per hire</span>
                   </p>
@@ -188,8 +193,7 @@ export function PricingContent({
           <div className="min-w-0 overflow-x-auto [scrollbar-width:thin]">
             <table className="w-full min-w-[42rem] border-collapse text-left">
               <caption className="sr-only">
-                Findtern hiring plans compared across six attributes. Espresso carries
-                a fixed per-hiring charge to cover verified screening and talent matching; it is free for now on Cappuccino and Latte.
+                Findtern hiring plans compared across six attributes. {perHireCaption(feeSetting)}
               </caption>
               <thead>
                 <tr className="border-b border-ink-200">
@@ -307,16 +311,20 @@ export function PricingContent({
                 {formatMoney(perHireMinor, currency)}
               </p>
               <p className="text-sm text-ink-600">
-per-hire fee on Espresso
-                <br />
-                free for now on Cappuccino and Latte
+{perHireStatLines(feeSetting)[0]}
+                {perHireStatLines(feeSetting)[1] ? (
+                  <>
+                    <br />
+                    {perHireStatLines(feeSetting)[1]}
+                  </>
+                ) : null}
               </p>
             </div>
           </div>
           <FaqExplorer
             showSearch={false}
             showChips={false}
-            items={pricingFaq(formatMoney(perHireMinor, currency))}
+            items={pricingFaq(formatMoney(perHireMinor, currency), feeSetting)}
           />
         </div>
       </PageSection>

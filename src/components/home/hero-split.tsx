@@ -237,7 +237,7 @@ export function HeroSplit() {
             kicker="For employers"
             Icon={Building2}
             title="Hire someone who has already been screened"
-            body="Browse candidates who are interviewed, tested and scored. Filter by Findtern Score, skills and interests. One flat per-hire fee with the first month, then billed monthly on approved timesheets."
+            body="Browse candidates who are interviewed, tested and scored. Filter by Findtern Score, skills and interests. A one-time per-hire fee (Espresso only, for now) with the first month, then billed monthly on approved timesheets."
             cta={{ label: "Start hiring", href: "/employers" }}
           />
           <AudienceCard
