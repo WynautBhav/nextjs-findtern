@@ -121,7 +121,7 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                   <td data-label="Amount" className={cn(tdClass, "nums text-right font-semibold text-ink-900")}>
                     {formatMoney(i.amountMinor, i.currency, { zeroLabel: false })}
                   </td>
-                  <td data-label="Paid on" className={cn(tdClass, "nums")}>{i.paidAt ? formatDate(i.paidAt) : "-"}</td>
+                  <td data-label="Paid on" className={cn(tdClass, "nums whitespace-nowrap")}>{i.paidAt ? formatDate(i.paidAt) : "-"}</td>
                   <td className={cn(tdClass, "text-right lg:sticky lg:right-0 lg:bg-white lg:shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
                     <div className="flex justify-end gap-2">
                       <button

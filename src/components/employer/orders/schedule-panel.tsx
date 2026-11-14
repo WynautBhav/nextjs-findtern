@@ -133,7 +133,7 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                       {h.ledger.paidOn.length ? (
                         <ul className="space-y-0.5">
                           {h.ledger.paidOn.map((d, i) => (
-                            <li key={`${d}-${i}`}>{formatDate(d)}</li>
+                            <li key={`${d}-${i}`} className="whitespace-nowrap">{formatDate(d)}</li>
                           ))}
                         </ul>
                       ) : (
