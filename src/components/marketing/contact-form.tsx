@@ -74,11 +74,17 @@ export function ContactForm({ initialType = "general" }: { initialType?: Contact
     "idle",
   );
   const [error, setError] = useState<string | null>(null);
+  const [attempted, setAttempted] = useState(false);
   const uid = useId();
 
-  // Optional, but when given it must be a real number for its country:
-  // exactly 10 digits starting 6-9 for India, 6-15 digits elsewhere.
-  const phoneProblem = v.phone.trim() ? phoneError(v.countryCode, v.phone) : null;
+  // Required, and it must be a real number for its country: exactly 10
+  // digits starting 6-9 for India, 6-15 digits elsewhere. "Required" shows
+  // only once a submit has been tried; a format problem shows as you type.
+  const phoneProblem = v.phone.trim()
+    ? phoneError(v.countryCode, v.phone)
+    : attempted
+      ? "Phone number is required."
+      : null;
 
   const emailProblem =
     v.queryType === "hiring" && v.email.includes("@")
@@ -89,7 +95,8 @@ export function ContactForm({ initialType = "general" }: { initialType?: Contact
 
   const missing = [
     !v.firstName.trim() && "first name",
-        !v.email.includes("@") && "email address",
+    !v.email.includes("@") && "email address",
+    !v.phone.trim() && "phone number",
     v.message.trim().length < 2 && "a message",
   ].filter(Boolean) as string[];
 
@@ -108,8 +115,13 @@ export function ContactForm({ initialType = "general" }: { initialType?: Contact
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setAttempted(true);
     if (!valid) {
-      setError(`Still needed: ${missing.join(", ")}.`);
+      setError(
+        missing.length
+          ? `Still needed: ${missing.join(", ")}.`
+          : (phoneProblem ?? emailProblem ?? "Please check the form."),
+      );
       setStatus("error");
       return;
     }
@@ -123,6 +135,14 @@ export function ContactForm({ initialType = "general" }: { initialType?: Contact
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...v, phone: v.phone.replace(/\D/g, "") }),
       });
+      if (res.status === 400) {
+        const body = (await res.json().catch(() => null)) as { error?: string; field?: string } | null;
+        if (body?.field === "phone" && body.error) {
+          setStatus("error");
+          setError(body.error);
+          return;
+        }
+      }
       if (!res.ok) throw new Error(String(res.status));
       setStatus("sent");
     } catch {
@@ -221,7 +241,9 @@ export function ContactForm({ initialType = "general" }: { initialType?: Contact
         <Field
           id={`${uid}-ph`}
           label="Phone"
-          hint={phoneProblem ?? `Optional. ${phoneHint(v.countryCode)}`}
+          required
+          error={phoneProblem}
+          hint={phoneHint(v.countryCode)}
         >
           <div className="flex gap-2">
             <select
@@ -251,6 +273,9 @@ export function ContactForm({ initialType = "general" }: { initialType?: Contact
               }}
               maxLength={v.countryCode === INDIA_CODE ? 10 : 15}
               autoComplete="tel-national"
+              required
+              aria-required="true"
+              aria-describedby={`${uid}-ph-msg`}
               aria-invalid={phoneProblem ? true : undefined}
               className={cn(inputCls, phoneProblem && "border-danger")}
             />
@@ -362,11 +387,11 @@ function Field({
       </label>
       {children}
       {error ? (
-        <p className="mt-1.5 text-xs text-danger" role="alert">
+        <p id={`${id}-msg`} className="mt-1.5 text-xs text-danger" role="alert">
           {error}
         </p>
       ) : hint ? (
-        <p className="mt-1.5 text-xs text-ink-600">{hint}</p>
+        <p id={`${id}-msg`} className="mt-1.5 text-xs text-ink-600">{hint}</p>
       ) : null}
     </div>
   );

@@ -1,32 +1,22 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
-import { isValidPhone } from "@/lib/phone";
-import { CONTACT_TYPES } from "@/lib/contact-types";
-
-const bodySchema = z.object({
-  firstName: z.string().trim().min(1).max(80),
-  lastName: z.string().trim().max(80).default(""),
-  email: z.string().trim().email().max(200),
-  countryCode: z.string().trim().max(6).default("+91"),
-  phone: z.string().default("").transform((v) => v.replace(/\D/g, "")).pipe(z.string().max(15)),
-  queryType: z.enum(CONTACT_TYPES).default("general"),
-  subject: z.string().trim().max(200).default(""),
-  message: z.string().trim().min(2).max(5000),
-}).refine((d) => !d.phone || isValidPhone(d.countryCode, d.phone), {
-  message: "Invalid phone number",
-  path: ["phone"],
-});
+import { contactBodySchema } from "@/lib/contact-schema";
 
 export async function POST(req: Request) {
   const ip = clientIp(req.headers);
   if (!limiters.contact.take(bucketKey(ip))) {
     return NextResponse.json({ error: "Too many attempts" }, { status: 429 });
   }
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  const parsed = contactBodySchema.safeParse(await req.json().catch(() => null));
+  if (!parsed.success) {
+    const phoneIssue = parsed.error.issues.find((i) => i.path[0] === "phone");
+    return NextResponse.json(
+      { error: phoneIssue?.message ?? "Invalid input", ...(phoneIssue ? { field: "phone" } : {}) },
+      { status: 400 },
+    );
+  }
 
   const db = getDb();
   const d = parsed.data;
@@ -34,8 +24,8 @@ export async function POST(req: Request) {
     firstName: d.firstName,
     lastName: d.lastName || "-",
     email: d.email,
-    phone: d.phone || null,
-    countryCode: d.phone ? d.countryCode : null,
+    phone: d.phone,
+    countryCode: d.countryCode,
     subject: d.subject || `Findtern enquiry - ${d.queryType}`,
     message: d.message,
     queryType: d.queryType,
