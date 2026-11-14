@@ -1,22 +1,22 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BadgeCheck, Building2, ChevronDown, Search, X } from "lucide-react";
+import { BadgeCheck, Building2 } from "lucide-react";
 
-import { LIGHT_TILE, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { LIGHT_TILE, Pill, Surface } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { csrfFetch } from "@/lib/client-fetch";
+import { COLLEGE_CODE_CONSENT_NOTICE } from "@/lib/college/code-consent";
+import { isCodeVerifiedMembership } from "@/lib/intern-account";
 import type { MyCollege } from "@/lib/college/membership";
 import { branchProblem } from "@/lib/college/join-input";
 import { cn } from "@/lib/utils";
 import { PushToggle } from "./college-push";
-import { controlClass, Label, SelectField } from "./onboarding/fields";
-
-type Option = { id: string; name: string; city: string | null; state: string | null; isPartner: boolean; code: string | null };
+import { Choice, controlClass, Label, SelectField } from "./onboarding/fields";
 
 const YEARS = [
   { value: 1, label: "1st year" },
@@ -28,11 +28,9 @@ const YEARS = [
 
 export function CollegeForm({
   initial,
-  institution,
   vapidKey,
 }: {
   initial: MyCollege | null;
-  institution: string;
   vapidKey: string;
 }) {
   const [editing, setEditing] = useState(!initial);
@@ -43,7 +41,6 @@ export function CollegeForm({
   return (
     <JoinForm
       initial={initial}
-      institution={institution}
       onCancel={initial ? () => setEditing(false) : undefined}
       onSaved={() => setEditing(false)}
     />
@@ -120,12 +117,12 @@ function Membership({
 
           <p className="mt-5 border-t border-ink-100 pt-4 text-sm leading-relaxed text-ink-700">
             {verified
-              ? college.verifiedBy === "promo"
+              ? college.verifiedBy === "promo" || college.verifiedBy === "college_code" || college.verifiedBy === "drive_code"
                 ? "You used your college's code, so employers in its drives see you as a verified student."
                 : college.verifiedBy === "roster"
                 ? "Your email is on your college's student list, so employers in its drives see you as a verified student."
                 : "You signed up with your college email, so employers in its drives see you as a verified student."
-              : "Employers in your college's drives only see verified students. You'll be verified when you enter your placement office's college code at the AI interview payment, or if you sign up with your college email. Your placement officer can also add you to a drive by hand."}
+              : "Employers in your college's drives only see verified students. You'll be verified when you enter your college's code (ask your placement office), or if you sign up with your college email. Your placement officer can also add you to a drive by hand."}
           </p>
 
           {!college.isPartner ? (
@@ -174,62 +171,51 @@ function Membership({
   );
 }
 
-/* ── Picking a college ──────────────────────────────────────────────── */
+/* ── Joining with the college's code ─────────────────────────────────── */
 
+/**
+ * The only way to join a college: its code. There is no list to pick from and nothing here can name a
+ * college, so a student cannot choose one they do not belong to. A wrong code gets one generic answer.
+ */
 function JoinForm({
   initial,
-  institution,
   onCancel,
   onSaved,
   embedded = false,
   defaultBranch = "",
-  onPicked,
 }: {
   initial: MyCollege | null;
-  institution: string;
   onCancel?: () => void;
-  onSaved: () => void;
-  /** Inside the profile's Academics step: no card of its own, and the picked name is handed back. */
+  onSaved: (college: MyCollege) => void;
+  /** Inside the profile's Academics step: no card of its own. */
   embedded?: boolean;
   defaultBranch?: string;
-  onPicked?: (name: string) => void;
 }) {
   const router = useRouter();
   const ids = useId();
-  const [chosen, setChosen] = useState<Option | null>(
-    initial ? { id: initial.collegeId, name: initial.name, city: initial.city, state: null, isPartner: initial.isPartner, code: null } : null,
-  );
+  const [code, setCode] = useState("");
   const [year, setYear] = useState<number | "">(initial?.year ?? "");
   const [branch, setBranch] = useState(initial?.branch ?? defaultBranch);
   const [adult, setAdult] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Which control the message is about: it is marked invalid, tied to the message, and focused.
-  const [invalid, setInvalid] = useState<"college" | "adult" | "branch" | null>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
+  const [invalid, setInvalid] = useState<"code" | "adult" | "branch" | null>(null);
   const errorId = `${ids}-error`;
+
+  function fail(message: string, field: "code" | "adult" | "branch") {
+    setError(message);
+    setInvalid(field);
+    document.getElementById(`${ids}-${field}`)?.focus();
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!chosen) {
-      setError("Choose your college from the list.");
-      setInvalid("college");
-      searchRef.current?.focus();
-      return;
-    }
+    if (saving) return;
+    if (code.replace(/[\s._-]/g, "").length < 5) return fail("Enter the college code your placement office gave you.", "code");
     const branchBad = branchProblem(branch);
-    if (branchBad) {
-      setError(branchBad);
-      setInvalid("branch");
-      document.getElementById(`${ids}-branch`)?.focus();
-      return;
-    }
-    if (!adult) {
-      setError("Confirm that you are 18 or older.");
-      setInvalid("adult");
-      document.getElementById(`${ids}-adult`)?.focus();
-      return;
-    }
+    if (branchBad) return fail(branchBad, "branch");
+    if (!adult) return fail("Confirm that you are 18 or older.", "adult");
     setSaving(true);
     setError(null);
     setInvalid(null);
@@ -237,22 +223,18 @@ function JoinForm({
       const res = await csrfFetch("/api/intern/college", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          collegeId: chosen.id,
-          year: year === "" ? null : year,
-          branch: branch.trim(),
-          declaredAdult: adult,
-        }),
+        body: JSON.stringify({ code, year: year === "" ? null : year, branch: branch.trim(), declaredAdult: adult }),
       });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? "Couldn't save. Try again.");
+      const body = (await res.json().catch(() => ({}))) as { error?: string; college?: MyCollege };
+      if (!res.ok || !body.college) {
+        fail(body.error ?? "Couldn't check the code. Try again.", "code");
         return;
       }
-      onSaved();
+      setCode("");
+      onSaved(body.college);
       router.refresh();
     } catch {
-      setError("Couldn't save. Check your connection and try again.");
+      fail("Couldn't check the code. Check your connection and try again.", "code");
     } finally {
       setSaving(false);
     }
@@ -262,52 +244,37 @@ function JoinForm({
     <form
       onSubmit={submit}
       className={cn(
-        "space-y-8",
+        "space-y-6",
         embedded ? "" : cn("max-w-3xl rounded-apple-xl border border-ink-200/80 bg-white p-5 sm:p-8", LIGHT_TILE),
       )}
       noValidate
     >
       <section>
-        {/* Settings titles this section already; only the embedded form needs its own heading. */}
-        {embedded ? (
-          <SectionHead title="College" hint="Type your college's name, or the code your placement office gave you." />
-        ) : (
-          <p className="mb-4 text-sm text-ink-600">Type your college&apos;s name, or the code your placement office gave you.</p>
-        )}
-        {chosen ? (
-          <div className="flex items-center gap-3 rounded-apple-xl border border-ink-200/80 p-4">
-            <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
-              <Building2 className="size-5" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-base font-medium leading-snug text-ink-900">{chosen.name}</p>
-              <p className="text-sm text-ink-600">
-                {[chosen.city, chosen.state, chosen.code].filter(Boolean).join(", ")}
-                {chosen.isPartner ? (chosen.city ? " · " : "") + "Runs drives on Findtern" : ""}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setChosen(null)}
-              className="inline-flex min-h-11 shrink-0 items-center rounded-apple-sm px-3 text-sm font-medium text-primary hover:bg-brand-50 focus-visible:outline-2 focus-visible:outline-brand-700"
-            >
-              Change
-            </button>
-          </div>
-        ) : (
-          <CollegeSearch
-            initialQuery={!embedded && institution.trim().length >= 3 ? institution.trim() : ""}
-            inputRef={searchRef}
-            invalid={invalid === "college"}
-            describedBy={errorId}
-            onPick={(o) => {
-              setChosen(o);
-              setError(null);
+        <Label htmlFor={`${ids}-code`}>College code</Label>
+        <input
+          id={`${ids}-code`}
+          value={code}
+          onChange={(e) => {
+            setCode(e.target.value);
+            if (invalid === "code") {
               setInvalid(null);
-              onPicked?.(o.name);
-            }}
-          />
-        )}
+              setError(null);
+            }
+          }}
+          maxLength={24}
+          required
+          aria-required="true"
+          aria-invalid={invalid === "code" || undefined}
+          aria-describedby={invalid === "code" ? `${ids}-code-hint ${errorId}` : `${ids}-code-hint`}
+          placeholder="FT followed by your code"
+          autoComplete="off"
+          autoCapitalize="characters"
+          spellCheck={false}
+          className={controlClass(invalid === "code" ? (error ?? "invalid") : undefined, "mt-2 font-mono uppercase tracking-wider sm:max-w-xs")}
+        />
+        <p id={`${ids}-code-hint`} className="mt-2 text-sm leading-relaxed text-ink-600">
+          Ask your college&apos;s placement cell for your college code. It starts with FT. Without it you can still use an individual account.
+        </p>
       </section>
 
       <section className="grid gap-4 sm:grid-cols-2">
@@ -360,7 +327,7 @@ function JoinForm({
           className="mt-0.5 size-5"
         />
         <span className="text-sm leading-relaxed text-ink-800">
-          I am 18 or older.{" "}
+          {COLLEGE_CODE_CONSENT_NOTICE}{" "}
           <span className="text-ink-600">If you&apos;re under 18, ask your placement office to add you with a parent&apos;s consent.</span>
         </span>
       </label>
@@ -372,7 +339,7 @@ function JoinForm({
 
       <div className="flex flex-wrap gap-3">
         <button type="submit" disabled={saving} className={cn(buttonVariants({ variant: embedded ? "outline" : "primary", size: "md" }))}>
-          {saving ? "Saving…" : initial ? "Save changes" : "Join college"}
+          {saving ? "Checking…" : initial ? "Change college" : "Verify code"}
         </button>
         {onCancel ? (
           <button type="button" onClick={onCancel} className={cn(buttonVariants({ variant: "light", size: "md" }))}>
@@ -384,354 +351,72 @@ function JoinForm({
   );
 }
 
-/* ── Search combobox ─────────────────────────────────────────────────── */
-
-function CollegeSearch({
-  initialQuery,
-  onPick,
-  inputRef,
-  invalid = false,
-  describedBy,
-}: {
-  initialQuery: string;
-  onPick: (o: Option) => void;
-  /** Lets the form focus the field when a submit fails. */
-  inputRef?: React.RefObject<HTMLInputElement | null>;
-  invalid?: boolean;
-  describedBy?: string;
-}) {
-  const ids = useId();
-  const [query, setQuery] = useState(initialQuery);
-  const [options, setOptions] = useState<Option[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [active, setActive] = useState(0);
-  const [open, setOpen] = useState(Boolean(initialQuery));
-  const reqId = useRef(0);
-  const ownInput = useRef<HTMLInputElement>(null);
-  const searchInput = inputRef ?? ownInput;
-
-  useEffect(() => {
-    const id = ++reqId.current;
-    const t = setTimeout(async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`/api/colleges/search?q=${encodeURIComponent(query.trim())}`);
-        if (!res.ok) throw new Error("search failed");
-        const body = (await res.json().catch(() => ({}))) as { colleges?: Option[] };
-        if (id === reqId.current) {
-          setOptions(body.colleges ?? []);
-          setActive(0);
-          setFailed(false);
-        }
-      } catch {
-        if (id === reqId.current) {
-          setOptions([]);
-          setFailed(true);
-        }
-      } finally {
-        if (id === reqId.current) setLoading(false);
-      }
-    }, 250);
-    return () => clearTimeout(t);
-  }, [query]);
-
-  const listId = `${ids}-list`;
-  const optionId = (i: number) => `${ids}-opt-${i}`;
-
-  function onKey(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "ArrowDown") {
-      e.preventDefault();
-      setOpen(true);
-      setActive((a) => Math.min(a + 1, options.length - 1));
-    } else if (e.key === "ArrowUp") {
-      e.preventDefault();
-      setActive((a) => Math.max(a - 1, 0));
-    } else if (e.key === "Enter") {
-      if (open && options[active]) {
-        e.preventDefault();
-        onPick(options[active]);
-      }
-    } else if (e.key === "Escape") {
-      setOpen(false);
-    }
-  }
-
-  const showList = open && options.length > 0;
-
-  return (
-    <div>
-      <label htmlFor={`${ids}-q`} className="sr-only">
-        College name or code
-      </label>
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-text-subtle" aria-hidden />
-        <input
-          ref={searchInput}
-          id={`${ids}-q`}
-          role="combobox"
-          aria-expanded={showList}
-          aria-controls={listId}
-          aria-autocomplete="list"
-          aria-invalid={invalid ? true : undefined}
-          aria-describedby={invalid ? describedBy : undefined}
-          aria-activedescendant={showList && options[active] ? optionId(active) : undefined}
-          value={query}
-          onChange={(e) => {
-            setQuery(e.target.value);
-            setOpen(true);
-          }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={onKey}
-          placeholder="College name or code"
-          autoComplete="off"
-          className={controlClass(undefined, "pl-10 pr-10")}
-        />
-        {query ? (
-          <button
-            type="button"
-            aria-label="Clear search"
-            onClick={() => {
-              setQuery("");
-              searchInput.current?.focus();
-            }}
-            className="absolute right-1 top-1/2 grid size-10 -translate-y-1/2 touch:size-11 place-items-center rounded-apple-sm text-text-subtle hover:text-ink-700 focus-visible:outline-2 focus-visible:outline-brand-700"
-          >
-            <X className="size-4" />
-          </button>
-        ) : null}
-      </div>
-
-      <ul
-        id={listId}
-        role="listbox"
-        aria-label="Colleges"
-        hidden={!showList}
-        className="mt-2 max-h-80 overflow-y-auto rounded-apple-sm border border-ink-200/80 bg-white p-1 shadow-sm"
-      >
-        {options.map((o, i) => (
-          <li
-            key={o.id}
-            id={optionId(i)}
-            role="option"
-            aria-selected={i === active}
-            onMouseDown={(e) => e.preventDefault()}
-            onClick={() => onPick(o)}
-            onMouseEnter={() => setActive(i)}
-            className={cn(
-              "flex min-h-12 cursor-pointer items-center justify-between gap-3 rounded-apple-sm px-3 py-2",
-              i === active ? "bg-brand-50" : "",
-            )}
-          >
-            <span className="min-w-0">
-              <span className="block break-words text-base leading-snug text-ink-900">{o.name}</span>
-              <span className="block break-words text-sm text-ink-600">{[o.city, o.state, o.code].filter(Boolean).join(" · ")}</span>
-            </span>
-            {o.isPartner ? (
-              <Pill tone="live" className="shrink-0">
-                Partner
-              </Pill>
-            ) : null}
-          </li>
-        ))}
-      </ul>
-
-      <p className="mt-2 text-sm text-ink-600" role="status" aria-live="polite">
-        {loading
-          ? "Searching…"
-          : failed
-            ? "Couldn't search colleges. Check your connection and keep typing to try again."
-            : query.trim().length >= 2 && options.length === 0
-              ? "No college matches. Check the spelling, or tell us about it below."
-              : query.trim().length < 2
-                ? "Colleges that run drives on Findtern are shown first."
-                : `${options.length} match${options.length === 1 ? "" : "es"}`}
-      </p>
-
-      <MissingCollege query={query.trim()} />
-    </div>
-  );
-}
-
-/* ── "My college isn't listed" ───────────────────────────────────────── */
-
-// Sits inside the join <form>, so it is not a <form> itself: Enter sends the request instead of submitting the join.
-function MissingCollege({ query }: { query: string }) {
-  const ids = useId();
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [city, setCity] = useState("");
-  const [state, setState] = useState("");
-  const [sending, setSending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
-  const toggle = useRef<HTMLButtonElement>(null);
-  const nameInput = useRef<HTMLInputElement>(null);
-  // The toggle and the form replace each other, so whichever unmounts hands focus to the other.
-  const wasOpen = useRef(false);
-  useEffect(() => {
-    if (open) nameInput.current?.focus();
-    else if (wasOpen.current) toggle.current?.focus();
-    wasOpen.current = open;
-  }, [open]);
-
-  async function send() {
-    if (sending) return;
-    if (name.trim().length < 3 || city.trim().length < 2 || state.trim().length < 2) {
-      setError("Add your college's name, city and state.");
-      return;
-    }
-    setSending(true);
-    setError(null);
-    try {
-      const res = await csrfFetch("/api/intern/college/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, city, state }),
-      });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(body.error ?? "Couldn't send. Try again.");
-        return;
-      }
-      setMessage(`Thanks. We've sent ${name.trim()} to the Findtern team. Once it's added, come back here and pick it.`);
-      setOpen(false);
-      setName("");
-      setCity("");
-      setState("");
-    } catch {
-      setError("Couldn't send. Check your connection and try again.");
-    } finally {
-      setSending(false);
-    }
-  }
-
-  const onEnter = (e: React.KeyboardEvent) => {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    void send();
-  };
-
-  return (
-    <div className="mt-3">
-      {!open ? (
-        <button
-          ref={toggle}
-          type="button"
-          onClick={() => {
-            setName((n) => n || query);
-            setMessage("");
-            setOpen(true);
-          }}
-          className="inline-flex min-h-11 items-center rounded-apple-sm text-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-brand-700"
-        >
-          {message ? "Add another college" : "My college isn’t listed"}
-        </button>
-      ) : null}
-
-      {open ? (
-        <div role="group" aria-labelledby={`${ids}-h`} className="space-y-3 rounded-apple-xl border border-ink-200/80 p-4">
-          <div>
-            <p id={`${ids}-h`} className="text-sm font-semibold text-ink-900">
-              Tell us your college
-            </p>
-            <p className="mt-0.5 text-sm text-ink-600">We&apos;ll add it. You can then pick it here.</p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Label htmlFor={`${ids}-name`}>College name</Label>
-              <input ref={nameInput} id={`${ids}-name`} value={name} onChange={(e) => setName(e.target.value)} onKeyDown={onEnter} maxLength={200} autoComplete="off" className={controlClass(undefined, "mt-2")} />
-            </div>
-            <div>
-              <Label htmlFor={`${ids}-city`}>City</Label>
-              <input id={`${ids}-city`} value={city} onChange={(e) => setCity(e.target.value)} onKeyDown={onEnter} maxLength={100} autoComplete="off" className={controlClass(undefined, "mt-2")} />
-            </div>
-            <div>
-              <Label htmlFor={`${ids}-state`}>State</Label>
-              <input id={`${ids}-state`} value={state} onChange={(e) => setState(e.target.value)} onKeyDown={onEnter} maxLength={60} autoComplete="off" className={controlClass(undefined, "mt-2")} />
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <button type="button" onClick={send} disabled={sending} className={cn(buttonVariants({ variant: "primary", size: "md" }))}>
-              {sending ? "Sending…" : "Send to Findtern"}
-            </button>
-            <button type="button" onClick={() => setOpen(false)} className={cn(buttonVariants({ variant: "light", size: "md" }))}>
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {/* Mounted empty, then filled, so both messages are announced. */}
-      <div role="alert" className="mt-2 text-sm font-medium text-danger">
-        {error}
-      </div>
-      <p role="status" aria-live="polite" className="mt-2 text-sm font-medium text-ink-800">
-        {message}
-      </p>
-    </div>
-  );
-}
-
 /* ── In the profile's Academics step ─────────────────────────────────── */
 
+const ACCOUNT_TYPES = [
+  { value: "individual", label: "Individual account" },
+  { value: "college", label: "College account" },
+] as const;
+
 /**
- * Optional "join your college" block under the institution field. Joining is
- * what lets the college's placement team and its virtual drives find the
- * student, so it is the same join as in Settings.
- * Changing or leaving it later happens there.
+ * "Individual or college account?", required, with nothing preselected. Choosing College shows the code
+ * form (nothing else: no list of colleges); the account only becomes a college account once the server has
+ * accepted the code. Changing or leaving the college later happens in Settings.
  */
-export function CollegeLink({
+export function AccountTypeChoice({
+  value,
+  onChange,
+  error,
   college,
-  institution,
-  branch,
-  onPicked,
+  defaultBranch,
 }: {
+  value: "individual" | "college" | "" | undefined;
+  onChange: (type: "individual" | "college") => void;
+  error?: string;
   college: MyCollege | null;
-  institution: string;
-  branch: string;
-  onPicked: (name: string) => void;
+  defaultBranch: string;
 }) {
-  if (college) {
-    return (
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-apple-xl border border-ink-200/80 bg-white p-5 text-sm">
-        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
-          <Building2 className="size-4" />
-        </span>
-        <p className="min-w-0 flex-1 text-ink-700">
-          You&apos;ve joined <span className="font-medium text-ink-900">{college.name}</span>
-          {college.status === "verified" ? " · verified student" : ""}
-        </p>
-        <Link
-          href="/intern/settings#college"
-          className="inline-flex min-h-11 items-center rounded-apple-sm px-2 font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-brand-700"
-        >
-          Manage in Settings
-        </Link>
-      </div>
-    );
-  }
+  const [joined, setJoined] = useState<MyCollege | null>(null);
+  const mine = joined ?? college;
+  const verified = isCodeVerifiedMembership(mine ? { status: mine.status, verifiedBy: mine.verifiedBy } : null);
+
   return (
-    <details className="group rounded-apple-xl border border-ink-200/80 bg-white p-5">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 focus-visible:outline-2 focus-visible:outline-brand-700">
-        <span className="min-w-0">
-          <span className="block text-sm font-semibold text-ink-900">Join your college&apos;s placement drives (optional)</span>
-          <span className="block text-sm text-ink-600">
-            Colleges run virtual drives on Findtern. Find yours by name or college code to be included.
-          </span>
-        </span>
-        <ChevronDown className="size-5 shrink-0 text-text-subtle transition-transform duration-[var(--duration-admin-base)] ease-[var(--ease-out-soft)] group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
-      </summary>
-      <div className="details-reveal mt-4">
-        <JoinForm
-          embedded
-          initial={null}
-          institution={institution}
-          defaultBranch={branch}
-          onPicked={onPicked}
-          onSaved={() => {}}
-        />
-      </div>
-    </details>
+    <div className="space-y-4">
+      <Choice
+        id="accountType"
+        label="Is this an individual account or a college account?"
+        value={value}
+        options={ACCOUNT_TYPES}
+        error={error}
+        hint="Choose College account only if your college's placement cell gave you a college code."
+        onChange={onChange}
+      />
+      {/* Always mounted, then filled, so the success is announced. */}
+      <p role="status" aria-live="polite" className="sr-only">
+        {value === "college" && verified && mine ? `College code accepted. You joined ${mine.name}.` : ""}
+      </p>
+      {value === "college" ? (
+        verified && mine ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-apple-xl border border-ink-200/80 bg-white p-5 text-sm">
+            <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-apple-sm bg-brand-50 text-brand-700">
+              <BadgeCheck className="size-4" />
+            </span>
+            <p className="min-w-0 flex-1 text-ink-700">
+              College code accepted. You&apos;ve joined <span className="font-medium text-ink-900">{mine.name}</span> as a verified student.
+            </p>
+            <Link
+              href="/intern/settings#college"
+              className="inline-flex min-h-11 items-center rounded-apple-sm px-2 font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-brand-700"
+            >
+              Manage in Settings
+            </Link>
+          </div>
+        ) : (
+          <div className="details-reveal rounded-apple-xl border border-ink-200/80 bg-white p-5">
+            <JoinForm embedded initial={null} defaultBranch={defaultBranch} onSaved={(c) => { setJoined(c); onChange("college"); }} />
+          </div>
+        )
+      ) : null}
+    </div>
   );
 }

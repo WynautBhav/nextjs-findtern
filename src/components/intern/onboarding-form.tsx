@@ -9,6 +9,7 @@ import { ArrowLeft, ArrowRight, Check, CheckCircle2, Loader2, TriangleAlert } fr
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import type { MyCollege } from "@/lib/college/membership";
+import { isCodeVerifiedMembership } from "@/lib/intern-account";
 import {
   experienceType,
   toDay,
@@ -151,8 +152,17 @@ export function OnboardingForm({
   }, [values, dirty, draftKey]);
 
   const ctx: ValidationContext = useMemo(
-    () => ({ hasPanImage, hasAadhaarImage, hasPhoto, ownPhone: account, storedAadhaar: initial.aadhaarNumber ?? "" }),
-    [hasPanImage, hasAadhaarImage, hasPhoto, account, initial.aadhaarNumber],
+    () => ({
+      hasPanImage,
+      hasAadhaarImage,
+      hasPhoto,
+      ownPhone: account,
+      storedAadhaar: initial.aadhaarNumber ?? "",
+      // Required on the first submission only; a profile submitted before the choice existed is not sent back to it.
+      accountTypeRequired: !submittedBefore,
+      collegeVerified: isCodeVerifiedMembership(college),
+    }),
+    [hasPanImage, hasAadhaarImage, hasPhoto, account, initial.aadhaarNumber, submittedBefore, college],
   );
 
   // Which steps pass right now, and the first that does not.

@@ -92,6 +92,8 @@ export const AUDIT_ACTIONS = {
   "college.admin_create": "Created a TPO login",
   "terms.publish": "Published terms",
   "account.password_change": "Changed own password",
+  "college_code.attempt": "A candidate tried a college code that did not open a college",
+  "college_code.joined": "A candidate joined a college with its code",
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

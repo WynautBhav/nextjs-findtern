@@ -4,6 +4,7 @@ import { and, asc, desc, eq } from "drizzle-orm";
 
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { CollegeDetailsForm, CollegeLogins, CollegeSwitches } from "@/components/admin/college-partners-manager";
+import { CopyText } from "@/components/college/copy-text";
 import { CollegeSeatBatches } from "@/components/admin/college-seat-batches";
 import { CollegeWalletPanel } from "@/components/admin/college-wallet-panel";
 import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
@@ -103,7 +104,17 @@ export default async function AdminCollegePage({
         <Panel>
           <PanelBody className="space-y-5">
             <InfoList>
-              <InfoRow label="College code">{college.code ?? "-"}</InfoRow>
+              <InfoRow label="College code">
+                {college.code ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono tracking-wider">{college.code}</span>
+                    <CopyText text={college.code} label="Copy" />
+                    {/^FT[A-Z2-9]{5}$/.test(college.code) ? <StatusBadge tone="neutral" label="Old format: rotate before sharing" dot={false} /> : null}
+                  </span>
+                ) : (
+                  "-"
+                )}
+              </InfoRow>
               <InfoRow label="AISHE code">{college.aisheCode ?? "-"}</InfoRow>
               <InfoRow label="Place">{place || "-"}</InfoRow>
               <InfoRow label="GSTIN">{college.gstin ?? "-"}</InfoRow>

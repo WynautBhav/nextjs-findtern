@@ -491,7 +491,7 @@ await check("Priya disappears at once: officer dashboard, her page, and the empl
 // ── 11. Security spot checks with the real sessions ──────────────────────
 await check("Officer cannot write student data (scores, college membership)", async () => {
   const a = await api(tpo, "PUT", `/api/admin/interns/${userId.aanya}/ratings`, { coding: 10 });
-  const b = await api(tpo, "POST", "/api/intern/college", { collegeId: "x", year: 3, branch: "x", declaredAdult: true });
+  const b = await api(tpo, "POST", "/api/intern/college", { code: "FTXXXXXXXX", year: 3, branch: "x", declaredAdult: true });
   assert([401, 403].includes(a.status) && b.status === 403, `ratings ${a.status}, join ${b.status}`);
   return `ratings → ${a.status}, membership → ${b.status}`;
 });

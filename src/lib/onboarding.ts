@@ -1,5 +1,6 @@
 import type { internOnboarding } from "@/lib/db/schema";
 import { phoneError } from "./phone.ts";
+import { getAccountType, type AccountType } from "./intern-account.ts";
 
 /**
  * Intern onboarding shape across the 8-step wizard.
@@ -125,6 +126,12 @@ export type OnboardingDraft = {
   /** Accepted the Internship Acceptance & Non-Bypass Agreement (/intern-nda). */
   ndaAccepted?: boolean;
 
+  /**
+   * Individual or college account, chosen at the end of the Academics step. "" until chosen. The server only
+   * stores "college" while a college code backs the membership, so this is a request, not proof.
+   */
+  accountType?: AccountType | "";
+
   // Step 2: Academics
   academics: {
     /** "" until picked (legacy starts blank). */
@@ -202,6 +209,7 @@ const BLANK: OnboardingDraft = {
   panNumber: "",
   photoUrl: "",
   ndaAccepted: false,
+  accountType: "",
   // Nothing preselected (INT-30): level, status and score type are chosen.
   academics: {
     qualificationLevel: "",
@@ -462,6 +470,7 @@ export function draftFromRecord(row: OnboardingLike): Partial<OnboardingDraft> {
   const degree = canonicalDegree(text(academics.degree || extra.degree), qualificationLevel);
 
   return {
+    accountType: getAccountType(extra) ?? "",
     linkedinUrl: text(row.linkedinUrl),
     city: text(row.city),
     state: text(row.state),
@@ -944,6 +953,13 @@ export type ValidationContext = {
   /** The Aadhaar number already stored. Legacy rows can hold one starting 0
    *  or 1; it is not re-judged on every save, only a newly typed one is. */
   storedAadhaar?: string;
+  /**
+   * First submission: the candidate has to pick Individual or College account. Left off for a profile
+   * submitted before the choice existed, so those stay editable without being sent back to it.
+   */
+  accountTypeRequired?: boolean;
+  /** A college code backs the candidate's college membership (server-verified; the form gets it from the page). */
+  collegeVerified?: boolean;
   now?: Date;
 };
 
@@ -1096,6 +1112,9 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     if (!level) errors.qualificationLevel = "Choose your highest qualification.";
     if (!a.status) errors.academicStatus = "Choose completed or pursuing.";
     if (!a.institution.trim()) errors.institution = "Enter your college or university.";
+    const type = values.accountType ?? "";
+    if (type === "college" && !ctx.collegeVerified) errors.accountType = "Enter your college code and join, or choose Individual account.";
+    else if (!type && ctx.accountTypeRequired) errors.accountType = "Choose Individual account or College account.";
     if (levelHasDegreeList(level)) {
       const option = degreeOption(a.degree, level);
       if (!option) errors.degree = "Choose your degree.";

@@ -658,3 +658,23 @@ test("a negative score is refused with the range message instead of being rewrit
   assert.equal(scoreProblem("cgpa", "-3"), "CGPA must be between 0 and 10.");
   assert.match(scoreProblem("percentage", "-3") ?? "", /between 0 and 100/);
 });
+
+test("Academics: Individual or College account is required on a first submission, and College needs a verified code", () => {
+  const first = { ...ctx, accountTypeRequired: true };
+  assert.match(validateStep({ ...complete(), accountType: "" }, 1, first).accountType, /Choose Individual account or College account/);
+  assert.equal(validateStep({ ...complete(), accountType: "individual" }, 1, first).accountType, undefined);
+  // "College" with no verified code is refused, however the client set the field.
+  assert.match(validateStep({ ...complete(), accountType: "college" }, 1, first).accountType, /college code/i);
+  assert.equal(validateStep({ ...complete(), accountType: "college" }, 1, { ...first, collegeVerified: true }).accountType, undefined);
+  // A profile submitted before the choice existed is not sent back to it, but a stray "college" is still checked.
+  assert.equal(validateStep({ ...complete(), accountType: "" }, 1, ctx).accountType, undefined);
+  assert.match(validateStep({ ...complete(), accountType: "college" }, 1, ctx).accountType, /college code/i);
+});
+
+test("the stored account type reads back into the draft; unknown values are blank", () => {
+  const row = (extraData: Record<string, unknown>) => ({ extraData }) as Parameters<typeof draftFromRecord>[0];
+  assert.equal(draftFromRecord(row({ accountType: "college" })).accountType, "college");
+  assert.equal(draftFromRecord(row({ accountType: "individual" })).accountType, "individual");
+  assert.equal(draftFromRecord(row({})).accountType, "");
+  assert.equal(draftFromRecord(row({ accountType: "admin" })).accountType, "");
+});

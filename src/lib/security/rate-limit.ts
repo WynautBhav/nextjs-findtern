@@ -111,6 +111,12 @@ export const limiters = {
   // Employer "send reminder", keyed on the interview.
   reminder: new RateLimiter(1, 10 * 60_000, { bypassable: false }),
   phoneLookup: new RateLimiter(10, 15 * 60_000),
+  // College code guesses (src/lib/college/code-throttle.ts). Never bypassable: they are what stops the
+  // code space being walked. Per signed-in user, per address, and a day-long tier behind each user that
+  // turns a 15-minute pause into a long lockout for someone who keeps guessing.
+  collegeCodeUser: new RateLimiter(10, 15 * 60_000, { bypassable: false }),
+  collegeCodeIp: new RateLimiter(30, 15 * 60_000, { bypassable: false }),
+  collegeCodeUserDay: new RateLimiter(30, 24 * 60 * 60_000, { bypassable: false }),
 };
 
 /**
