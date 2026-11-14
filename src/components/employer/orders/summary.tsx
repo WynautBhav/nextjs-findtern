@@ -93,7 +93,7 @@ export function OrdersSummary({ hires }: { hires: HireRow[] }) {
                 <dd className="nums mt-1 break-words text-lg font-bold leading-tight tabular-nums text-ink-900 sm:text-xl">
                   <Figure parts={q.parts} />
                 </dd>
-                <p className="mt-1 text-sm text-ink-700">{q.note}</p>
+                <dd className="mt-1 text-sm text-ink-700">{q.note}</dd>
               </div>
             ))}
           </dl>
