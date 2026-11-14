@@ -11,6 +11,7 @@ import { GetStartedMenu } from "@/components/layout/get-started-menu";
 import { NAV_LINKS } from "@/lib/content/site";
 import { cn } from "@/lib/utils";
 import { LogoHQ } from "@/components/brand/logo";
+import { LogoFindy } from "@/components/brand/logo-findy";
 import { ContactEmailLink } from "@/components/marketing/email-link";
 
 /**
@@ -102,12 +103,13 @@ export function SiteHeader() {
         <Link
           href="/"
           aria-label="Findtern - home"
-          className="group flex shrink-0 items-center transition-opacity duration-200 hover:opacity-90"
+          className="group relative flex shrink-0 items-center transition-opacity duration-200 hover:opacity-90"
         >
+          <LogoFindy />
           <LogoHQ
             alt="Findtern - Internship Simplified"
             priority
-            className={cn("transition-all duration-200", scrolled ? "h-11 sm:h-12" : "h-12 sm:h-14")}
+            className={cn("relative z-10 transition-all duration-200", scrolled ? "h-11 sm:h-12" : "h-12 sm:h-14")}
           />
         </Link>
 

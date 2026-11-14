@@ -24,9 +24,10 @@ import Link from "next/link";
 
 import { RAIL_COOKIE } from "@/lib/rail";
 import { usePathname, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { MotionConfig, motion } from "motion/react";
-import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, CircleQuestionMark, LogOut, Mail, Menu, MessageCircle, MessageSquareText, X } from "lucide-react";
+import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, CircleQuestionMark, LogOut, Mail, Menu, MessageSquareText, X } from "lucide-react";
 
 import { Logo, LogoMark } from "@/components/brand/logo";
 import { FeedbackFab } from "@/components/app/feedback-fab";
@@ -40,7 +41,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { buttonClass } from "@/components/ui/button";
 import { breadcrumbsFor } from "@/lib/breadcrumbs";
 import { initialsOf as personInitials } from "@/lib/admin/person-tint";
 import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
@@ -50,6 +50,12 @@ import { badgeText } from "@/lib/messaging/ui-logic";
 import { cn } from "@/lib/utils";
 import { newTabAttrs } from "@/components/ui/new-tab";
 import { NewTabHint } from "@/components/ui/new-tab-link";
+
+// The owl avatar pulls in `motion`; load it after the shell paints (the chat widget is lazy for the same reason).
+const MascotAvatar = dynamic(() => import("@/components/chat/mascot").then((m) => m.MascotAvatar), {
+  ssr: false,
+  loading: () => <span aria-hidden className="size-10 shrink-0 rounded-full bg-brand-100" />,
+});
 
 function LiveUnreadBadge({ light }: { light: boolean }) {
   const n = useUnread();
@@ -375,11 +381,15 @@ export function ConsoleShell({
                 <button
                   type="button"
                   onClick={() => window.dispatchEvent(new Event(OPEN_CHAT_EVENT))}
-                  // Intern and employer: on phones too, labelled, in place of the floating launcher.
-                  className={buttonClass({ size: "sm", variant: column ? "ghost" : "outline", className: cn("mr-1", column && "text-ink-700 hover:text-ink-900", askInBar ? "touch:min-h-11 touch:px-4" : "hidden lg:inline-flex") })}
+                  aria-label="Ask Findy - chat with Findy"
+                  // A dark green pill with the animated owl; on the intern and employer consoles it shows on phones too, in place of the floating launcher.
+                  className={cn(
+                    "apple-spring mr-1 h-12 items-center gap-2.5 rounded-full bg-brand-800 py-1 pl-1 pr-4 text-base font-semibold text-white shadow-md hover:bg-brand-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:pr-5",
+                    askInBar ? "inline-flex" : "hidden lg:inline-flex",
+                  )}
                 >
-                  <MessageCircle className="size-4" aria-hidden />
-                  Ask me
+                  <MascotAvatar className="size-10" />
+                  Ask Findy
                 </button>
               ) : null}
               {topActions}

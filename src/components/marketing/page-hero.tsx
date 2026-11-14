@@ -54,7 +54,13 @@ export function PageHero({
           aside && "lg:grid-cols-[minmax(0,1fr)_minmax(0,0.85fr)] lg:items-center lg:gap-16",
         )}
       >
-        <div className={cn(align === "center" && !aside && "mx-auto max-w-3xl text-center")}>
+        <div
+          className={cn(
+            align === "center" && !aside && "mx-auto max-w-3xl text-center",
+            // With an aside the copy stays centred until the two-column layout starts.
+            align === "center" && aside && "text-center lg:text-left",
+          )}
+        >
           {eyebrow ? (
             <p className="text-2xs font-semibold uppercase tracking-[0.16em] text-primary">
               {eyebrow}
@@ -86,6 +92,7 @@ export function PageHero({
               className={cn(
                 "mt-9 flex flex-col gap-3 sm:flex-row",
                 align === "center" && !aside && "justify-center",
+                align === "center" && aside && "justify-center lg:justify-start",
               )}
             >
               {children}
@@ -93,7 +100,7 @@ export function PageHero({
           ) : null}
         </div>
 
-        {aside ? <div className="relative">{aside}</div> : null}
+        {aside ? <div className="relative flex justify-center">{aside}</div> : null}
       </div>
     </section>
   );

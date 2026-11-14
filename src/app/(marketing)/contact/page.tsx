@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Clock, Mail, MapPin } from "lucide-react";
 
+import { ContactOwl } from "@/components/marketing/contact-owl";
 import { PageHero, PageSection } from "@/components/marketing/page-hero";
 import { ContactForm } from "@/components/marketing/contact-form";
 import { parseQueryType } from "@/lib/contact-types";
@@ -35,6 +36,7 @@ export default async function ContactPage({ searchParams }: { searchParams?: Pro
           </>
         }
         lead="Hiring, interning, or a question about how the rate card works - all three reach the same inbox and all three get a human answer."
+        aside={<ContactOwl />}
       />
 
       <PageSection>
