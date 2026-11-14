@@ -10,9 +10,18 @@ import type { SessionData } from "./session.ts";
 export const MB = 1024 * 1024;
 export const IMAGES = ["image/jpeg", "image/png", "image/webp"];
 export const DOCS = [...IMAGES, "application/pdf"];
+/** Intern marksheets and certificates: JPG or PNG only, so they can be resized to KB. No PDF, no WebP. */
+export const INTERN_SCANS = ["image/jpeg", "image/png"];
 export const VIDEO = ["video/mp4", "video/webm", "video/quicktime"];
 
-export type UploadKind = { roles: SessionData["role"][]; types: string[]; max: number; isPublic?: boolean };
+export type UploadKind = {
+  roles: SessionData["role"][];
+  types: string[];
+  max: number;
+  isPublic?: boolean;
+  /** Replaces `types` for the intern role only (a kind shared with employers). */
+  internTypes?: string[];
+};
 
 /**
  * What a file is for decides who may upload it, which types and sizes are
@@ -23,15 +32,17 @@ export const KINDS: Record<string, UploadKind> = {
   // Identity cards: images only (never PDF). Always re-encoded to WebP below.
   aadhaar: { roles: ["intern"], types: IMAGES, max: 10 * MB },
   pan: { roles: ["intern"], types: IMAGES, max: 10 * MB },
-  marksheet: { roles: ["intern"], types: DOCS, max: 25 * MB },
+  // Intern scans: JPG/PNG only (PDF removed). Files already stored as PDF still open: the read routes don't use these rules.
+  marksheet: { roles: ["intern"], types: INTERN_SCANS, max: 25 * MB },
   // Professional course / certification files. Stored only: the onboarding
   // save puts the key on its row (extra.academics …certificateUploads).
-  certificate: { roles: ["intern"], types: DOCS, max: 10 * MB },
+  certificate: { roles: ["intern"], types: INTERN_SCANS, max: 10 * MB },
   employer_logo: { roles: ["employer"], types: IMAGES, max: 2 * MB, isPublic: true },
   // PDF, PNG or JPG, as legacy accepted (employer-orders full-time dialog).
   offer_letter: { roles: ["employer"], types: ["application/pdf", "image/png", "image/jpeg"], max: 10 * MB },
   cms_image: { roles: ["admin"], types: IMAGES, max: 5 * MB, isPublic: true },
-  support: { roles: ["intern", "employer"], types: [...DOCS, ...VIDEO], max: 10 * MB },
+  // Shared: employers may still attach a PDF; interns may not.
+  support: { roles: ["intern", "employer"], types: [...DOCS, ...VIDEO], internTypes: [...IMAGES, ...VIDEO], max: 10 * MB },
 };
 
 /**
@@ -65,13 +76,22 @@ export async function toWebp(bytes: Buffer, opts: { maxPx: number; quality: numb
 
 export type Rejection = { ok: false; status: 415; error: string };
 
-/** Header check: is this content type allowed for the kind? */
-export function checkType(kind: UploadKind, type: string): Rejection | null {
-  if (kind.types.includes(type)) return null;
+/** The types a role may send for a kind (interns get `internTypes` when the kind has one). */
+export function typesFor(kind: UploadKind, role?: SessionData["role"]): string[] {
+  return role === "intern" && kind.internTypes ? kind.internTypes : kind.types;
+}
+
+/** Header check: is this content type allowed for the kind (and role)? */
+export function checkType(kind: UploadKind, type: string, role?: SessionData["role"]): Rejection | null {
+  const types = typesFor(kind, role);
+  if (types.includes(type)) return null;
+  const NAMES: Record<string, string> = { "image/jpeg": "JPG", "image/png": "PNG", "image/webp": "WebP" };
+  const names = Object.keys(NAMES).filter((t) => types.includes(t)).map((t) => NAMES[t]);
+  const imageList = names.length > 1 ? `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}` : names[0];
   return {
     ok: false,
     status: 415,
-    error: isImagesOnly(kind) ? "Upload a JPG, PNG or WebP image. PDFs aren't accepted for this file." : "That file type isn't accepted here",
+    error: imageList && !types.includes("application/pdf") ? `Upload a ${imageList} image. PDFs aren't accepted for this file.` : "That file type isn't accepted here",
   };
 }
 

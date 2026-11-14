@@ -9,7 +9,6 @@ const WHY: Record<string, { label?: string; why: string }> = {
     label: "Identity documents for payouts",
     why: "Aadhaar and PAN numbers and your PAN card image, so stipends can be paid and tax-filed. Never shown to employers before a hire.",
   },
-  emergency: { why: "Someone we can reach if you are unreachable during an internship." },
   academics: { why: "Employers filter by degree, college and graduation year first." },
   skills: { why: "Skills are what employers search. They also drive the match on open roles." },
   languages: { why: "Shows which languages you can work in with a team or client." },

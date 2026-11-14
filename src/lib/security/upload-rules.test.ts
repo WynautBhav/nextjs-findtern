@@ -105,20 +105,80 @@ test("an oversized image is capped to 2000px on the long side, small ones are no
   assert.deepEqual([(await sharp(small.bytes).metadata()).width, (await sharp(small.bytes).metadata()).height], [300, 200]);
 });
 
-test("other kinds keep their PDFs (marksheet, certificate, support, offer_letter) and PDFs are stored as sent", async () => {
-  for (const k of ["marksheet", "certificate", "support", "offer_letter"]) {
-    assert.equal(checkType(KINDS[k], "application/pdf"), null, k);
-    assert.equal(isImagesOnly(KINDS[k]), false, k);
-    const r = await prepareUpload(k, KINDS[k], "application/pdf", PDF, "doc.pdf");
-    assert.ok(r.ok, k);
-    assert.equal(r.contentType, "application/pdf");
-    assert.deepEqual(r.bytes, PDF);
-    assert.equal(r.fileName, "doc.pdf");
+// Intern uploads: no PDF anywhere (D2). Employer offer letters stay PDF.
+const INTERN_KINDS = Object.entries(KINDS).filter(([, k]) => k.roles.includes("intern"));
+
+test("every intern upload kind rejects application/pdf with 415 and a message that does not offer PDF", () => {
+  assert.deepEqual(INTERN_KINDS.map(([n]) => n).sort(), ["aadhaar", "marksheet", "pan", "profile_photo", "certificate", "support"].sort());
+  for (const [name, kind] of INTERN_KINDS) {
+    const r = checkType(kind, "application/pdf", "intern");
+    assert.ok(r, name);
+    assert.equal(r.status, 415, name);
+    assert.match(r.error, /JPG(, PNG)? or (PNG|WebP) image/, name);
+    assert.doesNotMatch(r.error, /Upload the original PDF/, name);
   }
-  // The generic message still names PDF where PDF is allowed.
-  const r = await prepareUpload("marksheet", KINDS.marksheet, "application/pdf", Buffer.from("MZ not a pdf"), "x.pdf");
-  assert.ok(!r.ok);
-  assert.match(r.error, /PDF/);
+});
+
+test("intern marksheet and certificate: JPG and PNG are accepted, WebP and GIF are not", async () => {
+  for (const name of ["marksheet", "certificate"]) {
+    assert.equal(checkType(KINDS[name], "image/jpeg", "intern"), null, name);
+    assert.equal(checkType(KINDS[name], "image/png", "intern"), null, name);
+    assert.equal(checkType(KINDS[name], "image/webp", "intern")?.status, 415, name);
+    assert.equal(checkType(KINDS[name], "image/gif", "intern")?.status, 415, name);
+    assert.ok(isImagesOnly(KINDS[name]), name);
+    assert.match(checkType(KINDS[name], "application/pdf", "intern")!.error, /JPG or PNG image/);
+    for (const [type, input, file] of [["image/jpeg", await jpeg(), "scan.jpg"], ["image/png", await png(), "scan.png"]] as const) {
+      const r = await prepareUpload(name, KINDS[name], type, input, file);
+      assert.ok(r.ok, `${name} ${type}`);
+      assert.ok(isWebp(r.bytes), `${name} ${type} re-encoded to WebP`);
+      assert.match(r.fileName, /\.webp$/);
+    }
+  }
+});
+
+test("a PDF sent as image/jpeg or image/png is refused by the sniffer for every intern kind (415)", async () => {
+  for (const [name, kind] of INTERN_KINDS) {
+    for (const type of ["image/jpeg", "image/png"]) {
+      const r = await prepareUpload(name, kind, type, PDF, "disguised.jpg");
+      assert.ok(!r.ok, `${name} ${type}`);
+      assert.equal(r.status, 415);
+    }
+  }
+});
+
+test("support: the intern role loses PDF (images and video stay), the employer keeps it", () => {
+  const kind = KINDS.support;
+  assert.equal(checkType(kind, "application/pdf", "intern")?.status, 415);
+  assert.equal(checkType(kind, "application/pdf", "employer"), null);
+  for (const t of ["image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm", "video/quicktime"]) {
+    assert.equal(checkType(kind, t, "intern"), null, t);
+  }
+});
+
+test("employer offer letters still accept PDF, and a stored PDF is kept as sent", async () => {
+  assert.equal(checkType(KINDS.offer_letter, "application/pdf", "employer"), null);
+  const r = await prepareUpload("offer_letter", KINDS.offer_letter, "application/pdf", PDF, "offer.pdf");
+  assert.ok(r.ok);
+  assert.equal(r.contentType, "application/pdf");
+  assert.deepEqual(r.bytes, PDF);
+  assert.equal(r.fileName, "offer.pdf");
+});
+
+test("the upload route checks the type with the session role", () => {
+  const src = readFileSync(join(import.meta.dirname, "../../app/api/uploads/route.ts"), "utf8");
+  assert.match(src, /checkType\(kind, type, session\.role\)/);
+});
+
+test("reading stored PDFs does not go through the upload rules", () => {
+  for (const f of ["../../app/intern/documents/open/route.ts", "../../app/api/files/legacy/[...path]/route.ts"]) {
+    let src = "";
+    try {
+      src = readFileSync(join(import.meta.dirname, f), "utf8");
+    } catch {
+      continue;
+    }
+    assert.doesNotMatch(src, /upload-rules/, f);
+  }
 });
 
 test("the upload route delegates to the rules module and stores only what prepareUpload returns", () => {

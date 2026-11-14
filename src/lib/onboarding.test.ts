@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   bankProblem,
@@ -322,6 +324,42 @@ test("Aadhaar number and PAN image are required; the Aadhaar image is optional (
     undefined,
     "a legacy number already stored is not re-judged (INT-30)",
   );
+});
+
+test("emergency contact is optional: empty passes every step and the whole profile (bug sheet 14 Nov)", () => {
+  for (const emergencyPhone of ["", "   "]) {
+    assert.equal(validateStep({ ...complete(), emergencyPhone }, 0, ctx).emergencyPhone, undefined);
+    assert.equal(validateProfile({ ...complete(), emergencyPhone }, ctx), null);
+  }
+  // Entered, it is still checked.
+  assert.ok(validateStep({ ...complete(), emergencyPhone: "12345" }, 0, ctx).emergencyPhone);
+});
+
+test("emergency contact is optional on the server too: the save schema, the stored value and the readers cope with none", () => {
+  const route = readFileSync(join(import.meta.dirname, "../app/api/intern/onboarding/route.ts"), "utf8");
+  assert.match(route, /emergencyPhone: z\.string\(\)\.max\(20\)\.optional\(\)/);
+  // An empty number is stored as null, and null reads back as "".
+  assert.match(route, /emergencyPhone: body\.emergencyPhone\.replace\(\/\\D\/g, ""\) \|\| null/);
+  assert.equal(draftFromRecord({ extraData: { emergencyPhone: null } }).emergencyPhone, "");
+  assert.equal(draftFromRecord({ extraData: {} }).emergencyPhone, "");
+});
+
+test("completion: an empty emergency contact is not missing, and there is no emergency item", () => {
+  const none = { ...storedComplete, extraData: { ...(storedComplete.extraData as object), emergencyPhone: null } };
+  const r = profileCompletion(none, allDocs);
+  assert.equal(r.complete, true);
+  assert.equal(r.items.some((i) => i.id === "emergency"), false);
+  assert.equal(r.done, r.total);
+  // Same result with a number: it neither helps nor hurts.
+  assert.equal(profileCompletion(storedComplete, allDocs).done, r.done);
+  assert.equal(profileCompletion(storedComplete, allDocs).total, r.total);
+  assert.equal(isOnboarded(none, allDocs), true);
+});
+
+test("no 'Score so far' copy remains in the academics step", () => {
+  const src = readFileSync(join(import.meta.dirname, "../components/intern/onboarding/academics-step.tsx"), "utf8");
+  assert.doesNotMatch(src, /Score so far/i);
+  assert.match(src, /Your current aggregated score/);
 });
 
 test("emergency contact: a valid Indian number, not your own (INT-40)", () => {

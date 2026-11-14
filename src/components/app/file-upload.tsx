@@ -5,6 +5,7 @@ import { Check, FileUp, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { announceTermsRequired, readCsrfCookie } from "@/lib/client-fetch";
+import { UnreadableImageError, shrinkImage } from "@/lib/image-shrink";
 import { cn } from "@/lib/utils";
 
 import { PROGRESS_DELAY_MS, nextPercent } from "./upload-progress";
@@ -105,6 +106,7 @@ export function FileUpload({
   noun,
   maxBytes,
   preview,
+  shrink,
 }: {
   kind: "profile_photo" | "aadhaar" | "pan" | "intro_video" | "marksheet" | "certificate" | "employer_logo" | "offer_letter" | "cms_image" | "support";
   accept: string;
@@ -120,6 +122,11 @@ export function FileUpload({
   maxBytes?: number;
   /** Show the uploaded video from the local file, so the candidate can check it. */
   preview?: "video";
+  /**
+   * Shrink a JPG/PNG in the browser (to a JPEG under ~500 KB, EXIF applied) before the size check and
+   * upload, so a phone photo is not refused for being over `maxBytes`. The server still checks it all.
+   */
+  shrink?: boolean;
 }) {
   const id = useId();
   const input = useRef<HTMLInputElement>(null);
@@ -139,14 +146,31 @@ export function FileUpload({
     if (previewUrl) URL.revokeObjectURL(previewUrl);
   }, [previewUrl]);
 
-  async function upload(file: File) {
+  async function upload(picked: File) {
     const allowed = accept.split(",").map((t) => t.trim());
-    const type = typeOf(file);
+    let file = picked;
+    let type = typeOf(file);
     if (!allowed.includes(type)) {
       setState("error");
       setError(`That file type isn't accepted here. Use ${allowed.map((t) => TYPE_NAMES[t] ?? t).join(", ")}.`);
       if (input.current) input.current.value = "";
       return;
+    }
+    if (shrink && type.startsWith("image/")) {
+      setState("busy");
+      setError(null);
+      setPercent(0);
+      setSent(false);
+      setShowBar(false);
+      try {
+        file = (await shrinkImage(file)).file;
+        type = file.type || type;
+      } catch (e) {
+        setState("error");
+        setError(e instanceof UnreadableImageError ? e.message : "That image could not be read. Try a different JPG or PNG.");
+        if (input.current) input.current.value = "";
+        return;
+      }
     }
     if (maxBytes && file.size > maxBytes) {
       setState("error");

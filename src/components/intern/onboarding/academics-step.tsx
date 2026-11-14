@@ -24,7 +24,8 @@ import { AddButton, Choice, EmptyEntries, EntryCard, Field, FieldNote, Grid, Lab
 import type { StepProps } from "./types";
 
 const MB = 1024 * 1024;
-const FILE_TYPES = "image/jpeg,image/png,image/webp,application/pdf";
+/** JPG or PNG only (no PDF): shrunk in the browser to a few hundred KB before upload. */
+const FILE_TYPES = "image/jpeg,image/png";
 const STATUS = [
   { value: "Completed", label: "Completed" },
   { value: "Pursuing", label: "Pursuing" },
@@ -176,7 +177,7 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
             />
             <Field
               id="cgpa"
-              label={completed ? "Final score" : "Score so far"}
+              label={completed ? "Final score" : "Your current aggregated score"}
                 inputMode="decimal"
               placeholder={a.scoreType === "percentage" ? "e.g. 84" : "e.g. 8.4"}
               inputClassName="nums"
@@ -253,7 +254,8 @@ function FileList({
           label={capitalise(noun)}
           noun={files.length === 0 ? noun : `another ${noun}`}
           maxBytes={1 * MB}
-          hint="Image or PDF, up to 1 MB each."
+          shrink
+          hint="A JPG or PNG photo or scan. We shrink it for you."
           onUploaded={(r) => onChange([...files, { name: r.key, originalName: r.name, type: r.contentType, size: r.bytes }])}
         />
       ) : (

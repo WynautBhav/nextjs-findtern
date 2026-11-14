@@ -1068,10 +1068,12 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     }
 
     // Only the number is asked for (bug sheet 23 Oct): no name, no relation,
-    // no second contact. Indian numbers only, as in legacy (INT-40).
+    // no second contact. It is optional (bug sheet 14 Nov): left empty it is
+    // fine, entered it must be a valid Indian number (INT-40) that is not your own.
     const ePhone = (values.emergencyPhone ?? "").trim();
-    if (!ePhone) errors.emergencyPhone = "Enter an emergency contact number.";
-    else if ((values.emergencyCountryCode || "+91") !== "+91") errors.emergencyPhone = "The emergency contact must be an Indian (+91) number.";
+    if (!ePhone) {
+      // optional: nothing to check
+    } else if ((values.emergencyCountryCode || "+91") !== "+91") errors.emergencyPhone = "The emergency contact must be an Indian (+91) number.";
     else {
       const p = phoneError("+91", ePhone);
       if (p) errors.emergencyPhone = `${p}.`;
@@ -1324,7 +1326,7 @@ export function profileCompletion(row: OnboardingLike | null, docs: boolean | Co
       done: Boolean(d?.aadhaarNumber && d?.panNumber && hasPanImage),
       href: form,
     },
-    { id: "emergency", label: "Emergency contact", done: Boolean(d?.emergencyPhone), href: form },
+    // The emergency contact is optional (bug sheet 14 Nov), so it is not a checklist item.
     { id: "academics", label: "Academics", done: academicsFilled(d?.academics), href: form },
     { id: "skills", label: `At least ${MIN_SKILLS} skills`, done: (d?.skills?.length ?? 0) >= MIN_SKILLS, href: form },
     // Languages and laptop: legacy checklist items (dashboard.tsx:500-553).
