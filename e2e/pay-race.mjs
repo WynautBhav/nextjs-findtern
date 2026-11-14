@@ -4,7 +4,7 @@
  * simultaneous requests each for: paying (one order, one invoice, one hire or
  * activation, on both sides), requesting an interview, sending an internship
  * offer and sending a full-time offer. Run against the QA server started with
- * PAYMENTS_TEST_BUTTON=1 (the test button is the instant settle that used to
+ * PAYMENTS_TEST_BUTTON=1 (the testPay order flag is the instant settle that used to
  * pay three times):
  *
  *   PAYMENTS_TEST_BUTTON=1 QA_REBUILD=1 npm run qa:serve     # terminal 1

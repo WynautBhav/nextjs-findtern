@@ -154,7 +154,7 @@ refuse a non-local database, except the staging journey.
 | `crawl.e2e.mjs`, `keyboard.e2e.mjs`, `motion.e2e.mjs`, `slow3g.e2e.mjs`, `lighthouse.mjs`, `baseline.mjs` | `npm run qa -- <step>` | Every route per role and width (errors, overflow, axe), keyboard-only pass, reduced motion, slow network, Lighthouse, baseline screenshots |
 | `admin.e2e.mjs` | `npm run e2e:admin` | Admin console as the seeded super admin (cleans up what it creates) |
 | `college-partners.e2e.mjs`, `college-money.e2e.mjs`, `college-real-onboarding.mjs` | `npm run test:e2e:college`, `test:e2e:college-money`, or `node` | College drives, seat batches, bank and withdrawals, the full officer-to-student story |
-| `pay-race.mjs` | `node e2e/pay-race.mjs` (QA server with `PAYMENTS_TEST_BUTTON=1`) | Double-submit safety: one order, one hire, one invoice |
+| `pay-race.mjs` | `node e2e/pay-race.mjs` (QA server with `PAYMENTS_TEST_BUTTON=1`, which the order APIs need before they accept `testPay`) | Double-submit safety: one order, one hire, one invoice |
 | `retest-qa001.mjs`, `retest-qa002.mjs` | `node …` | Regressions for QA-001 (campus call without a join link) and QA-002 (hydration under reduced motion) |
 | `staging-journey.e2e.mjs`, `bugsheet9-public.mjs` | `node --test …`, `node …` | The hiring journey and public pages on the **deployed staging site** (Vercel preview + Neon staging only; never the real domain). Needs admin credentials in the environment |
 

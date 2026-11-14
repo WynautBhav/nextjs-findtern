@@ -37,8 +37,6 @@ type Props = {
   paymentIndex?: number;
   /** PAYMENTS_MODE=free: the order completes without Razorpay. */
   testMode?: boolean;
-  /** PAYMENTS_TEST_BUTTON=1: a second button settles at the real amount without Razorpay. */
-  testPay?: boolean;
   /** Tells the page whether a promo is applied, so it can lock the monthly option. */
   onPromoChange?: (applied: boolean) => void;
 };
@@ -49,7 +47,7 @@ function errorText(e: unknown, fallback: string): string {
   return e instanceof Error && e.message ? e.message : fallback;
 }
 
-export function CheckoutPay({ employerId, currency, amountMinor, prefill, proposalIds, mode = "upfront", paymentIndex = 0, testMode = false, testPay = false, onPromoChange }: Props) {
+export function CheckoutPay({ employerId, currency, amountMinor, prefill, proposalIds, mode = "upfront", paymentIndex = 0, testMode = false, onPromoChange }: Props) {
   const router = useRouter();
   const [state, setState] = useState<"idle" | "busy" | "paid">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -90,16 +88,16 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
     }
   }
 
-  async function pay(asTest = false) {
+  async function pay() {
     setState("busy");
     setError(null);
     try {
       const [Razorpay, order] = await Promise.all([
-        testMode || asTest ? Promise.resolve(null) : loadRazorpay(),
+        testMode ? Promise.resolve(null) : loadRazorpay(),
         csrfFetch(`/api/employer/${encodeURIComponent(employerId)}/payment/razorpay/order`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ currency, promoCode: promo?.code, proposalIds, mode, paymentIndex, ...(asTest ? { testPay: true } : {}) }),
+          body: JSON.stringify({ currency, promoCode: promo?.code, proposalIds, mode, paymentIndex }),
         }).then(async (res) => {
           const body = await res.json().catch(() => ({}));
           if (!res.ok) throw new Error(body.error ?? "Could not create the payment order.");
@@ -249,16 +247,6 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
           </span>
         ) : null}
       </button>
-      {testPay ? (
-        <button
-          type="button"
-          onClick={() => pay(true)}
-          disabled={state === "busy"}
-          className={buttonClass({ variant: "light", size: "sm", block: true, className: "nums mt-2" })}
-        >
-          Test: mark as paid, no charge ({formatMoney(payable, currency)})
-        </button>
-      ) : null}
       {error ? (
         <p className="mt-2 text-pretty text-xs leading-relaxed text-danger">{error}</p>
       ) : testMode ? (

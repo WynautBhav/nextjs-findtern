@@ -24,7 +24,7 @@ const bodySchema = z.object({
   /** The month being paid: payments already made for this hire (0 = first). A stale second submit names a month that is already paid. */
   paymentIndex: z.number({ error: "This page is out of date. Refresh and try again." }).int().min(0),
   promoCode: z.string({ error: "Enter a valid promo code." }).trim().min(1, "Enter a valid promo code.").optional(),
-  /** The test button (PAYMENTS_TEST_BUTTON=1): settle at the real amount without Razorpay. */
+  /** e2e only: settle at the real amount without Razorpay. Refused with 403 unless testPayEnabled() (test hosts only). */
   testPay: z.boolean().optional(),
 }, { error: "Something is wrong with this payment request. Refresh the page and try again." });
 
@@ -200,9 +200,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     listAmountMinor: listMinor,
     discountAmountMinor: discountMinor + (promo?.discountMinor ?? 0),
   };
-  // Test mode, or the test button: record the order and settle it straight
+  // Test mode, or the testPay flag: record the order and settle it straight
   // away, through the same settlement as a real payment (hire, notifications,
-  // monthly dues). Free mode charges 0; the test button keeps the real amount.
+  // monthly dues). Free mode charges 0; testPay keeps the real amount.
   if (paymentsAreFree() || parsed.data.testPay) {
     const testPay = Boolean(parsed.data.testPay);
     const charged = testPay ? amountMinor : 0;

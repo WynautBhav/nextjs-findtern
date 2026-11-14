@@ -37,7 +37,7 @@ import { internPaidMinor, isInternPaid } from "@/lib/payments";
 import { internUnlockState } from "@/lib/intern-unlock";
 import { lockEnabled } from "@/lib/intern-lock";
 import { isHiredProposal } from "@/lib/hire-status";
-import { paymentsAreFree, testPayEnabled } from "@/lib/razorpay";
+import { paymentsAreFree } from "@/lib/razorpay";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { profileCompletion } from "@/lib/onboarding";
 import { collegeAccountState } from "@/lib/college/account-state";
@@ -566,7 +566,6 @@ export default async function InternHome() {
                   alreadyPaid={activated}
                   claim={claim}
                   testMode={paymentsAreFree()}
-                  testPay={testPayEnabled()}
                   feeMinor={activationFeeMinor}
                   internId={session.uid}
                   prefill={{

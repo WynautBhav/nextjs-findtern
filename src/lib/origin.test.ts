@@ -29,17 +29,32 @@ test("test pay: flag off means off, whatever else is set", () => {
   assert.equal(testPayEnabled({ PAYMENTS_TEST_BUTTON: "0", PUBLIC_ORIGIN: STAGING }), false);
 });
 
-test("test pay: a non-live key is enough", () => {
-  assert.equal(testPayEnabled({ PAYMENTS_TEST_BUTTON: "1", RAZORPAY_KEY_ID: "rzp_test_x" }), true);
-  assert.equal(testPayEnabled({ PAYMENTS_TEST_BUTTON: "1" }), true);
+test("test pay: needs the flag AND a test host, whatever the key", () => {
+  const LOCAL = "http://localhost:3000";
+  for (const key of [undefined, "", "rzp_test_x", "rzp_live_abc"]) {
+    const k = { RAZORPAY_KEY_ID: key };
+    assert.equal(testPayEnabled({ ...k, PAYMENTS_TEST_BUTTON: "1", PUBLIC_ORIGIN: LOCAL }), true, `local host + flag, key ${key}`);
+    assert.equal(testPayEnabled({ ...k, PAYMENTS_TEST_BUTTON: "1", PUBLIC_ORIGIN: STAGING }), true, `staging + flag, key ${key}`);
+    assert.equal(testPayEnabled({ ...k, PAYMENTS_TEST_BUTTON: "1", PUBLIC_ORIGIN: "https://findtern.in" }), false, `live origin + flag, key ${key}`);
+    assert.equal(testPayEnabled({ ...k, PAYMENTS_TEST_BUTTON: "1", PUBLIC_ORIGIN: "https://www.findtern.in" }), false, `www + flag, key ${key}`);
+    assert.equal(testPayEnabled({ ...k, PAYMENTS_TEST_BUTTON: "1" }), false, `unset origin fails closed, key ${key}`);
+    for (const flag of [undefined, "", "0", "true", "on"]) {
+      for (const PUBLIC_ORIGIN of [undefined, LOCAL, STAGING, "https://findtern.in"]) {
+        assert.equal(testPayEnabled({ ...k, PAYMENTS_TEST_BUTTON: flag, PUBLIC_ORIGIN }), false, `flag ${flag} on ${PUBLIC_ORIGIN}, key ${key}`);
+      }
+    }
+  }
 });
 
-test("test pay: a live key works on staging only", () => {
+test("test pay: a test key does not open it on the real domain", () => {
+  const f = { PAYMENTS_TEST_BUTTON: "1", RAZORPAY_KEY_ID: "rzp_test_x" };
+  assert.equal(testPayEnabled({ ...f, PUBLIC_ORIGIN: "https://findtern.in" }), false);
+  assert.equal(testPayEnabled({ ...f, PUBLIC_ORIGIN: "https://findtern.in", STAGING_HOSTS: "findtern.in" }), false, "the real domain cannot be listed in");
+  assert.equal(testPayEnabled({ ...f, PUBLIC_ORIGIN: "https://findtern.in." }), false, "trailing dot");
+});
+
+test("test pay: only a known test host counts", () => {
   const live = { PAYMENTS_TEST_BUTTON: "1", RAZORPAY_KEY_ID: "rzp_live_abc" };
-  assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: STAGING }), true);
-  assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://findtern.in" }), false, "leaked flag on the real domain");
-  assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://www.findtern.in" }), false);
-  assert.equal(testPayEnabled({ ...live }), false, "unset origin fails closed");
   assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://findtern.in.evil.com" }), false, "an unknown host is not a test host");
   assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://app.findtern.in" }), false, "nor is a production subdomain");
   assert.equal(testPayEnabled({ ...live, PUBLIC_ORIGIN: "https://staging.findtern.in", STAGING_HOSTS: "staging.findtern.in" }), true, "unless it is named as staging");

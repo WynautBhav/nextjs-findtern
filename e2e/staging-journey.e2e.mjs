@@ -9,8 +9,9 @@
  *  - the staging Neon database (e2e/lib/staging.mjs) to read the signup code
  *    of OUR test addresses, to assert what the UI claims, and to move OUR OWN
  *    rows' dates into the past (feedback and timesheets need elapsed time);
- *  - the "Test: mark as paid" button (PAYMENTS_TEST_BUTTON) - the real Pay
- *    button is never pressed, the Razorpay key is live.
+ *  - the order API's `testPay` flag (PAYMENTS_TEST_BUTTON=1 on the staging
+ *    server): the page's Pay button is pressed but the order request gets testPay:true
+ *    added (payWithTestFlag), so Razorpay is never opened, the Razorpay key is live.
  *
  * Steps marked [UI] drive the page with role/label selectors; [API] steps call
  * the endpoint the page calls (see e2e/lib/browser.mjs). Credentials come from
@@ -203,6 +204,30 @@ async function clickFor(page, locator, match) {
     locator.click(),
   ]);
   return { status: res.status(), body: await res.json().catch(() => null) };
+}
+
+/** The page's own Pay button (there is no test button any more). */
+const PAY_BUTTON = /^(Pay [₹$]|Activate free)/;
+
+/**
+ * Press the real Pay button but add `testPay: true` to the order request the page sends, so the
+ * server settles it at the real amount without Razorpay. Only works where the server has
+ * PAYMENTS_TEST_BUTTON=1 on a test host (src/lib/razorpay.ts).
+ */
+async function payWithTestFlag(page, orderPath) {
+  const pattern = `**${orderPath}`;
+  const handler = async (route) => {
+    const req = route.request();
+    if (req.method() !== "POST") return route.fallback();
+    const body = JSON.parse(req.postData() || "{}");
+    return route.continue({ postData: JSON.stringify({ ...body, testPay: true }) });
+  };
+  await page.route(pattern, handler);
+  try {
+    return await clickFor(page, page.getByRole("button", { name: PAY_BUTTON }), { path: orderPath, method: "POST" });
+  } finally {
+    await page.unroute(pattern, handler);
+  }
 }
 
 /**
@@ -462,14 +487,13 @@ step("intern 1: uploads photo + PAN and submits onboarding [API]", ["internId"],
   state.internOnboarded = true;
 });
 
-step("intern 1: dashboard shows the test button, pays with it, gets an invoice number [UI]", ["internOnboarded"], "internActivated", async () => {
+step("intern 1: dashboard shows Pay, settles it with the test flag, gets an invoice number [UI]", ["internOnboarded"], "internActivated", async () => {
   const page = pages.intern;
   const orderPath = `/api/intern/${state.internId}/payment/razorpay/order`;
   await visit(page, "/intern/dashboard");
   await shot("intern1-dashboard-before-pay");
-  const test = page.getByRole("button", { name: /^Test: mark as paid/ });
-  await test.waitFor({ state: "visible" });
-  const res = await clickFor(page, test, { path: orderPath, method: "POST" });
+  await page.getByRole("button", { name: PAY_BUTTON }).waitFor({ state: "visible" });
+  const res = await payWithTestFlag(page, orderPath);
   assertNotRateLimited("order", res);
   assert.equal(res.status, 200, `order → ${res.status} ${JSON.stringify(res.body)}`);
   assert.equal(res.body?.free, true);
@@ -535,7 +559,7 @@ step("admin: creates a 10% promo code for both sides [API]", ["adminReady"], "pr
   assert.equal(dup.status, 409, "a duplicate code name is refused");
 });
 
-step("intern 2: a bad promo is refused, the real one is applied, then pays with the test button [UI]", ["intern2Onboarded", "promoId", "internFeeMinor"], "intern2Activated", async () => {
+step("intern 2: a bad promo is refused, the real one is applied, then pays with the test flag [UI]", ["intern2Onboarded", "promoId", "internFeeMinor"], "intern2Activated", async () => {
   const page = pages.intern2;
   const orderPath = `/api/intern/${state.intern2Id}/payment/razorpay/order`;
   await visit(page, "/intern/dashboard");
@@ -554,7 +578,7 @@ step("intern 2: a bad promo is refused, the real one is applied, then pays with 
   if (Date.now() - appliedAt > 5000) console.log(`[slow promo apply] the code took ${Math.round((Date.now() - appliedAt) / 1000)}s to show`);
   await shot("intern2-good-promo");
 
-  const res = await clickFor(page, page.getByRole("button", { name: /^Test: mark as paid/ }), { path: orderPath, method: "POST" });
+  const res = await payWithTestFlag(page, orderPath);
   assertNotRateLimited("order", res);
   assert.equal(res.status, 200, `order → ${res.status} ${JSON.stringify(res.body)}`);
 
@@ -862,7 +886,7 @@ step("intern 2: accepts the offer [API]", ["proposal2Id"], "accepted2", async ()
 /** The intern page for a proposal's candidate. */
 const internPageFor = (internId) => (internId === state.internId ? pages.intern : pages.intern2);
 
-step("employer: pays one offer upfront with the promo, using the test button [UI]", ["accepted", "accepted2", "promoCode"], "paidUpfront", async () => {
+step("employer: pays one offer upfront with the promo, using the test flag [UI]", ["accepted", "accepted2", "promoCode"], "paidUpfront", async () => {
   const page = pages.employer;
   const orderPath = `/api/employer/${state.employerId}/payment/razorpay/order`;
   await visit(page, "/employer/checkout");
@@ -884,7 +908,7 @@ step("employer: pays one offer upfront with the promo, using the test button [UI
   await page.getByText(new RegExp(state.promoCode, "i")).first().waitFor({ timeout: 15_000 });
   await shot("employer-checkout-upfront-promo");
 
-  const res = await clickFor(page, page.getByRole("button", { name: /^Test: mark as paid/ }), { path: orderPath, method: "POST" });
+  const res = await payWithTestFlag(page, orderPath);
   assertNotRateLimited("order", res);
   assert.equal(res.status, 200, `order → ${res.status} ${JSON.stringify(res.body)}`);
   assert.equal(res.body?.free, true);
@@ -927,7 +951,7 @@ step("intern: after the hire the company name is revealed [UI]", ["paidUpfront"]
   assert.ok(!(await other.locator("body").innerText()).includes(EMPLOYER.companyName), "the other, unpaid candidate still does not see the company");
 });
 
-step("employer: pays the other offer with the month-end stipend plan, using the test button [UI]", ["paidUpfront"], "paidMonthly", async () => {
+step("employer: pays the other offer with the month-end stipend plan, using the test flag [UI]", ["paidUpfront"], "paidMonthly", async () => {
   const page = pages.employer;
   const orderPath = `/api/employer/${state.employerId}/payment/razorpay/order`;
   await visit(page, "/employer/checkout");
@@ -940,7 +964,7 @@ step("employer: pays the other offer with the month-end stipend plan, using the 
   const fee = Number((main.match(/Hiring charge \(one-time\)\s*₹([\d,]+)/)?.[1] ?? "").replace(/,/g, ""));
   await shot("employer-checkout-monthly");
 
-  const res = await clickFor(page, page.getByRole("button", { name: /^Test: mark as paid/ }), { path: orderPath, method: "POST" });
+  const res = await payWithTestFlag(page, orderPath);
   assert.equal(res.status, 200, `order → ${res.status} ${JSON.stringify(res.body)}`);
   const pay = await one(`SELECT * FROM employer_payments WHERE employer_id = $1 AND status = 'paid' ORDER BY paid_at DESC LIMIT 1`, [state.employerId]);
   assert.notEqual(pay.id, state.upfrontPaymentId, "a second, separate order");
@@ -1400,7 +1424,7 @@ async function composeAndSend(page, { internId, startIso, message, extra }) {
   return body.proposal.id;
 }
 
-step("interns 3 (score 8) and 4 (score 4, free band): sign up, onboard, pay the fee with the test button, get scored [UI + API]", ["adminReady"], "usInternsReady", async () => {
+step("interns 3 (score 8) and 4 (score 4, free band): sign up, onboard, pay the fee with the test flag, get scored [UI + API]", ["adminReady"], "usInternsReady", async () => {
   state.intern3Id = await signUpIntern(pages.intern3, INTERNS[3]);
   state.intern4Id = await signUpIntern(pages.intern4, INTERNS[4]);
   await onboardIntern(pages.intern3, INTERNS[3]);
@@ -1735,7 +1759,7 @@ step("free-band intern 4: the composer offers remote only, edits and withdrawals
   await shot("us-free-withdrawn");
 });
 
-step("US employer pays in dollars with the test button; Orders and the tax invoice are in USD with no GST [UI]", ["usAccepted"], "usPaid", async () => {
+step("US employer pays in dollars with the test flag; Orders and the tax invoice are in USD with no GST [UI]", ["usAccepted"], "usPaid", async () => {
   const page = pages.employer2;
   const orderPath = `/api/employer/${state.employer2Id}/payment/razorpay/order`;
   await visit(page, "/employer/checkout");
@@ -1748,7 +1772,7 @@ step("US employer pays in dollars with the test button; Orders and the tax invoi
   await settle(page);
   await page.getByRole("radio", { name: /charge due 2 days before the month.s pay date/ }).check();
   await shot("us-checkout");
-  const res = await clickFor(page, page.getByRole("button", { name: /^Test: mark as paid/ }), { path: orderPath, method: "POST" });
+  const res = await payWithTestFlag(page, orderPath);
   assert.equal(res.status, 200, `order → ${res.status} ${JSON.stringify(res.body)}`);
   const pay = await one(`SELECT * FROM employer_payments WHERE employer_id = $1 AND status = 'paid' ORDER BY paid_at DESC LIMIT 1`, [state.employer2Id]);
   assert.equal(pay.currency, "USD");
