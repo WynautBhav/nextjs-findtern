@@ -157,6 +157,9 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "account.password_change": {},
   "college_code.attempt": { outcome: "no_match", codeMask: "FT7•••••", shapeOk: true, ip: "203.0.113.9" },
   "college_code.joined": { outcome: "joined", codeMask: "FT7•••••", shapeOk: true, ip: "203.0.113.9" },
+  "college_promo.attempt": { outcome: "identity", kind: "drive", codeMask: "ABC•••••••", ip: "203.0.113.9", mismatch: ["phone"] },
+  "college_promo.redeemed": { outcome: "redeemed", kind: "drive", codeMask: "ABC•••••••", ip: "203.0.113.9" },
+  "account_type.switch": { from: "college", to: "individual" },
 };
 
 test("every call site's meta passes the redaction check: nothing sensitive leaks, nothing readable is lost", () => {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { collegeAccountPayBlock } from "@/lib/college/account-state";
 import { getDb } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { pendingClaimFor } from "@/lib/drives/claim";
@@ -14,6 +15,8 @@ const bodySchema = z.object({ declaredAdult: z.boolean() });
 export async function POST(req: Request) {
   const guard = await requireMutation({ req, roles: ["intern"] });
   if (!guard.ok) return guard.response;
+  const blocked = await collegeAccountPayBlock(guard.session.uid);
+  if (blocked) return blocked;
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Confirm you are 18 or older to continue." }, { status: 400 });
   try {
