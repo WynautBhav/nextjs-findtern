@@ -40,7 +40,7 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: "You can't upload that here" }, { status: 400 });
   }
   const type = req.headers.get("content-type")?.split(";")[0].trim() ?? "";
-  const badType = checkType(kind, type);
+  const badType = checkType(kind, type, session.role);
   if (badType) return NextResponse.json({ error: badType.error }, { status: badType.status });
   const limitMb = Math.round(kind.max / MB);
   if (Number(req.headers.get("content-length") ?? "0") > kind.max) {

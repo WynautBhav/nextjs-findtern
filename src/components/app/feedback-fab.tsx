@@ -1,5 +1,6 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { CheckCircle2, Loader2, MessageCircleQuestion } from "lucide-react";
 
@@ -39,6 +40,8 @@ export function FeedbackFab({
   /** Open on legacy `?support=feedback|report` links (EMB-28 / INT-37). One instance per page. */
   deepLink?: boolean;
 }) {
+  // Interns attach images only (the server refuses their PDFs); employers may still attach one.
+  const intern = (usePathname() ?? "").startsWith("/intern");
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<string>("bug");
 
@@ -208,9 +211,10 @@ export function FeedbackFab({
                 <FileUpload
                   key={attachments.length}
                   kind="support"
-                  accept="image/jpeg,image/png,image/webp,application/pdf"
+                  accept={intern ? "image/jpeg,image/png,image/webp" : "image/jpeg,image/png,image/webp,application/pdf"}
+                  shrink={intern}
                   label="Screenshot"
-                  hint={`Optional. Up to 5 images or PDFs, 10 MB each${attachments.length ? ` (${5 - attachments.length} left)` : ""}.`}
+                  hint={`Optional. Up to 5 ${intern ? "images" : "images or PDFs"}, 10 MB each${attachments.length ? ` (${5 - attachments.length} left)` : ""}.`}
                   onUploaded={(r) => setAttachments((list) => [...list, { key: r.key, name: r.name }].slice(0, 5))}
                 />
               ) : null}
