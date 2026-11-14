@@ -468,6 +468,8 @@ async function onboardIntern(page, who, over = {}) {
       hasLaptop: true,
       openToWork: true,
       ndaAccepted: true,
+      // Required since WP3: the first final submit must say Individual or College.
+      accountType: "individual",
       final: true,
       ...over,
     }),
@@ -796,7 +798,7 @@ step("employer: feedback is refused before the meeting, accepted after it has ha
       id,
       `UPDATE interviews SET slot1 = (now() AT TIME ZONE 'UTC') - interval '3 hours',
          slot2 = (now() AT TIME ZONE 'UTC') - interval '2 hours 30 minutes',
-         slot3 = (now() AT TIME ZONE 'UTC') - interval '2 hours' WHERE id = $1`,
+         slot3 = (now() AT TIME ZONE 'UTC') - interval '2 hours', employer_joined_at = now() WHERE id = $1`,
       [id],
     );
     expectOk(`POST feedback ${id}`, await api(page, "POST", `/api/interviews/${id}/feedback`, { feedback: "Clear communicator, solid SQL." }));
@@ -1594,7 +1596,7 @@ step("US employer: the offer is held until the meeting happens; Mark completed (
   assert.equal((await one(`SELECT status FROM interviews WHERE id = $1`, [state.interview3Id])).status, "completed");
 
   // Intern 4: the meeting is long over; the employer marks the candidate missed, then still leaves feedback.
-  await ownedWrite(state.interview4Id, `UPDATE interviews SET slot1 = (now() AT TIME ZONE 'UTC') - interval '3 hours', slot2 = (now() AT TIME ZONE 'UTC') - interval '2 hours 30 minutes', slot3 = (now() AT TIME ZONE 'UTC') - interval '2 hours', selected_slot = 1 WHERE id = $1`, [state.interview4Id]);
+  await ownedWrite(state.interview4Id, `UPDATE interviews SET slot1 = (now() AT TIME ZONE 'UTC') - interval '3 hours', slot2 = (now() AT TIME ZONE 'UTC') - interval '2 hours 30 minutes', slot3 = (now() AT TIME ZONE 'UTC') - interval '2 hours', selected_slot = 1, employer_joined_at = now() WHERE id = $1`, [state.interview4Id]);
   const missed = await api(page, "POST", `/api/interviews/${state.interview4Id}/mark-missed`, {});
   assert.equal(missed.status, 200, `Mark missed → ${missed.status} ${JSON.stringify(missed.body)}`);
   assert.equal((await one(`SELECT status FROM interviews WHERE id = $1`, [state.interview4Id])).status, "missed");

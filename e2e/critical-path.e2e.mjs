@@ -243,6 +243,8 @@ step("intern: completes onboarding (photo + PAN uploads, no Aadhaar image, final
     hasLaptop: true,
     openToWork: true,
     ndaAccepted: true,
+    // Required since WP3: the first final submit must say Individual or College.
+    accountType: "individual",
     final: true,
   });
   expectOk("POST /api/intern/onboarding (final)", res);
@@ -500,11 +502,16 @@ step("intern: picks a slot on /intern/interviews [UI]", ["interviewId"], async (
 step("employer: the interview takes place (slots moved into the past), feedback recorded [API]", ["slotPicked"], async () => {
   // Time travel: a booked slot is always in the future, and an open meeting
   // blocks the offer until it ends (employer-interview-rules). Move all three
-  // slots into the past, as if the meeting had happened.
+  // slots into the past, as if the meeting had happened. The employer also
+  // joined: a booked meeting the employer never joined within 30 minutes of
+  // the start is an expired no-show, not a meeting that took place (12 Nov
+  // row 13), and feedback is refused on it. The join link goes dark an hour
+  // after the start, so the stamp is written here rather than via /join.
   await one(
     `UPDATE interviews SET slot1 = (now() AT TIME ZONE 'UTC') - interval '3 hours',
        slot2 = (now() AT TIME ZONE 'UTC') - interval '2 hours 30 minutes',
-       slot3 = (now() AT TIME ZONE 'UTC') - interval '2 hours'
+       slot3 = (now() AT TIME ZONE 'UTC') - interval '2 hours',
+       employer_joined_at = now()
      WHERE id = $1 RETURNING id`,
     [state.interviewId],
   );
@@ -604,8 +611,11 @@ step("employer: checks out with the month-end stipend plan in free mode → prop
       await visit(page, "/employer/checkout");
       await page.getByRole("radio", { name: /charge due 2 days before the month.s pay date/i }).check();
       const main = await page.locator("main").innerText();
-      assert.match(main, /Hiring charge \(one-time\)/, "the hiring charge is part of the amount due now");
-      assert.match(main, /Month 1 charge/, "the Month 1 charge is paid with it");
+      // The one-time hiring charge follows the per-band setting (default: only Espresso pays it).
+      // A month-end plan needs a score of 6+, so this intern is in a free band: no Hiring charge row,
+      // and the amount due now is the Month 1 charge alone.
+      assert.doesNotMatch(main, /Hiring charge \(one-time\)/, "a free-band hire shows no hiring charge line");
+      assert.match(main, /Month 1 charge/, "the Month 1 charge is what is due now");
       assert.match(main, /Then\b.*\bmore months? · next due \d{1,2} \w{3}/, "the later months are one line naming the next due date");
       const res = await clickFor(page, page.getByRole("button", { name: /complete for free/i }), { path, method: "POST" });
       expectOk(`POST ${path}`, res);
@@ -629,6 +639,7 @@ step("employer: checks out with the month-end stipend plan in free mode → prop
   assert.equal(pay.raw?.notes?.paymentMode, "hiring_fee", "post-paid hire: the first order is the hiring fee");
   assert.deepEqual(pay.raw?.notes?.proposalIds, [state.proposalId]);
   assert.deepEqual(pay.raw?.notes?.firstMonthProposalIds, [state.proposalId], "the first order also pays Month 1");
+  assert.equal(pay.raw?.notes?.perHireFeeMinor?.[state.proposalId], 0, "the order records the hiring fee it charged: 0 for a free band");
   const hired = await waitForMail(INTERN.email, { since: SINCE, subject: /you.re hired/i });
   assert.ok(hired.text.includes(EMPLOYER.companyName), "after the hire the intern is told the company");
   await waitForMail(EMPLOYER.email, { since: SINCE, subject: /payment received/i });
