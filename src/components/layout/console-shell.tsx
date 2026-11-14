@@ -82,6 +82,8 @@ export type ConsoleNavItem = {
   newTab?: boolean;
   /** Not open yet (intern before payment): lock icon, "Unlocks after payment", and the href points at the page that explains it. */
   locked?: boolean;
+  /** Replaces "Unlocks after payment" in the lock's title and screen-reader text (e.g. "Complete your profile first"). */
+  lockedNote?: string;
 };
 
 /** lucide's Lock, inline: a nav lock icon without touching the import block. */
@@ -505,7 +507,7 @@ function RailLink({ item, active, compact, light, column = false, onNavigate }: 
       </span>
       <span className={cn("min-w-0 flex-1 truncate", compact && "sr-only")}>
         {item.label}
-        {locked ? `, locked. ${LOCKED_TEXT}` : ""}
+        {locked ? `, locked. ${item.lockedNote ?? LOCKED_TEXT}` : ""}
         {compact && item.attention ? ", needs you" : ""}
         {compact && item.badge ? `, ${item.badge} ${item.badgeLabel ?? "unread"}` : ""}
       </span>
@@ -533,7 +535,7 @@ function RailLink({ item, active, compact, light, column = false, onNavigate }: 
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
       aria-disabled={locked ? true : undefined}
-      title={locked ? `${item.label}: ${LOCKED_TEXT}` : compact ? item.label : undefined}
+      title={locked ? `${item.label}: ${item.lockedNote ?? LOCKED_TEXT}` : compact ? item.label : undefined}
       className={className}
       {...newTabAttrs(item.newTab)}
     >
@@ -604,7 +606,7 @@ function TabBar({ tabs, pathname }: { tabs: ConsoleNavItem[]; pathname: string }
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 aria-disabled={item.locked ? true : undefined}
-                title={item.locked ? `${item.label}: ${LOCKED_TEXT}` : undefined}
+                title={item.locked ? `${item.label}: ${item.lockedNote ?? LOCKED_TEXT}` : undefined}
                 className={cn(
                   "apple-spring relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-[0.6875rem] font-medium [&_svg]:size-5",
                   active ? "text-brand-700" : "text-ink-600 hover:text-ink-800",
@@ -620,7 +622,7 @@ function TabBar({ tabs, pathname }: { tabs: ConsoleNavItem[]; pathname: string }
                   ) : null}
                 </span>
                 <span className="max-w-full truncate">{item.label}</span>
-                {item.locked ? <span className="sr-only">, locked. {LOCKED_TEXT}</span> : null}
+                {item.locked ? <span className="sr-only">, locked. {item.lockedNote ?? LOCKED_TEXT}</span> : null}
                 {active ? (
                   <motion.span
                     layoutId="tab-indicator"
