@@ -8,6 +8,7 @@ import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { scoreOf, toCandidateProfile } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { requireMutation } from "@/lib/guards-mutation";
 import { emails } from "@/lib/emails";
 import { employerNames, notify } from "@/lib/notify";
@@ -251,14 +252,14 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // Price comes from the candidate's band, never from the request.
   const plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
-  const rate = resolvePricing(score, plans, currency, null);
+  const rate = resolvePricing(score, plans, currency, null, await getPerHireFeeSetting());
   const offerDetails = buildOffer({
     ...b,
     // Hours and money are worked out here, never taken from the request.
     monthlyHours: scheduledMonthlyHours(b.weeklySchedule, b.paidLeavesPerMonth),
     currency,
     hourlyRateMinor: rate.hourlyRateMinor,
-    // Per-hire is charged on every plan (checkout.ts PER_HIRE_MINOR).
+    // 0 when the candidate's band is free right now; the fee is decided again at payment from the live setting (checkout.ts hireFeeMinor).
     perHireMinor: rate.perHireMinor,
     candidateScore: score,
     projectSkills: b.skills,

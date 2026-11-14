@@ -77,9 +77,9 @@ export function ProposalOfferSummary({
         <DetailRow label="Location" value={offer.location || "-"} />
         <DetailRow label="Start date" value={formatDate(offer.startDate)} />
         <DetailRow label="Monthly" value={money(offer.monthlyMinor)} mono />
-        <DetailRow label="Total" value={money(offer.totalMinor)} mono />
+        <DetailRow label="Total (as quoted)" value={money(offer.totalMinor)} mono />
         <DetailRow label="Hourly rate" value={money(offer.hourlyRateMinor)} mono />
-        <DetailRow label="Hiring fee" value={money(offer.perHireMinor)} mono />
+        <DetailRow label="Hiring fee (as quoted)" value={money(offer.perHireMinor)} mono />
         <DetailRow label="Hours a month" value={offer.monthlyHours || "-"} mono />
         <DetailRow label="Working week" value={WEEKLY_SCHEDULES[offer.weeklySchedule].label} />
         <DetailRow label="Shift" value={offer.shiftFrom && offer.shiftTo ? `${offer.shiftFrom} to ${offer.shiftTo}` : offer.shiftFrom || "-"} />

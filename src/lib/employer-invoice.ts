@@ -1,5 +1,5 @@
 import { displayInvoiceNumber, LEGACY_INVOICE_CUTOFF, legacyInvoiceNumbers, type InvoiceLine } from "./invoice.ts";
-import { billingPlanOf, orderNotes, postpaidMonthsPaid } from "./billing-plan.ts";
+import { billingPlanOf, orderNotes, postpaidMonthsPaid, recordedFeeOf } from "./billing-plan.ts";
 import { hireInvoiceLines } from "./invoice-lines.ts";
 import { formatMoney } from "./format.ts";
 import { parseOffer } from "./offer.ts";
@@ -108,6 +108,8 @@ function build(
         (o.paidAt!.getTime() < p.paidAt!.getTime() || (o.paidAt!.getTime() === p.paidAt!.getTime() && o.orderId < p.orderId)),
     );
     const paymentIndex = earlier.length;
+    // The fee this hire's paid order recorded (older orders: none, so the offer's own fee, as charged then).
+    const feeMinor = recordedFeeOf(r.proposalId, paidByProposal.get(r.proposalId) ?? []);
     // Post-paid hire: the first order is the hiring charge (+ Month 1 when its notes say so), each later one is month k
     // (k counts months paid before this order, not payments: an old fee-only order pays no month).
     if (feeOrder || (monthly && billingPlanOf(r.proposalId, paidByProposal.get(r.proposalId) ?? []) === "postpaid")) {
@@ -122,6 +124,7 @@ function build(
         chargedMinor: rows.length === 1 ? p.amountMinor : null,
         postpaid: feeOrder ? "fee" : k,
         withMonth1: feeOrder && orderNotes(p.raw).firstMonthIds.includes(r.proposalId),
+        feeMinor,
       });
     }
     return hireInvoiceLines({
@@ -132,6 +135,7 @@ function build(
       monthly,
       paymentIndex,
       chargedMinor: rows.length === 1 ? p.amountMinor : null,
+      feeMinor,
     });
   });
 

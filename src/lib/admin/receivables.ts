@@ -2,6 +2,7 @@ import { orderNotes, postpaidAnchor, postpaidDueOn } from "../billing-plan.ts";
 import { acceptedLineCharge } from "../accepted-charge.ts";
 import { monthlyDues } from "../dues.ts";
 import { parseOffer } from "../offer.ts";
+import type { PerHireFeeSetting } from "../per-hire-fee.ts";
 import { toInrMinor } from "./money.ts";
 import { collegeBatchReceipts, istDayKey } from "./revenue.ts";
 import { addMonthsIso, stipendDues } from "./stipend-dues.ts";
@@ -56,6 +57,8 @@ export type ReceivablesInput = {
   collegeBatches?: { id: string; collegeId: string; status: string; amountMinor: number; invoiceNumber: string | null; referenceId: string | null; paidAt: Date | null; createdAt: Date | null; seats?: number }[];
   collegePayouts?: { id: string; collegeId: string; status: string; amountMinor: number; referenceId: string | null; paidAt: Date | null; createdAt: Date | null }[];
   collegeName?: (id: string) => string;
+  /** The live hiring-fee setting, for offers accepted but not yet paid. */
+  feeSetting?: PerHireFeeSetting;
 };
 
 const day = (d: Date | string | null | undefined) => {
@@ -138,7 +141,7 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
           description: offer.fullTime ? "Full-time hiring fee (offer accepted, unpaid)" : "Offer accepted, awaiting payment",
           companyName: input.employerName(p.employerId),
           candidateName: input.internName(p.internId),
-          amountMinor: acceptedLineCharge(offer, "upfront").totalMinor,
+          amountMinor: acceptedLineCharge(offer, "upfront", { feeSetting: input.feeSetting, bandScore: input.scoreOf?.(p.internId) }).totalMinor,
           currency: offer.currency,
           reference: null,
         }),

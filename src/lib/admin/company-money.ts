@@ -1,6 +1,7 @@
 import { acceptedLineCharge } from "../accepted-charge.ts";
 import { monthlyDues } from "../dues.ts";
 import { parseOffer } from "../offer.ts";
+import type { PerHireFeeSetting } from "../per-hire-fee.ts";
 import { toInrMinor } from "./money.ts";
 import { addMonthsIso } from "./stipend-dues.ts";
 
@@ -37,9 +38,10 @@ export function companyMoney(
   employerIds: string[],
   proposals: ProposalLike[],
   payments: PaymentLike[],
-  /** Not used: accepted offers are priced on a fixed basis (accepted-charge.ts). Kept so callers need no change. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  /** The intern's live score: names the band of an offer that stored none, for the hiring-fee setting. Nothing else is priced on it (accepted-charge.ts). */
   _scoreOf?: (internId: string) => number,
+  /** The live hiring-fee setting; these are offers not yet paid. */
+  feeSetting?: PerHireFeeSetting,
 ): Map<string, CompanyMoney> {
   const out = new Map<string, CompanyMoney>();
   for (const employerId of employerIds) {
@@ -57,7 +59,7 @@ export function companyMoney(
 
     for (const p of mine.filter((x) => x.status === "accepted" || x.status === "processing")) {
       const offer = parseOffer(p.offerDetails, p.currency);
-      amountLeft += toInrMinor(acceptedLineCharge(offer, "upfront").totalMinor, offer.currency);
+      amountLeft += toInrMinor(acceptedLineCharge(offer, "upfront", { feeSetting, bandScore: _scoreOf?.(p.internId) }).totalMinor, offer.currency);
       if (offer.startDate) dueDates.push(offer.startDate);
     }
 

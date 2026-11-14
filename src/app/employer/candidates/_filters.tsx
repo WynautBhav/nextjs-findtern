@@ -3,6 +3,7 @@ import { Plus, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import { RATING_META } from "@/lib/employer-candidates";
 import { resolvePricing, type Currency } from "@/lib/employer-pricing";
+import { PER_HIRE_FEE_DEFAULT } from "@/lib/per-hire-fee";
 import { BANDS, PLAN_NAME } from "@/lib/score";
 import { formatRate } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -134,7 +135,7 @@ export function FilterColumn({
               <option value="">Any price</option>
               {BANDS.map((band) => (
                 <option key={band.id} value={band.id}>
-                  {formatRate(resolvePricing(band.min, plans, currency, region).hourlyRateMinor, currency)} · {PLAN_NAME[band.id]}
+                  {formatRate(resolvePricing(band.min, plans, currency, region, PER_HIRE_FEE_DEFAULT).hourlyRateMinor, currency)} · {PLAN_NAME[band.id]}
                 </option>
               ))}
             </select>

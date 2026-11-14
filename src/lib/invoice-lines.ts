@@ -33,18 +33,21 @@ export function hireInvoiceLines(input: {
   postpaid?: "fee" | number;
   /** With `postpaid: "fee"`: the order also paid Month 1 (`notes.firstMonthProposalIds`), so it prints as two lines. */
   withMonth1?: boolean;
+  /** The hiring fee this hire's paid order recorded (billing-plan `recordedFeeOf`); null/absent on orders from before the per-band setting, which were charged the offer's fee. Never the live setting: a paid invoice does not change. */
+  feeMinor?: number | null;
 }): InvoiceLine[] {
   const { roleTitle, projectName, offer, monthly, paymentIndex } = input;
   // A nameless or deleted candidate still reads "Candidate — Designer", never "— Designer".
   const who = input.who.trim() || "Candidate";
   if (input.postpaid === "fee") {
-    const fee = acceptedLineCharge(offer, "postpaid").perHireMinor;
+    const fee = acceptedLineCharge(offer, "postpaid", { feeMinor: input.feeMinor }).perHireMinor;
     if (input.withMonth1) {
       const m1 = input.chargedMinor != null && input.chargedMinor > fee ? input.chargedMinor - fee : (offer.monthlyMinor ?? 0);
       const p = offer.startDate ? engagementPeriods(offer.startDate, offer.months)[0] : undefined;
       const day = (iso: string) => new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${iso}T00:00:00Z`)).replace("Sept", "Sep");
       return [
-        { label: `${who} — Hiring charge`, detail: `${projectName} · One-time hiring charge`, amountMinor: fee },
+        // A hire whose band was free when it paid has no hiring-charge line.
+        ...(fee > 0 ? [{ label: `${who} — Hiring charge`, detail: `${projectName} · One-time hiring charge`, amountMinor: fee }] : []),
         {
           label: `${who} — ${roleTitle || projectName}`,
           detail: `${offer.months}m · ${projectName} · Month 1 charge${p ? ` (${day(p.start)} – ${day(p.end)})` : ""}`,
@@ -75,7 +78,7 @@ export function hireInvoiceLines(input: {
   }
   const first = paymentIndex === 0;
   // Score 10: the mode was already allowed when the order was made.
-  const charge = acceptedLineCharge(offer, monthly ? "monthly" : "upfront", { firstPayment: first });
+  const charge = acceptedLineCharge(offer, monthly ? "monthly" : "upfront", { firstPayment: first, feeMinor: input.feeMinor });
   const feeMinor = charge.perHireMinor;
   const listed = charge.baseMinor - feeMinor;
   // Below the fee only happens in free mode: fall back to the list price (never `>= 0`, that would print a negative stipend).

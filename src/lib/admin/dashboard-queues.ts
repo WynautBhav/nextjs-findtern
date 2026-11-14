@@ -3,6 +3,7 @@ import { alias } from "drizzle-orm/pg-core";
 
 import { calendarMissing } from "@/lib/calendar-status";
 import { dbTimestamp, getDb, schema } from "@/lib/db";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { formatMoney, shortDate, shortDateTime } from "@/lib/format";
 import { formatPeriodDays } from "@/lib/timesheet-days";
 import { AI_INTERVIEW_EMAIL, inrMinorSql, realEmployerId, TEST_EMPLOYER_ID } from "@/lib/admin/scope";
@@ -207,6 +208,7 @@ const OFFER_SLIM = sql`jsonb_build_object(
   'monthlyAmount', ${schema.proposals.offerDetails}->'monthlyAmount',
   'monthly_amount', ${schema.proposals.offerDetails}->'monthly_amount',
   'perHireCharge', ${schema.proposals.offerDetails}->'perHireCharge',
+  'candidateScore', ${schema.proposals.offerDetails}->'candidateScore',
   'duration', ${schema.proposals.offerDetails}->'duration',
   'currency', ${schema.proposals.offerDetails}->'currency',
   'roleTitle', ${schema.proposals.offerDetails}->'roleTitle',
@@ -217,6 +219,7 @@ const OFFER_SLIM = sql`jsonb_build_object(
 const ACCEPTED_LOAD_CAP = 500;
 
 async function loadAccepted(now: Date): Promise<Result & Pick<MoneyStuck, "owedByEmployersMinor" | "employerOfferCount">> {
+  const feeSetting = await getPerHireFeeSetting();
   const pr = schema.proposals;
   const rows = await getDb()
     .select({
@@ -240,7 +243,7 @@ async function loadAccepted(now: Date): Promise<Result & Pick<MoneyStuck, "owedB
 
   const all = rows.map((r) => {
     const name = fullName(r.first, r.last);
-    const amountMinorInr = offerAmountMinorInr(r.offer, r.currency);
+    const amountMinorInr = offerAmountMinorInr(r.offer, r.currency, feeSetting);
     const company = (r.company ?? "").trim();
     const role = typeof r.offer?.roleTitle === "string" ? r.offer.roleTitle.trim() : "";
     const record: QueueRecord = {

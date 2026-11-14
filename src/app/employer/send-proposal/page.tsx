@@ -10,6 +10,8 @@ import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { displayNameOf, scoreOf, toCandidateProfile, type CandidateSummary } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
+import { PER_HIRE_FEE_DEFAULT } from "@/lib/per-hire-fee";
 import { EmptyScene, PageHead, Pill, Surface } from "@/components/app/primitives";
 import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { LoadError } from "@/components/app/load-error";
@@ -210,16 +212,17 @@ export default async function SendProposal({
       // published bands, so this is not a failure path worth surfacing.
     }
 
+    const feeSetting = await getPerHireFeeSetting();
     pricing = {
-      INR: resolvePricing(score, plans, "INR", region),
-      USD: resolvePricing(score, plans, "USD", region),
+      INR: resolvePricing(score, plans, "INR", region, feeSetting),
+      USD: resolvePricing(score, plans, "USD", region, feeSetting),
     };
   } catch (err) {
     console.error("[employer/send-proposal] load failed", err);
     loadFailed = true;
     pricing = {
-      INR: resolvePricing(0, [], "INR", null),
-      USD: resolvePricing(0, [], "USD", null),
+      INR: resolvePricing(0, [], "INR", null, PER_HIRE_FEE_DEFAULT),
+      USD: resolvePricing(0, [], "USD", null, PER_HIRE_FEE_DEFAULT),
     };
   }
 

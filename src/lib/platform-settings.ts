@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { getDb, hasDb, schema } from "@/lib/db";
+import { PER_HIRE_FEE_DEFAULT, PER_HIRE_FEE_KEY, parsePerHireFeeSetting, type PerHireFeeSetting } from "@/lib/per-hire-fee";
 
 /**
  * Admin-editable platform values, one `platform_settings` row per key.
@@ -11,6 +12,8 @@ import { getDb, hasDb, schema } from "@/lib/db";
 export const SETTING_DEFAULTS = {
   /** Intern activation fee, INR paise, GST-inclusive. */
   intern_activation_fee_minor: 249900,
+  /** Which score bands pay the one-time hiring fee (lib/per-hire-fee.ts). */
+  [PER_HIRE_FEE_KEY]: PER_HIRE_FEE_DEFAULT,
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
@@ -43,4 +46,13 @@ export async function setSetting(key: SettingKey, value: unknown, adminId: strin
 
 export function getInternActivationFeeMinor(): Promise<number> {
   return getSetting("intern_activation_fee_minor").then(Number);
+}
+
+/**
+ * The live per-hire setting. Never throws: no DB, no row, or a garbled value
+ * all give the default (Espresso charged, Cappuccino and Latte free), so a
+ * page or a payment never fails on it.
+ */
+export async function getPerHireFeeSetting(): Promise<PerHireFeeSetting> {
+  return parsePerHireFeeSetting(await getSetting(PER_HIRE_FEE_KEY));
 }

@@ -11,6 +11,7 @@ import { canWrite } from "@/lib/admin/permissions";
 import { canViewAs } from "@/lib/admin/impersonation";
 import { flattenParams } from "@/lib/admin/params";
 import { companyLedger } from "@/lib/admin/company-ledger";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { loadCompanyActivity, type ActivityEntry } from "@/lib/admin/record-activity";
 import { getDb, schema, withoutPassword } from "@/lib/db";
 
@@ -102,7 +103,7 @@ export default async function AdminCompanyDetailPage({
   const scores = new Map(
     data.onboarding.map((r) => [r.userId, Number(((r.extraData ?? {}) as Record<string, unknown>).findternScore) || 0]),
   );
-  const ledger = companyLedger(data.proposals, data.payments, (internId) => scores.get(internId) ?? 0);
+  const ledger = companyLedger(data.proposals, data.payments, (internId) => scores.get(internId) ?? 0, await getPerHireFeeSetting());
 
   return (
     <Company360View

@@ -9,6 +9,7 @@ import { formatMoney } from "@/lib/format";
 import { HOURS_PER_MONTH } from "@/lib/plan-offer";
 import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
 import { resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
+import { PER_HIRE_FEE_DEFAULT } from "@/lib/per-hire-fee";
 import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
 import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
 import { skillLead, studyOf, type ListView } from "@/components/employer/candidate-view";
@@ -175,7 +176,7 @@ export function CandidateCard({
   pendingMeetingAt = null,
   layout = "list",
 }: CandidateCardProps) {
-  const pricing = resolved ?? resolvePricing(candidate.score, [], currency, region);
+  const pricing = resolved ?? resolvePricing(candidate.score, [], currency, region, PER_HIRE_FEE_DEFAULT);
   const displayName = displayNameOf(candidate, nameUnlocked);
   const status = candidateStatusPill(proposal);
   const wantedSet = new Set(wantedSkills.map((w) => w.trim().toLowerCase()));

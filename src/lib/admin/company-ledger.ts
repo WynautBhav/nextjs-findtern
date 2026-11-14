@@ -1,6 +1,7 @@
-import { billingPlanOf, postpaidAnchor, postpaidDueOn } from "../billing-plan.ts";
+import { billingPlanOf, orderRecordedFee, postpaidAnchor, postpaidDueOn } from "../billing-plan.ts";
 import { acceptedLineCharge } from "../accepted-charge.ts";
 import { parseOffer } from "../offer.ts";
+import type { PerHireFeeSetting } from "../per-hire-fee.ts";
 import { toInrMinor } from "./money.ts";
 import { addMonthsIso } from "./stipend-dues.ts";
 
@@ -100,9 +101,10 @@ const time = (d: Date | string | null | undefined) => {
 export function companyLedger(
   proposals: ProposalLike[],
   payments: PaymentLike[],
-  /** Not used: accepted offers are priced on a fixed basis (accepted-charge.ts). Kept so callers need no change. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  /** The intern's live score: names the band of an offer that stored none, for the hiring-fee setting. Nothing else is priced on it (accepted-charge.ts). */
   _scoreOf?: (internId: string) => number,
+  /** The live hiring-fee setting, for hires not yet paid; paid ones keep the fee their order recorded. */
+  feeSetting?: PerHireFeeSetting,
 ): CompanyLedger {
   const byId = new Map(proposals.map((p) => [p.id, p]));
   const offers = new Map(proposals.map((p) => [p.id, parseOffer(p.offerDetails, p.currency)]));
@@ -138,7 +140,7 @@ export function companyLedger(
       const offer = offers.get(id)!;
       const isMonthly = monthly || dueIds.includes(id);
       const first = (monthlyCount.get(id) ?? 0) === 0 && !feePaid.has(id);
-      return Math.max(1, acceptedLineCharge(offer, feeOnly ? "postpaid" : isMonthly ? "monthly" : "upfront", { firstPayment: first }).totalMinor);
+      return Math.max(1, acceptedLineCharge(offer, feeOnly ? "postpaid" : isMonthly ? "monthly" : "upfront", { firstPayment: first, feeMinor: orderRecordedFee(pay.raw, id) }).totalMinor);
     });
     const sum = weights.reduce((s, w) => s + w, 0);
     let left = Math.max(0, pay.amountMinor);
@@ -204,7 +206,7 @@ export function companyLedger(
         nextDueDate: left > 0 ? addMonthsIso(offer.startDate, monthsPaid) : null,
       });
     } else {
-      const due = acceptedLineCharge(offer, "upfront").totalMinor;
+      const due = acceptedLineCharge(offer, "upfront", { feeSetting, bandScore: _scoreOf?.(p.internId) }).totalMinor;
       hires.push({ ...base, plan: "unpaid", totalMinor: due, paidMinor: 0, dueMinor: due, monthsPaid: 0, monthsLeft: base.months, nextDueDate: offer.startDate });
     }
   }

@@ -1,4 +1,5 @@
 import { lineCharge } from "../checkout.ts";
+import type { PerHireFeeSetting } from "../per-hire-fee.ts";
 import { shortDate } from "../format.ts";
 import { parseOffer } from "../offer.ts";
 import { attentionTotal } from "./dashboard.ts";
@@ -82,12 +83,12 @@ export function isoOrNull(d: Date | null | undefined): string | null {
  * rate. Null when the offer carries no price (an unparseable or empty
  * `offerDetails`), never 0.
  */
-export function offerAmountMinorInr(offerDetails: unknown, currency?: string | null): number | null {
+export function offerAmountMinorInr(offerDetails: unknown, currency?: string | null, feeSetting?: PerHireFeeSetting): number | null {
   if (!offerDetails || typeof offerDetails !== "object" || Array.isArray(offerDetails)) return null;
   const offer = parseOffer(offerDetails, currency);
   const priced = offer.fullTime ? (offer.fullTime.annualCtcMinor ?? 0) > 0 : (offer.totalMinor ?? 0) > 0 || (offer.monthlyMinor ?? 0) > 0;
   if (!priced) return null;
-  const total = lineCharge(offer, 0, "upfront").totalMinor;
+  const total = lineCharge(offer, 0, "upfront", { feeSetting }).totalMinor;
   return total > 0 ? Math.round(toInrMinor(total, offer.currency)) : null;
 }
 

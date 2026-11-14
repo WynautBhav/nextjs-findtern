@@ -17,6 +17,7 @@ import { studyOf } from "@/components/employer/candidate-view";
 import { SortSelect } from "../candidates/_sort-select";
 import { candidateStatusPill } from "@/components/employer/candidate-status";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { SkillFilter } from "@/components/employer/skill-filter";
 import { RememberSelection } from "@/components/employer/remember-selection";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedSelection } from "@/lib/employer-selection";
@@ -239,7 +240,8 @@ export default async function CompareCandidates({ searchParams }: { searchParams
     return `/employer/compare?${search.toString()}`;
   }
 
-  const pricing = new Map(candidates.map((c) => [c.id, resolvePricing(c.score, plans, currency, region)]));
+  const feeSetting = await getPerHireFeeSetting();
+  const pricing = new Map(candidates.map((c) => [c.id, resolvePricing(c.score, plans, currency, region, feeSetting)]));
   const skillGrid = skillAlignment(requiredSkills, candidates);
   const nameOf = (skill: string) => skill.split(" · ")[0].trim();
   const fit = new Map(

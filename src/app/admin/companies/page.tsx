@@ -12,6 +12,7 @@ import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
 import { CompanyActiveToggle, CompanyFteSelect } from "@/components/admin/company-controls";
 import { getSession } from "@/lib/auth";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { fteOf } from "@/lib/admin/fte";
 import { canWrite } from "@/lib/admin/permissions";
 import { StatusBadge } from "@/components/admin/status-badge";
@@ -160,7 +161,7 @@ export default async function AdminCompaniesPage({
     const scores = new Map(
       scoreRows.map((r) => [r.userId, Number(((r.extraData ?? {}) as Record<string, unknown>).findternScore) || 0]),
     );
-    const money = companyMoney(pageIds, moneyProposals, moneyPayments, (id) => scores.get(id) ?? 0);
+    const money = companyMoney(pageIds, moneyProposals, moneyPayments, (id) => scores.get(id) ?? 0, await getPerHireFeeSetting());
 
     loaded = {
       rows,

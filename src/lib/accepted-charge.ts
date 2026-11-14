@@ -1,4 +1,4 @@
-import { lineCharge, type LineCharge, type PayMode } from "./checkout.ts";
+import { lineCharge, type FeeOptions, type LineCharge, type PayMode } from "./checkout.ts";
 import type { Offer } from "./offer.ts";
 
 /**
@@ -12,6 +12,6 @@ import type { Offer } from "./offer.ts";
 export const ACCEPTED_OFFER_SCORE = 10;
 
 /** `lineCharge` for an accepted offer, on the fixed basis above instead of the intern's live score. */
-export function acceptedLineCharge(offer: Offer, mode: PayMode = "upfront", opts: { firstPayment?: boolean } = {}): LineCharge {
+export function acceptedLineCharge(offer: Offer, mode: PayMode = "upfront", opts: FeeOptions = {}): LineCharge {
   return lineCharge(offer, ACCEPTED_OFFER_SCORE, mode, opts);
 }

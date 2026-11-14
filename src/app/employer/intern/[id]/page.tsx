@@ -14,6 +14,7 @@ import { formatDate, formatMoney, formatRate } from "@/lib/format";
 import { RATING_META, displayNameOf, isCatalogSkill, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { hideContactText } from "@/lib/contact-scrub";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { SkillChips } from "@/components/employer/candidate-row-parts";
 import { skillBaseName, studyOf } from "@/components/employer/candidate-view";
@@ -300,7 +301,7 @@ export default async function EmployerInternDetail({
     aiRecordingLink: profile.aiRecordingLink,
   });
   const band = bandFor(profile.score);
-  const pricing = resolvePricing(profile.score, plans, currency, region);
+  const pricing = resolvePricing(profile.score, plans, currency, region, await getPerHireFeeSetting());
   const experiences = (details.experiences ?? []).filter((e) => e.company || e.role);
   const qualifications = [...(details.academics?.professional ?? []), ...(details.academics?.certifications ?? [])].filter((q) => q.name);
   const languages = (details.languages ?? []).filter((l) => l.language);
@@ -450,7 +451,9 @@ export default async function EmployerInternDetail({
                 <p className="nums mt-0.5 text-sm text-ink-600">
                   plus <span className="font-medium text-ink-900">{formatMoney(pricing.perHireMinor, currency)}</span> one-time hiring charge
                 </p>
-              ) : null}
+              ) : (
+                <p className="mt-0.5 text-sm text-ink-600">No one-time hiring charge (free for now)</p>
+              )}
             </div>
 
             <div className="flex flex-col gap-2 [&_button]:w-full [&_button]:justify-center">

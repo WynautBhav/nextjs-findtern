@@ -188,6 +188,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // "hiring_fee" is the first payment of a post-paid hire (billing-plan.ts).
     paymentMode: mode === "monthly" ? "monthly" : mode === "postpaid" ? "hiring_fee" : "total",
     dueProposalIds: paying.filter((l) => l.due).map((l) => l.id),
+    // The one-time hiring fee charged on each line (0 when its band is free). Invoices and ledgers read this, so a later admin switch never alters a paid order.
+    perHireFeeMinor: Object.fromEntries(paying.filter((l) => !l.due).map((l) => [l.id, l.charge.perHireMinor])),
     // A post-paid first payment also covers Month 1. A separate list, never dueProposalIds: settlement hires only ids that are not due (payments.ts).
     firstMonthProposalIds: mode === "postpaid" ? paying.filter((l) => !l.due).map((l) => l.id) : [],
     // The month each due line was priced for; settlement flags the order when the hire has moved on since.

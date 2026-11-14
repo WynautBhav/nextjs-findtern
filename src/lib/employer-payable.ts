@@ -20,6 +20,7 @@ import { parseOffer } from "@/lib/offer";
 import { initialsOf, scoreOf } from "@/lib/employer-candidates";
 import { hiredInternIds, hiredProposalSql, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, type Currency } from "@/lib/employer-pricing";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
 
 
 export const DURATION_LABEL: Record<string, string> = {
@@ -114,6 +115,8 @@ export async function payableCheckout(
   opts: { proposalIds?: string[]; mode?: PayMode } = {},
 ): Promise<PayableCheckout> {
   const db = getDb();
+  // The hiring fee is decided here, at charge time, from the live setting and each offer's band, so the page and the order route agree.
+  const feeSetting = await getPerHireFeeSetting();
 
   const [employer] = await db
     .select({
@@ -211,17 +214,17 @@ export async function payableCheckout(
         // A due month is a later instalment: the hiring fee was in the first.
         charge: dues.has(proposal.id)
           ? acceptedLineCharge(offer, "monthly", { firstPayment: false })
-          : lineCharge(offer, score, opts.mode),
+          : lineCharge(offer, score, opts.mode, { feeSetting, bandScore: score }),
         // What one month costs here: no hiring fee on a later instalment, or
         // the summary shows more than the order route charges.
         // A due month is priced on the fixed basis; a not-yet-due line keeps the live score
         // only so the checkout can say why month-end payment is not offered (monthlyBlocked).
         monthlyCharge: dues.has(proposal.id)
           ? acceptedLineCharge(offer, "monthly", { firstPayment: false })
-          : lineCharge(offer, score, "monthly"),
+          : lineCharge(offer, score, "monthly", { feeSetting, bandScore: score }),
         due: dues.get(proposal.id) ?? null,
         dueOn: dues.has(proposal.id) ? (dues.get(proposal.id)!.dueOn ?? addMonthsDay(offer.startDate, dues.get(proposal.id)!.monthsPaid)) : null,
-        feeCharge: acceptedLineCharge(offer, "postpaid"),
+        feeCharge: acceptedLineCharge(offer, "postpaid", { feeSetting, bandScore: score }),
         schedule: dues.has(proposal.id) || offer.fullTime
           ? []
           : Array.from({ length: Math.max(0, offer.months - 1) }, (_, i) => postpaidDueOn(postpaidAnchor(offer.startDate, null) ?? istDay(new Date()), offer.months, i + 2) ?? "").filter(Boolean),

@@ -1,4 +1,4 @@
-import { billingPlanOf, engagementEndOn, istDay, orderNotes, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, postpaidNext } from "./billing-plan.ts";
+import { billingPlanOf, engagementEndOn, istDay, orderNotes, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, postpaidNext, recordedFeeOf } from "./billing-plan.ts";
 import { acceptedLineCharge } from "./accepted-charge.ts";
 import { monthsOf, parseOffer } from "./offer.ts";
 
@@ -84,6 +84,8 @@ export type PlacementLedger = {
   currency: "INR" | "USD";
   /** Whole engagement incl. the one-time hiring fee (or the full-time fee). Minor units. */
   totalMinor: number;
+  /** The one-time hiring fee inside the total, as this hire was charged (0 when its band was free). */
+  feeMinor: number;
   paidMinor: number;
   dueMinor: number;
   months: number;
@@ -108,8 +110,11 @@ function addMonths(isoDay: string | null, months: number): string | null {
 
 export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike[]): PlacementLedger {
   const offer = parseOffer(hire.offerDetails, hire.currency);
-  const upfront = acceptedLineCharge(offer, "upfront");
-  const monthly = acceptedLineCharge(offer, "monthly", { firstPayment: false });
+  // A hire's figures never move with the admin setting: the fee is the one its paid order recorded
+  // (orders from before the per-band setting recorded none, and were charged the offer's fee).
+  const feeMinor = recordedFeeOf(hire.id, payments);
+  const upfront = acceptedLineCharge(offer, "upfront", { feeMinor });
+  const monthly = acceptedLineCharge(offer, "monthly", { firstPayment: false, feeMinor });
   let upfrontPaid = false;
   let monthsPaid = 0;
   // What promo codes took off this hire. An order stores it (`raw.promo`), and
@@ -160,6 +165,7 @@ export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike
     plan,
     currency: offer.currency,
     totalMinor,
+    feeMinor: offer.fullTime ? 0 : upfront.perHireMinor,
     paidMinor,
     dueMinor,
     months,

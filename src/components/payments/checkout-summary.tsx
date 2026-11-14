@@ -213,7 +213,7 @@ export function CheckoutSummary({
               <>
                 {mode === "postpaid" ? (
                   <>
-                    <Row label="Hiring charge (one-time)">{m(line.feeMinor, line.currency)}</Row>
+                    {line.feeMinor > 0 ? <Row label="Hiring charge (one-time)">{m(line.feeMinor, line.currency)}</Row> : null}
                     <Row label="Month 1 charge">{m(amountMinor - line.feeMinor, line.currency)}</Row>
                   </>
                 ) : (

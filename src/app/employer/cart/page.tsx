@@ -9,6 +9,7 @@ import { requireEmployerSetup } from "@/lib/employer-setup";
 import { redactForEmployer, toCandidateProfile } from "@/lib/employer-candidates";
 import { hiredInternIds, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pricing";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
 import { pendingMeetingAtFor } from "@/lib/proposal-guard";
 import { isBlockingInterview, isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
@@ -220,12 +221,13 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
     const onboardingByUser = new Map(onboardingRows.map((row) => [row.userId, row]));
     const projectsById = new Map(projectRows.map((row) => [row.id, row]));
 
+    const feeSetting = await getPerHireFeeSetting();
     for (const item of unique) {
       const user = usersById.get(item.internId);
       if (!user || hired.has(item.internId)) continue;
       // Name, email and recording stay server-side until hire.
       const candidate = redactForEmployer(toCandidateProfile(user, onboardingByUser.get(item.internId)), unlockAll);
-      const pricing = resolvePricing(candidate.score, plans, currency, region);
+      const pricing = resolvePricing(candidate.score, plans, currency, region, feeSetting);
       const project = projectsById.get(item.projectId);
       const projectStatus = String(project?.status ?? "active").toLowerCase();
       lines.push({

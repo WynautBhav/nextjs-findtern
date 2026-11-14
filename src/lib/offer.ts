@@ -48,6 +48,8 @@ export type Offer = {
   /** Fixed monthly intern stipend (INR paise), set when sent. Null on older offers, which use the 50% rule. */
   internStipendMinor: number | null;
   perHireMinor: number | null;
+  /** Score the offer was priced on (offerScore), which names its band for the hiring-fee setting; null on offers that never stored one. */
+  candidateScore: number | null;
   fullTime: {
     annualCtcMinor: number | null;
     offerLetterUrl: string | null;
@@ -274,6 +276,7 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
     hourlyRateMinor: toMinorKeepZero(o.hourlyRate),
     internStipendMinor: toMinorKeepZero(o.internStipendMonthly),
     perHireMinor: perHireOf(o, monthsOf(duration)),
+    candidateScore: offerScore(o),
     fullTime: ft
       ? {
           annualCtcMinor: num(ft.annualCtcMinor) ?? toMinor(ft.annualCtc),

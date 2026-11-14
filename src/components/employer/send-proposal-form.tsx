@@ -381,7 +381,13 @@ export function SendProposalForm({
             <p className="nums text-sm text-ink-700">
               <span className="font-semibold text-ink-900">{formatRate(rate.hourlyRateMinor, currency)}</span>
               {" · "}
-              <span>{formatPerHire(rate.perHireMinor, currency)}</span> one-time hiring fee
+              {rate.perHireMinor > 0 ? (
+                <>
+                  <span>{formatPerHire(rate.perHireMinor, currency)}</span> one-time hiring fee
+                </>
+              ) : (
+                <span>No one-time hiring fee (free for now)</span>
+              )}
             </p>
             <p className="flex w-full items-start gap-1.5 text-sm text-ink-600">
               <Info className="mt-0.5 size-3.5 shrink-0 text-ink-500" aria-hidden />

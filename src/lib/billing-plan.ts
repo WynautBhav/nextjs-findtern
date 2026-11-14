@@ -67,6 +67,27 @@ export function billingPlanOf(proposalId: string, orders: readonly PlanOrder[]):
   return "unpaid";
 }
 
+/**
+ * The one-time hiring fee an order recorded for a hire (`notes.perHireFeeMinor`, `{ proposalId: minor }`),
+ * or null for orders made before the fee became a per-band setting: those were all charged the offer's fee.
+ */
+export function orderRecordedFee(raw: unknown, proposalId: string): number | null {
+  const r = obj(raw);
+  const n = obj(r.notes ?? obj(r.order).notes);
+  const v = Number(obj(n.perHireFeeMinor)[proposalId]);
+  return Number.isFinite(v) && v >= 0 ? Math.round(v) : null;
+}
+
+/** The fee recorded for a hire on the first paid order that names one, else null. */
+export function recordedFeeOf(proposalId: string, orders: readonly PlanOrder[]): number | null {
+  for (const o of paidOldestFirst(orders)) {
+    if (!orderNotes(o.raw).ids.includes(proposalId)) continue;
+    const fee = orderRecordedFee(o.raw, proposalId);
+    if (fee != null) return fee;
+  }
+  return null;
+}
+
 /** Whether an order pays a month of `proposalId`: a due-month order, or a post-paid fee order that also covers Month 1 (`firstMonthProposalIds`). A fee-only order (from before that rule) pays none. */
 export function paysMonthOf(raw: unknown, proposalId: string): boolean {
   const { dueIds, firstMonthIds, mode } = orderNotes(raw);

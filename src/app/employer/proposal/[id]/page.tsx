@@ -12,7 +12,8 @@ import { hiredInternIds } from "@/lib/employer-visibility";
 import { formatDate as formatWords, formatMoney, formatSlotTime } from "@/lib/format";
 import { interviewStage, meetingTime } from "@/lib/employer-interview-rules";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
-import { fullTimeFeeMinor } from "@/lib/checkout";
+import { fullTimeFeeMinor, hireFeeMinor } from "@/lib/checkout";
+import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { laptopLabel, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
 import { shiftInIst } from "@/lib/timezones";
 import type { PlaceOfSupply } from "@/lib/gst";
@@ -175,6 +176,9 @@ export default async function EmployerProposalDetail({
     (entry): entry is [string, number] => typeof entry[1] === "number" && entry[0] !== "overall",
   );
   const score = offerScore(raw) ?? 0;
+  // The hiring fee as it is charged now: the offer's amount if its band is switched on, else none. A hire
+  // already made keeps the fee it paid (the stored one), so the setting never rewrites a settled order.
+  const shownFeeMinor = proposal.status === "hired" ? offer.perHireMinor : hireFeeMinor(offer, { feeSetting: await getPerHireFeeSetting(), bandScore: score });
   // The score shown is the one the offer was priced on, so it can never
   // disagree with the rate beside it.
   const ratings: [string, number][] = score > 0 ? [["overall", score], ...snapshot] : snapshot;
@@ -204,7 +208,7 @@ export default async function EmployerProposalDetail({
     hourlyRateMinor: offer.hourlyRateMinor,
     hours: offer.monthlyHours,
     monthlyMinor: offer.monthlyMinor,
-    perHireMinor: offer.perHireMinor,
+    perHireMinor: shownFeeMinor,
     place,
   });
 
@@ -470,7 +474,7 @@ export default async function EmployerProposalDetail({
                     preference={preference}
                     currency={currency}
                     place={place}
-                    perHireMinor={offer.perHireMinor}
+                    perHireMinor={shownFeeMinor}
                     shortOnly={score > 0 && score < 6}
                     hasLaptop={hasLaptop}
                     initial={{

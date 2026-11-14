@@ -3,6 +3,7 @@ import { ChevronDown, LayoutGrid, List, Search, X } from "lucide-react";
 
 import { redactForEmployer } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
+import { PER_HIRE_FEE_DEFAULT } from "@/lib/per-hire-fee";
 import { MAX_COMPARE } from "@/lib/employer-selection";
 import { SITE } from "@/lib/content/site";
 import { BANDS, PLAN_NAME } from "@/lib/score";
@@ -313,7 +314,7 @@ export function Results({
                   projectId={data.activeProjectId}
                   shortlisted={data.shortlisted.has(candidate.id)}
                   nameUnlocked={data.nameUnlocked.has(candidate.id)}
-                  pricing={resolvePricing(candidate.score, data.plans, data.currency, data.region)}
+                  pricing={resolvePricing(candidate.score, data.plans, data.currency, data.region, PER_HIRE_FEE_DEFAULT)}
                   proposal={rel?.proposal ?? null}
                   wantedSkills={data.effectiveSkills}
                   presence={data.presence[candidate.id] ?? null}

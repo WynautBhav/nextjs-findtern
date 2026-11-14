@@ -1,7 +1,7 @@
 import { eq, inArray, sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { getInternActivationFeeMinor } from "@/lib/platform-settings";
+import { getInternActivationFeeMinor, getPerHireFeeSetting } from "@/lib/platform-settings";
 import { computeReceivables } from "@/lib/admin/receivables";
 import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import { istDayKeys, istDayStart, istKeySql, istMonthKeys, istMonthStart, DRIVE_WAIVER_GATEWAY, isMoneyReceived, PAID_STATUS, receivedAtSql, utcSql, type Bucket } from "@/lib/admin/revenue";
@@ -103,6 +103,7 @@ export async function loadReceivables(
       internName: (id) => internName.get(id) ?? "Candidate",
       scoreOf: (id) => scores.get(id) ?? 0,
       activationFeeMinor: feeMinor,
+      feeSetting: await getPerHireFeeSetting(),
       proposals: proposals.filter((p) => realIds.has(p.employerId)),
       employerPayments,
       internPayments: internPayments.filter(isMoneyReceived),
