@@ -6,11 +6,16 @@ import { Camera, Loader2, RotateCw, UserRound, ZoomIn, ZoomOut } from "lucide-re
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
+import { shrinkImage, UnreadableImageError } from "@/lib/image-shrink";
 import { cn } from "@/lib/utils";
 
 const MB = 1024 * 1024;
-/** Legacy limits: JPG or PNG, up to 1 MB, saved as a 600×600 square. */
-const MAX_BYTES = 1 * MB;
+/**
+ * JPG or PNG of any size: the pick is shrunk in the browser first (≤2000px,
+ * ~500 KB), then cropped and saved as a 600×600 square. This cap is only a
+ * sanity check on the shrunk file; a normal photo never gets near it.
+ */
+const MAX_BYTES = 2 * MB;
 const TYPES = ["image/jpeg", "image/png"];
 const OUTPUT = 600;
 const MAX_ZOOM = 3;
@@ -19,9 +24,10 @@ type Loaded = { url: string; img: HTMLImageElement; name: string };
 
 /**
  * Profile photo with a square crop (INT-21), as the legacy form had: pick a
- * JPG or PNG up to 1 MB, drag to position it, zoom and rotate, and the square
- * is saved at 600×600. The crop runs on a canvas in the browser, so there is
- * no extra dependency and the original never leaves the device.
+ * JPG or PNG of any size, drag to position it, zoom and rotate, and the square
+ * is saved at 600×600. A big camera photo is shrunk first instead of refused.
+ * The crop runs on a canvas in the browser, so there is no extra dependency
+ * and the original never leaves the device.
  */
 export function PhotoUpload({
   src,
@@ -37,6 +43,9 @@ export function PhotoUpload({
   const input = useRef<HTMLInputElement>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [preparing, setPreparing] = useState(false);
+  // Only the latest pick may open the cropper if several are made while one is shrinking.
+  const latest = useRef(0);
   // A stored photo that cannot be fetched shows the placeholder, not alt text.
   const [brokenSrc, setBrokenSrc] = useState<string | null>(null);
   const shown = useRef<HTMLImageElement>(null);
@@ -50,11 +59,24 @@ export function PhotoUpload({
     if (loaded) URL.revokeObjectURL(loaded.url);
   }, [loaded]);
 
-  function pick(file: File) {
+  async function pick(file: File) {
+    const mine = ++latest.current;
     setProblem(null);
     if (!TYPES.includes(file.type)) return setProblem("Use a JPG or PNG photo.");
-    if (file.size > MAX_BYTES) return setProblem(`That photo is ${(file.size / MB).toFixed(1)} MB. The limit is 1 MB.`);
-    const url = URL.createObjectURL(file);
+    setPreparing(true);
+    let ready: File;
+    try {
+      // Shrink first (also applies the camera's EXIF rotation); a corrupt file or a PDF renamed .jpg fails here.
+      ready = (await shrinkImage(file)).file;
+    } catch (e) {
+      if (mine !== latest.current) return;
+      setPreparing(false);
+      return setProblem(e instanceof UnreadableImageError ? e.message : "That photo could not be opened. Try another one.");
+    }
+    if (mine !== latest.current) return;
+    setPreparing(false);
+    if (ready.size > MAX_BYTES) return setProblem(`That photo is still ${(ready.size / MB).toFixed(1)} MB after shrinking. Try a different one.`);
+    const url = URL.createObjectURL(ready);
     const img = new Image();
     img.onload = () => setLoaded({ url, img, name: file.name });
     img.onerror = () => {
@@ -84,23 +106,24 @@ export function PhotoUpload({
       <div className="min-w-0">
         <p className="text-sm font-medium text-ink-800">Profile photo</p>
         <p className="mt-1 max-w-sm text-sm leading-relaxed text-ink-600">
-          A clear, front-facing photo, like a passport one. JPG or PNG, up to 1 MB. You can crop it next.
+          A clear, front-facing photo, like a passport one. JPG or PNG. Big photos are shrunk for you. You can crop it next.
         </p>
         <label
           htmlFor={inputId}
           className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-11 cursor-pointer focus-within:ring-[3px] focus-within:ring-brand-600/20" })}
         >
-          <Camera className="size-4" aria-hidden />
-          {src ? "Change photo" : "Upload photo"}
+          {preparing ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Camera className="size-4" aria-hidden />}
+          {preparing ? "Preparing photo…" : src ? "Change photo" : "Upload photo"}
           <input
             ref={input}
             id={inputId}
             type="file"
             accept={TYPES.join(",")}
+            disabled={preparing}
             className="sr-only"
             onChange={(e) => {
               const f = e.target.files?.[0];
-              if (f) pick(f);
+              if (f) void pick(f);
               e.target.value = "";
             }}
           />
