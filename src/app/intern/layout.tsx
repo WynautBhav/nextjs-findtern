@@ -61,13 +61,13 @@ const STAGE_NAV: Record<Stage, ConsoleNavItem[]> = {
   ],
 };
 
-/** The tab bar before payment: the three open entries first, then two locked ones (the rest sit under More). */
+/** The tab bar before payment: the three open entries first, then two locked ones, Offers and Messages (the rest sit under More). */
 const LOCKED_STAGE_NAV: ConsoleNavItem[] = [
   { href: "/intern/dashboard", label: "Home", icon: <House /> },
   { href: "/intern/documents", label: "Documents", icon: <BadgeCheck /> },
   { href: "/intern/profile", label: "Your profile", icon: <CircleUserRound /> },
-  { href: "/intern/opportunities", label: "Open roles", icon: <Compass /> },
   { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
+  { href: "/intern/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
 ];
 
 const MORE_NAV: ConsoleNavItem[] = [

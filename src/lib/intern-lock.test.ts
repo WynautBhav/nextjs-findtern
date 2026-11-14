@@ -82,8 +82,6 @@ describe("isOpenInternPage: the allowlist", () => {
     "/intern/documents?next=/intern/proposals",
   ];
   const locked = [
-    "/intern/opportunities",
-    "/intern/opportunities/abc",
     "/intern/proposals",
     "/intern/proposals/123",
     "/intern/messages",
@@ -122,7 +120,6 @@ describe("isLockedApi: what an unpaid intern is refused", () => {
     "/api/threads/1/read",
     "/api/intern/timesheets",
     "/api/intern/timesheets/1/submit",
-    "/api/intern/saved-projects",
     "/api/intern/abc/payouts",
     "/api/PROPOSALS/1/status",
     "/api/proposals/",
@@ -164,7 +161,7 @@ describe("lockVerdict: state x path", () => {
     assert.equal(v("/intern/documents/../proposals", "locked"), "redirect_locked");
   });
   it("unlocked intern (paid, college-redeemed or grandfathered) reaches everything", () => {
-    for (const p of ["/intern/proposals", "/intern/messages", "/intern/timesheets", "/intern/opportunities/x"]) assert.equal(v(p, "unlocked"), "allow");
+    for (const p of ["/intern/proposals", "/intern/messages", "/intern/timesheets", "/intern/record/x"]) assert.equal(v(p, "unlocked"), "allow");
     assert.equal(v("/api/threads", "unlocked", true), "allow");
   });
   it("API: locked is a 403, unknown is a 503 (fails closed), open APIs are untouched", () => {
@@ -192,14 +189,14 @@ describe("lockVerdict: state x path", () => {
 
 describe("nav and locked page helpers", () => {
   it("nav: locks everything but the open pages, only before payment", () => {
-    assert.equal(isNavLocked("/intern/opportunities", false), true);
+    assert.equal(isNavLocked("/intern/proposals", false), true);
     assert.equal(isNavLocked("/intern/messages", false), true);
     assert.equal(isNavLocked("/intern/dashboard", false), false);
     assert.equal(isNavLocked("/intern/documents", false), false);
     assert.equal(isNavLocked("/intern/profile", false), false);
     assert.equal(isNavLocked("/intern/settings", false), false);
     assert.equal(isNavLocked("/intern/notifications", false), false);
-    assert.equal(isNavLocked("/intern/opportunities", true), false);
+    assert.equal(isNavLocked("/intern/proposals", true), false);
   });
   it("locked page: from only picks a label from a fixed list, never a redirect target", () => {
     assert.equal(lockedPageName("/intern/proposals/12"), "Offers");

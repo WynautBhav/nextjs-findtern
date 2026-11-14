@@ -78,7 +78,6 @@ const ALLOW = [
   ["home/about-section.tsx", "text-base font-medium text-ink-300", "dark", "#072f24", "unit beside a figure on the dark brand card"],
   ["layout/console-shell.tsx", "text-ink-300\">/</span>", "decorative", null, "aria-hidden breadcrumb slash; the crumbs either side carry the text"],
   ["layout/site-header.tsx", "size-4 text-ink-300", "decorative", null, "aria-hidden chevron in a menu row"],
-  ["intern/dashboard/page.tsx", "text-ink-300 group-hover:text-brand-700", "decorative", null, "aria-hidden arrow on a card that is one link (WP5b's file, not edited here)"],
   ["employer/drive-parts.tsx", "text-ink-300", "decorative", null, "aria-hidden separator dot between two values"],
   ["home/pricing-table.tsx", "size-4 shrink-0 text-ink-300", "decorative", null, "aria-hidden X before a plan line that says what is not included"],
   ["marketing/employer-plan-cards.tsx", "size-4 shrink-0 text-ink-300", "decorative", null, "aria-hidden X before a plan line that says what is not included"],

@@ -105,7 +105,6 @@ export default async function InternProposals({ searchParams }: { searchParams: 
           art
           title="No offers yet"
           body="When a company wants you, its offer lands here with the role, the stipend and the joining date. Keep your profile complete and open to work so companies can find you."
-          next={{ label: "Check your profile", href: "/intern/profile" }}
           who="Companies come to you"
         />
       ) : (

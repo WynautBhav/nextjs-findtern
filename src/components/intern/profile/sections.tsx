@@ -231,7 +231,7 @@ export function SkillsCard({ skills }: { skills: string[] }) {
       ) : (
         <CardEmpty
           title="No skills yet"
-          body="Skills are what employers search, and what matches you to open roles. Add at least four."
+          body="Skills are what employers search for when they look for candidates. Add at least four."
           action={{ label: "Add skills", href: FORM }}
         />
       )}
