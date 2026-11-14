@@ -215,8 +215,6 @@ async function main() {
       "/intern/dashboard",
       "/intern/profile",
       "/intern/onboarding",
-      "/intern/opportunities",
-      `/intern/opportunities/${ids.projectId}`,
       "/intern/interviews",
       "/intern/proposals",
       `/intern/proposals/${ids.internProposalId}`,

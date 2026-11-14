@@ -104,13 +104,13 @@ const CASES = [
   },
   {
     key: "in-page-link",
-    label: "in-page link (intern dashboard: See all open roles)",
+    label: "in-page link (intern dashboard: Profile status / College tile)",
     persona: "intern-one",
     start: "/intern/dashboard",
-    hold: /^\/intern\/opportunities$/,
-    url: "^/intern/opportunities$",
+    hold: /^\/intern\/(profile|settings)/,
+    url: "^/intern/(profile|settings)",
     ready: "main",
-    go: (page) => page.locator('main a[href="/intern/opportunities"]').first().click(),
+    go: (page) => page.locator('main a[href^="/intern/profile"], main a[href^="/intern/settings"]').first().click(),
   },
   {
     key: "filter-change",

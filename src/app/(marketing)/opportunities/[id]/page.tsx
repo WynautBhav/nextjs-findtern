@@ -28,9 +28,7 @@ export async function generateMetadata({
 /**
  * Public role detail.
  *
- * The signed-in version at /intern/opportunities/[id] adds the candidate's own
- * state - which offers they already hold, and what to do next for them. A
- * guest has none of that, so this is the brief, the skills, the facts, and an
+ * There is no signed-in version of this page. It is the brief, the skills, the facts, and an
  * honest account of what creating a profile would do. No apply button, because
  * there is no application to submit: companies search candidates, they do not
  * collect applications.

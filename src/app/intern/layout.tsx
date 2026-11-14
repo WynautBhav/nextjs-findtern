@@ -7,7 +7,6 @@ import {
   BriefcaseBusiness,
   CalendarCheck2,
   CircleUserRound,
-  Compass,
   House,
   LayoutList,
   MessageSquare,
@@ -41,7 +40,7 @@ export const metadata = { title: "Findtern" };
 /**
  * Navigation follows the stage: someone whose first offer is sitting unread
  * doesn't need Timesheets in front of them, and someone three weeks into a
- * role doesn't need Open roles. The stage is derived from the rows, never
+ * role doesn't need Offers. The stage is derived from the rows, never
  * stored, so it can't disagree with the data. These five are also the phone
  * tab bar, so Messages is one of them at every stage (a company that sent an
  * offer is waiting on a reply); everything else sits under "More".
@@ -49,7 +48,6 @@ export const metadata = { title: "Findtern" };
 const STAGE_NAV: Record<Stage, ConsoleNavItem[]> = {
   seeking: [
     { href: "/intern/dashboard", label: "Home", icon: <House /> },
-    { href: "/intern/opportunities", label: "Open roles", icon: <Compass /> },
     { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
     { href: "/intern/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
     { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 /> },
@@ -63,17 +61,16 @@ const STAGE_NAV: Record<Stage, ConsoleNavItem[]> = {
   ],
 };
 
-/** The tab bar before payment: the three open entries first, then two locked ones (the rest sit under More). */
+/** The tab bar before payment: the three open entries first, then two locked ones, Offers and Messages (the rest sit under More). */
 const LOCKED_STAGE_NAV: ConsoleNavItem[] = [
   { href: "/intern/dashboard", label: "Home", icon: <House /> },
   { href: "/intern/documents", label: "Documents", icon: <BadgeCheck /> },
   { href: "/intern/profile", label: "Your profile", icon: <CircleUserRound /> },
-  { href: "/intern/opportunities", label: "Open roles", icon: <Compass /> },
   { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
+  { href: "/intern/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
 ];
 
 const MORE_NAV: ConsoleNavItem[] = [
-  { href: "/intern/opportunities", label: "Open roles", icon: <Compass /> },
   { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
   { href: "/intern/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
   { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 /> },

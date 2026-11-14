@@ -10,7 +10,7 @@ const WHY: Record<string, { label?: string; why: string }> = {
     why: "Aadhaar and PAN numbers and your PAN card image, so stipends can be paid and tax-filed. Never shown to employers before a hire.",
   },
   academics: { why: "Employers filter by degree, college and graduation year first." },
-  skills: { why: "Skills are what employers search. They also drive the match on open roles." },
+  skills: { why: "Skills are what employers search. They also shape how you rank when employers search." },
   languages: { why: "Shows which languages you can work in with a team or client." },
   location: { why: "Tells employers where you can work: remote, hybrid or on-site." },
   laptop: { why: "Many roles need your own laptop; this saves a round of questions." },

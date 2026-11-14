@@ -76,7 +76,7 @@ export function MessagesShell({
   const next =
     base === "employer"
       ? { href: "/employer/candidates", label: "Browse candidates", body: "Send a proposal to a candidate and the conversation opens here, for both of you." }
-      : { href: "/intern/opportunities", label: "See open roles", body: "When a company sends you a proposal or an offer, you can talk to them here." };
+      : { href: null, label: null, body: "Nothing here yet. When a company sends you a proposal or an offer, you can talk to them here." };
 
   return (
     <>
@@ -100,7 +100,8 @@ export function MessagesShell({
             as="h2"
             title="No conversations yet"
             body={next.body}
-            next={{ href: next.href, label: next.label }}
+            next={next.href && next.label ? { href: next.href, label: next.label } : undefined}
+            who={base === "employer" ? undefined : "Companies message you first"}
             className="w-full max-w-md py-16"
           />
         ) : (
