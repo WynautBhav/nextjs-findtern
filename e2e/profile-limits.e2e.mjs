@@ -32,6 +32,9 @@ before(async () => {
   I = await mkIntern("limI", { skills: SKILLS.slice(0, 4) });
   L = await mkIntern("limL", { skills: SKILLS }); // legacy: 9 skills
   A9 = await mkIntern("limA", { skills: SKILLS }); // legacy: 9 skills
+  // L opens /intern/profile below. A fresh, unpaid intern with an incomplete profile is sent to onboarding from there
+  // (WP-C), so L is marked paid the legacy way (extra_data.payment.isPaid), which unlocks without a payment row to clean up.
+  await one(`UPDATE intern_onboarding SET extra_data = jsonb_build_object('payment', jsonb_build_object('isPaid', true)) WHERE user_id = $1 RETURNING id`, [L.id]);
   P.I = await signedIn(browser, I);
   P.L = await signedIn(browser, L);
   P.E = await signedIn(browser, E);

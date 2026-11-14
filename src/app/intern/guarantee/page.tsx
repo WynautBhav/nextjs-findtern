@@ -4,6 +4,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import { PageHead, Surface } from "@/components/app/primitives";
 import { Tile } from "@/components/app/tiles";
 import { requireRole } from "@/lib/auth";
+import { guardPrecomplete } from "@/lib/intern-precomplete";
 import { CONDITIONS, EXCLUSIONS, FAQS, PROGRAM_TERMS, STEPS, termsFor } from "@/lib/content/guarantee";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 
@@ -19,7 +20,9 @@ export const metadata: Metadata = {
  * already signed up.
  */
 export default async function InternGuarantee() {
-  await requireRole("intern");
+  const session = await requireRole("intern");
+  // Closed until the profile is complete (unpaid interns only).
+  await guardPrecomplete(session.uid, "/intern/guarantee");
   const fee = Math.round((await getInternActivationFeeMinor()) / 100);
 
   return (

@@ -188,6 +188,9 @@ export default async function InternHome() {
     hasAadhaarImage: Boolean(data.document?.aadhaarImageName),
     hasPhoto: Boolean(data.document?.profilePhotoName),
   });
+  // Unpaid and not complete: Home is the Getting started / Complete profile card and nothing else, because every other
+  // page it could link to is closed until the profile is done (lib/intern-lock.ts, precompleteVerdict).
+  const preComplete = lockState === "locked" && !completion.complete;
   const gettingStarted = !working && (!completion.complete || !activated || aiPhase !== "scored");
   // Whether employers can find this profile (legacy dashboard.tsx:1031: paid and
   // scored). Someone already hired got there through a visible profile, even when
@@ -229,8 +232,8 @@ export default async function InternHome() {
   // Key numbers: only the ones this person has. The first one is brand-filled.
   const approvedHours = data.timesheets.filter((t) => t.status === "approved").reduce((sum, t) => sum + hoursIn(t), 0);
   const waitingHours = data.timesheets.filter((t) => t.status === "submitted").reduce((sum, t) => sum + hoursIn(t), 0);
-  const allMonths = data.timesheets.length > 0 ? hoursByMonth(data.timesheets, now, 6, sheetOffer?.startDate ? new Date(sheetOffer.startDate) : null) : null;
-  const stats: React.ComponentProps<typeof StatTile>[] = [
+  const allMonths = data.timesheets.length > 0 && !preComplete ? hoursByMonth(data.timesheets, now, 6, sheetOffer?.startDate ? new Date(sheetOffer.startDate) : null) : null;
+  const stats: React.ComponentProps<typeof StatTile>[] = preComplete ? [] : [
     ...(data.money.paidMinor > 0
       ? [{
           label: "Paid to you",
@@ -277,7 +280,7 @@ export default async function InternHome() {
   const interviewCompany = upcomingInterviewItem
     ? data.names[upcomingInterviewItem.interview.employerId] ?? "the company"
     : "";
-  const nextUp = canOpen && next ? (
+  const nextUp = canOpen && !preComplete && next ? (
     next.kind === "interview" && upcomingInterviewItem ? (
       <NextUpTile next={next} today={today} heading={`Interview with ${interviewCompany}`} href="/intern/interviews" hrefLabel="Interviews">
         {upcomingInterviewItem.interview.meetingLink ? (
@@ -446,7 +449,7 @@ export default async function InternHome() {
         </Tile>
       ) : null}
 
-      {ratings ? (
+      {ratings && !preComplete ? (
         <Tile title="How your score is made" action={canOpen ? { href: "/intern/record", label: "Score details" } : undefined}>
           <ScoreScale rows={ratings.map(([label, value]) => ({ label, value }))} />
         </Tile>
@@ -581,7 +584,7 @@ export default async function InternHome() {
         {/* Before the profile is live the glanceable facts sit beside the current
             stage, and Activity shows only once there is some. */}
         {gettingStarted ? (
-          history.length > 0 ? <div className="grid gap-4">{activity}</div> : null
+          history.length > 0 && !preComplete ? <div className="grid gap-4">{activity}</div> : null
         ) : (
           <div className="grid gap-4 xl:grid-cols-3">
             <div className="grid min-w-0 content-start gap-4 xl:col-span-2">

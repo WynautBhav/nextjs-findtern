@@ -7,6 +7,7 @@ import {
   BriefcaseBusiness,
   CalendarCheck2,
   CircleUserRound,
+  ClipboardCheck,
   House,
   LayoutList,
   MessageSquare,
@@ -33,7 +34,8 @@ import { nextAction, type Stage } from "@/lib/journey";
 import { SITE } from "@/lib/content/site";
 import { shouldShowTermsPrompt } from "@/lib/terms";
 import { internUnlockState } from "@/lib/intern-unlock";
-import { isNavLocked, isOpenInternPage, lockEnabled, lockedHref } from "@/lib/intern-lock";
+import { isNavLocked, isOpenInternPage, lockEnabled, lockedHref, precompleteVerdict, PRECOMPLETE_LOCK_TEXT } from "@/lib/intern-lock";
+import { profileCompleteFrom } from "@/lib/intern-precomplete";
 
 export const metadata = { title: "Findtern" };
 
@@ -84,6 +86,19 @@ const MORE_NAV: ConsoleNavItem[] = [
 ];
 
 /**
+ * The tab bar while the profile is not complete (unpaid interns only): Home and Complete profile are the open
+ * entries; Documents and Your profile are locked "until the profile is complete" (they send you to onboarding),
+ * and Offers is locked for payment. Settings and Notifications are open, under More.
+ */
+const PRECOMPLETE_STAGE_NAV: ConsoleNavItem[] = [
+  { href: "/intern/dashboard", label: "Home", icon: <House /> },
+  { href: "/intern/onboarding", label: "Complete profile", icon: <ClipboardCheck /> },
+  { href: "/intern/documents", label: "Documents", icon: <BadgeCheck /> },
+  { href: "/intern/profile", label: "Your profile", icon: <CircleUserRound /> },
+  { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
+];
+
+/**
  * The intern shell.
  *
  * The stage and the attention list are derived here, once, from the rows the
@@ -123,6 +138,14 @@ export default async function InternLayout({ children }: { children: React.React
   // Second line behind the proxy: the same decision, for a page the proxy let through (it only fails open on a database error).
   const here = (await headers()).get("x-ft-path");
   if (lockedNav && here && !isOpenInternPage(here)) redirect(lockedHref(here));
+  // Before the profile is complete (and unpaid) Documents and Your profile close too: they send you to onboarding, which
+  // is always open, so this cannot loop. The pages repeat the check (a client-side move does not re-run this layout).
+  // An unreadable checklist is null and fails open.
+  const profileComplete = lockedNav ? profileCompleteFrom(data) : null;
+  const precomplete = lockedNav && profileComplete === false;
+  if (precomplete && here && precompleteVerdict({ pathname: here, complete: profileComplete, locked: lockedNav }) === "redirect_onboarding") {
+    redirect("/intern/onboarding");
+  }
   // The drive banner is rendered by the server too, so it is in the first paint instead of arriving with the first heartbeat.
   const liveDrive = college?.isPartner ? await liveDriveFor(college.collegeId).catch(() => null) : null;
   const action = nextAction(data.thread);
@@ -133,11 +156,18 @@ export default async function InternLayout({ children }: { children: React.React
   const unreadAlerts = Number(unread?.value ?? 0);
 
   const badge = (n: number) => (n > 99 ? "99+" : n);
-  // Before payment: Home, Documents and Your profile lead (the three that are open), and every other entry
+  // Before payment: Home, Documents and Your profile lead (the three that are open; before the profile is complete,
+  // Home and Complete profile lead and those two are locked), and every other entry
   // carries a lock and points at /intern/locked. The lock is the same rule the proxy enforces (lib/intern-lock.ts).
-  const mainSource = lockedNav ? LOCKED_STAGE_NAV : STAGE_NAV[data.stage];
-  const lock = (i: ConsoleNavItem): ConsoleNavItem =>
-    isNavLocked(i.href, !lockedNav) ? { ...i, href: lockedHref(i.href), locked: true, liveUnread: false } : i;
+  const mainSource = precomplete ? PRECOMPLETE_STAGE_NAV : lockedNav ? LOCKED_STAGE_NAV : STAGE_NAV[data.stage];
+  const lock = (i: ConsoleNavItem): ConsoleNavItem => {
+    // Open under the payment lock, closed only until the profile is complete: lock it. The href stays, so every entry
+    // has its own link; the page sends the intern to onboarding.
+    if (precomplete && (i.href === "/intern/documents" || i.href === "/intern/profile")) {
+      return { ...i, locked: true, lockedNote: PRECOMPLETE_LOCK_TEXT, liveUnread: false };
+    }
+    return isNavLocked(i.href, !lockedNav) ? { ...i, href: lockedHref(i.href), locked: true, liveUnread: false } : i;
+  };
   const main = mainSource.map((item) => ({
     ...lock(item),
     attention: !lockedNav && attentionHrefs.some((h) => h.startsWith(item.href)) && item.href !== "/intern/dashboard",

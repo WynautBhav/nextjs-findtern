@@ -6,6 +6,7 @@ import { PageHead, Surface } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
 import { LOCK_TEXT, lockEnabled, lockedPageName } from "@/lib/intern-lock";
+import { internProfileComplete } from "@/lib/intern-precomplete";
 import { internUnlockState } from "@/lib/intern-unlock";
 
 export const metadata: Metadata = {
@@ -25,11 +26,18 @@ export default async function InternLocked({ searchParams }: { searchParams: Pro
 
   if (!lockEnabled() || (await internUnlockState(session.uid)) === "unlocked") redirect("/intern/dashboard");
 
+  // Before the profile is complete only Home, Complete profile, Settings and Notifications are open (an unreadable check reads as complete).
+  const precomplete = (await internProfileComplete(session.uid)) === false;
+
   return (
     <div>
       <PageHead
         title={name ? `${name} ${LOCK_TEXT.charAt(0).toLowerCase()}${LOCK_TEXT.slice(1)}` : LOCK_TEXT}
-        lede="Home, Documents and Your profile are open now. The rest opens once your profile is activated."
+        lede={
+          precomplete
+            ? "Home, Complete profile, Settings and Notifications are open now. Documents and Your profile open once your profile is complete, and the rest once it is activated."
+            : "Home, Documents and Your profile are open now. The rest opens once your profile is activated."
+        }
       />
       <Surface className="max-w-2xl p-6 sm:p-8">
         <div className="flex items-start gap-4">
