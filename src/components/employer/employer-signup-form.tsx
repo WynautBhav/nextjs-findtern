@@ -313,7 +313,7 @@ export function EmployerSignupForm({
         value={name}
         onChange={setName}
         autoComplete="name"
-        placeholder="Priya Sharma"
+        placeholder="John Doe"
       />
 
       <TextInput
