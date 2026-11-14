@@ -1,12 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { ArrowRight, PencilLine } from "lucide-react";
+import { PencilLine } from "lucide-react";
 import { eq } from "drizzle-orm";
 
-import { DetailRow, PageHead } from "@/components/app/primitives";
+import { PageHead } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
-import { CompletionList } from "@/components/intern/completion-list";
-import { OpenToWorkToggle } from "@/components/intern/open-to-work-toggle";
 import { ProfileView, type ProfileStatus } from "@/components/intern/profile-view";
 import { requireRole } from "@/lib/auth";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
@@ -14,7 +11,7 @@ import { aiInterviewPhase, isScored, latestAiInterview } from "@/lib/ai-intervie
 import { getDb, schema } from "@/lib/db";
 import { loadInternData } from "@/lib/intern-data";
 import { initialsOf } from "@/lib/employer-candidates";
-import { draftFromRecord, emptyDraft, linkedinHref, profileCompletion, type OnboardingDraft } from "@/lib/onboarding";
+import { draftFromRecord, emptyDraft, profileCompletion, type OnboardingDraft } from "@/lib/onboarding";
 import { isInternPaid } from "@/lib/payments";
 
 export const metadata: Metadata = {
@@ -34,8 +31,9 @@ const RATING_LABELS: [key: string, label: string][] = [
  * Your profile, as employers read it (INT-13), with the status legacy showed
  * (INT-14): "Profile live" only once activation is paid and the score is
  * published, "Profile pending" before that, "Profile hidden" while
- * open-to-work is off. The rail holds what only the candidate sees:
- * completeness, visibility and the private contact details.
+ * open-to-work is off. The summary beside the sections holds what only the
+ * candidate sees: name, completeness and the next step; the private contact
+ * details and documents are the last two cards.
  */
 export default async function InternProfile() {
   const session = await requireRole("intern");
@@ -100,7 +98,11 @@ export default async function InternProfile() {
   const aiLinks = await aiInterviewLinks(session.uid, extra);
 
   const emergency = draft?.emergencyPhone
-    ? [draft.emergencyName, draft.emergencyRelation && `(${draft.emergencyRelation})`, `${draft.emergencyCountryCode ?? "+91"} ${draft.emergencyPhone}`]
+    ? [
+        draft.emergencyName,
+        draft.emergencyRelation && `(${draft.emergencyRelation})`,
+        `${draft.emergencyCountryCode ?? "+91"} ${draft.emergencyPhone}`,
+      ]
         .filter(Boolean)
         .join(" ")
     : null;
@@ -110,10 +112,10 @@ export default async function InternProfile() {
       <PageHead
         title="Your profile"
         lede="Employers search this profile, not applications. Keep it current."
-        // An empty profile has its own "Start your profile" below; one filled button per view.
+        // One filled button per view: while a step is open the summary's "Continue" is it, and this one steps back.
         action={
           draft ? (
-            <ButtonLink href="/intern/onboarding">
+            <ButtonLink href="/intern/onboarding" variant={completion.complete ? "primary" : "outline"}>
               <PencilLine className="size-4" aria-hidden />
               Edit profile
             </ButtonLink>
@@ -121,61 +123,28 @@ export default async function InternProfile() {
         }
       />
 
-      <div className="grid gap-x-12 xl:grid-cols-[minmax(0,1fr)_19rem]">
-        {/* Phones: what is still missing comes first, it is the one thing to do here. */}
-        {!completion.complete ? <CompletionList completion={completion} className="mb-6 xl:hidden" /> : null}
-
-        <div className="min-w-0">
-          <ProfileView
-            initials={initials}
-            photoUrl={data.document?.profilePhotoName ? "/api/intern/avatar" : null}
-            status={status}
-            score={score}
-            ratings={ratings}
-            draft={draft}
-            aiLinks={aiLinks}
-          />
-        </div>
-
-        <aside className="min-w-0 border-t border-ink-200/70 xl:border-t-0 xl:border-l xl:pl-8">
-          {!completion.complete ? <CompletionList completion={completion} className="max-xl:hidden" /> : null}
-
-          <div className="border-b border-ink-200/70 py-6 xl:pt-0 [&:not(:first-child)]:xl:pt-6">
-            <OpenToWorkToggle initial={openToWork} />
-          </div>
-
-          <section aria-labelledby="private-head" className="py-6">
-            <h2 id="private-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
-              Hidden until you are hired
-            </h2>
-            <p className="mt-1 text-sm text-ink-600">Only you and Findtern see these. A company gets them once it hires you.</p>
-            <dl className="mt-2 divide-y divide-ink-100">
-              <DetailRow label="Email" value={<span className="break-all">{user?.email ?? "-"}</span>} />
-              <DetailRow label="Phone" mono value={user?.phone ? `${user.countryCode} ${user.phone}` : "Not added"} />
-              <DetailRow label="Emergency" value={emergency ?? "Not added"} />
-              <DetailRow
-                label="LinkedIn"
-                value={
-                  linkedinHref(draft?.linkedinUrl) ? (
-                    <a href={linkedinHref(draft?.linkedinUrl) ?? undefined} target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
-                      Open
-                    </a>
-                  ) : (
-                    "Not added"
-                  )
-                }
-              />
-            </dl>
-            <Link
-              href="/intern/settings#details"
-              className="mt-2 inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline"
-            >
-              Change name or phone in Settings
-              <ArrowRight className="size-4" aria-hidden />
-            </Link>
-          </section>
-        </aside>
-      </div>
+      <ProfileView
+        name={`${user?.first ?? ""} ${user?.last ?? ""}`.trim() || "Candidate"}
+        initials={initials}
+        photoUrl={data.document?.profilePhotoName ? "/api/intern/avatar" : null}
+        status={status}
+        score={score}
+        ratings={ratings}
+        draft={draft}
+        aiLinks={aiLinks}
+        completion={completion}
+        openToWork={openToWork}
+        contact={{
+          email: user?.email ?? "",
+          phone: user?.phone ? `${user.countryCode} ${user.phone}` : null,
+          emergency,
+        }}
+        files={{
+          photo: Boolean(data.document?.profilePhotoName),
+          panImage: Boolean(data.document?.panImageName),
+          aadhaarImage: Boolean(data.document?.aadhaarImageName),
+        }}
+      />
     </div>
   );
 }
