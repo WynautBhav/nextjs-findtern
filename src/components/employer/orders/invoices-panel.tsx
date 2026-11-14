@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Download, Eye } from "lucide-react";
+import { Download, Eye, FileText } from "lucide-react";
 
-import { EmptyScene, Surface } from "@/components/app/primitives";
+import { Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RowMenu } from "@/components/app/row-menu";
@@ -14,7 +14,8 @@ import { downloadInvoice } from "@/lib/invoice";
 import { matchesQuery } from "@/lib/orders-filter";
 import { cn } from "@/lib/utils";
 import type { InvoiceRow } from "./types";
-import { LiveCount, ResetButton, SearchField } from "./shared";
+import { OrdersEmpty } from "./empty";
+import { LiveCount, ResetButton, SearchField, TOOLBAR_CARD } from "./shared";
 
 /* ── Invoices (legacy payment history) ─────────────────────────────── */
 
@@ -41,19 +42,19 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
 
   if (invoices.length === 0) {
     return (
-      <EmptyScene
-        art
+      <OrdersEmpty
+        icon={<FileText />}
         title="No invoices yet"
         body="A tax invoice is issued for every completed payment. Cancelled or failed checkouts don't create one."
+        hint="Next: complete a payment"
         next={{ label: "Go to checkout", href: "/employer/checkout" }}
-        who="You - complete a payment"
       />
     );
   }
 
   return (
     <div>
-      <div className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_10rem_10rem_10rem_auto] lg:items-end">
+      <div className={cn(TOOLBAR_CARD, "grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_10rem_10rem_10rem_auto] lg:items-end")}>
         <SearchField value={q} onChange={setQ} placeholder="Candidate, project, invoice or order ID" />
         <label className={labelClass}>
           Currency
@@ -87,10 +88,10 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
       </div>
 
       {filtered.length === 0 ? (
-        <EmptyScene title="No invoice matches" body="Try another name or ID, or reset the filters to see every invoice." className="py-10" />
+        <OrdersEmpty compact title="No invoice matches" body="Try another name or ID, or reset the filters to see every invoice." />
       ) : (
         <Surface data-stack tabIndex={0} role="region" aria-label="Invoices" className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
-          <table className="w-full border-collapse lg:min-w-[48rem]">
+          <table className="w-full border-collapse lg:min-w-[42rem]">
             <thead className="border-b border-ink-100 bg-ink-50">
               <tr>
                 <th scope="col" className={thClass}>Invoice</th>
@@ -120,7 +121,7 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                   <td data-label="Amount" className={cn(tdClass, "nums text-right font-semibold text-ink-900")}>
                     {formatMoney(i.amountMinor, i.currency, { zeroLabel: false })}
                   </td>
-                  <td data-label="Paid on" className={cn(tdClass, "nums")}>{i.paidAt ? formatDate(i.paidAt) : "-"}</td>
+                  <td data-label="Paid on" className={cn(tdClass, "nums whitespace-nowrap")}>{i.paidAt ? formatDate(i.paidAt) : "-"}</td>
                   <td className={cn(tdClass, "text-right lg:sticky lg:right-0 lg:bg-white lg:shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
                     <div className="flex justify-end gap-2">
                       <button

@@ -27,12 +27,12 @@ import { expireStaleEmployerOrders } from "@/lib/payments";
 import { isPaidRow } from "@/lib/admin/invoice-rows";
 
 export const metadata: Metadata = {
-  title: "Orders & payments",
+  title: "Orders",
   robots: { index: false, follow: false },
 };
 
 /**
- * Orders & payments.
+ * Orders.
  *
  * Three questions, one tab each: who have I hired (and on what terms), what
  * have I paid and what is left (legacy "Upcoming payments", per hire with
@@ -51,7 +51,7 @@ export default async function EmployerOrdersPage() {
   if (!data) {
     return (
       <div>
-        <PageHead title="Orders & payments" />
+        <PageHead title="Orders" />
         <LoadError what="your orders" retryHref="/employer/orders" email={SITE.adminEmail} />
       </div>
     );

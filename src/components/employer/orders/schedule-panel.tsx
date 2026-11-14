@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import { CalendarCheck } from "lucide-react";
 
-import { EmptyScene, Pill, Surface, type Tone } from "@/components/app/primitives";
+import { Pill, Surface, type Tone } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { tdClass, thClass } from "@/components/employer/ui-tokens";
 import { formatDate, formatMoney } from "@/lib/format";
@@ -12,7 +12,8 @@ import { filterHires } from "@/lib/orders-filter";
 import { todayIst } from "@/lib/offer";
 import { cn } from "@/lib/utils";
 import type { HireRow } from "./types";
-import { INLINE_LINK, LiveCount, ResetButton, SearchField, STATUS } from "./shared";
+import { OrdersEmpty } from "./empty";
+import { LiveCount, ResetButton, SearchField, STATUS, TOOLBAR_CARD } from "./shared";
 
 const payHref = (h: HireRow) => `/employer/checkout?proposal=${encodeURIComponent(h.proposalId)}`;
 
@@ -28,19 +29,20 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
 
   if (hires.length === 0) {
     return (
-      <EmptyScene
-        art
-        title="No payment schedule yet"
+      <OrdersEmpty
+        icon={<CalendarCheck />}
+        title="No payments yet"
         body="Each hire's total, what you've paid and the next instalment date appear here once a placement starts."
+        hint="Next: complete a hire"
         next={{ label: "Your proposals", href: "/employer/proposals" }}
-        who="You - complete a hire"
       />
     );
   }
 
   return (
     <div>
-      <div className="mb-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end lg:grid-cols-[minmax(0,1.6fr)_auto]">
+      <div className={TOOLBAR_CARD}>
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end lg:grid-cols-[minmax(0,1.6fr)_auto]">
         <SearchField value={q} onChange={setQ} placeholder="Candidate, project or role" />
         <ResetButton
           enabled={Boolean(q) || filter !== "all"}
@@ -51,7 +53,7 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
         />
         <LiveCount active={Boolean(q.trim()) || filter !== "all"} shown={rows.length} total={hires.length} noun="hires" />
       </div>
-      <div className="mb-3 flex flex-wrap items-center gap-2" role="group" aria-label="Filter by payment state">
+      <div className="mt-3 flex flex-wrap items-center gap-2" role="group" aria-label="Filter by payment state">
         {(
           [
             ["all", "All"],
@@ -66,16 +68,18 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
             onClick={() => setFilter(id)}
             className={cn(
               "apple-spring min-h-9 rounded-full border px-3.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600",
-              filter === id ? "border-brand-700 bg-brand-700 text-white" : "border-ink-200 bg-white text-ink-700 hover:border-ink-300",
+              filter === id ? "border-brand-200 bg-brand-100 font-semibold text-brand-900" : "border-ink-200 bg-white text-ink-700 hover:border-ink-300",
             )}
           >
             {label}
           </button>
         ))}
       </div>
+      </div>
 
       {rows.length === 0 ? (
-        <EmptyScene
+        <OrdersEmpty
+          compact
           title={q.trim() ? "No hire matches" : "Nothing here"}
           body={
             q.trim() && filter !== "all"
@@ -86,12 +90,11 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                   ? "No hire is partly paid right now. Choose another payment state or reset."
                   : "No hire is fully paid yet. Choose another payment state or reset."
           }
-          className="py-10"
         />
       ) : (
         /* Below lg each hire stacks into labelled lines ([data-stack], globals.css); the wide table only from lg. */
         <Surface data-stack tabIndex={0} role="region" aria-label="Hires and payments" className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
-          <table className="w-full border-collapse lg:min-w-[52rem]">
+          <table className="w-full border-collapse lg:min-w-[42rem]">
             <thead className="border-b border-ink-100 bg-ink-50/60">
               <tr>
                 <th scope="col" className={thClass}>Candidate</th>
@@ -100,7 +103,7 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                 <th scope="col" className={cn(thClass, "text-right")}>Left</th>
                 <th scope="col" className={thClass}>Paid on</th>
                 <th scope="col" className={thClass}>Next due</th>
-                <th scope="col" className={cn(thClass, "text-right")}>
+                <th scope="col" className={cn(thClass, "text-right lg:sticky lg:right-0 lg:bg-ink-50 lg:shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
                   <span className="sr-only">Action</span>
                 </th>
               </tr>
@@ -118,7 +121,7 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                       <div className="min-w-0 [overflow-wrap:anywhere]">
                         <p className="font-medium text-ink-900">{h.candidateName}</p>
                         <p className="text-sm text-ink-600">{h.projectName}</p>
-                        <Pill tone={s.tone} className="mt-1.5">{s.label}</Pill>
+                        <Pill tone={s.tone} className={cn("mt-1.5", overdue && "bg-danger-soft text-danger ring-danger/25")}>{s.label}</Pill>
                       </div>
                     </td>
                     <td data-label="Total" className={cn(tdClass, "nums text-right font-medium text-ink-900")}>{m(h.ledger.totalMinor)}</td>
@@ -130,7 +133,7 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                       {h.ledger.paidOn.length ? (
                         <ul className="space-y-0.5">
                           {h.ledger.paidOn.map((d, i) => (
-                            <li key={`${d}-${i}`}>{formatDate(d)}</li>
+                            <li key={`${d}-${i}`} className="whitespace-nowrap">{formatDate(d)}</li>
                           ))}
                         </ul>
                       ) : (
@@ -143,14 +146,6 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                           {h.ledger.nextDue < today ? (
                             <>
                               <span className="font-medium text-danger">Overdue since {formatDate(h.ledger.nextDue)}</span>
-                              {pay.show && pay.enabled ? (
-                                <>
-                                  {" · "}
-                                  <Link href={payHref(h)} className={INLINE_LINK}>
-                                    Pay now
-                                  </Link>
-                                </>
-                              ) : null}
                             </>
                           ) : h.ledger.plan === "postpaid" ? (
                             h.ledger.nextDue === today ? <span className="font-medium">Due now</span> : `Due on ${formatDate(h.ledger.nextDue)}`
@@ -165,7 +160,7 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                         "-"
                       )}
                     </td>
-                    <td className={cn(tdClass, "text-right")}>
+                    <td className={cn(tdClass, "text-right lg:sticky lg:right-0 lg:bg-white lg:shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
                       {pay.show ? (
                         pay.enabled ? (
                           <ButtonLink href={payHref(h)} size="sm">
