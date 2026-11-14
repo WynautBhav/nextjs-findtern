@@ -42,3 +42,9 @@ export const looksLikeThanks = (text: string): boolean => THANKS.test(text);
 /** Mood after a successful reply: a thumbs-up for thanks beats the one-time first-reply cheer. */
 export const replyState = (userText: string, firstReply: boolean): MascotState =>
   looksLikeThanks(userText) ? "thanked" : firstReply ? "celebrating" : "idle";
+
+/** WebKit plays VP9 WebM but drops its alpha, so it gets the opaque MP4 on the matching stage colour (or no alpha clip at all). Call in effects only. */
+export function prefersMp4(): boolean {
+  const ua = navigator.userAgent;
+  return /iPhone|iPad|iPod/.test(ua) || (/Safari/.test(ua) && !/Chrome|Chromium|Android/.test(ua));
+}

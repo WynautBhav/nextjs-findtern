@@ -6,7 +6,7 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { clipDir, clipPad, needsTile, PAGE_CLIP_SM_MAX_PX, PAGE_CLIPS, STAGE_LIGHT, type PageClip } from "./mascot-clips";
 import { setPageOwlVisible, usePageOwlVisible } from "./page-owl-store";
-import { clipFor, isOneShot, type MascotState } from "./mascot-state";
+import { clipFor, isOneShot, prefersMp4, type MascotState } from "./mascot-state";
 
 export type { PageClip } from "./mascot-clips";
 
@@ -16,11 +16,6 @@ export const MASCOT_STAGE_BG = STAGE_LIGHT;
 const BASE = "/media/mascot";
 const FADE_S = 0.2;
 
-/** WebKit plays VP9 WebM but drops its alpha, so it gets the opaque MP4 on the matching stage colour. */
-function prefersMp4(): boolean {
-  const ua = navigator.userAgent;
-  return /iPhone|iPad|iPod/.test(ua) || (/Safari/.test(ua) && !/Chrome|Chromium|Android/.test(ua));
-}
 
 /**
  * The owl, driven by `state`. Fills its (square) parent; decorative, so hidden from assistive tech.

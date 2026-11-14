@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
+import { prefersMp4 } from "@/components/chat/mascot-state";
+
 /**
  * Findy lives around the header logo (prototype).
  *
@@ -12,7 +14,7 @@ import { useEffect, useRef } from "react";
  *
  * Plays once per browser session after `load`, and as a short cameo on every hover/focus
  * of the logo (a hover during a run queues one replay). Nothing is
- * downloaded for prefers-reduced-motion or browsers without VP9-alpha WebM.
+ * downloaded for prefers-reduced-motion or browsers without VP9-alpha WebM (Safari/iOS drop the alpha).
  *
  * Replay: `sessionStorage.removeItem("findy-logo-seen")` and reload.
  */
@@ -43,7 +45,9 @@ export function LogoFindy() {
     if (!layer || !move || !bob || !wave || !walk || !link) return;
 
     // Reduced motion / unsupported codec: render nothing, download nothing.
+    // canPlayType alone is not enough: WebKit says "maybe" for VP9 but drops the alpha, which would show an opaque box under the logo.
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    if (prefersMp4()) return;
     if (!wave.canPlayType('video/webm; codecs="vp9"')) return;
 
     let disposed = false;
