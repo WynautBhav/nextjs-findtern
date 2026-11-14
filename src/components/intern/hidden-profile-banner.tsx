@@ -10,8 +10,9 @@ import { csrfFetch } from "@/lib/client-fetch";
 /**
  * Top of Home while Open to work is off: the profile is invisible to employers,
  * and a text line further down is easy to miss (bug sheet 12 Nov, row 22). The
- * dot pulses to draw the eye; `motion-safe:` means a reduced-motion setting
- * gets a still dot. The action flips the same `openToWork` flag the profile
+ * dot blinks red (opacity only, .status-blink in globals.css) to draw the eye;
+ * the text beside it says the same in words, and a reduced-motion setting gets
+ * a still dot. The action flips the same `openToWork` flag the profile
  * switch does.
  */
 export function HiddenProfileBanner() {
@@ -47,8 +48,8 @@ export function HiddenProfileBanner() {
     >
       <div className="flex min-w-0 items-start gap-3">
         <span className="relative mt-1 grid size-3 shrink-0 place-items-center" aria-hidden>
-          <span className="absolute inline-flex size-3 rounded-full bg-warning opacity-60 motion-safe:animate-ping" />
-          <span className="relative inline-flex size-2 rounded-full bg-warning motion-safe:animate-pulse" />
+          <span className="status-halo absolute inline-flex size-3 rounded-full bg-danger opacity-0" />
+          <span className="status-blink relative inline-flex size-2 rounded-full bg-danger" />
         </span>
         <div className="min-w-0">
           <p className="flex items-center gap-1.5 font-semibold">

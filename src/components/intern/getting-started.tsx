@@ -35,6 +35,7 @@ export function GettingStarted({
   aiLink,
   hidden = false,
   collegeName = null,
+  collegeAccount = null,
   aside,
 }: {
   completion: Completion;
@@ -49,13 +50,18 @@ export function GettingStarted({
   hidden?: boolean;
   /** A college that has paid for a batch: its code can waive the fee (shown on top, once the profile is complete). */
   collegeName?: string | null;
+  /**
+   * A college account (WP4): the fee is its college's. No price anywhere, no fee tile; the Activation stop and tile say
+   * who pays. `unpaid` shows the promo card in place of the payment form, `paid` says the college paid.
+   */
+  collegeAccount?: { name: string; state: "unpaid" | "paid" } | null;
   aside?: React.ReactNode;
 }) {
   const scored = aiPhase === "scored";
   const fee = formatMoney(feeMinor, "INR");
   const stage = gettingStartedStage({ profileComplete: completion.complete, activated, scored });
   // The price stays out of sight until the profile is complete (bug sheet 12 Nov, row 17).
-  const feeVisible = showFee(stage);
+  const feeVisible = showFee(stage) && !collegeAccount;
   const done = [completion.complete, activated, scored];
   const doneCount = done.filter(Boolean).length;
   const stateOf = (i: number): StopState => (i === stage ? "current" : done[i] ? "done" : "todo");
@@ -77,7 +83,7 @@ export function GettingStarted({
     },
     {
       title: "Activation",
-      status: activated ? "Paid" : feeVisible ? `${fee}, one-time` : "After your profile",
+      status: collegeAccount ? (activated ? "Paid by your college" : "Your college pays") : activated ? "Paid" : feeVisible ? `${fee}, one-time` : "After your profile",
       unlocks: "Opens the AI interview",
       fill: activated ? 1 : 0,
     },
@@ -95,7 +101,7 @@ export function GettingStarted({
 
   return (
     <div className="grid gap-4 xl:grid-cols-3">
-      {collegeName && stage === 1 && !activated ? <CollegeCodeNotice collegeName={collegeName} /> : null}
+      {collegeName && !collegeAccount && stage === 1 && !activated ? <CollegeCodeNotice collegeName={collegeName} /> : null}
       {/* ── The current stage, opened. ── */}
       {stage === 0 ? (
         <Tile
@@ -120,7 +126,10 @@ export function GettingStarted({
       ) : stage === 1 ? (
         // The anchor "Go to activation" lands on; the wrapper keeps the tile's grid slot and height.
         <div id="activation" className="scroll-mt-24 xl:col-span-2 [&>section]:h-full">
-          <Tile title="Activate your profile" description="Your profile is complete. Activation is the only payment you make on Findtern.">
+          <Tile
+            title={collegeAccount ? "Your college has paid" : "Activate your profile"}
+            description={collegeAccount ? undefined : "Your profile is complete. Activation is the only payment you make on Findtern."}
+          >
             {payment}
           </Tile>
         </div>
@@ -142,6 +151,7 @@ export function GettingStarted({
 
       <div className="grid min-w-0 content-start gap-4 md:grid-cols-2 md:[&>:last-child:nth-child(odd)]:col-span-2 xl:grid-cols-1 xl:[&>:last-child:nth-child(odd)]:col-span-1">
         {feeVisible ? <FeeTile fee={fee} activated={activated} /> : null}
+        {collegeAccount?.state === "paid" && stage >= 1 ? <CollegePaidTile name={collegeAccount.name} /> : null}
         {aside}
       </div>
       {/* ── The journey: the screen's one brand tile. ── */}
@@ -299,6 +309,20 @@ function FeeTile({ fee, activated }: { fee: string; activated: boolean }) {
       >
         How the 6-month guarantee works
       </Link>
+    </Tile>
+  );
+}
+
+/** A college account once the college's payment is recorded: who paid, no amount. */
+function CollegePaidTile({ name }: { name: string }) {
+  return (
+    <Tile title="Activation" aside={<Pill tone="live">Paid</Pill>}>
+      <p className="flex items-start gap-3 text-sm text-ink-700">
+        <Check className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
+        <span>
+          Paid by <span className="font-medium text-ink-900">{name}</span>. Nothing is charged to you.
+        </span>
+      </p>
     </Tile>
   );
 }

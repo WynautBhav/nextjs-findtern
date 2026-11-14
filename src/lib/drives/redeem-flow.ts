@@ -1,4 +1,4 @@
-import { withPgTransaction } from "@/lib/db/pg-tx";
+import { withPgTransaction, type PgClient } from "@/lib/db/pg-tx";
 import { promoConsentNotice } from "@/lib/college/promo-consent";
 import { markInternPaidFlag } from "@/lib/payments";
 import { notify } from "@/lib/notify";
@@ -10,18 +10,22 @@ import { redeemDriveCode } from "./redeem-db";
  * Redeem a drive code for a student and tell them. The one path behind both "type your code" and "claim what
  * your college paid", so the waiver, the consent record and the notification can never differ between them.
  * Throws RedeemRefused when the code is not usable.
+ *
+ * `verify` runs first, inside the same transaction: a college account's promo field uses it to check the
+ * student's name, phone and email against the roster row the code was issued to. A throw rolls everything back.
  */
-export async function redeemForStudent(input: { uid: string; code: string; declaredAdult: boolean }) {
-  const out = await withPgTransaction((client) =>
-    redeemDriveCode(client, {
+export async function redeemForStudent(input: { uid: string; code: string; declaredAdult: boolean; verify?: (client: PgClient) => Promise<void> }) {
+  const out = await withPgTransaction(async (client) => {
+    await input.verify?.(client);
+    return redeemDriveCode(client, {
       code: input.code,
       internId: input.uid,
       secret: driveCodeSecret(),
       now: new Date(),
       consentNotice: promoConsentNotice("your college"),
       declaredAdult: input.declaredAdult,
-    }),
-  );
+    });
+  });
   await markInternPaidFlag(input.uid, { orderId: `drive:${out.codeId}`, paymentId: out.paymentId }).catch((e) => console.error("[drive-redeem] paid flag", e));
   await notify({
     to: { type: "intern", id: input.uid },

@@ -94,6 +94,9 @@ export const AUDIT_ACTIONS = {
   "account.password_change": "Changed own password",
   "college_code.attempt": "A candidate tried a college code that did not open a college",
   "college_code.joined": "A candidate joined a college with its code",
+  "college_promo.attempt": "A college-account candidate tried a promo code that was not accepted",
+  "college_promo.redeemed": "A college-account candidate's fee was settled by their college's promo code",
+  "account_type.switch": "A candidate switched between an individual and a college account",
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

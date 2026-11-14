@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { collegeAccountPayBlock } from "@/lib/college/account-state";
 import { requireMutation } from "@/lib/guards-mutation";
 import { RedeemRefused } from "@/lib/drives/redeem-db";
 import { redeemForStudent } from "@/lib/drives/redeem-flow";
@@ -20,6 +21,9 @@ export async function POST(req: Request) {
   const guard = await requireMutation({ req, roles: ["intern"] });
   if (!guard.ok) return guard.response;
   const uid = guard.session.uid;
+  // A college account uses the promo field on Home, which also checks name, phone and email.
+  const blocked = await collegeAccountPayBlock(uid);
+  if (blocked) return blocked;
   const ip = clientIp(req.headers);
   if (!perUser.take(bucketKey("user", uid)) || !perIp.take(bucketKey(ip))) {
     return NextResponse.json({ error: "Too many attempts. Try again in a few minutes." }, { status: 429 });
