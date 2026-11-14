@@ -8,6 +8,8 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { PRICING_PLANS } from "@/lib/content/home";
 import { getSetting, setSetting } from "@/lib/platform-settings";
+import { PER_HIRE_FEE_KEY, parsePerHireFeeSetting } from "@/lib/per-hire-fee";
+import { isPerHireFeeBody, perHireFeeAuditMeta, perHireFeeBodySchema } from "@/lib/admin/per-hire-fee-setting";
 import { legacyBandChange } from "@/lib/admin/plan-band";
 import { inrMinorToUsdMinor } from "@/lib/currency";
 
@@ -108,7 +110,31 @@ export async function PUT(req: Request) {
   const guard = await requireMutation({ req, roles: ["admin"] });
   if (!guard.ok) return guard.response;
 
-  const parsed = settingsSchema.safeParse(await req.json().catch(() => null));
+  const body = await req.json().catch(() => null);
+
+  // Which bands pay the one-time hiring fee (lib/per-hire-fee.ts): read by billing and every public price line.
+  if (isPerHireFeeBody(body)) {
+    const bands = perHireFeeBodySchema.safeParse(body);
+    if (!bands.success) {
+      return NextResponse.json({ error: bands.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+    }
+    const from = parsePerHireFeeSetting(await getSetting(PER_HIRE_FEE_KEY));
+    const to = bands.data.perHireFeeBands;
+    await setSetting(PER_HIRE_FEE_KEY, to, guard.session.uid);
+    await recordAdminAudit(getDb(), {
+      adminId: guard.session.uid,
+      action: "settings.update",
+      targetType: "platform_setting",
+      targetId: PER_HIRE_FEE_KEY,
+      meta: perHireFeeAuditMeta(from, to),
+    }, { strict: true });
+    // The public pages and the employer cart/checkout read this setting.
+    revalidatePath("/", "layout");
+    revalidatePath("/employer", "layout");
+    return NextResponse.json({ ok: true, perHireFeeBands: to });
+  }
+
+  const parsed = settingsSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   }

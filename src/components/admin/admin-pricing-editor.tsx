@@ -10,6 +10,7 @@ import { buttonClass } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { describeLegacyBand, isLegacyTier, legacyBandChange } from "@/lib/admin/plan-band";
 import { csrfFetch } from "@/lib/client-fetch";
+import { FEE_BANDS, FEE_BAND_LABEL, type FeeBand, type PerHireFeeSetting } from "@/lib/per-hire-fee";
 import { inrMinorToUsdMinor, savingsPercent } from "@/lib/currency";
 import { formatMoney } from "@/lib/format";
 import type { CmsPlanFeature } from "@/lib/content/types";
@@ -55,9 +56,11 @@ const toMinorOrNull = (rupees: string) => (rupees.trim() === "" ? null : toMinor
 export function AdminPricingEditor({
   plans,
   activationFeeMinor,
+  perHireFee,
 }: {
   plans: EditablePlan[];
   activationFeeMinor: number;
+  perHireFee: PerHireFeeSetting;
 }) {
   const router = useRouter();
   const [seeding, setSeeding] = useState(false);
@@ -82,6 +85,7 @@ export function AdminPricingEditor({
         <ActivationFeePanel initialMinor={activationFeeMinor} />
         <RateCardSummary plans={plans} />
       </div>
+      <PerHireFeePanel initial={perHireFee} />
 
       {plans.length === 0 ? (
         <Panel>
@@ -218,6 +222,80 @@ function ActivationFeePanel({ initialMinor }: { initialMinor: number }) {
         <SaveButton state={state} />
         {error ? <p id="activation-fee-error" role="alert" className="w-full text-sm text-danger">{error}</p> : null}
       </form>
+    </Panel>
+  );
+}
+
+/**
+ * Which score bands pay the one-time hiring fee. A switch shows only the
+ * stored value: flipping it sends the full three-band object and the switch
+ * moves once the server confirms (dimmed and disabled meanwhile); on failure
+ * it stays where it was and says why.
+ */
+function PerHireFeePanel({ initial }: { initial: PerHireFeeSetting }) {
+  const [stored, setStored] = useState<PerHireFeeSetting>(initial);
+  const [pending, setPending] = useState<FeeBand | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function flip(band: FeeBand, next: boolean) {
+    setPending(band);
+    setError(null);
+    try {
+      const res = await csrfFetch("/api/admin/pricing", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ perHireFeeBands: { ...stored, [band]: next } }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body.error ?? "Could not save.");
+      } else {
+        setStored(body.perHireFeeBands ?? { ...stored, [band]: next });
+      }
+    } catch {
+      setError("Not saved: the network request failed.");
+    } finally {
+      setPending(null);
+    }
+  }
+
+  return (
+    <Panel>
+      <PanelHeader
+        title="Charge one-time hiring fee"
+        description="Applies to offers not yet paid and to new payments. Invoices already paid are never changed."
+        icon={IndianRupee}
+      />
+      <div className="space-y-1 px-5 py-4">
+        <p className="text-sm text-text-subtle">
+          Espresso hires with no stipend (score under 6) have nothing else to pay, so switching Espresso off leaves them with nothing payable at checkout.
+        </p>
+        <ul className="divide-y divide-[color:var(--admin-rule)]">
+          {FEE_BANDS.map((band) => {
+            const label = FEE_BAND_LABEL[band];
+            const busy = pending === band;
+            const id = `per-hire-fee-${band}`;
+            return (
+              <li key={band} className={cn("flex items-center justify-between gap-4 py-3", busy && "opacity-60")}>
+                <label htmlFor={id} className="text-sm font-medium text-ink-800">
+                  {label.plan} (score {label.scores})
+                  <span className="block text-xs font-normal text-text-subtle">
+                    {stored[band] ? "Charged with the first payment" : "Free for now"}
+                  </span>
+                </label>
+                <Switch
+                  id={id}
+                  checked={stored[band]}
+                  disabled={pending !== null}
+                  aria-busy={busy || undefined}
+                  onCheckedChange={(next) => void flip(band, next)}
+                />
+              </li>
+            );
+          })}
+        </ul>
+        {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
+      </div>
     </Panel>
   );
 }

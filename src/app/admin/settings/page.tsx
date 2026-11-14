@@ -11,25 +11,28 @@ import { AdminPricingEditor, type EditablePlan } from "@/components/admin/admin-
 import { getSession } from "@/lib/auth";
 import { canWrite } from "@/lib/admin/permissions";
 import { getDb, schema } from "@/lib/db";
-import { getInternActivationFeeMinor } from "@/lib/platform-settings";
+import { getInternActivationFeeMinor, getPerHireFeeSetting } from "@/lib/platform-settings";
+import type { PerHireFeeSetting } from "@/lib/per-hire-fee";
 
 export const metadata: Metadata = {
   title: "Pricing & Fees | Admin",
   robots: { index: false, follow: false },
 };
 
-async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMinor: number } | null> {
+async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMinor: number; perHireFee: PerHireFeeSetting } | null> {
   try {
-    const [rows, activationFeeMinor] = await Promise.all([
+    const [rows, activationFeeMinor, perHireFee] = await Promise.all([
       getDb()
         .select()
         .from(schema.pricingPlans)
         .where(eq(schema.pricingPlans.currency, "INR"))
         .orderBy(asc(schema.pricingPlans.sortOrder)),
       getInternActivationFeeMinor(),
+      getPerHireFeeSetting(),
     ]);
     return {
       activationFeeMinor,
+      perHireFee,
       plans: rows.map((r) => ({
         id: r.id,
         slug: r.slug,
@@ -96,7 +99,7 @@ export default async function AdminSettingsPage() {
       {pricing && !mayEdit ? (
         <p className="text-sm text-text-subtle">Editing prices needs the Edit website content permission.</p>
       ) : pricing ? (
-        <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} />
+        <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} perHireFee={pricing.perHireFee} />
       ) : (
         <Panel>
           <AdminLoadError what="the rate card" retryHref="/admin/settings" />
