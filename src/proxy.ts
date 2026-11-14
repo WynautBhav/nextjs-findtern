@@ -4,9 +4,11 @@ import { allows, firstAllowedPage, requiredPermissions } from "@/lib/admin/permi
 import { currentAdminPermissions } from "@/lib/account-status";
 import { ensureAdminRolesOnce } from "@/lib/admin/roles-seed";
 import { readSession, renewSession, type SessionData } from "@/lib/security/session";
+import { internUnlockState } from "@/lib/intern-unlock";
+import { lockEnabled, lockVerdict, lockedHref, needsLookup } from "@/lib/intern-lock";
 
 /**
- * Runs before every signed-in page and API call. Three jobs:
+ * Runs before every signed-in page and API call. Four jobs:
  *
  * 1. Admin role permissions, checked on every /admin page (including client
  *    navigations) and every /api/admin call. `*` is super admin.
@@ -19,7 +21,12 @@ import { readSession, renewSession, type SessionData } from "@/lib/security/sess
  *    `?next=<the page>`, and sign in returns there. The path is also passed
  *    to the layouts as `x-ft-path` for the cases only they can decide.
  *
- * 3. Sliding sessions (INT-38): an active session is re-issued with a fresh
+ * 3. The intern payment lock (WP2): until an intern has paid (or is grandfathered:
+ *    an offer, an interview or a job), only Home, Documents, Your profile, Settings
+ *    and Notifications open. Locked pages redirect to /intern/locked; the APIs those
+ *    pages call answer 403, and 503 if the lookup fails (never open). See lib/intern-lock.ts.
+ *
+ * 4. Sliding sessions (INT-38): an active session is re-issued with a fresh
  *    idle timeout (see renewSession), together with its CSRF cookie, so
  *    nobody is signed out in the middle of their work.
  */
@@ -39,12 +46,41 @@ export async function proxy(req: NextRequest) {
       login.searchParams.set("next", `${pathname}${search}`);
       return NextResponse.redirect(login);
     }
+    if (role === "intern") {
+      const blocked = await internGate(req, session, pathname, false);
+      if (blocked) return blocked;
+    }
     const headers = new Headers(req.headers);
     headers.set("x-ft-path", `${pathname}${search}`);
     return withRenewal(req, session, NextResponse.next({ request: { headers } }));
   }
 
+  if (isApi && session?.role === "intern") {
+    const blocked = await internGate(req, session, pathname, true);
+    if (blocked) return blocked;
+  }
+
   return withRenewal(req, session, NextResponse.next());
+}
+
+/**
+ * The intern payment lock. Null = carry on. Open pages and unlocked APIs never
+ * touch the database; the answer is cached only when positive (intern-unlock.ts).
+ */
+async function internGate(req: NextRequest, session: SessionData, pathname: string, isApi: boolean): Promise<NextResponse | null> {
+  const enabled = lockEnabled();
+  if (!needsLookup({ pathname, isApi, enabled })) return null;
+  const state = await internUnlockState(session.uid);
+  switch (lockVerdict({ pathname, isApi, enabled, state })) {
+    case "redirect_locked":
+      return NextResponse.redirect(new URL(lockedHref(pathname), req.url));
+    case "deny_locked":
+      return NextResponse.json({ error: "Unlocks after payment. Activate your profile to use this.", code: "intern_locked" }, { status: 403 });
+    case "deny_unverified":
+      return NextResponse.json({ error: "Could not check your account right now. Try again in a moment." }, { status: 503 });
+    default:
+      return null;
+  }
 }
 
 /** The signed-in role a page belongs to; null for public pages. */

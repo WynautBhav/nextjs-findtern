@@ -7,6 +7,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { getDb, schema } from "@/lib/db";
 import { canStartThread } from "@/lib/messaging/logic";
 import { listThreads, threadLimiter } from "@/lib/messaging/store";
+import { internLockResponse } from "@/lib/intern-unlock";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,8 @@ export async function GET() {
   if (!session || (session.role !== "employer" && session.role !== "intern")) {
     return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   }
+  const locked = await internLockResponse(session);
+  if (locked) return locked;
   return NextResponse.json({ threads: await listThreads(session.uid, session.role) }, { headers: { "Cache-Control": "no-store" } });
 }
 
@@ -29,6 +32,8 @@ const Body = z.object({ counterpartId: z.string().min(1).max(64), proposalId: z.
 export async function POST(req: Request) {
   const guard = await requireMutation({ req, roles: ["employer", "intern"] });
   if (!guard.ok) return guard.response;
+  const locked = await internLockResponse(guard.session);
+  if (locked) return locked;
   const { session } = guard;
   if (!threadLimiter.take(`thr:${session.uid}`)) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 

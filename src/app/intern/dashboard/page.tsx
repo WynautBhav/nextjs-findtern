@@ -31,6 +31,8 @@ import { isMeetingLinkLive } from "@/lib/employer-interview-rules";
 import { companyIn, hoursByMonth, hoursIn, nextAction, roleOf, slotOf } from "@/lib/journey";
 import { formatMoney, formatSlotTime, shortDate } from "@/lib/format";
 import { internPaidMinor, isInternPaid } from "@/lib/payments";
+import { internUnlockState } from "@/lib/intern-unlock";
+import { lockEnabled } from "@/lib/intern-lock";
 import { isHiredProposal } from "@/lib/hire-status";
 import { paymentsAreFree, testPayEnabled } from "@/lib/razorpay";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
@@ -93,7 +95,7 @@ export default async function InternHome() {
   const session = await requireRole("intern");
 
   // Independent reads, in parallel. loadInternData is cache()d: the layout's call already did the work.
-  const [data, [user], activated, activationFeeMinor, paidMinor, college, counts, [presenceRow]] = await Promise.all([
+  const [data, [user], activated, activationFeeMinor, paidMinor, college, counts, [presenceRow], lockState] = await Promise.all([
     loadInternData(session.uid),
     getDb()
       .select({
@@ -125,7 +127,10 @@ export default async function InternHome() {
       .from(schema.userPresence)
       .where(eq(schema.userPresence.userId, session.uid))
       .limit(1),
+    // Payment lock: before payment this page links only to open pages (Documents, profile, Settings), never into a locked one.
+    lockEnabled() ? internUnlockState(session.uid) : "unlocked",
   ]);
+  const canOpen = lockState !== "locked";
   // The college covers the interview fee only once it has paid for a batch (owner, 6 Nov).
   const collegePaid =
     college?.isPartner && !activated
@@ -233,7 +238,7 @@ export default async function InternHome() {
               : data.money.lastPaidAt
                 ? `Last paid ${shortDate(data.money.lastPaidAt, { day: "numeric", month: "short" })}`
                 : undefined,
-          href: "/intern/earnings",
+          href: canOpen ? "/intern/earnings" : undefined,
         }]
       : []),
     ...(data.timesheets.length > 0
@@ -242,11 +247,11 @@ export default async function InternHome() {
           value: Number(approvedHours.toFixed(1)),
           unit: "h",
           meta: waitingHours > 0 ? `${Number(waitingHours.toFixed(1))} h waiting for review` : undefined,
-          href: "/intern/timesheets",
+          href: canOpen ? "/intern/timesheets" : undefined,
         }]
       : []),
     ...(score !== null
-      ? [{ label: "Findtern Score", value: score.toFixed(1), unit: "/10", href: "/intern/record" }]
+      ? [{ label: "Findtern Score", value: score.toFixed(1), unit: "/10", href: canOpen ? "/intern/record" : undefined }]
       : []),
   ].map((s, i) => ({ ...s, featured: i === 0, index: i }));
 
@@ -265,7 +270,7 @@ export default async function InternHome() {
   const interviewCompany = upcomingInterviewItem
     ? data.names[upcomingInterviewItem.interview.employerId] ?? "the company"
     : "";
-  const nextUp = next ? (
+  const nextUp = canOpen && next ? (
     next.kind === "interview" && upcomingInterviewItem ? (
       <NextUpTile next={next} today={today} heading={`Interview with ${interviewCompany}`} href="/intern/interviews" hrefLabel="Interviews">
         {upcomingInterviewItem.interview.meetingLink ? (
@@ -298,7 +303,7 @@ export default async function InternHome() {
   // What needs this person next, in one fixed order: messages, an offer waiting,
   // the AI interview, the college's cover, the profile. Each line has one action.
   const nextSteps: { key: string; title: string; detail?: string; href?: string; label?: string; joinLink?: string }[] = [];
-  if (counts && counts.messages > 0) {
+  if (canOpen && counts && counts.messages > 0) {
     nextSteps.push({
       key: "messages",
       title: `${counts.messages} unread message${counts.messages === 1 ? "" : "s"}`,
@@ -309,7 +314,8 @@ export default async function InternHome() {
   }
   // nextAction() returns one node; the count comes from the thread.
   const waitingOffers = action?.kind === "proposal" ? data.thread.filter((n) => n.tone === "action" && n.kind === action.kind).length : 0;
-  if (waitingOffers > 1) {
+  // Locked: no offer line can exist (an offer is a proposal, which unlocks), and none may link out.
+  if (canOpen && waitingOffers > 1) {
     nextSteps.push({
       key: "offer",
       title: `${waitingOffers} offers waiting on you`,
@@ -317,7 +323,7 @@ export default async function InternHome() {
       href: "/intern/proposals",
       label: "Read your offers",
     });
-  } else if (action) {
+  } else if (canOpen && action) {
     nextSteps.push({ key: "offer", title: action.title, detail: action.detail, href: action.href ?? undefined, label: action.action ?? "Open" });
   }
   if (aiPhase === "ready") {
@@ -389,7 +395,7 @@ export default async function InternHome() {
   const activity = (
     <Tile
       title="Activity"
-      action={history.length > 0 ? { href: "/intern/record", label: "Full record" } : undefined}
+      action={canOpen && history.length > 0 ? { href: "/intern/record", label: "Full record" } : undefined}
     >
       {data.thread.length === 0 ? (
         // Profile done, activated and scored: the next move is a company's.
@@ -400,7 +406,7 @@ export default async function InternHome() {
               ? "Your profile is in front of employers. When a company books an interview or sends an offer, it lands here, then your timesheets and payments."
               : "Your profile is hidden from employers, so no one can book an interview or send an offer. Switch on Open to work in your profile to be found."
           }
-          next={openToWork ? { label: "See open roles", href: "/intern/opportunities" } : { label: "Open your profile", href: "/intern/profile" }}
+          next={!openToWork ? { label: "Open your profile", href: "/intern/profile" } : canOpen ? { label: "See open roles", href: "/intern/opportunities" } : undefined}
           who={openToWork ? "Waiting on employers" : "Waiting on you"}
         />
       ) : history.length === 0 ? (
@@ -439,7 +445,7 @@ export default async function InternHome() {
   // The glanceable facts: the narrow column on every state of Home.
   const asideTiles = (
     <>
-      {upcomingInterviewItem && next?.kind !== "interview" ? (
+      {canOpen && upcomingInterviewItem && next?.kind !== "interview" ? (
         <Tile title="Next interview" action={{ href: "/intern/interviews", label: "Interviews" }}>
           <p className="text-lg font-medium text-ink-900">{interviewCompany}</p>
           <p className="mt-1 text-sm text-text-subtle">
@@ -457,7 +463,7 @@ export default async function InternHome() {
       ) : null}
 
       {ratings ? (
-        <Tile title="How your score is made" action={{ href: "/intern/record", label: "Score details" }}>
+        <Tile title="How your score is made" action={canOpen ? { href: "/intern/record", label: "Score details" } : undefined}>
           <ScoreScale rows={ratings.map(([label, value]) => ({ label, value }))} />
         </Tile>
       ) : null}
@@ -500,7 +506,7 @@ export default async function InternHome() {
         title={`Hello, ${user?.first ?? "there"}`}
         lede={lede}
         action={
-          action?.href ? null : working && !hired && data.engagement ? (
+          !canOpen || action?.href ? null : working && !hired && data.engagement ? (
             <Link href={`/intern/proposals/${data.engagement.id}`} className={buttonClass({ variant: "outline" })}>
               See your offer
               <ArrowRight className="size-4" aria-hidden />

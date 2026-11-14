@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { LEGACY_DAY_STATUSES } from "@/lib/employer-timesheets";
 import { requireMutation } from "@/lib/guards-mutation";
 import { clearFutureDays, duplicateDay, mergeEntriesByDate, periodDays, todayIst } from "@/lib/timesheet-days";
+import { internLockResponse } from "@/lib/intern-unlock";
 
 /**
  * Autosave for a draft timesheet, and deleting one.
@@ -37,6 +38,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params;
   const guard = await requireMutation({ req, roles: ["intern"] });
   if (!guard.ok) return guard.response;
+  const locked = await internLockResponse(guard.session);
+  if (locked) return locked;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -105,6 +108,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const { id } = await params;
   const guard = await requireMutation({ req, roles: ["intern"] });
   if (!guard.ok) return guard.response;
+  const locked = await internLockResponse(guard.session);
+  if (locked) return locked;
   const deleted = await getDb()
     .delete(schema.timesheets)
     .where(

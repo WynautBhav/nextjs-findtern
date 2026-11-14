@@ -12,6 +12,7 @@ import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
 import { FREE_DECLINES, offerPastStart, parseOffer, todayIst } from "@/lib/offer";
 import { hasOpenOrderFor, OPEN_ORDER_MINUTES } from "@/lib/payments";
 import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
+import { internLockResponse } from "@/lib/intern-unlock";
 
 /**
  * Which role may set which status.
@@ -56,6 +57,8 @@ const bodySchema = z.object({
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const guard = await requireMutation({ req, roles: ["intern", "employer", "admin"] });
   if (!guard.ok) return guard.response;
+  const locked = await internLockResponse(guard.session);
+  if (locked) return locked;
   const { session } = guard;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));

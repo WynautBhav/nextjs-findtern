@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, count, eq } from "drizzle-orm";
 import {
@@ -33,6 +33,8 @@ import { loadInternData } from "@/lib/intern-data";
 import { nextAction, type Stage } from "@/lib/journey";
 import { SITE } from "@/lib/content/site";
 import { shouldShowTermsPrompt } from "@/lib/terms";
+import { internUnlockState } from "@/lib/intern-unlock";
+import { isNavLocked, isOpenInternPage, lockEnabled, lockedHref } from "@/lib/intern-lock";
 
 export const metadata = { title: "Findtern" };
 
@@ -60,6 +62,15 @@ const STAGE_NAV: Record<Stage, ConsoleNavItem[]> = {
     { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 /> },
   ],
 };
+
+/** The tab bar before payment: the three open entries first, then two locked ones (the rest sit under More). */
+const LOCKED_STAGE_NAV: ConsoleNavItem[] = [
+  { href: "/intern/dashboard", label: "Home", icon: <House /> },
+  { href: "/intern/documents", label: "Documents", icon: <BadgeCheck /> },
+  { href: "/intern/profile", label: "Your profile", icon: <CircleUserRound /> },
+  { href: "/intern/opportunities", label: "Open roles", icon: <Compass /> },
+  { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
+];
 
 const MORE_NAV: ConsoleNavItem[] = [
   { href: "/intern/opportunities", label: "Open roles", icon: <Compass /> },
@@ -93,7 +104,7 @@ export default async function InternLayout({ children }: { children: React.React
   if (!session || session.role !== "intern") redirect("/login?as=intern");
 
   // Independent reads, in parallel. loadInternData is cache()d, so the page's own call reuses this one.
-  const [data, { name, termsVersion }, [unread], college] = await Promise.all([
+  const [data, { name, termsVersion }, [unread], college, lockState] = await Promise.all([
     loadInternData(session.uid),
     fullName(session.uid),
     getDb()
@@ -108,7 +119,13 @@ export default async function InternLayout({ children }: { children: React.React
       ),
     // Only college members heartbeat; "View as" must not mark the student online.
     session.impersonator ? null : membershipOf(session.uid).catch(() => null),
+    // Payment lock (WP2): paid or grandfathered = unlocked. A failed lookup shows the nav unlocked; the proxy and the APIs decide on their own.
+    lockEnabled() ? internUnlockState(session.uid) : "unlocked",
   ]);
+  const lockedNav = lockState === "locked";
+  // Second line behind the proxy: the same decision, for a page the proxy let through (it only fails open on a database error).
+  const here = (await headers()).get("x-ft-path");
+  if (lockedNav && here && !isOpenInternPage(here)) redirect(lockedHref(here));
   // The drive banner is rendered by the server too, so it is in the first paint instead of arriving with the first heartbeat.
   const liveDrive = college?.isPartner ? await liveDriveFor(college.collegeId).catch(() => null) : null;
   const action = nextAction(data.thread);
@@ -119,13 +136,18 @@ export default async function InternLayout({ children }: { children: React.React
   const unreadAlerts = Number(unread?.value ?? 0);
 
   const badge = (n: number) => (n > 99 ? "99+" : n);
-  const main = STAGE_NAV[data.stage].map((item) => ({
-    ...item,
-    attention: attentionHrefs.some((h) => h.startsWith(item.href)) && item.href !== "/intern/dashboard",
+  // Before payment: Home, Documents and Your profile lead (the three that are open), and every other entry
+  // carries a lock and points at /intern/locked. The lock is the same rule the proxy enforces (lib/intern-lock.ts).
+  const mainSource = lockedNav ? LOCKED_STAGE_NAV : STAGE_NAV[data.stage];
+  const lock = (i: ConsoleNavItem): ConsoleNavItem =>
+    isNavLocked(i.href, !lockedNav) ? { ...i, href: lockedHref(i.href), locked: true, liveUnread: false } : i;
+  const main = mainSource.map((item) => ({
+    ...lock(item),
+    attention: !lockedNav && attentionHrefs.some((h) => h.startsWith(item.href)) && item.href !== "/intern/dashboard",
   }));
-  const more = MORE_NAV.filter((i) => !main.some((m) => m.href === i.href)).map((i) => {
+  const more = MORE_NAV.filter((i) => !mainSource.some((m) => m.href === i.href)).map((i) => {
     if (i.href === "/intern/notifications" && unreadAlerts > 0) return { ...i, badge: badge(unreadAlerts) };
-    return i;
+    return lock(i);
   });
 
   return (
@@ -160,7 +182,8 @@ export default async function InternLayout({ children }: { children: React.React
         />
       ) : null}
       {liveDrive ? <DismissedGuard store="session" storageKey={driveBannerKey(liveDrive.id)} name="drive" /> : null}
-      <MessagingLive />
+      {/* Messages are locked until payment: the live feed reads /api/threads, which is refused too. */}
+      {lockedNav ? null : <MessagingLive />}
       {children}
       <TermsGate role="intern" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>

@@ -8,6 +8,7 @@ import { getDb, schema } from "@/lib/db";
 import { SCRUBBED_NOTICE, scrubOutgoing } from "@/lib/contact-scrub";
 import { SEND_BLOCK_TEXT, canSend, isParticipant, otherParticipant, sanitizeBody } from "@/lib/messaging/logic";
 import { getThread, loadThreadContexts, messageLimiter, pushEvent, visibleBody } from "@/lib/messaging/store";
+import { internLockResponse } from "@/lib/intern-unlock";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +17,8 @@ const notFound = () => NextResponse.json({ error: "Not found" }, { status: 404 }
 export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const session = await getSession();
   if (!session) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  const locked = await internLockResponse(session);
+  if (locked) return locked;
   const { id } = await ctx.params;
   const thread = await getThread(id);
   if (!isParticipant(thread, session.uid)) return notFound();
@@ -62,6 +65,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { id } = await ctx.params;
   const guard = await requireMutation({ req, roles: ["employer", "intern"] });
   if (!guard.ok) return guard.response;
+  const locked = await internLockResponse(guard.session);
+  if (locked) return locked;
   const { session } = guard;
   const thread = await getThread(id);
   if (!thread || !isParticipant(thread, session.uid)) return notFound();

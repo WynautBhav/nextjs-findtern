@@ -7,6 +7,7 @@ import { unfilledDays } from "@/lib/employer-timesheets";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, notify } from "@/lib/notify";
 import { canSendOn, formatPeriodDays, periodDays, periodSendableFrom, todayIst, dayParts } from "@/lib/timesheet-days";
+import { internLockResponse } from "@/lib/intern-unlock";
 
 /**
  * Send a timesheet for approval.
@@ -27,6 +28,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const guard = await requireMutation({ req, roles: ["intern"] });
   if (!guard.ok) return guard.response;
+  const locked = await internLockResponse(guard.session);
+  if (locked) return locked;
 
   const db = getDb();
   const [sheet] = await db

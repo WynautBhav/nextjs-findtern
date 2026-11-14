@@ -9,6 +9,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { parseOffer } from "@/lib/offer";
 import { timesheetPeriod } from "@/lib/employer-timesheets";
 import { isoDay, periodDays, todayIst } from "@/lib/timesheet-days";
+import { internLockResponse } from "@/lib/intern-unlock";
 
 /**
  * Only the month is taken from the client. The period, the status (always
@@ -31,6 +32,8 @@ function generateMonthEntries(start: string, end: string) {
 export async function POST(req: Request) {
   const guard = await requireMutation({ req, roles: ["intern"] });
   if (!guard.ok) return guard.response;
+  const locked = await internLockResponse(guard.session);
+  if (locked) return locked;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {

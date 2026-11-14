@@ -11,6 +11,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, notify, resolveInterviewNotifications } from "@/lib/notify";
 import { hiredProposalSql } from "@/lib/employer-visibility";
 import { takedownBlock } from "@/lib/projects/takedown";
+import { internLockResponse } from "@/lib/intern-unlock";
 
 const bodySchema = z.object({ slot: z.number().int().min(1).max(3) });
 const MEETING_MS = 30 * 60 * 1000;
@@ -20,6 +21,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const { id } = await params;
   const guard = await requireMutation({ req, roles: ["intern"] });
   if (!guard.ok) return guard.response;
+  const locked = await internLockResponse(guard.session);
+  if (locked) return locked;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
