@@ -1022,6 +1022,40 @@
   }
 }
 
+/* Profile visibility status (WP5): the dot and a ring around it breathe, red while hidden, green while live.
+   Opacity only (no movement, no scale), slow, so nothing shifts. The label text is never dimmed and nothing sits behind it:
+   only the dot and a ring around the dot change.
+   Looping ambient status like pulse-dot above; check-motion-budget.mjs does not count infinite loops. Reduced motion
+   gets no animation at all (the keyframes are only attached under no-preference), so the dot is a static dot. */
+@keyframes status-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes status-halo {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .status-blink {
+    animation: status-blink 2s ease-in-out infinite;
+  }
+  .status-halo {
+    animation: status-halo 2s ease-in-out infinite;
+  }
+}
+
 @keyframes thread-breath {
   0%,
   100% {

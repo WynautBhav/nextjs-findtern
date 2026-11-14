@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, GraduationCap } from "lucide-react";
 
-import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
+import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { ActivityList, ScoreScale, STAT_ROW, StatTile, Tile } from "@/components/app/tiles";
 import { buttonClass } from "@/components/ui/button";
 import { ActivationCard } from "@/components/intern/activation-card";
@@ -13,6 +13,8 @@ import { HiddenProfileBanner } from "@/components/intern/hidden-profile-banner";
 import { JoinGate } from "@/components/intern/ai-interview-join-card";
 import { MeetingJoinButton } from "@/components/intern/meeting-join";
 import { OpenToWorkToggle } from "@/components/intern/open-to-work-toggle";
+import { VisibilityPill } from "@/components/intern/visibility-pill";
+import { visibilityState } from "@/components/intern/visibility-state";
 import { PresenceNotice } from "@/components/intern/presence-notice";
 import { aiInterviewPhase, isAiInterview, isScored, joinableLink, latestAiInterview } from "@/lib/ai-interview";
 import { requireRole } from "@/lib/auth";
@@ -483,7 +485,7 @@ export default async function InternHome() {
       {gettingStarted ? null : (
         <Tile
           title="Profile status"
-          aside={<Pill tone={profileStatus.tone}>{profileStatus.label}</Pill>}
+          aside={<VisibilityPill state={visibilityState(profileStatus.tone)}>{profileStatus.label}</VisibilityPill>}
           action={{ href: "/intern/profile", label: "See your profile as employers do" }}
         >
           <OpenToWorkToggle initial={openToWork} brief />
