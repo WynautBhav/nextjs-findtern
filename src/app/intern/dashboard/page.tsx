@@ -6,6 +6,7 @@ import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { ActivityList, ScoreScale, STAT_ROW, StatTile, Tile } from "@/components/app/tiles";
 import { buttonClass } from "@/components/ui/button";
 import { ActivationCard } from "@/components/intern/activation-card";
+import { CollegePromoCard, SwitchToCollegeButton } from "@/components/intern/college-promo-card";
 import { DismissedGuard } from "@/components/dismissed-guard";
 import { GettingStarted } from "@/components/intern/getting-started";
 import { HiddenProfileBanner } from "@/components/intern/hidden-profile-banner";
@@ -37,6 +38,8 @@ import { isHiredProposal } from "@/lib/hire-status";
 import { paymentsAreFree, testPayEnabled } from "@/lib/razorpay";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { profileCompletion } from "@/lib/onboarding";
+import { collegeAccountState } from "@/lib/college/account-state";
+import { canSwitchBackToCollege } from "@/lib/college/identity-match";
 import { membershipOf } from "@/lib/college/membership";
 import { presenceNoticeKey } from "@/lib/dismissed-keys";
 import { paidSeatTotal } from "@/lib/college/seat-gate";
@@ -95,7 +98,7 @@ export default async function InternHome() {
   const session = await requireRole("intern");
 
   // Independent reads, in parallel. loadInternData is cache()d: the layout's call already did the work.
-  const [data, [user], activated, activationFeeMinor, paidMinor, college, counts, [presenceRow], lockState] = await Promise.all([
+  const [data, [user], activated, activationFeeMinor, paidMinor, college, counts, [presenceRow], lockState, acct] = await Promise.all([
     loadInternData(session.uid),
     getDb()
       .select({
@@ -129,7 +132,13 @@ export default async function InternHome() {
       .limit(1),
     // Payment lock: before payment this page links only to open pages (Documents, profile, Settings), never into a locked one.
     lockEnabled() ? internUnlockState(session.uid) : "unlocked",
+    // College account (WP4): read from the database, never from the URL or the browser.
+    collegeAccountState(session.uid),
   ]);
+  // A college-account intern sees a different Home: no price, no Pay now, a promo field instead (until paid).
+  const collegeHome = acct.home !== "normal" ? { name: college?.name ?? "your college", state: acct.home === "college_paid" ? ("paid" as const) : ("unpaid" as const) } : null;
+  const collegeUnpaid = acct.home === "college_unpaid";
+  const canSwitchBack = canSwitchBackToCollege(acct);
   const canOpen = lockState !== "locked";
   // The college covers the interview fee only once it has paid for a batch (owner, 6 Nov).
   const collegePaid =
@@ -137,7 +146,7 @@ export default async function InternHome() {
       ? await paidSeatTotal(getDb(), college.collegeId).then((r) => r.seats > 0, () => false)
       : false;
   // A matched student whose college paid accepts in one click. Never breaks the dashboard if this lookup fails.
-  const claim = activated
+  const claim = activated || collegeUnpaid
     ? null
     : await (async () => pendingClaimFor(getDb().$client, session.uid, driveCodeSecret()))().catch(() => null);
   const action = nextAction(data.thread);
@@ -361,7 +370,9 @@ export default async function InternHome() {
       ? activated
         ? "Activation is done. The AI interview is the last step before employers can find you."
         : completion.complete
-          ? "Your profile is complete. Activation is next, and it is the only payment."
+          ? collegeUnpaid
+            ? "Your profile is complete. Enter the promo code your college gave you to finish activation."
+            : "Your profile is complete. Activation is next, and it is the only payment."
           : "Build your profile first. It is free, and employers shortlist you on your score once the AI interview is done."
       : pending
         ? undefined
@@ -488,14 +499,15 @@ export default async function InternHome() {
               {college.status === "verified" ? " · verified" : " · not verified yet"}
             </span>
           </p>
+          {/* An individual account that is still linked to its college and unpaid may go back to the college paying. */}
+          {canSwitchBack ? (
+            <>
+              <p className="mt-3 text-sm text-text-subtle">You are on an individual account, so you pay the activation fee yourself.</p>
+              <SwitchToCollegeButton />
+            </>
+          ) : null}
         </Tile>
-      ) : working ? null : (
-        <Tile title="Is your college on Findtern?" action={{ href: "/intern/settings#college", label: "Find your college" }}>
-          <p className="text-sm text-text-subtle">
-            Join it to be seen in your college&apos;s placement drives, where employers call students the same day.
-          </p>
-        </Tile>
-      )}
+      ) : null}
     </>
   );
 
@@ -542,21 +554,26 @@ export default async function InternHome() {
             aiLink={aiPhase === "ready" ? joinableLink(aiRow?.meetingLink) : null}
             hidden={!openToWork}
             collegeName={collegePaid && college ? college.name : null}
+            collegeAccount={collegeHome}
             aside={asideTiles}
             payment={
-              <ActivationCard
-                alreadyPaid={activated}
-                claim={claim}
-                testMode={paymentsAreFree()}
-                testPay={testPayEnabled()}
-                feeMinor={activationFeeMinor}
-                internId={session.uid}
-                prefill={{
-                  name: fullName,
-                  email: user?.email,
-                  contact: user ? `${user.countryCode}${user.phoneNumber}` : undefined,
-                }}
-              />
+              collegeUnpaid ? (
+                <CollegePromoCard collegeName={college?.name ?? "your college"} feeLabel={formatMoney(activationFeeMinor, "INR")} />
+              ) : (
+                <ActivationCard
+                  alreadyPaid={activated}
+                  claim={claim}
+                  testMode={paymentsAreFree()}
+                  testPay={testPayEnabled()}
+                  feeMinor={activationFeeMinor}
+                  internId={session.uid}
+                  prefill={{
+                    name: fullName,
+                    email: user?.email,
+                    contact: user ? `${user.countryCode}${user.phoneNumber}` : undefined,
+                  }}
+                />
+              )
             }
           />
         ) : null}
