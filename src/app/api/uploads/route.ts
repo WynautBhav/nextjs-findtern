@@ -7,59 +7,11 @@ import { MAX_MARKSHEETS } from "@/lib/onboarding";
 import { bucketKey, clientIp, limiters } from "@/lib/security/rate-limit";
 import type { SessionData } from "@/lib/security/session";
 import { signedUrl } from "@/lib/security/sign";
-import { bytesMatchType } from "@/lib/security/sniff";
 import { put, type StoredFile } from "@/lib/security/store";
+import { KINDS, MB, checkType, prepareUpload } from "@/lib/security/upload-rules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const MB = 1024 * 1024;
-const IMAGES = ["image/jpeg", "image/png", "image/webp"];
-const DOCS = [...IMAGES, "application/pdf"];
-const VIDEO = ["video/mp4", "video/webm", "video/quicktime"];
-
-/**
- * What a file is for decides who may upload it, which types and sizes are
- * allowed, whether it's public, and which record it attaches to.
- */
-const KINDS: Record<string, { roles: SessionData["role"][]; types: string[]; max: number; isPublic?: boolean }> = {
-  profile_photo: { roles: ["intern"], types: IMAGES, max: 5 * MB },
-  aadhaar: { roles: ["intern"], types: DOCS, max: 10 * MB },
-  pan: { roles: ["intern"], types: DOCS, max: 10 * MB },
-  marksheet: { roles: ["intern"], types: DOCS, max: 25 * MB },
-  // Professional course / certification files. Stored only: the onboarding
-  // save puts the key on its row (extra.academics …certificateUploads).
-  certificate: { roles: ["intern"], types: DOCS, max: 10 * MB },
-  employer_logo: { roles: ["employer"], types: IMAGES, max: 2 * MB, isPublic: true },
-  // PDF, PNG or JPG, as legacy accepted (employer-orders full-time dialog).
-  offer_letter: { roles: ["employer"], types: ["application/pdf", "image/png", "image/jpeg"], max: 10 * MB },
-  cms_image: { roles: ["admin"], types: IMAGES, max: 5 * MB, isPublic: true },
-  support: { roles: ["intern", "employer"], types: [...DOCS, ...VIDEO], max: 10 * MB },
-};
-
-/**
- * Photos and scanned documents are re-encoded to WebP before anything is
- * stored: auto-rotated from EXIF, EXIF/GPS stripped, capped in size. Only the
- * WebP is ever written - the original upload never touches disk or the
- * bucket. PDFs, videos, offer letters, logos and CMS images are kept as sent.
- * Documents keep more pixels than the face photo so ID numbers stay legible.
- */
-const WEBP: Record<string, { maxPx: number; quality: number }> = {
-  profile_photo: { maxPx: 1200, quality: 80 },
-  aadhaar: { maxPx: 2000, quality: 85 },
-  pan: { maxPx: 2000, quality: 85 },
-  marksheet: { maxPx: 2000, quality: 85 },
-  certificate: { maxPx: 2000, quality: 85 },
-};
-
-async function toWebp(bytes: Buffer, opts: { maxPx: number; quality: number }): Promise<Buffer> {
-  const sharp = (await import("sharp")).default;
-  return sharp(bytes, { failOn: "error", limitInputPixels: 60_000_000 })
-    .rotate()
-    .resize({ width: opts.maxPx, height: opts.maxPx, fit: "inside", withoutEnlargement: true })
-    .webp({ quality: opts.quality })
-    .toBuffer();
-}
 
 const DOC_COLUMNS = {
   profile_photo: ["profilePhotoName", "profilePhotoType", "profilePhotoSize"],
@@ -88,9 +40,8 @@ export async function POST(req: Request): Promise<Response> {
     return NextResponse.json({ error: "You can't upload that here" }, { status: 400 });
   }
   const type = req.headers.get("content-type")?.split(";")[0].trim() ?? "";
-  if (!kind.types.includes(type)) {
-    return NextResponse.json({ error: "That file type isn't accepted here" }, { status: 415 });
-  }
+  const badType = checkType(kind, type);
+  if (badType) return NextResponse.json({ error: badType.error }, { status: badType.status });
   const limitMb = Math.round(kind.max / MB);
   if (Number(req.headers.get("content-length") ?? "0") > kind.max) {
     return NextResponse.json({ error: `The file must be under ${limitMb} MB` }, { status: 413 });
@@ -104,28 +55,18 @@ export async function POST(req: Request): Promise<Response> {
   }
   if (bytes.length === 0) return NextResponse.json({ error: "Empty file" }, { status: 400 });
   if (bytes.length > kind.max) return NextResponse.json({ error: `The file must be under ${limitMb} MB` }, { status: 413 });
-  if (!bytesMatchType(type, bytes)) {
-    return NextResponse.json({ error: "That file is not what its name says. Upload the original PDF, JPG or PNG." }, { status: 415 });
-  }
   // The onboarding save refuses more than this, so a ninth file would block every later save.
   if (kindName === "marksheet" && (await marksheetCount(session.uid)) >= MAX_MARKSHEETS) {
     return NextResponse.json({ error: `You can keep at most ${MAX_MARKSHEETS} marksheets. Remove one and save your draft, then upload again.` }, { status: 409 });
   }
 
-  let contentType = type;
-  let fileName = decodeFileName(req.headers.get("x-file-name") ?? "").slice(0, 120);
-  const webp = WEBP[kindName];
-  if (webp && IMAGES.includes(type)) {
-    try {
-      bytes = await toWebp(bytes, webp);
-    } catch {
-      return NextResponse.json({ error: "That image could not be read. Try a JPG or PNG." }, { status: 415 });
-    }
-    contentType = "image/webp";
-    fileName = fileName ? `${fileName.replace(/\.[A-Za-z0-9]{1,5}$/, "")}.webp` : fileName;
-  }
+  // Sniffs the bytes, then re-encodes photos and scans to WebP. Identity cards
+  // (aadhaar, pan) are images-only; a failed conversion rejects and nothing is stored.
+  const prepared = await prepareUpload(kindName, kind, type, bytes, decodeFileName(req.headers.get("x-file-name") ?? "").slice(0, 120));
+  if (!prepared.ok) return NextResponse.json({ error: prepared.error }, { status: prepared.status });
+  const { contentType, fileName } = prepared;
 
-  const stored = await put(kind.isPublic ? "public" : session.uid, bytes, contentType, kind.max);
+  const stored = await put(kind.isPublic ? "public" : session.uid, prepared.bytes, contentType, kind.max);
   await attach(kindName, session, stored, fileName);
 
   return NextResponse.json(

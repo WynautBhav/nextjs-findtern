@@ -12,8 +12,8 @@ import { PhotoUpload } from "./photo-upload";
 import type { StepProps } from "./types";
 
 const MB = 1024 * 1024;
-/** Card images: legacy limit of 1 MB; a PDF scan is accepted as well. */
-const CARD_TYPES = "image/jpeg,image/png,application/pdf";
+/** Card images: legacy limit of 1 MB. Images only (no PDF); the server stores them as WebP. */
+const CARD_TYPES = "image/jpeg,image/png,image/webp";
 
 export function AboutStep({ values, update, errors, documents, account, onUploaded }: StepProps) {
   const onFile = (label: string) => (documents.find((d) => d.label === label) ? `${label} card on file` : null);
@@ -83,7 +83,7 @@ export function AboutStep({ values, update, errors, documents, account, onUpload
               noun="Aadhaar card"
               maxBytes={1 * MB}
               current={onFile("Aadhaar")}
-              hint="The front side. JPG, PNG or PDF, up to 1 MB."
+              hint="The front side. A JPG, PNG or WebP image (no PDF), up to 1 MB."
               onUploaded={() => onUploaded("aadhaar")}
             />
           </DocSlot>
@@ -95,7 +95,7 @@ export function AboutStep({ values, update, errors, documents, account, onUpload
               noun="PAN card"
               maxBytes={1 * MB}
               current={onFile("PAN")}
-              hint="The front side. JPG, PNG or PDF, up to 1 MB."
+              hint="The front side. A JPG, PNG or WebP image (no PDF), up to 1 MB."
               onUploaded={() => onUploaded("pan")}
             />
           </DocSlot>
