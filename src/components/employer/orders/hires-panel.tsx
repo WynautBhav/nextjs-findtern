@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, BriefcaseBusiness, CalendarCheck, CreditCard, Download, FileText } from "lucide-react";
 
-import { EmptyScene, Pill } from "@/components/app/primitives";
+import { Pill } from "@/components/app/primitives";
+import { Avatar } from "@/components/app/avatar";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { RowMenu } from "@/components/app/row-menu";
@@ -13,9 +14,9 @@ import { formatDate, formatMoney } from "@/lib/format";
 import { filterHires } from "@/lib/orders-filter";
 import { todayIst } from "@/lib/offer";
 import { cn } from "@/lib/utils";
-import { tintFor } from "@/components/employer/dashboard/card-geometry";
 import type { HireRow } from "./types";
-import { INLINE_LINK, PLAN, dateRange, feePaidMinor, initials, LiveCount, ResetButton, SearchField } from "./shared";
+import { OrdersEmpty } from "./empty";
+import { INLINE_LINK, PLAN, TOOLBAR_CARD, dateRange, feePaidMinor, initials, LiveCount, ResetButton, SearchField } from "./shared";
 
 const PAYMENTS_EMAIL = "communicate@findtern.in";
 
@@ -57,10 +58,10 @@ const payHref = (h: HireRow) => `/employer/checkout?proposal=${encodeURIComponen
  * Hire is the flexible column; the rest are fixed, so every row lines up
  * under its heading and a date range never has to wrap; below lg each hire is a card with the same fields labelled.
  */
-const COLS = "lg:grid lg:grid-cols-[minmax(230px,1fr)_104px_200px_130px_130px_8.5rem] lg:items-center lg:gap-x-4";
+const COLS = "min-[1320px]:grid min-[1320px]:grid-cols-[minmax(190px,1fr)_112px_172px_112px_116px_10.5rem] min-[1320px]:items-center min-[1320px]:gap-x-4";
 
 /** A field's label: visible on the card, a screen-reader label in the table. */
-const FIELD_LABEL = "mb-0.5 block text-xs font-medium text-ink-600 lg:sr-only";
+const FIELD_LABEL = "mb-0.5 block text-xs font-medium text-ink-600 min-[1320px]:sr-only";
 
 export function HiresPanel({
   hires,
@@ -88,12 +89,12 @@ export function HiresPanel({
   };
   if (hires.length === 0) {
     return (
-      <EmptyScene
-        art
+      <OrdersEmpty
+        icon={<BriefcaseBusiness />}
         title="No hires yet"
-        body="A candidate becomes a hire once they accept your proposal and you complete the payment. Their placement, dates and invoices land here."
+        body="Their placement, dates and invoices land here as soon as a hire is paid."
+        steps={["Send a proposal to a candidate", "They accept your offer", "You pay, and they become a hire"]}
         next={{ label: "Find candidates", href: "/employer/candidates" }}
-        who="You - send a proposal"
       />
     );
   }
@@ -120,8 +121,8 @@ export function HiresPanel({
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-2">
-        <div className="min-w-0 flex-1 lg:max-w-md">
+      <div className={cn(TOOLBAR_CARD, "flex items-center gap-2")}>
+        <div className="min-w-0 flex-1 min-[1320px]:max-w-md">
           <SearchField value={q} onChange={setQ} placeholder="Search hires" />
         </div>
         <ResetButton enabled={Boolean(q)} onClick={() => setQ("")} />
@@ -129,7 +130,7 @@ export function HiresPanel({
           type="button"
           onClick={exportCsv}
           disabled={rows.length === 0}
-          className={buttonClass({ variant: "outline", size: "sm", className: "h-11 shrink-0 lg:ml-auto" })}
+          className={buttonClass({ variant: "outline", size: "sm", className: "h-11 shrink-0 min-[1320px]:ml-auto" })}
         >
           <Download className="size-4" aria-hidden />
           <span><span className="max-sm:sr-only">{rows.length !== hires.length ? `Export ${rows.length} shown` : "Export"}</span> CSV</span>
@@ -137,7 +138,7 @@ export function HiresPanel({
         <LiveCount active={Boolean(q.trim())} shown={rows.length} total={hires.length} noun="hires" />
       </div>
       {rows.length === 0 ? (
-        <EmptyScene title="No hire matches" body="Try another candidate, project or role, or reset the search." className="py-10" />
+        <OrdersEmpty compact title="No hire matches" body="Try another candidate, project or role, or reset the search." />
       ) : (
         <>
           {/* The tab already counts the hires; a count here only says what a search left. */}
@@ -157,8 +158,8 @@ export function HiresPanel({
           ) : null}
 
           {/* Column headings: the table's header row from lg; below it each card labels its own fields. */}
-          <div className="lg:overflow-x-auto lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:shadow-[0_1px_2px_rgba(16,24,20,0.04)]">
-          <div className="lg:min-w-[1010px]">
+          <div className="min-[1320px]:overflow-x-auto min-[1320px]:rounded-2xl min-[1320px]:border min-[1320px]:border-ink-200 min-[1320px]:bg-white min-[1320px]:shadow-xs">
+          <div className="min-[1320px]:min-w-[960px]">
           <div aria-hidden className={cn(COLS, "hidden border-b border-ink-200 bg-ink-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-ink-600")}>
             <span>Hire</span>
             <span>Monthly</span>
@@ -167,7 +168,7 @@ export function HiresPanel({
             <span>Status</span>
             <span />
           </div>
-          <ul aria-label="Hires" className="space-y-3 lg:space-y-0 lg:divide-y lg:divide-ink-100">
+          <ul aria-label="Hires" className="space-y-3 min-[1320px]:space-y-0 min-[1320px]:divide-y min-[1320px]:divide-ink-100">
             {rows.map((h) => {
               // Pay only where checkout can bill this placement; otherwise the
               // link opened a checkout for a different hire (QA-139).
@@ -180,31 +181,31 @@ export function HiresPanel({
               const fee = feePaidMinor(h);
               const progress = h.fullTime ? null : contractProgress(h.startDate, h.ledger.endsOn);
               return (
-                <li key={h.proposalId} className={cn(COLS, "rounded-xl border border-ink-200 bg-white p-4 transition-colors lg:rounded-none lg:border-0 lg:px-4 lg:py-4 lg:even:bg-ink-50/60 lg:hover:bg-brand-50/70")}>
+                <li key={h.proposalId} className={cn(COLS, "rounded-xl border border-ink-200 bg-white p-4 transition-colors min-[1320px]:rounded-none min-[1320px]:border-0 min-[1320px]:px-4 min-[1320px]:py-4 min-[1320px]:even:bg-ink-50/60 min-[1320px]:hover:bg-brand-50/70")}>
                   <div className="min-w-0">
                     <div className="flex items-center gap-3">
-                      <span aria-hidden className={cn("grid size-10 shrink-0 place-items-center rounded-full text-sm font-semibold ring-1 ring-inset ring-black/5", tintFor(h.internId))}>
-                        {initials(h.candidateName)}
+                      <span aria-hidden className="inline-flex">
+                        <Avatar initials={initials(h.candidateName)} size="md" />
                       </span>
                       <div className="min-w-0">
                         <Link
                           href={`/employer/intern/${encodeURIComponent(h.internId)}`}
-                          className="block break-words text-base font-medium text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 touch:inline-flex touch:min-h-11 touch:items-center"
+                          className="inline-flex min-h-9 items-center break-words text-base font-medium text-ink-900 underline-offset-4 hover:text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 touch:min-h-11"
                         >
                           {h.candidateName}
                         </Link>
-                        <p className="truncate text-sm text-ink-700" title={h.roleTitle}>
+                        <p className="break-words text-sm text-ink-700">
                           {h.roleTitle}
                         </p>
                         {h.projectName !== h.roleTitle ? (
-                          <p className="truncate text-sm text-ink-600" title={h.projectName}>
+                          <p className="break-words text-sm text-ink-600">
                             {h.projectName}
                           </p>
                         ) : null}
                       </div>
                     </div>
                     {owedOffline ? (
-                      <p className="nums mt-2 text-sm text-ink-900 lg:pl-[3.25rem]">
+                      <p className="nums mt-2 text-sm text-ink-900 min-[1320px]:pl-[3.25rem]">
                         <span className="font-semibold">{formatMoney(h.ledger.dueMinor, h.currency)}</span> owed · checkout can&apos;t bill this one online ·{" "}
                         <a href={paymentLinkHref(h)} className={INLINE_LINK}>
                           Request a payment link
@@ -212,7 +213,7 @@ export function HiresPanel({
                       </p>
                     ) : null}
                     {due && !postpaid ? (
-                      <p className="nums mt-2 text-sm text-ink-900 lg:pl-[3.25rem]">
+                      <p className="nums mt-2 text-sm text-ink-900 min-[1320px]:pl-[3.25rem]">
                         <span className="font-semibold">{formatMoney(h.ledger.dueMinor, h.currency)}</span> to pay ·{" "}
                         <Link href={payHref(h)} className={INLINE_LINK}>
                           Pay now
@@ -220,7 +221,7 @@ export function HiresPanel({
                       </p>
                     ) : null}
                     {postpaid && h.ledger.nextDue ? (
-                      <p className="nums mt-2 text-sm font-medium text-ink-900 lg:pl-[3.25rem]">
+                      <p className="nums mt-2 text-sm font-medium text-ink-900 min-[1320px]:pl-[3.25rem]">
                         Month {h.ledger.monthsPaid + 1} of {h.ledger.months} · {due && h.ledger.nextDue <= todayIst() ? "Due now" : `Due on ${formatDate(h.ledger.nextDue)}${due ? " · you can pay it now" : ""}`}
                         {due ? (
                           <>
@@ -234,7 +235,7 @@ export function HiresPanel({
                     ) : null}
                   </div>
 
-                  <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 lg:contents">
+                  <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 min-[1320px]:contents">
                       <div className="nums">
                         <dt className={FIELD_LABEL}>{h.fullTime ? "Annual CTC" : "Monthly"}</dt>
                         <dd className="text-sm text-ink-900">
@@ -252,7 +253,7 @@ export function HiresPanel({
                           )}
                         </dd>
                       </div>
-                      <div className="nums order-last col-span-2 lg:order-none lg:col-span-1">
+                      <div className="nums order-last col-span-2 min-[1320px]:order-none min-[1320px]:col-span-1">
                         <dt className={FIELD_LABEL}>Period</dt>
                         <dd className="text-sm text-ink-900">
                           <span className="whitespace-nowrap">{h.fullTime ? `Joining ${h.startDate ? formatDate(h.startDate) : "to be agreed"}` : dateRange(h.startDate, h.ledger.endsOn)}</span>
@@ -272,9 +273,9 @@ export function HiresPanel({
                           ) : null}
                         </dd>
                       </div>
-                      <div className="nums lg:text-right lg:tabular-nums">
+                      <div className="nums min-[1320px]:text-right min-[1320px]:tabular-nums">
                         <dt className={FIELD_LABEL}>Paid</dt>
-                        <dd className="text-sm font-medium text-ink-900">
+                        <dd className="text-sm font-bold text-ink-900">
                           {formatMoney(h.ledger.paidMinor, h.currency, { zeroLabel: false })}
                           <span className="block whitespace-nowrap text-sm font-normal text-ink-600">
                             {h.fullTime ? "hiring fee" : fee > 0 ? `incl. ${formatMoney(fee, h.currency, { zeroLabel: false })} fee` : "\u00a0"}
@@ -283,14 +284,14 @@ export function HiresPanel({
                       </div>
                   </dl>
 
-                  <div className="mt-4 lg:mt-0">
+                  <div className="mt-4 min-[1320px]:mt-0">
                     <Pill tone={plan.tone} icon={<span aria-hidden className="!size-2 rounded-full bg-current" />}>{plan.label}</Pill>
                   </div>
 
                   {/* One visible action by state: Pay while money is due (it was
                       only reachable from the page header), else Timesheets, else
                       the contract; the rest are in the menu (QA-122). */}
-                  <div className="mt-3 flex items-center gap-1 lg:mt-0 lg:justify-end">
+                  <div className="mt-3 flex items-center gap-1 min-[1320px]:mt-0 min-[1320px]:justify-end">
                     {due ? (
                       <ButtonLink href={payHref(h)} variant="primary" size="sm">
                         <CreditCard className="size-4" aria-hidden />

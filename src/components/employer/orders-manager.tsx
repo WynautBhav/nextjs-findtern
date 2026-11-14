@@ -10,7 +10,6 @@ import { cn } from "@/lib/utils";
 import { HiresPanel } from "./orders/hires-panel";
 import { InvoicesPanel } from "./orders/invoices-panel";
 import { SchedulePanel } from "./orders/schedule-panel";
-import { sumLabel } from "./orders/shared";
 import { OrdersSummary } from "./orders/summary";
 import type { HireRow, InvoiceRow } from "./orders/types";
 
@@ -45,9 +44,9 @@ export function OrdersManager({
 }) {
   const [tab, setTab] = useState<Tab>("hires");
 
-  const tabs: { id: Tab; label: string; short?: string; count: number }[] = [
+  const tabs: { id: Tab; label: string; count: number }[] = [
     { id: "hires", label: "Hires", count: hires.length },
-    { id: "schedule", label: "Payment schedule", short: "Schedule", count: hires.length },
+    { id: "schedule", label: "Payments", count: hires.length },
     { id: "invoices", label: "Invoices", count: invoices.length },
   ];
 
@@ -58,15 +57,10 @@ export function OrdersManager({
   return (
     <div>
       <PageHead
-        title="Orders & payments"
-        // The money is in the summary band below; the line says only what it does not.
-        lede={
-          hires.length > 0
-            ? `${hires.length} hire${hires.length === 1 ? "" : "s"}${sumLabel(hires.map((h) => ({ currency: h.currency, minor: h.ledger.dueMinor }))) ? "" : " · nothing left to pay"}`
-            : offers
-              ? `No hires yet: ${offers}. The hire starts once you pay.`
-              : "No hires yet. A hire, its payments and its invoices land here once you pay for an accepted offer."
-        }
+        title="Orders"
+        // The money is in the summary card below; the line says only what it does not.
+        lede={hires.length === 0 && offers ? `${offers}. A hire starts once you pay.` : "Your hires, what you owe on each, and every invoice."}
+        className="mb-3 sm:mb-4 lg:mb-5 [&_h1]:text-[32px] [&_h1]:leading-10"
         action={
           payableCount + earlyCount > 0 ? (
             <ButtonLink href="/employer/checkout" variant="primary">
@@ -77,13 +71,11 @@ export function OrdersManager({
         }
       />
 
-      {hires.length > 0 ? <OrdersSummary hires={hires} /> : null}
-
-      {/* Wraps rather than scrolling behind a hidden scrollbar (QA-131). */}
+      {/* The same green strip with a white selected step as Candidates and Compare. */}
       <div
         role="tablist"
         aria-label="Orders"
-        className="mb-6 flex flex-wrap gap-x-3 border-b border-ink-200 sm:gap-x-7"
+        className="mb-4 grid grid-cols-3 items-stretch gap-1 rounded-xl border border-brand-200 bg-brand-100/60 p-1 text-[13px] sm:mb-5 sm:text-sm"
         onKeyDown={(e) => {
           // APG tabs: arrows, Home and End move between tabs; Tab leaves the list.
           const i = tabs.findIndex((t) => t.id === tab);
@@ -95,35 +87,31 @@ export function OrdersManager({
           document.getElementById(`orders-tab-${next}`)?.focus();
         }}
       >
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            role="tab"
-            id={`orders-tab-${t.id}`}
-            tabIndex={tab === t.id ? 0 : -1}
-            aria-selected={tab === t.id}
-            aria-controls={tab === t.id ? `orders-panel-${t.id}` : undefined}
-            onClick={() => setTab(t.id)}
-            className={cn(
-              "relative -mb-px inline-flex min-h-12 min-w-11 items-center justify-center gap-1 whitespace-nowrap text-sm outline-none transition-colors sm:gap-1.5",
-              "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
-              "focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent",
-              tab === t.id ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-700 hover:text-ink-900",
-            )}
-          >
-            {t.short ? (
-              <>
-                <span className="sm:hidden">{t.short}</span>
-                <span className="hidden sm:inline">{t.label}</span>
-              </>
-            ) : (
-              t.label
-            )}
-            <span className={cn("nums", tab === t.id ? "text-ink-900" : "text-ink-600")}>{t.count}</span>
-          </button>
-        ))}
+        {tabs.map((t) => {
+          const on = tab === t.id;
+          return (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              id={`orders-tab-${t.id}`}
+              tabIndex={on ? 0 : -1}
+              aria-selected={on}
+              aria-controls={on ? `orders-panel-${t.id}` : undefined}
+              onClick={() => setTab(t.id)}
+              className={cn(
+                "apple-spring inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-brand-600 sm:min-h-10 sm:gap-2 sm:px-4 sm:touch:min-h-11",
+                on ? "bg-white font-bold text-brand-900 shadow-sm ring-1 ring-brand-200" : "font-medium text-ink-700 hover:bg-white/60 hover:text-ink-900",
+              )}
+            >
+              {t.label}
+              <span className={cn("nums min-w-5 rounded-full px-1.5 py-px text-center text-xs font-bold", on ? "bg-brand-700 text-white" : "bg-white text-ink-700 ring-1 ring-brand-200")}>{t.count}</span>
+            </button>
+          );
+        })}
       </div>
+
+      {hires.length > 0 ? <OrdersSummary hires={hires} /> : null}
 
       <div role="tabpanel" id={`orders-panel-${tab}`} aria-labelledby={`orders-tab-${tab}`}>
         {tab === "hires" ? (
