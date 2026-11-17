@@ -1,4 +1,4 @@
-import { eq, and, isNull } from "drizzle-orm";
+import { eq, and, gt, isNull } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createHash } from "node:crypto";
@@ -21,23 +21,23 @@ export async function POST(req: Request) {
 
   const db = getDb();
   const tokenHash = createHash("sha256").update(parsed.data.token).digest("hex");
+  // Claim the token in one statement so two concurrent requests cannot both spend it.
   const [row] = await db
-    .select()
-    .from(schema.passwordResetTokens)
-    .where(and(eq(schema.passwordResetTokens.tokenHash, tokenHash), isNull(schema.passwordResetTokens.usedAt)))
-    .limit(1);
-  if (!row || row.expiresAt < new Date()) {
-    return NextResponse.json({ error: "Invalid or expired token" }, { status: 400 });
-  }
+    .update(schema.passwordResetTokens)
+    .set({ usedAt: new Date() })
+    .where(and(eq(schema.passwordResetTokens.tokenHash, tokenHash), isNull(schema.passwordResetTokens.usedAt), gt(schema.passwordResetTokens.expiresAt, new Date())))
+    .returning();
+  if (!row) return NextResponse.json({ error: "Invalid or expired token" }, { status: 400 });
 
   const password = await hashPassword(parsed.data.password);
   if (row.subjectType === "employer") {
     await db.update(schema.employers).set({ password, passwordChangedAt: new Date() }).where(eq(schema.employers.id, row.subjectId));
+  } else if (row.subjectType === "admin") {
+    await db.update(schema.admins).set({ password }).where(eq(schema.admins.id, row.subjectId));
   } else {
     await db.update(schema.users).set({ password }).where(eq(schema.users.id, row.subjectId));
   }
-  await db.update(schema.passwordResetTokens).set({ usedAt: new Date() }).where(eq(schema.passwordResetTokens.id, row.id));
   // A reset ends every existing session on the account (INT-26).
-  forgetAccountStatus(row.subjectType === "employer" ? "employer" : "intern", row.subjectId);
+  forgetAccountStatus(row.subjectType === "employer" ? "employer" : row.subjectType === "admin" ? "admin" : "intern", row.subjectId);
   return NextResponse.json({ ok: true });
 }

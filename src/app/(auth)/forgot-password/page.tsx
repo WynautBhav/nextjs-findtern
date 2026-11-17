@@ -10,7 +10,8 @@ export const metadata: Metadata = {
 };
 
 export default async function ForgotPasswordPage({ searchParams }: { searchParams: Promise<{ as?: string | string[] }> }) {
-  const role = doorOf((await searchParams).as, ["intern", "employer"]);
+  const as = (await searchParams).as;
+  const role = as === "admin" ? "admin" : doorOf(as, ["intern", "employer"]);
   return (
     <AuthShell
       title="Reset your password."
