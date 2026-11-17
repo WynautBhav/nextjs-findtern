@@ -1,7 +1,8 @@
 import type { pricingPlans } from "@/lib/db/schema";
 import { inrMinorToUsdMinor } from "./currency.ts";
-import { SLUG_HINTS, perHireChargedFor, type PerHireFeeSetting } from "./per-hire-fee.ts";
-import { BANDS, bandFor, bandsForRegion } from "./score.ts";
+import { perHireChargedFor, type PerHireFeeSetting } from "./per-hire-fee.ts";
+import { PRICING_DEFAULTS, bandById, planForBand, type PricingConfig } from "./pricing-config.ts";
+import { bandFor } from "./score.ts";
 
 /**
  * What a candidate costs, derived from their Findtern Score.
@@ -14,7 +15,7 @@ import { BANDS, bandFor, bandsForRegion } from "./score.ts";
  *
  * Source of truth, in order:
  *   1. `pricing_plans` - the admin-editable CMS rate card.
- *   2. `BANDS` in `lib/score.ts` - the published rate, when no CMS row matches.
+ *   2. the pricing config (`lib/pricing-config.ts`) - the published rate, when no CMS row matches.
  *
  * The result reports which one it used, so a CMS price is never mistaken for a
  * hard-coded constant.
@@ -44,6 +45,8 @@ export type Pricing = {
  *   currency, which `currency` already carries.
  * @param feeSetting  Which bands pay the hiring fee (lib/per-hire-fee.ts).
  *   Required, so no caller can price a candidate without the setting.
+ * @param config  What the band is priced at when no active INR plan row
+ *   matches it (lib/pricing-config.ts); the published defaults when omitted.
  */
 export function resolvePricing(
   score: number,
@@ -51,6 +54,7 @@ export function resolvePricing(
   currency: Currency,
   region: "IN" | null,
   feeSetting: PerHireFeeSetting,
+  config: PricingConfig = PRICING_DEFAULTS,
 ): Pricing {
   const band = bandFor(score);
   // The hiring fee follows the admin setting per band; lib/checkout.ts bills
@@ -58,50 +62,30 @@ export function resolvePricing(
   // prices at 0, and no fallback below may bring the amount back.
   const charged = perHireChargedFor(band.id, feeSetting);
   const priced = (listMinor: number) => ({ perHireMinor: charged ? listMinor : 0, perHireListMinor: listMinor, perHireCharged: charged });
-  // The CMS fallback must be in the employer's currency: INR band minors
-  // formatted as USD once quoted a $100/hr rate that should have been $1.
-  const fallbackBand =
-    bandsForRegion(currency === "INR").find((b) => b.id === band.id) ?? band;
+  // Rates are in the employer's currency: INR band minors formatted as USD
+  // once quoted a $100/hr rate that should have been $1. Only INR rows are
+  // authored; USD is derived at ₹100 = $1 (lib/currency), so the two regions
+  // can never quote different prices for the same band.
+  const convert = currency === "USD" ? inrMinorToUsdMinor : (minor: number) => minor;
+  const fromConfig = bandById(config, band.id);
   const fallback: Pricing = {
-    bandName: fallbackBand.name,
-    bandBlurb: fallbackBand.blurb,
-    hourlyRateMinor: fallbackBand.rateMinor,
-    ...priced(fallbackBand.perHireMinor),
+    bandName: band.name,
+    bandBlurb: band.blurb,
+    hourlyRateMinor: convert(fromConfig.hourlyInrMinor),
+    ...priced(convert(fromConfig.hireFeeInrMinor)),
     source: "default",
   };
-
-  // Only INR rows are authored; USD is derived at ₹100 = $1 (lib/currency),
-  // so the two regions can never quote different prices for the same band.
-  const inrPlans = plans.filter(
-    (plan) => plan.isActive && plan.currency.toUpperCase() === "INR",
-  );
-  if (inrPlans.length === 0) return fallback;
-
-  const scoped = inrPlans.filter((plan) => (plan.region ?? null) === "IN");
-  const pool = scoped.length > 0 ? scoped : inrPlans;
   void region;
 
-  const bandIndex = BANDS.findIndex((entry) => entry.id === band.id);
-  const hints = SLUG_HINTS[band.id];
-
-  const bySlug = pool.find((plan) => {
-    const slug = plan.slug.toLowerCase();
-    return hints.some((hint) => slug.includes(hint));
-  });
-  const plan =
-    bySlug ??
-    // No slug matched. Plans are priced in ascending order across the three
-    // bands, so index into the sorted list instead of guessing again.
-    [...pool].sort((a, b) => a.priceHourlyMinor - b.priceHourlyMinor)[Math.max(0, bandIndex)];
-
+  const plan = planForBand(plans, band.id);
   if (!plan) return fallback;
 
-  const convert = currency === "USD" ? inrMinorToUsdMinor : (minor: number) => minor;
   return {
     bandName: plan.displayName || band.name,
     bandBlurb: band.blurb,
     hourlyRateMinor: convert(plan.priceHourlyMinor),
-    ...priced(convert(plan.perHireChargeMinor) || fallbackBand.perHireMinor),
+    // A stored 0 has always meant "use the band's fee": free goes through the switch only.
+    ...priced(convert(plan.perHireChargeMinor) || fallback.perHireListMinor),
     source: "plan",
   };
 }

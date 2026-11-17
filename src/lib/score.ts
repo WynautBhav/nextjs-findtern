@@ -11,8 +11,9 @@
  */
 
 import { inrMinorToUsdMinor } from "./currency.ts";
+import { PRICING_DEFAULTS, type BandId, type PricingConfig } from "./pricing-config.ts";
 
-export type BandId = "standard" | "skilled" | "assured";
+export type { BandId };
 
 export type Band = {
   id: BandId;
@@ -29,39 +30,39 @@ export type Band = {
   blurb: string;
 };
 
-/** The per-hire charge where it applies (₹5,000 INR / $50 USD); which bands pay it is the admin setting (per-hire-fee.ts). */
-export const PER_HIRE_CHARGE_INR = 500000;
+/** The per-hire charge where it applies (₹5,000 INR / $50 USD by default); which bands pay it is the admin setting (per-hire-fee.ts). */
+export const PER_HIRE_CHARGE_INR = PRICING_DEFAULTS.bands[0].hireFeeInrMinor;
 export const PER_HIRE_CHARGE_USD = inrMinorToUsdMinor(PER_HIRE_CHARGE_INR);
 export const PER_HIRE_CUTOFF = 6;
-export const BANDS: Band[] = [
-  {
-    id: "standard",
-    name: "Standard",
-    min: 0,
-    max: 6,
-    rateMinor: 0,
-    perHireMinor: 500000,
-    blurb: "Screened, still building.",
-  },
-  {
-    id: "skilled",
-    name: "Skilled",
-    min: 6,
-    max: 8,
-    rateMinor: 10000,
-    perHireMinor: 500000,
-    blurb: "Above the cohort median.",
-  },
-  {
-    id: "assured",
-    name: "Assured",
-    min: 8,
-    max: 10,
-    rateMinor: 20000,
-    perHireMinor: 500000,
-    blurb: "Top decile of the cohort.",
-  },
-];
+
+const BAND_COPY: Record<BandId, { name: string; blurb: string }> = {
+  standard: { name: "Standard", blurb: "Screened, still building." },
+  skilled: { name: "Skilled", blurb: "Above the cohort median." },
+  assured: { name: "Assured", blurb: "Top decile of the cohort." },
+};
+
+/** The bands as a config states them: INR money, band names and blurbs from here. */
+function bandsFromConfig(config: PricingConfig): Band[] {
+  return config.bands.map((b) => ({
+    id: b.id,
+    ...BAND_COPY[b.id],
+    min: b.minScore,
+    max: b.maxScore,
+    rateMinor: b.hourlyInrMinor,
+    perHireMinor: b.hireFeeInrMinor,
+  }));
+}
+
+/** The published defaults. Anything showing a price to a visitor or employer should use `bandsForConfig` with the live config instead. */
+export const BANDS: Band[] = bandsFromConfig(PRICING_DEFAULTS);
+
+/** The bands under a live config, in INR (isIndia) or USD at ₹100 = $1. */
+export function bandsForConfig(config: PricingConfig, isIndia: boolean): Band[] {
+  const inr = bandsFromConfig(config);
+  return isIndia
+    ? inr
+    : inr.map((b) => ({ ...b, rateMinor: inrMinorToUsdMinor(b.rateMinor), perHireMinor: inrMinorToUsdMinor(b.perHireMinor) }));
+}
 
 /** The plan name employers see for each band (pricing page, invoices). */
 export const PLAN_NAME: Record<BandId, string> = {

@@ -9,7 +9,8 @@
  * and `BANDS[].perHireMinor` stay the amount charged when the band is on.
  */
 
-import { bandFor, type BandId } from "./score.ts";
+import { SLUG_HINTS, type BandId } from "./pricing-config.ts";
+import { bandFor } from "./score.ts";
 
 /** The score band ids from lib/score.ts: standard 0-6, skilled 6-8, assured 8-10. */
 export type FeeBand = BandId;
@@ -28,13 +29,7 @@ export const FEE_BAND_LABEL: Record<FeeBand, { plan: string; scores: string }> =
   assured: { plan: "Latte", scores: "8-10" },
 };
 
-/* Slug fragments that identify a band in the CMS. `pricing_plans.slug` is
- * admin-authored and has no enum behind it, so match loosely. */
-export const SLUG_HINTS: Record<FeeBand, string[]> = {
-  standard: ["espresso", "standard", "basic", "starter", "low", "tier1", "tier-1"],
-  skilled: ["cappuccino", "skilled", "intermediate", "mid", "plus", "tier2", "tier-2"],
-  assured: ["latte", "assured", "premium", "pro", "high", "tier3", "tier-3"],
-};
+export { SLUG_HINTS };
 
 /** A band id or a plan slug to its band; null when it matches neither. */
 export function feeBandOf(bandOrSlug: string | null | undefined): FeeBand | null {

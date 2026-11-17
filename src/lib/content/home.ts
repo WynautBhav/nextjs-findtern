@@ -1,5 +1,6 @@
 import type { CmsPlan, CmsPlanFeature } from "./types";
 import { inrMinorToUsdMinor } from "../currency.ts";
+import { PRICING_DEFAULTS } from "../pricing-config.ts";
 
 /* ==========================================================================
    SAMPLE DATA - flagged on purpose
@@ -109,8 +110,8 @@ export const PRICING_PLANS: CmsPlan[] = [
     slug: "espresso",
     displayName: "Espresso",
     currency: "INR",
-    priceHourlyMinor: 0,
-    perHireChargeMinor: 500000,
+    priceHourlyMinor: PRICING_DEFAULTS.bands[0].hourlyInrMinor,
+    perHireChargeMinor: PRICING_DEFAULTS.bands[0].hireFeeInrMinor,
     internshipDuration: "Up to 2 months",
     features: [
       "Budget-friendly hiring",
@@ -130,8 +131,8 @@ export const PRICING_PLANS: CmsPlan[] = [
     slug: "cappuccino",
     displayName: "Cappuccino",
     currency: "INR",
-    priceHourlyMinor: 10000,
-    perHireChargeMinor: 500000,
+    priceHourlyMinor: PRICING_DEFAULTS.bands[1].hourlyInrMinor,
+    perHireChargeMinor: PRICING_DEFAULTS.bands[1].hireFeeInrMinor,
     internshipDuration: "1-6 months",
     features: ["Skilled interns", "6-8/10", "Access to medium skilled talent"],
     featureList: featureRows(1),
@@ -147,8 +148,8 @@ export const PRICING_PLANS: CmsPlan[] = [
     slug: "latte",
     displayName: "Latte",
     currency: "INR",
-    priceHourlyMinor: 20000,
-    perHireChargeMinor: 500000,
+    priceHourlyMinor: PRICING_DEFAULTS.bands[2].hourlyInrMinor,
+    perHireChargeMinor: PRICING_DEFAULTS.bands[2].hireFeeInrMinor,
     internshipDuration: "1-6 months",
     features: ["Top-rated talent", "8+/10 (Top Rated)", "Access to top-decile talent"],
     featureList: featureRows(2),
