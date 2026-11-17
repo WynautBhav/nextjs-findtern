@@ -25,3 +25,12 @@ test("empty or 'all' returns the whole pool", () => {
   assert.equal(studentsForSkill(pool, "").length, 4);
   assert.equal(studentsForSkill(pool, "all").length, 4);
 });
+
+test("a featured skill with regex characters in its name matches by its literal text and never throws", () => {
+  const withCpp = [s(undefined, ["C++", "STL"]), s(undefined, ["C", "Java"]), s(undefined, ["C#"]), s(undefined, ["F#"])];
+  assert.equal(studentsForSkill(withCpp, "C++").length, 1, "C++ is a literal, not a quantifier");
+  assert.equal(studentsForSkill(withCpp, "C#").length, 1);
+  for (const odd of ["(", "[a", "R+", "a|b", "\\", "?", "*"]) {
+    assert.doesNotThrow(() => studentsForSkill(withCpp, odd), `skill name ${JSON.stringify(odd)}`);
+  }
+});

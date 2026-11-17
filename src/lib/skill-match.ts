@@ -90,8 +90,11 @@ export function matchesCategory(student: Candidate, keywords: string[]): boolean
 
   return keywords.some((kw) => {
     if (kw.length <= 3) {
-      const regex = new RegExp(`\\b${kw}\\b`, "i");
-      return regex.test(allTexts);
+      // Whole word only. The name is an admin-typed skill ("C++", "C#"), so it is escaped: unescaped, "C++" was an
+      // invalid pattern that threw and took the whole featured-skills list down with it. \b would fail after "+"
+      // and "#" (not word characters), hence the lookarounds.
+      const literal = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`(?<![a-z0-9])${literal}(?![a-z0-9])`, "i").test(allTexts);
     }
     return allTexts.toLowerCase().includes(kw.toLowerCase());
   });
