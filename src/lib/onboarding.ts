@@ -1,6 +1,7 @@
 import type { internOnboarding } from "@/lib/db/schema";
 import { phoneError } from "./phone.ts";
 import { getAccountType, type AccountType } from "./intern-account.ts";
+import { proofSlots } from "./cgpa-verification.ts";
 
 /**
  * Intern onboarding shape across the 8-step wizard.
@@ -94,8 +95,8 @@ export type CertificateUpload = { name: string; originalName?: string; type: str
 
 /** At most this many files per qualification row. */
 export const MAX_CERTIFICATE_UPLOADS = 3;
-/** At most this many marksheet files. */
-export const MAX_MARKSHEETS = 8;
+/** At most this many marksheet files (ten: a semester-10 student keeps one per semester). */
+export const MAX_MARKSHEETS = 10;
 export const MAX_EXPERIENCES = 20;
 
 export type ScoreType = "cgpa" | "percentage";
@@ -149,6 +150,10 @@ export type OnboardingDraft = {
     cgpa: string;
     /** Legacy `marksheetUploads`. Absent from an older client's save. */
     marksheetUploads?: CertificateUpload[];
+    /** Current semester (1-10) while pursuing a degree or diploma; absent for interns who never chose one. Null clears it. */
+    currentSemester?: number | null;
+    /** The CGPA proofs, by `proofSlots` key: one marksheet per earlier semester plus a college ID card. */
+    semesterProofUploads?: Record<string, CertificateUpload>;
     professional: QualificationEntry[];
     certifications: QualificationEntry[];
   };
@@ -501,6 +506,8 @@ export function draftFromRecord(row: OnboardingLike): Partial<OnboardingDraft> {
       scoreType: readScoreType(academics),
       cgpa: text(academics.score || academics.cgpa),
       marksheetUploads: readUploads(academics.marksheetUploads),
+      currentSemester: readSemester(academics.currentSemester),
+      semesterProofUploads: readProofs(academics.semesterProofUploads),
       professional: arr(academics.professionalCourses).map((c, i) => readProfessional(obj(c), i)),
       certifications: arr(academics.certifications).map((c, i) => readCertification(obj(c), i)),
     },
@@ -595,6 +602,16 @@ export function storedFromDraft(
         ? { certifications: writeRows(a.certifications, arr(prev.certifications).map(obj), readCertification, writeCertification) }
         : {}),
     };
+  }
+  if (draft.academics) {
+    // `undefined` means "none": the keys are removed rather than stored as null.
+    const academics = out.extraPatch.academics as Record<string, unknown>;
+    const prev = obj(prevExtra.academics);
+    const level = draft.academics.qualificationLevel ?? LEVELS.find(([k]) => k === text(prev.level))?.[1] ?? text(prev.level);
+    for (const [k, v] of Object.entries(semesterPatch(draft.academics, prev, level))) {
+      if (v === undefined) delete academics[k];
+      else academics[k] = v;
+    }
   }
   if (draft.languages) {
     out.extraPatch.languages = draft.languages
@@ -738,6 +755,93 @@ function readUploads(raw: unknown): CertificateUpload[] {
   });
 }
 
+const MAX_SEMESTER = 10;
+
+/** A stored `currentSemester` (number, or digits from an older client): 1-10 or undefined. */
+function readSemester(raw: unknown): number | null | undefined {
+  const n = typeof raw === "string" && /^\d+$/.test(raw.trim()) ? Number(raw) : raw;
+  return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= MAX_SEMESTER ? n : undefined;
+}
+
+/** Stored proofs by slot key; only valid slot keys with a file name survive. */
+function readProofs(raw: unknown): Record<string, CertificateUpload> | undefined {
+  const rec = obj(raw);
+  const valid = new Set(proofSlots(MAX_SEMESTER).map((s) => s.key));
+  const out: Record<string, CertificateUpload> = {};
+  for (const [key, value] of Object.entries(rec)) {
+    if (!valid.has(key)) continue;
+    const [u] = readUploads([value]);
+    if (u) out[key] = u;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
+/** Degrees, diplomas and master's have semesters; a Ph.D or nothing chosen does not. */
+export function levelHasSemesters(level: string | undefined): boolean {
+  return level === "Diploma" || level === "Bachelor's" || level === "Master's";
+}
+
+/** The semester question applies while the course is running (completed ones have no "current" semester). */
+export function semesterApplies(level: string | undefined, status: string | undefined): boolean {
+  return levelHasSemesters(level) && status !== "Completed";
+}
+
+const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+/**
+ * What `currentSemester` and `semesterProofUploads` become on a save. A save that does not mention them keeps what
+ * is stored; null clears the semester (and its proofs); proofs for slots the semester does not have are dropped.
+ * A completed course or a Ph.D keeps no semester.
+ */
+function semesterPatch(a: Partial<OnboardingDraft["academics"]>, prev: Record<string, unknown>, level: string | undefined): Record<string, unknown> {
+  const status = a.status ?? text(prev.status);
+  const semester = a.currentSemester === undefined ? readSemester(prev.currentSemester) : a.currentSemester;
+  if (!semesterApplies(level, status) || semester === null || semester === undefined || !proofSlots(semester).length) {
+    return { currentSemester: undefined, semesterProofUploads: undefined };
+  }
+  const given = a.semesterProofUploads ?? readProofs(prev.semesterProofUploads) ?? {};
+  const kept: Record<string, CertificateUpload> = {};
+  for (const slot of proofSlots(semester)) {
+    const u = given[slot.key];
+    if (u?.name) kept[slot.key] = { name: u.name, ...(u.originalName ? { originalName: u.originalName } : {}), type: u.type, size: u.size };
+  }
+  return { currentSemester: semester, semesterProofUploads: Object.keys(kept).length ? kept : undefined };
+}
+
+/**
+ * Per-field errors for the semester and its proofs (keys: `currentSemester`, `proof-<slot key>`). Empty for an
+ * intern who chose no semester (legacy profiles are never asked), who has not entered a score, or whose course
+ * has no current semester. With a semester and a score, every slot needs its own JPG or PNG photo.
+ */
+export function semesterProofErrors(a: Partial<OnboardingDraft["academics"]>): ValidationErrors {
+  const errors: ValidationErrors = {};
+  const semester = a.currentSemester;
+  if (semester === null || semester === undefined) return errors;
+  if (!semesterApplies(a.qualificationLevel, a.status)) return errors;
+  const slots = proofSlots(semester);
+  if (slots.length === 0) {
+    errors.currentSemester = "Choose a semester from 1 to 10.";
+    return errors;
+  }
+  if (!(a.cgpa ?? "").trim()) return errors;
+  const given = a.semesterProofUploads ?? {};
+  const seen = new Map<string, string>();
+  for (const slot of slots) {
+    const u = given[slot.key];
+    const id = `proof-${slot.key}`;
+    if (!u?.name) {
+      errors[id] = slot.key === "college-id" ? "Upload your college ID card." : `Upload your ${slot.label.charAt(0).toLowerCase()}${slot.label.slice(1)}.`;
+    } else if (u.type && !IMAGE_TYPES.has(u.type)) {
+      errors[id] = `${slot.label} must be a JPG or PNG photo.`;
+    } else if (seen.has(u.name)) {
+      errors[id] = `Use a different photo here - this is the same file as ${seen.get(u.name)?.toLowerCase()}.`;
+    } else {
+      seen.set(u.name, slot.label);
+    }
+  }
+  return errors;
+}
+
 /** Every certificate file on a stored academics object, labelled by its row. */
 export function certificateFiles(academics: unknown): (CertificateUpload & { label: string })[] {
   const a = obj(academics);
@@ -750,6 +854,11 @@ export function certificateFiles(academics: unknown): (CertificateUpload & { lab
     const row = readCertification(c, i);
     for (const u of row.uploads ?? []) out.push({ ...u, label: `${row.name || "Certification"} certificate` });
   });
+  // The CGPA proofs open from the same places as certificates (documents page, admin file route), under their slot label.
+  const slotLabel = new Map(proofSlots(MAX_SEMESTER).map((s) => [s.key, s.label]));
+  for (const [key, u] of Object.entries(readProofs(a.semesterProofUploads) ?? {})) {
+    out.push({ ...u, label: slotLabel.get(key) ?? "CGPA proof" });
+  }
   return out;
 }
 
@@ -1124,6 +1233,9 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
       errors.degree = level === "Ph.D" ? "Enter your Ph.D subject." : "Enter the name of your diploma.";
     }
     // Specialization is optional (bug sheet 23 Oct).
+
+    // Semester and CGPA proofs: asked only of interns who chose a semester and gave a score.
+    Object.assign(errors, semesterProofErrors(a));
 
     // Legacy year rules (INT-17): start not after this year; a completed
     // degree needs an end year no later than this year; while pursuing the
