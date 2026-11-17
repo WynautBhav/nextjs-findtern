@@ -12,6 +12,7 @@ export const reset = () => {
     interns: new Map(), // id -> row, the candidates that exist
     drive: new Map(), // fileId -> file as Drive would return it
     calls: [], // ordered log: { op, ... }
+    inserts: [], // every row passed to .values(...)
     attached: new Map(), // internId -> { link, meta }
     liveFile: new Map(), // internId -> driveFileId currently attached
     attachError: null,
@@ -42,6 +43,12 @@ export const getDb = () => {
     {},
     {
       get: (_t, prop) => {
+        // Rows handed to insert().values(...), in order, so a test can read what a route wrote.
+        if (prop === "values") return (v) => (g.__fake.inserts?.push(v), chain);
+        // With echoInsert, .returning() answers with the row just inserted (plus an id), as Postgres would.
+        if (prop === "returning" && g.__fake.echoInsert) {
+          return () => ({ then: (resolve) => resolve([{ id: "promo-new", ...g.__fake.inserts[g.__fake.inserts.length - 1] }]) });
+        }
         if (prop === "then") {
           const q = g.__fake.queue;
           const rows = q && q.length ? q.shift() : (() => {

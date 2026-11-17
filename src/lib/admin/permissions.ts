@@ -116,6 +116,8 @@ const RULES: Rule[] = [
   ["/api/admin/payouts", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/all-payouts", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/promo-codes", PROMO_R, PROMO_W],
+  // Minting a code that makes a payment free is finance's call: Accounts (transactions:write) only, not the content permission (cms:write) that edits ordinary codes.
+  ["/api/admin/promo-codes/full-waiver", ["transactions:read"], ["transactions:write"]],
   // Per-type check happens in the route (interns, companies, payments…).
   ["/api/admin/export", []],
   // Command palette search: any admin may call it; the handler checks each result group's permission.

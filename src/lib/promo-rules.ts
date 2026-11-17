@@ -8,6 +8,7 @@
 import { sql } from "drizzle-orm";
 
 import { inrMinorToUsdMinor } from "./currency.ts";
+import { FULL_WAIVER_TYPE } from "./full-waiver.ts";
 import { formatMoney } from "./format.ts";
 
 export type PromoRow = {
@@ -148,6 +149,8 @@ export function employerPromoTooLarge(discountMinor: number, discountableMinor: 
 
 /** Discount in the order's minor units, never more than the order itself. */
 export function promoDiscount(row: PromoRow, orderMinor: number, currency: Currency): number {
+  // A full waiver is the whole order, whatever `discountValue` says (full-waiver.ts).
+  if (row.discountType === FULL_WAIVER_TYPE) return Math.max(0, orderMinor);
   const raw =
     row.discountType === "percentage"
       ? Math.floor((orderMinor * Math.min(row.discountValue, 100)) / 100) // legacy rounds down

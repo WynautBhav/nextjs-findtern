@@ -120,6 +120,9 @@ export const limiters = {
   // Refused promo codes at checkout (src/lib/promo-throttle.ts): per signed-in account and per address.
   promoMissUser: new RateLimiter(8, 15 * 60_000, { bypassable: false }),
   promoMissIp: new RateLimiter(30, 15 * 60_000, { bypassable: false }),
+  // Full-waiver redemptions (src/lib/promo-throttle.ts): every attempt is charged, valid or not. Much tighter than the refused-code budget.
+  promoWaiverUser: new RateLimiter(5, 60 * 60_000, { bypassable: false }),
+  promoWaiverIp: new RateLimiter(20, 60 * 60_000, { bypassable: false }),
 };
 
 /**

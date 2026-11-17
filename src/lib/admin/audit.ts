@@ -59,6 +59,8 @@ export const AUDIT_ACTIONS = {
   "promo.create": "Created a promo code",
   "promo.update": "Edited a promo code",
   "promo.delete": "Deleted a promo code",
+  "promo.full_waiver_created": "Created a full-waiver promo code (makes a payment free)",
+  "promo.full_waiver_redeemed": "A full-waiver promo code completed a payment for free",
   "intern.activation_marked_paid": "Marked activation fee paid",
   "intern.marked_completed": "Marked an internship completed",
   "intern.completed_auto": "Internship completed automatically on final timesheet approval",

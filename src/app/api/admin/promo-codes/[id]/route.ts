@@ -5,6 +5,7 @@ import { z } from "zod";
 import { diffFields, recordAdminAudit } from "@/lib/admin/audit";
 import { promoCodeProblem, promoDiscountProblem } from "@/lib/admin/promo-edit-rules";
 import { getDb, schema } from "@/lib/db";
+import { isFullWaiver, waiverCodeTail, waiverEditProblem } from "@/lib/full-waiver";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation, openPromoOrders } from "@/lib/promo";
 import { collegeCodeDeleteProblem, collegeCodeEditProblem, promoDeleteProblem, promoMaxUsagesProblem, promoRenameProblem, PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
@@ -73,6 +74,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   // A college's code keeps its discount, audience and cap; those change on the college screen.
   const locked = collegeCodeEditProblem(existing, parsed.data);
   if (locked) return NextResponse.json({ error: locked }, { status: 403 });
+  // A full-waiver code can be turned on or off, nothing else: its caps can't be walked up one edit at a time.
+  const waiverLocked = waiverEditProblem(existing, parsed.data);
+  if (waiverLocked) return NextResponse.json({ error: waiverLocked }, { status: 403 });
   // A cap can't be lowered below the uses already made (the code would read as exhausted with orders still on it).
   if (parsed.data.maxUsages !== undefined) {
     const lowered = promoMaxUsagesProblem(parsed.data.maxUsages, existing.usedCount);
@@ -114,7 +118,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     if (isUniqueViolation(e)) return NextResponse.json({ error: DUPLICATE_CODE }, { status: 409 });
     throw e;
   }
-  await recordAdminAudit(db, { adminId: guard.session.uid, action: "promo.update", targetType: "promo_code", targetId: id, meta: { code: existing.code, discountType: next.discountType ?? existing.discountType, changes: diffFields(existing, next) } });
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "promo.update", targetType: "promo_code", targetId: id, meta: { ...(isFullWaiver(existing) ? { codeTail: waiverCodeTail(existing.code) } : { code: existing.code }), discountType: next.discountType ?? existing.discountType, changes: diffFields(existing, next) } });
   return NextResponse.json({ ok: true });
 }
 
@@ -123,7 +127,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const guard = await requireMutation({ req, roles: ["admin"] });
   if (!guard.ok) return guard.response;
   const db = getDb();
-  const [row] = await db.select({ collegeId: schema.promoCodes.collegeId, code: schema.promoCodes.code, usedCount: schema.promoCodes.usedCount }).from(schema.promoCodes).where(eq(schema.promoCodes.id, id)).limit(1);
+  const [row] = await db.select({ collegeId: schema.promoCodes.collegeId, code: schema.promoCodes.code, usedCount: schema.promoCodes.usedCount, discountType: schema.promoCodes.discountType }).from(schema.promoCodes).where(eq(schema.promoCodes.id, id)).limit(1);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
   const locked = collegeCodeDeleteProblem(row.collegeId);
   if (locked) return NextResponse.json({ error: locked }, { status: 403 });
@@ -132,6 +136,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const blocked = promoDeleteProblem({ usedCount: row.usedCount, usageRows, openOrders: await openPromoOrders(db, row.code) });
   if (blocked) return NextResponse.json({ error: blocked }, { status: 409 });
   await db.delete(schema.promoCodes).where(eq(schema.promoCodes.id, id));
-  await recordAdminAudit(db, { adminId: guard.session.uid, action: "promo.delete", targetType: "promo_code", targetId: id, meta: { code: row.code } });
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "promo.delete", targetType: "promo_code", targetId: id, meta: isFullWaiver(row) ? { codeTail: waiverCodeTail(row.code), fullWaiver: true } : { code: row.code } });
   return NextResponse.json({ ok: true });
 }
