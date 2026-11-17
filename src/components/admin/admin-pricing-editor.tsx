@@ -1,26 +1,46 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, IndianRupee, Loader2, Plus, Save, Star, Trash2 } from "lucide-react";
+import { AlertTriangle, IndianRupee, Loader2, Plus, Save, Star, Trash2 } from "lucide-react";
 
 import { EmptyScene } from "@/components/app/primitives";
 import { Panel, PanelHeader } from "@/components/admin/panel";
+import { AutosaveStatus, useAutosave, type SaveResult } from "@/components/admin/use-autosave";
 import { buttonClass } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { createAutosave } from "@/lib/admin/autosave";
 import { describeLegacyBand, isLegacyTier, legacyBandChange } from "@/lib/admin/plan-band";
+import {
+  planDraftEq,
+  planDraftFromPlan,
+  planPatchBody,
+  rupeesEq,
+  toRupees,
+  validateActivationFee,
+  validatePlanDraft,
+  validateStipends,
+  wholeRupeesEq,
+  type PlanDraft,
+  type StipendDraft,
+} from "@/lib/admin/pricing-draft";
 import { csrfFetch } from "@/lib/client-fetch";
 import { FEE_BANDS, FEE_BAND_LABEL, type FeeBand, type PerHireFeeSetting } from "@/lib/per-hire-fee";
 import { INR_PER_USD, inrMinorToUsdMinor, savingsPercent } from "@/lib/currency";
-import { MAX_MINOR, type StipendBands } from "@/lib/pricing-config";
+import type { StipendBands } from "@/lib/pricing-config";
 import { formatMoney } from "@/lib/format";
 import type { CmsPlanFeature } from "@/lib/content/types";
 import { cn } from "@/lib/utils";
-import { useConfirm } from "@/components/app/use-confirm";
 
 /**
  * Rate card editor. Admins type rupees; the API stores paise. USD is never
  * edited - it is derived at ₹100 = $1 and previewed beside every price.
+ *
+ * Every block saves by itself a moment after the last edit (see use-autosave):
+ * a plan card, the activation fee, the hiring-fee switches, the stipends, and the
+ * one "Most popular" choice. Each shows its own Saving… / Saved / Error state.
+ * A save is live on the public site at once, so there is no confirm dialog; each
+ * block shows "Live on the site" and an Undo for its last change instead.
  */
 
 export type EditablePlan = {
@@ -39,20 +59,34 @@ export type EditablePlan = {
 };
 
 const inputClass =
-  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500";
+  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500 aria-invalid:border-danger aria-invalid:focus:border-danger";
 
-const toRupees = (minor: number | null) => (minor == null ? "" : String(minor / 100));
 const toMinor = (rupees: string) => Math.round(Number(rupees || 0) * 100);
-/** Paise for a typed rupee amount; null when it is blank, not a number, or beyond what the API stores. */
-function parseRupees(raw: string): number | null {
-  const t = raw.trim();
-  if (!/^(\d+\.?\d*|\.\d+)$/.test(t)) return null;
-  const minor = Math.round(Number(t) * 100);
-  return Number.isFinite(minor) && minor <= 100_000_000 ? minor : null;
-}
-const PRICE_ERROR = "Enter a price in rupees, like 450 or 99.50.";
-
 const toMinorOrNull = (rupees: string) => (rupees.trim() === "" ? null : toMinor(rupees));
+
+const planMachine = createAutosave<PlanDraft>(planDraftEq);
+const feeMachine = createAutosave<string>(rupeesEq);
+const hireFeeMachine = createAutosave<PerHireFeeSetting>((a, b) => FEE_BANDS.every((k) => a[k] === b[k]));
+const stipendMachine = createAutosave<StipendDraft>((a, b) => wholeRupeesEq(a.skilled, b.skilled) && wholeRupeesEq(a.assured, b.assured));
+const featuredMachine = createAutosave<string | null>((a, b) => a === b);
+
+/** One request to the pricing API; the server's message when it refuses. */
+async function send(method: "PATCH" | "PUT", body: unknown): Promise<SaveResult> {
+  try {
+    const res = await csrfFetch("/api/admin/pricing", {
+      method,
+      headers: { "content-type": "application/json" },
+      // keepalive: a save fired as the tab is hidden still goes out.
+      keepalive: true,
+      body: JSON.stringify(body),
+    });
+    if (res.ok) return { ok: true };
+    const data = await res.json().catch(() => ({}));
+    return { ok: false, error: data.error ?? "Could not save." };
+  } catch {
+    return { ok: false, error: "Not saved: the network request failed." };
+  }
+}
 
 export function AdminPricingEditor({
   plans,
@@ -68,15 +102,19 @@ export function AdminPricingEditor({
   const router = useRouter();
   const [seeding, setSeeding] = useState(false);
   const [seedError, setSeedError] = useState<string | null>(null);
-  // "Most popular" is one choice for the whole rate card: checking a card unchecks the
-  // others at once, before anything is saved. Re-synced when the saved choice changes.
+
+  // "Most popular" is one choice for the whole rate card, saved on its own: ticking a card
+  // unticks the others at once (before the save), and the server un-features them in the
+  // same transaction. The page loads with at most one (settings/page.tsx heals duplicates).
   const serverFeaturedId = plans.find((p) => p.isFeatured)?.id ?? null;
-  const [featuredId, setFeaturedId] = useState<string | null>(serverFeaturedId);
-  const [seenFeaturedId, setSeenFeaturedId] = useState(serverFeaturedId);
-  if (seenFeaturedId !== serverFeaturedId) {
-    setSeenFeaturedId(serverFeaturedId);
-    setFeaturedId(serverFeaturedId);
-  }
+  const featured = useAutosave(
+    featuredMachine,
+    serverFeaturedId,
+    // Un-ticking sends the plan that held the flag; ticking sends the new one.
+    (value, saved) => (value ?? saved ? send("PATCH", { id: (value ?? saved)!, isFeatured: value !== null }) : Promise.resolve({ ok: true })),
+    () => router.refresh(),
+  );
+  const featuredId = featured.state.draft;
 
   async function seed() {
     setSeeding(true);
@@ -122,20 +160,32 @@ export function AdminPricingEditor({
           </div>
         </Panel>
       ) : (
-        // Columns follow the width of this area, not the viewport: the admin sidebar takes ~340px,
-        // so a viewport breakpoint left the third card alone on its own row at 1440. One column
-        // when narrow, two from 36rem, three from 56rem. Each card keeps its own form and Save.
-        <div className="@container">
-          <div className="grid items-start gap-[var(--admin-gap,1rem)] @xl:grid-cols-2 @4xl:grid-cols-3">
-            {plans.map((plan) => (
-              <PlanEditor
-                key={plan.id}
-                plan={plan}
-                featured={featuredId === plan.id}
-                featuredId={featuredId}
-                onFeatured={(on) => setFeaturedId(on ? plan.id : null)}
-              />
-            ))}
+        <div className="space-y-[var(--admin-gap,1rem)]">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-apple-sm border border-[color:var(--admin-rule)] bg-surface px-4 py-3">
+            <p className="flex items-center gap-2 text-sm text-ink-800">
+              <Star className="size-4 text-accent-700" aria-hidden />
+              <span>
+                Most popular:{" "}
+                <strong className="font-semibold">{plans.find((p) => p.id === featuredId)?.displayName ?? "none marked"}</strong>
+                <span className="ml-2 text-xs text-text-subtle">One plan at a time. Ticking another card moves it.</span>
+              </span>
+            </p>
+            <AutosaveStatus auto={featured} />
+          </div>
+          {/* Columns follow the width of this area, not the viewport: the admin sidebar takes ~340px,
+              so a viewport breakpoint left the third card alone on its own row at 1440. One column
+              when narrow, two from 36rem, three from 56rem. Each card saves on its own. */}
+          <div className="@container">
+            <div className="grid items-start gap-[var(--admin-gap,1rem)] @xl:grid-cols-2 @4xl:grid-cols-3">
+              {plans.map((plan) => (
+                <PlanEditor
+                  key={plan.id}
+                  plan={plan}
+                  featured={featuredId === plan.id}
+                  onFeatured={(on) => featured.edit(on ? plan.id : null)}
+                />
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -172,47 +222,18 @@ function RateCardSummary({ plans }: { plans: EditablePlan[] }) {
 
 function ActivationFeePanel({ initialMinor }: { initialMinor: number }) {
   const router = useRouter();
-  const { ask, dialog } = useConfirm();
-  const [rupees, setRupees] = useState(toRupees(initialMinor));
-  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
-  const [error, setError] = useState<string | null>(null);
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    const fee = parseRupees(rupees);
-    if (fee === null || fee <= 0) {
-      setError(fee === 0 ? "The fee must be above zero." : PRICE_ERROR);
-      document.getElementById("activation-fee")?.focus();
-      return;
-    }
-    const ok = await ask({
-      title: "Publish this activation fee?",
-      body: `New candidates are charged ${formatMoney(fee, "INR")} (GST-inclusive) from now on.`,
-      confirmLabel: "Yes, publish",
-    });
-    if (!ok) return;
-    setState("saving");
-    setError(null);
-    try {
-      const res = await csrfFetch("/api/admin/pricing", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ internActivationFeeMinor: fee }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setError(body.error ?? "Could not save.");
-        setState("idle");
-        return;
-      }
-      setState("saved");
-      router.refresh();
-      setTimeout(() => setState("idle"), 2500);
-    } catch {
-      setError("Not saved: the network request failed.");
-      setState("idle");
-    }
-  }
+  const auto = useAutosave(
+    feeMachine,
+    toRupees(initialMinor),
+    async (rupees) => {
+      const fee = validateActivationFee(rupees);
+      return fee.ok ? send("PUT", { internActivationFeeMinor: fee.minor }) : { ok: false, error: fee.message };
+    },
+    () => router.refresh(),
+  );
+  const rupees = auto.state.draft;
+  const check = validateActivationFee(rupees);
+  const error = auto.status === "invalid" && !check.ok ? check.message : null;
 
   return (
     <Panel>
@@ -221,62 +242,48 @@ function ActivationFeePanel({ initialMinor }: { initialMinor: number }) {
         description="Charged once to a candidate for the AI interview and onboarding. GST-inclusive. Promo codes apply on top."
         icon={IndianRupee}
       />
-      {dialog}
-      <form onSubmit={save} noValidate className="flex flex-wrap items-end gap-3 px-5 py-4">
-        <label className="block w-full max-w-48 text-sm font-medium text-ink-800">
-          Fee (₹)
-          <input
-            id="activation-fee"
-            inputMode="decimal"
-            value={rupees}
-            onChange={(e) => {
-              setRupees(e.target.value.replace(/[^\d.]/g, ""));
-              setError(null);
-            }}
-            aria-invalid={error ? true : undefined}
-            aria-describedby={error ? "activation-fee-error" : undefined}
-            className={inputClass}
-          />
-        </label>
-        <SaveButton state={state} />
-        {error ? <p id="activation-fee-error" role="alert" className="w-full text-sm text-danger">{error}</p> : null}
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          auto.flush();
+        }}
+        noValidate
+        className="space-y-3 px-5 py-4"
+      >
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block w-full max-w-48 text-sm font-medium text-ink-800">
+            Fee (₹)
+            <input
+              id="activation-fee"
+              inputMode="decimal"
+              value={rupees}
+              onChange={(e) => {
+                const v = e.target.value.replace(/[^\d.]/g, "");
+                const c = validateActivationFee(v);
+                auto.edit(v, c.ok ? null : c.message);
+              }}
+              aria-invalid={error ? true : undefined}
+              aria-describedby={error ? "activation-fee-error" : undefined}
+              className={inputClass}
+            />
+          </label>
+          <SaveNowButton enabled={auto.state.sending === null && auto.status === "pending"} />
+        </div>
+        {error ? <p id="activation-fee-error" role="alert" className="text-sm text-danger">{error}</p> : null}
+        <AutosaveStatus auto={auto} />
       </form>
     </Panel>
   );
 }
 
 /**
- * Which score bands pay the one-time hiring fee. A switch shows only the
- * stored value: flipping it sends the full three-band object and the switch
- * moves once the server confirms (dimmed and disabled meanwhile); on failure
- * it stays where it was and says why.
+ * Which score bands pay the one-time hiring fee. Each switch saves at once; the block
+ * says Saving…/Saved, and on a failure it shows the server's message with Retry (the
+ * switch stays where it was flipped until you retry or discard).
  */
 function PerHireFeePanel({ initial }: { initial: PerHireFeeSetting }) {
-  const [stored, setStored] = useState<PerHireFeeSetting>(initial);
-  const [pending, setPending] = useState<FeeBand | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function flip(band: FeeBand, next: boolean) {
-    setPending(band);
-    setError(null);
-    try {
-      const res = await csrfFetch("/api/admin/pricing", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ perHireFeeBands: { ...stored, [band]: next } }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(body.error ?? "Could not save.");
-      } else {
-        setStored(body.perHireFeeBands ?? { ...stored, [band]: next });
-      }
-    } catch {
-      setError("Not saved: the network request failed.");
-    } finally {
-      setPending(null);
-    }
-  }
+  const auto = useAutosave(hireFeeMachine, initial, (bands) => send("PUT", { perHireFeeBands: bands }));
+  const stored = auto.state.draft;
 
   return (
     <Panel>
@@ -290,41 +297,26 @@ function PerHireFeePanel({ initial }: { initial: PerHireFeeSetting }) {
           Espresso hires with no stipend (score under 6) have nothing else to pay, so switching Espresso off leaves them with nothing payable at checkout.
         </p>
         <ul className="divide-y divide-[color:var(--admin-rule)]">
-          {FEE_BANDS.map((band) => {
+          {FEE_BANDS.map((band: FeeBand) => {
             const label = FEE_BAND_LABEL[band];
-            const busy = pending === band;
             const id = `per-hire-fee-${band}`;
             return (
-              <li key={band} className={cn("flex items-center justify-between gap-4 py-3", busy && "opacity-60")}>
+              <li key={band} className="flex items-center justify-between gap-4 py-3">
                 <label htmlFor={id} className="text-sm font-medium text-ink-800">
                   {label.plan} (score {label.scores})
                   <span className="block text-xs font-normal text-text-subtle">
                     {stored[band] ? "Charged with the first payment" : "Free for now"}
                   </span>
                 </label>
-                <Switch
-                  id={id}
-                  checked={stored[band]}
-                  disabled={pending !== null}
-                  aria-busy={busy || undefined}
-                  onCheckedChange={(next) => void flip(band, next)}
-                />
+                <Switch id={id} checked={stored[band]} onCheckedChange={(next) => auto.edit({ ...stored, [band]: next }, null, true)} />
               </li>
             );
           })}
         </ul>
-        {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
+        <AutosaveStatus auto={auto} />
       </div>
     </Panel>
   );
-}
-
-/** Whole rupees only (a stipend is a round monthly figure): paise, or null when blank, not an integer, or over the cap. */
-function parseWholeRupees(raw: string): number | null {
-  const t = raw.trim();
-  if (!/^\d+$/.test(t)) return null;
-  const minor = Number(t) * 100;
-  return Number.isSafeInteger(minor) && minor <= MAX_MINOR ? minor : null;
 }
 
 /**
@@ -334,63 +326,23 @@ function parseWholeRupees(raw: string): number | null {
  */
 function StipendPanel({ initial }: { initial: StipendBands }) {
   const router = useRouter();
-  const { ask, dialog } = useConfirm();
-  const [stored, setStored] = useState<StipendBands>(initial);
-  const [skilled, setSkilled] = useState(toRupees(initial.skilled));
-  const [assured, setAssured] = useState(toRupees(initial.assured));
-  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
-  const [error, setError] = useState<string | null>(null);
-  const [badId, setBadId] = useState<string | null>(null);
+  const auto = useAutosave(
+    stipendMachine,
+    { skilled: toRupees(initial.skilled), assured: toRupees(initial.assured) },
+    async (d) => {
+      const r = validateStipends(d);
+      return r.ok ? send("PUT", { internStipendBands: r.bands }) : { ok: false, error: r.message };
+    },
+    () => router.refresh(),
+  );
+  const draft = auto.state.draft;
+  const check = validateStipends(draft);
+  const bad = auto.status === "invalid" && !check.ok ? check : null;
 
   const fields = [
-    { band: "skilled" as const, value: skilled, set: setSkilled },
-    { band: "assured" as const, value: assured, set: setAssured },
+    { band: "skilled" as const, value: draft.skilled },
+    { band: "assured" as const, value: draft.assured },
   ];
-  const dirty = fields.some((f) => parseWholeRupees(f.value) !== stored[f.band]);
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    const next: Record<"skilled" | "assured", number> = { skilled: 0, assured: 0 };
-    for (const f of fields) {
-      const minor = parseWholeRupees(f.value);
-      if (minor === null) {
-        setBadId(`stipend-${f.band}`);
-        setError(`The ${FEE_BAND_LABEL[f.band].plan} stipend must be a whole number of rupees, like 8000.`);
-        document.getElementById(`stipend-${f.band}`)?.focus();
-        return;
-      }
-      next[f.band] = minor;
-    }
-    const ok = await ask({
-      title: "Publish these stipends?",
-      body: `Cappuccino ${formatMoney(next.skilled, "INR")} a month, Latte ${formatMoney(next.assured, "INR")} a month. Applies to offers made from now on.`,
-      confirmLabel: "Yes, publish",
-    });
-    if (!ok) return;
-    setState("saving");
-    setError(null);
-    setBadId(null);
-    try {
-      const res = await csrfFetch("/api/admin/pricing", {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ internStipendBands: { standard: null, ...next } }),
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(body.error ?? "Could not save.");
-        setState("idle");
-        return;
-      }
-      setStored(body.internStipendBands ?? { standard: null, ...next });
-      setState("saved");
-      router.refresh();
-      setTimeout(() => setState("idle"), 2500);
-    } catch {
-      setError("Not saved: the network request failed.");
-      setState("idle");
-    }
-  }
 
   return (
     <Panel>
@@ -399,8 +351,14 @@ function StipendPanel({ initial }: { initial: StipendBands }) {
         description="The fixed amount a hired intern is paid each month, by Findtern Score. Cappuccino and Latte only."
         icon={IndianRupee}
       />
-      {dialog}
-      <form onSubmit={save} noValidate className="space-y-4 px-5 py-4">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          auto.flush();
+        }}
+        noValidate
+        className="space-y-4 px-5 py-4"
+      >
         <ul className="divide-y divide-[color:var(--admin-rule)]">
           <li className="flex items-center justify-between gap-4 py-3">
             <span className="text-sm font-medium text-ink-800">
@@ -425,12 +383,12 @@ function StipendPanel({ initial }: { initial: StipendBands }) {
                     inputMode="numeric"
                     value={f.value}
                     onChange={(e) => {
-                      f.set(e.target.value.replace(/\D/g, ""));
-                      setError(null);
-                      setBadId(null);
+                      const next = { ...draft, [f.band]: e.target.value.replace(/\D/g, "") };
+                      const c = validateStipends(next);
+                      auto.edit(next, c.ok ? null : c.message);
                     }}
-                    aria-invalid={badId === id ? true : undefined}
-                    aria-describedby={badId === id ? "stipend-error" : undefined}
+                    aria-invalid={bad?.field === f.band ? true : undefined}
+                    aria-describedby={bad?.field === f.band ? "stipend-error" : undefined}
                     className={cn(inputClass, "mt-0 w-36")}
                   />
                 </div>
@@ -439,13 +397,11 @@ function StipendPanel({ initial }: { initial: StipendBands }) {
           })}
         </ul>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--admin-rule)] pt-4">
-          <p className="text-xs text-ink-600">
-            The score ranges and the USD rate (₹{INR_PER_USD} = $1) are fixed.
-            {dirty ? <span className="ml-2 rounded-full bg-accent-100 px-2 py-0.5 font-medium text-accent-700">Unsaved changes</span> : null}
-          </p>
-          <SaveButton state={state} />
+          <p className="text-xs text-ink-600">The score ranges and the USD rate (₹{INR_PER_USD} = $1) are fixed.</p>
+          <SaveNowButton enabled={auto.state.sending === null && auto.status === "pending"} />
         </div>
-        {error ? <p id="stipend-error" role="alert" className="text-sm text-danger">{error}</p> : null}
+        {bad ? <p id="stipend-error" role="alert" className="text-sm text-danger">{bad.message}</p> : null}
+        <AutosaveStatus auto={auto} />
       </form>
     </Panel>
   );
@@ -454,142 +410,36 @@ function StipendPanel({ initial }: { initial: StipendBands }) {
 function PlanEditor({
   plan,
   featured,
-  featuredId,
   onFeatured,
 }: {
   plan: EditablePlan;
+  /** Whether this card is the page's "Most popular" choice (unsaved included); the parent keeps it to one. */
   featured: boolean;
-  /** The card currently marked on the page (unsaved included); null when none. */
-  featuredId: string | null;
   onFeatured: (on: boolean) => void;
 }) {
   const router = useRouter();
-  const { ask, dialog } = useConfirm();
-  const [name, setName] = useState(plan.displayName);
-  const [hourly, setHourly] = useState(toRupees(plan.priceHourlyMinor));
-  const [hourlyWas, setHourlyWas] = useState(toRupees(plan.compareAtHourlyMinor));
-  const [perHire, setPerHire] = useState(toRupees(plan.perHireChargeMinor));
-  const [perHireWas, setPerHireWas] = useState(toRupees(plan.compareAtPerHireMinor));
-  const [duration, setDuration] = useState(plan.internshipDuration);
-  const [features, setFeatures] = useState<string[]>([0, 1, 2].map((i) => plan.features[i] ?? ""));
-  const [featureList, setFeatureList] = useState<CmsPlanFeature[]>(plan.featureList);
-  const [active, setActive] = useState(plan.isActive);
-  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
-  const [error, setError] = useState<string | null>(null);
-  /** The price field (its id) the error is about, so it is marked invalid and focused. */
-  const [badField, setBadField] = useState<string | null>(null);
+  // Everything but "Most popular" (the parent's one choice) saves from here: PATCH with the whole card.
+  const auto = useAutosave(
+    planMachine,
+    planDraftFromPlan(plan),
+    (draft) => send("PATCH", planPatchBody(plan.id, draft)),
+    () => router.refresh(),
+  );
+  const d = auto.state.draft;
+  const saved = auto.state.saved;
+  const issue = validatePlanDraft(d, saved.features);
   const fid = (k: string) => `${plan.id}-${k}`;
+  const bad = (field: string, extra = true) => (issue?.field === field && extra ? ({ "aria-invalid": true, "aria-describedby": fid("error") } as const) : {});
 
-  // Re-sync from the server copy after router.refresh(). "Most popular" lives in the parent
-  // (one choice for the whole card set), so it never wipes what is half-typed here.
-  // (Adjusting state during render, keyed on the server copy, rather than in an effect.)
-  //
-  // This card only writes the flag when the admin acted on it: ticked it (the server then
-  // un-features the rest) or cleared the choice outright. Being unchecked because another
-  // card was ticked is not a change to save here.
-  const featuredChange = featured !== plan.isFeatured && (featured || featuredId === null);
-  const serverSig = JSON.stringify({ ...plan, isFeatured: null });
-  const [seenSig, setSeenSig] = useState(serverSig);
-  if (seenSig !== serverSig) {
-    setSeenSig(serverSig);
-    setName(plan.displayName);
-    setHourly(toRupees(plan.priceHourlyMinor));
-    setHourlyWas(toRupees(plan.compareAtHourlyMinor));
-    setPerHire(toRupees(plan.perHireChargeMinor));
-    setPerHireWas(toRupees(plan.compareAtPerHireMinor));
-    setDuration(plan.internshipDuration);
-    setFeatures([0, 1, 2].map((i) => plan.features[i] ?? ""));
-    setFeatureList(plan.featureList);
-    setActive(plan.isActive);
+  /** Applies one edit to the draft; invalid values stay on screen but are not saved. `immediate` for switches. */
+  function change(patch: Partial<PlanDraft>, immediate = false) {
+    const next = { ...d, ...patch };
+    auto.edit(next, validatePlanDraft(next, saved.features)?.message ?? null, immediate);
   }
 
-  const dirty =
-    name.trim() !== plan.displayName.trim() ||
-    toMinor(hourly) !== plan.priceHourlyMinor ||
-    toMinor(perHire) !== plan.perHireChargeMinor ||
-    toMinorOrNull(hourlyWas) !== plan.compareAtHourlyMinor ||
-    toMinorOrNull(perHireWas) !== plan.compareAtPerHireMinor ||
-    duration !== plan.internshipDuration ||
-    features.some((v, i) => v !== (plan.features[i] ?? "")) ||
-    JSON.stringify(featureList.filter((f) => f.label.trim())) !== JSON.stringify(plan.featureList) ||
-    featuredChange ||
-    active !== plan.isActive;
-
-  useEffect(() => {
-    if (!dirty) return;
-    const warn = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [dirty]);
-
-  const hourlySave = savingsPercent(toMinor(hourly), toMinorOrNull(hourlyWas));
-  const perHireSave = savingsPercent(toMinor(perHire), toMinorOrNull(perHireWas));
-
-  async function save(e: React.FormEvent) {
-    e.preventDefault();
-    // A blank or garbled price must never be coerced to ₹0 and published.
-    const checks: [string, string, boolean][] = [
-      ["hourly", hourly, true],
-      ["perHire", perHire, true],
-      ["hourlyWas", hourlyWas, false],
-      ["perHireWas", perHireWas, false],
-    ];
-    for (const [key, raw, required] of checks) {
-      if ((required || raw.trim() !== "") && parseRupees(raw) === null) {
-        setBadField(fid(key));
-        setError(PRICE_ERROR);
-        document.getElementById(fid(key))?.focus();
-        return;
-      }
-    }
-    const hourlyMinor = parseRupees(hourly)!;
-    const perHireMinor = parseRupees(perHire)!;
-    const ok = await ask({
-      title: `Publish new prices for ${name.trim() || plan.displayName}?`,
-      body: `${formatMoney(hourlyMinor, "INR")} per hour and ${formatMoney(perHireMinor, "INR")} per hire${active ? "" : " (the plan is switched off)"}. The public pricing page updates straight away.`,
-      confirmLabel: "Yes, publish",
-    });
-    if (!ok) return;
-    setState("saving");
-    setError(null);
-    setBadField(null);
-    try {
-      const res = await csrfFetch("/api/admin/pricing", {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          id: plan.id,
-          displayName: name,
-          priceHourlyMinor: hourlyMinor,
-          compareAtHourlyMinor: parseRupees(hourlyWas),
-          perHireChargeMinor: perHireMinor,
-          compareAtPerHireMinor: parseRupees(perHireWas),
-          internshipDuration: duration,
-          features,
-          featureList: featureList.filter((f) => f.label.trim()),
-          // Only when the admin changed it: re-sending a stale value would re-feature this
-          // plan and un-feature whichever card was saved as "Most popular" since.
-          ...(featuredChange ? { isFeatured: featured } : {}),
-          isActive: active,
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        setError(body.error ?? "Could not save.");
-        setState("idle");
-        return;
-      }
-      setState("saved");
-      router.refresh();
-      setTimeout(() => setState("idle"), 2500);
-    } catch {
-      setError("Not saved: the network request failed.");
-      setState("idle");
-    }
-  }
+  const hourlySave = savingsPercent(toMinor(d.hourly), toMinorOrNull(d.hourlyWas));
+  const perHireSave = savingsPercent(toMinor(d.perHire), toMinorOrNull(d.perHireWas));
+  const bandChange = legacyBandChange(saved.features[1], d.features[1]);
 
   return (
     <Panel className={cn("@container", featured && "ring-2 ring-brand-500")}>
@@ -597,70 +447,57 @@ function PlanEditor({
         title={plan.displayName}
         description={`slug: ${plan.slug}`}
         action={
-          <div className="flex items-center gap-3">
-            {dirty ? (
-              <span className="rounded-full bg-accent-100 px-2 py-0.5 text-xs font-medium text-accent-700">
-                Unsaved changes
-              </span>
-            ) : null}
-            <label className="flex items-center gap-2 text-sm font-medium text-ink-700">
-              Active
-              <Switch checked={active} onCheckedChange={setActive} aria-label="Plan is active" />
-            </label>
-          </div>
+          <label className="flex items-center gap-2 text-sm font-medium text-ink-700">
+            Active
+            <Switch checked={d.active} onCheckedChange={(active) => change({ active }, true)} aria-label="Plan is active" />
+          </label>
         }
       />
-      {dialog}
-      <form onSubmit={save} noValidate className="space-y-4 px-5 py-4">
-        {plan.isActive && !active && isLegacyTier(plan.features[1]) ? (
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          auto.flush();
+        }}
+        noValidate
+        className="space-y-4 px-5 py-4"
+      >
+        {saved.active && !d.active && isLegacyTier(saved.features[1]) ? (
           <Warning>
-            Switching this plan off also removes the {describeLegacyBand(plan.features[1])} price on the legacy site
+            Switching this plan off also removes the {describeLegacyBand(saved.features[1])} price on the legacy site
             (still the rollback target). Candidates in that band would be priced from another plan there.
           </Warning>
         ) : null}
         <label className="block text-sm font-medium text-ink-800">
           Display name
-          <input value={name} onChange={(e) => setName(e.target.value)} className={inputClass} />
+          <input value={d.name} onChange={(e) => change({ name: e.target.value })} {...bad("name")} className={inputClass} />
         </label>
 
         <PriceRow
           label="Hourly rate (₹/hr)"
-          now={hourly}
-          was={hourlyWas}
-          onNow={(v) => {
-            setHourly(v);
-            setBadField(null);
-          }}
-          onWas={(v) => {
-            setHourlyWas(v);
-            setBadField(null);
-          }}
+          now={d.hourly}
+          was={d.hourlyWas}
+          onNow={(v) => change({ hourly: v })}
+          onWas={(v) => change({ hourlyWas: v })}
           save={hourlySave}
           ids={[fid("hourly"), fid("hourlyWas")]}
-          badId={badField}
+          badId={issue ? fid(issue.field) : null}
           errorId={fid("error")}
         />
         <PriceRow
           label="Per-hire charge (₹)"
-          now={perHire}
-          was={perHireWas}
-          onNow={(v) => {
-            setPerHire(v);
-            setBadField(null);
-          }}
-          onWas={(v) => {
-            setPerHireWas(v);
-            setBadField(null);
-          }}
+          now={d.perHire}
+          was={d.perHireWas}
+          onNow={(v) => change({ perHire: v })}
+          onWas={(v) => change({ perHireWas: v })}
           save={perHireSave}
           ids={[fid("perHire"), fid("perHireWas")]}
-          badId={badField}
+          badId={issue ? fid(issue.field) : null}
           errorId={fid("error")}
         />
 
         <label className="block text-sm font-medium text-ink-800">
           Internship duration
-          <input value={duration} onChange={(e) => setDuration(e.target.value)} className={inputClass} />
+          <input value={d.duration} onChange={(e) => change({ duration: e.target.value })} {...bad("duration")} className={inputClass} />
         </label>
 
         <fieldset className="space-y-2">
@@ -669,39 +506,37 @@ function PlanEditor({
             <label key={label} className="block text-xs font-medium text-ink-600">
               {label}
               <input
-                value={features[i]}
-                aria-describedby={i === 1 ? `band-${plan.id}` : undefined}
-                onChange={(e) => setFeatures((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                value={d.features[i]}
+                {...bad("features", i === 1 || d.features[i].trim().length > 120)}
+                {...(i === 1 ? { "aria-describedby": `band-${plan.id}` } : {})}
+                onChange={(e) => change({ features: d.features.map((v, j) => (j === i ? e.target.value : v)) })}
                 className={cn(inputClass, "mt-1")}
               />
             </label>
           ))}
-          <LegacyBandNote id={`band-${plan.id}`} previous={plan.features[1]} next={features[1]} />
+          <LegacyBandNote id={`band-${plan.id}`} previous={saved.features[1]} next={d.features[1]} />
         </fieldset>
 
         <fieldset>
           <legend className="text-sm font-medium text-ink-800">Card checklist <span className="font-normal text-ink-600">(switch on: the plan includes it)</span></legend>
           <ul className="mt-1.5 space-y-2">
-            {featureList.map((f, i) => (
+            {d.featureList.map((f, i) => (
               <li key={i} className="flex items-center gap-2">
                 <Switch
                   checked={f.included}
-                  onCheckedChange={(included) =>
-                    setFeatureList((prev) => prev.map((row, j) => (j === i ? { ...row, included } : row)))
-                  }
+                  onCheckedChange={(included) => change({ featureList: d.featureList.map((row, j) => (j === i ? { ...row, included } : row)) }, true)}
                   aria-label={`${f.label || "Row"} included`}
                 />
                 <input
                   value={f.label}
                   aria-label={`Checklist row ${i + 1}`}
-                  onChange={(e) =>
-                    setFeatureList((prev) => prev.map((row, j) => (j === i ? { ...row, label: e.target.value } : row)))
-                  }
+                  onChange={(e) => change({ featureList: d.featureList.map((row, j) => (j === i ? { ...row, label: e.target.value } : row)) })}
+                  {...bad("featureList", f.label.trim().length > 120 || d.featureList.filter((r) => r.label.trim()).length > 12)}
                   className={cn(inputClass, "mt-0 min-w-0 flex-1")}
                 />
                 <button
                   type="button"
-                  onClick={() => setFeatureList((prev) => prev.filter((_, j) => j !== i))}
+                  onClick={() => change({ featureList: d.featureList.filter((_, j) => j !== i) }, true)}
                   className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "text-text-subtle hover:bg-danger-soft hover:text-danger")}
                   aria-label={`Remove checklist row ${i + 1}`}
                 >
@@ -712,7 +547,7 @@ function PlanEditor({
           </ul>
           <button
             type="button"
-            onClick={() => setFeatureList((prev) => [...prev, { label: "", included: true }])}
+            onClick={() => change({ featureList: [...d.featureList, { label: "", included: true }] })}
             className={cn(buttonClass({ variant: "ghost", size: "sm" }), "mt-2")}
           >
             <Plus className="size-3.5" /> Add row
@@ -730,14 +565,19 @@ function PlanEditor({
           Mark as &ldquo;Most popular&rdquo;
         </label>
 
-        <div className="flex items-center justify-between gap-3 border-t border-[color:var(--admin-rule)] pt-4">
-          <p className="nums text-xs text-ink-600">
-            USD: {formatMoney(inrMinorToUsdMinor(toMinor(hourly)), "USD")}/hr ·{" "}
-            {formatMoney(inrMinorToUsdMinor(toMinor(perHire)), "USD")} per hire
-          </p>
-          <SaveButton state={state} />
+        <div className="space-y-3 border-t border-[color:var(--admin-rule)] pt-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="nums text-xs text-ink-600">
+              USD: {formatMoney(inrMinorToUsdMinor(toMinor(d.hourly)), "USD")}/hr ·{" "}
+              {formatMoney(inrMinorToUsdMinor(toMinor(d.perHire)), "USD")} per hire
+            </p>
+            <SaveNowButton enabled={auto.state.sending === null && auto.status === "pending"} />
+          </div>
+          {issue && issue.message !== bandChange?.message ? (
+            <p id={fid("error")} role="alert" className="text-sm text-danger">{issue.message}</p>
+          ) : null}
+          <AutosaveStatus auto={auto} live={d.active ? "Live on the site" : "Switched off: not shown on the site"} />
         </div>
-        {error ? <p id={fid("error")} role="alert" className="text-sm text-danger">{error}</p> : null}
       </form>
     </Panel>
   );
@@ -793,21 +633,12 @@ function PriceRow({
   );
 }
 
-function SaveButton({ state }: { state: "idle" | "saving" | "saved" }) {
+/** Saves what is waiting right now instead of after the pause; also what Enter does in a form. */
+function SaveNowButton({ enabled }: { enabled: boolean }) {
   return (
-    <button
-      type="submit"
-      disabled={state === "saving"}
-      className={buttonClass({ variant: "primary", size: "sm" })}
-    >
-      {state === "saving" ? (
-        <Loader2 className="size-3.5 animate-spin" />
-      ) : state === "saved" ? (
-        <CheckCircle2 className="size-3.5" />
-      ) : (
-        <Save className="size-3.5" />
-      )}
-      {state === "saved" ? "Saved" : "Save"}
+    <button type="submit" disabled={!enabled} className={buttonClass({ variant: "outline", size: "sm" })}>
+      <Save className="size-3.5" />
+      Save now
     </button>
   );
 }
@@ -835,7 +666,7 @@ function LegacyBandNote({ id, previous, next }: { id: string; previous?: string;
     return (
       <Warning id={id} danger={change.block}>
         {change.message}
-        {change.block ? " Saving is refused until it can." : ""}
+        {change.block ? " It is not saved until it can." : ""}
       </Warning>
     );
   }

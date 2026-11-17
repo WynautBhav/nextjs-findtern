@@ -131,7 +131,7 @@ export default async function AdminSettingsPage() {
     <div className="space-y-8">
       <AdminPageHeader
         title="Pricing and fees"
-        subtitle="Prices are in rupees; USD is derived at ₹100 = $1. Changes go live on the next page load."
+        subtitle="Prices are in rupees; USD is derived at ₹100 = $1. Changes save by themselves a moment after you stop typing and go live on the site as soon as they save."
       />
       {/* While disconnected it is the dashboard's top attention item, so it
           leads here too; once connected it sits at the end. */}
