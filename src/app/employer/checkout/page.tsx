@@ -14,7 +14,7 @@ import { SITE } from "@/lib/content/site";
 import { HireFlow, type HireFlowCounts } from "@/components/employer/hire-flow";
 import { CheckoutEmpty } from "./_empty";
 import { CheckoutSummary } from "@/components/payments/checkout-summary";
-import { selectCheckoutLines } from "@/lib/checkout-selection";
+import { checkoutView, justPaid, selectCheckoutLines } from "@/lib/checkout-selection";
 
 export const metadata: Metadata = {
   title: "Checkout",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
 export default async function EmployerCheckout({
   searchParams,
 }: {
-  searchParams: Promise<{ proposal?: string; proposalId?: string }>;
+  searchParams: Promise<{ proposal?: string; proposalId?: string; paid?: string | string[] }>;
 }) {
   const session = await requireRole("employer");
   await requireEmployerSetup(session.uid);
@@ -74,6 +74,8 @@ export default async function EmployerCheckout({
   const selection = selectCheckoutLines(result.lines, sp.proposal ?? sp.proposalId);
   const lines = selection.lines;
   const othersDue = result.lines.length - lines.length;
+  const paid = justPaid(sp.paid);
+  const view = checkoutView(selection, paid);
   return (
     <div>
       <PageHead
@@ -82,7 +84,15 @@ export default async function EmployerCheckout({
       />
       {counts ? <HireFlow counts={counts} current="checkout" /> : null}
 
-      {selection.missing ? (
+      {view === "receipt" ? (
+        <CheckoutEmpty
+          title="Payment received"
+          body="Your hire is confirmed. The placement and its invoice are under Orders."
+          next={{ label: "Open orders and invoice", href: "/employer/orders" }}
+          who="You - open Orders for the invoice"
+          secondary={result.lines.length > 0 ? { label: `See what is still due (${result.lines.length})`, href: "/employer/checkout" } : undefined}
+        />
+      ) : view === "missing" ? (
         // A link named a placement this page can't bill: say so, never show
         // a different hire in its place (QA-139).
         <CheckoutEmpty
@@ -96,7 +106,7 @@ export default async function EmployerCheckout({
           who="Findtern - write to communicate@findtern.in"
           secondary={result.lines.length > 0 ? { label: "Back to orders", href: "/employer/orders" } : undefined}
         />
-      ) : lines.length === 0 ? (
+      ) : view === "empty" ? (
         <CheckoutEmpty
           title="Nothing to pay yet"
           body="Checkout bills offers a candidate has accepted, and the next month of a running monthly placement. None are waiting right now."
@@ -110,6 +120,11 @@ export default async function EmployerCheckout({
         />
       ) : (
         <>
+        {paid ? (
+          <p role="status" className="mb-4 rounded-apple-md border border-brand-200 bg-brand-50 p-4 text-sm text-brand-800">
+            Payment received. The hire and its invoice are under <Link href="/employer/orders" className="font-semibold underline underline-offset-4">Orders</Link>. Your other accepted offers are still waiting below.
+          </p>
+        ) : null}
         <CheckoutSummary
           employerId={uid}
           testMode={paymentsAreFree()}

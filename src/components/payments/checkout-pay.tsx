@@ -19,6 +19,7 @@ import { useRouter } from "next/navigation";
 import { CreditCard, Loader2, Tag } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
+import { AFTER_PAYMENT_HREF } from "@/lib/checkout-selection";
 import { formatMoney } from "@/lib/format";
 import { loadRazorpay, RAZORPAY_THEME_COLOR } from "./razorpay-client";
 import { buttonClass } from "@/components/ui/button";
@@ -108,7 +109,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
       // Test mode: the server already settled the order.
       if (order.free || !Razorpay) {
         setState("paid");
-        router.refresh();
+        router.replace(AFTER_PAYMENT_HREF);
         return;
       }
 
@@ -149,7 +150,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
             const body = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(body.error ?? "Payment could not be verified.");
             setState("paid");
-            router.refresh();
+            router.replace(AFTER_PAYMENT_HREF);
           } catch (e) {
             // The gateway may already have debited: no "try again" here, or a second Pay can charge twice.
             const why = e instanceof TypeError ? "Couldn't reach the server to confirm the payment." : errorText(e, "Payment could not be verified.");
