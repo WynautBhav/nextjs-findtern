@@ -616,9 +616,9 @@ step("employer: checks out with the month-end stipend plan in free mode → prop
       await page.getByRole("radio", { name: /charge due 2 days before the month.s pay date/i }).check();
       const main = await page.locator("main").innerText();
       // The one-time hiring charge follows the per-band setting (default: only Espresso pays it).
-      // A month-end plan needs a score of 6+, so this intern is in a free band: no Hiring charge row,
-      // and the amount due now is the Month 1 charge alone.
-      assert.doesNotMatch(main, /Hiring charge \(one-time\)/, "a free-band hire shows no hiring charge line");
+      // A month-end plan needs a score of 6+, so this intern is in a free band: the Hiring charge row is the list
+      // price struck through with (FREE) (667e5b37), never a charged amount, and the amount due now is the Month 1 charge alone.
+      assert.match(main, /Hiring charge \(one-time\)[\s\S]{0,40}\(FREE\)/, "a free-band hire shows the hiring charge as (FREE)");
       assert.match(main, /Month 1 charge/, "the Month 1 charge is what is due now");
       assert.match(main, /Then\b.*\bmore months? · next due \d{1,2} \w{3}/, "the later months are one line naming the next due date");
       const res = await clickFor(page, page.getByRole("button", { name: /complete for free/i }), { path, method: "POST" });
