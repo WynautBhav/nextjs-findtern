@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 
 import { getDb, hasDb, schema } from "@/lib/db";
+import { SUBSCRIPTION_DEFAULTS, parseSubscriptionConfig, parseSubscriptionOverrides, type SubscriptionConfig, type SubscriptionOverride } from "@/lib/employer-subscription";
 import { PER_HIRE_FEE_DEFAULT, PER_HIRE_FEE_KEY, parsePerHireFeeSetting, type PerHireFeeSetting } from "@/lib/per-hire-fee";
 import { INTERN_STIPEND_KEY, PRICING_DEFAULTS, STIPEND_BANDS_DEFAULT, parsePricingConfig, type PricingConfig } from "@/lib/pricing-config";
 
@@ -17,6 +18,12 @@ export const SETTING_DEFAULTS = {
   [PER_HIRE_FEE_KEY]: PER_HIRE_FEE_DEFAULT,
   /** Fixed monthly intern stipend per score band, INR paise (lib/pricing-config.ts); null for Espresso. */
   [INTERN_STIPEND_KEY]: STIPEND_BANDS_DEFAULT,
+  /** Employer subscription: price (INR paise, GST-inclusive), length in days, on/off (lib/employer-subscription.ts). */
+  employer_subscription: SUBSCRIPTION_DEFAULTS,
+  /** Per-employer admin grants and revokes, keyed by employer id (lib/employer-subscription.ts). */
+  employer_subscription_overrides: {} as Record<string, SubscriptionOverride>,
+  /** Days after an AI-interview link is sent before an uncompleted interview reads as expired. */
+  ai_link_expiry_days: 7,
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
@@ -85,4 +92,21 @@ export async function getPricingConfig(): Promise<PricingConfig> {
   } catch {
     return parsePricingConfig();
   }
+}
+
+/** The live subscription config. Never throws: no DB, no row or a garbled field gives that field's default. */
+export async function getEmployerSubscriptionConfig(): Promise<SubscriptionConfig> {
+  return parseSubscriptionConfig(await getSetting("employer_subscription"));
+}
+
+/** Admin grants and revokes by employer id. Never throws: anything unreadable is "none". */
+export async function getEmployerSubscriptionOverrides(): Promise<Record<string, SubscriptionOverride>> {
+  return parseSubscriptionOverrides(await getSetting("employer_subscription_overrides"));
+}
+
+/** Days before an unfinished AI interview with a sent link expires: a whole number 1-365, else 7. Never throws. */
+export async function getAiLinkExpiryDays(): Promise<number> {
+  const raw = await getSetting("ai_link_expiry_days");
+  const n = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : raw;
+  return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 365 ? n : SETTING_DEFAULTS.ai_link_expiry_days;
 }
