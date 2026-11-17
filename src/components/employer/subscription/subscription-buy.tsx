@@ -149,7 +149,7 @@ export function SubscriptionBuy({ employerId, currency, listMinor, durationDays,
     }
   }
 
-  const verb = renewing ? "Renew" : "Pay";
+  const payLabel = renewing ? `Renew · add ${durationDays} days · ${formatMoney(payable, currency)}` : `Pay ${formatMoney(payable, currency)}`;
   return (
     <div className="space-y-4">
       <div>
@@ -185,30 +185,30 @@ export function SubscriptionBuy({ employerId, currency, listMinor, durationDays,
         </div>
       </div>
 
-      <dl className="divide-y divide-ink-100 rounded-apple-md border border-ink-200/80 text-sm">
-        <div className="flex items-baseline justify-between gap-4 px-4 py-3">
-          <dt className="text-ink-700">Findtern Pro, {durationDays} days</dt>
-          <dd className="nums font-medium text-ink-900">{formatMoney(listMinor, currency)}</dd>
-        </div>
-        {applied ? (
+      {applied ? (
+        <dl className="divide-y divide-ink-100 rounded-apple-md border border-ink-200/80 text-sm">
+          <div className="flex items-baseline justify-between gap-4 px-4 py-3">
+            <dt className="text-ink-700">Findtern Pro, {durationDays} days</dt>
+            <dd className="nums font-medium text-ink-900">{formatMoney(listMinor, currency)}</dd>
+          </div>
           <div className="flex items-baseline justify-between gap-4 px-4 py-3">
             <dt className="min-w-0 break-words text-ink-700">Code {applied.code}</dt>
             <dd className="nums font-medium text-success">−{formatMoney(applied.discountMinor, currency)}</dd>
           </div>
-        ) : null}
-        <div className="flex items-baseline justify-between gap-4 px-4 py-3">
-          <dt className="font-semibold text-ink-900">{waived ? "To pay (full waiver)" : "To pay, GST included"}</dt>
-          <dd className="nums text-lg font-semibold text-ink-900">{formatMoney(payable, currency, { zeroLabel: false })}</dd>
-        </div>
-      </dl>
+          <div className="flex items-baseline justify-between gap-4 px-4 py-3">
+            <dt className="font-semibold text-ink-900">{waived ? "To pay (full waiver)" : "To pay, GST included"}</dt>
+            <dd className="nums text-lg font-semibold text-ink-900">{formatMoney(payable, currency, { zeroLabel: false })}</dd>
+          </div>
+        </dl>
+      ) : null}
 
       <button type="button" onClick={() => void pay()} disabled={busy || checking} className={buttonClass({ variant: "primary", block: true, size: "md", className: "nums" })}>
         {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : waived ? <CheckCircle2 className="size-4" aria-hidden /> : <CreditCard className="size-4" aria-hidden />}
-        {busy ? "Working…" : waived ? "Start Findtern Pro (free, code applied)" : `${verb} ${formatMoney(payable, currency)}`}
+        {busy ? "Working…" : waived ? (renewing ? `Renew free · add ${durationDays} days` : "Start Findtern Pro (free, code applied)") : payLabel}
       </button>
 
-      <p className="text-xs leading-relaxed text-text-subtle">{note}</p>
-      <p className="text-xs leading-relaxed text-text-subtle">Razorpay handles the card details; this site never sees them. The payment is verified on our server before it counts.</p>
+      <p className="text-sm leading-relaxed text-ink-700">{note}</p>
+      <p className="text-xs leading-relaxed text-ink-600">Razorpay handles the card details; this site never sees them. The payment is verified on our server before it counts.</p>
 
       <div role="status" aria-live="polite" className="min-h-5">
         {notice ? (

@@ -81,16 +81,19 @@ export function GrantDialog({ company, open, onOpenChange, onDone }: { company: 
         <DialogHeader>
           <DialogTitle>Grant Findtern Pro access</DialogTitle>
           <DialogDescription>
-            {company ? `${company.name} gets the CGPA filter and the college filter and sort until the end of the day you choose (India time). ` : ""}
+            {company ? `${company.name} gets the CGPA filter and the college filter and sort until the last day you choose. ` : ""}
             No payment is taken and no invoice is made.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4" noValidate>
           <div>
-            <label htmlFor={`${ids}-until`} className="block text-sm font-semibold text-ink-800">Access until</label>
+            <label htmlFor={`${ids}-until`} className="block text-sm font-semibold text-ink-800">Access until <span className="font-normal text-ink-600">(required)</span></label>
             <input id={`${ids}-until`} type="date" required min={addIstDays(today, 1)} max={addIstDays(today, GRANT_MAX_DAYS)} value={until} onChange={(e) => setUntil(e.target.value)} className={field} />
+            <p className="mt-1.5 text-sm text-ink-700" aria-live="polite">
+              {until ? `Access ends at the end of ${new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${until}T00:00:00Z`))}, India time.` : "Pick the last day of access."}
+            </p>
             <div className="mt-2 flex flex-wrap gap-2">
-              {[{ l: "30 days", d: 30 }, { l: "90 days", d: 90 }, { l: "1 year", d: 365 }].map((p) => (
+              {[{ l: "30 days from today", d: 30 }, { l: "90 days from today", d: 90 }, { l: "1 year from today", d: 365 }].map((p) => (
                 <button key={p.d} type="button" onClick={() => setUntil(addIstDays(today, p.d))} className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11 rounded-full" })}>
                   {p.l}
                 </button>
@@ -98,7 +101,7 @@ export function GrantDialog({ company, open, onOpenChange, onDone }: { company: 
             </div>
           </div>
           <div>
-            <label htmlFor={`${ids}-note`} className="block text-sm font-semibold text-ink-800">Note <span className="font-normal text-ink-600">(kept with the audit log)</span></label>
+            <label htmlFor={`${ids}-note`} className="block text-sm font-semibold text-ink-800">Note <span className="font-normal text-ink-600">(required, kept with the audit log)</span></label>
             <textarea id={`${ids}-note`} required rows={3} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why is access being granted? e.g. Pilot customer, agreed with sales" aria-invalid={error ? true : undefined} aria-describedby={error ? `${ids}-err` : undefined} className={cn(field, "resize-y py-2")} />
           </div>
           {error ? <p id={`${ids}-err`} role="alert" className="rounded-apple-sm bg-danger-soft p-3 text-sm font-medium text-danger">{error}</p> : null}
@@ -149,7 +152,7 @@ export function RevokeDialog({ company, open, onOpenChange, onDone }: { company:
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4" noValidate>
           <div>
-            <label htmlFor={`${ids}-note`} className="block text-sm font-semibold text-ink-800">Note <span className="font-normal text-ink-600">(kept with the audit log)</span></label>
+            <label htmlFor={`${ids}-note`} className="block text-sm font-semibold text-ink-800">Note <span className="font-normal text-ink-600">(required, kept with the audit log)</span></label>
             <textarea id={`${ids}-note`} required rows={3} maxLength={500} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Why is access being revoked? e.g. Chargeback, refund issued outside the app" aria-invalid={error ? true : undefined} aria-describedby={error ? `${ids}-err` : undefined} className={cn(field, "resize-y py-2")} />
           </div>
           {error ? <p id={`${ids}-err`} role="alert" className="rounded-apple-sm bg-danger-soft p-3 text-sm font-medium text-danger">{error}</p> : null}

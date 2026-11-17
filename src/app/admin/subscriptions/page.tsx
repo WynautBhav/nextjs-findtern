@@ -64,7 +64,6 @@ export default async function AdminSubscriptionsPage({ searchParams }: { searchP
 
   const columns: Column<SubscriptionRow>[] = [
     { header: "Company", cell: (r) => <IdentityCell name={r.company} id={r.employerId} sub={r.email} href={`/admin/companies/${encodeURIComponent(r.employerId)}`} /> },
-    { header: "Plan", cell: () => "Findtern Pro", className: "whitespace-nowrap" },
     { header: "Status", cell: (r) => <StatusBadge tone={TONE[r.status]} label={statusLabel(r)} /> },
     { header: "Started", cell: (r) => <span className="whitespace-nowrap">{r.startedAt ? formatDate(r.startedAt) : "-"}</span> },
     { header: "Ends", cell: (r) => <span className="whitespace-nowrap">{r.endsAt ? formatDate(r.endsAt) : "-"}</span> },
@@ -74,7 +73,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: { searchP
         <div>
           <span className="whitespace-nowrap">{r.source ? SOURCE_LABELS[r.source] : "-"}</span>
           {r.note ? (
-            <span className="block max-w-56 truncate text-[0.8125rem] text-text-subtle" title={r.note}>
+            <span className="block max-w-40 truncate text-[0.8125rem] text-text-subtle" title={r.note}>
               {r.note}
             </span>
           ) : null}
@@ -84,21 +83,23 @@ export default async function AdminSubscriptionsPage({ searchParams }: { searchP
     {
       header: "Amount",
       numeric: true,
-      cell: (r) => (r.source === "promo" ? <span className="text-text-subtle">Waived</span> : r.amountMinor === null ? "-" : formatMoney(r.amountMinor, r.currency ?? "INR", { zeroLabel: false })),
-    },
-    {
-      header: "Order",
-      cell: (r) =>
-        r.orderRef ? (
-          <Link
-            href={`/admin/orders?q=${encodeURIComponent(r.orderRef)}`}
-            className="inline-flex min-h-11 items-center break-all rounded-sm font-mono text-xs text-brand-700 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            {r.orderRef.length > 18 ? `${r.orderRef.slice(0, 16)}…` : r.orderRef}
-          </Link>
-        ) : (
-          "-"
-        ),
+      cell: (r) => {
+        const amount = r.source === "promo" ? <span className="text-text-subtle">Waived</span> : r.amountMinor === null ? "-" : formatMoney(r.amountMinor, r.currency ?? "INR", { zeroLabel: false });
+        return (
+          <div className="flex flex-col items-end">
+            <span>{amount}</span>
+            {r.orderRef ? (
+              <Link
+                href={`/admin/orders?q=${encodeURIComponent(r.orderRef)}`}
+                title={`Open order ${r.orderRef}`}
+                className="inline-flex min-h-11 items-center rounded-sm text-[0.8125rem] text-brand-700 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
+                View order
+              </Link>
+            ) : null}
+          </div>
+        );
+      },
     },
     ...(mayWrite
       ? [
@@ -138,7 +139,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: { searchP
           rows={shown}
           rowKey={(r) => r.employerId}
           noun="subscriptions"
-          caption="Findtern Pro subscriptions"
+          caption="Findtern Pro subscriptions (one plan)"
           searchPlaceholder="Search company or email"
           exportHref={csvHref}
           empty={{

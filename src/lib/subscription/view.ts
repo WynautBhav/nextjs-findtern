@@ -32,8 +32,9 @@ export function statusLine(state: SubscriptionState): string {
   const ends = state.endsAt ? formatDate(state.endsAt) : null;
   switch (state.status) {
     case "active":
+      return "The CGPA filter and the college filter and sort are unlocked on Candidates. Renewing adds days to the end date.";
     case "expiring":
-      return `Your access runs until ${ends} (India time).`;
+      return "The filters are unlocked on Candidates for now. Renew before the end date to keep them: the new days are added after it.";
     case "expired":
       return `Your access ended on ${ends}. The CGPA filter and the college filter and sort are locked again.`;
     case "revoked":
@@ -48,11 +49,10 @@ export function buyLabel(state: SubscriptionState): string {
 }
 
 /** What paying now will do to the end date: stacks while active, starts today otherwise. */
-export function renewalNote(state: SubscriptionState, durationDays: number, now: Date = new Date()): string {
+export function renewalNote(state: SubscriptionState, durationDays: number): string {
   if (state.active && state.endsAt) {
     const next = formatDate(new Date(Date.parse(state.endsAt) + durationDays * DAY_MS));
     return `Renewing adds ${durationDays} days to your current end date, so none of your remaining days are lost. New end date: ${next}.`;
   }
-  const next = formatDate(new Date(now.getTime() + durationDays * DAY_MS));
-  return `Access starts as soon as the payment is confirmed and runs for ${durationDays} days, until ${next}.`;
+  return `Access starts as soon as the payment is confirmed and runs for ${durationDays} days from then.`;
 }

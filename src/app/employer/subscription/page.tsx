@@ -7,7 +7,6 @@ import { LoadError } from "@/components/app/load-error";
 import { DetailRow, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { SubscriptionBuy } from "@/components/employer/subscription/subscription-buy";
 import { PageHeader } from "@/components/layout/page-header";
-import { buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
 import { SITE } from "@/lib/content/site";
 import { getDb, schema } from "@/lib/db";
@@ -93,7 +92,7 @@ export default async function EmployerSubscriptionPage() {
             ))}
           </ul>
 
-          <div className="mt-8 border-t border-ink-100 pt-6">
+          <div id="buy" className="mt-8 scroll-mt-24 border-t border-ink-100 pt-6">
             <h3 className="mb-4 text-sm font-semibold text-ink-900">{config.enabled ? buyLabel(state) : "Not on sale"}</h3>
             {config.enabled ? (
               <SubscriptionBuy
@@ -125,18 +124,21 @@ export default async function EmployerSubscriptionPage() {
             <p className="mt-3 text-sm leading-relaxed text-ink-700">{statusLine(state)}</p>
             {state.endsAt ? (
               <dl className="mt-3 divide-y divide-ink-100 border-t border-ink-100">
-                <DetailRow label={state.active ? "Access until" : "Ended on"} value={formatDate(state.endsAt)} mono />
+                <DetailRow label={state.active ? "Access until (India time)" : "Ended on (India time)"} value={formatDate(state.endsAt)} mono />
                 {state.active && state.daysLeft !== null ? <DetailRow label="Days left" value={state.daysLeft} mono /> : null}
               </dl>
             ) : null}
-          </Surface>
-          <Surface className="p-5">
-            <p className="text-sm font-medium text-ink-900">Invoices</p>
-            <p className="mt-1 text-sm text-text-subtle">Every payment has a tax invoice under Orders.</p>
-            <Link href="/employer/orders" className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-11" })}>
-              <Receipt className="size-4" aria-hidden />
-              View invoices
-            </Link>
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-ink-100 pt-3 text-sm">
+              {config.enabled ? (
+                <a href="#buy" className="inline-flex min-h-11 items-center rounded-sm font-medium text-brand-700 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring xl:hidden">
+                  {buyLabel(state)}
+                </a>
+              ) : null}
+              <Link href="/employer/orders" className="inline-flex min-h-11 items-center gap-1.5 rounded-sm font-medium text-brand-700 underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                <Receipt className="size-4" aria-hidden />
+                Invoices under Orders
+              </Link>
+            </div>
           </Surface>
         </aside>
       </div>

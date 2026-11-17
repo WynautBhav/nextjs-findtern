@@ -356,7 +356,8 @@ test("the page names each status as the brief does", () => {
   assert.equal(statusView(s("expiring", { daysLeft: 1 })).label, "Expiring in 1 day");
   assert.deepEqual(statusView(s("expired")), { label: "Expired", tone: "closed" });
   assert.deepEqual(statusView(s("revoked", { endsAt: null })), { label: "Revoked", tone: "closed" });
-  assert.match(statusLine(s("active")), /until 31 Mar 2027 \(India time\)/);
+  assert.match(statusLine(s("active")), /unlocked on Candidates\. Renewing adds days/);
+  assert.match(statusLine(s("expiring")), /Renew before the end date/);
   assert.match(statusLine(s("expired")), /ended on 31 Mar 2027/);
   assert.match(statusLine(s("none", { endsAt: null })), /not subscribed/);
   assert.equal(buyLabel(s("active")), "Renew Findtern Pro");
@@ -369,9 +370,9 @@ test("the page names each status as the brief does", () => {
 
 test("renewal note: stacks from the end while active, starts at payment otherwise", () => {
   const active = { active: true, status: "active" as const, endsAt: "2027-03-31T18:29:59.999Z", daysLeft: 100 };
-  assert.match(renewalNote(active, 365, NOW), /adds 365 days to your current end date.*New end date: 30 Mar 2028/);
+  assert.match(renewalNote(active, 365), /adds 365 days to your current end date.*New end date: 30 Mar 2028/);
   const none = { active: false, status: "none" as const, endsAt: null, daysLeft: null };
-  assert.match(renewalNote(none, 365, NOW), /as soon as the payment is confirmed.*until 17 Nov 2027/);
+  assert.match(renewalNote(none, 365), /as soon as the payment is confirmed and runs for 365 days from then/);
 });
 
 import { addIstDays, istToday } from "./grant.ts";
