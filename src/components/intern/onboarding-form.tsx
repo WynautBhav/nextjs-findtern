@@ -71,6 +71,7 @@ export function OnboardingForm({
   college = null,
   onboarded = false,
   submittedBefore = false,
+  readOnly = false,
 }: {
   initial: OnboardingDraft;
   documents: StoredDocument[];
@@ -92,6 +93,8 @@ export function OnboardingForm({
   onboarded?: boolean;
   /** Submitted once before (or past the AI interview): steps that pass stay open. */
   submittedBefore?: boolean;
+  /** An admin in "View as": every field is disabled, nothing can be saved, and every step can be opened. */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
@@ -163,7 +166,7 @@ export function OnboardingForm({
   // lacks one item (often a card image legacy never asked for) can still be
   // edited; it read "0 of 7 steps" with everything locked behind step 1.
   // Review stays gated until every step before it passes (INT-41).
-  const reachable = (i: number) => i <= (firstOpen === -1 ? LAST : firstOpen) || (submittedBefore && i < LAST && passes[i]);
+  const reachable = (i: number) => readOnly || i <= (firstOpen === -1 ? LAST : firstOpen) || (submittedBefore && i < LAST && passes[i]);
   // The step to show: the one picked; else, while the profile is incomplete,
   // the first step that doesn't pass yet. The remembered step (INT-30) lives
   // in this browser only, so a reload elsewhere, or a cleared browser, opened
@@ -224,7 +227,7 @@ export function OnboardingForm({
   }
 
   function onContinue() {
-    if (Object.keys(live).length > 0) {
+    if (!readOnly && Object.keys(live).length > 0) {
       showStep(step, live);
       setNotice({ text: "A few details on this step need attention.", ok: false });
       return;
@@ -354,6 +357,7 @@ export function OnboardingForm({
                 if (key && !touched.has(key)) setTouched((prev) => new Set(prev).add(key));
               }}
             >
+              <fieldset disabled={readOnly} className="min-w-0">
               <StepView
                 values={values}
                 update={update}
@@ -371,6 +375,7 @@ export function OnboardingForm({
                 }}
                 onJumpStep={goTo}
               />
+              </fieldset>
             </motion.div>
 
             {/* ── Actions ─────────────────────────────────────────────── */}
@@ -406,7 +411,7 @@ export function OnboardingForm({
                     Back
                   </button>
                   {/* On the review step of a live profile the main button already saves. */}
-                  {onboarded && step === LAST ? null : (
+                  {readOnly || (onboarded && step === LAST) ? null : (
                     <button
                       type="button"
                       onClick={() => void save(onboarded)}
@@ -427,7 +432,7 @@ export function OnboardingForm({
                     Continue
                     <ArrowRight className="size-4" aria-hidden />
                   </button>
-                ) : (
+                ) : readOnly ? null : (
                   <button
                     type="button"
                     onClick={() => void save(true)}
