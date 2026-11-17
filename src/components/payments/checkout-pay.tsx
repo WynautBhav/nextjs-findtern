@@ -14,9 +14,9 @@
  * server routes.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, Loader2, Tag } from "lucide-react";
+import { CheckCircle2, CreditCard, Loader2, Tag } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { AFTER_PAYMENT_HREF } from "@/lib/checkout-selection";
@@ -39,8 +39,10 @@ type Props = {
   /** PAYMENTS_MODE=free: the order completes without Razorpay. */
   testMode?: boolean;
   /** Tells the page which promo is applied (and its discount), so it can lock the monthly option and show the discounted total. */
-  onPromoChange?: (promo: { code: string; discountMinor: number } | null) => void;
+  onPromoChange?: (promo: { code: string; discountMinor: number; fullWaiver?: boolean } | null) => void;
 };
+
+type AppliedPromo = { code: string; discountMinor: number; fullWaiver?: boolean };
 
 // fetch rejects with a TypeError ("Failed to fetch") when offline; never show that raw.
 function errorText(e: unknown, fallback: string): string {
@@ -53,14 +55,18 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
   const [state, setState] = useState<"idle" | "busy" | "paid">("idle");
   const [error, setError] = useState<string | null>(null);
   const [code, setCode] = useState("");
-  const [promo, setPromo] = useState<{ code: string; discountMinor: number } | null>(null);
+  const [promo, setPromo] = useState<AppliedPromo | null>(null);
+  // A second click in the same tick, before `state` has re-rendered, must not start a second payment.
+  const inFlight = useRef(false);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
-  const payable = promo ? amountMinor - promo.discountMinor : amountMinor;
-  // Promo codes are for upfront payment only; the server refuses them on monthly too.
+  const payable = promo ? Math.max(0, amountMinor - promo.discountMinor) : amountMinor;
+  // A full-waiver code makes the order free: no Razorpay popup, the server completes the hire itself.
+  const waived = Boolean(promo?.fullWaiver) && payable === 0;
+  // An ordinary promo code is for upfront payment only (the server refuses it on monthly); a full-waiver code works on any plan.
   const needsUpfront = mode !== "upfront";
   const hintId = `promo-hint-${currency}`;
-  const setPromoApplied = (next: { code: string; discountMinor: number } | null) => {
+  const setPromoApplied = (next: AppliedPromo | null) => {
     setPromo(next);
     onPromoChange?.(next);
   };
@@ -81,7 +87,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
       );
       const body = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(body.error ?? "That code did not work.");
-      setPromoApplied({ code: body.code, discountMinor: Number(body.discountMinor) || 0 });
+      setPromoApplied({ code: body.code, discountMinor: Number(body.discountMinor) || 0, ...(body.fullWaiver === true ? { fullWaiver: true } : {}) });
     } catch (e) {
       setPromoError(errorText(e, "That code did not work. Try again."));
     } finally {
@@ -90,11 +96,13 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
   }
 
   async function pay() {
+    if (inFlight.current) return;
+    inFlight.current = true;
     setState("busy");
     setError(null);
     try {
       const [Razorpay, order] = await Promise.all([
-        testMode ? Promise.resolve(null) : loadRazorpay(),
+        testMode || waived ? Promise.resolve(null) : loadRazorpay(),
         csrfFetch(`/api/employer/${encodeURIComponent(employerId)}/payment/razorpay/order`, {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -169,13 +177,16 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
     } catch (e) {
       setError(errorText(e, "Couldn't start the payment. Try again."));
       setState("idle");
+    } finally {
+      // While the Razorpay popup is open the button stays disabled (state "busy"), so releasing the guard here is safe.
+      inFlight.current = false;
     }
   }
 
   if (state === "paid") {
     return (
       <div role="status" className="rounded-apple-md border border-brand-200 bg-brand-50 p-4 text-sm leading-relaxed text-brand-800">
-        Payment received. The hire and its invoice are under{" "}
+        {waived ? "Payment received (complimentary, full waiver). The hire is under" : "Payment received. The hire and its invoice are under"}{" "}
         <a href="/employer/orders" className="font-semibold underline underline-offset-4">
           Orders
         </a>
@@ -202,7 +213,6 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
               }}
               placeholder="Promo code"
               autoComplete="off"
-              disabled={needsUpfront}
               aria-describedby={needsUpfront ? hintId : undefined}
               className={cn(fieldClass, "pl-8 uppercase placeholder:normal-case")}
             />
@@ -210,23 +220,25 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
           <button
             type="button"
             onClick={applyCode}
-            disabled={!code.trim() || checking || state === "busy" || needsUpfront}
+            disabled={!code.trim() || checking || state === "busy"}
             className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}
           >
             {checking ? <Loader2 className="size-4 animate-spin" aria-hidden /> : "Apply"}
           </button>
         </div>
-        {needsUpfront ? (
-          <p id={hintId} className="mt-1.5 text-xs text-text-subtle">
-            Promo codes only work when the whole engagement is paid upfront.
-          </p>
-        ) : promoError ? (
+        {promoError ? (
           <p className="mt-1.5 text-xs text-danger" role="alert">
             {promoError}
           </p>
         ) : promo ? (
-          <p className="mt-1.5 text-xs text-success">
-            {promo.code} applied: {formatMoney(promo.discountMinor, currency)} off
+          <p className="mt-1.5 text-xs text-success" role="status">
+            {waived
+              ? `FULL WAIVER applied: ${formatMoney(promo.discountMinor, currency)} waived. Nothing is charged.`
+              : `${promo.code} applied: ${formatMoney(promo.discountMinor, currency)} off`}
+          </p>
+        ) : needsUpfront ? (
+          <p id={hintId} className="mt-1.5 text-xs text-text-subtle">
+            An ordinary promo code only works when the whole engagement is paid upfront. A full-waiver code works on any plan.
           </p>
         ) : null}
       </div>
@@ -238,10 +250,12 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
       >
         {state === "busy" ? (
           <Loader2 className="size-4 animate-spin" aria-hidden />
+        ) : waived ? (
+          <CheckCircle2 className="size-4" aria-hidden />
         ) : (
           <CreditCard className="size-4" aria-hidden />
         )}
-        {testMode ? "Complete for free (test mode)" : `Pay ${formatMoney(payable, currency)}`}
+        {testMode ? "Complete for free (test mode)" : waived ? "Complete hire (free, code applied)" : `Pay ${formatMoney(payable, currency)}`}
         {promo && !testMode ? (
           <span className="text-xs font-normal line-through opacity-70">
             {formatMoney(amountMinor, currency)}
@@ -250,9 +264,9 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
       </button>
       {error ? (
         <p className="mt-2 text-pretty text-xs leading-relaxed text-danger">{error}</p>
-      ) : testMode ? (
+      ) : testMode || waived ? (
         <p className="mt-2 text-xs leading-relaxed text-text-subtle">
-          Test mode: no payment is taken. The hire completes as if it were paid.
+          {waived ? "No payment is taken. The hire completes as if it were paid." : "Test mode: no payment is taken. The hire completes as if it were paid."}
         </p>
       ) : (
         <p className="mt-2 text-xs leading-relaxed text-text-subtle">

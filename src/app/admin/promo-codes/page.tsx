@@ -46,6 +46,8 @@ export default async function AdminPromoCodesPage() {
     );
   }
 
+  const session = await getSession();
+  const permissions = session?.permissions;
   const activeCount = rows.filter((r) => r.isActive).length;
   const totalRedemptions = rows.reduce((s, r) => s + (r.usedCount ?? 0), 0);
   const totalCodes = rows.length;
@@ -63,7 +65,7 @@ export default async function AdminPromoCodesPage() {
         <StatCard label="Used up" value={formatNumber(exhausted)} hint="Codes at their usage limit" />
       </StatGrid>
 
-      <PromoCodesManager initialPromoCodes={rows} canWrite={canWrite((await getSession())?.permissions, "/admin/promo-codes")} discountGiven={Object.fromEntries(given)} />
+      <PromoCodesManager initialPromoCodes={rows} canWrite={canWrite(permissions, "/admin/promo-codes")} canMintWaiver={session?.role === "admin" && canWrite(permissions, "/api/admin/promo-codes/full-waiver")} discountGiven={Object.fromEntries(given)} />
     </div>
   );
 }

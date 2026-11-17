@@ -73,8 +73,9 @@ export function CheckoutSummary({
   const line = lines.find((l) => l.id === selectedId) ?? lines[0];
   const [picked, setPicked] = useState<Mode>("postpaid");
   // A promo code is for the whole engagement paid upfront: while one is applied, monthly payment is locked.
-  const [promo, setPromo] = useState<{ code: string; discountMinor: number } | null>(null);
-  const promoApplied = promo !== null;
+  // A full-waiver code works on every plan, so it does not lock the plan; the plan picker clears it (the pay box below restarts with the plan).
+  const [promo, setPromo] = useState<{ code: string; discountMinor: number; fullWaiver?: boolean } | null>(null);
+  const promoApplied = promo !== null && !promo.fullWaiver;
 
   const canPostpaid = Boolean(line && line.postpaidMinor != null) && !promoApplied;
   const mode: Mode = line?.due ? "monthly" : canPostpaid ? picked : "upfront";
@@ -193,7 +194,10 @@ export function CheckoutSummary({
                     className="size-4 shrink-0 accent-brand-700"
                     checked={mode === "postpaid"}
                     disabled={!canPostpaid}
-                    onChange={() => setPicked("postpaid")}
+                    onChange={() => {
+                      setPicked("postpaid");
+                      setPromo(null);
+                    }}
                   />
                   <span className="min-w-0 flex-1">
                     {line.postpaidMinor != null ? `${m(line.postpaidMinor, line.currency)} now (hiring charge + Month 1 charge)${line.months > 1 ? ", then each later month's charge due 2 days before the month's pay date" : ""}` : "Each month's charge due 2 days before the month's pay date"}
@@ -208,7 +212,10 @@ export function CheckoutSummary({
                     name="checkout-mode"
                     className="size-4 accent-brand-700"
                     checked={mode === "upfront"}
-                    onChange={() => setPicked("upfront")}
+                    onChange={() => {
+                      setPicked("upfront");
+                      setPromo(null);
+                    }}
                   />
                   <span className="min-w-0 flex-1">
                     Pay the whole internship now
@@ -241,6 +248,11 @@ export function CheckoutSummary({
               </>
             )}
             {line && promo && discountMinor > 0 ? <Row label={`Promo ${promo.code}`}>{`−${m(discountMinor, line.currency)}`}</Row> : null}
+            {line && promo?.fullWaiver ? (
+              <p role="status" className="rounded-apple-sm bg-success-soft px-3 py-2 text-xs font-medium text-success">
+                Complimentary (full waiver): nothing is charged, hiring fee included.
+              </p>
+            ) : null}
             <div className="flex items-baseline justify-between gap-3 border-t border-ink-100 pt-3">
               <dt className="text-sm font-medium text-ink-800">{mode === "upfront" ? "Total" : "Due now"}</dt>
               <dd className="nums text-4xl font-light tracking-[-0.04em] text-ink-900">{m(totalMinor, line.currency)}</dd>
@@ -270,7 +282,7 @@ export function CheckoutSummary({
           </div>
           <p className="mt-4 text-xs leading-relaxed text-text-subtle">
             {line.currency === "INR" ? "Prices include GST. " : "Billed in US dollars. "}
-            The one-time hiring fee is never discounted.{" "}
+            {promo?.fullWaiver ? "A full-waiver code covers the hiring fee too." : "The one-time hiring fee is never discounted by an ordinary code."}{" "}
             <Link href="/employer/orders" className="font-medium text-brand-700 underline-offset-4 hover:underline">
               Past payments
             </Link>

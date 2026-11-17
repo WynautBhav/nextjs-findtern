@@ -11,6 +11,7 @@ import {
   Plus,
   Receipt,
   Search,
+  ShieldAlert,
   Tag,
   Trash2,
   X,
@@ -35,6 +36,8 @@ import { RowMenu } from "@/components/app/row-menu";
 import { useConfirm } from "@/components/app/use-confirm";
 import { ADMIN_PILL_PRIMARY, ADMIN_SURFACE } from "@/components/admin/surface";
 import { COLLEGE_CODE_LOCKED } from "@/lib/promo-rules";
+import { FullWaiverDialog } from "@/components/admin/full-waiver-dialog";
+import { isFullWaiver } from "@/lib/full-waiver";
 import { isoToIstInput, istInputToIso } from "@/lib/admin/promo-form-time";
 import { paginate, sortPromos, type PromoSort, type Redemption } from "@/lib/admin/promo-redemptions";
 
@@ -51,18 +54,30 @@ const inputClass =
 const PROMO_GRID = "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_4.5rem_2.5rem]";
 
 function benefitLabel(promo: PromoCode): string {
+  if (isFullWaiver(promo)) return "Full waiver (whole payment free)";
   return promo.discountType === "percentage"
     ? `${promo.discountValue}% off`
     : `${formatMoney(Number(promo.discountValue), "INR", { zeroLabel: false })} off`;
 }
 
+/** "Active, 1 of 1 uses left, expires 24 Nov" for a waiver row; the first word is the state an admin scans for. */
+function waiverState(p: PromoCode): string {
+  const until = p.validUntil ? new Date(p.validUntil) : null;
+  const left = p.maxUsages === null ? 0 : Math.max(0, p.maxUsages - p.usedCount);
+  const state = !p.isActive ? "Disabled" : until && until.getTime() < Date.now() ? "Expired" : left === 0 ? "Used up" : "Active";
+  return `${state} · expires ${until ? formatDate(until.toISOString()) : "never (invalid)"}`;
+}
+
 export function PromoCodesManager({
   initialPromoCodes,
   canWrite,
+  canMintWaiver = false,
   discountGiven = {},
 }: {
   initialPromoCodes: PromoCode[];
   canWrite: boolean;
+  /** Finance (transactions:write): may create full-waiver codes. */
+  canMintWaiver?: boolean;
   /** Discount given per promo id, in INR paise. */
   discountGiven?: Record<string, number>;
 }) {
@@ -79,7 +94,8 @@ export function PromoCodesManager({
   // Search & Filter state
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
-  const [typeFilter, setTypeFilter] = useState<"all" | "percentage" | "fixed">("all");
+  const [typeFilter, setTypeFilter] = useState<"all" | "percentage" | "fixed" | "full_waiver">("all");
+  const [waiverOpen, setWaiverOpen] = useState(false);
   const [sort, setSort] = useState<PromoSort>("newest");
   const [page, setPage] = useState(1);
 
@@ -414,13 +430,14 @@ export function PromoCodesManager({
           </select>
           <select
             value={typeFilter}
-            onChange={(e) => { setTypeFilter(e.target.value as "all" | "percentage" | "fixed"); setPage(1); }}
+            onChange={(e) => { setTypeFilter(e.target.value as "all" | "percentage" | "fixed" | "full_waiver"); setPage(1); }}
             aria-label="Filter by discount type"
             className="h-10 cursor-pointer rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
           >
             <option value="all">All types</option>
             <option value="percentage">Percentage</option>
             <option value="fixed">Fixed amount</option>
+            <option value="full_waiver">Full waiver</option>
           </select>
         </div>
 
@@ -433,10 +450,18 @@ export function PromoCodesManager({
           {(Object.keys(SORT_LABELS) as PromoSort[]).map((k) => <option key={k} value={k}>{SORT_LABELS[k]}</option>)}
         </select>
 
+        {canWrite && canMintWaiver ? <button
+          type="button"
+          onClick={() => setWaiverOpen(true)}
+          className={buttonClass({ variant: "outline", size: "md", className: "lg:ml-auto" })}
+        >
+          <ShieldAlert className="size-4" aria-hidden />
+          New full-waiver code
+        </button> : null}
         {canWrite ? <button
           type="button"
           onClick={openCreateModal}
-          className={buttonClass({ variant: "primary", size: "md", className: cn(ADMIN_PILL_PRIMARY, "lg:ml-auto") })}
+          className={buttonClass({ variant: "primary", size: "md", className: cn(ADMIN_PILL_PRIMARY, !(canWrite && canMintWaiver) && "lg:ml-auto") })}
         >
           <Plus className="size-4" />
           New code
@@ -493,6 +518,24 @@ export function PromoCodesManager({
                     </button>
                   </p>
                   {promo.description ? <p className="text-sm text-ink-600">{promo.description}</p> : null}
+                  {isFullWaiver(promo) ? (
+                    <p className="mt-1 flex flex-wrap items-center gap-2">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2 py-0.5 text-[0.6875rem] font-bold tracking-wide text-danger">
+                        <ShieldAlert className="size-3" aria-hidden />
+                        FULL WAIVER
+                      </span>
+                      <span className="text-xs text-ink-600">{waiverState(promo)}</span>
+                      {canWrite && promo.isActive ? (
+                        <button
+                          type="button"
+                          onClick={() => void handleToggleActive(promo)}
+                          className="inline-flex min-h-11 items-center rounded-full px-2 text-xs font-semibold text-danger underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                        >
+                          Disable
+                        </button>
+                      ) : null}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="max-lg:col-span-2">
                   <p className="nums font-semibold text-ink-900">{benefitLabel(promo)}</p>
@@ -505,6 +548,7 @@ export function PromoCodesManager({
                   <p className="nums text-sm text-ink-800">
                     {used.toLocaleString("en-IN")}
                     {max ? ` of ${max.toLocaleString("en-IN")}` : " · no limit"}
+                    {isFullWaiver(promo) && max ? ` · ${Math.max(0, max - used)} left` : ""}
                   </p>
                   {max ? (
                     <div aria-hidden className="mt-1.5 h-2 max-w-40 overflow-hidden rounded-full bg-[color:var(--admin-panel-2)]">
@@ -538,12 +582,13 @@ export function PromoCodesManager({
                   <RowMenu
                     label={`More actions for ${promo.code}`}
                     items={[
-                      { label: "Edit code", onSelect: () => openEditModal(promo), icon: <Edit2 /> },
+                      ...(isFullWaiver(promo) ? [] : [{ label: "Edit code", onSelect: () => openEditModal(promo), icon: <Edit2 /> }]),
                       ...(promo.collegeId ? [] : [{ label: "Delete code", onSelect: () => void handleDelete(promo), icon: <Trash2 />, destructive: true }]),
                     ]}
                   />
                 </div>
                 <div className="flex gap-2 lg:hidden max-lg:col-span-2">
+                  {isFullWaiver(promo) ? null : (
                   <button
                     type="button"
                     onClick={() => openEditModal(promo)}
@@ -552,6 +597,7 @@ export function PromoCodesManager({
                     <Edit2 className="size-4" />
                     Edit
                   </button>
+                  )}
                   {promo.collegeId ? null : (
                     <button
                       type="button"
@@ -641,6 +687,15 @@ export function PromoCodesManager({
           )}
         </DialogContent>
       </Dialog>
+
+      <FullWaiverDialog
+        open={waiverOpen}
+        onOpenChange={setWaiverOpen}
+        onCreated={(promo) => {
+          setPromos((prev) => [promo, ...prev]);
+          router.refresh();
+        }}
+      />
 
       {/* Add / Edit Dialog */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
