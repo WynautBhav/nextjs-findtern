@@ -15,6 +15,7 @@ import { hash } from "@node-rs/argon2";
 import { chromium } from "playwright";
 
 import { api, url } from "./lib/browser.mjs";
+import { businessStartDate } from "./lib/start-date.mjs";
 import { closeDb, db, one, rows } from "./lib/db.mjs";
 import { RUN, SKILLS, PASSWORD, cleanup, mkEmployer, mkIntern, mkProject, mkProposal, signedIn } from "./lib/fixtures2.mjs";
 
@@ -121,7 +122,7 @@ test("the employer sees why, cannot send an offer (409) and cannot delete it (40
   await P.E.page.goto(url("/employer/projects"), { waitUntil: "domcontentloaded" });
   await P.E.page.getByText("Taken down by Findtern").first().waitFor({ timeout: 20_000 });
   assert.match((await P.E.page.locator("main").textContent()) ?? "", new RegExp(REASON));
-  const start = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+  const start = businessStartDate(14);
   const offer = await api(P.E.page, "POST", `/api/employer/${E.id}/proposals`, {
     internId: I.id, projectId: pid, flowType: "direct", agreedToPolicy: true, roleTitle: "Engineer", jd: "Build things.", additionalInfo: "Shipping real work with code review and mentoring.", mode: "remote",
     startDate: start, duration: "1m", shiftFrom: "09:00", shiftTo: "17:00", timezone: "Asia/Kolkata", laptop: "company", skills: SKILLS.slice(0, 4),
@@ -304,7 +305,7 @@ test("restored: the same offer can be accepted, paid for and its interview booke
 
 // ── Revision 2: a takedown withdraws the open offers on the project; no new offer goes out from it. ──
 const withdrawn = async (id) => (await one(`SELECT status, offer_details FROM proposals WHERE id = $1`, [id]));
-const startFuture = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+const startFuture = businessStartDate(30);
 const SET_OFFER = `UPDATE proposals SET status = $2, currency = 'INR', offer_details = $3::jsonb WHERE id = $1 RETURNING id`;
 const offerJson = (extra = {}) => JSON.stringify({ roleTitle: "Withdraw Role", duration: "1m", monthlyAmount: 10000, startDate: startFuture, ...extra });
 
@@ -403,7 +404,7 @@ test("admin UI: the takedown confirmation says open offers are withdrawn and not
 test("a taken-down listing sends no new offer: internship proposal and full-time offer both 409 listing_taken_down, nothing inserted", async () => {
   assert.ok((await td(S.wp, { reason: "send block" })).status === 200);
   const before = (await one(`SELECT count(*)::int AS n FROM proposals WHERE employer_id = $1`, [E.id])).n;
-  const start = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
+  const start = businessStartDate(14);
   const offer = await api(P.E.page, "POST", `/api/employer/${E.id}/proposals`, {
     internId: I.id, projectId: S.wp, flowType: "direct", agreedToPolicy: true, roleTitle: "Engineer", jd: "Build things.", additionalInfo: "Shipping real work with code review and mentoring.", mode: "remote",
     startDate: start, duration: "1m", shiftFrom: "09:00", shiftTo: "17:00", timezone: "Asia/Kolkata", laptop: "company", skills: SKILLS.slice(0, 4),

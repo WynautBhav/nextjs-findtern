@@ -26,6 +26,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { chromium, firefox, webkit } from "playwright";
 
 import { singleWindow } from "./lib/one-window.mjs";
+import { businessStartDate, weekendStartDate } from "./lib/start-date.mjs";
 import { api as rawApi, expectOk, gotoWithRetry, pngBase64, stalls, upload, visit } from "./lib/browser.mjs";
 import { STAGING_URL, closeDb, manifest, one as rawOne, own, ownedWrite, readSignupCode, rows as rawRows } from "./lib/staging.mjs";
 
@@ -822,7 +823,7 @@ step("employer: bad offers are refused, then sends one offer to each intern [API
     roleTitle: "Data Analyst Intern",
     jd: "Build and maintain SQL dashboards for the operations team.", additionalInfo: "Shipping real work with code review and mentoring.",
     mode: "remote",
-    startDate: istDate(7),
+    startDate: businessStartDate(7),
     duration: "1m",
     weeklySchedule: "mon_fri",
     shiftFrom: "10:00",
@@ -835,6 +836,8 @@ step("employer: bad offers are refused, then sends one offer to each intern [API
   });
   const bad = [
     ["a start date in the past", { startDate: istDate(-3) }],
+    ["a start date tomorrow (the earliest is two days out, on a weekday)", { startDate: istDate(1) }],
+    ["a start date on a weekend", { startDate: weekendStartDate(7) }],
     ["a start date more than a year away", { startDate: istDate(400) }],
     ["an impossible date", { startDate: "2026-02-31" }],
     ["a time zone that does not exist", { timezone: "Mars/Phobos" }],
@@ -1581,7 +1584,7 @@ step("US employer: the offer is held until the meeting happens; Mark completed (
   assert.ok(await page.getByRole("link", { name: /Open the schedule/ }).isVisible(), "and points to the schedule");
   const early = await api(page, "POST", `/api/employer/${state.employer2Id}/proposals`, {
     internId: state.intern3Id, projectId: state.project2Id, flowType: "interview_first", agreedToPolicy: true, roleTitle: "Growth analyst", jd: "Build funnel dashboards for the growth team.", additionalInfo: "Shipping real work with code review and mentoring.",
-    mode: "remote", startDate: istDate(30), duration: "1m", weeklySchedule: "mon_fri", shiftFrom: "09:00", shiftTo: "18:00", timezone: NY, laptop: "company", paidLeavesPerMonth: 2, skills: ["SQL"],
+    mode: "remote", startDate: businessStartDate(30), duration: "1m", weeklySchedule: "mon_fri", shiftFrom: "09:00", shiftTo: "18:00", timezone: NY, laptop: "company", paidLeavesPerMonth: 2, skills: ["SQL"],
   });
   assert.equal(early.status, 409, `an offer before the meeting is refused (got ${early.status} ${JSON.stringify(early.body).slice(0, 140)})`);
 
@@ -1624,18 +1627,27 @@ step("US employer composes the offer in the form: calendar, no flexible hours, N
   assert.match(text, /\$/, "a US company is quoted in dollars");
   assert.doesNotMatch(text, /₹/, "and never in rupees");
 
-  // The calendar: its button is there and the picker's choice lands in the field as DD/MM/YYYY.
+  // The calendar: its button is there, weekends and too-early days are greyed out, and a click lands in the field as DD/MM/YYYY.
   await page.locator('button[aria-label^="Open calendar"]').first().waitFor({ state: "visible" });
+  const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
   const pick = async (iso) => {
-    for (let attempt = 0; attempt < 5; attempt++) {
-      await page.locator('input[type="date"]').first().fill(iso);
-      await page.waitForTimeout(300);
-      if ((await page.locator("#startDate").inputValue()) === dmy(iso)) return;
+    const [y, m, d] = iso.split("-").map(Number);
+    await page.locator('button[aria-label^="Open calendar"]').first().click();
+    const cal = page.getByRole("dialog", { name: "Choose a date" });
+    await cal.waitFor();
+    for (let i = 0; i < 24 && !(await cal.getByText(`${MONTHS[m - 1]} ${y}`, { exact: true }).isVisible()); i++) {
+      await cal.getByRole("button", { name: "Next month" }).click();
     }
-    throw new Error(`The calendar's choice ${iso} never reached the start date field`);
+    await cal.getByRole("button", { name: new RegExp(`^\\w+, ${d} ${MONTHS[m - 1]} ${y}$`) }).click();
+    await page.waitForFunction(([want]) => document.querySelector("#startDate")?.value === want, [dmy(iso)], { timeout: 5000 });
   };
+  await page.locator('button[aria-label^="Open calendar"]').first().click();
+  const open = page.getByRole("dialog", { name: "Choose a date" });
+  await open.waitFor();
+  assert.ok((await open.getByRole("button", { name: /unavailable$/ }).count()) > 0, "weekends and too-early days are greyed out in the calendar");
+  await page.keyboard.press("Escape");
   // Daylight saving: 9am-6pm in New York is 7:30 pm in India after the clocks go back (winter) and 6:30 pm after they go forward.
-  const winter = istDate(10);
+  const winter = businessStartDate(10);
   const summer = "2027-03-16";
   await pick(winter);
   const previewFor = async () => (await page.getByText(/The intern sees these as/).first().innerText()).replace(/\s+/g, " ");
@@ -1653,13 +1665,14 @@ step("US employer composes the offer in the form: calendar, no flexible hours, N
   assert.equal(await page.getByLabel("Hours per month").inputValue(), "192 h");
   await page.locator("#weeklySchedule").selectOption("mon_fri");
 
-  // A start date in the past is refused with a reason.
-  await typeInto(page.locator("#startDate"), "01/01/2020");
-  await typeInto(page.locator("#message"), "x".repeat(40));
-  await page.getByRole("button", { name: "Review and send" }).filter({ visible: true }).first().click();
-  await page.getByText(/Pick a start date after today/i).first().waitFor({ timeout: 10_000 });
+  // A start date in the past is moved to the earliest allowed day, and the form says so.
+  await page.locator("#startDate").fill("01/01/2020"); // not typeInto: the form moves the date, so the field rightly does not keep it
+  await page.getByText(/is too soon, so the start date moved to/i).first().waitFor({ timeout: 10_000 });
+  // So is a weekend.
+  await page.locator("#startDate").fill(dmy(weekendStartDate(14)));
+  await page.getByText(/is a weekend, so the start date moved to/i).first().waitFor({ timeout: 10_000 });
 
-  const start = istDate(10);
+  const start = businessStartDate(10);
   state.usStart = start;
   state.usOfferId = own("proposal:us-intern3", await composeAndSend(page, {
     internId: state.intern3Id,
@@ -1725,7 +1738,7 @@ step("free-band intern 4: the composer offers remote only, edits and withdrawals
 
   const offer = (over = {}) => ({
     internId: state.intern4Id, projectId: state.project2Id, flowType: "interview_first", agreedToPolicy: true, roleTitle: "Support analyst intern", jd: "Triage and tag support tickets for the growth team.", additionalInfo: "Shipping real work with code review and mentoring.",
-    mode: "remote", startDate: istDate(12), duration: "1m", weeklySchedule: "mon_fri", shiftFrom: "09:00", shiftTo: "18:00", timezone: NY, laptop: "company", paidLeavesPerMonth: 0, skills: ["SQL"], ...over,
+    mode: "remote", startDate: businessStartDate(12), duration: "1m", weeklySchedule: "mon_fri", shiftFrom: "09:00", shiftTo: "18:00", timezone: NY, laptop: "company", paidLeavesPerMonth: 0, skills: ["SQL"], ...over,
   });
   const path = `/api/employer/${state.employer2Id}/proposals`;
   const hybrid = await api(page, "POST", path, offer({ mode: "hybrid", city: "Pune", state: "Maharashtra", officeDays: 2, homeDays: 3 }));
@@ -1734,7 +1747,7 @@ step("free-band intern 4: the composer offers remote only, edits and withdrawals
   const onsite = await api(page, "POST", path, offer({ mode: "onsite", city: "Pune", state: "Maharashtra" }));
   assert.equal(onsite.status, 400, `an on-site offer is refused too (got ${onsite.status})`);
 
-  state.usFreeOfferId = own("proposal:us-intern4", await composeAndSend(page, { internId: state.intern4Id, startIso: istDate(12), message: "Triage and tag support tickets for the growth team every week.", extra: "" }));
+  state.usFreeOfferId = own("proposal:us-intern4", await composeAndSend(page, { internId: state.intern4Id, startIso: businessStartDate(12), message: "Triage and tag support tickets for the growth team every week.", extra: "" }));
 
   // Edit it while it is still unanswered, in the form: no flexible-hours box, the calendar is there, and saving tells the intern.
   await visit(page, `/employer/proposal/${state.usFreeOfferId}?edit=1`);

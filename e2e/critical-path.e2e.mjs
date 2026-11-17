@@ -30,6 +30,7 @@ import { chromium } from "playwright";
 import { closeDb, one, rows } from "./lib/db.mjs";
 import { ARTIFACTS, ROOT, baseUrl, testDatabaseUrl } from "./lib/env.mjs";
 import { api, expectOk, pngBase64, upload, visit } from "./lib/browser.mjs";
+import { businessStartDate } from "./lib/start-date.mjs";
 import { mailTo, otpFrom, waitForMail } from "./lib/mail.mjs";
 
 testDatabaseUrl(); // throws unless the DB is local - before anything else runs
@@ -536,7 +537,7 @@ step("employer: sends an offer (proposal; offer_details money in rupees) [API]",
     roleTitle: "Data Analyst Intern",
     jd: "Build and maintain SQL dashboards for the operations team.", additionalInfo: "Shipping real work with code review and mentoring.",
     mode: "remote",
-    startDate: istDate(7),
+    startDate: businessStartDate(7),
     duration: "2m",
     weeklySchedule: "mon_fri",
     shiftFrom: "10:00",

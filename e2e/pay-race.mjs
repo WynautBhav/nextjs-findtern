@@ -20,6 +20,7 @@ import assert from "node:assert/strict";
 import { closeDb, one, rows } from "./lib/db.mjs";
 import { LOGIN, PERSONAS } from "./lib/personas.mjs";
 import { nextIp } from "./lib/session.mjs";
+import { businessStartDate } from "./lib/start-date.mjs";
 
 const PARALLEL = 3;
 const origin = process.env.E2E_BASE_URL || `http://localhost:${process.env.QA_PORT || 3500}`;
@@ -95,7 +96,7 @@ async function proposalRace({ emp, session }, since) {
   const [project] = await rows("select id from projects where employer_id = $1 and status = 'active' limit 1", [emp.id]);
   const body = {
     flowType: "direct", agreedToPolicy: true, roleTitle: "Race test role", jd: "Race test.", additionalInfo: "Shipping real work with code review and mentoring.", mode: "remote",
-    startDate: day(20), duration: "1m", shiftFrom: "09:00", shiftTo: "18:00", timezone: "Asia/Kolkata", laptop: "company",
+    startDate: businessStartDate(20), duration: "1m", shiftFrom: "09:00", shiftTo: "18:00", timezone: "Asia/Kolkata", laptop: "company",
     paidLeavesPerMonth: 0, skills: [], projectId: project.id,
   };
   let tried = 0;

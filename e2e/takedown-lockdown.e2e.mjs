@@ -17,6 +17,7 @@ import { hash } from "@node-rs/argon2";
 import { chromium } from "playwright";
 
 import { api, url } from "./lib/browser.mjs";
+import { businessStartDate } from "./lib/start-date.mjs";
 import { closeDb, one, rows } from "./lib/db.mjs";
 import { RUN, PASSWORD, cleanup, mkEmployer, mkIntern, mkProject, mkProposal, signedIn } from "./lib/fixtures2.mjs";
 
@@ -132,7 +133,7 @@ test("03 every employer API action on the taken-down project answers 409 project
   const slot = (d) => `${futureDay(d)}T10:00`;
   const offerBody = {
     internId: I1.id, projectId: pid, flowType: "direct", agreedToPolicy: true, roleTitle: "Growth Intern", jd: "Build growth experiments.",
-    additionalInfo: "You will learn to run growth experiments and read the results.", mode: "remote", startDate: futureDay(14), duration: "1m",
+    additionalInfo: "You will learn to run growth experiments and read the results.", mode: "remote", startDate: businessStartDate(14), duration: "1m",
     weeklySchedule: "mon_fri", shiftFrom: "10:00", shiftTo: "18:00", timezone: "Asia/Kolkata", laptop: "company", skills: [],
   };
   const calls = [
