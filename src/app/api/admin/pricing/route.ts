@@ -12,6 +12,8 @@ import { PER_HIRE_FEE_KEY, parsePerHireFeeSetting } from "@/lib/per-hire-fee";
 import { perHireFeeAuditMeta } from "@/lib/admin/per-hire-fee-setting";
 import { PRICING_REVALIDATE, activationFeeAuditMeta, parsePricingPut, stipendSaveAuditMeta } from "@/lib/admin/pricing-put";
 import { INTERN_STIPEND_KEY, parseStipendBands } from "@/lib/pricing-config";
+import { allows } from "@/lib/admin/permissions";
+import { subscriptionConfigAuditMeta } from "@/lib/subscription/config-put";
 import { writePlan, type PlanStore } from "@/lib/admin/pricing-plan-write";
 
 /**
@@ -122,6 +124,24 @@ export async function PUT(req: Request) {
   // One schema per setting, picked by the body's shape (lib/admin/pricing-put.ts).
   const put = parsePricingPut(await req.json().catch(() => null));
   if (put.kind === "invalid") return NextResponse.json({ error: put.error }, { status: 400 });
+
+  // Findtern Pro: price, length, on/off. Money, so it also needs the Accounts permission (transactions:write), not only the pricing one.
+  if (put.kind === "subscription") {
+    if (!allows(guard.session.permissions, ["transactions:write"])) return NextResponse.json({ error: "Changing the Findtern Pro price needs the Accounts permission." }, { status: 403 });
+    const before = await getSetting("employer_subscription");
+    await setSetting("employer_subscription", put.config, guard.session.uid);
+    await recordAdminAudit(getDb(), {
+      adminId: guard.session.uid,
+      action: "subscription.config_updated",
+      targetType: "platform_setting",
+      targetId: "employer_subscription",
+      meta: subscriptionConfigAuditMeta(before, put.config),
+    }, { strict: true });
+    // The candidates page, the billing page and every cached price read this.
+    revalidatePricing();
+    revalidatePath("/employer", "layout");
+    return NextResponse.json({ ok: true, employerSubscription: put.config });
+  }
 
   // Which bands pay the one-time hiring fee (lib/per-hire-fee.ts): read by billing and every public price line.
   if (put.kind === "perHireFee") {
