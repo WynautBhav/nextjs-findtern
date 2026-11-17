@@ -4,7 +4,7 @@ import { Briefcase, Check, Gift, X, Zap } from "lucide-react";
 
 import { ButtonLink } from "@/components/ui/button";
 import { TiltCard } from "@/components/motion/tilt-card";
-import { useRegionBands } from "@/components/marketing/region-rates";
+import { usePricingBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
 import { OfferNote, PerHireCharge, PlanPrice } from "@/components/marketing/plan-price";
 import { usePerHireFee } from "@/components/marketing/per-hire-fee-context";
@@ -28,7 +28,7 @@ export function EmployerPlanCards({
   plansInr: CmsPlan[];
   plansUsd: CmsPlan[];
 }) {
-  const { isIndia, bands, currency } = useRegionBands();
+  const { isIndia, bands, currency } = usePricingBands();
   const feeSetting = usePerHireFee();
   const plans = isIndia ? plansInr : plansUsd;
 

@@ -108,20 +108,22 @@ export const HOME_STUDENT_COPY = {
 
 /** What a student earns by Findtern Score band, shown on the student side of
  *  the home hero. Whole rupees, always INR (these are not converted to the
- *  visitor's currency). Keys match the band ids in lib/score. A null stipend
- *  means the band has a completion bonus only. */
+ *  visitor's currency). Keys match the band ids in lib/score. The monthly
+ *  stipend is not here: it is admin-editable and read from the pricing config
+ *  (lib/pricing-config.ts; none below a score of 6, so that band shows its
+ *  completion bonus only). */
 export const HOME_STUDENT_BANDS = [
-  { id: "standard", range: "Below 6", stipend: null, bonus: 2000 },
-  { id: "skilled", range: "6 to 8", stipend: 8000, bonus: 2500 },
-  { id: "assured", range: "8 to 10", stipend: 15000, bonus: 3000 },
+  { id: "standard", range: "Below 6", bonus: 2000 },
+  { id: "skilled", range: "6 to 8", bonus: 2500 },
+  { id: "assured", range: "8 to 10", bonus: 3000 },
 ] as const;
 
 /** The home and about pages quote the same three product terms. */
 export const PROOF_STATS = [
   { value: 100, prefix: "", suffix: "%", label: "Screened before you see them" },
   { value: 3, prefix: "", suffix: "", label: "Plans to pick from" },
-  // Shown in the visitor's currency (PerHireFigure); these are the INR defaults.
-  { value: 5000, prefix: "₹", suffix: "", label: "Per-hire fee on Espresso", perHire: true },
+  // The figure is the live Espresso hiring fee in the visitor's currency (PerHireFigure reads the pricing config); value and prefix are unused placeholders.
+  { value: 0, prefix: "", suffix: "", label: "Per-hire fee on Espresso", perHire: true },
 ] as const;
 
 export const ABOUT_COPY = {

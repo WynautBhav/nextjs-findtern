@@ -11,12 +11,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { PRICE_CURRENCIES, isPriceCurrency, type PriceCurrency } from "@/lib/currency";
 import { formatMoney, formatRate, detectIsIndia } from "@/lib/format";
-import {
-  BANDS,
-  bandsForRegion,
-  type Band,
-  type BandId,
-} from "@/lib/score";
+import { BANDS, bandsForConfig, type Band, type BandId } from "@/lib/score";
+import { usePricingConfig } from "@/components/marketing/per-hire-fee-context";
 import { cn } from "@/lib/utils";
 import { CountUp } from "@/components/motion/count-up";
 
@@ -84,17 +80,19 @@ export function useIsIndia(): boolean {
   return useCurrency() === "INR";
 }
 
-export function useRegionBands(): {
+/** The bands under the live admin pricing config, in the visitor's region (INR, or USD at ₹100 = $1). */
+export function usePricingBands(): {
   isIndia: boolean;
   currency: PriceCurrency;
   bands: Band[];
 } {
   const currency = useCurrency();
+  const config = usePricingConfig();
   const isIndia = currency === "INR";
-  return { isIndia, currency, bands: bandsForRegion(isIndia) };
+  return { isIndia, currency, bands: bandsForConfig(config, isIndia) };
 }
 
-/** The INR band geometry, for layouts that must not move between regions. */
+/** The band geometry (names, score ranges), for layouts that must not move between regions. Money here is the published default: read money from `usePricingBands`. */
 export { BANDS };
 
 function bandById(bands: Band[], id: BandId): Band {
@@ -103,13 +101,13 @@ function bandById(bands: Band[], id: BandId): Band {
 
 /** Formatted hourly rate for a band id, in the visitor's currency. */
 export function BandRate({ bandId, className }: { bandId: BandId; className?: string }) {
-  const { bands, currency } = useRegionBands();
+  const { bands, currency } = usePricingBands();
   return <span className={className}>{formatRate(bandById(bands, bandId).rateMinor, currency)}</span>;
 }
 
 /** Formatted per-hire charge for a band id. */
 export function BandPerHire({ bandId }: { bandId: BandId }) {
-  const { bands, currency } = useRegionBands();
+  const { bands, currency } = usePricingBands();
   const band = bandById(bands, bandId);
   return <>{formatMoney(band.perHireMinor, currency)}</>;
 }
@@ -120,7 +118,7 @@ export function BandPerHire({ bandId }: { bandId: BandId }) {
  * (QA-105). The symbol is split off so the bands can style it smaller.
  */
 export function PerHireFigure({ prefixClassName }: { prefixClassName?: string }) {
-  const { bands, currency } = useRegionBands();
+  const { bands, currency } = usePricingBands();
   const text = formatMoney(bands[0]?.perHireMinor ?? 0, currency);
   const m = /^([^\d]*)([\d,.]+)/.exec(text);
   const prefix = m?.[1]?.trim() ?? "";
