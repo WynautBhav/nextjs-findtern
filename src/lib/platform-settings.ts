@@ -106,7 +106,7 @@ export async function getEmployerSubscriptionOverrides(): Promise<Record<string,
 
 /** Days before an unfinished AI interview with a sent link expires: a whole number 1-365, else 7. Never throws. */
 export async function getAiLinkExpiryDays(): Promise<number> {
-  const raw = await getSetting("ai_link_expiry_days");
+  const raw: unknown = await getSetting("ai_link_expiry_days");
   const n = typeof raw === "string" && raw.trim() !== "" ? Number(raw) : raw;
   return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= 365 ? n : SETTING_DEFAULTS.ai_link_expiry_days;
 }

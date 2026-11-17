@@ -13,6 +13,19 @@ export const AUTO_NOTIFICATION_TYPES = [
 ];
 
 /**
+ * Notification types sent by the semester / CGPA verification, unpaid-offer expiry and employer subscription work.
+ * Events, not nudges: they stay out of AUTO_NOTIFICATION_TYPES (the admin history shows them) and are not in
+ * notify-prefs' suppressible sets, so they always `required` (fail closed). `audience` is who gets the row by default.
+ */
+export const SEM_NOTIFICATION_TYPES: { type: string; label: string; audience: ("intern" | "employer")[] }[] = [
+  { type: "cgpa_verification_requested", label: "CGPA verification requested", audience: ["intern"] },
+  { type: "cgpa_verified", label: "CGPA verified", audience: ["intern", "employer"] },
+  { type: "cgpa_incorrect", label: "CGPA corrected", audience: ["intern", "employer"] },
+  { type: "proposal_expired_unpaid", label: "Offer expired before payment", audience: ["employer", "intern"] },
+  { type: "subscription_started", label: "Findtern Pro subscription started", audience: ["employer"] },
+];
+
+/**
  * A notification link is a page on this site. The first character after "/"
  * must be a letter or digit, which rejects "//host" and "/\host" (both read
  * as another origin by browsers) and "/" followed by whitespace or controls.

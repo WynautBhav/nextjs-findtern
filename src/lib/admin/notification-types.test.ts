@@ -40,3 +40,27 @@ test("notification links: on-site paths only, no protocol-relative or backslash 
     assert.equal(isSafeNotificationLink(bad), false, String(bad));
   }
 });
+
+test("semester, CGPA, expiry and subscription notification types: unique slugs, a label and an audience each", async () => {
+  const { SEM_NOTIFICATION_TYPES } = await import("./notification-types.ts");
+  assert.deepEqual(
+    SEM_NOTIFICATION_TYPES.map((t) => t.type),
+    ["cgpa_verification_requested", "cgpa_verified", "cgpa_incorrect", "proposal_expired_unpaid", "subscription_started"],
+  );
+  for (const t of SEM_NOTIFICATION_TYPES) {
+    assert.equal(cleanNotificationType(t.type), t.type, `${t.type} is a clean slug`);
+    assert.ok(t.label.length > 0 && t.audience.length > 0, t.type);
+    for (const a of t.audience) assert.ok(a === "intern" || a === "employer", `${t.type}: ${a}`);
+  }
+});
+
+test("those notification types can never be switched off: verification and money mail is required", async () => {
+  const { SEM_NOTIFICATION_TYPES } = await import("./notification-types.ts");
+  const { categoryOf, isSuppressible } = await import("../notify-prefs.ts");
+  for (const t of SEM_NOTIFICATION_TYPES) assert.equal(isSuppressible(categoryOf(t.type)), false, t.type);
+});
+
+test("they are events people act on, not the machine's daily nudges, so staff still see them in the history", async () => {
+  const { SEM_NOTIFICATION_TYPES, AUTO_NOTIFICATION_TYPES } = await import("./notification-types.ts");
+  for (const t of SEM_NOTIFICATION_TYPES) assert.ok(!AUTO_NOTIFICATION_TYPES.includes(t.type), t.type);
+});

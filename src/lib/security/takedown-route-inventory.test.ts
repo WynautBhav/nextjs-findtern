@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join, relative } from "node:path";
 
 /**
@@ -37,7 +37,12 @@ const ALLOWED: Record<string, string> = {
   "terms/accept/route.ts": "accepts the platform terms; not project data",
   "uploads/route.ts": "file upload session; attaches to nothing until a guarded route references the file",
   "threads/[id]/read/route.ts": "read receipts on a thread; the send route (guarded for project threads) is the action",
+  "employer/[id]/subscription/order/route.ts": "employer-level, not project-scoped: buys the employer's own subscription (no project, no proposal)",
+  "employer/[id]/subscription/verify/route.ts": "employer-level, not project-scoped: records the employer's own subscription payment the gateway already captured",
 };
+
+/** Allowlisted routes a later package creates. Until the file exists the stale-entry check skips them; once it does they are checked like any other. */
+const NOT_YET_WRITTEN = new Set(["employer/[id]/subscription/order/route.ts", "employer/[id]/subscription/verify/route.ts"]);
 
 const walk = (dir: string): string[] =>
   readdirSync(dir).flatMap((f) => {
@@ -97,7 +102,10 @@ for (const r of rows.filter((x) => x.mutating)) {
 
 test("every ALLOWED entry is a real employer-callable mutating route (no stale entries)", () => {
   const live = new Set(rows.filter((r) => r.mutating).map((r) => r.route));
-  for (const k of Object.keys(ALLOWED)) assert.ok(live.has(k), `ALLOWED has ${k} but no such employer-callable mutating route exists`);
+  for (const k of Object.keys(ALLOWED)) {
+    if (NOT_YET_WRITTEN.has(k) && !existsSync(join(API, k))) continue;
+    assert.ok(live.has(k), `ALLOWED has ${k} but no such employer-callable mutating route exists`);
+  }
 });
 
 test("the guard is never applied to an admin route (admin can always restore and edit)", () => {

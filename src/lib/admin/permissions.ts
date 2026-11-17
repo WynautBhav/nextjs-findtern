@@ -53,6 +53,8 @@ const RULES: Rule[] = [
   ["/admin/dashboard", ["dashboard:read"]],
   ["/admin/proposal-tracker", ["interns:read"], ["interns:write"]],
   ["/admin/ai-interviews", ["interns:read"], ["interns:write"]],
+  ["/admin/cgpa-verifications", ["interns:read"], ["interns:write"]],
+  ["/admin/subscriptions", ["transactions:read"], ["transactions:write"]],
   ["/admin/notification-history", ["notifications:read"]],
   // Someone who may send must be able to open the composer (legacy quirk fixed).
   ["/admin/notifications", ["notifications:read", "notifications:write"], ["notifications:write"]],
@@ -92,6 +94,11 @@ const RULES: Rule[] = [
   ["/api/admin/intern", INTERN_LEGAL_R, INTERN_LEGAL_W],
   ["/api/admin/interviews", ["interns:read"], ["interns:write"]],
   ["/api/admin/ai-reports", ["interns:read"], ["interns:write"]],
+  ["/api/admin/cgpa-verifications", ["interns:read"], ["interns:write"]],
+  // Employer subscriptions are money: grant, revoke and the price are Accounts (transactions:write).
+  ["/api/admin/subscriptions", ["transactions:read"], ["transactions:write"]],
+  // The expired-offers and expired-AI-interviews CSV (tracker and AI interviews tabs).
+  ["/api/admin/expired", ["interns:read"]],
   ["/api/admin/company", COMPANY_LEGAL_R, COMPANY_LEGAL_W],
   ["/api/admin/companies", ["companies:read"], ["companies:write"]],
   ["/api/admin/colleges", ["companies:read"], ["companies:write"]],
