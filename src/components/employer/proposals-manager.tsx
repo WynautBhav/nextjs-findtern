@@ -20,13 +20,16 @@ import { parseOffer } from "@/lib/offer";
 import { offerState } from "@/components/employer/proposal-state";
 import { proposalBucket, proposalCounts } from "@/components/employer/proposal-bucket";
 import { cn } from "@/lib/utils";
+import { TakedownBadge } from "@/components/employer/takedown-badge";
+import { TakedownBanner } from "@/components/employer/takedown-banner";
+import { TAKEN_DOWN_SHORT } from "@/components/employer/takedown-ui";
 import { fieldClass } from "@/components/employer/ui-tokens";
 
 export type ProposalItem = {
   proposal: EmployerProposal;
   /** Identity only; initials until this employer has hired them. */
   user: { firstName: string; lastName: string } | null;
-  project: { id: string; projectName: string } | null;
+  project: { id: string; projectName: string; /** Findtern took the project down: the offer is view only. */ takenDown?: boolean } | null;
   /** Hired by this employer on any project - the unmasking rule. */
   internHired: boolean;
   /** Avatar route when they uploaded a photo (shown before hire; the name is not). */
@@ -67,7 +70,11 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
     () =>
       proposals.map((item) => {
         const offer = parseOffer(item.proposal.offerDetails, item.proposal.currency);
-        return { item, offer, state: offerState(item.proposal, offer) };
+        const base = offerState(item.proposal, offer);
+        // A taken-down project's offers are view only: no pay, edit or withdraw, and they leave the Waiting / To pay groups.
+        const down = Boolean(item.project?.takenDown);
+        const state = down ? { ...base, canPay: false, canEdit: false, canWithdraw: false } : base;
+        return { item, offer, state, down };
       })
         // Offers waiting on your payment come first: they are the only rows that need you.
         .sort((a, b) => Number(b.state.canPay) - Number(a.state.canPay)),
@@ -77,14 +84,17 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
   const projectOptions = Array.from(new Map(proposals.filter((p) => p.project).map((p) => [p.project!.id, p.project!.projectName])).entries());
 
   // The same counter the hire strip, the dashboard and the page header use.
-  const counts = proposalCounts(rows.map((r) => ({ status: r.item.proposal.status, lapsed: r.state.lapsed })));
+  const counts = proposalCounts(rows.map((r) => ({ status: r.item.proposal.status, lapsed: r.state.lapsed, ...(r.down ? { viewOnly: true } : {}) })));
 
   const needle = search.trim().toLowerCase();
-  const filtered = rows.filter(({ item, offer, state }) => {
+  const filtered = rows.filter(({ item, offer, state, down }) => {
     // Project, role or the initials shown - never a hidden name.
     const hay = `${item.project?.projectName ?? ""} ${offer.roleTitle} ${nameOf(item)}`.toLowerCase();
     if (needle && !hay.includes(needle)) return false;
-    if (statusFilter !== "all" && proposalBucket(item.proposal.status, state.lapsed) !== statusFilter) return false;
+    const bucket = proposalBucket(item.proposal.status, state.lapsed);
+    const isViewOnly = down && (bucket === "open" || bucket === "accepted");
+    if (statusFilter === "viewonly") return isViewOnly && (!needle || hay.includes(needle)) && (projectFilter === "all" || item.proposal.projectId === projectFilter);
+    if (statusFilter !== "all" && (bucket !== statusFilter || isViewOnly)) return false;
     if (projectFilter !== "all" && item.proposal.projectId !== projectFilter) return false;
     return true;
   });
@@ -147,6 +157,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
     // Accepted offers only; running placements' monthly dues are on Orders,
     // so this is not called "payment due" beside the dashboard's count (QA-123).
     { key: "accepted", label: "Accepted · to pay", short: "To pay", count: counts.accepted },
+    ...(counts.viewOnly ? [{ key: "viewonly", label: "View only · taken down", short: "View only", count: counts.viewOnly }] : []),
     { key: "hired", label: "Hired", short: "Hired", count: counts.hired },
     // "Expired" is an offer that went unanswered past its start date.
     { key: "closed", label: "Declined & expired", short: "Closed", count: counts.closed },
@@ -156,6 +167,11 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
 
   return (
     <div>
+      <div className="mb-4">
+        <TakedownBanner
+          projects={Array.from(new Map(proposals.filter((p) => p.project?.takenDown).map((p) => [p.project!.id, { id: p.project!.id, name: p.project!.projectName }])).values())}
+        />
+      </div>
       {showTools ? (
         <div className="mb-4 flex gap-2">
           <label className="relative min-w-0 flex-1 sm:max-w-xl">
@@ -262,7 +278,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
         </div>
       ) : (
         <ul className="space-y-4 pt-5">
-          {filtered.slice(0, shown).map(({ item, offer, state }) => {
+          {filtered.slice(0, shown).map(({ item, offer, state, down }) => {
             const ini = initialsOf(item.user?.firstName?.trim() || "", item.user?.lastName?.trim() || "");
             const ft = offer.fullTime;
             // Full-time rows: annual CTC, not "-/month" (EMH-19). Only the
@@ -281,6 +297,8 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
             // One colour per meaning on this list: Hired green, Waiting amber, To pay blue, Closed grey.
             const chipTone = item.proposal.status === "hired" ? "paid" : state.canPay || item.proposal.status === "accepted" ? "new" : state.tone;
             const pill = <Pill tone={chipTone} className="whitespace-nowrap">{state.label}</Pill>;
+            // Taken-down project: the offer can be viewed, never acted on.
+            const closedLike = state.tone === "closed" || down;
             const closed = state.tone === "closed";
             const label = "text-[11px] font-semibold uppercase tracking-wider text-text-subtle";
             return (
@@ -306,6 +324,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                   </p>
                   <p className="mt-0.5 break-words text-sm font-medium text-ink-800">{title}</p>
                   {item.project ? <p className="mt-0.5 break-words text-sm text-ink-700">{item.project.projectName}</p> : null}
+                  {down ? <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-700"><TakedownBadge /> <span>{TAKEN_DOWN_SHORT}</span></p> : null}
                 </div>
                 <div className="col-span-2 flex flex-col items-start gap-1 lg:col-span-1">
                   <span className={cn(label, "lg:sr-only")}>Status</span>
@@ -333,7 +352,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                         <CreditCard className="size-4" aria-hidden />
                         Pay now
                       </Link>
-                    ) : closed ? (
+                    ) : closedLike ? (
                       <Link href={href} className={buttonClass({ variant: "outline" })} aria-label={`View ${title}, ${who}`}>
                         View
                       </Link>

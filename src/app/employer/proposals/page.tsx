@@ -62,6 +62,7 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
         lastName: schema.users.lastName,
         projectId: schema.projects.id,
         projectName: schema.projects.projectName,
+        takenDownAt: schema.projects.takenDownAt,
       })
       .from(schema.proposals)
       .leftJoin(schema.users, eq(schema.proposals.internId, schema.users.id))
@@ -89,7 +90,7 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
     }
     proposals = rows.map((row) => ({
       proposal: toEmployerProposal(row.proposal),
-      project: row.projectId ? { id: row.projectId, projectName: row.projectName ?? "Project" } : null,
+      project: row.projectId ? { id: row.projectId, projectName: row.projectName ?? "Project", ...(row.takenDownAt ? { takenDown: true } : {}) } : null,
       internHired: hired.has(row.proposal.internId),
       photoUrl: withPhoto.has(row.proposal.internId) ? avatarUrl(row.proposal.internId) : null,
       presence: presence[row.proposal.internId] ?? null,
