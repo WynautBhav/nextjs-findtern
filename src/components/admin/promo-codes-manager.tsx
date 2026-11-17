@@ -35,7 +35,7 @@ import { cn } from "@/lib/utils";
 import { RowMenu } from "@/components/app/row-menu";
 import { useConfirm } from "@/components/app/use-confirm";
 import { ADMIN_PILL_PRIMARY, ADMIN_SURFACE } from "@/components/admin/surface";
-import { COLLEGE_CODE_LOCKED } from "@/lib/promo-rules";
+import { COLLEGE_CODE_LOCKED, type PromoAppliesTo } from "@/lib/promo-rules";
 import { FullWaiverDialog } from "@/components/admin/full-waiver-dialog";
 import { isFullWaiver } from "@/lib/full-waiver";
 import { isoToIstInput, istInputToIso } from "@/lib/admin/promo-form-time";
@@ -52,6 +52,11 @@ const inputClass =
 /** Fixed amounts are stored as major rupees (the form takes "₹"), not minor units. */
 /** Code · discount · used · active · menu. */
 const PROMO_GRID = "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_minmax(0,1fr)_4.5rem_2.5rem]";
+
+/** Who a code is for, as the list says it. */
+function audienceLabel(appliesTo: string | null | undefined): string {
+  return appliesTo === "intern" ? "Interns only" : appliesTo === "employer" ? "Companies only (hiring)" : appliesTo === "subscription" ? "Employer subscription only" : "Interns and companies";
+}
 
 function benefitLabel(promo: PromoCode): string {
   if (isFullWaiver(promo)) return "Full waiver (whole payment free)";
@@ -124,7 +129,7 @@ export function PromoCodesManager({
   const [validFrom, setValidFrom] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [isActive, setIsActive] = useState(true);
-  const [appliesTo, setAppliesTo] = useState<"intern" | "employer" | "both">("intern");
+  const [appliesTo, setAppliesTo] = useState<PromoAppliesTo>("intern");
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -176,7 +181,7 @@ export function PromoCodesManager({
     setValidFrom(isoToIstInput(promo.validFrom));
     setValidUntil(isoToIstInput(promo.validUntil));
     setIsActive(promo.isActive);
-    setAppliesTo(promo.appliesTo === "intern" || promo.appliesTo === "employer" ? promo.appliesTo : "both");
+    setAppliesTo(promo.appliesTo === "intern" || promo.appliesTo === "employer" || promo.appliesTo === "subscription" ? promo.appliesTo : "both");
     setErrorMsg("");
     setErrorField(null);
     setModalOpen(true);
@@ -213,7 +218,12 @@ export function PromoCodesManager({
       return;
     }
     if (discountType === "percentage" && valNum === 100 && appliesTo !== "intern") {
-      invalid("Only an intern code can be 100%. Company codes can't cover the whole stipend.", "promo-value");
+      invalid(
+        appliesTo === "subscription"
+          ? "A subscription code can't be 100%. To give a subscription away, create a full-waiver code for the subscription."
+          : "Only an intern code can be 100%. Company codes can't cover the whole stipend.",
+        "promo-value",
+      );
       return;
     }
     if (validFrom && validUntil && (istInputToIso(validUntil) ?? "") < (istInputToIso(validFrom) ?? "")) {
@@ -540,7 +550,7 @@ export function PromoCodesManager({
                 <div className="max-lg:col-span-2">
                   <p className="nums font-semibold text-ink-900">{benefitLabel(promo)}</p>
                   <p className="text-xs text-ink-600">
-                    {promo.appliesTo === "intern" ? "Interns only" : promo.appliesTo === "employer" ? "Companies only" : "Interns and companies"}
+                    {audienceLabel(promo.appliesTo)}
                     {promo.minOrderAmountMinor ? ` · min ${formatMoney(promo.minOrderAmountMinor, "INR", { zeroLabel: false })}` : ""}
                   </p>
                 </div>
@@ -860,13 +870,20 @@ export function PromoCodesManager({
                 id="promo-applies"
                 value={appliesTo}
                 disabled={collegeLocked}
-                onChange={(e) => setAppliesTo(e.target.value as "intern" | "employer" | "both")}
+                onChange={(e) => setAppliesTo(e.target.value as PromoAppliesTo)}
+                aria-describedby="promo-applies-help"
                 className={inputClass}
               >
                 <option value="both">Interns and companies</option>
                 <option value="intern">Interns only (activation fee)</option>
-                <option value="employer">Companies only (checkout)</option>
+                <option value="employer">Companies only (hiring checkout)</option>
+                <option value="subscription">Employer subscription (Findtern Pro)</option>
               </select>
+              <p id="promo-applies-help" className="mt-1 text-xs text-ink-600">
+                {appliesTo === "subscription"
+                  ? "Takes money off the Findtern Pro subscription only. It does not work on hires or intern activation, and hiring codes do not work on the subscription."
+                  : "Hiring and activation codes never apply to the Findtern Pro subscription. Choose Employer subscription for a code that does."}
+              </p>
             </div>
 
             <div className="flex items-center justify-between rounded-apple-sm bg-ink-50 px-3 py-2">

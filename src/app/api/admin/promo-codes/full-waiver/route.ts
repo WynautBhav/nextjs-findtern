@@ -54,7 +54,7 @@ export async function POST(req: Request) {
         maxUsages,
         validUntil,
         isActive: true,
-        appliesTo: body.appliesTo as "employer" | "intern" | "both",
+        appliesTo: body.appliesTo as string,
       })
       .returning();
     await recordAdminAudit(db, {

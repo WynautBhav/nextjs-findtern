@@ -12,7 +12,8 @@ import { getSession } from "@/lib/auth";
 import { canWrite } from "@/lib/admin/permissions";
 import { getDb, schema } from "@/lib/db";
 import Link from "next/link";
-import { getInternActivationFeeMinor, getPerHireFeeSetting, getSetting } from "@/lib/platform-settings";
+import { getEmployerSubscriptionConfig, getInternActivationFeeMinor, getPerHireFeeSetting, getSetting } from "@/lib/platform-settings";
+import type { SubscriptionConfig } from "@/lib/employer-subscription";
 import type { PerHireFeeSetting } from "@/lib/per-hire-fee";
 import { singleFeatured } from "@/lib/pricing-featured";
 import { INTERN_STIPEND_KEY, parseStipendBands, type StipendBands } from "@/lib/pricing-config";
@@ -22,9 +23,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMinor: number; perHireFee: PerHireFeeSetting; stipendBands: StipendBands } | null> {
+async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMinor: number; perHireFee: PerHireFeeSetting; stipendBands: StipendBands; subscription: SubscriptionConfig } | null> {
   try {
-    const [rows, activationFeeMinor, perHireFee, stipendRaw] = await Promise.all([
+    const [rows, activationFeeMinor, perHireFee, stipendRaw, subscription] = await Promise.all([
       getDb()
         .select()
         .from(schema.pricingPlans)
@@ -33,10 +34,12 @@ async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMino
       getInternActivationFeeMinor(),
       getPerHireFeeSetting(),
       getSetting(INTERN_STIPEND_KEY),
+      getEmployerSubscriptionConfig(),
     ]);
     return {
       activationFeeMinor,
       perHireFee,
+      subscription,
       stipendBands: parseStipendBands(stipendRaw),
       // More than one row can be flagged (old writes, the seed, two saves at once): show the
       // most recently updated one as the choice, the way the next save will settle it.
@@ -96,7 +99,9 @@ function HandEditedTexts() {
 
 export default async function AdminSettingsPage() {
   const [pricing, calendarConnected] = await Promise.all([loadPricing(), checkCalendar()]);
-  const mayEdit = canWrite((await getSession())?.permissions, "/api/admin/pricing");
+  const permissions = (await getSession())?.permissions;
+  const mayEdit = canWrite(permissions, "/api/admin/pricing");
+  const mayEditSubscription = mayEdit && canWrite(permissions, "/api/admin/subscriptions");
 
   const calendar = (
       <Panel>
@@ -131,7 +136,7 @@ export default async function AdminSettingsPage() {
     <div className="space-y-8">
       <AdminPageHeader
         title="Pricing and fees"
-        subtitle="Prices are in rupees; USD is derived at ₹100 = $1. Changes save by themselves a moment after you stop typing and go live on the site as soon as they save."
+        subtitle="Prices are in rupees (the employer subscription included); USD is derived at ₹100 = $1. Changes save by themselves a moment after you stop typing and go live on the site as soon as they save."
       />
       {/* While disconnected it is the dashboard's top attention item, so it
           leads here too; once connected it sits at the end. */}
@@ -139,7 +144,7 @@ export default async function AdminSettingsPage() {
       {pricing && !mayEdit ? (
         <p className="text-sm text-text-subtle">Editing prices needs the Edit website content permission.</p>
       ) : pricing ? (
-        <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} perHireFee={pricing.perHireFee} stipendBands={pricing.stipendBands} />
+        <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} perHireFee={pricing.perHireFee} stipendBands={pricing.stipendBands} subscription={pricing.subscription} mayEditSubscription={mayEditSubscription} />
       ) : (
         <Panel>
           <AdminLoadError what="the rate card" retryHref="/admin/settings" />

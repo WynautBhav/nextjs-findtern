@@ -311,3 +311,35 @@ test("CSV: header, one line per row, IST dates, money as a decimal, formula-look
   assert.equal(csv[0], "Company,Email,Plan,Status,Started (IST),Ends (IST),Days left,Source,Amount,Currency,Order,Note");
   assert.ok(csv[1].startsWith(`"'=HYPERLINK(""x"")",hr@acme.test,Findtern Pro,active,2026-11-07,2027-11-07,355,Paid,10000.00,INR,order_a,`), csv[1]);
 });
+
+// ---- the editor's draft ------------------------------------------------------------------------------------------
+
+import { draftFromConfig, subscriptionDraftEq, usdPreviewMinor, validateSubscriptionDraft } from "./draft.ts";
+
+test("draft: rupees in, paise out; USD preview is the derived dollar price", () => {
+  const d = draftFromConfig(SUBSCRIPTION_DEFAULTS);
+  assert.deepEqual(d, { price: "10000", days: "365", enabled: true });
+  assert.deepEqual(validateSubscriptionDraft(d), { ok: true, config: SUBSCRIPTION_DEFAULTS });
+  assert.deepEqual(validateSubscriptionDraft({ price: "9999.50", days: "30", enabled: false }), { ok: true, config: { priceInrMinor: 999_950, durationDays: 30, enabled: false } });
+  assert.equal(usdPreviewMinor("10000"), 10_000);
+  assert.equal(usdPreviewMinor("12500"), 12_500);
+  assert.equal(usdPreviewMinor("abc"), null);
+  assert.equal(usdPreviewMinor("0"), null);
+});
+
+test("draft: every refusal names the field and says what to do", () => {
+  const bad = (price: string, days: string) => validateSubscriptionDraft({ price, days, enabled: true });
+  for (const [price, days, field] of [["", "365", "price"], ["0", "365", "price"], ["-5", "365", "price"], ["1e5", "365", "price"], ["10000", "", "days"], ["10000", "0", "days"], ["10000", "1096", "days"], ["10000", "1.5", "days"], ["10000", "abc", "days"], ["99999999", "365", "price"]] as const) {
+    const r = bad(price, days);
+    assert.equal(r.ok, false, `${price}/${days}`);
+    if (!r.ok) assert.equal(r.field, field, `${price}/${days}`);
+  }
+  assert.equal(bad("10000", "1095").ok, true);
+  assert.equal(bad("10000", "1").ok, true);
+});
+
+test("draft equality ignores how a number is typed", () => {
+  assert.equal(subscriptionDraftEq({ price: "10000", days: "365", enabled: true }, { price: "10000.00", days: "0365", enabled: true }), true);
+  assert.equal(subscriptionDraftEq({ price: "10000", days: "365", enabled: true }, { price: "10000", days: "365", enabled: false }), false);
+  assert.equal(subscriptionDraftEq({ price: "10000", days: "365", enabled: true }, { price: "9999", days: "365", enabled: true }), false);
+});
