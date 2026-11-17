@@ -130,3 +130,33 @@ test("promo codes: the redemptions list reads with a read permission, every chan
   }
   assert.equal(canWrite(["transactions:read"], "/admin/promo-codes"), false);
 });
+
+test("CGPA verification: candidates' permissions (interns), page and API", () => {
+  for (const path of ["/admin/cgpa-verifications", "/admin/cgpa-verifications/i1", "/api/admin/cgpa-verifications", "/api/admin/cgpa-verifications/i1/verify"]) {
+    assert.deepEqual(requiredPermissions(path, "GET"), ["interns:read"], path);
+    assert.deepEqual(requiredPermissions(path, "POST"), ["interns:write"], path);
+  }
+  assert.equal(allows(["interns:read"], requiredPermissions("/api/admin/cgpa-verifications/i1/verify", "POST")), false, "read-only roles cannot verify");
+  assert.equal(allows(["interns:write"], requiredPermissions("/api/admin/cgpa-verifications/i1/verify", "POST")), true);
+  assert.equal(allows(["companies:write", "transactions:write"], requiredPermissions("/api/admin/cgpa-verifications/i1/verify", "POST")), false);
+  assert.equal(canWrite(["interns:read"], "/admin/cgpa-verifications"), false);
+  assert.equal(canWrite(["interns:write"], "/admin/cgpa-verifications"), true);
+});
+
+test("employer subscriptions are money: transactions permissions, page and API", () => {
+  for (const path of ["/admin/subscriptions", "/api/admin/subscriptions", "/api/admin/subscriptions/e1/grant", "/api/admin/subscriptions/e1/revoke"]) {
+    assert.deepEqual(requiredPermissions(path, "GET"), ["transactions:read"], path);
+    assert.deepEqual(requiredPermissions(path, "POST"), ["transactions:write"], path);
+  }
+  assert.equal(allows(["interns:write", "companies:write"], requiredPermissions("/api/admin/subscriptions/e1/grant", "POST")), false);
+  assert.equal(allows(["transactions:read"], requiredPermissions("/api/admin/subscriptions/e1/grant", "POST")), false);
+  assert.equal(allows(["transactions:write"], requiredPermissions("/api/admin/subscriptions/e1/grant", "POST")), true);
+  assert.equal(canWrite(["transactions:read"], "/admin/subscriptions"), false);
+  assert.equal(canWrite(["transactions:write"], "/admin/subscriptions"), true);
+});
+
+test("the expired-offers CSV needs interns:read and nothing else gets it", () => {
+  assert.deepEqual(requiredPermissions("/api/admin/expired", "GET"), ["interns:read"]);
+  assert.equal(allows(["interns:read"], requiredPermissions("/api/admin/expired", "GET")), true);
+  assert.equal(allows(["transactions:read", "companies:read"], requiredPermissions("/api/admin/expired", "GET")), false);
+});

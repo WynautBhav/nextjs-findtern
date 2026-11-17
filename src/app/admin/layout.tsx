@@ -3,11 +3,13 @@ import { redirect } from "next/navigation";
 import { count, eq } from "drizzle-orm";
 import {
   ArrowLeftRight,
+  BadgeCheck,
   BarChart3,
   Bell,
   Briefcase,
   Building2,
   CircleUserRound,
+  ClipboardCheck,
   CreditCard,
   Globe,
   GraduationCap,
@@ -36,6 +38,7 @@ import { allows, requiredPermissions } from "@/lib/admin/permissions";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { badgeFor, settleCount } from "@/lib/admin/queue-badge";
+import { pendingCgpaCount } from "@/lib/cgpa-verification-db";
 import { loadQueueCounts } from "@/lib/admin/queue-counts";
 import { adminFullName } from "@/lib/admin/admin-name";
 
@@ -70,6 +73,7 @@ const NAV: AdminNavGroup[] = [
     title: "People and work",
     items: [
       { href: "/admin/interns", label: "Candidates", icon: <Users /> },
+      { href: "/admin/cgpa-verifications", label: "CGPA checks", icon: <ClipboardCheck /> },
       { href: "/admin/users", label: "Users", icon: <UserCheck /> },
       { href: "/admin/companies", label: "Companies", icon: <Building2 /> },
       { href: "/admin/colleges", label: "Colleges", icon: <GraduationCap /> },
@@ -81,6 +85,7 @@ const NAV: AdminNavGroup[] = [
     title: "Finance",
     items: [
       { href: "/admin/orders", label: "Orders", icon: <ShoppingBag /> },
+      { href: "/admin/subscriptions", label: "Subscriptions", icon: <BadgeCheck /> },
       { href: "/admin/intern-invoices", label: "Intern invoices", icon: <Receipt /> },
       { href: "/admin/transactions", label: "Transactions", icon: <ArrowLeftRight /> },
       { href: "/admin/refunds", label: "Refunds", icon: <Undo2 /> },
@@ -142,7 +147,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const hasItem = (href: string) => groups.some((g) => g.items.some((i) => i.href === href));
 
   // Every figure is read independently: a failed one is `null` and shows nothing, never 0.
-  const [unreadMessages, adminName, queue] = await Promise.all([
+  const [unreadMessages, adminName, queue, cgpaPending] = await Promise.all([
     hasItem("/admin/messages") && db
       ? settleCount(async () => {
           const [unread] = await db.select({ value: count() }).from(schema.contactMessages).where(eq(schema.contactMessages.isRead, false));
@@ -157,6 +162,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       pipeline: hasItem("/admin/proposal-tracker"),
       collegePayouts: hasItem("/admin/colleges"),
     }),
+    // Interns waiting for Findtern to check their CGPA; a failed read is 0 inside, so no badge rather than a broken rail.
+    hasItem("/admin/cgpa-verifications") ? settleCount(pendingCgpaCount) : null,
   ]);
 
   // The rail is the live queue: the badge on each item is the number the dashboard's "Needs you" list
@@ -167,6 +174,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     "/admin/interns": { count: queue.candidates, note: "awaiting a score" },
     "/admin/proposal-tracker": { count: queue.pipeline, note: "need action" },
     "/admin/colleges": { count: queue.collegePayouts, note: "withdrawals to pay" },
+    "/admin/cgpa-verifications": { count: cgpaPending, note: "to verify" },
   };
   const withBadges = groups.map((g) => ({
     ...g,
