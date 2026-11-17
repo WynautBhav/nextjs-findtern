@@ -138,17 +138,19 @@ export function DmyDateInput({
               aria-label="Choose a date"
               className="z-[70] rounded-apple-lg border border-ink-200 bg-white p-3 shadow-lg outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-reduce:animate-none"
             >
-              <DayCalendar
-                selected={toIso(text)}
-                startDay={toIso(text) || nextOpenDay(today, isDisabled)}
-                today={today}
-                isDisabled={isDisabled}
-                note="Greyed-out days are unavailable."
-                onPick={(iso) => {
-                  commit(toDmy(iso));
-                  setOpen(false);
-                }}
-              />
+              {today ? (
+                <DayCalendar
+                  selected={toIso(text)}
+                  startDay={toIso(text) || nextOpenDay(today, isDisabled)}
+                  today={today}
+                  isDisabled={isDisabled}
+                  note="Greyed-out days are unavailable."
+                  onPick={(iso) => {
+                    commit(toDmy(iso));
+                    setOpen(false);
+                  }}
+                />
+              ) : null}
             </Popover.Content>
           </Popover.Portal>
         </Popover.Root>
