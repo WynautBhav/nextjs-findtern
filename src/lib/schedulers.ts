@@ -2,6 +2,7 @@ import { and, eq, gte, lt, lte, or, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { readSkills, scoreOf } from "@/lib/employer-candidates";
+import { activeProject } from "@/lib/admin/scope";
 import { notify } from "@/lib/notify";
 import { sendPaymentReminders } from "@/lib/payment-reminders-job";
 import { hasFeedbackText } from "@/lib/interview-feedback";
@@ -293,7 +294,7 @@ async function employerProfileNudges(now: Date) {
  * Daily talent spotlight (SYS-07), the legacy job (notificationScheduler.ts
  * 100-195): for each onboarded employer, the top 5 candidates by skill
  * overlap with their projects, then by Findtern Score. Two deliberate
- * differences: only active projects of active employers count, and the
+ * differences: only live (published or legacy active) projects of active employers count, and the
  * notification carries candidate ids only. Legacy also put the interns'
  * full names in it, which showed identities before hire. Hidden profiles
  * are never spotlighted.
@@ -307,7 +308,8 @@ async function talentSpotlight(now: Date) {
     .innerJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
     .where(
       and(
-        eq(schema.projects.status, "active"),
+        // Published (lifecycle) or the legacy active; a paused, draft or closed project is not being hired for.
+        activeProject(),
         eq(schema.employers.isActive, true),
         eq(schema.employers.onboardingCompleted, true),
       ),
