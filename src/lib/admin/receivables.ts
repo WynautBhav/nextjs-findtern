@@ -241,6 +241,10 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
   // Stipends are candidate-side; a "company" filter empties them.
   if (filter.payables !== "company") {
     for (const p of input.payouts) {
+      // Only paid and pending payouts are money out or owed. A failed one is neither: the Payouts page
+      // counts only 'pending', and its month is listed again as an upcoming stipend below (stipendDues).
+      const state = String(p.status).toLowerCase();
+      if (state !== "paid" && state !== "pending") continue;
       const scheduled = (p.raw as Record<string, unknown> | null)?.scheduledFor;
       // paidAt / createdAt are instants (India day); scheduledFor is already a date.
       const date = p.paidAt ? istDayKey(p.paidAt) : typeof scheduled === "string" && day(scheduled) ? day(scheduled) : istDayKey(p.createdAt);
@@ -250,7 +254,7 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
           id: `payout:${p.id}`,
           date: date!,
           source: "candidate",
-          status: p.status === "paid" ? "paid" : "pending",
+          status: state === "paid" ? "paid" : "pending",
           description: p.kind === "completion_bonus" ? "Completion bonus" : "Stipend payout",
           companyName: null,
           candidateName: input.internName(p.internId),
