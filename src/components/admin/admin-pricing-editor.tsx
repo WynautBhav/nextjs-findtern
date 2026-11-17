@@ -425,7 +425,7 @@ function StipendPanel({ initial }: { initial: StipendBands }) {
         </ul>
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--admin-rule)] pt-4">
           <p className="text-xs text-ink-600">
-            Fixed, not editable: the score ranges above, and USD at ₹{INR_PER_USD} = $1.
+            The score ranges and the USD rate (₹{INR_PER_USD} = $1) are fixed.
             {dirty ? <span className="ml-2 rounded-full bg-accent-100 px-2 py-0.5 font-medium text-accent-700">Unsaved changes</span> : null}
           </p>
           <SaveButton state={state} />
