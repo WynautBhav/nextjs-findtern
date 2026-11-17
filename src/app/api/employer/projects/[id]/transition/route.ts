@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { isTransitionConflict, planTransition } from "@/lib/projects/transition";
+import { revalidatePublicRoles } from "@/lib/projects/revalidate-public";
 
 const bodySchema = z.object({ to: z.string().min(1), reason: z.string().max(1000).optional() });
 
@@ -39,5 +40,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (isTransitionConflict(updated.length)) {
     return NextResponse.json({ error: "This project just changed. Reload and try again." }, { status: 409 });
   }
+  revalidatePublicRoles();
   return NextResponse.json({ ok: true, status: plan.to });
 }

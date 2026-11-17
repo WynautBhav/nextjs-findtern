@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { notify } from "@/lib/notify";
 import { tryPublicOrigin } from "@/lib/origin";
 import { planTakedown } from "./takedown";
+import { revalidatePublicRoles } from "./revalidate-public";
 import { lockOpenOfferRows, notifyWithdrawnOffers, withdrawOpenOffers } from "./takedown-withdraw";
 
 /**
@@ -81,6 +82,7 @@ export async function applyTakedown(input: {
   if (out.kind === "noop") return NextResponse.json({ ok: true, takenDown: out.down, unchanged: true });
 
   const down = input.action === "takedown";
+  revalidatePublicRoles();
   const name = out.project.projectName;
   const count = out.withdrawn.length;
   const withdrawnNote = count > 0 ? ` ${count === 1 ? "1 open offer on it was" : `${count} open offers on it were`} withdrawn.` : "";
