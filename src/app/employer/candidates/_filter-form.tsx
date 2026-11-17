@@ -20,7 +20,7 @@ import { SlidersHorizontal } from "lucide-react";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
 /** Range filters at zero mean "any" and are left out of the URL. */
-const ZERO_IS_ANY = /^(min|r_[a-z]+)$/;
+const ZERO_IS_ANY = /^(min|cgpaMin|r_[a-z]+)$/;
 const DESKTOP = "(min-width: 1024px)";
 
 let refocus: { selector: string; at: number; sheet: boolean } | null = null;
@@ -76,12 +76,12 @@ export function FilterPanel({
     const active = document.activeElement;
     const inForm = (active instanceof HTMLInputElement || active instanceof HTMLSelectElement) && el.contains(active) && (active.name || active.id);
     // By name, or by id for a control with no name (the city box: its value travels in a hidden input).
-    const selector =
-      inForm && active
-        ? (active as HTMLInputElement).name
-          ? `[name="${CSS.escape((active as HTMLInputElement).name)}"]:not([type="hidden"])`
-          : `#${CSS.escape(active.id)}`
-        : "";
+    // A repeated checkbox (the colleges) is found again by its value, or focus would jump to the first of them.
+    const named = (a: HTMLInputElement) =>
+      a.type === "checkbox" && a.value
+        ? `[name="${CSS.escape(a.name)}"][value="${CSS.escape(a.value)}"]:not([type="hidden"])`
+        : `[name="${CSS.escape(a.name)}"]:not([type="hidden"])`;
+    const selector = inForm && active ? ((active as HTMLInputElement).name ? named(active as HTMLInputElement) : `#${CSS.escape(active.id)}`) : "";
     refocus = selector || openRef.current ? { selector, at: Date.now(), sheet: openRef.current } : null;
     const next = new URLSearchParams();
     for (const [key, raw] of new FormData(el).entries()) {

@@ -37,6 +37,18 @@ export function proRequestOf(params: { cgpaMin?: Raw; cgpaVerified?: Raw; colleg
   };
 }
 
+/**
+ * The URL pairs for a request (the college order rides in `sort`, written by the caller). One `colleges`
+ * parameter per college, so a name with a comma, an ampersand or non-Latin letters survives a round trip.
+ */
+export function proQueryPairs(r: ProRequest): [string, string][] {
+  const out: [string, string][] = [];
+  if (r.cgpaMin > 0) out.push(["cgpaMin", String(r.cgpaMin)]);
+  if (r.cgpaVerified) out.push(["cgpaVerified", "1"]);
+  for (const college of r.colleges) out.push(["colleges", college]);
+  return out;
+}
+
 export const hasProRequest = (r: ProRequest): boolean => hasProCriteria(r) || r.collegeSort !== null;
 
 /**

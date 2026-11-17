@@ -153,6 +153,7 @@ export default async function CandidatesPage({
             effectiveSkills={data.effectiveSkills}
             projectCity={projectApplied?.city ?? ""}
             projectToggle={projectToggle}
+            pro={data.pro}
           />
         </div>
 

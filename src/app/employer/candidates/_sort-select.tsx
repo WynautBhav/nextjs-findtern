@@ -21,7 +21,7 @@ export function SortSelect({
   prefix = "Sort: ",
 }: {
   value: string;
-  options: { value: string; label: string; href: string }[];
+  options: { value: string; label: string; href: string; /** Shown, not choosable (a locked Findtern Pro sort). */ disabled?: boolean }[];
   className?: string;
   id?: string;
   label?: string;
@@ -80,7 +80,7 @@ export function SortSelect({
         className={cn(fieldClass, "min-h-11 w-auto min-w-0 max-w-full truncate pr-8 sm:min-h-10", className)}
       >
         {options.map((o) => (
-          <option key={o.value} value={o.value}>
+          <option key={o.value} value={o.value} disabled={o.disabled}>
             {`${prefix}${o.label}`}
           </option>
         ))}

@@ -10,7 +10,7 @@ import test, { beforeEach } from "node:test";
 
 register("./admin/test-support/sem-hooks.mjs", import.meta.url);
 const fakes = (await import("./admin/test-support/sem-fakes.mjs")) as typeof import("./admin/test-support/sem-fakes.mjs");
-const { proAccess, enforcePro, proRequestOf, EMPTY_PRO_REQUEST } = await import("./candidate-pro-access.ts");
+const { proAccess, enforcePro, proRequestOf, proQueryPairs, EMPTY_PRO_REQUEST } = await import("./candidate-pro-access.ts");
 const { employerSubscription } = await import("./subscription/entitlement-db.ts");
 
 type Fake = { rows: Record<string, unknown>; dbDown: boolean; noDb: boolean; failSelect: string | null };
@@ -156,4 +156,35 @@ test("proRequestOf reads and bounds the URL values", () => {
   assert.equal(proRequestOf({ cgpaVerified: ["0", "1"] }).cgpaVerified, true);
   assert.equal(proRequestOf({ cgpaVerified: "0" }).cgpaVerified, false);
   assert.equal(proRequestOf({ sort: ["coding", "college_desc"] }).collegeSort, "desc");
+});
+
+/* ── URL round trip ──────────────────────────────────────────────────────────────────────────────── */
+
+/** What Next hands the page: a repeated key becomes an array. */
+const asNextParams = (qs: string) => {
+  const out: Record<string, string | string[]> = {};
+  for (const [k, v] of new URLSearchParams(qs)) out[k] = k in out ? [...([] as string[]).concat(out[k]), v] : v;
+  return out;
+};
+const roundTrip = (r: ReturnType<typeof proRequestOf>) => {
+  const qs = new URLSearchParams(proQueryPairs(r)).toString();
+  return { qs, back: proRequestOf(asNextParams(qs)) };
+};
+
+test("colleges with commas, ampersands, quotes, plus signs and non-Latin letters round-trip whole", () => {
+  const colleges = ["Indian Institute of Technology, Bombay", "A & B College of Arts", "St. Xavier's \"Autonomous\" College", "C++ Academy + Labs", "भारतीय प्रौद्योगिकी संस्थान", "Universität Zürich", "50% Quota Institute #1", "Ünï=University?x=1"];
+  const { qs, back } = roundTrip(proRequestOf({ cgpaMin: "7.5", cgpaVerified: "1", colleges }));
+  assert.deepEqual(back.colleges, colleges);
+  assert.equal(back.cgpaMin, 7.5);
+  assert.equal(back.cgpaVerified, true);
+  assert.ok(!qs.includes(" ") && !qs.includes("&&"), qs);
+});
+
+test("one college round-trips as a single value, none as nothing", () => {
+  assert.deepEqual(roundTrip(proRequestOf({ colleges: "Anna University" })).back.colleges, ["Anna University"]);
+  assert.equal(roundTrip(EMPTY_PRO_REQUEST).qs, "");
+});
+
+test("a hand-written link with a comma list reads as ONE college (names contain commas), never split", () => {
+  assert.deepEqual(proRequestOf({ colleges: "IIT Bombay,IIT Delhi" }).colleges, ["IIT Bombay,IIT Delhi"]);
 });

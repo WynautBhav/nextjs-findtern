@@ -162,11 +162,17 @@ export function RatingSlider({
   label,
   icon,
   defaultValue,
+  disabled = false,
+  describedBy,
 }: {
   name: string;
   label: string;
   icon?: React.ReactNode;
   defaultValue: number;
+  /** Locked (Findtern Pro): not focusable, not submitted. */
+  disabled?: boolean;
+  /** The element that says why it is locked. */
+  describedBy?: string;
 }) {
   const [value, setValue] = useState(defaultValue);
   const id = `filter-${name}`;
@@ -193,7 +199,10 @@ export function RatingSlider({
         value={value}
         onChange={(e) => setValue(Number(e.target.value))}
         aria-valuetext={value > 0 ? `${value.toFixed(1)} or more` : "Any"}
-        className="mt-1 h-6 w-full cursor-pointer accent-ink-900"
+        disabled={disabled}
+        aria-disabled={disabled || undefined}
+        aria-describedby={describedBy}
+        className="mt-1 h-6 w-full cursor-pointer accent-ink-900 disabled:cursor-not-allowed disabled:opacity-60"
       />
     </div>
   );
