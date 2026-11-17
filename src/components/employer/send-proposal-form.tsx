@@ -133,6 +133,8 @@ export function SendProposalForm({
   const held = heldProjectIds.includes(projectId);
   const projectTimezone = (id: string) => projects.find((p) => p.id === id)?.timezone || companyTimezone;
   const [timezone, setTimezone] = useState(projectTimezone(firstProject?.id ?? ""));
+  // A project that sets a timezone owns it (feedback sheet 2, row 7): the field then offers only that zone.
+  const lockedZone = projects.find((p) => p.id === projectId)?.timezone || null;
   const modes = MODES.filter((m) => offerableModes(preference).includes(m.value));
   const allowedMode = (m: string | null | undefined) => (m && modes.some((x) => x.value === m) ? m : null);
   const [roleTitle, setRoleTitle] = useState(firstProject?.projectName ?? "");
@@ -554,9 +556,17 @@ export function SendProposalForm({
             <SelectField
               id="timezone"
               label="Timezone"
-              hint="The working hours and interview slots use this zone."
+              hint={
+                lockedZone
+                  ? "Set by the project: working hours and interview slots use it. Change it on the project."
+                  : "The working hours and interview slots use this zone."
+              }
               value={timezone}
-              options={TIMEZONES.map((t) => ({ value: t.id, label: t.group ? `── ${t.label} ──` : t.label, disabled: t.group }))}
+              options={TIMEZONES.filter((t) => !lockedZone || t.id === timezone || t.id === lockedZone).map((t) => ({
+                value: t.id,
+                label: t.group ? `── ${t.label} ──` : t.label,
+                disabled: t.group,
+              }))}
               onChange={setTimezone}
             />
             <SelectField

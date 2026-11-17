@@ -205,3 +205,22 @@ export function shiftInIst(from: string, to: string, tz: string, day?: string | 
   const next = dayOf(end) !== dayOf(start) ? " (next day)" : "";
   return `${time(start)} – ${time(end)}${next} IST`;
 }
+
+/** Zone used when nothing better is known: Findtern's own, India. */
+export const DEFAULT_ZONE = "Asia/Kolkata";
+
+/**
+ * The timezone a project's times are shown and entered in (feedback sheet 2,
+ * row 7): the project's own field first. The fallbacks (an interview's stored
+ * zone, then the company's location) apply only to a project that sets none,
+ * or one that was deleted. Entries that are blank, group headers ("group-asia")
+ * or not a zone this runtime knows are skipped, so one bad row never renders
+ * a blank or throws inside Intl. Never the viewer's browser zone.
+ */
+export function projectZone(projectTz: string | null | undefined, ...fallbacks: (string | null | undefined)[]): string {
+  for (const tz of [projectTz, ...fallbacks]) {
+    const z = (tz ?? "").trim();
+    if (z && !z.startsWith("group-") && isKnownTimezone(z)) return z;
+  }
+  return DEFAULT_ZONE;
+}

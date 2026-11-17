@@ -7,7 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
-import { timezoneForLocation, wallTimeToUtc } from "@/lib/timezones";
+import { projectZone, timezoneForLocation, wallTimeToUtc } from "@/lib/timezones";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { hiredProposalSql } from "@/lib/employer-visibility";
 import { hasDuplicateSlots, hasSlotTooFarAhead, isBlockingInterview, isQuarterHourWall } from "@/lib/employer-interview-rules";
@@ -37,15 +37,28 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Offer three time slots." }, { status: 400 });
   const db = getDb();
-  let timezone = parsed.data.timezone;
-  if (!timezone) {
+  // The meeting runs on the PROJECT's clock (feedback sheet 2, row 7): the project's zone is authoritative, so
+  // what the employer types and what the intern reads cannot differ. A project with no zone (or no project)
+  // takes the zone sent, then the company's own.
+  let projectTz: string | null = null;
+  if (parsed.data.projectId) {
+    const [p] = await db
+      .select({ timezone: schema.projects.timezone })
+      .from(schema.projects)
+      .where(and(eq(schema.projects.id, parsed.data.projectId), eq(schema.projects.employerId, id)))
+      .limit(1);
+    projectTz = p?.timezone ?? null;
+  }
+  let companyTz: string | null = null;
+  if (!projectTz && !parsed.data.timezone) {
     const [employer] = await db
       .select({ country: schema.employers.country, state: schema.employers.state })
       .from(schema.employers)
       .where(eq(schema.employers.id, id))
       .limit(1);
-    timezone = timezoneForLocation(employer ?? {});
+    companyTz = timezoneForLocation(employer ?? {});
   }
+  const timezone = projectTz ? projectZone(projectTz, parsed.data.timezone, companyTz) : (parsed.data.timezone ?? companyTz ?? projectZone(null));
   const b = { ...parsed.data, timezone };
   if (![b.slot1, b.slot2, b.slot3].every(isQuarterHourWall)) {
     return NextResponse.json({ error: "Slots start on the hour or at :15, :30 or :45." }, { status: 400 });
@@ -135,8 +148,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // The company stays hidden from the intern until it hires them.
       companyName: (await hiredBy(db, id, b.internId)) ? (await employerNames(id)).company : "A company on Findtern",
       project: projectName,
-      // The intern reads every time in IST, like the interviews page (INW-09).
-      slots: slots.map((s) => formatIst(s, { year: true })),
+      // Each time carries the project zone it was booked in, labelled.
+      slots: slots.map((s) => formatIst(s, { year: true, zone: b.timezone })),
     }),
   });
   return NextResponse.json({ interview }, { status: 201 });

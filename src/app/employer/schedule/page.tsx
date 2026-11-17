@@ -26,6 +26,7 @@ import { buttonClass } from "@/components/ui/button";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { formatSlotDay } from "@/lib/format";
+import { projectZone } from "@/lib/timezones";
 import { ProposalTabs } from "@/components/employer/section-tabs";
 import { InterviewActions } from "@/components/employer/interview-actions";
 import { cn } from "@/lib/utils";
@@ -91,6 +92,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
   const names = new Map<string, string>();
   const initials = new Map<string, string>();
   const projectNames = new Map<string, string>();
+  const projectZones = new Map<string, string | null>();
   try {
     const db = getDb();
     rows = await db
@@ -111,7 +113,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
         : Promise.resolve([]),
       projectIds.length
         ? db
-            .select({ id: schema.projects.id, projectName: schema.projects.projectName })
+            .select({ id: schema.projects.id, projectName: schema.projects.projectName, timezone: schema.projects.timezone })
             .from(schema.projects)
             .where(inArray(schema.projects.id, projectIds))
         : Promise.resolve([]),
@@ -123,7 +125,10 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
       initials.set(u.id, ini === "?" ? "C" : ini);
       names.set(u.id, displayNameOf({ id: u.id, fullName: `${first} ${last}`.trim() || "Candidate", initials: ini }, unlocked.has(u.id)));
     }
-    for (const p of projects) projectNames.set(p.id, p.projectName);
+    for (const p of projects) {
+      projectNames.set(p.id, p.projectName);
+      projectZones.set(p.id, p.timezone);
+    }
   } catch (err) {
     console.error("[employer/schedule] load failed", err);
     const retryQs = new URLSearchParams(Object.entries(sp).filter((e): e is [string, string] => typeof e[1] === "string" && e[1] !== ""));
@@ -140,7 +145,8 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
   const all = rows.map((iv) => {
     const stage = interviewStage(iv, now);
     const when = meetingTime(iv);
-    const tz = iv.timezone || "Asia/Kolkata";
+    // Each meeting reads on its project's clock (feedback sheet 2, row 7); the zone it was booked in only if the project has none.
+    const tz = projectZone(iv.projectId ? projectZones.get(iv.projectId) : null, iv.timezone);
     return {
       iv,
       stage,

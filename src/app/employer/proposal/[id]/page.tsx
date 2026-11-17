@@ -16,7 +16,7 @@ import { fullTimeFeeMinor, hireFeeMinor } from "@/lib/checkout";
 import { feeDisplay } from "@/lib/fee-display";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { laptopLabel, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
-import { shiftInIst } from "@/lib/timezones";
+import { projectZone, shiftInIst } from "@/lib/timezones";
 import type { PlaceOfSupply } from "@/lib/gst";
 import { offerBreakdown, offerPlace } from "@/lib/offer-breakdown";
 import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
@@ -85,6 +85,7 @@ export default async function EmployerProposalDetail({
   let initials = "C";
   let unlocked = false;
   let projectName: string | null = null;
+  let projectTimezone: string | null = null;
   let preference: WorkPreference = { modes: [], cities: [] };
   let hasLaptop: boolean | null = null;
   let photoUrl: string | null = null;
@@ -96,6 +97,7 @@ export default async function EmployerProposalDetail({
         firstName: schema.users.firstName,
         lastName: schema.users.lastName,
         projectName: schema.projects.projectName,
+        projectTimezone: schema.projects.timezone,
       })
       .from(schema.proposals)
       .innerJoin(schema.users, eq(schema.proposals.internId, schema.users.id))
@@ -112,6 +114,7 @@ export default async function EmployerProposalDetail({
       internName = unlocked ? `${first} ${last}`.trim() || "Candidate" : ini === "?" ? "Candidate" : `Candidate ${ini}`;
     }
     projectName = row?.projectName ?? null;
+    projectTimezone = row?.projectTimezone ?? null;
     const [pref] = await db
       .select({
         locationTypes: schema.internOnboarding.locationTypes,
@@ -410,7 +413,7 @@ export default async function EmployerProposalDetail({
               <h2 id="proposal-interview-h" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
                 Interview
               </h2>
-              <p className="nums mt-1 text-sm text-ink-600">{formatSlotTime(new Date(meetingTime(interview) ?? 0), interview.timezone || "Asia/Kolkata")}</p>
+              <p className="nums mt-1 text-sm text-ink-600">{formatSlotTime(new Date(meetingTime(interview) ?? 0), projectZone(projectTimezone, interview.timezone))}</p>
               <div className="mt-3">
                 <JoinMeetingButton interviewId={interview.id} link={interview.meetingLink} ready={Boolean(interview.meetingLink)} variant="outline" />
               </div>
@@ -486,6 +489,7 @@ export default async function EmployerProposalDetail({
                     place={place}
                     perHireMinor={shownFeeMinor}
                     fee={fee}
+                    projectTimezone={projectTimezone}
                     shortOnly={score > 0 && score < 6}
                     hasLaptop={hasLaptop}
                     initial={{

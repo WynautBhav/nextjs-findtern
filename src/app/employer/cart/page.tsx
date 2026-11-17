@@ -213,7 +213,7 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
         ? db.select().from(schema.internOnboarding).where(inArray(schema.internOnboarding.userId, internIds))
         : Promise.resolve([] as (typeof schema.internOnboarding.$inferSelect)[]),
       db
-        .select({ id: schema.projects.id, projectName: schema.projects.projectName, status: schema.projects.status })
+        .select({ id: schema.projects.id, projectName: schema.projects.projectName, status: schema.projects.status, timezone: schema.projects.timezone })
         .from(schema.projects)
         .where(and(eq(schema.projects.employerId, uid), inArray(schema.projects.id, projectIds))),
     ]);
@@ -234,6 +234,7 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
         id: item.id,
         projectId: item.projectId,
         projectName: project?.projectName ?? "Project",
+        projectTimezone: project?.timezone ?? null,
         // Legacy writes "inactive"; earlier new-app builds wrote "closed" (EMH-03).
         projectClosed: ["closed", "inactive", "archived"].includes(projectStatus),
         createdAt: item.createdAt ? item.createdAt.toISOString() : null,

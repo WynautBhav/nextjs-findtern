@@ -20,7 +20,7 @@ import { isProjectOpen } from "@/lib/project-locations";
 import { offerState } from "@/components/employer/proposal-state";
 import { proposalBucket } from "@/components/employer/proposal-bucket";
 import { parseOffer } from "@/lib/offer";
-import { timezoneForLocation } from "@/lib/timezones";
+import { projectZone, timezoneForLocation } from "@/lib/timezones";
 import { formatSlotTime } from "@/lib/format";
 import { buildActivity, buildFunnel, buildProjectStats, untilLabel, type Activity as ActivityData, type DashProposal, type Funnel as FunnelData } from "@/lib/employer-dashboard";
 import { Hero, type HeroQueueItem } from "@/components/employer/dashboard/hero";
@@ -222,7 +222,8 @@ export default async function EmployerDashboard() {
       next && nextAt
         ? {
             with: data.nextWith ? { initials: data.nextWith.initials, photoUrl: data.nextWith.photoUrl } : null,
-            whenLabel: formatSlotTime(nextAt, data.timezone),
+            // The meeting's own project decides the clock (feedback sheet 2, row 7), not the company's location.
+            whenLabel: formatSlotTime(nextAt, projectZone(data.projects.find((p) => p.id === next.projectId)?.timezone, next.timezone, data.timezone)),
             untilLabel: untilLabel(nextAt),
             projectName: data.nextWith?.projectName ?? null,
             joinLink: joinLive && next.meetingLink ? next.meetingLink : null,

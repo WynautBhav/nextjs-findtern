@@ -88,6 +88,7 @@ export function ProposalOfferForm({
   place = null,
   perHireMinor = null,
   fee,
+  projectTimezone = null,
 }: {
   proposalId: string;
   /** The candidate already accepted: saving asks them to accept again. */
@@ -106,6 +107,8 @@ export function ProposalOfferForm({
   perHireMinor?: number | null;
   /** How that fee is shown (struck through with FREE when waived); wins over `perHireMinor`. */
   fee?: FeeDisplay;
+  /** The project's own timezone: when it sets one, the offer runs on it and the field offers only that zone. */
+  projectTimezone?: string | null;
   /** Score below 6: at most two months. */
   shortOnly?: boolean;
 }) {
@@ -123,7 +126,7 @@ export function ProposalOfferForm({
   const breakdown = offerBreakdown({ currency, hourlyRateMinor: initial.hourlyRateMinor ?? null, hours, perHireMinor, fee, place });
   const modes = MODE_OPTIONS.filter((m) => offerableModes(preference).includes(m.value) || m.value === initial.mode);
   const [mode, setMode] = useState(initial.mode || modes[0]?.value || "remote");
-  const [timezone, setTimezone] = useState(initial.timezone || "Asia/Kolkata");
+  const [timezone, setTimezone] = useState(projectTimezone || initial.timezone || "Asia/Kolkata");
   const [city, setCity] = useState(initial.city ?? "");
   const [state, setState] = useState(initial.state ?? "");
   const week = workingDaysPerWeek(schedule);
@@ -376,7 +379,7 @@ export function ProposalOfferForm({
         <label className="col-span-2 block">
           <span className={LABEL}>Timezone</span>
           <select value={timezone} onChange={(e) => setTimezone(e.target.value)} className={INPUT}>
-            {TIMEZONES.map((t) =>
+            {TIMEZONES.filter((t) => !projectTimezone || t.id === timezone || t.id === projectTimezone).map((t) =>
               t.group ? (
                 <option key={t.id} value={t.id} disabled>
                   ── {t.label} ──

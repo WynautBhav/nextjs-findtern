@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notify } from "@/lib/notify";
 import { learnField } from "@/lib/proposal-copy";
+import { projectZone } from "@/lib/timezones";
 import { hasOpenOrderFor } from "@/lib/payments";
 import { takedownBlock } from "@/lib/projects/takedown";
 import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
@@ -119,6 +120,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const { message, ...edits } = parsed.data.offer;
+  // The offer's zone is the project's (feedback sheet 2, row 7): an edit cannot move it elsewhere.
+  if (edits.timezone !== undefined && proposal.projectId) {
+    const [pz] = await db
+      .select({ timezone: schema.projects.timezone })
+      .from(schema.projects)
+      .where(eq(schema.projects.id, proposal.projectId))
+      .limit(1);
+    if (pz?.timezone) edits.timezone = projectZone(pz.timezone, edits.timezone);
+  }
   // No "candidate's own laptop" for someone without one (EMH-18).
   if (edits.laptop !== undefined && normalizeLaptop(edits.laptop) === "candidate") {
     const [ob] = await db

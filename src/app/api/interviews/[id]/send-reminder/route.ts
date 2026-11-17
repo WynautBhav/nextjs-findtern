@@ -5,6 +5,7 @@ import { getDb, schema } from "@/lib/db";
 import { hiredProposalSql } from "@/lib/employer-visibility";
 import { emails } from "@/lib/emails";
 import { formatSlotTime } from "@/lib/format";
+import { interviewZone, loadProjectZones } from "@/lib/project-zones";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { employerNoShow, hasNoSlotsToPick, isMeetingOver, isStaleInterview, normalizeMeetingLink, reminderWindow } from "@/lib/employer-interview-rules";
@@ -42,7 +43,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const start = interview.selectedSlot ? [interview.slot1, interview.slot2, interview.slot3][interview.selectedSlot - 1] : null;
-  const when = start ? formatSlotTime(start, interview.timezone) : null;
+  const when = start ? formatSlotTime(start, interviewZone(interview, await loadProjectZones(db, [interview.projectId]))) : null;
   // The intern sees the company's name only once it has hired them (same
   // rule as booking, select-slot/route.ts).
   const [hire] = await db

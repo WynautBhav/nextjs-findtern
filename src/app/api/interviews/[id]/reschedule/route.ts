@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { emails, icsInvite } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
 import { internFirstName, notify } from "@/lib/notify";
+import { loadProjectZones, interviewZone } from "@/lib/project-zones";
 import { wallTimeToUtc } from "@/lib/timezones";
 import { hasDuplicateSlots, hasSlotTooFarAhead, isQuarterHourWall } from "@/lib/employer-interview-rules";
 import { CALENDAR_TOKEN_OWNER, calendarConfig, refreshAccessToken } from "@/lib/google";
@@ -42,7 +43,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!wanted.every(isQuarterHourWall)) {
     return NextResponse.json({ error: "Slots start on the hour or at :15, :30 or :45." }, { status: 400 });
   }
-  const slots = wanted.map((s) => wallTimeToUtc(s, interview.timezone || "Asia/Kolkata"));
+  // Wall-clock times are the project's (what the screen shows), not whatever zone the first booking used.
+  const zone = interviewZone(interview, await loadProjectZones(db, [interview.projectId]));
+  const slots = wanted.map((s) => wallTimeToUtc(s, zone));
   if (slots.some((s) => s!.getTime() < Date.now())) {
     return NextResponse.json({ error: "Slots must be in the future" }, { status: 400 });
   }
