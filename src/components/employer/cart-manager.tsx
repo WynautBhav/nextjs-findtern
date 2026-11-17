@@ -28,11 +28,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { RowMenu } from "@/components/app/row-menu";
+import { projectZone } from "@/lib/timezones";
 
 export type CartLineItem = {
   id: string;
   projectId: string;
   projectName: string;
+  /** The project's own timezone; meetings on it are booked in this zone. Null: the company's. */
+  projectTimezone?: string | null;
   /** The project is closed (inactive): no new meetings or proposals on it. */
   projectClosed?: boolean;
   createdAt: string | null;
@@ -143,8 +146,10 @@ export function CartManager({
   function openMeeting(line: CartLineItem) {
     // Three suggested slots: the next quarter hour, then +1 h and +2 h
     // (bug sheet 7 S2 r2). Editable.
-    setTimezone(companyTimezone);
-    setSlots(suggestedSlots(nowMs(), companyTimezone));
+    // The project's zone, else the company's (feedback sheet 2, row 7).
+    const zone = projectZone(line.projectTimezone, companyTimezone);
+    setTimezone(zone);
+    setSlots(suggestedSlots(nowMs(), zone));
     setSlotsTouched(false);
     setMeetingCandidate(line);
     setMeetingError("");
@@ -362,17 +367,24 @@ export function CartManager({
                   Timezone
                 </label>
                 <div className="mt-1.5">
-                  <TimezoneSelect
-                    id="cart-timezone"
-                    value={timezone}
-                    onChange={(tz) => {
-                      setTimezone(tz);
-                      // Untouched suggestions move to the new zone's next quarter hour.
-                      if (!slotsTouched) setSlots(suggestedSlots(nowMs(), tz));
-                    }}
-                  />
+                  {meetingCandidate?.projectTimezone ? (
+                    // The project owns its zone (feedback sheet 2, row 7); the server applies it too.
+                    <p id="cart-timezone" className="nums text-sm font-medium text-ink-900">
+                      {timezone}
+                    </p>
+                  ) : (
+                    <TimezoneSelect
+                      id="cart-timezone"
+                      value={timezone}
+                      onChange={(tz) => {
+                        setTimezone(tz);
+                        // Untouched suggestions move to the new zone's next quarter hour.
+                        if (!slotsTouched) setSlots(suggestedSlots(nowMs(), tz));
+                      }}
+                    />
+                  )}
                 </div>
-                <p className="mt-1.5 text-xs text-text-subtle">Set from your company&apos;s location. The candidate sees the times in IST.</p>
+                <p className="mt-1.5 text-xs text-text-subtle">{meetingCandidate?.projectTimezone ? "Set by the project." : "Set from your company's location."} The candidate sees the times in this zone.</p>
               </div>
               {meetingError ? (
                 <p role="alert" className="text-sm text-danger">

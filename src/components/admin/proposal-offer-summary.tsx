@@ -96,7 +96,7 @@ export function ProposalOfferSummary({
 function AdditionalInfo({ text }: { text: string }) {
   return (
     <div>
-      <p className="mb-2 text-sm font-semibold text-foreground">Additional information</p>
+      <p className="mb-2 text-sm font-semibold text-foreground">What the intern will learn</p>
       <p className="whitespace-pre-line rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)] p-4 text-sm leading-relaxed text-foreground [overflow-wrap:anywhere]">{text}</p>
     </div>
   );

@@ -12,7 +12,8 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { acceptedLineCharge } from "@/lib/accepted-charge";
-import { lineCharge, type LineCharge, type PayMode } from "@/lib/checkout";
+import { hireFeeMinor, lineCharge, type LineCharge, type PayMode } from "@/lib/checkout";
+import { feeDisplay, type FeeDisplay } from "@/lib/fee-display";
 import { getDb, schema } from "@/lib/db";
 import { istDay, postpaidAnchor, postpaidDueOn } from "@/lib/billing-plan";
 import { monthlyDues } from "@/lib/dues";
@@ -46,6 +47,8 @@ export type PayableLine = {
   monthlyMinor: number | null;
   score: number;
   charge: LineCharge;
+  /** How the one-time hiring fee is shown at checkout (lib/fee-display.ts). */
+  fee: FeeDisplay;
   /** Same line billed as one month (score 6+ only; see charge.monthlyBlocked). */
   monthlyCharge: LineCharge;
   /** Set for a hired monthly-plan placement: the next month is due. */
@@ -194,6 +197,12 @@ export async function payableCheckout(
     lines = proposals.map((proposal) => {
       const offer = parseOffer(proposal.offerDetails, proposal.currency);
       const score = scoreOf(onboardingByUser.get(proposal.internId));
+      const isDue = dues.has(proposal.id);
+      // A due month is a later instalment: the hiring fee was in the first.
+      const charge = isDue
+        ? acceptedLineCharge(offer, "monthly", { firstPayment: false })
+        : lineCharge(offer, score, opts.mode, { feeSetting, bandScore: score });
+      const feeCharge = acceptedLineCharge(offer, "postpaid", { feeSetting, bandScore: score });
       return {
         id: proposal.id,
         internName: namesById.get(proposal.internId)?.full ?? "Intern",
@@ -211,10 +220,14 @@ export async function payableCheckout(
         months: offer.months,
         monthlyMinor: offer.monthlyMinor,
         score,
-        // A due month is a later instalment: the hiring fee was in the first.
-        charge: dues.has(proposal.id)
-          ? acceptedLineCharge(offer, "monthly", { firstPayment: false })
-          : lineCharge(offer, score, opts.mode, { feeSetting, bandScore: score }),
+        charge,
+        // How the one-time fee is shown: FREE only when every charge path above bills 0 for it.
+        fee: feeDisplay({
+          currency: offer.currency,
+          chargedMinor: Math.max(charge.perHireMinor, feeCharge.perHireMinor),
+          listMinor: hireFeeMinor(offer),
+          applicable: !offer.fullTime && !isDue,
+        }),
         // What one month costs here: no hiring fee on a later instalment, or
         // the summary shows more than the order route charges.
         // A due month is priced on the fixed basis; a not-yet-due line keeps the live score
@@ -224,7 +237,7 @@ export async function payableCheckout(
           : lineCharge(offer, score, "monthly", { feeSetting, bandScore: score }),
         due: dues.get(proposal.id) ?? null,
         dueOn: dues.has(proposal.id) ? (dues.get(proposal.id)!.dueOn ?? addMonthsDay(offer.startDate, dues.get(proposal.id)!.monthsPaid)) : null,
-        feeCharge: acceptedLineCharge(offer, "postpaid", { feeSetting, bandScore: score }),
+        feeCharge,
         schedule: dues.has(proposal.id) || offer.fullTime
           ? []
           : Array.from({ length: Math.max(0, offer.months - 1) }, (_, i) => postpaidDueOn(postpaidAnchor(offer.startDate, null) ?? istDay(new Date()), offer.months, i + 2) ?? "").filter(Boolean),

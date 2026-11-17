@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { emails, icsInvite } from "@/lib/emails";
 import { initialsOf } from "@/lib/employer-candidates";
 import { formatIst, formatSlotTime } from "@/lib/format";
+import { interviewZone, loadProjectZones } from "@/lib/project-zones";
 import { CALENDAR_TOKEN_OWNER, createMeetEvent, deleteMeetEvent } from "@/lib/google";
 import { requireMutation } from "@/lib/guards-mutation";
 import { employerNames, notify, resolveInterviewNotifications } from "@/lib/notify";
@@ -47,7 +48,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!start) return NextResponse.json({ error: "That slot wasn't offered" }, { status: 400 });
   if (start.getTime() < Date.now()) return NextResponse.json({ error: "That slot has passed" }, { status: 409 });
   const end = new Date(start.getTime() + MEETING_MS);
-  const tz = interview.timezone || "Asia/Kolkata";
+  const tz = interviewZone(interview, await loadProjectZones(db, [interview.projectId]));
 
   const [[intern], names] = await Promise.all([
     db.select().from(schema.users).where(eq(schema.users.id, interview.internId)).limit(1),
@@ -104,10 +105,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   await resolveInterviewNotifications(interview.internId, id);
 
-  // Each side reads the time in its own zone: the company in the zone it
-  // booked in, the intern always in India time, labelled IST (INW-09).
+  // Both sides read the time on the project's clock, labelled (feedback sheet 2, row 7).
   const when = formatSlotTime(start, tz);
-  const whenIst = formatIst(start, { year: true });
+  const whenIst = formatIst(start, { year: true, zone: tz });
   // The intern sees the company's name only once it has hired them.
   const [hire] = await db
     .select({ id: schema.proposals.id })

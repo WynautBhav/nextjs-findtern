@@ -451,7 +451,10 @@ export default async function EmployerInternDetail({
                   plus <span className="font-medium text-ink-900">{formatMoney(pricing.perHireMinor, currency)}</span> one-time hiring charge
                 </p>
               ) : (
-                <p className="mt-0.5 text-sm text-ink-600">No one-time hiring charge (free for now)</p>
+                <p className="nums mt-0.5 text-sm text-ink-600">
+                  plus <s className="text-text-subtle">{formatMoney(pricing.perHireListMinor, currency)}</s>{" "}
+                  <span className="font-semibold text-success">(FREE)</span> one-time hiring charge
+                </p>
               )}
             </div>
 

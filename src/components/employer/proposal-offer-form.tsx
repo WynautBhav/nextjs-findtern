@@ -24,6 +24,8 @@ import {
   type WeeklySchedule,
 } from "@/lib/offer";
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
+import type { FeeDisplay } from "@/lib/fee-display";
+import { LEARN_LABEL, learnIssue } from "@/lib/proposal-copy";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
 import { DmyDateInput } from "@/components/app/dmy-date-input";
 import { fieldClass } from "@/components/employer/ui-tokens";
@@ -85,6 +87,8 @@ export function ProposalOfferForm({
   preference = { modes: [], cities: [] },
   place = null,
   perHireMinor = null,
+  fee,
+  projectTimezone = null,
 }: {
   proposalId: string;
   /** The candidate already accepted: saving asks them to accept again. */
@@ -101,6 +105,10 @@ export function ProposalOfferForm({
   place?: PlaceOfSupply | null;
   /** The one-time hiring fee on this offer, shown under the monthly amount. */
   perHireMinor?: number | null;
+  /** How that fee is shown (struck through with FREE when waived); wins over `perHireMinor`. */
+  fee?: FeeDisplay;
+  /** The project's own timezone: when it sets one, the offer runs on it and the field offers only that zone. */
+  projectTimezone?: string | null;
   /** Score below 6: at most two months. */
   shortOnly?: boolean;
 }) {
@@ -115,10 +123,10 @@ export function ProposalOfferForm({
   const [leaves, setLeaves] = useState(String(Math.min(3, Math.round((initial.paidLeavesPerMonth ?? 0) * 2) / 2)));
   const hours = scheduledMonthlyHours(schedule, Number(leaves) || 0);
   const days = billableWorkingDays(schedule);
-  const breakdown = offerBreakdown({ currency, hourlyRateMinor: initial.hourlyRateMinor ?? null, hours, perHireMinor, place });
+  const breakdown = offerBreakdown({ currency, hourlyRateMinor: initial.hourlyRateMinor ?? null, hours, perHireMinor, fee, place });
   const modes = MODE_OPTIONS.filter((m) => offerableModes(preference).includes(m.value) || m.value === initial.mode);
   const [mode, setMode] = useState(initial.mode || modes[0]?.value || "remote");
-  const [timezone, setTimezone] = useState(initial.timezone || "Asia/Kolkata");
+  const [timezone, setTimezone] = useState(projectTimezone || initial.timezone || "Asia/Kolkata");
   const [city, setCity] = useState(initial.city ?? "");
   const [state, setState] = useState(initial.state ?? "");
   const week = workingDaysPerWeek(schedule);
@@ -167,6 +175,8 @@ export function ProposalOfferForm({
       return fail("shiftTo", `A shift can't run longer than 8 hours. Latest end for a ${shiftFrom} start: ${latestShiftEnd(shiftFrom)}.`);
     }
     if (!message.trim()) return fail("message", "Add a job description.");
+    const learn = learnIssue(additionalInfo);
+    if (learn) return fail("learn", learn);
 
     const offer: Record<string, unknown> = {
       roleTitle: roleTitle.trim(),
@@ -369,7 +379,7 @@ export function ProposalOfferForm({
         <label className="col-span-2 block">
           <span className={LABEL}>Timezone</span>
           <select value={timezone} onChange={(e) => setTimezone(e.target.value)} className={INPUT}>
-            {TIMEZONES.map((t) =>
+            {TIMEZONES.filter((t) => !projectTimezone || t.id === timezone || t.id === projectTimezone).map((t) =>
               t.group ? (
                 <option key={t.id} value={t.id} disabled>
                   ── {t.label} ──
@@ -395,10 +405,9 @@ export function ProposalOfferForm({
         />
       </label>
       <label className="block">
-        <span className={LABEL}>
-          Additional information <span className="font-normal text-text-subtle">(optional)</span>
-        </span>
+        <span className={LABEL}>{LEARN_LABEL}</span>
         <textarea
+          {...fieldProps("learn")}
           value={additionalInfo}
           onChange={(e) => setAdditionalInfo(e.target.value)}
           rows={3}

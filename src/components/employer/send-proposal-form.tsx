@@ -15,6 +15,8 @@ import { offerBreakdown } from "@/lib/offer-breakdown";
 import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
 import { billableWorkingDays, isClockTime, latestShiftEnd, MAX_SHIFT_MINUTES, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, shiftMinutes, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
+import { feeDisplay } from "@/lib/fee-display";
+import { JD_HINT, JD_LABEL, LEARN_HINT, LEARN_LABEL, learnIssue } from "@/lib/proposal-copy";
 import { SURFACE_CLASS } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -131,6 +133,8 @@ export function SendProposalForm({
   const held = heldProjectIds.includes(projectId);
   const projectTimezone = (id: string) => projects.find((p) => p.id === id)?.timezone || companyTimezone;
   const [timezone, setTimezone] = useState(projectTimezone(firstProject?.id ?? ""));
+  // A project that sets a timezone owns it (feedback sheet 2, row 7): the field then offers only that zone.
+  const lockedZone = projects.find((p) => p.id === projectId)?.timezone || null;
   const modes = MODES.filter((m) => offerableModes(preference).includes(m.value));
   const allowedMode = (m: string | null | undefined) => (m && modes.some((x) => x.value === m) ? m : null);
   const [roleTitle, setRoleTitle] = useState(firstProject?.projectName ?? "");
@@ -186,7 +190,9 @@ export function SendProposalForm({
     return { monthly, perHire };
   }, [monthlyHours, rate]);
   const firstNote = firstPaymentNote(candidate.scored ? candidate.score : null);
-  const breakdown = offerBreakdown({ currency, hourlyRateMinor: rate.hourlyRateMinor, hours: monthlyHours, perHireMinor: rate.perHireMinor, place });
+  // The fee as billing will charge it under the live per-band setting (the server page priced it with that setting).
+  const fee = feeDisplay({ currency, chargedMinor: rate.perHireMinor, listMinor: rate.perHireListMinor });
+  const breakdown = offerBreakdown({ currency, hourlyRateMinor: rate.hourlyRateMinor, hours: monthlyHours, fee, place });
 
   /** Validate first; the policy agreement only opens for a complete offer. */
   function review() {
@@ -194,7 +200,7 @@ export function SendProposalForm({
       document.getElementById("projectId")?.focus();
       return;
     }
-    const problems = validate({ projectId, roleTitle, duration, startDate, minStart, mode, city, state, officeDays, homeDays, week, laptop, message, shiftFrom, shiftTo, timezone });
+    const problems = validate({ projectId, roleTitle, duration, startDate, minStart, mode, city, state, officeDays, homeDays, week, laptop, message, additionalInfo, shiftFrom, shiftTo, timezone });
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
       setNotice({ tone: "bad", text: "Some details need attention before this can be sent." });
@@ -220,7 +226,7 @@ export function SendProposalForm({
           agreedToPolicy: true,
           roleTitle: roleTitle.trim(),
           jd: message.trim(),
-          ...(additionalInfo.trim() ? { additionalInfo: additionalInfo.trim() } : {}),
+          additionalInfo: additionalInfo.trim(),
           mode,
           location: [city.trim(), state.trim()].filter(Boolean).join(", "),
           ...(mode !== "remote" ? { city: city.trim(), state: state.trim() } : {}),
@@ -381,12 +387,15 @@ export function SendProposalForm({
             <p className="nums text-sm text-ink-700">
               <span className="font-semibold text-ink-900">{formatRate(rate.hourlyRateMinor, currency)}</span>
               {" · "}
-              {rate.perHireMinor > 0 ? (
+              {fee.kind === "free" ? (
+                <>
+                  <s className="text-text-subtle">{formatMoney(fee.listMinor, currency)}</s>{" "}
+                  <span className="font-semibold text-success">(FREE)</span> one-time hiring fee
+                </>
+              ) : (
                 <>
                   <span>{formatPerHire(rate.perHireMinor, currency)}</span> one-time hiring fee
                 </>
-              ) : (
-                <span>No one-time hiring fee (free for now)</span>
               )}
             </p>
             <p className="flex w-full items-start gap-1.5 text-sm text-ink-600">
@@ -547,9 +556,17 @@ export function SendProposalForm({
             <SelectField
               id="timezone"
               label="Timezone"
-              hint="The working hours and interview slots use this zone."
+              hint={
+                lockedZone
+                  ? "Set by the project: working hours and interview slots use it. Change it on the project."
+                  : "The working hours and interview slots use this zone."
+              }
               value={timezone}
-              options={TIMEZONES.map((t) => ({ value: t.id, label: t.group ? `── ${t.label} ──` : t.label, disabled: t.group }))}
+              options={TIMEZONES.filter((t) => !lockedZone || t.id === timezone || t.id === lockedZone).map((t) => ({
+                value: t.id,
+                label: t.group ? `── ${t.label} ──` : t.label,
+                disabled: t.group,
+              }))}
               onChange={setTimezone}
             />
             <SelectField
@@ -568,19 +585,22 @@ export function SendProposalForm({
         <Step n={4} title="Message" hint="Plain text. This is the part candidates read to decide." last>
           <TextArea
             id="message"
-            label="What the intern will do"
+            label={JD_LABEL}
             rows={6}
             placeholder="What the intern will own, who they will work with, and what success looks like at the end of it."
+            hint={JD_HINT}
             value={message}
             error={errors.message}
             onChange={setMessage}
           />
           <TextArea
             id="additionalInfo"
-            label="Additional information (optional)"
-            rows={3}
-            placeholder="No client data on personal devices. Two fixed Saturdays a month for college."
+            label={`${LEARN_LABEL} (additional information)`}
+            rows={4}
+            placeholder="Building and shipping production features, code review habits, working with a product team."
+            hint={LEARN_HINT}
             value={additionalInfo}
+            error={errors.additionalInfo}
             onChange={setAdditionalInfo}
           />
         </Step>
@@ -957,6 +977,7 @@ type Draft = {
   week: number;
   laptop: string;
   message: string;
+  additionalInfo: string;
   shiftFrom: string;
   shiftTo: string;
   timezone: string;
@@ -1002,6 +1023,8 @@ function validate(draft: Draft): Record<string, string> {
   if (draft.message.trim().length < 30) {
     errors.message = "At least a couple of sentences - 30 characters minimum.";
   }
+  const learn = learnIssue(draft.additionalInfo);
+  if (learn) errors.additionalInfo = learn;
 
   return errors;
 }

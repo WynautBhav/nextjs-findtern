@@ -4,12 +4,13 @@ import { formatIstDay } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /**
- * One company round as an agenda entry: a date block on the left (in IST),
+ * One company round as an agenda entry: a date block on the left (project time),
  * the round and its state on the right, and whatever it needs below.
  * `iso` null means no date yet (times offered but none picked, or none sent).
  */
 export function AgendaRow({
   iso,
+  zone,
   past = false,
   title,
   company,
@@ -17,14 +18,16 @@ export function AgendaRow({
   children,
 }: {
   iso: string | null;
+  /** The project's timezone; India when absent. */
+  zone?: string | null;
   past?: boolean;
   title: string;
   company: string;
   status: React.ReactNode;
   children?: React.ReactNode;
 }) {
-  // "Fri 10 Jul", in India time.
-  const [weekday, day, month] = iso ? formatIstDay(iso).split(" ") : [];
+  // "Fri 10 Jul", on the project's clock.
+  const [weekday, day, month] = iso ? formatIstDay(iso, zone).split(" ") : [];
   return (
     <li className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-4 gap-y-4 p-5 sm:grid-cols-[4rem_minmax(0,1fr)] lg:p-6">
       {iso ? (

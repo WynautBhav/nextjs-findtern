@@ -123,7 +123,7 @@ test("the employer sees why, cannot send an offer (409) and cannot delete it (40
   assert.match((await P.E.page.locator("main").textContent()) ?? "", new RegExp(REASON));
   const start = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
   const offer = await api(P.E.page, "POST", `/api/employer/${E.id}/proposals`, {
-    internId: I.id, projectId: pid, flowType: "direct", agreedToPolicy: true, roleTitle: "Engineer", jd: "Build things.", mode: "remote",
+    internId: I.id, projectId: pid, flowType: "direct", agreedToPolicy: true, roleTitle: "Engineer", jd: "Build things.", additionalInfo: "Shipping real work with code review and mentoring.", mode: "remote",
     startDate: start, duration: "1m", shiftFrom: "09:00", shiftTo: "17:00", timezone: "Asia/Kolkata", laptop: "company", skills: SKILLS.slice(0, 4),
   });
   assert.equal(offer.status, 409, JSON.stringify(offer.body));
@@ -403,7 +403,7 @@ test("a taken-down listing sends no new offer: internship proposal and full-time
   const before = (await one(`SELECT count(*)::int AS n FROM proposals WHERE employer_id = $1`, [E.id])).n;
   const start = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
   const offer = await api(P.E.page, "POST", `/api/employer/${E.id}/proposals`, {
-    internId: I.id, projectId: S.wp, flowType: "direct", agreedToPolicy: true, roleTitle: "Engineer", jd: "Build things.", mode: "remote",
+    internId: I.id, projectId: S.wp, flowType: "direct", agreedToPolicy: true, roleTitle: "Engineer", jd: "Build things.", additionalInfo: "Shipping real work with code review and mentoring.", mode: "remote",
     startDate: start, duration: "1m", shiftFrom: "09:00", shiftTo: "17:00", timezone: "Asia/Kolkata", laptop: "company", skills: SKILLS.slice(0, 4),
   });
   assert.equal(offer.status, 409, JSON.stringify(offer.body));

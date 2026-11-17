@@ -308,9 +308,11 @@ export function companyInitials(name: string | null | undefined): string {
   return letters.toUpperCase();
 }
 
-/* ── India time for interns ──────────────────────────────────────────────
- * Interns always read times in IST, labelled, whatever zone the company
- * booked in (bug sheet 7, S2 r7). Slots are stored as UTC instants that the
+/* ── Labelled project time ───────────────────────────────────────────────
+ * These default to India (IST) when no zone is passed. Interview and meeting
+ * screens pass the PROJECT's zone (lib/timezones projectZone), so each
+ * project's times read on that project's clock, labelled (feedback sheet 2,
+ * row 7); only a project with no zone falls back to India. Slots are stored as UTC instants that the
  * employer's wall time was converted from with `wallTimeToUtc` (DST-aware),
  * so showing them in India time is a plain re-format in Asia/Kolkata, which
  * has no DST of its own. Built from parts so the output does not depend on
@@ -318,10 +320,10 @@ export function companyInitials(name: string | null | undefined): string {
 
 export const IST_ZONE = "Asia/Kolkata";
 
-function istParts(date: Date) {
+function istParts(date: Date, zone: string = IST_ZONE) {
   const p = Object.fromEntries(
     new Intl.DateTimeFormat("en-US", {
-      timeZone: IST_ZONE,
+      timeZone: zone,
       weekday: "short",
       day: "numeric",
       month: "short",
@@ -338,6 +340,17 @@ function istParts(date: Date) {
   return { weekday: p.weekday, day: p.day, month: p.month, year: p.year, clock };
 }
 
+/** "IST" for India, else the zone's short name at that instant ("GMT-5", "EST"); the zone id when Intl has none. */
+export function zoneLabel(zone: string | null | undefined, date: Date): string {
+  const z = (zone ?? "").trim();
+  if (!z || z === IST_ZONE || z === "Asia/Calcutta") return "IST";
+  try {
+    return new Intl.DateTimeFormat("en-US", { timeZone: z, timeZoneName: "short" }).formatToParts(date).find((x) => x.type === "timeZoneName")?.value ?? z;
+  } catch {
+    return z;
+  }
+}
+
 function asDate(value: Date | string | null | undefined): Date | null {
   if (!value) return null;
   const date = typeof value === "string" ? new Date(value) : value;
@@ -345,24 +358,25 @@ function asDate(value: Date | string | null | undefined): Date | null {
 }
 
 /** "Fri 10 Jul, 7:30 PM IST" (with `year`: "Fri 10 Jul 2026, 7:30 PM IST"). */
-export function formatIst(value: Date | string | null | undefined, opts: { year?: boolean } = {}): string {
+export function formatIst(value: Date | string | null | undefined, opts: { year?: boolean; zone?: string | null } = {}): string {
   const date = asDate(value);
   if (!date) return "Time to be confirmed";
-  const p = istParts(date);
-  return `${p.weekday} ${p.day} ${p.month}${opts.year ? ` ${p.year}` : ""}, ${p.clock} IST`;
+  const zone = opts.zone || IST_ZONE;
+  const p = istParts(date, zone);
+  return `${p.weekday} ${p.day} ${p.month}${opts.year ? ` ${p.year}` : ""}, ${p.clock} ${zoneLabel(zone, date)}`;
 }
 
-/** Day only, in India: "Fri 10 Jul". */
-export function formatIstDay(value: Date | string | null | undefined): string {
+/** Day only, in India or in `zone` (a project's): "Fri 10 Jul". */
+export function formatIstDay(value: Date | string | null | undefined, zone?: string | null): string {
   const date = asDate(value);
   if (!date) return "To be confirmed";
-  const p = istParts(date);
+  const p = istParts(date, zone || IST_ZONE);
   return `${p.weekday} ${p.day} ${p.month}`;
 }
 
 /** Clock only, in India and labelled: "7:30 PM IST". */
-export function formatIstClock(value: Date | string | null | undefined): string {
+export function formatIstClock(value: Date | string | null | undefined, zone?: string | null): string {
   const date = asDate(value);
   if (!date) return "Time to be confirmed";
-  return `${istParts(date).clock} IST`;
+  return `${istParts(date, zone || IST_ZONE).clock} ${zoneLabel(zone, date)}`;
 }

@@ -4,6 +4,8 @@ import { after, NextResponse } from "next/server";
 import { isHiredProposal } from "@/lib/hire-status";
 import { z } from "zod";
 
+import { learnField } from "@/lib/proposal-copy";
+import { projectZone } from "@/lib/timezones";
 import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { scoreOf, toCandidateProfile } from "@/lib/employer-candidates";
@@ -47,7 +49,8 @@ const bodySchema = z
   // Legacy required a job description, a city and state off-remote, the
   // hybrid split, a shift, a timezone and the laptop answer.
   jd: z.string().trim().min(1, "Add a job description.").max(4000, "Keep the job description under 4000 characters."),
-  additionalInfo: z.string().trim().max(2000).optional(),
+  // What the intern will learn: mandatory (feedback sheet 2, row 3), checked here as well as in the composer.
+  additionalInfo: learnField,
   mode: z.enum(["remote", "hybrid", "onsite"]),
   location: z.string().trim().max(120).default(""),
   city: z.string().trim().max(80).default(""),
@@ -141,7 +144,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .limit(1);
   const currency = employerRegion(employer ?? {}) === "IN" ? "INR" : "USD";
   const [project] = await db
-    .select({ id: schema.projects.id, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt })
+    .select({ id: schema.projects.id, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt, timezone: schema.projects.timezone })
     .from(schema.projects)
     .where(and(eq(schema.projects.id, b.projectId), eq(schema.projects.employerId, id)))
     .limit(1);
@@ -255,6 +258,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const rate = resolvePricing(score, plans, currency, null, await getPerHireFeeSetting());
   const offerDetails = buildOffer({
     ...b,
+    // The offer runs on the PROJECT's clock (feedback sheet 2, row 7): its zone wins over the one sent.
+    timezone: projectZone(project.timezone, b.timezone),
     // Hours and money are worked out here, never taken from the request.
     monthlyHours: scheduledMonthlyHours(b.weeklySchedule, b.paidLeavesPerMonth),
     currency,

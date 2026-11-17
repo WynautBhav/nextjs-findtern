@@ -5,6 +5,8 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notify } from "@/lib/notify";
+import { learnField } from "@/lib/proposal-copy";
+import { projectZone } from "@/lib/timezones";
 import { hasOpenOrderFor } from "@/lib/payments";
 import { takedownBlock } from "@/lib/projects/takedown";
 import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
@@ -37,8 +39,8 @@ const offerSchema = z
       .refine((n) => (PAID_LEAVE_OPTIONS as readonly number[]).includes(n), "Paid leave is 0 to 3 days a month, in half days.")
       .optional(),
     message: z.string().trim().min(1, "Add a job description.").max(4000, "Keep the job description under 4000 characters.").optional(),
-    // Blank clears it.
-    additionalInfo: z.string().trim().max(2000).optional(),
+    // What the intern will learn stays mandatory: optional here (left alone when absent) but never blank.
+    additionalInfo: learnField.optional(),
     mode: z.enum(["remote", "hybrid", "onsite"]).optional(),
     city: z.string().trim().max(80).optional(),
     state: z.string().trim().max(80).optional(),
@@ -118,6 +120,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   const { message, ...edits } = parsed.data.offer;
+  // The offer's zone is the project's (feedback sheet 2, row 7): an edit cannot move it elsewhere.
+  if (edits.timezone !== undefined && proposal.projectId) {
+    const [pz] = await db
+      .select({ timezone: schema.projects.timezone })
+      .from(schema.projects)
+      .where(eq(schema.projects.id, proposal.projectId))
+      .limit(1);
+    if (pz?.timezone) edits.timezone = projectZone(pz.timezone, edits.timezone);
+  }
   // No "candidate's own laptop" for someone without one (EMH-18).
   if (edits.laptop !== undefined && normalizeLaptop(edits.laptop) === "candidate") {
     const [ob] = await db

@@ -820,7 +820,7 @@ step("employer: bad offers are refused, then sends one offer to each intern [API
     flowType: "interview_first",
     agreedToPolicy: true,
     roleTitle: "Data Analyst Intern",
-    jd: "Build and maintain SQL dashboards for the operations team.",
+    jd: "Build and maintain SQL dashboards for the operations team.", additionalInfo: "Shipping real work with code review and mentoring.",
     mode: "remote",
     startDate: istDate(7),
     duration: "1m",
@@ -1580,7 +1580,7 @@ step("US employer: the offer is held until the meeting happens; Mark completed (
   assert.equal(await page.getByRole("button", { name: "Review and send" }).count(), 0, "no way to send the offer while the meeting is still ahead: the page says 'Meeting first' instead of the form");
   assert.ok(await page.getByRole("link", { name: /Open the schedule/ }).isVisible(), "and points to the schedule");
   const early = await api(page, "POST", `/api/employer/${state.employer2Id}/proposals`, {
-    internId: state.intern3Id, projectId: state.project2Id, flowType: "interview_first", agreedToPolicy: true, roleTitle: "Growth analyst", jd: "Build funnel dashboards for the growth team.",
+    internId: state.intern3Id, projectId: state.project2Id, flowType: "interview_first", agreedToPolicy: true, roleTitle: "Growth analyst", jd: "Build funnel dashboards for the growth team.", additionalInfo: "Shipping real work with code review and mentoring.",
     mode: "remote", startDate: istDate(30), duration: "1m", weeklySchedule: "mon_fri", shiftFrom: "09:00", shiftTo: "18:00", timezone: NY, laptop: "company", paidLeavesPerMonth: 2, skills: ["SQL"],
   });
   assert.equal(early.status, 409, `an offer before the meeting is refused (got ${early.status} ${JSON.stringify(early.body).slice(0, 140)})`);
@@ -1724,7 +1724,7 @@ step("free-band intern 4: the composer offers remote only, edits and withdrawals
   await shot("us-free-band-composer");
 
   const offer = (over = {}) => ({
-    internId: state.intern4Id, projectId: state.project2Id, flowType: "interview_first", agreedToPolicy: true, roleTitle: "Support analyst intern", jd: "Triage and tag support tickets for the growth team.",
+    internId: state.intern4Id, projectId: state.project2Id, flowType: "interview_first", agreedToPolicy: true, roleTitle: "Support analyst intern", jd: "Triage and tag support tickets for the growth team.", additionalInfo: "Shipping real work with code review and mentoring.",
     mode: "remote", startDate: istDate(12), duration: "1m", weeklySchedule: "mon_fri", shiftFrom: "09:00", shiftTo: "18:00", timezone: NY, laptop: "company", paidLeavesPerMonth: 0, skills: ["SQL"], ...over,
   });
   const path = `/api/employer/${state.employer2Id}/proposals`;

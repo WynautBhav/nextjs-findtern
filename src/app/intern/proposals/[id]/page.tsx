@@ -345,7 +345,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
 
           {offer.additionalInfo ? (
             <Surface className="p-5 lg:p-6">
-              <SectionHead title="Additional information" />
+              <SectionHead title="What the intern will learn" />
               <p className="whitespace-pre-line text-pretty text-base leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{offer.additionalInfo}</p>
             </Surface>
           ) : null}
