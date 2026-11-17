@@ -25,7 +25,7 @@ const SHOTS = process.env.TD_SHOTS || "";
 if (SHOTS) mkdirSync(SHOTS, { recursive: true });
 let browser;
 const P = {};
-let E, I1, I2, I3, I4, ADMIN, pid, qid, hiredId, tsId, ivId, sentId, acceptedId, cartPid;
+let E, I1, I2, I3, I4, ADMIN, pid, qid, hiredId, tsId, ivId, sentId, acceptedId;
 const NAME = `Growth Lab Intern ${RUN}`;
 const QNAME = `Control Project ${RUN}`;
 const REASON = `Misleading stipend ${RUN}`;
@@ -126,7 +126,6 @@ test("02 admin takes the project down in the admin UI, with a reason", async () 
   sentId = await mkProposal(E.id, I2.id, pid);
   acceptedId = await mkProposal(E.id, I4.id, pid);
   await one(`UPDATE proposals SET status='accepted' WHERE id=$1 RETURNING id`, [acceptedId]);
-  cartPid = pid;
 });
 
 test("03 every employer API action on the taken-down project answers 409 project_taken_down", async () => {

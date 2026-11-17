@@ -20,7 +20,7 @@ import { after, before, test } from "node:test";
 import { chromium } from "playwright";
 
 import { ROOT, testDatabaseUrl } from "./lib/env.mjs";
-import { closeDb, db, one, RUN, seedAdmin, seedEmployer, seedIntern, seedProject, send, signedInContext } from "./lib/fixtures.mjs";
+import { closeDb, one, RUN, seedAdmin, seedEmployer, seedIntern, seedProject, send, signedInContext } from "./lib/fixtures.mjs";
 import { visit } from "./lib/browser.mjs";
 
 testDatabaseUrl();

@@ -993,7 +993,6 @@ step("employer: pays the other offer with the month-end stipend plan, using the 
 /** ₹ amount in en-IN grouping: 7688000 paise -> "76,880". */
 const rupees = (minor) => (minor / 100).toLocaleString("en-IN", { minimumFractionDigits: minor % 100 ? 2 : 0 });
 const num = (text) => Number(String(text).replace(/[₹,\s]/g, "").replace("−", "-"));
-const istLongDate = (d) => new Date(d).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" });
 // The invoice itself prints dd-mm-yy (the reference PDF), not the long date.
 const istInvoiceDate = (d) => new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "2-digit", timeZone: "Asia/Kolkata" }).replace(/\//g, "-");
 
