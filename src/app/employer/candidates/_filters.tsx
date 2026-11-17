@@ -14,8 +14,10 @@ import { RatingSlider } from "@/components/employer/candidate-filters";
 import { buttonClass } from "@/components/ui/button";
 import { fieldClass } from "@/components/employer/ui-tokens";
 import { FilterSection } from "@/components/employer/candidates/filter-parts";
+import { ProFilterSections, ProLockedCard } from "@/components/employer/candidates/pro-filters";
+import { collegeSortToken } from "@/lib/candidate-sort";
 import { FilterPanel } from "./_filter-form";
-import { activeFilterCount, queryOf, resetHref, type Filters } from "./_query";
+import { activeFilterCount, queryOf, resetHref, type Filters, type ProData } from "./_query";
 
 const SELECT = cn(fieldClass, "mt-2");
 
@@ -37,6 +39,7 @@ export function FilterColumn({
   effectiveSkills,
   projectCity = "",
   projectToggle = null,
+  pro,
 }: {
   filters: Filters;
   projects: { id: string; projectName: string }[];
@@ -53,6 +56,8 @@ export function FilterColumn({
   projectCity?: string;
   /** "Ignore project skills" / "Match to project": on a phone it lives in the sheet, not on the page. */
   projectToggle?: React.ReactNode;
+  /** Findtern Pro: who has the CGPA and college filters, and what they list. */
+  pro: ProData;
 }) {
   return (
     <aside
@@ -70,7 +75,7 @@ export function FilterColumn({
         {!filters.projectDefaults ? <input type="hidden" name="pf" value="0" /> : null}
         {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}
         {filters.skillsSet ? <input type="hidden" name="skills" value={filters.skills.join(",")} /> : null}
-        {filters.sorts.length > 0 ? <input type="hidden" name="sort" value={filters.sorts.join(",")} /> : null}
+        {filters.sorts.length > 0 || filters.collegeSort ? <input type="hidden" name="sort" value={[...filters.sorts, collegeSortToken(filters.collegeSort)].filter(Boolean).join(",")} /> : null}
         {filters.dir === "asc" ? <input type="hidden" name="dir" value="asc" /> : null}
 
         {/* lg: the card's own header. Phones get "Filters" from the sheet title. */}
@@ -128,6 +133,17 @@ export function FilterColumn({
           <FilterSection title="Findtern Score">
             <RatingSlider name="min" label="Minimum score" defaultValue={filters.minScore} />
           </FilterSection>
+
+          {pro.active ? (
+            <ProFilterSections
+              cgpaMin={filters.cgpaMin}
+              cgpaVerified={filters.cgpaVerified}
+              colleges={filters.colleges}
+              options={pro.colleges}
+            />
+          ) : (
+            <ProLockedCard offered={pro.offered} priceMinor={pro.priceMinor} periodDays={pro.periodDays} currency={currency} />
+          )}
 
           <FilterSection title="Hourly price">
             <label htmlFor="filter-plan" className="sr-only">

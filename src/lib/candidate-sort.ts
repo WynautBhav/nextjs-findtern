@@ -31,3 +31,45 @@ export function compareBySortFields(a: Sortable, b: Sortable, fields: readonly S
   }
   return 0;
 }
+
+/**
+ * College order (a Findtern Pro sort): `sort=college` is A-Z, `sort=college_desc` Z-A. It rides in the same
+ * `sort` parameter as the score fields, which ignore it, so an old link keeps working.
+ */
+export type CollegeSort = "asc" | "desc";
+
+export function parseCollegeSort(raw: string | string[] | undefined): CollegeSort | null {
+  const parts = (Array.isArray(raw) ? raw : [raw ?? ""]).flatMap((v) => v.split(",")).map((p) => p.trim());
+  for (const part of parts) {
+    if (part === "college") return "asc";
+    if (part === "college_desc") return "desc";
+  }
+  return null;
+}
+
+export const collegeSortToken = (sort: CollegeSort | null): string => (sort === "asc" ? "college" : sort === "desc" ? "college_desc" : "");
+
+/** Take the college tokens out of a `sort` value, keeping the rest in order (for a free employer, who has none). */
+export function withoutCollegeSort(raw: string): string {
+  return raw
+    .split(",")
+    .map((p) => p.trim())
+    .filter((p) => p && p !== "college" && p !== "college_desc")
+    .join(",");
+}
+
+const foldCollege = (name: string) => name.normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
+
+/**
+ * Stable college sort: A-Z or Z-A, a candidate with no college last either way, ties keep their incoming order
+ * (so the score fields chosen next to it still break them). Does not change `list`.
+ */
+export function sortByCollege<T>(list: readonly T[], collegeOf: (item: T) => string | null, dir: CollegeSort): T[] {
+  const sign = dir === "asc" ? 1 : -1;
+  return [...list].sort((a, b) => {
+    const x = collegeOf(a);
+    const y = collegeOf(b);
+    if (x === null || y === null) return x === y ? 0 : x === null ? 1 : -1;
+    return sign * foldCollege(x).localeCompare(foldCollege(y), "en");
+  });
+}

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, LayoutGrid, List, Rows3, Search, X } from "lucide-react";
+import { ChevronDown, Info, LayoutGrid, List, Rows3, Search, X } from "lucide-react";
 
 import { redactForEmployer } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
@@ -15,6 +15,8 @@ import { buttonClass } from "@/components/ui/button";
 import { PAGE_SIZES, pageWindow, showClearAll } from "@/components/employer/candidate-view";
 import { Segmented, SegmentLink } from "@/components/employer/candidates/toolbar-parts";
 import { FiltersToggle } from "@/components/employer/candidate-filter-collapse";
+import { SUBSCRIPTION_HREF } from "@/components/employer/candidates/pro-filters";
+import { collegeSortToken } from "@/lib/candidate-sort";
 import { SortSelect } from "./_sort-select";
 import {
   SORT_OPTIONS,
@@ -58,13 +60,18 @@ export function CandidateSearch({ filters, className }: { filters: Filters; clas
 }
 
 /** Sort options: best match, each field high to low, and the score low to high. */
-function sortOptions(filters: Filters) {
+function sortOptions(filters: Filters, proActive: boolean) {
+  // One choice at a time: picking a score sort drops the college order, and the reverse.
   const to = (sort: SortKey | "", dir: "asc" | "desc") =>
-    withFilters(filters, { sorts: sort ? [sort] : [], dir, page: "" });
+    withFilters(filters, { sorts: sort ? [sort] : [], dir, collegeSort: null, page: "" });
+  const college = (dir: "asc" | "desc") => withFilters(filters, { sorts: [], dir: "desc", collegeSort: dir, page: "" });
   return [
     { value: "", label: "Best match", href: to("", "desc") },
     ...SORT_OPTIONS.map((o) => ({ value: o.value, label: o.value === "score" ? "Highest Findtern Score" : `Highest ${o.label}`, href: to(o.value, "desc") })),
     { value: "score:asc", label: "Lowest Findtern Score", href: to("score", "asc") },
+    // Findtern Pro: shown to everyone, choosable by subscribers (the loader ignores `sort=college` for anyone else).
+    { value: "college", label: proActive ? "College A-Z" : "College A-Z (Pro)", href: college("asc"), disabled: !proActive },
+    { value: "college_desc", label: proActive ? "College Z-A" : "College Z-A (Pro)", href: college("desc"), disabled: !proActive },
   ];
 }
 
@@ -121,7 +128,11 @@ export function ActiveFilters({ data, filters, className }: { data: CandidatesDa
  */
 export function ToolbarSort({ data, filters, className }: { data: CandidatesData; filters: Filters; className?: string }) {
   const saved = filters.saved && Boolean(data.activeProjectId);
-  const sortValue = filters.sorts[0] ? `${filters.sorts[0]}${filters.dir === "asc" ? ":asc" : ""}` : "";
+  const sortValue = filters.collegeSort
+    ? collegeSortToken(filters.collegeSort)
+    : filters.sorts[0]
+      ? `${filters.sorts[0]}${filters.dir === "asc" ? ":asc" : ""}`
+      : "";
   const projectKeep = (id: string) => {
     // No `ids`: each project keeps its own compare picks, so the new project shows its own.
     const next = new URLSearchParams({ project: id });
@@ -140,7 +151,7 @@ export function ToolbarSort({ data, filters, className }: { data: CandidatesData
           className={cn(select, "max-w-[min(28rem,100%)] max-lg:hidden")}
         />
       ) : null}
-      {saved ? null : <SortSelect className={select} value={sortValue} options={sortOptions(filters)} />}
+      {saved ? null : <SortSelect className={select} value={sortValue} options={sortOptions(filters, data.pro.active)} />}
       <ViewToggle filters={filters} />
     </div>
   );
@@ -223,6 +234,60 @@ export function StatusRow({ data, filters, className }: { data: CandidatesData; 
   );
 }
 
+/**
+ * Two things Findtern Pro adds above the list, both server-rendered:
+ * - a link that carried Pro filters to an employer without the subscription: the filters were ignored, and
+ *   this says so (Dismiss goes to the same page without them, so the address bar is honest too);
+ * - for a subscriber with a CGPA filter on: how many candidates were left out for having no score, and how
+ *   many shown results rest on a converted percentage ("approx.").
+ * `role="status"` so a change after the list reloads is announced.
+ */
+function ProNotes({ data, filters }: { data: CandidatesData; filters: Filters }) {
+  const { pro } = data;
+  const cgpaOn = filters.cgpaMin > 0 || filters.cgpaVerified;
+  const parts: string[] = [];
+  if (pro.active && cgpaOn) {
+    if (pro.hiddenNoScore > 0) parts.push(`${pro.hiddenNoScore} candidate${pro.hiddenNoScore === 1 ? " with" : "s with"} no CGPA or percentage on their profile ${pro.hiddenNoScore === 1 ? "is" : "are"} not shown.`);
+    if (pro.approxKept > 0) parts.push(`${pro.approxKept} of these ${data.total} result${data.total === 1 ? "" : "s"} ${pro.approxKept === 1 ? "gives" : "give"} a percentage, converted to CGPA at ÷ 9.5 (approx.).`);
+  }
+  if (!pro.ignored && parts.length === 0) return null;
+  return (
+    <div role="status" className="mb-3 space-y-2">
+      {pro.ignored ? (
+        <div className="flex items-start gap-3 rounded-xl bg-info-soft px-4 py-3 text-sm text-ink-900 ring-1 ring-inset ring-info/25">
+          <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
+          <p className="min-w-0 flex-1">
+            Those filters are part of Findtern Pro, so this list is not filtered by them.
+            {pro.offered ? (
+              <>
+                {" "}
+                <Link href={SUBSCRIPTION_HREF} className="font-medium underline underline-offset-4 hover:text-ink-700">
+                  See Findtern Pro
+                </Link>
+              </>
+            ) : null}
+          </p>
+          <Link
+            href={withFilters(filters, { page: "" })}
+            replace
+            scroll={false}
+            aria-label="Dismiss this notice"
+            className="-m-1.5 grid size-11 shrink-0 place-items-center rounded-lg text-ink-600 outline-none hover:bg-white/60 hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 sm:size-9 sm:touch:size-11"
+          >
+            <X className="size-4" aria-hidden />
+          </Link>
+        </div>
+      ) : null}
+      {parts.length > 0 ? (
+        <p className="flex items-start gap-2 text-[13px] leading-relaxed text-ink-700">
+          <Info className="mt-0.5 size-3.5 shrink-0 text-ink-500" aria-hidden />
+          <span>{parts.join(" ")}</span>
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function Results({
   data,
   filters,
@@ -261,6 +326,8 @@ export function Results({
         </div>
       ) : null}
 
+      {loadFailed ? null : <ProNotes data={data} filters={filters} />}
+
       {loadFailed ? (
         <LoadError what="the candidate pool" retryHref={withFilters(filters)} email={SITE.adminEmail} />
       ) : candidates.length === 0 ? (
@@ -271,6 +338,19 @@ export function Results({
             body="Press Save on a candidate to add them to this project's shortlist."
             next={{ label: "Browse all candidates", href: withFilters(filters, { saved: false, page: "" }) }}
             who="You - save a candidate"
+          />
+        ) : filters.cgpaMin > 0 || filters.cgpaVerified || filters.colleges.length > 0 ? (
+          // Findtern Pro filters are the likeliest cause of nobody matching: name them and offer to drop just those.
+          <EmptyScene
+            art
+            title="No candidates match your CGPA or college filters"
+            body={
+              data.pro.hiddenNoScore > 0
+                ? `${data.pro.hiddenNoScore} candidate${data.pro.hiddenNoScore === 1 ? " was" : "s were"} left out for having no score. Lower the minimum CGPA, turn off verified only or choose more colleges.`
+                : "Lower the minimum CGPA, turn off verified only or choose more colleges."
+            }
+            next={{ label: "Clear CGPA and college filters", href: withFilters(filters, { cgpaMin: 0, cgpaVerified: false, colleges: [], collegeSort: null, page: "" }) }}
+            who="You - widen the filters"
           />
         ) : data.cityList.length > 0 ? (
           // EMB-21: legacy offered "Clear location" and "Include remote

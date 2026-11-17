@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { restorableFilters } from "./employer-filter-restore.ts";
+import { PRO_PARAMS, restorableFilters, withoutProParams } from "./employer-filter-restore.ts";
 
 const KEYS = ["q", "skills", "city", "mode", "min", "plan", "sort", "dir", "page"];
 
@@ -29,4 +29,29 @@ test("repeated keys survive in order", () => {
 test("empty and junk input restore nothing", () => {
   assert.equal(restorableFilters("", KEYS), "");
   assert.equal(restorableFilters("%%%", KEYS), "");
+});
+
+/* ── Findtern Pro parameters: never restored for an employer without the subscription ── */
+
+const PRO_KEYS = [...KEYS, ...PRO_PARAMS];
+
+test("Pro filters are restored for a subscriber, who passes the keys through", () => {
+  assert.equal(restorableFilters("cgpaMin=8&colleges=IIT%20Bombay&colleges=Anna%20University&sort=college", PRO_KEYS), "cgpaMin=8&colleges=IIT+Bombay&colleges=Anna+University&sort=college");
+});
+
+test("withoutProParams drops the Pro keys and the college sort, and keeps every other filter", () => {
+  assert.equal(withoutProParams("cgpaMin=8&cgpaVerified=1&colleges=A&colleges=B&city=Jaipur&plan=assured"), "city=Jaipur&plan=assured");
+  assert.equal(withoutProParams("sort=coding,college_desc&dir=asc"), "sort=coding&dir=asc");
+  assert.equal(withoutProParams("sort=college&skills=react"), "skills=react");
+  assert.equal(withoutProParams("sort=college,college_desc"), "");
+});
+
+test("a saved string of only Pro filters restores nothing without the subscription", () => {
+  assert.equal(withoutProParams(restorableFilters("cgpaMin=7.5&colleges=X&sort=college", PRO_KEYS)), "");
+});
+
+test("withoutProParams leaves a plain query alone and survives junk", () => {
+  assert.equal(withoutProParams("skills=react&skills=sql"), "skills=react&skills=sql");
+  assert.equal(withoutProParams(""), "");
+  assert.doesNotThrow(() => withoutProParams("%%%"));
 });

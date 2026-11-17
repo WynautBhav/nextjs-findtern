@@ -23,6 +23,8 @@ export function SwitchField({
   label,
   hint,
   zeroValue,
+  disabled = false,
+  describedBy,
 }: {
   name: string;
   value: string;
@@ -31,19 +33,33 @@ export function SwitchField({
   hint?: string;
   /** Sent when unchecked (a hidden input before the checkbox). */
   zeroValue?: string;
+  /** Locked: not focusable, not submitted, and said so to assistive tech. */
+  disabled?: boolean;
+  /** The element that explains why it is disabled. */
+  describedBy?: string;
 }) {
   return (
-    <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 py-1 text-sm text-ink-800">
+    <label className={cn("flex min-h-11 items-center justify-between gap-3 py-1 text-sm text-ink-800", disabled ? "cursor-not-allowed" : "cursor-pointer")}>
       <span className="min-w-0">
         <span className="block font-medium text-ink-900">{label}</span>
         {hint ? <span className="mt-0.5 block text-xs text-text-subtle">{hint}</span> : null}
       </span>
       {zeroValue !== undefined ? <input type="hidden" name={name} value={zeroValue} /> : null}
-      <input type="checkbox" role="switch" name={name} value={value} defaultChecked={defaultChecked} className="peer sr-only" />
+      <input
+        type="checkbox"
+        role="switch"
+        name={name}
+        value={value}
+        defaultChecked={defaultChecked}
+        disabled={disabled}
+        aria-disabled={disabled || undefined}
+        aria-describedby={describedBy}
+        className="peer sr-only"
+      />
       <span
         aria-hidden
         className={cn(
-          "relative h-6 w-10 shrink-0 rounded-full bg-ink-300 transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform",
+          "relative h-6 w-10 shrink-0 rounded-full bg-ink-300 transition-colors peer-disabled:opacity-60 after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform",
           "peer-checked:bg-brand-700 peer-checked:after:translate-x-4 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-600 motion-reduce:transition-none motion-reduce:after:transition-none",
         )}
       />

@@ -13,9 +13,13 @@ import { projectCities } from "@/lib/project-locations";
 import { likePattern } from "@/lib/admin/palette-search";
 import { employerRegion, type Currency } from "@/lib/employer-pricing";
 import { BANDS, PLAN_NAME, type BandId } from "@/lib/score";
-import { parseSortFields } from "@/lib/candidate-sort";
+import { collegeSortToken, parseSortFields, type CollegeSort } from "@/lib/candidate-sort";
+import { EMPTY_PRO_REQUEST, enforcePro, hasProRequest, proAccess, proQueryPairs, proRequestOf } from "@/lib/candidate-pro-access";
+import { proChips, proFactsOf, type CollegeOption } from "@/lib/candidate-pro-filters";
+import { getEmployerSubscriptionConfig } from "@/lib/platform-settings";
+import { subscriptionPriceMinor } from "@/lib/employer-subscription";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedFilters } from "@/lib/employer-selection";
-import { restorableFilters } from "@/lib/employer-filter-restore";
+import { PRO_PARAMS, restorableFilters, withoutProParams } from "@/lib/employer-filter-restore";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { savedInternIds } from "@/lib/saved-roles";
 import { rankProfiles } from "@/components/employer/candidate-rank";
@@ -42,6 +46,15 @@ export type Filters = {
   /** Sort fields in priority order (legacy multi-field sort); empty = Findtern Score. */
   sorts: SortKey[];
   dir: "desc" | "asc";
+  /**
+   * Findtern Pro (subscribers only): a minimum CGPA, only CGPAs a college has verified, the colleges wanted and a
+   * college order. As read from the URL; `loadCandidates` empties them in place for an employer without the
+   * subscription, so every link built afterwards is clean.
+   */
+  cgpaMin: number;
+  cgpaVerified: boolean;
+  colleges: string[];
+  collegeSort: CollegeSort | null;
   /**
    * Legacy "Include remote candidates" (EMB-15): off, candidates who only
    * work remotely are left out. Null = the project's default, which legacy
@@ -82,6 +95,7 @@ export const FILTER_KEYS = [
   "sort",
   "dir",
   "pageSize",
+  ...PRO_PARAMS,
   "pf",
   "remote",
   "sm",
@@ -102,6 +116,10 @@ export type SearchParams = {
   dir?: string | string[];
   view?: string | string[];
   pageSize?: string | string[];
+  /** Findtern Pro: read by `loadCandidates` only for a subscriber. */
+  cgpaMin?: string | string[];
+  cgpaVerified?: string | string[];
+  colleges?: string | string[];
   ids?: string | string[];
   page?: string | string[];
   project?: string | string[];
@@ -127,6 +145,7 @@ export function readFilters(params: SearchParams): Filters {
   };
   const all = (raw: string | string[] | undefined) => (raw === undefined ? [] : Array.isArray(raw) ? raw : [raw]);
   const remoteValues = all(params.remote);
+  const pro = proRequestOf(params);
 
   return {
     q: (one(params.q) ?? "").trim().slice(0, 60),
@@ -145,6 +164,10 @@ export function readFilters(params: SearchParams): Filters {
     },
     sorts: parseSortFields(params.sort),
     dir: one(params.dir) === "asc" ? "asc" : "desc",
+    cgpaMin: pro.cgpaMin,
+    cgpaVerified: pro.cgpaVerified,
+    colleges: pro.colleges,
+    collegeSort: pro.collegeSort,
     // The form sends remote=0, plus remote=1 when ticked; absent = default.
     remote: remoteValues.some((v) => ["1", "true", "on"].includes(v)) ? true : remoteValues.includes("0") ? false : null,
     // Absent = on (the default); the form sends sm=0, plus sm=1 when ticked.
@@ -234,7 +257,9 @@ function filterParams(merged: Filters, withKeyword = true): URLSearchParams {
     const value = merged.minRatings[meta.key];
     if (value > 0) next.set(`r_${meta.key}`, String(value));
   }
-  if (merged.sorts.length > 0) next.set("sort", merged.sorts.join(","));
+  const sortTokens = [...merged.sorts, collegeSortToken(merged.collegeSort)].filter(Boolean);
+  if (sortTokens.length > 0) next.set("sort", sortTokens.join(","));
+  for (const [key, value] of proQueryPairs(merged)) next.append(key, value);
   if (merged.dir === "asc") next.set("dir", "asc");
   if (merged.remote !== null) next.set("remote", merged.remote ? "1" : "0");
   if (!merged.skillPriority) next.set("sm", "0");
@@ -301,6 +326,8 @@ export function activeChips(filters: Filters): FilterChip[] {
       });
     }
   }
+  // Pro chips: only a subscriber has these set (the loader empties them for everyone else).
+  for (const chip of proChips(filters)) chips.push({ key: chip.key, label: chip.label, href: drop({ cgpaMin: chip.without.cgpaMin, cgpaVerified: chip.without.cgpaVerified, colleges: chip.without.colleges }) });
   if (!filters.skillPriority) chips.push({ key: "sm", label: "Skill-match ranking off", href: drop({ skillPriority: true }) });
   return chips;
 }
@@ -348,7 +375,30 @@ export type CandidatesData = {
   saved: Set<string>;
   /** Shortlisted for the selected project and still in the pool: the "Saved (N)" tab. */
   savedCount: number;
+  /** Findtern Pro: who may use the CGPA and college filters, and what they did to this list. */
+  pro: ProData;
 };
+
+export type ProData = {
+  /** An active subscription (lookup failed or none = false). */
+  active: boolean;
+  /** The link asked for a Pro filter or sort this employer may not use; it was dropped. */
+  ignored: boolean;
+  /** Subscriptions are on sale (admin switch). */
+  offered: boolean;
+  /** Price per period in the employer's currency, minor units; null when not offered or unreadable. */
+  priceMinor: number | null;
+  /** How long one purchase lasts, in days. */
+  periodDays: number | null;
+  /** Colleges in the pool (subscribers only). */
+  colleges: CollegeOption[];
+  /** Left out of a CGPA-filtered list for having no score. */
+  hiddenNoScore: number;
+  /** Results that rest on a percentage converted to CGPA. */
+  approxKept: number;
+};
+
+const NO_PRO: ProData = { active: false, ignored: false, offered: false, priceMinor: null, periodDays: null, colleges: [], hiddenNoScore: 0, approxKept: 0 };
 
 /**
  * Everything the candidates page reads. `filters.project` is corrected in
@@ -381,7 +431,22 @@ export async function loadCandidates(
     presence: {},
     saved: new Set(),
     savedCount: 0,
+    pro: { ...NO_PRO },
   };
+
+  // Findtern Pro: the entitlement decides, never the URL. Whatever the link asked for is read once,
+  // then emptied in place for an employer without an active subscription (a lapsed subscriber's stale
+  // link, a hand-edited one), so no filter, sort, chip or remembered query carries it on.
+  const requested = { cgpaMin: filters.cgpaMin, cgpaVerified: filters.cgpaVerified, colleges: filters.colleges, collegeSort: filters.collegeSort };
+  let proConfig: Awaited<ReturnType<typeof getEmployerSubscriptionConfig>> | null = null;
+  const proActive = await proAccess(uid);
+  data.pro.active = proActive;
+  if (!proActive) {
+    data.pro.ignored = hasProRequest(requested) && !filters.saved;
+    Object.assign(filters, { ...EMPTY_PRO_REQUEST, colleges: [] });
+    proConfig = await getEmployerSubscriptionConfig();
+    data.pro.offered = proConfig.enabled;
+  }
 
   try {
     const db = getDb();
@@ -429,7 +494,9 @@ export async function loadCandidates(
     if (!opts.hasFilterParams && !opts.fresh && activeProjectId) {
       // Only real filters are restored. A cookie holding just the retired `view`
       // used to redirect to itself forever (see lib/employer-filter-restore).
-      const savedFilters = restorableFilters(await rememberedFilters(uid, activeProjectId), FILTER_KEYS);
+      const restorable = restorableFilters(await rememberedFilters(uid, activeProjectId), FILTER_KEYS);
+      // A remembered query from before the subscription ended must not bring the Pro filters back.
+      const savedFilters = proActive ? restorable : withoutProParams(restorable);
       if (savedFilters) {
         const next = new URLSearchParams(savedFilters);
         next.set("project", activeProjectId);
@@ -468,6 +535,10 @@ export async function loadCandidates(
       .limit(1);
     data.region = employerRegion(employer ?? {});
     data.currency = data.region === "IN" ? "INR" : "USD";
+    if (proConfig?.enabled) {
+      data.pro.priceMinor = subscriptionPriceMinor(proConfig, data.currency);
+      data.pro.periodDays = proConfig.durationDays;
+    }
 
     // The pool rule (active, live, open to work, AI-interviewed, approved)
     // lives in lib/employer-pool so the dashboard applies the same one.
@@ -611,16 +682,36 @@ export async function loadCandidates(
 
     // `intern_onboarding` has no unique index on `user_id`: one row per intern.
     const seen = new Set<string>();
-    const profiles = rows
+    // The raw onboarding bag per intern: the CGPA filter needs the college's verification status, which the
+    // employer-facing profile does not carry.
+    const extraById = new Map<string, unknown>();
+    const pool = rows
       .filter((row) => {
         if (seen.has(row.user.id)) return false;
         seen.add(row.user.id);
+        extraById.set(row.user.id, row.onboarding.extraData);
         return true;
       })
       .map((row) => toCandidateProfile(row.user, row.onboarding))
       // Rating floors run here: `ratings` is a nested jsonb object whose
       // values the legacy writer stored as numbers or numeric strings.
       .filter((p) => savedOnly || RATING_META.every((meta) => p.ratings[meta.key] >= filters.minRatings[meta.key]));
+
+    // Findtern Pro, in the same in-memory pool the rating floors use, so the total, the pages and every sort
+    // agree. A subscriber's CGPA and college filters narrow it; for anyone else this returns it untouched.
+    // The Shortlist tab sets all filters aside, as it does for the others.
+    const proOutcome = enforcePro(
+      pool,
+      savedOnly ? EMPTY_PRO_REQUEST : { cgpaMin: filters.cgpaMin, cgpaVerified: filters.cgpaVerified, colleges: filters.colleges, collegeSort: filters.collegeSort },
+      proActive,
+      (p) => proFactsOf(p.academics, extraById.get(p.id)),
+    );
+    const profiles = proOutcome.items;
+    if (proActive) {
+      data.pro.colleges = proOutcome.options;
+      data.pro.hiddenNoScore = proOutcome.hiddenNoScore;
+      data.pro.approxKept = proOutcome.approxKept;
+    }
 
     // Roles students saved for this project (OA3). Optional: a failed read
     // only drops the "Interested in this role" boost, never the list.
@@ -633,7 +724,7 @@ export async function loadCandidates(
 
     // A sort the employer picked leads; otherwise saved roles do. Skill and
     // city matches then break ties (bug sheet 21 Oct). Initials, never the name.
-    const ranked = rankProfiles(profiles, {
+    const ranked = proOutcome.order(rankProfiles(profiles, {
       sorts: filters.sorts,
       dir: filters.dir,
       skillTerms,
@@ -641,7 +732,7 @@ export async function loadCandidates(
       cities: cityList,
       saved: data.saved,
       projectSkills: data.activeProjectSkills,
-    });
+    }));
 
     data.total = ranked.length;
     const paged = pageWindow(data.total, filters.page, filters.pageSize);
