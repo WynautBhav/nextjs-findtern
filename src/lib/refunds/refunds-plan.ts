@@ -45,7 +45,7 @@ export function planScan(rows: ScanRow[], actor: string, now = new Date()): Plan
 
 export interface RazorpayRefundPayload {
   event?: string;
-  payload?: { refund?: { entity?: { id?: string; receipt?: string | null; status?: string } } };
+  payload?: { refund?: { entity?: { id?: string; receipt?: string | null; status?: string; payment_id?: string; amount?: number; created_at?: number } } };
 }
 
 /** Maps a verified webhook body to a refund event, or null if it is not one we handle. */

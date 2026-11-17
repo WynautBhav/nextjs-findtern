@@ -9,7 +9,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Razorpay webhook (payment.captured / order.paid): settles orders whose
- * browser callback never arrived. Unsigned or mis-signed events are refused.
+ * browser callback never arrived. refund.processed / refund.failed settle student refunds, and
+ * record an employer order's refund beside the order. Unsigned or mis-signed events are refused.
  */
 export async function POST(req: Request) {
   const rawBody = await req.text();
@@ -27,6 +28,8 @@ export async function POST(req: Request) {
     try {
       const outcome = await settleRefundWebhook(event as Parameters<typeof settleRefundWebhook>[0]);
       if (outcome === "unknown") console.warn("[razorpay webhook] refund event for unknown refund id");
+      // 200 either way (a retry cannot fix it), but a refund bigger than the payment needs a human.
+      if (outcome === "employer_over_paid") console.error("[razorpay webhook] employer refund exceeds the amount paid; not recorded");
       return NextResponse.json({ status: outcome === "unknown" ? "unknown_refund" : "ok" });
     } catch (error) {
       console.error("[razorpay webhook] refund", error);

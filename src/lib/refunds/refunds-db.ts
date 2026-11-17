@@ -5,6 +5,7 @@ import { createRefund } from "../razorpay.ts";
 import {
   applyWebhook, initiateRefundFlow, type InitiateResult, type RefundExecutor, type RefundGateway,
 } from "./refunds.ts";
+import { recordEmployerRefund, type EmployerRefundOutcome } from "./employer-refund.ts";
 import { parseRefundWebhook, planScan, type RazorpayRefundPayload, type ScanRow } from "./refunds-plan.ts";
 
 export function pgExecutor(c: PgClient): RefundExecutor {
@@ -109,7 +110,7 @@ export async function listRefunds(f: { status?: string; reason?: string; limit: 
   };
 }
 
-export type WebhookOutcome = "unknown" | "noop" | "refunded" | "failed" | "ignored";
+export type WebhookOutcome = "unknown" | "noop" | "refunded" | "failed" | "ignored" | `employer_${EmployerRefundOutcome}`;
 
 /** Settles a verified refund.* webhook. Replays and out-of-order events are no-ops. */
 export async function settleRefundWebhook(body: RazorpayRefundPayload): Promise<WebhookOutcome> {
@@ -121,7 +122,13 @@ export async function settleRefundWebhook(body: RazorpayRefundPayload): Promise<
     [ev.gatewayRefundId, ev.receipt],
   );
   const row = found.rows[0];
-  if (!row) return "unknown";
+  if (!row) {
+    // Not a student refund: an employer order refunded from the gateway. Recorded as a contra entry on the order.
+    const entity = body.payload?.refund?.entity;
+    if (!entity || body.event !== "refund.processed") return "unknown";
+    const outcome = await withPgTransaction((c) => recordEmployerRefund(c, entity));
+    return outcome === "not_employer" ? "unknown" : `employer_${outcome}`;
+  }
   const next = applyWebhook({ status: row.status }, ev);
   if (!next) return "noop";
   const upd = await pool.query(
