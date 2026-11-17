@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { payableCheckout } from "@/lib/employer-payable";
 import { requireMutation } from "@/lib/guards-mutation";
-import { quotePromo } from "@/lib/promo";
+import { promoRefusal, quotePromoGuarded } from "@/lib/promo";
 import { promoModeProblem } from "@/lib/promo-rules";
 
 const bodySchema = z.object({
@@ -32,7 +32,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const feeMinor = paying.reduce((s, l) => s + l.charge.perHireMinor, 0);
   if (orderMinor <= 0) return NextResponse.json({ error: "There is nothing to pay on this offer right now. Refresh the page." }, { status: 400 });
 
-  const quote = await quotePromo({ code: parsed.data.code, subjectId: id, orderMinor, currency: parsed.data.currency, audience: "employer", undiscountableMinor: feeMinor });
-  if (!quote.ok) return NextResponse.json({ error: quote.error }, { status: quote.status });
+  const quote = await quotePromoGuarded(req, id, { code: parsed.data.code, subjectId: id, orderMinor, currency: parsed.data.currency, audience: "employer", undiscountableMinor: feeMinor });
+  if (!quote.ok) return promoRefusal(quote);
   return NextResponse.json({ code: quote.promo.code, discountMinor: quote.discountMinor, payableMinor: quote.payableMinor });
 }

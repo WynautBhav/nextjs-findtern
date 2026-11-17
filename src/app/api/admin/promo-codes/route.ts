@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -47,7 +47,7 @@ export async function POST(req: Request) {
 
   const db = getDb();
   const code = parsed.data.code.trim().toUpperCase();
-  const [clash] = await db.select({ id: schema.promoCodes.id }).from(schema.promoCodes).where(eq(schema.promoCodes.code, code)).limit(1);
+  const [clash] = await db.select({ id: schema.promoCodes.id }).from(schema.promoCodes).where(sql`upper(${schema.promoCodes.code}) = ${code}`).limit(1);
   if (clash) return NextResponse.json({ error: DUPLICATE_CODE }, { status: 409 });
 
   try {

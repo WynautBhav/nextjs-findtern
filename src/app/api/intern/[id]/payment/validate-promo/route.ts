@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
-import { quotePromo } from "@/lib/promo";
+import { promoRefusal, quotePromoGuarded } from "@/lib/promo";
 import { isInternPaid } from "@/lib/payments";
 
 const bodySchema = z.object({ code: z.string() });
@@ -25,13 +25,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
-  const quote = await quotePromo({
+  const quote = await quotePromoGuarded(req, id, {
     code: parsed.data.code,
     subjectId: id,
     orderMinor: await getInternActivationFeeMinor(),
     currency: "INR",
   });
-  if (!quote.ok) return NextResponse.json({ error: quote.error }, { status: quote.status });
+  if (!quote.ok) return promoRefusal(quote);
   const [college] = quote.promo.collegeId
     ? await getDb().select({ name: schema.colleges.name }).from(schema.colleges).where(eq(schema.colleges.id, quote.promo.collegeId)).limit(1)
     : [];

@@ -12,7 +12,7 @@ import { openProposalsWithDues, payableCheckout, type PayableLine } from "@/lib/
 import { expireStaleEmployerOrders, legacyOrderRaw, OPEN_ORDER_MINUTES, orderProposalIds, settleEmployerOrder } from "@/lib/payments";
 import { TAKEDOWN_BLOCKS, takedownCheckedLineIds } from "@/lib/projects/takedown";
 import { orderModeProblem } from "@/lib/order-mode";
-import { quotePromo } from "@/lib/promo";
+import { promoHoldRefusal, promoRefusal, quotePromoGuarded } from "@/lib/promo";
 import { createOrder, paymentsAreFree, razorpayKeyId, testPayEnabled } from "@/lib/razorpay";
 
 const bodySchema = z.object({
@@ -86,6 +86,11 @@ async function openOrder(
   return withLock(`employer-pay:${employerId}`, async (tx): Promise<Refusal | null> => {
     const conflict = await openConflict(tx, employerId, paying.map((l) => l.id), promoCode);
     if (conflict) return { error: conflict };
+    // A capped code whose last uses sit on other accounts' open payments is refused (consume on paid, hold while open).
+    if (promoCode) {
+      const held = await promoHoldRefusal(tx, promoCode, employerId);
+      if (held) return { error: held };
+    }
     // Takedown re-check for the new-hire lines, under a shared lock on the project rows (id order).
     // The admin takedown holds FOR UPDATE on the project, so it either committed before this read
     // (seen here) or waits until this order is committed, and then sees it and leaves the offer.
@@ -171,8 +176,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (parsed.data.promoCode) {
     // The one-time hiring fee is never discounted (bug sheet 23 Oct).
     const feeMinor = paying.reduce((s, l) => s + l.charge.perHireMinor, 0);
-    const quote = await quotePromo({ code: parsed.data.promoCode, subjectId: id, orderMinor: amountMinor, currency, audience: "employer", undiscountableMinor: feeMinor });
-    if (!quote.ok) return NextResponse.json({ error: quote.error }, { status: quote.status });
+    const quote = await quotePromoGuarded(req, id, { code: parsed.data.promoCode, subjectId: id, orderMinor: amountMinor, currency, audience: "employer", undiscountableMinor: feeMinor });
+    if (!quote.ok) return promoRefusal(quote);
     promo = { promoCode: quote.promo.code, discountMinor: quote.discountMinor };
     amountMinor = quote.payableMinor;
   }

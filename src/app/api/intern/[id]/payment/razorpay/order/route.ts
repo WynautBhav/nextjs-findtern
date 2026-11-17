@@ -10,7 +10,7 @@ import { collegeAccountPayBlock } from "@/lib/college/account-state";
 import { openOrder } from "@/lib/intern-order-open";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { consentProblem } from "@/lib/college/promo-membership";
-import { quotePromo } from "@/lib/promo";
+import { promoRefusal, quotePromoGuarded } from "@/lib/promo";
 import { isInternPaid, settleInternOrder } from "@/lib/payments";
 import { internProfileStatus } from "@/lib/profile-complete";
 import { createOrder, paymentsAreFree, razorpayKeyId, testPayEnabled } from "@/lib/razorpay";
@@ -81,13 +81,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let discountMinor = 0;
 
   if (parsed.data.promoCode) {
-    const quote = await quotePromo({
+    const quote = await quotePromoGuarded(req, id, {
       code: parsed.data.promoCode,
       subjectId: id,
       orderMinor: baseMinor,
       currency: "INR",
     });
-    if (!quote.ok) return NextResponse.json({ error: quote.error }, { status: quote.status });
+    if (!quote.ok) return promoRefusal(quote);
     // A college code verifies the student with that college, so the 18+ tick is required with it.
     const noConsent = quote.promo.collegeId ? consentProblem(parsed.data.declaredAdult) : null;
     if (noConsent) return NextResponse.json({ error: noConsent, needsConsent: true }, { status: 400 });
