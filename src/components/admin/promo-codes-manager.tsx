@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import {
   Check,
   Copy,
+  Download,
   Edit2,
   Loader2,
   Plus,
+  Receipt,
   Search,
   Tag,
   Trash2,
@@ -15,7 +17,7 @@ import {
 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatIstStamp, formatMoney } from "@/lib/format";
 import type { PromoCode } from "@/lib/db/schema";
 import { AdminEmpty } from "@/components/admin/panel";
 import { buttonClass } from "@/components/ui/button";
@@ -33,6 +35,13 @@ import { RowMenu } from "@/components/app/row-menu";
 import { useConfirm } from "@/components/app/use-confirm";
 import { ADMIN_PILL_PRIMARY, ADMIN_SURFACE } from "@/components/admin/surface";
 import { COLLEGE_CODE_LOCKED } from "@/lib/promo-rules";
+import { isoToIstInput, istInputToIso } from "@/lib/admin/promo-form-time";
+import { paginate, sortPromos, type PromoSort, type Redemption } from "@/lib/admin/promo-redemptions";
+
+const PAGE_SIZE = 25;
+const SORT_LABELS: Record<PromoSort, string> = { newest: "Newest first", used: "Most used", code: "Code A to Z", ending: "Ending soonest" };
+
+type RedemptionsView = { code: string; usedCount: number; totalDiscountInrMinor: number; redemptions: (Omit<Redemption, "redeemedAt"> & { redeemedAt: string | null })[] };
 
 const inputClass =
   "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500";
@@ -50,9 +59,12 @@ function benefitLabel(promo: PromoCode): string {
 export function PromoCodesManager({
   initialPromoCodes,
   canWrite,
+  discountGiven = {},
 }: {
   initialPromoCodes: PromoCode[];
   canWrite: boolean;
+  /** Discount given per promo id, in INR paise. */
+  discountGiven?: Record<string, number>;
 }) {
   const router = useRouter();
   const { ask, dialog: confirmDialog } = useConfirm();
@@ -68,6 +80,13 @@ export function PromoCodesManager({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "percentage" | "fixed">("all");
+  const [sort, setSort] = useState<PromoSort>("newest");
+  const [page, setPage] = useState(1);
+
+  // Redemptions dialog
+  const [redeemFor, setRedeemFor] = useState<PromoCode | null>(null);
+  const [redeemView, setRedeemView] = useState<RedemptionsView | null>(null);
+  const [redeemError, setRedeemError] = useState("");
 
   // Modal Dialog state (Add / Edit)
   const [modalOpen, setModalOpen] = useState(false);
@@ -115,6 +134,20 @@ export function PromoCodesManager({
     setModalOpen(true);
   }
 
+  async function openRedemptions(promo: PromoCode) {
+    setRedeemFor(promo);
+    setRedeemView(null);
+    setRedeemError("");
+    try {
+      const res = await fetch(`/api/admin/promo-codes/${promo.id}/redemptions`, { cache: "no-store" });
+      const data = (await res.json().catch(() => null)) as (RedemptionsView & { error?: string }) | null;
+      if (!res.ok || !data) throw new Error(data?.error || `Could not load (HTTP ${res.status})`);
+      setRedeemView(data);
+    } catch (err: unknown) {
+      setRedeemError(err instanceof Error ? err.message : "Could not load the redemptions.");
+    }
+  }
+
   function openEditModal(promo: PromoCode) {
     setEditingPromo(promo);
     setCode(promo.code);
@@ -122,13 +155,10 @@ export function PromoCodesManager({
     setDiscountType(promo.discountType === "fixed" ? "fixed" : "percentage");
     setDiscountValue(promo.discountType === "fixed" ? promo.discountValue / 100 : promo.discountValue);
     setMaxUsages(promo.maxUsages ?? "");
-    setMinOrderAmountRupees(
-      promo.minOrderAmountMinor ? Math.round(promo.minOrderAmountMinor / 100) : ""
-    );
-    // datetime-local wants local time; toISOString() is UTC, which moved
-    // the dates 5½ hours earlier on every save.
-    setValidFrom(promo.validFrom ? toLocalInput(promo.validFrom) : "");
-    setValidUntil(promo.validUntil ? toLocalInput(promo.validUntil) : "");
+    setMinOrderAmountRupees(promo.minOrderAmountMinor ? promo.minOrderAmountMinor / 100 : "");
+    // The date fields are IST, whatever zone the admin's browser is in.
+    setValidFrom(isoToIstInput(promo.validFrom));
+    setValidUntil(isoToIstInput(promo.validUntil));
     setIsActive(promo.isActive);
     setAppliesTo(promo.appliesTo === "intern" || promo.appliesTo === "employer" ? promo.appliesTo : "both");
     setErrorMsg("");
@@ -170,7 +200,7 @@ export function PromoCodesManager({
       invalid("Only an intern code can be 100%. Company codes can't cover the whole stipend.", "promo-value");
       return;
     }
-    if (validFrom && validUntil && new Date(validUntil) < new Date(validFrom)) {
+    if (validFrom && validUntil && (istInputToIso(validUntil) ?? "") < (istInputToIso(validFrom) ?? "")) {
       invalid("The end date must be on or after the start date.", "promo-until");
       return;
     }
@@ -186,8 +216,8 @@ export function PromoCodesManager({
         maxUsages: maxUsages !== "" ? Number(maxUsages) : null,
         minOrderAmountMinor:
           minOrderAmountRupees !== "" ? Math.round(Number(minOrderAmountRupees) * 100) : null,
-        validFrom: validFrom ? new Date(validFrom).toISOString() : null,
-        validUntil: validUntil ? new Date(validUntil).toISOString() : null,
+        validFrom: istInputToIso(validFrom),
+        validUntil: istInputToIso(validUntil),
         isActive,
         appliesTo,
       };
@@ -217,8 +247,8 @@ export function PromoCodesManager({
                   maxUsages: maxUsages !== "" ? Number(maxUsages) : null,
                   minOrderAmountMinor:
                     minOrderAmountRupees !== "" ? Math.round(Number(minOrderAmountRupees) * 100) : null,
-                  validFrom: validFrom ? new Date(validFrom) : null,
-                  validUntil: validUntil ? new Date(validUntil) : null,
+                  validFrom: istInputToIso(validFrom) ? new Date(istInputToIso(validFrom)!) : null,
+                  validUntil: istInputToIso(validUntil) ? new Date(istInputToIso(validUntil)!) : null,
                   isActive,
                   appliesTo,
                   updatedAt: new Date(),
@@ -288,7 +318,7 @@ export function PromoCodesManager({
   async function handleDelete(promo: PromoCode) {
     const ok = await ask({
       title: `Delete ${promo.code}?`,
-      body: "This removes the voucher permanently. Orders already placed keep their discount.",
+      body: "This removes the code permanently. A code that has been used can't be deleted: turn it off instead.",
       confirmLabel: "Delete",
     });
     if (!ok) return;
@@ -322,7 +352,7 @@ export function PromoCodesManager({
   }
 
   // Filtered rows
-  const filteredPromos = promos.filter((promo) => {
+  const filteredAll = promos.filter((promo) => {
     const q = search.trim().toLowerCase();
     const matchesSearch =
       !q ||
@@ -339,6 +369,8 @@ export function PromoCodesManager({
 
     return matchesSearch && matchesStatus && matchesType;
   });
+  const paged = paginate(sortPromos(filteredAll, sort), page, PAGE_SIZE);
+  const filteredPromos = paged.items;
 
   return (
     <div className="apple-admin space-y-4">
@@ -352,7 +384,7 @@ export function PromoCodesManager({
           <input
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
             placeholder="Search codes…"
             aria-label="Search promo codes"
             className="h-10 w-full rounded-full bg-[color:var(--admin-panel-2)] pr-11 pl-10 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 [&::-webkit-search-cancel-button]:hidden"
@@ -360,7 +392,7 @@ export function PromoCodesManager({
           {search ? (
             <button
               type="button"
-              onClick={() => setSearch("")}
+              onClick={() => { setSearch(""); setPage(1); }}
               aria-label="Clear search"
               className="absolute top-1/2 right-0 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-full text-text-subtle hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
             >
@@ -372,7 +404,7 @@ export function PromoCodesManager({
         <div className="flex flex-wrap items-center gap-2">
           <select
             value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as "all" | "active" | "inactive")}
+            onChange={(e) => { setStatusFilter(e.target.value as "all" | "active" | "inactive"); setPage(1); }}
             aria-label="Filter by status"
             className="h-10 cursor-pointer rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
           >
@@ -382,7 +414,7 @@ export function PromoCodesManager({
           </select>
           <select
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value as "all" | "percentage" | "fixed")}
+            onChange={(e) => { setTypeFilter(e.target.value as "all" | "percentage" | "fixed"); setPage(1); }}
             aria-label="Filter by discount type"
             className="h-10 cursor-pointer rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
           >
@@ -391,6 +423,15 @@ export function PromoCodesManager({
             <option value="fixed">Fixed amount</option>
           </select>
         </div>
+
+        <select
+          value={sort}
+          onChange={(e) => { setSort(e.target.value as PromoSort); setPage(1); }}
+          aria-label="Sort promo codes"
+          className="h-10 cursor-pointer rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+        >
+          {(Object.keys(SORT_LABELS) as PromoSort[]).map((k) => <option key={k} value={k}>{SORT_LABELS[k]}</option>)}
+        </select>
 
         {canWrite ? <button
           type="button"
@@ -473,6 +514,17 @@ export function PromoCodesManager({
                   <p className="mt-1 text-xs text-ink-600">
                     {promo.validUntil ? `Until ${formatDate(new Date(promo.validUntil).toISOString())}` : "No expiry"}
                   </p>
+                  <p className="mt-1 flex items-center gap-2 text-xs text-ink-600">
+                    {discountGiven[promo.id] ? <span className="nums">{formatMoney(discountGiven[promo.id], "INR", { zeroLabel: false })} given</span> : null}
+                    <button
+                      type="button"
+                      onClick={() => void openRedemptions(promo)}
+                      className="inline-flex items-center gap-1 rounded-full font-medium text-foreground underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+                    >
+                      <Receipt className="size-3.5" />
+                      Redemptions
+                    </button>
+                  </p>
                 </div>
                 <div className="max-lg:col-start-2 max-lg:row-start-1 max-lg:justify-self-end">
                   <Switch
@@ -523,6 +575,72 @@ export function PromoCodesManager({
           </ul>
         </div>
       )}
+
+      {paged.total > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-ink-700">
+          <p className="nums" aria-live="polite">Showing {paged.from} to {paged.to} of {paged.total}</p>
+          {paged.pages > 1 ? (
+            <div className="flex items-center gap-2">
+              <button type="button" disabled={paged.page <= 1} onClick={() => setPage(paged.page - 1)} className={buttonClass({ variant: "ghost", size: "md" })}>Previous</button>
+              <span className="nums">Page {paged.page} of {paged.pages}</span>
+              <button type="button" disabled={paged.page >= paged.pages} onClick={() => setPage(paged.page + 1)} className={buttonClass({ variant: "ghost", size: "md" })}>Next</button>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {/* Redemptions */}
+      <Dialog open={redeemFor !== null} onOpenChange={(o) => { if (!o) setRedeemFor(null); }}>
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>{redeemFor?.code} redemptions</DialogTitle>
+            <DialogDescription>Every use of this code: who, the order and the discount given.</DialogDescription>
+          </DialogHeader>
+          {redeemError ? (
+            <p role="alert" className="text-sm font-medium text-danger">{redeemError}</p>
+          ) : !redeemView ? (
+            <p className="flex items-center gap-2 text-sm text-ink-600"><Loader2 className="size-4 animate-spin" /> Loading</p>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="nums text-sm text-ink-800">
+                  <span className="font-semibold">{redeemView.usedCount.toLocaleString("en-IN")}</span> used ·{" "}
+                  <span className="font-semibold">{formatMoney(redeemView.totalDiscountInrMinor, "INR", { zeroLabel: false })}</span> discount given
+                </p>
+                <a
+                  href={`/api/admin/promo-codes/${redeemFor?.id}/redemptions?format=csv`}
+                  download
+                  className={buttonClass({ variant: "ghost", size: "md" })}
+                >
+                  <Download className="size-4" />
+                  Download CSV
+                </a>
+              </div>
+              {redeemView.redemptions.length === 0 ? (
+                <p className="rounded-apple-sm bg-ink-50 px-3 py-6 text-center text-sm text-ink-600">No one has used this code yet.</p>
+              ) : (
+                <div className="max-h-[50dvh] overflow-auto rounded-apple-sm border border-[color:var(--admin-rule)]">
+                  <table className="w-full min-w-[34rem] text-left text-sm">
+                    <thead className="sticky top-0 bg-background text-[0.8125rem] text-text-subtle">
+                      <tr><th className="px-3 py-2 font-medium">Who</th><th className="px-3 py-2 font-medium">Order</th><th className="px-3 py-2 text-right font-medium">Discount</th><th className="px-3 py-2 font-medium">When</th></tr>
+                    </thead>
+                    <tbody className="divide-y divide-[color:var(--admin-rule)]">
+                      {redeemView.redemptions.map((r, i) => (
+                        <tr key={`${r.orderId}-${i}`}>
+                          <td className="px-3 py-2"><span className="block font-medium text-ink-900">{r.who ?? "Unknown"}</span><span className="block text-xs text-ink-600">{r.kind === "employer" ? "Company" : "Intern"}{r.email ? ` · ${r.email}` : ""}</span></td>
+                          <td className="px-3 py-2 font-mono text-xs text-ink-700">{r.orderId ?? "-"}</td>
+                          <td className="nums px-3 py-2 text-right">{formatMoney(r.discountMinor, r.currency, { zeroLabel: false })}</td>
+                          <td className="nums px-3 py-2 whitespace-nowrap text-ink-700">{formatIstStamp(r.redeemedAt)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Add / Edit Dialog */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
@@ -651,7 +769,7 @@ export function PromoCodesManager({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="promo-from" className="block text-sm font-semibold text-ink-800">
-                  From <span className="font-normal text-ink-600">(optional)</span>
+                  From, IST <span className="font-normal text-ink-600">(optional)</span>
                 </label>
                 <input
                   id="promo-from"
@@ -663,7 +781,7 @@ export function PromoCodesManager({
               </div>
               <div>
                 <label htmlFor="promo-until" className="block text-sm font-semibold text-ink-800">
-                  Until <span className="font-normal text-ink-600">(optional)</span>
+                  Until, IST <span className="font-normal text-ink-600">(optional)</span>
                 </label>
                 <input
                   id="promo-until"
@@ -671,8 +789,10 @@ export function PromoCodesManager({
                   type="datetime-local"
                   value={validUntil}
                   onChange={(e) => setValidUntil(e.target.value)}
+                  aria-describedby="promo-until-help"
                   className={inputClass}
                 />
+                <p id="promo-until-help" className="mt-1 text-xs text-ink-600">Ends at this time, IST.</p>
               </div>
             </div>
 
@@ -728,11 +848,4 @@ export function PromoCodesManager({
       {confirmDialog}
     </div>
   );
-}
-
-/** A Date as `YYYY-MM-DDTHH:mm` in the browser's own time zone. */
-function toLocalInput(value: string | Date): string {
-  const d = new Date(value);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
