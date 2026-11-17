@@ -90,7 +90,7 @@ test("edited (hourly 12300, fee 650000, stipend 900000): every text surface foll
   assert.match(perHireEmployerPayAnswer(fee, hireFeeText(EDITED)), /₹6,500 \(or \$65\)/);
   assert.deepEqual(llmsInternMoneyLines(EDITED), [
     "- Candidate AI interview fee: ₹3,499 one-time, paid by the candidate (INR)",
-    "- Intern stipend: a fixed monthly stipend of ₹9,000 a month at a score of 6 to 8 and ₹9,000 a month at 8 to 10; none below a score of 6",
+    "- Intern stipend: a fixed monthly stipend of ₹9,000 at a score of 6 to 8 and ₹9,000 at 8 to 10; none below a score of 6",
   ]);
 });
 
@@ -105,7 +105,7 @@ test("different fees on the charged plans are quoted as a range, not one band's 
 test("llms.txt default lines carry the activation fee and the stipends", () => {
   assert.deepEqual(llmsInternMoneyLines(PRICING_DEFAULTS), [
     "- Candidate AI interview fee: ₹2,499 one-time, paid by the candidate (INR)",
-    "- Intern stipend: a fixed monthly stipend of ₹8,000 a month at a score of 6 to 8 and ₹15,000 a month at 8 to 10; none below a score of 6",
+    "- Intern stipend: a fixed monthly stipend of ₹8,000 at a score of 6 to 8 and ₹15,000 at 8 to 10; none below a score of 6",
   ]);
 });
 

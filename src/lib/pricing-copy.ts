@@ -80,7 +80,7 @@ export function stipendText(config: PricingConfig, id: BandId): string | null {
 export function llmsInternMoneyLines(config: PricingConfig): string[] {
   const skilled = stipendText(config, "skilled");
   const assured = stipendText(config, "assured");
-  const stipends = [skilled ? `${skilled} a month at a score of 6 to 8` : null, assured ? `${assured} a month at 8 to 10` : null].filter(Boolean);
+  const stipends = [skilled ? `${skilled} at a score of 6 to 8` : null, assured ? `${assured} at 8 to 10` : null].filter(Boolean);
   return [
     `- Candidate AI interview fee: ${activationFeeText(config)} one-time, paid by the candidate (INR)`,
     stipends.length
