@@ -150,12 +150,19 @@ export async function initiateRefundFlow(
   return { ok: true, gatewayRefundId: res.id, refundReason: refund.reason ?? null };
 }
 
-export type WebhookEvent = { event: "refund.processed" | "refund.failed"; gatewayRefundId: string };
+export type WebhookEvent = { event: "refund.processed" | "refund.failed"; gatewayRefundId: string; /** What the gateway says it refunded; absent when the event does not carry it. */ amountMinor?: number | null };
 
-/** Returns the new status, or null for a no-op. Only `initiated` moves; refunded/failed are terminal. */
-export function applyWebhook(refund: Pick<RefundLike, "status">, e: WebhookEvent): "refunded" | "failed" | null {
+/**
+ * Returns the new status, or null for a no-op. Only `initiated` moves; refunded/failed are terminal.
+ * A processed event for a different amount than the stored one is not settled: the row stays initiated so the
+ * reconcile job flags it for a human (refund-reconcile.ts invariant 4), instead of recording a full refund that was not.
+ */
+export function applyWebhook(refund: Pick<RefundLike, "status"> & { amountMinor?: number }, e: WebhookEvent): "refunded" | "failed" | null {
   if (refund.status !== "initiated") return null;
-  if (e.event === "refund.processed") return "refunded";
+  if (e.event === "refund.processed") {
+    if (typeof e.amountMinor === "number" && typeof refund.amountMinor === "number" && e.amountMinor !== refund.amountMinor) return null;
+    return "refunded";
+  }
   if (e.event === "refund.failed") return "failed";
   return null;
 }

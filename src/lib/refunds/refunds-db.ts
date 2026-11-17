@@ -120,7 +120,7 @@ export async function settleRefundWebhook(body: RazorpayRefundPayload): Promise<
   if (!ev) return "ignored";
   const pool = getDb().$client;
   const found = await pool.query(
-    `SELECT id, status, reason FROM payment_refunds WHERE gateway_refund_id=$1 OR ($2::text IS NOT NULL AND idempotency_key=$2) LIMIT 1`,
+    `SELECT id, status, reason, amount_minor FROM payment_refunds WHERE gateway_refund_id=$1 OR ($2::text IS NOT NULL AND idempotency_key=$2) LIMIT 1`,
     [ev.gatewayRefundId, ev.receipt],
   );
   const row = found.rows[0];
@@ -131,8 +131,13 @@ export async function settleRefundWebhook(body: RazorpayRefundPayload): Promise<
     const outcome = await withPgTransaction((c) => recordEmployerRefund(c, entity));
     return outcome === "not_employer" ? "unknown" : `employer_${outcome}`;
   }
-  const next = applyWebhook({ status: row.status }, ev);
-  if (!next) return "noop";
+  const next = applyWebhook({ status: row.status, amountMinor: Number(row.amount_minor) }, ev);
+  if (!next) {
+    if (row.status === "initiated" && ev.event === "refund.processed" && ev.amountMinor != null && ev.amountMinor !== Number(row.amount_minor)) {
+      console.error("[refunds] processed webhook amount differs from the stored refund; left initiated for reconcile", row.id);
+    }
+    return "noop";
+  }
   const upd = await pool.query(
     `UPDATE payment_refunds SET status=$2, settled_at=now(), updated_at=now(), gateway_refund_id=coalesce(gateway_refund_id,$3), raw=$4
       WHERE id=$1 AND status='initiated'`,

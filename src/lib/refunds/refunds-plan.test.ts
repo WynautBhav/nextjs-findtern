@@ -60,3 +60,17 @@ test("razorpay refund request builder", () => {
   assert.throws(() => buildRefundRequest({ paymentId: "pay_A1", amountMinor: 0, idempotencyKey: "k" }));
   assert.ok(!JSON.stringify(r).includes("Basic"));
 });
+
+test("webhook: a processed event whose amount differs from the stored refund does not settle it (left initiated for reconcile to flag)", () => {
+  const body = (amount?: number) => ({ event: "refund.processed", payload: { refund: { entity: { id: "rfnd_1", receipt: "refund:p1:1", amount } } } });
+  const stored = { status: "initiated", amountMinor: 249900 };
+  const same = parseRefundWebhook(body(249900))!;
+  const short = parseRefundWebhook(body(100000))!;
+  const unstated = parseRefundWebhook(body())!;
+  assert.equal(applyWebhook(stored, same), "refunded");
+  assert.equal(applyWebhook(stored, short), null);
+  assert.equal(applyWebhook(stored, unstated), "refunded"); // no amount on the event: nothing to compare, as before
+  // a failure event settles regardless of amount
+  const failed = parseRefundWebhook({ ...body(100000), event: "refund.failed" })!;
+  assert.equal(applyWebhook(stored, failed), "failed");
+});

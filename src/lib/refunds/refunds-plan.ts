@@ -53,5 +53,5 @@ export function parseRefundWebhook(body: RazorpayRefundPayload): (WebhookEvent &
   if (body.event !== "refund.processed" && body.event !== "refund.failed") return null;
   const entity = body.payload?.refund?.entity;
   if (!entity?.id) return null;
-  return { event: body.event, gatewayRefundId: entity.id, receipt: entity.receipt ?? null };
+  return { event: body.event, gatewayRefundId: entity.id, receipt: entity.receipt ?? null, amountMinor: typeof entity.amount === "number" ? entity.amount : null };
 }
