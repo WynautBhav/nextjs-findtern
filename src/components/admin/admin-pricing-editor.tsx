@@ -11,7 +11,8 @@ import { Switch } from "@/components/ui/switch";
 import { describeLegacyBand, isLegacyTier, legacyBandChange } from "@/lib/admin/plan-band";
 import { csrfFetch } from "@/lib/client-fetch";
 import { FEE_BANDS, FEE_BAND_LABEL, type FeeBand, type PerHireFeeSetting } from "@/lib/per-hire-fee";
-import { inrMinorToUsdMinor, savingsPercent } from "@/lib/currency";
+import { INR_PER_USD, inrMinorToUsdMinor, savingsPercent } from "@/lib/currency";
+import { MAX_MINOR, type StipendBands } from "@/lib/pricing-config";
 import { formatMoney } from "@/lib/format";
 import type { CmsPlanFeature } from "@/lib/content/types";
 import { cn } from "@/lib/utils";
@@ -57,10 +58,12 @@ export function AdminPricingEditor({
   plans,
   activationFeeMinor,
   perHireFee,
+  stipendBands,
 }: {
   plans: EditablePlan[];
   activationFeeMinor: number;
   perHireFee: PerHireFeeSetting;
+  stipendBands: StipendBands;
 }) {
   const router = useRouter();
   const [seeding, setSeeding] = useState(false);
@@ -86,6 +89,7 @@ export function AdminPricingEditor({
         <RateCardSummary plans={plans} />
       </div>
       <PerHireFeePanel initial={perHireFee} />
+      <StipendPanel initial={stipendBands} />
 
       {plans.length === 0 ? (
         <Panel>
@@ -296,6 +300,138 @@ function PerHireFeePanel({ initial }: { initial: PerHireFeeSetting }) {
         </ul>
         {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
       </div>
+    </Panel>
+  );
+}
+
+/** Whole rupees only (a stipend is a round monthly figure): paise, or null when blank, not an integer, or over the cap. */
+function parseWholeRupees(raw: string): number | null {
+  const t = raw.trim();
+  if (!/^\d+$/.test(t)) return null;
+  const minor = Number(t) * 100;
+  return Number.isSafeInteger(minor) && minor <= MAX_MINOR ? minor : null;
+}
+
+/**
+ * The fixed monthly intern stipend per score band. Espresso (score under 6)
+ * is not paid one. Cappuccino and Latte are typed in whole rupees and sent as
+ * paise in one save. The score ranges and the USD rule are fixed, shown only.
+ */
+function StipendPanel({ initial }: { initial: StipendBands }) {
+  const router = useRouter();
+  const { ask, dialog } = useConfirm();
+  const [stored, setStored] = useState<StipendBands>(initial);
+  const [skilled, setSkilled] = useState(toRupees(initial.skilled));
+  const [assured, setAssured] = useState(toRupees(initial.assured));
+  const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+  const [error, setError] = useState<string | null>(null);
+  const [badId, setBadId] = useState<string | null>(null);
+
+  const fields = [
+    { band: "skilled" as const, value: skilled, set: setSkilled },
+    { band: "assured" as const, value: assured, set: setAssured },
+  ];
+  const dirty = fields.some((f) => parseWholeRupees(f.value) !== stored[f.band]);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    const next: Record<"skilled" | "assured", number> = { skilled: 0, assured: 0 };
+    for (const f of fields) {
+      const minor = parseWholeRupees(f.value);
+      if (minor === null) {
+        setBadId(`stipend-${f.band}`);
+        setError(`The ${FEE_BAND_LABEL[f.band].plan} stipend must be a whole number of rupees, like 8000.`);
+        document.getElementById(`stipend-${f.band}`)?.focus();
+        return;
+      }
+      next[f.band] = minor;
+    }
+    const ok = await ask({
+      title: "Publish these stipends?",
+      body: `Cappuccino ${formatMoney(next.skilled, "INR")} a month, Latte ${formatMoney(next.assured, "INR")} a month. Applies to offers made from now on.`,
+      confirmLabel: "Yes, publish",
+    });
+    if (!ok) return;
+    setState("saving");
+    setError(null);
+    setBadId(null);
+    try {
+      const res = await csrfFetch("/api/admin/pricing", {
+        method: "PUT",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ internStipendBands: { standard: null, ...next } }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(body.error ?? "Could not save.");
+        setState("idle");
+        return;
+      }
+      setStored(body.internStipendBands ?? { standard: null, ...next });
+      setState("saved");
+      router.refresh();
+      setTimeout(() => setState("idle"), 2500);
+    } catch {
+      setError("Not saved: the network request failed.");
+      setState("idle");
+    }
+  }
+
+  return (
+    <Panel>
+      <PanelHeader
+        title="Intern monthly stipend"
+        description="The fixed amount a hired intern is paid each month, by Findtern Score. Cappuccino and Latte only."
+        icon={IndianRupee}
+      />
+      {dialog}
+      <form onSubmit={save} noValidate className="space-y-4 px-5 py-4">
+        <ul className="divide-y divide-[color:var(--admin-rule)]">
+          <li className="flex items-center justify-between gap-4 py-3">
+            <span className="text-sm font-medium text-ink-800">
+              {FEE_BAND_LABEL.standard.plan} (score {FEE_BAND_LABEL.standard.scores.replace("-", "–")})
+              <span className="block text-xs font-normal text-text-subtle">No stipend: a score under 6 is not paid one</span>
+            </span>
+            <span className="text-sm text-text-subtle">None</span>
+          </li>
+          {fields.map((f) => {
+            const id = `stipend-${f.band}`;
+            const label = FEE_BAND_LABEL[f.band];
+            return (
+              <li key={f.band} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+                <label htmlFor={id} className="text-sm font-medium text-ink-800">
+                  {label.plan} (score {label.scores.replace("-", "–")})
+                  <span className="block text-xs font-normal text-text-subtle">Per month, in whole rupees</span>
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-ink-600" aria-hidden>₹</span>
+                  <input
+                    id={id}
+                    inputMode="numeric"
+                    value={f.value}
+                    onChange={(e) => {
+                      f.set(e.target.value.replace(/\D/g, ""));
+                      setError(null);
+                      setBadId(null);
+                    }}
+                    aria-invalid={badId === id ? true : undefined}
+                    aria-describedby={badId === id ? "stipend-error" : undefined}
+                    className={cn(inputClass, "mt-0 w-36")}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--admin-rule)] pt-4">
+          <p className="text-xs text-ink-600">
+            Fixed, not editable: the score ranges above, and USD at ₹{INR_PER_USD} = $1.
+            {dirty ? <span className="ml-2 rounded-full bg-accent-100 px-2 py-0.5 font-medium text-accent-700">Unsaved changes</span> : null}
+          </p>
+          <SaveButton state={state} />
+        </div>
+        {error ? <p id="stipend-error" role="alert" className="text-sm text-danger">{error}</p> : null}
+      </form>
     </Panel>
   );
 }

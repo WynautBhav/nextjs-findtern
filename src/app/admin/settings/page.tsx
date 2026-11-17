@@ -11,17 +11,19 @@ import { AdminPricingEditor, type EditablePlan } from "@/components/admin/admin-
 import { getSession } from "@/lib/auth";
 import { canWrite } from "@/lib/admin/permissions";
 import { getDb, schema } from "@/lib/db";
-import { getInternActivationFeeMinor, getPerHireFeeSetting } from "@/lib/platform-settings";
+import Link from "next/link";
+import { getInternActivationFeeMinor, getPerHireFeeSetting, getSetting } from "@/lib/platform-settings";
 import type { PerHireFeeSetting } from "@/lib/per-hire-fee";
+import { INTERN_STIPEND_KEY, parseStipendBands, type StipendBands } from "@/lib/pricing-config";
 
 export const metadata: Metadata = {
   title: "Pricing & Fees | Admin",
   robots: { index: false, follow: false },
 };
 
-async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMinor: number; perHireFee: PerHireFeeSetting } | null> {
+async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMinor: number; perHireFee: PerHireFeeSetting; stipendBands: StipendBands } | null> {
   try {
-    const [rows, activationFeeMinor, perHireFee] = await Promise.all([
+    const [rows, activationFeeMinor, perHireFee, stipendRaw] = await Promise.all([
       getDb()
         .select()
         .from(schema.pricingPlans)
@@ -29,10 +31,12 @@ async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMino
         .orderBy(asc(schema.pricingPlans.sortOrder)),
       getInternActivationFeeMinor(),
       getPerHireFeeSetting(),
+      getSetting(INTERN_STIPEND_KEY),
     ]);
     return {
       activationFeeMinor,
       perHireFee,
+      stipendBands: parseStipendBands(stipendRaw),
       plans: rows.map((r) => ({
         id: r.id,
         slug: r.slug,
@@ -52,6 +56,39 @@ async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMino
     console.error("[admin/settings] pricing load failed", e);
     return null;
   }
+}
+
+/** Figures typed into copy rather than read from the settings above: a price change does not reach them. */
+const HAND_EDITED: { what: string; where: string; href?: string }[] = [
+  { what: "FAQ page copy", where: "Written in the site's code, so a developer changes it." },
+  { what: "Intern terms (legal)", where: "Edited as a legal document.", href: "/admin/interns/terms" },
+  { what: "Blog posts", where: "Edited in the CMS.", href: "/admin/cms?tab=blog" },
+  { what: "CMS FAQ rows", where: "Edited in the CMS.", href: "/admin/cms?tab=faq" },
+];
+
+function HandEditedTexts() {
+  return (
+    <Panel>
+      <PanelHeader
+        title="Texts that still quote figures and must be edited by hand"
+        description="Prices, stipends and fees saved above do not rewrite these. Check them after a change."
+      />
+      <ul className="divide-y divide-[color:var(--admin-rule)] px-5 pb-2 text-sm">
+        {HAND_EDITED.map((t) => (
+          <li key={t.what} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5">
+            <span className="font-medium text-ink-800">{t.what}</span>
+            {t.href ? (
+              <Link href={t.href} className="text-brand-700 underline underline-offset-2">
+                {t.where}
+              </Link>
+            ) : (
+              <span className="text-text-subtle">{t.where}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
 }
 
 export default async function AdminSettingsPage() {
@@ -99,12 +136,14 @@ export default async function AdminSettingsPage() {
       {pricing && !mayEdit ? (
         <p className="text-sm text-text-subtle">Editing prices needs the Edit website content permission.</p>
       ) : pricing ? (
-        <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} perHireFee={pricing.perHireFee} />
+        <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} perHireFee={pricing.perHireFee} stipendBands={pricing.stipendBands} />
       ) : (
         <Panel>
           <AdminLoadError what="the rate card" retryHref="/admin/settings" />
         </Panel>
       )}
+
+      {pricing ? <HandEditedTexts /> : null}
 
       {calendarConnected === false ? null : calendar}
     </div>
