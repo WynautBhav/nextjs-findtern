@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { downloadCsv } from "@/lib/admin/csv";
+import { invoiceCsvColumns } from "@/lib/admin/invoice-csv";
 import {
   displayInvoiceNumber,
   gatewayLabel,
@@ -17,7 +18,7 @@ import {
   type AdminInvoiceRow,
   type InvoiceKind,
 } from "@/lib/admin/invoice-rows";
-import { formatDate, formatIstStamp, formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { placeOfSupply, splitGst } from "@/lib/gst";
 import { downloadInvoice, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
 import { adminInvoiceInput } from "@/lib/admin/invoice-print";
@@ -106,6 +107,18 @@ export function InvoiceRowActions({ row, kind, seller }: { row: AdminInvoiceRow;
             <Detail label="Amount">
               <span className="nums font-semibold">{money(row.amountMinor, row.currency)}</span>
             </Detail>
+            {(row.refundedMinor ?? 0) > 0 ? (
+              <Detail label="Refunded">
+                <span className="nums">
+                  {money(row.refundedMinor ?? 0, row.currency)} · net {money(Math.max(0, row.amountMinor - (row.refundedMinor ?? 0)), row.currency)}
+                </span>
+              </Detail>
+            ) : null}
+            {row.reviewReasons?.length ? (
+              <Detail label="Needs review">
+                <span className="text-danger">{row.reviewReasons.join(". ")}</span>
+              </Detail>
+            ) : null}
             <Detail label="GST included">
               <span className="nums">{money(row.amountMinor - gstBase(row), row.currency)}</span>
             </Detail>
@@ -149,28 +162,7 @@ export function InvoiceCsvButton({ rows, kind }: { rows: AdminInvoiceRow[]; kind
   return (
     <button
       type="button"
-      onClick={() =>
-        downloadCsv(k.csv, rows, [
-          { header: "Invoice number", value: (r) => displayInvoiceNumber(r, k.invoicePrefix) ?? "" },
-          { header: "Order ID", value: (r) => r.orderId },
-          { header: "Payment ID", value: (r) => r.paymentId },
-          { header: "Gateway", value: (r) => r.gateway ?? "" },
-          { header: k.party, value: (r) => r.partyName },
-          { header: "Email", value: (r) => r.partyEmail },
-          ...(kind === "employer" ? [{ header: "Interns", value: (r: AdminInvoiceRow) => r.interns ?? "" }] : []),
-          { header: "Amount", value: (r) => (r.amountMinor / 100).toFixed(2) },
-          { header: "Currency", value: (r) => r.currency },
-          // 18% GST is included in INR amounts; USD (export) carries none.
-          { header: "Amount before GST", value: (r) => (gstBase(r) / 100).toFixed(2) },
-          { header: "GST", value: (r) => ((r.amountMinor - gstBase(r)) / 100).toFixed(2) },
-          { header: "Discount", value: (r) => ((r.discountMinor ?? 0) / 100).toFixed(2) },
-          { header: "Promo code", value: (r) => r.promoCode ?? "" },
-          { header: "Status", value: (r) => r.status },
-          { header: "Needs review", value: (r) => (r.needsReview ? "yes" : "") },
-          { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
-          { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
-        ])
-      }
+      onClick={() => downloadCsv(k.csv, rows, invoiceCsvColumns(kind))}
       className={PILL_TONAL}
     >
       <Download className="size-3.5" aria-hidden />

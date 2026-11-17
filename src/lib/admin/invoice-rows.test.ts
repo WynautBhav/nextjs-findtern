@@ -73,3 +73,14 @@ test("sorting by amount and date", () => {
   assert.deepEqual(sortInvoiceRows(rows, "amount", "desc").map((r) => r.id), ["l", "s"]);
   assert.deepEqual(sortInvoiceRows(rows, "date", "asc").map((r) => r.id), ["s", "l"]);
 });
+
+test("status filter: 'refunded' keeps any order with money back, 'review' keeps flagged orders", () => {
+  const rows = [
+    row({ id: "a", orderId: "order_a" }),
+    row({ id: "b", orderId: "order_b", refundedMinor: 1000 }),
+    row({ id: "c", orderId: "order_c", needsReview: true, reviewReasons: ["A second payment came in"] }),
+  ];
+  assert.deepEqual(filterInvoiceRows(rows, invoiceFilters({ status: "refunded" }), "INV").map((r) => r.id), ["b"]);
+  assert.deepEqual(filterInvoiceRows(rows, invoiceFilters({ status: "review" }), "INV").map((r) => r.id), ["c"]);
+  assert.deepEqual(filterInvoiceRows(rows, invoiceFilters({ status: "paid" }), "INV").map((r) => r.id), ["a", "b", "c"]);
+});

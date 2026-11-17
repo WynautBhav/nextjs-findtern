@@ -8,6 +8,7 @@ import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { ButtonLink } from "@/components/ui/button";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { orderProposalIds } from "@/lib/order-ids";
+import { orderReview } from "@/lib/payment-flags";
 import { employerInvoices, needsLegacyNumber } from "@/lib/employer-invoice";
 import { loadInvoiceHires } from "@/lib/employer-invoice-hires";
 import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admin-invoices-view";
@@ -88,7 +89,9 @@ async function loadOrders(): Promise<{ rows: AdminInvoiceRow[]; uncounted: Set<s
       promoCode: promo.code,
       discountMinor: promo.discountMinor,
       discountLabel: discountLabel(promo, o.amountMinor),
-      needsReview: Boolean((o.raw as { needsReview?: unknown } | null)?.needsReview),
+      // The settle flag, a second payment for the order, a refused amount: each in words, for the badge, filter and CSV.
+      needsReview: orderReview(o.raw).flagged,
+      reviewReasons: orderReview(o.raw).reasons.map((r) => r.label),
       partyName: o.companyName || "Unknown employer",
       partyEmail: o.companyEmail || "-",
       // The issued invoice's own buyer block (snapshot at settle), else the live profile.

@@ -111,7 +111,21 @@ test("ledgerTotals: collected is paid payment rows only, flag-only rows are not 
 });
 
 test("ledgerTotals of nothing is zero", () => {
-  assert.deepEqual(ledgerTotals([]), { collectedMinor: 0, collectedCount: 0, discountMinor: 0, notCollectedMinor: 0, notCollectedCount: 0, markedPaidCount: 0 });
+  assert.deepEqual(ledgerTotals([]), { collectedMinor: 0, collectedCount: 0, discountMinor: 0, notCollectedMinor: 0, notCollectedCount: 0, markedPaidCount: 0, refundedMinor: 0, netCollectedMinor: 0 });
+});
+
+test("ledgerTotals: collected stays gross, refunds are their own figure, net is the difference (USD at ₹100/$, test employers out)", () => {
+  const rows: LedgerRow[] = [
+    { id: "a", status: "paid", amountMinor: 100_000, currency: "INR", refundedMinor: 40_000 },
+    { id: "b", status: "paid", amountMinor: 300, currency: "USD", refundedMinor: 100 }, // $3 paid, $1 back
+    { id: "c", status: "paid", amountMinor: 50_000, currency: "INR" },
+    { id: "test", status: "paid", amountMinor: 9_000, currency: "INR", refundedMinor: 9_000 },
+    { id: "unpaid", status: "created", amountMinor: 700, currency: "INR", refundedMinor: 700 },
+  ];
+  const t = ledgerTotals(rows, new Set(["test"]));
+  assert.equal(t.collectedMinor, 100_000 + 30_000 + 50_000);
+  assert.equal(t.refundedMinor, 40_000 + 10_000);
+  assert.equal(t.netCollectedMinor, 130_000);
 });
 
 test("net = received - paid out - owed", () => {
@@ -153,4 +167,16 @@ test("college-drive waiver rows are not money received; a paid gateway row still
   const rows = [{ gateway: "razorpay" }, { gateway: "free" }, { gateway: "college_drive" }, {}];
   assert.deepEqual(rows.filter(isMoneyReceived).length, 3);
   assert.equal(isMoneyReceived({ gateway: "college_drive" }), false);
+});
+
+test("ledgerTotals: a legacy row labelled refunded was received money, as Transactions counts it", () => {
+  const rows: LedgerRow[] = [
+    { id: "a", status: "refunded", amountMinor: 4_000, currency: "INR", refundedMinor: 4_000 },
+    { id: "b", status: "partially_refunded", amountMinor: 10_000, currency: "INR", refundedMinor: 2_500 },
+  ];
+  const t = ledgerTotals(rows);
+  assert.equal(t.collectedMinor, 14_000);
+  assert.equal(t.collectedCount, 2);
+  assert.equal(t.notCollectedCount, 0);
+  assert.equal(t.netCollectedMinor, 14_000 - 6_500);
 });

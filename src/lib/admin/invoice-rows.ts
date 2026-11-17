@@ -46,6 +46,8 @@ export type AdminInvoiceRow = {
   discountLabel?: string | null;
   /** Paid, but not every proposal could be hired - accounts should refund the difference. */
   needsReview?: boolean;
+  /** Why accounts must look at it (settle flag, a duplicate payment, a refused amount), in words. */
+  reviewReasons?: string[];
   /** Paid outside this ledger (only the profile's paid flag records it). */
   flagOnly?: boolean;
 };
@@ -119,7 +121,11 @@ export function filterInvoiceRows(rows: AdminInvoiceRow[], f: InvoiceFilters, in
         .toLowerCase();
       if (!words.every((w) => hay.includes(w))) return false;
     }
-    if (f.status === "paid" ? !isPaidRow(r) : f.status && r.status !== f.status) return false;
+    if (f.status === "refunded") {
+      if ((r.refundedMinor ?? 0) <= 0) return false;
+    } else if (f.status === "review") {
+      if (!r.needsReview) return false;
+    } else if (f.status === "paid" ? !isPaidRow(r) : f.status && r.status !== f.status) return false;
     if (f.currency && r.currency !== f.currency) return false;
     const promoApplied = Boolean(r.promoCode) || (r.discountMinor ?? 0) > 0;
     if (f.promo === "with" && !promoApplied) return false;
