@@ -176,3 +176,30 @@ test("funnel: a status nobody planned for is still in play, not 'declined or exp
   const f = buildFunnel({ proposals: [prop("a", "pending"), prop("b", "sent")], shortlistInternIds: [], metInternIds: [] });
   assert.equal(f.stages[1].lost, 0);
 });
+
+test("funnel: a verifying offer is accepted by the candidate (nesting holds) and says so, apart from 'to pay'", () => {
+  const f = buildFunnel({
+    proposals: [prop("a", "accepted", { bucket: "verifying" }), prop("b", "accepted"), prop("c", "sent"), prop("d", "accepted", { bucket: "closed" })],
+    shortlistInternIds: [],
+    metInternIds: [],
+  });
+  assert.deepEqual(counts(f), [4, 4, 2, 0]);
+  assert.equal(f.stages[1].sub, "1 awaiting a reply");
+  assert.equal(f.stages[2].sub, "1 to pay \u00b7 1 verifying CGPA");
+  // The expired-unpaid offer (bucket closed) is a lost offer, not an accepted one.
+  assert.equal(f.stages[1].lost, 1);
+});
+
+test("funnel: only verifying offers read '1 verifying CGPA', no 'to pay'", () => {
+  const f = buildFunnel({ proposals: [prop("a", "accepted", { bucket: "verifying" })], shortlistInternIds: [], metInternIds: [] });
+  assert.equal(f.stages[2].sub, "1 verifying CGPA");
+});
+
+test("project stats: verifying is in play but not to pay; expired-unpaid is closed", () => {
+  const m = buildProjectStats([
+    prop("a", "accepted", { projectId: "p1", bucket: "verifying" }),
+    prop("b", "accepted", { projectId: "p1" }),
+    prop("c", "accepted", { projectId: "p1", bucket: "closed" }),
+  ]);
+  assert.deepEqual(m.get("p1"), { hired: 0, open: 2, declined: 1, toPay: 1 });
+});

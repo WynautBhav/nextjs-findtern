@@ -9,14 +9,14 @@
 import { todayIst, weekdayOf } from "./timesheet-days.ts";
 
 /** Same union as `ProposalBucket` (components/employer/proposal-bucket.ts), inlined to keep this module import-free. */
-export type DashBucket = "open" | "draft" | "accepted" | "hired" | "closed";
+export type DashBucket = "open" | "draft" | "verifying" | "accepted" | "hired" | "closed";
 
 export type DashProposal = {
   internId: string;
   projectId: string;
   /** Raw proposals.status. */
   status: string;
-  /** `proposalBucket(status, lapsed)`; null for an unknown status. */
+  /** `proposalBucket(status, lapsed, flags)` (via offerState); null for an unknown status. */
   bucket: DashBucket | null;
   createdAt: Date | string | null;
   hiredAt: Date | string | null;
@@ -65,18 +65,20 @@ const pct = (n: number, of: number) => (of > 0 ? Math.round((n / of) * 100) : nu
  * from the previous one, so Hired <= Accepted <= Offered <= In pipeline.
  */
 export function buildFunnel({ proposals, shortlistInternIds, metInternIds }: FunnelInput): Funnel {
-  type Flags = { anyProposal: boolean; offered: boolean; accepted: boolean; hired: boolean; live: boolean; awaiting: boolean; toPay: boolean };
+  type Flags = { anyProposal: boolean; offered: boolean; accepted: boolean; hired: boolean; live: boolean; awaiting: boolean; toPay: boolean; verifying: boolean };
   const byIntern = new Map<string, Flags>();
   for (const p of proposals) {
-    const f = byIntern.get(p.internId) ?? { anyProposal: false, offered: false, accepted: false, hired: false, live: false, awaiting: false, toPay: false };
+    const f = byIntern.get(p.internId) ?? { anyProposal: false, offered: false, accepted: false, hired: false, live: false, awaiting: false, toPay: false, verifying: false };
     f.anyProposal = true;
     if (p.bucket !== "draft") f.offered = true;
-    if (p.bucket === "accepted" || p.bucket === "hired") f.accepted = true;
+    // Verifying CGPA is accepted by the candidate; only payment is on hold.
+    if (p.bucket === "accepted" || p.bucket === "verifying" || p.bucket === "hired") f.accepted = true;
     if (p.bucket === "hired") f.hired = true;
     // Anything not closed is still in play, a status nobody planned for included (it is in the Proposals total too).
     if (p.bucket !== "closed") f.live = true;
     if (p.bucket === "open") f.awaiting = true;
     if (p.bucket === "accepted") f.toPay = true;
+    if (p.bucket === "verifying") f.verifying = true;
     byIntern.set(p.internId, f);
   }
 
@@ -86,6 +88,7 @@ export function buildFunnel({ proposals, shortlistInternIds, metInternIds }: Fun
   let lost = 0;
   let awaiting = 0;
   let toPay = 0;
+  let verifying = 0;
   for (const [id, f] of byIntern) {
     if (f.offered) {
       offered.add(id);
@@ -95,6 +98,7 @@ export function buildFunnel({ proposals, shortlistInternIds, metInternIds }: Fun
       if (f.accepted) {
         accepted.add(id);
         if (f.toPay) toPay += 1;
+        if (f.verifying) verifying += 1;
         if (f.hired) hired.add(id);
       }
     }
@@ -130,7 +134,7 @@ export function buildFunnel({ proposals, shortlistInternIds, metInternIds }: Fun
         href: "/employer/proposals?status=open",
       }),
       stage("accepted", "Accepted", accepted, offered, "offered", {
-        sub: toPay ? `${toPay} to pay` : null,
+        sub: [toPay ? `${toPay} to pay` : "", verifying ? `${verifying} verifying CGPA` : ""].filter(Boolean).join(" · ") || null,
         href: "/employer/proposals?status=accepted",
       }),
       stage("hired", "Hired", hired, accepted, "accepted", {
@@ -215,11 +219,11 @@ export function buildActivity(proposals: Pick<DashProposal, "status" | "createdA
 
 export type ProjectProgressStats = {
   hired: number;
-  /** Offers still in play: awaiting a reply or accepted. */
+  /** Offers still in play: awaiting a reply, accepted (verifying CGPA or to pay). */
   open: number;
   /** Declined, withdrawn or expired. */
   declined: number;
-  /** Accepted offers waiting on payment. */
+  /** Accepted offers the employer can pay for now. */
   toPay: number;
 };
 
@@ -228,9 +232,10 @@ export function buildProjectStats(proposals: Pick<DashProposal, "projectId" | "s
   for (const p of proposals) {
     const row = out.get(p.projectId) ?? { hired: 0, open: 0, declined: 0, toPay: 0 };
     if (p.bucket === "hired") row.hired += 1;
-    if (p.bucket === "open" || p.bucket === "draft" || p.bucket === "accepted") row.open += 1;
+    if (p.bucket === "open" || p.bucket === "draft" || p.bucket === "verifying" || p.bucket === "accepted") row.open += 1;
     if (p.bucket === "closed") row.declined += 1;
-    if (p.status === "accepted" || p.status === "processing") row.toPay += 1;
+    // Payable now: the accepted bucket (accepted and processing, CGPA clear, not expired). Verifying and expired are not.
+    if (p.bucket === "accepted") row.toPay += 1;
     out.set(p.projectId, row);
   }
   return out;

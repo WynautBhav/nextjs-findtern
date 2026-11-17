@@ -17,9 +17,9 @@ import { gated } from "@/lib/request-gate";
 import { isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { payableCheckout } from "@/lib/employer-payable";
 import { isProjectOpen } from "@/lib/project-locations";
-import { offerState } from "@/components/employer/proposal-state";
-import { proposalBucket, proposalCounts } from "@/components/employer/proposal-bucket";
-import { parseOffer } from "@/lib/offer";
+import { counterRow, type OfferState } from "@/components/employer/proposal-state";
+import { proposalCounts } from "@/components/employer/proposal-bucket";
+import { heldIds, internExtraData, openOrderProposalIds, stateForRow } from "@/lib/employer-flow";
 import { projectZone, timezoneForLocation } from "@/lib/timezones";
 import { formatSlotTime } from "@/lib/format";
 import { buildActivity, buildFunnel, buildProjectStats, untilLabel, type Activity as ActivityData, type DashProposal, type Funnel as FunnelData } from "@/lib/employer-dashboard";
@@ -48,6 +48,7 @@ type Loaded = {
   timezone: string;
   projects: ProjectRow[];
   proposals: {
+    id: string;
     status: string;
     projectId: string;
     internId: string;
@@ -55,6 +56,8 @@ type Loaded = {
     createdAt: Date | null;
     hiredAt: Date | null;
   }[];
+  /** `offerState` per proposal, same order: the one source of every bucket on this page. */
+  states: OfferState[];
   /** Interns with a scheduled or completed interview (funnel: "met"). */
   metInternIds: string[];
   submittedSheets: number;
@@ -123,21 +126,19 @@ export default async function EmployerDashboard() {
   }
 
   const { proposals, projects } = data;
-  // The same buckets as the Proposals tabs (an unanswered offer past its start
-  // date is closed there), so every figure here matches the tab it opens.
-  const lapsed = proposals.map((p) => offerState({ status: p.status, hiredAt: null }, parseOffer(p.offerDetails)).lapsed);
-  const bucket = proposals.map((p, i) => proposalBucket(p.status, lapsed[i]));
+  // The same states as the Proposals tabs (an unanswered offer past its start date is closed there, an accepted
+  // offer whose CGPA is being confirmed is "verifying"), so every figure here matches the tab it opens.
   const dashProposals: DashProposal[] = proposals.map((p, i) => ({
     internId: p.internId,
     projectId: p.projectId,
     status: p.status,
-    bucket: bucket[i],
+    bucket: data.states[i].bucket,
     createdAt: p.createdAt,
     hiredAt: p.hiredAt,
   }));
   // Offers on a project Findtern took down are "View only", not "waiting on the candidate".
   const downProjectIds = new Set(projects.filter((p) => p.takenDownAt).map((p) => p.id));
-  const awaiting = proposalCounts(proposals.map((p, i) => ({ status: p.status, lapsed: lapsed[i], ...(downProjectIds.has(p.projectId) ? { viewOnly: true } : {}) }))).awaiting;
+  const awaiting = proposalCounts(proposals.map((p, i) => counterRow(p.status, data.states[i], downProjectIds.has(p.projectId)))).awaiting;
 
   const tasks: Task[] = (
     [
@@ -349,11 +350,14 @@ async function load(employerId: string): Promise<Loaded> {
     gated(() => db.select().from(schema.projects).where(eq(schema.projects.employerId, employerId)).orderBy(desc(schema.projects.createdAt))),
     gated(() => db
       .select({
+        id: schema.proposals.id,
         status: schema.proposals.status,
         projectId: schema.proposals.projectId,
         internId: schema.proposals.internId,
         offerDetails: schema.proposals.offerDetails,
+        currency: schema.proposals.currency,
         createdAt: schema.proposals.createdAt,
+        updatedAt: schema.proposals.updatedAt,
         hiredAt: schema.proposals.hiredAt,
       })
       .from(schema.proposals)
@@ -387,6 +391,13 @@ async function load(employerId: string): Promise<Loaded> {
   ]);
 
   const employer = employerRow[0];
+  // The CGPA gate and the open-order freeze, once for every proposal below (two small reads).
+  const ctx = {
+    openOrders: await gated(() => openOrderProposalIds(db, employerId)),
+    extraByIntern: await gated(() => internExtraData(db, proposalRows.map((p) => p.internId))),
+  };
+  const states = proposalRows.map((p) => stateForRow(p, ctx).state);
+  const held = heldIds(proposalRows.map((p, i) => ({ id: p.id, state: states[i] })));
   // Top matches leave out anyone already proposed to.
   const proposedTo = new Set(proposalRows.map((p) => p.internId));
   // Same set as the nav badge and the Shortlist page: no live proposal yet
@@ -467,13 +478,15 @@ async function load(employerId: string): Promise<Loaded> {
     timezone: timezoneForLocation(employer ?? {}),
     projects: projectRows,
     proposals: proposalRows,
+    states,
     metInternIds: Array.from(new Set(metRows.map((r) => r.internId))),
     submittedSheets: sheetRows.length,
     pendingInterviews: interviewRows.filter((i) => i.status === "pending" || i.status === "proposed").length,
     nextInterview: nextIv,
     shortlisted,
     shortlistEntries,
-    toPay: payable.lines.length,
+    // Not the lines that are held for the CGPA check or expired (payableCheckout drops expired ones itself once WP3 lands).
+    toPay: payable.lines.filter((l) => !held.has(l.id)).length,
     candidates,
     presence,
     wanted,
