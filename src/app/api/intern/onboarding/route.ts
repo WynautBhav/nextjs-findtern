@@ -15,6 +15,7 @@ import {
   MAX_EXTRACURRICULARS,
   MAX_MARKSHEETS,
   MAX_SKILLS,
+  semesterProofErrors,
   skillsToStore,
   storedFileNames,
   storedFromDraft,
@@ -22,6 +23,8 @@ import {
   type OnboardingDraft,
   workModes,
 } from "@/lib/onboarding";
+import { readCgpaVerification } from "@/lib/cgpa-verification";
+import { nextCgpaVerification } from "@/lib/cgpa-verification-flow";
 import { hasCodeVerifiedMembership } from "@/lib/college/membership";
 import { decideAccountType, getAccountType } from "@/lib/intern-account";
 import { isInternPaid } from "@/lib/payments";
@@ -79,6 +82,9 @@ const bodySchema = z.object({
       scoreType: z.enum(["cgpa", "percentage", ""]).optional(),
       cgpa: z.string().max(10).default(""),
       marksheetUploads: z.array(upload).max(MAX_MARKSHEETS).optional(),
+      // Current semester (null clears it) and its proofs by slot key; the slots are checked below against the semester.
+      currentSemester: z.number().int().min(1).max(10).nullable().optional(),
+      semesterProofUploads: z.record(z.string().max(40), upload).refine((r) => Object.keys(r).length <= MAX_MARKSHEETS).optional(),
       professional: z.array(qualification).max(20).optional(),
       certifications: z.array(qualification).max(20).optional(),
     })
@@ -206,6 +212,7 @@ const LIST_CAPS: Record<string, string> = {
   experiences: `Add at most ${MAX_EXPERIENCES} experiences.`,
   extracurriculars: `Add at most ${MAX_EXTRACURRICULARS} activities.`,
   marksheetUploads: `You can keep at most ${MAX_MARKSHEETS} marksheets. Remove one.`,
+  semesterProofUploads: "Too many proof photos for that semester.",
 };
 
 function friendlyIssue(issue: z.core.$ZodIssue | undefined): string {
@@ -282,9 +289,25 @@ export async function POST(req: Request) {
     const files = [
       ...(body.academics.marksheetUploads ?? []),
       ...[...(body.academics.professional ?? []), ...(body.academics.certifications ?? [])].flatMap((r) => r.uploads ?? []),
+      ...Object.values(body.academics.semesterProofUploads ?? {}),
     ];
     if (files.some((u) => !known.has(u.name) && !own.test(u.name))) {
       return NextResponse.json({ error: "A file did not upload properly - upload it again.", step: 1 }, { status: 400 });
+    }
+  }
+
+  // Semester and CGPA proofs: a semester with a score needs every proof slot (the semester's own N photos), on
+  // drafts too, so a pending verification never starts with nothing for the admin to check. The messages are keyed
+  // by the slot's field id; the form shows each under its slot.
+  if (body.academics) {
+    if (body.academics.currentSemester === null && readCgpaVerification(existing?.extraData).status !== "not_required") {
+      const error = "Your semester is being verified and can't be removed. Change it to the right one instead.";
+      return NextResponse.json({ error, step: 1, fields: { currentSemester: error } }, { status: 400 });
+    }
+    const merged = { ...emptyDraft().academics, ...saved.academics, ...body.academics };
+    const proofErrors = semesterProofErrors(merged);
+    if (Object.keys(proofErrors).length > 0) {
+      return NextResponse.json({ error: Object.values(proofErrors)[0], step: 1, fields: proofErrors }, { status: 400 });
     }
   }
 
@@ -396,9 +419,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error, step: 1, fields: { accountType: error } }, { status: 400 });
   }
   const stored = storedFromDraft(input, existing ?? null);
+  // A semester with a score is a claim for Findtern to verify; a changed score or semester starts it again.
+  const storedAcademics = (stored.extraPatch.academics ?? null) as Record<string, unknown> | null;
+  const cgpaClaim = storedAcademics
+    ? nextCgpaVerification(
+        previousExtra,
+        {
+          score: String(storedAcademics.score ?? ""),
+          scoreType: storedAcademics.scoreType === "percentage" ? "percentage" : storedAcademics.scoreType === "cgpa" ? "cgpa" : "",
+          semester: typeof storedAcademics.currentSemester === "number" ? storedAcademics.currentSemester : null,
+        },
+        new Date(),
+      )
+    : null;
   const extraData = {
     ...previousExtra,
     ...stored.extraPatch,
+    ...(cgpaClaim ? { cgpaVerification: cgpaClaim } : {}),
     ...(accountType ? { accountType } : {}),
     // First acceptance is the one that counts; it is never cleared by a later save.
     ...(body.ndaAccepted && !previousExtra.ndaAcceptedAt ? { ndaAcceptedAt: new Date().toISOString() } : {}),

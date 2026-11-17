@@ -19,6 +19,8 @@ import { normaliseEntries, countStatuses, sheetHours } from "@/lib/employer-time
 import { offerScore, parseOffer } from "@/lib/offer";
 import { ProposalOfferSummary } from "@/components/admin/proposal-offer-summary";
 import { draftFromRecord, linkedinHref } from "@/lib/onboarding";
+import { readCgpaVerification } from "@/lib/cgpa-verification";
+import { readCgpaHistory } from "@/lib/cgpa-verification-flow";
 import type { RevealField } from "@/lib/admin/identity-mask";
 import type { User as UserType, InternOnboarding, Interview, Proposal, Timesheet, InternPayout } from "@/lib/db/schema";
 import { DetailRow, EmptyScene, Pill, SectionHead } from "@/components/app/primitives";
@@ -589,6 +591,8 @@ function ProfileTab({
           <p className="mt-3 text-sm text-ink-600">Marksheets and certificate files are on the Documents tab.</p>
         </div>
 
+        <CgpaVerificationBlock extra={extra} />
+
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="Experience" />
           {draft.experiences?.length ? (
@@ -1155,5 +1159,60 @@ function RevealValue({ canWrite, internId, field, masked, label }: { canWrite: b
       </button>
       {error ? <span role="alert" className="basis-full text-xs text-danger">{error}</span> : null}
     </span>
+  );
+}
+
+const HISTORY_LABEL: Record<string, string> = { requested: "Claimed", reset: "Claim changed, check restarted", verified: "Marked correct", incorrect: "Marked incorrect" };
+
+/**
+ * The CGPA check on the candidate's record: where it stands, what they claimed, what Findtern decided, and the
+ * history of claims and decisions. Nothing for a candidate who never picked a semester (legacy profiles).
+ */
+function CgpaVerificationBlock({ extra }: { extra: Record<string, unknown> }) {
+  const v = readCgpaVerification(extra);
+  if (v.status === "not_required") return null;
+  const history = readCgpaHistory(extra);
+  const unit = v.scoreType === "percentage" ? "%" : " / 10";
+  const at = (iso?: string) => (iso ? formatDate(iso) : "-");
+  return (
+    <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
+      <SectionHead
+        title="CGPA verification"
+        hint="Checked against the proof photos the candidate uploaded."
+        action={
+          <Link href="/admin/cgpa-verifications" className={cn(buttonClass({ variant: "outline", size: "sm" }), ADMIN_PILL_SECONDARY, "min-h-11")}>
+            Open the queue
+          </Link>
+        }
+      />
+      <p className="mb-3">
+        <StatusBadge tone={v.status === "verified" ? "success" : v.status === "incorrect" ? "danger" : "warning"} label={v.status === "verified" ? "Verified" : v.status === "incorrect" ? "Marked incorrect" : "Pending"} />
+      </p>
+      <dl className="divide-y divide-ink-100">
+        <DetailRow label="Semester" value={v.semester ? `Semester ${v.semester}` : "-"} />
+        <DetailRow label={v.scoreType === "percentage" ? "Claimed percentage" : "Claimed CGPA"} value={`${v.claimedScore}${unit}`} mono />
+        {v.status === "incorrect" ? <DetailRow label="Corrected score" value={`${v.correctedScore ?? "-"}${unit}`} mono /> : null}
+        <DetailRow label="Requested" value={at(v.requestedAt)} />
+        {v.status !== "pending" ? <DetailRow label="Decided" value={at(v.decidedAt)} /> : null}
+        {v.note ? <DetailRow label="Note" value={v.note} /> : null}
+      </dl>
+      {history.length > 1 ? (
+        <div className="mt-4 border-t border-ink-100 pt-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-text-subtle">History</p>
+          <ol className="mt-2 space-y-1.5 text-sm text-ink-700">
+            {history.map((h, i) => (
+              <li key={`${h.at}-${i}`} className="flex flex-wrap gap-x-2">
+                <span className="nums text-text-subtle">{at(h.at)}</span>
+                <span>
+                  {HISTORY_LABEL[h.event] ?? h.event}
+                  {h.semester ? `, semester ${h.semester}` : ""}: {h.claimedScore}
+                  {h.correctedScore ? ` → ${h.correctedScore}` : ""}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      ) : null}
+    </div>
   );
 }

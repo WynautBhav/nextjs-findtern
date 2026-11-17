@@ -6,7 +6,12 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
-import { emails } from "@/lib/emails";
+import { emails, renderEmail } from "@/lib/emails";
+import { cgpaEmails } from "@/lib/emails/cgpa";
+import { readCgpaVerification } from "@/lib/cgpa-verification";
+import { withAcceptedAt } from "@/lib/cgpa-verification-flow";
+import { sendSmtpMail } from "@/lib/mailer";
+import { SITE } from "@/lib/content/site";
 import { initialsOf } from "@/lib/employer-candidates";
 import { employerNames, internFirstName, notify, resolveOfferNotifications } from "@/lib/notify";
 import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
@@ -202,7 +207,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const base = (proposal.offerDetails ?? {}) as Record<string, unknown>;
     const now = new Date().toISOString();
     if (recordTerms) {
-      return { ...base, termsAcceptedAt: now, ...(offer.fullTime ? { fullTimeTermsAcceptedAt: now } : {}) };
+      // acceptedAt starts the CGPA check clock and the unpaid-offer rules; it is stamped the first time only.
+      return { ...withAcceptedAt(base, new Date(now)), termsAcceptedAt: now, ...(offer.fullTime ? { fullTimeTermsAcceptedAt: now } : {}) };
     }
     if (internDecline) return { ...base, declinedBy: "intern", declinedAt: now };
     // Keep a lapsed `sent` offer countable once it leaves `sent` (withdraw / admin expire).
@@ -373,6 +379,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
       data: { proposalId: id },
       email: emails.proposalDecision({ employerName: contact, candidate, role, accepted: status === "accepted", proposalId: id, fullTime }),
     });
+    if (status === "accepted") {
+      await requestCgpaCheck({ proposalId: id, internId: proposal.internId, employerId: proposal.employerId, role, startDate: offer.startDate ?? null });
+    }
     // Accepting a full-time offer is the hire itself (legacy routes.ts:14570).
     if (status === "accepted" && fullTime) {
       const { company } = await employerNames(proposal.employerId);
@@ -423,4 +432,48 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   return NextResponse.json({ proposal: { id: updated.id, status: updated.status } });
+}
+
+/**
+ * An intern who chose a semester and entered a score is waiting for Findtern to verify the CGPA. When they accept an
+ * offer, the clock starts: tell the admin team and promise the intern an answer in 24-48 hours. One in-app row per
+ * proposal (dedupe key); the admin email goes only when that row was newly written, so a repeat sends nothing.
+ * Best effort: nothing here can undo the acceptance.
+ */
+async function requestCgpaCheck(o: { proposalId: string; internId: string; employerId: string; role: string; startDate: string | null }) {
+  try {
+    const db = getDb();
+    const [onboarding] = await db
+      .select({ extraData: schema.internOnboarding.extraData })
+      .from(schema.internOnboarding)
+      .where(eq(schema.internOnboarding.userId, o.internId))
+      .limit(1);
+    const v = readCgpaVerification(onboarding?.extraData);
+    if (v.status !== "pending") return;
+    const [user] = await db
+      .select({ f: schema.users.firstName, l: schema.users.lastName })
+      .from(schema.users)
+      .where(eq(schema.users.id, o.internId))
+      .limit(1);
+    const internName = `${user?.f ?? ""} ${user?.l ?? ""}`.trim() || "A candidate";
+    const first = await notify({
+      to: { type: "intern", id: o.internId },
+      type: "cgpa_verification_requested",
+      title: "We'll verify your CGPA within 24-48 hours",
+      message: "You'll get a confirmation call or email from Findtern. There is nothing else you need to do.",
+      data: { proposalId: o.proposalId },
+      dedupeKey: `cgpa_requested:${o.proposalId}`,
+      email: cgpaEmails.requestedForIntern({ internName: user?.f ?? "", semester: v.semester, score: v.claimedScore, scoreType: v.scoreType }),
+    });
+    if (!first) return;
+    const { company } = await employerNames(o.employerId);
+    await sendSmtpMail({
+      to: process.env.ADMIN_ALERT_EMAIL ?? SITE.adminEmail,
+      ...renderEmail(
+        cgpaEmails.dueForAdmin({ internName, internId: o.internId, proposalId: o.proposalId, semester: v.semester, score: v.claimedScore, scoreType: v.scoreType, company, role: o.role, startDate: o.startDate }),
+      ),
+    });
+  } catch (err) {
+    console.error("[proposal-status] CGPA check request failed", err);
+  }
 }

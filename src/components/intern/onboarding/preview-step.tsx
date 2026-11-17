@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 
 import { NewTabHint } from "@/components/ui/new-tab-link";
 import { Check } from "./fields";
+import { CgpaDisclaimer } from "./semester-proofs";
 import type { StepProps } from "./types";
 
 /**
@@ -60,7 +61,9 @@ export function PreviewStep({ values, update, errors, documents, onJumpStep }: S
                 value={`${[a.startYear, a.yearOfGraduation].filter(Boolean).join(" – ") || "-"}${a.status ? ` (${a.status.toLowerCase()})` : ""}`}
               />
               {a.cgpa ? <DetailRow label={a.scoreType === "percentage" ? "Percentage" : "CGPA"} mono value={a.scoreType === "percentage" ? `${a.cgpa}%` : `${a.cgpa} / 10`} /> : null}
+              {typeof a.currentSemester === "number" ? <DetailRow label="Current semester" mono value={`Semester ${a.currentSemester}`} /> : null}
             </dl>
+            {a.cgpa && typeof a.currentSemester === "number" ? <CgpaDisclaimer compact className="mt-3" /> : null}
             {qualifications.length > 0 ? (
               <ul className="mt-3 space-y-1.5 text-sm text-ink-700 [overflow-wrap:anywhere]">
                 {qualifications.map((q) => (

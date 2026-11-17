@@ -293,8 +293,10 @@ export function OnboardingForm({
         router.replace("/intern/dashboard");
         return;
       }
+      // A semester with a score is now waiting for Findtern's check: say so where the intern is looking.
+      const checking = typeof values.academics.currentSemester === "number" && Boolean(values.academics.cgpa?.trim());
       setNotice({
-        text: final ? "Changes saved." : "Draft saved.",
+        text: `${final ? "Changes saved." : "Draft saved."}${checking ? " Findtern will verify your CGPA once you accept an offer." : ""}`,
         ok: true,
       });
       router.refresh();
