@@ -27,7 +27,11 @@ const bodySchema = z.object({
     message: "A percentage discount can't be more than 100",
   })
   // Employer codes may not cover the stipend (C1); fixed amounts are checked at quote time, when the stipend is known.
-  .refine((b) => b.discountType !== "percentage" || b.discountValue !== 100 || b.appliesTo === "intern" || b.appliesTo === undefined, {
+  // A subscription code can't be 100% either; a free subscription is a full-waiver code scoped to it.
+  .refine((b) => b.discountType !== "percentage" || b.discountValue !== 100 || b.appliesTo !== "subscription", {
+    message: "A subscription code can't be 100%. To give a subscription away, create a full-waiver code for the subscription.",
+  })
+  .refine((b) => b.discountType !== "percentage" || b.discountValue !== 100 || b.appliesTo === "intern" || b.appliesTo === undefined || b.appliesTo === "subscription", {
     message: "Only an intern code can be 100%. Employer codes can't cover the whole stipend.",
   });
 
