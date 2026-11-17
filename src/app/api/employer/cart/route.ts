@@ -68,7 +68,7 @@ export async function POST(req: Request) {
         .limit(1);
       if (!project) return NextResponse.json({ error: "Unknown project" }, { status: 404 });
       if (!isProjectOpen(project.status, project.takenDownAt)) {
-        return NextResponse.json({ error: "This project is closed or was taken down. Pick another project." }, { status: 409 });
+        return NextResponse.json({ error: "This project is not open (closed, paused, draft or taken down). Pick another." }, { status: 409 });
       }
 
       // Only someone in the candidate pool can be shortlisted, and not anyone

@@ -2,6 +2,7 @@ import { and, eq, inArray, isNotNull, isNull, ne, or, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { activeProject } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
@@ -10,7 +11,6 @@ import { editBlockedReason } from "@/lib/projects/transition";
 import { projectNameIssue } from "@/lib/project-name";
 import {
   CLOSED_PROJECT_STATUS,
-  CLOSED_PROJECT_STATUSES,
   MAX_PROJECT_SKILLS,
   isProjectOpen,
   projectLocationsError,
@@ -150,10 +150,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
           eq(schema.projects.employerId, project.employerId),
           ne(schema.projects.id, id),
           isNull(schema.projects.takenDownAt),
-          sql`coalesce(lower(trim(${schema.projects.status})), '') not in (${sql.join(
-            CLOSED_PROJECT_STATUSES.map((v) => sql`${v}`),
-            sql`, `,
-          )})`,
+          activeProject(),
         ),
       )
       .limit(1);

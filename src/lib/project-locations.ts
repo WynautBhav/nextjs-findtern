@@ -7,7 +7,7 @@
  */
 import { findContact } from "./contact-scrub.ts";
 import { canonicalSkill } from "./data/skills.ts";
-import { isVisibleToInterns } from "./projects/lifecycle.ts";
+import { isVisibleToInterns, normalizeStatus } from "./projects/lifecycle.ts";
 
 export const MAX_PROJECT_LOCATIONS = 3;
 
@@ -43,20 +43,27 @@ export function projectLocationsError(next: readonly string[], stored: readonly 
 
 /* ── Project status (EMH-03) ────────────────────────────────────────────
  * Legacy writes "inactive" when a project is closed and treats every other
- * value as active (its keep-one-active rule relies on it). This build writes
- * "inactive" too, and reads closed / inactive / archived (any case) as
- * closed; blank, null and anything else stay open, as in legacy. */
-
-export const CLOSED_PROJECT_STATUSES = ["inactive", "closed", "archived"] as const;
+ * value as active; this build writes "inactive" too. Since the lifecycle
+ * (lib/projects/lifecycle.ts) a project is open only while it is published. */
 
 /** The value written when an employer closes a project. */
 export const CLOSED_PROJECT_STATUS = "inactive";
 
+/**
+ * Is this project open for NEW business: a new offer, a new meeting, a shortlist entry, a place in the pickers.
+ * Only `published` is (lifecycle), plus the legacy `active` and a blank status (the column default, legacy active).
+ * Paused (and its legacy "inactive"), draft, pending review, rejected, closed, archived and any unknown value are not,
+ * and neither is a listing Findtern took down.
+ *
+ * Open is NOT the test for work already under way: an offer, meeting, hire, payment or timesheet that exists on a
+ * project that is later paused keeps working to completion, because none of those paths ask this question - only the
+ * routes that create a proposal, an interview or a cart entry do (pinned by security/open-project-gate.test.ts).
+ */
 export function isProjectOpen(status: string | null | undefined, takenDownAt?: Date | string | null): boolean {
   // A listing Findtern took down keeps status "active" but takes no offers.
   if (takenDownAt) return false;
   const s = String(status ?? "").trim().toLowerCase();
-  return !(CLOSED_PROJECT_STATUSES as readonly string[]).includes(s);
+  return s === "" || normalizeStatus(s) === "published";
 }
 
 /**

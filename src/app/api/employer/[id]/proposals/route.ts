@@ -154,7 +154,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!isProjectOpen(project.status, project.takenDownAt)) {
     const blocked = takedownBlock(project, "send");
     if (blocked) return NextResponse.json({ error: blocked, code: "listing_taken_down" }, { status: 409 });
-    return NextResponse.json({ error: "This project is closed. Reopen it or pick an open project." }, { status: 409 });
+    return NextResponse.json({ error: "This project is not open for offers (it is closed, paused or a draft). Publish it again or pick an open project." }, { status: 409 });
   }
 
   // Only a pool candidate, or one this employer already works with.

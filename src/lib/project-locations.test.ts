@@ -15,9 +15,11 @@ import {
 } from "./project-locations.ts";
 import { scopeLabel, scopeValue } from "./db/schema.ts";
 
-test("closed, inactive and archived read as closed; anything else is open (EMH-03)", () => {
-  for (const s of ["inactive", "closed", "archived", "Inactive", " CLOSED "]) assert.equal(isProjectOpen(s), false, s);
-  for (const s of ["active", "", null, undefined, "Active", "paused"]) assert.equal(isProjectOpen(s), true, String(s));
+test("only a published project (or the legacy active, or a blank status) is open for new offers", () => {
+  for (const s of ["published", "active", "Active", " PUBLISHED ", "", null, undefined]) assert.equal(isProjectOpen(s), true, String(s));
+  // closed in every spelling, and every lifecycle status that is not live: paused (and its legacy "inactive"), draft, review, rejected.
+  for (const s of ["inactive", "closed", "archived", "Inactive", " CLOSED ", "paused", "draft", "pending_review", "rejected", "Paused"]) assert.equal(isProjectOpen(s), false, s);
+  assert.equal(isProjectOpen("something-new"), false, "an unknown status is not treated as open");
 });
 
 test("projects need 4 to 7 skills; an older shorter list still resaves (EMH-13)", () => {

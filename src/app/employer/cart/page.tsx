@@ -22,6 +22,7 @@ import { SITE } from "@/lib/content/site";
 import { HireFlow, type HireFlowCounts } from "@/components/employer/hire-flow";
 import { ButtonLink } from "@/components/ui/button";
 import { rememberedSelection } from "@/lib/employer-selection";
+import { isProjectOpen } from "@/lib/project-locations";
 import { CartManager, type CartLineItem } from "@/components/employer/cart-manager";
 
 export const metadata: Metadata = {
@@ -213,7 +214,7 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
         ? db.select().from(schema.internOnboarding).where(inArray(schema.internOnboarding.userId, internIds))
         : Promise.resolve([] as (typeof schema.internOnboarding.$inferSelect)[]),
       db
-        .select({ id: schema.projects.id, projectName: schema.projects.projectName, status: schema.projects.status, timezone: schema.projects.timezone })
+        .select({ id: schema.projects.id, projectName: schema.projects.projectName, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt, timezone: schema.projects.timezone })
         .from(schema.projects)
         .where(and(eq(schema.projects.employerId, uid), inArray(schema.projects.id, projectIds))),
     ]);
@@ -229,14 +230,13 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
       const candidate = redactForEmployer(toCandidateProfile(user, onboardingByUser.get(item.internId)), unlockAll);
       const pricing = resolvePricing(candidate.score, plans, currency, region, feeSetting);
       const project = projectsById.get(item.projectId);
-      const projectStatus = String(project?.status ?? "active").toLowerCase();
       lines.push({
         id: item.id,
         projectId: item.projectId,
         projectName: project?.projectName ?? "Project",
         projectTimezone: project?.timezone ?? null,
-        // Legacy writes "inactive"; earlier new-app builds wrote "closed" (EMH-03).
-        projectClosed: ["closed", "inactive", "archived"].includes(projectStatus),
+        // Not open for new offers: closed (legacy "inactive", "closed", "archived"), paused, draft, rejected or taken down.
+        projectClosed: project ? !isProjectOpen(project.status, project.takenDownAt) : false,
         createdAt: item.createdAt ? item.createdAt.toISOString() : null,
         candidate,
         hourlyRateMinor: pricing.hourlyRateMinor,
