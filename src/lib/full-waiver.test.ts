@@ -229,3 +229,30 @@ test("an order flagged as a waiver must be a zero-amount waiver-gateway order, o
   assert.equal(waiverOrderProblem({ gateway: "razorpay", amountMinor: 100, raw: { promo: { promoCode: "X" } } }), null, "ordinary orders are untouched");
   assert.ok(waiverOrderProblem({ gateway: WAIVER_GATEWAY, amountMinor: 0, raw: {} }), "the waiver gateway needs the flag too");
 });
+
+// ---------------------------------------------------------------- regression: ordinary codes behave exactly as before
+
+import { promoDiscountProblem } from "./admin/promo-edit-rules.ts";
+import { employerPromoTooLarge, promoModeProblem } from "./promo-rules.ts";
+
+test("regression: an ordinary 100% percentage code is still refused for employers, and 100% stays an intern-only thing", () => {
+  assert.equal(promoDiscountProblem({ discountType: "percentage", discountValue: 100, appliesTo: "employer" }), "Only an intern code can be 100%. Employer codes can't cover the whole stipend.");
+  assert.equal(promoDiscountProblem({ discountType: "percentage", discountValue: 100, appliesTo: "both" }), "Only an intern code can be 100%. Employer codes can't cover the whole stipend.");
+  assert.equal(promoDiscountProblem({ discountType: "percentage", discountValue: 100, appliesTo: "intern" }), null);
+  assert.equal(employerPromoTooLarge(1000, 1000), true, "an ordinary employer code that takes the whole discountable amount is still refused at quote time");
+});
+
+test("regression: ordinary percentage and fixed discounts price exactly as before, in INR and USD", () => {
+  const pct: PromoRow = { ...waiverRow, discountType: "percentage", discountValue: 25 };
+  const fixed: PromoRow = { ...waiverRow, discountType: "fixed", discountValue: 500_000 };
+  assert.equal(promoDiscount(pct, 2_100_000, "INR"), 525_000);
+  assert.equal(promoDiscount(pct, 21_000, "USD"), 5_250);
+  assert.equal(promoDiscount(fixed, 2_100_000, "INR"), 500_000);
+  assert.equal(promoDiscount(fixed, 300_000, "INR"), 300_000);
+  assert.equal(promoDiscount(fixed, 21_000, "USD"), 5_000);
+});
+
+test("regression: an ordinary code is still upfront-only (the waiver is the only code that works on every plan)", () => {
+  assert.ok(promoModeProblem("monthly"));
+  assert.equal(promoModeProblem("upfront"), null);
+});
