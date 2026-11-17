@@ -16,7 +16,8 @@ import { SITE } from "@/lib/content/site";
 import { ButtonLink } from "@/components/ui/button";
 import { HireFlow } from "@/components/employer/hire-flow";
 import { ProposalTabs } from "@/components/employer/section-tabs";
-import { hireFlowCountsFor } from "@/lib/employer-flow";
+import { hireFlowCountsFor, internExtraData, openOrderProposalIds, stateForRow } from "@/lib/employer-flow";
+import { tabFromParam } from "@/components/employer/proposal-tabs";
 import { ProposalsManager, type ProposalItem } from "@/components/employer/proposals-manager";
 
 export const metadata: Metadata = {
@@ -36,12 +37,9 @@ function userFor(first: string | null, last: string | null, hired: boolean): Pro
   return { firstName: initials.charAt(0), lastName: initials.slice(1) };
 }
 
-const STATUSES = new Set(["open", "draft", "accepted", "hired", "closed"]);
-
 export default async function EmployerProposalsPage({ searchParams }: { searchParams: Promise<{ status?: string | string[] }> }) {
-  // The dashboard's figures open a tab here (?status=open|draft|accepted|hired|closed).
-  const wanted = (await searchParams).status;
-  const initialStatus = typeof wanted === "string" && STATUSES.has(wanted) ? wanted : "all";
+  // The dashboard's figures and the hire strip open a tab here (?status=open|draft|verifying|accepted|viewonly|hired|closed).
+  const initialStatus = tabFromParam((await searchParams).status);
   const session = await requireRole("employer");
   await requireEmployerSetup(session.uid);
   const employerId = session.uid;
@@ -73,6 +71,12 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
     // Unmask on a hire with this employer on any project, as every other
     // employer screen does.
     const hired = await hiredInternIds(db, employerId);
+    // The CGPA gate and the open-order freeze come from server-side reads (the intern's extra_data never leaves the
+    // server): only the derived gate goes to the list.
+    const ctx = {
+      openOrders: await openOrderProposalIds(db, employerId),
+      extraByIntern: await internExtraData(db, rows.map((r) => r.proposal.internId)),
+    };
     // Photo and presence show before hire (owner call, 6 Nov); the name stays initials.
     const internIds = [...new Set(rows.map((r) => r.proposal.internId))];
     const withPhoto = new Set<string>();
@@ -90,6 +94,8 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
     }
     proposals = rows.map((row) => ({
       proposal: toEmployerProposal(row.proposal),
+      gate: stateForRow(row.proposal, ctx).state.gate,
+      hasOpenOrder: ctx.openOrders.has(row.proposal.id),
       project: row.projectId ? { id: row.projectId, projectName: row.projectName ?? "Project", ...(row.takenDownAt ? { takenDown: true } : {}) } : null,
       internHired: hired.has(row.proposal.internId),
       photoUrl: withPhoto.has(row.proposal.internId) ? avatarUrl(row.proposal.internId) : null,
@@ -114,7 +120,8 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
         className="mb-4 lg:mb-5"
       />
       <ProposalTabs active="proposals" proposals={flow?.proposals} />
-      {flow ? <HireFlow counts={flow} current="proposals" /> : null}
+      {/* No step is lit here: the tabs below are the stages (Waiting, Verifying, To pay, Hired), and the strip links into them. */}
+      {flow ? <HireFlow counts={flow} current={null} /> : null}
 
       {loadFailed ? (
         <LoadError what="your proposals" retryHref="/employer/proposals" email={SITE.adminEmail} />
@@ -122,7 +129,7 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
         // The manager copies its props into state (for optimistic withdraws),
         // so a changed server list must remount it.
         <ProposalsManager
-          key={proposals.map((p) => `${p.proposal.id}:${p.proposal.status}`).join("|")}
+          key={proposals.map((p) => `${p.proposal.id}:${p.proposal.status}:${p.gate?.state ?? ""}`).join("|")}
           initialProposals={proposals}
           initialStatus={initialStatus}
         />

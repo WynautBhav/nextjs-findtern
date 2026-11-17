@@ -58,7 +58,10 @@ test("byte-identical to the pre-change module on every no-takedown fixture (all 
   const statuses = ["draft", "sent", "interview_scheduled", "accepted", "processing", "hired", "rejected", "withdrawn", "expired", "weird", "Sent", " SENT ", "Interview Scheduled"];
   const rows = statuses.flatMap((status) => [{ status, lapsed: false }, { status, lapsed: true }]);
   const withIds = rows.map((r, i) => ({ ...r, internId: i % 4 === 0 ? "a" : `x${i}` }));
-  const mine = JSON.stringify([proposalCounts(rows), hireFlowFrom({ cartInternIds: ["a", "b", "c"], proposals: withIds, toPay: 3 })]);
+  // WP4 added `verifying` to the strip (0 here: nothing has a CGPA flag). Every other value is the frozen one.
+  const { verifying, ...strip } = hireFlowFrom({ cartInternIds: ["a", "b", "c"], proposals: withIds, toPay: 3 });
+  assert.equal(verifying, 0);
+  const mine = JSON.stringify([proposalCounts(rows), strip]);
   // Frozen from the module as it was on master before the View-only group existed.
   const BEFORE = '[{"all":26,"total":11,"awaiting":5,"drafts":2,"accepted":2,"hired":1,"closed":15,"other":1},{"shortlisted":2,"awaitingReply":5,"toPay":3,"hired":1,"proposals":11}]';
   assert.equal(mine, BEFORE);

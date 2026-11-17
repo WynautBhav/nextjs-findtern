@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
-import { ArrowLeft, Check, ChevronDown, Clock, CreditCard, Download, X } from "lucide-react";
+import { ArrowLeft, Check, ChevronDown, Clock, CreditCard, Download, Send, X } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -30,6 +30,9 @@ import { buttonClass } from "@/components/ui/button";
 import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
 import { offerState } from "@/components/employer/proposal-state";
+import { CgpaNotice, ExpiredNotice } from "@/components/employer/proposal-detail/cgpa-notice";
+import { proposalCgpaGate } from "@/lib/cgpa-verification";
+import { hasOpenOrderFor } from "@/lib/payments";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { TAKEN_DOWN_EXPLAIN, TAKEN_DOWN_SHORT } from "@/components/employer/takedown-ui";
 import { offerTimeline } from "@/components/employer/proposal-timeline";
@@ -91,6 +94,8 @@ export default async function EmployerProposalDetail({
   let projectDown: { id: string; reason: string | null } | null = null;
   let preference: WorkPreference = { modes: [], cities: [] };
   let hasLaptop: boolean | null = null;
+  // Read server-side only to derive the CGPA gate; the intern's data never goes to the page.
+  let internExtra: unknown = null;
   let photoUrl: string | null = null;
   let presence: PresenceLabel | null = null;
   try {
@@ -134,6 +139,7 @@ export default async function EmployerProposalDetail({
       .limit(1);
     preference = workPreferenceOf(pref, Number(((pref?.extraData ?? {}) as Record<string, unknown>).findternScore ?? 0) || 0);
     hasLaptop = typeof pref?.hasLaptop === "boolean" ? pref.hasLaptop : null;
+    internExtra = pref?.extraData ?? null;
     // Photo and presence show before hire (owner call, 6 Nov); the name stays initials.
     const [doc] = await db
       .select({ userId: schema.internDocuments.userId })
@@ -182,8 +188,14 @@ export default async function EmployerProposalDetail({
     console.error("[employer/proposal] tax place", err);
   }
   // Findtern took the project down: the offer is view only (no pay, edit, withdraw or message).
-  const baseState = offerState(proposal, offer);
-  const state = projectDown ? { ...baseState, canPay: false, canEdit: false, canWithdraw: false } : baseState;
+  // An open payment order freezes expiry; the CGPA check blocks payment until Findtern confirms it (or a correction is confirmed).
+  const hasOpenOrder = await hasOpenOrderFor(proposal.employerId, proposal.id).catch(() => false);
+  const gate = proposalCgpaGate({ status: proposal.status, extraData: internExtra, offerDetails: proposal.offerDetails, updatedAt: proposal.updatedAt });
+  const baseState = offerState({ ...proposal, hasOpenOrder, gate }, offer);
+  const state = projectDown ? { ...baseState, canPay: false, canEdit: false, canWithdraw: false, canSendNew: false } : baseState;
+  const confirmingCgpa = !projectDown && state.gate?.state === "incorrect_unacked";
+  // An expired offer: start again with the same candidate and project.
+  const sendNewHref = state.canSendNew ? `/employer/send-proposal?intern=${encodeURIComponent(proposal.internId)}${proposal.projectId ? `&project=${encodeURIComponent(proposal.projectId)}` : ""}` : null;
   const skills = Array.isArray(proposal.skills) ? proposal.skills.filter(Boolean) : [];
   const snapshot = Object.entries(proposal.aiRatings ?? {}).filter(
     (entry): entry is [string, number] => typeof entry[1] === "number" && entry[0] !== "overall",
@@ -234,7 +246,11 @@ export default async function EmployerProposalDetail({
     place,
   });
 
-  const timeline = offerTimeline(proposal, { startDate: offer.startDate, fullTime: Boolean(ft) }, state, formatDate);
+  // An expired offer ends the timeline at its closed step, like an unanswered one.
+  const timeline = offerTimeline(proposal, { startDate: offer.startDate, fullTime: Boolean(ft) }, { label: state.label, lapsed: state.lapsed || state.expiredReason === "unpaid_past_start" }, formatDate).map((step) =>
+    // While Findtern confirms the CGPA the next step is not yours yet.
+    state.verifying && /^You pay/.test(step.label) ? { ...step, label: state.gate?.state === "incorrect_unacked" ? "You confirm the CGPA, then pay" : "Findtern confirms the CGPA, then you pay" } : step,
+  );
   const profileHref = `/employer/intern/${encodeURIComponent(proposal.internId)}`;
 
   return (
@@ -287,6 +303,12 @@ export default async function EmployerProposalDetail({
               {ft ? "Pay the hiring fee" : "Pay to confirm hire"}
             </Link>
           ) : null}
+          {sendNewHref ? (
+            <Link href={sendNewHref} className={buttonClass({ className: "max-sm:w-full" })}>
+              <Send className="size-4" aria-hidden />
+              Send a new proposal
+            </Link>
+          ) : null}
           <div className="max-sm:[&_button]:w-full">
             {projectDown ? (
               <button type="button" disabled aria-disabled="true" title={TAKEN_DOWN_EXPLAIN} tabIndex={-1} className={buttonClass({ variant: "outline", className: "max-sm:w-full" })}>
@@ -298,6 +320,9 @@ export default async function EmployerProposalDetail({
           </div>
         </div>
       </header>
+
+      <CgpaNotice proposalId={proposal.id} state={state} canConfirm={confirmingCgpa} />
+      <ExpiredNotice state={state} />
 
       {/* ── The four numbers the decision rests on ───────────────────── */}
       <dl className="mt-8 grid grid-cols-2 border-y border-ink-100 sm:grid-cols-4">
@@ -497,7 +522,7 @@ export default async function EmployerProposalDetail({
 
           {state.canWithdraw || state.canEdit || proposal.status === "hired" ? (
             <section className="border-t border-ink-100 pt-8">
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{proposal.status === "hired" ? "Hire" : "Change this offer"}</h2>
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{proposal.status === "hired" ? "Hire" : state.expiredReason ? "Close this offer" : "Change this offer"}</h2>
               <div className="mt-4 grid gap-2">
                 {state.canEdit ? (
                   <ProposalOfferForm
@@ -533,7 +558,13 @@ export default async function EmployerProposalDetail({
                     }}
                   />
                 ) : null}
-                <ProposalActions proposalId={proposal.id} status={proposal.status} canPay={false} canWithdraw={state.canWithdraw} />
+                <ProposalActions
+                  proposalId={proposal.id}
+                  status={proposal.status}
+                  canPay={false}
+                  canWithdraw={state.canWithdraw}
+                  {...(confirmingCgpa ? { withdrawLabel: "Withdraw proposal", withdrawSecondary: true } : {})}
+                />
                 {proposal.status === "hired" && !ft ? (
                   <Link href="/employer/timesheets" className={buttonClass({ variant: "outline", block: true })}>
                     <Clock className="size-4" aria-hidden />
