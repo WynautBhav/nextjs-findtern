@@ -23,6 +23,8 @@ test("ledger totals: the waived order adds nothing to collected, its count or th
   assert.equal(withWaiver.discountMinor, without.discountMinor, "the waived value is not a discount given");
   assert.equal(withWaiver.waivedMinor, 3_520_000);
   assert.equal(withWaiver.waivedCount, 1);
+  const { waivedMinor: _m, waivedCount: _c, ...rest } = withWaiver; // eslint-disable-line @typescript-eslint/no-unused-vars
+  assert.deepEqual(rest, without, "everything else is exactly what the paid order alone gives");
   assert.equal(withWaiver.refundedMinor, 0);
 });
 
@@ -36,15 +38,15 @@ test("ledger totals with ONLY waived orders: everything is 0, nothing is NaN", (
 });
 
 test("a waived order that is not settled (failed, created) is not counted as waived", () => {
-  assert.equal(ledgerTotals([{ ...waived, status: "failed" }]).waivedCount, 0);
-  assert.equal(ledgerTotals([{ ...waived, status: "created" }]).waivedCount, 0);
+  assert.equal(ledgerTotals([{ ...waived, status: "failed" }]).waivedCount, undefined);
+  assert.equal(ledgerTotals([{ ...waived, status: "created" }]).waivedCount, undefined);
 });
 
 test("ordinary rows are byte-identical with and without the new fields (regression)", () => {
   const rows = [paid, { ...paid, id: "p2", amountMinor: 440_000, currency: "USD", discountMinor: 5_000 }, { id: "u1", status: "created", amountMinor: 100, currency: "INR" }];
   const t = ledgerTotals(rows);
-  assert.deepEqual({ ...t, waivedMinor: undefined, waivedCount: undefined }, { collectedMinor: 3_520_000 + 44_000_000, collectedCount: 2, discountMinor: 500_000, notCollectedMinor: 100, notCollectedCount: 1, markedPaidCount: 0, refundedMinor: 0, netCollectedMinor: 47_520_000, waivedMinor: undefined, waivedCount: undefined });
-  assert.equal(t.waivedCount, 0);
+  assert.deepEqual(t, { collectedMinor: 3_520_000 + 44_000_000, collectedCount: 2, discountMinor: 500_000, notCollectedMinor: 100, notCollectedCount: 1, markedPaidCount: 0, refundedMinor: 0, netCollectedMinor: 47_520_000 });
+  assert.equal("waivedCount" in t, false, "no waiver keys at all when no waived order exists");
 });
 
 test("labels: the gateway reads 'Complimentary (full waiver)'", () => {
@@ -91,5 +93,5 @@ test("Money in/out: a normal paid order still yields its 'received' row (regress
     { receivables: "both", payables: "both" },
   );
   assert.equal(out.totals.receivedMinor, 3_520_000);
-  assert.deepEqual(out.waived, { minor: 0, count: 0 });
+  assert.equal("waived" in out, false, "the report is unchanged when no waived order exists");
 });

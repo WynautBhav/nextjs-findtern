@@ -242,7 +242,7 @@ export function ledgerTotals(rows: LedgerRow[], uncounted?: ReadonlySet<string>)
     }
   }
   // collectedMinor stays gross (what was received); refunds are a separate figure and net is their difference.
-  return { collectedMinor, collectedCount, discountMinor, notCollectedMinor, notCollectedCount, markedPaidCount, refundedMinor, netCollectedMinor: collectedMinor - refundedMinor, waivedMinor, waivedCount };
+  return { collectedMinor, collectedCount, discountMinor, notCollectedMinor, notCollectedCount, markedPaidCount, refundedMinor, netCollectedMinor: collectedMinor - refundedMinor, ...(waivedCount > 0 ? { waivedMinor, waivedCount } : {}) };
 }
 
 /** Net position: money received less money paid out and still owed to interns. */

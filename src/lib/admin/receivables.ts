@@ -389,8 +389,9 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
   payables.sort(byDate);
 
   const totals = moneyTotals(receivables, payables);
-  const waived = waivedTotals(input.waivedOrders ?? [], receivedIn);
-  return { receivables, payables, totals, refunds, refundFlags, refundTotals: refundTotalsOf(refunds, totals.receivedMinor), waived };
+  // Only present when a waived order exists, so the report for a ledger without any is unchanged to the byte.
+  const waived = input.waivedOrders?.length ? waivedTotals(input.waivedOrders, receivedIn) : undefined;
+  return { receivables, payables, totals, refunds, refundFlags, refundTotals: refundTotalsOf(refunds, totals.receivedMinor), ...(waived ? { waived } : {}) };
 }
 
 /** What full-waiver codes took off the orders they completed in the window (INR): the list value, not money. */
@@ -461,5 +462,5 @@ export function narrowReceivables(data: Receivables, f: MoneyRowFilter): Receiva
   const company = f.company.toLowerCase();
   const refunds = f.candidate || f.status ? [] : data.refunds.filter((r) => !company || (r.companyName ?? "").toLowerCase().includes(company));
   const shown = new Set(refunds.map((r) => r.orderId));
-  return { receivables, payables, totals, refunds, refundFlags: data.refundFlags.filter((x) => shown.has(x.orderId)), refundTotals: refundTotalsOf(refunds, totals.receivedMinor), waived: data.waived };
+  return { receivables, payables, totals, refunds, refundFlags: data.refundFlags.filter((x) => shown.has(x.orderId)), refundTotals: refundTotalsOf(refunds, totals.receivedMinor), ...(data.waived ? { waived: data.waived } : {}) };
 }

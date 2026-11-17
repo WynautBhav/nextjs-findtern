@@ -183,7 +183,7 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
                 value: inr(data.totals.dueMinor),
                 note: `Accepted offers and instalments \u00b7 ${inr(data.totals.prospectMinor)} in unpaid fees`,
               },
-              ...(data.waived.count > 0
+              ...(data.waived && data.waived.count > 0
                 ? [{ label: "Waived", value: inr(data.waived.minor), note: `${data.waived.count} complimentary ${data.waived.count === 1 ? "order" : "orders"} (full-waiver code) · not money received` }]
                 : []),
               { label: "Paid to interns", value: inr(data.totals.paidOutMinor), note: "Stipend payouts marked paid" },

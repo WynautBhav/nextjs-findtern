@@ -356,6 +356,7 @@ async function DuesView({ params }: { params: Record<string, string> }) {
                 {d.projectName ? ` · ${d.projectName}` : ""}
               </span>
               {d.startDate ? <span className="nums block truncate">Started {formatDate(d.startDate)}</span> : null}
+              {d.fundedByWaiver ? <StatusBadge tone="neutral" label="Funded by promo waiver" /> : null}
             </>
           }
         />

@@ -146,7 +146,7 @@ export function AdminInvoicesView({
 
   return (
     <div className="space-y-[var(--admin-gap)] lg:space-y-6">
-      <StatGrid cols={totals.refundedMinor > 0 || totals.waivedCount > 0 ? 4 : 3}>
+      <StatGrid cols={totals.refundedMinor > 0 || totals.waivedCount ? 4 : 3}>
         <StatCard
           featured
           label="Collected"
@@ -168,10 +168,10 @@ export function AdminInvoicesView({
           hint="Promo codes and legacy discounts on paid rows"
           tone="neutral"
         />
-        {totals.waivedCount > 0 ? (
+        {totals.waivedCount ? (
           <StatCard
             label="Waived"
-            value={formatMoney(totals.waivedMinor, "INR", { zeroLabel: "₹0" })}
+            value={formatMoney(totals.waivedMinor ?? 0, "INR", { zeroLabel: "₹0" })}
             hint={`${formatNumber(totals.waivedCount)} complimentary ${totals.waivedCount === 1 ? "order" : "orders"} (full-waiver code) · not money received`}
             tone="neutral"
           />

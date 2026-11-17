@@ -3,7 +3,8 @@ import { alias } from "drizzle-orm/pg-core";
 
 import { getDb, schema } from "@/lib/db";
 import { inrMinorSql } from "@/lib/admin/scope";
-import { WAIVER_GATEWAY } from "@/lib/full-waiver";
+import { WAIVER_GATEWAY, waiverFlagOf } from "@/lib/full-waiver";
+import { orderProposalIds } from "@/lib/order-ids";
 import { searchAny } from "@/lib/admin/params";
 import { isHiredProposal } from "@/lib/hire-status";
 import { stipendDues, type StipendDue } from "@/lib/admin/stipend-dues";
@@ -190,6 +191,8 @@ export type PlacementDueRow = StipendDue & {
   internName: string;
   companyName: string;
   projectName: string;
+  /** The company's order for this placement was completed by a full-waiver code: Findtern pays the intern, nobody paid Findtern. */
+  fundedByWaiver?: boolean;
 };
 
 export function filterDues(rows: PlacementDueRow[], filter: DueFilter, q: string): PlacementDueRow[] {
@@ -300,6 +303,7 @@ export async function loadPlacementDues(internId?: string): Promise<PlacementDue
         internName: `${p.internFirst ?? ""} ${p.internLast ?? ""}`.trim() || "Candidate",
         companyName: p.companyName ?? "Company",
         projectName: p.projectName ?? "Project",
+        fundedByWaiver: theirOrders.some((o) => waiverFlagOf(o.raw) !== null && orderProposalIds(o.raw as Record<string, unknown>).includes(due.proposalId)),
       });
     }
   }
