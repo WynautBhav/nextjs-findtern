@@ -19,6 +19,7 @@ export function PeriodBar({
   defaultLabel,
   includeAll = true,
   hidden = {},
+  periods = PERIOD_OPTIONS,
 }: {
   basePath: string;
   params: Record<string, string>;
@@ -28,11 +29,13 @@ export function PeriodBar({
   /** Add an explicit "All time" option (pages whose default is not all time). */
   includeAll?: boolean;
   hidden?: Record<string, string | undefined>;
+  /** The presets after the default; the shared set unless a report needs its own. */
+  periods?: { value: string; label: string }[];
 }) {
   const keep = Object.fromEntries(Object.entries(hidden).filter((e): e is [string, string] => Boolean(e[1])));
   const options = [
     { value: defaultValue, label: defaultLabel },
-    ...PERIOD_OPTIONS.filter((o) => o.value !== defaultValue),
+    ...periods.filter((o) => o.value !== defaultValue),
     ...(includeAll && defaultValue !== "all" ? [{ value: "all", label: "All time" }] : []),
   ];
   const current = activePeriod(params, defaultValue);

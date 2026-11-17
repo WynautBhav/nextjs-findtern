@@ -28,7 +28,7 @@ export function StatStrip({ stats, label = "Key figures" }: { stats: Stat[]; lab
       data-rp="strip"
       className={cn(
         "grid grid-cols-2 overflow-hidden rounded-[var(--radius-admin-card)] border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)] shadow-[var(--admin-shadow)]",
-        n >= 5 ? "xl:grid-cols-5" : n === 3 ? "sm:grid-cols-3" : "xl:grid-cols-4",
+        n >= 6 ? "sm:grid-cols-3 xl:grid-cols-6" : n >= 5 ? "xl:grid-cols-5" : n === 3 ? "sm:grid-cols-3" : "xl:grid-cols-4",
       )}
     >
       {stats.map((s) => (
