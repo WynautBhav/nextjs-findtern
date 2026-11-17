@@ -42,7 +42,9 @@ export type Due = {
  * owe the next month straight away; post-paid hires owe month k 2 days before
  * the intern is paid for it, payable from 15 days before that (`todayIst`, YYYY-MM-DD).
  */
-export function monthlyDues(proposals: ProposalLike[], payments: PaymentLike[], todayIst: string = istDay(new Date())!): Due[] {
+export function monthlyDues(proposals: ProposalLike[], allPayments: PaymentLike[], todayIst: string = istDay(new Date())!): Due[] {
+  // A refunded order is still a paid month: a refund never makes the employer owe (or be charged) it again.
+  const payments = settledOrders(allPayments);
   const paid = new Map<string, number>();
   for (const p of payments) {
     if (p.status !== "paid") continue;

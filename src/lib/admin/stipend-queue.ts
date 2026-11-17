@@ -1,6 +1,7 @@
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { SETTLED_STATUSES, settledOrders } from "@/lib/refund-accounting";
 import { nextFromCycle, proposalOf, stipendDues, type StipendDue } from "@/lib/admin/stipend-dues";
 
 type Db = ReturnType<typeof getDb>;
@@ -56,9 +57,9 @@ export async function loadPlacementDue(
   const orders = await db
     .select({ status: schema.employerPayments.status, raw: schema.employerPayments.raw, paidAt: schema.employerPayments.paidAt })
     .from(schema.employerPayments)
-    .where(and(eq(schema.employerPayments.employerId, proposal.employerId), eq(schema.employerPayments.status, "paid")));
+    .where(and(eq(schema.employerPayments.employerId, proposal.employerId), inArray(schema.employerPayments.status, SETTLED_STATUSES)));
   const scoreRaw = Number(((onboarding?.extraData ?? {}) as Record<string, unknown>).findternScore);
-  const [due] = stipendDues([proposal], payouts, Number.isFinite(scoreRaw) ? scoreRaw : null, orders);
+  const [due] = stipendDues([proposal], payouts, Number.isFinite(scoreRaw) ? scoreRaw : null, settledOrders(orders));
   const offer = (proposal.offerDetails ?? {}) as Record<string, unknown>;
   return {
     due,

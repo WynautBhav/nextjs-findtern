@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { monthlyDues } from "./dues.ts";
 
 import { isSettledStatus, orderRefunds, planRefundRecord, refundGstMinor, settledOrders } from "./refund-accounting.ts";
 
@@ -122,4 +123,17 @@ test("refund GST: the inclusive 18% split of the refunded amount, same rounding 
   assert.equal(refundGstMinor(800_000, "INR"), 122_034);
   assert.equal(refundGstMinor(10_000, "USD"), 0);
   assert.equal(refundGstMinor(0, "INR"), 0);
+});
+
+// monthlyDues is what the employer is asked to pay: a refund must not reopen a month already paid.
+const hireRow = { id: "p1", status: "hired", offerDetails: { monthlyAmount: 5000, duration: "3m" }, hiredAt: "2026-10-17T23:00:00Z" };
+const monthly = (status: string, amount = 1_000_000) => ({ status, paidAt: new Date("2026-10-18T05:00:00Z"), raw: { notes: { proposalIds: ["p1"], paymentMode: "monthly" } }, amountMinor: amount, currency: "INR" });
+
+test("monthlyDues: a refunded month is still a paid month, so the employer is not asked to pay it again", () => {
+  const paid = monthlyDues([hireRow], [monthly("paid")], "2026-11-17");
+  const refunded = monthlyDues([hireRow], [monthly("refunded")], "2026-11-17");
+  const partly = monthlyDues([hireRow], [monthly("partially_refunded")], "2026-11-17");
+  assert.deepEqual(refunded, paid);
+  assert.deepEqual(partly, paid);
+  assert.notDeepEqual(monthlyDues([hireRow], [monthly("failed")], "2026-11-17"), paid, "a failed order is still unpaid");
 });

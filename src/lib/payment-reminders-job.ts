@@ -2,6 +2,7 @@ import { and, eq, inArray, like, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { notify } from "@/lib/notify";
+import { settledOrders } from "@/lib/refund-accounting";
 import { billingPlanOf, istDay } from "@/lib/billing-plan";
 import { internNoticeDue, reminderDue, reminderEmail, reminderKey } from "@/lib/payment-reminders";
 
@@ -18,8 +19,8 @@ export async function sendPaymentReminders(now = new Date()): Promise<{ sent: nu
   const orders = await db
     .select({ employerId: schema.employerPayments.employerId, status: schema.employerPayments.status, raw: schema.employerPayments.raw, paidAt: schema.employerPayments.paidAt })
     .from(schema.employerPayments)
-    .where(and(inArray(schema.employerPayments.employerId, [...new Set(hired.map((h) => h.employerId))]), sql`lower(${schema.employerPayments.status}) = 'paid'`));
-  const hires = hired.filter((h) => billingPlanOf(h.id, orders.filter((o) => o.employerId === h.employerId)) === "postpaid");
+    .where(and(inArray(schema.employerPayments.employerId, [...new Set(hired.map((h) => h.employerId))]), sql`lower(${schema.employerPayments.status}) in ('paid','refunded','partially_refunded')`));
+  const hires = hired.filter((h) => billingPlanOf(h.id, settledOrders(orders.filter((o) => o.employerId === h.employerId))) === "postpaid");
   if (!hires.length) return { sent: 0 };
   const employerIds = [...new Set(hires.map((h) => h.employerId))];
   const [users, employers, keys] = await Promise.all([
@@ -38,7 +39,7 @@ export async function sendPaymentReminders(now = new Date()): Promise<{ sent: nu
   for (const h of hires) {
     const emp = employer.get(h.employerId);
     if (!emp?.isActive) continue;
-    const r = reminderDue(h, orders.filter((o) => o.employerId === h.employerId), sent, today);
+    const r = reminderDue(h, settledOrders(orders.filter((o) => o.employerId === h.employerId)), sent, today);
     if (!r) continue;
     const mail = reminderEmail(r, { name: emp.name ?? "", intern: intern.get(h.internId) ?? "your intern" });
     const key = reminderKey(h.id, r.k, r.type, r.offset);
