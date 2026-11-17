@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CheckCircle2, CreditCard, Loader2, Send } from "lucide-react";
+import { CheckCircle2, CreditCard, Loader2 } from "lucide-react";
 
 import { useConfirm } from "@/components/app/use-confirm";
 import { buttonClass } from "@/components/ui/button";
@@ -67,17 +67,17 @@ export function ProposalActions({
   status,
   canPay,
   canWithdraw,
-  confirmCgpa = false,
-  sendNewHref = null,
+  withdrawLabel = "Withdraw offer",
+  withdrawSecondary = false,
 }: {
   proposalId: string;
   status: string;
   canPay: boolean;
   canWithdraw: boolean;
-  /** Findtern corrected the candidate's CGPA and it is waiting for the employer: Confirm and continue, with Withdraw proposal beside it. */
-  confirmCgpa?: boolean;
-  /** An expired offer: where "Send a new proposal" goes. Never shown with a pay button. */
-  sendNewHref?: string | null;
+  /** The button's words ("Withdraw proposal" while a CGPA correction waits for the employer). */
+  withdrawLabel?: string;
+  /** Withdraw is the quiet second choice beside another primary action on the page (Confirm and continue). */
+  withdrawSecondary?: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -127,26 +127,19 @@ export function ProposalActions({
           Proceed to checkout
         </Link>
       ) : null}
-      {confirmCgpa ? <CgpaAckButton proposalId={proposalId} /> : null}
-      {sendNewHref ? (
-        <Link href={sendNewHref} className={buttonClass({ block: true, className: "min-h-11" })}>
-          <Send className="size-4" aria-hidden />
-          Send a new proposal
-        </Link>
-      ) : null}
       {canWithdraw ? (
         <button
           type="button"
           onClick={() => void withdraw()}
           disabled={busy}
           className={buttonClass(
-            confirmCgpa
+            withdrawSecondary
               ? { variant: "outline", block: true, className: "min-h-11" }
               : { variant: "ghost", block: true, className: "min-h-11 text-ink-700 hover:bg-danger-soft hover:text-danger" },
           )}
         >
           {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-          {confirmCgpa ? "Withdraw proposal" : "Withdraw offer"}
+          {withdrawLabel}
         </button>
       ) : null}
       {error ? (
