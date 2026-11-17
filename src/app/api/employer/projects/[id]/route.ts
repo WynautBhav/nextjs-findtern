@@ -7,6 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
 import { requireMutation } from "@/lib/guards-mutation";
+import { revalidatePublicRoles } from "@/lib/projects/revalidate-public";
 import { editBlockedReason } from "@/lib/projects/transition";
 import { projectNameIssue } from "@/lib/project-name";
 import {
@@ -160,6 +161,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   }
 
   await db.update(schema.projects).set({ ...d, updatedAt: new Date() }).where(eq(schema.projects.id, id));
+  revalidatePublicRoles();
   return NextResponse.json({ ok: true });
 }
 
@@ -210,5 +212,6 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   await db.delete(schema.employerCartItems).where(eq(schema.employerCartItems.projectId, id));
   await db.delete(schema.internSavedProjects).where(eq(schema.internSavedProjects.projectId, id));
   await db.delete(schema.projects).where(eq(schema.projects.id, id));
+  revalidatePublicRoles();
   return NextResponse.json({ ok: true });
 }

@@ -7,6 +7,7 @@ import { scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
 import { requireMutation } from "@/lib/guards-mutation";
 import { MAX_SKILLS_PER_PROJECT } from "@/lib/projects/lifecycle";
+import { revalidatePublicRoles } from "@/lib/projects/revalidate-public";
 import { projectNameIssue } from "@/lib/project-name";
 import {
   MAX_PROJECT_SKILLS,
@@ -99,5 +100,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .returning();
   // The first project completes onboarding, as in legacy.
   await db.update(schema.employers).set({ onboardingCompleted: true }).where(eq(schema.employers.id, id));
+  revalidatePublicRoles();
   return NextResponse.json({ project }, { status: 201 });
 }

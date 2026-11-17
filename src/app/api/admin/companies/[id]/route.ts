@@ -6,6 +6,7 @@ import { forgetAccountStatus } from "@/lib/account-status";
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { revalidatePublicRoles } from "@/lib/projects/revalidate-public";
 import { notify } from "@/lib/notify";
 
 const bodySchema = z
@@ -119,6 +120,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     await tx.delete(schema.employers).where(eq(schema.employers.id, id));
   });
   forgetAccountStatus("employer", id);
+  revalidatePublicRoles(); // its projects were deleted with it
   await recordAdminAudit(db, { adminId: guard.session.uid, action: "company.delete", targetType: "employer", targetId: id, meta: { email: employer.email } });
   return NextResponse.json({ ok: true });
 }
