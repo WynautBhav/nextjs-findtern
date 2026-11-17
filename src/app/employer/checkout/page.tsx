@@ -125,6 +125,7 @@ export default async function EmployerCheckout({
             durationLabel: line.durationLabel,
             monthlyRateMinor: line.monthlyMinor,
             feeMinor: line.charge.perHireMinor,
+            feeWaivedListMinor: line.fee.kind === "free" ? line.fee.listMinor : 0,
             // A running monthly placement is already priced as its due month.
             upfrontMinor: line.charge.totalMinor,
             monthlyMinor: line.due ? line.monthlyCharge.totalMinor : null,

@@ -15,6 +15,7 @@ import { offerBreakdown } from "@/lib/offer-breakdown";
 import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
 import { billableWorkingDays, isClockTime, latestShiftEnd, MAX_SHIFT_MINUTES, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, shiftMinutes, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
+import { feeDisplay } from "@/lib/fee-display";
 import { JD_HINT, JD_LABEL, LEARN_HINT, LEARN_LABEL, learnIssue } from "@/lib/proposal-copy";
 import { SURFACE_CLASS } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
@@ -187,7 +188,9 @@ export function SendProposalForm({
     return { monthly, perHire };
   }, [monthlyHours, rate]);
   const firstNote = firstPaymentNote(candidate.scored ? candidate.score : null);
-  const breakdown = offerBreakdown({ currency, hourlyRateMinor: rate.hourlyRateMinor, hours: monthlyHours, perHireMinor: rate.perHireMinor, place });
+  // The fee as billing will charge it under the live per-band setting (the server page priced it with that setting).
+  const fee = feeDisplay({ currency, chargedMinor: rate.perHireMinor, listMinor: rate.perHireListMinor });
+  const breakdown = offerBreakdown({ currency, hourlyRateMinor: rate.hourlyRateMinor, hours: monthlyHours, fee, place });
 
   /** Validate first; the policy agreement only opens for a complete offer. */
   function review() {
@@ -382,12 +385,15 @@ export function SendProposalForm({
             <p className="nums text-sm text-ink-700">
               <span className="font-semibold text-ink-900">{formatRate(rate.hourlyRateMinor, currency)}</span>
               {" · "}
-              {rate.perHireMinor > 0 ? (
+              {fee.kind === "free" ? (
+                <>
+                  <s className="text-text-subtle">{formatMoney(fee.listMinor, currency)}</s>{" "}
+                  <span className="font-semibold text-success">(FREE)</span> one-time hiring fee
+                </>
+              ) : (
                 <>
                   <span>{formatPerHire(rate.perHireMinor, currency)}</span> one-time hiring fee
                 </>
-              ) : (
-                <span>No one-time hiring fee (free for now)</span>
               )}
             </p>
             <p className="flex w-full items-start gap-1.5 text-sm text-ink-600">

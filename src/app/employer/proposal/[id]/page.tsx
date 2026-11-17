@@ -13,6 +13,7 @@ import { formatDate as formatWords, formatMoney, formatSlotTime } from "@/lib/fo
 import { interviewStage, meetingTime } from "@/lib/employer-interview-rules";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { fullTimeFeeMinor, hireFeeMinor } from "@/lib/checkout";
+import { feeDisplay } from "@/lib/fee-display";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { laptopLabel, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
 import { shiftInIst } from "@/lib/timezones";
@@ -179,6 +180,15 @@ export default async function EmployerProposalDetail({
   // The hiring fee as it is charged now: the offer's amount if its band is switched on, else none. A hire
   // already made keeps the fee it paid (the stored one), so the setting never rewrites a settled order.
   const shownFeeMinor = proposal.status === "hired" ? offer.perHireMinor : hireFeeMinor(offer, { feeSetting: await getPerHireFeeSetting(), bandScore: score });
+  // Struck-through "(FREE)" only on an offer still to be paid, where billing re-decides the fee from the live
+  // setting (shownFeeMinor is that same figure). A settled hire or a closed offer shows what was charged, or nothing.
+  const feeStillToPay = ["draft", "sent", "interview_scheduled", "accepted", "processing"].includes(proposal.status);
+  const fee = feeDisplay({
+    currency,
+    chargedMinor: shownFeeMinor ?? 0,
+    listMinor: hireFeeMinor(offer),
+    applicable: !offer.fullTime && ((shownFeeMinor ?? 0) > 0 || feeStillToPay),
+  });
   // The score shown is the one the offer was priced on, so it can never
   // disagree with the rate beside it.
   const ratings: [string, number][] = score > 0 ? [["overall", score], ...snapshot] : snapshot;
@@ -208,7 +218,7 @@ export default async function EmployerProposalDetail({
     hourlyRateMinor: offer.hourlyRateMinor,
     hours: offer.monthlyHours,
     monthlyMinor: offer.monthlyMinor,
-    perHireMinor: shownFeeMinor,
+    fee,
     place,
   });
 
@@ -475,6 +485,7 @@ export default async function EmployerProposalDetail({
                     currency={currency}
                     place={place}
                     perHireMinor={shownFeeMinor}
+                    fee={fee}
                     shortOnly={score > 0 && score < 6}
                     hasLaptop={hasLaptop}
                     initial={{

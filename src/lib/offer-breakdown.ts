@@ -1,4 +1,5 @@
 import { formatMoney, formatRate, type Currency } from "./format.ts";
+import type { FeeDisplay } from "./fee-display.ts";
 import { buyerFromEmployer, type LiveEmployerBuyer } from "./invoice-buyer.ts";
 import { placeOfSupply, splitGst, type PlaceOfSupply } from "./gst.ts";
 
@@ -17,6 +18,8 @@ export type BreakdownLine = {
   label: string;
   /** Already formatted for display. */
   value: string;
+  /** A waived amount to print struck through, before `value` ("(FREE)"). */
+  struck?: string;
   strong?: boolean;
 };
 
@@ -40,6 +43,8 @@ export function offerBreakdown(input: {
   /** The monthly amount as stored on a sent offer; worked out from rate × hours when absent. */
   monthlyMinor?: number | null;
   perHireMinor?: number | null;
+  /** How to show the hiring fee; wins over `perHireMinor`. Only set where billing's own figure is known (lib/fee-display.ts). */
+  fee?: FeeDisplay;
   /** Null when the company's tax place is unknown: the GST line is left out rather than guessed. */
   place: PlaceOfSupply | null;
 }): OfferBreakdown {
@@ -52,7 +57,10 @@ export function offerBreakdown(input: {
       : input.hourlyRateMinor == null
         ? null
         : Math.round(rate * hours);
-  const feeMinor = input.perHireMinor && input.perHireMinor > 0 ? input.perHireMinor : 0;
+  const fee: FeeDisplay =
+    input.fee ??
+    (input.perHireMinor && input.perHireMinor > 0 ? { kind: "charged", amountMinor: input.perHireMinor } : { kind: "none" });
+  const feeMinor = fee.kind === "charged" ? fee.amountMinor : 0;
   const inr = currency.toUpperCase() === "INR";
 
   let gstMinor = 0;
@@ -72,7 +80,11 @@ export function offerBreakdown(input: {
     strong: true,
   });
   if (gstMinor > 0) lines.push({ key: "gst", label: "of which GST", value: formatMoney(gstMinor, currency) });
-  if (feeMinor > 0) lines.push({ key: "fee", label: "Hiring fee, one-time", value: formatMoney(feeMinor, currency) });
+  if (fee.kind === "charged") {
+    lines.push({ key: "fee", label: "Hiring fee, one-time", value: formatMoney(fee.amountMinor, currency) });
+  } else if (fee.kind === "free") {
+    lines.push({ key: "fee", label: "Hiring fee, one-time", struck: formatMoney(fee.listMinor, currency), value: "(FREE)" });
+  }
 
   return { monthlyMinor, gstMinor, feeMinor, lines };
 }

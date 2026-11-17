@@ -23,6 +23,8 @@ export type SummaryLine = {
   monthlyRateMinor: number | null;
   /** One-time hiring fee inside the upfront figure (0 on a later month). */
   feeMinor: number;
+  /** The list amount of a hiring fee that is waived (free band): shown struck through with (FREE); 0 when none. */
+  feeWaivedListMinor: number;
   /** The whole engagement paid now (or the full-time fee). */
   upfrontMinor: number;
   /** A running placement's due month (no fee); null on a new hire. */
@@ -78,6 +80,17 @@ export function CheckoutSummary({
     l.due ? (l.monthlyMinor ?? 0) : m === "postpaid" && l.postpaidMinor != null ? l.postpaidMinor : l.upfrontMinor;
   const amountMinor = line ? amountOf(line, mode) : 0;
   const m = (minor: number, cur: string) => formatMoney(minor, cur, { zeroLabel: false });
+  // The one-time fee row: the amount when charged; struck through with (FREE) when the band is waived.
+  const fee = line ? (
+    line.feeMinor > 0 ? (
+      <Row label="Hiring charge (one-time)">{m(line.feeMinor, line.currency)}</Row>
+    ) : line.feeWaivedListMinor > 0 ? (
+      <Row label="Hiring charge (one-time)">
+        <s className="mr-1.5 font-normal text-text-subtle">{m(line.feeWaivedListMinor, line.currency)}</s>
+        <span className="font-semibold text-success">(FREE)</span>
+      </Row>
+    ) : null
+  ) : null;
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
@@ -211,7 +224,7 @@ export function CheckoutSummary({
               <>
                 {mode === "postpaid" ? (
                   <>
-                    {line.feeMinor > 0 ? <Row label="Hiring charge (one-time)">{m(line.feeMinor, line.currency)}</Row> : null}
+                    {fee}
                     <Row label="Month 1 charge">{m(amountMinor - line.feeMinor, line.currency)}</Row>
                   </>
                 ) : (
@@ -219,7 +232,7 @@ export function CheckoutSummary({
                     <Row label={line.due ? line.durationLabel : "Monthly charges, whole internship"}>
                       {m(amountMinor - (line.due ? 0 : line.feeMinor), line.currency)}
                     </Row>
-                    {!line.due && line.feeMinor > 0 ? <Row label="Hiring charge (one-time)">{m(line.feeMinor, line.currency)}</Row> : null}
+                    {!line.due ? fee : null}
                   </>
                 )}
               </>

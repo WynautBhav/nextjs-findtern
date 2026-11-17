@@ -18,7 +18,14 @@ export function OfferBreakdownList({ lines, className }: { lines: BreakdownLine[
               line.key === "gst" && "font-normal text-ink-600",
             )}
           >
-            {line.value}
+            {line.struck ? (
+              <>
+                <s className="mr-1.5 font-normal text-text-subtle">{line.struck}</s>
+                <span className="font-semibold text-success">{line.value}</span>
+              </>
+            ) : (
+              line.value
+            )}
           </dd>
         </div>
       ))}
