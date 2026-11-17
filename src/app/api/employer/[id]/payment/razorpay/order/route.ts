@@ -9,7 +9,7 @@ import { getDb, schema } from "@/lib/db";
 import { paymentIndexMismatch } from "@/lib/dues";
 import { requireMutation } from "@/lib/guards-mutation";
 import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
-import { openProposalsWithDues, payableCheckout, type PayableLine } from "@/lib/employer-payable";
+import { heldRefusal, openProposalsWithDues, payableCheckout, payGateRefusalFor, type PayableLine, type PayGateRefusal } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders, legacyOrderRaw, OPEN_ORDER_MINUTES, orderProposalIds, settleEmployerOrder } from "@/lib/payments";
 import { TAKEDOWN_BLOCKS, takedownCheckedLineIds } from "@/lib/projects/takedown";
 import { isFullWaiver, WAIVER_GATEWAY, waiverPromoRaw } from "@/lib/full-waiver";
@@ -70,7 +70,7 @@ async function openConflict(q: Db | Tx, employerId: string, proposalIds: string[
   return null;
 }
 
-type Refusal = { error: string; code?: "listing_taken_down" };
+type Refusal = { error: string; code?: "listing_taken_down" | PayGateRefusal["code"] };
 
 /**
  * Check and insert as one step per employer, so two requests at once (a double
@@ -110,6 +110,9 @@ async function openOrder(
         .for("share", { of: schema.projects });
       if (projects.some((p) => p.takenDownAt)) return { error: TAKEDOWN_BLOCKS.pay, code: "listing_taken_down" };
     }
+    // Expiry and the CGPA check, re-read under the lock. The list was priced before it: an offer whose start date began, or whose\n    // candidate's CGPA is still being checked, is refused here whatever the client was shown. openConflict above found no open order, so\n    // nothing freezes expiry. Settlement (payments.ts) is untouched: an order opened before the start still hires when it is paid after it.
+    const gate = await payGateRefusalFor(tx, employerId, paying.map((l) => l.id));
+    if (gate) return gate;
     // The offers were priced before the lock. A request ahead of this one may
     // have paid them since (they read paid, not open), so confirm each is still
     // what was owed: an accepted hire, or the same month due as when priced.
@@ -148,7 +151,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   // Amount is recomputed from the accepted offers; the client never sends it.
-  const { lines } = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode: parsed.data.mode });
+  const checkout = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode: parsed.data.mode });
+  const { lines } = checkout;
+  // Expired (start date passed unpaid) or waiting on the CGPA check: refused with a code the page can act on, never a generic 400.
+  const held = heldRefusal(checkout, parsed.data.proposalIds);
+  if (held) return NextResponse.json(held, { status: 409 });
   const paying = lines.filter((l) => l.currency === currency);
   if (paying.length === 0) return NextResponse.json({ error: "There is nothing to pay on this offer right now. Refresh the page." }, { status: 400 });
   // A taken-down listing freezes its unpaid internship offers. A due month, or the fee of a full-time

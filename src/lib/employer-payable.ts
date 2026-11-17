@@ -24,9 +24,9 @@ import { employerRegion, type Currency } from "@/lib/employer-pricing";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { splitTakenDownProposals, TAKEN_DOWN_PAY_NOTE } from "@/lib/projects/takedown-payable";
 import { orderProposalIds } from "@/lib/order-ids";
-import { payGateFor, PAY_GATE_MESSAGE, splitByPayGate, type PayGate, type PayGateReason } from "@/lib/pay-gate";
+import { payGateFor, payGateRefusal, PAY_GATE_CODE, PAY_GATE_MESSAGE, splitByPayGate, type PayGate, type PayGateReason, type PayGateRefusal } from "@/lib/pay-gate";
 
-export { payGateFor, type PayGate, type PayGateReason } from "@/lib/pay-gate";
+export { payGateFor, PAY_GATE_CODE, type PayGate, type PayGateReason, type PayGateRefusal } from "@/lib/pay-gate";
 
 /** How long an unpaid checkout order stays open (payments.ts OPEN_ORDER_MINUTES; kept here so this module needs no payments import). */
 const OPEN_ORDER_WINDOW_MINUTES = 30;
@@ -159,6 +159,22 @@ export async function payGatesFor(db: Db | Tx, employerId: string, proposalIds: 
   return new Map(
     rows.map((p) => [p.id, payGateFor({ status: p.status, hiredAt: p.hiredAt, offerDetails: p.offerDetails, extraData: extraOf.get(p.internId), updatedAt: p.updatedAt, hasOpenOrder: open.has(p.id) }, now)]),
   );
+}
+
+/** The first refusal among these proposals' pay gates (expired, CGPA check), or null when each is payable or not found. For the order transaction. */
+export async function payGateRefusalFor(db: Db | Tx, employerId: string, proposalIds: string[], now: Date = new Date()): Promise<PayGateRefusal | null> {
+  const gates = await payGatesFor(db, employerId, proposalIds, now);
+  for (const id of proposalIds) {
+    const refusal = payGateRefusal(gates.get(id) ?? { payable: true, reason: null });
+    if (refusal) return refusal;
+  }
+  return null;
+}
+
+/** The refusal for a requested offer that `payableCheckout` held back (expired / CGPA gated), or null. The route's early answer; the order transaction re-checks. */
+export function heldRefusal(checkout: Pick<PayableCheckout, "expired" | "gated">, proposalIds: string[]): PayGateRefusal | null {
+  const h = [...checkout.expired, ...checkout.gated].find((x) => proposalIds.includes(x.id));
+  return h ? { error: h.note, code: PAY_GATE_CODE[h.reason] } : null;
 }
 
 /**
