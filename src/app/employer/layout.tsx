@@ -15,6 +15,7 @@ import {
   MessageSquare,
   Receipt,
   CalendarClock,
+  Sparkles,
 } from "lucide-react";
 
 import { ConsoleShell, type ConsoleNavGroup, type ConsoleNavItem } from "@/components/layout/console-shell";
@@ -62,6 +63,7 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
     items: [
       { href: "/employer/timesheets", label: "Timesheets", icon: <Clock /> },
       { href: "/employer/orders", label: "Orders", icon: <ShoppingCart />, also: ["/employer/checkout"] },
+      { href: "/employer/subscription", label: "Findtern Pro", icon: <Sparkles /> },
     ],
   },
 ];
