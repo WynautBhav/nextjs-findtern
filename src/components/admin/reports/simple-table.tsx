@@ -6,6 +6,7 @@ export function SimpleTable({
   head,
   rows,
   right = [],
+  nowrap = [],
   empty,
   minWidth = "lg:min-w-[32rem]",
   caption,
@@ -14,6 +15,8 @@ export function SimpleTable({
   head: string[];
   rows: React.ReactNode[][];
   right?: number[];
+  /** Columns whose cells never wrap (short figures, dates). */
+  nowrap?: number[];
   empty: { title: string; body: string };
   minWidth?: string;
   /** Accessible name of the scroll region (default: the first column). */
@@ -42,7 +45,7 @@ export function SimpleTable({
                   key={i}
                   {...(i === 0 ? { "data-title": "" } : { "data-label": head[i] })}
                   {...(cell === "-" || cell === "–" || cell === "—" ? { "data-empty": "" } : {})}
-                  className={cn("px-3 py-2.5 text-foreground [overflow-wrap:anywhere] first:pl-[var(--admin-pad-panel)] last:pr-[var(--admin-pad-panel)]", right.includes(i) && "nums text-right")}
+                  className={cn("px-3 py-2.5 text-foreground [overflow-wrap:anywhere] first:pl-[var(--admin-pad-panel)] last:pr-[var(--admin-pad-panel)]", right.includes(i) && "nums text-right", nowrap.includes(i) && "lg:whitespace-nowrap")}
                 >
                   {cell}
                 </td>
