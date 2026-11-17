@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { computeAnalytics, filterHires, type AnalyticsInput } from "./analytics.ts";
+import { computeAnalytics, filterCompanies, filterHires, type AnalyticsInput } from "./analytics.ts";
 
 const d = (s: string) => new Date(s);
 
@@ -91,4 +91,98 @@ test("employer behaviour ratios, company status and hire filters (ADM-15, ADM-16
   assert.deepEqual(filterHires(a.hiredList, { kind: "full-time", from: "", to: "", q: "" }).map((h) => h.companyName), ["Offers only"]);
   assert.deepEqual(filterHires(a.hiredList, { kind: "", from: "2026-03-01", to: "2026-03-31", q: "" }).map((h) => h.companyName), ["Acme"]);
   assert.equal(filterHires(a.hiredList, { kind: "", from: "", to: "", q: "acme" }).length, 1);
+});
+
+test("application status buckets follow legacy's seven groups, all time, largest first", () => {
+  const p = (id: string, status: string, offerDetails: unknown = {}) => ({
+    id, employerId: "e1", internId: "i" + id, projectId: "p1", status, offerDetails, currency: "INR" as const, createdAt: d("2024-05-01"), hiredAt: null,
+  });
+  const input: AnalyticsInput = {
+    since: d("2026-01-01"),
+    until: d("2026-04-01"),
+    interns: [],
+    onboarding: [],
+    employers: [{ id: "e1", companyName: "Acme", createdAt: d("2025-01-02") }],
+    projects: [],
+    // Created long before the range: legacy counted every proposal ever, whatever the period.
+    proposals: [
+      p("1", "hired", { monthlyAmount: 100, duration: "1m" }),
+      p("2", "accepted", { monthlyAmount: 100, duration: "1m" }),
+      p("3", "hired", { fullTimeOffer: { ctc: 600000 } }),
+      p("4", "sent"),
+      p("5", "draft"),
+      p("6", "mystery"),
+      p("7", "interview_scheduled"),
+      p("8", "interviewed"),
+      p("9", "under_review"),
+      p("10", "reviewing"),
+      p("11", "rejected"),
+      p("12", "expired"),
+      p("13", ""),
+    ],
+    interviews: [],
+    employerPayments: [],
+    internPayments: [],
+  };
+  const a = computeAnalytics(input);
+  assert.deepEqual(a.applicationStatus, [
+    { name: "Sent", value: 3 },
+    { name: "Under Review", value: 2 },
+    { name: "Interviewed", value: 2 },
+    { name: "Hired (Internship)", value: 2 },
+    { name: "Hired (Full-time)", value: 1 },
+    { name: "Rejected", value: 1 },
+    { name: "Withdrawn", value: 1 },
+  ]);
+});
+
+test("the monthly trend also counts new interns and new companies (legacy growth chart)", () => {
+  const input: AnalyticsInput = {
+    since: d("2026-01-01"),
+    until: d("2026-03-01"),
+    interns: [],
+    onboarding: [
+      { userId: "a", createdAt: d("2026-01-05"), meaningful: true, feePaid: false, score: null },
+      { userId: "b", createdAt: d("2026-01-25"), meaningful: false, feePaid: false, score: null },
+      { userId: "c", createdAt: d("2026-02-02"), meaningful: false, feePaid: false, score: null },
+      { userId: "old", createdAt: d("2025-12-31"), meaningful: false, feePaid: false, score: null },
+    ],
+    employers: [
+      { id: "e1", companyName: "Acme", createdAt: d("2026-02-10") },
+      { id: "e2", companyName: "Beta", createdAt: d("2025-06-10") },
+    ],
+    projects: [],
+    proposals: [],
+    interviews: [],
+    employerPayments: [],
+    internPayments: [],
+  };
+  const a = computeAnalytics(input);
+  assert.deepEqual(a.trend.map((t) => [t.interns, t.companies]), [[2, 0], [1, 1]]);
+});
+
+test("cities: top rows plus an Others row, shares of everyone who gave a city", () => {
+  const a = computeAnalytics({
+    since: null, until: null, interns: [], onboarding: [], employers: [], projects: [], proposals: [], interviews: [], employerPayments: [], internPayments: [],
+    cities: [{ city: "Jaipur", count: 6 }, { city: "Delhi", count: 3 }],
+    citiesTotal: 10,
+  });
+  assert.deepEqual(a.cities, [
+    { city: "Jaipur", count: 6, percentage: 60 },
+    { city: "Delhi", count: 3, percentage: 30 },
+    { city: "Others", count: 1, percentage: 10 },
+  ]);
+  const none = computeAnalytics({ since: null, until: null, interns: [], onboarding: [], employers: [], projects: [], proposals: [], interviews: [], employerPayments: [], internPayments: [] });
+  assert.deepEqual(none.cities, []);
+});
+
+test("filterCompanies: status chip and name search together", () => {
+  const list = [
+    { name: "Acme Labs", status: "active" as const },
+    { name: "Acme Idle", status: "inactive" as const },
+    { name: "Beta", status: "active" as const },
+  ];
+  assert.deepEqual(filterCompanies(list, { status: "active", q: "acme" }).map((c) => c.name), ["Acme Labs"]);
+  assert.deepEqual(filterCompanies(list, { status: "", q: "  BETA " }).map((c) => c.name), ["Beta"]);
+  assert.equal(filterCompanies(list, { status: "", q: "" }).length, 3);
 });

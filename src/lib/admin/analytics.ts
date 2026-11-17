@@ -41,6 +41,9 @@ export type AnalyticsInput = {
   internPayments: { amountMinor: number; currency: string; status: string; paidAt: Date | null; createdAt: Date | null }[];
   /** Paid college seat batches count as revenue like employer orders. */
   collegeBatches?: { amountMinor: number; status: string; paidAt: Date | null; createdAt: Date | null }[];
+  /** Interns who gave a city, most first, already grouped and limited in SQL; `citiesTotal` is everyone who gave one. */
+  cities?: { city: string; count: number }[];
+  citiesTotal?: number;
 };
 
 const pct = (n: number, d: number) => (d > 0 ? Number(((n / d) * 100).toFixed(1)) : 0);
@@ -160,7 +163,7 @@ export function computeAnalytics(input: AnalyticsInput) {
   // Month buckets in UTC so the server's own time zone cannot add a month.
   const end = until ?? new Date();
   const start = since ?? new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - 5, 1));
-  const trend: { month: string; proposals: number; hires: number; successRate: number; interviewRate: number }[] = [];
+  const trend: { month: string; proposals: number; hires: number; successRate: number; interviewRate: number; interns: number; companies: number }[] = [];
   for (
     let m = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1));
     m < end && trend.length < 24;
@@ -178,6 +181,9 @@ export function computeAnalytics(input: AnalyticsInput) {
       hires,
       successRate: pct(hires, props.length),
       interviewRate: pct(intv.size, app.size),
+      // Legacy's growth chart: new interns (profile created) and new companies per month.
+      interns: input.onboarding.filter((o) => within(o.createdAt)).length,
+      companies: input.employers.filter((e) => within(e.createdAt)).length,
     });
   }
 
@@ -266,7 +272,48 @@ export function computeAnalytics(input: AnalyticsInput) {
     }))
     .sort((a, b) => String(b.hiredAt).localeCompare(String(a.hiredAt)));
 
-  return { totals, rates, funnel, trend, skillDemand, regionDemand, highestPayingSkills, topCompanies, topInterns, hiredList };
+  // Legacy's "Application status" tiles: every proposal ever, whatever the period (routes.ts:6366-6396).
+  const applicationStatus = applicationStatusBuckets(input.proposals.map((p) => ({ status: p.status, fullTime: isFullTime(p) })));
+  const cities = topWithOthers(input.cities ?? [], input.citiesTotal ?? 0);
+
+  return { totals, rates, funnel, trend, skillDemand, regionDemand, highestPayingSkills, topCompanies, topInterns, hiredList, applicationStatus, cities };
+}
+
+const STATUS_ORDER = ["Sent", "Under Review", "Interviewed", "Hired (Internship)", "Hired (Full-time)", "Rejected", "Withdrawn"];
+
+/** Legacy's seven proposal-status groups with counts, largest first (ties in the order Sent, Under Review, Interviewed, hired, Rejected, Withdrawn); empty groups are left out. */
+export function applicationStatusBuckets(rows: { status: string; fullTime: boolean }[]): { name: string; value: number }[] {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const raw = r.status.trim().toLowerCase();
+    if (!raw) continue;
+    const name =
+      raw === "accepted" || raw === "hired" ? (r.fullTime ? "Hired (Full-time)" : "Hired (Internship)")
+      : raw === "rejected" ? "Rejected"
+      : raw === "interview_scheduled" || raw === "interviewed" ? "Interviewed"
+      : raw === "under_review" || raw === "review" || raw === "reviewing" ? "Under Review"
+      : raw === "withdrawn" || raw === "expired" ? "Withdrawn"
+      : "Sent";
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return STATUS_ORDER.filter((n) => counts.has(n))
+    .map((name) => ({ name, value: counts.get(name)! }))
+    .sort((a, b) => b.value - a.value);
+}
+
+/** The top rows plus one "Others" row for the rest, each with its share of `total` (one decimal). */
+export function topWithOthers(rows: { city: string; count: number }[], total: number): { city: string; count: number; percentage: number }[] {
+  if (rows.length === 0 || total <= 0) return [];
+  const out = rows.map((r) => ({ city: r.city, count: r.count, percentage: pct(r.count, total) }));
+  const rest = total - rows.reduce((s, r) => s + r.count, 0);
+  if (rest > 0) out.push({ city: "Others", count: rest, percentage: pct(rest, total) });
+  return out;
+}
+
+/** Top companies: the status chip and a name search together (legacy had both). */
+export function filterCompanies<T extends { name: string; status: string }>(list: T[], f: { status: string; q: string }): T[] {
+  const q = f.q.trim().toLowerCase();
+  return list.filter((c) => (!f.status || c.status === f.status) && (!q || c.name.toLowerCase().includes(q)));
 }
 
 export type Analytics = ReturnType<typeof computeAnalytics>;
