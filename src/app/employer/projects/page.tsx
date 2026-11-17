@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import { proposalOutcome } from "@/lib/proposals";
 import { ProjectList, type ListProject } from "./project-list";
+import { TakedownBanner } from "@/components/employer/takedown-banner";
 
 export const metadata: Metadata = {
   title: "Projects",
@@ -77,6 +78,7 @@ export default async function EmployerProjectsPage() {
           </ButtonLink>
         }
       />
+      <TakedownBanner projects={rows.filter((r) => r.takenDown).map((r) => ({ id: r.id, name: r.projectName, reason: r.takenDownReason }))} />
       <ProjectList projects={rows} />
     </div>
   );

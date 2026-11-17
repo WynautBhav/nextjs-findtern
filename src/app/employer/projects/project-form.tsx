@@ -29,6 +29,7 @@ export function ProjectForm({
   companyPlace,
   defaultTimezone,
   lockedFields = false,
+  readOnly = false,
 }: {
   employerId: string;
   /** Present when editing. */
@@ -39,6 +40,8 @@ export function ProjectForm({
   defaultTimezone?: string;
   /** Published: only scope, preferred locations and the full-time flag may change. */
   lockedFields?: boolean;
+  /** The project is taken down by Findtern: every field is read-only and there is nothing to save. */
+  readOnly?: boolean;
 }) {
   const router = useProgressRouter();
   const [form, setForm] = useState<ProjectDraft>(initial ?? { ...emptyProject(), timezone: defaultTimezone ?? "Asia/Kolkata" });
@@ -111,9 +114,11 @@ export function ProjectForm({
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
+        if (readOnly) return;
         void save(false);
       }}
     >
+      <fieldset disabled={readOnly} aria-describedby={readOnly ? "takedown-readonly-note" : undefined} className="m-0 min-w-0 border-0 p-0">
       <div className={lockedFields ? "max-w-2xl" : "lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-8"}>
         <div className="min-w-0 space-y-5">
           {lockedFields && (
@@ -183,8 +188,14 @@ export function ProjectForm({
           </aside>
         )}
       </div>
+      </fieldset>
       {error && <FormNotice tone="error" className="mt-5">{error}</FormNotice>}
 
+      {readOnly ? (
+        <p id="takedown-readonly-note" className="mt-5 border-t border-ink-200 py-3 text-sm text-text-subtle">
+          Taken down by Findtern: view only. Nothing here can be saved or published. Use Contact admin above to resolve this.
+        </p>
+      ) : (
       <div className="sticky bottom-0 z-20 mt-5 border-t border-ink-200 bg-white/85 backdrop-blur-md">
         <div className="flex items-center justify-end gap-2 py-3 sm:justify-between">
           <p className="text-sm text-text-subtle max-sm:hidden">
@@ -202,6 +213,7 @@ export function ProjectForm({
           </div>
         </div>
       </div>
+      )}
     </form>
   );
 }

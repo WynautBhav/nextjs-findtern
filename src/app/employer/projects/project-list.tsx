@@ -14,6 +14,8 @@ import { MetaList } from "@/components/app/meta-list";
 import { RowMenu, type RowMenuItem } from "@/components/app/row-menu";
 import { RatioBar } from "@/components/employer/kit/ratio-bar";
 import { StatusPill } from "./status-icon";
+import { ContactAdminButton } from "@/components/employer/contact-admin-button";
+import { TakedownBadge } from "@/components/employer/takedown-badge";
 import { STATUS_META, STATUS_ORDER, statusMeta } from "./status";
 
 export type ListProject = {
@@ -129,12 +131,13 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
       <ul className="grid gap-3">
         {shown.map((p, idx) => {
           const meta = statusMeta(p.status);
-          const actions = (meta.key && ACTIONS[meta.key]) || [];
+          // Taken down by Findtern: view only. No lifecycle action, no edit, no candidates: View and Contact admin.
+          const actions = p.takenDown ? [] : (meta.key && ACTIONS[meta.key]) || [];
           const busy = busyId === p.id;
           const edit = `/employer/projects/${p.id}/edit`;
           const menu: RowMenuItem[] = [];
-          if (meta.key === "published" || meta.key === "paused") menu.push({ label: "Edit", href: edit, icon: <Pencil /> });
-          if (meta.key === "published") menu.push({ label: "View candidates", href: `/employer/candidates?project=${encodeURIComponent(p.id)}`, icon: <Users /> });
+          if (!p.takenDown && (meta.key === "published" || meta.key === "paused")) menu.push({ label: "Edit", href: edit, icon: <Pencil /> });
+          if (!p.takenDown && meta.key === "published") menu.push({ label: "View candidates", href: `/employer/candidates?project=${encodeURIComponent(p.id)}`, icon: <Users /> });
           for (const a of actions) {
             if (a.to === "published") continue; // Resume is the primary action
             menu.push({
@@ -155,6 +158,7 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                     <h2 className="break-words text-base font-semibold text-ink-900">{p.projectName}</h2>
                     <StatusPill status={p.status} />
+                    {p.takenDown && <TakedownBadge />}
                   </div>
                   <MetaList
                     items={[
@@ -178,12 +182,18 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
                 </div>
                 <div className="flex items-center justify-end gap-1 sm:contents">
                   <div className="flex items-center justify-end max-sm:hidden">
-                    {meta.key === "published" && (
+                    {p.takenDown && (
+                      <div className="flex items-center gap-2">
+                        <ButtonLink href={edit} variant="outline" size="sm" className="min-h-11">View</ButtonLink>
+                        <ContactAdminButton projectId={p.id} projectName={p.projectName} />
+                      </div>
+                    )}
+                    {!p.takenDown && meta.key === "published" && (
                       <ButtonLink href={`/employer/candidates?project=${encodeURIComponent(p.id)}`} size="sm" className="min-h-11">
                         <Users className="size-4" aria-hidden /> View candidates
                       </ButtonLink>
                     )}
-                    {meta.key === "draft" && (
+                    {!p.takenDown && meta.key === "draft" && (
                       <ButtonLink href={edit} size="sm" className="min-h-11">
                         <Pencil className="size-4" aria-hidden /> Edit
                       </ButtonLink>
@@ -193,17 +203,17 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
                         <Play className="size-4" aria-hidden /> {resume.label}
                       </button>
                     )}
-                    {meta.key === "closed" && (
+                    {!p.takenDown && meta.key === "closed" && (
                       <ButtonLink href={`/employer/candidates?project=${encodeURIComponent(p.id)}`} variant="outline" size="sm" className="min-h-11">View</ButtonLink>
                     )}
                   </div>
-                  <RowMenu label={`More actions for ${p.projectName}`} items={menu} />
+                  {!p.takenDown && <RowMenu label={`More actions for ${p.projectName}`} items={menu} />}
                 </div>
               </div>
               {p.takenDown && (
                 <div role="note" className="rounded-apple-md bg-danger-soft p-3 text-sm text-ink-900">
                   <p className="font-semibold">Taken down by Findtern</p>
-                  <p className="mt-0.5 break-words">{p.takenDownReason || "No reason was recorded."} Contact support if you think this is a mistake.</p>
+                  <p className="mt-0.5 break-words">{p.takenDownReason || "No reason was recorded."} It is view only until admin restores it. Use Contact admin to resolve this.</p>
                 </div>
               )}
               {meta.key === "pending_review" && <p className="text-sm text-text-subtle">Not shown to candidates yet. Publish it now, or move it back to a draft to edit it.</p>}
@@ -215,17 +225,23 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
               )}
               {/* Phone: the primary action sits under the facts, full width. */}
               <div className="sm:hidden">
-                {meta.key === "published" && (
+                {p.takenDown && (
+                  <div className="flex gap-2">
+                    <ButtonLink href={edit} variant="outline" size="sm" block className="min-h-11 flex-1">View</ButtonLink>
+                    <ContactAdminButton projectId={p.id} projectName={p.projectName} className="flex-1" />
+                  </div>
+                )}
+                {!p.takenDown && meta.key === "published" && (
                   <ButtonLink href={`/employer/candidates?project=${encodeURIComponent(p.id)}`} size="sm" block className="min-h-11">View candidates</ButtonLink>
                 )}
-                {meta.key === "draft" && (
+                {!p.takenDown && meta.key === "draft" && (
                   <ButtonLink href={edit} size="sm" block className="min-h-11">Edit and publish</ButtonLink>
                 )}
-                {resume && (
+                {resume && !p.takenDown && (
                   <button type="button" disabled={busy} onClick={() => void move(p, resume)} className={buttonClass({ size: "sm", block: true, className: "min-h-11" })}>{resume.label}</button>
                 )}
               </div>
-              {meta.key === "rejected" && (
+              {meta.key === "rejected" && !p.takenDown && (
                 <button type="button" disabled={busy} onClick={() => void resubmit(p)} className={buttonClass({ size: "sm", className: "min-h-11 max-sm:w-full" })}>
                   <Wrench className="size-4" aria-hidden /> Edit and publish
                 </button>

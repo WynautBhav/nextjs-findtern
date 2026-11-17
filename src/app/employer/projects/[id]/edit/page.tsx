@@ -8,6 +8,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { projectFromRecord } from "@/lib/employer-onboarding";
 import { isEditableByEmployer, normalizeStatus } from "@/lib/projects/lifecycle";
 import { ProjectForm } from "../../project-form";
+import { TakedownBanner } from "@/components/employer/takedown-banner";
+import { isTakenDown } from "@/lib/projects/takedown-guard";
 
 export const metadata: Metadata = { title: "Edit project", robots: { index: false, follow: false } };
 
@@ -25,10 +27,13 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
   ]);
   if (!project) notFound();
   const published = normalizeStatus(project.status) === "published";
-  if (!published && !isEditableByEmployer(project.status)) notFound();
+  // A taken-down project opens read-only whatever its status: the owner may look at it and contact admin.
+  const down = isTakenDown(project);
+  if (!down && !published && !isEditableByEmployer(project.status)) notFound();
   return (
     <div className="container-page section-y space-y-6">
-      <PageHeader title="Edit project" />
+      <PageHeader title={down ? "View project" : "Edit project"} />
+      <TakedownBanner projects={down ? [{ id: project.id, name: project.projectName, reason: project.takenDownReason }] : []} />
       <ProjectForm
         employerId={session.uid}
         projectId={project.id}
@@ -36,6 +41,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
         companyName={company?.companyName}
         companyPlace={company ? { city: company.city, state: company.state } : undefined}
         lockedFields={published}
+        readOnly={down}
       />
     </div>
   );
