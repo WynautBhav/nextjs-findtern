@@ -128,16 +128,17 @@ export default async function EmployerDashboard() {
   const { proposals, projects } = data;
   // The same states as the Proposals tabs (an unanswered offer past its start date is closed there, an accepted
   // offer whose CGPA is being confirmed is "verifying"), so every figure here matches the tab it opens.
+  // Offers on a project Findtern took down are "View only", not "waiting on the candidate".
+  const downProjectIds = new Set(projects.filter((p) => p.takenDownAt).map((p) => p.id));
   const dashProposals: DashProposal[] = proposals.map((p, i) => ({
     internId: p.internId,
     projectId: p.projectId,
     status: p.status,
     bucket: data.states[i].bucket,
+    ...(downProjectIds.has(p.projectId) ? { viewOnly: true } : {}),
     createdAt: p.createdAt,
     hiredAt: p.hiredAt,
   }));
-  // Offers on a project Findtern took down are "View only", not "waiting on the candidate".
-  const downProjectIds = new Set(projects.filter((p) => p.takenDownAt).map((p) => p.id));
   const awaiting = proposalCounts(proposals.map((p, i) => counterRow(p.status, data.states[i], downProjectIds.has(p.projectId)))).awaiting;
 
   const tasks: Task[] = (

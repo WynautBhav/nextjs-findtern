@@ -30,7 +30,7 @@ import { buttonClass } from "@/components/ui/button";
 import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
 import { offerState } from "@/components/employer/proposal-state";
-import { CgpaNotice } from "@/components/employer/proposal-detail/cgpa-notice";
+import { CgpaNotice, ExpiredNotice } from "@/components/employer/proposal-detail/cgpa-notice";
 import { proposalCgpaGate } from "@/lib/cgpa-verification";
 import { hasOpenOrderFor } from "@/lib/payments";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
@@ -247,7 +247,10 @@ export default async function EmployerProposalDetail({
   });
 
   // An expired offer ends the timeline at its closed step, like an unanswered one.
-  const timeline = offerTimeline(proposal, { startDate: offer.startDate, fullTime: Boolean(ft) }, { label: state.label, lapsed: state.lapsed || state.expiredReason === "unpaid_past_start" }, formatDate);
+  const timeline = offerTimeline(proposal, { startDate: offer.startDate, fullTime: Boolean(ft) }, { label: state.label, lapsed: state.lapsed || state.expiredReason === "unpaid_past_start" }, formatDate).map((step) =>
+    // While Findtern confirms the CGPA the next step is not yours yet.
+    state.verifying && /^You pay/.test(step.label) ? { ...step, label: state.gate?.state === "incorrect_unacked" ? "You confirm the CGPA, then pay" : "Findtern confirms the CGPA, then you pay" } : step,
+  );
   const profileHref = `/employer/intern/${encodeURIComponent(proposal.internId)}`;
 
   return (
@@ -319,6 +322,7 @@ export default async function EmployerProposalDetail({
       </header>
 
       <CgpaNotice proposalId={proposal.id} state={state} canConfirm={confirmingCgpa} />
+      <ExpiredNotice state={state} />
 
       {/* ── The four numbers the decision rests on ───────────────────── */}
       <dl className="mt-8 grid grid-cols-2 border-y border-ink-100 sm:grid-cols-4">

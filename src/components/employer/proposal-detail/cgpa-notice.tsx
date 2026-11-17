@@ -1,4 +1,4 @@
-import { Hourglass, Info } from "lucide-react";
+import { Hourglass, Info, TimerOff } from "lucide-react";
 
 import { CgpaAckButton } from "@/components/employer/proposal-actions";
 import type { OfferState } from "@/components/employer/proposal-state";
@@ -48,6 +48,17 @@ export function CgpaNotice({ proposalId, state, canConfirm }: { proposalId: stri
           </p>
         ) : null}
       </div>
+    </section>
+  );
+}
+
+/** An expired offer says why, above the "Send a new proposal" button, so the reader understands before acting. */
+export function ExpiredNotice({ state }: { state: OfferState }) {
+  if (!state.canSendNew) return null;
+  return (
+    <section aria-label="Why this offer expired" className="mt-6 flex items-start gap-3 rounded-2xl bg-ink-50 px-5 py-4">
+      <TimerOff className="mt-0.5 size-5 shrink-0 text-ink-600" aria-hidden />
+      <p className="max-w-prose text-pretty text-sm leading-relaxed text-ink-800">{state.next}</p>
     </section>
   );
 }

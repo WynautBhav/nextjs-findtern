@@ -85,7 +85,8 @@ export default async function EmployerCheckout({
   const selection = selectCheckoutLines(payable, sp.proposal ?? sp.proposalId);
   const lines = selection.lines;
   const othersDue = payable.length - lines.length;
-  const verifyingHeld = proposals.filter((p) => p.state.verifying);
+  // A taken-down project's offers are covered by the takedown notice above, and are View only on Proposals.
+  const verifyingHeld = proposals.filter((p) => p.state.verifying && !p.viewOnly);
   // Expired and unpaid: newest start date first, a handful here and the rest under Proposals > Closed.
   const expiredAll = proposals
     .filter((p) => p.state.closedReason === "expired_unpaid")

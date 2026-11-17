@@ -18,7 +18,7 @@ import { buttonClass } from "@/components/ui/button";
 import type { EmployerProposal } from "@/lib/employer-proposal-view";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { parseOffer } from "@/lib/offer";
-import { counterRow, offerState } from "@/components/employer/proposal-state";
+import { counterRow, EXPIRED_CARD_NOTE, offerState } from "@/components/employer/proposal-state";
 import { closedBreakdown, proposalCounts } from "@/components/employer/proposal-bucket";
 import { closedSummary, inTab, TAB_EMPTY, TAB_EXPLAINER, TAB_LABEL, tabFromParam, type TabKey } from "@/components/employer/proposal-tabs";
 import { CgpaAckButton } from "@/components/employer/proposal-actions";
@@ -272,7 +272,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
           <EmptyScene
             title={narrowing ? "No proposals here" : TAB_EMPTY[statusFilter].title}
             body={narrowing ? "Nothing fits this search and status." : TAB_EMPTY[statusFilter].body}
-            who={narrowing ? "You - try another tab" : undefined}
+            who={narrowing ? "You - clear the search or project filter" : undefined}
           />
           {narrowing ? (
             <p className="mt-3 text-center">
@@ -315,7 +315,12 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
             // One colour per meaning on this list: Hired green, Waiting amber, To pay blue, Closed grey.
             // A verifying or expired offer is still status "accepted" but is not to pay: it keeps its own tone.
             const chipTone = item.proposal.status === "hired" ? "paid" : state.canPay || (item.proposal.status === "accepted" && !state.verifying && state.expiredReason === null) ? "new" : state.tone;
-            const pill = <Pill tone={chipTone} className="whitespace-nowrap">{state.label}</Pill>;
+            // A long label wraps inside its column instead of running into the price beside it.
+            const pill = (
+              <Pill tone={chipTone} className={cn("max-w-full text-left leading-snug", state.label.length > 24 ? "rounded-xl" : "whitespace-nowrap")}>
+                {state.label}
+              </Pill>
+            );
             // Taken-down project: the offer can be viewed, never acted on.
             const closedLike = state.tone === "closed" || down;
             const closed = state.tone === "closed";
@@ -375,8 +380,8 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                   >
                     <div className="flex min-w-0 items-start gap-2.5 text-sm leading-relaxed text-ink-800">
                       {note.gate && note.gate.state !== "incorrect_unacked" ? <Hourglass className="mt-0.5 size-4 shrink-0 text-accent-700" aria-hidden /> : null}
-                      <p className="min-w-0">
-                        {state.next}
+                      <p className="min-w-0 text-pretty">
+                        {note.sendNew && state.expiredReason && EXPIRED_CARD_NOTE[state.expiredReason] ? EXPIRED_CARD_NOTE[state.expiredReason] : state.next}
                         {note.gate && note.gate.state !== "incorrect_unacked" && note.gate.dueBy ? (
                           <span className="nums mt-0.5 block font-medium text-ink-900">
                             {note.gate.state === "overdue" ? "Was due by" : "Due by"} {formatIst(note.gate.dueBy)}

@@ -58,6 +58,12 @@ const EXPIRED_NEXT: Record<ExpiryReason, string> = {
   withdrawn: "You withdrew this offer.",
 };
 
+/** The one-line note a list card carries under an expired offer: why, not what to do (the button beside it says that). */
+export const EXPIRED_CARD_NOTE: Partial<Record<ExpiryReason, string>> = {
+  unpaid_past_start: "The candidate accepted, but the offer was not paid before its start date, so it can no longer be paid.",
+  no_reply_past_start: "The candidate did not reply before the start date.",
+};
+
 export function offerState(p: OfferStateInput, offer: Pick<Offer, "startDate" | "fullTime">, now: Date = new Date()): OfferState {
   const status = (p.status ?? "").toLowerCase();
   const fullTime = Boolean(offer.fullTime);
@@ -174,7 +180,8 @@ export function offerState(p: OfferStateInput, offer: Pick<Offer, "startDate" | 
     case "withdrawn":
       return { ...base, label: "Withdrawn", tone: "closed", next: "You withdrew this offer." };
     case "expired":
-      return { ...base, label: EXPIRY_LABEL[expiredReason ?? "accepted_elsewhere"], tone: "closed", next: EXPIRED_NEXT[expiredReason ?? "accepted_elsewhere"] };
+      // "Closed · accepted elsewhere" fits a status pill; the full sentence is in `next`.
+      return { ...base, label: expiredReason === "accepted_elsewhere" || expiredReason === null ? "Closed · accepted elsewhere" : EXPIRY_LABEL[expiredReason], tone: "closed", next: EXPIRED_NEXT[expiredReason ?? "accepted_elsewhere"] };
     default:
       return { ...base, label: status ? status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, " ") : "Unknown", tone: "neutral", next: "" };
   }

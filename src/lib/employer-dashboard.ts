@@ -18,6 +18,8 @@ export type DashProposal = {
   status: string;
   /** `proposalBucket(status, lapsed, flags)` (via offerState); null for an unknown status. */
   bucket: DashBucket | null;
+  /** The project is taken down: the offer reads "View only" on the Proposals page, so it is not "awaiting", "to pay" or "verifying" here either. */
+  viewOnly?: boolean;
   createdAt: Date | string | null;
   hiredAt: Date | string | null;
 };
@@ -76,9 +78,10 @@ export function buildFunnel({ proposals, shortlistInternIds, metInternIds }: Fun
     if (p.bucket === "hired") f.hired = true;
     // Anything not closed is still in play, a status nobody planned for included (it is in the Proposals total too).
     if (p.bucket !== "closed") f.live = true;
-    if (p.bucket === "open") f.awaiting = true;
-    if (p.bucket === "accepted") f.toPay = true;
-    if (p.bucket === "verifying") f.verifying = true;
+    // The waiting sub-labels follow the Proposals tabs: a taken-down project's offers are View only there.
+    if (p.bucket === "open" && !p.viewOnly) f.awaiting = true;
+    if (p.bucket === "accepted" && !p.viewOnly) f.toPay = true;
+    if (p.bucket === "verifying" && !p.viewOnly) f.verifying = true;
     byIntern.set(p.internId, f);
   }
 
@@ -135,7 +138,8 @@ export function buildFunnel({ proposals, shortlistInternIds, metInternIds }: Fun
       }),
       stage("accepted", "Accepted", accepted, offered, "offered", {
         sub: [toPay ? `${toPay} to pay` : "", verifying ? `${verifying} verifying CGPA` : ""].filter(Boolean).join(" · ") || null,
-        href: "/employer/proposals?status=accepted",
+        // Opens the tab that needs attention: To pay first, then Verifying CGPA.
+        href: toPay || !verifying ? "/employer/proposals?status=accepted" : "/employer/proposals?status=verifying",
       }),
       stage("hired", "Hired", hired, accepted, "accepted", {
         href: "/employer/proposals?status=hired",

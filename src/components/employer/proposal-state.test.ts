@@ -87,7 +87,7 @@ test("unanswered past start: Expired · no reply before start, can send a new pr
 
 test("stored expired rows read by their reason; a row with none is the legacy 'accepted another offer'", () => {
   const legacy = offerState({ status: "expired", hiredAt: null, offerDetails: {} }, AHEAD, NOW);
-  assert.deepEqual([legacy.label, legacy.closedReason, legacy.canSendNew], ["Closed · candidate accepted another offer", "accepted_elsewhere", false]);
+  assert.deepEqual([legacy.label, legacy.closedReason, legacy.canSendNew], ["Closed · accepted elsewhere", "accepted_elsewhere", false]);
   const unpaid = offerState({ status: "expired", hiredAt: null, offerDetails: { expiredReason: "unpaid_past_start" } }, PAST, NOW);
   assert.deepEqual([unpaid.label, unpaid.closedReason, unpaid.canSendNew, unpaid.canPay, unpaid.canWithdraw], ["Expired · not paid before start", "expired_unpaid", true, false, false]);
   const admin = offerState({ status: "expired", hiredAt: null, offerDetails: { expiredReason: "admin_closed" } }, AHEAD, NOW);

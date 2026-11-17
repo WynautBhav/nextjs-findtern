@@ -39,7 +39,7 @@ export const TAB_LABEL: Record<TabKey, { label: string; short: string }> = {
 
 /** One line under the tab bar for the active tab. */
 export const TAB_EXPLAINER: Record<TabKey, string> = {
-  all: "Every proposal you have sent. Each one sits in exactly one tab, so the tab counts add up to this.",
+  all: "Every proposal, closed ones included. Each sits in exactly one tab, so the tab counts add up to the All count.",
   open: "These candidates have not replied yet. They can accept until the start date.",
   draft: "Saved but never sent. The candidate sees nothing until you send it.",
   verifying: "These candidates accepted. Findtern is confirming their CGPA (usually 24-48 h) before you can pay.",

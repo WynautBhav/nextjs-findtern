@@ -120,7 +120,8 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
         className="mb-4 lg:mb-5"
       />
       <ProposalTabs active="proposals" proposals={flow?.proposals} />
-      {flow ? <HireFlow counts={flow} current="proposals" /> : null}
+      {/* No step is lit here: the tabs below are the stages (Waiting, Verifying, To pay, Hired), and the strip links into them. */}
+      {flow ? <HireFlow counts={flow} current={null} /> : null}
 
       {loadFailed ? (
         <LoadError what="your proposals" retryHref="/employer/proposals" email={SITE.adminEmail} />
