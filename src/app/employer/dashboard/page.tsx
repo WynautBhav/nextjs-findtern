@@ -18,7 +18,7 @@ import { isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules
 import { payableCheckout } from "@/lib/employer-payable";
 import { isProjectOpen } from "@/lib/project-locations";
 import { offerState } from "@/components/employer/proposal-state";
-import { proposalBucket } from "@/components/employer/proposal-bucket";
+import { proposalBucket, proposalCounts } from "@/components/employer/proposal-bucket";
 import { parseOffer } from "@/lib/offer";
 import { projectZone, timezoneForLocation } from "@/lib/timezones";
 import { formatSlotTime } from "@/lib/format";
@@ -125,7 +125,8 @@ export default async function EmployerDashboard() {
   const { proposals, projects } = data;
   // The same buckets as the Proposals tabs (an unanswered offer past its start
   // date is closed there), so every figure here matches the tab it opens.
-  const bucket = proposals.map((p) => proposalBucket(p.status, offerState({ status: p.status, hiredAt: null }, parseOffer(p.offerDetails)).lapsed));
+  const lapsed = proposals.map((p) => offerState({ status: p.status, hiredAt: null }, parseOffer(p.offerDetails)).lapsed);
+  const bucket = proposals.map((p, i) => proposalBucket(p.status, lapsed[i]));
   const dashProposals: DashProposal[] = proposals.map((p, i) => ({
     internId: p.internId,
     projectId: p.projectId,
@@ -134,7 +135,7 @@ export default async function EmployerDashboard() {
     createdAt: p.createdAt,
     hiredAt: p.hiredAt,
   }));
-  const awaiting = bucket.filter((b) => b === "open").length;
+  const awaiting = proposalCounts(proposals.map((p, i) => ({ status: p.status, lapsed: lapsed[i] }))).awaiting;
 
   const tasks: Task[] = (
     [
