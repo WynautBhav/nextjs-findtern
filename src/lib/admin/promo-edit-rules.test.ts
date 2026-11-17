@@ -36,3 +36,12 @@ test("code length and characters", () => {
   assert.ok(promoCodeProblem("HELLO WORLD"));
   assert.ok(promoCodeProblem("PROMO!"));
 });
+
+test("a 100% Findtern Pro subscription code is refused in words about the subscription, not the stipend, and points to the full-waiver code", () => {
+  const msg = promoDiscountProblem({ discountType: "percentage", discountValue: 100, appliesTo: "subscription" }) ?? "";
+  assert.match(msg, /subscription/i);
+  assert.match(msg, /full-waiver/i);
+  assert.doesNotMatch(msg, /stipend/i);
+  // the employer wording is unchanged
+  assert.match(promoDiscountProblem({ discountType: "percentage", discountValue: 100, appliesTo: "employer" }) ?? "", /stipend/);
+});

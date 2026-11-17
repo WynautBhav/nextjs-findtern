@@ -14,6 +14,7 @@ export function promoDiscountProblem({ discountType, discountValue, appliesTo }:
   if (discountType === "percentage") {
     if (discountValue > 100) return "A percentage discount can't be more than 100";
     // Employer codes may not cover the stipend; fixed amounts are checked at quote time, when the stipend is known.
+    if (discountValue === 100 && appliesTo === "subscription") return "A subscription code can't be 100%. To give a subscription away, create a full-waiver code for the subscription.";
     if (discountValue === 100 && appliesTo !== "intern") return "Only an intern code can be 100%. Employer codes can't cover the whole stipend.";
   }
   return null;
