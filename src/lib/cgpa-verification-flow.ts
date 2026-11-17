@@ -100,6 +100,8 @@ export function nextCgpaVerification(extraData: unknown, claim: CgpaClaim, now: 
 
 export type CgpaDecisionInput = { decision: "verified" | "incorrect"; correctedScore?: string; note?: string };
 
+export const NOTE_REQUIRED = "Add a note saying what the proof shows.";
+
 /** What is wrong with a decision (null when fine). `claimed` is the score being judged. */
 export function decisionProblem(input: CgpaDecisionInput, claimed: string, scoreType: ScoreType | ""): string | null {
   if (input.decision !== "incorrect") return null;
@@ -108,7 +110,7 @@ export function decisionProblem(input: CgpaDecisionInput, claimed: string, score
   const bad = scoreProblem(scoreType, corrected);
   if (bad) return bad;
   if (sameScore(corrected, claimed)) return "The corrected score must be different from the claimed one. Use Verify if it is right.";
-  if (!(input.note ?? "").trim()) return "Add a note saying what the proof shows.";
+  if (!(input.note ?? "").trim()) return NOTE_REQUIRED;
   return null;
 }
 

@@ -98,7 +98,7 @@ export function searchRows<T extends Pick<CgpaQueueRow, "name" | "email" | "phon
  * Pending: overdue first (oldest acceptance first), then the soonest to be overdue, then candidates with no accepted
  * offer yet (oldest request first). Decided checks: newest decision first.
  */
-export function sortRows<T extends CgpaQueueRow>(rows: T[], filter: CgpaFilter, now: Date): T[] {
+export function sortRows<T extends CgpaQueueRow>(rows: T[], filter: CgpaFilter): T[] {
   const t = (v: string | null) => (v ? Date.parse(v) || 0 : 0);
   if (filter === "verified" || filter === "incorrect") return [...rows].sort((a, b) => t(b.decidedAt) - t(a.decidedAt));
   return [...rows].sort((a, b) => {

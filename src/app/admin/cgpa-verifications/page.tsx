@@ -47,7 +47,7 @@ export default async function CgpaVerificationsPage({ searchParams }: { searchPa
   }
 
   const counts = countsByFilter(all, now);
-  const rows = sortRows(searchRows(all, q).filter((r) => matchesFilter(r, filter, now)), filter, now);
+  const rows = sortRows(searchRows(all, q).filter((r) => matchesFilter(r, filter, now)), filter);
   const href = (f: CgpaFilter) => `/admin/cgpa-verifications?filter=${f}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
 
   return (
@@ -61,13 +61,13 @@ export default async function CgpaVerificationsPage({ searchParams }: { searchPa
         }
       />
       <TableToolbar searchPlaceholder="Name, college, company, phone or email" extra={<CgpaExport rows={rows} now={now.toISOString()} />} />
-      <nav aria-label="Filter" className="mb-4 flex flex-wrap gap-2">
+      <nav aria-label="Filter" className="mb-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {CGPA_FILTERS.map((f) => (
           <Link
             key={f.key}
             href={href(f.key)}
             aria-current={f.key === filter ? "page" : undefined}
-            className={cn(buttonClass({ variant: f.key === filter ? "primary" : "outline", size: "sm" }), "min-h-11 max-sm:flex-1")}
+            className={cn(buttonClass({ variant: f.key === filter ? "primary" : "outline", size: "sm" }), "min-h-11")}
           >
             {f.label}
             <span className="nums ml-1.5 opacity-80">{counts[f.key]}</span>

@@ -63,10 +63,10 @@ test("pending sort: oldest acceptance first, then those not accepted yet by requ
   const b = row({ internId: "b", accepted: [ago(50)] });
   const c = row({ internId: "c", requestedAt: ago(500) });
   const d = row({ internId: "d", requestedAt: ago(20) });
-  assert.deepEqual(sortRows([c, a, d, b], "pending", NOW).map((r) => r.internId), ["b", "a", "c", "d"]);
+  assert.deepEqual(sortRows([c, a, d, b], "pending").map((r) => r.internId), ["b", "a", "c", "d"]);
   const v1 = row({ internId: "v1", status: "verified", decidedAt: ago(3) });
   const v2 = row({ internId: "v2", status: "verified", decidedAt: ago(1) });
-  assert.deepEqual(sortRows([v1, v2], "verified", NOW).map((r) => r.internId), ["v2", "v1"]);
+  assert.deepEqual(sortRows([v1, v2], "verified").map((r) => r.internId), ["v2", "v1"]);
 });
 
 test("start warning: amber under 48 h, red once the start day has come, nothing further out", () => {

@@ -6,7 +6,7 @@ import { CheckCircle2, Loader2, TriangleAlert } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { decisionProblem } from "@/lib/cgpa-verification-flow";
+import { NOTE_REQUIRED, decisionProblem } from "@/lib/cgpa-verification-flow";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 
@@ -45,9 +45,12 @@ export function CgpaDecision({ target }: { target: Target }) {
   const [tried, setTried] = useState(false);
   const id = useId();
   const unit = target.scoreType === "percentage" ? "%" : " / 10";
-  const problem = decisionProblem({ decision: "incorrect", correctedScore: corrected, note }, target.claimedScore, target.scoreType);
-  const scoreError = tried && problem && !/note/i.test(problem) ? problem : null;
-  const noteError = tried && problem && /note/i.test(problem) ? problem : null;
+  // Both fields are judged on their own, so one submit shows every problem at once.
+  const scoreProblem = decisionProblem({ decision: "incorrect", correctedScore: corrected, note: "x" }, target.claimedScore, target.scoreType);
+  const noteProblem = note.trim() ? null : NOTE_REQUIRED;
+  const problem = scoreProblem ?? noteProblem;
+  const scoreError = tried ? scoreProblem : null;
+  const noteError = tried ? noteProblem : null;
 
   function close() {
     setOpen(null);
@@ -60,7 +63,10 @@ export function CgpaDecision({ target }: { target: Target }) {
   async function submit(decision: "verified" | "incorrect") {
     setTried(true);
     setError(null);
-    if (decision === "incorrect" && problem) return;
+    if (decision === "incorrect" && problem) {
+      document.getElementById(scoreProblem ? `${id}-score` : `${id}-note`)?.focus();
+      return;
+    }
     setBusy(true);
     const res = await send(target.internId, decision === "verified" ? { decision } : { decision, correctedScore: corrected.trim(), note: note.trim() });
     setBusy(false);
@@ -71,7 +77,7 @@ export function CgpaDecision({ target }: { target: Target }) {
 
   return (
     <>
-      <div className="flex flex-wrap gap-2 max-sm:flex-col">
+      <div className="flex flex-wrap gap-2 max-sm:flex-col max-sm:gap-3">
         <button type="button" onClick={() => setOpen("verify")} className={cn(buttonClass({ variant: "primary", size: "sm" }), "min-h-11 rounded-full px-5")}>
           <CheckCircle2 className="size-4" aria-hidden />
           Verify CGPA correct
