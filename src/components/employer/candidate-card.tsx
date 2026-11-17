@@ -115,6 +115,11 @@ export function SaveToggle({ internId, projectId, shortlisted, name }: { internI
   );
 }
 
+/** Compare and Quick view are the card's two quiet controls: one look, so they read as a pair. */
+const SECONDARY_PILL =
+  "relative z-10 inline-flex h-11 items-center justify-center rounded-xl border px-3 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:h-10 sm:touch:h-11";
+const QUICK_VIEW_PILL = "gap-2 border-ink-200 bg-ink-50 text-[13px] font-semibold text-ink-800 hover:bg-ink-100 hover:text-ink-900";
+
 /** A checkbox-style link: the compare picks live in the URL, so it navigates. */
 function CompareToggle({ href, selected, name }: { href: string | null; selected: boolean; name: string }) {
   const box = (
@@ -128,8 +133,7 @@ function CompareToggle({ href, selected, name }: { href: string | null; selected
       {selected ? <Check className="size-3" strokeWidth={3} /> : null}
     </span>
   );
-  const cls =
-    "relative z-10 inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-xl border px-3 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:h-10 sm:touch:h-11";
+  const cls = cn(SECONDARY_PILL, "shrink-0 gap-2");
   if (!href) {
     return (
       <span aria-disabled="true" title="Compare holds four. Remove one to add another." className={cn(cls, "cursor-not-allowed border-ink-200 bg-ink-50 text-ink-500")}>
@@ -196,7 +200,11 @@ export function CandidateCard({
       {proposalActionLabel(proposal)}
     </ButtonLink>
   ) : sendProposalHold(pendingMeetingAt) ? (
-    <SendProposalHold pendingMeetingAt={pendingMeetingAt} className="relative z-10" />
+    <SendProposalHold
+      pendingMeetingAt={pendingMeetingAt}
+      className="relative z-10 max-w-60 text-right max-sm:max-w-none max-sm:flex-1 max-sm:items-stretch"
+      controlClassName="justify-center rounded-xl border border-ink-200 sm:h-10 sm:touch:h-11"
+    />
   ) : (
     <ButtonLink href={sendHref} variant="primary" size="sm" className="relative z-10 h-11 rounded-xl px-4 sm:h-10 sm:touch:h-11">
       <Send className="size-4" aria-hidden />
@@ -222,7 +230,16 @@ export function CandidateCard({
   const wanted = skillMatch(candidate.skills, wantedSkills);
   const cellLabel = "text-[11px] font-semibold uppercase tracking-wider text-text-subtle";
   const quickView = (
-    <CandidateQuickView candidate={candidate} displayName={displayName} place={place} currency={currency} pricing={pricing} wantedSkills={wantedSkills} profileHref={profileHref} />
+    <CandidateQuickView
+      candidate={candidate}
+      displayName={displayName}
+      place={place}
+      currency={currency}
+      pricing={pricing}
+      wantedSkills={wantedSkills}
+      profileHref={profileHref}
+      className={QUICK_VIEW_PILL}
+    />
   );
 
   if (layout === "rows") {
@@ -356,7 +373,7 @@ export function CandidateCard({
 
   return (
     <li className="group/row relative flex flex-col gap-4 rounded-2xl border border-ink-200 bg-white p-4 shadow-xs transition-colors hover:border-ink-300 sm:gap-5 sm:p-6">
-      {/* Who: tile, name and stage, where, and the two quiet controls. */}
+      {/* Who: tile, name and stage, where, and the shortlist star. */}
       <div className="flex items-start justify-between gap-2 sm:gap-4">
         <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <RowAvatar square photoUrl={candidate.photoUrl} initials={candidate.initials} seed={candidate.id} presence={presence} />
@@ -378,10 +395,11 @@ export function CandidateCard({
             </p>
           </div>
         </div>
-        <div className="relative z-10 flex shrink-0 items-center gap-1 sm:gap-2">
-          {canSave && projectId ? <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} name={displayName} /> : null}
-          <CompareToggle href={compareHref} selected={selected} name={displayName} />
-        </div>
+        {canSave && projectId ? (
+          <div className="relative z-10 shrink-0">
+            <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} name={displayName} />
+          </div>
+        ) : null}
       </div>
 
       {/* What they are: degree and field, then how many skills you asked for. */}
@@ -401,6 +419,12 @@ export function CandidateCard({
         <div className="flex flex-col gap-1">
           <span className={cellLabel}>Findtern Score</span>
           <ScoreBadge size="cell" score={candidate.score} scored={candidate.scored} />
+          {interview > 0 ? (
+            <p className="nums flex items-center gap-1 text-[11px] leading-4 text-text-subtle">
+              <Sparkles className="size-3 text-brand-600" aria-hidden />
+              AI interview {interview.toFixed(1)} / 10
+            </p>
+          ) : null}
         </div>
         <div className="flex flex-col gap-1 border-l border-ink-200 pl-3 sm:pl-5">
           <span className={cn(cellLabel, "whitespace-nowrap")}>Hourly rate</span>
@@ -427,18 +451,13 @@ export function CandidateCard({
 
       <SkillChips heading skills={candidate.skills} wanted={wantedSkills} />
 
-      {/* One quiet action and the one primary action. The profile link is stretched over the whole card. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-ink-100 pt-4">
-        {interview > 0 ? (
-          <p className="nums flex items-center gap-1.5 text-[13px] text-text-subtle max-sm:hidden">
-            <Sparkles className="size-4 text-brand-600" aria-hidden />
-            AI interview {interview.toFixed(1)} / 10
-          </p>
-        ) : (
-          <span />
-        )}
-        <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:justify-end">
+      {/* The pair of quiet controls on the left, the profile and the one primary action on the right. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-3 border-t border-ink-100 pt-4">
+        <div className="flex flex-wrap items-center gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
+          <CompareToggle href={compareHref} selected={selected} name={displayName} />
           {quickView}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 max-sm:w-full sm:justify-end [&>*]:max-sm:flex-1">
           {viewProfile}
           {primary}
         </div>
