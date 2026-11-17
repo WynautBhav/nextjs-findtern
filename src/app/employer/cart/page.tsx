@@ -14,6 +14,7 @@ import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
 import { pendingMeetingAtFor } from "@/lib/proposal-guard";
 import { isBlockingInterview, isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { hireFlowCounts } from "@/lib/employer-flow";
+import { normalizeStatus } from "@/components/employer/proposal-bucket";
 import { payableCheckout } from "@/lib/employer-payable";
 import { timezoneForLocation } from "@/lib/timezones";
 import { PageHead } from "@/components/app/primitives";
@@ -175,8 +176,10 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
     const acceptedFor = new Map<string, string>();
     const openFor = new Map<string, string>();
     for (const p of proposals) {
-      if ((p.status === "accepted" || p.status === "processing") && !acceptedFor.has(p.internId)) acceptedFor.set(p.internId, p.id);
-      if (["draft", "sent", "interview_scheduled"].includes(p.status) && !openFor.has(p.internId)) openFor.set(p.internId, p.id);
+      // Legacy rows may be cased or spaced differently ("Sent"); the shared normaliser matches them.
+      const status = normalizeStatus(p.status);
+      if ((status === "accepted" || status === "processing") && !acceptedFor.has(p.internId)) acceptedFor.set(p.internId, p.id);
+      if (["draft", "sent", "interview_scheduled"].includes(status) && !openFor.has(p.internId)) openFor.set(p.internId, p.id);
     }
 
     // A meeting that is still open (booked, or slots offered) holds the
