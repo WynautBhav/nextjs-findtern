@@ -166,3 +166,11 @@ export function trendSpec(w: ReportWindow, now: Date = new Date()): TrendSpec {
   const keys = bucketKeys(since, end, bucket).slice(-24);
   return { bucket, keys, since: istDayStart(keys[0]) };
 }
+
+const MON = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** Short axis label for a bucket key: day "17 Nov", week "16 Nov" (the Monday), month "Nov 26". */
+export function bucketLabel(key: string, unit: BucketUnit): string {
+  const [y, m, d] = key.split("-");
+  return unit === "month" ? `${MON[Number(m) - 1]} ${y.slice(2)}` : `${Number(d)} ${MON[Number(m) - 1]}`;
+}

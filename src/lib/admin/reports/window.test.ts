@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { bucketKeys, bucketKeyOf, parseReportWindow, trendSpec } from "./window.ts";
+import { bucketKeys, bucketKeyOf, bucketLabel, parseReportWindow, trendSpec } from "./window.ts";
 
 // 17 Nov 2026 is a Tuesday. 10:00 IST = 04:30 UTC.
 const NOW = new Date("2026-11-17T04:30:00Z");
@@ -110,4 +110,10 @@ test("trend spec: today shows 14 days, week 8 weeks, month 6 months; long custom
   const short = trendSpec(parseReportWindow({ period: "7d" }, NOW), NOW);
   assert.equal(short.bucket, "day");
   assert.equal(short.keys.length, 7);
+});
+
+test("bucket labels are short and unambiguous", () => {
+  assert.equal(bucketLabel("2026-11-17", "day"), "17 Nov");
+  assert.equal(bucketLabel("2026-11-16", "week"), "16 Nov");
+  assert.equal(bucketLabel("2026-11-01", "month"), "Nov 26");
 });

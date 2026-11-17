@@ -8,8 +8,7 @@ import { cn } from "@/lib/utils";
 
 export type ReportTabItem = { key: string; label: string; href: string };
 
-export const REPORT_PANEL_ID = "report-tabpanel";
-export const reportTabId = (key: string) => `report-tab-${key}`;
+import { REPORT_PANEL_ID, reportTabId } from "@/lib/admin/reports/tab-ids";
 
 /**
  * The Reports tab row. Each tab is a link (so it works with no JS, opens in a new tab

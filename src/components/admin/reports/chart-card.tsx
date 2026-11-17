@@ -65,7 +65,7 @@ export function ChartCard({ views, className }: { views: ChartView[]; className?
       </div>
       <div data-panel-body="" className="p-[var(--admin-pad-panel)] pt-3">
         {empty ? (
-          <p className="py-14 text-center text-sm text-text-subtle">Nothing to chart yet: {view.unit.toLowerCase()} is zero for every month shown.</p>
+          <p className="py-14 text-center text-sm text-text-subtle">Nothing to chart yet: {view.unit.toLowerCase()} is zero for every period shown.</p>
         ) : (
           <>
             <p className="mb-1 text-xs font-medium text-text-subtle">{view.unit}</p>

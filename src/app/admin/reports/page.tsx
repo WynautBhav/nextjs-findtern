@@ -3,10 +3,11 @@ import { Suspense } from "react";
 
 import { AdminPageHeader } from "@/components/admin/panel";
 import { RangeBar } from "@/components/admin/reports/range-bar";
-import { REPORT_PANEL_ID, ReportTabs, reportTabId } from "@/components/admin/reports/report-tabs";
+import { ReportTabs } from "@/components/admin/reports/report-tabs";
 import { SectionSkeleton } from "@/components/admin/reports/skeletons";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { reportHref } from "@/lib/admin/reports/href";
+import { REPORT_PANEL_ID, reportTabId } from "@/lib/admin/reports/tab-ids";
 import { parseReportWindow, REPORT_TABS, TAB_LABELS } from "@/lib/admin/reports/window";
 
 import EmployersTab from "./_tabs/employers";
