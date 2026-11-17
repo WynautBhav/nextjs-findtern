@@ -3,7 +3,7 @@
  * testable (node --test cannot import the .tsx strip).
  */
 
-export type FlowStepKey = "candidates" | "shortlisted" | "awaitingReply" | "toPay" | "hired";
+export type FlowStepKey = "candidates" | "shortlisted" | "awaitingReply" | "verifying" | "toPay" | "hired";
 
 /** The pages that carry the strip. `null` shows it with no step lit. */
 export type FlowPage = "candidates" | "cart" | "proposals" | "checkout";

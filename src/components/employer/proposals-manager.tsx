@@ -3,10 +3,11 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Clock, CreditCard, Eye, Loader2, Pencil, RotateCcw, Search, X } from "lucide-react";
+import { Clock, CreditCard, Eye, Hourglass, Loader2, Pencil, RotateCcw, Search, Send, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatMoney } from "@/lib/format";
+import { formatIst, formatMoney } from "@/lib/format";
+import type { CgpaGate } from "@/lib/cgpa-verification";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { EmptyScene, Pill } from "@/components/app/primitives";
 import { RowMenu, type RowMenuItem } from "@/components/app/row-menu";
@@ -17,8 +18,10 @@ import { buttonClass } from "@/components/ui/button";
 import type { EmployerProposal } from "@/lib/employer-proposal-view";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { parseOffer } from "@/lib/offer";
-import { offerState } from "@/components/employer/proposal-state";
-import { proposalBucket, proposalCounts } from "@/components/employer/proposal-bucket";
+import { counterRow, offerState } from "@/components/employer/proposal-state";
+import { closedBreakdown, proposalCounts } from "@/components/employer/proposal-bucket";
+import { closedSummary, inTab, TAB_EMPTY, TAB_EXPLAINER, TAB_LABEL, tabFromParam, type TabKey } from "@/components/employer/proposal-tabs";
+import { CgpaAckButton } from "@/components/employer/proposal-actions";
 import { cn } from "@/lib/utils";
 import { TakedownBadge } from "@/components/employer/takedown-badge";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
@@ -35,7 +38,13 @@ export type ProposalItem = {
   /** Avatar route when they uploaded a photo (shown before hire; the name is not). */
   photoUrl: string | null;
   presence: PresenceLabel | null;
+  /** Where the candidate's CGPA check stands, only while it blocks payment (derived on the server: the intern's own data stays there). */
+  gate: CgpaGate | null;
+  /** A payment order is open for this offer: it freezes expiry. */
+  hasOpenOrder: boolean;
 };
+
+const needsYou = (s: ReturnType<typeof offerState>) => s.canPay || s.gate?.state === "incorrect_unacked";
 
 function nameOf(item: ProposalItem): string {
   const first = item.user?.firstName?.trim() || "";
@@ -54,11 +63,11 @@ function formatStart(iso: string | null): string | null {
   return `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}`;
 }
 
-export function ProposalsManager({ initialProposals, initialStatus = "all" }: { initialProposals: ProposalItem[]; initialStatus?: string }) {
+export function ProposalsManager({ initialProposals, initialStatus = "all" }: { initialProposals: ProposalItem[]; initialStatus?: TabKey }) {
   const router = useRouter();
   const [proposals, setProposals] = useState<ProposalItem[]>(initialProposals);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [statusFilter, setStatusFilter] = useState<TabKey>(tabFromParam(initialStatus));
   const [projectFilter, setProjectFilter] = useState("all");
   const [shown, setShown] = useState(PAGE);
   const [withdrawTarget, setWithdrawTarget] = useState<ProposalItem | null>(null);
@@ -70,36 +79,36 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
     () =>
       proposals.map((item) => {
         const offer = parseOffer(item.proposal.offerDetails, item.proposal.currency);
-        const base = offerState(item.proposal, offer);
+        const base = offerState({ ...item.proposal, hasOpenOrder: item.hasOpenOrder, gate: item.gate }, offer);
         // A taken-down project's offers are view only: no pay, edit or withdraw, and they leave the Waiting / To pay groups.
         const down = Boolean(item.project?.takenDown);
         const open = !base.lapsed && ["sent", "interview_scheduled", "accepted", "processing"].includes(item.proposal.status);
-        const state = down ? { ...base, canPay: false, canEdit: false, canWithdraw: false, ...(open ? { label: "View only · taken down", tone: "closed" as const } : {}) } : base;
+        const state = down ? { ...base, canPay: false, canEdit: false, canWithdraw: false, canSendNew: false, ...(open ? { label: "View only · taken down", tone: "closed" as const } : {}) } : base;
         return { item, offer, state, down };
       })
-        // Offers waiting on your payment come first: they are the only rows that need you.
-        .sort((a, b) => Number(b.state.canPay) - Number(a.state.canPay)),
+        // Offers waiting on your payment, or on you to confirm a corrected CGPA, come first: they are the only rows that need you.
+        .sort((a, b) => Number(needsYou(b.state)) - Number(needsYou(a.state))),
     [proposals],
   );
 
   const projectOptions = Array.from(new Map(proposals.filter((p) => p.project).map((p) => [p.project!.id, p.project!.projectName])).entries());
 
   // The same counter the hire strip, the dashboard and the page header use.
-  const counts = proposalCounts(rows.map((r) => ({ status: r.item.proposal.status, lapsed: r.state.lapsed, ...(r.down ? { viewOnly: true } : {}) })));
+  const counterRows = rows.map((r) => counterRow(r.item.proposal.status, r.state, r.down));
+  const counts = proposalCounts(counterRows);
 
   const needle = search.trim().toLowerCase();
   const filtered = rows.filter(({ item, offer, state, down }) => {
     // Project, role or the initials shown - never a hidden name.
     const hay = `${item.project?.projectName ?? ""} ${offer.roleTitle} ${nameOf(item)}`.toLowerCase();
     if (needle && !hay.includes(needle)) return false;
-    const bucket = proposalBucket(item.proposal.status, state.lapsed);
-    const isViewOnly = down && (bucket === "open" || bucket === "accepted");
-    if (statusFilter === "viewonly") return isViewOnly && (!needle || hay.includes(needle)) && (projectFilter === "all" || item.proposal.projectId === projectFilter);
-    if (statusFilter !== "all" && (bucket !== statusFilter || isViewOnly)) return false;
+    if (!inTab(statusFilter, state.bucket, down)) return false;
     if (projectFilter !== "all" && item.proposal.projectId !== projectFilter) return false;
     return true;
   });
-  const filtering = Boolean(needle) || statusFilter !== "all" || projectFilter !== "all";
+  // A search or project filter narrows within a tab; the tab itself is not a "filter" that can be cleared.
+  const narrowing = Boolean(needle) || projectFilter !== "all";
+  const filtering = narrowing || statusFilter !== "all";
 
   async function handleWithdraw() {
     if (!withdrawTarget) return;
@@ -134,7 +143,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
       { label: "View offer", href, icon: <Eye /> },
       ...(state.canEdit ? [{ label: "Edit offer", href: `${href}?edit=1`, icon: <Pencil /> }] : []),
       ...(item.proposal.status === "hired" ? [{ label: "Timesheets", href: "/employer/timesheets", icon: <Clock /> }] : []),
-      ...(state.canWithdraw ? [{ label: "Withdraw offer", onSelect: () => setWithdrawTarget(item), icon: <X />, destructive: true }] : []),
+      ...(state.canWithdraw ? [{ label: state.gate?.state === "incorrect_unacked" ? "Withdraw proposal" : "Withdraw offer", onSelect: () => setWithdrawTarget(item), icon: <X />, destructive: true }] : []),
     ];
   }
 
@@ -150,19 +159,21 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
     );
   }
 
-  const tabs = [
-    { key: "all", label: "All", short: "All", count: counts.all },
-    { key: "open", label: "Waiting on candidate", short: "Waiting", count: counts.awaiting },
-    // Unsent drafts have their own tab, only when there are some (not counted as "waiting").
-    ...(counts.drafts > 0 ? [{ key: "draft", label: "Drafts · not sent", short: "Drafts", count: counts.drafts }] : []),
+  // One counter feeds every number here (proposalCounts). Waiting, Verifying, To pay, Hired and Closed are always
+  // listed, even at 0, so every state has a visible name; drafts and view only appear when there are some.
+  const tabs: { key: TabKey; count: number }[] = [
+    { key: "all", count: counts.all },
+    { key: "open", count: counts.awaiting },
+    ...(counts.drafts > 0 ? [{ key: "draft" as const, count: counts.drafts }] : []),
+    { key: "verifying", count: counts.verifying ?? 0 },
     // Accepted offers only; running placements' monthly dues are on Orders,
     // so this is not called "payment due" beside the dashboard's count (QA-123).
-    { key: "accepted", label: "Accepted · to pay", short: "To pay", count: counts.accepted },
-    ...(counts.viewOnly ? [{ key: "viewonly", label: "View only · taken down", short: "View only", count: counts.viewOnly }] : []),
-    { key: "hired", label: "Hired", short: "Hired", count: counts.hired },
-    // "Expired" is an offer that went unanswered past its start date.
-    { key: "closed", label: "Declined & expired", short: "Closed", count: counts.closed },
+    { key: "accepted", count: counts.accepted },
+    ...(counts.viewOnly ? [{ key: "viewonly" as const, count: counts.viewOnly }] : []),
+    { key: "hired", count: counts.hired },
+    { key: "closed", count: counts.closed },
   ];
+  const closedLine = statusFilter === "closed" ? closedSummary(closedBreakdown(counterRows)) : "";
   // A handful of offers reads at a glance; search only earns its place on a longer list.
   const showTools = proposals.length > 5;
 
@@ -213,7 +224,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
 
       {/* Status tabs with counts, underlined like candidate search. Toggle
           buttons, not role=tab: they narrow one list, they don't switch panels. */}
-      <div role="group" aria-label="Show proposals" className="flex flex-wrap gap-x-3 border-b border-ink-100 sm:gap-x-7">
+      <div role="group" aria-label="Show proposals" aria-describedby="proposal-tab-explainer" className="flex flex-wrap gap-x-3 border-b border-ink-100 sm:gap-x-7">
         {tabs.map((t) => {
           const on = statusFilter === t.key;
           return (
@@ -221,6 +232,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
               key={t.key}
               type="button"
               aria-pressed={on}
+              aria-label={`${TAB_LABEL[t.key].label}, ${t.count}`}
               onClick={() => {
                 setStatusFilter(t.key);
                 setShown(PAGE);
@@ -232,13 +244,18 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                 on ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-700 hover:text-ink-900",
               )}
             >
-              <span className="sm:hidden">{t.short}</span>
-              <span className="max-sm:hidden">{t.label}</span>
-              <span className={cn("nums", on ? "text-ink-900" : "text-ink-600")}>{t.count}</span>
+              <span aria-hidden className="sm:hidden">{TAB_LABEL[t.key].short}</span>
+              <span aria-hidden className="max-sm:hidden">{TAB_LABEL[t.key].label}</span>
+              <span aria-hidden className={cn("nums", on ? "text-ink-900" : "text-ink-600")}>{t.count}</span>
             </button>
           );
         })}
       </div>
+      {/* What the open tab holds, in one line: a tab at 0 beside an All of 2 means the two sit in another tab. */}
+      <p id="proposal-tab-explainer" aria-live="polite" className="mt-3 max-w-3xl text-sm leading-relaxed text-ink-700">
+        {TAB_EXPLAINER[statusFilter]}
+        {closedLine ? <span className="nums block text-ink-600">{closedLine}</span> : null}
+      </p>
 
       {errorMsg ? (
         <p role="alert" className="mt-4 rounded-apple-md border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-ink-800">
@@ -253,11 +270,11 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
       {filtered.length === 0 ? (
         <div className="pt-8">
           <EmptyScene
-            title="No proposals here"
-            body={filtering ? "Nothing fits this search and status." : "No offers in this group yet."}
-            who="You - try another tab"
+            title={narrowing ? "No proposals here" : TAB_EMPTY[statusFilter].title}
+            body={narrowing ? "Nothing fits this search and status." : TAB_EMPTY[statusFilter].body}
+            who={narrowing ? "You - try another tab" : undefined}
           />
-          {needle || projectFilter !== "all" ? (
+          {narrowing ? (
             <p className="mt-3 text-center">
               <button
                 type="button"
@@ -296,12 +313,17 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
             const title = offer.roleTitle || item.project?.projectName || "Internship";
             const who = nameOf(item);
             // One colour per meaning on this list: Hired green, Waiting amber, To pay blue, Closed grey.
-            const chipTone = item.proposal.status === "hired" ? "paid" : state.canPay || item.proposal.status === "accepted" ? "new" : state.tone;
+            // A verifying or expired offer is still status "accepted" but is not to pay: it keeps its own tone.
+            const chipTone = item.proposal.status === "hired" ? "paid" : state.canPay || (item.proposal.status === "accepted" && !state.verifying && state.expiredReason === null) ? "new" : state.tone;
             const pill = <Pill tone={chipTone} className="whitespace-nowrap">{state.label}</Pill>;
             // Taken-down project: the offer can be viewed, never acted on.
             const closedLike = state.tone === "closed" || down;
             const closed = state.tone === "closed";
             const label = "text-[11px] font-semibold uppercase tracking-wider text-text-subtle";
+            // The note under a card that needs more than a pill: CGPA being confirmed, a correction to confirm, an expired offer.
+            const gate = down ? null : state.gate;
+            const sendNew = !down && state.canSendNew ? `/employer/send-proposal?intern=${encodeURIComponent(item.proposal.internId)}&project=${encodeURIComponent(item.proposal.projectId)}` : null;
+            const note = gate || sendNew ? { gate, sendNew } : null;
             return (
               <li
                 key={item.proposal.id}
@@ -344,6 +366,35 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                     {start ? ` · ${ft ? "Joins" : "Starts"} ${start}` : ""}
                   </span>
                 </div>
+                {note ? (
+                  <div
+                    className={cn(
+                      "relative z-10 col-span-2 flex flex-col gap-3 rounded-xl px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:order-last lg:col-span-full",
+                      note.gate?.state === "incorrect_unacked" ? "bg-info-soft" : note.gate ? "bg-accent-100/60" : "bg-ink-50",
+                    )}
+                  >
+                    <div className="flex min-w-0 items-start gap-2.5 text-sm leading-relaxed text-ink-800">
+                      {note.gate && note.gate.state !== "incorrect_unacked" ? <Hourglass className="mt-0.5 size-4 shrink-0 text-accent-700" aria-hidden /> : null}
+                      <p className="min-w-0">
+                        {state.next}
+                        {note.gate && note.gate.state !== "incorrect_unacked" && note.gate.dueBy ? (
+                          <span className="nums mt-0.5 block font-medium text-ink-900">
+                            {note.gate.state === "overdue" ? "Was due by" : "Due by"} {formatIst(note.gate.dueBy)}
+                          </span>
+                        ) : null}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-col gap-2 sm:w-60">
+                      {note.gate?.state === "incorrect_unacked" ? <CgpaAckButton proposalId={item.proposal.id} /> : null}
+                      {note.sendNew ? (
+                        <Link href={note.sendNew} className={buttonClass({ block: true, className: "min-h-11" })}>
+                          <Send className="size-4" aria-hidden />
+                          Send a new proposal
+                        </Link>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
                 {/* Above the stretched link, so these stay clickable. */}
                 <div className="relative z-10 col-span-2 flex items-center gap-3 border-t border-ink-100 pt-3 lg:col-span-1 lg:border-0 lg:pt-0">
                   {/* One visible action, chosen by the state (QA-120); the menu holds the rest. */}
