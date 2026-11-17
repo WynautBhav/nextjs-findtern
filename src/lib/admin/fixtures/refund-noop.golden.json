@@ -1,0 +1,1362 @@
+{
+ "accepted_unpaid": {
+  "placement": [
+   {
+    "proposalId": "h1",
+    "plan": "unpaid",
+    "currency": "INR",
+    "totalMinor": 2900000,
+    "feeMinor": 500000,
+    "paidMinor": 0,
+    "dueMinor": 2900000,
+    "months": 3,
+    "monthsPaid": 0,
+    "paidOn": [],
+    "nextDue": "2026-12-01",
+    "endsOn": "2027-02-28",
+    "status": "unpaid"
+   }
+  ],
+  "ledger": {
+   "hires": [
+    {
+     "proposalId": "h1",
+     "internId": "intern-h1",
+     "projectId": "proj1",
+     "status": "accepted",
+     "currency": "INR",
+     "fullTime": false,
+     "ctcMinor": null,
+     "monthlyMinor": 800000,
+     "months": 3,
+     "plan": "unpaid",
+     "totalMinor": 2900000,
+     "paidMinor": 0,
+     "dueMinor": 2900000,
+     "monthsPaid": 0,
+     "monthsLeft": 3,
+     "nextDueDate": "2026-12-01"
+    }
+   ],
+   "payments": [],
+   "totals": {
+    "billedInrMinor": 2900000,
+    "paidInrMinor": 0,
+    "remainingInrMinor": 2900000
+   }
+  },
+  "money": [
+   [
+    "emp1",
+    {
+     "lastPaymentAt": null,
+     "lastPaymentInrMinor": null,
+     "nextDueDate": "2026-12-01",
+     "amountLeftInrMinor": 2900000
+    }
+   ]
+  ],
+  "receivables": {
+   "receivables": [
+    {
+     "id": "due:h1",
+     "date": "2026-12-01",
+     "source": "company",
+     "status": "due",
+     "description": "Offer accepted, awaiting payment",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 2900000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 2900000
+    }
+   ],
+   "payables": [
+    {
+     "id": "stipend:h1:3",
+     "date": "2027-03-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 3 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "stipend:h1:2",
+     "date": "2027-02-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 2 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "stipend:h1:1",
+     "date": "2027-01-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 1 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "payout:p1",
+     "date": "2026-12-02",
+     "source": "candidate",
+     "status": "paid",
+     "description": "Stipend payout",
+     "companyName": null,
+     "candidateName": "Intern",
+     "amountMinor": 800000,
+     "currency": "INR",
+     "reference": "r1",
+     "inrMinor": 800000
+    }
+   ],
+   "totals": {
+    "receivedMinor": 0,
+    "dueMinor": 2900000,
+    "prospectMinor": 0,
+    "paidOutMinor": 800000,
+    "owedMinor": 1200000
+   }
+  }
+ },
+ "paid_upfront": {
+  "placement": [
+   {
+    "proposalId": "h1",
+    "plan": "upfront",
+    "currency": "INR",
+    "totalMinor": 2900000,
+    "feeMinor": 500000,
+    "paidMinor": 2900000,
+    "dueMinor": 0,
+    "months": 3,
+    "monthsPaid": 3,
+    "paidOn": [
+     "2026-11-21T10:00:00.000Z"
+    ],
+    "nextDue": null,
+    "endsOn": "2027-02-28",
+    "status": "fully_paid"
+   }
+  ],
+  "ledger": {
+   "hires": [
+    {
+     "proposalId": "h1",
+     "internId": "intern-h1",
+     "projectId": "proj1",
+     "status": "hired",
+     "currency": "INR",
+     "fullTime": false,
+     "ctcMinor": null,
+     "monthlyMinor": 800000,
+     "months": 3,
+     "plan": "upfront",
+     "totalMinor": 2900000,
+     "paidMinor": 2900000,
+     "dueMinor": 0,
+     "monthsPaid": 3,
+     "monthsLeft": 0,
+     "nextDueDate": null
+    }
+   ],
+   "payments": [
+    [
+     "o1",
+     {
+      "paymentId": "o1",
+      "proposalIds": [
+       "h1"
+      ],
+      "type": "Internship",
+      "mode": "Upfront"
+     }
+    ]
+   ],
+   "totals": {
+    "billedInrMinor": 2900000,
+    "paidInrMinor": 2900000,
+    "remainingInrMinor": 0
+   }
+  },
+  "money": [
+   [
+    "emp1",
+    {
+     "lastPaymentAt": "2026-11-21T10:00:00.000Z",
+     "lastPaymentInrMinor": 2900000,
+     "nextDueDate": null,
+     "amountLeftInrMinor": 0
+    }
+   ]
+  ],
+  "receivables": {
+   "receivables": [
+    {
+     "id": "order:o1",
+     "date": "2026-11-21",
+     "source": "company",
+     "status": "received",
+     "description": "Employer payment",
+     "companyName": "Acme",
+     "candidateName": null,
+     "amountMinor": 2900000,
+     "currency": "INR",
+     "reference": "pay_o1",
+     "inrMinor": 2900000
+    }
+   ],
+   "payables": [
+    {
+     "id": "stipend:h1:3",
+     "date": "2027-03-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 3 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "stipend:h1:2",
+     "date": "2027-02-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 2 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "stipend:h1:1",
+     "date": "2027-01-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 1 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "payout:p1",
+     "date": "2026-12-02",
+     "source": "candidate",
+     "status": "paid",
+     "description": "Stipend payout",
+     "companyName": null,
+     "candidateName": "Intern",
+     "amountMinor": 800000,
+     "currency": "INR",
+     "reference": "r1",
+     "inrMinor": 800000
+    }
+   ],
+   "totals": {
+    "receivedMinor": 2900000,
+    "dueMinor": 0,
+    "prospectMinor": 0,
+    "paidOutMinor": 800000,
+    "owedMinor": 1200000
+   }
+  }
+ },
+ "monthly_one_paid": {
+  "placement": [
+   {
+    "proposalId": "h1",
+    "plan": "monthly",
+    "currency": "INR",
+    "totalMinor": 2000000,
+    "feeMinor": 500000,
+    "paidMinor": 1000000,
+    "dueMinor": 1000000,
+    "months": 3,
+    "monthsPaid": 1,
+    "paidOn": [
+     "2026-11-21T10:00:00.000Z"
+    ],
+    "nextDue": "2027-01-01",
+    "endsOn": "2027-02-28",
+    "status": "partially_paid"
+   }
+  ],
+  "ledger": {
+   "hires": [
+    {
+     "proposalId": "h1",
+     "internId": "intern-h1",
+     "projectId": "proj1",
+     "status": "hired",
+     "currency": "INR",
+     "fullTime": false,
+     "ctcMinor": null,
+     "monthlyMinor": 500000,
+     "months": 3,
+     "plan": "monthly",
+     "totalMinor": 2000000,
+     "paidMinor": 1000000,
+     "dueMinor": 1000000,
+     "monthsPaid": 1,
+     "monthsLeft": 2,
+     "nextDueDate": "2027-01-01"
+    }
+   ],
+   "payments": [
+    [
+     "o1",
+     {
+      "paymentId": "o1",
+      "proposalIds": [
+       "h1"
+      ],
+      "type": "Internship",
+      "mode": "Monthly"
+     }
+    ]
+   ],
+   "totals": {
+    "billedInrMinor": 2000000,
+    "paidInrMinor": 1000000,
+    "remainingInrMinor": 1000000
+   }
+  },
+  "money": [
+   [
+    "emp1",
+    {
+     "lastPaymentAt": "2026-11-21T10:00:00.000Z",
+     "lastPaymentInrMinor": 1000000,
+     "nextDueDate": "2027-01-01",
+     "amountLeftInrMinor": 1000000
+    }
+   ]
+  ],
+  "receivables": {
+   "receivables": [
+    {
+     "id": "instalment:h1:3",
+     "date": "2027-02-01",
+     "source": "company",
+     "status": "upcoming",
+     "description": "Monthly instalment 3 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 500000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 500000
+    },
+    {
+     "id": "instalment:h1:2",
+     "date": "2027-01-01",
+     "source": "company",
+     "status": "upcoming",
+     "description": "Monthly instalment 2 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 500000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 500000
+    },
+    {
+     "id": "order:o1",
+     "date": "2026-11-21",
+     "source": "company",
+     "status": "received",
+     "description": "Employer payment",
+     "companyName": "Acme",
+     "candidateName": null,
+     "amountMinor": 1000000,
+     "currency": "INR",
+     "reference": "pay_o1",
+     "inrMinor": 1000000
+    }
+   ],
+   "payables": [
+    {
+     "id": "stipend:h1:3",
+     "date": "2027-03-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 3 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 250000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 250000
+    },
+    {
+     "id": "stipend:h1:2",
+     "date": "2027-02-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 2 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 250000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 250000
+    },
+    {
+     "id": "stipend:h1:1",
+     "date": "2027-01-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 1 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 250000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 250000
+    },
+    {
+     "id": "payout:p1",
+     "date": "2026-12-02",
+     "source": "candidate",
+     "status": "paid",
+     "description": "Stipend payout",
+     "companyName": null,
+     "candidateName": "Intern",
+     "amountMinor": 800000,
+     "currency": "INR",
+     "reference": "r1",
+     "inrMinor": 800000
+    }
+   ],
+   "totals": {
+    "receivedMinor": 1000000,
+    "dueMinor": 1000000,
+    "prospectMinor": 0,
+    "paidOutMinor": 800000,
+    "owedMinor": 750000
+   }
+  }
+ },
+ "postpaid_fee_then_due": {
+  "placement": [
+   {
+    "proposalId": "h1",
+    "plan": "postpaid",
+    "currency": "INR",
+    "totalMinor": 5000000,
+    "feeMinor": 500000,
+    "paidMinor": 3500000,
+    "dueMinor": 1500000,
+    "months": 3,
+    "monthsPaid": 2,
+    "paidOn": [
+     "2026-11-21T10:00:00.000Z",
+     "2026-12-20T10:00:00.000Z"
+    ],
+    "nextDue": "2027-02-27",
+    "endsOn": "2027-02-28",
+    "status": "partially_paid"
+   }
+  ],
+  "ledger": {
+   "hires": [
+    {
+     "proposalId": "h1",
+     "internId": "intern-h1",
+     "projectId": "proj1",
+     "status": "hired",
+     "currency": "INR",
+     "fullTime": false,
+     "ctcMinor": null,
+     "monthlyMinor": 1500000,
+     "months": 3,
+     "plan": "postpaid",
+     "totalMinor": 3500000,
+     "paidMinor": 2000000,
+     "dueMinor": 1500000,
+     "monthsPaid": 2,
+     "monthsLeft": 1,
+     "nextDueDate": "2027-02-27"
+    }
+   ],
+   "payments": [
+    [
+     "o1",
+     {
+      "paymentId": "o1",
+      "proposalIds": [
+       "h1"
+      ],
+      "type": "Internship",
+      "mode": "Hiring charge"
+     }
+    ],
+    [
+     "o2",
+     {
+      "paymentId": "o2",
+      "proposalIds": [
+       "h1"
+      ],
+      "type": "Internship",
+      "mode": "Monthly"
+     }
+    ]
+   ],
+   "totals": {
+    "billedInrMinor": 3500000,
+    "paidInrMinor": 2000000,
+    "remainingInrMinor": 1500000
+   }
+  },
+  "money": [
+   [
+    "emp1",
+    {
+     "lastPaymentAt": "2026-12-20T10:00:00.000Z",
+     "lastPaymentInrMinor": 1500000,
+     "nextDueDate": "2027-02-27",
+     "amountLeftInrMinor": 1500000
+    }
+   ]
+  ],
+  "receivables": {
+   "receivables": [
+    {
+     "id": "instalment:h1:3",
+     "date": "2027-02-27",
+     "source": "company",
+     "status": "upcoming",
+     "description": "Month 3 of 3 stipend (due 2 days before the intern is paid)",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 1500000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 1500000
+    },
+    {
+     "id": "order:o2",
+     "date": "2026-12-20",
+     "source": "company",
+     "status": "received",
+     "description": "Employer payment",
+     "companyName": "Acme",
+     "candidateName": null,
+     "amountMinor": 1500000,
+     "currency": "INR",
+     "reference": "pay_o2",
+     "inrMinor": 1500000
+    },
+    {
+     "id": "order:o1",
+     "date": "2026-11-21",
+     "source": "company",
+     "status": "received",
+     "description": "Employer payment: hiring charge + month 1",
+     "companyName": "Acme",
+     "candidateName": null,
+     "amountMinor": 500000,
+     "currency": "INR",
+     "reference": "pay_o1",
+     "inrMinor": 500000
+    }
+   ],
+   "payables": [
+    {
+     "id": "stipend:h1:3",
+     "date": "2027-03-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 3 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 750000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 750000
+    },
+    {
+     "id": "stipend:h1:2",
+     "date": "2027-02-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 2 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 750000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 750000
+    },
+    {
+     "id": "stipend:h1:1",
+     "date": "2027-01-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 1 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 750000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 750000
+    },
+    {
+     "id": "payout:p1",
+     "date": "2026-12-02",
+     "source": "candidate",
+     "status": "paid",
+     "description": "Stipend payout",
+     "companyName": null,
+     "candidateName": "Intern",
+     "amountMinor": 800000,
+     "currency": "INR",
+     "reference": "r1",
+     "inrMinor": 800000
+    }
+   ],
+   "totals": {
+    "receivedMinor": 2000000,
+    "dueMinor": 1500000,
+    "prospectMinor": 0,
+    "paidOutMinor": 800000,
+    "owedMinor": 2250000
+   }
+  }
+ },
+ "usd_paid": {
+  "placement": [
+   {
+    "proposalId": "h1",
+    "plan": "upfront",
+    "currency": "USD",
+    "totalMinor": 35000,
+    "feeMinor": 5000,
+    "paidMinor": 35000,
+    "dueMinor": 0,
+    "months": 3,
+    "monthsPaid": 3,
+    "paidOn": [
+     "2026-11-21T10:00:00.000Z"
+    ],
+    "nextDue": null,
+    "endsOn": "2027-02-28",
+    "status": "fully_paid"
+   }
+  ],
+  "ledger": {
+   "hires": [
+    {
+     "proposalId": "h1",
+     "internId": "intern-h1",
+     "projectId": "proj1",
+     "status": "hired",
+     "currency": "USD",
+     "fullTime": false,
+     "ctcMinor": null,
+     "monthlyMinor": 10000,
+     "months": 3,
+     "plan": "upfront",
+     "totalMinor": 35000,
+     "paidMinor": 35000,
+     "dueMinor": 0,
+     "monthsPaid": 3,
+     "monthsLeft": 0,
+     "nextDueDate": null
+    }
+   ],
+   "payments": [
+    [
+     "o1",
+     {
+      "paymentId": "o1",
+      "proposalIds": [
+       "h1"
+      ],
+      "type": "Internship",
+      "mode": "Upfront"
+     }
+    ]
+   ],
+   "totals": {
+    "billedInrMinor": 3500000,
+    "paidInrMinor": 3500000,
+    "remainingInrMinor": 0
+   }
+  },
+  "money": [
+   [
+    "emp1",
+    {
+     "lastPaymentAt": "2026-11-21T10:00:00.000Z",
+     "lastPaymentInrMinor": 3500000,
+     "nextDueDate": null,
+     "amountLeftInrMinor": 0
+    }
+   ]
+  ],
+  "receivables": {
+   "receivables": [
+    {
+     "id": "order:o1",
+     "date": "2026-11-21",
+     "source": "company",
+     "status": "received",
+     "description": "Employer payment",
+     "companyName": "Acme",
+     "candidateName": null,
+     "amountMinor": 35000,
+     "currency": "USD",
+     "reference": "pay_o1",
+     "inrMinor": 3500000
+    }
+   ],
+   "payables": [
+    {
+     "id": "stipend:h1:3",
+     "date": "2027-03-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 3 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 500000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 500000
+    },
+    {
+     "id": "stipend:h1:2",
+     "date": "2027-02-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 2 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 500000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 500000
+    },
+    {
+     "id": "stipend:h1:1",
+     "date": "2027-01-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 1 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 500000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 500000
+    },
+    {
+     "id": "payout:p1",
+     "date": "2026-12-02",
+     "source": "candidate",
+     "status": "paid",
+     "description": "Stipend payout",
+     "companyName": null,
+     "candidateName": "Intern",
+     "amountMinor": 800000,
+     "currency": "INR",
+     "reference": "r1",
+     "inrMinor": 800000
+    }
+   ],
+   "totals": {
+    "receivedMinor": 3500000,
+    "dueMinor": 0,
+    "prospectMinor": 0,
+    "paidOutMinor": 800000,
+    "owedMinor": 1500000
+   }
+  }
+ },
+ "two_hires_one_order": {
+  "placement": [
+   {
+    "proposalId": "h1",
+    "plan": "upfront",
+    "currency": "INR",
+    "totalMinor": 2900000,
+    "feeMinor": 500000,
+    "paidMinor": 2900000,
+    "dueMinor": 0,
+    "months": 3,
+    "monthsPaid": 3,
+    "paidOn": [
+     "2026-11-21T10:00:00.000Z"
+    ],
+    "nextDue": null,
+    "endsOn": "2027-02-28",
+    "status": "fully_paid"
+   },
+   {
+    "proposalId": "h2",
+    "plan": "upfront",
+    "currency": "INR",
+    "totalMinor": 2000000,
+    "feeMinor": 500000,
+    "paidMinor": 2000000,
+    "dueMinor": 0,
+    "months": 3,
+    "monthsPaid": 3,
+    "paidOn": [
+     "2026-11-21T10:00:00.000Z"
+    ],
+    "nextDue": null,
+    "endsOn": "2027-02-28",
+    "status": "fully_paid"
+   }
+  ],
+  "ledger": {
+   "hires": [
+    {
+     "proposalId": "h1",
+     "internId": "intern-h1",
+     "projectId": "proj1",
+     "status": "hired",
+     "currency": "INR",
+     "fullTime": false,
+     "ctcMinor": null,
+     "monthlyMinor": 800000,
+     "months": 3,
+     "plan": "upfront",
+     "totalMinor": 3195918,
+     "paidMinor": 3195918,
+     "dueMinor": 0,
+     "monthsPaid": 3,
+     "monthsLeft": 0,
+     "nextDueDate": null
+    },
+    {
+     "proposalId": "h2",
+     "internId": "intern-h2",
+     "projectId": "proj1",
+     "status": "hired",
+     "currency": "INR",
+     "fullTime": false,
+     "ctcMinor": null,
+     "monthlyMinor": 500000,
+     "months": 3,
+     "plan": "upfront",
+     "totalMinor": 2204082,
+     "paidMinor": 2204082,
+     "dueMinor": 0,
+     "monthsPaid": 3,
+     "monthsLeft": 0,
+     "nextDueDate": null
+    }
+   ],
+   "payments": [
+    [
+     "o1",
+     {
+      "paymentId": "o1",
+      "proposalIds": [
+       "h1",
+       "h2"
+      ],
+      "type": "Internship",
+      "mode": "Upfront"
+     }
+    ]
+   ],
+   "totals": {
+    "billedInrMinor": 5400000,
+    "paidInrMinor": 5400000,
+    "remainingInrMinor": 0
+   }
+  },
+  "money": [
+   [
+    "emp1",
+    {
+     "lastPaymentAt": "2026-11-21T10:00:00.000Z",
+     "lastPaymentInrMinor": 5400000,
+     "nextDueDate": null,
+     "amountLeftInrMinor": 0
+    }
+   ]
+  ],
+  "receivables": {
+   "receivables": [
+    {
+     "id": "order:o1",
+     "date": "2026-11-21",
+     "source": "company",
+     "status": "received",
+     "description": "Employer payment",
+     "companyName": "Acme",
+     "candidateName": null,
+     "amountMinor": 5400000,
+     "currency": "INR",
+     "reference": "pay_o1",
+     "inrMinor": 5400000
+    }
+   ],
+   "payables": [
+    {
+     "id": "stipend:h1:3",
+     "date": "2027-03-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 3 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "stipend:h2:3",
+     "date": "2027-03-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 3 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 250000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 250000
+    },
+    {
+     "id": "stipend:h1:2",
+     "date": "2027-02-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 2 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "stipend:h2:2",
+     "date": "2027-02-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 2 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 250000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 250000
+    },
+    {
+     "id": "stipend:h1:1",
+     "date": "2027-01-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 1 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "stipend:h2:1",
+     "date": "2027-01-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 1 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 250000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 250000
+    },
+    {
+     "id": "payout:p1",
+     "date": "2026-12-02",
+     "source": "candidate",
+     "status": "paid",
+     "description": "Stipend payout",
+     "companyName": null,
+     "candidateName": "Intern",
+     "amountMinor": 800000,
+     "currency": "INR",
+     "reference": "r1",
+     "inrMinor": 800000
+    }
+   ],
+   "totals": {
+    "receivedMinor": 5400000,
+    "dueMinor": 0,
+    "prospectMinor": 0,
+    "paidOutMinor": 800000,
+    "owedMinor": 1950000
+   }
+  }
+ },
+ "promo_monthly": {
+  "placement": [
+   {
+    "proposalId": "h1",
+    "plan": "monthly",
+    "currency": "INR",
+    "totalMinor": 2900000,
+    "feeMinor": 500000,
+    "paidMinor": 1300000,
+    "dueMinor": 1600000,
+    "months": 3,
+    "monthsPaid": 1,
+    "paidOn": [
+     "2026-11-21T10:00:00.000Z"
+    ],
+    "nextDue": "2027-01-01",
+    "endsOn": "2027-02-28",
+    "status": "partially_paid"
+   }
+  ],
+  "ledger": {
+   "hires": [
+    {
+     "proposalId": "h1",
+     "internId": "intern-h1",
+     "projectId": "proj1",
+     "status": "hired",
+     "currency": "INR",
+     "fullTime": false,
+     "ctcMinor": null,
+     "monthlyMinor": 800000,
+     "months": 3,
+     "plan": "monthly",
+     "totalMinor": 2800000,
+     "paidMinor": 1200000,
+     "dueMinor": 1600000,
+     "monthsPaid": 1,
+     "monthsLeft": 2,
+     "nextDueDate": "2027-01-01"
+    }
+   ],
+   "payments": [
+    [
+     "o1",
+     {
+      "paymentId": "o1",
+      "proposalIds": [
+       "h1"
+      ],
+      "type": "Internship",
+      "mode": "Monthly"
+     }
+    ]
+   ],
+   "totals": {
+    "billedInrMinor": 2800000,
+    "paidInrMinor": 1200000,
+    "remainingInrMinor": 1600000
+   }
+  },
+  "money": [
+   [
+    "emp1",
+    {
+     "lastPaymentAt": "2026-11-21T10:00:00.000Z",
+     "lastPaymentInrMinor": 1200000,
+     "nextDueDate": "2027-01-01",
+     "amountLeftInrMinor": 1600000
+    }
+   ]
+  ],
+  "receivables": {
+   "receivables": [
+    {
+     "id": "instalment:h1:3",
+     "date": "2027-02-01",
+     "source": "company",
+     "status": "upcoming",
+     "description": "Monthly instalment 3 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 800000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 800000
+    },
+    {
+     "id": "instalment:h1:2",
+     "date": "2027-01-01",
+     "source": "company",
+     "status": "upcoming",
+     "description": "Monthly instalment 2 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 800000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 800000
+    },
+    {
+     "id": "order:o1",
+     "date": "2026-11-21",
+     "source": "company",
+     "status": "received",
+     "description": "Employer payment",
+     "companyName": "Acme",
+     "candidateName": null,
+     "amountMinor": 1200000,
+     "currency": "INR",
+     "reference": "pay_o1",
+     "inrMinor": 1200000
+    }
+   ],
+   "payables": [
+    {
+     "id": "stipend:h1:3",
+     "date": "2027-03-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 3 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "stipend:h1:2",
+     "date": "2027-02-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 2 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "stipend:h1:1",
+     "date": "2027-01-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 1 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "payout:p1",
+     "date": "2026-12-02",
+     "source": "candidate",
+     "status": "paid",
+     "description": "Stipend payout",
+     "companyName": null,
+     "candidateName": "Intern",
+     "amountMinor": 800000,
+     "currency": "INR",
+     "reference": "r1",
+     "inrMinor": 800000
+    }
+   ],
+   "totals": {
+    "receivedMinor": 1200000,
+    "dueMinor": 1600000,
+    "prospectMinor": 0,
+    "paidOutMinor": 800000,
+    "owedMinor": 1200000
+   }
+  }
+ },
+ "failed_and_created_ignored": {
+  "placement": [
+   {
+    "proposalId": "h1",
+    "plan": "unpaid",
+    "currency": "INR",
+    "totalMinor": 2900000,
+    "feeMinor": 500000,
+    "paidMinor": 0,
+    "dueMinor": 2900000,
+    "months": 3,
+    "monthsPaid": 0,
+    "paidOn": [],
+    "nextDue": "2026-12-01",
+    "endsOn": "2027-02-28",
+    "status": "unpaid"
+   }
+  ],
+  "ledger": {
+   "hires": [
+    {
+     "proposalId": "h1",
+     "internId": "intern-h1",
+     "projectId": "proj1",
+     "status": "accepted",
+     "currency": "INR",
+     "fullTime": false,
+     "ctcMinor": null,
+     "monthlyMinor": 800000,
+     "months": 3,
+     "plan": "unpaid",
+     "totalMinor": 2900000,
+     "paidMinor": 0,
+     "dueMinor": 2900000,
+     "monthsPaid": 0,
+     "monthsLeft": 3,
+     "nextDueDate": "2026-12-01"
+    }
+   ],
+   "payments": [
+    [
+     "o1",
+     {
+      "paymentId": "o1",
+      "proposalIds": [
+       "h1"
+      ],
+      "type": "Internship",
+      "mode": "Upfront"
+     }
+    ],
+    [
+     "o2",
+     {
+      "paymentId": "o2",
+      "proposalIds": [
+       "h1"
+      ],
+      "type": "Internship",
+      "mode": "Upfront"
+     }
+    ]
+   ],
+   "totals": {
+    "billedInrMinor": 2900000,
+    "paidInrMinor": 0,
+    "remainingInrMinor": 2900000
+   }
+  },
+  "money": [
+   [
+    "emp1",
+    {
+     "lastPaymentAt": null,
+     "lastPaymentInrMinor": null,
+     "nextDueDate": "2026-12-01",
+     "amountLeftInrMinor": 2900000
+    }
+   ]
+  ],
+  "receivables": {
+   "receivables": [
+    {
+     "id": "due:h1",
+     "date": "2026-12-01",
+     "source": "company",
+     "status": "due",
+     "description": "Offer accepted, awaiting payment",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 2900000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 2900000
+    }
+   ],
+   "payables": [
+    {
+     "id": "stipend:h1:3",
+     "date": "2027-03-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 3 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "stipend:h1:2",
+     "date": "2027-02-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 2 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "stipend:h1:1",
+     "date": "2027-01-01",
+     "source": "candidate",
+     "status": "upcoming",
+     "description": "Stipend month 1 of 3",
+     "companyName": "Acme",
+     "candidateName": "Intern",
+     "amountMinor": 400000,
+     "currency": "INR",
+     "reference": null,
+     "inrMinor": 400000
+    },
+    {
+     "id": "payout:p1",
+     "date": "2026-12-02",
+     "source": "candidate",
+     "status": "paid",
+     "description": "Stipend payout",
+     "companyName": null,
+     "candidateName": "Intern",
+     "amountMinor": 800000,
+     "currency": "INR",
+     "reference": "r1",
+     "inrMinor": 800000
+    }
+   ],
+   "totals": {
+    "receivedMinor": 0,
+    "dueMinor": 2900000,
+    "prospectMinor": 0,
+    "paidOutMinor": 800000,
+    "owedMinor": 1200000
+   }
+  }
+ }
+}
