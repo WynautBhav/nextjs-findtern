@@ -256,7 +256,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
           <CreditCard className="size-4" aria-hidden />
         )}
         {testMode ? "Complete for free (test mode)" : waived ? "Complete hire (free, code applied)" : `Pay ${formatMoney(payable, currency)}`}
-        {promo && !testMode ? (
+        {promo && !testMode && !waived ? (
           <span className="text-xs font-normal line-through opacity-70">
             {formatMoney(amountMinor, currency)}
           </span>
