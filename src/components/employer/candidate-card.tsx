@@ -118,7 +118,7 @@ export function SaveToggle({ internId, projectId, shortlisted, name }: { internI
 /** Compare and Quick view are the card's two quiet controls: one look, so they read as a pair. */
 const SECONDARY_PILL =
   "relative z-10 inline-flex h-11 items-center justify-center rounded-xl border px-3 text-[13px] font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:h-10 sm:touch:h-11";
-const QUICK_VIEW_PILL = "gap-2 border-ink-200 bg-ink-50 text-[13px] font-semibold text-ink-800 hover:bg-ink-100 hover:text-ink-900";
+const QUICK_VIEW_PILL = "gap-2 border border-ink-200 bg-ink-50 text-[13px] font-semibold text-ink-800 hover:bg-ink-100 hover:text-ink-900";
 
 /** A checkbox-style link: the compare picks live in the URL, so it navigates. */
 function CompareToggle({ href, selected, name }: { href: string | null; selected: boolean; name: string }) {
@@ -243,59 +243,65 @@ export function CandidateCard({
   );
 
   if (layout === "rows") {
-    // The dense line: who, the skills, the two numbers, then the same actions as the cards.
+    // The compact line pair: who and the two numbers, then the skills and the same actions as the cards.
     return (
-      <li className="group/row relative flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-ink-200 bg-white p-3 shadow-xs transition-colors hover:border-ink-300 sm:p-4 xl:flex-nowrap">
-        <div className="flex min-w-0 basis-full items-center gap-3 sm:basis-[17rem] xl:w-64 xl:shrink-0 xl:basis-auto">
-          <RowAvatar square photoUrl={candidate.photoUrl} initials={candidate.initials} seed={candidate.id} presence={presence} className="size-11 sm:size-11" />
-          <div className="min-w-0">
-            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-              <h3 className="break-words text-base font-bold leading-6 text-ink-900">{displayName}</h3>
-              {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
-              {interested ? (
-                <Pill tone="live" className="shrink-0 whitespace-nowrap">
-                  Interested in this role
-                </Pill>
-              ) : null}
+      <li className="group/row relative flex min-w-0 flex-col gap-3 rounded-2xl border border-ink-200 bg-white p-3 shadow-xs transition-colors hover:border-ink-300 sm:p-4">
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+          <div className="flex min-w-0 flex-1 basis-60 items-center gap-3">
+            <RowAvatar square photoUrl={candidate.photoUrl} initials={candidate.initials} seed={candidate.id} presence={presence} className="size-11 sm:size-11" />
+            <div className="min-w-0">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <h3 className="break-words text-base font-bold leading-6 text-ink-900">{displayName}</h3>
+                {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
+                {interested ? (
+                  <Pill tone="live" className="shrink-0 whitespace-nowrap">
+                    Interested in this role
+                  </Pill>
+                ) : null}
+              </div>
+              <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1 text-sm text-ink-600">
+                <MapPin className="size-3.5 shrink-0 text-ink-500" aria-hidden />
+                <span className="min-w-0 truncate">{place}</span>
+                {headline ? <span className="max-sm:hidden">· {headline}</span> : null}
+                {presence === PRESENCE_ONLINE ? <span className="whitespace-nowrap font-medium text-success">, {presence}</span> : null}
+              </p>
             </div>
-            <p className="mt-0.5 flex min-w-0 items-center gap-1 text-sm text-ink-600">
-              <MapPin className="size-3.5 shrink-0 text-ink-500" aria-hidden />
-              <span className="min-w-0 truncate">{place}</span>
-              {presence === PRESENCE_ONLINE ? <span className="shrink-0 whitespace-nowrap font-medium text-success">, {presence}</span> : null}
-            </p>
-            {headline ? <p className="mt-0.5 truncate text-[13px] text-ink-600">{headline}</p> : null}
           </div>
-        </div>
-
-        <div className="min-w-0 flex-1 basis-full space-y-1.5 sm:basis-64">
-          <SkillChips skills={candidate.skills} wanted={wantedSkills} />
-          {wanted.total > 0 ? (
-            <p className="text-xs text-ink-600">
-              <span className="nums font-medium text-ink-900">{wanted.matched.length} of {wanted.total}</span> skills you asked for
-            </p>
+          <div className="flex shrink-0 items-start gap-5 sm:gap-8">
+            <div className="flex flex-col gap-1">
+              <span className={cellLabel}>Findtern Score</span>
+              <ScoreBadge size="cell" score={candidate.score} scored={candidate.scored} />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className={cn(cellLabel, "whitespace-nowrap")}>Hourly rate</span>
+              <p className="nums flex items-baseline gap-1 text-lg font-bold leading-7 text-ink-900">
+                {formatMoney(pricing.hourlyRateMinor, currency)}
+                <span className="text-xs font-normal text-text-subtle">/ hr</span>
+              </p>
+            </div>
+          </div>
+          {canSave && projectId ? (
+            <div className="relative z-10 shrink-0 max-sm:absolute max-sm:right-2 max-sm:top-2">
+              <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} name={displayName} />
+            </div>
           ) : null}
         </div>
 
-        <div className="flex shrink-0 items-start gap-4 sm:gap-6">
-          <div className="flex flex-col gap-1">
-            <span className={cellLabel}>Findtern Score</span>
-            <ScoreBadge size="cell" score={candidate.score} scored={candidate.scored} />
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 border-t border-ink-100 pt-3">
+          <div className="min-w-0 flex-1 basis-64 space-y-1.5">
+            <SkillChips skills={candidate.skills} wanted={wantedSkills} />
+            {wanted.total > 0 ? (
+              <p className="text-xs text-ink-600">
+                <span className="nums font-medium text-ink-900">{wanted.matched.length} of {wanted.total}</span> skills you asked for
+              </p>
+            ) : null}
           </div>
-          <div className="flex flex-col gap-1">
-            <span className={cn(cellLabel, "whitespace-nowrap")}>Hourly rate</span>
-            <p className="nums flex items-baseline gap-1 text-lg font-bold leading-7 text-ink-900">
-              {formatMoney(pricing.hourlyRateMinor, currency)}
-              <span className="text-xs font-normal text-text-subtle">/ hr</span>
-            </p>
+          <div className="relative z-10 flex flex-wrap items-center gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
+            <CompareToggle href={compareHref} selected={selected} name={displayName} />
+            {quickView}
+            {viewProfile}
+            {primary}
           </div>
-        </div>
-
-        <div className="relative z-10 flex flex-wrap items-center gap-2 max-xl:w-full xl:shrink-0 xl:justify-end">
-          {canSave && projectId ? <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} name={displayName} /> : null}
-          <CompareToggle href={compareHref} selected={selected} name={displayName} />
-          {quickView}
-          {viewProfile}
-          {primary}
         </div>
       </li>
     );
@@ -452,12 +458,12 @@ export function CandidateCard({
       <SkillChips heading skills={candidate.skills} wanted={wantedSkills} />
 
       {/* The pair of quiet controls on the left, the profile and the one primary action on the right. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-3 border-t border-ink-100 pt-4">
-        <div className="flex flex-wrap items-center gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-3 border-t border-ink-100 pt-4">
+        <div className="flex flex-wrap items-start gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
           <CompareToggle href={compareHref} selected={selected} name={displayName} />
           {quickView}
         </div>
-        <div className="flex flex-wrap items-center gap-2 max-sm:w-full sm:justify-end [&>*]:max-sm:flex-1">
+        <div className="flex flex-wrap items-start gap-2 max-sm:w-full sm:justify-end [&>*]:max-sm:flex-1">
           {viewProfile}
           {primary}
         </div>
