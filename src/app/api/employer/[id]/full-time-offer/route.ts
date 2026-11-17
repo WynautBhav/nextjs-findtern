@@ -12,6 +12,7 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { sendSmtpMail } from "@/lib/mailer";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
+import { startDateProblem } from "@/lib/business-days";
 import { parseOffer } from "@/lib/offer";
 import { requirePublicOrigin } from "@/lib/origin";
 import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
@@ -29,6 +30,8 @@ const bodySchema = z.object({
   annualCtc: z.number().positive().max(100_000_000),
   /** Key returned by /api/uploads (kind offer_letter). */
   offerLetterKey: z.string().min(10),
+  /** Optional joining date. When sent it is held to the hiring start rule (a weekday, two days after sending). Stored inside fullTimeOffer, so it never lapses the offer. */
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a start date.").optional(),
 });
 
 /**
@@ -44,6 +47,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   const b = parsed.data;
+  const dateProblem = b.startDate === undefined ? null : startDateProblem(b.startDate, new Date());
+  if (dateProblem) return NextResponse.json({ error: dateProblem }, { status: 400 });
   if (b.jobMode !== "remote" && (!b.jobLocationCity || !b.jobLocationState)) {
     return NextResponse.json({ error: "City and state are needed for onsite or hybrid roles." }, { status: 400 });
   }
@@ -126,6 +131,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             annualCtc: b.annualCtc,
             offerLetterKey: b.offerLetterKey,
             offerLetterUrl,
+            ...(b.startDate ? { startDate: b.startDate } : {}),
             createdAt: new Date().toISOString(),
           },
           currency: b.ctcCurrency,

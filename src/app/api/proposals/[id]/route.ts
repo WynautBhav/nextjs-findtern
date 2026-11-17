@@ -165,12 +165,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (modeIssue) return NextResponse.json({ error: modeIssue }, { status: 400 });
   }
   // Judge only what this edit changes (legacy offers may not meet today's rules); same checks as the composer.
-  const termIssue = offerEditTermIssues(edits, {
-    startDate: before.startDate,
-    timezone: current.timezone,
-    shiftFrom: current.shiftFrom,
-    shiftTo: current.shiftTo,
-  })[0];
+  // A changed start date is measured from now (the edit time); one left as it was is not judged against the lead.
+  const termIssue = offerEditTermIssues(
+    edits,
+    {
+      startDate: before.startDate,
+      timezone: current.timezone,
+      shiftFrom: current.shiftFrom,
+      shiftTo: current.shiftTo,
+    },
+    new Date(),
+  )[0];
   if (termIssue) return NextResponse.json({ error: termIssue.message }, { status: 400 });
   if (edits.startDate !== undefined && edits.startDate <= todayIst()) {
     return NextResponse.json({ error: "Pick a start date after today." }, { status: 400 });

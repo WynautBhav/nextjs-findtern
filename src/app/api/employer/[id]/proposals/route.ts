@@ -24,7 +24,6 @@ import {
   parseOffer,
   PAID_LEAVE_OPTIONS,
   scheduledMonthlyHours,
-  todayIst,
   WEEKLY_SCHEDULES,
   workingDaysPerWeek,
   type WeeklySchedule,
@@ -75,8 +74,8 @@ const bodySchema = z
   skills: z.array(z.string()).max(30).default([]),
 })
   .superRefine((b, ctx) => {
-    // The route also needs the start to be after today; these keep junk out of the stored offer.
-    for (const i of offerTermIssues(b)) ctx.addIssue({ code: "custom", message: i.message, path: [i.path] });
+    // Start date: a weekday, two days after today at least (business-days.ts); shift and timezone keep junk out of the stored offer.
+    for (const i of offerTermIssues(b, new Date())) ctx.addIssue({ code: "custom", message: i.message, path: [i.path] });
     if (!["company", "candidate"].includes(normalizeLaptop(b.laptop))) {
       ctx.addIssue({ code: "custom", message: "Say who provides the laptop: the company or the candidate.", path: ["laptop"] });
     }
@@ -134,10 +133,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const b = parsed.data;
   const td = await assertProjectActionable(b.projectId, id);
   if (!td.ok) return td.response;
-  // An offer lapses on its start date, so the start has to be after today.
-  if (b.startDate <= todayIst()) {
-    return NextResponse.json({ error: "Pick a start date after today." }, { status: 400 });
-  }
 
   const db = getDb();
   // Indian companies are billed in INR, everyone else in USD (row 64).

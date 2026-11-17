@@ -1,5 +1,6 @@
 import { INR_PER_USD } from "./currency.ts";
 import { PRICING_DEFAULTS, stipendInrMinorFor, type PricingConfig } from "./pricing-config.ts";
+import { startDateProblem } from "./business-days.ts";
 import { isKnownTimezone } from "./timezones.ts";
 
 /**
@@ -66,6 +67,8 @@ export type Offer = {
     timezone: string;
     shiftFrom: string;
     shiftTo: string;
+    /** The joining date the employer set on the offer (a weekday, two days out at least when sent); null when none. */
+    startDate: string | null;
   } | null;
 };
 
@@ -295,6 +298,7 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
           timezone: str(ft.timezone),
           shiftFrom: str(ft.shiftFrom),
           shiftTo: str(ft.shiftTo),
+          startDate: str(ft.startDate) || null,
         }
       : null,
   };
@@ -514,17 +518,28 @@ export const MAX_DAYS_AHEAD = 365;
 /**
  * The start-date, shift and timezone rules shared by the composer and the
  * offer edit. Pass only what is being set; each issue names its field.
+ *
+ * With `sentAt` (the moment the offer goes out, or is edited) the hiring start rule applies too: a weekday, at
+ * least two days after the India day of `sentAt` (business-days.startDateProblem). Without it only the
+ * calendar checks run.
  */
-export function offerTermIssues(t: {
-  startDate?: string;
-  shiftFrom?: string;
-  shiftTo?: string;
-  timezone?: string;
-}): { path: string; message: string }[] {
+export function offerTermIssues(
+  t: {
+    startDate?: string;
+    shiftFrom?: string;
+    shiftTo?: string;
+    timezone?: string;
+  },
+  sentAt?: Date,
+): { path: string; message: string }[] {
   const out: { path: string; message: string }[] = [];
   if (t.startDate !== undefined) {
     if (!isRealDay(t.startDate)) out.push({ path: "startDate", message: "Pick a real start date." });
     else if (t.startDate > addDays(todayIst(), MAX_DAYS_AHEAD)) out.push({ path: "startDate", message: "Pick a start date within the next year." });
+    else if (sentAt) {
+      const problem = startDateProblem(t.startDate, sentAt);
+      if (problem) out.push({ path: "startDate", message: problem });
+    }
   }
   if (t.shiftFrom !== undefined || t.shiftTo !== undefined) {
     const from = t.shiftFrom ?? "";
@@ -549,23 +564,31 @@ export function offerTermIssues(t: {
  * The same term rules for an edit of a stored offer, judging only what the edit changes: the form resends every
  * field, and an older offer (a shift over 8 hours, a start date now in the past, an odd timezone) may not meet
  * today's rules. An edit of one shift end is judged against the stored other end.
+ *
+ * A start date the edit leaves as it was is never judged, so editing other terms is not refused because the date is
+ * now closer than two days (it was valid when sent) or is a weekend on an older offer. A changed start date is
+ * measured from `now`, the edit time.
  */
 export function offerEditTermIssues(
   edits: { startDate?: string; shiftFrom?: string; shiftTo?: string; timezone?: string },
   stored: { startDate?: unknown; shiftFrom?: unknown; shiftTo?: unknown; timezone?: unknown },
+  now?: Date,
 ): { path: string; message: string }[] {
   const storedShift = shiftFields(String(stored.shiftFrom ?? ""), String(stored.shiftTo ?? ""));
   const changed = (v: string | undefined, was: unknown) => (v !== undefined && v !== String(was ?? "") ? v : undefined);
   const newFrom = changed(edits.shiftFrom, storedShift.shiftFrom);
   const newTo = changed(edits.shiftTo, storedShift.shiftTo);
-  return offerTermIssues({
-    startDate: changed(edits.startDate, stored.startDate),
-    timezone: changed(edits.timezone, stored.timezone),
-    ...(newFrom !== undefined || newTo !== undefined
-      ? {
-          shiftFrom: newFrom ?? (String(storedShift.shiftFrom) || "flexible"),
-          shiftTo: newTo ?? (String(storedShift.shiftTo) || "flexible"),
-        }
-      : {}),
-  });
+  return offerTermIssues(
+    {
+      startDate: changed(edits.startDate, stored.startDate),
+      timezone: changed(edits.timezone, stored.timezone),
+      ...(newFrom !== undefined || newTo !== undefined
+        ? {
+            shiftFrom: newFrom ?? (String(storedShift.shiftFrom) || "flexible"),
+            shiftTo: newTo ?? (String(storedShift.shiftTo) || "flexible"),
+          }
+        : {}),
+    },
+    now,
+  );
 }
