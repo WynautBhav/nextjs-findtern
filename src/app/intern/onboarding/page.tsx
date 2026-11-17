@@ -129,6 +129,7 @@ export default async function InternOnboarding() {
         hasPanImage={hasPanImage}
         hasAadhaarImage={hasAadhaarImage}
         hasPhoto={hasPhoto}
+        readOnly={Boolean(session.impersonator)}
       />
     </div>
   );

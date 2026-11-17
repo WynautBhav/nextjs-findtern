@@ -22,8 +22,8 @@ import { PasswordInput } from "@/components/auth/password-input";
  * double-submit to satisfy.
  */
 
-export function ForgotPasswordForm({ role = "intern" }: { role?: "intern" | "employer" }) {
-  const loginHref = `/login?as=${role}`;
+export function ForgotPasswordForm({ role = "intern" }: { role?: "intern" | "employer" | "admin" }) {
+  const loginHref = role === "admin" ? "/admin/login" : `/login?as=${role}`;
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
@@ -100,9 +100,9 @@ export function ResetPasswordForm({
   role = "intern",
 }: {
   token: string | null;
-  role?: "intern" | "employer";
+  role?: "intern" | "employer" | "admin";
 }) {
-  const loginHref = `/login?as=${role}`;
+  const loginHref = role === "admin" ? "/admin/login" : `/login?as=${role}`;
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);

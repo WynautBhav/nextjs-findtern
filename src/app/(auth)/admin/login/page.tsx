@@ -18,7 +18,7 @@ export default function AdminLoginPage() {
       <p className="mt-1.5 text-sm text-text-subtle">Staff access only.</p>
 
       <div className="mt-8">
-        <LoginForm endpoint="/api/auth/admin/login" redirectTo="/admin/dashboard" />
+        <LoginForm endpoint="/api/auth/admin/login" redirectTo="/admin/dashboard" forgotHref="/forgot-password?as=admin" />
       </div>
     </AuthShell>
   );

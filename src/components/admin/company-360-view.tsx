@@ -20,6 +20,9 @@ import { formatDate, formatMoney, formatSlotTime } from "@/lib/format";
 import { parseOffer } from "@/lib/offer";
 import { cn } from "@/lib/utils";
 import { StatCard } from "@/components/admin/stat-card";
+import { ProjectDetailsButton } from "@/components/admin/project-details";
+import { normalizeStatus } from "@/lib/projects/lifecycle";
+import { STATUS_ORDER, statusMeta } from "@/app/employer/projects/status";
 
 /**
  * Company 360 (legacy admin-company-detail.tsx): a profile first (ADP-04),
@@ -34,8 +37,8 @@ type InternLite = { id: string; firstName: string | null; lastName: string | nul
 const money = (minor: number | null | undefined, currency: string | null | undefined) =>
   minor == null ? "-" : formatMoney(minor, String(currency).toUpperCase() === "USD" ? "USD" : "INR");
 
-const ACTIVE_PROJECT = (status: string | null) =>
-  !["inactive", "closed", "archived"].includes(String(status || "active").toLowerCase());
+// Live = published (or legacy "active", or blank). Paused, draft, rejected and closed are not.
+const ACTIVE_PROJECT = (status: string | null) => normalizeStatus(status || "published") === "published";
 
 function slotOf(i: Interview): Date | null {
   const s = i.selectedSlot === 1 ? i.slot1 : i.selectedSlot === 2 ? i.slot2 : i.selectedSlot === 3 ? i.slot3 : null;
@@ -84,6 +87,8 @@ export function Company360View({
   const upcoming = interviews.filter((i) => i.status === "scheduled" && (slotOf(i)?.getTime() ?? 0) > now).length;
   const hired = proposals.filter((p) => p.status === "hired");
   const activeProjects = projects.filter((p) => ACTIVE_PROJECT(p.status)).length;
+  const projectStatus = STATUS_ORDER.find((s) => s === params.status);
+  const shownProjects = projectStatus ? projects.filter((p) => normalizeStatus(p.status || "published") === projectStatus) : projects;
   const dues = ledger.hires.filter((h) => h.dueMinor > 0 || h.plan === "monthly" || h.plan === "postpaid");
   const fte = fteOf(company.internationalFteStatus);
 
@@ -213,10 +218,11 @@ export function Company360View({
           params={params}
           page={1}
           pages={1}
-          total={projects.length}
-          perPage={Math.max(projects.length, 1)}
-          rows={projects}
+          total={shownProjects.length}
+          perPage={Math.max(shownProjects.length, 1)}
+          rows={shownProjects}
           noun="projects"
+          filters={[{ key: "status", label: "Status", options: STATUS_ORDER.map((s) => ({ value: s, label: statusMeta(s).label })) }]}
           caption="Projects posted by this company"
           empty={{ title: "No projects yet", body: "This company hasn't posted a project. Projects appear here once they create one." }}
           columns={[
@@ -255,8 +261,9 @@ export function Company360View({
               },
             },
             { header: "Full-time", cell: (p) => (p.fullTimeOffer ? "Yes" : "No") },
-            { header: "Status", cell: (p) => <StatusBadge value={ACTIVE_PROJECT(p.status) ? "active" : p.status || "closed"} /> },
+            { header: "Status", cell: (p) => <StatusBadge value={ACTIVE_PROJECT(p.status) ? "active" : p.status || "closed"} label={statusMeta(p.status || "published").label} /> },
             { header: "Posted", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.createdAt)}</span> },
+            { header: "Details", cell: (p) => <ProjectDetailsButton project={p} /> },
           ]}
         />
       ) : null}

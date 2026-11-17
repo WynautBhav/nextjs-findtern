@@ -11,7 +11,7 @@ import { publicOrigin } from "@/lib/google";
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email(),
-  role: z.enum(["intern", "employer"]).default("intern"),
+  role: z.enum(["intern", "employer", "admin"]).default("intern"),
 });
 
 /** Legacy reset links lived 30 minutes (routes.ts:3428). */
@@ -27,22 +27,17 @@ export async function POST(req: Request) {
   }
 
   const db = getDb();
-  const isEmployer = parsed.data.role === "employer";
-  const subject = isEmployer
-    ? (
-        await db
-          .select({ id: schema.employers.id, email: schema.employers.companyEmail })
-          .from(schema.employers)
-          .where(sql`lower(${schema.employers.companyEmail}) = ${parsed.data.email}`)
-          .limit(1)
-      )[0]
-    : (
-        await db
-          .select({ id: schema.users.id, email: schema.users.email })
-          .from(schema.users)
-          .where(sql`lower(${schema.users.email}) = ${parsed.data.email}`)
-          .limit(1)
-      )[0];
+  // One lookup per account type; each yields the subject row the token is issued against.
+  const lookup = {
+    admin: { table: schema.admins, email: schema.admins.email, id: schema.admins.id, type: "admin", path: "/reset-password?as=admin&" },
+    employer: { table: schema.employers, email: schema.employers.companyEmail, id: schema.employers.id, type: "employer", path: "/reset-password?as=employer&" },
+    intern: { table: schema.users, email: schema.users.email, id: schema.users.id, type: "user", path: "/reset-password?" },
+  }[parsed.data.role];
+  const [subject] = await db
+    .select({ id: lookup.id, email: lookup.email })
+    .from(lookup.table)
+    .where(sql`lower(${lookup.email}) = ${parsed.data.email}`)
+    .limit(1);
 
   // Always return ok to avoid email enumeration, whoever the address belongs to.
   if (!subject) return NextResponse.json({ ok: true });
@@ -50,17 +45,16 @@ export async function POST(req: Request) {
   const token = randomBytes(32).toString("base64url");
   const tokenHash = createHash("sha256").update(token).digest("hex");
   await db.insert(schema.passwordResetTokens).values({
-    subjectType: isEmployer ? "employer" : "user",
+    subjectType: lookup.type,
     subjectId: subject.id,
     tokenHash,
     expiresAt: new Date(Date.now() + RESET_TTL_MINUTES * 60_000),
   });
 
   const base = publicOrigin(req);
-  const resetPath = isEmployer ? "/reset-password?as=employer&" : "/reset-password?";
   await sendSmtpMail({
     to: subject.email,
-    ...renderEmail(emails.passwordReset({ url: `${base}${resetPath}token=${token}`, ttlMinutes: RESET_TTL_MINUTES })),
+    ...renderEmail(emails.passwordReset({ url: `${base}${lookup.path}token=${token}`, ttlMinutes: RESET_TTL_MINUTES })),
   });
   return NextResponse.json({ ok: true });
 }
