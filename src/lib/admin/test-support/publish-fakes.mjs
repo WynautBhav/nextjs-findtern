@@ -9,6 +9,7 @@
 //   __pub.failOn       { op, table, error }: that write throws instead of recording
 //   __pub.deny         a response the guard returns instead of letting the request through
 //   __pub.session      the session the guard hands back
+//   __pub.studentsForSkill  (pool, title) => candidates, for the live count on a featured-skill card (default: none)
 
 import { getTableName } from "drizzle-orm";
 
@@ -28,6 +29,7 @@ export const reset = () => {
     failOn: null,
     deny: null,
     session: { uid: "admin-1", role: "admin" },
+    studentsForSkill: null,
   };
 };
 reset();
@@ -55,7 +57,7 @@ export const notifyWithdrawnOffers = async () => {};
 
 // skill-benches (the live candidate count on a featured-skill card)
 export const loadPublicStudents = async () => [];
-export const studentsForSkill = () => [];
+export const studentsForSkill = (...a) => (g.__pub.studentsForSkill ? g.__pub.studentsForSkill(...a) : []);
 
 // db
 export const schema = realSchema;

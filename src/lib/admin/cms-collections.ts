@@ -96,7 +96,7 @@ export const CMS_COLLECTIONS = {
       { name: "title", label: "Skill", kind: "text", required: true },
       { name: "metaText", label: "Caption", kind: "text" },
       { name: "iconClass", label: "Icon name", kind: "text" },
-      { name: "resourceCount", label: "Candidate count", kind: "number" },
+      { name: "resourceCount", label: "Fallback candidate count", kind: "number", hint: "The website shows the live number of candidates matching this skill. This number is used only if that count cannot be read." },
       { name: "href", label: "Link", kind: "text", link: true },
       { name: "sortOrder", label: "Order", kind: "number" },
     ],
