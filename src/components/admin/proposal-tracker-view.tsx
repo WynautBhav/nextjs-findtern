@@ -10,8 +10,12 @@ import { InterviewNotesButton, MeetingLinkCell } from "@/components/admin/propos
 import { StatusBadge } from "@/components/admin/status-badge";
 import type { ToolbarFilter } from "@/components/admin/table-toolbar";
 import { toQueryString } from "@/lib/admin/params";
-import { matchesSearch, paginate, sortBy } from "@/lib/admin/tracker";
-import { formatDate, formatDayLabel, formatMoney, formatSlotTime } from "@/lib/format";
+import { daysSince } from "@/lib/admin/ai-interview-expiry";
+import { EXPIRED_REASONS, HEADLINE_REASONS, expiredCounts, filterExpired, headlineCount, matchesSearch, offerFacts, paginate, sortBy, type ExpiredRow } from "@/lib/admin/tracker";
+import { EXPIRY_LABEL, type ExpiryReason } from "@/lib/proposal-expiry";
+import { formatDate, formatDayLabel, formatIstStamp, formatMoney, formatNumber, formatSlotTime } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { buttonClass } from "@/components/ui/button";
 import { parseOffer } from "@/lib/offer";
 import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
 
@@ -22,7 +26,7 @@ import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
  */
 
 // Proposals first: the work itself; Companies is a rollup of it.
-export const TRACKER_TABS = ["proposals", "candidates", "interviews", "hired", "companies"] as const;
+export const TRACKER_TABS = ["proposals", "candidates", "interviews", "hired", "expired", "companies"] as const;
 export type TrackerTab = (typeof TRACKER_TABS)[number];
 
 type ProposalItem = {
@@ -88,6 +92,7 @@ export function ProposalTrackerView({
   proposals,
   interviews,
   noGuarantee,
+  expired,
   options,
 }: {
   tab: TrackerTab;
@@ -100,6 +105,8 @@ export function ProposalTrackerView({
   interviews: InterviewItem[];
   /** Intern ids with an ended guarantee (same function as the intern's offer page). */
   noGuarantee: Set<string>;
+  /** Expired offers after the date range (by expiry) and the company / candidate / timezone pickers; the tab applies reason, search, sort and page. */
+  expired: ExpiredRow[];
   options: { companies: Option[]; interns: Option[]; timezones: Option[] };
 }) {
   const hired = proposals.filter((p) => p.status === "hired");
@@ -111,6 +118,8 @@ export function ProposalTrackerView({
     { key: "candidates", label: "Candidates", count: candidateIds.size },
     { key: "interviews", label: "Interviews", count: interviews.length },
     { key: "hired", label: "Hired", count: hired.length },
+    // Headline = the three offers that lapsed on their own; closures by a person are chips inside the tab.
+    { key: "expired", label: "Expired", count: headlineCount(expiredCounts(expired)) },
     { key: "companies", label: "Companies", count: activeCompanies.length },
   ];
 
@@ -136,6 +145,7 @@ export function ProposalTrackerView({
       {tab === "candidates" ? <CandidatesTab {...{ params, page, perPage, search, pickers, proposals, noGuarantee }} /> : null}
       {tab === "interviews" ? <InterviewsTab {...{ params, page, perPage, search, pickers }} rows={interviews} /> : null}
       {tab === "hired" ? <HiredTab {...{ params, page, perPage, search, pickers }} rows={hired} /> : null}
+      {tab === "expired" ? <ExpiredTab {...{ params, page, perPage, search, pickers }} rows={expired} /> : null}
     </div>
   );
 }
@@ -610,6 +620,162 @@ function HiredTab({ params, page, perPage, search, pickers, rows }: TabProps & {
           },
           { header: "Start", sort: "start", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(parseOffer(p.offerDetails, p.currency).startDate)}</span> },
           { header: "Hired on", sort: "hired", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.hiredAt ?? p.createdAt)}</span> },
+        ]}
+      />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// Expired: offers that lapsed or were closed (rules and the one definition: lib/admin/tracker.ts expiredProposals).
+// ---------------------------------------------------------------------------------------------------------------
+
+const REASON_SHORT: Record<ExpiryReason, string> = {
+  no_reply_past_start: "No reply",
+  unpaid_past_start: "Not paid",
+  accepted_elsewhere: "Accepted elsewhere",
+  admin_closed: "Closed by Findtern",
+  withdrawn: "Withdrawn",
+};
+// A lapse that cost a hire is red; a closure someone chose is neutral.
+const REASON_TONE = { no_reply_past_start: "warning", unpaid_past_start: "danger", accepted_elsewhere: "neutral", admin_closed: "neutral", withdrawn: "neutral" } as const;
+
+function ExpiredTab({ params, page, perPage, search, pickers, rows }: TabProps & { rows: ExpiredRow[] }) {
+  const reason = (EXPIRED_REASONS as string[]).includes(params.reason ?? "") ? (params.reason as ExpiryReason) : null;
+  // Counts come from the rows before reason and search, so a chip never hides its own siblings.
+  const counts = expiredCounts(rows);
+  const now = new Date();
+  const filtered = filterExpired(rows, { reason: reason ?? "", q: search, company: "", intern: "", tz: "", since: null, until: null });
+  const sort = parseSort(params, ["candidate", "company", "start", "expired"] as const, { key: "expired", dir: "desc" });
+  const sorted = sortBy(
+    filtered,
+    (r) =>
+      sort.key === "candidate"
+        ? nameOf(r).toLowerCase()
+        : sort.key === "company"
+          ? (r.companyName ?? "").toLowerCase()
+          : sort.key === "start"
+            ? offerFacts(r).startDay
+            : time(r.at),
+    sort.dir,
+  );
+  const pg = paginate(sorted, page, perPage);
+  const chipHref = (r: ExpiryReason | null) => `${BASE}${toQueryString({ ...params, tab: "expired", reason: r ?? "", page: "" })}`;
+  const chips: { key: ExpiryReason | null; label: string; n: number }[] = [
+    { key: null, label: "All", n: rows.length },
+    ...EXPIRED_REASONS.map((r) => ({ key: r, label: REASON_SHORT[r], n: counts[r] })),
+  ];
+  const lapsed = headlineCount(counts);
+  const filtersOn = Boolean(search || reason || params.company || params.intern || params.tz || params.from || params.to);
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-text-subtle" data-testid="expired-summary">
+        <span className="nums font-medium text-foreground">{formatNumber(lapsed)}</span> expired ({HEADLINE_REASONS.map((r) => `${formatNumber(counts[r])} ${REASON_SHORT[r].toLowerCase()}`).join(", ")}).{" "}
+        Closed by hand and not counted as expired: <span className="nums">{formatNumber(counts.admin_closed)}</span> by Findtern, <span className="nums">{formatNumber(counts.withdrawn)}</span> withdrawn. Dates here are when the offer expired; an offer
+        that passed its start date but has not been swept yet still shows, dated at the start of that day (IST).
+      </p>
+      <nav aria-label="Expiry reason" className="flex flex-wrap gap-2">
+        {chips.map((c) => {
+          const on = (reason ?? null) === c.key;
+          return (
+            <Link
+              key={c.key ?? "all"}
+              href={chipHref(c.key)}
+              aria-current={on ? "page" : undefined}
+              className={cn(buttonClass({ variant: on ? "primary" : "outline", size: "sm" }), "min-h-11 gap-2 max-sm:flex-1")}
+            >
+              {c.label}
+              <span className="nums opacity-80">{formatNumber(c.n)}</span>
+            </Link>
+          );
+        })}
+      </nav>
+      <DataTable
+        basePath={BASE}
+        params={params}
+        page={pg.page}
+        pages={pg.pages}
+        total={pg.total}
+        perPage={perPage}
+        rows={pg.rows}
+        rowKey={(r) => r.id}
+        noun="expired offers"
+        caption="Expired offers"
+        searchPlaceholder="Search candidate, company, project…"
+        filters={pickers}
+        empty={
+          filtersOn
+            ? { title: "No expired offers match", body: "Nothing expired fits this reason, search and these filters.", action: { href: `${BASE}?tab=expired`, label: "Clear filters" } }
+            : { title: "No expired offers", body: "Offers that go unanswered or unpaid past their start date, or that are closed or withdrawn, are listed here." }
+        }
+        columns={[
+          {
+            header: "Reason",
+            cell: (r) => <StatusBadge tone={REASON_TONE[r.reason]} label={EXPIRY_LABEL[r.reason]} />,
+          },
+          {
+            header: "Candidate",
+            sort: "candidate",
+            cell: (r) => <IdentityCell name={nameOf(r)} id={r.internId} href={`/admin/interns/${r.internId}`} sub={r.internEmail ?? "-"} size="sm" className="max-w-64" />,
+          },
+          {
+            header: "Company and project",
+            sort: "company",
+            cell: (r) => (
+              <div className="min-w-0 max-w-60">
+                <Link href={`/admin/companies/${r.employerId}`} className="block truncate font-medium text-foreground hover:underline">
+                  {r.companyName ?? "Company"}
+                </Link>
+                <p className="truncate text-xs text-text-subtle">{r.projectName ?? "Project"}</p>
+              </div>
+            ),
+          },
+          {
+            header: "Offer",
+            align: "right",
+            cell: (r) => {
+              const f = offerFacts(r);
+              return (
+                <div className="whitespace-nowrap">
+                  <p className="nums font-medium text-foreground">
+                    {f.amountMinor == null ? "-" : `${formatMoney(f.amountMinor, f.currency)}${f.fullTime ? " CTC" : "/mo"}`}
+                  </p>
+                  <p className="text-xs text-text-subtle">{f.fullTime ? "Full-time" : `${f.months} mo internship`}</p>
+                </div>
+              );
+            },
+          },
+          { header: "Start", sort: "start", cell: (r) => <span className="nums whitespace-nowrap">{formatDate(offerFacts(r).startDay)}</span> },
+          {
+            header: "Expired",
+            sort: "expired",
+            cell: (r) => {
+              const d = daysSince(r.at, now);
+              return r.at ? (
+                <div className="whitespace-nowrap">
+                  <p className="nums text-foreground" title={formatIstStamp(r.at)}>
+                    {r.atApprox ? "about " : ""}
+                    {formatDate(r.at)}
+                  </p>
+                  <p className="text-xs text-text-subtle">
+                    {d === 0 ? "today" : `${d} ${d === 1 ? "day" : "days"} ago`}
+                    {r.persisted ? "" : " · not swept yet"}
+                  </p>
+                </div>
+              ) : (
+                <span className="text-text-subtle">Unknown</span>
+              );
+            },
+          },
+          {
+            header: "",
+            cell: (r) => (
+              <Link href={`${BASE}${toQueryString({ tab: "proposals", intern: r.internId, company: r.employerId })}`} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11 whitespace-nowrap")}>
+                View offer
+              </Link>
+            ),
+          },
         ]}
       />
     </div>
