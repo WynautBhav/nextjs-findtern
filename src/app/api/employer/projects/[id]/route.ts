@@ -46,6 +46,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const { id } = await params;
   const guard = await requireMutation({ req, roles: ["employer"] });
   if (!guard.ok) return guard.response;
+  // Before the body is read: a taken-down project answers 409 whatever the request says.
+  const td = await assertProjectActionable(id, guard.session.uid);
+  if (!td.ok) return td.response;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
@@ -54,8 +57,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const [project] = await db.select().from(schema.projects).where(eq(schema.projects.id, id)).limit(1);
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (project.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const td = await assertProjectActionable(id, guard.session.uid);
-  if (!td.ok) return td.response;
 
   const d = { ...parsed.data };
   // Lifecycle: canonical rows move only through /transition. Legacy rows

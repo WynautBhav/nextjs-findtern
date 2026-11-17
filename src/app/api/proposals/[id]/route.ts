@@ -73,6 +73,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const guard = await requireMutation({ req, roles: ["employer", "admin"] });
   if (!guard.ok) return guard.response;
   const { session } = guard;
+  // Before the body is read: an offer on a taken-down project answers 409 whatever the request says.
+  if (session.role === "employer") {
+    const td = await assertProposalActionable((await ctx.params).id, session.uid);
+    if (!td.ok) return td.response;
+  }
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
@@ -90,10 +95,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   if (session.role !== "admin" && proposal.employerId !== session.uid) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
-  if (session.role === "employer") {
-    const td = await assertProposalActionable(id, session.uid);
-    if (!td.ok) return td.response;
   }
   if (!EDITABLE.includes(proposal.status) || proposal.hiredAt) {
     return NextResponse.json(
