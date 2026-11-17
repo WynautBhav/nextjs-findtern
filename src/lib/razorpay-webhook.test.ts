@@ -94,3 +94,12 @@ test("refund events go to the refund settler, never to the order settlers", asyn
   assert.equal(res.status, 200);
   assert.deepEqual(P().calls.map((c) => c.op), ["refund"]);
 });
+
+test("a payment for an order we have no record of is acknowledged but reported as unknown, never as ok", async () => {
+  fakes.reset();
+  P().intern = { ok: false, status: 404, error: "Unknown order" };
+  P().employer = { ok: false, status: 404, error: "Unknown order" };
+  const res = await post(captured());
+  assert.equal(res.status, 200);
+  assert.equal(res.body.status, "unknown_order");
+});

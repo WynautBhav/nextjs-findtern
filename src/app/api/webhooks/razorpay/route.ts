@@ -49,6 +49,11 @@ export async function POST(req: Request) {
     if (!intern.ok && intern.code === "amount_mismatch") return refused(orderId);
     const employer = intern.ok ? null : await settleEmployerOrder({ orderId, paymentId, paid });
     if (employer && !employer.ok && employer.code === "amount_mismatch") return refused(orderId);
+    // Money Razorpay took for an order we never created: 200 (a retry cannot fix it), but say so and leave a trail for accounts.
+    if (employer && !employer.ok && employer.status === 404) {
+      console.error(`[razorpay webhook] payment ${paymentId} names order ${orderId}, which is not ours; nothing settled`);
+      return NextResponse.json({ status: "unknown_order" });
+    }
     return NextResponse.json({ status: "ok" });
   } catch (error) {
     console.error("[razorpay webhook]", error);
