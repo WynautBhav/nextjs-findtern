@@ -4,8 +4,9 @@ import { monthlyDues } from "../dues.ts";
 import { parseOffer } from "../offer.ts";
 import type { PerHireFeeSetting } from "../per-hire-fee.ts";
 import { toInrMinor } from "./money.ts";
+import { isSettledStatus, orderRefunds, refundGstMinor, settledOrders } from "../refund-accounting.ts";
 import { collegeBatchReceipts, istDayKey } from "./revenue.ts";
-import { addMonthsIso, stipendDues } from "./stipend-dues.ts";
+import { addMonthsIso, proposalOf, stipendDues } from "./stipend-dues.ts";
 
 /**
  * Money in / money out (legacy `GET /api/admin/reports/transactions`,
@@ -38,6 +39,41 @@ export type MoneyRow = {
   inrMinor: number;
   reference: string | null;
 };
+
+/**
+ * A refund to a company: a contra record beside the payment it came out of, never a reopened receivable.
+ * `gstInrMinor` is the GST inside the refunded amount (inclusive split, rounded like a payment); a refund with
+ * GST and no credit note recorded needs one (CGST s.34).
+ */
+export type RefundRow = {
+  id: string;
+  orderId: string;
+  date: string;
+  companyName: string | null;
+  description: string;
+  amountMinor: number;
+  currency: string;
+  inrMinor: number;
+  gstInrMinor: number;
+  creditNote: string | null;
+  creditNoteNeeded: boolean;
+  /** No refund amount is recorded for the order; it is counted fully refunded from its status label alone. */
+  amountNotRecorded: boolean;
+  reference: string | null;
+};
+
+/** An order refunded while an intern payout for the same placement is already paid: an admin decides what to do. */
+export type RefundFlag = {
+  kind: "refund_after_payout";
+  orderId: string;
+  companyName: string | null;
+  internNames: string[];
+  refundedInrMinor: number;
+  paidOutInrMinor: number;
+  payoutIds: string[];
+};
+
+export type RefundTotals = { refundedMinor: number; gstMinor: number; netReceivedMinor: number };
 
 export type ReceivablesInput = {
   since: Date | null;
@@ -82,12 +118,60 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
 
   const receivables: MoneyRow[] = [];
   const payables: MoneyRow[] = [];
+  const refunds: RefundRow[] = [];
+  const refundFlags: RefundFlag[] = [];
   const row = (r: Omit<MoneyRow, "inrMinor">): MoneyRow => ({ ...r, inrMinor: toInrMinor(r.amountMinor, r.currency) });
+
+  /** The contra rows of one order, dated by the refund's own day, and the payout flag when an intern was already paid. */
+  const refundRowsOf = (p: ReceivablesInput["employerPayments"][number]) => {
+    const view = orderRefunds(p);
+    if (view.refundedMinor <= 0) return;
+    const entries = view.labelOnly ? [{ id: "label", amountMinor: view.refundedMinor, at: null as string | null, creditNote: null as string | null }] : view.refunds;
+    let left = view.refundedMinor;
+    let shown = 0;
+    for (const e of entries) {
+      const amountMinor = Math.min(e.amountMinor, left);
+      left -= amountMinor;
+      const when = e.at ? new Date(e.at) : (p.paidAt ?? p.createdAt);
+      if (amountMinor <= 0 || !receivedIn(when)) continue;
+      const gstInrMinor = toInrMinor(refundGstMinor(amountMinor, p.currency), p.currency);
+      refunds.push({
+        id: `refund:${p.id}:${e.id}`,
+        orderId: p.id,
+        date: istDayKey(when)!,
+        companyName: input.employerName(p.employerId),
+        description: view.labelOnly ? "Refund to employer (amount not recorded, whole order counted)" : "Refund to employer",
+        amountMinor,
+        currency: p.currency,
+        inrMinor: toInrMinor(amountMinor, p.currency),
+        gstInrMinor,
+        creditNote: e.creditNote ?? null,
+        creditNoteNeeded: gstInrMinor > 0 && !e.creditNote,
+        amountNotRecorded: view.labelOnly,
+        reference: p.paymentId ?? p.orderId,
+      });
+      shown += 1;
+    }
+    if (shown === 0) return;
+    const hires = orderNotes(p.raw).ids.map((id) => input.proposals.find((x) => x.id === id)).filter((x): x is ReceivablesInput["proposals"][number] => Boolean(x));
+    const paidOuts = input.payouts.filter((o) => String(o.status).toLowerCase() === "paid" && hires.some((h) => h.internId === o.internId && (proposalOf(o.raw) ?? h.id) === h.id));
+    if (paidOuts.length === 0) return;
+    refundFlags.push({
+      kind: "refund_after_payout",
+      orderId: p.id,
+      companyName: input.employerName(p.employerId),
+      internNames: [...new Set(paidOuts.map((o) => input.internName(o.internId)))],
+      refundedInrMinor: toInrMinor(view.refundedMinor, p.currency),
+      paidOutInrMinor: paidOuts.reduce((s, o) => s + toInrMinor(o.amountMinor, o.currency), 0),
+      payoutIds: paidOuts.map((o) => o.id),
+    });
+  };
 
   if (filter.receivables !== "candidate") {
     for (const p of input.employerPayments) {
-      if (p.status !== "paid") continue;
+      if (!isSettledStatus(p.status)) continue;
       const date = istDayKey(p.paidAt ?? p.createdAt);
+      refundRowsOf(p);
       if (!receivedIn(p.paidAt ?? p.createdAt)) continue;
       receivables.push(
         row({
@@ -148,7 +232,8 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
       );
     }
 
-    const paidOrders = input.employerPayments.filter((p) => p.status === "paid");
+    // A refunded order still counts as paid coverage: a refund never makes the company owe it again.
+    const paidOrders = settledOrders(input.employerPayments);
     for (const d of monthlyDues(input.proposals, paidOrders)) {
       const p = input.proposals.find((x) => x.id === d.proposalId);
       if (!p) continue;
@@ -298,7 +383,14 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
   receivables.sort(byDate);
   payables.sort(byDate);
 
-  return { receivables, payables, totals: moneyTotals(receivables, payables) };
+  const totals = moneyTotals(receivables, payables);
+  return { receivables, payables, totals, refunds, refundFlags, refundTotals: refundTotalsOf(refunds, totals.receivedMinor) };
+}
+
+/** What was refunded in the shown rows, the GST inside it, and received less refunded. */
+export function refundTotalsOf(refunds: RefundRow[], receivedMinor: number): RefundTotals {
+  const refundedMinor = refunds.reduce((s, r) => s + r.inrMinor, 0);
+  return { refundedMinor, gstMinor: refunds.reduce((s, r) => s + r.gstInrMinor, 0), netReceivedMinor: receivedMinor - refundedMinor };
 }
 
 /** INR totals for the four report tiles, from whichever rows are shown. */
@@ -346,5 +438,10 @@ export function narrowReceivables(data: Receivables, f: MoneyRowFilter): Receiva
   if (!f.company && !f.candidate && !f.status) return data;
   const receivables = filterMoneyRows(data.receivables, f);
   const payables = filterMoneyRows(data.payables, f);
-  return { receivables, payables, totals: moneyTotals(receivables, payables) };
+  const totals = moneyTotals(receivables, payables);
+  // Refunds are company rows: a candidate or status filter hides them, a company filter narrows them by name.
+  const company = f.company.toLowerCase();
+  const refunds = f.candidate || f.status ? [] : data.refunds.filter((r) => !company || (r.companyName ?? "").toLowerCase().includes(company));
+  const shown = new Set(refunds.map((r) => r.orderId));
+  return { receivables, payables, totals, refunds, refundFlags: data.refundFlags.filter((x) => shown.has(x.orderId)), refundTotals: refundTotalsOf(refunds, totals.receivedMinor) };
 }

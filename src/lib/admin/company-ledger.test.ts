@@ -38,7 +38,7 @@ test("per-hire dues: unpaid, monthly, upfront and settled hires", () => {
   assert.deepEqual([f.fullTime, f.ctcMinor, f.dueMinor], [true, 60_000_000, 0]);
 
   // INR totals: paid $150 (₹15,000) + ₹9,000; due ₹25,000 + $200 (₹20,000)
-  assert.deepEqual(l.totals, { paidInrMinor: 2_400_000, remainingInrMinor: 4_500_000, billedInrMinor: 6_900_000 });
+  assert.deepEqual(l.totals, { paidInrMinor: 2_400_000, refundedInrMinor: 0, netPaidInrMinor: 2_400_000, remainingInrMinor: 4_500_000, billedInrMinor: 6_900_000 });
 });
 
 test("payment rows name their proposals, type and mode", () => {

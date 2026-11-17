@@ -11,9 +11,9 @@ import { computeReceivables, type ReceivablesInput } from "./receivables.ts";
  * Orders with no refund must produce exactly the figures they produced before refund accounting.
  * The golden file was generated from the branch base (before any refund code); refund-only keys
  * (listed in REFUND_KEYS) are ignored, every other key and value must match to the byte.
- * Regenerate only on purpose: UPDATE_GOLDEN=1 npm test -- is wrong; run this file directly.
+ * Regenerate only on purpose, from a commit with no refund code: UPDATE_GOLDEN=1 node --test --experimental-strip-types <this file>.
  */
-const REFUND_KEYS = new Set(["refundedMinor", "refundedInrMinor", "netPaidInrMinor", "refunds", "refundFlags"]);
+const REFUND_KEYS = new Set(["refundedMinor", "refundedInrMinor", "netPaidInrMinor", "refunds", "refundFlags", "refundTotals"]);
 const strip = (v: unknown): unknown =>
   Array.isArray(v) ? v.map(strip)
     : v instanceof Map ? [...v].map(([k, x]) => [k, strip(x)])

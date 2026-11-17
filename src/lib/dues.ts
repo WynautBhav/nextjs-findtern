@@ -1,6 +1,7 @@
 import { billingPlanOf, engagementEndOn, istDay, orderNotes, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, postpaidNext, recordedFeeOf } from "./billing-plan.ts";
 import { acceptedLineCharge } from "./accepted-charge.ts";
 import { monthsOf, parseOffer } from "./offer.ts";
+import { settledOrders } from "./refund-accounting.ts";
 
 /**
  * Monthly-plan placements: how many months each hired proposal has paid for,
@@ -108,7 +109,9 @@ function addMonths(isoDay: string | null, months: number): string | null {
   return new Date(Date.UTC(y, mo, Math.min(Number(m[3]), last))).toISOString().slice(0, 10);
 }
 
-export function placementLedger(hire: HireLike, payments: readonly PaidOrderLike[]): PlacementLedger {
+export function placementLedger(hire: HireLike, allPayments: readonly PaidOrderLike[]): PlacementLedger {
+  // A refunded order still counts as paid coverage (a contra record, never a reopened receivable).
+  const payments = settledOrders(allPayments);
   const offer = parseOffer(hire.offerDetails, hire.currency);
   // A hire's figures never move with the admin setting: the fee is the one its paid order recorded
   // (orders from before the per-band setting recorded none, and were charged the offer's fee).

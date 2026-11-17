@@ -1,6 +1,7 @@
 import { acceptedLineCharge } from "../accepted-charge.ts";
 import { monthlyDues } from "../dues.ts";
 import { parseOffer } from "../offer.ts";
+import { isSettledStatus, orderRefunds, settledOrders } from "../refund-accounting.ts";
 import type { PerHireFeeSetting } from "../per-hire-fee.ts";
 import { toInrMinor } from "./money.ts";
 import { addMonthsIso } from "./stipend-dues.ts";
@@ -26,6 +27,8 @@ export type CompanyMoney = {
   lastPaymentInrMinor: number | null;
   nextDueDate: string | null;
   amountLeftInrMinor: number;
+  /** Refunded to the company across its orders (a contra record; the payments above stay as recorded). */
+  refundedInrMinor: number;
 };
 
 const iso = (d: Date | string | null | undefined) => {
@@ -46,10 +49,13 @@ export function companyMoney(
   const out = new Map<string, CompanyMoney>();
   for (const employerId of employerIds) {
     const mine = proposals.filter((p) => p.employerId === employerId);
-    const paid = payments.filter((p) => p.employerId === employerId && p.status === "paid");
+    const received = payments.filter((p) => p.employerId === employerId && isSettledStatus(p.status));
+    // A refunded order still counts as paid coverage: a refund never makes the company owe it again.
+    const paid = settledOrders(received);
+    const refundedInr = received.reduce((sum, p) => sum + toInrMinor(orderRefunds(p).refundedMinor, p.currency), 0);
 
     let last: PaymentLike | null = null;
-    for (const p of paid) {
+    for (const p of received) {
       const at = iso(p.paidAt ?? p.createdAt);
       if (at && (!last || at > (iso(last.paidAt ?? last.createdAt) ?? ""))) last = p;
     }
@@ -79,6 +85,7 @@ export function companyMoney(
       lastPaymentInrMinor: last ? toInrMinor(last.amountMinor, last.currency) : null,
       nextDueDate: dueDates[0] ?? null,
       amountLeftInrMinor: amountLeft,
+      refundedInrMinor: refundedInr,
     });
   }
   return out;

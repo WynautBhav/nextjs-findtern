@@ -239,14 +239,22 @@ test("promo on a monthly plan: the discount lowers the total and 'paid' by the s
   assert.equal(pl.paidMinor, o.amountMinor, "paid equals the charge");
 });
 
-test("OBSERVATION (read): there is no refund model in the money views: a refunded or failed employer order is simply not 'paid'", () => {
+test("a refunded or partially refunded order is not 'unpaid': the company does not owe it again; failed and created ones are still unpaid", () => {
   const H = hire("h1", 8000, {}, "INR", "accepted");
-  for (const status of ["refunded", "failed", "created", "partially_refunded"]) {
+  for (const status of ["failed", "created"]) {
     const o = { ...order("o1", 2_900_000, ["h1"], "total"), status };
     const f = figures(H, [o]);
     say(`order ${status}`, "treated as unpaid: ₹29,000 still to collect", money(f.listDue));
     assert.equal(f.listDue, 2_900_000);
     assert.equal(f.ledgerPaid, 0);
+  }
+  for (const status of ["refunded", "partially_refunded"]) {
+    const o = { ...order("o1", 2_900_000, ["h1"], "total"), status };
+    const f = figures(H, [o]);
+    say(`order ${status}`, "paid stays recorded, nothing owed again", { paid: money(f.ledgerPaid), due: money(f.listDue) });
+    assert.equal(f.listDue, 0);
+    assert.equal(f.reportDue, 0);
+    assert.equal(f.ledgerPaid, 2_900_000);
   }
 });
 

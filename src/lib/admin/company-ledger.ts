@@ -2,6 +2,7 @@ import { billingPlanOf, orderRecordedFee, postpaidAnchor, postpaidDueOn } from "
 import { acceptedLineCharge } from "../accepted-charge.ts";
 import { parseOffer } from "../offer.ts";
 import type { PerHireFeeSetting } from "../per-hire-fee.ts";
+import { isSettledStatus, orderRefunds, settledOrders } from "../refund-accounting.ts";
 import { toInrMinor } from "./money.ts";
 import { addMonthsIso } from "./stipend-dues.ts";
 
@@ -55,6 +56,8 @@ export type HireLedger = {
   plan: "upfront" | "monthly" | "postpaid" | "unpaid";
   totalMinor: number;
   paidMinor: number;
+  /** Refunded to the company out of `paidMinor` (a contra record: paid stays as recorded; 0 when none). */
+  refundedMinor: number;
   dueMinor: number;
   months: number;
   monthsPaid: number;
@@ -73,7 +76,8 @@ export type PaymentLedger = {
 export type CompanyLedger = {
   hires: HireLedger[];
   payments: Map<string, PaymentLedger>;
-  totals: { billedInrMinor: number; paidInrMinor: number; remainingInrMinor: number };
+  /** `paid` is as recorded, `refunded` the contra, `netPaid` = paid - refunded; billed = net paid + remaining. */
+  totals: { billedInrMinor: number; paidInrMinor: number; refundedInrMinor: number; netPaidInrMinor: number; remainingInrMinor: number };
 };
 
 function notesOf(raw: unknown): { ids: string[]; dueIds: string[]; firstMonthIds: string[]; mode: string } {
@@ -115,8 +119,11 @@ export function companyLedger(
   const feePaid = new Set<string>(); // post-paid hires: the hiring-charge order is in
   const paymentInfo = new Map<string, PaymentLedger>();
 
-  // Oldest first, so "first monthly payment" (which carries the fee) is right.
-  const paid = payments.filter((p) => p.status === "paid").sort((a, b) => time(a.paidAt ?? a.createdAt) - time(b.paidAt ?? b.createdAt));
+  // Oldest first, so "first monthly payment" (which carries the fee) is right. A refunded order still
+  // counts as paid coverage (a refund is a contra record, never a reopened receivable).
+  const refundOf = new Map(payments.map((p) => [p.id, orderRefunds(p)]));
+  const refundedMinor = new Map<string, number>();
+  const paid = settledOrders(payments).sort((a, b) => time(a.paidAt ?? a.createdAt) - time(b.paidAt ?? b.createdAt));
 
   for (const pay of payments) {
     const { ids, mode } = notesOf(pay.raw);
@@ -144,10 +151,17 @@ export function companyLedger(
     });
     const sum = weights.reduce((s, w) => s + w, 0);
     let left = Math.max(0, pay.amountMinor);
+    const orderRefunded = refundOf.get(pay.id)?.refundedMinor ?? 0;
+    let refundLeft = orderRefunded;
     mine.forEach((id, i) => {
       const share = i === mine.length - 1 ? left : Math.round((Math.max(0, pay.amountMinor) * weights[i]) / sum);
       left -= share;
       paidMinor.set(id, (paidMinor.get(id) ?? 0) + share);
+      if (orderRefunded > 0) {
+        const part = i === mine.length - 1 ? refundLeft : Math.min(refundLeft, Math.round((orderRefunded * share) / Math.max(1, pay.amountMinor)));
+        refundLeft -= part;
+        refundedMinor.set(id, (refundedMinor.get(id) ?? 0) + part);
+      }
       if (feeOnly) {
         feePaid.add(id);
         // The fee order also paid Month 1 when its notes say so (orders from before that rule did not).
@@ -171,6 +185,7 @@ export function companyLedger(
       ctcMinor: offer.fullTime?.annualCtcMinor ?? null,
       monthlyMinor: offer.fullTime ? null : offer.monthlyMinor,
       months: offer.fullTime ? 1 : offer.months,
+      refundedMinor: refundedMinor.get(p.id) ?? 0,
     };
     const paidSoFar = paidMinor.get(p.id) ?? 0;
     const monthsPaid = monthlyCount.get(p.id) ?? 0;
@@ -211,11 +226,14 @@ export function companyLedger(
     }
   }
 
-  const paidInr = paid.reduce((s, p) => s + toInrMinor(p.amountMinor, p.currency), 0);
+  // Money received, as recorded: every settled row, including a refunded order replaced by a new payment.
+  const received = payments.filter((p) => isSettledStatus(p.status));
+  const paidInr = received.reduce((s, p) => s + toInrMinor(p.amountMinor, p.currency), 0);
+  const refundedInr = received.reduce((s, p) => s + toInrMinor(refundOf.get(p.id)?.refundedMinor ?? 0, p.currency), 0);
   const remainingInr = hires.reduce((s, h) => s + toInrMinor(h.dueMinor, h.currency), 0);
   return {
     hires,
     payments: paymentInfo,
-    totals: { billedInrMinor: paidInr + remainingInr, paidInrMinor: paidInr, remainingInrMinor: remainingInr },
+    totals: { billedInrMinor: paidInr - refundedInr + remainingInr, paidInrMinor: paidInr, refundedInrMinor: refundedInr, netPaidInrMinor: paidInr - refundedInr, remainingInrMinor: remainingInr },
   };
 }

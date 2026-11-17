@@ -70,7 +70,7 @@ export function orderRefunds(o: OrderLike): OrderRefundView {
   return { paidMinor, refundedMinor, netMinor: paidMinor - refundedMinor, currency: String(o.currency ?? "INR").toUpperCase(), status, refunds, overRefunded: sum > paidMinor, labelOnly };
 }
 
-type SettledLike = { status: string; amountMinor: number; currency: string; raw: unknown; paidAt?: Date | string | null };
+type SettledLike = { status: string; amountMinor?: number; currency?: string; raw: unknown; paidAt?: Date | string | null };
 
 const at = (o: { paidAt?: Date | string | null }) => (o.paidAt ? new Date(o.paidAt).getTime() || 0 : 0);
 const sameSet = (inner: string[], outer: string[]) => inner.every((x) => outer.includes(x));
@@ -92,7 +92,7 @@ export function settledOrders<T extends SettledLike>(orders: readonly T[]): T[] 
       continue;
     }
     if (s !== "refunded" && s !== "partially_refunded") continue;
-    const view = orderRefunds(o);
+    const view = orderRefunds({ status: o.status, amountMinor: o.amountMinor ?? 0, currency: o.currency ?? "INR", raw: o.raw });
     if (view.status === "refunded") {
       const a = orderNotes(o.raw);
       const again = paid.some((p) => {

@@ -23,5 +23,6 @@ test("last payment, upfront charge for an accepted offer, remaining monthly inst
     lastPaymentInrMinor: null,
     nextDueDate: null,
     amountLeftInrMinor: 0,
+    refundedInrMinor: 0,
   });
 });
