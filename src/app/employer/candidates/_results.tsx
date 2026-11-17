@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, LayoutGrid, List, Search, X } from "lucide-react";
+import { ChevronDown, LayoutGrid, List, Rows3, Search, X } from "lucide-react";
 
 import { redactForEmployer } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
@@ -12,7 +12,8 @@ import { CandidateCard } from "@/components/employer/candidate-card";
 import { EmptyScene } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { buttonClass } from "@/components/ui/button";
-import { showClearAll } from "@/components/employer/candidate-view";
+import { PAGE_SIZES, pageWindow, showClearAll } from "@/components/employer/candidate-view";
+import { Segmented, SegmentLink } from "@/components/employer/candidates/toolbar-parts";
 import { FiltersToggle } from "@/components/employer/candidate-filter-collapse";
 import { SortSelect } from "./_sort-select";
 import {
@@ -146,13 +147,15 @@ export function ToolbarSort({ data, filters, className }: { data: CandidatesData
 }
 
 /**
- * List (the full-width cards) or Grid (compact cards, two across, three on wide screens). The choice rides in
- * the URL (`view=grid`), so every link on the page keeps it; it is a display choice, not a filter.
+ * Cards (the full-width cards), Grid (compact cards, two across, three on wide screens) or List (one dense line
+ * per candidate). All three carry the same actions. The choice rides in the URL (`view=grid`, `view=rows`; Cards
+ * is the default and needs none), so every link on the page keeps it; it is a display choice, not a filter.
  */
 function ViewToggle({ filters }: { filters: Filters }) {
   const options = [
-    { view: "list" as const, label: "List view", Icon: List },
+    { view: "list" as const, label: "Card view", Icon: Rows3 },
     { view: "grid" as const, label: "Grid view", Icon: LayoutGrid },
+    { view: "rows" as const, label: "List view", Icon: List },
   ];
   return (
     <nav aria-label="Layout" className="flex shrink-0 items-center gap-0.5 rounded-xl border border-ink-200 bg-white p-0.5">
@@ -176,6 +179,22 @@ function ViewToggle({ filters }: { filters: Filters }) {
         );
       })}
     </nav>
+  );
+}
+
+/** "Per page 12 24 48": how many candidates one page holds. Changing it returns to page 1. */
+function PageSizeControl({ filters, className }: { filters: Filters; className?: string }) {
+  return (
+    <div className={cn("flex items-center gap-2 text-sm text-ink-600", className)}>
+      <span>Per page</span>
+      <Segmented label="Candidates per page">
+        {PAGE_SIZES.map((size) => (
+          <SegmentLink key={size} href={withFilters(filters, { pageSize: size, page: "" })} active={filters.pageSize === size} label={`${size} per page`}>
+            <span className="nums">{size}</span>
+          </SegmentLink>
+        ))}
+      </Segmented>
+    </div>
   );
 }
 
@@ -219,8 +238,10 @@ export function Results({
     compareIds.includes(id) || !compareFull ? withFilters(filters, { ids: toggle(compareIds, id) }) : null;
   const reset = resetHref(data.activeProjectId);
   const saved = filters.saved && Boolean(data.activeProjectId);
-  const firstShown = (filters.page - 1) * filters.pageSize + 1;
-  const lastShown = firstShown + candidates.length - 1;
+  const paged = pageWindow(total, filters.page, filters.pageSize);
+  const firstShown = paged.first;
+  const lastShown = paged.last;
+  const currentPage = paged.page;
   const pageLink =
     "inline-flex h-10 items-center rounded-xl bg-ink-100 px-3.5 text-sm font-medium text-ink-700 outline-none hover:bg-ink-200 hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 touch:h-11";
 
@@ -294,9 +315,16 @@ export function Results({
       ) : (
         <>
           <ScoreLegend />
+          {/* Chunks, not one endless scroll: how many to a page is the employer's choice. */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 lg:mt-1">
+            <p className="nums text-sm text-ink-600">
+              Showing <strong className="font-semibold text-ink-900">{firstShown}&ndash;{lastShown}</strong> of <strong className="font-semibold text-ink-900">{total}</strong>
+            </p>
+            <PageSizeControl filters={filters} />
+          </div>
           <ul
             aria-label="Candidates"
-            className={cn("mt-3 lg:mt-1", filters.view === "grid" ? "grid gap-4 sm:grid-cols-2 2xl:grid-cols-3" : "flex flex-col gap-4 lg:gap-5")}
+            className={cn("mt-3", filters.view === "grid" ? "grid gap-4 sm:grid-cols-2 2xl:grid-cols-3" : filters.view === "rows" ? "flex flex-col gap-2.5" : "flex flex-col gap-4 lg:gap-5")}
           >
             {candidates.map((candidate) => {
               const rel = data.relations.get(candidate.id);
@@ -331,33 +359,34 @@ export function Results({
             <p className="nums text-sm text-ink-600">
               Showing <strong className="font-semibold text-ink-900">{firstShown}&ndash;{lastShown}</strong> of <strong className="font-semibold text-ink-900">{total}</strong> candidate{total === 1 ? "" : "s"}
             </p>
+            <PageSizeControl filters={filters} className="max-sm:w-full" />
             {pages > 1 ? (
               <nav aria-label="Pagination" className="flex flex-wrap items-center gap-1.5">
-                {filters.page > 1 ? (
-                  <Link href={withFilters(filters, { page: filters.page - 1 === 1 ? "" : filters.page - 1 })} className={pageLink}>
+                {currentPage > 1 ? (
+                  <Link href={withFilters(filters, { page: currentPage - 1 === 1 ? "" : currentPage - 1 })} className={pageLink}>
                     Previous
                   </Link>
                 ) : null}
                 {Array.from({ length: pages }, (_, i) => i + 1)
-                  .filter((page) => page === 1 || page === pages || Math.abs(page - filters.page) <= 1)
+                  .filter((page) => page === 1 || page === pages || Math.abs(page - currentPage) <= 1)
                   .map((page, i, visible) => (
                     <span key={page} className="flex items-center gap-1.5">
                       {i > 0 && visible[i - 1] !== page - 1 ? <span className="px-1 text-ink-500">…</span> : null}
                       <Link
                         href={withFilters(filters, { page: page === 1 ? "" : page })}
-                        aria-current={page === filters.page ? "page" : undefined}
+                        aria-current={page === currentPage ? "page" : undefined}
                         aria-label={`Page ${page}`}
                         className={cn(
                           "nums grid size-10 place-items-center rounded-xl text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 touch:size-11",
-                          page === filters.page ? "bg-ink-900 text-white" : "text-ink-800 hover:bg-ink-100",
+                          page === currentPage ? "bg-ink-900 text-white" : "text-ink-800 hover:bg-ink-100",
                         )}
                       >
                         {page}
                       </Link>
                     </span>
                   ))}
-                {filters.page < pages ? (
-                  <Link href={withFilters(filters, { page: filters.page + 1 })} className={cn(pageLink, "text-ink-900")}>
+                {currentPage < pages ? (
+                  <Link href={withFilters(filters, { page: currentPage + 1 })} className={cn(pageLink, "text-ink-900")}>
                     Next
                   </Link>
                 ) : null}

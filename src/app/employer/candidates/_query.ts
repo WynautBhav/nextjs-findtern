@@ -19,7 +19,7 @@ import { restorableFilters } from "@/lib/employer-filter-restore";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { savedInternIds } from "@/lib/saved-roles";
 import { rankProfiles } from "@/components/employer/candidate-rank";
-import { dedupeSkills, filterCount, parseView, type ListView } from "@/components/employer/candidate-view";
+import { DEFAULT_PAGE_SIZE, dedupeSkills, filterCount, pageWindow, parsePageSize, parseView, type ListView } from "@/components/employer/candidate-view";
 
 export type SortKey = "score" | keyof Ratings;
 
@@ -50,7 +50,7 @@ export type Filters = {
   remote: boolean | null;
   /** Legacy "Maximum skill match": rank candidates with more of the chosen skills first. */
   skillPriority: boolean;
-  /** "list" is the full-width cards (the default); "grid" the compact ones, two across, three on wide screens. */
+  /** "list" is the full-width cards (the default); "grid" the compact ones, two across, three on wide screens; "rows" one line each. */
   view: ListView;
   pageSize: number;
   page: number;
@@ -118,8 +118,7 @@ export type SearchParams = {
 export function readFilters(params: SearchParams): Filters {
   const min = Number(one(params.min) ?? "0");
   const page = Number(one(params.page) ?? "1");
-  const ps = Number(one(params.pageSize) ?? "24");
-  const pageSize = ps === 12 || ps === 48 ? ps : 24;
+  const pageSize = parsePageSize(one(params.pageSize));
   const view = parseView(one(params.view));
   const planRaw = (one(params.plan) ?? "").trim();
   const floor = (raw: string | string[] | undefined) => {
@@ -212,7 +211,7 @@ export function queryOf(merged: Filters): string {
   if (!filters.toString() && !merged.q && !merged.saved && merged.view === "list" && merged.page <= 1) next.set("fresh", "1");
   if (merged.project) next.set("project", merged.project);
   // The view is a display choice: carried on links, never remembered with the filters.
-  if (merged.view === "grid") next.set("view", "grid");
+  if (merged.view !== "list") next.set("view", merged.view);
   // The Saved tab is a view, not a filter: carried on links, never remembered.
   if (merged.saved) next.set("saved", "1");
   if (merged.ids.length > 0 || merged.idsSet) next.set("ids", merged.ids.join(","));
@@ -239,7 +238,7 @@ function filterParams(merged: Filters, withKeyword = true): URLSearchParams {
   if (merged.dir === "asc") next.set("dir", "asc");
   if (merged.remote !== null) next.set("remote", merged.remote ? "1" : "0");
   if (!merged.skillPriority) next.set("sm", "0");
-  if (merged.pageSize && merged.pageSize !== 24) next.set("pageSize", String(merged.pageSize));
+  if (merged.pageSize && merged.pageSize !== DEFAULT_PAGE_SIZE) next.set("pageSize", String(merged.pageSize));
   if (!merged.projectDefaults) next.set("pf", "0");
   return next;
 }
@@ -645,9 +644,9 @@ export async function loadCandidates(
     });
 
     data.total = ranked.length;
-    data.pages = Math.max(1, Math.ceil(data.total / filters.pageSize));
-    const start = (Math.min(filters.page, data.pages) - 1) * filters.pageSize;
-    data.candidates = ranked.slice(start, start + filters.pageSize);
+    const paged = pageWindow(data.total, filters.page, filters.pageSize);
+    data.pages = paged.pages;
+    data.candidates = ranked.slice(paged.start, paged.end);
     await attachPhotos(db, data.candidates);
 
     data.plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));

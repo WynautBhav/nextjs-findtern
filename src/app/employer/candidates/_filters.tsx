@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import { RATING_META } from "@/lib/employer-candidates";
+import { DEFAULT_PAGE_SIZE } from "@/components/employer/candidate-view";
 import { resolvePricing, type Currency } from "@/lib/employer-pricing";
 import { PER_HIRE_FEE_DEFAULT } from "@/lib/per-hire-fee";
 import { BANDS, PLAN_NAME } from "@/lib/score";
@@ -64,7 +65,8 @@ export function FilterColumn({
     >
       <FilterPanel key={queryOf(filters)} activeCount={activeFilterCount(filters, effectiveSkills, projectCity)} total={total}>
         {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
-        {filters.view === "grid" ? <input type="hidden" name="view" value="grid" /> : null}
+        {filters.view !== "list" ? <input type="hidden" name="view" value={filters.view} /> : null}
+        {filters.pageSize !== DEFAULT_PAGE_SIZE ? <input type="hidden" name="pageSize" value={filters.pageSize} /> : null}
         {!filters.projectDefaults ? <input type="hidden" name="pf" value="0" /> : null}
         {filters.q ? <input type="hidden" name="q" value={filters.q} /> : null}
         {filters.skillsSet ? <input type="hidden" name="skills" value={filters.skills.join(",")} /> : null}

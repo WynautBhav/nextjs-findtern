@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { AVATAR_TINTS, avatarTint, dedupeSkills, filterCount, showClearAll, headlineOf, parseView, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
+import { AVATAR_TINTS, avatarTint, dedupeSkills, filterCount, showClearAll, headlineOf, DEFAULT_PAGE_SIZE, PAGE_SIZES, pageWindow, parsePageSize, parseView, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
 
 test("skillBaseName drops the level", () => {
   assert.equal(skillBaseName("React · Advanced"), "React");
@@ -116,9 +116,11 @@ test("the active count, the skills parse and the project-city chip go through th
   assert.match(query, /projectDefaults: false, skills: effectiveSkills, skillsSet: true/);
 });
 
-test("parseView: grid is the compact cards, anything else falls back to the list", () => {
+test("parseView: grid and rows are themselves, anything else falls back to the cards", () => {
   assert.equal(parseView("grid"), "grid");
   assert.equal(parseView(" Grid "), "grid");
+  assert.equal(parseView("rows"), "rows");
+  assert.equal(parseView(" ROWS "), "rows");
   assert.equal(parseView("list"), "list");
   assert.equal(parseView("table"), "list");
   assert.equal(parseView("nonsense"), "list");
@@ -139,4 +141,48 @@ test("rowSkills: opening a folded list shows every skill (max = length)", () => 
   const { shown, more } = rowSkills(nine, new Set(), nine.length);
   assert.equal(shown.length, 9);
   assert.equal(more, 0);
+});
+
+test("parsePageSize: 12, 24 and 48 are the choices; anything else is the default (12)", () => {
+  assert.deepEqual([...PAGE_SIZES], [12, 24, 48]);
+  assert.equal(DEFAULT_PAGE_SIZE, 12);
+  assert.equal(parsePageSize("24"), 24);
+  assert.equal(parsePageSize(48), 48);
+  assert.equal(parsePageSize("30"), 12);
+  assert.equal(parsePageSize("abc"), 12);
+  assert.equal(parsePageSize(undefined), 12);
+  assert.equal(parsePageSize(null), 12);
+});
+
+test("pageWindow: 30 candidates at 12 a page are chunks of 12, 12 and 6", () => {
+  assert.deepEqual(pageWindow(30, 1, 12), { page: 1, pages: 3, start: 0, end: 12, first: 1, last: 12 });
+  assert.deepEqual(pageWindow(30, 2, 12), { page: 2, pages: 3, start: 12, end: 24, first: 13, last: 24 });
+  assert.deepEqual(pageWindow(30, 3, 12), { page: 3, pages: 3, start: 24, end: 30, first: 25, last: 30 });
+});
+
+test("pageWindow: a page past the end or below one is clamped, so 'Showing a-b of c' stays true", () => {
+  assert.equal(pageWindow(30, 9, 12).page, 3);
+  assert.equal(pageWindow(30, 0, 12).page, 1);
+  assert.equal(pageWindow(30, Number.NaN, 12).page, 1);
+  assert.equal(pageWindow(24, 2, 24).pages, 1);
+  assert.equal(pageWindow(24, 2, 24).page, 1);
+});
+
+test("pageWindow: no candidates is one empty page showing 0-0", () => {
+  assert.deepEqual(pageWindow(0, 1, 12), { page: 1, pages: 1, start: 0, end: 0, first: 0, last: 0 });
+});
+
+test("pageWindow: every candidate lands on exactly one page", () => {
+  for (const total of [1, 11, 12, 13, 24, 25, 47, 48, 49]) {
+    for (const size of PAGE_SIZES) {
+      const { pages } = pageWindow(total, 1, size);
+      let seen = 0;
+      for (let p = 1; p <= pages; p++) {
+        const w = pageWindow(total, p, size);
+        assert.equal(w.start, seen);
+        seen = w.end;
+      }
+      assert.equal(seen, total);
+    }
+  }
 });

@@ -49,7 +49,7 @@ export interface CandidateCardProps {
   interested?: boolean;
   /** ISO time of a booked meeting that still holds the candidate: "Send proposal" waits for it. */
   pendingMeetingAt?: string | null;
-  /** "list" (default): the full-width card. "grid": the compact one, two across, three on wide screens. */
+  /** "list" (default): the full-width card. "grid": the compact one, two across, three on wide screens. "rows": one dense line, same actions. */
   layout?: ListView;
 }
 
@@ -204,11 +204,85 @@ export function CandidateCard({
     </ButtonLink>
   );
 
+  // Opens the profile; its ::after stretches over the whole card, so the other controls sit above it (z-10).
+  const viewProfile = (
+    <Link
+      href={profileHref}
+      aria-label={`View profile of ${displayName}`}
+      className={buttonClass({
+        variant: "outline",
+        size: "sm",
+        className:
+          "h-11 rounded-xl sm:h-10 sm:touch:h-11 after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500",
+      })}
+    >
+      View profile
+    </Link>
+  );
   const wanted = skillMatch(candidate.skills, wantedSkills);
   const cellLabel = "text-[11px] font-semibold uppercase tracking-wider text-text-subtle";
   const quickView = (
     <CandidateQuickView candidate={candidate} displayName={displayName} place={place} currency={currency} pricing={pricing} wantedSkills={wantedSkills} profileHref={profileHref} />
   );
+
+  if (layout === "rows") {
+    // The dense line: who, the skills, the two numbers, then the same actions as the cards.
+    return (
+      <li className="group/row relative flex flex-wrap items-center gap-x-4 gap-y-3 rounded-2xl border border-ink-200 bg-white p-3 shadow-xs transition-colors hover:border-ink-300 sm:p-4 xl:flex-nowrap">
+        <div className="flex min-w-0 basis-full items-center gap-3 sm:basis-[17rem] xl:w-64 xl:shrink-0 xl:basis-auto">
+          <RowAvatar square photoUrl={candidate.photoUrl} initials={candidate.initials} seed={candidate.id} presence={presence} className="size-11 sm:size-11" />
+          <div className="min-w-0">
+            <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              <h3 className="break-words text-base font-bold leading-6 text-ink-900">{displayName}</h3>
+              {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
+              {interested ? (
+                <Pill tone="live" className="shrink-0 whitespace-nowrap">
+                  Interested in this role
+                </Pill>
+              ) : null}
+            </div>
+            <p className="mt-0.5 flex min-w-0 items-center gap-1 text-sm text-ink-600">
+              <MapPin className="size-3.5 shrink-0 text-ink-500" aria-hidden />
+              <span className="min-w-0 truncate">{place}</span>
+              {presence === PRESENCE_ONLINE ? <span className="shrink-0 whitespace-nowrap font-medium text-success">, {presence}</span> : null}
+            </p>
+            {headline ? <p className="mt-0.5 truncate text-[13px] text-ink-600">{headline}</p> : null}
+          </div>
+        </div>
+
+        <div className="min-w-0 flex-1 basis-full space-y-1.5 sm:basis-64">
+          <SkillChips skills={candidate.skills} wanted={wantedSkills} />
+          {wanted.total > 0 ? (
+            <p className="text-xs text-ink-600">
+              <span className="nums font-medium text-ink-900">{wanted.matched.length} of {wanted.total}</span> skills you asked for
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 items-start gap-4 sm:gap-6">
+          <div className="flex flex-col gap-1">
+            <span className={cellLabel}>Findtern Score</span>
+            <ScoreBadge size="cell" score={candidate.score} scored={candidate.scored} />
+          </div>
+          <div className="flex flex-col gap-1">
+            <span className={cn(cellLabel, "whitespace-nowrap")}>Hourly rate</span>
+            <p className="nums flex items-baseline gap-1 text-lg font-bold leading-7 text-ink-900">
+              {formatMoney(pricing.hourlyRateMinor, currency)}
+              <span className="text-xs font-normal text-text-subtle">/ hr</span>
+            </p>
+          </div>
+        </div>
+
+        <div className="relative z-10 flex flex-wrap items-center gap-2 max-xl:w-full xl:shrink-0 xl:justify-end">
+          {canSave && projectId ? <SaveToggle internId={candidate.id} projectId={projectId} shortlisted={shortlisted} name={displayName} /> : null}
+          <CompareToggle href={compareHref} selected={selected} name={displayName} />
+          {quickView}
+          {viewProfile}
+          {primary}
+        </div>
+      </li>
+    );
+  }
 
   if (layout === "grid") {
     // The compact card: who, the two numbers that decide a shortlist, the skills, then the actions.
@@ -272,18 +346,7 @@ export function CandidateCard({
             {quickView}
           </div>
           <div className="flex flex-wrap items-center gap-2 [&>*]:flex-1">
-            <Link
-              href={profileHref}
-              aria-label={`View profile of ${displayName}`}
-              className={buttonClass({
-                variant: "outline",
-                size: "sm",
-                className:
-                  "h-11 rounded-xl sm:h-10 sm:touch:h-11 after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500",
-              })}
-            >
-              View profile
-            </Link>
+            {viewProfile}
             {primary}
           </div>
         </div>
@@ -376,18 +439,7 @@ export function CandidateCard({
         )}
         <div className="flex flex-wrap items-center gap-2 max-sm:w-full max-sm:justify-end">
           {quickView}
-          <Link
-            href={profileHref}
-            aria-label={`View profile of ${displayName}`}
-            className={buttonClass({
-              variant: "outline",
-              size: "sm",
-              className:
-                "h-11 rounded-xl sm:h-10 sm:touch:h-11 after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500",
-            })}
-          >
-            View profile
-          </Link>
+          {viewProfile}
           {primary}
         </div>
       </div>

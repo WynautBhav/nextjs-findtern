@@ -18,14 +18,43 @@ export function rowSkills(skills: string[], wanted: Set<string>, max = MAX_SKILL
   return { shown: ordered.slice(skip, max), more: Math.max(0, ordered.length - max), isWanted };
 }
 
-export type ListView = "list" | "grid";
+/**
+ * How the candidates are laid out: "list" is the full-width cards (the default, shown as "Cards"), "grid" the
+ * compact cards two across, "rows" one dense line per candidate (shown as "List"). Same actions in all three.
+ */
+export type ListView = "list" | "grid" | "rows";
 
 /**
- * The `view` URL value: "grid" is the compact cards, anything else (missing,
- * misspelt, the retired "table") is the full-width list.
+ * The `view` URL value: "grid" and "rows" are themselves, anything else (missing, misspelt, the retired
+ * "table") is the full-width cards.
  */
 export function parseView(raw: string | null | undefined): ListView {
-  return (raw ?? "").trim().toLowerCase() === "grid" ? "grid" : "list";
+  const v = (raw ?? "").trim().toLowerCase();
+  return v === "grid" || v === "rows" ? v : "list";
+}
+
+/** Candidates per page the employer can pick. The first is the default, so 20-30 results are never one long scroll. */
+export const PAGE_SIZES = [12, 24, 48] as const;
+export const DEFAULT_PAGE_SIZE = PAGE_SIZES[0];
+
+/** The `pageSize` URL value: one of PAGE_SIZES, else the default. */
+export function parsePageSize(raw: string | number | null | undefined): number {
+  const n = Number(raw);
+  return (PAGE_SIZES as readonly number[]).includes(n) ? n : DEFAULT_PAGE_SIZE;
+}
+
+/**
+ * Which slice of `total` a page shows. The page is clamped into range, so a stale link past the last page
+ * (or page 0) shows the nearest real one, and "Showing a-b of c" is always true.
+ */
+export function pageWindow(total: number, page: number, pageSize: number): { page: number; pages: number; start: number; end: number; first: number; last: number } {
+  const size = Math.max(1, Math.floor(pageSize) || DEFAULT_PAGE_SIZE);
+  const count = Math.max(0, Math.floor(total) || 0);
+  const pages = Math.max(1, Math.ceil(count / size));
+  const at = Math.min(pages, Math.max(1, Math.floor(page) || 1));
+  const start = (at - 1) * size;
+  const end = Math.min(count, start + size);
+  return { page: at, pages, start, end, first: count === 0 ? 0 : start + 1, last: end };
 }
 
 /** `HIDDEN_UNTIL_HIRE` in lib/contact-scrub (inlined: this module stays import-free for the node tests). */
