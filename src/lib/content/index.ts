@@ -22,6 +22,7 @@ import { PRICING_DEFAULTS, type PricingConfig } from "@/lib/pricing-config";
 import { blogImageRoutes, cmsImageSrc, imageVersion } from "./image-response";
 import { unstable_cache } from "next/cache";
 import { loadPublicStudents, studentsForSkill } from "@/lib/skill-benches";
+import { withLiveCounts } from "./featured-counts";
 
 /* ==========================================================================
    Content accessors - the seam for the data layer
@@ -134,9 +135,17 @@ export async function getFeaturedSkills() {
     if (!rows.length) return emptyOrBuiltIn(schema.websiteFeaturedSkills, "skill", FEATURED_SKILLS);
     // The stored resource_count is a hand-typed number; the card must show the
     // live bench size. If the candidate query fails, keep the stored number.
-    const pool = await liveBenchPool().catch(() => null);
-    return rows.map((r) => (pool ? { ...r, resourceCount: studentsForSkill(pool, r.title).length } : r)) as unknown as typeof FEATURED_SKILLS;
+    return withLiveBenchCounts(rows) as unknown as Promise<typeof FEATURED_SKILLS>;
   }, FEATURED_SKILLS);
+}
+
+/**
+ * Featured-skill rows with the live bench size in `resourceCount` (the stored number if the candidates cannot be
+ * read). The home page and the admin list both use this, so an admin sees the number visitors see.
+ */
+export async function withLiveBenchCounts<T extends { title: string; resourceCount: number }>(rows: T[]): Promise<T[]> {
+  const pool = await liveBenchPool().catch(() => null);
+  return withLiveCounts(rows, pool, (p, title) => studentsForSkill(p, title).length);
 }
 
 // Cached 5 min so the home page does not scan the candidate pool on every view.

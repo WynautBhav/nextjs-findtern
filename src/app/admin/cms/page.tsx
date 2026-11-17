@@ -9,6 +9,7 @@ import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel
 import { StatusBadge } from "@/components/admin/status-badge";
 import { CMS_COLLECTIONS, CMS_TYPES, cmsImageSrc, matchesCmsSearch, type CmsType } from "@/lib/admin/cms-collections";
 import { CMS_TABLES, cmsListColumns } from "@/lib/admin/cms-tables";
+import { withLiveBenchCounts } from "@/lib/content";
 import { flattenParams, parsePageRequest, toPage } from "@/lib/admin/params";
 import { getDb } from "@/lib/db";
 import { getSession } from "@/lib/auth";
@@ -35,6 +36,8 @@ async function loadCollection(type: CmsType): Promise<CmsItem[]> {
     .select(cmsListColumns(type) as never)
     .from(table)
     .orderBy(...order);
+  // The website shows each skill's live bench size, never the typed number: list what visitors see.
+  if (type === "skill") return withLiveBenchCounts(rows as unknown as (CmsItem & { title: string; resourceCount: number })[]);
   return rows as unknown as CmsItem[];
 }
 

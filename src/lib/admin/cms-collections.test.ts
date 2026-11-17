@@ -5,6 +5,7 @@ import {
   INLINE_IMAGE_PREFIX,
   buildCmsCreate,
   buildCmsPatch,
+  cmsFields,
   cmsImageSrc,
   draftFromItem,
   imageError,
@@ -113,4 +114,10 @@ test("partner and skill links refuse javascript: URLs", () => {
   assert.equal(validateCmsValues("partner", { ...p, href: "https://acme.test" }, { partial: false }).ok, true);
   assert.equal(validateCmsValues("skill", { title: "S", href: "/search?q=react" }, { partial: false }).ok, true);
   assert.equal(validateCmsValues("skill", { title: "S", href: "data:text/html,x" }, { partial: false }).ok, false);
+});
+
+test("the featured-skill count field says it is a fallback: the site shows the live bench size", () => {
+  const f = cmsFields("skill").find((x) => x.name === "resourceCount");
+  assert.match(f?.label ?? "", /fallback/i);
+  assert.match(f?.hint ?? "", /live/i);
 });

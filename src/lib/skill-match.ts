@@ -73,7 +73,9 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
 export function getCategoryKeywords(categoryName: string): string[] {
   const norm = categoryName.toLowerCase().trim();
   for (const [key, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (norm === key || norm.includes(key) || key.includes(norm)) {
+    // A shortened category ("Tech", "Social media") finds its category, but a 1-3 letter skill name ("R", "C", "UI") is
+    // not a category: as a substring of "human resource" it used to return every HR candidate.
+    if (norm === key || norm.includes(key) || (norm.length >= 4 && key.includes(norm))) {
       return keywords;
     }
   }
@@ -90,8 +92,11 @@ export function matchesCategory(student: Candidate, keywords: string[]): boolean
 
   return keywords.some((kw) => {
     if (kw.length <= 3) {
-      const regex = new RegExp(`\\b${kw}\\b`, "i");
-      return regex.test(allTexts);
+      // Whole word only. The name is an admin-typed skill ("C++", "C#"), so it is escaped: unescaped, "C++" was an
+      // invalid pattern that threw and took the whole featured-skills list down with it. \b would fail after "+"
+      // and "#" (not word characters), hence the lookarounds.
+      const literal = kw.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      return new RegExp(`(?<![a-z0-9])${literal}(?![a-z0-9])`, "i").test(allTexts);
     }
     return allTexts.toLowerCase().includes(kw.toLowerCase());
   });
