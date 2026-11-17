@@ -76,7 +76,7 @@ export function CgpaDecision({ target }: { target: Target }) {
           <CheckCircle2 className="size-4" aria-hidden />
           Verify CGPA correct
         </button>
-        <button type="button" onClick={() => setOpen("incorrect")} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11 rounded-full px-5")}>
+        <button type="button" onClick={() => setOpen("incorrect")} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11 rounded-full border-danger/40 px-5 text-danger hover:bg-danger-soft")}>
           <TriangleAlert className="size-4" aria-hidden />
           Mark incorrect
         </button>

@@ -24,7 +24,7 @@ export function CopyValue({ value, label, className }: { value: string; label: s
 
   return (
     <span className={cn("inline-flex max-w-full items-center gap-1", className)}>
-      <span className="min-w-0 break-all">{value}</span>
+      <span className="min-w-0 break-words">{value}</span>
       <button
         type="button"
         onClick={() => void copy()}

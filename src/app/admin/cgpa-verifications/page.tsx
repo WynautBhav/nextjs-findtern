@@ -57,7 +57,7 @@ export default async function CgpaVerificationsPage({ searchParams }: { searchPa
         subtitle={
           counts.pending === 0
             ? "No candidate is waiting for a CGPA check."
-            : `${counts.pending} candidate${counts.pending === 1 ? "" : "s"} waiting${counts.overdue ? `, ${counts.overdue} overdue (past 48 hours)` : ""}. Aim to decide within 24 to 48 hours of the offer being accepted.`
+            : `${counts.pending} candidate${counts.pending === 1 ? "" : "s"} waiting${counts.overdue ? `, ${counts.overdue} overdue` : ""}.`
         }
       />
       <TableToolbar searchPlaceholder="Name, college, company, phone or email" extra={<CgpaExport rows={rows} now={now.toISOString()} />} />
@@ -74,6 +74,9 @@ export default async function CgpaVerificationsPage({ searchParams }: { searchPa
           </Link>
         ))}
       </nav>
+      <p className="mb-3 text-sm text-text-subtle">
+        The clock starts when the candidate accepts an offer: green for the first 24 hours, amber until hour 48, red after that. Amber start dates are under 48 hours away.
+      </p>
       <Panel>
         {rows.length === 0 ? (
           <AdminEmpty icon={ClipboardCheck} title={q ? "Nothing matches" : EMPTY[filter].title} body={q ? "No check in this view matches that search." : EMPTY[filter].body} />

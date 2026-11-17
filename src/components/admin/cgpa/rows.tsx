@@ -38,7 +38,7 @@ export function CgpaRows({ rows, now, canWrite }: { rows: CgpaQueueRow[]; now: D
             <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
               <div className="min-w-0">
                 <h2 className="break-words text-base font-semibold text-foreground">
-                  <Link href={`/admin/interns/${r.internId}`} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                  <Link href={`/admin/interns/${r.internId}`} className="rounded-sm underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:inline-flex touch:min-h-11 touch:items-center">
                     {r.name}
                   </Link>
                 </h2>
@@ -87,7 +87,7 @@ export function CgpaRows({ rows, now, canWrite }: { rows: CgpaQueueRow[]; now: D
                   {r.proofs.map((p) => {
                     const src = `/admin/interns/${r.internId}/documents/open?key=${encodeURIComponent(p.docKey)}`;
                     return (
-                      <li key={p.key} className="w-24">
+                      <li key={p.key} className="w-28 sm:w-32">
                         <a
                           href={src}
                           target="_blank"
@@ -99,7 +99,7 @@ export function CgpaRows({ rows, now, canWrite }: { rows: CgpaQueueRow[]; now: D
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={src} alt={`${p.label} for ${r.name}`} loading="lazy" className="size-full object-cover transition-transform duration-150 group-hover:scale-105" />
                           </span>
-                          <span className="mt-1 flex items-start gap-1 text-xs leading-snug text-ink-700">
+                          <span className="mt-1 flex items-start gap-1 text-xs leading-snug text-ink-800">
                             <span className="min-w-0 break-words">{p.label}</span>
                             <ExternalLink className="mt-0.5 size-3 shrink-0 text-text-subtle" aria-hidden />
                             <span className="sr-only"> (opens in a new tab)</span>
