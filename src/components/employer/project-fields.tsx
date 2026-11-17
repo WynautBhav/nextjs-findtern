@@ -155,6 +155,7 @@ export function ProjectFields({
         required
         value={scopeValue(values.scopeOfWork) || values.scopeOfWork}
         options={scopeOfWorkOptions}
+        groupClassName="grid gap-2 sm:grid-cols-3"
         error={errors.scopeOfWork}
         onChange={(v) => set({ scopeOfWork: v })}
       />
@@ -202,6 +203,7 @@ export function ProjectFields({
         hint="How the intern works. It decides which candidates you see."
         value={values.locationType}
         options={WORK_MODES}
+        groupClassName="grid grid-cols-3 gap-2"
         error={errors.locationType}
         onChange={pickMode}
       />
@@ -252,7 +254,7 @@ export function ProjectFields({
             id={id("places")}
             label="Other cities you'd consider"
             hint={`Optional. Up to ${MAX_PROJECT_LOCATIONS}, for candidates who would relocate.`}
-            placeholder="Pune"
+            placeholder="Search a city"
             suggest={(q) => districtOptions(q).map((d) => d.district)}
             entries={values.preferredLocations}
             max={MAX_PROJECT_LOCATIONS}

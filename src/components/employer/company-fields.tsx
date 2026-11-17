@@ -230,6 +230,7 @@ export function ChoiceGroup({
   error,
   hint,
   required,
+  groupClassName,
 }: {
   id: string;
   label: string;
@@ -239,6 +240,8 @@ export function ChoiceGroup({
   error?: string;
   hint?: React.ReactNode;
   required?: boolean;
+  /** Replaces the default wrapping row, e.g. an even grid; options then centre their label. */
+  groupClassName?: string;
 }) {
   return (
     <fieldset aria-describedby={error ? `${id}-error` : hint ? `${id}-hint` : undefined}>
@@ -251,7 +254,7 @@ export function ChoiceGroup({
         ) : null}
       </legend>
       {hint && !error ? <FieldHint id={`${id}-hint`}>{hint}</FieldHint> : null}
-      <div role="radiogroup" aria-label={label} onKeyDown={onRadioKeys} className="mt-2.5 flex flex-wrap gap-2">
+      <div role="radiogroup" aria-label={label} onKeyDown={onRadioKeys} className={cn("mt-2.5", groupClassName ?? "flex flex-wrap gap-2")}>
         {options.map((o, i) => {
           const active = value === o.value;
           return (
@@ -264,6 +267,7 @@ export function ChoiceGroup({
               onClick={() => onChange(o.value)}
               className={cn(
                 "apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-apple-sm border px-4 text-sm font-medium",
+                groupClassName && "justify-center",
                 active
                   ? "border-brand-700 bg-brand-700 text-white shadow-xs"
                   : error
