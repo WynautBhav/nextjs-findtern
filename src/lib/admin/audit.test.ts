@@ -134,6 +134,7 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "intern.visibility": { visibility: "hidden", count: 2, ids: ["i-1", "i-2"] },
   "intern.skills_update": { skills: ["React", "SQL", "Excel", "Python"] },
   "payout.create": { internId: "i-1", proposalId: "pr-1", amountMinor: 800000, method: "bank", scheduledFor: "2026-12-01", months: 1 },
+  "order.invoice_resent": { employerId: "e-1", invoiceNumber: "171126-01" },
   "order.marked_received": { employerId: "e-1", amountMinor: 1760000 },
   "cms.create": { type: "blog", fields: ["title", "slug"] },
   "cms.update": { type: "blog", fields: ["title"] },

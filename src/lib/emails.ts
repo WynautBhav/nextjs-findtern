@@ -394,6 +394,17 @@ export const emails = {
     cta: ctaTo("View orders and invoice", "/employer/orders"),
   }),
 
+  /** Sent when accounts re-sends an order's invoice: the PDF is made on the Orders page, so the mail points there. */
+  invoiceCopy: (o: { employerName: string; invoiceNumber: string; amount: string }): EmailContent => ({
+    subject: `Your Findtern invoice ${o.invoiceNumber}`,
+    preheader: `Invoice ${o.invoiceNumber} for ${o.amount} is on your Orders page.`,
+    heading: "Your invoice is ready",
+    greeting: hi(o.employerName),
+    lines: ["Here is the tax invoice for your payment. Open Orders to view it or download the PDF."],
+    facts: [["Invoice number", o.invoiceNumber], ["Amount", o.amount]],
+    cta: ctaTo("View orders and invoice", "/employer/orders"),
+  }),
+
   hireConfirmed: (o: { internName: string; companyName: string; role: string }): EmailContent => ({
     subject: "You’re hired | Internship confirmed on Findtern",
     preheader: `${o.companyName} confirmed your engagement. Your dashboard has the next steps.`,
