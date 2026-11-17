@@ -40,7 +40,7 @@ type Expired = { id: string; employerId: string; internId: string; projectId: st
 
 /** SQL for "the start day has begun": the offer's start date is a real-looking day on or before today in India. */
 const startBegun = (today: string) =>
-  sql`(left(${schema.proposals.offerDetails}->>'startDate', 10) ~ '^\d{4}-\d{2}-\d{2}$' and left(${schema.proposals.offerDetails}->>'startDate', 10) <= ${today})`;
+  sql`(left(${schema.proposals.offerDetails}->>'startDate', 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' and left(${schema.proposals.offerDetails}->>'startDate', 10) <= ${today})`;
 
 async function expireForEmployer(employerId: string, now: Date, today: string): Promise<Expired[]> {
   return withLock(`employer-pay:${employerId}`, async (tx) => {

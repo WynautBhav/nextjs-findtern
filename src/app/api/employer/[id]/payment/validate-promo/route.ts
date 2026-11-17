@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { heldRefusal, payableCheckout } from "@/lib/employer-payable";
+import { payableCheckout, payRequestRefusal } from "@/lib/employer-payable";
+import { getDb } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { isFullWaiver } from "@/lib/full-waiver";
@@ -35,7 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Priced exactly as the order route prices it: one hire, in the chosen mode.
   const checkout = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode: parsed.data.mode });
   // An expired or CGPA-held offer gets no promo preview (and so no code is touched): the same 409 the order route gives.
-  const held = heldRefusal(checkout, parsed.data.proposalIds);
+  const held = await payRequestRefusal(getDb(), id, checkout, parsed.data.proposalIds);
   if (held) return NextResponse.json(held, { status: 409 });
   const { lines } = checkout;
   const paying = lines.filter((l) => l.currency === parsed.data.currency);

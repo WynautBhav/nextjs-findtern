@@ -24,6 +24,7 @@ import { employerRegion, type Currency } from "@/lib/employer-pricing";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { splitTakenDownProposals, TAKEN_DOWN_PAY_NOTE } from "@/lib/projects/takedown-payable";
 import { orderProposalIds } from "@/lib/order-ids";
+import { expiryOf } from "@/lib/proposal-expiry";
 import { payGateFor, payGateRefusal, PAY_GATE_CODE, PAY_GATE_MESSAGE, splitByPayGate, type PayGate, type PayGateReason, type PayGateRefusal } from "@/lib/pay-gate";
 
 export { payGateFor, PAY_GATE_CODE, type PayGate, type PayGateReason, type PayGateRefusal } from "@/lib/pay-gate";
@@ -171,10 +172,22 @@ export async function payGateRefusalFor(db: Db | Tx, employerId: string, proposa
   return null;
 }
 
-/** The refusal for a requested offer that `payableCheckout` held back (expired / CGPA gated), or null. The route's early answer; the order transaction re-checks. */
-export function heldRefusal(checkout: Pick<PayableCheckout, "expired" | "gated">, proposalIds: string[]): PayGateRefusal | null {
+/**
+ * The 409 for a requested offer that cannot be paid because of the pay gate, or null. The routes' early answer (the order
+ * transaction re-checks). Three cases: `payableCheckout` held it back (expired by the clock, or CGPA check); or it was already
+ * expired by the sweeper for not being paid (status `expired`, reason `unpaid_past_start`, so it is not in the checkout at all).
+ * An offer that is simply unknown or already paid is left to the caller's own "nothing to pay" answer.
+ */
+export async function payRequestRefusal(db: Db | Tx, employerId: string, checkout: Pick<PayableCheckout, "expired" | "gated" | "lines">, proposalIds: string[]): Promise<PayGateRefusal | null> {
   const h = [...checkout.expired, ...checkout.gated].find((x) => proposalIds.includes(x.id));
-  return h ? { error: h.note, code: PAY_GATE_CODE[h.reason] } : null;
+  if (h) return { error: h.note, code: PAY_GATE_CODE[h.reason] };
+  const missing = proposalIds.filter((id) => !checkout.lines.some((l) => l.id === id));
+  if (missing.length === 0) return null;
+  const rows = await db
+    .select({ status: schema.proposals.status, hiredAt: schema.proposals.hiredAt, offerDetails: schema.proposals.offerDetails })
+    .from(schema.proposals)
+    .where(and(eq(schema.proposals.employerId, employerId), inArray(schema.proposals.id, missing)));
+  return rows.some((r) => expiryOf(r).reason === "unpaid_past_start") ? { error: PAY_GATE_MESSAGE.expired, code: PAY_GATE_CODE.expired } : null;
 }
 
 /**
