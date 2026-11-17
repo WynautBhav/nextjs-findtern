@@ -9,7 +9,7 @@ import { ChipLinks } from "@/components/admin/report-range";
 import { ChartCard } from "@/components/admin/reports/chart-card";
 import { PeriodBar } from "@/components/admin/reports/period-bar";
 import { StatStrip, trendOf } from "@/components/admin/reports/stat-strip";
-import { formatPercentDelta, monthlyFlows, percentChange, previousWindow } from "@/lib/admin/reports-shape";
+import { formatPercentDelta, monthlyFlows, percentChange, previousWindow, REPORT_PERIODS } from "@/lib/admin/reports-shape";
 import { loadCollected } from "@/lib/admin/receivables-load";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ButtonAnchor, ButtonLink } from "@/components/ui/button";
@@ -125,7 +125,7 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
           </>
         }
       />
-      <PeriodBar basePath={BASE} params={params} defaultValue="" defaultLabel="Last 18 months" hidden={keep} />
+      <PeriodBar basePath={BASE} params={params} defaultValue="" defaultLabel="Last 18 months" periods={REPORT_PERIODS} hidden={keep} />
 
       {/* Candidate / company / status (ADM-15): one GET form, applies to both
           tables as you change it (no Filter button, QA-149). */}

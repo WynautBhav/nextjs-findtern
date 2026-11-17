@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { activePeriod, formatPercentDelta, funnelRows, monthlyFlows, percentChange, previousWindow } from "./reports-shape.ts";
+import { activePeriod, formatPercentDelta, funnelRows, monthlyFlows, percentChange, previousWindow, REPORT_PERIODS } from "./reports-shape.ts";
+import { periodStart } from "./params.ts";
 import { computeReceivables, type ReceivablesInput } from "./receivables.ts";
 
 test("previousWindow is the equal span before the period; null for all time", () => {
@@ -88,4 +89,11 @@ test("computeReceivables: received total is exact to the instant of the period s
   // Upper bound is exclusive too.
   const closed = computeReceivables({ ...input, since: null, until: new Date("2026-10-05T11:00:00Z") }, { receivables: "both", payables: "both" });
   assert.equal(closed.totals.receivedMinor, 12_500_000);
+});
+
+test("REPORT_PERIODS keeps the legacy presets (7 days, 30 days, 3 and 6 months) and every one resolves to a start", () => {
+  const values = REPORT_PERIODS.map((p) => p.value);
+  for (const legacy of ["7d", "30d", "90d", "180d"]) assert.ok(values.includes(legacy), legacy);
+  for (const p of REPORT_PERIODS) assert.ok(periodStart(p.value) instanceof Date, p.value);
+  assert.equal(new Set(values).size, values.length);
 });

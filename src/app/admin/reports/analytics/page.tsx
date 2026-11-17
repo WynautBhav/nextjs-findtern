@@ -11,7 +11,7 @@ import { Funnel } from "@/components/admin/reports/funnel";
 import { PeriodBar } from "@/components/admin/reports/period-bar";
 import { RankCard } from "@/components/admin/reports/rank-card";
 import { StatStrip, trendOf } from "@/components/admin/reports/stat-strip";
-import { formatPercentDelta } from "@/lib/admin/reports-shape";
+import { formatPercentDelta, REPORT_PERIODS } from "@/lib/admin/reports-shape";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ButtonAnchor, ButtonLink } from "@/components/ui/button";
 import { filterCompanies, filterHires, type Analytics, type HireFilter } from "@/lib/admin/analytics";
@@ -99,7 +99,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
   return (
     <div className="space-y-5 lg:space-y-6">
       {header}
-      <PeriodBar basePath={BASE} params={params} defaultValue="" defaultLabel="Last 18 months" />
+      <PeriodBar basePath={BASE} params={params} defaultValue="" defaultLabel="Last 18 months" periods={REPORT_PERIODS} />
 
       <StatStrip
         stats={[
@@ -117,6 +117,8 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
             note: `Companies ${formatMoney(a.totals.revenueEmployersMinor, "INR", { zeroLabel: "\u20b90" })} \u00b7 Fees ${formatMoney(a.totals.revenueInternsMinor, "INR", { zeroLabel: "\u20b90" })} \u00b7 Colleges ${formatMoney(a.totals.revenueCollegesMinor, "INR", { zeroLabel: "\u20b90" })}`,
           },
           { label: "Avg time to hire", value: a.rates.avgHireTimeDays == null ? "-" : `${a.rates.avgHireTimeDays} days`, note: "Offer sent to employer paid" },
+          { label: "New companies", value: formatNumber(a.totals.companies), note: `${a.totals.activeEmployers} active in the range` },
+          { label: "Active projects", value: formatNumber(a.totals.activeProjects), note: `${a.totals.projects} posted in the range` },
         ]}
       />
 
@@ -224,7 +226,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
         title="Offers and where interns are"
         description="Both are all time, not limited to the range."
         groups={[
-          { title: "Offer status", note: "Every offer sent, grouped as the old report did", rows: a.applicationStatus.map((x) => ({ label: x.name, value: x.value })) },
+          { title: "Offer status", note: "Every offer ever sent, grouped as the old report did. Accepted offers count as hired here, so this can exceed Hires above (paid hires in the range).", rows: a.applicationStatus.map((x) => ({ label: x.name, value: x.value })) },
           { title: "Interns by city", note: "Top six cities; Others is the rest", rows: a.cities.map((x) => ({ label: x.city, value: x.count, display: `${formatNumber(x.count)} \u00b7 ${x.percentage}%` })) },
         ]}
       />
