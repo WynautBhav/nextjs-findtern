@@ -68,6 +68,15 @@ export function AdminPricingEditor({
   const router = useRouter();
   const [seeding, setSeeding] = useState(false);
   const [seedError, setSeedError] = useState<string | null>(null);
+  // "Most popular" is one choice for the whole rate card: checking a card unchecks the
+  // others at once, before anything is saved. Re-synced when the saved choice changes.
+  const serverFeaturedId = plans.find((p) => p.isFeatured)?.id ?? null;
+  const [featuredId, setFeaturedId] = useState<string | null>(serverFeaturedId);
+  const [seenFeaturedId, setSeenFeaturedId] = useState(serverFeaturedId);
+  if (seenFeaturedId !== serverFeaturedId) {
+    setSeenFeaturedId(serverFeaturedId);
+    setFeaturedId(serverFeaturedId);
+  }
 
   async function seed() {
     setSeeding(true);
@@ -119,7 +128,13 @@ export function AdminPricingEditor({
         <div className="@container">
           <div className="grid items-start gap-[var(--admin-gap,1rem)] @xl:grid-cols-2 @4xl:grid-cols-3">
             {plans.map((plan) => (
-              <PlanEditor key={plan.id} plan={plan} />
+              <PlanEditor
+                key={plan.id}
+                plan={plan}
+                featured={featuredId === plan.id}
+                featuredId={featuredId}
+                onFeatured={(on) => setFeaturedId(on ? plan.id : null)}
+              />
             ))}
           </div>
         </div>
@@ -436,7 +451,18 @@ function StipendPanel({ initial }: { initial: StipendBands }) {
   );
 }
 
-function PlanEditor({ plan }: { plan: EditablePlan }) {
+function PlanEditor({
+  plan,
+  featured,
+  featuredId,
+  onFeatured,
+}: {
+  plan: EditablePlan;
+  featured: boolean;
+  /** The card currently marked on the page (unsaved included); null when none. */
+  featuredId: string | null;
+  onFeatured: (on: boolean) => void;
+}) {
   const router = useRouter();
   const { ask, dialog } = useConfirm();
   const [name, setName] = useState(plan.displayName);
@@ -447,7 +473,6 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
   const [duration, setDuration] = useState(plan.internshipDuration);
   const [features, setFeatures] = useState<string[]>([0, 1, 2].map((i) => plan.features[i] ?? ""));
   const [featureList, setFeatureList] = useState<CmsPlanFeature[]>(plan.featureList);
-  const [featured, setFeatured] = useState(plan.isFeatured);
   const [active, setActive] = useState(plan.isActive);
   const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -455,15 +480,14 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
   const [badField, setBadField] = useState<string | null>(null);
   const fid = (k: string) => `${plan.id}-${k}`;
 
-  // Re-sync from the server copy after router.refresh(). Featured is its own effect: saving
-  // another card as "Most popular" un-features this one on the server, and that must not
-  // wipe whatever is half-typed here.
+  // Re-sync from the server copy after router.refresh(). "Most popular" lives in the parent
+  // (one choice for the whole card set), so it never wipes what is half-typed here.
   // (Adjusting state during render, keyed on the server copy, rather than in an effect.)
-  const [seenFeatured, setSeenFeatured] = useState(plan.isFeatured);
-  if (seenFeatured !== plan.isFeatured) {
-    setSeenFeatured(plan.isFeatured);
-    setFeatured(plan.isFeatured);
-  }
+  //
+  // This card only writes the flag when the admin acted on it: ticked it (the server then
+  // un-features the rest) or cleared the choice outright. Being unchecked because another
+  // card was ticked is not a change to save here.
+  const featuredChange = featured !== plan.isFeatured && (featured || featuredId === null);
   const serverSig = JSON.stringify({ ...plan, isFeatured: null });
   const [seenSig, setSeenSig] = useState(serverSig);
   if (seenSig !== serverSig) {
@@ -488,7 +512,7 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
     duration !== plan.internshipDuration ||
     features.some((v, i) => v !== (plan.features[i] ?? "")) ||
     JSON.stringify(featureList.filter((f) => f.label.trim())) !== JSON.stringify(plan.featureList) ||
-    featured !== plan.isFeatured ||
+    featuredChange ||
     active !== plan.isActive;
 
   useEffect(() => {
@@ -548,7 +572,7 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
           featureList: featureList.filter((f) => f.label.trim()),
           // Only when the admin changed it: re-sending a stale value would re-feature this
           // plan and un-feature whichever card was saved as "Most popular" since.
-          ...(featured !== plan.isFeatured ? { isFeatured: featured } : {}),
+          ...(featuredChange ? { isFeatured: featured } : {}),
           isActive: active,
         }),
       });
@@ -699,7 +723,7 @@ function PlanEditor({ plan }: { plan: EditablePlan }) {
           <input
             type="checkbox"
             checked={featured}
-            onChange={(e) => setFeatured(e.target.checked)}
+            onChange={(e) => onFeatured(e.target.checked)}
             className="size-4 accent-brand-700"
           />
           <Star className="size-4 text-accent-700" aria-hidden />

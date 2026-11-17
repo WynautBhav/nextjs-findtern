@@ -14,6 +14,7 @@ import { getDb, schema } from "@/lib/db";
 import Link from "next/link";
 import { getInternActivationFeeMinor, getPerHireFeeSetting, getSetting } from "@/lib/platform-settings";
 import type { PerHireFeeSetting } from "@/lib/per-hire-fee";
+import { singleFeatured } from "@/lib/pricing-featured";
 import { INTERN_STIPEND_KEY, parseStipendBands, type StipendBands } from "@/lib/pricing-config";
 
 export const metadata: Metadata = {
@@ -37,7 +38,9 @@ async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMino
       activationFeeMinor,
       perHireFee,
       stipendBands: parseStipendBands(stipendRaw),
-      plans: rows.map((r) => ({
+      // More than one row can be flagged (old writes, the seed, two saves at once): show the
+      // most recently updated one as the choice, the way the next save will settle it.
+      plans: singleFeatured(rows).map((r) => ({
         id: r.id,
         slug: r.slug,
         displayName: r.displayName,

@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, asc, eq, inArray, ne, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -12,8 +12,7 @@ import { PER_HIRE_FEE_KEY, parsePerHireFeeSetting } from "@/lib/per-hire-fee";
 import { perHireFeeAuditMeta } from "@/lib/admin/per-hire-fee-setting";
 import { PRICING_REVALIDATE, activationFeeAuditMeta, parsePricingPut, stipendSaveAuditMeta } from "@/lib/admin/pricing-put";
 import { INTERN_STIPEND_KEY, parseStipendBands } from "@/lib/pricing-config";
-import { legacyBandChange } from "@/lib/admin/plan-band";
-import { inrMinorToUsdMinor } from "@/lib/currency";
+import { writePlan, type PlanStore } from "@/lib/admin/pricing-plan-write";
 
 /**
  * Admin rate card. Only INR rows are edited - USD is derived at ₹100 = $1
@@ -48,6 +47,40 @@ function revalidatePricing() {
   }
 }
 
+type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
+
+/** The drizzle half of `PlanStore`, bound to one transaction. */
+function drizzlePlanStore(tx: Tx): PlanStore {
+  const t = schema.pricingPlans;
+  return {
+    async lock() {
+      // Serialises pricing writers for the length of the transaction; released on commit/rollback.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext('pricing_plans'))`);
+    },
+    async getPlan(id) {
+      const [row] = await tx.select().from(t).where(eq(t.id, id)).limit(1);
+      return row;
+    },
+    async updatePlan(id, set) {
+      await tx.update(t).set(set).where(eq(t.id, id));
+    },
+    async updateUsdBySlug(slug, set) {
+      await tx.update(t).set(set).where(and(eq(t.slug, slug), eq(t.currency, "USD")));
+    },
+    async listInr() {
+      return tx.select().from(t).where(sql`upper(${t.currency}) = 'INR'`).orderBy(asc(t.sortOrder));
+    },
+    async unfeatureInr(ids, at) {
+      if (ids.length) await tx.update(t).set({ isFeatured: false, updatedAt: at }).where(inArray(t.id, ids));
+    },
+    async syncUsdFeatured(slug, at) {
+      const usdRows = sql`upper(${t.currency}) = 'USD'`;
+      await tx.update(t).set({ isFeatured: false, updatedAt: at }).where(and(usdRows, eq(t.isFeatured, true), slug === null ? undefined : ne(t.slug, slug)));
+      if (slug !== null) await tx.update(t).set({ isFeatured: true, updatedAt: at }).where(and(usdRows, eq(t.slug, slug), eq(t.isFeatured, false)));
+    },
+  };
+}
+
 export async function PATCH(req: Request) {
   const guard = await requireMutation({ req, roles: ["admin"] });
   if (!guard.ok) return guard.response;
@@ -58,56 +91,26 @@ export async function PATCH(req: Request) {
   }
   const { id, ...fields } = parsed.data;
 
-  const db = getDb();
-  const [plan] = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.id, id)).limit(1);
-  if (!plan || plan.currency.toUpperCase() !== "INR") {
-    return NextResponse.json({ error: "Unknown plan" }, { status: 404 });
-  }
-
-  // DB-26: legacy prices candidates from features[1]; never let a reword
-  // break a band it can read.
-  if (fields.features) {
-    const change = legacyBandChange((plan.features ?? [])[1], fields.features[1]);
-    if (change?.block) return NextResponse.json({ error: change.message }, { status: 400 });
-  }
-
-  await db.update(schema.pricingPlans).set({ ...fields, updatedAt: new Date() }).where(eq(schema.pricingPlans.id, id));
-
-  // ADM-17: the new app derives USD from INR, but the legacy site (rollback
-  // target) still reads its own USD rows. Keep them in step at ₹100 = $1.
-  const usd = (v: number | null | undefined) => (v == null ? v : inrMinorToUsdMinor(v));
-  const mirror = Object.fromEntries(
-    Object.entries({
-      displayName: fields.displayName,
-      priceHourlyMinor: usd(fields.priceHourlyMinor),
-      perHireChargeMinor: usd(fields.perHireChargeMinor),
-      compareAtHourlyMinor: usd(fields.compareAtHourlyMinor),
-      compareAtPerHireMinor: usd(fields.compareAtPerHireMinor),
-      internshipDuration: fields.internshipDuration,
-      features: fields.features,
-      isActive: fields.isActive,
-    }).filter(([, v]) => v !== undefined),
-  );
-  if (Object.keys(mirror).length) {
-    await db
-      .update(schema.pricingPlans)
-      .set({ ...mirror, updatedAt: new Date() })
-      .where(and(eq(schema.pricingPlans.slug, plan.slug), eq(schema.pricingPlans.currency, "USD")));
-  }
-  // One "Most popular" at a time.
-  if (fields.isFeatured) {
-    await db
-      .update(schema.pricingPlans)
-      .set({ isFeatured: false, updatedAt: new Date() })
-      .where(and(ne(schema.pricingPlans.id, id), eq(schema.pricingPlans.currency, plan.currency)));
-  }
-  await recordAdminAudit(db, {
-    adminId: guard.session.uid,
-    action: "pricing.update",
-    targetType: "pricing_plan",
-    targetId: id,
-    meta: { plan: plan.displayName, changes: diffFields(plan, fields) },
-  }, { strict: true });
+  // One transaction: the write, the one-"Most popular" rule and the audit row land together
+  // or not at all (lib/admin/pricing-plan-write.ts has the rules).
+  const now = new Date();
+  const result = await getDb().transaction(async (tx) => {
+    const written = await writePlan(drizzlePlanStore(tx), id, fields, now);
+    if (!written.ok) return written;
+    await recordAdminAudit(tx, {
+      adminId: guard.session.uid,
+      action: "pricing.update",
+      targetType: "pricing_plan",
+      targetId: id,
+      meta: {
+        plan: written.before.displayName,
+        changes: diffFields(written.before, fields),
+        ...(written.unfeatured.length ? { unfeatured: written.unfeatured.map((p) => p.displayName) } : {}),
+      },
+    }, { strict: true });
+    return written;
+  });
+  if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
   revalidatePricing();
   return NextResponse.json({ ok: true });
 }
