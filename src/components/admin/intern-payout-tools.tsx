@@ -403,7 +403,7 @@ export function InternPayoutTools({
           </p>
         ) : (
           <div data-stack className="rounded-apple-md lg:overflow-x-auto">
-            <table className="w-full text-left lg:min-w-[52rem]">
+            <table className="w-full text-left lg:min-w-[46rem]">
               <caption className="sr-only">Payouts recorded for this intern</caption>
               <thead>
                 <tr>
@@ -413,7 +413,7 @@ export function InternPayoutTools({
                   <th scope="col" className={th}>Status</th>
                   <th scope="col" className={th}>Reference</th>
                   <th scope="col" className={th}>Paid on</th>
-                  <th scope="col" className={th}><span className="sr-only">Action</span></th>
+                  <th scope="col" className={cn(th, "lg:sticky lg:right-0 lg:z-10")}><span className="sr-only">Action</span></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[color:var(--admin-rule)]">
@@ -444,7 +444,7 @@ export function InternPayoutTools({
                       </td>
                       <td data-label="Reference" data-empty={p.referenceId ? undefined : ""} className={cn(td, "nums max-lg:[overflow-wrap:anywhere]")}>{p.referenceId ?? <span className="text-text-subtle">-</span>}</td>
                       <td data-label="Paid on" data-empty={p.paidAt ? undefined : ""} className={cn(td, "nums whitespace-nowrap")}>{p.paidAt ? formatDate(p.paidAt) : "-"}</td>
-                      <td className={cn(td, "text-right lg:pr-5")}>
+                      <td className={cn(td, "text-right lg:sticky lg:right-0 lg:bg-[color:var(--admin-panel)] lg:pr-5 lg:shadow-[-8px_0_8px_-8px_rgba(0,0,0,0.12)]")}>
                         {!canPay ? null : p.status === "pending" ? (
                           <PayoutEditor payoutId={p.id} status={p.status} initialReference={p.referenceId} initialNote={opsNote} />
                         ) : p.status === "paid" ? (

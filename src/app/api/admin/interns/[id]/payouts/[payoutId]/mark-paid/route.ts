@@ -36,19 +36,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const payable = canPayOut(onboarding?.extra as Record<string, unknown> | null | undefined);
   if (!payable.ok) return NextResponse.json({ error: payable.error }, { status: 409 });
   // Conditional on the row still being pending, so a double click or two
-  // admins cannot both mark it (and both queue a next month).
-  const updated = await db
-    .update(schema.internPayouts)
-    .set({ status: "paid", paidAt: new Date(), referenceId: parsed.data.referenceId, updatedAt: new Date() })
-    .where(and(eq(schema.internPayouts.id, payoutId), eq(schema.internPayouts.internId, id), eq(schema.internPayouts.status, "pending")))
-    .returning({
-      amountMinor: schema.internPayouts.amountMinor,
-      currency: schema.internPayouts.currency,
-      method: schema.internPayouts.method,
-      notes: schema.internPayouts.notes,
-      raw: schema.internPayouts.raw,
-      kind: schema.internPayouts.kind,
-    });
+  // admins cannot both mark it (and both queue a next month). The audit row is
+  // written in the same transaction and strictly: a paid payout with no audit row rolls back.
+  const updated = await db.transaction(async (tx) => {
+    const rows = await tx
+      .update(schema.internPayouts)
+      .set({ status: "paid", paidAt: new Date(), referenceId: parsed.data.referenceId, updatedAt: new Date() })
+      .where(and(eq(schema.internPayouts.id, payoutId), eq(schema.internPayouts.internId, id), eq(schema.internPayouts.status, "pending")))
+      .returning({
+        amountMinor: schema.internPayouts.amountMinor,
+        currency: schema.internPayouts.currency,
+        method: schema.internPayouts.method,
+        notes: schema.internPayouts.notes,
+        raw: schema.internPayouts.raw,
+        kind: schema.internPayouts.kind,
+      });
+    if (rows.length > 0) {
+      await recordAdminAudit(tx, { adminId: guard.session.uid, action: "payout.mark_paid", targetType: "payout", targetId: payoutId, meta: { internId: id, amountMinor: rows[0].amountMinor, referenceId: parsed.data.referenceId } }, { strict: true });
+    }
+    return rows;
+  });
 
   if (updated.length === 0) {
     const [existing] = await db
@@ -61,7 +68,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Only a pending payout can be marked paid" }, { status: 409 });
   }
 
-  await recordAdminAudit(db, { adminId: guard.session.uid, action: "payout.mark_paid", targetType: "payout", targetId: payoutId, meta: { internId: id, amountMinor: updated[0].amountMinor, referenceId: parsed.data.referenceId } });
   // Queue first: the row is already "paid", so a retry would 409 and never queue.
   // A completion bonus is a one-off: no next month.
   const next = updated[0].kind === "stipend" ? await queueNextMonth(db, id, updated[0]) : null;

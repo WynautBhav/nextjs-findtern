@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { recordAdminAudit } from "@/lib/admin/audit";
+import { canPayOut } from "@/lib/admin/payout-kind";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { cycleFor, payoutRefusal } from "@/lib/admin/stipend-dues";
@@ -55,6 +56,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const body = parsed.data;
 
   const db = getDb();
+  // Findtern can't pay an account it doesn't have: refuse here, with the reason, instead of leaving a pending
+  // payout that mark-paid will later refuse (and that blocks the placement meanwhile).
+  const [onboarding] = await db.select({ extra: schema.internOnboarding.extraData }).from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).limit(1);
+  const payable = canPayOut(onboarding?.extra as Record<string, unknown> | null | undefined);
+  if (!payable.ok) return NextResponse.json({ error: payable.error }, { status: 409 });
   const result = await db.transaction(async (tx) => {
     await lockPlacement(tx, body.proposalId);
     const { due, proposal } = await loadPlacementDue(tx, id, body.proposalId);

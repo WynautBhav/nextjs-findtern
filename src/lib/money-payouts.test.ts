@@ -279,10 +279,9 @@ test("OBSERVATION: a paid payout with no placement link counts against a month o
   assert.equal(offByThree.remainingMinor, 2_400_000);
 });
 
-test("OPEN QUESTION: an unlinked paid payout with no scheduled date is dated by its UTC day, not its IST day (legacy parity unknown)", () => {
+test("FIXED (package U): an unlinked paid payout with no scheduled date is dated by its IST day, so an early-morning IST payment matches its month", () => {
   // paid 01:30 IST on 1 Dec = 2026-11-30T20:00Z. The month it stands for falls on 2026-12-01 (start 1 Nov + 1 month).
-  // payoutDateKey() slices the UTC date (30 Nov), so the payout does not match the 1 Dec month and the month stays owed.
-  // Not changed: the key is documented as legacy's, and legacy's own day rule is not in this repo.
+  // payoutDateKey() used the UTC date (30 Nov), so the payout missed the 1 Dec month, which stayed "owed" and could be paid twice.
   const offer = { monthlyAmount: 16000, duration: "2m", startDate: "2026-11-01" };
   const payout = { status: "paid", raw: {}, amountMinor: 800_000, currency: "INR", paidAt: new Date("2026-11-30T20:00:00Z") };
   const sameDayUtc = { ...payout, paidAt: new Date("2026-12-01T05:00:00Z") };
@@ -290,5 +289,5 @@ test("OPEN QUESTION: an unlinked paid payout with no scheduled date is dated by 
   const ok = stipendDues([hired("p1", offer)], [sameDayUtc], 7)[0];
   row("paid 01:30 IST 1 Dec vs 10:30 IST 1 Dec", { late: "₹8,000 left", ok: "₹8,000 left" }, { late: `${inr(late.remainingMinor)} left`, ok: `${inr(ok.remainingMinor)} left` });
   assert.equal(ok.remainingMinor, 800_000, "control: the same IST day, later in the day, matches");
-  assert.equal(late.remainingMinor, 1_600_000, "documents today's behaviour: the early-morning IST payment is not matched");
+  assert.equal(late.remainingMinor, 800_000, "the early-morning IST payment now matches too");
 });

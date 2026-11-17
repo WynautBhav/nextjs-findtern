@@ -72,6 +72,7 @@ export const AUDIT_ACTIONS = {
   "intern.skills_update": "Edited a candidate's skills",
   "payout.create": "Created a stipend payout",
   "order.invoice_resent": "Re-sent an order's invoice to the company",
+  "payout.update": "Edited a payout (status, bank reference or note)",
   "order.marked_received": "Marked an order's money received",
   "cms.create": "Added website content",
   "cms.update": "Edited website content",
