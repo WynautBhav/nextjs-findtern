@@ -51,8 +51,8 @@ export function planTakedown(input: {
  * Returns the refusal text (answer 409), or null when the listing is up.
  */
 export const TAKEDOWN_BLOCKS = {
-  accept: "Findtern took this listing down, so this offer can't be accepted right now. You can still turn it down.",
-  pay: "Findtern took this listing down, so this offer can't be paid for right now. Contact support.",
+  accept: "On hold: Findtern took this listing down, so this offer can't be accepted right now. You can still turn it down.",
+  pay: "Findtern took this listing down, so this offer can't be paid for right now. Contact admin.",
   schedule: "Findtern took this listing down, so this interview can't be scheduled right now.",
   send: "Findtern took this listing down, so you can't send offers on it. Pick another project.",
 } as const;
