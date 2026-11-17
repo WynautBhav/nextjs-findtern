@@ -116,3 +116,17 @@ test("marking a drive order paid needs transactions:write", () => {
   assert.equal(allows(["companies:write"], requiredPermissions("/api/admin/drive-orders/x/payment", "POST")), false);
   assert.equal(allows(["transactions:read"], requiredPermissions("/api/admin/drive-orders/x/payment", "GET")), true);
 });
+
+test("promo codes: the redemptions list reads with a read permission, every change needs a write permission", () => {
+  const read = requiredPermissions("/api/admin/promo-codes/p1/redemptions", "GET");
+  assert.deepEqual(read, ["transactions:read", "cms:read"]);
+  assert.equal(allows(["cms:read"], read), true);
+  assert.equal(allows(["interns:read"], read), false, "a role with no money or content access can't read who used a code");
+  for (const m of ["POST", "PUT", "DELETE"]) {
+    const need = requiredPermissions("/api/admin/promo-codes/p1", m);
+    assert.deepEqual(need, ["transactions:write", "cms:write"]);
+    assert.equal(allows(["transactions:read", "cms:read"], need), false, `${m}: read-only roles can't change a code`);
+    assert.equal(allows(["cms:write"], need), true);
+  }
+  assert.equal(canWrite(["transactions:read"], "/admin/promo-codes"), false);
+});

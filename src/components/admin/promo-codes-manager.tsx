@@ -591,7 +591,7 @@ export function PromoCodesManager({
 
       {/* Redemptions */}
       <Dialog open={redeemFor !== null} onOpenChange={(o) => { if (!o) setRedeemFor(null); }}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl [&>*]:min-w-0 grid-cols-[minmax(0,1fr)]">
           <DialogHeader>
             <DialogTitle>{redeemFor?.code} redemptions</DialogTitle>
             <DialogDescription>Every use of this code: who, the order and the discount given.</DialogDescription>
@@ -758,6 +758,7 @@ export function PromoCodesManager({
                   id="promo-min"
                   type="number"
                   min="0"
+                  step="0.01"
                   value={minOrderAmountRupees}
                   onChange={(e) => setMinOrderAmountRupees(e.target.value)}
                   placeholder="2499"
