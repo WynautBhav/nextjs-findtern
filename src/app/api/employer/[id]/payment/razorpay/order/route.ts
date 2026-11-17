@@ -8,6 +8,7 @@ import { withLock, type Tx } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { paymentIndexMismatch } from "@/lib/dues";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { openProposalsWithDues, payableCheckout, type PayableLine } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders, legacyOrderRaw, OPEN_ORDER_MINUTES, orderProposalIds, settleEmployerOrder } from "@/lib/payments";
 import { TAKEDOWN_BLOCKS, takedownCheckedLineIds } from "@/lib/projects/takedown";
@@ -141,6 +142,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   const { currency } = parsed.data;
   if (parsed.data.testPay && !testPayEnabled()) return NextResponse.json({ error: "Test payments are off" }, { status: 403 });
+  for (const pid of parsed.data.proposalIds) {
+    const td = await assertProposalActionable(pid, id);
+    if (!td.ok) return td.response;
+  }
 
   // Amount is recomputed from the accepted offers; the client never sends it.
   const { lines } = await payableCheckout(id, { proposalIds: parsed.data.proposalIds, mode: parsed.data.mode });

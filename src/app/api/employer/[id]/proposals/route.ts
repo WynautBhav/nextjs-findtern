@@ -13,6 +13,7 @@ import { resolvePricing } from "@/lib/employer-pricing";
 import { getPricingConfig } from "@/lib/platform-settings";
 import { feeSettingOf } from "@/lib/pricing-config";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertProjectActionable } from "@/lib/projects/takedown-guard-server";
 import { emails } from "@/lib/emails";
 import { employerNames, notify } from "@/lib/notify";
 import {
@@ -131,6 +132,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
   }
   const b = parsed.data;
+  const td = await assertProjectActionable(b.projectId, id);
+  if (!td.ok) return td.response;
   // An offer lapses on its start date, so the start has to be after today.
   if (b.startDate <= todayIst()) {
     return NextResponse.json({ error: "Pick a start date after today." }, { status: 400 });

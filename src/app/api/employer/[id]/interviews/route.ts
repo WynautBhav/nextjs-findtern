@@ -6,6 +6,7 @@ import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertProjectActionable } from "@/lib/projects/takedown-guard-server";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { projectZone, timezoneForLocation, wallTimeToUtc } from "@/lib/timezones";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
@@ -36,6 +37,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Offer three time slots." }, { status: 400 });
+  if (parsed.data.projectId) {
+    const td = await assertProjectActionable(parsed.data.projectId, id);
+    if (!td.ok) return td.response;
+  }
   const db = getDb();
   // The meeting runs on the PROJECT's clock (feedback sheet 2, row 7): the project's zone is authoritative, so
   // what the employer types and what the intern reads cannot differ. A project with no zone (or no project)

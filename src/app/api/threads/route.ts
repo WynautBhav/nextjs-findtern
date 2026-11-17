@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getSession } from "@/lib/auth";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { getDb, schema } from "@/lib/db";
 import { canStartThread } from "@/lib/messaging/logic";
 import { listThreads, threadLimiter } from "@/lib/messaging/store";
@@ -40,6 +41,10 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   const { counterpartId, proposalId } = parsed.data;
+  if (guard.session.role === "employer" && proposalId) {
+    const td = await assertProposalActionable(proposalId, guard.session.uid);
+    if (!td.ok) return td.response;
+  }
 
   const role = session.role as "employer" | "intern";
   const employerId = role === "employer" ? session.uid : counterpartId;

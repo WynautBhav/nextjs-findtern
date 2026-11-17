@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertProjectActionable } from "@/lib/projects/takedown-guard-server";
 import { isTransitionConflict, planTransition } from "@/lib/projects/transition";
 import { revalidatePublicRoles } from "@/lib/projects/revalidate-public";
 
@@ -22,6 +23,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const [project] = await db.select().from(schema.projects).where(eq(schema.projects.id, id)).limit(1);
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (project.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const td = await assertProjectActionable(id, guard.session.uid);
+  if (!td.ok) return td.response;
 
   const plan = planTransition({
     project: { ...project, skills: (project.skills as string[] | null) ?? [] },

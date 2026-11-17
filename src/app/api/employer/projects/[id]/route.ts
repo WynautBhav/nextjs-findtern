@@ -7,6 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertProjectActionable } from "@/lib/projects/takedown-guard-server";
 import { revalidatePublicRoles } from "@/lib/projects/revalidate-public";
 import { editBlockedReason } from "@/lib/projects/transition";
 import { projectNameIssue } from "@/lib/project-name";
@@ -53,6 +54,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const [project] = await db.select().from(schema.projects).where(eq(schema.projects.id, id)).limit(1);
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (project.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const td = await assertProjectActionable(id, guard.session.uid);
+  if (!td.ok) return td.response;
 
   const d = { ...parsed.data };
   // Lifecycle: canonical rows move only through /transition. Legacy rows
@@ -175,6 +178,8 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const [project] = await db.select().from(schema.projects).where(eq(schema.projects.id, id)).limit(1);
   if (!project) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (project.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const td = await assertProjectActionable(id, guard.session.uid);
+  if (!td.ok) return td.response;
   // Deleting and re-posting would undo an admin takedown and orphan its audit row.
   if (project.takenDownAt) {
     return NextResponse.json({ error: "Findtern took this listing down. Contact support." }, { status: 409 });

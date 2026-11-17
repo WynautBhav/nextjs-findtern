@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertProjectActionable } from "@/lib/projects/takedown-guard-server";
 import { poolInternIds } from "@/lib/employer-pool";
 import { OFFER_BLOCKING_STATUSES } from "@/lib/employer-offer-status";
 import { isProjectOpen } from "@/lib/project-locations";
@@ -53,6 +54,10 @@ export async function POST(req: Request) {
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if ("projectId" in parsed.data && parsed.data.projectId) {
+    const td = await assertProjectActionable(parsed.data.projectId, employerId);
+    if (!td.ok) return td.response;
+  }
 
   const db = getDb();
 

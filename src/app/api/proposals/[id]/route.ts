@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { notify } from "@/lib/notify";
 import { learnField } from "@/lib/proposal-copy";
 import { projectZone } from "@/lib/timezones";
@@ -89,6 +90,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   if (session.role !== "admin" && proposal.employerId !== session.uid) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (session.role === "employer") {
+    const td = await assertProposalActionable(id, session.uid);
+    if (!td.ok) return td.response;
   }
   if (!EDITABLE.includes(proposal.status) || proposal.hiredAt) {
     return NextResponse.json(

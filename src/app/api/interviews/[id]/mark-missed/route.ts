@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertInterviewActionable } from "@/lib/projects/takedown-guard-server";
 import { MISSED_GRACE_MINUTES, canMarkMissed, employerNoShow } from "@/lib/employer-interview-rules";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -14,6 +15,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const [interview] = await db.select().from(schema.interviews).where(eq(schema.interviews.id, id)).limit(1);
   if (!interview) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (interview.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const td = await assertInterviewActionable(id, guard.session.uid);
+  if (!td.ok) return td.response;
 
   // The employer is the one who did not show; the candidate cannot be marked missed for it.
   if (employerNoShow(interview)) return NextResponse.json({ error: "This interview expired: the employer did not join within 30 minutes of the start. Offer new times instead." }, { status: 409 });

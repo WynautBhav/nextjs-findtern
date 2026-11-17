@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
 import { emails } from "@/lib/emails";
 import { initialsOf } from "@/lib/employer-candidates";
@@ -99,6 +100,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     (session.role === "employer" && proposal.employerId === session.uid) ||
     (session.role === "intern" && proposal.internId === session.uid);
   if (!ownsIt) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (session.role === "employer") {
+    const td = await assertProposalActionable(id, session.uid);
+    if (!td.ok) return td.response;
+  }
 
   // State-machine guard. The legacy routes had none, which meant a withdrawn
   // offer could be accepted afterwards and both parties could be told it was

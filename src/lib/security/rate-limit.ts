@@ -104,6 +104,8 @@ export const limiters = {
   signup: new RateLimiter(5, 60 * 60_000),
   upload: new RateLimiter(20, 60 * 60_000),
   generic: new RateLimiter(60, 60_000),
+  // Employer "Contact admin" about a taken-down project: a few messages an hour is plenty for a person.
+  takedownContact: new RateLimiter(5, 60 * 60_000),
   // Public form: tight like login, but its own bucket so it cannot eat logins.
   contact: new RateLimiter(8, 15 * 60_000),
   // Signup's "is this number taken?" pre-check. Unauthenticated, so it is

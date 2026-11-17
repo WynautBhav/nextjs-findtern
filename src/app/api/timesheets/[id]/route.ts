@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { DAY_STATUSES } from "@/lib/employer-timesheets";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertTimesheetActionable } from "@/lib/projects/takedown-guard-server";
 import { notify } from "@/lib/notify";
 
 const bodySchema = z
@@ -35,6 +36,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const [sheet] = await db.select().from(schema.timesheets).where(eq(schema.timesheets.id, id)).limit(1);
   if (!sheet) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (sheet.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const td = await assertTimesheetActionable(id, guard.session.uid);
+  if (!td.ok) return td.response;
   if (sheet.status === "approved") {
     return NextResponse.json({ error: "Approved timesheets can't be edited." }, { status: 409 });
   }

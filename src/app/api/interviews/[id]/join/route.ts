@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertInterviewActionable } from "@/lib/projects/takedown-guard-server";
 import { employerNoShow, isMeetingLinkLive, joinCounts, normalizeMeetingLink } from "@/lib/employer-interview-rules";
 
 /**
@@ -21,6 +22,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const [interview] = await db.select().from(schema.interviews).where(eq(schema.interviews.id, id)).limit(1);
   if (!interview) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (interview.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const td = await assertInterviewActionable(id, guard.session.uid);
+  if (!td.ok) return td.response;
 
   if (interview.status !== "scheduled" || !interview.selectedSlot) {
     return NextResponse.json({ error: "Only a booked interview can be joined." }, { status: 409 });

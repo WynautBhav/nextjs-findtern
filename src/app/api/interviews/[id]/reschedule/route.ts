@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb, schema } from "@/lib/db";
 import { emails, icsInvite } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertInterviewActionable } from "@/lib/projects/takedown-guard-server";
 import { internFirstName, notify } from "@/lib/notify";
 import { loadProjectZones, interviewZone } from "@/lib/project-zones";
 import { wallTimeToUtc } from "@/lib/timezones";
@@ -33,6 +34,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (interview.employerId !== session.uid) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
+  const td = await assertInterviewActionable(id, session.uid);
+  if (!td.ok) return td.response;
   if (!["pending", "scheduled"].includes(interview.status)) {
     return NextResponse.json({ error: `This interview is already ${interview.status}` }, { status: 409 });
   }

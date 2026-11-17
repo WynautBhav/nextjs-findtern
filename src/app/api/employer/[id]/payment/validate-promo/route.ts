@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { payableCheckout } from "@/lib/employer-payable";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { isFullWaiver } from "@/lib/full-waiver";
 import { isWaiverCode, promoRefusal, quotePromoGuarded } from "@/lib/promo";
 import { promoModeProblem } from "@/lib/promo-rules";
@@ -22,6 +23,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Something is wrong with this request. Refresh the page and try again." }, { status: 400 });
+  for (const pid of parsed.data.proposalIds) {
+    const td = await assertProposalActionable(pid, id);
+    if (!td.ok) return td.response;
+  }
 
   // A full-waiver code works on every pay plan; an ordinary code only upfront.
   const modeProblem = (await isWaiverCode(parsed.data.code)) ? null : promoModeProblem(parsed.data.mode === "upfront" ? "upfront" : "monthly");

@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertInterviewActionable } from "@/lib/projects/takedown-guard-server";
 import { notify } from "@/lib/notify";
 import { canLeaveFeedback } from "@/lib/employer-interview-rules";
 import { FEEDBACK_TAG_LINE_SQL, hasFeedbackText } from "@/lib/interview-feedback";
@@ -23,6 +24,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const [interview] = await db.select().from(schema.interviews).where(eq(schema.interviews.id, id)).limit(1);
   if (!interview) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (interview.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const td = await assertInterviewActionable(id, guard.session.uid);
+  if (!td.ok) return td.response;
 
   // A meeting marked missed can still get feedback (legacy allowed it, e.g.
   // after marking missed by mistake; EMB-22).

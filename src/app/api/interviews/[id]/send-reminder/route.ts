@@ -7,6 +7,7 @@ import { emails } from "@/lib/emails";
 import { formatSlotTime } from "@/lib/format";
 import { interviewZone, loadProjectZones } from "@/lib/project-zones";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertInterviewActionable } from "@/lib/projects/takedown-guard-server";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { employerNoShow, hasNoSlotsToPick, isMeetingOver, isStaleInterview, normalizeMeetingLink, reminderWindow } from "@/lib/employer-interview-rules";
 import { limiters } from "@/lib/security/rate-limit";
@@ -25,6 +26,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const [interview] = await db.select().from(schema.interviews).where(eq(schema.interviews.id, id)).limit(1);
   if (!interview) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (interview.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const td = await assertInterviewActionable(id, guard.session.uid);
+  if (!td.ok) return td.response;
   if (interview.status !== "scheduled" && interview.status !== "pending") {
     return NextResponse.json({ error: `This interview is already ${interview.status}` }, { status: 409 });
   }

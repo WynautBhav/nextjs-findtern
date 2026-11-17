@@ -9,6 +9,7 @@ import { afterRatingsSaved } from "@/lib/admin/score-live";
 import { getDb, schema } from "@/lib/db";
 import { unfilledDays } from "@/lib/employer-timesheets";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertTimesheetActionable } from "@/lib/projects/takedown-guard-server";
 import { notify } from "@/lib/notify";
 import { periodDays } from "@/lib/timesheet-days";
 
@@ -61,6 +62,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
   if (session.role !== "admin" && sheet.employerId !== session.uid) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  if (session.role !== "admin") {
+    const td = await assertTimesheetActionable(id, session.uid);
+    if (!td.ok) return td.response;
   }
 
   if (sheet.status !== "submitted") {

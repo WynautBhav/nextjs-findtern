@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getSession } from "@/lib/auth";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { getDb, schema } from "@/lib/db";
 import { SCRUBBED_NOTICE, scrubOutgoing } from "@/lib/contact-scrub";
 import { SEND_BLOCK_TEXT, canSend, isParticipant, otherParticipant, sanitizeBody } from "@/lib/messaging/logic";
@@ -70,6 +71,11 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const { session } = guard;
   const thread = await getThread(id);
   if (!thread || !isParticipant(thread, session.uid)) return notFound();
+  // A thread tied to a proposal is the employer's conversation about that project: closed while it is taken down.
+  if (session.role === "employer" && thread.proposalId) {
+    const td = await assertProposalActionable(thread.proposalId, session.uid);
+    if (!td.ok) return td.response;
+  }
   if (!messageLimiter.take(`msg:${session.uid}`)) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
   const parsed = Body.safeParse(await req.json().catch(() => null));

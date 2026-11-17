@@ -9,6 +9,7 @@ import { SITE } from "@/lib/content/site";
 import { getDb, schema } from "@/lib/db";
 import { emails, renderEmail } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
+import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { sendSmtpMail } from "@/lib/mailer";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { parseOffer } from "@/lib/offer";
@@ -56,6 +57,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     db.select().from(schema.proposals).where(eq(schema.proposals.id, b.proposalId)).limit(1),
   ]);
   if (!base || base.employerId !== id) return NextResponse.json({ error: "Unknown placement" }, { status: 404 });
+  const td = await assertProposalActionable(b.proposalId, id);
+  if (!td.ok) return td.response;
   if (base.status !== "hired") return NextResponse.json({ error: "Full-time offers go to interns you've hired." }, { status: 409 });
   // A taken-down listing sends no new offers, a full-time one included.
   if (base.projectId) {
