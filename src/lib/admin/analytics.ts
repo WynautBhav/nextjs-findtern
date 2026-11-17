@@ -272,7 +272,7 @@ export function computeAnalytics(input: AnalyticsInput) {
     }))
     .sort((a, b) => String(b.hiredAt).localeCompare(String(a.hiredAt)));
 
-  // Legacy's "Application status" tiles: every proposal ever, whatever the period (routes.ts:6366-6396).
+  // Legacy's "Application status" tiles: every proposal ever, whatever the period (legacy server/routes.ts:6461-6497).
   const applicationStatus = applicationStatusBuckets(input.proposals.map((p) => ({ status: p.status, fullTime: isFullTime(p) })));
   const cities = topWithOthers(input.cities ?? [], input.citiesTotal ?? 0);
 
