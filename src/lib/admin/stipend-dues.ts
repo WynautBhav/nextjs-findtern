@@ -120,11 +120,16 @@ export const proposalOf = (raw: unknown) => {
   return typeof id === "string" && id.trim() ? id.trim() : null;
 };
 
+/**
+ * The Indian calendar day of a value: a bare YYYY-MM-DD is already a day and is kept; anything with a time
+ * (a Date, an ISO timestamp) is read in IST, so a payout paid at 01:30 IST belongs to that IST day, not to
+ * the UTC day before it (which made it miss its month and stay "owed").
+ */
 const dayOf = (v: unknown): string => {
   if (!v) return "";
-  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}/.test(v)) return v.slice(0, 10);
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())) return v.trim();
   const d = new Date(v as string);
-  return Number.isNaN(d.getTime()) ? "" : d.toISOString().slice(0, 10);
+  return Number.isNaN(d.getTime()) ? "" : new Date(d.getTime() + 330 * 60_000).toISOString().slice(0, 10);
 };
 
 /** The date a payout stands for: scheduled, else paid, else created (legacy key). */
@@ -248,7 +253,8 @@ export function stipendDues(
     if (!id) {
       // ADP-18: the legacy admin also creates payouts with no placement; a
       // paid one counts against a month when amount and date match.
-      const amount = Math.floor(Number(p.amountMinor ?? 0));
+      // Compared in INR: a USD payout's bare number is cents, not rupees paise.
+      const amount = Math.floor(toInrMinor(Number(p.amountMinor ?? 0), p.currency));
       const key = payoutDateKey(p);
       if (status === "paid" && amount > 0 && key) unlinkedPaid.push({ amountMinor: amount, key, used: false });
       continue;
