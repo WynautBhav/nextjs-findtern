@@ -7,6 +7,7 @@
   "crons": [
     { "path": "/api/cron/payment-reminders", "schedule": "30 3 * * *" },
     { "path": "/api/cron/refund-reconcile", "schedule": "30 4 * * *" },
-    { "path": "/api/cron/roster-import-purge", "schedule": "15 4 * * *" }
+    { "path": "/api/cron/roster-import-purge", "schedule": "15 4 * * *" },
+    { "path": "/api/cron/proposal-expiry", "schedule": "45 18 * * *" }
   ]
 }

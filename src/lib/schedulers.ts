@@ -24,10 +24,14 @@ export function startSchedulers() {
 
   const reminders = run("interview reminders", interviewReminders);
   const daily = run("notification jobs", notificationJobs);
+  const expiry = run("unpaid offer expiry", async () => void (await import("@/lib/proposal-expiry-db").then((m) => m.expireUnpaidPastStart())));
   reminders();
   daily();
+  expiry();
   setInterval(reminders, 5 * 60 * 1000);
   setInterval(daily, 6 * 60 * 60 * 1000);
+  // Hourly: an accepted offer is not payable once its start day begins (00:00 IST); this makes that state permanent. The daily Vercel cron is the backstop.
+  setInterval(expiry, 60 * 60 * 1000);
   setInterval(() => void import("@/lib/outbox/run").then((m) => m.runOutboxTick()).catch((e) => console.error("[scheduler] email outbox failed", e)), 30_000);
   console.log("[scheduler] started");
 }
