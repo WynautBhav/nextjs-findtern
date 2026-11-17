@@ -29,6 +29,7 @@ import { formatSlotDay } from "@/lib/format";
 import { projectZone } from "@/lib/timezones";
 import { ProposalTabs } from "@/components/employer/section-tabs";
 import { InterviewActions } from "@/components/employer/interview-actions";
+import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
 
@@ -93,6 +94,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
   const initials = new Map<string, string>();
   const projectNames = new Map<string, string>();
   const projectZones = new Map<string, string | null>();
+  const downProjects = new Map<string, string>(); // taken down by Findtern: view only
   try {
     const db = getDb();
     rows = await db
@@ -113,7 +115,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
         : Promise.resolve([]),
       projectIds.length
         ? db
-            .select({ id: schema.projects.id, projectName: schema.projects.projectName, timezone: schema.projects.timezone })
+            .select({ id: schema.projects.id, projectName: schema.projects.projectName, timezone: schema.projects.timezone, takenDownAt: schema.projects.takenDownAt })
             .from(schema.projects)
             .where(inArray(schema.projects.id, projectIds))
         : Promise.resolve([]),
@@ -128,6 +130,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
     for (const p of projects) {
       projectNames.set(p.id, p.projectName);
       projectZones.set(p.id, p.timezone);
+      if (p.takenDownAt) downProjects.set(p.id, p.projectName);
     }
   } catch (err) {
     console.error("[employer/schedule] load failed", err);
@@ -157,6 +160,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
       initials: initials.get(iv.internId) ?? "C",
       project: iv.projectId ? (projectNames.get(iv.projectId) ?? "Project") : null,
       feedback: feedbackTextOf(iv.notes) || null,
+      down: Boolean(iv.projectId && downProjects.has(iv.projectId)),
     };
   });
 
@@ -235,6 +239,11 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
         className="mb-4 lg:mb-5"
       />
       <ProposalTabs active="interviews" />
+      {downProjects.size > 0 ? (
+        <div className="my-4">
+          <TakedownBanner projects={[...downProjects].map(([id, name]) => ({ id, name }))} />
+        </div>
+      ) : null}
 
       {all.length === 0 ? (
         <EmptyScene
@@ -379,6 +388,8 @@ type Row = {
   initials: string;
   project: string | null;
   feedback: string | null;
+  /** The interview's project is taken down by Findtern: no action on it. */
+  down: boolean;
 };
 
 const dayKey = (t: number, tz: string) => new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" }).format(t);
@@ -466,6 +477,7 @@ function ScheduleRow({ r, now, past }: { r: Row; now: number; past: boolean }) {
         canMarkCompleted={canMarkCompleted(iv)}
         canFeedback={!r.feedback && canLeaveFeedback(iv)}
         internHref={`/employer/intern/${encodeURIComponent(iv.internId)}`}
+        takenDown={r.down}
       />
     </li>
   );

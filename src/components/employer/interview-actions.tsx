@@ -47,8 +47,11 @@ export function InterviewActions({
   canFeedback = false,
   internHref,
   soon = false,
+  takenDown = false,
 }: {
   interviewId: string;
+  /** The project is taken down by Findtern: no join, remind, reschedule, feedback or mark: view only. */
+  takenDown?: boolean;
   stage: InterviewStage;
   /** The interview's timezone; suggested slots are wall-clock times in it. */
   timezone?: string;
@@ -173,6 +176,20 @@ export function InterviewActions({
           : canReschedule
             ? "reschedule"
             : null;
+
+  if (takenDown) {
+    // Every action here is refused by the server while the project is taken down; none is offered.
+    return (
+      <div className="contents">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-self-end">
+          <button type="button" disabled aria-disabled="true" aria-describedby={`td-${interviewId}`} tabIndex={-1} className={buttonClass({ variant: "outline", size: "sm" })}>
+            Actions unavailable
+          </button>
+          <span id={`td-${interviewId}`} className="text-xs text-ink-700">Taken down: contact admin</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     // `contents`: the buttons sit in the row's last column, panels and messages span the whole row.
