@@ -10,7 +10,9 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { DoorSwitch } from "@/components/auth/door-switch";
 import { LoginForm } from "@/components/auth/login-form";
 import { getSession } from "@/lib/auth";
-import { authPath, DOOR_POINTS, doorOf, ownNext, LAST_DOOR_COOKIE, type Door } from "@/lib/auth-doors";
+import { hireFeeText } from "@/lib/pricing-copy";
+import { getRenderPricingConfig } from "@/lib/pricing-config-server";
+import { authPath, doorPoints, doorOf, ownNext, LAST_DOOR_COOKIE, type Door } from "@/lib/auth-doors";
 import { googleLoginEnabled, oauthErrorMessage, safeNext } from "@/lib/google";
 
 export const metadata: Metadata = {
@@ -21,14 +23,15 @@ export const metadata: Metadata = {
 const one = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) ?? "";
 
 /** What each account type's sign in says and where it posts. */
-const DOOR: Record<
+function doorCopy(pts: ReturnType<typeof doorPoints>): Record<
   Door,
   { title: string; subtitle: string; points: { lead: string; text: string }[]; heading: string; lede: string; email: string; endpoint: string; home: string }
-> = {
+> {
+  return {
   intern: {
     title: "Your score, your rate, your offers.",
     subtitle: "One AI interview sets your Findtern Score, and the score sets what employers pay you. You see both first.",
-    points: DOOR_POINTS.intern,
+    points: pts.intern,
     heading: "Welcome back",
     lede: "Sign in to your intern account.",
     email: "you@gmail.com",
@@ -38,7 +41,7 @@ const DOOR: Record<
   employer: {
     title: "Hire interns already screened.",
     subtitle: "Filter on Findtern Score, skills and interests, then send a proposal in one sitting.",
-    points: DOOR_POINTS.employer,
+    points: pts.employer,
     heading: "Welcome back",
     lede: "Sign in to your company's hiring dashboard.",
     email: "you@company.com",
@@ -58,7 +61,8 @@ const DOOR: Record<
     endpoint: "/api/auth/college/login",
     home: "/college",
   },
-};
+  };
+}
 
 export default async function LoginPage({
   searchParams,
@@ -68,7 +72,7 @@ export default async function LoginPage({
   const params = await searchParams;
   // No `as`: open on the type this browser last signed in as.
   const door = doorOf(params.as ?? (await cookies()).get(LAST_DOOR_COOKIE)?.value);
-  const d = DOOR[door];
+  const d = doorCopy(doorPoints(hireFeeText(await getRenderPricingConfig())))[door];
   const oauthError = oauthErrorMessage(one(params.oauthError));
   // Where sign in returns to (INT-07 / EMH-37): the page that sent them here.
   const next = ownNext(safeNext(one(params.next), ""), door);

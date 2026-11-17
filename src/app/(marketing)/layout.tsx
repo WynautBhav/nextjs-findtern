@@ -1,8 +1,8 @@
 import { SiteFooter } from "@/components/layout/site-footer";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SmoothScroll } from "@/components/motion/smooth-scroll";
-import { PerHireFeeProvider } from "@/components/marketing/per-hire-fee-context";
-import { getPerHireFeeSetting } from "@/lib/platform-settings";
+import { PricingConfigProvider } from "@/components/marketing/per-hire-fee-context";
+import { getPricingConfig } from "@/lib/platform-settings";
 
 /**
  * ISR safety net. Marketing pages are prerendered at build time from the CMS
@@ -21,10 +21,10 @@ export const revalidate = 300;
 export default async function MarketingLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
-  // One read of the hiring-fee setting for every public page; client components take it from context.
-  const feeSetting = await getPerHireFeeSetting();
+  // One read of the pricing config for every public page; client components take it from context.
+  const config = await getPricingConfig();
   return (
-    <PerHireFeeProvider setting={feeSetting}>
+    <PricingConfigProvider config={config}>
     <SmoothScroll>
       <div className="flex min-h-dvh flex-col">
         <SiteHeader />
@@ -34,6 +34,6 @@ export default async function MarketingLayout({
         <SiteFooter />
       </div>
     </SmoothScroll>
-    </PerHireFeeProvider>
+    </PricingConfigProvider>
   );
 }

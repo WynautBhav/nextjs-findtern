@@ -7,7 +7,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { FaqExplorer } from "@/components/marketing/faq-explorer";
 import { formatMoney } from "@/lib/format";
-import { CurrencyNote, useRegionBands } from "@/components/marketing/region-rates";
+import { CurrencyNote, usePricingBands } from "@/components/marketing/region-rates";
 import { MonthlyRate } from "@/components/marketing/monthly-rate";
 import { OfferNote, PerHireCharge, PlanPrice } from "@/components/marketing/plan-price";
 import { usePerHireFee } from "@/components/marketing/per-hire-fee-context";
@@ -33,7 +33,7 @@ export function PricingContent({
   /** Server-rendered section placed above the FAQ (the testimonials). */
   beforeFaq?: React.ReactNode;
 }) {
-  const { isIndia, currency, bands } = useRegionBands();
+  const { isIndia, currency, bands } = usePricingBands();
   const feeSetting = usePerHireFee();
   const plans = isIndia ? plansInr : plansUsd;
   const featuredIdx = Math.max(

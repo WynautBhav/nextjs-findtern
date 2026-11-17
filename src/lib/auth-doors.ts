@@ -31,8 +31,12 @@ export function ownNext(next: string, door: Door): string {
 /** Cookie that remembers the last account type signed in, so /login opens on it. */
 export const LAST_DOOR_COOKIE = "ft_door";
 
-/** True for every intern and every company; the brand panel beside sign in and sign up. */
-export const DOOR_POINTS = {
+/**
+ * True for every intern and every company; the brand panel beside sign in and sign up.
+ * `hireFee` is the hiring fee in both currencies (lib/pricing-copy hireFeeText), so the line follows the admin's figure.
+ */
+export function doorPoints(hireFee: { inr: string; usd: string }) {
+  return {
   intern: [
     { lead: "One AI interview", text: "It sets your Findtern Score out of 10. Paid once, never a subscription." },
     { lead: "Your score sets your stipend band", text: "Employers filter on it and your stipend band follows it. Nobody can buy a higher one." },
@@ -41,6 +45,7 @@ export const DOOR_POINTS = {
   employer: [
     { lead: "Screened before you see them", text: "Every candidate has taken the AI interview and carries a Findtern Score." },
     { lead: "Priced by score", text: "Three bands: Espresso, Cappuccino and Latte. You see the rate before you send an offer." },
-    { lead: "Pay when you hire", text: "₹5,000 (or $50) per hire when a candidate accepts your offer; for score 6+ the rest is billed monthly." },
+    { lead: "Pay when you hire", text: `${hireFee.inr} (or ${hireFee.usd}) per hire when a candidate accepts your offer; for score 6+ the rest is billed monthly.` },
   ],
-};
+  };
+}

@@ -2,7 +2,9 @@ import { getBlogPosts, getFaqItems, getPlans } from "@/lib/content";
 import { SITE } from "@/lib/content/site";
 import { formatMoney, formatRate } from "@/lib/format";
 import { perHireFreeForNow } from "@/lib/plan-offer";
-import { getPerHireFeeSetting } from "@/lib/platform-settings";
+import { getPricingConfig } from "@/lib/platform-settings";
+import { llmsInternMoneyLines } from "@/lib/pricing-copy";
+import { feeSettingOf } from "@/lib/pricing-config";
 import { plainTextExcerpt } from "@/lib/richtext";
 import { SITE_URL } from "@/lib/seo";
 import { tidyText } from "@/lib/text";
@@ -17,7 +19,8 @@ export const revalidate = 3600;
  * the pages it links to.
  */
 export async function GET() {
-  const [plans, posts, faqs, feeSetting] = await Promise.all([getPlans(true), getBlogPosts().catch(() => []), getFaqItems(), getPerHireFeeSetting()]);
+  const [plans, posts, faqs, config] = await Promise.all([getPlans(true), getBlogPosts().catch(() => []), getFaqItems(), getPricingConfig()]);
+  const feeSetting = feeSettingOf(config);
   const isEmployerFaq = (f: (typeof faqs)[number]) => f.category.trim().toLowerCase().startsWith("employer");
   const employerFaqs = faqs.filter(isEmployerFaq);
   const internFaqs = faqs.filter((f) => !isEmployerFaq(f));
@@ -37,6 +40,7 @@ export async function GET() {
     "- Findtern Score: one number out of 10 across communication, aptitude, role depth, coding and academics; the score band sets the rate",
     "- Billing: hourly rate against approved monthly timesheets (one per month, sent on the period's last day), plus a one-time per-hire charge on the plans where it applies (see Plans below); prices in INR include GST; USD is derived at ₹100 = $1",
     "- Overseas employers: contract with Findtern for the service and pay in USD; Findtern engages and pays the intern in India (no visa, no local entity)",
+    ...llmsInternMoneyLines(config),
     "- Candidate guarantee: an internship within 6 months of the AI interview or the fee is refunded in full, after the window closes (terms at /guaranteed-internship-program)",
     "",
     "## Plans (INR, published rate card)",

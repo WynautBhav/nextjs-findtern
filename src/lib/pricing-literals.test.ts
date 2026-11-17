@@ -24,32 +24,6 @@ const ALLOWED = [
   /^lib\/admin\/cms-collections\.ts$/,
 ];
 
-/**
- * TODO(surfaces package): files that still carry a literal and have not been moved onto the config yet.
- * The surfaces package empties this list; each entry must still contain a literal (so a migrated file has
- * to be removed from the list, and the list cannot go stale).
- */
-const TODO_NOT_YET_MIGRATED = [
-  "app/(marketing)/employers/page.tsx",
-  "app/(marketing)/page.tsx",
-  "app/(marketing)/pricing/page.tsx",
-  "app/layout.tsx",
-  "lib/auth-doors.ts",
-  "lib/chatbot/knowledge.ts",
-  "lib/content/pricing-faq.ts",
-  "lib/per-hire-copy.ts",
-];
-
-/**
- * TODO(surfaces package): client components that still read the hard-coded bands through `useRegionBands`
- * instead of the live config. Emptied the same way.
- */
-const TODO_REGION_BANDS = [
-  "components/home/score-card.tsx",
-  "components/marketing/employer-plan-cards.tsx",
-  "components/marketing/pricing-content.tsx",
-  "components/marketing/region-rates.tsx",
-];
 
 function* sources(dir: string): Generator<string> {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -89,22 +63,15 @@ function literalHits(): Map<string, string[]> {
   return hits;
 }
 
-test("no price literal outside the config, the allowlist and the surfaces TODO list", () => {
-  const stray = [...literalHits()].filter(([rel]) => !ALLOWED.some((a) => a.test(rel)) && !TODO_NOT_YET_MIGRATED.includes(rel)).flatMap(([, lines]) => lines);
-  assert.deepEqual(stray, [], "read the figure from lib/pricing-config.ts (server: getPricingConfig, client: the config context) instead of typing it");
+test("no price literal outside the config and the allowlist", () => {
+  const stray = [...literalHits()].filter(([rel]) => !ALLOWED.some((a) => a.test(rel))).flatMap(([, lines]) => lines);
+  assert.deepEqual(stray, [], "read the figure from lib/pricing-config.ts (server: getPricingConfig, client: usePricingConfig) instead of typing it");
 });
 
-test("the TODO list holds only files that still carry a literal (migrated files must leave it)", () => {
-  const hits = literalHits();
-  assert.deepEqual(TODO_NOT_YET_MIGRATED.filter((rel) => !hits.has(rel)), []);
-  assert.deepEqual(TODO_NOT_YET_MIGRATED.filter((rel) => ALLOWED.some((a) => a.test(rel))), []);
-});
-
-test("no component outside the TODO list reads the hard-coded bands through useRegionBands", () => {
+test("no client component reads the hard-coded bands (useRegionBands is gone; use usePricingBands)", () => {
   const users: string[] = [];
   for (const file of sources(SRC)) {
     if (/\buseRegionBands\b/.test(readFileSync(file, "utf8"))) users.push(relative(SRC, file).split("\\").join("/"));
   }
-  assert.deepEqual(users.filter((rel) => !TODO_REGION_BANDS.includes(rel)), []);
-  assert.deepEqual(TODO_REGION_BANDS.filter((rel) => !users.includes(rel)), [], "a migrated component must leave TODO_REGION_BANDS");
+  assert.deepEqual(users, []);
 });

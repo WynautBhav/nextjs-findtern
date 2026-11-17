@@ -10,7 +10,9 @@ import { GoogleButton } from "@/components/auth/login-form";
 import { SignupForm } from "@/components/auth/signup-form";
 import { EmployerSignupForm } from "@/components/employer/employer-signup-form";
 import { getSession } from "@/lib/auth";
-import { authPath, DOOR_POINTS, doorOf, ownNext } from "@/lib/auth-doors";
+import { hireFeeText } from "@/lib/pricing-copy";
+import { getRenderPricingConfig } from "@/lib/pricing-config-server";
+import { authPath, doorPoints, doorOf, ownNext } from "@/lib/auth-doors";
 import { googleLoginEnabled, oauthErrorMessage, safeNext } from "@/lib/google";
 
 export const metadata: Metadata = {
@@ -50,7 +52,7 @@ export default async function SignupPage({
           ? "One company account, one billing identity for all your hiring."
           : "Create an account, verify your email, and finish your profile. Employers see the same profile you do."
       }
-      points={DOOR_POINTS[door]}
+      points={doorPoints(hireFeeText(await getRenderPricingConfig()))[door]}
     >
       {/* Mid-way through a Google signup the type is already decided. */}
       {fromGoogle ? null : <DoorSwitch path="/signup" doors={["intern", "employer"]} current={door} keep={{ next }} />}

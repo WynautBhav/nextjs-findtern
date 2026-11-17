@@ -42,7 +42,7 @@ export function MarkPaidButton({ internId }: { internId: string }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
       <input aria-label="Payment reference" className={input} placeholder="Bank / UTR reference" value={reference} onChange={(e) => setReference(e.target.value)} />
-      <input aria-label="Amount in rupees" className={`${input} w-28`} inputMode="decimal" placeholder="₹ 2,499" value={amount} onChange={(e) => setAmount(e.target.value)} />
+      <input aria-label="Amount in rupees" className={`${input} w-28`} inputMode="decimal" placeholder="₹ (blank = standard fee)" value={amount} onChange={(e) => setAmount(e.target.value)} />
       <input aria-label="Reason, needed when the amount is not the standard fee" className={`${input} w-56`} placeholder="Reason (if not the standard fee)" value={reason} onChange={(e) => setReason(e.target.value)} />
       <button type="button" onClick={submit} disabled={busy || reference.trim().length < 3 || (amount.trim() !== "" && !(Number(amount) > 0))} className={buttonClass({ variant: "outline", size: "sm" })}>
         {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}

@@ -19,8 +19,9 @@ import { SectionHeading } from "@/components/ui/section-heading";
 import { EmployerPlanCards } from "@/components/marketing/employer-plan-cards";
 import { PricingCalculator } from "@/components/marketing/pricing-calculator";
 import { getHappyFaces, getPlans } from "@/lib/content";
-import { getPerHireFeeSetting } from "@/lib/platform-settings";
-import type { PerHireFeeSetting } from "@/lib/per-hire-fee";
+import { feeSettingOf, type PricingConfig } from "@/lib/pricing-config";
+import { getRenderPricingConfig } from "@/lib/pricing-config-server";
+import { hireFeeText, pricingMetaSentence } from "@/lib/pricing-copy";
 import { perHireEmployerPayAnswer as perHireFeeAnswerE3 } from "@/lib/per-hire-copy";
 import { TiltCard } from "@/components/motion/tilt-card";
 import { CountUp } from "@/components/motion/count-up";
@@ -31,12 +32,18 @@ import { JsonLd } from "@/components/seo/json-ld";
 import { breadcrumbJsonLd, faqJsonLd, howToJsonLd, webPageJsonLd } from "@/lib/seo";
 import { CurrencyPicker } from "@/components/marketing/region-rates";
 
-export const metadata: Metadata = {
-  title: "Hire Pre-Screened Interns in India | For Employers",
-  description:
-    "Hire interns in India who are already interviewed, tested and scored. Three published plans from free to ₹200/hr, a ₹5,000 per-hire fee on Espresso (free for now on Cappuccino and Latte), and hiring from abroad without a visa or local entity.",
-  alternates: { canonical: "/employers" },
-};
+/** Meta description: the prices are the live config's, so an admin edit reaches search results too. */
+const metaDescription = (config: PricingConfig) =>
+  `Hire interns in India who are already interviewed, tested and scored. ${pricingMetaSentence(config)}, and hiring from abroad without a visa or local entity.`;
+
+// Reads the config under the marketing layout's ISR (revalidate = 300): the page stays prerendered.
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: "Hire Pre-Screened Interns in India | For Employers",
+    description: metaDescription(await getRenderPricingConfig()),
+    alternates: { canonical: "/employers" },
+  };
+}
 
 const PROBLEMS = [
   {
@@ -82,7 +89,7 @@ const STEPS = [
   },
 ];
 
-const employerFaq = (feeSetting: PerHireFeeSetting) => [
+const employerFaq = (config: PricingConfig) => [
     {
       id: "e1",
       category: "Hiring",
@@ -102,7 +109,7 @@ const employerFaq = (feeSetting: PerHireFeeSetting) => [
       category: "Payment",
       question: "When do I pay?",
       answer:
-        `${perHireFeeAnswerE3(feeSetting)} The first month's charge is paid at hire; each later month is billed against the timesheets you approve, due 2 days before the intern's pay day (you can pay up to 15 days early).`,
+        `${perHireFeeAnswerE3(feeSettingOf(config), hireFeeText(config))} The first month's charge is paid at hire; each later month is billed against the timesheets you approve, due 2 days before the intern's pay day (you can pay up to 15 days early).`,
     },
     {
       id: "e4",
@@ -128,14 +135,14 @@ const employerFaq = (feeSetting: PerHireFeeSetting) => [
 ];
 
 export default async function EmployersPage() {
-  const feeSetting = await getPerHireFeeSetting();
-  const faq = employerFaq(feeSetting);
+  const config = await getRenderPricingConfig();
+  const faq = employerFaq(config);
   const [plansInr, plansUsd, faces] = await Promise.all([getPlans(true), getPlans(false), getHappyFaces()]);
   return (
     <>
       <JsonLd
         data={[
-          webPageJsonLd({ path: "/employers", name: "Hire interns with Findtern", description: String(metadata.description) }),
+          webPageJsonLd({ path: "/employers", name: "Hire interns with Findtern", description: metaDescription(config) }),
           breadcrumbJsonLd([{ name: "For employers", path: "/employers" }]),
           howToJsonLd({
             name: "How to hire an intern on Findtern",

@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
+import { systemPrompt } from "./chatbot/knowledge-text.ts";
 import { FAQ_EMPLOYER } from "./content/faq.ts";
 import { PRICING_PLANS } from "./content/home.ts";
 import type { Proposal } from "./db/schema.ts";
@@ -10,6 +11,7 @@ import { toEmployerProposal } from "./employer-proposal-view.ts";
 import { emails } from "./emails.ts";
 import { hireInvoiceLines } from "./invoice-lines.ts";
 import { buildOffer, parseOffer } from "./offer.ts";
+import { PRICING_DEFAULTS } from "./pricing-config.ts";
 
 const ROOT = join(import.meta.dirname, "..", "..");
 // Owner rule (6 Nov 2026): an employer never sees what the intern is paid.
@@ -74,8 +76,8 @@ test("employer-facing content and the chatbot do not state intern pay", () => {
   const amounts = /stipend|bonus|payout|₹\s?8,000|₹\s?15,000/i;
   for (const f of FAQ_EMPLOYER) assert.doesNotMatch(`${f.question} ${f.answer}`, amounts, f.question);
   for (const p of PRICING_PLANS) assert.doesNotMatch(JSON.stringify(p), amounts, p.slug);
-  // knowledge.ts imports through the "@/" alias, which node:test cannot resolve: read the source.
-  assert.match(readFileSync(join(ROOT, "src/lib/chatbot/knowledge.ts"), "utf8"), /Never state intern stipend or completion-bonus amounts/);
+  // The prompt text lives in chatbot/knowledge-text.ts (pure, so it can be imported here).
+  assert.match(systemPrompt(PRICING_DEFAULTS), /Never state intern stipend or completion-bonus amounts/);
 });
 
 function walk(path: string): string[] {

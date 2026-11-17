@@ -4,10 +4,11 @@ import { z } from "zod";
 import { SITE } from "@/lib/content/site";
 import { RateLimiter, bucketKey, clientIp } from "@/lib/security/rate-limit";
 import {
-  SYSTEM_PROMPT,
+  systemPrompt,
   localAnswer,
   retrieveContext,
 } from "@/lib/chatbot/knowledge";
+import { getPricingConfig } from "@/lib/platform-settings";
 import { deepseekChat, type ChatMessage } from "@/lib/chatbot/deepseek";
 
 /**
@@ -47,17 +48,20 @@ export async function POST(req: Request) {
   const lastUser = [...history].reverse().find((m) => m.role === "user");
   const query = lastUser?.content ?? "";
 
+  // One read of the admin's pricing, so the prompt, the context and the local fallback quote the same figures.
+  const config = await getPricingConfig();
+
   try {
-    const context = await retrieveContext(query);
+    const context = await retrieveContext(query, config);
 
     // Offline/dev fallback: answer extractively from the CMS when no key.
     if (!process.env.DEEPSEEK_API_KEY) {
-      const reply = await localAnswer(query);
+      const reply = await localAnswer(query, config);
       return NextResponse.json({ reply, source: "local" });
     }
 
     const messages: ChatMessage[] = [
-      { role: "system", content: `${SYSTEM_PROMPT}\n\n--- FINDTERN CONTEXT ---\n${context}` },
+      { role: "system", content: `${systemPrompt(config)}\n\n--- FINDTERN CONTEXT ---\n${context}` },
       ...history.map((m) => ({
         role: m.role as "user" | "assistant",
         content: m.content,
@@ -70,7 +74,7 @@ export async function POST(req: Request) {
     // Never leak provider errors to the client; fall back to local retrieval.
     console.error("[chat] failed, falling back to local:", err);
     try {
-      const reply = await localAnswer(query);
+      const reply = await localAnswer(query, config);
       return NextResponse.json({ reply, source: "local-fallback" });
     } catch {
       return NextResponse.json(

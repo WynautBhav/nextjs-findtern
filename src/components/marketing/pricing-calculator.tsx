@@ -13,10 +13,10 @@ import {
 import { ButtonLink } from "@/components/ui/button";
 import { PerHireCharge } from "@/components/marketing/plan-price";
 import { useCurrency } from "@/components/marketing/region-rates";
-import { perHireFreeForNow } from "@/lib/plan-offer";
+import { perHireFreeForNow, planMonthMinor } from "@/lib/plan-offer";
 import { usePerHireFee } from "@/components/marketing/per-hire-fee-context";
 import { formatMoney, formatNumber, formatRate } from "@/lib/format";
-import { HOURS_PER_DAY, WEEKLY_SCHEDULES, scheduledMonthlyHours } from "@/lib/offer";
+import { HOURS_PER_DAY, WEEKLY_SCHEDULES } from "@/lib/offer";
 import type { CmsPlan } from "@/lib/content/types";
 import { cn } from "@/lib/utils";
 
@@ -63,11 +63,16 @@ export function PricingCalculator({
   const plan = plans[Math.min(planIdx, plans.length - 1)];
   if (!plan) return null;
 
-  const hoursMonth = scheduledMonthlyHours(SCHEDULE[days], 0);
-  const monthly = plan.priceHourlyMinor * hoursMonth;
   const money = (minor: number) => formatMoney(minor, currency, { zeroLabel: false });
   // The admin setting decides which plans pay the fee; a free plan shows the charge struck through.
   const perHireFree = perHireFreeForNow(plan.slug, feeSetting) && plan.perHireChargeMinor > 0;
+  // The month as billing computes it (lib/plan-offer planMonthMinor), not a second copy of the arithmetic.
+  const { hours: hoursMonth, monthlyMinor: monthly, firstMonthMinor } = planMonthMinor({
+    hourlyMinor: plan.priceHourlyMinor,
+    perHireMinor: plan.perHireChargeMinor,
+    perHireFree,
+    schedule: SCHEDULE[days],
+  });
 
   return (
     <div
@@ -127,7 +132,7 @@ export function PricingCalculator({
             <PerHireCharge slug={plan.slug} nowMinor={plan.perHireChargeMinor} currency={currency} className="justify-end" feeSetting={feeSetting} />
           </Row>
           <Row label="First month" strong>
-            {money(monthly + (perHireFree ? 0 : plan.perHireChargeMinor))}
+            {money(firstMonthMinor)}
           </Row>
           <Row label="Each month after" last>
             {money(monthly)}

@@ -3,7 +3,8 @@
 import { useRef, useState } from "react";
 
 import { formatMoney, formatRate } from "@/lib/format";
-import { useRegionBands } from "@/components/marketing/region-rates";
+import { usePricingBands } from "@/components/marketing/region-rates";
+import { usePricingConfig } from "@/components/marketing/per-hire-fee-context";
 import { HOME_STUDENT_BANDS } from "@/lib/content/site";
 import { BANDS, DISTRIBUTION, bandFor } from "@/lib/score";
 import { cn } from "@/lib/utils";
@@ -30,8 +31,11 @@ export function ScoreCard({ audience = "employer" }: { audience?: "employer" | "
 
   const band = bandFor(score);
   // Money follows the visitor's region; geometry (band id) does not.
-  const { bands: regionBands, currency } = useRegionBands();
+  const { bands: regionBands, currency } = usePricingBands();
   const money = regionBands.find((b) => b.id === band.id) ?? band;
+  // The student's monthly stipend is INR whatever the visitor's currency, and admin-editable.
+  const config = usePricingConfig();
+  const stipendOf = (id: string) => config.bands.find((cb) => cb.id === id)?.stipendInrMinor ?? null;
 
   const pct = Math.max(0, Math.min(100, (score / 10) * 100));
 
@@ -208,13 +212,13 @@ export function ScoreCard({ audience = "employer" }: { audience?: "employer" | "
                   {b.range}
                 </p>
                 <p className="min-w-0 text-right text-sm text-ink-700">
-                  {b.stipend !== null && (
+                  {stipendOf(b.id) !== null && (
                     <span className="block font-semibold tabular-nums text-ink-900">
-                      Stipend {formatMoney(b.stipend * 100, "INR")} a month
+                      Stipend {formatMoney(stipendOf(b.id) ?? 0, "INR")} a month
                     </span>
                   )}
-                  <span className={cn("block tabular-nums", b.stipend === null && "font-semibold text-ink-900")}>
-                    {b.stipend !== null && "plus a "}
+                  <span className={cn("block tabular-nums", stipendOf(b.id) === null && "font-semibold text-ink-900")}>
+                    {stipendOf(b.id) !== null && "plus a "}
                     {formatMoney(b.bonus * 100, "INR")} completion bonus
                   </span>
                 </p>

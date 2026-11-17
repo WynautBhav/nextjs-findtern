@@ -23,14 +23,22 @@ import {
 } from "@/lib/content";
 import { JsonLd } from "@/components/seo/json-ld";
 import { howToJsonLd, pricingJsonLd, webPageJsonLd } from "@/lib/seo";
-import { getPerHireFeeSetting } from "@/lib/platform-settings";
+import { feeSettingOf, type PricingConfig } from "@/lib/pricing-config";
+import { getRenderPricingConfig } from "@/lib/pricing-config-server";
+import { pricingMetaSentence } from "@/lib/pricing-copy";
 
-export const metadata: Metadata = {
-  title: { absolute: "Findtern | Hire Pre-Screened Interns in India for the Price of a Coffee" },
-  description:
-    "Hire interns in India who are already interviewed, tested and scored. Three published plans from free to ₹200/hr, a ₹5,000 per-hire fee on Espresso (free for now on Cappuccino and Latte), then billed monthly on approved timesheets. Students: get assessed and placed in an internship.",
-  alternates: { canonical: "/" },
-};
+/** Meta description: the prices are the live config's, so an admin edit reaches search results too. */
+const metaDescription = (config: PricingConfig) =>
+  `Hire interns in India who are already interviewed, tested and scored. ${pricingMetaSentence(config)}, then billed monthly on approved timesheets. Students: get assessed and placed in an internship.`;
+
+// Reads the config under the marketing layout's ISR (revalidate = 300): the page stays prerendered.
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: { absolute: "Findtern | Hire Pre-Screened Interns in India for the Price of a Coffee" },
+    description: metaDescription(await getRenderPricingConfig()),
+    alternates: { canonical: "/" },
+  };
+}
 
 const HOME_HOWTO = howToJsonLd({
   name: "How to hire a pre-screened intern on Findtern",
@@ -47,7 +55,7 @@ const HOME_HOWTO = howToJsonLd({
 });
 
 export default async function HomePage() {
-  const [partners, skills, faces, steps, plansInr, plansUsd, colleges, feeSetting] = await Promise.all([
+  const [partners, skills, faces, steps, plansInr, plansUsd, colleges, config] = await Promise.all([
     getPartners(),
     getFeaturedSkills(),
     getHappyFaces(),
@@ -59,8 +67,9 @@ export default async function HomePage() {
     getPlans(true),
     getPlans(false),
     getCollegePartners(),
-    getPerHireFeeSetting(),
+    getRenderPricingConfig(),
   ]);
+  const feeSetting = feeSettingOf(config);
 
   return (
     <>
@@ -69,7 +78,7 @@ export default async function HomePage() {
           webPageJsonLd({
             path: "/",
             name: "Findtern - hire pre-screened interns in India",
-            description: String(metadata.description),
+            description: metaDescription(config),
           }),
           HOME_HOWTO,
           pricingJsonLd(plansInr, feeSetting),
