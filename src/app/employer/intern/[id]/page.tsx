@@ -34,7 +34,6 @@ import { ScoreBar } from "@/components/app/score-bar";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
-import { PrintButton } from "./_print-button";
 import { profileText } from "@/components/employer/profile-text";
 import { PresenceDot } from "@/components/app/presence-dot";
 import { MessageButton } from "@/components/app/message-button";
@@ -568,7 +567,7 @@ export default async function EmployerInternDetail({
                 </div>
               ))}
             </dl>
-            {rated.length > 0 ? (
+            {rated.length > 0 && (aiLinks.feedbackLink || (nameUnlocked && aiLinks.recordingLink)) ? (
               <div className="-ml-3 mt-3 flex flex-wrap items-center gap-1 print:hidden">
                 {aiLinks.feedbackLink ? (
                   <a href={aiLinks.feedbackLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
@@ -585,7 +584,6 @@ export default async function EmployerInternDetail({
                     <ExternalLink className="size-3.5" aria-hidden />
                   </a>
                 ) : null}
-                <PrintButton />
               </div>
             ) : null}
           </section>
