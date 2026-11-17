@@ -104,7 +104,7 @@ for (const [name, table, read, builtIn] of [
     answers(table, [], []);
     const got = await read();
     assert.ok((got as unknown[]).length > 0);
-    if (builtIn) assert.equal(got, builtIn);
+    if (builtIn) assert.deepEqual(got, builtIn);
   });
 
   test(`${name}: database unreachable shows the built-in list`, async () => {

@@ -5,7 +5,8 @@ import { allows } from "@/lib/admin/permissions";
 import { getSession } from "@/lib/auth";
 import { LegalTabs } from "@/components/admin/legal-tabs";
 import { LegalDocEditor } from "@/components/admin/legal-doc-editor";
-import { PLATFORM_TERMS } from "@/lib/content/legal";
+import { platformTerms } from "@/lib/content/legal";
+import { getPricingConfig } from "@/lib/platform-settings";
 
 export const metadata: Metadata = {
   title: "Platform Terms | Admin",
@@ -15,6 +16,7 @@ export const metadata: Metadata = {
 export default async function AdminPlatformTermsPage() {
   const session = await getSession();
   const canWrite = allows(session?.permissions, ["cms:write"]);
+  const config = await getPricingConfig(); // the built-in text quotes the live prices
   return (
     <div className="space-y-6">
       <AdminPageHeader
@@ -26,7 +28,7 @@ export default async function AdminPlatformTermsPage() {
         title="Terms and Conditions"
         description="This content is shown at /terms-and-conditions."
         documentKey="platform_terms"
-        initialContent={PLATFORM_TERMS.html}
+        initialContent={platformTerms(config).html}
         readOnly={!canWrite}
         apiEndpoint="/api/admin/website/terms"
         publicHref="/terms-and-conditions"

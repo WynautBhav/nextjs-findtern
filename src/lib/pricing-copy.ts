@@ -77,6 +77,23 @@ export function stipendText(config: PricingConfig, id: BandId): string | null {
 }
 
 /**
+ * Espresso's rate and fee as the Plans FAQ words it: "The intern’s rate is shown as ₹50/hr but is currently free, plus the
+ * ₹5,000 hiring fee." The struck-through rate is the plan's compare-at price; a rate that is not free, no struck-through
+ * rate, or a fee that is waived each get a sentence that is still true.
+ */
+export function espressoPlanSentence(config: PricingConfig): string {
+  const band = bandById(config, "standard");
+  const rate =
+    band.hourlyInrMinor > 0
+      ? `The intern’s rate is ${formatRate(band.hourlyInrMinor, "INR")}`
+      : band.compareAtHourlyInrMinor && band.compareAtHourlyInrMinor > 0
+        ? `The intern’s rate is shown as ${formatRate(band.compareAtHourlyInrMinor, "INR")} but is currently free`
+        : "The intern’s rate is currently free";
+  const fee = band.hireFeeCharged ? `, plus the ${formatMoney(band.hireFeeInrMinor, "INR")} hiring fee.` : ", and the hiring fee is free for now.";
+  return `${rate}${fee}`;
+}
+
+/**
  * The intern-side money lines for llms.txt: the AI interview fee only. llms.txt is read by employers'
  * tools and public crawlers, and the owner's rule is that employers never see what an intern is paid,
  * so no stipend or bonus text goes here.

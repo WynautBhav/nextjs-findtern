@@ -12,13 +12,15 @@ import { test } from "node:test";
  */
 
 const SRC = resolve(import.meta.dirname, "..");
-const LITERALS = /\b(?:500000|500_000|800_000|800000|1_500_000|1500000|249900|249_900)\b|₹5,000|₹8,000|₹15,000|₹2,499|₹100\/hr|₹200\/hr/;
+const LITERALS = /\b(?:500000|500_000|800_000|800000|1_500_000|1500000|249900|249_900)\b|₹5,000|₹8,000|₹15,000|₹2,499|₹50\/hr|₹100\/hr|₹200\/hr|\b(?:2,499|8,000|15,000)\b/;
 
-/** Allowed for good: the config itself, legal and long-form copy (edited by hand, listed by the copy audit), and one unrelated byte limit. */
+/**
+ * Allowed for good: the config itself, the blog (long-form articles edited by hand, listed by the copy audit) and one
+ * unrelated byte limit. The FAQ and the legal documents are NOT here: their figures come from the config through
+ * template functions (content/faq.ts, legal.ts, legal-intern.ts), so a typed figure in them fails this test.
+ */
 const ALLOWED = [
   /^lib\/pricing-config\.ts$/,
-  /^lib\/content\/legal[^/]*\.ts$/,
-  /^lib\/content\/faq\.ts$/,
   /^lib\/content\/blog\.ts$/,
   // 1.5 MB cap on an inline CMS image: a byte count, not a price.
   /^lib\/admin\/cms-collections\.ts$/,

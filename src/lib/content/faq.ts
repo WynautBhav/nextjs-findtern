@@ -16,9 +16,20 @@
  *     insertion order is applied instead of letting an unstable comparator
  *     shuffle the list between requests.
  */
+import { activationFeeText, espressoPlanSentence } from "../pricing-copy.ts";
+import { PRICING_DEFAULTS, type PricingConfig } from "../pricing-config.ts";
 import type { CmsFaqItem } from "./types";
 
-export const FAQ_INTERN: CmsFaqItem[] = [
+/*
+ * The figures in these answers (the AI interview fee, Espresso's rate and hiring fee) are read from the pricing config
+ * through ../pricing-copy.ts, so an admin's edit reaches them. `faqIntern` / `faqEmployer` render the copy for a config;
+ * FAQ_INTERN / FAQ_EMPLOYER are the same at the published defaults (the built-in copy when the CMS table is empty or the
+ * database is unreachable). Nothing else in the wording is changed: content/figures-copy.test.ts pins it.
+ */
+
+export const faqIntern = (config: PricingConfig = PRICING_DEFAULTS): CmsFaqItem[] => {
+  const fee = activationFeeText(config);
+  return [
   {
     "id": "0f8fae53-9864-4689-8f21-9cc3020c672d",
     "category": "Intern",
@@ -39,7 +50,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "60d53375-b7f4-4d15-818d-60af3fb14aaf",
     "category": "Intern",
     "question": "Is Findtern free for the interns?",
-    "answer": "Creating a profile on Findtern is free. However, to make your profile live and visible to companies, you must take the AI interview, which comes with a one-time fee of ₹2,499.\nThe AI interview generates your Findtern Score, showcasing your technical and soft skills and helping companies easily notice and shortlist your profile.",
+    "answer": "Creating a profile on Findtern is free. However, to make your profile live and visible to companies, you must take the AI interview, which comes with a one-time fee of " + fee + ".\nThe AI interview generates your Findtern Score, showcasing your technical and soft skills and helping companies easily notice and shortlist your profile.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -63,7 +74,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "94140c2c-4f9b-4e37-aa5a-d561f7e115bb",
     "category": "Intern",
     "question": "Can I improve my Findtern Score? If yes, how?",
-    "answer": "Yes, you can improve your Findtern Score.\n Once your score is generated after the AI interview, it becomes your official rating. If you wish to improve it, you can retake the AI interview: one free retake after 6 months, then ₹2,499 for each later attempt.\nTo request a new attempt, contact the Findtern team. Preparing well-by practicing interview questions, strengthening your technical knowledge, and improving your communication skills-will help you perform better in the next round and achieve a higher score.",
+    "answer": "Yes, you can improve your Findtern Score.\n Once your score is generated after the AI interview, it becomes your official rating. If you wish to improve it, you can retake the AI interview: one free retake after 6 months, then " + fee + " for each later attempt.\nTo request a new attempt, contact the Findtern team. Preparing well-by practicing interview questions, strengthening your technical knowledge, and improving your communication skills-will help you perform better in the next round and achieve a higher score.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -94,7 +105,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
   {
     "id": "02fff963-6383-4428-a564-df455fbdbe99",
     "category": "Intern",
-    "question": "Is the ₹2,499 AI interview fee refundable if I don’t get internships?",
+    "question": "Is the " + fee + " AI interview fee refundable if I don’t get internships?",
     "answer": "The AI interview fee is refundable. If you do not secure an internship within 6 months of your AI interview, you will receive a full refund after the 6-month window closes, within 7 working days.\n",
     "sortOrder": 0,
     "isActive": true
@@ -295,7 +306,7 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "id": "ebddc008-bc1d-4958-90e1-36425ef9d63c",
     "category": "Intern",
     "question": "Can I retake the AI interview if I make a mistake?",
-    "answer": "You get one free retake after 6 months, then ₹2,499 for each later attempt. To request a retake, contact Findtern support. If an attempt failed because of a genuine technical issue, contact support and we’ll send you a fresh interview link.",
+    "answer": "You get one free retake after 6 months, then " + fee + " for each later attempt. To request a retake, contact Findtern support. If an attempt failed because of a genuine technical issue, contact support and we’ll send you a fresh interview link.",
     "sortOrder": 0,
     "isActive": true
   },
@@ -411,9 +422,10 @@ export const FAQ_INTERN: CmsFaqItem[] = [
     "sortOrder": 0,
     "isActive": true
   }
-];
+  ];
+};
 
-export const FAQ_EMPLOYER: CmsFaqItem[] = [
+export const faqEmployer = (config: PricingConfig = PRICING_DEFAULTS): CmsFaqItem[] => [
   {
     "id": "5392bf83-aed4-405b-b92c-351a784335e6",
     "category": "Employer",
@@ -522,7 +534,7 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
     "id": "b53e04fe-6844-4d41-b92b-e2be768ba1b3",
     "category": "Employer",
     "question": " What are Findtern’s employer pricing plans?",
-    "answer": "Espresso: For budget-friendly, short-term interns. The intern’s rate is shown as ₹50/hr but is currently free, plus the ₹5,000 hiring fee.\n\n\nCappuccino: For medium-skilled interns, longer durations.\n\n\nLatte: For high-skill and strategic long-term interns.\n\n\nEach plan suits different business needs.\n",
+    "answer": "Espresso: For budget-friendly, short-term interns. " + espressoPlanSentence(config) + "\n\n\nCappuccino: For medium-skilled interns, longer durations.\n\n\nLatte: For high-skill and strategic long-term interns.\n\n\nEach plan suits different business needs.\n",
     "sortOrder": 0,
     "isActive": true
   },
@@ -736,4 +748,9 @@ export const FAQ_EMPLOYER: CmsFaqItem[] = [
   }
 ];
 
+export const FAQ_INTERN: CmsFaqItem[] = faqIntern();
+export const FAQ_EMPLOYER: CmsFaqItem[] = faqEmployer();
 export const FAQ_ITEMS: CmsFaqItem[] = [...FAQ_INTERN, ...FAQ_EMPLOYER];
+
+/** Both lists rendered for one pricing config. */
+export const faqItems = (config: PricingConfig): CmsFaqItem[] => [...faqIntern(config), ...faqEmployer(config)];

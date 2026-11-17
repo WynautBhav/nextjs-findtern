@@ -34,6 +34,11 @@ export type BandConfig = {
   hireFeeCharged: boolean;
   /** Fixed monthly intern stipend, INR paise; null = no stipend (below a score of 6). */
   stipendInrMinor: number | null;
+  /**
+   * The rate shown struck through next to a discounted hourly rate (Espresso's "₹50/hr, now free"), INR paise; absent or
+   * null = nothing struck through. Read from the plan's compare-at price, so it is display copy, never billed.
+   */
+  compareAtHourlyInrMinor?: number | null;
 };
 
 export type PricingConfig = {
@@ -47,9 +52,9 @@ export type PricingConfig = {
 /** What each band meant before the figures were editable. */
 export const PRICING_DEFAULTS: PricingConfig = {
   bands: [
-    { id: "standard", minScore: 0, maxScore: 6, hourlyInrMinor: 0, hireFeeInrMinor: 500000, hireFeeCharged: true, stipendInrMinor: null },
-    { id: "skilled", minScore: 6, maxScore: 8, hourlyInrMinor: 10000, hireFeeInrMinor: 500000, hireFeeCharged: false, stipendInrMinor: 800000 },
-    { id: "assured", minScore: 8, maxScore: 10, hourlyInrMinor: 20000, hireFeeInrMinor: 500000, hireFeeCharged: false, stipendInrMinor: 1500000 },
+    { id: "standard", minScore: 0, maxScore: 6, hourlyInrMinor: 0, hireFeeInrMinor: 500000, hireFeeCharged: true, stipendInrMinor: null, compareAtHourlyInrMinor: 5000 },
+    { id: "skilled", minScore: 6, maxScore: 8, hourlyInrMinor: 10000, hireFeeInrMinor: 500000, hireFeeCharged: false, stipendInrMinor: 800000, compareAtHourlyInrMinor: null },
+    { id: "assured", minScore: 8, maxScore: 10, hourlyInrMinor: 20000, hireFeeInrMinor: 500000, hireFeeCharged: false, stipendInrMinor: 1500000, compareAtHourlyInrMinor: null },
   ],
   activationFeeInrMinor: 249900,
   inrPerUsd: INR_PER_USD,
@@ -137,6 +142,8 @@ export type PlanRowLike = {
   region?: string | null;
   priceHourlyMinor: number;
   perHireChargeMinor: number;
+  /** The struck-through "was" hourly rate; undefined (a row type without it) keeps the default. */
+  compareAtHourlyMinor?: number | null;
 };
 
 /**
@@ -222,6 +229,8 @@ export function parsePricingConfig(src: PricingSources = {}): PricingConfig {
       hireFeeInrMinor: plan && isMinor(plan.perHireChargeMinor, 1) ? plan.perHireChargeMinor : d.hireFeeInrMinor,
       hireFeeCharged: typeof src.feeSetting?.[d.id] === "boolean" ? src.feeSetting[d.id] : d.hireFeeCharged,
       stipendInrMinor: stipends[d.id],
+      // Only when the plan row says so (a row type without the column, or no row, keeps the default as it is).
+      ...(plan && plan.compareAtHourlyMinor !== undefined ? { compareAtHourlyInrMinor: isMinor(plan.compareAtHourlyMinor, 1) ? plan.compareAtHourlyMinor : null } : {}),
     };
   });
   const activation = Number(src.activationFeeMinor);

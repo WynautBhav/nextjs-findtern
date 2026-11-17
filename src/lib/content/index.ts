@@ -1,4 +1,4 @@
-import { FAQ_ITEMS } from "./faq";
+import { FAQ_ITEMS, faqItems } from "./faq";
 import {
   FEATURED_SKILLS,
   HAPPY_FACES,
@@ -12,11 +12,13 @@ import {
 import { BLOG_POSTS } from "./blog";
 import { COLLEGE_PITCH } from "./colleges";
 import type { CmsBlogPost, CmsCollegePartner, CmsCollegePitch, CmsHome, CmsLegalDoc, CmsPlan } from "./types";
-import { EMPLOYER_TERMS, PLATFORM_TERMS } from "./legal";
-import { INTERN_NDA, INTERN_TERMS } from "./legal-intern";
+import { EMPLOYER_TERMS, platformTerms } from "./legal";
+import { INTERN_NDA, internTerms } from "./legal-intern";
 import { getDb, schema, hasDb } from "@/lib/db";
 import { eq, desc, asc, sql, and, inArray } from "drizzle-orm";
 import { inrMinorToUsdMinor } from "@/lib/currency";
+import { getPricingConfig } from "@/lib/platform-settings";
+import { PRICING_DEFAULTS, type PricingConfig } from "@/lib/pricing-config";
 import { blogImageRoutes, cmsImageSrc, imageVersion } from "./image-response";
 import { unstable_cache } from "next/cache";
 import { loadPublicStudents, studentsForSkill } from "@/lib/skill-benches";
@@ -78,8 +80,9 @@ type CmsContentTable =
   | typeof schema.websiteFeaturedSkills;
 
 /** A list the CMS answered with nothing in: the built-in list on first run, otherwise empty. */
-async function emptyOrBuiltIn<T extends unknown[]>(table: CmsContentTable, type: ContentCollection, builtIn: T): Promise<T> {
-  return (await builtInApplies(table, type)) ? builtIn : ([] as unknown as T);
+async function emptyOrBuiltIn<T extends unknown[]>(table: CmsContentTable, type: ContentCollection, builtIn: T | (() => Promise<T>)): Promise<T> {
+  if (!(await builtInApplies(table, type))) return [] as unknown as T;
+  return typeof builtIn === "function" ? builtIn() : builtIn;
 }
 
 export async function getHomeContent(): Promise<CmsHome> {
@@ -152,7 +155,8 @@ export async function getFaqItems() {
   return tryDb(async () => {
     const db = getDb();
     const rows = await db.select().from(schema.websiteFaqs).where(eq(schema.websiteFaqs.isActive, true)).orderBy(asc(schema.websiteFaqs.sortOrder));
-    return rows.length ? (rows as unknown as typeof FAQ_ITEMS) : emptyOrBuiltIn(schema.websiteFaqs, "faq", FAQ_ITEMS);
+    // The built-in answers quote the AI interview and hiring fees: render them from the live pricing config.
+    return rows.length ? (rows as unknown as typeof FAQ_ITEMS) : emptyOrBuiltIn(schema.websiteFaqs, "faq", async () => faqItems(await getPricingConfig()));
   }, FAQ_ITEMS);
 }
 
@@ -337,12 +341,17 @@ type LegalTable =
   | typeof schema.employerTerms
   | typeof schema.internTerms;
 
-async function getLegalDoc(table: LegalTable, fallback: CmsLegalDoc): Promise<CmsLegalDoc> {
+/**
+ * The newest saved document, else the built-in copy. The built-in copy quotes prices, so it is rendered for the live
+ * pricing config (`build`); an unreachable database means unreachable pricing too, which is the published defaults.
+ */
+async function getLegalDoc(table: LegalTable, build: (config: PricingConfig) => CmsLegalDoc): Promise<CmsLegalDoc> {
+  const fallback = build(PRICING_DEFAULTS);
   return tryDb(async () => {
     const db = getDb();
     // The newest row is the live one, matching the admin editor and legacy.
     const [row] = await db.select().from(table).orderBy(desc(table.updatedAt), desc(table.createdAt)).limit(1);
-    if (!row?.bodyHtml?.trim()) return fallback;
+    if (!row?.bodyHtml?.trim()) return build(await getPricingConfig());
     return {
       ...fallback,
       title: row.title || fallback.title,
@@ -353,15 +362,15 @@ async function getLegalDoc(table: LegalTable, fallback: CmsLegalDoc): Promise<Cm
 }
 
 export function getPlatformTerms() {
-  return getLegalDoc(schema.websiteTerms, PLATFORM_TERMS);
+  return getLegalDoc(schema.websiteTerms, platformTerms);
 }
 
 export function getEmployerTerms() {
-  return getLegalDoc(schema.employerTerms, EMPLOYER_TERMS);
+  return getLegalDoc(schema.employerTerms, () => EMPLOYER_TERMS);
 }
 
 export function getInternTerms() {
-  return getLegalDoc(schema.internTerms, INTERN_TERMS);
+  return getLegalDoc(schema.internTerms, internTerms);
 }
 
 /** Active NDA clauses in order, joined into one document. */

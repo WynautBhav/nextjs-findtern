@@ -11,9 +11,15 @@
  * the Company Terms, which already carry them; the verification clause no
  * longer promises an SMS OTP, which does not exist.
  */
+import { stipendText } from "../pricing-copy.ts";
+import { PRICING_DEFAULTS, type PricingConfig } from "../pricing-config.ts";
 import type { CmsLegalDoc } from "./types";
 
-export const INTERN_TERMS: CmsLegalDoc = {
+/**
+ * The intern terms for a pricing config. Only the stipend figures are read from it; the wording is unchanged (it is legal
+ * text), and content/figures-copy.test.ts pins it character for character at the published defaults.
+ */
+export const internTerms = (config: PricingConfig = PRICING_DEFAULTS): CmsLegalDoc => ({
   id: "intern",
   title: "Intern Terms and Conditions",
   updated: "2026-11-06",
@@ -56,7 +62,7 @@ export const INTERN_TERMS: CmsLegalDoc = {
 <li>You must provide accurate academic and skill-related information.</li>
 <li>Misrepresentation of skills or submitting fake documents will result in account termination.</li>
 <li>Findtern reserves the right to verify academic credentials and remove any fraudulent profiles.</li>
-<li>Your stipend is a fixed monthly amount set by your Findtern score: ₹0 below 6, ₹8,000 a month from 6 up to 8, and ₹15,000 a month from 8 and above, plus a completion bonus when you finish the internship.</li>
+<li>Your stipend is a fixed monthly amount set by your Findtern score: ₹0 below 6, ${stipendText(config, "skilled") ?? "₹0"} a month from 6 up to 8, and ${stipendText(config, "assured") ?? "₹0"} a month from 8 and above, plus a completion bonus when you finish the internship.</li>
 <li>Each month's stipend (score 6 and above) is paid after that month ends.</li>
 <li>You must not share your personal information or direct contact details with clients outside of Findtern's platform. Any violation of this may lead to legal action.</li>
 </ul>
@@ -101,7 +107,9 @@ export const INTERN_TERMS: CmsLegalDoc = {
 <h2>10. Contact Us</h2>
 <p>For any questions about these Terms &amp; Conditions, please reach out to us at <a href="mailto:communicate@findtern.in">communicate@findtern.in</a>.</p>
 `.trim(),
-};
+});
+
+export const INTERN_TERMS: CmsLegalDoc = internTerms();
 
 export const INTERN_NDA: CmsLegalDoc = {
   id: "intern-nda",
