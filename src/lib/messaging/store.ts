@@ -63,6 +63,8 @@ export async function loadThreadContexts(threads: ThreadRecord[]): Promise<Map<s
         id: schema.employers.id,
         name: schema.employers.name,
         companyName: schema.employers.companyName,
+        companyEmail: schema.employers.companyEmail,
+        websiteUrl: schema.employers.websiteUrl,
         primaryContactName: schema.employers.primaryContactName,
         escalationContactName: schema.employers.escalationContactName,
       })
@@ -93,6 +95,8 @@ export async function loadThreadContexts(threads: ThreadRecord[]): Promise<Map<s
       employerHasMessaged: employerSpoke.has(t.id),
       denyTerms: denyTermsFor({
         company: e?.companyName,
+        companyWebsite: e?.websiteUrl,
+        companyEmail: e?.companyEmail,
         employerNames: [e?.name, e?.primaryContactName, e?.escalationContactName],
         internFirst: u?.firstName,
         internLast: u?.lastName,

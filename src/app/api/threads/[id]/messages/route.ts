@@ -83,8 +83,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const gate = canSend({ role, employerHasMessaged: tctx?.employerHasMessaged ?? false, proposalStatus: tctx?.proposalStatus });
   if (!gate.ok) return NextResponse.json({ error: SEND_BLOCK_TEXT[gate.reason][role], code: gate.reason }, { status: 409 });
 
-  // Row 10: until the hire is paid, contact details and names are removed before the text is stored.
-  const scrub = tctx && !tctx.hired ? scrubOutgoing(clean, tctx.denyTerms) : null;
+  // Row 10 (and sheet 2 row 9): until the hire is paid, contact details, the company's name and personal names are
+  // removed before the text is stored, whichever side sends. No thread context fails closed: contact details still go.
+  const scrub = tctx?.hired ? null : scrubOutgoing(clean, tctx?.denyTerms ?? []);
   const body = scrub ? scrub.text : clean;
 
   const db = getDb();
