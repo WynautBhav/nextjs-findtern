@@ -9,6 +9,7 @@ import {
   collegeKey,
   hasProCriteria,
   parseColleges,
+  proChips,
   proFactsOf,
   type ProFacts,
 } from "./candidate-pro-filters.ts";
@@ -213,4 +214,26 @@ test("sortByCollege orders A-Z or Z-A, no college last either way, ties keep the
   assert.deepEqual(sortByCollege(list, key, "asc").map((x) => x.id), ["3", "5", "1", "4", "2"]);
   assert.deepEqual(sortByCollege(list, key, "desc").map((x) => x.id), ["1", "4", "5", "3", "2"]);
   assert.deepEqual(list.map((x) => x.id), ["1", "2", "3", "4", "5"], "input is not mutated");
+});
+
+/* ── chips ────────────────────────────────────────────────────────────────── */
+
+test("proChips: nothing active, no chips", () => {
+  assert.deepEqual(proChips({ cgpaMin: 0, cgpaVerified: false, colleges: [] }), []);
+});
+
+test("proChips: a chip per active filter, each removal leaves the others untouched", () => {
+  const c = { cgpaMin: 7.5, cgpaVerified: true, colleges: ["IIT Bombay", "A & B College"] };
+  const chips = proChips(c);
+  assert.deepEqual(chips.map((x) => x.label), ["CGPA 7.5+", "Verified CGPA only", "College: IIT Bombay", "College: A & B College"]);
+  assert.deepEqual(chips[0].without, { cgpaMin: 0, cgpaVerified: true, colleges: c.colleges });
+  assert.deepEqual(chips[1].without, { cgpaMin: 7.5, cgpaVerified: false, colleges: c.colleges });
+  assert.deepEqual(chips[2].without, { cgpaMin: 7.5, cgpaVerified: true, colleges: ["A & B College"] });
+  assert.deepEqual(chips[3].without.colleges, ["IIT Bombay"]);
+  assert.equal(new Set(chips.map((x) => x.key)).size, chips.length, "keys are unique");
+  assert.deepEqual(c.colleges, ["IIT Bombay", "A & B College"], "input is not mutated");
+});
+
+test("proChips: the CGPA floor prints one decimal", () => {
+  assert.equal(proChips({ cgpaMin: 8, cgpaVerified: false, colleges: [] })[0].label, "CGPA 8.0+");
 });

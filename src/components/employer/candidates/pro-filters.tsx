@@ -73,7 +73,7 @@ export function ProLockedCard({ offered, priceMinor, periodDays, currency }: { o
               <span className="nums font-semibold text-ink-900">{formatMoney(priceMinor, currency)}</span> {periodLabel(periodDays)}
             </p>
           ) : null}
-          <ButtonLink href={SUBSCRIPTION_HREF} variant="primary" size="md" block className="h-11 rounded-xl">
+          <ButtonLink href={SUBSCRIPTION_HREF} variant="primary" size="md" block className="h-auto min-h-11 whitespace-normal rounded-xl px-3 py-2 text-center text-sm leading-snug">
             Unlock with Findtern Pro
           </ButtonLink>
         </div>
@@ -115,7 +115,7 @@ export function ProFilterSections({
       <ProSection id="pro-cgpa-title" title="CGPA">
         <RatingSlider name="cgpaMin" label="Minimum CGPA" defaultValue={cgpaMin} />
         <SwitchField name="cgpaVerified" value="1" defaultChecked={cgpaVerified} label="Verified CGPA only" hint="A college has confirmed the score." />
-        <p className="mt-1 text-xs leading-relaxed text-text-subtle">Scores given as a percentage are converted at ÷ 9.5 and counted as approx.</p>
+        <p className="mt-1 text-xs leading-relaxed text-text-subtle">A percentage score is converted to CGPA (÷ 9.5) and marked approx.</p>
       </ProSection>
       <ProSection id="pro-college-title" title="College">
         <CollegePicker options={options} selected={colleges} />

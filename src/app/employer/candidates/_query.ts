@@ -15,7 +15,7 @@ import { employerRegion, type Currency } from "@/lib/employer-pricing";
 import { BANDS, PLAN_NAME, type BandId } from "@/lib/score";
 import { collegeSortToken, parseSortFields, type CollegeSort } from "@/lib/candidate-sort";
 import { EMPTY_PRO_REQUEST, enforcePro, hasProRequest, proAccess, proQueryPairs, proRequestOf } from "@/lib/candidate-pro-access";
-import { proFactsOf, type CollegeOption } from "@/lib/candidate-pro-filters";
+import { proChips, proFactsOf, type CollegeOption } from "@/lib/candidate-pro-filters";
 import { getEmployerSubscriptionConfig } from "@/lib/platform-settings";
 import { subscriptionPriceMinor } from "@/lib/employer-subscription";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedFilters } from "@/lib/employer-selection";
@@ -327,11 +327,7 @@ export function activeChips(filters: Filters): FilterChip[] {
     }
   }
   // Pro chips: only a subscriber has these set (the loader empties them for everyone else).
-  if (filters.cgpaMin > 0) chips.push({ key: "cgpaMin", label: `CGPA ${filters.cgpaMin.toFixed(1)}+`, href: drop({ cgpaMin: 0 }) });
-  if (filters.cgpaVerified) chips.push({ key: "cgpaVerified", label: "Verified CGPA only", href: drop({ cgpaVerified: false }) });
-  for (const college of filters.colleges) {
-    chips.push({ key: `college:${college}`, label: `College: ${college}`, href: drop({ colleges: filters.colleges.filter((c) => c !== college) }) });
-  }
+  for (const chip of proChips(filters)) chips.push({ key: chip.key, label: chip.label, href: drop({ cgpaMin: chip.without.cgpaMin, cgpaVerified: chip.without.cgpaVerified, colleges: chip.without.colleges }) });
   if (!filters.skillPriority) chips.push({ key: "sm", label: "Skill-match ranking off", href: drop({ skillPriority: true }) });
   return chips;
 }

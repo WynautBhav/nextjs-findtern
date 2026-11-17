@@ -84,6 +84,20 @@ export function proFactsOf(
   };
 }
 
+/** One removable chip: what it says, and the criteria left when it is removed. */
+export type ProChip = { key: string; label: string; without: ProCriteria };
+
+/** The chips of the active Pro criteria: a CGPA floor, verified only, and one per college, each with its own removal. */
+export function proChips(c: ProCriteria): ProChip[] {
+  const chips: ProChip[] = [];
+  if (c.cgpaMin > 0) chips.push({ key: "cgpaMin", label: `CGPA ${c.cgpaMin.toFixed(1)}+`, without: { ...c, cgpaMin: 0 } });
+  if (c.cgpaVerified) chips.push({ key: "cgpaVerified", label: "Verified CGPA only", without: { ...c, cgpaVerified: false } });
+  for (const college of c.colleges) {
+    chips.push({ key: `college:${collegeKey(college)}`, label: `College: ${college}`, without: { ...c, colleges: c.colleges.filter((x) => collegeKey(x) !== collegeKey(college)) } });
+  }
+  return chips;
+}
+
 export type CollegeOption = { name: string; count: number };
 
 export type ProResult<T> = {

@@ -247,8 +247,8 @@ function ProNotes({ data, filters }: { data: CandidatesData; filters: Filters })
   const cgpaOn = filters.cgpaMin > 0 || filters.cgpaVerified;
   const parts: string[] = [];
   if (pro.active && cgpaOn) {
-    if (pro.hiddenNoScore > 0) parts.push(`${pro.hiddenNoScore} candidate${pro.hiddenNoScore === 1 ? " is" : "s are"} hidden because they have no CGPA or percentage on their profile.`);
-    if (pro.approxKept > 0) parts.push(`${pro.approxKept} of the results ${pro.approxKept === 1 ? "has" : "have"} a percentage converted to CGPA (÷ 9.5), so ${pro.approxKept === 1 ? "it is" : "they are"} approx.`);
+    if (pro.hiddenNoScore > 0) parts.push(`${pro.hiddenNoScore} candidate${pro.hiddenNoScore === 1 ? " with" : "s with"} no CGPA or percentage on their profile ${pro.hiddenNoScore === 1 ? "is" : "are"} not shown.`);
+    if (pro.approxKept > 0) parts.push(`${pro.approxKept} of these ${data.total} result${data.total === 1 ? "" : "s"} ${pro.approxKept === 1 ? "gives" : "give"} a percentage, converted to CGPA at ÷ 9.5 (approx.).`);
   }
   if (!pro.ignored && parts.length === 0) return null;
   return (

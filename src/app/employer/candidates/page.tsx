@@ -133,10 +133,10 @@ export default async function CandidatesPage({
             filters={filters}
             className="col-span-2 row-start-3 mb-1 lg:border-t lg:border-ink-100 lg:pt-3"
           />
-          <ToolbarSort data={data} filters={filters} className="col-span-2 col-start-1 row-start-4 justify-self-end lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:justify-self-auto" />
+          <ToolbarSort data={data} filters={filters} className="col-span-2 col-start-1 row-start-5 justify-self-end lg:col-span-1 lg:col-start-2 lg:row-start-1 lg:justify-self-auto" />
         </div>
 
-        {/* The real count above the columns. Phones: left of Sort on the same line. */}
+        {/* The real count above the columns. Phones: its own line above Sort (side by side, the count ran under the Sort box at 390). */}
         <StatusRow data={data} filters={filters} className="col-span-2 col-start-1 row-start-4 justify-self-start lg:col-span-full lg:row-start-2 lg:mb-5 lg:justify-self-stretch" />
 
         <div id="candidate-filter-column" className="col-start-2 row-start-1 lg:col-span-1 lg:col-start-1 lg:row-start-3 lg:group-data-[filters=hidden]/fl:hidden">
@@ -158,7 +158,7 @@ export default async function CandidatesPage({
         </div>
 
         {/* Phones: the compare tray sits over the bottom nav, so the last row needs room to scroll clear of it. */}
-        <div className={cn("col-span-2 row-start-5 min-w-0 lg:col-span-1 lg:col-start-2 lg:row-start-3 lg:group-data-[filters=hidden]/fl:col-start-1", compareIds.length >= 1 && "pb-24")}>
+        <div className={cn("col-span-2 row-start-6 min-w-0 lg:col-span-1 lg:col-start-2 lg:row-start-3 lg:group-data-[filters=hidden]/fl:col-start-1", compareIds.length >= 1 && "pb-24")}>
           <RememberSelection employerId={uid} project={activeProjectId} compare={compareIds} filters={loadFailed ? undefined : rememberQueryOf(filters)} />
 
           {compareIds.length >= 1 ? (

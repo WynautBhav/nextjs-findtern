@@ -78,7 +78,7 @@ export function CollegePicker({ options, selected }: { options: CollegeOption[];
                   className="mt-0.5 size-4 shrink-0 rounded-[4px] border-ink-300 accent-ink-900"
                 />
                 <span className="min-w-0 flex-1 break-words">{row.name}</span>
-                <span className={cn("nums shrink-0 text-xs text-text-subtle", row.count === 0 && "text-ink-500")} aria-label={`${row.count} candidate${row.count === 1 ? "" : "s"}`}>
+                <span className={cn("nums shrink-0 text-xs leading-5 text-text-subtle", row.count === 0 && "text-ink-500")} aria-label={`${row.count} candidate${row.count === 1 ? "" : "s"}`}>
                   {row.count}
                 </span>
               </label>
