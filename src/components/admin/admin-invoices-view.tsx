@@ -148,6 +148,7 @@ export function AdminInvoicesView({
     <div className="space-y-[var(--admin-gap)] lg:space-y-6">
       <StatGrid cols={totals.refundedMinor > 0 || totals.waivedCount ? 4 : 3}>
         <StatCard
+          fit
           featured
           label="Collected"
           value={formatMoney(totals.collectedMinor, "INR", { zeroLabel: "₹0" })}
@@ -156,6 +157,7 @@ export function AdminInvoicesView({
         />
         {totals.refundedMinor > 0 ? (
           <StatCard
+            fit
             label="Refunded"
             value={formatMoney(totals.refundedMinor, "INR", { zeroLabel: "₹0" })}
             hint={`Net collected ${formatMoney(totals.netCollectedMinor, "INR", { zeroLabel: "₹0" })}`}
@@ -163,6 +165,7 @@ export function AdminInvoicesView({
           />
         ) : null}
         <StatCard
+          fit
           label="Discounts given"
           value={formatMoney(totals.discountMinor, "INR", { zeroLabel: "₹0" })}
           hint="Promo codes and legacy discounts on paid rows"
@@ -170,6 +173,7 @@ export function AdminInvoicesView({
         />
         {totals.waivedCount ? (
           <StatCard
+            fit
             label="Waived"
             value={formatMoney(totals.waivedMinor ?? 0, "INR", { zeroLabel: "₹0" })}
             hint={`${formatNumber(totals.waivedCount)} complimentary ${totals.waivedCount === 1 ? "order" : "orders"} (full-waiver code) · not money received`}
@@ -177,6 +181,7 @@ export function AdminInvoicesView({
           />
         ) : null}
         <StatCard
+          fit
           label="Not collected"
           value={formatMoney(totals.notCollectedMinor, "INR", { zeroLabel: "₹0" })}
           hint={`${formatNumber(totals.notCollectedCount)} unpaid, failed or abandoned`}
