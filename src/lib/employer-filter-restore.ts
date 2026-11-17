@@ -10,6 +10,11 @@
  *
  * Pure and free of `@/` imports so it runs under plain `node --test`.
  */
+import { withoutCollegeSort } from "./candidate-sort.ts";
+
+/** The query keys that belong to Findtern Pro (the college sort rides inside `sort`). */
+export const PRO_PARAMS = ["cgpaMin", "cgpaVerified", "colleges"] as const;
+
 export function restorableFilters(saved: string, filterKeys: readonly string[]): string {
   let source: URLSearchParams;
   try {
@@ -21,6 +26,30 @@ export function restorableFilters(saved: string, filterKeys: readonly string[]):
   const kept = new URLSearchParams();
   for (const [key, value] of source) {
     if (key === "q" || !allowed.has(key)) continue;
+    kept.append(key, value);
+  }
+  return kept.toString();
+}
+
+/**
+ * A saved query with the Pro filters and the college sort taken out: what an employer without an active
+ * subscription gets restored (a stale cookie from before the subscription ended must not bring them back).
+ */
+export function withoutProParams(query: string): string {
+  let source: URLSearchParams;
+  try {
+    source = new URLSearchParams(query);
+  } catch {
+    return "";
+  }
+  const kept = new URLSearchParams();
+  for (const [key, value] of source) {
+    if ((PRO_PARAMS as readonly string[]).includes(key)) continue;
+    if (key === "sort") {
+      const rest = withoutCollegeSort(value);
+      if (rest) kept.append(key, rest);
+      continue;
+    }
     kept.append(key, value);
   }
   return kept.toString();
