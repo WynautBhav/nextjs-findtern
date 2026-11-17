@@ -134,7 +134,7 @@ export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, colleg
               <Surface as="li" key={o.id} className="p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium">{o.slots} students at {money(o.feePerStudentMinor)}</p>
+                    <p className="text-sm font-medium">{o.slots} {o.slots === 1 ? "student" : "students"} at {money(o.feePerStudentMinor)}</p>
                     <p className="text-xs text-ink-500">
                       Total {money(o.slots * o.feePerStudentMinor)} · Payable {money(o.payableMinor)}{o.creditMinor ? ` (credit ${money(o.creditMinor)})` : ""} · codes valid until {formatDate(o.codeValidUntil)} · {o.issuedCount} issued, {o.redeemedCount} redeemed
                       {o.paidAt ? ` · paid ${formatDate(o.paidAt)}${o.gatewayRef ? ` (ref ${o.gatewayRef})` : ""}` : ""}
