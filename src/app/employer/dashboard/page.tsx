@@ -135,7 +135,9 @@ export default async function EmployerDashboard() {
     createdAt: p.createdAt,
     hiredAt: p.hiredAt,
   }));
-  const awaiting = proposalCounts(proposals.map((p, i) => ({ status: p.status, lapsed: lapsed[i] }))).awaiting;
+  // Offers on a project Findtern took down are "View only", not "waiting on the candidate".
+  const downProjectIds = new Set(projects.filter((p) => p.takenDownAt).map((p) => p.id));
+  const awaiting = proposalCounts(proposals.map((p, i) => ({ status: p.status, lapsed: lapsed[i], ...(downProjectIds.has(p.projectId) ? { viewOnly: true } : {}) }))).awaiting;
 
   const tasks: Task[] = (
     [

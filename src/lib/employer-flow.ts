@@ -25,8 +25,9 @@ export async function hireFlowCounts(employerId: string, toPay: number): Promise
         ),
       ),
     db
-      .select({ internId: schema.proposals.internId, status: schema.proposals.status, offerDetails: schema.proposals.offerDetails })
+      .select({ internId: schema.proposals.internId, status: schema.proposals.status, offerDetails: schema.proposals.offerDetails, downAt: schema.projects.takenDownAt })
       .from(schema.proposals)
+      .leftJoin(schema.projects, eq(schema.projects.id, schema.proposals.projectId))
       .where(eq(schema.proposals.employerId, employerId)),
   ]);
   // Same rule as the Proposals tabs and the dashboard: one counter (proposal-bucket.ts), and an
@@ -37,6 +38,7 @@ export async function hireFlowCounts(employerId: string, toPay: number): Promise
       internId: p.internId,
       status: p.status,
       lapsed: offerState({ status: p.status, hiredAt: null }, parseOffer(p.offerDetails)).lapsed,
+      ...(p.downAt ? { viewOnly: true } : {}),
     })),
     toPay,
   });

@@ -10,6 +10,7 @@
  *   draft    saved, never sent: counted on its own, not as "waiting"
  *   accepted accepted or payment in progress: the employer's move is to pay
  *   hired    paid and placed
+ *   viewOnly open/accepted offers of a taken-down project (an overlay on open + accepted, see ProposalRow.viewOnly)
  *   closed   declined, withdrawn, expired, or sent and unanswered past its start date
  *   null     a status nobody planned for; still counted (`other`), never dropped
  */
@@ -35,7 +36,8 @@ export function proposalBucket(status: string, lapsed: boolean): ProposalBucket 
   return null;
 }
 
-export type ProposalRow = { status: string; lapsed: boolean };
+/** `viewOnly`: the proposal's project is taken down by admin (projects.takenDownAt). Its open/accepted offers count as "View only", not Waiting / To pay. */
+export type ProposalRow = { status: string; lapsed: boolean; viewOnly?: boolean };
 
 export type ProposalCounts = {
   /** Every proposal. The Proposals page's "All" tab. */
@@ -51,13 +53,20 @@ export type ProposalCounts = {
   closed: number;
   /** Unrecognised status: shown in "All" and in `total`, in no tab. */
   other: number;
+  /**
+   * Waiting or accepted offers on a project Findtern took down: no reply to wait for, nothing to pay while it is down.
+   * Still inside `total`. The key is only present when there is one, so every other output is unchanged.
+   */
+  viewOnly?: number;
 };
 
 export function proposalCounts(rows: ProposalRow[]): ProposalCounts {
   const c = { all: rows.length, total: 0, awaiting: 0, drafts: 0, accepted: 0, hired: 0, closed: 0, other: 0 };
+  let viewOnly = 0;
   for (const r of rows) {
     const b = proposalBucket(r.status, r.lapsed);
-    if (b === "open") c.awaiting += 1;
+    if (r.viewOnly && (b === "open" || b === "accepted")) viewOnly += 1;
+    else if (b === "open") c.awaiting += 1;
     else if (b === "draft") c.drafts += 1;
     else if (b === "accepted") c.accepted += 1;
     else if (b === "hired") c.hired += 1;
@@ -65,7 +74,7 @@ export function proposalCounts(rows: ProposalRow[]): ProposalCounts {
     else c.other += 1;
   }
   c.total = c.all - c.closed;
-  return c;
+  return viewOnly > 0 ? { ...c, viewOnly } : c;
 }
 
 /** The hire-flow strip (cart → proposals → checkout → hired). */

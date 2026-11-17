@@ -9,7 +9,7 @@
  * accepted proposal is a commitment, and only the second is worth billing.
  */
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { acceptedLineCharge } from "@/lib/accepted-charge";
 import { hireFeeMinor, lineCharge, type LineCharge, type PayMode } from "@/lib/checkout";
@@ -22,6 +22,7 @@ import { initialsOf, scoreOf } from "@/lib/employer-candidates";
 import { hiredInternIds, hiredProposalSql, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, type Currency } from "@/lib/employer-pricing";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
+import { splitTakenDownProposals, TAKEN_DOWN_PAY_NOTE } from "@/lib/projects/takedown-payable";
 
 
 export const DURATION_LABEL: Record<string, string> = {
@@ -75,8 +76,17 @@ function addMonthsDay(isoDay: string | null, months: number): string | null {
   return new Date(Date.UTC(Number(m[1]), mo, Math.min(Number(m[3]), last))).toISOString().slice(0, 10);
 }
 
+/** An accepted offer or due month the employer cannot pay now because its project is taken down (shown, never orderable). */
+export type BlockedPayable = { id: string; projectId: string; projectName: string | null; internInitials: string; note: string };
+
 export type PayableCheckout = {
   lines: PayableLine[];
+  /**
+   * Offers / due months that would be payable but belong to a project Findtern took down. They are NOT in `lines`
+   * (so not in `totals`, the "To pay" counts or any pay-now button) and carry the note "Taken down: contact admin".
+   * Empty whenever no project is taken down.
+   */
+  blocked: BlockedPayable[];
   /** Per-currency order total, minor units. */
   totals: Map<Currency, number>;
   region: "IN" | null;
@@ -143,10 +153,21 @@ export async function payableCheckout(
 
 
   const { open, dues } = await openProposalsWithDues(db, employerId);
-  const proposals = open.filter(
+  const wanted = open.filter(
     (p) =>
       (p.status === "accepted" || p.status === "processing" || dues.has(p.id)) && (!opts.proposalIds?.length || opts.proposalIds.includes(p.id)),
   );
+  // A project Findtern took down is view-only for the employer: its offers and due months are listed as blocked, never as payable.
+  const wantedProjectIds = [...new Set(wanted.map((p) => p.projectId))];
+  const downRows = wantedProjectIds.length
+    ? await db
+        .select({ id: schema.projects.id, projectName: schema.projects.projectName })
+        .from(schema.projects)
+        .where(and(inArray(schema.projects.id, wantedProjectIds), isNotNull(schema.projects.takenDownAt)))
+    : [];
+  const { payable: proposals, blocked: blockedProposals } = splitTakenDownProposals(wanted, new Set(downRows.map((r) => r.id)));
+  const downName = new Map(downRows.map((r) => [r.id, r.projectName]));
+  const blocked: BlockedPayable[] = blockedProposals.map((p) => ({ id: p.id, projectId: p.projectId, projectName: downName.get(p.projectId) ?? null, note: TAKEN_DOWN_PAY_NOTE }));
 
   let lines: PayableLine[] = [];
 
@@ -254,5 +275,5 @@ export async function payableCheckout(
     totals.set(line.currency, (totals.get(line.currency) ?? 0) + line.charge.totalMinor);
   }
 
-  return { lines, totals, region, defaultCurrency, prefill };
+  return { lines, blocked, totals, region, defaultCurrency, prefill };
 }
