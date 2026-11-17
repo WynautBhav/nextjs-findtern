@@ -217,6 +217,26 @@ export async function listGatewayPaymentRefunds(paymentId: string): Promise<Gate
   return (body?.items ?? []).map(toEntity).filter((e): e is GatewayRefundEntity => e !== null);
 }
 
+/**
+ * What Razorpay itself says was paid on a payment, to compare with the order's own amount before settling a
+ * checkout callback (the callback's signature covers the two ids only, not the amount). An entity that names a
+ * different order reads "no amount", so settle refuses it. null = Razorpay could not be asked (unreachable, no
+ * keys, unknown id): the verified signature alone stands, as it always did. Read-only; never throws.
+ */
+export async function fetchGatewayPaid(orderId: string, paymentId: string): Promise<{ amountMinor: number | null; currency: string | null } | null> {
+  if (!/^pay_[A-Za-z0-9]+$/.test(paymentId) || !razorpayConfigured()) return null;
+  try {
+    const p = (await gatewayGet(`/v1/payments/${paymentId}`)) as { order_id?: unknown; amount?: unknown; currency?: unknown } | null;
+    if (!p) return null;
+    const currency = typeof p.currency === "string" ? p.currency : null;
+    if (p.order_id !== orderId) return { amountMinor: null, currency };
+    return { amountMinor: typeof p.amount === "number" ? p.amount : null, currency };
+  } catch (error) {
+    console.error("[razorpay] could not read payment", paymentId, error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
 /** True when the Razorpay key pair is present (the reconcile job refuses to run without it). */
 export function razorpayConfigured(env: Record<string, string | undefined> = process.env): boolean {
   return Boolean((env.RAZORPAY_KEY_ID ?? "").trim() && (env.RAZORPAY_KEY_SECRET ?? "").trim());

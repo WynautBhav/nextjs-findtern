@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { afterEach, test } from "node:test";
 
-import { buildRefundRequest, createOrder, fetchGatewayRefund, listGatewayPaymentRefunds, razorpayApiBase, razorpayConfigured, refundReceipt } from "./razorpay.ts";
+import { buildRefundRequest, createOrder, fetchGatewayPaid, fetchGatewayRefund, listGatewayPaymentRefunds, razorpayApiBase, razorpayConfigured, refundReceipt } from "./razorpay.ts";
 
 const realFetch = globalThis.fetch;
 const env = { id: process.env.RAZORPAY_KEY_ID, secret: process.env.RAZORPAY_KEY_SECRET };
@@ -76,4 +76,35 @@ test("gateway reads: GET only, basic auth, 404 is null, errors carry no keys, od
   await assert.rejects(listGatewayPaymentRefunds("pay_1/refund"));
   assert.ok(seen.every((c) => c.method === "GET" && c.url.startsWith("https://api.razorpay.com/")));
   assert.equal(seen.length, 4);
+});
+
+test("fetchGatewayPaid: what Razorpay itself says was paid on that payment, in minor units", async () => {
+  process.env.RAZORPAY_KEY_ID = "rzp_test_k";
+  process.env.RAZORPAY_KEY_SECRET = "s";
+  let url = "";
+  globalThis.fetch = (async (u: string) => {
+    url = String(u);
+    return new Response(JSON.stringify({ id: "pay_A1", order_id: "order_X", amount: 3520000, currency: "INR", status: "captured" }), { status: 200 });
+  }) as typeof fetch;
+  assert.deepEqual(await fetchGatewayPaid("order_X", "pay_A1"), { amountMinor: 3520000, currency: "INR" });
+  assert.match(url, /\/v1\/payments\/pay_A1$/);
+});
+
+test("fetchGatewayPaid: a payment that belongs to a different order says no amount, so settle refuses it", async () => {
+  process.env.RAZORPAY_KEY_ID = "rzp_test_k";
+  process.env.RAZORPAY_KEY_SECRET = "s";
+  globalThis.fetch = (async () => new Response(JSON.stringify({ id: "pay_A1", order_id: "order_OTHER", amount: 100, currency: "INR" }), { status: 200 })) as typeof fetch;
+  assert.deepEqual(await fetchGatewayPaid("order_X", "pay_A1"), { amountMinor: null, currency: "INR" });
+});
+
+test("fetchGatewayPaid: Razorpay unreachable, unknown payment or no keys reads null (the signature alone stands), never throws", async () => {
+  process.env.RAZORPAY_KEY_ID = "rzp_test_k";
+  process.env.RAZORPAY_KEY_SECRET = "s";
+  globalThis.fetch = (async () => { throw new Error("network down"); }) as typeof fetch;
+  assert.equal(await fetchGatewayPaid("order_X", "pay_A1"), null);
+  globalThis.fetch = (async () => new Response("{}", { status: 404 })) as typeof fetch;
+  assert.equal(await fetchGatewayPaid("order_X", "pay_A1"), null);
+  assert.equal(await fetchGatewayPaid("order_X", "../evil"), null);
+  delete process.env.RAZORPAY_KEY_ID;
+  assert.equal(await fetchGatewayPaid("order_X", "pay_A1"), null);
 });

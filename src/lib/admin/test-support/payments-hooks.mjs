@@ -10,6 +10,7 @@ const FAKES = pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url
 const FAKED = new Set(["@/lib/payments", "@/lib/refunds/refunds-db", "@/lib/db", "@/lib/guards-mutation", "next/server"]);
 
 export async function resolve(specifier, context, next) {
+  if (specifier === "@/lib/razorpay" && process.env.PAY_FAKE_RAZORPAY) return { url: FAKES, shortCircuit: true };
   if (FAKED.has(specifier)) return { url: FAKES, shortCircuit: true };
   if (specifier.startsWith("@/")) {
     const base = path.join(SRC, specifier.slice(2));
