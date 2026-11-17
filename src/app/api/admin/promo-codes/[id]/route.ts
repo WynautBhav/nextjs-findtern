@@ -7,7 +7,7 @@ import { promoCodeProblem, promoDiscountProblem } from "@/lib/admin/promo-edit-r
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation, openPromoOrders } from "@/lib/promo";
-import { collegeCodeDeleteProblem, collegeCodeEditProblem, promoDeleteProblem, promoMaxUsagesProblem, PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
+import { collegeCodeDeleteProblem, collegeCodeEditProblem, promoDeleteProblem, promoMaxUsagesProblem, promoRenameProblem, PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
 
 // Omitted = leave as is; null = clear.
 const bodySchema = z.object({
@@ -91,6 +91,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (code && code !== existing.code?.toUpperCase()) {
     const bad = promoCodeProblem(code);
     if (bad) return NextResponse.json({ error: bad }, { status: 400 });
+    const [{ n: usageRows }] = await db.select({ n: count() }).from(schema.promoCodeUsages).where(eq(schema.promoCodeUsages.promoCodeId, id));
+    const rename = promoRenameProblem({ usedCount: existing.usedCount, usageRows, openOrders: await openPromoOrders(db, existing.code) });
+    if (rename) return NextResponse.json({ error: rename }, { status: 409 });
   }
   const nextFrom = toDate(parsed.data.validFrom);
   const nextUntil = toDate(parsed.data.validUntil);

@@ -106,7 +106,7 @@ test("a student in another college can't redeem this college's code", () => {
 });
 
 // ---- Admin audit (package S) -------------------------------------------------------------------------------------
-import { promoDeleteProblem, promoHoldProblem, promoMaxUsagesProblem } from "./promo-rules.ts";
+import { promoDeleteProblem, promoHoldProblem, promoMaxUsagesProblem, promoRenameProblem } from "./promo-rules.ts";
 
 test("max uses can't be set below the uses already made; clearing it (unlimited) is always fine", () => {
   assert.equal(promoMaxUsagesProblem(null, 40), null);
@@ -132,4 +132,11 @@ test("holds: open payments of other accounts count against the cap until they ar
   assert.match(promoHoldProblem(capped, 2) ?? "", /still open/); // 3 + 2 = 5: the last use is held by someone mid-payment
   assert.equal(promoHoldProblem({ ...capped, maxUsages: null }, 50), null);
   assert.match(promoHoldProblem({ maxUsages: 1, usedCount: 0, collegeId: "c1" }, 1) ?? "", /seat/i);
+});
+
+test("a code that has been used, or is on an open payment, can't be renamed: orders keep the old name and would stop counting", () => {
+  assert.equal(promoRenameProblem({ usedCount: 0, usageRows: 0, openOrders: 0 }), null);
+  assert.match(promoRenameProblem({ usedCount: 2, usageRows: 2, openOrders: 0 }) ?? "", /used can't be renamed/);
+  assert.match(promoRenameProblem({ usedCount: 0, usageRows: 1, openOrders: 0 }) ?? "", /can't be renamed/);
+  assert.match(promoRenameProblem({ usedCount: 0, usageRows: 0, openOrders: 1 }) ?? "", /open payment/);
 });

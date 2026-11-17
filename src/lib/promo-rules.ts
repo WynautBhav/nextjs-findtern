@@ -186,3 +186,13 @@ export function promoHoldProblem(row: { maxUsages: number | null; usedCount: num
     ? "This college's last free seat is on a payment that's still open. Try again in a few minutes."
     : "The last uses of this code are on payments that are still open. Try again in a few minutes.";
 }
+
+/**
+ * Renaming is refused once a code has history: an open or paid order carries the old name, and settlement and the
+ * holds look the code up by that name, so a rename would let a payment take the discount without spending a use.
+ */
+export function promoRenameProblem(c: { usedCount: number; usageRows: number; openOrders: number }): string | null {
+  if (Math.max(c.usedCount, c.usageRows) > 0) return "A code that has been used can't be renamed. Create a new code and turn this one off.";
+  if (c.openOrders > 0) return "This code is on an open payment, so it can't be renamed right now.";
+  return null;
+}
