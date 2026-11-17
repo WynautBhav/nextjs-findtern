@@ -5,6 +5,12 @@ import { feePaidSql } from "@/lib/fee-paid-sql";
 import { SETTLED_STATUSES } from "@/lib/refund-accounting";
 import { realEmployerId, realEmployers } from "@/lib/admin/scope";
 
+import { expiredAiRows } from "@/lib/admin/ai-interview-expiry";
+import { loadAiLinkRows } from "@/lib/admin/ai-link-queue-load";
+import { loadExpiredProposals } from "@/lib/admin/expired-load";
+import { getAiLinkExpiryDays } from "@/lib/platform-settings";
+
+import { expiriesInWindow, type Expiries } from "./expiries";
 import { baseCte } from "./interns-load";
 import type { Share } from "./overview";
 import { timed } from "./timing";
@@ -150,4 +156,18 @@ export async function loadAcquisition(w: ReportWindow): Promise<Acquisition> {
     ),
   ]);
   return { signups: n(paid?.signups), signedUpAndPaid: n(paid?.paid), college, promo, accountType: type };
+}
+
+/**
+ * Offers and AI interviews that expired in the window, by reason. The same loaders and pure rules as the tracker's and the AI
+ * page's Expired tabs (so a count equals its list), cut to the window on the expiry time. Throws on a database error: the
+ * section shows an inline error, never a false 0.
+ */
+export async function loadExpiries(w: ReportWindow, now: Date): Promise<Expiries> {
+  const [proposals, ai, days] = await Promise.all([
+    timed("overview", "expired-offers", () => loadExpiredProposals(now)),
+    timed("overview", "expired-ai", () => loadAiLinkRows()),
+    getAiLinkExpiryDays(),
+  ]);
+  return expiriesInWindow({ proposals, ai: expiredAiRows(ai, now, days) }, { since: w.since, until: w.until });
 }
