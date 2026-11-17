@@ -106,8 +106,8 @@ export default async function AiInterviewsPage({ searchParams }: { searchParams?
           <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
             <DateRangeForm params={params} fromLabel="Expired from" toLabel="Expired to" />
             <p className="max-w-prose text-sm text-text-subtle">
-              A link not completed within <span className="nums font-medium text-foreground">{days}</span> {days === 1 ? "day" : "days"} of being sent counts as expired. Missed and cancelled interviews are listed too. The send time comes from
-              when the link was last added or changed.
+              A link not completed within <span className="nums font-medium text-foreground">{days}</span> {days === 1 ? "day" : "days"} of being sent is expired. Missed, cancelled and no-show interviews are listed here too. Send time is when the link was
+              last added or changed.
             </p>
           </div>
           <nav aria-label="Expiry reason" className="flex flex-wrap gap-2">

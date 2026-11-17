@@ -662,7 +662,7 @@ function ExpiredTab({ params, page, perPage, search, pickers, rows }: TabProps &
   const pg = paginate(sorted, page, perPage);
   const chipHref = (r: ExpiryReason | null) => `${BASE}${toQueryString({ ...params, tab: "expired", reason: r ?? "", page: "" })}`;
   const chips: { key: ExpiryReason | null; label: string; n: number }[] = [
-    { key: null, label: "All", n: rows.length },
+    { key: null, label: "All reasons", n: rows.length },
     ...EXPIRED_REASONS.map((r) => ({ key: r, label: REASON_SHORT[r], n: counts[r] })),
   ];
   const lapsed = headlineCount(counts);
@@ -671,9 +671,8 @@ function ExpiredTab({ params, page, perPage, search, pickers, rows }: TabProps &
   return (
     <div className="space-y-3">
       <p className="text-sm text-text-subtle" data-testid="expired-summary">
-        <span className="nums font-medium text-foreground">{formatNumber(lapsed)}</span> expired ({HEADLINE_REASONS.map((r) => `${formatNumber(counts[r])} ${REASON_SHORT[r].toLowerCase()}`).join(", ")}).{" "}
-        Closed by hand and not counted as expired: <span className="nums">{formatNumber(counts.admin_closed)}</span> by Findtern, <span className="nums">{formatNumber(counts.withdrawn)}</span> withdrawn. Dates here are when the offer expired; an offer
-        that passed its start date but has not been swept yet still shows, dated at the start of that day (IST).
+        <span className="nums font-medium text-foreground">{formatNumber(lapsed)}</span> expired ({HEADLINE_REASONS.map((r) => `${formatNumber(counts[r])} ${REASON_SHORT[r].toLowerCase()}`).join(", ")}). Closed by hand, not counted as expired:{" "}
+        <span className="nums">{formatNumber(counts.admin_closed)}</span> by Findtern, <span className="nums">{formatNumber(counts.withdrawn)}</span> withdrawn, so the list below is longer. An offer past its start date that has not been marked yet still shows, dated at the start of that day (India time).
       </p>
       <nav aria-label="Expiry reason" className="flex flex-wrap gap-2">
         {chips.map((c) => {
@@ -712,49 +711,50 @@ function ExpiredTab({ params, page, perPage, search, pickers, rows }: TabProps &
         columns={[
           {
             header: "Reason",
-            cell: (r) => <StatusBadge tone={REASON_TONE[r.reason]} label={EXPIRY_LABEL[r.reason]} />,
+            cell: (r) => <StatusBadge tone={REASON_TONE[r.reason]} label={EXPIRY_LABEL[r.reason]} className="h-auto min-h-6 max-w-44 whitespace-normal py-1 leading-snug" />,
           },
           {
             header: "Candidate",
             sort: "candidate",
-            cell: (r) => <IdentityCell name={nameOf(r)} id={r.internId} href={`/admin/interns/${r.internId}`} sub={r.internEmail ?? "-"} size="sm" className="max-w-64" />,
+            cell: (r) => <IdentityCell name={nameOf(r)} id={r.internId} href={`/admin/interns/${r.internId}`} sub={r.internEmail ?? "-"} size="sm" className="min-w-0" />,
           },
           {
             header: "Company and project",
             sort: "company",
             cell: (r) => (
-              <div className="min-w-0 max-w-60">
-                <Link href={`/admin/companies/${r.employerId}`} className="block truncate font-medium text-foreground hover:underline">
+              <div className="min-w-0">
+                <Link href={`/admin/companies/${r.employerId}`} className="line-clamp-2 break-words font-medium text-foreground hover:underline" title={r.companyName ?? undefined}>
                   {r.companyName ?? "Company"}
                 </Link>
-                <p className="truncate text-xs text-text-subtle">{r.projectName ?? "Project"}</p>
+                <p className="line-clamp-2 break-words text-xs text-text-subtle" title={r.projectName ?? undefined}>
+                  {r.projectName ?? "Project"}
+                </p>
               </div>
             ),
           },
           {
-            header: "Offer",
-            align: "right",
+            header: "Offer and start",
+            sort: "start",
             cell: (r) => {
               const f = offerFacts(r);
               return (
-                <div className="whitespace-nowrap">
-                  <p className="nums font-medium text-foreground">
-                    {f.amountMinor == null ? "-" : `${formatMoney(f.amountMinor, f.currency)}${f.fullTime ? " CTC" : "/mo"}`}
+                <div>
+                  <p className="nums font-medium text-foreground">{f.amountMinor == null ? "-" : `${formatMoney(f.amountMinor, f.currency)}${f.fullTime ? " CTC" : "/mo"}`}</p>
+                  <p className="nums text-xs text-text-subtle">
+                    {f.fullTime ? "Full-time" : `${f.months} mo`} · starts {formatDate(f.startDay)}
                   </p>
-                  <p className="text-xs text-text-subtle">{f.fullTime ? "Full-time" : `${f.months} mo internship`}</p>
                 </div>
               );
             },
           },
-          { header: "Start", sort: "start", cell: (r) => <span className="nums whitespace-nowrap">{formatDate(offerFacts(r).startDay)}</span> },
           {
             header: "Expired",
             sort: "expired",
             cell: (r) => {
               const d = daysSince(r.at, now);
               return r.at ? (
-                <div className="whitespace-nowrap">
-                  <p className="nums text-foreground" title={formatIstStamp(r.at)}>
+                <div>
+                  <p className="nums text-foreground" title={`${formatIstStamp(r.at)} IST`}>
                     {r.atApprox ? "about " : ""}
                     {formatDate(r.at)}
                   </p>
@@ -767,14 +767,6 @@ function ExpiredTab({ params, page, perPage, search, pickers, rows }: TabProps &
                 <span className="text-text-subtle">Unknown</span>
               );
             },
-          },
-          {
-            header: "",
-            cell: (r) => (
-              <Link href={`${BASE}${toQueryString({ tab: "proposals", intern: r.internId, company: r.employerId })}`} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11 whitespace-nowrap")}>
-                View offer
-              </Link>
-            ),
           },
         ]}
       />

@@ -11,7 +11,11 @@ import { getAiLinkExpiryDays } from "@/lib/platform-settings";
  */
 export async function GET(req: Request) {
   return handleExpiredExport(req, {
-    session: getSession,
+    session: async () => {
+      // The live session (role and permissions re-read from the DB), admin only; the handler then checks interns:read.
+      const session = await getSession();
+      return !session || session.role !== "admin" ? null : session;
+    },
     loadProposals: loadExpiredProposals,
     loadAi: async () => {
       const [rows, days] = await Promise.all([loadAiLinkRows(), getAiLinkExpiryDays()]);

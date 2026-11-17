@@ -42,6 +42,7 @@ export function AiLinkRows({ rows, now, canWrite, state }: { rows: AiLinkListRow
 }
 
 const dayStamp = (d: Date | string | null) => (d ? shortDate(new Date(d), { day: "numeric", month: "short", year: "numeric" }) : "n/a");
+const ENDED_VERB: Record<AiExpiryReason, string> = { link_expired: "link ran out", missed: "marked missed", cancelled: "cancelled", no_show: "marked no-show" };
 const EXPIRED_TONE: Record<AiExpiryReason, "danger" | "warning" | "neutral"> = { link_expired: "danger", missed: "danger", cancelled: "neutral", no_show: "danger" };
 
 /**
@@ -69,20 +70,20 @@ export function AiExpiredRows({ rows, now, canWrite, days }: { rows: ExpiredAiRo
                 {r.at ? (
                   <>
                     {" · "}
-                    <span title={`${formatIstStamp(r.at)} IST`}>{r.reason === "link_expired" ? "expired" : "closed"} {dayStamp(r.at)}</span>
+                    <span title={`${formatIstStamp(r.at)} IST`}>{ENDED_VERB[r.reason]} {dayStamp(r.at)}</span>
                     <span className="font-medium text-foreground"> · {since === 0 ? "today" : `${since} ${since === 1 ? "day" : "days"} ago`}</span>
                   </>
                 ) : null}
               </p>
               <p className="mt-0.5 text-xs font-medium text-text-subtle">
-                Status: {String(r.status ?? "unknown").replace(/_/g, " ")} · {r.paid ? (r.promo ? "Promo activated" : "Paid") : "Unpaid"}
+                {r.reason === "link_expired" ? "Not taken" : String(r.status ?? "unknown").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())} · {r.paid ? (r.promo ? "Promo activated" : "Paid") : "Unpaid"}
               </p>
             </div>
             <div className="flex min-w-0 flex-col gap-2 sm:items-end">
               {canWrite && r.paid && r.reason === "link_expired" ? (
                 <>
                   <AiLinkAction interviewId={r.interviewId} label="Send a new link" />
-                  <p className="text-xs text-text-subtle sm:text-right">A different link restarts the {days}-day window; saving the same one does not.</p>
+                  <p className="text-xs text-text-subtle sm:text-right">A different link starts a new {days}-day window. Saving the same link changes nothing.</p>
                 </>
               ) : null}
               <Link href={`/admin/interns/${r.internId}`} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11 max-sm:w-full")}>
