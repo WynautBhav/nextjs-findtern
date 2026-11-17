@@ -123,6 +123,7 @@ export default async function CandidatesPage({
             active={data.effectiveSkills}
             projectSkills={data.activeProjectSkills}
             fromProject={!filters.skillsSet && filters.projectDefaults && data.activeProjectSkills.length > 0}
+            hasPro={data.pro.active}
           >
             {/* The selected project fills in its skills (and city); one quiet link turns that off. */}
             {projectToggle ? <span className="contents max-lg:hidden">{projectToggle}</span> : null}

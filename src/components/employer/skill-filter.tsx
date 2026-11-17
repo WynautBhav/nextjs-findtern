@@ -23,6 +23,7 @@ import { Check, Plus, X } from "lucide-react";
 
 import { suggestSkills } from "@/lib/data/skills";
 import { MAX_SKILLS } from "@/lib/onboarding";
+import { skillFilterHref } from "@/lib/skill-filter-href";
 import { arrowKey, limitNote } from "@/components/employer/skill-combobox";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ export function SkillFilter({
   title = "Required skills",
   note,
   className,
+  hasPro = false,
   children,
 }: {
   /** The skills the list is filtered by right now. */
@@ -45,6 +47,8 @@ export function SkillFilter({
   /** Replaces the line under the chips that explains how they filter. */
   note?: string;
   className?: string;
+  /** Findtern Pro is active: the chip links keep the Pro filters in the URL. Without it they are dropped (default). */
+  hasPro?: boolean;
   /** Trailing quiet links (e.g. "Show everyone"). */
   children?: React.ReactNode;
 }) {
@@ -74,12 +78,7 @@ export function SkillFilter({
    * over the project's list; `null` drops it so the project's skills apply.
    */
   function hrefWith(skills: string[] | null) {
-    const next = new URLSearchParams(params.toString());
-    if (skills === null) next.delete("skills");
-    else next.set("skills", skills.join(","));
-    next.delete("page"); // A new filter starts at page one.
-    const qs = next.toString();
-    return qs ? `${pathname}?${qs}` : pathname;
+    return skillFilterHref(pathname, params.toString(), skills, hasPro); // A new filter starts at page one.
   }
 
   function add(skill: string) {
