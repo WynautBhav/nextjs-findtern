@@ -10,6 +10,7 @@ import { sql } from "drizzle-orm";
 import { inrMinorToUsdMinor } from "./currency.ts";
 import { FULL_WAIVER_TYPE } from "./full-waiver.ts";
 import { formatMoney } from "./format.ts";
+import { PROMO_APPLIES_TO, promoAudienceProblem, type PromoAppliesTo, type PromoAudience } from "./promo-scope.ts";
 
 export type PromoRow = {
   code: string;
@@ -27,16 +28,7 @@ export type PromoRow = {
 
 type Currency = "INR" | "USD";
 
-export type PromoAudience = "intern" | "employer";
-export const PROMO_APPLIES_TO = ["intern", "employer", "both"] as const;
-export type PromoAppliesTo = (typeof PROMO_APPLIES_TO)[number];
-
-/** Why a code cannot be redeemed by this kind of account, or null. */
-export function promoAudienceProblem(appliesTo: string | null | undefined, audience: PromoAudience): string | null {
-  const scope = appliesTo ?? "both";
-  if (scope === "both" || scope === audience) return null;
-  return audience === "employer" ? "This code is for interns only" : "This code is for companies only";
-}
+export { PROMO_APPLIES_TO, promoAudienceProblem, type PromoAppliesTo, type PromoAudience };
 
 /**
  * A promo code is for an employer paying the whole engagement upfront, never

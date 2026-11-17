@@ -83,6 +83,10 @@ export async function quotePromo(input: {
   if (audience === "employer" && !waiver && employerPromoTooLarge(discountMinor, discountableMinor)) {
     return { ok: false, error: "This code can't be used on a hire. A code can't cover the whole monthly charge.", status: 400 };
   }
+  // A subscription code that would take the whole price is refused: free access is what a full-waiver code is for.
+  if (audience === "subscription" && !waiver && employerPromoTooLarge(discountMinor, discountableMinor)) {
+    return { ok: false, error: "This code can't cover the whole subscription price. Ask Findtern for a full-waiver code.", status: 400 };
+  }
   return { ok: true, promo: row, discountMinor, payableMinor: input.orderMinor - discountMinor };
 }
 

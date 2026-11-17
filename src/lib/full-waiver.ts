@@ -9,6 +9,7 @@
  * redemption and edit all check these here, and a row that breaks them (made by hand in SQL) is dead at redemption.
  */
 import type { PromoRow } from "./promo-rules.ts";
+import { promoAudienceProblem, type PromoAudience } from "./promo-scope.ts";
 
 export const FULL_WAIVER_TYPE = "full_waiver";
 export const WAIVER_PREFIX = "FREE-";
@@ -52,7 +53,7 @@ export function waiverPricing(orderMinor: number): { discountMinor: number; paya
 /** Admin create: why this waiver request is refused, or null. `validUntil` is an instant. */
 export function waiverCreateProblem(input: { maxUsages?: number | null; validUntil?: Date | null; appliesTo?: string | null; now?: Date }): string | null {
   const now = input.now ?? new Date();
-  if (input.appliesTo !== "employer" && input.appliesTo !== "intern" && input.appliesTo !== "both") return "Choose who can use this code: companies, interns or both";
+  if (input.appliesTo !== "employer" && input.appliesTo !== "intern" && input.appliesTo !== "both" && input.appliesTo !== "subscription") return "Choose who can use this code: hiring payments, interns, both or the subscription";
   const { maxUsages } = input;
   if (maxUsages == null || !Number.isInteger(maxUsages) || maxUsages < 1) return "Max uses is required: a whole number of at least 1";
   if (maxUsages > FULL_WAIVER_LIMITS.maxUsesCap) return `A full-waiver code can be used ${FULL_WAIVER_LIMITS.maxUsesCap} times at most`;
@@ -124,7 +125,7 @@ export function waiverOrderProblem(order: { gateway: string; amountMinor: number
  */
 export function waiverRedeemProblem(
   row: Pick<PromoRow, "discountType" | "isActive" | "validFrom" | "validUntil" | "maxUsages" | "usedCount"> & { appliesTo: string | null },
-  ctx: { audience: "employer" | "intern"; alreadyUsedByAccount: boolean; now?: Date },
+  ctx: { audience: PromoAudience; alreadyUsedByAccount: boolean; now?: Date },
 ): string | null {
   const now = ctx.now ?? new Date();
   if (!isFullWaiver(row) || !row.isActive) return "Invalid promo code";
@@ -133,8 +134,8 @@ export function waiverRedeemProblem(
   if (row.validFrom && row.validFrom > now) return "Promo code is not active yet";
   if (row.validUntil && row.validUntil < now) return "Promo code expired";
   if (row.maxUsages !== null && row.usedCount >= row.maxUsages) return "Promo code exhausted";
-  const scope = row.appliesTo ?? "both";
-  if (scope !== "both" && scope !== ctx.audience) return ctx.audience === "employer" ? "This code is for interns only" : "This code is for companies only";
+  const scope = promoAudienceProblem(row.appliesTo, ctx.audience);
+  if (scope) return scope;
   if (ctx.alreadyUsedByAccount) return "You have already used this code";
   return null;
 }
