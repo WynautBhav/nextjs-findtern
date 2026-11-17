@@ -7,6 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { notifyStipendPaid } from "@/lib/payments";
 import { canPayOut } from "@/lib/admin/payout-kind";
+import { payoutPatchAudit } from "@/lib/admin/payout-patch";
 import { proposalOf } from "@/lib/admin/stipend-dues";
 import { lockPlacement, queueNextMonth } from "@/lib/admin/stipend-queue";
 
@@ -54,6 +55,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       internId: schema.internPayouts.internId,
       kind: schema.internPayouts.kind,
       status: schema.internPayouts.status,
+      referenceId: schema.internPayouts.referenceId,
       amountMinor: schema.internPayouts.amountMinor,
       currency: schema.internPayouts.currency,
       method: schema.internPayouts.method,
@@ -99,6 +101,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   // Reopening takes the placement lock and re-checks for another pending
   // payout inside it, like the create path, so two reopens cannot both win.
   const reopenProposal = to === "pending" && existing.status !== "pending" ? proposalOf(existing.raw) : null;
+  // What the audit row records: marking paid has its own action; every other change (failed, reopened,
+  // a rewritten reference, a note) is `payout.update`. Written in the same transaction, strictly: a payout
+  // edit with no audit row rolls back instead of leaving an unlogged money change.
+  const auditEntry: { action: "payout.mark_paid" | "payout.update"; meta: Record<string, unknown> } | null =
+    to === "paid"
+      ? { action: "payout.mark_paid", meta: { internId: existing.internId, amountMinor: existing.amountMinor, referenceId: (body.referenceId ?? "").trim() } }
+      : (() => {
+          const meta = payoutPatchAudit({ internId: existing.internId, status: existing.status, referenceId: existing.referenceId, raw: existing.raw }, body);
+          return meta ? { action: "payout.update" as const, meta: { ...meta, amountMinor: existing.amountMinor } } : null;
+        })();
   const updated = await db.transaction(async (tx) => {
     if (reopenProposal) {
       await lockPlacement(tx, reopenProposal);
@@ -117,11 +129,15 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       if (other) return "other-pending" as const;
     }
     // Conditional on the status read above, so two admins cannot both mark it.
-    return tx
+    const rows = await tx
       .update(schema.internPayouts)
       .set(set)
       .where(and(eq(schema.internPayouts.id, id), eq(schema.internPayouts.status, existing.status)))
       .returning({ id: schema.internPayouts.id });
+    if (rows.length > 0 && auditEntry) {
+      await recordAdminAudit(tx, { adminId: guard.session.uid, action: auditEntry.action, targetType: "payout", targetId: id, meta: auditEntry.meta }, { strict: true });
+    }
+    return rows;
   });
   if (updated === "other-pending") {
     return NextResponse.json({ error: "Another payout is already pending for this placement" }, { status: 409 });
@@ -130,7 +146,6 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: "This payout changed meanwhile. Reload and try again." }, { status: 409 });
   }
 
-  if (to === "paid") await recordAdminAudit(db, { adminId: guard.session.uid, action: "payout.mark_paid", targetType: "payout", targetId: id, meta: { internId: existing.internId, amountMinor: existing.amountMinor, referenceId: body.referenceId } });
   let next = null;
   if (to === "paid") {
     // Queue first: the row is already "paid", so a retry would 409 and never queue.
