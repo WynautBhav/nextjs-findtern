@@ -7,7 +7,8 @@
  *
  * The server needs PAYMENTS_MODE=free, PAYMENTS_TEST_BUTTON=1, CRON_SECRET and RAZORPAY_WEBHOOK_SECRET (a payment then settles at
  * once, through the same settlement as a real one; E2E_WEBHOOK_SECRET is the webhook secret). Needs `npm run db:seed` data (hiring@northwind.dev, hiring@urbancompany-ds.dev).
- * Every row it makes is tagged and removed before and after. Refuses a non-loopback database.
+ * Every row it makes is tagged and removed before and after. One test redeems a full-waiver code, and the server throttles those
+ * per user and address in memory (a third run within the hour answers 429): restart the dev server between repeated runs. Refuses a non-loopback database.
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -98,7 +99,7 @@ before(async () => {
   await seedOffer("hired", { status: "hired", startOffset: -3, intern: s(7), hired: true });
   await seedOffer("startToday", { status: "accepted", startOffset: 0, intern: s(8) });
   await seedOffer("expiredAndCgpa", { status: "accepted", startOffset: -1, intern: s(9) });
-  for (const i of [3, 4, 9]) await clearCgpa(s(i));
+  for (const u of interns) await clearCgpa(u); // a re-run starts with no CGPA flag on any intern it uses
   await setCgpa(s(3), { status: "pending", claimedScore: "8.2", scoreType: "cgpa", semester: 5, requestedAt: new Date().toISOString() });
   await setCgpa(s(4), { status: "incorrect", claimedScore: "9.1", correctedScore: "8.0", scoreType: "cgpa", semester: 5, decidedAt: new Date(Date.now() - 3_600_000).toISOString(), decidedBy: "ops" });
   await setCgpa(s(9), { status: "pending", claimedScore: "8.2", scoreType: "cgpa", semester: 5, requestedAt: new Date().toISOString() });
@@ -114,6 +115,7 @@ after(async () => {
     writeFileSync(process.env.E2E_REPORT, md + "\n");
   }
   await clean();
+  for (const u of ids?.interns ?? []) await clearCgpa(u);
   await pool.end();
 });
 
