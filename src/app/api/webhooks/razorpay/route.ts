@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { webhookPayment } from "@/lib/payment-flags";
 import { settleEmployerOrder, settleInternOrder } from "@/lib/payments";
 import { verifyWebhookSignature } from "@/lib/razorpay";
 import { settleRefundWebhook } from "@/lib/refunds/refunds-db";
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
   }
 
-  let event: { event?: string; payload?: { payment?: { entity?: { order_id?: string; id?: string; status?: string } } } };
+  let event: { event?: string; payload?: { payment?: { entity?: { order_id?: string; id?: string; amount?: number; currency?: string; status?: string } } } };
   try {
     event = JSON.parse(rawBody);
   } catch {
@@ -38,17 +39,30 @@ export async function POST(req: Request) {
   }
   if (event.event !== "payment.captured" && event.event !== "order.paid") return NextResponse.json({ status: "ignored" });
 
-  const entity = event.payload?.payment?.entity;
-  const orderId = entity?.order_id;
-  const paymentId = entity?.id;
-  if (!orderId || !paymentId) return NextResponse.json({ status: "ignored" });
+  const payment = webhookPayment(event);
+  if (!payment) return NextResponse.json({ status: "ignored" });
+  const { orderId, paymentId, paid } = payment;
 
   try {
-    const intern = await settleInternOrder({ orderId, paymentId });
-    if (!intern.ok) await settleEmployerOrder({ orderId, paymentId });
+    // The amount Razorpay says was paid goes to settle, which compares it with the order's own stored amount.
+    const intern = await settleInternOrder({ orderId, paymentId, paid });
+    if (!intern.ok && intern.code === "amount_mismatch") return refused(orderId);
+    const employer = intern.ok ? null : await settleEmployerOrder({ orderId, paymentId, paid });
+    if (employer && !employer.ok && employer.code === "amount_mismatch") return refused(orderId);
+    // Money Razorpay took for an order we never created: 200 (a retry cannot fix it), but say so and leave a trail for accounts.
+    if (employer && !employer.ok && employer.status === 404) {
+      console.error(`[razorpay webhook] payment ${paymentId} names order ${orderId}, which is not ours; nothing settled`);
+      return NextResponse.json({ status: "unknown_order" });
+    }
     return NextResponse.json({ status: "ok" });
   } catch (error) {
     console.error("[razorpay webhook]", error);
     return NextResponse.json({ error: "Webhook error" }, { status: 500 });
   }
+}
+
+/** 200, not 4xx/5xx: Razorpay would retry the same wrong amount for days. The order carries the flag for accounts. */
+function refused(orderId: string) {
+  console.error(`[razorpay webhook] order ${orderId}: the amount paid does not match the order; not settled`);
+  return NextResponse.json({ status: "refused" });
 }

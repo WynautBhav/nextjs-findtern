@@ -1,6 +1,7 @@
 import { sql, type SQL, type SQLWrapper } from "drizzle-orm";
 
 import { shortDate } from "../format.ts";
+import { isSettledStatus } from "../refund-accounting.ts";
 import { toInrMinor } from "./money.ts";
 
 /**
@@ -181,6 +182,8 @@ export type LedgerRow = {
   amountMinor: number;
   currency: string;
   discountMinor?: number | null;
+  /** Refunded out of this order, in its own currency. The row stays collected: a refund is a contra record. */
+  refundedMinor?: number | null;
   /** Marked paid only by the profile flag: listed, never counted as money. */
   flagOnly?: boolean;
 };
@@ -199,22 +202,26 @@ export function ledgerTotals(rows: LedgerRow[], uncounted?: ReadonlySet<string>)
   let notCollectedMinor = 0;
   let notCollectedCount = 0;
   let markedPaidCount = 0;
+  let refundedMinor = 0;
   for (const r of rows) {
     if (r.flagOnly) {
       markedPaidCount += 1;
       continue;
     }
     if (uncounted?.has(r.id)) continue;
-    if (isPaid(r)) {
+    // Received money: paid, and the two refund labels (the order was paid first): the set Transactions counts.
+    if (isSettledStatus(r.status)) {
       collectedMinor += toInrMinor(r.amountMinor, r.currency);
       discountMinor += toInrMinor(r.discountMinor ?? 0, r.currency);
       collectedCount += 1;
+      refundedMinor += Math.min(toInrMinor(r.refundedMinor ?? 0, r.currency), toInrMinor(r.amountMinor, r.currency));
     } else {
       notCollectedMinor += toInrMinor(r.amountMinor, r.currency);
       notCollectedCount += 1;
     }
   }
-  return { collectedMinor, collectedCount, discountMinor, notCollectedMinor, notCollectedCount, markedPaidCount };
+  // collectedMinor stays gross (what was received); refunds are a separate figure and net is their difference.
+  return { collectedMinor, collectedCount, discountMinor, notCollectedMinor, notCollectedCount, markedPaidCount, refundedMinor, netCollectedMinor: collectedMinor - refundedMinor };
 }
 
 /** Net position: money received less money paid out and still owed to interns. */

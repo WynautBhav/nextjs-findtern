@@ -1,23 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { Download, Eye, Loader2 } from "lucide-react";
+import { Download, Eye, Loader2, Mail } from "lucide-react";
 
 import { StatusBadge } from "@/components/admin/status-badge";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { csrfFetch } from "@/lib/client-fetch";
 import { downloadCsv } from "@/lib/admin/csv";
+import { invoiceCsvColumns } from "@/lib/admin/invoice-csv";
 import {
   displayInvoiceNumber,
+  displayStatus,
   gatewayLabel,
   hasTaxInvoice,
   INVOICE_KINDS,
-  isPaidRow,
   type AdminInvoiceRow,
   type InvoiceKind,
 } from "@/lib/admin/invoice-rows";
-import { formatDate, formatIstStamp, formatMoney } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { placeOfSupply, splitGst } from "@/lib/gst";
 import { downloadInvoice, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
 import { adminInvoiceInput } from "@/lib/admin/invoice-print";
@@ -48,6 +50,25 @@ export function InvoiceRowActions({ row, kind, seller }: { row: AdminInvoiceRow;
   const [printing, setPrinting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const invoiceable = hasTaxInvoice(row);
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState<string | null>(null);
+
+  // Employer orders only: the mail goes to the company's address on the order.
+  async function resend() {
+    setSending(true);
+    setError(null);
+    setSent(null);
+    try {
+      const res = await csrfFetch(`/api/admin/orders/${encodeURIComponent(row.orderId)}/resend-invoice`, { method: "POST" });
+      const body = (await res.json().catch(() => ({}))) as { error?: string };
+      if (res.ok) setSent(`Sent to ${row.partyEmail}`);
+      else setError(body.error ?? "The invoice could not be sent.");
+    } catch {
+      setError("The invoice could not be sent. Check your connection and try again.");
+    } finally {
+      setSending(false);
+    }
+  }
 
   async function print() {
     setPrinting(true);
@@ -101,11 +122,23 @@ export function InvoiceRowActions({ row, kind, seller }: { row: AdminInvoiceRow;
             <Detail label={k.party}>{row.partyName}</Detail>
             {row.interns ? <Detail label="Interns">{row.interns.split("; ").join(", ")}</Detail> : null}
             <Detail label="Status">
-              <StatusBadge value={isPaidRow(row) ? "paid" : row.status} />
+              <StatusBadge value={displayStatus(row)} />
             </Detail>
             <Detail label="Amount">
               <span className="nums font-semibold">{money(row.amountMinor, row.currency)}</span>
             </Detail>
+            {(row.refundedMinor ?? 0) > 0 ? (
+              <Detail label="Refunded">
+                <span className="nums">
+                  {money(row.refundedMinor ?? 0, row.currency)} · net {money(Math.max(0, row.amountMinor - (row.refundedMinor ?? 0)), row.currency)}
+                </span>
+              </Detail>
+            ) : null}
+            {row.reviewReasons?.length ? (
+              <Detail label="Needs review">
+                <span className="text-danger">{row.reviewReasons.join(". ")}</span>
+              </Detail>
+            ) : null}
             <Detail label="GST included">
               <span className="nums">{money(row.amountMinor - gstBase(row), row.currency)}</span>
             </Detail>
@@ -120,8 +153,22 @@ export function InvoiceRowActions({ row, kind, seller }: { row: AdminInvoiceRow;
             <Detail label="Paid on">{row.paidAt ? formatDate(row.paidAt) : "-"}</Detail>
             <Detail label="Created">{formatDate(row.createdAt)}</Detail>
           </dl>
+          {sent ? <p role="status" className="text-sm font-medium text-brand-700">{sent}</p> : null}
+          {error && open ? <p role="alert" className="text-sm font-medium text-danger">{error}</p> : null}
           <div className="flex items-center justify-between gap-2 pt-2">
-            {invoiceable ? invoiceButton : <span className="text-sm text-ink-600">No tax invoice for unpaid or ₹0 rows.</span>}
+            {invoiceable ? (
+              <span className="flex flex-wrap items-center gap-1.5">
+                {invoiceButton}
+                {kind === "employer" ? (
+                  <button type="button" onClick={resend} disabled={sending} className={PILL_TONAL}>
+                    {sending ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <Mail className="size-3.5" aria-hidden />}
+                    Resend
+                  </button>
+                ) : null}
+              </span>
+            ) : (
+              <span className="text-sm text-ink-600">No tax invoice for unpaid or ₹0 rows.</span>
+            )}
             <button type="button" onClick={() => setOpen(false)} className={buttonClass({ variant: "light", size: "sm" })}>
               Close
             </button>
@@ -149,28 +196,7 @@ export function InvoiceCsvButton({ rows, kind }: { rows: AdminInvoiceRow[]; kind
   return (
     <button
       type="button"
-      onClick={() =>
-        downloadCsv(k.csv, rows, [
-          { header: "Invoice number", value: (r) => displayInvoiceNumber(r, k.invoicePrefix) ?? "" },
-          { header: "Order ID", value: (r) => r.orderId },
-          { header: "Payment ID", value: (r) => r.paymentId },
-          { header: "Gateway", value: (r) => r.gateway ?? "" },
-          { header: k.party, value: (r) => r.partyName },
-          { header: "Email", value: (r) => r.partyEmail },
-          ...(kind === "employer" ? [{ header: "Interns", value: (r: AdminInvoiceRow) => r.interns ?? "" }] : []),
-          { header: "Amount", value: (r) => (r.amountMinor / 100).toFixed(2) },
-          { header: "Currency", value: (r) => r.currency },
-          // 18% GST is included in INR amounts; USD (export) carries none.
-          { header: "Amount before GST", value: (r) => (gstBase(r) / 100).toFixed(2) },
-          { header: "GST", value: (r) => ((r.amountMinor - gstBase(r)) / 100).toFixed(2) },
-          { header: "Discount", value: (r) => ((r.discountMinor ?? 0) / 100).toFixed(2) },
-          { header: "Promo code", value: (r) => r.promoCode ?? "" },
-          { header: "Status", value: (r) => r.status },
-          { header: "Needs review", value: (r) => (r.needsReview ? "yes" : "") },
-          { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
-          { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
-        ])
-      }
+      onClick={() => downloadCsv(k.csv, rows, invoiceCsvColumns(kind))}
       className={PILL_TONAL}
     >
       <Download className="size-3.5" aria-hidden />

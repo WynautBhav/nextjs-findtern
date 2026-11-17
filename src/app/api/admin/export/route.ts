@@ -17,6 +17,8 @@ import { placeOfSupply, sellerStateCode, splitGst } from "@/lib/gst";
 import { formatIstStamp } from "@/lib/format";
 import { placeLabel } from "@/lib/invoice";
 import { dateRangeConditions } from "@/lib/admin/date-range";
+import { orderRefunds } from "@/lib/refund-accounting";
+import { orderReview } from "@/lib/payment-flags";
 import { paymentPromo } from "@/lib/admin/payment-promo";
 import { filterProposals, matchesSearch, parseIstDay, proposalTimezone, type TrackerFilters } from "@/lib/admin/tracker";
 import { parseOffer } from "@/lib/offer";
@@ -73,7 +75,7 @@ export async function GET(req: Request) {
     case "proposals":
       return exportProposals(req2.search, params);
     case "payments":
-      return exportPayments(req2.search, params);
+      return exportPayments(req2.search, params, session.uid);
     case "payouts":
       return exportPayouts(req2.search, params);
     case "intern-payments":
@@ -376,7 +378,7 @@ async function exportCollegeBatches(search: string, params: Record<string, strin
   return csvResponse(toCsv(rows, columns), csvFilename("college-payments"));
 }
 
-async function exportPayments(search: string, params: Record<string, string>) {
+async function exportPayments(search: string, params: Record<string, string>, adminId?: string) {
   if (params.source === "college") return exportCollegeBatches(search, params);
   const db = getDb();
 
@@ -396,8 +398,8 @@ async function exportPayments(search: string, params: Record<string, string>) {
     params.status ? eq(schema.employerPayments.status, params.status) : undefined,
     params.currency ? eq(schema.employerPayments.currency, params.currency) : undefined,
     since ? gte(schema.employerPayments.createdAt, since) : undefined,
-    // The custom From/To on the ledger (ADM-07).
-    ...dateRangeConditions(schema.employerPayments.createdAt, params),
+    // The custom From/To on the ledger (ADM-07), on the column the screen shows as Date (paid, else created).
+    ...dateRangeConditions(sql`coalesce(${schema.employerPayments.paidAt}, ${schema.employerPayments.createdAt})`, params),
   ].filter(Boolean) as SQL[];
   const combined = parts.length ? sql`${parts.reduce((acc, c) => sql`${acc} and ${c}`)}` : undefined;
 
@@ -446,12 +448,22 @@ async function exportPayments(search: string, params: Record<string, string>) {
     { header: "Place of supply", value: (r) => placeLabel(placeOf(r)) },
     { header: "Discount", value: (r) => (paymentPromo(r.raw, undefined, r.amountMinor).discountMinor / 100).toFixed(2) },
     { header: "Promo code", value: (r) => paymentPromo(r.raw).code ?? "" },
+    { header: "Refunded", value: (r) => (orderRefunds(r).refundedMinor / 100).toFixed(2) },
+    { header: "Net of refunds", value: (r) => ((r.amountMinor - orderRefunds(r).refundedMinor) / 100).toFixed(2) },
     { header: "Status", value: (r) => r.status },
+    { header: "Needs review", value: (r) => orderReview(r.raw).reasons.map((x) => x.label).join("; ") },
     { header: "Gateway", value: (r) => r.gateway },
     { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
     { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
   ];
 
+  // Billing data (company emails, GSTINs, amounts): fail closed like the candidate export, no audit row, no file.
+  try {
+    await recordAdminAudit(getDb(), { adminId: adminId ?? "unknown", action: "export.payments", targetType: "employer_payments", targetId: null, meta: { rows: rows.length, filters: params } }, { strict: true });
+  } catch (err) {
+    console.error("[admin/export] audit insert failed", err);
+    return NextResponse.json({ error: "Could not record the export" }, { status: 500 });
+  }
   return csvResponse(toCsv(rows, columns), csvFilename("payments"));
 }
 

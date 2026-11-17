@@ -5,11 +5,11 @@ import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { StatusBadge } from "@/components/admin/status-badge";
 import {
   displayInvoiceNumber,
+  displayStatus,
   filterInvoiceRows,
   gatewayLabel,
   INVOICE_KINDS,
   invoiceFilters,
-  isPaidRow,
   promoCodeOptions,
   sortInvoiceRows,
   type AdminInvoiceRow,
@@ -116,8 +116,8 @@ export function AdminInvoicesView({
       cell: (r) => (
         <div className="flex flex-col items-start gap-1">
           <span className="inline-flex flex-wrap items-center gap-1">
-            <StatusBadge value={isPaidRow(r) ? ((r.refundedMinor ?? 0) <= 0 ? "paid" : r.refundedMinor! >= r.amountMinor ? "refunded" : "partially_refunded") : r.status} />
-            {r.needsReview ? <StatusBadge tone="danger" label="Needs review" /> : null}
+            <StatusBadge value={displayStatus(r)} />
+            {r.needsReview ? <span title={r.reviewReasons?.join(". ")}><StatusBadge tone="danger" label="Needs review" /></span> : null}
             {r.flagOnly ? <StatusBadge tone="neutral" label="Marked paid" /> : null}
           </span>
           {kind === "employer" ? <span className="text-xs text-text-subtle">{gatewayLabel(r.gateway)}</span> : null}
@@ -143,14 +143,22 @@ export function AdminInvoicesView({
 
   return (
     <div className="space-y-[var(--admin-gap)] lg:space-y-6">
-      <StatGrid cols={3}>
+      <StatGrid cols={totals.refundedMinor > 0 ? 4 : 3}>
         <StatCard
           featured
           label="Collected"
           value={formatMoney(totals.collectedMinor, "INR", { zeroLabel: "₹0" })}
-          hint={`${formatNumber(totals.collectedCount)} paid ${k.noun} · USD at ₹100/$${totals.markedPaidCount ? ` · ${formatNumber(totals.markedPaidCount)} marked paid elsewhere, not counted` : ""}`}
+          hint={`${formatNumber(totals.collectedCount)} paid ${k.noun} · gross, before refunds · USD at ₹100/$${totals.markedPaidCount ? ` · ${formatNumber(totals.markedPaidCount)} marked paid elsewhere, not counted` : ""}`}
           tone="neutral"
         />
+        {totals.refundedMinor > 0 ? (
+          <StatCard
+            label="Refunded"
+            value={formatMoney(totals.refundedMinor, "INR", { zeroLabel: "₹0" })}
+            hint={`Net collected ${formatMoney(totals.netCollectedMinor, "INR", { zeroLabel: "₹0" })}`}
+            tone="neutral"
+          />
+        ) : null}
         <StatCard
           label="Discounts given"
           value={formatMoney(totals.discountMinor, "INR", { zeroLabel: "₹0" })}
@@ -186,6 +194,8 @@ export function AdminInvoicesView({
               { value: "created", label: "Pending" },
               { value: "failed", label: "Failed" },
               { value: "cancelled", label: "Cancelled" },
+              { value: "refunded", label: "Has a refund" },
+              { value: "review", label: "Needs review" },
             ],
           },
           ...(kind === "employer" ? [{ key: "currency", label: "Currency", options: [{ value: "INR", label: "INR" }, { value: "USD", label: "USD" }] }] : []),

@@ -4,6 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import { getInternActivationFeeMinor, getPerHireFeeSetting } from "@/lib/platform-settings";
 import { SETTLED_STATUSES } from "@/lib/refund-accounting";
 import { computeReceivables } from "@/lib/admin/receivables";
+import { refundedInrMinorWithin } from "@/lib/admin/refund-window";
 import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import { istDayKeys, istDayStart, istKeySql, istMonthKeys, istMonthStart, DRIVE_WAIVER_GATEWAY, isMoneyReceived, PAID_STATUS, receivedAtSql, utcSql, type Bucket } from "@/lib/admin/revenue";
 
@@ -155,9 +156,26 @@ export async function loadCollected(range: { since?: Date | null; until?: Date |
   return { receivedMinor: Number(r?.total ?? 0), receivedCount: Number(r?.n ?? 0), employerMinor: Number(r?.employer ?? 0), internMinor: Number(r?.intern ?? 0), collegeMinor: Number(r?.college ?? 0) };
 }
 
+/** Employer money refunded (INR minor) with the refund dated in [since, until): the contra to loadCollected, which stays gross. Test employers excluded. */
+export async function loadRefundedWithin(range: { since?: Date | null; until?: Date | null } = {}): Promise<number> {
+  const ep = schema.employerPayments;
+  const rows = await getDb()
+    .select({ status: ep.status, amountMinor: ep.amountMinor, currency: ep.currency, raw: ep.raw, paidAt: ep.paidAt })
+    .from(ep)
+    .where(sql`${ep.status} IN (${sql.join(SETTLED_STATUSES.map((x) => sql`${x}`), sql`, `)}) AND ${realEmployerId(ep.employerId)} AND (${ep.status} <> 'paid' OR jsonb_array_length(coalesce(${ep.raw}->'refunds', '[]'::jsonb)) > 0)`);
+  return refundedInrMinorWithin(rows, range);
+}
+
 /** Received in the last `days` India days including today (the "last 7 days" window). */
 export function loadCollectedLastDays(days: number, now: Date = new Date()): Promise<Collected> {
   return loadCollected({ since: istDayStart(istDayKeys(now, days)[0]) });
+}
+
+/** The same window, gross and net: what came in, what went back, and the difference (the dashboard's tile). */
+export async function loadNetCollectedLastDays(days: number, now: Date = new Date()): Promise<{ grossMinor: number; refundedMinor: number; netMinor: number }> {
+  const since = istDayStart(istDayKeys(now, days)[0]);
+  const [gross, refunded] = await Promise.all([loadCollected({ since }), loadRefundedWithin({ since })]);
+  return { grossMinor: gross.receivedMinor, refundedMinor: refunded, netMinor: gross.receivedMinor - refunded };
 }
 
 /** Received per India month / day, as maps keyed `YYYY-MM` / `YYYY-MM-DD`. */

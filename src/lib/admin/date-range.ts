@@ -1,4 +1,4 @@
-import { gte, lt, type AnyColumn, type SQL } from "drizzle-orm";
+import { gte, lt, type AnyColumn, type SQL, type SQLWrapper } from "drizzle-orm";
 
 /**
  * A custom From/To range from the query string (`YYYY-MM-DD`, both days
@@ -7,7 +7,9 @@ import { gte, lt, type AnyColumn, type SQL } from "drizzle-orm";
  * range and export every date (ADM-07).
  */
 export function parseDateRange(params: Record<string, string | undefined>): { from: Date | null; toExclusive: Date | null } {
-  const valid = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? Date.parse(v) : null);
+  // India days, like every other date on the admin screens: the day starts at 00:00 IST (UTC+5:30), not 00:00 UTC.
+  const IST_MS = 330 * 60_000;
+  const valid = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? Date.parse(v) - IST_MS : null);
   const from = valid(params.from);
   const to = valid(params.to);
   return {
@@ -16,7 +18,7 @@ export function parseDateRange(params: Record<string, string | undefined>): { fr
   };
 }
 
-export function dateRangeConditions(col: AnyColumn, params: Record<string, string | undefined>): SQL[] {
+export function dateRangeConditions(col: AnyColumn | SQLWrapper, params: Record<string, string | undefined>): SQL[] {
   const { from, toExclusive } = parseDateRange(params);
   return [from ? gte(col, from) : undefined, toExclusive ? lt(col, toExclusive) : undefined].filter(Boolean) as SQL[];
 }
