@@ -89,6 +89,8 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "refund.create": { created: 3, review: 1 },
   "refund.initiate": { refundId: "r-1", amountMinor: 250000, idempotencyKey: "k-1" },
   "refund.reconcile": { refundId: "r-1", from: "initiated", to: "refunded", gatewayRefundId: "rfnd_1", gatewayStatus: "processed", gatewayAmountMinor: 250000, storedAmountMinor: 250000 },
+  "refund.webhook": { refundId: "r-1", from: "initiated", to: "refunded", gatewayRefundId: "rfnd_1", reason: "drive_entitlement_after_payment", trigger: "razorpay webhook" },
+  "refund.employer_recorded": { orderId: "o-1", gatewayRefundId: "rfnd_1", amountMinor: 1000000, currency: "INR", refundedAfterMinor: 1000000, paidMinor: 2900000, trigger: "razorpay webhook" },
   "pricing.update": { plan: "Standard", changes: { monthlyPriceMinor: { from: 100000, to: 120000 }, featureList: { from: ["a"], to: ["a", "b"] } } },
   "settings.update": { value: { from: 99900, to: 149900 } },
   "identity.reveal": { field: "phone" },

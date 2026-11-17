@@ -39,7 +39,7 @@ test("mismatched confirm refused", () => {
 });
 
 function fake(opts: { recordThrows?: boolean } = {}) {
-  const row: RefundLike & { ambiguous?: boolean } = { id: "r1", internPaymentId: "p1", amountMinor: 250000, status: "eligible", idempotencyKey: "k" };
+  const row: RefundLike & { ambiguous?: boolean } = { id: "r1", internPaymentId: "p1", amountMinor: 250000, status: "eligible", idempotencyKey: "k", reason: "drive_entitlement_after_payment" };
   let tail: Promise<void> = Promise.resolve();
   // Serialises transactions like a row lock; each tx() call is its own short transaction.
   const tx = async <T,>(fn: (e: RefundExecutor) => Promise<T>): Promise<T> => {
@@ -101,6 +101,13 @@ test("refund made at the gateway but not recorded: row stays initiated for the w
   const r = await initiateRefundFlow({ tx, gateway: { refund: async () => ({ id: "rfnd_9" }) } }, input);
   assert.equal(r.ok, true);
   assert.equal(row.status, "initiated");
+});
+
+test("the initiate result carries the refund's reason so the audit row can name why, on success and on a gateway refusal", async () => {
+  const ok = await initiateRefundFlow({ tx: fake().tx, gateway: { refund: async () => ({ id: "rfnd_9" }) } }, input);
+  assert.equal(ok.ok && ok.refundReason, "drive_entitlement_after_payment");
+  const bad = await initiateRefundFlow({ tx: fake().tx, gateway: { refund: async () => { throw Object.assign(new Error("no"), { definite: true }); } } }, input);
+  assert.equal(!bad.ok && bad.refundReason, "drive_entitlement_after_payment");
 });
 
 test("webhook idempotence and ordering", () => {

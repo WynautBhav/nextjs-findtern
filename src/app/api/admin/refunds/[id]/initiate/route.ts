@@ -32,7 +32,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const audit = (outcome: string) =>
       recordAdminAudit(getDb(), {
         adminId: guard.session.uid, action: "refund.initiate", targetType: "payment_refunds", targetId: id,
-        meta: { refundId: id, amountMinor: body.amountMinor, idempotencyKey: idemKey, outcome },
+        meta: { refundId: id, amountMinor: body.amountMinor, idempotencyKey: idemKey, outcome, reason: result.refundReason ?? null },
       }).catch((e) => console.error("[admin/refunds] audit write failed after initiate", id, e)); // the refund already happened; do not hide it
     if (!result.ok) {
       if (result.reason === "gateway_error" || result.reason === "gateway_unknown") await audit(result.reason);

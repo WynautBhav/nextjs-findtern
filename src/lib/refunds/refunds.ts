@@ -23,6 +23,8 @@ export interface RefundLike {
   status: string;
   gatewayRefundId?: string | null;
   idempotencyKey: string;
+  /** Why the refund exists (drive_entitlement_after_payment, interview_consumed); for the audit row. */
+  reason?: string | null;
 }
 
 export type Eligibility = { eligible: true; amountMinor: number } | { eligible: false; reason: string };
@@ -98,8 +100,8 @@ export interface RefundOps {
 }
 
 export type InitiateResult =
-  | { ok: true; gatewayRefundId: string }
-  | { ok: false; reason: string; httpStatus: 404 | 409 | 422 | 502 };
+  | { ok: true; gatewayRefundId: string; refundReason: string | null }
+  | { ok: false; reason: string; httpStatus: 404 | 409 | 422 | 502; refundReason?: string | null };
 
 export function redactError(e: unknown): string {
   const msg = e instanceof Error ? e.message : String(e);
@@ -138,14 +140,14 @@ export async function initiateRefundFlow(
     const definite = (e as { definite?: boolean }).definite === true;
     const raw = { error: redactError(e), ...(definite ? {} : { ambiguous: true }) };
     await ops.tx((x) => (definite ? x.markFailed(refund.id, raw) : x.markAmbiguous(refund.id, raw)));
-    return { ok: false, reason: definite ? "gateway_error" : "gateway_unknown", httpStatus: 502 };
+    return { ok: false, reason: definite ? "gateway_error" : "gateway_unknown", httpStatus: 502, refundReason: refund.reason ?? null };
   }
   try {
     await ops.tx((x) => x.recordGatewayRefund(refund.id, res.id, res.raw ?? {}));
   } catch (e) {
     console.error("[refunds] gateway refund made but not recorded; the webhook will settle it", refund.id, redactError(e));
   }
-  return { ok: true, gatewayRefundId: res.id };
+  return { ok: true, gatewayRefundId: res.id, refundReason: refund.reason ?? null };
 }
 
 export type WebhookEvent = { event: "refund.processed" | "refund.failed"; gatewayRefundId: string };

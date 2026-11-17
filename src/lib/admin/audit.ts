@@ -51,6 +51,8 @@ export const AUDIT_ACTIONS = {
   "refund.create": "Created refund rows for students who got a drive seat",
   "refund.initiate": "Initiated a student refund",
   "refund.reconcile": "Refund status settled from Razorpay (automatic job)",
+  "refund.webhook": "Refund status settled by a Razorpay webhook (automatic)",
+  "refund.employer_recorded": "An employer order's refund recorded from Razorpay (automatic)",
   "promo.create": "Created a promo code",
   "promo.update": "Edited a promo code",
   "promo.delete": "Deleted a promo code",

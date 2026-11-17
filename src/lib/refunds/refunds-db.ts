@@ -5,18 +5,18 @@ import { createRefund } from "../razorpay.ts";
 import {
   applyWebhook, initiateRefundFlow, type InitiateResult, type RefundExecutor, type RefundGateway,
 } from "./refunds.ts";
-import { recordEmployerRefund, type EmployerRefundOutcome } from "./employer-refund.ts";
+import { AUDIT_SQL, recordEmployerRefund, WEBHOOK_ACTOR, type EmployerRefundOutcome } from "./employer-refund.ts";
 import { parseRefundWebhook, planScan, type RazorpayRefundPayload, type ScanRow } from "./refunds-plan.ts";
 
 export function pgExecutor(c: PgClient): RefundExecutor {
   return {
     async lockRefund(id) {
       const r = await c.query(
-        `SELECT id, intern_payment_id, amount_minor, status, gateway_refund_id, idempotency_key FROM payment_refunds WHERE id=$1 FOR UPDATE`,
+        `SELECT id, intern_payment_id, amount_minor, status, gateway_refund_id, idempotency_key, reason FROM payment_refunds WHERE id=$1 FOR UPDATE`,
         [id],
       );
       const x = r.rows[0];
-      return x ? { id: x.id, internPaymentId: x.intern_payment_id, amountMinor: x.amount_minor, status: x.status, gatewayRefundId: x.gateway_refund_id, idempotencyKey: x.idempotency_key } : null;
+      return x ? { id: x.id, internPaymentId: x.intern_payment_id, amountMinor: x.amount_minor, status: x.status, gatewayRefundId: x.gateway_refund_id, idempotencyKey: x.idempotency_key, reason: x.reason ?? null } : null;
     },
     async getGatewayPaymentId(internPaymentId) {
       const r = await c.query(`SELECT payment_id FROM intern_payments WHERE id=$1`, [internPaymentId]);
@@ -118,7 +118,7 @@ export async function settleRefundWebhook(body: RazorpayRefundPayload): Promise<
   if (!ev) return "ignored";
   const pool = getDb().$client;
   const found = await pool.query(
-    `SELECT id, status FROM payment_refunds WHERE gateway_refund_id=$1 OR ($2::text IS NOT NULL AND idempotency_key=$2) LIMIT 1`,
+    `SELECT id, status, reason FROM payment_refunds WHERE gateway_refund_id=$1 OR ($2::text IS NOT NULL AND idempotency_key=$2) LIMIT 1`,
     [ev.gatewayRefundId, ev.receipt],
   );
   const row = found.rows[0];
@@ -136,5 +136,10 @@ export async function settleRefundWebhook(body: RazorpayRefundPayload): Promise<
       WHERE id=$1 AND status='initiated'`,
     [row.id, next, ev.gatewayRefundId, JSON.stringify(body.payload?.refund?.entity ?? {})],
   );
-  return upd.rowCount ? next : "noop";
+  if (!upd.rowCount) return "noop";
+  // The status change is the record; the audit row names the system actor and the refund's reason. A failed audit write must not fail the webhook (Razorpay would retry a settled refund).
+  await pool
+    .query(AUDIT_SQL, [WEBHOOK_ACTOR, "refund.webhook", "payment_refunds", row.id, JSON.stringify({ refundId: row.id, from: row.status, to: next, gatewayRefundId: ev.gatewayRefundId, reason: row.reason ?? null, trigger: "razorpay webhook" })])
+    .catch((e) => console.error("[refunds] webhook audit write failed", row.id, e));
+  return next;
 }

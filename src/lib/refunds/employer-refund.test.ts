@@ -7,8 +7,10 @@ import { recordEmployerRefund, type EmployerRefundEvent } from "./employer-refun
 /** A one-table fake of employer_payments: enough SQL to prove the order of operations, with no database. */
 function fakeClient(rows: Record<string, { id: string; status: string; amount_minor: number; currency: string; raw: Record<string, unknown> }>) {
   const log: string[] = [];
+  const audits: { adminId: unknown; target: unknown; meta: Record<string, unknown> }[] = [];
   return {
     log,
+    audits,
     rows,
     async query(sql: string, params: unknown[] = []) {
       const q = sql.replace(/\s+/g, " ").trim();
@@ -17,6 +19,13 @@ function fakeClient(rows: Record<string, { id: string; status: string; amount_mi
         assert.match(q, /FOR UPDATE/, "the order row is locked before the refund list is read");
         const r = Object.values(rows).find((x) => (x as { payment_id?: string }).payment_id === params[0]);
         return { rows: r ? [r] : [], rowCount: r ? 1 : 0 };
+      }
+      if (q.startsWith("INSERT")) {
+        assert.match(q, /admin_audit_log/);
+        assert.equal(params[1], "refund.employer_recorded");
+        assert.equal(params[2], "employer_payments");
+        audits.push({ adminId: params[0], target: params[3], meta: JSON.parse(String(params[4])) });
+        return { rows: [], rowCount: 1 };
       }
       if (q.startsWith("UPDATE")) {
         assert.doesNotMatch(q, /status\s*=/, "the order's status label is not rewritten: the payment stays as recorded");
@@ -35,6 +44,16 @@ test("a processed refund event is stored on the order's refund list", async () =
   const c = fakeClient(order());
   assert.equal(await recordEmployerRefund(c, ev()), "recorded");
   assert.equal(orderRefunds({ status: "paid", amountMinor: 2_900_000, currency: "INR", raw: c.rows.o1.raw }).refundedMinor, 1_000_000);
+});
+
+test("recording writes one audit row naming the system actor, the order, the refund id and the amounts; a replay writes none", async () => {
+  const c = fakeClient(order());
+  await recordEmployerRefund(c, ev());
+  await recordEmployerRefund(c, ev());
+  assert.equal(c.audits.length, 1);
+  assert.equal(c.audits[0].adminId, "system:refund-webhook");
+  assert.equal(c.audits[0].target, "o1");
+  assert.deepEqual(c.audits[0].meta, { orderId: "o1", gatewayRefundId: "rfnd_1", amountMinor: 1_000_000, currency: "INR", refundedAfterMinor: 1_000_000, paidMinor: 2_900_000, trigger: "razorpay webhook" });
 });
 
 test("the same event delivered twice counts once", async () => {
