@@ -1,5 +1,6 @@
 import { guaranteeEnded, guaranteeMisses } from "../guarantee.ts";
 import { parseOffer } from "../offer.ts";
+import { expiryOf, type ExpiryReason } from "../proposal-expiry.ts";
 
 /**
  * Proposal tracker filters (legacy admin-proposal-tracker.tsx), as pure
@@ -117,4 +118,125 @@ export function ineligibleInterns(
   const out = new Set<string>();
   for (const [id, rows] of byIntern) if (guaranteeEnded(extraByIntern.get(id), guaranteeMisses(rows, now))) out.add(id);
   return out;
+}
+
+/**
+ * Expired offers (the pipeline's Expired tab, its CSV and the Reports card). ONE definition: `expiryOf`
+ * (proposal-expiry.ts), computed on read so an offer the sweeper has not yet written still shows, plus
+ * status `withdrawn` (which expiryOf does not know: a withdrawn offer is a closure, not a lapse).
+ *
+ * Headline ("Expired" count): the three reasons where the offer lapsed on its own or was lost to another
+ * offer. `admin_closed` and `withdrawn` are deliberate closures by a person: own chips, never in the headline.
+ *
+ * Expiry time: the stored `expiredAt`, else the start-day boundary (computed rows). A legacy `expired` row with
+ * no stamp, and `withdrawn`, have no event time of their own: `updated_at` stands in and the row is marked
+ * `atApprox`. Open order: the loader passes the proposal ids with an unpaid order inside its 30-minute window
+ * (the sweeper's own freeze rule); without it an in-checkout offer would read as expired.
+ */
+export const HEADLINE_REASONS: ExpiryReason[] = ["no_reply_past_start", "unpaid_past_start", "accepted_elsewhere"];
+export const EXPIRED_REASONS: ExpiryReason[] = [...HEADLINE_REASONS, "admin_closed", "withdrawn"];
+
+export type ExpiredSource = {
+  id: string;
+  status: string;
+  currency: string | null;
+  offerDetails: unknown;
+  hiredAt: Date | null;
+  updatedAt: Date | null;
+  internId: string;
+  internFirstName: string | null;
+  internLastName: string | null;
+  internEmail: string | null;
+  employerId: string;
+  companyName: string | null;
+  projectId: string;
+  projectName: string | null;
+  projectTimezone: string | null;
+};
+
+export type ExpiredRow<S extends ExpiredSource = ExpiredSource> = S & {
+  reason: ExpiryReason;
+  /** When it expired; null when no time is known. */
+  at: Date | null;
+  /** `at` is the row's last update, not an event time. */
+  atApprox: boolean;
+  /** The sweeper (or an admin) already wrote status `expired`; false = computed on read. */
+  persisted: boolean;
+};
+
+export function expiredProposals<S extends ExpiredSource>(rows: S[], now: Date, openOrderIds: ReadonlySet<string> = new Set()): ExpiredRow<S>[] {
+  const out: ExpiredRow<S>[] = [];
+  for (const p of rows) {
+    if (p.hiredAt) continue;
+    if (p.status === "withdrawn") {
+      out.push({ ...p, reason: "withdrawn", at: p.updatedAt, atApprox: true, persisted: true });
+      continue;
+    }
+    const e = expiryOf({ status: p.status, hiredAt: p.hiredAt, offerDetails: p.offerDetails, currency: p.currency, hasOpenOrder: p.status === "accepted" && openOrderIds.has(p.id) }, now);
+    if (!e.expired || !e.reason) continue;
+    const stored = e.at ? new Date(e.at) : null;
+    const approx = p.status === "expired" && !stored;
+    out.push({ ...p, reason: e.reason, at: stored ?? (approx ? p.updatedAt : null), atApprox: approx && p.updatedAt !== null, persisted: p.status === "expired" });
+  }
+  return out;
+}
+
+export type ExpiredFilters = {
+  reason: string;
+  q: string;
+  company: string;
+  intern: string;
+  tz: string;
+  /** Expiry time range: since inclusive, until exclusive. */
+  since: Date | null;
+  until: Date | null;
+};
+
+/** The Expired tab's, the CSV's and the Reports card's filters from one URL bag. `from`/`to` are IST days of the EXPIRY (to is the whole day). */
+export function parseExpiredFilters(params: Record<string, string | undefined>): ExpiredFilters {
+  const to = parseIstDay(params.to, true);
+  return {
+    reason: (EXPIRED_REASONS as string[]).includes(params.reason ?? "") ? (params.reason as string) : "",
+    q: (params.q ?? "").trim(),
+    company: params.company ?? "",
+    intern: params.intern ?? "",
+    tz: params.tz ?? "",
+    since: parseIstDay(params.from),
+    until: to ? new Date(to.getTime() + 1) : null,
+  };
+}
+
+const nameOfExpired = (r: ExpiredSource) => `${r.internFirstName ?? ""} ${r.internLastName ?? ""}`.trim();
+
+/** Applies every filter; the Expired tab's chip counts run this with `reason` cleared. */
+export function filterExpired<R extends ExpiredRow>(rows: R[], f: ExpiredFilters): R[] {
+  return rows.filter(
+    (r) =>
+      (!f.reason || r.reason === f.reason) &&
+      (!f.company || r.employerId === f.company) &&
+      (!f.intern || r.internId === f.intern) &&
+      (!f.tz || proposalTimezone({ offerDetails: r.offerDetails, currency: r.currency, projectTimezone: r.projectTimezone }) === f.tz) &&
+      ((!f.since && !f.until) || (r.at !== null && (!f.since || r.at >= f.since) && (!f.until || r.at < f.until))) &&
+      matchesSearch([nameOfExpired(r), r.internEmail, r.companyName, r.projectName], f.q),
+  );
+}
+
+export function expiredCounts(rows: { reason: ExpiryReason }[]): Record<ExpiryReason, number> {
+  const out = Object.fromEntries(EXPIRED_REASONS.map((r) => [r, 0])) as Record<ExpiryReason, number>;
+  for (const r of rows) out[r.reason] += 1;
+  return out;
+}
+
+export const headlineCount = (c: Record<ExpiryReason, number>) => HEADLINE_REASONS.reduce((n, r) => n + c[r], 0);
+
+/** What the tracker's cards already show of an offer: start day, and the monthly amount (internship) or CTC (full-time), in minor units. */
+export function offerFacts(p: { offerDetails: unknown; currency: string | null }): { startDay: string | null; fullTime: boolean; amountMinor: number | null; months: number | null; currency: string } {
+  const o = parseOffer(p.offerDetails, p.currency);
+  return {
+    startDay: o.startDate ? String(o.startDate).slice(0, 10) : null,
+    fullTime: Boolean(o.fullTime),
+    amountMinor: o.fullTime ? o.fullTime.annualCtcMinor : o.monthlyMinor,
+    months: o.fullTime ? null : o.months,
+    currency: o.currency,
+  };
 }

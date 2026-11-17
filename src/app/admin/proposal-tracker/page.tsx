@@ -4,7 +4,8 @@ import { Download } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
 import { flattenParams, parsePageRequest, toQueryString } from "@/lib/admin/params";
 import { isTestEmployer } from "@/lib/admin/scope";
-import { filterInterviews, filterProposals, ineligibleInterns, parseIstDay, proposalTimezone, type TrackerFilters } from "@/lib/admin/tracker";
+import { expiredCounts, expiredProposals, filterExpired, filterInterviews, filterProposals, headlineCount, ineligibleInterns, parseExpiredFilters, parseIstDay, proposalTimezone, type TrackerFilters } from "@/lib/admin/tracker";
+import { loadExpiredSources } from "@/lib/admin/expired-load";
 import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
 import { formatNumber } from "@/lib/format";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
@@ -23,7 +24,7 @@ import { ButtonAnchor } from "@/components/ui/button";
 
 async function load() {
   const db = getDb();
-  const [employers, proposals, interviews, onboarding] = await Promise.all([
+  const [employers, proposals, interviews, onboarding, expiredSources] = await Promise.all([
     db
       .select({
         id: schema.employers.id,
@@ -91,10 +92,11 @@ async function load() {
       .select({ userId: schema.internOnboarding.userId, endedAt: sql<string | null>`${schema.internOnboarding.extraData}->>'guaranteeEndedAt'` })
       .from(schema.internOnboarding)
       .where(sql`${schema.internOnboarding.extraData} ? 'guaranteeEndedAt'`),
+    loadExpiredSources(),
   ]);
   // From every proposal, not the filtered page rows: same inputs as the intern's own offer page.
   const noGuarantee = ineligibleInterns(proposals, new Map(onboarding.map((o) => [o.userId, { guaranteeEndedAt: o.endedAt }])));
-  return { noGuarantee, employers, proposals, interviews: interviews.map(({ companyEmail, ...i }) => ({ ...i, isAi: isAiInterview(i.employerId, companyEmail) })) };
+  return { noGuarantee, expiredSources, employers, proposals, interviews: interviews.map(({ companyEmail, ...i }) => ({ ...i, isAi: isAiInterview(i.employerId, companyEmail) })) };
 }
 
 type TrackerData = Awaited<ReturnType<typeof load>>;
@@ -122,14 +124,16 @@ export default async function AdminProposalTrackerPage({
           href={
             tab === "hired"
               ? `/api/admin/export/hired${toQueryString({ ...params, tab: "", page: "", per: "" })}`
-              : `/api/admin/export${toQueryString({ ...params, type: "proposals", tab: "", page: "", per: "" })}`
+              : tab === "expired"
+                ? `/api/admin/expired${toQueryString({ ...params, type: "proposals", tab: "", page: "", per: "", sort: "", dir: "" })}`
+                : `/api/admin/export${toQueryString({ ...params, type: "proposals", tab: "", page: "", per: "" })}`
           }
           variant="outline"
           size="sm"
           className={ADMIN_PILL_SECONDARY}
         >
           <Download className="size-4" aria-hidden />
-          {tab === "hired" ? "Export hires" : "Export CSV"}
+          {tab === "hired" ? "Export hires" : tab === "expired" ? "Export expired" : "Export CSV"}
         </ButtonAnchor>
       }
     />
@@ -184,6 +188,10 @@ export default async function AdminProposalTrackerPage({
     const s = i.selectedSlot === 1 ? i.slot1 : i.selectedSlot === 2 ? i.slot2 : i.selectedSlot === 3 ? i.slot3 : null;
     return i.status === "scheduled" && s && s.getTime() > now;
   }).length;
+  // Expired offers: on this tab the date range is the EXPIRY date (every other tab filters on when the offer was sent).
+  const expiredNow = new Date();
+  const expired = filterExpired(expiredProposals(data.expiredSources.rows, expiredNow, data.expiredSources.openOrderIds), { ...parseExpiredFilters(params), reason: "", q: "" });
+  const expiredHeadline = headlineCount(expiredCounts(expired));
   const rangeLabel = filters.from || filters.to ? `${params.from ?? "start"} to ${params.to ?? "today"}` : "All time";
   const req = parsePageRequest(params);
 
@@ -194,15 +202,23 @@ export default async function AdminProposalTrackerPage({
       {/* Date range and the period's figures in one row; the four tiles
           repeated the tab counts below (critique). */}
       <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
-        <DateRangeForm params={params} />
-        <p className="nums pb-2 text-sm text-text-subtle">
-          <span className="font-medium text-foreground">{rangeLabel}</span>
-          {" · "}
-          {formatNumber(won)} accepted or hired
-          {rate === null ? "" : ` (${rate}% of decided offers, ${formatNumber(lost)} declined)`}
-          {" · "}
-          {upcoming ? `${formatNumber(upcoming)} interviews upcoming` : "no interviews upcoming"}
-        </p>
+        <DateRangeForm params={params} fromLabel={tab === "expired" ? "Expired from" : "From"} toLabel={tab === "expired" ? "Expired to" : "To"} />
+        {tab === "expired" ? (
+          <p className="nums pb-2 text-sm text-text-subtle">
+            <span className="font-medium text-foreground">{filters.from || filters.to ? `Expired ${rangeLabel}` : "All time"}</span>
+            {" · "}
+            {formatNumber(expiredHeadline)} expired
+          </p>
+        ) : (
+          <p className="nums pb-2 text-sm text-text-subtle">
+            <span className="font-medium text-foreground">{rangeLabel}</span>
+            {" · "}
+            {formatNumber(won)} accepted or hired
+            {rate === null ? "" : ` (${rate}% of decided offers, ${formatNumber(lost)} declined)`}
+            {" · "}
+            {upcoming ? `${formatNumber(upcoming)} interviews upcoming` : "no interviews upcoming"}
+          </p>
+        )}
       </div>
 
       <ProposalTrackerView
@@ -215,6 +231,7 @@ export default async function AdminProposalTrackerPage({
         proposals={proposals}
         interviews={interviews}
         noGuarantee={data.noGuarantee}
+        expired={expired}
         options={{ companies: companyOptions, interns: internOptions, timezones: tzOptions }}
       />
     </div>

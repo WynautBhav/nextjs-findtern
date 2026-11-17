@@ -4,6 +4,7 @@ import { SectionSkeleton } from "@/components/admin/reports/skeletons";
 
 import type { TabProps } from "../types";
 import Conversion from "./conversion";
+import Expiries from "./expiries";
 import Growth from "./growth";
 import HiringAnalytics from "./hiring-analytics";
 import PlatformSummary from "./platform-summary";
@@ -21,6 +22,9 @@ export default function OverviewTab(props: TabProps) {
       </Suspense>
       <Suspense fallback={<SectionSkeleton label="Loading conversion" height="h-72" />}>
         <Conversion {...props} />
+      </Suspense>
+      <Suspense fallback={<SectionSkeleton label="Loading expiries" height="h-56" />}>
+        <Expiries {...props} />
       </Suspense>
       <Suspense fallback={<SectionSkeleton label="Loading the platform summary" strip />}>
         <PlatformSummary {...props} />
