@@ -57,8 +57,12 @@ export type MoneyStuck = {
   /** Sum of pending stipend payouts due now or within 3 days, in INR minor units. */
   dueToInternsMinor: number;
   payoutCount: number;
-  /** Collected in the last 7 India days, from lib/admin/revenue (the one money layer). */
+  /** Collected in the last 7 India days NET of refunds made in the same window (gross - refunded), the dashboard's headline. */
   collectedWeekMinor: number;
+  /** The gross part: money received in the window. */
+  collectedGrossWeekMinor: number;
+  /** The refunds made in the window. */
+  refundedWeekMinor: number;
 };
 
 export type DashboardQueues = {

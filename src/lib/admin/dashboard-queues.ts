@@ -7,7 +7,7 @@ import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { formatMoney, shortDate, shortDateTime } from "@/lib/format";
 import { formatPeriodDays } from "@/lib/timesheet-days";
 import { AI_INTERVIEW_EMAIL, inrMinorSql, realEmployerId, TEST_EMPLOYER_ID } from "@/lib/admin/scope";
-import { loadCollectedLastDays } from "@/lib/admin/receivables-load";
+import { loadNetCollectedLastDays } from "@/lib/admin/receivables-load";
 import type { DashboardQueues, MoneyStuck, QueueGroup, QueueKey, QueueRecord } from "@/lib/admin/dashboard-queues.types";
 import {
   ageInDays,
@@ -525,19 +525,18 @@ export async function loadDashboardQueues(now: Date = new Date()): Promise<Dashb
     }),
     settle("sheets", () => loadSheets(now, weekAgo)),
     // The one money layer; the week is the last 7 India days, as on Transactions. MoneyStuck has no error flag, so a failure is logged and reads 0.
-    loadCollectedLastDays(7, now)
-      .then((c) => c.receivedMinor)
-      .catch((error) => {
-        console.error("[admin/dashboard] collected failed", error);
-        return 0;
-      }),
+    // Net of refunds (money back in the same week), with both parts kept so the tile can label them.
+    loadNetCollectedLastDays(7, now).catch((error) => {
+      console.error("[admin/dashboard] collected failed", error);
+      return { grossMinor: 0, refundedMinor: 0, netMinor: 0 };
+    }),
   ]);
 
   const byKey: Record<QueueKey, QueueGroup> = { calendar, payouts, nolink, unscored, messages, accepted, sheets };
   const groups = QUEUE_ORDER.map((k) => byKey[k]);
   return {
     groups,
-    money: { ...acceptedMoney, ...payoutMoney, collectedWeekMinor: collected },
+    money: { ...acceptedMoney, ...payoutMoney, collectedWeekMinor: collected.netMinor, collectedGrossWeekMinor: collected.grossMinor, refundedWeekMinor: collected.refundedMinor },
     ...totalOf(groups),
   };
 }

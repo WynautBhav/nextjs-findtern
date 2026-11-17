@@ -1,4 +1,5 @@
 import type { MoneyStuck } from "@/lib/admin/dashboard-queues.types";
+import { collectedCaption } from "@/lib/admin/collected-caption";
 import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { cn } from "@/lib/utils";
 import { plural } from "./format";
@@ -25,9 +26,9 @@ export function MoneyStrip({ money }: { money: MoneyStuck }) {
     },
     {
       key: "collected",
-      label: "Collected",
+      label: "Collected, net of refunds",
       value: money.collectedWeekMinor,
-      caption: "last 7 days, India time",
+      caption: collectedCaption(money),
       testId: "collected-week",
     },
   ];

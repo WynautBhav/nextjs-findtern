@@ -4,6 +4,7 @@ import { TickCount } from "@/components/admin/triage/tick-count";
 import { cn } from "@/lib/utils";
 import { plural } from "@/components/admin/triage/format";
 import type { MoneyStuck } from "@/lib/admin/dashboard-queues.types";
+import { collectedCaption } from "@/lib/admin/collected-caption";
 
 /**
  * Money stuck on both sides and what came in: a white card with three figures (the hero tile is the
@@ -26,9 +27,9 @@ export function MoneyCard({ money, payoutsHref }: { money: MoneyStuck; payoutsHr
     },
     {
       key: "collected",
-      label: "Collected",
+      label: "Collected, net of refunds",
       value: money.collectedWeekMinor,
-      caption: "last 7 days, India time",
+      caption: collectedCaption(money),
       testId: "collected-week",
     },
   ];
