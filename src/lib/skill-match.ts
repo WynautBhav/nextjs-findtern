@@ -73,7 +73,9 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
 export function getCategoryKeywords(categoryName: string): string[] {
   const norm = categoryName.toLowerCase().trim();
   for (const [key, keywords] of Object.entries(CATEGORY_KEYWORDS)) {
-    if (norm === key || norm.includes(key) || key.includes(norm)) {
+    // A shortened category ("Tech", "Social media") finds its category, but a 1-3 letter skill name ("R", "C", "UI") is
+    // not a category: as a substring of "human resource" it used to return every HR candidate.
+    if (norm === key || norm.includes(key) || (norm.length >= 4 && key.includes(norm))) {
       return keywords;
     }
   }

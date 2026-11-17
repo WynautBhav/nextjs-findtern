@@ -34,3 +34,17 @@ test("a featured skill with regex characters in its name matches by its literal 
     assert.doesNotThrow(() => studentsForSkill(withCpp, odd), `skill name ${JSON.stringify(odd)}`);
   }
 });
+
+test("a short skill name is not mistaken for a category it happens to sit inside", () => {
+  const p = [s(undefined, ["R", "Statistics"]), s(undefined, ["Recruitment", "Payroll"]), s("Human Resource", ["HRMS"])];
+  // "r" is a substring of "human resource"; "C" and "R" used to return every HR candidate.
+  assert.equal(studentsForSkill(p, "R").length, 1);
+  assert.equal(studentsForSkill(p, "C").length, 0);
+  assert.equal(studentsForSkill(p, "Ru").length, 0);
+});
+
+test("a shortened category name still finds its category", () => {
+  assert.equal(studentsForSkill(pool, "Tech").length, 1);
+  assert.equal(studentsForSkill(pool, "Social Media").length, 0);
+  assert.equal(studentsForSkill([s(undefined, ["Reels"])], "Social Media").length, 1);
+});
