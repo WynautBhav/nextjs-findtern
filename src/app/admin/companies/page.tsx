@@ -13,6 +13,7 @@ import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-tabl
 import { CompanyActiveToggle, CompanyFteSelect } from "@/components/admin/company-controls";
 import { getSession } from "@/lib/auth";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
+import { SETTLED_STATUSES } from "@/lib/refund-accounting";
 import { fteOf } from "@/lib/admin/fte";
 import { canWrite } from "@/lib/admin/permissions";
 import { StatusBadge } from "@/components/admin/status-badge";
@@ -30,7 +31,7 @@ const SORTS = ["name", "joined", "country", "projects", "proposals", "hires", "p
 const projectCount = sql<number>`(select count(*)::int from ${schema.projects} p where p.employer_id = ${q(schema.employers, schema.employers.id)})`;
 const proposalCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.employer_id = ${q(schema.employers, schema.employers.id)})`;
 const hireCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.employer_id = ${q(schema.employers, schema.employers.id)} and p.status = 'hired')`;
-const paidTotal = sql<number>`(select coalesce(sum(${inrMinorSql(sql`ep.amount_minor`, sql`ep.currency`)}), 0)::bigint from ${schema.employerPayments} ep where ep.employer_id = ${q(schema.employers, schema.employers.id)} and ep.status = 'paid')`;
+const paidTotal = sql<number>`(select coalesce(sum(${inrMinorSql(sql`ep.amount_minor`, sql`ep.currency`)}), 0)::bigint from ${schema.employerPayments} ep where ep.employer_id = ${q(schema.employers, schema.employers.id)} and ep.status in ('paid','refunded','partially_refunded'))`;
 
 export default async function AdminCompaniesPage({
   searchParams,
@@ -148,7 +149,7 @@ export default async function AdminCompaniesPage({
               raw: schema.employerPayments.raw,
             })
             .from(schema.employerPayments)
-            .where(and(inArray(schema.employerPayments.employerId, pageIds), eq(schema.employerPayments.status, "paid"))),
+            .where(and(inArray(schema.employerPayments.employerId, pageIds), inArray(schema.employerPayments.status, SETTLED_STATUSES))),
         ])
       : [[], []];
     const internIds = [...new Set(moneyProposals.map((p) => p.internId))];
@@ -296,6 +297,11 @@ export default async function AdminCompaniesPage({
               return Number(row.paidTotal) > 0 ? (
                 <div>
                   <p className="font-medium text-ink-900">{formatMoney(Number(row.paidTotal), "INR")}</p>
+                  {m && m.refundedInrMinor > 0 ? (
+                    <p className="text-xs text-text-subtle">
+                      refunded {formatMoney(m.refundedInrMinor, "INR")} · net {formatMoney(Math.max(0, Number(row.paidTotal) - m.refundedInrMinor), "INR")}
+                    </p>
+                  ) : null}
                   {m?.lastPaymentAt ? <p className="text-xs text-text-subtle">last {formatDate(m.lastPaymentAt)}</p> : null}
                 </div>
               ) : (

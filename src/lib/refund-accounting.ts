@@ -35,6 +35,8 @@ const SETTLED = new Set(["paid", "refunded", "partially_refunded"]);
 const norm = (s: unknown) => String(s ?? "").trim().toLowerCase();
 
 /** Rows whose money was received: paid, and the two refund labels (the order was paid first). */
+/** For SQL `IN (...)`: the statuses of rows whose money was received. */
+export const SETTLED_STATUSES = ["paid", "refunded", "partially_refunded"];
 export const isSettledStatus = (status: unknown): boolean => SETTLED.has(norm(status));
 
 const rawOf = (raw: unknown): Record<string, unknown> => (raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {});

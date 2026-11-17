@@ -6,6 +6,7 @@ import { inrMinorSql } from "@/lib/admin/scope";
 import { searchAny } from "@/lib/admin/params";
 import { isHiredProposal } from "@/lib/hire-status";
 import { stipendDues, type StipendDue } from "@/lib/admin/stipend-dues";
+import { SETTLED_STATUSES, settledOrders } from "@/lib/refund-accounting";
 
 /**
  * The two lists on /admin/payouts, shared with their CSV export so the file
@@ -273,7 +274,7 @@ export async function loadPlacementDues(internId?: string): Promise<PlacementDue
     db
       .select({ employerId: schema.employerPayments.employerId, status: schema.employerPayments.status, raw: schema.employerPayments.raw, paidAt: schema.employerPayments.paidAt })
       .from(schema.employerPayments)
-      .where(and(inArray(schema.employerPayments.employerId, employerIds), eq(schema.employerPayments.status, "paid"))),
+      .where(and(inArray(schema.employerPayments.employerId, employerIds), inArray(schema.employerPayments.status, SETTLED_STATUSES))),
   ]);
 
   const scoreOf = new Map(
@@ -288,7 +289,7 @@ export async function loadPlacementDues(internId?: string): Promise<PlacementDue
     const mine = hired.filter((p) => p.internId === internId);
     const theirPayouts = payouts.filter((p) => p.internId === internId);
     const theirOrders = orders.filter((o) => mine.some((p) => p.employerId === o.employerId));
-    for (const due of stipendDues(mine, theirPayouts, scoreOf.get(internId) ?? null, theirOrders)) {
+    for (const due of stipendDues(mine, theirPayouts, scoreOf.get(internId) ?? null, settledOrders(theirOrders))) {
       const p = mine.find((x) => x.id === due.proposalId)!;
       out.push({
         ...due,

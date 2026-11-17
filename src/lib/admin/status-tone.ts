@@ -54,6 +54,7 @@ export const TONE_BY_STATUS: Record<string, StatusTone> = {
   processing: "info",
   failed: "danger",
   refunded: "warning",
+  partially_refunded: "warning",
 
   // timesheets
   submitted: "info",

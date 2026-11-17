@@ -201,9 +201,10 @@ export function Company360View({
             label="Paid to date"
             value={formatMoney(ledger.totals.paidInrMinor, "INR", { zeroLabel: "₹0" })}
             hint={
-              ledger.totals.remainingInrMinor > 0
+              (ledger.totals.refundedInrMinor > 0 ? `${formatMoney(ledger.totals.refundedInrMinor, "INR")} refunded, net ${formatMoney(ledger.totals.netPaidInrMinor, "INR")}. ` : "") +
+              (ledger.totals.remainingInrMinor > 0
                 ? `${formatMoney(ledger.totals.remainingInrMinor, "INR")} still due of ${formatMoney(ledger.totals.billedInrMinor, "INR")}`
-                : "Nothing due"
+                : "Nothing due")
             }
             tone={ledger.totals.remainingInrMinor > 0 ? "warning" : "neutral"}
             href={`${base}?tab=dues`}
@@ -424,7 +425,19 @@ export function Company360View({
                 return info?.type ? `${info.type} · ${info.mode}` : info?.mode ?? "-";
               },
             },
-            { header: "Amount", align: "right", cell: (p) => <span className="font-semibold text-ink-900">{money(p.amountMinor, p.currency)}</span> },
+            {
+              header: "Amount",
+              align: "right",
+              cell: (p) => {
+                const refunded = ledger.payments.get(p.id)?.refundedMinor ?? 0;
+                return (
+                  <div>
+                    <span className="font-semibold text-ink-900">{money(p.amountMinor, p.currency)}</span>
+                    {refunded > 0 ? <p className="text-xs text-text-subtle">refunded {money(refunded, p.currency)} · net {money(Math.max(0, p.amountMinor - refunded), p.currency)}</p> : null}
+                  </div>
+                );
+              },
+            },
             { header: "Status", cell: (p) => <StatusBadge value={p.status} /> },
             { header: "Paid", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.paidAt)}</span> },
             { header: "Created", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.createdAt)}</span> },
@@ -582,9 +595,10 @@ function DuesTab({
   const { totals } = ledger;
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-[var(--admin-gap)] @xl:grid-cols-3 [&_.leading-none]:text-[1.75rem]">
-        <StatCard label="Billed" value={formatMoney(totals.billedInrMinor, "INR", { zeroLabel: "₹0" })} hint="Paid plus still due, in INR" />
-        <StatCard label="Paid" value={formatMoney(totals.paidInrMinor, "INR", { zeroLabel: "₹0" })} hint="Every paid order" />
+      <div className={cn("grid grid-cols-1 gap-[var(--admin-gap)] [&_.leading-none]:text-[1.75rem]", totals.refundedInrMinor > 0 ? "@xl:grid-cols-4" : "@xl:grid-cols-3")}>
+        <StatCard label="Billed" value={formatMoney(totals.billedInrMinor, "INR", { zeroLabel: "₹0" })} hint={totals.refundedInrMinor > 0 ? "Net paid plus still due, in INR" : "Paid plus still due, in INR"} />
+        <StatCard label="Paid" value={formatMoney(totals.paidInrMinor, "INR", { zeroLabel: "₹0" })} hint="Every paid order, as recorded" />
+        {totals.refundedInrMinor > 0 ? <StatCard label="Refunded" value={formatMoney(totals.refundedInrMinor, "INR", { zeroLabel: "₹0" })} hint={`Net paid ${formatMoney(totals.netPaidInrMinor, "INR", { zeroLabel: "₹0" })}`} /> : null}
         <StatCard label="Remaining" value={formatMoney(totals.remainingInrMinor, "INR", { zeroLabel: "₹0" })} hint="Unpaid offers and monthly instalments left" />
       </div>
       <DataTable

@@ -43,7 +43,7 @@ test("per-hire dues: unpaid, monthly, upfront and settled hires", () => {
 
 test("payment rows name their proposals, type and mode", () => {
   const l = companyLedger(proposals, payments, () => 7);
-  assert.deepEqual(l.payments.get("pay1"), { paymentId: "pay1", proposalIds: ["m"], type: "Internship", mode: "Monthly" });
+  assert.deepEqual(l.payments.get("pay1"), { paymentId: "pay1", proposalIds: ["m"], type: "Internship", mode: "Monthly", refundedMinor: 0 });
   assert.equal(l.payments.get("pay3")!.type, "Mixed");
   assert.equal(l.payments.get("pay2")!.mode, "Upfront");
 });

@@ -71,6 +71,8 @@ export type PaymentLedger = {
   /** "Full-time", "Internship" or "Mixed"; null when the order names no proposal. */
   type: "Full-time" | "Internship" | "Mixed" | null;
   mode: "Monthly" | "Upfront" | "Hiring charge";
+  /** Refunded out of this order, in its own currency (0 when none). */
+  refundedMinor: number;
 };
 
 export type CompanyLedger = {
@@ -133,6 +135,7 @@ export function companyLedger(
       proposalIds: ids,
       type: kinds.size === 0 ? null : kinds.size > 1 ? "Mixed" : (kinds.values().next().value as "Full-time" | "Internship"),
       mode: mode === "monthly" ? "Monthly" : mode === "hiring_fee" ? "Hiring charge" : "Upfront",
+      refundedMinor: refundOf.get(pay.id)?.refundedMinor ?? 0,
     });
   }
 
