@@ -3,6 +3,7 @@ import { and, asc, eq, gte, inArray } from "drizzle-orm";
 import { withLock } from "@/lib/advisory-lock";
 import { schema } from "@/lib/db";
 import { isInternPaid } from "@/lib/payments";
+import { promoHoldRefusal } from "@/lib/promo";
 
 /** How long an order that settles on the spot (test, free, full promo) counts as still being completed. */
 export const SETTLING_MINUTES = 5;
@@ -22,6 +23,12 @@ export type Opened = { error: string; alreadyPaid?: true } | { reuse: string } |
 export async function openOrder(internId: string, row: typeof schema.internPayments.$inferInsert): Promise<Opened> {
   return withLock(`intern-pay:${internId}`, async (tx): Promise<Opened> => {
     if (await isInternPaid(internId, tx)) return { error: "Your profile is already activated.", alreadyPaid: true as const };
+    // A capped code whose last uses sit on other accounts' open payments is refused (consume on paid, hold while open).
+    const promoCode = (row.raw as { promoCode?: unknown } | null)?.promoCode;
+    if (typeof promoCode === "string" && promoCode) {
+      const held = await promoHoldRefusal(tx, promoCode, internId);
+      if (held) return { error: held };
+    }
     // Razorpay checkouts for this fee still open (a second tab, a double click, or
     // the modal closed and Pay pressed again). The same request (same amount, same
     // code) is handed the order already open, so both tabs can be paid only once.

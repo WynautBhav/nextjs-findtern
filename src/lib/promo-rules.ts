@@ -154,3 +154,45 @@ export function promoDiscount(row: PromoRow, orderMinor: number, currency: Curre
       : inCurrency(row.discountValue, currency); // fixed: paise, as the legacy app stores it
   return Math.max(0, Math.min(raw, orderMinor));
 }
+
+/** How long an unpaid order holds a use of its code: the same 30 minutes an open order blocks a retry (OPEN_ORDER_MINUTES in payments.ts). */
+export const PROMO_HOLD_MINUTES = 30;
+
+/** Admin edit: a cap can't be set below the uses already made. Null (unlimited) is always fine. */
+export function promoMaxUsagesProblem(maxUsages: number | null | undefined, usedCount: number): string | null {
+  if (maxUsages == null || maxUsages >= usedCount) return null;
+  return `Already used ${usedCount} ${usedCount === 1 ? "time" : "times"}; the max can't go below that`;
+}
+
+/**
+ * A code with history is never deleted: its redemption list is the record behind real orders. Turning it off
+ * stops new use and keeps the history. `usageRows` is checked as well as `usedCount`, because the counter can drift.
+ */
+export function promoDeleteProblem(c: { usedCount: number; usageRows: number; openOrders: number }): string | null {
+  const used = Math.max(c.usedCount, c.usageRows);
+  if (used > 0) return `This code has been used ${used} ${used === 1 ? "time" : "times"}. Turn it off instead of deleting it, so its history stays.`;
+  if (c.openOrders > 0) return "This code is on an open payment. Turn it off, or delete it once that payment closes.";
+  return null;
+}
+
+/**
+ * Consume on paid, hold while a payment is open, release on expiry or failure. `held` is the number of OTHER
+ * accounts' open payments carrying this code. A capped code with no use left once holds are counted is refused now,
+ * so two payments can't both be taken for the last use.
+ */
+export function promoHoldProblem(row: { maxUsages: number | null; usedCount: number; collegeId?: string | null }, held: number): string | null {
+  if (row.maxUsages === null || row.usedCount + held < row.maxUsages) return null;
+  return row.collegeId
+    ? "This college's last free seat is on a payment that's still open. Try again in a few minutes."
+    : "The last uses of this code are on payments that are still open. Try again in a few minutes.";
+}
+
+/**
+ * Renaming is refused once a code has history: an open or paid order carries the old name, and settlement and the
+ * holds look the code up by that name, so a rename would let a payment take the discount without spending a use.
+ */
+export function promoRenameProblem(c: { usedCount: number; usageRows: number; openOrders: number }): string | null {
+  if (Math.max(c.usedCount, c.usageRows) > 0) return "A code that has been used can't be renamed. Create a new code and turn this one off.";
+  if (c.openOrders > 0) return "This code is on an open payment, so it can't be renamed right now.";
+  return null;
+}

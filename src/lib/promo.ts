@@ -1,7 +1,9 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { collegeCodeMemberProblem, collegeCodeProblem, employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoProblem, seatFreeWhere, type PromoAudience } from "@/lib/promo-rules";
+import { chargePromoMiss, promoBlockedMessage, promoGuessBlock } from "@/lib/promo-throttle";
+import { clientIp } from "@/lib/security/rate-limit";
+import { collegeCodeMemberProblem, collegeCodeProblem, employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoHoldProblem, PROMO_HOLD_MINUTES, promoProblem, seatFreeWhere, type PromoAudience } from "@/lib/promo-rules";
 
 /**
  * Promo codes against a real order: shared by the intern activation payment
@@ -35,7 +37,7 @@ export async function quotePromo(input: {
   const [row] = await db
     .select()
     .from(schema.promoCodes)
-    .where(eq(schema.promoCodes.code, input.code.trim().toUpperCase()))
+    .where(sql`upper(${schema.promoCodes.code}) = ${input.code.trim().toUpperCase()}`)
     .limit(1);
   if (!row || !row.isActive) return { ok: false, error: "Invalid promo code", status: 404 };
 
@@ -76,6 +78,63 @@ export async function quotePromo(input: {
     return { ok: false, error: "This code can't be used on a hire. A code can't cover the whole monthly charge.", status: 400 };
   }
   return { ok: true, promo: row, discountMinor, payableMinor: input.orderMinor - discountMinor };
+}
+
+export type GuardedQuote = PromoQuote | { ok: false; error: string; status: 429; retryAfterSeconds: number };
+
+/** `quotePromo` behind the brute-force budget: a blocked account is refused before the code is looked at, a refused code is charged. */
+export async function quotePromoGuarded(req: Request, uid: string, input: Parameters<typeof quotePromo>[0]): Promise<GuardedQuote> {
+  const who = { uid, ip: clientIp(req.headers) };
+  const block = promoGuessBlock(who);
+  if (block.blocked) return { ok: false, error: promoBlockedMessage(block.retryAfterSeconds), status: 429, retryAfterSeconds: block.retryAfterSeconds };
+  const quote = await quotePromo(input);
+  if (!quote.ok) chargePromoMiss(who);
+  return quote;
+}
+
+/** The JSON refusal for a failed quote, with Retry-After on a throttled one. */
+export function promoRefusal(quote: Extract<GuardedQuote, { ok: false }>): Response {
+  const retry = "retryAfterSeconds" in quote ? { "Retry-After": String(quote.retryAfterSeconds) } : undefined;
+  return Response.json({ error: quote.error }, { status: quote.status, headers: retry });
+}
+
+/**
+ * Run on the order-opening transaction, after the account's own pay lock: a use is consumed when an order is
+ * paid, held while one is open (30 minutes, then it reads as expired) and free again when it fails or expires.
+ * A capped code is refused here when its remaining uses are all held by OTHER accounts' open payments, so two
+ * payments can't both be taken for the last use. Taken under a per-code lock (always after the account lock, so
+ * no lock cycle) and read in ONE statement, so a payment settling in between can't be counted twice or not at all.
+ */
+export async function promoHoldRefusal(tx: Db | Tx, code: string, subjectId: string): Promise<string | null> {
+  // UTC ISO text: the *_at columns are timestamp-without-zone holding UTC (drizzle writes toISOString), and a raw Date parameter would go in as server-local time.
+  const since = new Date(Date.now() - PROMO_HOLD_MINUTES * 60_000).toISOString();
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`promo:${code.toUpperCase()}`}))`);
+  const res = await tx.execute(sql`
+    select p.max_usages, p.used_count, p.college_id,
+      (select count(*) from employer_payments e
+        where e.status = 'created' and e.created_at >= ${since}::timestamp and e.employer_id <> ${subjectId}
+          and upper(e.raw -> 'promo' ->> 'promoCode') = upper(p.code))
+      + (select count(*) from intern_payments i
+        where i.status = 'created' and i.created_at >= ${since}::timestamp and i.intern_id <> ${subjectId}
+          and upper(i.raw ->> 'promoCode') = upper(p.code)) as held
+    from promo_codes p where upper(p.code) = ${code.toUpperCase()} limit 1`);
+  const row = res.rows[0] as Record<string, unknown> | undefined;
+  if (!row) return null;
+  return promoHoldProblem(
+    { maxUsages: row.max_usages === null ? null : Number(row.max_usages), usedCount: Number(row.used_count), collegeId: (row.college_id as string | null) ?? null },
+    Number(row.held),
+  );
+}
+
+/** How many unpaid orders, from any account, currently hold this code. For the delete guard. */
+export async function openPromoOrders(q: Db | Tx, code: string): Promise<number> {
+  // UTC ISO text: the *_at columns are timestamp-without-zone holding UTC (drizzle writes toISOString), and a raw Date parameter would go in as server-local time.
+  const since = new Date(Date.now() - PROMO_HOLD_MINUTES * 60_000).toISOString();
+  const res = await q.execute(sql`
+    select (select count(*) from employer_payments e where e.status = 'created' and e.created_at >= ${since}::timestamp and upper(e.raw -> 'promo' ->> 'promoCode') = ${code.toUpperCase()})
+         + (select count(*) from intern_payments i where i.status = 'created' and i.created_at >= ${since}::timestamp and upper(i.raw ->> 'promoCode') = ${code.toUpperCase()}) as n`);
+  const row = res.rows[0] as Record<string, unknown> | undefined;
+  return Number(row?.n ?? 0);
 }
 
 /** An id is an employer's if it is in `employers`; otherwise an intern's. */

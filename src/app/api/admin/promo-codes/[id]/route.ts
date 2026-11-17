@@ -1,4 +1,4 @@
-import { and, eq, ne } from "drizzle-orm";
+import { and, count, eq, ne, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -6,8 +6,8 @@ import { diffFields, recordAdminAudit } from "@/lib/admin/audit";
 import { promoCodeProblem, promoDiscountProblem } from "@/lib/admin/promo-edit-rules";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
-import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
-import { collegeCodeDeleteProblem, collegeCodeEditProblem, PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
+import { DUPLICATE_CODE, isUniqueViolation, openPromoOrders } from "@/lib/promo";
+import { collegeCodeDeleteProblem, collegeCodeEditProblem, promoDeleteProblem, promoMaxUsagesProblem, promoRenameProblem, PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
 
 // Omitted = leave as is; null = clear.
 const bodySchema = z.object({
@@ -44,7 +44,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     const [clash] = await db
       .select({ id: schema.promoCodes.id })
       .from(schema.promoCodes)
-      .where(and(eq(schema.promoCodes.code, code), ne(schema.promoCodes.id, id)))
+      .where(and(sql`upper(${schema.promoCodes.code}) = ${code}`, ne(schema.promoCodes.id, id)))
       .limit(1);
     if (clash) return NextResponse.json({ error: DUPLICATE_CODE }, { status: 409 });
   }
@@ -61,6 +61,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       discountValue: schema.promoCodes.discountValue,
       appliesTo: schema.promoCodes.appliesTo,
       maxUsages: schema.promoCodes.maxUsages,
+      usedCount: schema.promoCodes.usedCount,
       description: schema.promoCodes.description,
       minOrderAmountMinor: schema.promoCodes.minOrderAmountMinor,
       isActive: schema.promoCodes.isActive,
@@ -72,6 +73,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   // A college's code keeps its discount, audience and cap; those change on the college screen.
   const locked = collegeCodeEditProblem(existing, parsed.data);
   if (locked) return NextResponse.json({ error: locked }, { status: 403 });
+  // A cap can't be lowered below the uses already made (the code would read as exhausted with orders still on it).
+  if (parsed.data.maxUsages !== undefined) {
+    const lowered = promoMaxUsagesProblem(parsed.data.maxUsages, existing.usedCount);
+    if (lowered) return NextResponse.json({ error: lowered }, { status: 400 });
+  }
   // The same discount rules as create, on the row as it will be after this edit (an edit may send only one field).
   const d = parsed.data;
   if (d.discountType !== undefined || d.discountValue !== undefined || d.appliesTo !== undefined) {
@@ -85,6 +91,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (code && code !== existing.code?.toUpperCase()) {
     const bad = promoCodeProblem(code);
     if (bad) return NextResponse.json({ error: bad }, { status: 400 });
+    const [{ n: usageRows }] = await db.select({ n: count() }).from(schema.promoCodeUsages).where(eq(schema.promoCodeUsages.promoCodeId, id));
+    const rename = promoRenameProblem({ usedCount: existing.usedCount, usageRows, openOrders: await openPromoOrders(db, existing.code) });
+    if (rename) return NextResponse.json({ error: rename }, { status: 409 });
   }
   const nextFrom = toDate(parsed.data.validFrom);
   const nextUntil = toDate(parsed.data.validUntil);
@@ -114,10 +123,15 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const guard = await requireMutation({ req, roles: ["admin"] });
   if (!guard.ok) return guard.response;
   const db = getDb();
-  const [row] = await db.select({ collegeId: schema.promoCodes.collegeId, code: schema.promoCodes.code }).from(schema.promoCodes).where(eq(schema.promoCodes.id, id)).limit(1);
-  const locked = collegeCodeDeleteProblem(row?.collegeId);
+  const [row] = await db.select({ collegeId: schema.promoCodes.collegeId, code: schema.promoCodes.code, usedCount: schema.promoCodes.usedCount }).from(schema.promoCodes).where(eq(schema.promoCodes.id, id)).limit(1);
+  if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const locked = collegeCodeDeleteProblem(row.collegeId);
   if (locked) return NextResponse.json({ error: locked }, { status: 403 });
+  // A code with history is turned off, never deleted: its redemptions are the record behind real orders.
+  const [{ n: usageRows }] = await db.select({ n: count() }).from(schema.promoCodeUsages).where(eq(schema.promoCodeUsages.promoCodeId, id));
+  const blocked = promoDeleteProblem({ usedCount: row.usedCount, usageRows, openOrders: await openPromoOrders(db, row.code) });
+  if (blocked) return NextResponse.json({ error: blocked }, { status: 409 });
   await db.delete(schema.promoCodes).where(eq(schema.promoCodes.id, id));
-  await recordAdminAudit(db, { adminId: guard.session.uid, action: "promo.delete", targetType: "promo_code", targetId: id, meta: { code: row?.code ?? null } });
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "promo.delete", targetType: "promo_code", targetId: id, meta: { code: row.code } });
   return NextResponse.json({ ok: true });
 }

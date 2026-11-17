@@ -117,6 +117,9 @@ export const limiters = {
   collegeCodeUser: new RateLimiter(10, 15 * 60_000, { bypassable: false }),
   collegeCodeIp: new RateLimiter(30, 15 * 60_000, { bypassable: false }),
   collegeCodeUserDay: new RateLimiter(30, 24 * 60 * 60_000, { bypassable: false }),
+  // Refused promo codes at checkout (src/lib/promo-throttle.ts): per signed-in account and per address.
+  promoMissUser: new RateLimiter(8, 15 * 60_000, { bypassable: false }),
+  promoMissIp: new RateLimiter(30, 15 * 60_000, { bypassable: false }),
 };
 
 /**

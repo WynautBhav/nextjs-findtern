@@ -7,7 +7,8 @@ import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { PromoCodesManager } from "@/components/admin/promo-codes-manager";
 import { getSession } from "@/lib/auth";
 import { canWrite } from "@/lib/admin/permissions";
-import { formatNumber } from "@/lib/format";
+import { discountGivenByCode } from "@/lib/admin/promo-redemptions-load";
+import { formatMoney, formatNumber } from "@/lib/format";
 
 export const metadata = {
   title: "Promo Codes · Admin",
@@ -15,8 +16,14 @@ export const metadata = {
 
 export default async function AdminPromoCodesPage() {
   let rows: PromoCode[] | null = null;
+  let given = new Map<string, number>();
   try {
     rows = await getDb().select().from(schema.promoCodes).orderBy(desc(schema.promoCodes.createdAt));
+    // One grouped query; a failure here only hides the "given" figures, never the list.
+    given = await discountGivenByCode(getDb()).catch((error) => {
+      console.error("[admin/promo-codes] discount totals failed", error);
+      return given;
+    });
   } catch (error) {
     console.error("[admin/promo-codes] load failed", error);
   }
@@ -42,6 +49,7 @@ export default async function AdminPromoCodesPage() {
   const activeCount = rows.filter((r) => r.isActive).length;
   const totalRedemptions = rows.reduce((s, r) => s + (r.usedCount ?? 0), 0);
   const totalCodes = rows.length;
+  const totalGiven = [...given.values()].reduce((a, b) => a + b, 0);
   const exhausted = rows.filter((r) => r.maxUsages && r.usedCount >= r.maxUsages).length;
 
   return (
@@ -51,15 +59,11 @@ export default async function AdminPromoCodesPage() {
       <StatGrid cols={4}>
         <StatCard featured label="Active codes" value={formatNumber(activeCount)} hint={`${formatNumber(totalCodes)} codes in all`} />
         <StatCard label="Total redemptions" value={formatNumber(totalRedemptions)} hint="Paid orders and fees that used a code" />
-        <StatCard
-          label="Uses per code"
-          value={totalCodes ? (totalRedemptions / totalCodes).toFixed(1) : "-"}
-          hint="Average across every code"
-        />
+        <StatCard label="Discount given" value={formatMoney(totalGiven, "INR", { zeroLabel: false })} hint="Across every redemption, in rupees" />
         <StatCard label="Used up" value={formatNumber(exhausted)} hint="Codes at their usage limit" />
       </StatGrid>
 
-      <PromoCodesManager initialPromoCodes={rows} canWrite={canWrite((await getSession())?.permissions, "/admin/promo-codes")} />
+      <PromoCodesManager initialPromoCodes={rows} canWrite={canWrite((await getSession())?.permissions, "/admin/promo-codes")} discountGiven={Object.fromEntries(given)} />
     </div>
   );
 }

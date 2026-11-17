@@ -104,3 +104,39 @@ test("a student in another college can't redeem this college's code", () => {
   assert.equal(collegeCodeMemberProblem(null, "college-a"), null);
   assert.equal(collegeCodeMemberProblem(undefined, "college-a"), null);
 });
+
+// ---- Admin audit (package S) -------------------------------------------------------------------------------------
+import { promoDeleteProblem, promoHoldProblem, promoMaxUsagesProblem, promoRenameProblem } from "./promo-rules.ts";
+
+test("max uses can't be set below the uses already made; clearing it (unlimited) is always fine", () => {
+  assert.equal(promoMaxUsagesProblem(null, 40), null);
+  assert.equal(promoMaxUsagesProblem(undefined, 40), null);
+  assert.equal(promoMaxUsagesProblem(40, 40), null);
+  assert.equal(promoMaxUsagesProblem(100, 40), null);
+  assert.match(promoMaxUsagesProblem(39, 40) ?? "", /Already used 40 times.*can't go below/);
+  assert.match(promoMaxUsagesProblem(1, 2) ?? "", /Already used 2 times/);
+});
+
+test("a used code, or one on an open payment, is never deleted: turn it off instead", () => {
+  assert.equal(promoDeleteProblem({ usedCount: 0, usageRows: 0, openOrders: 0 }), null);
+  assert.match(promoDeleteProblem({ usedCount: 3, usageRows: 3, openOrders: 0 }) ?? "", /used 3 times.*Turn it off/);
+  // used_count can be edited by hand or drift; a usage row alone also protects the history.
+  assert.match(promoDeleteProblem({ usedCount: 0, usageRows: 1, openOrders: 0 }) ?? "", /used 1 time\b.*Turn it off/);
+  assert.match(promoDeleteProblem({ usedCount: 0, usageRows: 0, openOrders: 1 }) ?? "", /open payment/);
+});
+
+test("holds: open payments of other accounts count against the cap until they are paid or expire", () => {
+  const capped = { maxUsages: 5, usedCount: 3, collegeId: null };
+  assert.equal(promoHoldProblem(capped, 0), null);
+  assert.equal(promoHoldProblem(capped, 1), null); // 3 used + 1 held = 4 of 5, one left for me
+  assert.match(promoHoldProblem(capped, 2) ?? "", /still open/); // 3 + 2 = 5: the last use is held by someone mid-payment
+  assert.equal(promoHoldProblem({ ...capped, maxUsages: null }, 50), null);
+  assert.match(promoHoldProblem({ maxUsages: 1, usedCount: 0, collegeId: "c1" }, 1) ?? "", /seat/i);
+});
+
+test("a code that has been used, or is on an open payment, can't be renamed: orders keep the old name and would stop counting", () => {
+  assert.equal(promoRenameProblem({ usedCount: 0, usageRows: 0, openOrders: 0 }), null);
+  assert.match(promoRenameProblem({ usedCount: 2, usageRows: 2, openOrders: 0 }) ?? "", /used can't be renamed/);
+  assert.match(promoRenameProblem({ usedCount: 0, usageRows: 1, openOrders: 0 }) ?? "", /can't be renamed/);
+  assert.match(promoRenameProblem({ usedCount: 0, usageRows: 0, openOrders: 1 }) ?? "", /open payment/);
+});
