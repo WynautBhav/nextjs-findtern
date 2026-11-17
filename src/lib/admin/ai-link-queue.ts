@@ -19,7 +19,7 @@ const ms = (d: Date | string | null) => (d ? new Date(d).getTime() || 0 : 0);
 export function aiLinkState(r: Pick<AiLinkRow, "status" | "meetingLink">): AiLinkState {
   const s = String(r.status ?? "").toLowerCase();
   if (s === "completed") return "completed";
-  if (s === "cancelled" || s === "canceled" || s === "missed") return "closed";
+  if (s === "cancelled" || s === "canceled" || s === "missed" || s === "no_show") return "closed";
   return String(r.meetingLink ?? "").trim() ? "sent" : "waiting";
 }
 
