@@ -1,7 +1,8 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { chargePromoMiss, promoBlockedMessage, promoGuessBlock } from "@/lib/promo-throttle";
+import { isFullWaiver, waiverRowProblem } from "@/lib/full-waiver";
+import { chargePromoMiss, chargeWaiverRedeem, promoBlockedMessage, promoGuessBlock, waiverBlockedMessage, waiverRedeemBlock } from "@/lib/promo-throttle";
 import { clientIp } from "@/lib/security/rate-limit";
 import { collegeCodeMemberProblem, collegeCodeProblem, employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoHoldProblem, PROMO_HOLD_MINUTES, promoProblem, seatFreeWhere, type PromoAudience } from "@/lib/promo-rules";
 
@@ -45,8 +46,13 @@ export async function quotePromo(input: {
   const scopeProblem = promoAudienceProblem(row.appliesTo, audience);
   if (scopeProblem) return { ok: false, error: scopeProblem, status: 400 };
 
-  const discountableMinor = input.orderMinor - (input.undiscountableMinor ?? 0);
-  if (discountableMinor <= 0) return { ok: false, error: "Promo codes don't apply to the hiring fee", status: 400 };
+  // A full waiver is the one code that takes the hiring fee too: the whole order is discountable.
+  const waiver = isFullWaiver(row);
+  const discountableMinor = waiver ? input.orderMinor : input.orderMinor - (input.undiscountableMinor ?? 0);
+  if (discountableMinor <= 0) return { ok: false, error: waiver ? "Invalid promo code" : "Promo codes don't apply to the hiring fee", status: waiver ? 404 : 400 };
+  // A waiver row with no cap or no expiry (made by hand in SQL) is dead.
+  const deadWaiver = waiverRowProblem(row);
+  if (deadWaiver) return { ok: false, error: deadWaiver, status: 404 };
 
   if (row.collegeId) {
     const [college] = await db.select({ isActive: schema.colleges.isActive, isPartner: schema.colleges.isPartner }).from(schema.colleges).where(eq(schema.colleges.id, row.collegeId)).limit(1);
@@ -74,7 +80,7 @@ export async function quotePromo(input: {
   if (priorUse) return { ok: false, error: "You have already used this code", status: 400 };
 
   const discountMinor = promoDiscount(row, discountableMinor, input.currency);
-  if (audience === "employer" && employerPromoTooLarge(discountMinor, discountableMinor)) {
+  if (audience === "employer" && !waiver && employerPromoTooLarge(discountMinor, discountableMinor)) {
     return { ok: false, error: "This code can't be used on a hire. A code can't cover the whole monthly charge.", status: 400 };
   }
   return { ok: true, promo: row, discountMinor, payableMinor: input.orderMinor - discountMinor };
@@ -83,13 +89,30 @@ export async function quotePromo(input: {
 export type GuardedQuote = PromoQuote | { ok: false; error: string; status: 429; retryAfterSeconds: number };
 
 /** `quotePromo` behind the brute-force budget: a blocked account is refused before the code is looked at, a refused code is charged. */
-export async function quotePromoGuarded(req: Request, uid: string, input: Parameters<typeof quotePromo>[0]): Promise<GuardedQuote> {
+export async function quotePromoGuarded(req: Request, uid: string, input: Parameters<typeof quotePromo>[0], opts: { redeem?: boolean } = {}): Promise<GuardedQuote> {
   const who = { uid, ip: clientIp(req.headers) };
   const block = promoGuessBlock(who);
   if (block.blocked) return { ok: false, error: promoBlockedMessage(block.retryAfterSeconds), status: 429, retryAfterSeconds: block.retryAfterSeconds };
   const quote = await quotePromo(input);
   if (!quote.ok) chargePromoMiss(who);
+  // Redeeming a full waiver (the order route, not the preview) spends the much tighter waiver budget, valid code or not.
+  else if (opts.redeem && isFullWaiver(quote.promo)) {
+    const wb = waiverRedeemBlock(who);
+    if (wb.blocked) return { ok: false, error: waiverBlockedMessage(wb.retryAfterSeconds), status: 429, retryAfterSeconds: wb.retryAfterSeconds };
+    chargeWaiverRedeem(who);
+  }
   return quote;
+}
+
+/** Is this text a full-waiver code? Reads the row only; a waiver is allowed on any pay plan, an ordinary code only upfront. */
+export async function isWaiverCode(code: string): Promise<boolean> {
+  if (code.includes("\u0000")) return false;
+  const [row] = await getDb()
+    .select({ discountType: schema.promoCodes.discountType })
+    .from(schema.promoCodes)
+    .where(sql`upper(${schema.promoCodes.code}) = ${code.trim().toUpperCase()}`)
+    .limit(1);
+  return isFullWaiver(row);
 }
 
 /** The JSON refusal for a failed quote, with Retry-After on a throttled one. */

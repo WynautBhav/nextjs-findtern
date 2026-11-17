@@ -7,6 +7,8 @@ import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { parseOffer } from "@/lib/offer";
 import { applyPendingRatings } from "@/lib/admin/score-live";
 import { recordPromoUse } from "@/lib/promo";
+import { redeemWaiverInTx, WaiverRefused } from "@/lib/full-waiver-settle";
+import { waiverFlagOf, waiverOrderProblem } from "@/lib/full-waiver";
 import { SEATS_USED_UP } from "@/lib/promo-rules";
 import { PROMO_CONSENT_VERSION } from "@/lib/college/promo-consent";
 import { consentProblem, membershipFromPromo, promoConsentHash } from "@/lib/college/promo-membership";
@@ -87,6 +89,8 @@ export function legacyOrderRaw(order: { id: string; amountMinor: number; currenc
 
 type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
 const GATEWAY_ACTOR = "system:razorpay";
+/** What a receipt email says in place of "₹0.00" for an order a full-waiver code completed. */
+const WAIVED_LABEL = "Complimentary (full waiver)";
 /** What settle hands back when the gateway's amount is not the order's: the webhook acknowledges it, accounts see the flag. */
 const MISMATCH = { ok: false, status: 409, code: "amount_mismatch", error: "The amount paid does not match this order" } as const;
 
@@ -141,6 +145,10 @@ export async function settleEmployerOrder(input: {
     )
     .limit(1);
   if (!order) return { ok: false, status: 404, error: "Unknown order" };
+  // A full-waiver mark only belongs on a zero-amount waiver order (no Razorpay money behind it, nothing to be signed): never settle anything else as free.
+  const waiverBad = waiverOrderProblem(order);
+  if (waiverBad) return { ok: false, status: 409, error: waiverBad };
+  const waived = waiverFlagOf(order.raw) !== null;
   // Never settle on a number we did not charge: a signed event for another amount or currency is refused and flagged.
   const problem = input.paid ? paidAmountProblem(order, input.paid) : null;
   if (problem) {
@@ -179,7 +187,10 @@ export async function settleEmployerOrder(input: {
     }
 
     const promo = promoOf(order.raw);
-    if (promo) {
+    if (waived) {
+      // The code's row is locked and every check repeated; a refusal rolls this whole claim back (the order stays unpaid, the code unspent).
+      await redeemWaiverInTx(tx, { kind: "employer", paymentRowId: order.id, orderId: input.orderId, accountId: order.employerId, currency: order.currency, raw: order.raw });
+    } else if (promo) {
       await recordPromoUse({ code: promo.code, subjectId: order.employerId, orderId: input.orderId, discountMinor: promo.discountMinor }, tx);
     }
 
@@ -257,7 +268,8 @@ export async function settleEmployerOrder(input: {
         .where(eq(schema.internOnboarding.id, ob.id));
     }
     return hired;
-  });
+  }).catch((e) => (e instanceof WaiverRefused ? e : Promise.reject(e)));
+  if (hired instanceof WaiverRefused) return { ok: false, status: 409, error: hired.message };
   if (!hired || ids.length === 0) return { ok: true, hired: 0 };
 
   const { contact, company } = await employerNames(order.employerId);
@@ -287,7 +299,7 @@ export async function settleEmployerOrder(input: {
         hireIds.length === 0
           ? ids.length === 1 ? `this month of ${roleOf(ids[0])}` : `this month of ${ids.length} placements`
           : hired.length === 1 ? roleOf(hired[0].id) : `${hired.length} hires`,
-      amount: formatMoney(order.amountMinor, order.currency, { zeroLabel: false }),
+      amount: waived ? WAIVED_LABEL : formatMoney(order.amountMinor, order.currency, { zeroLabel: false }),
     }),
   });
   for (const p of hired) {
@@ -378,6 +390,9 @@ export async function settleInternOrder(input: {
     )
     .limit(1);
   if (!payment) return { ok: false, status: 404, error: "Unknown order" };
+  const waiverBad = waiverOrderProblem(payment);
+  if (waiverBad) return { ok: false, status: 409, error: waiverBad };
+  const waived = waiverFlagOf(payment.raw) !== null;
   const problem = input.paid ? paidAmountProblem(payment, input.paid) : null;
   if (problem) {
     await db.transaction((tx) =>
@@ -399,7 +414,9 @@ export async function settleInternOrder(input: {
     }
     if (payment.amountMinor > 0) await assignInvoiceNumber("intern", payment.id, new Date(), tx);
     const promo = promoOf(payment.raw);
-    if (promo) {
+    if (waived) {
+      await redeemWaiverInTx(tx, { kind: "intern", paymentRowId: payment.id, orderId: input.orderId, accountId: payment.internId, currency: payment.currency, raw: payment.raw });
+    } else if (promo) {
       const use = await recordPromoUse({ code: promo.code, subjectId: payment.internId, orderId: input.orderId, discountMinor: promo.discountMinor, enforceCap: payment.amountMinor === 0 }, tx);
       // Throwing rolls back the claim above too, so the seat and the order stay unspent.
       if (use.capped) throw new SettleRefused(use.refused);
@@ -409,8 +426,8 @@ export async function settleInternOrder(input: {
       }
     }
     return true;
-  }).catch((e) => (e instanceof SettleRefused ? e : Promise.reject(e)));
-  if (claimed instanceof SettleRefused) return { ok: false, status: 409, error: claimed.message };
+  }).catch((e) => (e instanceof SettleRefused || e instanceof WaiverRefused ? e : Promise.reject(e)));
+  if (claimed instanceof SettleRefused || claimed instanceof WaiverRefused) return { ok: false, status: 409, error: claimed.message };
   if (claimed === true) {
     await notify({
       to: { type: "intern", id: payment.internId },
@@ -420,7 +437,7 @@ export async function settleInternOrder(input: {
       dedupeKey: `activation_${input.orderId}`,
       email: emails.activationPaid({
         internName: await internFirstName(payment.internId),
-        amount: formatMoney(payment.amountMinor, payment.currency, { zeroLabel: false }),
+        amount: waived ? WAIVED_LABEL : formatMoney(payment.amountMinor, payment.currency, { zeroLabel: false }),
       }),
     });
   }

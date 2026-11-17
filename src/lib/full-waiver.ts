@@ -23,7 +23,7 @@ const BYTE_LIMIT = 248;
 
 const DAY_MS = 86_400_000;
 
-export const isFullWaiver = (row: { discountType?: string | null } | null | undefined): boolean => row?.discountType === FULL_WAIVER_TYPE;
+export const isFullWaiver = (row: { discountType?: string | null; [k: string]: unknown } | null | undefined): boolean => row?.discountType === FULL_WAIVER_TYPE;
 
 type RandomSource = (n: number) => Uint8Array;
 const cryptoSource: RandomSource = (n) => globalThis.crypto.getRandomValues(new Uint8Array(n));
@@ -80,11 +80,61 @@ type WaiverTerms = { discountType: string; discountValue: number; appliesTo: str
  */
 export function waiverEditProblem(
   existing: Pick<WaiverTerms, "discountType"> & Partial<WaiverTerms>,
-  next: Partial<Record<keyof WaiverTerms, unknown>>,
+  next: Partial<Record<keyof WaiverTerms | "isActive" | "description", unknown>>,
 ): string | null {
   if (!isFullWaiver(existing)) return null;
   const same = (a: unknown, b: unknown) => (a instanceof Date || b instanceof Date ? new Date(a as Date).getTime() === new Date(b as Date).getTime() : (a ?? null) === (b ?? null));
   const keys: (keyof WaiverTerms)[] = ["discountType", "discountValue", "appliesTo", "maxUsages", "validFrom", "validUntil", "code", "minOrderAmountMinor"];
   const changed = keys.some((k) => next[k] !== undefined && !same(next[k], existing[k]));
   return changed ? WAIVER_LOCKED : null;
+}
+
+/** `gateway` on an order row that a full waiver completed: it never touched Razorpay. */
+export const WAIVER_GATEWAY = "promo_full_waiver";
+
+/** What the order row's promo block records, so a waived order is distinguishable and the list value waived is on record. */
+export function waiverPromoRaw(input: { code: string; promoCodeId: string; waivedMinor: number }) {
+  return { promoCode: input.code, discountMinor: input.waivedMinor, fullWaiver: true as const, promoCodeId: input.promoCodeId, waivedMinor: input.waivedMinor };
+}
+
+export type WaiverFlag = { promoCodeId: string | null; waivedMinor: number };
+
+/** The waiver mark on an order's `raw`: employer orders keep it under `raw.promo`, intern orders on `raw`. Null for any other order. */
+export function waiverFlagOf(raw: unknown): WaiverFlag | null {
+  const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const p = (r.promo && typeof r.promo === "object" ? r.promo : r) as Record<string, unknown>;
+  if (p.fullWaiver !== true) return null;
+  return { promoCodeId: typeof p.promoCodeId === "string" ? p.promoCodeId : null, waivedMinor: typeof p.waivedMinor === "number" ? p.waivedMinor : 0 };
+}
+
+/**
+ * Settlement's check of the order itself: a waiver flag only belongs on a zero-amount order of the waiver gateway (and
+ * that gateway only with the flag), so no paid order can be settled as free and no order is settled twice by two routes.
+ */
+export function waiverOrderProblem(order: { gateway: string; amountMinor: number; raw: unknown }): string | null {
+  const flagged = waiverFlagOf(order.raw) !== null;
+  if (!flagged && order.gateway !== WAIVER_GATEWAY) return null;
+  if (flagged && order.gateway === WAIVER_GATEWAY && order.amountMinor === 0) return null;
+  return "This order is not a valid full-waiver order";
+}
+
+/**
+ * Redemption, repeated by settlement under a lock on the code's row: the order route checked all this a moment ago, but a code
+ * switched off, expired or used up in between must not complete the order. Pure. `row.usedCount` is read under the lock.
+ */
+export function waiverRedeemProblem(
+  row: Pick<PromoRow, "discountType" | "isActive" | "validFrom" | "validUntil" | "maxUsages" | "usedCount"> & { appliesTo: string | null },
+  ctx: { audience: "employer" | "intern"; alreadyUsedByAccount: boolean; now?: Date },
+): string | null {
+  const now = ctx.now ?? new Date();
+  if (!isFullWaiver(row) || !row.isActive) return "Invalid promo code";
+  const caps = waiverRowProblem(row);
+  if (caps) return caps;
+  if (row.validFrom && row.validFrom > now) return "Promo code is not active yet";
+  if (row.validUntil && row.validUntil < now) return "Promo code expired";
+  if (row.maxUsages !== null && row.usedCount >= row.maxUsages) return "Promo code exhausted";
+  const scope = row.appliesTo ?? "both";
+  if (scope !== "both" && scope !== ctx.audience) return ctx.audience === "employer" ? "This code is for interns only" : "This code is for companies only";
+  if (ctx.alreadyUsedByAccount) return "You have already used this code";
+  return null;
 }

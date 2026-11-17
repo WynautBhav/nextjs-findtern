@@ -2,6 +2,7 @@ import { and, asc, eq, gte, inArray } from "drizzle-orm";
 
 import { withLock } from "@/lib/advisory-lock";
 import { schema } from "@/lib/db";
+import { WAIVER_GATEWAY } from "@/lib/full-waiver";
 import { isInternPaid } from "@/lib/payments";
 import { promoHoldRefusal } from "@/lib/promo";
 
@@ -59,7 +60,7 @@ export async function openOrder(internId: string, row: typeof schema.internPayme
     }
     // Orders that settle on the spot are inserted, then settled after the lock
     // is released; one still in that gap must not be joined by a second.
-    if (row.gateway === "test" || row.gateway === "free") {
+    if (row.gateway === "test" || row.gateway === "free" || row.gateway === WAIVER_GATEWAY) {
       const [settling] = await tx
         .select({ id: schema.internPayments.id })
         .from(schema.internPayments)
@@ -67,7 +68,7 @@ export async function openOrder(internId: string, row: typeof schema.internPayme
           and(
             eq(schema.internPayments.internId, internId),
             eq(schema.internPayments.status, "created"),
-            inArray(schema.internPayments.gateway, ["test", "free"]),
+            inArray(schema.internPayments.gateway, ["test", "free", WAIVER_GATEWAY]),
             gte(schema.internPayments.createdAt, new Date(Date.now() - SETTLING_MINUTES * 60_000)),
           ),
         )

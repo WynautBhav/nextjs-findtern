@@ -180,3 +180,52 @@ test("an ordinary code is never blocked by the waiver edit rule", () => {
   const plain = { ...waiverRow, discountType: "percentage", appliesTo: "intern" };
   assert.equal(waiverEditProblem(plain, { maxUsages: 500, discountValue: 20 }), null);
 });
+
+// ---------------------------------------------------------------- redemption (the check settlement repeats under a row lock)
+
+import { WAIVER_GATEWAY, waiverOrderProblem, waiverPromoRaw, waiverRedeemProblem, waiverFlagOf } from "./full-waiver.ts";
+
+const fresh = { ...waiverRow, appliesTo: "employer" as string | null };
+
+test("redeem: a live, in-cap code for the right audience passes", () => {
+  assert.equal(waiverRedeemProblem(fresh, { audience: "employer", alreadyUsedByAccount: false, now: NOW }), null);
+  assert.equal(waiverRedeemProblem({ ...fresh, appliesTo: "both" }, { audience: "intern", alreadyUsedByAccount: false, now: NOW }), null);
+});
+
+test("redeem: disabled, expired, not yet open, exhausted, wrong audience and second use by the same account are each refused", () => {
+  const go = (row: typeof fresh, over: Partial<{ audience: "employer" | "intern"; alreadyUsedByAccount: boolean }> = {}) =>
+    waiverRedeemProblem(row, { audience: "employer", alreadyUsedByAccount: false, now: NOW, ...over });
+  assert.equal(go({ ...fresh, isActive: false }), "Invalid promo code");
+  assert.equal(go({ ...fresh, validUntil: day(-0.001) }), "Promo code expired");
+  assert.equal(go({ ...fresh, validFrom: day(1) }), "Promo code is not active yet");
+  assert.equal(go({ ...fresh, usedCount: 1 }), "Promo code exhausted");
+  assert.equal(go(fresh, { audience: "intern" }), "This code is for companies only");
+  assert.equal(go({ ...fresh, appliesTo: "intern" }), "This code is for interns only");
+  assert.equal(go(fresh, { alreadyUsedByAccount: true }), "You have already used this code");
+  assert.equal(go({ ...fresh, validUntil: null }), "Invalid promo code", "a waiver row with no expiry is dead");
+  assert.equal(go({ ...fresh, maxUsages: 26 }), "Invalid promo code");
+});
+
+test("the order's promo block records it as a full waiver with the code id, the list value waived, and the zero payable", () => {
+  const raw = waiverPromoRaw({ code: "FREE-ABCD-EFGH-JKMN", promoCodeId: "p1", waivedMinor: 3_520_000 });
+  assert.deepEqual(raw, { promoCode: "FREE-ABCD-EFGH-JKMN", discountMinor: 3_520_000, fullWaiver: true, promoCodeId: "p1", waivedMinor: 3_520_000 });
+  assert.equal(WAIVER_GATEWAY, "promo_full_waiver");
+});
+
+test("waiverFlagOf reads the flag from an employer order (raw.promo) and an intern order (raw), and nothing else", () => {
+  assert.equal(waiverFlagOf({ promo: { fullWaiver: true, promoCodeId: "p1", waivedMinor: 5 } })?.promoCodeId, "p1");
+  assert.equal(waiverFlagOf({ fullWaiver: true, promoCodeId: "p2", waivedMinor: 5 })?.promoCodeId, "p2");
+  assert.equal(waiverFlagOf({ promo: { promoCode: "X", discountMinor: 5 } }), null);
+  assert.equal(waiverFlagOf({ promo: { fullWaiver: "true" } }), null, "only a real boolean true counts");
+  assert.equal(waiverFlagOf(null), null);
+  assert.equal(waiverFlagOf({}), null);
+});
+
+test("an order flagged as a waiver must be a zero-amount waiver-gateway order, or settlement refuses it", () => {
+  const raw = { promo: { fullWaiver: true, promoCodeId: "p1", waivedMinor: 5 } };
+  assert.equal(waiverOrderProblem({ gateway: WAIVER_GATEWAY, amountMinor: 0, raw }), null);
+  assert.ok(waiverOrderProblem({ gateway: WAIVER_GATEWAY, amountMinor: 100, raw }), "a waiver order with money on it is not settled");
+  assert.ok(waiverOrderProblem({ gateway: "razorpay", amountMinor: 0, raw }), "a Razorpay order can't carry the waiver flag");
+  assert.equal(waiverOrderProblem({ gateway: "razorpay", amountMinor: 100, raw: { promo: { promoCode: "X" } } }), null, "ordinary orders are untouched");
+  assert.ok(waiverOrderProblem({ gateway: WAIVER_GATEWAY, amountMinor: 0, raw: {} }), "the waiver gateway needs the flag too");
+});

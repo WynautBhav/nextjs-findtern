@@ -10,6 +10,7 @@ import { collegeAccountPayBlock } from "@/lib/college/account-state";
 import { openOrder } from "@/lib/intern-order-open";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { consentProblem } from "@/lib/college/promo-membership";
+import { isFullWaiver, WAIVER_GATEWAY, waiverPromoRaw } from "@/lib/full-waiver";
 import { promoRefusal, quotePromoGuarded } from "@/lib/promo";
 import { isInternPaid, settleInternOrder } from "@/lib/payments";
 import { internProfileStatus } from "@/lib/profile-complete";
@@ -79,6 +80,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   let amountMinor = baseMinor;
   let promo: { code: string; collegeId: string | null } | null = null;
   let discountMinor = 0;
+  let waiver: ReturnType<typeof waiverPromoRaw> | null = null;
 
   if (parsed.data.promoCode) {
     const quote = await quotePromoGuarded(req, id, {
@@ -86,7 +88,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       subjectId: id,
       orderMinor: baseMinor,
       currency: "INR",
-    });
+    }, { redeem: true });
     if (!quote.ok) return promoRefusal(quote);
     // A college code verifies the student with that college, so the 18+ tick is required with it.
     const noConsent = quote.promo.collegeId ? consentProblem(parsed.data.declaredAdult) : null;
@@ -94,8 +96,23 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     promo = quote.promo;
     discountMinor = quote.discountMinor;
     amountMinor = quote.payableMinor;
+    if (isFullWaiver(quote.promo)) waiver = waiverPromoRaw({ code: quote.promo.code, promoCodeId: quote.promo.id, waivedMinor: quote.discountMinor });
   }
   const raw = promo ? { promoCode: promo.code, discountMinor, ...(promo.collegeId ? { declaredAdult: true } : {}) } : {};
+
+  // Full waiver: no Razorpay order at all. The order is marked as a waiver (code id, list value waived); settlement locks the code,
+  // consumes its use once and audits it. The order id carries no code text.
+  if (waiver && promo) {
+    return settleNow(id, {
+      internId: id,
+      orderId: `waiver_${randomUUID()}`,
+      gateway: WAIVER_GATEWAY,
+      amountMinor: 0,
+      currency: "INR",
+      status: "created",
+      raw: waiver,
+    });
+  }
 
   // Full-discount code: no Razorpay order at all. Settle it now and let the
   // client skip the modal.

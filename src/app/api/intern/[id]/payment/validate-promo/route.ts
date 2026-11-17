@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
+import { isFullWaiver } from "@/lib/full-waiver";
 import { promoRefusal, quotePromoGuarded } from "@/lib/promo";
 import { isInternPaid } from "@/lib/payments";
 
@@ -41,5 +42,6 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     discountType: quote.promo.discountType,
     discountValue: quote.promo.discountValue,
     discountMinor: quote.discountMinor,
+    ...(isFullWaiver(quote.promo) ? { fullWaiver: true } : {}),
   });
 }

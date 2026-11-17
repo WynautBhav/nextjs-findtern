@@ -122,6 +122,8 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "promo.create": { code: "FB1INT10", discountType: "percentage", discountValue: 10, appliesTo: "employer", maxUsages: 50 },
   "promo.update": { code: "FB1INT10", discountType: "percentage", changes: { discountValue: { from: 10, to: 15 } } },
   "promo.delete": { code: "FB1INT10" },
+  "promo.full_waiver_created": { codeTail: "JKMN", appliesTo: "employer", maxUsages: 1, validUntil: "2026-11-24T10:00:00.000Z" },
+  "promo.full_waiver_redeemed": { orderId: "waiver_1", promoCodeId: "p-1", codeTail: "JKMN", accountId: "e-1", audience: "employer", amountWaivedMinor: 3520000, currency: "INR" },
   "intern.activation_marked_paid": { orderId: "ord_1", amountMinor: 49900, reference: "UTR412345678901" },
   "intern.marked_completed": { proposalId: "pr-1", bonusMinor: 100000 },
   "intern.completed_auto": { proposalId: "pr-1", timesheetId: "t-1", approverRole: "employer", bonusMinor: 100000 },

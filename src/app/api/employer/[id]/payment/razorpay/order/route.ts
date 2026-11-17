@@ -11,8 +11,9 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { openProposalsWithDues, payableCheckout, type PayableLine } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders, legacyOrderRaw, OPEN_ORDER_MINUTES, orderProposalIds, settleEmployerOrder } from "@/lib/payments";
 import { TAKEDOWN_BLOCKS, takedownCheckedLineIds } from "@/lib/projects/takedown";
+import { isFullWaiver, WAIVER_GATEWAY, waiverPromoRaw } from "@/lib/full-waiver";
 import { orderModeProblem } from "@/lib/order-mode";
-import { promoHoldRefusal, promoRefusal, quotePromoGuarded } from "@/lib/promo";
+import { isWaiverCode, promoHoldRefusal, promoRefusal, quotePromoGuarded } from "@/lib/promo";
 import { createOrder, paymentsAreFree, razorpayKeyId, testPayEnabled } from "@/lib/razorpay";
 
 const bodySchema = z.object({
@@ -123,6 +124,14 @@ async function openOrder(
   });
 }
 
+/** An order that never settles is closed, or it would block the next try for 30 minutes. The status guard leaves one alone once it has been paid. */
+function closeOrder(employerId: string, orderId: string) {
+  return getDb()
+    .update(schema.employerPayments)
+    .set({ status: "failed" })
+    .where(and(eq(schema.employerPayments.orderId, orderId), eq(schema.employerPayments.employerId, employerId), eq(schema.employerPayments.status, "created")));
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const guard = await requireMutation({ req, roles: ["employer"], ownerId: id });
@@ -154,7 +163,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "This month is already paid. Refresh the page to see it under Orders." }, { status: 409 });
   }
   // Pay-at-start monthly gone, postpaid for a score under 6 or full-time, promo with monthly payment (order-mode.ts).
-  const modeCheck = orderModeProblem({ mode: parsed.data.mode, paying, hasPromo: Boolean(parsed.data.promoCode) });
+  // A full-waiver code works on every pay plan; any other code only on upfront (the rule is unchanged for them).
+  const waiverCode = parsed.data.promoCode ? await isWaiverCode(parsed.data.promoCode) : false;
+  const modeCheck = orderModeProblem({ mode: parsed.data.mode, paying, hasPromo: Boolean(parsed.data.promoCode) && !waiverCode });
   if (!modeCheck.ok) return NextResponse.json({ error: modeCheck.error }, { status: modeCheck.status });
   const mode = modeCheck.mode;
 
@@ -173,15 +184,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const discountMinor = paying.reduce((s, l) => s + l.charge.discountMinor, 0);
   let amountMinor = listMinor;
   let promo: { promoCode: string; discountMinor: number } | null = null;
+  let waiver: ReturnType<typeof waiverPromoRaw> | null = null;
   if (parsed.data.promoCode) {
-    // The one-time hiring fee is never discounted (bug sheet 23 Oct).
+    // The one-time hiring fee is never discounted by an ordinary code (bug sheet 23 Oct); a full-waiver code takes it too.
     const feeMinor = paying.reduce((s, l) => s + l.charge.perHireMinor, 0);
-    const quote = await quotePromoGuarded(req, id, { code: parsed.data.promoCode, subjectId: id, orderMinor: amountMinor, currency, audience: "employer", undiscountableMinor: feeMinor });
+    const quote = await quotePromoGuarded(req, id, { code: parsed.data.promoCode, subjectId: id, orderMinor: amountMinor, currency, audience: "employer", undiscountableMinor: feeMinor }, { redeem: true });
     if (!quote.ok) return promoRefusal(quote);
     promo = { promoCode: quote.promo.code, discountMinor: quote.discountMinor };
+    if (isFullWaiver(quote.promo)) waiver = waiverPromoRaw({ code: quote.promo.code, promoCodeId: quote.promo.id, waivedMinor: quote.discountMinor });
     amountMinor = quote.payableMinor;
   }
-  if (amountMinor <= 0) return NextResponse.json({ error: "Nothing payable" }, { status: 400 });
+  // A full waiver is the only code that may bring the order to nothing; for any other code a zero total is refused as before.
+  if (amountMinor <= 0 && !waiver) return NextResponse.json({ error: "Nothing payable" }, { status: 400 });
 
   // Same notes the legacy app writes, so either app can settle the order.
   const notes = {
@@ -205,6 +219,30 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     listAmountMinor: listMinor,
     discountAmountMinor: discountMinor + (promo?.discountMinor ?? 0),
   };
+  // Full waiver: nothing to pay, so there is no Razorpay order and no popup. The order is recorded and settled straight away through
+  // the same settlement a paid order uses (hire, notifications, monthly dues), which locks the code, consumes its use once and audits it.
+  if (waiver) {
+    const orderId = `waiver_${randomUUID()}`;
+    const refused = await openOrder(id, paying, promo?.promoCode, {
+      employerId: id,
+      gateway: WAIVER_GATEWAY,
+      orderId,
+      amountMinor: 0,
+      currency,
+      status: "created",
+      raw: { notes, order: legacyOrderRaw({ id: orderId, amountMinor: 0, currency, notes }), promo: waiver },
+    });
+    if (refused) return NextResponse.json(refused, { status: 409 });
+    const settled = await settleEmployerOrder({ orderId, paymentId: orderId, employerId: id }).catch(async (e) => {
+      await closeOrder(id, orderId);
+      throw e;
+    });
+    if (!settled.ok) {
+      await closeOrder(id, orderId);
+      return NextResponse.json({ error: settled.error }, { status: settled.status });
+    }
+    return NextResponse.json({ free: true, waived: true });
+  }
   // Test mode, or the testPay flag: record the order and settle it straight
   // away, through the same settlement as a real payment (hire, notifications,
   // monthly dues). Free mode charges 0; testPay keeps the real amount.
