@@ -2,6 +2,7 @@ import { adminInvoiceInput } from "./admin/invoice-print.ts";
 import type { AdminInvoiceRow } from "./admin/invoice-rows.ts";
 import { discountLabel, paymentPromo } from "./admin/payment-promo.ts";
 import { taxInvoiceHtml, type InvoiceSeller } from "./invoice.ts";
+import { waiverFlagOf } from "./full-waiver.ts";
 
 /** An `intern_payments` row joined to the intern's user and onboarding rows (the admin ledger's query shape). */
 export type InternPaymentRecord = {
@@ -41,6 +42,7 @@ export function internInvoiceRow(inv: InternPaymentRecord): AdminInvoiceRow {
     orderId: inv.orderId,
     paymentId: inv.paymentId,
     gateway: inv.gateway,
+    waivedMinor: waiverFlagOf(inv.raw)?.waivedMinor ?? null,
     amountMinor: inv.amountMinor,
     currency: inv.currency || "INR",
     status: inv.status,

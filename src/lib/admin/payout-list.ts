@@ -3,6 +3,7 @@ import { alias } from "drizzle-orm/pg-core";
 
 import { getDb, schema } from "@/lib/db";
 import { inrMinorSql } from "@/lib/admin/scope";
+import { WAIVER_GATEWAY } from "@/lib/full-waiver";
 import { searchAny } from "@/lib/admin/params";
 import { isHiredProposal } from "@/lib/hire-status";
 import { stipendDues, type StipendDue } from "@/lib/admin/stipend-dues";
@@ -103,6 +104,8 @@ export async function loadPayouts(
         employerId: payoutEmployer.id,
         companyName: payoutEmployer.companyName,
         projectName: payoutProject.projectName,
+        // The employer's order for this placement was completed by a full-waiver code: Findtern pays the intern, nobody paid Findtern.
+        fundedByWaiver: sql<boolean>`(${proposalRef} is not null and exists (select 1 from employer_payments wp where wp.gateway = ${WAIVER_GATEWAY} and wp.status in ('paid', 'refunded', 'partially_refunded') and strpos(wp.raw::text, ${proposalRef}) > 0))`,
       })
       .from(schema.internPayouts)
       .leftJoin(schema.users, eq(schema.users.id, schema.internPayouts.internId))

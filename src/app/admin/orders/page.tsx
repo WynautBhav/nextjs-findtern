@@ -16,6 +16,7 @@ import { discountLabel, paymentPromo } from "@/lib/admin/payment-promo";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { isTestEmployer } from "@/lib/admin/scope";
 import { invoiceBuyerOf } from "@/lib/invoice-buyer";
+import { waiverFlagOf } from "@/lib/full-waiver";
 
 export const metadata: Metadata = {
   title: "Employer Orders · Admin Ledger",
@@ -78,6 +79,7 @@ async function loadOrders(): Promise<{ rows: AdminInvoiceRow[]; uncounted: Set<s
       orderId: o.orderId,
       paymentId: o.paymentId,
       gateway: o.gateway,
+      waivedMinor: waiverFlagOf(o.raw)?.waivedMinor ?? null,
       amountMinor: o.amountMinor,
       refundedMinor: orderRefunds(o).refundedMinor,
       currency: o.currency || "INR",

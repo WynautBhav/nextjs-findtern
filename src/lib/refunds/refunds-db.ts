@@ -19,7 +19,9 @@ export function pgExecutor(c: PgClient): RefundExecutor {
       return x ? { id: x.id, internPaymentId: x.intern_payment_id, amountMinor: x.amount_minor, status: x.status, gatewayRefundId: x.gateway_refund_id, idempotencyKey: x.idempotency_key, reason: x.reason ?? null } : null;
     },
     async getGatewayPaymentId(internPaymentId) {
-      const r = await c.query(`SELECT payment_id FROM intern_payments WHERE id=$1`, [internPaymentId]);
+      const r = await c.query(`SELECT payment_id, gateway, amount_minor FROM intern_payments WHERE id=$1`, [internPaymentId]);
+      // Only money that went through Razorpay can come back through it: a full-waiver (or any zero-amount) order has nothing to refund.
+      if (r.rows[0] && (r.rows[0].gateway === "promo_full_waiver" || Number(r.rows[0].amount_minor) <= 0)) return null;
       return (r.rows[0]?.payment_id as string | null) ?? null;
     },
     async claimInitiated(id) {

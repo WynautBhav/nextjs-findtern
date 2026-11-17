@@ -1,6 +1,7 @@
 import { sql, type SQL, type SQLWrapper } from "drizzle-orm";
 
 import { shortDate } from "../format.ts";
+import { WAIVER_GATEWAY } from "../full-waiver.ts";
 import { isSettledStatus } from "../refund-accounting.ts";
 import { toInrMinor } from "./money.ts";
 
@@ -55,7 +56,13 @@ export const PAID_STATUS = "paid";
  * a fee as covered; no money moved and no invoice exists. They are not receipts.
  */
 export const DRIVE_WAIVER_GATEWAY = "college_drive";
-export const isMoneyReceived = (p: { gateway?: string | null }) => p.gateway !== DRIVE_WAIVER_GATEWAY;
+/**
+ * Full-waiver promo orders (gateway 'promo_full_waiver', amount 0, status 'paid', lib/full-waiver.ts): a complimentary
+ * order, not a sale. Paid and settled like any other (the hire, the stipend schedule), but never money received, never
+ * counted as an order collected: they are reported apart, as "Waived" (the list value the code took off).
+ */
+export const isMoneyReceived = (p: { gateway?: string | null }) => p.gateway !== DRIVE_WAIVER_GATEWAY && p.gateway !== WAIVER_GATEWAY;
+export const isFullWaiverGateway = (p: { gateway?: string | null }) => p.gateway === WAIVER_GATEWAY;
 const IST_OFFSET_MS = 330 * 60_000;
 const DAY_MS = 86_400_000;
 
@@ -186,6 +193,10 @@ export type LedgerRow = {
   refundedMinor?: number | null;
   /** Marked paid only by the profile flag: listed, never counted as money. */
   flagOnly?: boolean;
+  /** 'promo_full_waiver' rows are complimentary: see isMoneyReceived. */
+  gateway?: string | null;
+  /** The list value a full-waiver code took off, in the row's own currency. */
+  waivedMinor?: number | null;
 };
 
 export const isPaid = (r: Pick<LedgerRow, "status">) => r.status === PAID_STATUS;
@@ -196,6 +207,8 @@ export const isPaid = (r: Pick<LedgerRow, "status">) => r.status === PAID_STATUS
  * customers' money (test employers).
  */
 export function ledgerTotals(rows: LedgerRow[], uncounted?: ReadonlySet<string>) {
+  let waivedMinor = 0;
+  let waivedCount = 0;
   let collectedMinor = 0;
   let collectedCount = 0;
   let discountMinor = 0;
@@ -209,6 +222,14 @@ export function ledgerTotals(rows: LedgerRow[], uncounted?: ReadonlySet<string>)
       continue;
     }
     if (uncounted?.has(r.id)) continue;
+    // A full-waiver order is complimentary: not collected, not a paid order, not in the discount total; shown as its own figure.
+    if (isFullWaiverGateway(r)) {
+      if (isSettledStatus(r.status)) {
+        waivedMinor += toInrMinor(r.waivedMinor ?? 0, r.currency);
+        waivedCount += 1;
+      }
+      continue;
+    }
     // Received money: paid, and the two refund labels (the order was paid first): the set Transactions counts.
     if (isSettledStatus(r.status)) {
       collectedMinor += toInrMinor(r.amountMinor, r.currency);
@@ -221,7 +242,7 @@ export function ledgerTotals(rows: LedgerRow[], uncounted?: ReadonlySet<string>)
     }
   }
   // collectedMinor stays gross (what was received); refunds are a separate figure and net is their difference.
-  return { collectedMinor, collectedCount, discountMinor, notCollectedMinor, notCollectedCount, markedPaidCount, refundedMinor, netCollectedMinor: collectedMinor - refundedMinor };
+  return { collectedMinor, collectedCount, discountMinor, notCollectedMinor, notCollectedCount, markedPaidCount, refundedMinor, netCollectedMinor: collectedMinor - refundedMinor, waivedMinor, waivedCount };
 }
 
 /** Net position: money received less money paid out and still owed to interns. */

@@ -13,7 +13,7 @@ const MESSAGES: Record<string, string> = {
   confirm_required: "Confirmation is required",
   amount_mismatch: "Amount does not match the stored refund amount",
   bad_status: "This refund can no longer be initiated",
-  no_gateway_payment: "The payment has no gateway payment id",
+  no_gateway_payment: "Nothing to refund: this payment has no Razorpay payment (it was free, for example a full-waiver code, or it has no gateway payment id)",
   gateway_error: "Razorpay refused the refund; it is marked failed and can be retried from a new scan",
   gateway_unknown: "Razorpay did not answer, so the refund may or may not have gone through. Do not retry: check the Razorpay dashboard; the webhook will settle it.",
 };

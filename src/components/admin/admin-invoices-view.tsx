@@ -9,6 +9,7 @@ import {
   filterInvoiceRows,
   gatewayLabel,
   INVOICE_KINDS,
+  isWaivedRow,
   invoiceFilters,
   promoCodeOptions,
   sortInvoiceRows,
@@ -101,6 +102,7 @@ export function AdminInvoicesView({
         <div className="whitespace-nowrap">
           <p className="nums font-semibold text-foreground">{money(r.amountMinor, r.currency)}</p>
           {r.amountMinor > 0 ? <p className="nums text-xs text-text-subtle">incl. GST {money(gstOf(r), r.currency)}</p> : null}
+          {isWaivedRow(r) ? <p className="nums text-xs text-text-subtle">list value waived {money(r.waivedMinor ?? 0, r.currency)}</p> : null}
           {(r.refundedMinor ?? 0) > 0 ? <p className="nums text-xs text-text-subtle">refunded {money(r.refundedMinor ?? 0, r.currency)} · net {money(Math.max(0, r.amountMinor - (r.refundedMinor ?? 0)), r.currency)}</p> : null}
           {(r.discountMinor ?? 0) > 0 || r.promoCode ? (
             <p className="nums text-xs text-text-subtle">
@@ -117,10 +119,11 @@ export function AdminInvoicesView({
         <div className="flex flex-col items-start gap-1">
           <span className="inline-flex flex-wrap items-center gap-1">
             <StatusBadge value={displayStatus(r)} />
+            {isWaivedRow(r) ? <StatusBadge tone="success" label="Complimentary (full waiver)" /> : null}
             {r.needsReview ? <span title={r.reviewReasons?.join(". ")}><StatusBadge tone="danger" label="Needs review" /></span> : null}
             {r.flagOnly ? <StatusBadge tone="neutral" label="Marked paid" /> : null}
           </span>
-          {kind === "employer" ? <span className="text-xs text-text-subtle">{gatewayLabel(r.gateway)}</span> : null}
+          {kind === "employer" && !isWaivedRow(r) ? <span className="text-xs text-text-subtle">{gatewayLabel(r.gateway)}</span> : null}
         </div>
       ),
     },
@@ -143,7 +146,7 @@ export function AdminInvoicesView({
 
   return (
     <div className="space-y-[var(--admin-gap)] lg:space-y-6">
-      <StatGrid cols={totals.refundedMinor > 0 ? 4 : 3}>
+      <StatGrid cols={totals.refundedMinor > 0 || totals.waivedCount > 0 ? 4 : 3}>
         <StatCard
           featured
           label="Collected"
@@ -165,6 +168,14 @@ export function AdminInvoicesView({
           hint="Promo codes and legacy discounts on paid rows"
           tone="neutral"
         />
+        {totals.waivedCount > 0 ? (
+          <StatCard
+            label="Waived"
+            value={formatMoney(totals.waivedMinor, "INR", { zeroLabel: "₹0" })}
+            hint={`${formatNumber(totals.waivedCount)} complimentary ${totals.waivedCount === 1 ? "order" : "orders"} (full-waiver code) · not money received`}
+            tone="neutral"
+          />
+        ) : null}
         <StatCard
           label="Not collected"
           value={formatMoney(totals.notCollectedMinor, "INR", { zeroLabel: "₹0" })}

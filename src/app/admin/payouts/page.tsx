@@ -190,6 +190,7 @@ async function PayoutsView({ params }: { params: Record<string, string> }) {
             {payoutSourceLabel(r.source)}
             {r.opsNote ? ` · ${r.opsNote}` : ""}
           </span>
+          {r.fundedByWaiver ? <StatusBadge tone="neutral" label="Funded by promo waiver" /> : null}
         </span>
       ),
     },

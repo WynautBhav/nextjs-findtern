@@ -5,6 +5,7 @@ import { parseOffer } from "../offer.ts";
 import type { PerHireFeeSetting } from "../per-hire-fee.ts";
 import { toInrMinor } from "./money.ts";
 import { isSettledStatus, orderRefunds, refundGstMinor, settledOrders } from "../refund-accounting.ts";
+import { WAIVER_GATEWAY, waiverFlagOf } from "../full-waiver.ts";
 import { collegeBatchReceipts, istDayKey } from "./revenue.ts";
 import { addMonthsIso, proposalOf, stipendDues } from "./stipend-dues.ts";
 
@@ -85,8 +86,10 @@ export type ReceivablesInput = {
   scoreOf: (internId: string) => number;
   activationFeeMinor: number;
   proposals: { id: string; employerId: string; internId: string; status: string; offerDetails: unknown; currency: string | null; hiredAt?: Date | string | null }[];
-  employerPayments: { id: string; employerId: string; orderId: string; paymentId: string | null; status: string; amountMinor: number; currency: string; paidAt: Date | null; createdAt: Date | null; raw: unknown }[];
+  employerPayments: { id: string; employerId: string; orderId: string; gateway?: string; paymentId: string | null; status: string; amountMinor: number; currency: string; paidAt: Date | null; createdAt: Date | null; raw: unknown }[];
   internPayments: { id: string; internId: string; paymentId: string | null; status: string; amountMinor: number; currency: string; paidAt: Date | null; createdAt: Date | null }[];
+  /** Orders a full-waiver code completed (both ledgers): reported as "Waived", never as money received. */
+  waivedOrders?: { id: string; status: string; currency: string; at: Date | null; raw: unknown }[];
   unpaidProfiles: { userId: string; createdAt: Date | null }[];
   payouts: { id: string; internId: string; status: string; amountMinor: number; currency: string; referenceId: string | null; paidAt: Date | null; createdAt: Date | null; raw: unknown; kind?: string }[];
   /** College seat batches (any status; only paid ones are money received) and college withdrawals (only paid ones are money out). */
@@ -172,6 +175,8 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
       if (!isSettledStatus(p.status)) continue;
       const date = istDayKey(p.paidAt ?? p.createdAt);
       refundRowsOf(p);
+      // A full-waiver order is complimentary: no money came in, so no "received" row (it is reported as Waived).
+      if (p.gateway === WAIVER_GATEWAY) continue;
       if (!receivedIn(p.paidAt ?? p.createdAt)) continue;
       receivables.push(
         row({
@@ -384,7 +389,20 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
   payables.sort(byDate);
 
   const totals = moneyTotals(receivables, payables);
-  return { receivables, payables, totals, refunds, refundFlags, refundTotals: refundTotalsOf(refunds, totals.receivedMinor) };
+  const waived = waivedTotals(input.waivedOrders ?? [], receivedIn);
+  return { receivables, payables, totals, refunds, refundFlags, refundTotals: refundTotalsOf(refunds, totals.receivedMinor), waived };
+}
+
+/** What full-waiver codes took off the orders they completed in the window (INR): the list value, not money. */
+export function waivedTotals(orders: NonNullable<ReceivablesInput["waivedOrders"]>, inWindow: (at: Date | null | undefined) => boolean): { minor: number; count: number } {
+  let minor = 0;
+  let count = 0;
+  for (const o of orders) {
+    if (!isSettledStatus(o.status) || !inWindow(o.at)) continue;
+    minor += toInrMinor(waiverFlagOf(o.raw)?.waivedMinor ?? 0, o.currency);
+    count += 1;
+  }
+  return { minor, count };
 }
 
 /** What was refunded in the shown rows, the GST inside it, and received less refunded. */
@@ -443,5 +461,5 @@ export function narrowReceivables(data: Receivables, f: MoneyRowFilter): Receiva
   const company = f.company.toLowerCase();
   const refunds = f.candidate || f.status ? [] : data.refunds.filter((r) => !company || (r.companyName ?? "").toLowerCase().includes(company));
   const shown = new Set(refunds.map((r) => r.orderId));
-  return { receivables, payables, totals, refunds, refundFlags: data.refundFlags.filter((x) => shown.has(x.orderId)), refundTotals: refundTotalsOf(refunds, totals.receivedMinor) };
+  return { receivables, payables, totals, refunds, refundFlags: data.refundFlags.filter((x) => shown.has(x.orderId)), refundTotals: refundTotalsOf(refunds, totals.receivedMinor), waived: data.waived };
 }

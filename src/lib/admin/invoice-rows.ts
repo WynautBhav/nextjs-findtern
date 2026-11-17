@@ -50,6 +50,8 @@ export type AdminInvoiceRow = {
   reviewReasons?: string[];
   /** Paid outside this ledger (only the profile's paid flag records it). */
   flagOnly?: boolean;
+  /** A full-waiver code completed this order for free: the list value it took off, in the row's currency (the amount charged is 0). */
+  waivedMinor?: number | null;
 };
 
 /** Money received. Settlement writes "paid" and nothing else (no legacy row says "captured"). */
@@ -66,6 +68,9 @@ export function displayStatus(r: Pick<AdminInvoiceRow, "status" | "amountMinor" 
  * A tax invoice exists only for money actually received. Unpaid, failed and
  * ₹0 rows used to print a TAX INVOICE with a made-up number (ADM-06).
  */
+/** A complimentary order completed by a full-waiver code (gateway 'promo_full_waiver'). */
+export const isWaivedRow = (r: Pick<AdminInvoiceRow, "gateway">) => r.gateway === "promo_full_waiver";
+
 export const hasTaxInvoice = (r: Pick<AdminInvoiceRow, "status" | "amountMinor">) => isPaidRow(r) && r.amountMinor > 0;
 
 /** The number shown in the table and searched: the stored serial, or the PDF's fallback for paid rows. */
@@ -155,7 +160,7 @@ export function promoCodeOptions(rows: AdminInvoiceRow[]): string[] {
 export function gatewayLabel(gateway: string | null | undefined): string {
   if (!gateway) return "-";
   const g = gateway.toLowerCase();
-  return g === "razorpay" ? "Razorpay" : g === "free" ? "Free (100% code)" : g === "manual" ? "Manual" : gateway;
+  return g === "razorpay" ? "Razorpay" : g === "free" ? "Free (100% code)" : g === "promo_full_waiver" ? "Complimentary (full waiver)" : g === "manual" ? "Manual" : gateway;
 }
 
 /** Per-ledger wording and invoice details. */

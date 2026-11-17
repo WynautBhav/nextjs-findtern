@@ -1,6 +1,7 @@
 import { eq, inArray, sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { WAIVER_GATEWAY } from "@/lib/full-waiver";
 import { getInternActivationFeeMinor, getPerHireFeeSetting } from "@/lib/platform-settings";
 import { SETTLED_STATUSES } from "@/lib/refund-accounting";
 import { computeReceivables } from "@/lib/admin/receivables";
@@ -53,6 +54,7 @@ export async function loadReceivables(
         id: schema.employerPayments.id,
         employerId: schema.employerPayments.employerId,
         orderId: schema.employerPayments.orderId,
+        gateway: schema.employerPayments.gateway,
         paymentId: schema.employerPayments.paymentId,
         status: schema.employerPayments.status,
         amountMinor: schema.employerPayments.amountMinor,
@@ -74,6 +76,7 @@ export async function loadReceivables(
         currency: schema.internPayments.currency,
         paidAt: schema.internPayments.paidAt,
         createdAt: schema.internPayments.createdAt,
+        raw: schema.internPayments.raw,
       })
       .from(schema.internPayments),
     db.select().from(schema.internPayouts),
@@ -109,6 +112,10 @@ export async function loadReceivables(
       proposals: proposals.filter((p) => realIds.has(p.employerId)),
       employerPayments,
       internPayments: internPayments.filter(isMoneyReceived),
+      waivedOrders: [
+        ...employerPayments.filter((p) => p.gateway === WAIVER_GATEWAY && realIds.has(p.employerId)).map((p) => ({ id: p.id, status: p.status, currency: p.currency, at: p.paidAt ?? p.createdAt, raw: p.raw })),
+        ...internPayments.filter((p) => p.gateway === WAIVER_GATEWAY).map((p) => ({ id: p.id, status: p.status, currency: p.currency, at: p.paidAt ?? p.createdAt, raw: p.raw })),
+      ],
       unpaidProfiles,
       payouts,
       collegeBatches,
@@ -129,10 +136,10 @@ function paidReceipts(): SQL {
   const csb = schema.collegeSeatBatches;
   return sql`(
     SELECT 'employer' AS source, ${inrMinorSql(ep.amountMinor, ep.currency)} AS inr_minor, ${receivedAtSql(ep.paidAt, ep.createdAt)} AS received_at
-      FROM ${ep} WHERE ${ep.status} IN (${sql.join(SETTLED_STATUSES.map((x) => sql`${x}`), sql`, `)}) AND ${realEmployerId(ep.employerId)}
+      FROM ${ep} WHERE ${ep.status} IN (${sql.join(SETTLED_STATUSES.map((x) => sql`${x}`), sql`, `)}) AND ${realEmployerId(ep.employerId)} AND ${ep.gateway} <> ${WAIVER_GATEWAY}
     UNION ALL
     SELECT 'intern', ${inrMinorSql(ip.amountMinor, ip.currency)}, ${receivedAtSql(ip.paidAt, ip.createdAt)}
-      FROM ${ip} WHERE ${ip.status} = ${PAID_STATUS} AND ${ip.gateway} <> ${DRIVE_WAIVER_GATEWAY}
+      FROM ${ip} WHERE ${ip.status} = ${PAID_STATUS} AND ${ip.gateway} <> ${DRIVE_WAIVER_GATEWAY} AND ${ip.gateway} <> ${WAIVER_GATEWAY}
     UNION ALL
     SELECT 'college', ${csb.amountMinor}, ${receivedAtSql(csb.paidAt, csb.createdAt)}
       FROM ${csb} WHERE ${csb.status} = ${PAID_STATUS}
