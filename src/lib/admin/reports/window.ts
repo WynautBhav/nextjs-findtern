@@ -174,3 +174,17 @@ export function bucketLabel(key: string, unit: BucketUnit): string {
   const [y, m, d] = key.split("-");
   return unit === "month" ? `${MON[Number(m) - 1]} ${y.slice(2)}` : `${Number(d)} ${MON[Number(m) - 1]}`;
 }
+
+/**
+ * The { since, until } an export route should use. A link made by a Reports tab carries `tab` and/or `range`
+ * and means that tab's window; an older link (no `tab`, no `range`) keeps its legacy reading, passed in as `legacy`.
+ */
+export function exportRange(
+  params: Record<string, string | undefined>,
+  legacy: (p: Record<string, string | undefined>) => { since: Date | null; until: Date | null },
+  now: Date = new Date(),
+): { since: Date | null; until: Date | null } {
+  if (!params.tab && !params.range) return legacy(params);
+  const w = parseReportWindow(params, now);
+  return { since: w.since, until: w.until };
+}

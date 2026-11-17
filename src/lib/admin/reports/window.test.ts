@@ -117,3 +117,11 @@ test("bucket labels are short and unambiguous", () => {
   assert.equal(bucketLabel("2026-11-16", "week"), "16 Nov");
   assert.equal(bucketLabel("2026-11-01", "month"), "Nov 26");
 });
+
+test("exportRange: a tab link means the tab's window; a legacy link keeps its own reading", async () => {
+  const { exportRange } = await import("./window.ts");
+  const legacy = () => ({ since: new Date("2020-01-01T00:00:00Z"), until: null });
+  assert.equal(iso(exportRange({ tab: "finance", range: "today" }, legacy, NOW).since), "2026-11-16T18:30:00.000Z");
+  assert.equal(iso(exportRange({ period: "30d" }, legacy, NOW).since), "2020-01-01T00:00:00.000Z");
+  assert.equal(exportRange({ range: "all" }, legacy, NOW).since, null);
+});

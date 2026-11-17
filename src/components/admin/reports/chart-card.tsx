@@ -36,7 +36,10 @@ export function ChartCard({ views, className }: { views: ChartView[]; className?
   const [key, setKey] = useState(views[0]?.key);
   const view = views.find((v) => v.key === key) ?? views[0];
   if (!view) return null;
-  const empty = view.series.every((s) => s.points.length < 2 || s.points.every((p) => p.y === 0));
+  const allZero = view.series.every((s) => s.points.every((p) => p.y === 0));
+  // One point is not a trend: say so, instead of claiming the data is zero.
+  const tooShort = !allZero && view.series.every((s) => s.points.length < 2);
+  const empty = allZero || tooShort;
   return (
     <Panel className={className}>
       <div data-panel-header="" className="flex flex-wrap items-start justify-between gap-3 px-[var(--admin-pad-panel)] pt-[var(--admin-pad-panel)]">
@@ -65,7 +68,9 @@ export function ChartCard({ views, className }: { views: ChartView[]; className?
       </div>
       <div data-panel-body="" className="p-[var(--admin-pad-panel)] pt-3">
         {empty ? (
-          <p className="py-14 text-center text-sm text-text-subtle">Nothing to chart yet: {view.unit.toLowerCase()} is zero for every period shown.</p>
+          <p className="py-14 text-center text-sm text-text-subtle">
+            {tooShort ? "Only one period in this range, so there is no trend to draw. Pick a longer period, such as 3 months or 12 months." : `Nothing to chart yet: ${view.unit.toLowerCase()} is zero for every period shown.`}
+          </p>
         ) : (
           <>
             <p className="mb-1 text-xs font-medium text-text-subtle">{view.unit}</p>

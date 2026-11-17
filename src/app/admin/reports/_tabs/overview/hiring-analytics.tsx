@@ -1,34 +1,34 @@
-import type { Metadata } from "next";
 import { Download } from "lucide-react";
 
 import { IdentityCell } from "@/components/admin/data-table";
-import { EmptyScene } from "@/components/app/primitives";
-import { AdminLoadError, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
-import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { AdminLoadError, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { ChipLinks, DateRangeForm } from "@/components/admin/report-range";
 import { ChartCard } from "@/components/admin/reports/chart-card";
 import { Funnel } from "@/components/admin/reports/funnel";
-import { PeriodBar } from "@/components/admin/reports/period-bar";
 import { RankCard } from "@/components/admin/reports/rank-card";
 import { StatStrip, trendOf } from "@/components/admin/reports/stat-strip";
-import { formatPercentDelta, REPORT_PERIODS } from "@/lib/admin/reports-shape";
+import { SimpleTable } from "@/components/admin/reports/simple-table";
+import { formatPercentDelta } from "@/lib/admin/reports-shape";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { ButtonAnchor, ButtonLink } from "@/components/ui/button";
+import { ButtonAnchor } from "@/components/ui/button";
 import { filterCompanies, filterHires, type Analytics, type HireFilter } from "@/lib/admin/analytics";
-import { analyticsRange, loadAnalytics } from "@/lib/admin/analytics-load";
+import { loadAnalytics } from "@/lib/admin/analytics-load";
 import { Pager } from "@/components/admin/pagination";
-import { flattenParams, toPage, type RawSearchParams } from "@/lib/admin/params";
+import { toPage } from "@/lib/admin/params";
+import { reportHref } from "@/lib/admin/reports/href";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
-import { cn } from "@/lib/utils";
+import type { TabProps } from "../types";
 
-export const metadata: Metadata = { title: "Hiring analytics" };
+const BASE = "/admin/reports";
 
-const BASE = "/admin/reports/analytics";
-
-/** Legacy's analytics report (routes.ts:5455-6400), ported with USD converted and test employers excluded. */
-export default async function AdminAnalyticsPage({ searchParams }: { searchParams?: Promise<RawSearchParams> }) {
-  const params = flattenParams(await searchParams);
-  const range = analyticsRange(params);
+/**
+ * Legacy's analytics report (routes.ts:5455-6400), ported with USD converted and test employers excluded: the
+ * "Hiring analytics" section of the Overview tab (it was /admin/reports/analytics). Same loader and figures;
+ * the period is the tab's window (Today / week / month, a preset or custom dates).
+ */
+export default async function HiringAnalytics({ window: w, params }: TabProps) {
+  const range = { since: w.since, until: w.until };
   let a: Analytics | null = null;
   try {
     a = await loadAnalytics(range);
@@ -37,45 +37,29 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
   }
   const query = new URLSearchParams(params).toString();
   const rate = (v: number | null, suffix = "%") => (v == null ? "-" : `${v}${suffix}`);
-  const link = (patch: Record<string, string>) => {
-    const q = new URLSearchParams({ ...params, ...patch });
-    if (!("hp" in patch)) q.delete("hp");
-    for (const [k, v] of [...q.entries()]) if (!v) q.delete(k);
-    const s = q.toString();
-    return s ? `${BASE}?${s}` : BASE;
-  };
+  const link = (patch: Record<string, string>) => reportHref(params, patch, "hp" in patch ? [] : ["hp"]);
 
   const header = (
-    <AdminPageHeader
-      title="Hiring analytics"
-      subtitle="Money in INR (USD at ₹100/$); test employers excluded."
-      action={
-        <>
-          <ButtonLink href="/admin/reports" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
-            Reports
-          </ButtonLink>
-          <ButtonAnchor
-            href={`/api/admin/reports/analytics?${query}${query ? "&" : ""}download=1`}
-            variant="primary"
-            size="sm"
-            className={ADMIN_PILL_PRIMARY}
-          >
-            <Download className="size-4" aria-hidden />
-            Export JSON
-          </ButtonAnchor>
-        </>
-      }
-    />
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <h2 id="hiring-analytics" className="text-lg font-semibold tracking-[-0.01em] text-foreground">
+        Hiring analytics
+        <span className="ml-2 text-sm font-normal text-text-subtle">Money in INR (USD at ₹100/$); test employers excluded.</span>
+      </h2>
+      <ButtonAnchor href={`/api/admin/reports/analytics?${query}${query ? "&" : ""}download=1`} variant="primary" size="sm" className={ADMIN_PILL_PRIMARY}>
+        <Download className="size-4" aria-hidden />
+        Export JSON
+      </ButtonAnchor>
+    </div>
   );
 
   if (!a) {
     return (
-      <div className="space-y-5 lg:space-y-6">
+      <section aria-labelledby="hiring-analytics" className="space-y-5 lg:space-y-6" data-rp="hiring-analytics">
         {header}
         <Panel>
-          <AdminLoadError what="hiring analytics" retryHref={BASE} />
+          <AdminLoadError what="hiring analytics" retryHref={reportHref(params, {})} />
         </Panel>
-      </div>
+      </section>
     );
   }
 
@@ -97,9 +81,8 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
   const hires = allHires.slice((hiresPage.page - 1) * HIRES_PER_PAGE, hiresPage.page * HIRES_PER_PAGE);
 
   return (
-    <div className="space-y-5 lg:space-y-6">
+    <section aria-labelledby="hiring-analytics" className="space-y-5 lg:space-y-6" data-rp="hiring-analytics">
       {header}
-      <PeriodBar basePath={BASE} params={params} defaultValue="" defaultLabel="Last 18 months" periods={REPORT_PERIODS} />
 
       <StatStrip
         stats={[
@@ -355,7 +338,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
         />
         <Pager page={hiresPage.page} pages={hiresPage.pages} total={allHires.length} perPage={HIRES_PER_PAGE} rowsShown={hires.length} params={params} basePath={BASE} noun="hires" pageKey="hp" />
       </Panel>
-    </div>
+    </section>
   );
 }
 
@@ -365,55 +348,6 @@ function Ratio({ label, value, note }: { label: string; value: string; note?: st
       <dt className="text-[0.8125rem] leading-snug text-text-subtle">{label}</dt>
       <dd className="nums mt-0.5 text-2xl font-semibold tracking-[-0.02em] text-foreground">{value}</dd>
       {note ? <dd className="text-xs text-text-subtle">{note}</dd> : null}
-    </div>
-  );
-}
-
-/** A small read-only table in the DataTable treatment (sticky sentence-case header, right-aligned figures, no zebra). */
-function SimpleTable({
-  head,
-  rows,
-  right = [],
-  empty,
-  minWidth,
-}: {
-  head: string[];
-  rows: React.ReactNode[][];
-  right?: number[];
-  empty: { title: string; body: string };
-  minWidth: string;
-}) {
-  if (rows.length === 0) return <EmptyScene compact title={empty.title} body={empty.body} />;
-  return (
-    // Focusable, so the inner scroll can be reached from the keyboard (axe scrollable-region-focusable).
-    <div tabIndex={0} role="region" aria-label={`${head[0]} table`} data-stack className="max-h-[32rem] overflow-y-auto lg:overflow-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
-      <table className={cn("w-full text-left text-sm", minWidth)}>
-        <thead>
-          <tr className="border-b border-[color:var(--admin-rule)]">
-            {head.map((h, i) => (
-              <th key={h} scope="col" className={cn("sticky top-0 z-10 bg-[color:var(--admin-panel)] px-3 py-2.5 text-[0.8125rem] font-medium text-text-subtle first:pl-[var(--admin-pad-panel)] last:pr-[var(--admin-pad-panel)]", right.includes(i) && "text-right")}>
-                {h}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r, ri) => (
-            <tr key={ri} className="border-b border-[color:var(--admin-rule)] last:border-0 hover:bg-[color:var(--admin-panel-2)]">
-              {r.map((cell, i) => (
-                <td
-                  key={i}
-                  {...(i === 0 ? { "data-title": "" } : { "data-label": head[i] })}
-                  {...(cell === "-" || cell === "–" || cell === "—" ? { "data-empty": "" } : {})}
-                  className={cn("px-3 py-2.5 text-foreground [overflow-wrap:anywhere] first:pl-[var(--admin-pad-panel)] last:pr-[var(--admin-pad-panel)]", right.includes(i) && "nums text-right")}
-                >
-                  {cell}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }

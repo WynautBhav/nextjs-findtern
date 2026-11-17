@@ -94,7 +94,7 @@ export function mergeCityRows(rows: readonly { city: string | null; count: numbe
     } else by.set(n.key, { ...n, count: r.count, top: r.count, ...("state" in r ? { state: r.state ?? null } : {}) });
   }
   return [...by.values()]
-    .map(({ top: _top, ...rest }) => rest)
+    .map((c): MergedCity => (c.state === undefined && !("state" in c) ? { key: c.key, label: c.label, count: c.count } : { key: c.key, label: c.label, count: c.count, state: c.state }))
     .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label));
 }
 

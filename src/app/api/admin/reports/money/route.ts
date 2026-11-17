@@ -4,6 +4,7 @@ import { analyticsRange } from "@/lib/admin/analytics-load";
 import { toCsv } from "@/lib/admin/csv";
 import { loadReceivables, moneyFilter } from "@/lib/admin/receivables-load";
 import { moneyRowFilter, narrowReceivables, type MoneyRow } from "@/lib/admin/receivables";
+import { exportRange } from "@/lib/admin/reports/window";
 import { isSessionRevoked } from "@/lib/account-status";
 import { requireRole } from "@/lib/security/guards";
 
@@ -13,7 +14,9 @@ export async function GET(req: Request) {
   const guard = requireRole(req.headers.get("cookie"), ["admin"]);
   if (!guard.ok || (await isSessionRevoked(guard.session.sid))) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
   const params = Object.fromEntries(new URL(req.url).searchParams);
-  const loaded = await loadReceivables(analyticsRange(params), {
+  // The Finance tab's links carry `tab` / `range`: its Today / week / month window. Old links keep the legacy default.
+  const range = exportRange(params, analyticsRange);
+  const loaded = await loadReceivables(range, {
     receivables: moneyFilter(params.receivables),
     payables: moneyFilter(params.payables),
   });

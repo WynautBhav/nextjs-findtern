@@ -214,7 +214,7 @@ export async function loadSkillDemand(w: ReportWindow): Promise<SkillDemand> {
   const demand = (name: string, extra: SQL) =>
     timed("employers", name, () =>
       db
-        .execute(sql`SELECT ${SKILL_KEY("name")} AS k, min(name) AS label, count(DISTINCT id)::int AS c
+        .execute(sql`SELECT ${SKILL_KEY("name")} AS k, mode() WITHIN GROUP (ORDER BY trim(name)) AS label, count(DISTINCT id)::int AS c
           FROM (SELECT ${P.id} AS id, ${SKILL_NAME} AS name FROM ${P}, ${explode("skills")} WHERE ${REAL_PROJECT} AND ${extra}) s
           WHERE coalesce(name, '') <> '' AND ${SKILL_KEY("name")} <> '' GROUP BY 1 ORDER BY c DESC, 1 LIMIT 20`)
         .then((r) => (r.rows as { k: string; label: string; c: number }[]).map((x) => ({ key: x.k, label: x.label, count: n(x.c) }))),

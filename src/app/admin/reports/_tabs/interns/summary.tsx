@@ -66,6 +66,7 @@ export default async function Summary({ window: w, now }: TabProps) {
                 ["Active", c.active],
                 ["Hidden by admin", c.hidden],
                 ["Banned", c.banned],
+                ["Switched off (inactive)", c.inactive],
                 ["Total interns", c.total],
                 ["Paid activation", c.paid],
                 ["AI interview scored", c.scored],

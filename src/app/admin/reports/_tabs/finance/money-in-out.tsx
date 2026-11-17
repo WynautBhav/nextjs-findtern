@@ -1,30 +1,26 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Download } from "lucide-react";
 
 import { IdentityCell } from "@/components/admin/data-table";
-import { AdminLoadError, AdminPageHeader, Panel, PanelHeader } from "@/components/admin/panel";
-import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { AdminLoadError, Panel, PanelHeader } from "@/components/admin/panel";
 import { ChipLinks } from "@/components/admin/report-range";
 import { ChartCard } from "@/components/admin/reports/chart-card";
-import { PeriodBar } from "@/components/admin/reports/period-bar";
 import { StatStrip, trendOf } from "@/components/admin/reports/stat-strip";
-import { formatPercentDelta, monthlyFlows, percentChange, previousWindow, REPORT_PERIODS } from "@/lib/admin/reports-shape";
+import { formatPercentDelta, monthlyFlows, percentChange } from "@/lib/admin/reports-shape";
 import { loadCollected } from "@/lib/admin/receivables-load";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { ButtonAnchor, ButtonLink } from "@/components/ui/button";
-import { analyticsRange } from "@/lib/admin/analytics-load";
-import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
+import { ButtonAnchor } from "@/components/ui/button";
+import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { MONEY_STATUSES, moneyRowFilter, narrowReceivables, type MoneyRow, type Receivables } from "@/lib/admin/receivables";
 import { loadReceivables, moneyFilter } from "@/lib/admin/receivables-load";
-import { netMinor } from "@/lib/admin/revenue";
+import { istDayKey, netMinor } from "@/lib/admin/revenue";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AutoSubmitForm } from "@/components/app/auto-submit-form";
 
-export const metadata: Metadata = { title: "Money in and out" };
+import type { TabProps } from "../types";
 
-const BASE = "/admin/reports/money";
+const BASE = "/admin/reports";
 const SHOWN = 300;
 /** Rows drawn before "Show all": long enough to be useful, short enough not to bury the page. */
 const FIRST_ROWS = 25;
@@ -51,23 +47,24 @@ const STATUS_TONE: Record<MoneyRow["status"], string> = {
 const field =
   "h-10 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11";
 
-/** Legacy receivables / payables report (routes.ts:5100-5453), with INR totals. */
-export default async function AdminMoneyReportPage({ searchParams }: { searchParams?: Promise<RawSearchParams> }) {
-  const params = flattenParams(await searchParams);
+/**
+ * The old Money in and out report (legacy receivables / payables, routes.ts:5100-5453), now a section of the Finance
+ * tab: same loaders, tiles, filters, tables and CSV, with the period taken from the tab's window.
+ */
+export default async function MoneyInOut({ window: w, params }: TabProps) {
   const receivablesFilter = moneyFilter(params.receivables);
   const payablesFilter = moneyFilter(params.payables);
   const rowFilter = moneyRowFilter(params);
   let data: Receivables | null = null;
   try {
     data = narrowReceivables(
-      await loadReceivables(analyticsRange(params), { receivables: receivablesFilter, payables: payablesFilter }),
+      await loadReceivables({ since: w.since, until: w.until }, { receivables: receivablesFilter, payables: payablesFilter }),
       rowFilter,
     );
   } catch (error) {
     console.error("[admin/reports/money] load failed", error);
   }
-  const range = analyticsRange(params);
-  const prev = data ? previousWindow(range) : null;
+  const prev = data && w.prevSince ? { since: w.prevSince, until: w.prevUntil } : null;
   // Same definition as the Reports page (loadCollected), so the delta is not a different "received".
   // Like with like: the source chips pick the matching side, and a company/candidate/status filter has no comparable base.
   const rowFiltered = Boolean(rowFilter.company || rowFilter.candidate || rowFilter.status);
@@ -75,7 +72,7 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
   const sideOf = (c: { receivedMinor: number; employerMinor: number; internMinor: number; collegeMinor: number }) =>
     receivablesFilter === "company" ? c.employerMinor + c.collegeMinor : receivablesFilter === "candidate" ? c.internMinor : c.receivedMinor;
   const prevReceived =
-    prev && !rowFiltered && (params.period !== "all" || params.from || params.to)
+    prev && !rowFiltered
       ? await loadCollected(prev).then(sideOf).catch(() => null)
       : null;
   const receivedChange = data && prevReceived !== null ? percentChange(data.totals.receivedMinor, prevReceived) : null;
@@ -98,34 +95,25 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
       }))}
     />
   );
-  // Filters that ride along when the period changes.
-  const keep = { receivables: params.receivables, payables: params.payables, company: params.company, candidate: params.candidate, status: params.status, view: params.view };
   const filtered = Boolean(rowFilter.company || rowFilter.candidate || rowFilter.status);
+  // "Due" rows are owed now (accepted offers, post-paid months); overdue is the part whose date has already passed (India date).
+  const today = istDayKey(new Date());
+  const overdueMinor = data ? data.receivables.filter((r) => r.status === "due" && r.date < today!).reduce((s, r) => s + r.inrMinor, 0) : 0;
+  const pendingPayableMinor = data ? data.payables.filter((r) => r.status === "pending").reduce((s, r) => s + r.inrMinor, 0) : 0;
   const flows = data ? monthlyFlows(data.receivables, data.payables) : [];
 
   return (
-    <div className="space-y-6 lg:space-y-8">
-      <AdminPageHeader
-        title="Money in and out"
-        subtitle="Amounts keep their currency; totals are in INR (USD at ₹100/$)."
-        action={
-          <>
-            <ButtonLink href="/admin/reports" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
-              Reports
-            </ButtonLink>
-            <ButtonAnchor
-              href={`/api/admin/reports/money?${query}${query ? "&" : ""}format=csv`}
-              variant="primary"
-              size="sm"
-              className={ADMIN_PILL_PRIMARY}
-            >
-              <Download className="size-4" aria-hidden />
-              Export CSV
-            </ButtonAnchor>
-          </>
-        }
-      />
-      <PeriodBar basePath={BASE} params={params} defaultValue="" defaultLabel="Last 18 months" periods={REPORT_PERIODS} hidden={keep} />
+    <section aria-labelledby="money-in-out" className="space-y-5 lg:space-y-6" data-rp="money-in-out">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="money-in-out" className="text-lg font-semibold tracking-[-0.01em] text-foreground">
+          Money in and out
+          <span className="ml-2 text-sm font-normal text-text-subtle">Amounts keep their currency; totals are in INR (USD at ₹100/$).</span>
+        </h2>
+        <ButtonAnchor href={`/api/admin/reports/money?${query}${query ? "&" : ""}format=csv`} variant="primary" size="sm" className={ADMIN_PILL_PRIMARY}>
+          <Download className="size-4" aria-hidden />
+          Export CSV
+        </ButtonAnchor>
+      </div>
 
       {/* Candidate / company / status (ADM-15): one GET form, applies to both
           tables as you change it (no Filter button, QA-149). */}
@@ -181,10 +169,10 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
               {
                 label: "Still to collect",
                 value: inr(data.totals.dueMinor),
-                note: `Accepted offers and instalments \u00b7 ${inr(data.totals.prospectMinor)} in unpaid fees`,
+                note: `Accepted offers and instalments \u00b7 ${inr(overdueMinor)} past its date \u00b7 ${inr(data.totals.prospectMinor)} in unpaid fees`,
               },
               { label: "Paid to interns", value: inr(data.totals.paidOutMinor), note: "Stipend payouts marked paid" },
-              { label: "Owed to interns", value: inr(data.totals.owedMinor), note: "Pending payouts and stipend months ahead" },
+              { label: "Owed to interns", value: inr(data.totals.owedMinor), note: `${inr(pendingPayableMinor)} pending payouts \u00b7 ${inr(data.totals.owedMinor - pendingPayableMinor)} stipend months ahead` },
               ...(data.refunds.length > 0
                 ? [{ label: "Refunded to companies", value: inr(data.refundTotals.refundedMinor), note: `Net received ${inr(data.refundTotals.netReceivedMinor)} \u00b7 ${inr(data.refundTotals.gstMinor)} GST inside` }]
                 : []),
@@ -235,7 +223,7 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
           <AdminLoadError what="the money report" retryHref={BASE} />
         </Panel>
       )}
-    </div>
+    </section>
   );
 }
 

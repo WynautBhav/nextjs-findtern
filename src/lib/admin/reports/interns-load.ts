@@ -36,7 +36,7 @@ function academic(k: "institution" | "degree" | "year"): SQL {
 }
 
 /** One row per intern with every flag the tab needs. Reused by the summary, the table and the CSV. */
-function baseCte(): SQL {
+export function baseCte(): SQL {
   return sql`base AS (
     SELECT ${U.id} AS id, ${U.firstName} AS first_name, ${U.lastName} AS last_name, ${U.email} AS email, ${U.createdAt} AS created_at,
       ${U.isActive} AS is_active, ${U.bannedAt} AS banned_at, ${U.profileVisibility} AS visibility, ${U.emailVerified} AS email_verified,
@@ -64,7 +64,7 @@ const n = (v: unknown) => Number(v ?? 0);
 export type InternCounts = {
   total: number; newWindow: number; newPrev: number | null; today: number; week: number; month: number;
   hired: number; paid: number; scored: number; kyc: number; approved: number; emailVerified: number;
-  banned: number; hidden: number; active: number;
+  banned: number; hidden: number; active: number; inactive: number;
   stages: Record<string, number>;
 };
 
@@ -97,6 +97,7 @@ export async function loadInternSummary(w: ReportWindow, now: Date): Promise<{ c
             count(*) FILTER (WHERE banned_at IS NOT NULL)::int AS banned,
             count(*) FILTER (WHERE banned_at IS NULL AND visibility = 'hidden')::int AS hidden,
             count(*) FILTER (WHERE banned_at IS NULL AND visibility <> 'hidden' AND is_active)::int AS active,
+            count(*) FILTER (WHERE banned_at IS NULL AND visibility <> 'hidden' AND NOT is_active)::int AS inactive,
             count(*) FILTER (WHERE hired)::int AS s_hired,
             count(*) FILTER (WHERE NOT hired AND applied)::int AS s_in_pipeline,
             count(*) FILTER (WHERE NOT hired AND NOT applied AND score IS NOT NULL)::int AS s_interviewed,
@@ -129,7 +130,7 @@ export async function loadInternSummary(w: ReportWindow, now: Date): Promise<{ c
     counts: {
       total: n(c.total), newWindow: n(c.new_window), newPrev: c.new_prev == null ? null : n(c.new_prev), today: n(c.today), week: n(c.week), month: n(c.month),
       hired: n(c.hired), paid: n(c.paid), scored: n(c.scored), kyc: n(c.kyc), approved: n(c.approved), emailVerified: n(c.email_verified),
-      banned: n(c.banned), hidden: n(c.hidden), active: n(c.active),
+      banned: n(c.banned), hidden: n(c.hidden), active: n(c.active), inactive: n(c.inactive),
       stages: {
         signed_up: n(c.s_signed_up), profile_started: n(c.s_profile_started), profile_complete: n(c.s_profile_complete), activated: n(c.s_activated),
         interviewed: n(c.s_interviewed), in_pipeline: n(c.s_in_pipeline), hired: n(c.s_hired),
