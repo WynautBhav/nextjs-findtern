@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { payableCheckout, type PayableCheckout } from "@/lib/employer-payable";
+import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { displayNameOf } from "@/lib/employer-candidates";
 import { hireFlowCounts } from "@/lib/employer-flow";
 import { expireStaleEmployerOrders } from "@/lib/payments";
@@ -83,6 +84,16 @@ export default async function EmployerCheckout({
         lede="Pay for an accepted offer to complete the hire. Each payment covers one candidate, on the terms they accepted."
       />
       {counts ? <HireFlow counts={counts} current="checkout" /> : null}
+      {result.blocked.length > 0 ? (
+        <div className="mb-5 space-y-3">
+          <TakedownBanner projects={[...new Map(result.blocked.map((b) => [b.projectId, { id: b.projectId, name: b.projectName ?? "This project" }])).values()]} />
+          <ul aria-label="Not payable while taken down" className="space-y-1 text-sm text-ink-700">
+            {result.blocked.map((b) => (
+              <li key={b.id}><strong>{b.projectName ?? "Project"}</strong>: {b.note}. No payment can be made for it until admin restores the project.</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       {view === "receipt" ? (
         <CheckoutEmpty

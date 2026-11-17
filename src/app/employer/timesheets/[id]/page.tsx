@@ -8,6 +8,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { TimesheetDecision } from "@/components/employer/decision-button";
 import { TimesheetReview } from "@/components/employer/timesheet-review";
+import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { canAccess } from "@/lib/security/guards";
 import { Avatar } from "@/components/app/avatar";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
@@ -52,10 +53,11 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
   let initials = "I";
   let masked = true;
   let projectName: string | null = null;
+  let down: { id: string; reason: string | null } | null = null;
   try {
     const db = getDb();
     const [row] = await db
-      .select({ firstName: schema.users.firstName, lastName: schema.users.lastName, projectName: schema.projects.projectName })
+      .select({ firstName: schema.users.firstName, lastName: schema.users.lastName, projectName: schema.projects.projectName, projectId: schema.projects.id, takenDownAt: schema.projects.takenDownAt, takenDownReason: schema.projects.takenDownReason })
       .from(schema.timesheets)
       .innerJoin(schema.users, eq(schema.timesheets.internId, schema.users.id))
       .leftJoin(schema.proposals, eq(schema.timesheets.proposalId, schema.proposals.id))
@@ -68,6 +70,7 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
       const ini = initialsOf(first, last);
       initials = ini === "?" ? "I" : ini;
       projectName = row.projectName ?? null;
+      down = row.takenDownAt && row.projectId ? { id: row.projectId, reason: row.takenDownReason } : null;
       const unlocked = (await hiredInternIds(db, timesheet.employerId)).has(timesheet.internId);
       masked = !unlocked;
       name = !unlocked && ini !== "?" ? `Candidate ${ini}` : displayNameOf({ id: timesheet.internId, fullName: `${first} ${last}`.trim() || "Intern", initials: ini }, unlocked);
@@ -96,6 +99,11 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
 
   return (
     <div>
+      {down ? (
+        <div className="mb-5">
+          <TakedownBanner projects={[{ id: down.id, name: projectName ?? "This project", reason: down.reason }]} />
+        </div>
+      ) : null}
       <Link
         href="/employer/timesheets"
         className="apple-spring mb-3 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm text-sm font-medium text-brand-700 hover:underline"
@@ -146,14 +154,18 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
                 : `${days.length} days, every one filled.`
             }
           />
-          <TimesheetReview timesheetId={timesheet.id} days={days} editable={status !== "approved"} />
+          <TimesheetReview timesheetId={timesheet.id} days={days} editable={status !== "approved" && !down} />
         </Surface>
 
         <aside className="min-w-0 space-y-4 xl:sticky xl:top-24 xl:self-start">
           <Surface as="section" className="p-5">
             <h2 className="text-base font-semibold text-ink-900">Decision</h2>
             <div className="mt-3">
-              {status === "submitted" ? (
+              {down ? (
+                <p className="text-sm leading-relaxed text-ink-700">
+                  Taken down by Findtern: view only. This timesheet cannot be approved or sent back while the project is taken down. Use Contact admin above.
+                </p>
+              ) : status === "submitted" ? (
                 <TimesheetDecision timesheetId={timesheet.id} unfilled={unfilled} />
               ) : decided ? (
                 <p className="text-sm leading-relaxed text-ink-700">

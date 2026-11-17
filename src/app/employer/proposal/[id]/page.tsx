@@ -30,6 +30,8 @@ import { buttonClass } from "@/components/ui/button";
 import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
 import { offerState } from "@/components/employer/proposal-state";
+import { TakedownBanner } from "@/components/employer/takedown-banner";
+import { TAKEN_DOWN_EXPLAIN, TAKEN_DOWN_SHORT } from "@/components/employer/takedown-ui";
 import { offerTimeline } from "@/components/employer/proposal-timeline";
 import { MeetingRulesList } from "@/components/employer/meeting-rules";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
@@ -86,6 +88,7 @@ export default async function EmployerProposalDetail({
   let unlocked = false;
   let projectName: string | null = null;
   let projectTimezone: string | null = null;
+  let projectDown: { id: string; reason: string | null } | null = null;
   let preference: WorkPreference = { modes: [], cities: [] };
   let hasLaptop: boolean | null = null;
   let photoUrl: string | null = null;
@@ -98,6 +101,9 @@ export default async function EmployerProposalDetail({
         lastName: schema.users.lastName,
         projectName: schema.projects.projectName,
         projectTimezone: schema.projects.timezone,
+        projectId: schema.projects.id,
+        takenDownAt: schema.projects.takenDownAt,
+        takenDownReason: schema.projects.takenDownReason,
       })
       .from(schema.proposals)
       .innerJoin(schema.users, eq(schema.proposals.internId, schema.users.id))
@@ -115,6 +121,7 @@ export default async function EmployerProposalDetail({
     }
     projectName = row?.projectName ?? null;
     projectTimezone = row?.projectTimezone ?? null;
+    projectDown = row?.takenDownAt && row.projectId ? { id: row.projectId, reason: row.takenDownReason } : null;
     const [pref] = await db
       .select({
         locationTypes: schema.internOnboarding.locationTypes,
@@ -174,7 +181,9 @@ export default async function EmployerProposalDetail({
   } catch (err) {
     console.error("[employer/proposal] tax place", err);
   }
-  const state = offerState(proposal, offer);
+  // Findtern took the project down: the offer is view only (no pay, edit, withdraw or message).
+  const baseState = offerState(proposal, offer);
+  const state = projectDown ? { ...baseState, canPay: false, canEdit: false, canWithdraw: false } : baseState;
   const skills = Array.isArray(proposal.skills) ? proposal.skills.filter(Boolean) : [];
   const snapshot = Object.entries(proposal.aiRatings ?? {}).filter(
     (entry): entry is [string, number] => typeof entry[1] === "number" && entry[0] !== "overall",
@@ -238,6 +247,11 @@ export default async function EmployerProposalDetail({
         All proposals
       </Link>
 
+      {projectDown ? (
+        <div className="mb-6">
+          <TakedownBanner projects={[{ id: projectDown.id, name: projectName ?? "This project", reason: projectDown.reason }]} />
+        </div>
+      ) : null}
       {/* ── Header: who, what, status, and the one thing to do ───────── */}
       <header className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 items-start gap-4">
@@ -274,7 +288,13 @@ export default async function EmployerProposalDetail({
             </Link>
           ) : null}
           <div className="max-sm:[&_button]:w-full">
-            <MessageButton proposalId={proposal.id} counterpartId={proposal.internId} />
+            {projectDown ? (
+              <button type="button" disabled aria-disabled="true" title={TAKEN_DOWN_EXPLAIN} tabIndex={-1} className={buttonClass({ variant: "outline", className: "max-sm:w-full" })}>
+                Message unavailable: {TAKEN_DOWN_SHORT}
+              </button>
+            ) : (
+              <MessageButton proposalId={proposal.id} counterpartId={proposal.internId} />
+            )}
           </div>
         </div>
       </header>
