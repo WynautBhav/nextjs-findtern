@@ -343,3 +343,45 @@ test("draft equality ignores how a number is typed", () => {
   assert.equal(subscriptionDraftEq({ price: "10000", days: "365", enabled: true }, { price: "10000", days: "365", enabled: false }), false);
   assert.equal(subscriptionDraftEq({ price: "10000", days: "365", enabled: true }, { price: "9999", days: "365", enabled: true }), false);
 });
+
+// ---- the employer page's words -----------------------------------------------------------------------------------
+
+import { buyLabel, renewalNote, statusLine, statusView, UNLOCKS } from "./view.ts";
+
+test("the page names each status as the brief does", () => {
+  const s = (status: "none" | "active" | "expiring" | "expired" | "revoked", over = {}) => ({ active: status === "active" || status === "expiring", status, endsAt: "2027-03-31T18:29:59.999Z", daysLeft: status === "active" ? 100 : status === "expiring" ? 12 : null, ...over });
+  assert.deepEqual(statusView(s("none", { endsAt: null })), { label: "None", tone: "neutral" });
+  assert.deepEqual(statusView(s("active")), { label: "Active", tone: "paid" });
+  assert.deepEqual(statusView(s("expiring")), { label: "Expiring in 12 days", tone: "waiting" });
+  assert.equal(statusView(s("expiring", { daysLeft: 1 })).label, "Expiring in 1 day");
+  assert.deepEqual(statusView(s("expired")), { label: "Expired", tone: "closed" });
+  assert.deepEqual(statusView(s("revoked", { endsAt: null })), { label: "Revoked", tone: "closed" });
+  assert.match(statusLine(s("active")), /until 31 Mar 2027 \(India time\)/);
+  assert.match(statusLine(s("expired")), /ended on 31 Mar 2027/);
+  assert.match(statusLine(s("none", { endsAt: null })), /not subscribed/);
+  assert.equal(buyLabel(s("active")), "Renew Findtern Pro");
+  assert.equal(buyLabel(s("expiring")), "Renew Findtern Pro");
+  assert.equal(buyLabel(s("expired")), "Renew Findtern Pro");
+  assert.equal(buyLabel(s("none", { endsAt: null })), "Buy Findtern Pro");
+  assert.equal(buyLabel(s("revoked", { endsAt: null })), "Buy Findtern Pro");
+  assert.deepEqual([...UNLOCKS], ["CGPA filter", "College filter and sort"]);
+});
+
+test("renewal note: stacks from the end while active, starts at payment otherwise", () => {
+  const active = { active: true, status: "active" as const, endsAt: "2027-03-31T18:29:59.999Z", daysLeft: 100 };
+  assert.match(renewalNote(active, 365, NOW), /adds 365 days to your current end date.*New end date: 30 Mar 2028/);
+  const none = { active: false, status: "none" as const, endsAt: null, daysLeft: null };
+  assert.match(renewalNote(none, 365, NOW), /as soon as the payment is confirmed.*until 17 Nov 2027/);
+});
+
+import { addIstDays, istToday } from "./grant.ts";
+
+test("IST day helpers for the grant form", () => {
+  assert.equal(istToday(new Date("2026-11-17T20:00:00Z")), "2026-11-18", "after 18:30 UTC it is already tomorrow in India");
+  assert.equal(istToday(new Date("2026-11-17T10:00:00Z")), "2026-11-17");
+  assert.equal(addIstDays("2026-11-17", 30), "2026-12-17");
+  assert.equal(addIstDays("2026-12-20", 365), "2027-12-20");
+  assert.equal(addIstDays("2027-02-27", 2), "2027-03-01");
+  assert.equal(grantUntilProblem(istDayEnd(addIstDays(istToday(NOW), 1095)), NOW), null, "the form's own maximum is accepted");
+  assert.ok(grantUntilProblem(istDayEnd(addIstDays(istToday(NOW), 1100)), NOW));
+});

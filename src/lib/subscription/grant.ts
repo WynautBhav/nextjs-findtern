@@ -9,7 +9,6 @@ import { subscriptionState, type SubscriptionOverride, type SubscriptionConfig, 
  * employer's state changes nothing (no write, no audit), so a double click is harmless.
  */
 
-const DAY_MS = 86_400_000;
 const IST_MS = 330 * 60_000;
 export const GRANT_MAX_DAYS = 1095;
 
@@ -44,7 +43,8 @@ export function istDayEnd(day: string): Date | null {
 export function grantUntilProblem(until: Date | null, now: Date): string | null {
   if (!until) return "That is not a real date.";
   if (until.getTime() <= now.getTime()) return "Pick a day in the future.";
-  if (until.getTime() > now.getTime() + GRANT_MAX_DAYS * DAY_MS) return `Access can be granted for ${GRANT_MAX_DAYS} days at most.`;
+  // The last day the form offers is 1095 days out, to the end of that India day.
+  if (until.getTime() > istDayEnd(addIstDays(istToday(now), GRANT_MAX_DAYS))!.getTime()) return `Access can be granted for ${GRANT_MAX_DAYS} days at most.`;
   return null;
 }
 
@@ -83,3 +83,14 @@ export function overrideAuditView(o: SubscriptionOverride | null | undefined) {
 
 export { subscriptionState };
 export type { SubscriptionConfig };
+
+/** Today's date in India as YYYY-MM-DD. */
+export function istToday(now: Date = new Date()): string {
+  return new Date(now.getTime() + IST_MS).toISOString().slice(0, 10);
+}
+
+/** The IST day `days` after an IST day (YYYY-MM-DD), for the form's quick choices and its min/max. */
+export function addIstDays(day: string, days: number): string {
+  const [y, m, d] = day.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
+}
