@@ -14,6 +14,8 @@ import { assignInvoiceNumber } from "@/lib/invoice-number";
 import { invoiceBuyerPatch } from "@/lib/invoice-buyer";
 import { monthMismatches } from "@/lib/billing-plan";
 import { orderProposalIds } from "@/lib/order-ids";
+import { recordAdminAudit } from "@/lib/admin/audit";
+import { paidAmountProblem, planAmountMismatch, planDuplicatePayment, type AmountProblem, type GatewayPaid } from "@/lib/payment-flags";
 
 /**
  * Settling a paid Razorpay order. Called by the checkout verify routes and by
@@ -83,6 +85,36 @@ export function legacyOrderRaw(order: { id: string; amountMinor: number; currenc
   return { id: order.id, amount: order.amountMinor, currency: order.currency, notes: order.notes };
 }
 
+type Tx = Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0];
+const GATEWAY_ACTOR = "system:razorpay";
+/** What settle hands back when the gateway's amount is not the order's: the webhook acknowledges it, accounts see the flag. */
+const MISMATCH = { ok: false, status: 409, code: "amount_mismatch", error: "The amount paid does not match this order" } as const;
+
+/**
+ * Writes a payment flag (a refused amount, a duplicate payment) into the order's `raw` and the audit log, in
+ * one transaction. The row is locked first, so a second event for the same order reads the first one's flag.
+ * Returns false when there was nothing to add (a replay).
+ */
+async function flagPayment(
+  tx: Tx,
+  kind: "employer" | "intern",
+  id: string,
+  action: "payment.duplicate_flagged" | "payment.amount_mismatch",
+  plan: (row: { status: string; paymentId: string | null; raw: Raw }) => { raw: Record<string, unknown> } | null,
+  meta: Record<string, unknown>,
+): Promise<boolean> {
+  const table = kind === "employer" ? schema.employerPayments : schema.internPayments;
+  const [row] = await tx.select({ status: table.status, paymentId: table.paymentId, raw: table.raw }).from(table).where(eq(table.id, id)).for("update");
+  const next = row ? plan(row) : null;
+  if (!next) return false;
+  await tx.update(table).set({ raw: next.raw }).where(eq(table.id, id));
+  await recordAdminAudit(tx, { adminId: GATEWAY_ACTOR, action, targetType: kind === "employer" ? "employer_payments" : "intern_payments", targetId: id, meta }, { strict: true });
+  console.error(`[payments] ${kind} payment ${id}: ${action}`);
+  return true;
+}
+
+const mismatchMeta = (orderId: string, paymentId: string, p: AmountProblem) => ({ orderId, paymentId, reason: p.reason, expectedMinor: p.expectedMinor, paidMinor: p.paidMinor, expectedCurrency: p.expectedCurrency, paidCurrency: p.paidCurrency });
+
 function promoOf(raw: Raw) {
   const r = (raw ?? {}) as { promoCode?: string; discountMinor?: number; promo?: { promoCode?: string; discountMinor?: number } };
   const code = r.promo?.promoCode ?? r.promoCode;
@@ -94,7 +126,9 @@ export async function settleEmployerOrder(input: {
   paymentId: string;
   signature?: string;
   employerId?: string;
-}): Promise<{ ok: true; hired: number } | { ok: false; status: number; error: string }> {
+  /** What the gateway says was paid (the webhook has it; the checkout callback does not). Compared with the order's own amount. */
+  paid?: GatewayPaid;
+}): Promise<{ ok: true; hired: number } | { ok: false; status: number; error: string; code?: string }> {
   const db = getDb();
   const [order] = await db
     .select()
@@ -107,6 +141,14 @@ export async function settleEmployerOrder(input: {
     )
     .limit(1);
   if (!order) return { ok: false, status: 404, error: "Unknown order" };
+  // Never settle on a number we did not charge: a signed event for another amount or currency is refused and flagged.
+  const problem = input.paid ? paidAmountProblem(order, input.paid) : null;
+  if (problem) {
+    await db.transaction((tx) =>
+      flagPayment(tx, "employer", order.id, "payment.amount_mismatch", (row) => planAmountMismatch(row.raw, input.paymentId, problem, new Date()), mismatchMeta(input.orderId, input.paymentId, problem)),
+    );
+    return MISMATCH;
+  }
   // Verify and the webhook can arrive together: only the one that flips the
   // row to paid goes on to hire and notify. Every write commits with the
   // claim or not at all, so a failure leaves the order open for the retry.
@@ -119,7 +161,11 @@ export async function settleEmployerOrder(input: {
       .set({ paymentId: input.paymentId, signature: input.signature ?? order.signature, status: "paid", paidAt: new Date() })
       .where(and(eq(schema.employerPayments.id, order.id), ne(schema.employerPayments.status, "paid")))
       .returning({ id: schema.employerPayments.id });
-    if (claimed.length === 0) return null;
+    if (claimed.length === 0) {
+      // Already paid. The same payment again is a replay; a different payment id is money taken twice for one order.
+      await flagPayment(tx, "employer", order.id, "payment.duplicate_flagged", (row) => planDuplicatePayment(row, input.paymentId, input.paid ?? {}, new Date()), { orderId: input.orderId, paymentId: input.paymentId, amountMinor: order.amountMinor, currency: order.currency });
+      return null;
+    }
     // A free (test-mode) order is not a sale, so it takes no invoice number.
     if (order.amountMinor > 0) {
       await assignInvoiceNumber("employer", order.id, new Date(), tx);
@@ -318,7 +364,8 @@ export async function settleInternOrder(input: {
   paymentId: string;
   signature?: string;
   internId?: string;
-}): Promise<{ ok: true } | { ok: false; status: number; error: string }> {
+  paid?: GatewayPaid;
+}): Promise<{ ok: true } | { ok: false; status: number; error: string; code?: string }> {
   const db = getDb();
   const [payment] = await db
     .select()
@@ -331,6 +378,13 @@ export async function settleInternOrder(input: {
     )
     .limit(1);
   if (!payment) return { ok: false, status: 404, error: "Unknown order" };
+  const problem = input.paid ? paidAmountProblem(payment, input.paid) : null;
+  if (problem) {
+    await db.transaction((tx) =>
+      flagPayment(tx, "intern", payment.id, "payment.amount_mismatch", (row) => planAmountMismatch(row.raw, input.paymentId, problem, new Date()), mismatchMeta(input.orderId, input.paymentId, problem)),
+    );
+    return MISMATCH;
+  }
   // The claim, its invoice number and the promo use commit together, so a
   // failure leaves the order open for the retry; notify only after commit.
   const claimed = await db.transaction(async (tx) => {
@@ -339,7 +393,10 @@ export async function settleInternOrder(input: {
       .set({ paymentId: input.paymentId, signature: input.signature ?? payment.signature, status: "paid", paidAt: new Date(), updatedAt: new Date() })
       .where(and(eq(schema.internPayments.id, payment.id), ne(schema.internPayments.status, "paid")))
       .returning({ id: schema.internPayments.id });
-    if (rows.length === 0) return false;
+    if (rows.length === 0) {
+      await flagPayment(tx, "intern", payment.id, "payment.duplicate_flagged", (row) => planDuplicatePayment(row, input.paymentId, input.paid ?? {}, new Date()), { orderId: input.orderId, paymentId: input.paymentId, amountMinor: payment.amountMinor, currency: payment.currency });
+      return false;
+    }
     if (payment.amountMinor > 0) await assignInvoiceNumber("intern", payment.id, new Date(), tx);
     const promo = promoOf(payment.raw);
     if (promo) {

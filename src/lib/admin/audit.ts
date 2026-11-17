@@ -53,6 +53,8 @@ export const AUDIT_ACTIONS = {
   "refund.reconcile": "Refund status settled from Razorpay (automatic job)",
   "refund.webhook": "Refund status settled by a Razorpay webhook (automatic)",
   "refund.employer_recorded": "An employer order's refund recorded from Razorpay (automatic)",
+  "payment.duplicate_flagged": "A second payment came in for an order that was already paid (needs a refund)",
+  "payment.amount_mismatch": "A payment did not match its order's amount and was not settled",
   "promo.create": "Created a promo code",
   "promo.update": "Edited a promo code",
   "promo.delete": "Deleted a promo code",
