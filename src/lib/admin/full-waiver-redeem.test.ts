@@ -32,7 +32,7 @@ function fakeTx(answers: unknown[][]) {
 const NOW = Date.now();
 const row = { id: "p1", code: "FREE-ABCD-EFGH-JKMN", discountType: "full_waiver", discountValue: 100, maxUsages: 2, usedCount: 0, isActive: true, validFrom: null, validUntil: new Date(NOW + 86_400_000), appliesTo: "employer" };
 const flaggedRaw = { promo: { promoCode: row.code, fullWaiver: true, promoCodeId: "p1", waivedMinor: 7_500_000, discountMinor: 7_500_000 } };
-const order = { kind: "employer" as const, paymentRowId: "pay1", orderId: "waiver_x", accountId: "emp1", currency: "INR", raw: flaggedRaw };
+const order: { kind: "employer" | "intern"; paymentRowId: string; orderId: string; accountId: string; currency: string; raw: unknown } = { kind: "employer", paymentRowId: "pay1", orderId: "waiver_x", accountId: "emp1", currency: "INR", raw: flaggedRaw };
 
 // answers in call order: [lock the code row, prior use by this account, insert usage returning, bump counter returning]
 const happy = () => [[row], [], [{ id: "u1" }], [{ id: "p1" }]];
