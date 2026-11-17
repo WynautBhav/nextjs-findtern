@@ -120,8 +120,8 @@ export function activePeriod(params: { period?: string; from?: string; to?: stri
 
 /**
  * Presets for the Analytics and Money reports: the old report's 7 days, 30
- * days, 3 months and 6 months (90 and 180 days), plus the 12 months this app
- * added. The default (18 months) and All time are added by the period bar.
+ * days, 3 months and 6 months (90 and 180 days), plus the year view this app
+ * added. The page default and All time are added by the period bar.
  */
 export const REPORT_PERIODS: PeriodChoice[] = [
   { value: "7d", label: "Last 7 days" },
