@@ -27,6 +27,8 @@ export type AdminInvoiceRow = {
   /** razorpay / free / manual; null when unknown. */
   gateway?: string | null;
   amountMinor: number;
+  /** Refunded out of this order, in its own currency (0 or absent when none). The row stays "paid": a refund is a contra record. */
+  refundedMinor?: number;
   currency: string;
   status: string;
   paidAt?: string | null;

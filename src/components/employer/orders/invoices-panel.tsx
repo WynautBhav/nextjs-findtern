@@ -120,6 +120,11 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                   <td data-label="Project" className={cn(tdClass, "[overflow-wrap:anywhere]")}>{i.projects.join(", ") || "-"}</td>
                   <td data-label="Amount" className={cn(tdClass, "nums text-right font-semibold text-ink-900")}>
                     {formatMoney(i.amountMinor, i.currency, { zeroLabel: false })}
+                    {(i.refundedMinor ?? 0) > 0 ? (
+                      <span className="block text-xs font-normal text-text-subtle">
+                        Refunded {formatMoney(i.refundedMinor ?? 0, i.currency, { zeroLabel: false })} · net {formatMoney(Math.max(0, i.amountMinor - (i.refundedMinor ?? 0)), i.currency, { zeroLabel: false })}
+                      </span>
+                    ) : null}
                   </td>
                   <td data-label="Paid on" className={cn(tdClass, "nums whitespace-nowrap")}>{i.paidAt ? formatDate(i.paidAt) : "-"}</td>
                   <td className={cn(tdClass, "text-right lg:sticky lg:right-0 lg:bg-white lg:shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>

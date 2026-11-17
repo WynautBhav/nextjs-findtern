@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { desc, eq } from "drizzle-orm";
 
+import { orderRefunds } from "@/lib/refund-accounting";
 import { getDb, schema } from "@/lib/db";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
@@ -77,6 +78,7 @@ async function loadOrders(): Promise<{ rows: AdminInvoiceRow[]; uncounted: Set<s
       paymentId: o.paymentId,
       gateway: o.gateway,
       amountMinor: o.amountMinor,
+      refundedMinor: orderRefunds(o).refundedMinor,
       currency: o.currency || "INR",
       status: o.status,
       paidAt: o.paidAt ? o.paidAt.toISOString() : null,

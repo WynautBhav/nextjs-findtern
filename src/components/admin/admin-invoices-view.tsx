@@ -101,6 +101,7 @@ export function AdminInvoicesView({
         <div className="whitespace-nowrap">
           <p className="nums font-semibold text-foreground">{money(r.amountMinor, r.currency)}</p>
           {r.amountMinor > 0 ? <p className="nums text-xs text-text-subtle">incl. GST {money(gstOf(r), r.currency)}</p> : null}
+          {(r.refundedMinor ?? 0) > 0 ? <p className="nums text-xs text-text-subtle">refunded {money(r.refundedMinor ?? 0, r.currency)} · net {money(Math.max(0, r.amountMinor - (r.refundedMinor ?? 0)), r.currency)}</p> : null}
           {(r.discountMinor ?? 0) > 0 || r.promoCode ? (
             <p className="nums text-xs text-text-subtle">
               {r.promoCode ? <span className="font-semibold text-foreground">{r.promoCode}</span> : null}
@@ -115,7 +116,7 @@ export function AdminInvoicesView({
       cell: (r) => (
         <div className="flex flex-col items-start gap-1">
           <span className="inline-flex flex-wrap items-center gap-1">
-            <StatusBadge value={isPaidRow(r) ? "paid" : r.status} />
+            <StatusBadge value={isPaidRow(r) ? ((r.refundedMinor ?? 0) <= 0 ? "paid" : r.refundedMinor! >= r.amountMinor ? "refunded" : "partially_refunded") : r.status} />
             {r.needsReview ? <StatusBadge tone="danger" label="Needs review" /> : null}
             {r.flagOnly ? <StatusBadge tone="neutral" label="Marked paid" /> : null}
           </span>

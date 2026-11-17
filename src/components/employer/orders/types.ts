@@ -29,6 +29,8 @@ export type InvoiceRow = {
   paymentId: string | null;
   paidAt: string | null;
   amountMinor: number;
+  /** Refunded out of this order (0 when none); the invoice itself stands as issued. */
+  refundedMinor?: number;
   currency: string;
   candidates: string[];
   projects: string[];

@@ -14,6 +14,7 @@ import {
   type InvoiceRow,
 } from "@/components/employer/orders-manager";
 import { placementLedger } from "@/lib/dues";
+import { orderRefunds } from "@/lib/refund-accounting";
 import { placeOfSupply } from "@/lib/gst";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { LEGACY_INVOICE_CUTOFF, taxInvoiceHtml } from "@/lib/invoice";
@@ -154,6 +155,7 @@ async function loadOrders(employerId: string) {
         paymentId: p.paymentId,
         paidAt: p.paidAt ? p.paidAt.toISOString() : null,
         amountMinor: p.amountMinor,
+        refundedMinor: orderRefunds(p).refundedMinor,
         currency,
         candidates: inv.hireNames,
         projects: inv.projects,
