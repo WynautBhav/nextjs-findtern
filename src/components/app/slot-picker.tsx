@@ -38,7 +38,7 @@ export function SlotPicker({
 }: {
   interviewId: string;
   slots: Slot[];
-  /** The project's timezone: every time here is shown in it, labelled. India when absent. */
+  /** The zone the company booked in; shown as a note, never used for display. */
   timezone: string | null;
   /** 1, 2 or 3 once they have answered. */
   chosen: number | null;
@@ -94,7 +94,7 @@ export function SlotPicker({
   if (bookedSlot) {
     return (
       <div>
-        <Booked iso={bookedSlot.iso} zone={timezone} meetUrl={meetUrl} justBooked={Boolean(booked && !chosen)} />
+        <Booked iso={bookedSlot.iso} meetUrl={meetUrl} justBooked={Boolean(booked && !chosen)} />
         <ul className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="The three offered times">
           {slots.map((slot) => {
             const mine = slot.index === bookedSlot.index;
@@ -106,8 +106,8 @@ export function SlotPicker({
                   mine ? "border-brand-700 bg-brand-50 ring-1 ring-inset ring-brand-700" : "border-ink-200/80 text-text-subtle",
                 )}
               >
-                <span className="nums text-sm text-ink-700">{formatIstDay(slot.iso, timezone)}</span>
-                <span className="nums text-base font-semibold text-ink-900">{formatIstClock(slot.iso, timezone)}</span>
+                <span className="nums text-sm text-ink-700">{formatIstDay(slot.iso)}</span>
+                <span className="nums text-base font-semibold text-ink-900">{formatIstClock(slot.iso)}</span>
                 {mine ? (
                   <span className="inline-flex items-center gap-1 text-xs font-medium text-brand-800">
                     <Check className="size-3.5" aria-hidden />
@@ -134,7 +134,8 @@ export function SlotPicker({
   return (
     <div>
       <p className="text-pretty text-sm text-text-subtle">
-        Choose one, then confirm. Times are in the project&apos;s time ({otherZone ?? "IST"}).
+        Choose one, then confirm. Times are in India time (IST)
+        {otherZone ? `, converted from the company's ${otherZone} time` : ""}.
       </p>
 
       <ul className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="Offered times">
@@ -155,9 +156,9 @@ export function SlotPicker({
                   slot.passed && "opacity-50",
                 )}
               >
-                <span className="nums text-sm text-ink-700">{formatIstDay(slot.iso, timezone)}</span>
+                <span className="nums text-sm text-ink-700">{formatIstDay(slot.iso)}</span>
                 <span className="nums text-base font-semibold text-ink-900">
-                  {slot.passed ? "Passed" : formatIstClock(slot.iso, timezone)}
+                  {slot.passed ? "Passed" : formatIstClock(slot.iso)}
                 </span>
               </button>
             </li>
@@ -176,7 +177,7 @@ export function SlotPicker({
             className={buttonClass({ variant: "primary" })}
           >
             {sending ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-            {pick ? `Book ${formatIst(pick.iso, { zone: timezone })}` : "Book this time"}
+            {pick ? `Book ${formatIst(pick.iso)}` : "Book this time"}
           </button>
           <p className="text-xs text-text-subtle">
             {pick ? "The company is told straight away. A booked time can't be changed here." : "Select a time above first."}
@@ -198,7 +199,7 @@ export function SlotPicker({
 }
 
 /** The booked time, and Join from 15 minutes before it until the link closes. */
-function Booked({ iso, zone, meetUrl, justBooked }: { iso: string; zone: string | null; meetUrl: string | null; justBooked: boolean }) {
+function Booked({ iso, meetUrl, justBooked }: { iso: string; meetUrl: string | null; justBooked: boolean }) {
   const opensAt = new Date(iso).getTime() - JOIN_OPENS_MIN * 60_000;
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -213,7 +214,7 @@ function Booked({ iso, zone, meetUrl, justBooked }: { iso: string; zone: string 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <p className="nums text-sm font-medium text-ink-900">{formatIst(iso, { zone })}</p>
+        <p className="nums text-sm font-medium text-ink-900">{formatIst(iso)}</p>
         <p className="mt-1 text-pretty text-sm text-text-subtle">
           {justBooked ? (
             <span className="inline-flex items-center gap-1.5 font-medium text-success">
@@ -223,7 +224,7 @@ function Booked({ iso, zone, meetUrl, justBooked }: { iso: string; zone: string 
           ) : meetUrl && open ? (
             "Join a few minutes early. The meeting rules open when you press Join."
           ) : meetUrl ? (
-            `Join opens at ${formatIstClock(new Date(opensAt), zone)}, ${JOIN_OPENS_MIN} minutes before the start.`
+            `Join opens at ${formatIstClock(new Date(opensAt))}, ${JOIN_OPENS_MIN} minutes before the start.`
           ) : (
             "The meeting link appears here and in your email before the interview."
           )}

@@ -30,7 +30,6 @@ import { pendingClaimFor } from "@/lib/drives/claim";
 import { driveCodeSecret } from "@/lib/drives/code-derive";
 import { eq } from "drizzle-orm";
 import { loadInternData } from "@/lib/intern-data";
-import { interviewZone, loadProjectZones } from "@/lib/project-zones";
 import { isMeetingLinkLive } from "@/lib/employer-interview-rules";
 import { companyIn, hoursByMonth, hoursIn, nextAction, roleOf, slotOf } from "@/lib/journey";
 import { formatMoney, formatSlotTime, shortDate } from "@/lib/format";
@@ -93,6 +92,8 @@ function ratingsOf(onboarding: { extraData?: Record<string, unknown> | null } | 
   });
   return rows.length > 0 ? rows : null;
 }
+
+const IST = "Asia/Kolkata";
 
 
 export default async function InternHome() {
@@ -174,8 +175,6 @@ export default async function InternHome() {
         Boolean(x.when && isMeetingLinkLive(x.interview)),
       )
       .sort((a, b) => a.when.getTime() - b.when.getTime())[0] ?? null;
-
-  const projectZones = await loadProjectZones(getDb(), [upcomingInterviewItem?.interview.projectId]);
 
   const aiRow = latestAiInterview(data.interviews, data.aiEmployerIds);
   const aiPhase = aiInterviewPhase(aiRow, isScored(data.onboarding?.extraData));
@@ -437,8 +436,8 @@ export default async function InternHome() {
         <Tile title="Next interview" action={{ href: "/intern/interviews", label: "Interviews" }}>
           <p className="text-lg font-medium text-ink-900">{interviewCompany}</p>
           <p className="mt-1 text-sm text-text-subtle">
-            {/* The project's clock, labelled (feedback sheet 2, row 7). */}
-            {formatSlotTime(upcomingInterviewItem.when, interviewZone(upcomingInterviewItem.interview, projectZones))}
+            {/* Interns always see India time, labelled (bug sheet 7, S2 r7). */}
+            {formatSlotTime(upcomingInterviewItem.when, IST)}
           </p>
           {upcomingInterviewItem.interview.meetingLink ? (
             <div className="mt-4">

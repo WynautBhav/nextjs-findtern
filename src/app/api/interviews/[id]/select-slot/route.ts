@@ -105,9 +105,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   await resolveInterviewNotifications(interview.internId, id);
 
-  // Both sides read the time on the project's clock, labelled (feedback sheet 2, row 7).
+  // The employer reads the time on the project's clock; the intern always reads India time, each labelled
+  // (owner's rule: interns see IST, employers the project's zone).
   const when = formatSlotTime(start, tz);
-  const whenIst = formatIst(start, { year: true, zone: tz });
+  const whenIst = formatIst(start, { year: true });
   // The intern sees the company's name only once it has hired them.
   const [hire] = await db
     .select({ id: schema.proposals.id })

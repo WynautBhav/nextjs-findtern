@@ -43,7 +43,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const start = interview.selectedSlot ? [interview.slot1, interview.slot2, interview.slot3][interview.selectedSlot - 1] : null;
+  // The employer's note reads on the project's clock; the intern's reminder is always India time.
   const when = start ? formatSlotTime(start, interviewZone(interview, await loadProjectZones(db, [interview.projectId]))) : null;
+  const whenIst = start ? formatSlotTime(start, "Asia/Kolkata") : null;
   // The intern sees the company's name only once it has hired them (same
   // rule as booking, select-slot/route.ts).
   const [hire] = await db
@@ -62,7 +64,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const link = normalizeMeetingLink(interview.meetingLink);
   const text = interview.status === "pending"
     ? `${company} is waiting for you to pick an interview slot.`
-    : `Your interview with ${company} is on ${when}.`;
+    : `Your interview with ${company} is on ${whenIst}.`;
   const window = reminderWindow();
   const delivered = await notify({
     to: { type: "intern", id: interview.internId },

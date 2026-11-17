@@ -148,8 +148,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // The company stays hidden from the intern until it hires them.
       companyName: (await hiredBy(db, id, b.internId)) ? (await employerNames(id)).company : "A company on Findtern",
       project: projectName,
-      // Each time carries the project zone it was booked in, labelled.
-      slots: slots.map((s) => formatIst(s, { year: true, zone: b.timezone })),
+      // The invitation is the intern's, so every time is India time, labelled (the employer typed them in b.timezone).
+      slots: slots.map((s) => formatIst(s, { year: true })),
     }),
   });
   return NextResponse.json({ interview }, { status: 201 });

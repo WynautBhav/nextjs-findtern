@@ -125,8 +125,13 @@ export const TIMEZONES: TimezoneOption[] = [
   }
 }
 
-/** Whether `tz` is an IANA zone this runtime knows ("Asia/Kolkata"); a made-up name throws in Intl. */
+/**
+ * Whether `tz` is a real IANA region zone this runtime knows ("Asia/Kolkata"); a made-up name throws in Intl.
+ * A fixed offset ("+05:30", "Etc/GMT-5", "EST") is refused: Intl accepts it, but it never changes with daylight
+ * saving, so a meeting booked on it would be an hour off for half the year in a DST region.
+ */
 export function isKnownTimezone(tz: string): boolean {
+  if (/^[+-]\d|^(Etc\/(GMT|UTC)[+-]|GMT[+-]|UTC[+-])|^(EST|MST|HST)$/i.test(tz.trim())) return false;
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: tz });
     return true;
@@ -136,34 +141,40 @@ export function isKnownTimezone(tz: string): boolean {
 }
 
 /**
- * "2026-11-03T15:30" read as wall-clock time in `tz` → the UTC instant.
- * Uses Intl to find the zone's offset at that moment (DST-aware), then
- * corrects once for offsets that change across the guess.
+ * "2026-11-03T15:30" read as wall-clock time in `tz` → the UTC instant, for that date's own offset (Intl, so
+ * daylight saving is applied on the day, including the switch days).
+ *
+ * A switch day makes a wall time odd, and both cases are decided here, not left to chance:
+ *  - it does not exist (the hour skipped in spring, 02:30 in New York): shifted FORWARD by the gap, so 02:30 is
+ *    03:30 local, the first valid time at or after what was typed;
+ *  - it happens twice (the hour repeated in autumn, 01:30 in New York): the FIRST occurrence, the daylight-time one.
  */
 export function wallTimeToUtc(local: string, tz: string): Date {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(local);
   if (!m) throw new Error("Expected YYYY-MM-DDTHH:mm");
   const asUtc = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+  const fmt = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
   const offsetAt = (t: number) => {
-    const parts = Object.fromEntries(
-      new Intl.DateTimeFormat("en-US", {
-        timeZone: tz,
-        hourCycle: "h23",
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      })
-        .formatToParts(new Date(t))
-        .map((p) => [p.type, p.value]),
-    );
+    const parts = Object.fromEntries(fmt.formatToParts(new Date(t)).map((p) => [p.type, p.value]));
     return Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second) - t;
   };
-  let t = asUtc - offsetAt(asUtc);
-  t = asUtc - offsetAt(t);
-  return new Date(t);
+  // The offsets in force a day before and a day after: they differ only when a switch is near.
+  const before = offsetAt(asUtc - 86_400_000);
+  const after = offsetAt(asUtc + 86_400_000);
+  const candidates = Array.from(new Set([before, after]))
+    .map((o) => asUtc - o)
+    .filter((t) => asUtc - offsetAt(t) === t);
+  if (candidates.length > 0) return new Date(Math.min(...candidates)); // two = ambiguous: the earlier instant
+  return new Date(asUtc - before); // gap: read with the pre-switch offset, which lands after the gap
 }
 
 /**

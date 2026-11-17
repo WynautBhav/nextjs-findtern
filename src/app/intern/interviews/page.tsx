@@ -16,8 +16,6 @@ import { SITE } from "@/lib/content/site";
 import { employerNoShow, isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
 import { formatIst } from "@/lib/format";
 import { HIDDEN_COMPANY, loadInternData, projectNames } from "@/lib/intern-data";
-import { getDb } from "@/lib/db";
-import { interviewZone, loadProjectZones } from "@/lib/project-zones";
 import { feedbackForIntern } from "@/lib/interview-feedback";
 import { isPast, slotOf, type InterviewRow } from "@/lib/journey";
 import { isInternPaid } from "@/lib/payments";
@@ -35,7 +33,7 @@ export const metadata: Metadata = {
  * (the AI interview's own step, company rounds to pick a time for or join),
  * then the Findtern Score (ring + radar), then past rounds. The AI interview
  * is Findtern's, labelled "AI Interview", never "Hidden company" (bug sheet 7,
- * S1 r63). Every time here is on its project's clock, labelled (INW-09, S2 r7; feedback sheet 2, row 7).
+ * S1 r63). Every time here is India time, labelled IST (INW-09, S2 r7).
  */
 export default async function InternInterviews() {
   const session = await requireRole("intern");
@@ -48,9 +46,6 @@ export default async function InternInterviews() {
   const aiInterview = data.interviews.find(isAi);
   const company = data.interviews.filter((i) => !isAi(i));
   const projects = await projectNames(company.map((i) => i.projectId ?? ""));
-  // Each round reads on its project's clock (feedback sheet 2, row 7).
-  const zones = await loadProjectZones(getDb(), company.map((i) => i.projectId));
-  const zoneOf = (i: InterviewRow) => interviewZone(i, zones);
 
   // A booked meeting stays upcoming, with its Join button, until the link
   // window closes (legacy: slot + 60 min), not the moment it starts. An open
@@ -91,13 +86,12 @@ export default async function InternInterviews() {
       <AgendaRow
         key={i.id}
         iso={when ? when.toISOString() : null}
-        zone={zoneOf(i)}
         title={titleOf(i)}
         company={companyLine(i)}
         status={booked ? <Pill tone="live">Booked</Pill> : slots.length > 0 ? <Pill tone="waiting">Pick a time</Pill> : <Pill tone="neutral">Times to follow</Pill>}
       >
         {slots.length > 0 ? (
-          <SlotPicker interviewId={i.id} slots={slots} timezone={zoneOf(i)} chosen={i.selectedSlot} meetUrl={isMeetingLinkLive(i) ? i.meetingLink : null} />
+          <SlotPicker interviewId={i.id} slots={slots} timezone={i.timezone} chosen={i.selectedSlot} meetUrl={isMeetingLinkLive(i) ? i.meetingLink : null} />
         ) : (
           <p className="text-pretty text-sm text-text-subtle">The company has not sent its times yet. They appear here as soon as they are set.</p>
         )}
@@ -113,12 +107,11 @@ export default async function InternInterviews() {
         key={i.id}
         past
         iso={when ? when.toISOString() : null}
-        zone={zoneOf(i)}
         title={titleOf(i)}
         company={companyLine(i)}
         status={<Pill tone={outcome.tone}>{outcome.label}</Pill>}
       >
-        {when ? <p className="nums text-sm text-ink-700">{formatIst(when, { year: true, zone: zoneOf(i) })}</p> : null}
+        {when ? <p className="nums text-sm text-ink-700">{formatIst(when, { year: true })}</p> : null}
         {/* The pill already says "Interview done"; its generic sentence would repeat on every row. */}
         {outcome.label === "Interview done" ? null : <p className="mt-1 text-pretty text-sm text-text-subtle">{outcome.detail}</p>}
         {/* A missed round can carry feedback too; the employer is told it is shared. */}

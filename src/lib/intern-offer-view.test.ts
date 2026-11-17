@@ -107,8 +107,8 @@ test("DST change days: the zone's offset on that day applies", () => {
   assert.equal(shiftInIst("01:30", "03:30", "America/New_York", "2026-11-01"), "11:00 am – 2:00 pm IST");
   // Spring forward, 8 Mar 2026 (NY): 9-5 is EDT (UTC-4).
   assert.equal(shiftInIst("09:00", "17:00", "America/New_York", "2026-03-08"), "6:30 pm – 2:30 am (next day) IST");
-  // 2:30 AM does not exist that day. It is pinned as read today (as 1:30 AM EST, 12:00 pm IST), not rejected.
-  assert.equal(shiftInIst("02:30", "04:00", "America/New_York", "2026-03-08"), "12:00 pm – 1:30 pm IST");
+  // 2:30 AM does not exist that day. It is shifted forward by the gap (to 3:30 AM EDT, 1:00 pm IST), not rejected.
+  assert.equal(shiftInIst("02:30", "04:00", "America/New_York", "2026-03-08"), "1:00 pm – 1:30 pm IST");
 });
 
 test("realJoiningDay is null for a placeholder start date, a day otherwise", async () => {

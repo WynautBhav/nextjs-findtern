@@ -308,15 +308,14 @@ export function companyInitials(name: string | null | undefined): string {
   return letters.toUpperCase();
 }
 
-/* ── Labelled project time ───────────────────────────────────────────────
- * These default to India (IST) when no zone is passed. Interview and meeting
- * screens pass the PROJECT's zone (lib/timezones projectZone), so each
- * project's times read on that project's clock, labelled (feedback sheet 2,
- * row 7); only a project with no zone falls back to India. Slots are stored as UTC instants that the
- * employer's wall time was converted from with `wallTimeToUtc` (DST-aware),
- * so showing them in India time is a plain re-format in Asia/Kolkata, which
- * has no DST of its own. Built from parts so the output does not depend on
- * the runtime's locale data ("pm" vs "PM", "Sept" vs "Sep"). */
+/* ── Labelled times ─────────────────────────────────────────────────────
+ * Owner's rule: interns are in India and always read India time (the default
+ * here, labelled IST); employers read the PROJECT's zone, so employer screens
+ * pass lib/timezones projectZone() as the zone. An employer's wall time is
+ * converted to a UTC instant with `wallTimeToUtc` (IANA zone, DST-aware on
+ * that date), so re-formatting the stored instant in any zone, India included,
+ * is a plain Intl conversion. Built from parts so the output does not depend
+ * on the runtime's locale data ("pm" vs "PM", "Sept" vs "Sep"). */
 
 export const IST_ZONE = "Asia/Kolkata";
 
