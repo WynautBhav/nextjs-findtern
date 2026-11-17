@@ -15,7 +15,7 @@ import type { CmsBlogPost, CmsCollegePartner, CmsCollegePitch, CmsHome, CmsLegal
 import { EMPLOYER_TERMS, PLATFORM_TERMS } from "./legal";
 import { INTERN_NDA, INTERN_TERMS } from "./legal-intern";
 import { getDb, schema, hasDb } from "@/lib/db";
-import { eq, desc, asc, sql } from "drizzle-orm";
+import { eq, desc, asc, sql, and, inArray } from "drizzle-orm";
 import { inrMinorToUsdMinor } from "@/lib/currency";
 import { blogImageRoutes, cmsImageSrc, imageVersion } from "./image-response";
 import { unstable_cache } from "next/cache";
@@ -29,19 +29,57 @@ import { loadPublicStudents, studentsForSkill } from "@/lib/skill-benches";
    swapping in a database call does not force every `await` to be unwrapped.
 
    Each accessor tries the database first and falls back to the mirrored TS
-   content when the DB is unavailable or the table is empty. This keeps the
-   marketing site rendering during local dev without a seeded DB, while
-   production reads the same tables the admin CMS writes.
+   content when the DB cannot be reached, or the CMS collection has never been
+   used (see `builtInApplies`). This keeps the marketing site rendering during
+   local dev without a seeded DB, while production reads the same tables the
+   admin CMS writes.
    ========================================================================== */
 
+/** The database's answer, or `fallback` when there is no database or the query throws. A null answer is an answer. */
 async function tryDb<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
   if (!hasDb()) return fallback;
   try {
-    const result = await fn();
-    return result ?? fallback;
+    return await fn();
   } catch {
     return fallback;
   }
+}
+
+/**
+ * Whether the built-in copy may stand in for a CMS collection the database answered about.
+ *
+ * Rule: only when the collection has never been used - its table has no row at all (any status, active or not) AND
+ * the audit log holds no cms.create / cms.update / cms.delete for it. That is the first-run case (a fresh database
+ * before db:seed or any admin edit). Once the CMS has held the collection, the database is the truth: a deleted post
+ * stays deleted, and unpublishing or switching off the last item shows an empty section instead of the seed copy
+ * coming back. (A database that cannot be reached never gets here: tryDb serves the built-in copy.)
+ * The audit log is append-only, which is what lets "deleted the last row" be told apart from "never had one" without
+ * a tombstone table. Costs one extra query, and only when the collection came back empty.
+ */
+async function builtInApplies(table: CmsContentTable, type: ContentCollection): Promise<boolean> {
+  const db = getDb();
+  const [anyRow] = await db.select({ id: table.id }).from(table).limit(1);
+  if (anyRow) return false;
+  const a = schema.adminAuditLog;
+  const [edited] = await db
+    .select({ id: a.id })
+    .from(a)
+    .where(and(inArray(a.action, ["cms.create", "cms.update", "cms.delete"]), sql`${a.meta}->>'type' = ${type}`))
+    .limit(1);
+  return !edited;
+}
+
+type ContentCollection = "blog" | "partner" | "faq" | "testimonial" | "skill";
+type CmsContentTable =
+  | typeof schema.websiteBlogPosts
+  | typeof schema.websitePartners
+  | typeof schema.websiteFaqs
+  | typeof schema.websiteHappyFaces
+  | typeof schema.websiteFeaturedSkills;
+
+/** A list the CMS answered with nothing in: the built-in list on first run, otherwise empty. */
+async function emptyOrBuiltIn<T extends unknown[]>(table: CmsContentTable, type: ContentCollection, builtIn: T): Promise<T> {
+  return (await builtInApplies(table, type)) ? builtIn : ([] as unknown as T);
 }
 
 export async function getHomeContent(): Promise<CmsHome> {
@@ -68,7 +106,7 @@ export async function getPartners() {
   return tryDb(async () => {
     const db = getDb();
     const rows = await db.select().from(schema.websitePartners).where(eq(schema.websitePartners.isActive, true)).orderBy(asc(schema.websitePartners.sortOrder));
-    if (!rows.length) return PARTNERS;
+    if (!rows.length) return emptyOrBuiltIn(schema.websitePartners, "partner", PARTNERS);
     return rows.map((r) => ({ ...r, logoUrl: cmsImageSrc(r.logoUrl, `/api/cms-image/partner/${r.id}`, imageVersion(r.updatedAt)) ?? "" })) as unknown as typeof PARTNERS;
   }, PARTNERS);
 }
@@ -90,7 +128,7 @@ export async function getFeaturedSkills() {
   return tryDb(async () => {
     const db = getDb();
     const rows = await db.select().from(schema.websiteFeaturedSkills).where(eq(schema.websiteFeaturedSkills.isActive, true)).orderBy(asc(schema.websiteFeaturedSkills.sortOrder));
-    if (!rows.length) return FEATURED_SKILLS;
+    if (!rows.length) return emptyOrBuiltIn(schema.websiteFeaturedSkills, "skill", FEATURED_SKILLS);
     // The stored resource_count is a hand-typed number; the card must show the
     // live bench size. If the candidate query fails, keep the stored number.
     const pool = await liveBenchPool().catch(() => null);
@@ -105,7 +143,7 @@ export async function getHappyFaces() {
   return tryDb(async () => {
     const db = getDb();
     const rows = await db.select().from(schema.websiteHappyFaces).where(eq(schema.websiteHappyFaces.isActive, true)).orderBy(asc(schema.websiteHappyFaces.sortOrder));
-    if (!rows.length) return HAPPY_FACES;
+    if (!rows.length) return emptyOrBuiltIn(schema.websiteHappyFaces, "testimonial", HAPPY_FACES);
     return rows.map((r) => ({ ...r, avatarUrl: cmsImageSrc(r.avatarUrl, `/api/cms-image/face/${r.id}`, imageVersion(r.updatedAt)) })) as unknown as typeof HAPPY_FACES;
   }, HAPPY_FACES);
 }
@@ -114,7 +152,7 @@ export async function getFaqItems() {
   return tryDb(async () => {
     const db = getDb();
     const rows = await db.select().from(schema.websiteFaqs).where(eq(schema.websiteFaqs.isActive, true)).orderBy(asc(schema.websiteFaqs.sortOrder));
-    return rows.length ? (rows as unknown as typeof FAQ_ITEMS) : FAQ_ITEMS;
+    return rows.length ? (rows as unknown as typeof FAQ_ITEMS) : emptyOrBuiltIn(schema.websiteFaqs, "faq", FAQ_ITEMS);
   }, FAQ_ITEMS);
 }
 
@@ -221,21 +259,22 @@ export async function getBlogPosts(): Promise<CmsBlogPost[]> {
   return tryDb(async () => {
     const db = getDb();
     const rows = await db.select(blogColumns).from(t).where(eq(t.status, "published")).orderBy(desc(t.publishedAt));
-    return rows.length ? rows.map(withImageRoutes) : FALLBACK_POSTS;
+    return rows.length ? rows.map(withImageRoutes) : emptyOrBuiltIn(t, "blog", FALLBACK_POSTS);
   }, FALLBACK_POSTS);
 }
 
 /**
  * One post by slug, published only (SYS-01; legacy 404'd anything else). A
  * draft in the CMS hides the post even when the TS fallback has a copy of
- * it, so unpublishing in the admin takes it off the site.
+ * it, so unpublishing in the admin takes it off the site, and a post deleted
+ * in the admin stays gone (the built-in copy only applies per `builtInApplies`).
  */
 export async function getBlogPost(slug: string): Promise<CmsBlogPost | null> {
   return tryDb(async () => {
     const db = getDb();
     const [row] = await db.select(blogColumns).from(t).where(eq(t.slug, slug)).limit(1);
     if (row) return isPublished(row.status) ? withImageRoutes(row) : null;
-    return FALLBACK_POSTS.find((p) => p.slug === slug) ?? null;
+    return (await builtInApplies(t, "blog")) ? (FALLBACK_POSTS.find((p) => p.slug === slug) ?? null) : null;
   }, FALLBACK_POSTS.find((p) => p.slug === slug) ?? null);
 }
 
@@ -269,7 +308,7 @@ export async function getBlogImage(slug: string, kind: "cover" | "banner"): Prom
       .from(t)
       .where(eq(t.slug, slug))
       .limit(1);
-    if (!row) return fromFallback;
+    if (!row) return (await builtInApplies(t, "blog")) ? fromFallback : null;
     // A draft's images are as private as its text (SYS-01).
     if (!isPublished(row.status)) return null;
     return (kind === "banner" ? row.banner || row.cover : row.cover) || null;

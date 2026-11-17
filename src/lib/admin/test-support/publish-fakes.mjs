@@ -3,7 +3,8 @@
 //
 //   __pub.calls        ordered log of every db write and read: { op, table, values? }
 //   __pub.revalidated  every revalidatePath / revalidateTag call, in order
-//   __pub.rows         table name -> rows a select() returns
+//   __pub.rows         table name -> rows a select() returns, or a function (n) => rows for the n-th select of that table (0-based)
+//   __pub.dbDown       true: getDb() throws, as when the database is unreachable
 //   __pub.updateRows   table name -> rows an update().returning() returns (default: one row { id: "row-1" })
 //   __pub.failOn       { op, table, error }: that write throws instead of recording
 //   __pub.deny         a response the guard returns instead of letting the request through
@@ -22,6 +23,7 @@ export const reset = () => {
     revalidated: [],
     notified: [],
     rows: {},
+    dbDown: false,
     updateRows: {},
     failOn: null,
     deny: null,
@@ -35,6 +37,7 @@ export const NextResponse = { json: (body, init) => ({ status: init?.status ?? 2
 
 // next/cache
 export const revalidatePath = (path, type) => void g.__pub.revalidated.push({ fn: "revalidatePath", path, type });
+export const unstable_cache = (fn) => fn;
 export const revalidateTag = (tag) => void g.__pub.revalidated.push({ fn: "revalidateTag", tag });
 
 // guards-mutation: whoever the test says is signed in
@@ -49,6 +52,10 @@ export const notify = async (n) => void g.__pub.notified.push(n);
 export const lockOpenOfferRows = async () => {};
 export const withdrawOpenOffers = async () => ({ withdrawn: [], skipped: [] });
 export const notifyWithdrawnOffers = async () => {};
+
+// skill-benches (the live candidate count on a featured-skill card)
+export const loadPublicStudents = async () => [];
+export const studentsForSkill = () => [];
 
 // db
 export const schema = realSchema;
@@ -71,8 +78,12 @@ function chain(op, table) {
     then: (resolve, reject) => {
       const f = g.__pub.failOn;
       if (f && f.op === op && f.table === entry.table) return reject(f.error);
+      const nth = g.__pub.calls.filter((c) => c.op === op && c.table === entry.table).length;
       g.__pub.calls.push(entry);
-      if (op === "select") return resolve(g.__pub.rows[entry.table] ?? []);
+      if (op === "select") {
+        const r = g.__pub.rows[entry.table];
+        return resolve(typeof r === "function" ? r(nth) : (r ?? []));
+      }
       if (op === "update" && returning) return resolve(g.__pub.updateRows[entry.table] ?? [{ id: "row-1" }]);
       if (op === "insert" && returning) return resolve([{ id: "new-1" }]);
       return resolve([]);
@@ -88,4 +99,7 @@ const db = {
   select: () => ({ from: (t) => chain("select", t) }),
   transaction: async (fn) => fn(db),
 };
-export const getDb = () => db;
+export const getDb = () => {
+  if (g.__pub.dbDown) throw new Error("database unreachable");
+  return db;
+};
