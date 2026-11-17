@@ -55,3 +55,24 @@ export function payGateRefusal(gate: PayGate): PayGateRefusal | null {
   if (gate.payable || !gate.reason) return null;
   return { error: PAY_GATE_MESSAGE[gate.reason], code: PAY_GATE_CODE[gate.reason] };
 }
+
+/**
+ * Partitions offers for the checkout: payable ones (input order kept; the very same array when nothing is held back),
+ * expired ones, and ones held by the CGPA check (with the reason). Expired and gated rows are never priced.
+ */
+export function splitByPayGate<T>(
+  items: T[],
+  inputOf: (t: T) => PayGateInput,
+  now: Date = new Date(),
+): { payable: T[]; expired: T[]; gated: { item: T; reason: Exclude<PayGateReason, "expired"> }[] } {
+  const payable: T[] = [];
+  const expired: T[] = [];
+  const gated: { item: T; reason: Exclude<PayGateReason, "expired"> }[] = [];
+  for (const item of items) {
+    const g = payGateFor(inputOf(item), now);
+    if (g.payable) payable.push(item);
+    else if (g.reason === "expired") expired.push(item);
+    else gated.push({ item, reason: g.reason as Exclude<PayGateReason, "expired"> });
+  }
+  return expired.length === 0 && gated.length === 0 ? { payable: items, expired, gated } : { payable, expired, gated };
+}

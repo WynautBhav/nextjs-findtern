@@ -9,7 +9,7 @@
  * accepted proposal is a commitment, and only the second is worth billing.
  */
 
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
 
 import { acceptedLineCharge } from "@/lib/accepted-charge";
 import { hireFeeMinor, lineCharge, type LineCharge, type PayMode } from "@/lib/checkout";
@@ -23,6 +23,13 @@ import { hiredInternIds, hiredProposalSql, isAdminViewing } from "@/lib/employer
 import { employerRegion, type Currency } from "@/lib/employer-pricing";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { splitTakenDownProposals, TAKEN_DOWN_PAY_NOTE } from "@/lib/projects/takedown-payable";
+import { orderProposalIds } from "@/lib/order-ids";
+import { payGateFor, PAY_GATE_MESSAGE, splitByPayGate, type PayGate, type PayGateReason } from "@/lib/pay-gate";
+
+export { payGateFor, type PayGate, type PayGateReason } from "@/lib/pay-gate";
+
+/** How long an unpaid checkout order stays open (payments.ts OPEN_ORDER_MINUTES; kept here so this module needs no payments import). */
+const OPEN_ORDER_WINDOW_MINUTES = 30;
 
 
 export const DURATION_LABEL: Record<string, string> = {
@@ -79,8 +86,28 @@ function addMonthsDay(isoDay: string | null, months: number): string | null {
 /** An accepted offer or due month the employer cannot pay now because its project is taken down (shown, never orderable). */
 export type BlockedPayable = { id: string; projectId: string; projectName: string | null; note: string };
 
+/**
+ * An accepted offer that is not payable and is NOT in `lines`: its start date has passed unpaid (`expired`), or Findtern is
+ * still checking the candidate's CGPA / a correction awaits the employer's confirmation (`gated`). Carries only what the
+ * employer may see before hire (initials, never a name; no pay figures) so the page can say why and what to do next.
+ */
+export type HeldPayable = {
+  id: string;
+  projectId: string;
+  projectName: string | null;
+  roleTitle: string;
+  internInitials: string;
+  startDate: string | null;
+  reason: PayGateReason;
+  note: string;
+};
+
 export type PayableCheckout = {
   lines: PayableLine[];
+  /** Accepted, unpaid offers whose start date has passed with no open order: "Expired, send a new proposal". Empty when none. */
+  expired: HeldPayable[];
+  /** Accepted offers held by the CGPA check (reason `cgpa_pending` | `cgpa_incorrect_unacked`). Empty when none. */
+  gated: HeldPayable[];
   /**
    * Offers / due months that would be payable but belong to a project Findtern took down. They are NOT in `lines`
    * (so not in `totals`, the "To pay" counts or any pay-now button) and carry the note "Taken down: contact admin".
@@ -96,6 +123,43 @@ export type PayableCheckout = {
 
 type Db = ReturnType<typeof getDb>;
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/** Proposal ids that have an unpaid order from the last 30 minutes (the same rule as payments.ts hasOpenOrderFor, one query for all). */
+export async function openOrderProposalIds(db: Db | Tx, employerId: string, now: Date = new Date()): Promise<Set<string>> {
+  const rows = await db
+    .select({ raw: schema.employerPayments.raw })
+    .from(schema.employerPayments)
+    .where(
+      and(
+        eq(schema.employerPayments.employerId, employerId),
+        eq(schema.employerPayments.status, "created"),
+        gte(schema.employerPayments.createdAt, new Date(now.getTime() - OPEN_ORDER_WINDOW_MINUTES * 60_000)),
+      ),
+    );
+  return new Set(rows.flatMap((r) => orderProposalIds(r.raw)));
+}
+
+/**
+ * The pay gate (expiry + CGPA check) for these proposals of one employer, read on `db` (pass the order transaction to
+ * re-check under the lock). A proposal that is not found, or not this employer's, is absent from the map.
+ */
+export async function payGatesFor(db: Db | Tx, employerId: string, proposalIds: string[], now: Date = new Date()): Promise<Map<string, PayGate>> {
+  if (proposalIds.length === 0) return new Map();
+  const rows = await db
+    .select()
+    .from(schema.proposals)
+    .where(and(eq(schema.proposals.employerId, employerId), inArray(schema.proposals.id, proposalIds)));
+  if (rows.length === 0) return new Map();
+  const ob = await db
+    .select({ userId: schema.internOnboarding.userId, extraData: schema.internOnboarding.extraData })
+    .from(schema.internOnboarding)
+    .where(inArray(schema.internOnboarding.userId, [...new Set(rows.map((r) => r.internId))]));
+  const extraOf = new Map(ob.map((o) => [o.userId, o.extraData]));
+  const open = await openOrderProposalIds(db, employerId, now);
+  return new Map(
+    rows.map((p) => [p.id, payGateFor({ status: p.status, hiredAt: p.hiredAt, offerDetails: p.offerDetails, extraData: extraOf.get(p.internId), updatedAt: p.updatedAt, hasOpenOrder: open.has(p.id) }, now)]),
+  );
+}
 
 /**
  * Accepted offers awaiting payment, plus hired monthly-plan placements whose
@@ -165,9 +229,51 @@ export async function payableCheckout(
         .from(schema.projects)
         .where(and(inArray(schema.projects.id, wantedProjectIds), isNotNull(schema.projects.takenDownAt)))
     : [];
-  const { payable: proposals, blocked: blockedProposals } = splitTakenDownProposals(wanted, new Set(downRows.map((r) => r.id)));
+  const { payable: notDown, blocked: blockedProposals } = splitTakenDownProposals(wanted, new Set(downRows.map((r) => r.id)));
   const downName = new Map(downRows.map((r) => [r.id, r.projectName]));
   const blocked: BlockedPayable[] = blockedProposals.map((p) => ({ id: p.id, projectId: p.projectId, projectName: downName.get(p.projectId) ?? null, note: TAKEN_DOWN_PAY_NOTE }));
+
+  // The pay gate (pay-gate.ts): an accepted offer whose start date has passed unpaid, or whose candidate's CGPA is still being
+  // checked, is held back from `lines` (never priced, never in `totals`) and listed in `expired` / `gated` instead. Processing and
+  // hired rows, due months and any offer with an open order are never held. Offers that pass come back as the same array.
+  const gateInternIds = [...new Set(notDown.map((p) => p.internId))];
+  const onboardingRows = gateInternIds.length ? await db.select().from(schema.internOnboarding).where(inArray(schema.internOnboarding.userId, gateInternIds)) : [];
+  const onboardingByUser = new Map(onboardingRows.map((row) => [row.userId, row]));
+  const openOrderIds = notDown.length ? await openOrderProposalIds(db, employerId) : new Set<string>();
+  const split = splitByPayGate(
+    notDown,
+    (p) => ({ status: p.status, hiredAt: p.hiredAt, offerDetails: p.offerDetails, extraData: onboardingByUser.get(p.internId)?.extraData, updatedAt: p.updatedAt, hasOpenOrder: openOrderIds.has(p.id) }),
+    new Date(),
+  );
+  const proposals = split.payable;
+  const held = [...split.expired.map((item) => ({ item, reason: "expired" as PayGateReason })), ...split.gated];
+  const expired: HeldPayable[] = [];
+  const gated: HeldPayable[] = [];
+  if (held.length > 0) {
+    const heldUsers = await db
+      .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName })
+      .from(schema.users)
+      .where(inArray(schema.users.id, [...new Set(held.map((h) => h.item.internId))]));
+    const initialsById = new Map(heldUsers.map((u) => [u.id, initialsOf((u.firstName || "").trim(), (u.lastName || "").trim())]));
+    const heldProjects = await db
+      .select({ id: schema.projects.id, projectName: schema.projects.projectName })
+      .from(schema.projects)
+      .where(and(eq(schema.projects.employerId, employerId), inArray(schema.projects.id, [...new Set(held.map((h) => h.item.projectId))])));
+    const heldProjectName = new Map(heldProjects.map((r) => [r.id, r.projectName]));
+    for (const { item, reason } of held) {
+      const offer = parseOffer(item.offerDetails, item.currency);
+      (reason === "expired" ? expired : gated).push({
+        id: item.id,
+        projectId: item.projectId,
+        projectName: heldProjectName.get(item.projectId) ?? null,
+        roleTitle: offer.roleTitle || heldProjectName.get(item.projectId) || "Internship",
+        internInitials: initialsById.get(item.internId) ?? "?",
+        startDate: offer.startDate,
+        reason,
+        note: PAY_GATE_MESSAGE[reason],
+      });
+    }
+  }
 
   let lines: PayableLine[] = [];
 
@@ -202,12 +308,6 @@ export async function payableCheckout(
     const hiredIds = (await isAdminViewing())
       ? await hiredInternIds(db, employerId)
       : new Set(hiredRows.map((row) => row.internId));
-
-    const onboardingRows = await db
-      .select()
-      .from(schema.internOnboarding)
-      .where(inArray(schema.internOnboarding.userId, internIds));
-    const onboardingByUser = new Map(onboardingRows.map((row) => [row.userId, row]));
 
     const projectRows = await db
       .select({ id: schema.projects.id, projectName: schema.projects.projectName })
@@ -275,5 +375,5 @@ export async function payableCheckout(
     totals.set(line.currency, (totals.get(line.currency) ?? 0) + line.charge.totalMinor);
   }
 
-  return { lines, blocked, totals, region, defaultCurrency, prefill };
+  return { lines, expired, gated, blocked, totals, region, defaultCurrency, prefill };
 }

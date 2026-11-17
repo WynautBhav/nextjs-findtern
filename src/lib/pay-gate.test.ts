@@ -102,3 +102,25 @@ test("payGateRefusal: null when payable, a 409 body with the code otherwise", ()
   assert.deepEqual(payGateRefusal({ payable: false, reason: "expired" }), { error: PAY_GATE_MESSAGE.expired, code: "offer_expired" });
   assert.deepEqual(payGateRefusal({ payable: false, reason: "cgpa_pending" }), { error: PAY_GATE_MESSAGE.cgpa_pending, code: "cgpa_verification_pending" });
 });
+
+/** splitByPayGate: the checkout's partition. Nothing gated = the same array back, so money for ordinary offers cannot move. */
+import { splitByPayGate } from "./pay-gate.ts";
+
+type Row = { id: string } & Parameters<typeof payGateFor>[0];
+const row = (id: string, startDate: string, extra: Partial<Row> = {}): Row => ({ id, ...accepted(startDate), ...extra });
+
+test("splitByPayGate: all payable returns the very same array", () => {
+  const items = [row("a", START_FUTURE), row("b", START_FUTURE, { status: "hired", hiredAt: "2026-11-01T00:00:00Z" })];
+  const out = splitByPayGate(items, (r) => r, NOW);
+  assert.equal(out.payable, items);
+  assert.deepEqual(out.expired, []);
+  assert.deepEqual(out.gated, []);
+});
+
+test("splitByPayGate: expired and CGPA-blocked rows leave the payable list, order kept", () => {
+  const items = [row("a", START_FUTURE), row("b", START_PAST), row("c", START_FUTURE, { extraData: pending }), row("d", START_FUTURE), row("e", START_PAST, { hasOpenOrder: true })];
+  const out = splitByPayGate(items, (r) => r, NOW);
+  assert.deepEqual(out.payable.map((r) => r.id), ["a", "d", "e"]);
+  assert.deepEqual(out.expired.map((r) => r.id), ["b"]);
+  assert.deepEqual(out.gated.map((g) => [g.item.id, g.reason]), [["c", "cgpa_pending"]]);
+});
