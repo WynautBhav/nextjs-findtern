@@ -60,9 +60,11 @@ const FORCE_DELAY_MS = 300;
 const CAMEO_DEBOUNCE_MS = 400;
 /** Time into the wave clip where Findy stands still facing us (the wave starts after). */
 const STAND_T = 1.0;
-/** Open menus, dialogs and popovers (the chat panel is a dialog, aria-hidden while closed). */
-const OVERLAY_OPEN =
-  '[aria-controls="mobile-nav"][aria-expanded="true"], [role="menu"], [role="listbox"], [role="dialog"]:not([aria-hidden="true"]), [aria-modal="true"], [aria-haspopup][aria-expanded="true"]';
+/** The mobile menu toggle is open. */
+const MENU_OPEN = '[aria-controls="mobile-nav"][aria-expanded="true"]';
+/** Any other open menu, dialog or popover (the chat panel is a dialog, aria-hidden while closed). */
+const DIALOG_OPEN =
+  '[role="menu"], [role="listbox"], [role="dialog"]:not([aria-hidden="true"]), [aria-modal="true"], [aria-haspopup][aria-expanded="true"]';
 
 const WAVE_SRC = "/media/mascot/logo/wave.webm";
 const WALK_SRC = "/media/mascot/logo/walk.webm";
@@ -331,7 +333,14 @@ export function LogoFindy() {
       const now = performance.now();
       if (running) return arm(retry());
       const blocked = blockedFor(
-        { hidden: false, hovered, menuOpen: document.querySelector(OVERLAY_OPEN) !== null, dialogOpen: false, lastScrollAt, now },
+        {
+          hidden: false,
+          hovered,
+          menuOpen: document.querySelector(MENU_OPEN) !== null,
+          dialogOpen: document.querySelector(DIALOG_OPEN) !== null,
+          lastScrollAt,
+          now,
+        },
         Math.random,
       );
       if (blocked) return arm(blocked.retryMs);

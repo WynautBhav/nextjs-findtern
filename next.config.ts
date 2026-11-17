@@ -144,6 +144,12 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Findy's clips (not content-hashed): the closed chat pill and the header logo fetch each one on first
+        // need and replay it all session, so the browser keeps it a day instead of revalidating on every act.
+        source: "/media/mascot/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
+      {
         // The push service worker must never be cached, or a fix never reaches phones.
         source: "/sw.js",
         headers: [
