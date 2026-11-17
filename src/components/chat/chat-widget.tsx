@@ -9,7 +9,8 @@ import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { cn } from "@/lib/utils";
 import { newTabAttrs } from "@/components/ui/new-tab";
 import { NewTabHint } from "@/components/ui/new-tab-link";
-import { Mascot, MascotAvatar, MASCOT_STAGE_BG } from "./mascot";
+import { Mascot, MASCOT_STAGE_BG } from "./mascot";
+import { PillMascot } from "./pill-owl";
 import { busyState, replyState, SLEEPY_AFTER_MS, TYPING_AFTER_MS, type MascotState } from "./mascot-state";
 
 type Msg = { role: "user" | "assistant"; content: string };
@@ -576,7 +577,7 @@ export function ChatWidget() {
           "bg-brand-800 hover:bg-brand-900",
           // Labelled on every screen size (bug sheet 7, NC r30/r40: the
           // icon-only launcher was too small to notice).
-          // The owl avatar (idle loop) sits in the pill; 48px tall, small enough not
+          // The owl (PillMascot: idle loop plus every other clip in turn) sits in the pill; 48px tall, small enough not
           // to sit over a whole row of the page beneath it.
           "h-12 min-w-12 gap-2 py-1 pl-1 pr-4 text-sm",
           open && "hidden",
@@ -584,7 +585,13 @@ export function ChatWidget() {
           headerOnly && "hidden",
         )}
       >
-        <MascotAvatar className="size-10" state={launcherMood} onDone={() => setLauncherMood("idle")} />
+        <PillMascot
+          className="size-10"
+          active={!open && !headerOnly}
+          path={pathname ?? ""}
+          cue={launcherMood === "bye" ? "bye" : null}
+          onCueDone={() => setLauncherMood("idle")}
+        />
         <span className="font-semibold">Ask Findy</span>
       </button>
     </div>
