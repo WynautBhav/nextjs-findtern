@@ -10,6 +10,7 @@ import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatDate, formatMoney } from "@/lib/format";
+import { refundGstMinor } from "@/lib/refund-accounting";
 import type { RefundListRow } from "@/lib/refunds/refunds-db";
 
 const select = "h-9 rounded-apple-sm border border-ink-200 bg-surface px-3 text-sm text-ink-900";
@@ -78,9 +79,9 @@ export function RefundsTable(props: { rows: RefundListRow[]; total: number; page
         <AdminEmpty title="No refunds here" body="Run a scan to find students who paid before receiving a drive seat, or clear the filters." />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[40rem] text-left text-sm">
+          <table className="w-full min-w-[48rem] text-left text-sm">
             <thead className="text-xs text-text-subtle">
-              <tr><th className="p-3">Student</th><th className="p-3">Amount</th><th className="p-3">Paid</th><th className="p-3">Status</th><th className="p-3 text-right">Action</th></tr>
+              <tr><th className="p-3">Student</th><th className="p-3">Amount</th><th className="p-3">Paid</th><th className="p-3">Status</th><th className="p-3">GST inside</th><th className="p-3">Credit note</th><th className="p-3 text-right">Action</th></tr>
             </thead>
             <tbody>
               {props.rows.map((r) => {
@@ -91,6 +92,9 @@ export function RefundsTable(props: { rows: RefundListRow[]; total: number; page
                     <td className="p-3 tabular-nums">{formatMoney(r.amountMinor, "INR")}</td>
                     <td className="p-3">{formatDate(r.paidAt)}</td>
                     <td className="p-3"><StatusBadge value={r.status} /></td>
+                    <td className="p-3 tabular-nums">{r.status === "refunded" ? formatMoney(refundGstMinor(r.amountMinor, "INR"), "INR") : "-"}</td>
+                    {/* No credit-note column exists yet (open item): every refunded row is flagged until one is recorded. */}
+                    <td className="p-3">{r.status === "refunded" ? <span className="font-medium text-warning">Credit note needed</span> : "-"}</td>
                     <td className="p-3 text-right">
                       {actionable ? (
                         <button type="button" disabled={busy === r.id} className={buttonClass({ variant: r.status === "review" ? "outline" : "primary", size: "sm" })} onClick={() => setTarget(r)}>
