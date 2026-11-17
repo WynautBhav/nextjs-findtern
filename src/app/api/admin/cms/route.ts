@@ -129,8 +129,12 @@ export async function DELETE(req: Request) {
   if (!b || !id) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
   const table = TABLES[b.type];
   const db = getDb();
-  await db.delete(table).where(eq(table.id, id));
-  revalidatePath("/", "layout");
-  await recordAdminAudit(db, { adminId: guard.session.uid, action: "cms.delete", targetType: "cms", targetId: id, meta: { type: b.type } });
-  return NextResponse.json({ ok: true });
+  try {
+    await db.delete(table).where(eq(table.id, id));
+    revalidatePath("/", "layout");
+    await recordAdminAudit(db, { adminId: guard.session.uid, action: "cms.delete", targetType: "cms", targetId: id, meta: { type: b.type } });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    return failed(e);
+  }
 }
