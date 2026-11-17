@@ -55,6 +55,13 @@ export type AdminInvoiceRow = {
 /** Money received. Settlement writes "paid" and nothing else (no legacy row says "captured"). */
 export const isPaidRow = (r: Pick<AdminInvoiceRow, "status">) => r.status === "paid";
 
+/** The badge value for a row: a paid order with money back is partially refunded / refunded (its stored status stays "paid"). */
+export function displayStatus(r: Pick<AdminInvoiceRow, "status" | "amountMinor" | "refundedMinor">): string {
+  if (!isPaidRow(r)) return r.status;
+  const back = r.refundedMinor ?? 0;
+  return back <= 0 ? "paid" : back >= r.amountMinor ? "refunded" : "partially_refunded";
+}
+
 /**
  * A tax invoice exists only for money actually received. Unpaid, failed and
  * ₹0 rows used to print a TAX INVOICE with a made-up number (ADM-06).

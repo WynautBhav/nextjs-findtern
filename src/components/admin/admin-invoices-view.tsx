@@ -5,11 +5,11 @@ import { StatCard, StatGrid } from "@/components/admin/stat-card";
 import { StatusBadge } from "@/components/admin/status-badge";
 import {
   displayInvoiceNumber,
+  displayStatus,
   filterInvoiceRows,
   gatewayLabel,
   INVOICE_KINDS,
   invoiceFilters,
-  isPaidRow,
   promoCodeOptions,
   sortInvoiceRows,
   type AdminInvoiceRow,
@@ -116,7 +116,7 @@ export function AdminInvoicesView({
       cell: (r) => (
         <div className="flex flex-col items-start gap-1">
           <span className="inline-flex flex-wrap items-center gap-1">
-            <StatusBadge value={isPaidRow(r) ? ((r.refundedMinor ?? 0) <= 0 ? "paid" : r.refundedMinor! >= r.amountMinor ? "refunded" : "partially_refunded") : r.status} />
+            <StatusBadge value={displayStatus(r)} />
             {r.needsReview ? <span title={r.reviewReasons?.join(". ")}><StatusBadge tone="danger" label="Needs review" /></span> : null}
             {r.flagOnly ? <StatusBadge tone="neutral" label="Marked paid" /> : null}
           </span>

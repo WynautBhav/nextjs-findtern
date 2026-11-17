@@ -13,10 +13,13 @@ import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-tabl
 import { StatusBadge } from "@/components/admin/status-badge";
 import { DateRangeForm } from "@/components/admin/report-range";
 import { dateRangeConditions } from "@/lib/admin/date-range";
+import { displayStatus } from "@/lib/admin/invoice-rows";
+import { orderRefunds } from "@/lib/refund-accounting";
+import { orderReview } from "@/lib/payment-flags";
 import { gatewayLabel } from "@/lib/admin/invoice-rows";
 import { payoutKindLabel } from "@/lib/admin/payout-kind";
 import { fillBuckets, istDayKeys, istMonthKeys, istMonthLabel, istWeekdayLabel } from "@/lib/admin/revenue";
-import { loadCollected, loadPayoutTotals, loadReceiptBuckets } from "@/lib/admin/receivables-load";
+import { loadCollected, loadPayoutTotals, loadReceiptBuckets, loadRefundedWithin } from "@/lib/admin/receivables-load";
 import { PayoutEditor } from "@/components/admin/payout-editor";
 import { getSession } from "@/lib/auth";
 import { allows } from "@/lib/admin/permissions";
@@ -35,8 +38,9 @@ const money = (minor: number, currency: string) => formatMoney(minor, currency =
 
 async function loadMetrics() {
   // Received = paid rows (employer orders + intern fees), outflow = settled payouts; one definition in lib/admin/revenue.
-  const [collected, payouts] = await Promise.all([loadCollected(), loadPayoutTotals()]);
+  const [collected, payouts, refundedMinor] = await Promise.all([loadCollected(), loadPayoutTotals(), loadRefundedWithin()]);
   return {
+    refundedMinor,
     inflowMinor: collected.receivedMinor,
     inflowCount: collected.receivedCount,
     outflowMinor: payouts.paidOutMinor,
@@ -106,7 +110,7 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
             label="Received"
             featured
             value={formatMoney(metrics.inflowMinor, "INR", { zeroLabel: "₹0" })}
-            hint={`${formatNumber(metrics.inflowCount)} paid receipts · USD at ₹100/$`}
+            hint={`${formatNumber(metrics.inflowCount)} paid receipts · gross · USD at ₹100/$${metrics.refundedMinor > 0 ? ` · ${formatMoney(metrics.refundedMinor, "INR", { zeroLabel: "₹0" })} refunded, net ${formatMoney(metrics.inflowMinor - metrics.refundedMinor, "INR", { zeroLabel: "₹0" })}` : ""}`}
           />
           <StatCard
             label="Paid out"
@@ -196,11 +200,12 @@ async function EmployerPaymentsTable({ params }: { params: Record<string, string
   const db = getDb();
   const req = parsePageRequest(params);
   const conditions = [
-    searchAny([sql`${schema.employers.companyName}`, sql`${schema.employerPayments.orderId}`, sql`coalesce(${schema.employerPayments.paymentId}, '')`, sql`coalesce(${schema.employerPayments.invoiceNumber}, '')`], req.search),
+    searchAny([sql`${schema.employers.companyName}`, sql`${schema.employers.companyEmail}`, sql`${schema.employerPayments.orderId}`, sql`coalesce(${schema.employerPayments.paymentId}, '')`, sql`coalesce(${schema.employerPayments.invoiceNumber}, '')`], req.search),
     params.status ? eq(schema.employerPayments.status, params.status) : undefined,
     params.currency ? eq(schema.employerPayments.currency, params.currency) : undefined,
     periodStart(params.period) ? gte(schema.employerPayments.createdAt, periodStart(params.period)!) : undefined,
-    ...dateRangeConditions(schema.employerPayments.createdAt, params),
+    // The column shown as "Date" (paid, else created), as Orders filters it.
+    ...dateRangeConditions(sql`coalesce(${schema.employerPayments.paidAt}, ${schema.employerPayments.createdAt})`, params),
   ].filter(Boolean) as SQL[];
   const where = conditions.length ? and(...conditions) : undefined;
 
@@ -218,6 +223,7 @@ async function EmployerPaymentsTable({ params }: { params: Record<string, string
         employerId: schema.employerPayments.employerId,
         companyName: schema.employers.companyName,
         companyEmail: schema.employers.companyEmail,
+        raw: schema.employerPayments.raw,
       })
       .from(schema.employerPayments)
       .innerJoin(schema.employers, eq(schema.employers.id, schema.employerPayments.employerId))
@@ -228,6 +234,8 @@ async function EmployerPaymentsTable({ params }: { params: Record<string, string
     db.select({ c: count() }).from(schema.employerPayments).innerJoin(schema.employers, eq(schema.employers.id, schema.employerPayments.employerId)).where(where),
   ]);
   const page = toPage(rows, Number(totalRow?.c ?? 0), req.page, req.perPage);
+  // Money back beside the amount, as on Orders: the stored status stays "paid" (a refund is a contra record).
+  const shown = rows.map((r) => ({ ...r, refundedMinor: orderRefunds(r).refundedMinor, needsReview: orderReview(r.raw).flagged }));
 
   return (
     <DataTable
@@ -237,7 +245,7 @@ async function EmployerPaymentsTable({ params }: { params: Record<string, string
       pages={page.pages}
       total={page.total}
       perPage={page.perPage}
-      rows={rows}
+      rows={shown}
       noun="employer payments"
       caption="Employer payments"
       searchPlaceholder="Search company, invoice, order or payment ID…"
@@ -254,10 +262,28 @@ async function EmployerPaymentsTable({ params }: { params: Record<string, string
           header: "Company",
           cell: (row) => <IdentityCell name={row.companyName} id={row.employerId} sub={row.companyEmail} href={`/admin/companies/${row.employerId}`} />,
         },
-        { header: "Amount", numeric: true, sort: "amount", cell: (row) => <span className="font-semibold">{money(row.amountMinor, row.currency)}</span> },
+        {
+          header: "Amount",
+          numeric: true,
+          sort: "amount",
+          cell: (row) => (
+            <>
+              <span className="font-semibold">{money(row.amountMinor, row.currency)}</span>
+              {row.refundedMinor > 0 ? <span className="nums block text-xs font-normal text-text-subtle">refunded {money(row.refundedMinor, row.currency)}</span> : null}
+            </>
+          ),
+        },
         { header: "Gateway", cell: (row) => gatewayLabel(row.gateway) },
         { header: "Order ID", cell: (row) => <span className="nums break-all text-[0.8125rem] text-text-subtle">{row.orderId}</span> },
-        { header: "Status", cell: (row) => <StatusBadge value={row.status} /> },
+        {
+          header: "Status",
+          cell: (row) => (
+            <span className="inline-flex flex-wrap items-center gap-1">
+              <StatusBadge value={displayStatus(row)} />
+              {row.needsReview ? <StatusBadge tone="danger" label="Needs review" /> : null}
+            </span>
+          ),
+        },
         { header: "Date", numeric: true, sort: "date", cell: (row) => formatDate((row.paidAt ?? row.createdAt)?.toISOString() ?? null) },
       ]}
     />

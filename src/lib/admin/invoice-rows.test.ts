@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   displayInvoiceNumber,
+  displayStatus,
   filterInvoiceRows,
   hasTaxInvoice,
   inDateRange,
@@ -83,4 +84,13 @@ test("status filter: 'refunded' keeps any order with money back, 'review' keeps 
   assert.deepEqual(filterInvoiceRows(rows, invoiceFilters({ status: "refunded" }), "INV").map((r) => r.id), ["b"]);
   assert.deepEqual(filterInvoiceRows(rows, invoiceFilters({ status: "review" }), "INV").map((r) => r.id), ["c"]);
   assert.deepEqual(filterInvoiceRows(rows, invoiceFilters({ status: "paid" }), "INV").map((r) => r.id), ["a", "b", "c"]);
+});
+
+test("displayStatus: a paid order with money back reads partially refunded or refunded; unpaid rows keep their own status", () => {
+  assert.equal(displayStatus({ status: "paid", amountMinor: 1000, refundedMinor: 0 }), "paid");
+  assert.equal(displayStatus({ status: "paid", amountMinor: 1000 }), "paid");
+  assert.equal(displayStatus({ status: "paid", amountMinor: 1000, refundedMinor: 400 }), "partially_refunded");
+  assert.equal(displayStatus({ status: "paid", amountMinor: 1000, refundedMinor: 1000 }), "refunded");
+  assert.equal(displayStatus({ status: "failed", amountMinor: 1000, refundedMinor: 0 }), "failed");
+  assert.equal(displayStatus({ status: "created", amountMinor: 1000 }), "created");
 });
