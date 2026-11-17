@@ -9,7 +9,9 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { PRICING_PLANS } from "@/lib/content/home";
 import { getSetting, setSetting } from "@/lib/platform-settings";
 import { PER_HIRE_FEE_KEY, parsePerHireFeeSetting } from "@/lib/per-hire-fee";
-import { isPerHireFeeBody, perHireFeeAuditMeta, perHireFeeBodySchema } from "@/lib/admin/per-hire-fee-setting";
+import { perHireFeeAuditMeta } from "@/lib/admin/per-hire-fee-setting";
+import { PRICING_REVALIDATE, activationFeeAuditMeta, parsePricingPut, stipendSaveAuditMeta } from "@/lib/admin/pricing-put";
+import { INTERN_STIPEND_KEY, parseStipendBands } from "@/lib/pricing-config";
 import { legacyBandChange } from "@/lib/admin/plan-band";
 import { inrMinorToUsdMinor } from "@/lib/currency";
 
@@ -38,9 +40,13 @@ const planSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
-const settingsSchema = z.object({
-  internActivationFeeMinor: minor.refine((v) => v > 0, "Fee must be above zero"),
-});
+/** Every pricing write ends here: the public pages and /llms.txt print prices, so purge them all. */
+function revalidatePricing() {
+  for (const { path, type } of PRICING_REVALIDATE) {
+    if (type) revalidatePath(path, type);
+    else revalidatePath(path);
+  }
+}
 
 export async function PATCH(req: Request) {
   const guard = await requireMutation({ req, roles: ["admin"] });
@@ -102,7 +108,7 @@ export async function PATCH(req: Request) {
     targetId: id,
     meta: { plan: plan.displayName, changes: diffFields(plan, fields) },
   }, { strict: true });
-  revalidatePath("/", "layout");
+  revalidatePricing();
   return NextResponse.json({ ok: true });
 }
 
@@ -110,16 +116,14 @@ export async function PUT(req: Request) {
   const guard = await requireMutation({ req, roles: ["admin"] });
   if (!guard.ok) return guard.response;
 
-  const body = await req.json().catch(() => null);
+  // One schema per setting, picked by the body's shape (lib/admin/pricing-put.ts).
+  const put = parsePricingPut(await req.json().catch(() => null));
+  if (put.kind === "invalid") return NextResponse.json({ error: put.error }, { status: 400 });
 
   // Which bands pay the one-time hiring fee (lib/per-hire-fee.ts): read by billing and every public price line.
-  if (isPerHireFeeBody(body)) {
-    const bands = perHireFeeBodySchema.safeParse(body);
-    if (!bands.success) {
-      return NextResponse.json({ error: bands.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
-    }
+  if (put.kind === "perHireFee") {
     const from = parsePerHireFeeSetting(await getSetting(PER_HIRE_FEE_KEY));
-    const to = bands.data.perHireFeeBands;
+    const to = put.bands;
     await setSetting(PER_HIRE_FEE_KEY, to, guard.session.uid);
     await recordAdminAudit(getDb(), {
       adminId: guard.session.uid,
@@ -129,26 +133,37 @@ export async function PUT(req: Request) {
       meta: perHireFeeAuditMeta(from, to),
     }, { strict: true });
     // The public pages and the employer cart/checkout read this setting.
-    revalidatePath("/", "layout");
+    revalidatePricing();
     revalidatePath("/employer", "layout");
     return NextResponse.json({ ok: true, perHireFeeBands: to });
   }
 
-  const parsed = settingsSchema.safeParse(body);
-  if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+  // Fixed monthly intern stipend per band (lib/pricing-config.ts): Espresso null, Cappuccino and Latte paise.
+  if (put.kind === "stipend") {
+    const from = parseStipendBands(await getSetting(INTERN_STIPEND_KEY));
+    const to = put.bands;
+    await setSetting(INTERN_STIPEND_KEY, to, guard.session.uid);
+    await recordAdminAudit(getDb(), {
+      adminId: guard.session.uid,
+      action: "settings.update",
+      targetType: "platform_setting",
+      targetId: INTERN_STIPEND_KEY,
+      meta: stipendSaveAuditMeta(from, to),
+    }, { strict: true });
+    revalidatePricing();
+    return NextResponse.json({ ok: true, internStipendBands: to });
   }
 
   const before = await getSetting("intern_activation_fee_minor");
-  await setSetting("intern_activation_fee_minor", parsed.data.internActivationFeeMinor, guard.session.uid);
-  const db = getDb();
-  await recordAdminAudit(db, {
+  await setSetting("intern_activation_fee_minor", put.feeMinor, guard.session.uid);
+  await recordAdminAudit(getDb(), {
     adminId: guard.session.uid,
     action: "settings.update",
     targetType: "platform_setting",
     targetId: "intern_activation_fee_minor",
-    meta: { value: { from: before, to: parsed.data.internActivationFeeMinor } },
+    meta: activationFeeAuditMeta(before, put.feeMinor),
   }, { strict: true });
+  revalidatePricing();
   return NextResponse.json({ ok: true });
 }
 
@@ -184,6 +199,6 @@ export async function POST(req: Request) {
       isActive: true,
     })),
   );
-  revalidatePath("/", "layout");
+  revalidatePricing();
   return NextResponse.json({ ok: true }, { status: 201 });
 }
