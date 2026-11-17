@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { getDb, hasDb, schema } from "@/lib/db";
 import { PER_HIRE_FEE_DEFAULT, PER_HIRE_FEE_KEY, parsePerHireFeeSetting, type PerHireFeeSetting } from "@/lib/per-hire-fee";
-import { INTERN_STIPEND_KEY, STIPEND_BANDS_DEFAULT, parsePricingConfig, type PricingConfig } from "@/lib/pricing-config";
+import { INTERN_STIPEND_KEY, PRICING_DEFAULTS, STIPEND_BANDS_DEFAULT, parsePricingConfig, type PricingConfig } from "@/lib/pricing-config";
 
 /**
  * Admin-editable platform values, one `platform_settings` row per key.
@@ -12,7 +12,7 @@ import { INTERN_STIPEND_KEY, STIPEND_BANDS_DEFAULT, parsePricingConfig, type Pri
 
 export const SETTING_DEFAULTS = {
   /** Intern activation fee, INR paise, GST-inclusive. */
-  intern_activation_fee_minor: 249900,
+  intern_activation_fee_minor: PRICING_DEFAULTS.activationFeeInrMinor,
   /** Which score bands pay the one-time hiring fee (lib/per-hire-fee.ts). */
   [PER_HIRE_FEE_KEY]: PER_HIRE_FEE_DEFAULT,
   /** Fixed monthly intern stipend per score band, INR paise (lib/pricing-config.ts); null for Espresso. */

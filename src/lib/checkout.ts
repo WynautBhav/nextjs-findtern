@@ -5,7 +5,7 @@ import { perHireChargedForScore, type PerHireFeeSetting } from "./per-hire-fee.t
  * What an employer pays for one accepted proposal. Same base rules as the
  * legacy order route (routes.ts ~15184), because both apps bill the same rows:
  *
- * - One-time hiring fee (₹5,000 / $50, or what the offer was priced with) on
+ * - One-time hiring fee (what the offer was priced with: its stored fee, else its snapshot of the band's fee, else the legacy ₹5,000 / $50) on
  *   the internship hires whose score band is switched on in the admin setting
  *   (lib/per-hire-fee.ts), charged once with the first payment. Whether it is
  *   charged is decided here, at charge time, from the live setting and the
@@ -26,7 +26,12 @@ import { perHireChargedForScore, type PerHireFeeSetting } from "./per-hire-fee.t
  */
 export type PayMode = "upfront" | "monthly" | "postpaid";
 
-export const PER_HIRE_MINOR = { INR: 500_000, USD: 5_000 } as const;
+/**
+ * The hiring fee offers were sent with before the amount was snapshotted on the offer (`perHireListCharge`):
+ * used only for an offer that carries neither a charged fee nor a snapshot. Every other amount is read from
+ * the offer, so editing the rate card never reprices a sent offer. Frozen on purpose: do not change it.
+ */
+export const LEGACY_PER_HIRE_MINOR = { INR: 500_000, USD: 5_000 } as const;
 export const FULL_TIME_FEE = 0.0833;
 
 /** 8.33% of the annual CTC, rounded to whole major units (legacy rounding). */
@@ -53,7 +58,10 @@ export type FeeOptions = {
 /** The hiring fee on one line (before `firstPayment`): what the offer would charge, then the setting or a recorded fee applied. */
 export function hireFeeMinor(offer: Offer, opts: Pick<FeeOptions, "feeSetting" | "bandScore" | "feeMinor"> = {}): number {
   if (offer.fullTime) return 0;
-  const amount = (offer.perHireMinor ?? 0) > 0 ? offer.perHireMinor! : PER_HIRE_MINOR[offer.currency];
+  // The fee the offer was sent with, else the band's fee as it stood when it was sent (the snapshot kept for a
+  // band that was free then), else the legacy amount for offers older than the snapshot.
+  const amount =
+    (offer.perHireMinor ?? 0) > 0 ? offer.perHireMinor! : (offer.perHireListMinor ?? 0) > 0 ? offer.perHireListMinor! : LEGACY_PER_HIRE_MINOR[offer.currency];
   if (opts.feeMinor != null) return Math.max(0, Math.round(opts.feeMinor));
   if (opts.feeSetting && !perHireChargedForScore(offer.candidateScore ?? opts.bandScore, opts.feeSetting)) return 0;
   return amount;

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { buildOffer, parseOffer } from "./offer.ts";
-import { fullTimeFeeMinor, lineCharge, PER_HIRE_MINOR } from "./checkout.ts";
+import { fullTimeFeeMinor, lineCharge, LEGACY_PER_HIRE_MINOR } from "./checkout.ts";
 
 const newOffer = () =>
   parseOffer(
@@ -14,7 +14,7 @@ const newOffer = () =>
       duration: "3m",
       monthlyHours: 160,
       hourlyRateMinor: 10_000,
-      perHireMinor: PER_HIRE_MINOR.INR,
+      perHireMinor: LEGACY_PER_HIRE_MINOR.INR,
     }),
     "INR",
   );
@@ -50,7 +50,7 @@ test("EMH-11: placement ledger, monthly plan one of three months paid", async ()
     duration: "3m",
     monthlyHours: 160,
     hourlyRateMinor: 10_000,
-    perHireMinor: PER_HIRE_MINOR.INR,
+    perHireMinor: LEGACY_PER_HIRE_MINOR.INR,
   });
   const hire = { id: "p1", status: "hired", offerDetails, currency: "INR" };
   const l = placementLedger(hire, [
@@ -80,7 +80,7 @@ test("E-B06: a promo code lowers a hire's total and paid by what was taken off, 
     duration: "3m",
     monthlyHours: 160,
     hourlyRateMinor: 10_000,
-    perHireMinor: PER_HIRE_MINOR.INR,
+    perHireMinor: LEGACY_PER_HIRE_MINOR.INR,
   });
   const hire = { id: "p1", status: "hired", offerDetails, currency: "INR" };
   const notes = { proposalIds: ["p1"], paymentMode: "total" };

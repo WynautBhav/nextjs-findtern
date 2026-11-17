@@ -10,7 +10,8 @@ import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { scoreOf, toCandidateProfile } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
-import { getPerHireFeeSetting } from "@/lib/platform-settings";
+import { getPricingConfig } from "@/lib/platform-settings";
+import { feeSettingOf } from "@/lib/pricing-config";
 import { requireMutation } from "@/lib/guards-mutation";
 import { emails } from "@/lib/emails";
 import { employerNames, notify } from "@/lib/notify";
@@ -255,7 +256,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // Price comes from the candidate's band, never from the request.
   const plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
-  const rate = resolvePricing(score, plans, currency, null, await getPerHireFeeSetting());
+  const pricing = await getPricingConfig();
+  const rate = resolvePricing(score, plans, currency, null, feeSettingOf(pricing), pricing);
   const offerDetails = buildOffer({
     ...b,
     // The offer runs on the PROJECT's clock (feedback sheet 2, row 7): its zone wins over the one sent.
@@ -266,6 +268,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     hourlyRateMinor: rate.hourlyRateMinor,
     // 0 when the candidate's band is free right now; the fee is decided again at payment from the live setting (checkout.ts hireFeeMinor).
     perHireMinor: rate.perHireMinor,
+    // The band's fee whether charged or not, kept on the offer so a later rate-card edit never reprices it.
+    perHireListMinor: rate.perHireListMinor,
+    // The stipend this band pays today, fixed on the offer when it is sent.
+    pricing,
     candidateScore: score,
     projectSkills: b.skills,
   });

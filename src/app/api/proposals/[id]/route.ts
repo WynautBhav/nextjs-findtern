@@ -11,6 +11,7 @@ import { hasOpenOrderFor } from "@/lib/payments";
 import { takedownBlock } from "@/lib/projects/takedown";
 import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
 import {
+  carryPricingSnapshot,
   hybridDaysOf,
   jdToHtml,
   normalizeLaptop,
@@ -191,6 +192,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (edits.shiftFrom !== undefined || edits.shiftTo !== undefined) {
     Object.assign(next, shiftFields(String(next.shiftFrom ?? ""), String(next.shiftTo ?? "")));
   }
+  // The stipend and hiring fee the offer was sent with stay as they were: a rate-card edit since never reprices it.
+  carryPricingSnapshot(current, next);
   // Back to the intern: the acceptance was of the old terms.
   const reopen = proposal.status === "accepted";
   if (reopen) {

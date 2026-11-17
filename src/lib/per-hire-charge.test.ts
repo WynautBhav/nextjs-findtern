@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { orderRecordedFee, recordedFeeOf } from "./billing-plan.ts";
-import { hireFeeMinor, lineCharge, PER_HIRE_MINOR } from "./checkout.ts";
+import { hireFeeMinor, lineCharge, LEGACY_PER_HIRE_MINOR } from "./checkout.ts";
 import { resolvePricing } from "./employer-pricing.ts";
 import { buildOffer, parseOffer } from "./offer.ts";
 import { PER_HIRE_FEE_DEFAULT } from "./per-hire-fee.ts";
@@ -33,8 +33,8 @@ test("an admin switch reprices offers not yet paid, both ways", () => {
   const sentFree = offerAt(9, 0); // sent while Latte was free
   assert.equal(lineCharge(sentFree, 9, "upfront", { feeSetting: PER_HIRE_FEE_DEFAULT }).perHireMinor, 0);
   const on = lineCharge(sentFree, 9, "upfront", { feeSetting: ALL_ON });
-  assert.equal(on.perHireMinor, PER_HIRE_MINOR.INR, "Latte switched on charges the standard fee");
-  assert.equal(on.totalMinor, 1_600_000 * 3 + PER_HIRE_MINOR.INR);
+  assert.equal(on.perHireMinor, LEGACY_PER_HIRE_MINOR.INR, "Latte switched on charges the standard fee");
+  assert.equal(on.totalMinor, 1_600_000 * 3 + LEGACY_PER_HIRE_MINOR.INR);
   const sentCharged = offerAt(9, 500_000);
   const off = lineCharge(sentCharged, 9, "upfront", { feeSetting: ALL_OFF });
   assert.equal(off.perHireMinor, 0);

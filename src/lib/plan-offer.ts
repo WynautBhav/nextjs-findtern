@@ -1,5 +1,5 @@
 import type { CmsPlan } from "@/lib/content/types";
-import { scheduledMonthlyHours } from "./offer.ts";
+import { scheduledMonthlyHours, type WeeklySchedule } from "./offer.ts";
 import { PER_HIRE_FEE_DEFAULT, perHireChargedFor, type PerHireFeeSetting } from "./per-hire-fee.ts";
 
 /**
@@ -33,3 +33,24 @@ export function perHireFreeForNow(slugOrBand: string | null | undefined, setting
  * Marketing figures use the same billed month as a real offer (offer.ts):
  * Mon–Fri is 22 working days × 8 h = 176 h, Mon–Sat 26 × 8 = 208 h. */
 export const HOURS_PER_MONTH = scheduledMonthlyHours("mon_fri", 0);
+
+/**
+ * The calculator's month, as a pure function (moved out of pricing-calculator.tsx so a test can
+ * hold it to the figure billing charges). `hourlyMinor` and `perHireMinor` are the plan's, in the
+ * viewer's currency; `perHireFree` is the admin switch for the plan (perHireFreeForNow).
+ *
+ * `monthlyMinor` is what each month costs (rate × the schedule's billed hours, as offer.ts bills it);
+ * `firstMonthMinor` adds the one-time hiring fee unless the plan is free for now.
+ */
+export function planMonthMinor(input: {
+  hourlyMinor: number;
+  perHireMinor: number;
+  perHireFree: boolean;
+  schedule: WeeklySchedule;
+  paidLeavesPerMonth?: number;
+}): { hours: number; monthlyMinor: number; hireFeeMinor: number; firstMonthMinor: number } {
+  const hours = scheduledMonthlyHours(input.schedule, input.paidLeavesPerMonth ?? 0);
+  const monthlyMinor = input.hourlyMinor * hours;
+  const hireFeeMinor = input.perHireFree ? 0 : input.perHireMinor;
+  return { hours, monthlyMinor, hireFeeMinor, firstMonthMinor: monthlyMinor + hireFeeMinor };
+}

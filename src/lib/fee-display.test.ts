@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { feeDisplay } from "./fee-display.ts";
-import { hireFeeMinor, lineCharge, PER_HIRE_MINOR } from "./checkout.ts";
+import { hireFeeMinor, lineCharge, LEGACY_PER_HIRE_MINOR } from "./checkout.ts";
 import { acceptedLineCharge } from "./accepted-charge.ts";
 import { PER_HIRE_FEE_DEFAULT, type PerHireFeeSetting } from "./per-hire-fee.ts";
 import { offerBreakdown } from "./offer-breakdown.ts";
@@ -59,7 +59,7 @@ test("display matches billing for every band, setting and currency", () => {
           buildOffer({
             roleTitle: "Intern", jd: "x", mode: "remote", location: "", city: "", state: "", startDate: "2027-01-05", duration: "3m",
             monthlyHours: 160, weeklySchedule: "mon_fri", shiftFrom: "09:00", shiftTo: "17:00", timezone: "Asia/Kolkata", laptop: "company",
-            paidLeavesPerMonth: 0, currency, hourlyRateMinor: currency === "INR" ? 20000 : 200, perHireMinor: PER_HIRE_MINOR[currency], candidateScore: score,
+            paidLeavesPerMonth: 0, currency, hourlyRateMinor: currency === "INR" ? 20000 : 200, perHireMinor: LEGACY_PER_HIRE_MINOR[currency], candidateScore: score,
           } as Parameters<typeof buildOffer>[0]),
           currency,
         );
@@ -67,7 +67,7 @@ test("display matches billing for every band, setting and currency", () => {
         const billed = Math.max(lineCharge(offer, score, "upfront", opts).perHireMinor, acceptedLineCharge(offer, "postpaid", opts).perHireMinor);
         const shown = feeDisplay({ currency, chargedMinor: billed, listMinor: hireFeeMinor(offer) });
         if (billed > 0) assert.deepEqual(shown, { kind: "charged", amountMinor: billed }, `${currency} ${score}`);
-        else assert.deepEqual(shown, { kind: "free", listMinor: PER_HIRE_MINOR[currency] }, `${currency} ${score}`);
+        else assert.deepEqual(shown, { kind: "free", listMinor: LEGACY_PER_HIRE_MINOR[currency] }, `${currency} ${score}`);
       }
     }
   }

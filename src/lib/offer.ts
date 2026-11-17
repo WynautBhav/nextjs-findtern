@@ -1,4 +1,5 @@
 import { INR_PER_USD } from "./currency.ts";
+import { PRICING_DEFAULTS, stipendInrMinorFor, type PricingConfig } from "./pricing-config.ts";
 import { isKnownTimezone } from "./timezones.ts";
 
 /**
@@ -48,6 +49,12 @@ export type Offer = {
   /** Fixed monthly intern stipend (INR paise), set when sent. Null on older offers, which use the 50% rule. */
   internStipendMinor: number | null;
   perHireMinor: number | null;
+  /**
+   * The band's hiring-fee amount at send time (INR/USD minor of the offer), charged or not: a snapshot, so a
+   * band switched back on later is charged what the offer was priced with, not a newer rate card. Null on
+   * offers sent before it existed, which fall back to the legacy fee (checkout.ts LEGACY_PER_HIRE_MINOR).
+   */
+  perHireListMinor: number | null;
   /** Score the offer was priced on (offerScore), which names its band for the hiring-fee setting; null on offers that never stored one. */
   candidateScore: number | null;
   fullTime: {
@@ -276,6 +283,7 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
     hourlyRateMinor: toMinorKeepZero(o.hourlyRate),
     internStipendMinor: toMinorKeepZero(o.internStipendMonthly),
     perHireMinor: perHireOf(o, monthsOf(duration)),
+    perHireListMinor: toMinor(o.perHireListCharge),
     candidateScore: offerScore(o),
     fullTime: ft
       ? {
@@ -305,10 +313,9 @@ export function stipendEligible(score: number | null | undefined): boolean {
   return !(s > 0 && s < 6);
 }
 
-/** Fixed monthly intern stipend by score band (INR paise): 6-8 ₹8,000, 8+ ₹15,000, else none. */
-export function fixedInternStipendInrMinor(score: number | null | undefined): number | null {
-  const s = Number(score ?? 0);
-  return s >= 8 ? 1_500_000 : s >= 6 ? 800_000 : null;
+/** Fixed monthly intern stipend by score band (INR paise), from the pricing config (defaults: 6-8 ₹8,000, 8+ ₹15,000), else none. */
+export function fixedInternStipendInrMinor(score: number | null | undefined, config: PricingConfig = PRICING_DEFAULTS): number | null {
+  return stipendInrMinorFor(config, score);
 }
 
 /**
@@ -430,6 +437,10 @@ export type OfferInput = {
   paidLeavesPerMonth?: number;
   hourlyRateMinor: number;
   perHireMinor: number;
+  /** The band's fee amount whether or not it is charged now; stored as the offer's snapshot. Defaults to `perHireMinor`. */
+  perHireListMinor?: number;
+  /** The live pricing config, for the stipend. Defaults to the published figures. */
+  pricing?: PricingConfig;
   candidateScore?: number;
   projectSkills?: string[];
 };
@@ -441,7 +452,7 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
   const monthlyMinor = Math.round(input.monthlyHours * input.hourlyRateMinor);
   const totalMinor = monthlyMinor * months + input.perHireMinor;
   const major = (minor: number) => Math.round(minor) / 100;
-  const fixedStipend = fixedInternStipendInrMinor(input.candidateScore);
+  const fixedStipend = fixedInternStipendInrMinor(input.candidateScore, input.pricing);
   return {
     roleTitle: input.roleTitle,
     jd: jdToHtml(jdToText(input.jd ?? "")),
@@ -477,9 +488,24 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
         ? { internStipendMonthly: 0 }
         : {}),
     perHireCharge: major(input.perHireMinor),
+    perHireListCharge: major(input.perHireListMinor ?? input.perHireMinor),
     candidateScore: input.candidateScore ?? null,
     projectSkills: input.projectSkills ?? [],
   };
+}
+
+/** The money a sent offer carries; an edit of its terms never moves them. */
+const PRICING_SNAPSHOT_KEYS = ["internStipendMonthly", "perHireCharge", "perHireListCharge"] as const;
+
+/**
+ * Carries the figures an offer was sent with onto its edited copy. Only keys the stored offer had are carried,
+ * so an older offer without a snapshot stays without one (and keeps the legacy fee) instead of gaining today's.
+ */
+export function carryPricingSnapshot(current: Record<string, unknown>, next: Record<string, unknown>): Record<string, unknown> {
+  for (const key of PRICING_SNAPSHOT_KEYS) {
+    if (current[key] !== undefined) next[key] = current[key];
+  }
+  return next;
 }
 
 /** How far ahead an offer start or an interview slot may be. */
