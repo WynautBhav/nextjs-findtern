@@ -38,8 +38,8 @@ type Props = {
   paymentIndex?: number;
   /** PAYMENTS_MODE=free: the order completes without Razorpay. */
   testMode?: boolean;
-  /** Tells the page whether a promo is applied, so it can lock the monthly option. */
-  onPromoChange?: (applied: boolean) => void;
+  /** Tells the page which promo is applied (and its discount), so it can lock the monthly option and show the discounted total. */
+  onPromoChange?: (promo: { code: string; discountMinor: number } | null) => void;
 };
 
 // fetch rejects with a TypeError ("Failed to fetch") when offline; never show that raw.
@@ -62,7 +62,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
   const hintId = `promo-hint-${currency}`;
   const setPromoApplied = (next: { code: string; discountMinor: number } | null) => {
     setPromo(next);
-    onPromoChange?.(next !== null);
+    onPromoChange?.(next);
   };
 
   async function applyCode() {

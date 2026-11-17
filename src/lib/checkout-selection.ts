@@ -35,3 +35,9 @@ export function checkoutView(
   if (paid) return "receipt";
   return selection.missing ? "missing" : "empty";
 }
+
+/** What an applied promo does to the amount: the total charged, with the discount held to 0..order. */
+export function promoTotals(amountMinor: number, discountMinor: number): { discountMinor: number; totalMinor: number } {
+  const d = Number.isFinite(discountMinor) ? Math.min(Math.max(0, Math.trunc(discountMinor)), Math.max(0, amountMinor)) : 0;
+  return { discountMinor: d, totalMinor: amountMinor - d };
+}

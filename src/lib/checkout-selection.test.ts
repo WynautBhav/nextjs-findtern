@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { AFTER_PAYMENT_HREF, checkoutView, justPaid, selectCheckoutLines } from "./checkout-selection.ts";
+import { AFTER_PAYMENT_HREF, checkoutView, justPaid, promoTotals, selectCheckoutLines } from "./checkout-selection.ts";
 
 const lines = [{ id: "qab-month-2" }, { id: "accepted-offer" }];
 
@@ -45,4 +45,11 @@ test("justPaid reads only ?paid=1; the redirect after paying drops the paid prop
   assert.equal(justPaid(undefined), false);
   assert.equal(justPaid("0"), false);
   assert.equal(AFTER_PAYMENT_HREF, "/employer/checkout?paid=1");
+});
+
+test("promoTotals: the total shown is what is charged, and a discount never goes below zero or above the order", () => {
+  assert.deepEqual(promoTotals(105600_00, 21120_00), { discountMinor: 21120_00, totalMinor: 84480_00 });
+  assert.deepEqual(promoTotals(5000, 9000), { discountMinor: 5000, totalMinor: 0 });
+  assert.deepEqual(promoTotals(5000, -300), { discountMinor: 0, totalMinor: 5000 });
+  assert.deepEqual(promoTotals(5000, Number.NaN), { discountMinor: 0, totalMinor: 5000 });
 });
