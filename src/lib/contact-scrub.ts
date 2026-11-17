@@ -225,13 +225,42 @@ const COMMON_ENGLISH_NAMES = new Set(
   "will mark may grant hope rose dawn bill chase joy sunny river art pat ray rob sam max jack july april june faith summer".split(" "),
 );
 
+const FREE_MAIL = new Set(["gmail", "googlemail", "yahoo", "ymail", "outlook", "hotmail", "live", "msn", "rediffmail", "rediff", "icloud", "me", "protonmail", "proton", "aol", "gmx", "mail"]);
+
+/** "https://www.acme.co.in/x" or "hr@acme.com" -> "acme". Null when there is no usable host. */
+function domainLabel(raw: string | null | undefined, isEmail: boolean): string | null {
+  let host = String(raw ?? "").trim().toLowerCase();
+  if (!host) return null;
+  if (isEmail) host = host.split("@").pop() ?? "";
+  else {
+    try {
+      host = new URL(/^[a-z][a-z0-9+.-]*:\/\//.test(host) ? host : `https://${host}`).hostname;
+    } catch {
+      return null;
+    }
+  }
+  const parts = host.replace(/^www\./, "").split(".").filter(Boolean);
+  if (parts.length < 2) return null;
+  const second = parts[parts.length - 2];
+  const label = parts.length >= 3 && ["co", "com", "org", "net", "ac", "gov", "edu"].includes(second) ? parts[parts.length - 3] : second;
+  return foldName(label).replace(/[^a-z0-9-]/g, "") || null;
+}
+
 /**
  * Names that must not pass between the two sides before the hire is paid:
  * the company (full name and the name without "Pvt Ltd"), every contact name
  * of the employer, and the intern's first and last name. Whole phrases of any
  * length, single words of three letters or more.
  */
-export function denyTermsFor(input: { company?: string | null; employerNames?: (string | null | undefined)[]; internFirst?: string | null; internLast?: string | null }): string[] {
+export function denyTermsFor(input: {
+  company?: string | null;
+  employerNames?: (string | null | undefined)[];
+  internFirst?: string | null;
+  internLast?: string | null;
+  /** The company's own website and email: their domain name is another spelling of the company name. */
+  companyWebsite?: string | null;
+  companyEmail?: string | null;
+}): string[] {
   const out = new Set<string>();
   const phrase = (s: string | null | undefined) => {
     const f = foldName(s ?? "");
@@ -248,6 +277,14 @@ export function denyTermsFor(input: { company?: string | null; employerNames?: (
   if (coreWords.join(" ").length >= 3) out.add(coreWords.join(" "));
   // The distinctive word of a multi-word name on its own ("Acme" of "Acme Technologies").
   for (const w of coreWords) if (w.length >= 4 && /^\p{L}+$/u.test(w) && !GENERIC_COMPANY_WORDS.has(w)) out.add(w);
+  // Leading words of a longer name ("Blue Sky" of "Blue Sky Studio"), so "BlueSky" is caught too.
+  for (let n = 2; n < coreWords.length; n++) {
+    const lead = coreWords.slice(0, n);
+    if (lead.some((w) => !GENERIC_COMPANY_WORDS.has(w))) out.add(lead.join(" "));
+  }
+  for (const label of [domainLabel(input.companyWebsite, false), domainLabel(input.companyEmail, true)]) {
+    if (label && label.length >= 4 && /\p{L}/u.test(label) && !GENERIC_COMPANY_WORDS.has(label) && !FREE_MAIL.has(label)) out.add(label.replace(/-/g, " "));
+  }
   for (const n of input.employerNames ?? []) person(n);
   person(input.internFirst);
   person(input.internLast);
@@ -261,10 +298,95 @@ function denyRegex(terms: string[]): RegExp | null {
   return parts.length ? new RegExp(String.raw`(?<![\p{L}\p{N}])(?:${parts.join("|")})(?![\p{L}\p{N}])`, "giu") : null;
 }
 
+/* ── disguised names: look-alike letters, leet, glued words ─────────────── */
+
+// Cyrillic and Greek letters that read as Latin ones (NFKD does not fold these).
+const LOOKALIKE: Record<string, string> = {
+  а: "a", е: "e", о: "o", р: "p", с: "c", у: "y", х: "x", к: "k", м: "m", н: "h", т: "t", і: "i", ј: "j", ѕ: "s", ԁ: "d", ӏ: "i", ь: "b",
+  α: "a", β: "b", ε: "e", ι: "i", κ: "k", ν: "v", ο: "o", ρ: "p", τ: "t", υ: "u", χ: "x", γ: "y", η: "n", μ: "u",
+};
+const LEET: Record<string, string> = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "8": "b" };
+
+/** One word, reduced to what a reader sees: no accents or invisible marks, look-alikes and leet digits as letters, l and I as one. */
+function skeletonOf(word: string): string {
+  let s = word.normalize("NFKD").replace(/[\p{M}\p{Cf}]/gu, "").toLowerCase();
+  s = [...s].map((c) => LOOKALIKE[c] ?? c).join("");
+  // Pure numbers stay numbers; digits only turn into letters inside a word ("Q0rv3x").
+  if (/\p{L}/u.test(s)) s = s.replace(/[013578]/g, (d) => LEET[d]);
+  return s.replace(/l/g, "i");
+}
+
+// What may be glued to a name without making it a different word: "QorvexLabs", "QorvexHR", "Qorvexpvtltd".
+const GLUE = new Set([...LEGAL_SUFFIXES, ...GENERIC_COMPANY_WORDS, "hr", "team", "careers", "official", "jobs", "pvtltd", "privatelimited"].map(skeletonOf));
+const GAP = /^[ \t]*[._\-*&+/|,]{0,2}[ \t]*$/;
+const MAX_WINDOW = 14;
+
+type NameIndex = { skeletons: Set<string>; maxLen: number };
+let indexMemo: { key: string; index: NameIndex } | null = null;
+function nameIndex(terms: string[]): NameIndex {
+  const key = terms.join("\u0000");
+  if (indexMemo?.key === key) return indexMemo.index;
+  const skeletons = new Set<string>();
+  for (const t of terms) {
+    if (t.length < 3) continue;
+    const sk = t.split(/[^\p{L}\p{N}]+/u).filter(Boolean).map(skeletonOf).join("");
+    if (sk.length >= 3) skeletons.add(sk);
+  }
+  const index = { skeletons, maxLen: Math.max(0, ...[...skeletons].map((s) => s.length)) };
+  indexMemo = { key, index };
+  return index;
+}
+
+/** Does one word read as a denied name with something harmless glued on (numbers, "labs", "hr", a legal suffix)? */
+function singleWordHit(word: string, skeletons: Set<string>): boolean {
+  const bare = word.replace(/^\d+|\d+$/g, "");
+  for (const v of new Set([skeletonOf(word), bare ? skeletonOf(bare) : ""])) {
+    if (v.length < 3) continue;
+    if (skeletons.has(v)) return true;
+    for (const t of skeletons) {
+      if (t.length < 4 || v.length <= t.length) continue;
+      if ((v.startsWith(t) && GLUE.has(v.slice(t.length))) || (v.endsWith(t) && GLUE.has(v.slice(0, v.length - t.length)))) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Spans of the text that read as a denied name once look-alike letters, leet
+ * digits and invisible marks are undone, a name glued to a generic word or
+ * number ("QorvexLabs", "qorvex2026"), or a name split by a few separators
+ * ("Q-o-r-v-e-x", "Qor vex"). Whole words only: a name inside a longer
+ * ordinary word ("sharmaji", "Rahulan") does not count.
+ */
+function disguisedNameSpans(text: string, terms: string[]): [number, number][] {
+  const { skeletons, maxLen } = nameIndex(terms);
+  if (!skeletons.size) return [];
+  const toks = [...String(text ?? "").matchAll(/[\p{L}\p{N}\p{M}\p{Cf}]+/gu)].map((m) => ({ s: m.index!, e: m.index! + m[0].length, w: m[0], k: /^\d$/.test(m[0]) ? (LEET[m[0]] ?? m[0]) : skeletonOf(m[0]) }));
+  // k: a lone digit between spaced-out letters reads as a letter ("q.0.r.v.3.x").
+  const spans: [number, number][] = [];
+  for (let i = 0; i < toks.length; i++) {
+    let hit = -1;
+    let joined = "";
+    for (let j = i; j < toks.length && j - i < MAX_WINDOW; j++) {
+      if (j > i && !GAP.test(text.slice(toks[j - 1].e, toks[j].s))) break;
+      joined += toks[j].k;
+      if (joined.length > maxLen) break;
+      if (j > i && joined.length >= 4 && skeletons.has(joined)) hit = j;
+    }
+    if (hit < 0 && singleWordHit(toks[i].w, skeletons)) hit = i;
+    if (hit >= 0) {
+      spans.push([toks[i].s, toks[hit].e]);
+      i = hit;
+    }
+  }
+  return spans;
+}
+
 /** True when the text mentions a denied name, however it is cased, accented or spaced out ("r a h u l"). */
 export function hasDeniedName(text: string, terms: string[]): boolean {
   const re = denyRegex(terms);
   if (!re) return false;
+  if (disguisedNameSpans(text, terms).length > 0) return true;
   const folded = foldName(normalizeForDetection(text)).replace(/\p{Cf}/gu, "");
   if (re.test(folded)) return true;
   // "R a h u l", "r.a.h.u.l": a deliberately spelled-out run is squashed and compared as one word.
@@ -295,6 +417,11 @@ export function scrubOutgoing(body: string, terms: string[]): { text: string; ch
       names = true;
       return NAME_MASK;
     });
+  }
+  // What the plain pattern cannot see: leet, look-alike letters, names glued to a word or number.
+  for (const [a, b] of disguisedNameSpans(text, terms).reverse()) {
+    names = true;
+    text = text.slice(0, a) + NAME_MASK + text.slice(b);
   }
   const bad = (s: string) => findContact(s).kinds.length > 0 || hasDeniedName(s, terms);
   text = text
