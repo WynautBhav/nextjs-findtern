@@ -178,3 +178,24 @@ export function cgpaSla(acceptedAt: string | null, now: Date = new Date()): { to
   const left = Math.max(1, Math.ceil(CGPA_SLA_HOURS.max - elapsed));
   return { tone: elapsed >= CGPA_SLA_HOURS.min ? "soon" : "ok", label: `${left} h left`, hoursElapsed: elapsed };
 }
+
+/**
+ * The offer details after the intern accepts: `acceptedAt` is stamped the first time only (the SLA clock and the
+ * expiry rules read it), and a later call never moves it.
+ */
+export function withAcceptedAt(offerDetails: unknown, now: Date = new Date()): Record<string, unknown> {
+  const base = isRecord(offerDetails) ? offerDetails : {};
+  const existing = typeof base.acceptedAt === "string" ? Date.parse(base.acceptedAt) : NaN;
+  return Number.isFinite(existing) ? { ...base } : { ...base, acceptedAt: now.toISOString() };
+}
+
+/**
+ * The offer details of an accepted, unpaid offer after Findtern marks its intern's CGPA incorrect: the correction is
+ * recorded and any earlier confirmation by the employer is cleared, so the employer has to confirm the corrected
+ * score (proposalCgpaGate reads `cgpaAckAt` against the decision time).
+ */
+export function withCgpaCorrection(offerDetails: unknown, c: { from: string; to: string; scoreType: string; at: string }): Record<string, unknown> {
+  const { cgpaAckAt: _ack, ...rest } = isRecord(offerDetails) ? offerDetails : ({} as Record<string, unknown>);
+  void _ack;
+  return { ...rest, cgpaCorrection: { from: c.from, to: c.to, scoreType: c.scoreType, at: c.at } };
+}

@@ -9,6 +9,8 @@ import {
   effectiveScore,
   nextCgpaVerification,
   readCgpaHistory,
+  withAcceptedAt,
+  withCgpaCorrection,
 } from "./cgpa-verification-flow.ts";
 
 const NOW = new Date("2026-11-17T10:00:00.000Z");
@@ -166,4 +168,25 @@ test("cgpaSla: green, amber near the deadline, red past 48 h; none without an ac
   assert.equal(cgpaSla(accepted, at(50)).label, "2 h overdue");
   assert.equal(cgpaSla(null, NOW).tone, "none");
   assert.equal(cgpaSla(null, NOW).label, "Not accepted yet");
+});
+
+test("withAcceptedAt stamps the first acceptance only and keeps the other details", () => {
+  const first = withAcceptedAt({ startDate: "2026-12-01", termsAcceptedAt: "x" }, NOW);
+  assert.equal(first.acceptedAt, NOW.toISOString());
+  assert.equal(first.startDate, "2026-12-01");
+  const again = withAcceptedAt(first, new Date(NOW.getTime() + 86_400_000));
+  assert.equal(again.acceptedAt, NOW.toISOString());
+  assert.equal(withAcceptedAt(null, NOW).acceptedAt, NOW.toISOString());
+  assert.equal(withAcceptedAt({ acceptedAt: "not a date" }, NOW).acceptedAt, NOW.toISOString());
+});
+
+test("withCgpaCorrection clears the employer's earlier confirmation so the gate asks again", () => {
+  const res = applyCgpaDecision(pendingExtra(), { decision: "incorrect", correctedScore: "7.9", note: "n", by: "a", now: NOW });
+  assert.ok(res.ok);
+  if (!res.ok) return;
+  const stamped = withCgpaCorrection({ acceptedAt: "2026-11-16T10:00:00.000Z", cgpaAckAt: "2026-11-16T12:00:00.000Z", startDate: "2026-12-01" }, { from: "8.4", to: "7.9", scoreType: "cgpa", at: NOW.toISOString() });
+  assert.equal("cgpaAckAt" in stamped, false);
+  assert.equal(stamped.startDate, "2026-12-01");
+  const gate = proposalCgpaGate({ status: "accepted", extraData: { cgpaVerification: res.verification }, offerDetails: stamped }, NOW);
+  assert.equal(gate.state, "incorrect_unacked");
 });
