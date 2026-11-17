@@ -11,6 +11,7 @@ export function SimpleTable({
   minWidth = "lg:min-w-[32rem]",
   caption,
   maxHeight = "max-h-[32rem]",
+  compact = false,
 }: {
   head: string[];
   rows: React.ReactNode[][];
@@ -22,6 +23,8 @@ export function SimpleTable({
   /** Accessible name of the scroll region (default: the first column). */
   caption?: string;
   maxHeight?: string;
+  /** Tighter cell padding for wide tables (many numeric columns). */
+  compact?: boolean;
 }) {
   if (rows.length === 0) return <EmptyScene compact title={empty.title} body={empty.body} />;
   return (
@@ -31,7 +34,7 @@ export function SimpleTable({
         <thead>
           <tr className="border-b border-[color:var(--admin-rule)]">
             {head.map((h, i) => (
-              <th key={h} scope="col" className={cn("sticky top-0 z-10 bg-[color:var(--admin-panel)] px-3 py-2.5 text-[0.8125rem] font-medium text-text-subtle first:pl-[var(--admin-pad-panel)] last:pr-[var(--admin-pad-panel)]", right.includes(i) && "text-right")}>
+              <th key={h} scope="col" className={cn("sticky top-0 z-10 bg-[color:var(--admin-panel)] py-2.5 text-[0.8125rem] font-medium text-text-subtle first:pl-[var(--admin-pad-panel)] last:pr-[var(--admin-pad-panel)]", compact ? "px-2" : "px-3", right.includes(i) && "text-right")}>
                 {h}
               </th>
             ))}
@@ -45,7 +48,7 @@ export function SimpleTable({
                   key={i}
                   {...(i === 0 ? { "data-title": "" } : { "data-label": head[i] })}
                   {...(cell === "-" || cell === "–" || cell === "—" ? { "data-empty": "" } : {})}
-                  className={cn("px-3 py-2.5 text-foreground [overflow-wrap:anywhere] first:pl-[var(--admin-pad-panel)] last:pr-[var(--admin-pad-panel)]", right.includes(i) && "nums text-right", nowrap.includes(i) && "lg:whitespace-nowrap")}
+                  className={cn(compact ? "px-2" : "px-3", "py-2.5 text-foreground [overflow-wrap:anywhere] first:pl-[var(--admin-pad-panel)] last:pr-[var(--admin-pad-panel)]", right.includes(i) && "nums text-right", nowrap.includes(i) && "lg:whitespace-nowrap")}
                 >
                   {cell}
                 </td>

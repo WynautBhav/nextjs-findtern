@@ -14,7 +14,7 @@ const VIEWS = [
 const PRESETS = [
   { value: "30d", label: "30 days" },
   { value: "90d", label: "3 months" },
-  { value: "365d", label: "12 months" },
+  { value: "365d", label: "Last 12 months" },
 ] as const;
 
 const PILL = "apple-spring inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11";

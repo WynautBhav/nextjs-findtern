@@ -61,10 +61,12 @@ export default async function InternTable({ params }: TabProps) {
       </div>
       <SimpleTable
         caption="Interns"
-        minWidth="lg:min-w-[56rem]"
+        compact
+        minWidth="lg:min-w-[52rem]"
         maxHeight="max-h-none"
         head={SORT_HEAD.map(([h]) => h)}
         right={[4]}
+        nowrap={[4, 6, 7]}
         rows={rows.map((r) => {
           const skills = skillNames(r.skills);
           const stage = internStage({ profileStarted: r.started, profileComplete: r.complete, feePaid: r.paid, scored: r.score != null, applied: r.applied, hired: r.hired });

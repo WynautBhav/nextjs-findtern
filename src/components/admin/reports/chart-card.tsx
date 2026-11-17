@@ -69,7 +69,7 @@ export function ChartCard({ views, className }: { views: ChartView[]; className?
       <div data-panel-body="" className="p-[var(--admin-pad-panel)] pt-3">
         {empty ? (
           <p className="py-14 text-center text-sm text-text-subtle">
-            {tooShort ? "Only one period in this range, so there is no trend to draw. Pick a longer period, such as 3 months or 12 months." : `Nothing to chart yet: ${view.unit.toLowerCase()} is zero for every period shown.`}
+            {tooShort ? "Only one period in this range, so there is no trend to draw. Pick a longer period, such as the last 3 months or the last year." : `Nothing to chart yet: ${view.unit.toLowerCase()} is zero for every period shown.`}
           </p>
         ) : (
           <>

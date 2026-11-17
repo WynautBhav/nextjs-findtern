@@ -38,7 +38,7 @@ export default async function Companies({ window: w, params }: TabProps) {
     <Panel data-rp="employers-companies" id="company-table" className="scroll-mt-4">
       <PanelHeader
         title={`Companies (${formatNumber(total)})`}
-        description={`Projects are as they are now. Proposals, interviews, hires and money are for ${win}. Paid is gross of refunds, in rupees (a dollar order counts as ₹100 per $1) with the latest order's payment mode under it.`}
+        description={`Projects are as they are now. Proposals, interviews, hires and money are for ${win}. Under each company: its city and state. Projects: all (live / paused / closed). Sent: proposals sent. Expired: ran out of time (+Nw: also N withdrawn by the employer). Paid is gross of refunds, in rupees (a dollar order counts as ₹100 per $1) with the latest order's payment mode under it.`}
         action={<ExportLink href={csv} label="Export the filtered companies as CSV" />}
       />
       <div className="flex flex-wrap items-center gap-2 border-b border-[color:var(--admin-rule)] px-[var(--admin-pad-panel)] py-3.5">
@@ -57,20 +57,20 @@ export default async function Companies({ window: w, params }: TabProps) {
       </div>
       <SimpleTable
         caption="Companies"
-        minWidth="lg:min-w-[64rem]"
+        compact
+        minWidth=""
         maxHeight="max-h-none"
-        head={["Company", "Region", "Projects (live / paused / closed)", "Proposals sent", "Accepted", "Rejected", "Pending", "Expired", "Interviews", "Hires", "Paid", "Joined"]}
-        right={[3, 4, 5, 6, 7, 8, 9, 10]}
-        nowrap={[2, 3, 4, 5, 6, 7, 8, 9, 10, 11]}
+        head={["Company", "Projects", "Sent", "Accepted", "Rejected", "Pending", "Expired", "Interviews", "Hires", "Paid", "Joined"]}
+        right={[1, 2, 3, 4, 5, 6, 7, 8, 9]}
+        nowrap={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
         rows={rows.map((r) => [
-          <IdentityCell key="n" name={r.name} id={r.id} sub={r.email} href={`/admin/companies/${r.id}`} size="sm" />,
-          [r.city, r.state, r.country && r.country !== "India" ? r.country : null].filter(Boolean).join(", ") || "-",
+          <IdentityCell key="n" name={r.name} id={r.id} sub={[r.city, r.state, r.country && r.country !== "India" ? r.country : null].filter(Boolean).join(", ") || r.email} href={`/admin/companies/${r.id}`} size="sm" />,
           `${r.projects} (${r.live} / ${r.paused} / ${r.closed})`,
           formatNumber(r.sent),
           formatNumber(r.accepted),
           formatNumber(r.rejected),
           formatNumber(r.pending),
-          r.withdrawn ? `${formatNumber(r.expired)} + ${r.withdrawn} withdrawn` : formatNumber(r.expired),
+          r.withdrawn ? `${formatNumber(r.expired)} +${formatNumber(r.withdrawn)}w` : formatNumber(r.expired),
           formatNumber(r.interviews),
           formatNumber(r.hires),
           r.paidMinor > 0 ? (
