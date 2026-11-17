@@ -133,7 +133,7 @@ export function SemesterProofs({ a, errors, onChange }: { a: Academics; errors: 
                     onUploaded={(r) => onChange({ ...proofs, [slot.key]: { name: r.key, originalName: r.name, type: r.contentType, size: r.bytes } })}
                   />
                   {error ? (
-                    <p id={`${id}-error`} className="mt-2 text-xs font-medium text-danger">
+                    <p id={`${id}-error`} className="mt-2 text-sm font-medium text-danger">
                       {error}
                     </p>
                   ) : null}
