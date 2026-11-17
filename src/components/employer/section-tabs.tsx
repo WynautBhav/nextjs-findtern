@@ -51,13 +51,13 @@ export function CandidateTabs({ active, shortlist, compare }: { active: "candida
 }
 
 /** Proposals | Interviews: the offer and the meeting that precedes it. */
-export function ProposalTabs({ active }: { active: "proposals" | "interviews" }) {
+export function ProposalTabs({ active, proposals }: { active: "proposals" | "interviews"; /** Every proposal not closed (proposalCounts().total). Omitted when unknown: no number rather than a wrong 0. */ proposals?: number }) {
   return (
     <SectionTabs
       label="Proposals and interviews"
       active={active}
       tabs={[
-        { key: "proposals", label: "Proposals", href: "/employer/proposals" },
+        { key: "proposals", label: "Proposals", href: "/employer/proposals", count: proposals },
         { key: "interviews", label: "Interviews", href: "/employer/schedule" },
       ]}
     />

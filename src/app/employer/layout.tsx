@@ -109,7 +109,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
           and(
             eq(schema.employerCartItems.employerId, session.uid),
             inArray(schema.employerCartItems.listType, ["cart", "checkout"]),
-            sql`NOT EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.employer_id = ${q(schema.employerCartItems, schema.employerCartItems.employerId)} AND p.intern_id = ${q(schema.employerCartItems, schema.employerCartItems.internId)} AND p.status NOT IN ('rejected', 'withdrawn', 'expired'))`,
+            sql`NOT EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.employer_id = ${q(schema.employerCartItems, schema.employerCartItems.employerId)} AND p.intern_id = ${q(schema.employerCartItems, schema.employerCartItems.internId)} AND lower(btrim(p.status)) NOT IN ('rejected', 'withdrawn', 'expired'))`,
           ),
         ),
     ),
@@ -121,6 +121,10 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   }
   if (unreadRes.status === "fulfilled") unreadAlerts = Number(unreadRes.value[0]?.value ?? 0);
   if (cartRes.status === "fulfilled") cartCount = Number(cartRes.value[0]?.value ?? 0);
+  // A failed read leaves its fallback (0 = no badge, never a wrong number) but must not be silent.
+  for (const [what, res] of [["company", empRes], ["alerts", unreadRes], ["shortlist badge", cartRes]] as const) {
+    if (res.status === "rejected") console.error(`[employer/layout] ${what} read failed`, res.reason);
+  }
 
   // Messages carries its own live unread count (MessagingLive); nothing else in the sidebar does.
   // The shortlist count rides on its own item, like the bag in the header.

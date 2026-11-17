@@ -1,21 +1,18 @@
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
+import type { HireFlowCounts } from "@/components/employer/proposal-bucket";
 import { currentStepKey, type FlowPage, type FlowStepKey } from "@/lib/employer-flow-steps";
 
-export type HireFlowCounts = {
-  shortlisted: number;
-  awaitingReply: number;
-  toPay: number;
-  hired: number;
-};
+// Defined next to the counting rules, so every page's strip is computed by the same code.
+export type { HireFlowCounts };
 
 type Step = { key: FlowStepKey; label: string; hint: string; href: string };
 
 const STEPS: Step[] = [
   { key: "candidates", label: "Candidates", hint: "find and compare", href: "/employer/candidates" },
   { key: "shortlisted", label: "Shortlist", hint: "meet, then propose", href: "/employer/cart" },
-  { key: "awaitingReply", label: "Proposed", hint: "candidate decides", href: "/employer/proposals" },
+  { key: "awaitingReply", label: "Waiting", hint: "proposals waiting on the candidate", href: "/employer/proposals" },
   { key: "toPay", label: "Accepted", hint: "pay to complete", href: "/employer/checkout" },
   { key: "hired", label: "Hired", hint: "placement running", href: "/employer/orders" },
 ];
