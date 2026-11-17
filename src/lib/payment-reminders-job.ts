@@ -1,4 +1,4 @@
-import { and, eq, inArray, like, sql } from "drizzle-orm";
+import { and, eq, inArray, isNull, like, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { notify } from "@/lib/notify";
@@ -13,7 +13,15 @@ import { internNoticeDue, reminderDue, reminderEmail, reminderKey } from "@/lib/
 export async function sendPaymentReminders(now = new Date()): Promise<{ sent: number }> {
   const db = getDb();
   const today = istDay(now)!;
-  const hired = await db.select().from(schema.proposals).where(eq(schema.proposals.status, "hired"));
+  // A hire on a project Findtern took down is not nagged about: the employer cannot pay it while it is down (the order route is
+  // closed), and an admin sees the due month on the placement. A hire with no project row is unaffected.
+  const hired = (
+    await db
+      .select({ p: schema.proposals })
+      .from(schema.proposals)
+      .leftJoin(schema.projects, eq(schema.projects.id, schema.proposals.projectId))
+      .where(and(eq(schema.proposals.status, "hired"), isNull(schema.projects.takenDownAt)))
+  ).map((r) => r.p);
   if (!hired.length) return { sent: 0 };
   // Paid orders of the hiring employers only (not the whole table), then keep just the post-paid hires.
   const orders = await db

@@ -1,4 +1,4 @@
-import { and, eq, gte, lt, lte, or, sql } from "drizzle-orm";
+import { and, eq, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { readSkills, scoreOf } from "@/lib/employer-candidates";
@@ -54,8 +54,11 @@ async function interviewReminders() {
     .select({ i: schema.interviews, email: schema.employers.companyEmail })
     .from(schema.interviews)
     .leftJoin(schema.employers, eq(schema.employers.id, schema.interviews.employerId))
+    .leftJoin(schema.projects, eq(schema.projects.id, schema.interviews.projectId))
     .where(
       and(
+        // An interview on a project Findtern took down is on hold: nobody is reminded of it (no project = unaffected).
+        isNull(schema.projects.takenDownAt),
         eq(schema.interviews.status, "scheduled"),
         or(
           gte(schema.interviews.slot1, new Date(now)),
@@ -182,8 +185,11 @@ async function cartInactivity(now: Date) {
   const rows = await getDb()
     .select({ employerId: schema.employerCartItems.employerId, n: sql<number>`count(*)::int` })
     .from(schema.employerCartItems)
+    .innerJoin(schema.projects, eq(schema.projects.id, schema.employerCartItems.projectId))
     .where(
       and(
+        // A shortlist on a taken-down project cannot be acted on, so it is not nagged about.
+        isNull(schema.projects.takenDownAt),
         eq(schema.employerCartItems.listType, "cart"),
         lte(schema.employerCartItems.createdAt, new Date(now.getTime() - 3 * 86_400_000)),
       ),
@@ -218,8 +224,11 @@ async function weeklyHireTip(now: Date) {
     .from(schema.proposals)
     .innerJoin(schema.employers, eq(schema.employers.id, schema.proposals.employerId))
     .leftJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
+    .leftJoin(schema.projects, eq(schema.projects.id, schema.proposals.projectId))
     .where(
       and(
+        // The tip tells the employer to approve timesheets or hire full-time: both are blocked on a taken-down project.
+        isNull(schema.projects.takenDownAt),
         eq(schema.proposals.status, "hired"),
         eq(schema.employers.isActive, true),
         eq(schema.employers.onboardingCompleted, true),
@@ -310,6 +319,8 @@ async function talentSpotlight(now: Date) {
       and(
         // Published (lifecycle) or the legacy active; a paused, draft or closed project is not being hired for.
         activeProject(),
+        // A taken-down project is not hired for: no spotlight is built from its skills.
+        isNull(schema.projects.takenDownAt),
         eq(schema.employers.isActive, true),
         eq(schema.employers.onboardingCompleted, true),
       ),
@@ -357,8 +368,11 @@ async function feedbackRequests(now: Date) {
     .select({ id: schema.interviews.id, employerId: schema.interviews.employerId, at: schema.interviews.updatedAt, created: schema.interviews.createdAt, notes: schema.interviews.notes, email: schema.employers.companyEmail })
     .from(schema.interviews)
     .innerJoin(schema.employers, eq(schema.employers.id, schema.interviews.employerId))
+    .leftJoin(schema.projects, eq(schema.projects.id, schema.interviews.projectId))
     .where(
       and(
+        // Feedback is an employer action; it is blocked while the project is taken down, so it is not requested.
+        isNull(schema.projects.takenDownAt),
         eq(schema.interviews.status, "completed"),
         // The key's trailing day part is derived from updated_at, so match on the prefix.
         sql`not exists (select 1 from ${schema.notifications} n where n.recipient_type = 'employer' and n.recipient_id = ${schema.interviews.employerId} and n.dedupe_key like concat('interview_feedback_request:', ${schema.interviews.id}::text, ':', ${schema.interviews.employerId}::text, ':%'))`,
