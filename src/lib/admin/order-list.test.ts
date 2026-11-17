@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { publicOrder } from "./order-list.ts";
+import { orderInternsLabel, publicOrder } from "./order-list.ts";
 
 test("the orders list API returns money facts, not the payment signature or the raw gateway/buyer blob", () => {
   const out = publicOrder({
@@ -17,4 +17,11 @@ test("the orders list API returns money facts, not the payment signature or the 
   assert.equal(out.refundedMinor, 100);
   assert.equal(out.netMinor, 900);
   assert.equal(out.needsReview, true);
+});
+
+test("the admin orders list names what an order bought: the interns for a hire, the plan for a Findtern Pro subscription", () => {
+  assert.equal(orderInternsLabel({ kind: "employer_subscription" }, []), "Findtern Pro subscription");
+  assert.equal(orderInternsLabel({ kind: "employer_subscription" }, ["ignored"]), "Findtern Pro subscription");
+  assert.equal(orderInternsLabel({ proposalIds: ["p1"] }, ["Sneha Kapoor", "Meera Nair"]), "Sneha Kapoor; Meera Nair");
+  assert.equal(orderInternsLabel(null, []), "");
 });

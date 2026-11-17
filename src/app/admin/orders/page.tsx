@@ -15,6 +15,7 @@ import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admi
 import { discountLabel, paymentPromo } from "@/lib/admin/payment-promo";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { isTestEmployer } from "@/lib/admin/scope";
+import { orderInternsLabel } from "@/lib/admin/order-list";
 import { invoiceBuyerOf } from "@/lib/invoice-buyer";
 import { waiverFlagOf } from "@/lib/full-waiver";
 
@@ -87,7 +88,7 @@ async function loadOrders(): Promise<{ rows: AdminInvoiceRow[]; uncounted: Set<s
       paidAt: o.paidAt ? o.paidAt.toISOString() : null,
       createdAt: o.createdAt ? o.createdAt.toISOString() : null,
       partyId: o.employerId,
-      interns: orderProposalIds(o.raw).map((id) => hires.get(id)?.who).filter(Boolean).join("; "),
+      interns: orderInternsLabel(o.raw, orderProposalIds(o.raw).map((id) => hires.get(id)?.who).filter((who): who is string => Boolean(who))),
       promoCode: promo.code,
       discountMinor: promo.discountMinor,
       discountLabel: discountLabel(promo, o.amountMinor),

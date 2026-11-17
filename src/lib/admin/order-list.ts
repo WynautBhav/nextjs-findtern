@@ -1,3 +1,4 @@
+import { isSubscriptionOrderRaw } from "../employer-subscription.ts";
 import { orderReview } from "../payment-flags.ts";
 import { orderRefunds } from "../refund-accounting.ts";
 
@@ -16,4 +17,9 @@ export function publicOrder(o: OrderRow) {
     refundedMinor: view.refundedMinor, netMinor: view.netMinor,
     needsReview: orderReview(o.raw as Record<string, unknown> | null).flagged,
   };
+}
+
+/** The "Interns" cell of an order row: the people a hire paid for, or the plan name for a Findtern Pro subscription (it has no proposals). */
+export function orderInternsLabel(raw: unknown, internNames: string[]): string {
+  return isSubscriptionOrderRaw(raw) ? "Findtern Pro subscription" : internNames.join("; ");
 }
