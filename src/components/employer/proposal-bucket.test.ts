@@ -6,7 +6,7 @@ import { proposalBucket } from "./proposal-bucket.ts";
 test("an offer waiting on the candidate is open until its start date passes", () => {
   assert.equal(proposalBucket("sent", false), "open");
   assert.equal(proposalBucket("interview_scheduled", false), "open");
-  assert.equal(proposalBucket("draft", false), "open");
+  assert.equal(proposalBucket("draft", false), "draft");
   // Past its start with no reply: closed on every screen (dashboard and Proposals agree).
   assert.equal(proposalBucket("sent", true), "closed");
   assert.equal(proposalBucket("interview_scheduled", true), "closed");

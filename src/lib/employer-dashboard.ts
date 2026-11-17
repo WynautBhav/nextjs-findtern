@@ -9,7 +9,7 @@
 import { todayIst, weekdayOf } from "./timesheet-days.ts";
 
 /** Same union as `ProposalBucket` (components/employer/proposal-bucket.ts), inlined to keep this module import-free. */
-export type DashBucket = "open" | "accepted" | "hired" | "closed";
+export type DashBucket = "open" | "draft" | "accepted" | "hired" | "closed";
 
 export type DashProposal = {
   internId: string;
@@ -70,12 +70,13 @@ export function buildFunnel({ proposals, shortlistInternIds, metInternIds }: Fun
   for (const p of proposals) {
     const f = byIntern.get(p.internId) ?? { anyProposal: false, offered: false, accepted: false, hired: false, live: false, awaiting: false, toPay: false };
     f.anyProposal = true;
-    if (p.status !== "draft") f.offered = true;
+    if (p.bucket !== "draft") f.offered = true;
     if (p.bucket === "accepted" || p.bucket === "hired") f.accepted = true;
     if (p.bucket === "hired") f.hired = true;
-    if (p.bucket === "open" || p.bucket === "accepted" || p.bucket === "hired") f.live = true;
-    if (p.bucket === "open" && p.status !== "draft") f.awaiting = true;
-    if (p.status === "accepted" || p.status === "processing") f.toPay = true;
+    // Anything not closed is still in play, a status nobody planned for included (it is in the Proposals total too).
+    if (p.bucket !== "closed") f.live = true;
+    if (p.bucket === "open") f.awaiting = true;
+    if (p.bucket === "accepted") f.toPay = true;
     byIntern.set(p.internId, f);
   }
 
@@ -227,7 +228,7 @@ export function buildProjectStats(proposals: Pick<DashProposal, "projectId" | "s
   for (const p of proposals) {
     const row = out.get(p.projectId) ?? { hired: 0, open: 0, declined: 0, toPay: 0 };
     if (p.bucket === "hired") row.hired += 1;
-    if (p.bucket === "open" || p.bucket === "accepted") row.open += 1;
+    if (p.bucket === "open" || p.bucket === "draft" || p.bucket === "accepted") row.open += 1;
     if (p.bucket === "closed") row.declined += 1;
     if (p.status === "accepted" || p.status === "processing") row.toPay += 1;
     out.set(p.projectId, row);

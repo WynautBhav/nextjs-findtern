@@ -18,7 +18,7 @@ import type { EmployerProposal } from "@/lib/employer-proposal-view";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { parseOffer } from "@/lib/offer";
 import { offerState } from "@/components/employer/proposal-state";
-import { proposalBucket } from "@/components/employer/proposal-bucket";
+import { proposalBucket, proposalCounts } from "@/components/employer/proposal-bucket";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
 
@@ -76,11 +76,8 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
 
   const projectOptions = Array.from(new Map(proposals.filter((p) => p.project).map((p) => [p.project!.id, p.project!.projectName])).entries());
 
-  const counts = { open: 0, accepted: 0, hired: 0, closed: 0 };
-  for (const r of rows) {
-    const b = proposalBucket(r.item.proposal.status, r.state.lapsed);
-    if (b) counts[b] += 1;
-  }
+  // The same counter the hire strip, the dashboard and the page header use.
+  const counts = proposalCounts(rows.map((r) => ({ status: r.item.proposal.status, lapsed: r.state.lapsed })));
 
   const needle = search.trim().toLowerCase();
   const filtered = rows.filter(({ item, offer, state }) => {
@@ -143,13 +140,16 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
   }
 
   const tabs = [
-    { key: "all", label: "All", short: "All", count: rows.length },
-    { key: "open", label: "Waiting on candidate", short: "Waiting", count: counts.open },
+    { key: "all", label: "All", short: "All", count: counts.all },
+    { key: "open", label: "Waiting on candidate", short: "Waiting", count: counts.awaiting },
+    // Unsent drafts have their own tab, only when there are some (not counted as "waiting").
+    ...(counts.drafts > 0 ? [{ key: "draft", label: "Drafts · not sent", short: "Drafts", count: counts.drafts }] : []),
     // Accepted offers only; running placements' monthly dues are on Orders,
     // so this is not called "payment due" beside the dashboard's count (QA-123).
     { key: "accepted", label: "Accepted · to pay", short: "To pay", count: counts.accepted },
     { key: "hired", label: "Hired", short: "Hired", count: counts.hired },
-    { key: "closed", label: "Declined & closed", short: "Closed", count: counts.closed },
+    // "Expired" is an offer that went unanswered past its start date.
+    { key: "closed", label: "Declined & expired", short: "Closed", count: counts.closed },
   ];
   // A handful of offers reads at a glance; search only earns its place on a longer list.
   const showTools = proposals.length > 5;

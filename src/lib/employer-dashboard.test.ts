@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { buildActivity, buildFunnel, buildProjectStats, mondayOf, untilLabel, type DashBucket, type DashProposal } from "./employer-dashboard.ts";
 
-const BUCKET: Record<string, DashBucket | null> = { draft: "open", sent: "open", interview_scheduled: "open", accepted: "accepted", processing: "accepted", hired: "hired", rejected: "closed", withdrawn: "closed", expired: "closed" };
+const BUCKET: Record<string, DashBucket | null> = { draft: "draft", sent: "open", interview_scheduled: "open", accepted: "accepted", processing: "accepted", hired: "hired", rejected: "closed", withdrawn: "closed", expired: "closed" };
 const prop = (internId: string, status: string, extra: Partial<DashProposal> = {}): DashProposal => ({
   internId,
   projectId: "p1",
@@ -170,4 +170,9 @@ test("untilLabel: minutes, hours and minutes, days, now", () => {
   assert.equal(untilLabel(at(135), now), "in 2 h 15 m");
   assert.equal(untilLabel(at(120), now), "in 2 h");
   assert.equal(untilLabel(at(3 * 24 * 60 + 30), now), "in 3 d");
+});
+
+test("funnel: a status nobody planned for is still in play, not 'declined or expired'", () => {
+  const f = buildFunnel({ proposals: [prop("a", "pending"), prop("b", "sent")], shortlistInternIds: [], metInternIds: [] });
+  assert.equal(f.stages[1].lost, 0);
 });

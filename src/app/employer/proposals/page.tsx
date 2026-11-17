@@ -36,10 +36,10 @@ function userFor(first: string | null, last: string | null, hired: boolean): Pro
   return { firstName: initials.charAt(0), lastName: initials.slice(1) };
 }
 
-const STATUSES = new Set(["open", "accepted", "hired", "closed"]);
+const STATUSES = new Set(["open", "draft", "accepted", "hired", "closed"]);
 
 export default async function EmployerProposalsPage({ searchParams }: { searchParams: Promise<{ status?: string | string[] }> }) {
-  // The dashboard's figures open a tab here (?status=open|accepted|hired|closed).
+  // The dashboard's figures open a tab here (?status=open|draft|accepted|hired|closed).
   const wanted = (await searchParams).status;
   const initialStatus = typeof wanted === "string" && STATUSES.has(wanted) ? wanted : "all";
   const session = await requireRole("employer");
@@ -112,7 +112,7 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
         }
         className="mb-4 lg:mb-5"
       />
-      <ProposalTabs active="proposals" />
+      <ProposalTabs active="proposals" proposals={flow?.proposals} />
       {flow ? <HireFlow counts={flow} current="proposals" /> : null}
 
       {loadFailed ? (

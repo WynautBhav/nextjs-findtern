@@ -2,7 +2,9 @@ import { and, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { payableCheckout } from "@/lib/employer-payable";
-import type { HireFlowCounts } from "@/components/employer/hire-flow";
+import { parseOffer } from "@/lib/offer";
+import { offerState } from "@/components/employer/proposal-state";
+import { hireFlowFrom, type HireFlowCounts } from "@/components/employer/proposal-bucket";
 
 /**
  * Where this company's candidates stand, for the cart → checkout strip.
@@ -23,17 +25,21 @@ export async function hireFlowCounts(employerId: string, toPay: number): Promise
         ),
       ),
     db
-      .select({ internId: schema.proposals.internId, status: schema.proposals.status })
+      .select({ internId: schema.proposals.internId, status: schema.proposals.status, offerDetails: schema.proposals.offerDetails })
       .from(schema.proposals)
       .where(eq(schema.proposals.employerId, employerId)),
   ]);
-  const proposedTo = new Set(proposals.filter((p) => !["rejected", "withdrawn", "expired"].includes(p.status)).map((p) => p.internId));
-  return {
-    shortlisted: new Set(cart.map((c) => c.internId).filter((id) => !proposedTo.has(id))).size,
-    awaitingReply: proposals.filter((p) => p.status === "sent" || p.status === "interview_scheduled").length,
+  // Same rule as the Proposals tabs and the dashboard: one counter (proposal-bucket.ts), and an
+  // unanswered offer past its start date is closed everywhere, not "waiting" here and "closed" there.
+  return hireFlowFrom({
+    cartInternIds: cart.map((c) => c.internId),
+    proposals: proposals.map((p) => ({
+      internId: p.internId,
+      status: p.status,
+      lapsed: offerState({ status: p.status, hiredAt: null }, parseOffer(p.offerDetails)).lapsed,
+    })),
     toPay,
-    hired: new Set(proposals.filter((p) => p.status === "hired").map((p) => p.internId)).size,
-  };
+  });
 }
 
 /**
