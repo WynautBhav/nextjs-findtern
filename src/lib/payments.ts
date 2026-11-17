@@ -17,6 +17,8 @@ import { invoiceBuyerPatch } from "@/lib/invoice-buyer";
 import { monthMismatches } from "@/lib/billing-plan";
 import { orderProposalIds } from "@/lib/order-ids";
 import { recordAdminAudit } from "@/lib/admin/audit";
+import { isSubscriptionOrderRaw } from "@/lib/employer-subscription";
+import { notifySubscriptionStarted } from "@/lib/subscription/notify";
 import { paidAmountProblem, planAmountMismatch, planDuplicatePayment, type AmountProblem, type GatewayPaid } from "@/lib/payment-flags";
 
 /**
@@ -270,6 +272,11 @@ export async function settleEmployerOrder(input: {
     return hired;
   }).catch((e) => (e instanceof WaiverRefused ? e : Promise.reject(e)));
   if (hired instanceof WaiverRefused) return { ok: false, status: 409, error: hired.message };
+  // A Findtern Pro subscription has no proposals: nothing was hired, and the receipt says what was bought. `hired` is null on a replay.
+  if (hired && ids.length === 0 && isSubscriptionOrderRaw(order.raw)) {
+    await notifySubscriptionStarted(order, waived);
+    return { ok: true, hired: 0 };
+  }
   if (!hired || ids.length === 0) return { ok: true, hired: 0 };
 
   const { contact, company } = await employerNames(order.employerId);
