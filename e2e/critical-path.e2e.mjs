@@ -437,6 +437,9 @@ step("employer: company setup + first project (onboarding) [API]", ["employerId"
   assert.equal(emp.onboarding_completed, true, "first project completes onboarding");
   const p = await one(`SELECT * FROM projects WHERE id = $1`, [body.project.id]);
   assert.equal(p.employer_id, state.employerId);
+  // A new project is a draft until the employer publishes it; interviews and offers need it open (the project form's Submit does this).
+  assert.equal(p.status, "draft");
+  expectOk("publish the project", await api(page, "POST", `/api/employer/projects/${p.id}/transition`, { to: "published" }));
 
   await assertRoleArea(page, "/employer/dashboard", EMPLOYER_NAV);
   state.projectId = p.id;

@@ -129,7 +129,7 @@ test("edit: each row of the table, from the edit time", () => {
   }
 });
 
-// ── Wiring: the routes have no DB harness here (e2e/start-date-rules.e2e.mjs drives them over HTTP) ──
+// ── Wiring: the routes have no DB harness here, so these pin the calls; the report records the HTTP run against a local DB ──
 
 const APP = join(import.meta.dirname, "../app");
 const read = (p: string) => readFileSync(join(APP, p), "utf8");
