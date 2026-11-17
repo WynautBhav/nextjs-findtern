@@ -119,7 +119,7 @@ test("the listing is gone for candidates at once: public page 404, not on the pu
 
 test("the employer sees why, cannot send an offer (409) and cannot delete it (409)", async () => {
   await P.E.page.goto(url("/employer/projects"), { waitUntil: "domcontentloaded" });
-  await P.E.page.getByText("Taken down by Findtern").waitFor({ timeout: 20_000 });
+  await P.E.page.getByText("Taken down by Findtern").first().waitFor({ timeout: 20_000 });
   assert.match((await P.E.page.locator("main").textContent()) ?? "", new RegExp(REASON));
   const start = new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10);
   const offer = await api(P.E.page, "POST", `/api/employer/${E.id}/proposals`, {
@@ -228,7 +228,7 @@ test("taken down: the employer cannot open a payment for an accepted offer (409)
   );
   const r = await order(offerId);
   assert.equal(r.status, 409, JSON.stringify(r.body));
-  assert.equal(r.body.code, "listing_taken_down");
+  assert.equal(r.body.code, "project_taken_down"); // the shared takedown guard (takedown-guard-server.ts)
   assert.match(r.body.error, /taken down by Findtern|took this listing down/);
   assert.equal(await status(offerId), "accepted", "not hired");
   assert.equal((await one(`SELECT count(*)::int AS n FROM employer_payments WHERE employer_id = $1`, [E.id])).n, 0, "no order row opened");
@@ -248,7 +248,7 @@ test("taken down: the intern cannot book an interview slot (409); the interview 
   assert.equal((await one(`SELECT status FROM interviews WHERE id = $1`, [iv.id])).status, "pending");
 });
 
-test("taken down: the full-time fee of an offer the intern accepted BEFORE the takedown is still payable", async () => {
+test("taken down: the full-time fee of an offer the intern accepted BEFORE the takedown is NOT payable either (lockdown: no employer payment while down)", async () => {
   const intern = await mkIntern("tdI5");
   const offerId = await mkProposal(E.id, intern.id, pid);
   await one(
@@ -256,9 +256,11 @@ test("taken down: the full-time fee of an offer the intern accepted BEFORE the t
     [offerId, JSON.stringify({ roleTitle: "Engineer", startDate: "2099-01-01", fullTimeOffer: { jobTitle: "Engineer", annualCtcMinor: 60000000 } })],
   );
   const r = await api(P.E.page, "POST", `/api/employer/${E.id}/payment/razorpay/order`, { currency: "INR", proposalIds: [offerId], mode: "upfront", paymentIndex: 0 });
-  assert.notEqual(r.body?.code, "listing_taken_down", `refused as taken down: ${JSON.stringify(r.body)}`);
-  assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.equal(await status(offerId), "hired", "the hire the intern already made is completed");
+  // Changed by the takedown lockdown: the owner wants every employer action blocked while a project is down, payments included.
+  // The money is not lost: the offer stays accepted and the fee is payable the moment admin restores the project.
+  assert.equal(r.status, 409, JSON.stringify(r.body));
+  assert.equal(r.body.code, "project_taken_down");
+  assert.equal(await status(offerId), "accepted", "nothing paid, nothing hired");
 });
 
 test("accept race: a takedown that commits after the early check but before the write still refuses the accept", async () => {
@@ -407,14 +409,14 @@ test("a taken-down listing sends no new offer: internship proposal and full-time
     startDate: start, duration: "1m", shiftFrom: "09:00", shiftTo: "17:00", timezone: "Asia/Kolkata", laptop: "company", skills: SKILLS.slice(0, 4),
   });
   assert.equal(offer.status, 409, JSON.stringify(offer.body));
-  assert.equal(offer.body.code, "listing_taken_down");
+  assert.equal(offer.body.code, "project_taken_down");
   assert.match(offer.body.error, /taken down by Findtern|took this listing down/);
   const ft = await api(P.E.page, "POST", `/api/employer/${E.id}/full-time-offer`, {
     proposalId: S.wpHired, jobTitle: "Engineer", jobMode: "remote", ctcCurrency: "INR", annualCtc: 600000, shiftFrom: "09:00", shiftTo: "18:00", timezone: "Asia/Kolkata",
     offerLetterKey: `${E.id.replace(/[^a-z0-9_-]/gi, "").slice(0, 32)}/offer-letter.pdf`,
   });
   assert.equal(ft.status, 409, JSON.stringify(ft.body));
-  assert.equal(ft.body.code, "listing_taken_down");
+  assert.equal(ft.body.code, "project_taken_down");
   assert.match(ft.body.error, /taken down by Findtern|took this listing down/);
   assert.equal((await one(`SELECT count(*)::int AS n FROM proposals WHERE employer_id = $1`, [E.id])).n, before, "no proposal row written");
   // Restored, the same full-time offer goes through.
@@ -506,7 +508,7 @@ test("editing an accepted offer on a taken-down listing is refused (409 listing_
   const edit = () => api(P.E.page, "PATCH", `/api/proposals/${offerId}`, { offer: { additionalInfo: "Bring a charger." } });
   const r = await edit();
   assert.equal(r.status, 409, JSON.stringify(r.body));
-  assert.equal(r.body.code, "listing_taken_down");
+  assert.equal(r.body.code, "project_taken_down");
   assert.equal(await status(offerId), "accepted", "not sent back to the intern");
   assert.equal((await one(`SELECT offer_details ? 'reopenedAfterEditAt' AS reopened FROM proposals WHERE id = $1`, [offerId])).reopened, false);
   assert.equal((await rows(`SELECT 1 FROM notifications WHERE recipient_id = $1 AND type = 'proposal_updated'`, [intern.id])).length, 0, "intern not told to accept again");
