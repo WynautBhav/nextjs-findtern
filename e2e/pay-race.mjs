@@ -94,7 +94,7 @@ async function interviewRace({ emp, session }, since) {
 async function proposalRace({ emp, session }, since) {
   const [project] = await rows("select id from projects where employer_id = $1 and status = 'active' limit 1", [emp.id]);
   const body = {
-    flowType: "direct", agreedToPolicy: true, roleTitle: "Race test role", jd: "Race test.", mode: "remote",
+    flowType: "direct", agreedToPolicy: true, roleTitle: "Race test role", jd: "Race test.", additionalInfo: "Shipping real work with code review and mentoring.", mode: "remote",
     startDate: day(20), duration: "1m", shiftFrom: "09:00", shiftTo: "18:00", timezone: "Asia/Kolkata", laptop: "company",
     paidLeavesPerMonth: 0, skills: [], projectId: project.id,
   };

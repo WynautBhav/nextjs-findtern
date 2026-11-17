@@ -24,6 +24,7 @@ import {
   type WeeklySchedule,
 } from "@/lib/offer";
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
+import { LEARN_LABEL, learnIssue } from "@/lib/proposal-copy";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
 import { DmyDateInput } from "@/components/app/dmy-date-input";
 import { fieldClass } from "@/components/employer/ui-tokens";
@@ -167,6 +168,8 @@ export function ProposalOfferForm({
       return fail("shiftTo", `A shift can't run longer than 8 hours. Latest end for a ${shiftFrom} start: ${latestShiftEnd(shiftFrom)}.`);
     }
     if (!message.trim()) return fail("message", "Add a job description.");
+    const learn = learnIssue(additionalInfo);
+    if (learn) return fail("learn", learn);
 
     const offer: Record<string, unknown> = {
       roleTitle: roleTitle.trim(),
@@ -395,10 +398,9 @@ export function ProposalOfferForm({
         />
       </label>
       <label className="block">
-        <span className={LABEL}>
-          Additional information <span className="font-normal text-text-subtle">(optional)</span>
-        </span>
+        <span className={LABEL}>{LEARN_LABEL}</span>
         <textarea
+          {...fieldProps("learn")}
           value={additionalInfo}
           onChange={(e) => setAdditionalInfo(e.target.value)}
           rows={3}

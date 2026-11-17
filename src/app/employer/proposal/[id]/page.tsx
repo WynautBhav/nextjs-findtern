@@ -352,7 +352,7 @@ export default async function EmployerProposalDetail({
 
           {offer.jd ? (
             <section>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">What the intern will do</h2>
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Job description</h2>
               {/* Text: legacy Quill HTML is read back as plain text (EMH-28). */}
               <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-base leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{offer.jd}</p>
             </section>
@@ -360,7 +360,7 @@ export default async function EmployerProposalDetail({
 
           {offer.additionalInfo ? (
             <section>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Additional information</h2>
+              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">What the intern will learn</h2>
               <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-base leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{offer.additionalInfo}</p>
             </section>
           ) : null}
