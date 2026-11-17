@@ -151,7 +151,7 @@ export function offerJoiningDay(offer: Offer): string | null {
   const ft = offer.fullTime;
   const tz = ((ft?.timezone || offer.timezone || IST_TZ) as string).trim();
   const day = ft
-    ? joiningDayIst(ft.shiftFrom, ft.shiftTo, tz, offer.startDate)
+    ? joiningDayIst(ft.shiftFrom, ft.shiftTo, tz, ft.startDate || offer.startDate) // a full-time offer's own joining date, else the base internship's
     : joiningDayIst(offer.shiftFrom, offer.shiftTo, tz, offer.startDate);
   return day ?? offer.startDate;
 }

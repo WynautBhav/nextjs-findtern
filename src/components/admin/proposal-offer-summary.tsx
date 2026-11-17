@@ -42,7 +42,7 @@ export function ProposalOfferSummary({
           <DetailRow label="Annual CTC" value={money(ft.annualCtcMinor)} mono />
           <DetailRow label="Work mode" value={<span className="capitalize">{ft.jobMode || offer.mode || "-"}</span>} />
           <DetailRow label="Location" value={ft.location || offer.location || "-"} />
-          <DetailRow label="Joining" value={formatDate(offer.startDate)} />
+          <DetailRow label="Joining" value={formatDate(ft.startDate || offer.startDate)} />
           <DetailRow label="Hours" value={ft.shiftFrom && ft.shiftTo ? `${ft.shiftFrom} to ${ft.shiftTo}` : "-"} />
           <DetailRow label="Timezone" value={ft.timezone || offer.timezone || "-"} />
         </dl>

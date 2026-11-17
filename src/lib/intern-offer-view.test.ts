@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { canDecide, hybridSplit, internOfferKey, joiningDayIst, joiningInstant, offerGroup, offerWasEdited, shiftInIst } from "./intern-offer-view.ts";
+import { canDecide, hybridSplit, internOfferKey, joiningDayIst, joiningInstant, offerGroup, offerJoiningDay, offerWasEdited, shiftInIst } from "./intern-offer-view.ts";
+import { parseOffer } from "./offer.ts";
 
 const now = new Date("2026-10-19T06:00:00Z"); // 19 Oct, 11:30 IST
 const internship = (extra: Record<string, unknown> = {}) => ({ roleTitle: "Design intern", startDate: "2026-11-01", ...extra });
@@ -117,4 +118,11 @@ test("realJoiningDay is null for a placeholder start date, a day otherwise", asy
   assert.equal(realJoiningDay(parseOffer(internship({ startDate: "To be agreed" }), "INR")), null);
   assert.equal(realJoiningDay(parseOffer(internship({ startDate: "" }), "INR")), null);
   assert.equal(realJoiningDay(parseOffer(internship({ startDate: "2026-11-01" }), "INR")), "2026-11-01");
+});
+
+test("a full-time offer's own joining date (fullTimeOffer.startDate) is the joining day shown; an older offer without one falls back", () => {
+  const withDate = parseOffer({ ...fullTime({ startDate: "2026-11-01" }), fullTimeOffer: { jobTitle: "Designer", annualCtc: 600000, jobMode: "onsite", shiftFrom: "10:00", shiftTo: "18:00", timezone: "Asia/Kolkata", startDate: "2026-12-07" } }, "INR");
+  assert.equal(offerJoiningDay(withDate), "2026-12-07");
+  const without = parseOffer({ ...fullTime({ startDate: "2026-11-01" }), fullTimeOffer: { jobTitle: "Designer", annualCtc: 600000, jobMode: "onsite", shiftFrom: "10:00", shiftTo: "18:00", timezone: "Asia/Kolkata" } }, "INR");
+  assert.equal(offerJoiningDay(without), "2026-11-01");
 });
