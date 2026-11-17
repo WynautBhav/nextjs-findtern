@@ -10,6 +10,8 @@ import { AutosaveStatus, useAutosave, type SaveResult } from "@/components/admin
 import { buttonClass } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { createAutosave } from "@/lib/admin/autosave";
+import type { SubscriptionConfig } from "@/lib/employer-subscription";
+import { draftFromConfig, subscriptionDraftEq, usdPreviewMinor, validateSubscriptionDraft, type SubscriptionDraft } from "@/lib/subscription/draft";
 import { describeLegacyBand, isLegacyTier, legacyBandChange } from "@/lib/admin/plan-band";
 import {
   planDraftEq,
@@ -69,6 +71,7 @@ const feeMachine = createAutosave<string>(rupeesEq);
 const hireFeeMachine = createAutosave<PerHireFeeSetting>((a, b) => FEE_BANDS.every((k) => a[k] === b[k]));
 const stipendMachine = createAutosave<StipendDraft>((a, b) => wholeRupeesEq(a.skilled, b.skilled) && wholeRupeesEq(a.assured, b.assured));
 const featuredMachine = createAutosave<string | null>((a, b) => a === b);
+const subscriptionMachine = createAutosave<SubscriptionDraft>(subscriptionDraftEq);
 
 /** One request to the pricing API; the server's message when it refuses. */
 async function send(method: "PATCH" | "PUT", body: unknown): Promise<SaveResult> {
@@ -93,11 +96,17 @@ export function AdminPricingEditor({
   activationFeeMinor,
   perHireFee,
   stipendBands,
+  subscription,
+  mayEditSubscription = false,
 }: {
   plans: EditablePlan[];
   activationFeeMinor: number;
   perHireFee: PerHireFeeSetting;
   stipendBands: StipendBands;
+  /** Findtern Pro as saved; the block is hidden when absent. */
+  subscription?: SubscriptionConfig;
+  /** Saving it needs the Accounts permission on top of this page's; without it the block is read-only. */
+  mayEditSubscription?: boolean;
 }) {
   const router = useRouter();
   const [seeding, setSeeding] = useState(false);
@@ -137,6 +146,7 @@ export function AdminPricingEditor({
       </div>
       <PerHireFeePanel initial={perHireFee} />
       <StipendPanel initial={stipendBands} />
+      {subscription ? <SubscriptionPanel initial={subscription} editable={mayEditSubscription} /> : null}
 
       {plans.length === 0 ? (
         <Panel>
@@ -402,6 +412,121 @@ function StipendPanel({ initial }: { initial: StipendBands }) {
         </div>
         {bad ? <p id="stipend-error" role="alert" className="text-sm text-danger">{bad.message}</p> : null}
         <AutosaveStatus auto={auto} />
+      </form>
+    </Panel>
+  );
+}
+
+/**
+ * Findtern Pro: the employer subscription's price (rupees, GST-inclusive), length and on/off switch. Autosaves like the other
+ * blocks. USD is derived (₹100 = $1), never typed. Switching it off hides the offer and puts every employer back to no access;
+ * paid orders and their invoices stay as they are.
+ */
+function SubscriptionPanel({ initial, editable }: { initial: SubscriptionConfig; editable: boolean }) {
+  const router = useRouter();
+  const auto = useAutosave(
+    subscriptionMachine,
+    draftFromConfig(initial),
+    async (d) => {
+      const r = validateSubscriptionDraft(d);
+      return r.ok ? send("PUT", { employerSubscription: r.config }) : { ok: false, error: r.message };
+    },
+    () => router.refresh(),
+  );
+  const draft = auto.state.draft;
+  const check = validateSubscriptionDraft(draft);
+  const bad = auto.status === "invalid" && !check.ok ? check : null;
+  const usd = usdPreviewMinor(draft.price);
+
+  return (
+    <Panel>
+      <PanelHeader
+        title="Findtern Pro employer subscription"
+        description="Unlocks the CGPA filter and the college filter and sort on Candidates. Paying while active adds the days to the current end."
+        icon={IndianRupee}
+      />
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          auto.flush();
+        }}
+        noValidate
+        className="space-y-4 px-5 py-4"
+      >
+        <ul className="divide-y divide-[color:var(--admin-rule)]">
+          <li className="flex items-center justify-between gap-4 py-3">
+            <label htmlFor="subscription-enabled" className="text-sm font-medium text-ink-800">
+              On sale
+              <span className="block text-xs font-normal text-text-subtle">
+                {draft.enabled ? "Employers can buy it and active ones keep their access" : "Off: nobody has access and nobody can buy it. Paid orders stay on record"}
+              </span>
+            </label>
+            <Switch
+              id="subscription-enabled"
+              checked={draft.enabled}
+              disabled={!editable}
+              onCheckedChange={(next) => auto.edit({ ...draft, enabled: next }, null, true)}
+            />
+          </li>
+          <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+            <label htmlFor="subscription-price" className="text-sm font-medium text-ink-800">
+              Price
+              <span className="block text-xs font-normal text-text-subtle">
+                Rupees, GST-inclusive.{" "}
+                {usd !== null ? <span className="nums">Charged as {formatMoney(usd, "USD")} to employers outside India.</span> : "Dollars are derived at ₹100 = $1."}
+              </span>
+            </label>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-ink-600" aria-hidden>₹</span>
+              <input
+                id="subscription-price"
+                inputMode="decimal"
+                value={draft.price}
+                readOnly={!editable}
+                onChange={(e) => {
+                  const next = { ...draft, price: e.target.value.replace(/[^\d.]/g, "") };
+                  const c = validateSubscriptionDraft(next);
+                  auto.edit(next, c.ok || c.field !== "price" ? null : c.message);
+                }}
+                aria-invalid={bad?.field === "price" ? true : undefined}
+                aria-describedby={bad?.field === "price" ? "subscription-error" : undefined}
+                className={cn(inputClass, "mt-0 w-36")}
+              />
+            </div>
+          </li>
+          <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+            <label htmlFor="subscription-days" className="text-sm font-medium text-ink-800">
+              Length
+              <span className="block text-xs font-normal text-text-subtle">Days of access per purchase, 1 to 1095. A paid order keeps the length it was bought with.</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="subscription-days"
+                inputMode="numeric"
+                value={draft.days}
+                readOnly={!editable}
+                onChange={(e) => {
+                  const next = { ...draft, days: e.target.value.replace(/\D/g, "") };
+                  const c = validateSubscriptionDraft(next);
+                  auto.edit(next, c.ok || c.field !== "days" ? null : c.message);
+                }}
+                aria-invalid={bad?.field === "days" ? true : undefined}
+                aria-describedby={bad?.field === "days" ? "subscription-error" : undefined}
+                className={cn(inputClass, "mt-0 w-28")}
+              />
+              <span className="text-sm text-ink-600" aria-hidden>days</span>
+            </div>
+          </li>
+        </ul>
+        {editable ? (
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[color:var(--admin-rule)] pt-4">
+            <SaveNowButton enabled={auto.state.sending === null && auto.status === "pending"} />
+          </div>
+        ) : (
+          <p className="border-t border-[color:var(--admin-rule)] pt-4 text-xs text-ink-600">Changing the Findtern Pro price needs the Accounts permission. You can see it here.</p>
+        )}
+        {bad ? <p id="subscription-error" role="alert" className="text-sm text-danger">{bad.message}</p> : null}
+        <AutosaveStatus auto={auto} live="Live: employers see this now" />
       </form>
     </Panel>
   );

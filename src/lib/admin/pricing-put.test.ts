@@ -84,11 +84,22 @@ test("the route runs the guard first, keeps the admin role, and every write purg
     assert.ok(h.indexOf("requireMutation(") < h.indexOf("req.json()") || !h.includes("req.json()"), `${name}: guard before body`);
     assert.ok(h.includes("revalidatePricing()"), `${name}: purges the pricing pages`);
   }
-  // PUT has three writers (per-hire, stipend, activation fee), each followed by its own purge.
+  // PUT has four writers (Findtern Pro subscription, per-hire, stipend, activation fee), each followed by its own purge.
   const put = handlers[1];
-  assert.equal(put.match(/revalidatePricing\(\)/g)?.length, 3);
-  assert.equal(put.match(/setSetting\(/g)?.length, 3);
-  assert.equal(put.match(/recordAdminAudit\(/g)?.length, 3, "one audit row per save");
+  assert.equal(put.match(/revalidatePricing\(\)/g)?.length, 4);
+  assert.equal(put.match(/setSetting\(/g)?.length, 4);
+  assert.equal(put.match(/recordAdminAudit\(/g)?.length, 4, "one audit row per save");
+  // The subscription price is money: it also needs the Accounts permission, checked before anything is written.
+  assert.ok(put.indexOf('allows(guard.session.permissions, ["transactions:write"])') < put.indexOf('setSetting("employer_subscription"'));
   // The purge covers the layout and /llms.txt.
   assert.deepEqual(PRICING_REVALIDATE, [{ path: "/", type: "layout" }, { path: "/llms.txt" }]);
+});
+
+test("a Findtern Pro body is routed to the subscription writer and validated there", () => {
+  assert.deepEqual(parsePricingPut({ employerSubscription: { priceInrMinor: 1_000_000, durationDays: 365, enabled: true } }), { kind: "subscription", config: { priceInrMinor: 1_000_000, durationDays: 365, enabled: true } });
+  const bad = parsePricingPut({ employerSubscription: { priceInrMinor: 0, durationDays: 365, enabled: true } });
+  assert.equal(bad.kind, "invalid");
+  assert.equal(parsePricingPut({ employerSubscription: { priceInrMinor: 1_000_000, durationDays: 2000, enabled: true } }).kind, "invalid");
+  // The other three bodies still route as before.
+  assert.equal(parsePricingPut({ internActivationFeeMinor: 49900 }).kind, "activationFee");
 });

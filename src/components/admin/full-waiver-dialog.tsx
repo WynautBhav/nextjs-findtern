@@ -14,11 +14,12 @@ const inputClass =
   "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500";
 
 const DAY_MS = 86_400_000;
-type Audience = "employer" | "intern" | "both";
+type Audience = "employer" | "intern" | "both" | "subscription";
 const AUDIENCES: { value: Audience; label: string }[] = [
-  { value: "employer", label: "Company" },
+  { value: "employer", label: "Hiring payments" },
+  { value: "subscription", label: "Subscription" },
   { value: "intern", label: "Intern" },
-  { value: "both", label: "Both" },
+  { value: "both", label: "Hiring and intern" },
 ];
 
 /**
@@ -53,7 +54,7 @@ export function FullWaiverDialog({ open, onOpenChange, onCreated }: { open: bool
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
-    if (!appliesTo) return setError("Choose who can use this code: companies, interns or both.");
+    if (!appliesTo) return setError("Choose who can use this code: hiring payments, the subscription, interns or both.");
     const uses = Number(maxUsages);
     if (!Number.isInteger(uses) || uses < 1 || uses > FULL_WAIVER_LIMITS.maxUsesCap) return setError(`Max uses must be a whole number from 1 to ${FULL_WAIVER_LIMITS.maxUsesCap}.`);
     const until = istInputToIso(validUntil);
@@ -158,6 +159,17 @@ export function FullWaiverDialog({ open, onOpenChange, onCreated }: { open: bool
                     </label>
                   ))}
                 </div>
+                {appliesTo ? (
+                  <p className="mt-1.5 text-xs text-ink-600">
+                    {appliesTo === "subscription"
+                      ? "Starts the Findtern Pro subscription at no charge. It frees nothing else, and a hiring code cannot free the subscription."
+                      : appliesTo === "intern"
+                        ? "Frees the intern activation fee."
+                        : appliesTo === "both"
+                          ? "Frees a hiring payment or an intern activation fee. It does not free the subscription."
+                          : "Frees a hiring payment. It does not free the subscription."}
+                  </p>
+                ) : null}
               </fieldset>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

@@ -3,6 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { waiverCodeTail, waiverFlagOf, waiverRedeemProblem } from "@/lib/full-waiver";
+import { isSubscriptionOrderRaw } from "@/lib/employer-subscription";
 import { seatFreeWhere } from "@/lib/promo-rules";
 
 type Db = ReturnType<typeof getDb>;
@@ -25,7 +26,8 @@ export async function redeemWaiverInTx(
   const flag = waiverFlagOf(order.raw);
   if (!flag) return;
   if (!flag.promoCodeId) throw new WaiverRefused("This order is not a valid full-waiver order");
-  const audience = order.kind;
+  // A Findtern Pro subscription is its own audience: only a code scoped "subscription" frees it (and such a code frees nothing else).
+  const audience = order.kind === "employer" && isSubscriptionOrderRaw(order.raw) ? "subscription" : order.kind;
   const [row] = await tx.select().from(schema.promoCodes).where(eq(schema.promoCodes.id, flag.promoCodeId)).for("update").limit(1);
   if (!row) throw new WaiverRefused("Invalid promo code");
   const [prior] = await tx

@@ -2,7 +2,9 @@ import { displayInvoiceNumber, LEGACY_INVOICE_CUTOFF, legacyInvoiceNumbers, type
 import { billingPlanOf, orderNotes, postpaidMonthsPaid, recordedFeeOf } from "./billing-plan.ts";
 import { hireInvoiceLines } from "./invoice-lines.ts";
 import { formatMoney } from "./format.ts";
+import { isSubscriptionOrderRaw } from "./employer-subscription.ts";
 import { parseOffer } from "./offer.ts";
+import { subscriptionLineLabel } from "./subscription/order.ts";
 import { orderProposalIds } from "./order-ids.ts";
 import { discountLabel, paymentPromo } from "./admin/payment-promo.ts";
 
@@ -81,6 +83,7 @@ function build(
   paidByProposal: ReadonlyMap<string, readonly InvoicePayment[]>,
   legacyPaid: Input["legacyPaid"],
 ): EmployerInvoice {
+  if (isSubscriptionOrderRaw(p.raw)) return buildSubscription(p, legacyNumbers, legacyPaid);
   const ids = orderProposalIds(p.raw as Record<string, unknown> | null);
   const rows = ids.map((id) => hires.get(id)).filter((r): r is InvoiceHire => Boolean(r));
   const { mode } = orderNotes(p.raw);
@@ -152,6 +155,32 @@ function build(
     lines,
     hireNames: rows.map((r) => r.who).filter(Boolean),
     projects: Array.from(new Set(rows.map((r) => r.projectName ?? "Project"))),
+    promo: promoCode ? { code: promoCode, discountMinor: promoFacts.discountMinor || null } : null,
+  };
+}
+
+/**
+ * A Findtern Pro subscription is not a hire: one line for the plan (its length is frozen on the order), no candidates,
+ * no projects, never an instalment. The number and the promo note come from the same helpers a hire invoice uses.
+ */
+function buildSubscription(
+  p: InvoicePayment,
+  legacyNumbers: ReadonlyMap<string, { number: string; paidAtMs: number }>,
+  legacyPaid: Input["legacyPaid"],
+): EmployerInvoice {
+  const days = Number((p.raw as { periodDays?: unknown }).periodDays);
+  const periodDays = Number.isInteger(days) && days > 0 ? days : 365;
+  const hit = needsLegacyNumber(p) ? legacyNumbers.get(p.orderId) : undefined;
+  const number = hit && p.paidAt && hit.paidAtMs === p.paidAt.getTime() ? hit.number : displayInvoiceNumber(p, legacyPaid);
+  const promoFacts = paymentPromo(p.raw, undefined, p.amountMinor);
+  const promoCode = discountLabel(promoFacts, p.amountMinor);
+  return {
+    number,
+    description: "Findtern Pro subscription",
+    monthly: false,
+    lines: [{ label: subscriptionLineLabel(periodDays), detail: "Employer subscription · CGPA filter, college filter and sort", amountMinor: p.amountMinor }],
+    hireNames: [],
+    projects: [],
     promo: promoCode ? { code: promoCode, discountMinor: promoFacts.discountMinor || null } : null,
   };
 }
