@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
-import { AlertCircle, ArrowLeft, Download, Phone, User } from "lucide-react";
+import { AlertCircle, ArrowLeft, Download, Info, Phone, User } from "lucide-react";
 
 import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { ScoreScale, STAT_ROW, StatTile } from "@/components/app/tiles";
@@ -21,7 +21,7 @@ import { loadInternData } from "@/lib/intern-data";
 import { rawScore } from "@/lib/employer-candidates";
 import { offerBonusMinor } from "@/lib/completion-bonus";
 import { formatDate, formatMoney, shortDate } from "@/lib/format";
-import { canDecide, hybridSplit, offerJoiningDay, shiftInIst } from "@/lib/intern-offer-view";
+import { canDecide, hybridSplit, internOfferOverlay, offerJoiningDay, shiftInIst } from "@/lib/intern-offer-view";
 import { toArray } from "@/lib/journey";
 import { sanitizeRichText } from "@/lib/richtext";
 import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
@@ -74,7 +74,9 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   const facts = offerFacts(proposal, { score, names: data.names });
   const { offer, fullTime } = facts;
   const ft = offer.fullTime;
-  const status = proposalStatus(facts.key);
+  const overlay = internOfferOverlay(proposal, extra);
+  // The CGPA check and an expired offer read differently from the stored status (intern-offer-view.ts).
+  const status = overlay.kind ? { label: overlay.label, tone: overlay.tone, detail: overlay.detail } : proposalStatus(facts.key);
   const open = canDecide(facts.key);
   // A bonus already scheduled for this offer (it ran on the score before completion) beats today's score.
   let scheduledMinor: number | null = null;
@@ -246,6 +248,12 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
               ) : (
                 <div className="space-y-4">
                   <p className="text-pretty text-sm leading-relaxed text-ink-700">{status.detail}</p>
+                  {overlay.disclaimer ? (
+                    <div className="flex items-start gap-2.5 rounded-apple-sm bg-ink-50 px-4 py-3 text-sm leading-relaxed text-ink-800">
+                      <Info className="mt-0.5 size-4 shrink-0 text-ink-600" aria-hidden />
+                      <p className="text-pretty">{overlay.disclaimer}</p>
+                    </div>
+                  ) : null}
                   {facts.key === "hired" ? (
                     <ButtonLink href="/intern/timesheets" variant="primary" block className="text-sm font-semibold">
                       Log your hours

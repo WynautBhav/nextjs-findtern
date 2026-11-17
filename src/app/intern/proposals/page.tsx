@@ -20,7 +20,7 @@ import { requireRole } from "@/lib/auth";
 import { formatDate } from "@/lib/format";
 import { loadInternData, projectNames, takenDownProjectIds } from "@/lib/intern-data";
 import { cn } from "@/lib/utils";
-import { canDecide, offerGroup } from "@/lib/intern-offer-view";
+import { canDecide, internOfferOverlay, offerGroup, type InternOfferOverlay } from "@/lib/intern-offer-view";
 import type { ProposalRow } from "@/lib/journey";
 import { guaranteeEnded as isGuaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
 import { FREE_DECLINES } from "@/lib/offer";
@@ -68,14 +68,17 @@ export default async function InternProposals({ searchParams }: { searchParams: 
     .map((p) => ({
       p,
       facts: offerFacts(p, { score, names: data.names }),
+      overlay: internOfferOverlay(p, extra),
       project: p.projectId ? (projects[p.projectId] ?? null) : null,
       takenDown: Boolean(p.projectId && takenDown.has(p.projectId)),
     }));
+  // An expired offer files under Closed, a CGPA check under Accepted (intern-offer-view.ts internOfferOverlay).
+  const groupOf = (r: Row) => r.overlay.group ?? offerGroup(r.facts.key);
   const groups: Record<GroupKey, Row[]> = {
-    open: rows.filter((r) => offerGroup(r.facts.key) === "open"),
-    accepted: rows.filter((r) => offerGroup(r.facts.key) === "accepted"),
-    active: rows.filter((r) => offerGroup(r.facts.key) === "active"),
-    closed: rows.filter((r) => offerGroup(r.facts.key) === "closed"),
+    open: rows.filter((r) => groupOf(r) === "open"),
+    accepted: rows.filter((r) => groupOf(r) === "accepted"),
+    active: rows.filter((r) => groupOf(r) === "active"),
+    closed: rows.filter((r) => groupOf(r) === "closed"),
   };
 
   const decision = { declinesUsed, guaranteeEnded };
@@ -154,7 +157,7 @@ export default async function InternProposals({ searchParams }: { searchParams: 
   );
 }
 
-type Row = { p: ProposalRow; facts: OfferFacts; project: string | null; takenDown?: boolean };
+type Row = { p: ProposalRow; facts: OfferFacts; overlay: InternOfferOverlay; project: string | null; takenDown?: boolean };
 
 function Group({
   title,
@@ -191,6 +194,7 @@ function Group({
 function OfferRow({
   p,
   facts,
+  overlay,
   project,
   takenDown,
   decision,
@@ -201,7 +205,7 @@ function OfferRow({
   compact: boolean;
   hideStatus?: string;
 }) {
-  const status = proposalStatus(facts.key);
+  const status = overlay.kind ? { label: overlay.label, tone: overlay.tone, detail: overlay.detail } : proposalStatus(facts.key);
   const open = canDecide(facts.key);
   const href = `/intern/proposals/${p.id}`;
   const terms = [
@@ -269,6 +273,12 @@ function OfferRow({
               </Link>
             }
           />
+        </div>
+      ) : overlay.group === "accepted" ? (
+        // A CGPA check always says what is happening, in any tab: the intern should never wonder why nothing moved.
+        <div className="mt-2 space-y-1.5 text-pretty text-sm">
+          <p className="text-ink-700">{status.detail}</p>
+          {overlay.disclaimer ? <p className="text-text-subtle">{overlay.disclaimer}</p> : null}
         </div>
       ) : compact || hideStatus ? null : (
         <p className="mt-2 text-pretty text-sm text-text-subtle">{status.detail}</p>

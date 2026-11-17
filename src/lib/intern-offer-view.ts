@@ -1,5 +1,7 @@
+import { CGPA_DISCLAIMER, CGPA_SLA_HOURS, cgpaBlocksPayment, proposalCgpaGate, type CgpaGate } from "./cgpa-verification.ts";
 import { isHiredProposal } from "./hire-status.ts";
 import { isClockTime, isRealDay, offerPastStart, parseOffer, type Offer } from "./offer.ts";
+import { expiryOf } from "./proposal-expiry.ts";
 import { wallTimeToUtc } from "./timezones.ts";
 
 /**
@@ -175,4 +177,113 @@ export function shiftInIst(from: string, to: string, tz: string | null | undefin
     new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: IST_TZ }).format(d);
   const next = istDay(s.end) !== istDay(s.start) ? " (next day)" : "";
   return `${clock(s.start)} – ${clock(s.end)}${next} IST`;
+}
+
+/**
+ * "19 Nov, 3:40 PM IST": a moment in India time, in plain words. Built from parts so the output does not depend on the
+ * runtime's locale data. Empty for anything that is not a date.
+ */
+export function formatIstPlain(value: Date | string | null | undefined): string {
+  if (!value) return "";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "";
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", { timeZone: IST_TZ, day: "numeric", month: "short", hour: "numeric", minute: "2-digit", hourCycle: "h23" })
+      .formatToParts(d)
+      .map((x) => [x.type, x.value]),
+  ) as Record<string, string>;
+  const hour = Number(p.hour) % 24;
+  return `${p.day} ${p.month}, ${hour % 12 || 12}:${p.minute} ${hour < 12 ? "AM" : "PM"} IST`;
+}
+
+/**
+ * What the intern reads of an offer beyond `internOfferKey`: the CGPA check after they accepted, and an offer that
+ * expired because the company never paid. Separate from the key on purpose (the key is a closed set other screens
+ * label); a screen calls this and, when `kind` is not null, uses its label, detail and group instead.
+ *
+ *   verifying          accepted, Findtern is checking the CGPA (within its 48 h)
+ *   verifying_overdue  still unchecked past 48 h: said honestly, no blame
+ *   correction         Findtern corrected the score; the company has to confirm before paying
+ *   expired_unpaid     accepted, but the company did not pay before the start date
+ *   closed_by_admin    Findtern closed the offer
+ *
+ * Only an accepted internship offer can be verifying; a hired, processing, sent or full-time row never is.
+ */
+export type InternOverlayKind = "verifying" | "verifying_overdue" | "correction" | "expired_unpaid" | "closed_by_admin";
+
+export type InternOfferOverlay = {
+  kind: InternOverlayKind | null;
+  label: string;
+  tone: "waiting" | "closed" | "new" | "neutral";
+  detail: string;
+  /** The SLA line, for the verifying kinds only. */
+  sla: string | null;
+  /** The disclaimer text, for the verifying kinds only. */
+  disclaimer: string | null;
+  /** When Findtern aims to have confirmed it ("19 Nov, 3:40 PM IST"); the verifying kinds only. */
+  dueBy: string | null;
+  /** The offers list group to file it under; null leaves `offerGroup(key)` as it is. */
+  group: "accepted" | "closed" | null;
+};
+
+const NO_OVERLAY: InternOfferOverlay = { kind: null, label: "", tone: "neutral", detail: "", sla: null, disclaimer: null, dueBy: null, group: null };
+
+export function internOfferOverlay(
+  p: { status: string | null; hiredAt?: Date | string | null; offerDetails: unknown; currency?: string | null; updatedAt?: Date | string | null },
+  extraData: unknown,
+  now: Date = new Date(),
+): InternOfferOverlay {
+  const status = (p.status ?? "").toLowerCase();
+  const offer = parseOffer(p.offerDetails, p.currency);
+  if (offer.fullTime) return NO_OVERLAY;
+
+  const expiry = expiryOf({ status, hiredAt: p.hiredAt ?? null, offerDetails: p.offerDetails, currency: p.currency }, now);
+  if (expiry.reason === "unpaid_past_start") {
+    return {
+      ...NO_OVERLAY,
+      kind: "expired_unpaid",
+      label: "Expired",
+      tone: "closed",
+      detail: "The company did not complete the payment before the start date, so this offer expired.",
+      group: "closed",
+    };
+  }
+  if (status === "expired" && expiry.reason === "admin_closed") {
+    return { ...NO_OVERLAY, kind: "closed_by_admin", label: "Closed by Findtern", tone: "closed", detail: "Findtern closed this offer. Nothing more is needed from you.", group: "closed" };
+  }
+  if (status !== "accepted" || p.hiredAt) return NO_OVERLAY;
+
+  const gate: CgpaGate = proposalCgpaGate({ status, extraData, offerDetails: p.offerDetails, updatedAt: p.updatedAt ?? null }, now);
+  if (!cgpaBlocksPayment(gate)) return NO_OVERLAY;
+
+  const sla = `Usually ${CGPA_SLA_HOURS.min}-${CGPA_SLA_HOURS.max} hours.`;
+  if (gate.state === "incorrect_unacked") {
+    return {
+      ...NO_OVERLAY,
+      kind: "correction",
+      label: "Verifying your CGPA",
+      tone: "waiting",
+      detail:
+        gate.correctedFrom && gate.correctedTo
+          ? `Findtern updated your CGPA from ${gate.correctedFrom} to ${gate.correctedTo}. The company needs to confirm before they can pay.`
+          : "Findtern updated your CGPA. The company needs to confirm before they can pay.",
+      sla: null,
+      disclaimer: null,
+      group: "accepted",
+    };
+  }
+  const overdue = gate.state === "overdue";
+  const due = formatIstPlain(gate.dueBy);
+  return {
+    kind: overdue ? "verifying_overdue" : "verifying",
+    label: "Verifying your CGPA",
+    tone: "waiting",
+    detail: overdue
+      ? "This is taking longer than usual. We're on it."
+      : `You accepted this offer. Findtern is verifying your CGPA before the company can pay. ${sla}${due ? ` We aim to confirm by ${due}.` : ""}`,
+    sla: overdue ? null : sla,
+    disclaimer: CGPA_DISCLAIMER,
+    dueBy: overdue ? null : due || null,
+    group: "accepted",
+  };
 }
