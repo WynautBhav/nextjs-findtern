@@ -13,6 +13,7 @@ import {
   QUALIFICATION_LEVELS,
   degreeOption,
   levelHasDegreeList,
+  semesterApplies,
   type CertificateUpload,
   type OnboardingDraft,
   type QualificationEntry,
@@ -21,6 +22,7 @@ import {
 
 import { DateField, localToday } from "../date-input";
 import { AddButton, Choice, EmptyEntries, EntryCard, Field, FieldNote, Grid, Label, RemoveButton, Section, Select, SelectField, controlClass } from "./fields";
+import { CgpaDisclaimer, SemesterProofs, SemesterSelect } from "./semester-proofs";
 import type { StepProps } from "./types";
 
 const MB = 1024 * 1024;
@@ -189,8 +191,25 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
           </Grid>
         )}
 
+        {phd ? null : <CgpaDisclaimer compact />}
+
+        {semesterApplies(level, a.status) && !phd ? (
+          <Grid>
+            <SemesterSelect a={a} collegeYear={college?.year ?? null} error={errors.currentSemester} onChange={(currentSemester) => set({ currentSemester })} />
+          </Grid>
+        ) : null}
+
         <AccountTypeChoice value={values.accountType} onChange={(t) => update("accountType", t)} error={errors.accountType} college={college} defaultBranch={a.branch} />
       </Section>
+
+      {semesterApplies(level, a.status) && typeof a.currentSemester === "number" ? (
+        <Section
+          title="Proof of your CGPA"
+          hint={`Semester ${a.currentSemester} needs ${a.currentSemester} photo${a.currentSemester === 1 ? "" : "s"}: a marksheet for each earlier semester and your college ID card. All are required.`}
+        >
+          <SemesterProofs a={a} errors={errors} onChange={(semesterProofUploads) => set({ semesterProofUploads })} />
+        </Section>
+      ) : null}
 
       <Section title={phd ? "Certificates" : "Marksheets"} hint="Your latest semester or final marksheet. Optional - you can add several.">
         <FileList

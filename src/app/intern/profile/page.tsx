@@ -13,6 +13,8 @@ import { loadInternData } from "@/lib/intern-data";
 import { initialsOf } from "@/lib/employer-candidates";
 import { draftFromRecord, emptyDraft, profileCompletion, type OnboardingDraft } from "@/lib/onboarding";
 import { isInternPaid } from "@/lib/payments";
+import { readCgpaVerification } from "@/lib/cgpa-verification";
+import { CgpaVerificationCard } from "@/components/intern/profile/cgpa-card";
 import { guardPrecomplete } from "@/lib/intern-precomplete";
 
 export const metadata: Metadata = {
@@ -67,6 +69,7 @@ export default async function InternProfile() {
     : null;
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
 
+  const cgpa = readCgpaVerification(extra);
   const openToWork = extra.openToWork !== false;
   const scored = aiInterviewPhase(latestAiInterview(data.interviews, data.aiEmployerIds), isScored(extra)) === "scored";
   const status: ProfileStatus = !openToWork
@@ -136,6 +139,7 @@ export default async function InternProfile() {
         draft={draft}
         aiLinks={aiLinks}
         completion={completion}
+        extraSections={cgpa.status === "not_required" ? [] : [{ id: "cgpa", label: "CGPA verification", node: <CgpaVerificationCard v={cgpa} /> }]}
         openToWork={openToWork}
         contact={{
           email: user?.email ?? "",
