@@ -120,15 +120,31 @@ export function ScoreBadge({ score, scored, size = "inline" }: { score: number; 
 }
 
 /**
- * Skills that match the search first, as filled chips with a check; the rest
- * as quiet outlines. At most seven, then "+N". Levels stay private.
+ * Every skill the candidate has: skills that match the search first, as filled
+ * chips with a check; the rest as quiet outlines. Interns hold at most seven, so
+ * all of them show. A legacy list longer than seven folds behind "+N more",
+ * which opens the rest. `heading` puts a "Skills (N)" label above the chips so a
+ * card says what the row of chips is. Levels stay private.
  */
-export function SkillChips({ skills, wanted, className, skip = 0 }: { skills: string[]; wanted: string[]; className?: string; skip?: number }) {
-  const { shown, more, isWanted } = rowSkills(skills, new Set(wanted.map((w) => w.trim().toLowerCase())), undefined, skip);
+export function SkillChips({
+  skills,
+  wanted,
+  className,
+  skip = 0,
+  heading = false,
+}: {
+  skills: string[];
+  wanted: string[];
+  className?: string;
+  skip?: number;
+  heading?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const { shown, more, isWanted } = rowSkills(skills, new Set(wanted.map((w) => w.trim().toLowerCase())), open ? skills.length : undefined, skip);
   if (skip > 0 && shown.length === 0 && more === 0) return null;
   if (shown.length === 0) return <p className={cn("text-sm text-ink-600", className)}>No skills listed yet.</p>;
-  return (
-    <ul className={cn("flex flex-wrap gap-1.5", className)} aria-label="Skills">
+  const chips = (
+    <ul className={cn("flex flex-wrap gap-1.5", !heading && className)} aria-label="Skills">
       {shown.map((skill) => {
         const hit = isWanted(skill);
         return (
@@ -146,11 +162,26 @@ export function SkillChips({ skills, wanted, className, skip = 0 }: { skills: st
         );
       })}
       {more > 0 ? (
-        <li className="inline-flex h-7 items-center rounded-full px-2 text-[13px] font-medium text-ink-600">
-          +{more}
-          <span className="sr-only"> more skills</span>
+        <li>
+          <button
+            type="button"
+            onClick={() => setOpen(true)}
+            className="relative z-10 inline-flex h-7 items-center rounded-lg px-2 text-[13px] font-medium text-ink-700 underline underline-offset-4 outline-none hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500"
+          >
+            +{more} more
+            <span className="sr-only"> skills: show them</span>
+          </button>
         </li>
       ) : null}
     </ul>
+  );
+  if (!heading) return chips;
+  return (
+    <div className={className}>
+      <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-text-subtle">
+        Skills <span className="nums font-medium normal-case tracking-normal">({skills.length})</span>
+      </p>
+      {chips}
+    </div>
   );
 }

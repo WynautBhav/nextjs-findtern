@@ -126,3 +126,17 @@ test("parseView: grid is the compact cards, anything else falls back to the list
   assert.equal(parseView(undefined), "list");
   assert.equal(parseView(null), "list");
 });
+
+test("rowSkills: a candidate with seven skills shows all seven chips when nothing is skipped", () => {
+  const seven = ["A", "B", "C", "D", "E", "F", "G"];
+  const { shown, more } = rowSkills(seven, new Set());
+  assert.deepEqual(shown, seven);
+  assert.equal(more, 0);
+});
+
+test("rowSkills: opening a folded list shows every skill (max = length)", () => {
+  const nine = ["A", "B", "C", "D", "E", "F", "G", "H", "I"];
+  const { shown, more } = rowSkills(nine, new Set(), nine.length);
+  assert.equal(shown.length, 9);
+  assert.equal(more, 0);
+});

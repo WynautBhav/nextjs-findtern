@@ -12,7 +12,7 @@ import { resolvePricing, type Currency, type Pricing } from "@/lib/employer-pric
 import { PER_HIRE_FEE_DEFAULT } from "@/lib/per-hire-fee";
 import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
 import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
-import { skillLead, studyOf, type ListView } from "@/components/employer/candidate-view";
+import { type ListView } from "@/components/employer/candidate-view";
 import { CandidateQuickView } from "@/components/employer/candidate-quick-view";
 import { Pill } from "@/components/app/primitives";
 import { skillMatch } from "@/components/app/skill-match";
@@ -157,7 +157,7 @@ function CompareToggle({ href, selected, name }: { href: string | null; selected
  * One candidate as a card: the tile and who they are, Save and Compare, then a
  * three-cell strip (score, rate, availability), the skills, and one secondary
  * and one primary action. Only fields the pool really has: no bio, no role
- * headline (the schema has none, so the top skills lead).
+ * headline (the schema has none, so the degree leads).
  */
 export function CandidateCard({
   candidate,
@@ -179,11 +179,9 @@ export function CandidateCard({
   const pricing = resolved ?? resolvePricing(candidate.score, [], currency, region, PER_HIRE_FEE_DEFAULT);
   const displayName = displayNameOf(candidate, nameUnlocked);
   const status = candidateStatusPill(proposal);
-  const wantedSet = new Set(wantedSkills.map((w) => w.trim().toLowerCase()));
-  // Lead with the top skills (the schema has no role or headline); the degree moves to the meta line.
-  const { lead, rest } = skillLead(candidate.skills, wantedSet);
-  const headline = lead || headlineOf(candidate);
-  const study = lead ? studyOf(candidate.academics) : "";
+  // The headline is the degree and field (else the top two skills). The skills are listed once, in full, in the
+  // "Skills" block below: they used to lead the headline and then drop out of the chips, so only four showed.
+  const headline = headlineOf(candidate);
   const profileHref = `/employer/intern/${encodeURIComponent(candidate.id)}${projectId ? `?project=${encodeURIComponent(projectId)}` : ""}`;
   const sendHref = `/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ""}`;
   const place = candidate.city || candidate.location || "City not stated";
@@ -266,7 +264,7 @@ export function CandidateCard({
           </div>
         </div>
 
-        <SkillChips skills={candidate.skills} wanted={wantedSkills} skip={lead ? candidate.skills.length - rest.length : 0} />
+        <SkillChips heading skills={candidate.skills} wanted={wantedSkills} />
 
         <div className="mt-auto flex flex-col gap-2 border-t border-ink-100 pt-3">
           <div className="flex flex-wrap items-center gap-2 [&>*]:flex-1">
@@ -311,7 +309,6 @@ export function CandidateCard({
             </div>
             <p className="mt-1 flex flex-wrap items-center gap-x-1 text-sm text-ink-600">
               <MapPin className="size-3.5 shrink-0 text-ink-500" aria-hidden />
-              {study ? <span className="max-sm:hidden">{study} ·</span> : null}
               <span>{place}</span>
               {/* The dot alone is colour only; say it in words (a coarse label, nothing when the candidate hides it). */}
               {presence ? <span className={cn("whitespace-nowrap", presence === PRESENCE_ONLINE && "font-medium text-success")}>, {presence}</span> : null}
@@ -324,7 +321,7 @@ export function CandidateCard({
         </div>
       </div>
 
-      {/* What they are: the top skills lead (no role field), then how many you asked for. */}
+      {/* What they are: degree and field, then how many skills you asked for. */}
       {headline || wanted.total > 0 ? (
         <div>
           {headline ? <p className="line-clamp-2 text-pretty text-lg font-semibold leading-snug text-ink-900">{headline}</p> : null}
@@ -365,7 +362,7 @@ export function CandidateCard({
         </div>
       </div>
 
-      <SkillChips skills={candidate.skills} wanted={wantedSkills} skip={lead ? candidate.skills.length - rest.length : 0} />
+      <SkillChips heading skills={candidate.skills} wanted={wantedSkills} />
 
       {/* One quiet action and the one primary action. The profile link is stretched over the whole card. */}
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-t border-ink-100 pt-4">
