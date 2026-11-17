@@ -114,8 +114,10 @@ after(async () => {
     const md = ["| Call | HTTP | code | message |", "|---|---|---|---|", ...table.map((r) => `| ${r.label} | ${r.status} | ${r.code} | ${String(r.body).replaceAll("|", "/")} |`)].join("\n");
     writeFileSync(process.env.E2E_REPORT, md + "\n");
   }
-  await clean();
-  for (const u of ids?.interns ?? []) await clearCgpa(u);
+  if (!process.env.E2E_KEEP) {
+    await clean();
+    for (const u of ids?.interns ?? []) await clearCgpa(u);
+  }
   await pool.end();
 });
 

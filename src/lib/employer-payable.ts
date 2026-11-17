@@ -9,7 +9,7 @@
  * accepted proposal is a commitment, and only the second is worth billing.
  */
 
-import { and, desc, eq, gte, inArray, isNotNull } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 
 import { acceptedLineCharge } from "@/lib/accepted-charge";
 import { hireFeeMinor, lineCharge, type LineCharge, type PayMode } from "@/lib/checkout";
@@ -31,6 +31,8 @@ export { payGateFor, PAY_GATE_CODE, type PayGate, type PayGateReason, type PayGa
 
 /** How long an unpaid checkout order stays open (payments.ts OPEN_ORDER_MINUTES; kept here so this module needs no payments import). */
 const OPEN_ORDER_WINDOW_MINUTES = 30;
+/** How long an offer the sweeper expired for non-payment stays in `PayableCheckout.expired`. */
+const SWEPT_EXPIRY_VISIBLE_DAYS = 14;
 
 
 export const DURATION_LABEL: Record<string, string> = {
@@ -275,7 +277,24 @@ export async function payableCheckout(
     new Date(),
   );
   const proposals = split.payable;
-  const held = [...split.expired.map((item) => ({ item, reason: "expired" as PayGateReason })), ...split.gated];
+  // Offers the sweeper already expired (status `expired`, reason unpaid_past_start) stay listed for a while, so the page shows the
+  // same "Expired, send a new proposal" row before and after the hourly sweep. Not priced; only on the unfiltered view or when asked for.
+  const swept = await db
+    .select()
+    .from(schema.proposals)
+    .where(
+      and(
+        eq(schema.proposals.employerId, employerId),
+        eq(schema.proposals.status, "expired"),
+        sql`${schema.proposals.offerDetails}->>'expiredReason' = 'unpaid_past_start'`,
+        sql`(${schema.proposals.offerDetails}->>'expiredAt')::timestamptz >= ${new Date(Date.now() - SWEPT_EXPIRY_VISIBLE_DAYS * 86_400_000).toISOString()}::timestamptz`,
+        opts.proposalIds?.length ? inArray(schema.proposals.id, opts.proposalIds) : undefined,
+      ),
+    )
+    .orderBy(desc(schema.proposals.updatedAt))
+    .limit(50);
+  const held = [...split.expired, ...swept].map((item) => ({ item, reason: "expired" as PayGateReason }));
+  held.push(...split.gated);
   const expired: HeldPayable[] = [];
   const gated: HeldPayable[] = [];
   if (held.length > 0) {
