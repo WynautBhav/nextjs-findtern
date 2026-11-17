@@ -96,7 +96,7 @@ async function proposalRace({ emp, session }, since) {
   const [project] = await rows("select id from projects where employer_id = $1 and status = 'active' limit 1", [emp.id]);
   const body = {
     flowType: "direct", agreedToPolicy: true, roleTitle: "Race test role", jd: "Race test.", additionalInfo: "Shipping real work with code review and mentoring.", mode: "remote",
-    startDate: businessStartDate(20), duration: "1m", shiftFrom: "09:00", shiftTo: "18:00", timezone: "Asia/Kolkata", laptop: "company",
+    startDate: businessStartDate(20), duration: "1m", shiftFrom: "10:00", shiftTo: "18:00", timezone: "Asia/Kolkata", laptop: "company",
     paidLeavesPerMonth: 0, skills: [], projectId: project.id,
   };
   let tried = 0;
@@ -114,7 +114,7 @@ async function proposalRace({ emp, session }, since) {
 
 async function fullTimeRace({ emp, session, offerId }, since) {
   const body = {
-    proposalId: offerId, jobTitle: "Race test engineer", jobMode: "remote", timezone: "Asia/Kolkata", shiftFrom: "09:00", shiftTo: "18:00",
+    proposalId: offerId, jobTitle: "Race test engineer", jobMode: "remote", timezone: "Asia/Kolkata", shiftFrom: "10:00", shiftTo: "18:00",
     ctcCurrency: "INR", annualCtc: 600000, offerLetterKey: `${emp.id.replace(/[^a-z0-9_-]/gi, "").slice(0, 32)}-race-letter.pdf`,
   };
   const rs = await Promise.all(Array.from({ length: PARALLEL }, () => post(session, `/api/employer/${emp.id}/full-time-offer`, body)));
