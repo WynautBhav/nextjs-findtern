@@ -6,6 +6,7 @@ import { ShieldCheck } from "lucide-react";
 
 import { Pill } from "@/components/app/primitives";
 import { scheduleSummary } from "@/lib/dues-display";
+import { promoTotals } from "@/lib/checkout-selection";
 import { formatDate, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CheckoutPay } from "./checkout-pay";
@@ -72,13 +73,15 @@ export function CheckoutSummary({
   const line = lines.find((l) => l.id === selectedId) ?? lines[0];
   const [picked, setPicked] = useState<Mode>("postpaid");
   // A promo code is for the whole engagement paid upfront: while one is applied, monthly payment is locked.
-  const [promoApplied, setPromoApplied] = useState(false);
+  const [promo, setPromo] = useState<{ code: string; discountMinor: number } | null>(null);
+  const promoApplied = promo !== null;
 
   const canPostpaid = Boolean(line && line.postpaidMinor != null) && !promoApplied;
   const mode: Mode = line?.due ? "monthly" : canPostpaid ? picked : "upfront";
   const amountOf = (l: SummaryLine, m: Mode) =>
     l.due ? (l.monthlyMinor ?? 0) : m === "postpaid" && l.postpaidMinor != null ? l.postpaidMinor : l.upfrontMinor;
   const amountMinor = line ? amountOf(line, mode) : 0;
+  const { discountMinor, totalMinor } = promoTotals(amountMinor, promo?.discountMinor ?? 0);
   const m = (minor: number, cur: string) => formatMoney(minor, cur, { zeroLabel: false });
   // The one-time fee row: the amount when charged; struck through with (FREE) when the band is waived.
   const fee = line ? (
@@ -119,7 +122,7 @@ export function CheckoutSummary({
                     checked={selected}
                     onChange={() => {
                       setSelectedId(l.id);
-                      setPromoApplied(false);
+                      setPromo(null);
                     }}
                   />
                   <span className="grid min-w-0 flex-1 gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -237,9 +240,10 @@ export function CheckoutSummary({
                 )}
               </>
             )}
+            {line && promo && discountMinor > 0 ? <Row label={`Promo ${promo.code}`}>{`−${m(discountMinor, line.currency)}`}</Row> : null}
             <div className="flex items-baseline justify-between gap-3 border-t border-ink-100 pt-3">
               <dt className="text-sm font-medium text-ink-800">{mode === "upfront" ? "Total" : "Due now"}</dt>
-              <dd className="nums text-4xl font-light tracking-[-0.04em] text-ink-900">{m(amountMinor, line.currency)}</dd>
+              <dd className="nums text-4xl font-light tracking-[-0.04em] text-ink-900">{m(totalMinor, line.currency)}</dd>
             </div>
           </dl>
 
@@ -261,7 +265,7 @@ export function CheckoutSummary({
               mode={mode}
               paymentIndex={line.monthsPaid}
               testMode={testMode}
-              onPromoChange={setPromoApplied}
+              onPromoChange={setPromo}
             />
           </div>
           <p className="mt-4 text-xs leading-relaxed text-text-subtle">

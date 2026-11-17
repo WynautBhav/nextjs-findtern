@@ -14,3 +14,30 @@ export function selectCheckoutLines<T extends { id: string }>(
   const match = lines.filter((l) => l.id === requested);
   return { lines: match, requested, missing: match.length === 0 };
 }
+
+/**
+ * Where checkout goes after a payment lands. The paid proposal is no longer payable,
+ * so staying on `?proposal=<id>` would answer "This placement can't be paid here";
+ * this link names no proposal and carries the receipt flag instead.
+ */
+export const AFTER_PAYMENT_HREF = "/employer/checkout?paid=1";
+
+export function justPaid(param: string | string[] | undefined): boolean {
+  return (Array.isArray(param) ? param[0] : param) === "1";
+}
+
+/** Which body checkout renders: the payable lines, the receipt just after paying, or one of the two empty states. */
+export function checkoutView(
+  selection: { lines: readonly unknown[]; missing: boolean },
+  paid: boolean,
+): "lines" | "receipt" | "missing" | "empty" {
+  if (selection.lines.length > 0) return "lines";
+  if (paid) return "receipt";
+  return selection.missing ? "missing" : "empty";
+}
+
+/** What an applied promo does to the amount: the total charged, with the discount held to 0..order. */
+export function promoTotals(amountMinor: number, discountMinor: number): { discountMinor: number; totalMinor: number } {
+  const d = Number.isFinite(discountMinor) ? Math.min(Math.max(0, Math.trunc(discountMinor)), Math.max(0, amountMinor)) : 0;
+  return { discountMinor: d, totalMinor: amountMinor - d };
+}
