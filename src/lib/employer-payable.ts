@@ -77,7 +77,7 @@ function addMonthsDay(isoDay: string | null, months: number): string | null {
 }
 
 /** An accepted offer or due month the employer cannot pay now because its project is taken down (shown, never orderable). */
-export type BlockedPayable = { id: string; projectId: string; projectName: string | null; internInitials: string; note: string };
+export type BlockedPayable = { id: string; projectId: string; projectName: string | null; note: string };
 
 export type PayableCheckout = {
   lines: PayableLine[];
