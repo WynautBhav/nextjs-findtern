@@ -17,7 +17,7 @@ import { INTERN_NDA, INTERN_TERMS } from "./legal-intern";
 import { getDb, schema, hasDb } from "@/lib/db";
 import { eq, desc, asc, sql } from "drizzle-orm";
 import { inrMinorToUsdMinor } from "@/lib/currency";
-import { cmsImageSrc } from "./image-response";
+import { blogImageRoutes, cmsImageSrc, imageVersion } from "./image-response";
 import { unstable_cache } from "next/cache";
 import { loadPublicStudents, studentsForSkill } from "@/lib/skill-benches";
 
@@ -69,7 +69,7 @@ export async function getPartners() {
     const db = getDb();
     const rows = await db.select().from(schema.websitePartners).where(eq(schema.websitePartners.isActive, true)).orderBy(asc(schema.websitePartners.sortOrder));
     if (!rows.length) return PARTNERS;
-    return rows.map((r) => ({ ...r, logoUrl: cmsImageSrc(r.logoUrl, `/api/cms-image/partner/${r.id}`) ?? "" })) as unknown as typeof PARTNERS;
+    return rows.map((r) => ({ ...r, logoUrl: cmsImageSrc(r.logoUrl, `/api/cms-image/partner/${r.id}`, imageVersion(r.updatedAt)) ?? "" })) as unknown as typeof PARTNERS;
   }, PARTNERS);
 }
 
@@ -106,7 +106,7 @@ export async function getHappyFaces() {
     const db = getDb();
     const rows = await db.select().from(schema.websiteHappyFaces).where(eq(schema.websiteHappyFaces.isActive, true)).orderBy(asc(schema.websiteHappyFaces.sortOrder));
     if (!rows.length) return HAPPY_FACES;
-    return rows.map((r) => ({ ...r, avatarUrl: cmsImageSrc(r.avatarUrl, `/api/cms-image/face/${r.id}`) })) as unknown as typeof HAPPY_FACES;
+    return rows.map((r) => ({ ...r, avatarUrl: cmsImageSrc(r.avatarUrl, `/api/cms-image/face/${r.id}`, imageVersion(r.updatedAt)) })) as unknown as typeof HAPPY_FACES;
   }, HAPPY_FACES);
 }
 
@@ -207,17 +207,14 @@ const blogColumns = {
   body: t.body,
   status: t.status,
   publishedAt: t.publishedAt,
+  updatedAt: t.updatedAt,
   hasCover: sql<boolean>`${t.coverImageUrl} is not null and ${t.coverImageUrl} <> ''`,
   hasBanner: sql<boolean>`${t.bannerImageUrl} is not null and ${t.bannerImageUrl} <> ''`,
 };
 
-function withImageRoutes({ hasCover, hasBanner, ...row }: { hasCover: boolean; hasBanner: boolean; slug: string }): CmsBlogPost {
-  const base = `/api/blog-image/${encodeURIComponent(row.slug)}`;
-  return {
-    ...(row as unknown as CmsBlogPost),
-    coverImageUrl: hasCover ? `${base}/cover` : null,
-    bannerImageUrl: hasBanner ? `${base}/banner` : null,
-  };
+function withImageRoutes({ hasCover, hasBanner, updatedAt, ...row }: { hasCover: boolean; hasBanner: boolean; updatedAt: Date | null; slug: string }): CmsBlogPost {
+  const { cover, banner } = blogImageRoutes(row.slug, hasCover, hasBanner, imageVersion(updatedAt));
+  return { ...(row as unknown as CmsBlogPost), coverImageUrl: cover, bannerImageUrl: banner };
 }
 
 export async function getBlogPosts(): Promise<CmsBlogPost[]> {
