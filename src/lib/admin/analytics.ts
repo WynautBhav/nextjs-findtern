@@ -1,3 +1,4 @@
+import { isSettledStatus } from "../refund-accounting.ts";
 import { parseOffer } from "../offer.ts";
 import { toInrMinor } from "./money.ts";
 import { shortDateTime } from "../format.ts";
@@ -99,7 +100,7 @@ export function computeAnalytics(input: AnalyticsInput) {
   const paidOrders = new Map<string, number>();
   const realEmployer = new Set(input.employers.map((e) => e.id));
   for (const pay of input.employerPayments) {
-    if (!pay.employerId || !realEmployer.has(pay.employerId) || pay.status !== "paid" || !inRange(pay.paidAt ?? pay.createdAt)) continue;
+    if (!pay.employerId || !realEmployer.has(pay.employerId) || !isSettledStatus(pay.status) || !inRange(pay.paidAt ?? pay.createdAt)) continue;
     paidOrders.set(pay.employerId, (paidOrders.get(pay.employerId) ?? 0) + 1);
   }
   const repeatEmployers = [...paidOrders.values()].filter((n) => n >= 2).length;

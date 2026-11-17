@@ -185,7 +185,10 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
               },
               { label: "Paid to interns", value: inr(data.totals.paidOutMinor), note: "Stipend payouts marked paid" },
               { label: "Owed to interns", value: inr(data.totals.owedMinor), note: "Pending payouts and stipend months ahead" },
-              { label: "Net", value: inr(netMinor(data.totals)), accent: netMinor(data.totals) >= 0, negative: netMinor(data.totals) < 0, note: "Received, less paid and owed to interns" },
+              ...(data.refunds.length > 0
+                ? [{ label: "Refunded to companies", value: inr(data.refundTotals.refundedMinor), note: `Net received ${inr(data.refundTotals.netReceivedMinor)} \u00b7 ${inr(data.refundTotals.gstMinor)} GST inside` }]
+                : []),
+              { label: "Net", value: inr(netOf(data)), accent: netOf(data) >= 0, negative: netOf(data) < 0, note: data.refunds.length > 0 ? "Received, less refunds, paid and owed to interns" : "Received, less paid and owed to interns" },
             ]}
           />
 
@@ -205,6 +208,8 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
               },
             ]}
           />
+
+          <RefundsPanel refunds={data.refunds} flags={data.refundFlags} inr={inr} />
 
           <MoneyTable
             title={view === "receivables" ? "Receivables" : "Payables"}
@@ -231,6 +236,57 @@ export default async function AdminMoneyReportPage({ searchParams }: { searchPar
         </Panel>
       )}
     </div>
+  );
+}
+
+/** Net = received - refunded - paid to interns - owed to interns. With no refund it is exactly the old figure. */
+const netOf = (d: Receivables) => netMinor(d.totals) - d.refundTotals.refundedMinor;
+
+/** Refunds are their own rows (a contra record beside the payment), never a reopened receivable. */
+function RefundsPanel({ refunds, flags, inr }: { refunds: Receivables["refunds"]; flags: Receivables["refundFlags"]; inr: (m: number) => string }) {
+  if (refunds.length === 0) return null;
+  return (
+    <Panel>
+      <PanelHeader title="Refunds to companies" description="Money returned to a company. The payment it came from stays as recorded; net received is payments less refunds." />
+      {flags.length > 0 ? (
+        <div role="note" className="mx-[var(--admin-pad-panel)] mt-3 rounded-2xl border border-[color:var(--admin-rule)] p-3 text-sm text-foreground">
+          <p className="font-medium">Refund after payout: decide whether to recover or accept</p>
+          <ul className="mt-1 list-disc pl-5 text-text-subtle">
+            {flags.map((f) => (
+              <li key={f.orderId}>
+                {f.companyName ?? "Company"} was refunded {inr(f.refundedInrMinor)}, and {f.internNames.join(", ")} {f.internNames.length === 1 ? "was" : "were"} already paid {inr(f.paidOutInrMinor)}. Nothing was changed automatically.
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <div tabIndex={0} role="region" aria-label="Refunds" className="mt-3 overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring">
+        <table className="w-full text-left text-sm lg:min-w-[40rem]">
+          <thead>
+            <tr className="border-b border-[color:var(--admin-rule)]">
+              {["Date", "Company", "Refunded", "GST inside", "Credit note", "Reference"].map((h) => (
+                <th key={h} scope="col" className={cn("px-3 py-2.5 text-[0.8125rem] font-medium text-text-subtle first:pl-[var(--admin-pad-panel)] last:pr-[var(--admin-pad-panel)]", (h === "Refunded" || h === "GST inside") && "text-right")}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {refunds.map((r) => (
+              <tr key={r.id} className="border-b border-[color:var(--admin-rule)] last:border-0">
+                <td className="nums px-3 py-2.5 first:pl-[var(--admin-pad-panel)] lg:whitespace-nowrap">{formatDate(r.date)}</td>
+                <td className="px-3 py-2.5 [overflow-wrap:anywhere]">{r.companyName ?? "-"}{r.amountNotRecorded ? <span className="block text-xs text-text-subtle">Amount not recorded: whole order counted</span> : null}</td>
+                <td className="nums px-3 py-2.5 text-right font-semibold lg:whitespace-nowrap">
+                  {formatMoney(r.amountMinor, r.currency === "USD" ? "USD" : "INR", { zeroLabel: false })}
+                  {r.currency === "USD" ? <span className="block text-xs font-normal text-text-subtle">{inr(r.inrMinor)}</span> : null}
+                </td>
+                <td className="nums px-3 py-2.5 text-right lg:whitespace-nowrap">{r.gstInrMinor > 0 ? inr(r.gstInrMinor) : "-"}</td>
+                <td className="px-3 py-2.5">{r.creditNote ?? (r.creditNoteNeeded ? <span className="font-medium text-warning">Credit note needed</span> : "-")}</td>
+                <td className="nums px-3 py-2.5 text-[0.8125rem] text-text-subtle [overflow-wrap:anywhere] last:pr-[var(--admin-pad-panel)]">{r.reference ?? ""}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Panel>
   );
 }
 

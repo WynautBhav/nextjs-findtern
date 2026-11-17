@@ -24,7 +24,12 @@ export async function GET(req: Request) {
   const rows = [
     ...data.receivables.map((r) => ({ ...r, kind: "Receivable" })),
     ...data.payables.map((r) => ({ ...r, kind: "Payable" })),
-  ];
+    // A refund is its own row beside the payment, never a negative receivable.
+    ...data.refunds.map((r) => ({
+      id: r.id, kind: "Refund to company", date: r.date, source: "company", status: r.creditNoteNeeded ? "credit note needed" : "refunded",
+      description: r.description, companyName: r.companyName, candidateName: null, amountMinor: r.amountMinor, currency: r.currency, inrMinor: r.inrMinor, reference: r.reference,
+    })),
+  ] as (MoneyRow & { kind: string })[];
   const csv = toCsv<MoneyRow & { kind: string }>(rows, [
     { header: "Type", value: (r) => r.kind },
     { header: "Date", value: (r) => r.date },

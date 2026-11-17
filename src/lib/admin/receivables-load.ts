@@ -2,6 +2,7 @@ import { eq, inArray, sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { getInternActivationFeeMinor, getPerHireFeeSetting } from "@/lib/platform-settings";
+import { SETTLED_STATUSES } from "@/lib/refund-accounting";
 import { computeReceivables } from "@/lib/admin/receivables";
 import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import { istDayKeys, istDayStart, istKeySql, istMonthKeys, istMonthStart, DRIVE_WAIVER_GATEWAY, isMoneyReceived, PAID_STATUS, receivedAtSql, utcSql, type Bucket } from "@/lib/admin/revenue";
@@ -120,14 +121,14 @@ export async function loadReceivables(
 // ----------------------------------------------------------------------
 // The one money layer, over the database (definitions: lib/admin/revenue.ts).
 
-/** Every paid employer order, intern fee and college seat batch as (source, inr_minor, received_at); test employers excluded. */
+/** Every paid employer order (a refunded one stays: the refund is a separate contra record), intern fee and college seat batch as (source, inr_minor, received_at); test employers excluded. */
 function paidReceipts(): SQL {
   const ep = schema.employerPayments;
   const ip = schema.internPayments;
   const csb = schema.collegeSeatBatches;
   return sql`(
     SELECT 'employer' AS source, ${inrMinorSql(ep.amountMinor, ep.currency)} AS inr_minor, ${receivedAtSql(ep.paidAt, ep.createdAt)} AS received_at
-      FROM ${ep} WHERE ${ep.status} = ${PAID_STATUS} AND ${realEmployerId(ep.employerId)}
+      FROM ${ep} WHERE ${ep.status} IN (${sql.join(SETTLED_STATUSES.map((x) => sql`${x}`), sql`, `)}) AND ${realEmployerId(ep.employerId)}
     UNION ALL
     SELECT 'intern', ${inrMinorSql(ip.amountMinor, ip.currency)}, ${receivedAtSql(ip.paidAt, ip.createdAt)}
       FROM ${ip} WHERE ${ip.status} = ${PAID_STATUS} AND ${ip.gateway} <> ${DRIVE_WAIVER_GATEWAY}

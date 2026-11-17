@@ -1,6 +1,7 @@
 import { eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { SETTLED_STATUSES } from "@/lib/refund-accounting";
 import { computeAnalytics, type AnalyticsInput } from "@/lib/admin/analytics";
 import { periodStart } from "@/lib/admin/params";
 import { isMoneyReceived, istDateRange, istMonthKeys, istMonthStart } from "@/lib/admin/revenue";
@@ -89,7 +90,7 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
         createdAt: schema.employerPayments.createdAt,
       })
       .from(schema.employerPayments)
-      .where(eq(schema.employerPayments.status, "paid")),
+      .where(inArray(schema.employerPayments.status, SETTLED_STATUSES)),
     db
       .select({
         internId: schema.internPayments.internId,
