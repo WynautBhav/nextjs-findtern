@@ -1,7 +1,7 @@
 import { formatMoney, formatRate } from "./format.ts";
 import { planMonthMinor } from "./plan-offer.ts";
 import { bandById, bandMoneyFor, feeSettingOf, type BandId, type PricingConfig } from "./pricing-config.ts";
-import { feePlans, joinNames } from "./per-hire-copy.ts";
+import { perHireClause } from "./per-hire-copy.ts";
 
 /**
  * The published figures as text, derived from the pricing config: the one place
@@ -100,9 +100,5 @@ export function pricingMetaSentence(config: PricingConfig): string {
 
 /** "a ₹5,000 per-hire fee on Espresso (free for now on Cappuccino and Latte)", from the admin switch. */
 export function perHireMetaClause(config: PricingConfig): string {
-  const { charged, free } = feePlans(feeSettingOf(config));
-  const fee = hireFeeText(config).inr;
-  if (charged.length === 0) return "no per-hire fee for now";
-  if (free.length === 0) return `a ${fee} per-hire fee on every plan`;
-  return `a ${fee} per-hire fee on ${joinNames(charged)} (free for now on ${joinNames(free)})`;
+  return perHireClause(feeSettingOf(config), hireFeeText(config).inr);
 }
