@@ -59,10 +59,10 @@ export function perHireAnswer(amount: string, setting: PerHireFeeSetting): strin
   return free.length ? `${base} On ${joinNames(free)} the per-hire charge is free for now.` : base;
 }
 
-/** The first sentences of the employer "When do I pay?" answer. */
-export function perHireEmployerPayAnswer(setting: PerHireFeeSetting): string {
+/** The first sentences of the employer "When do I pay?" answer. `amount` is the fee in both currencies (lib/pricing-copy hireFeeText). */
+export function perHireEmployerPayAnswer(setting: PerHireFeeSetting, amount: { inr: string; usd: string }): string {
   const { charged, free } = feePlans(setting);
   if (charged.length === 0) return "The per-hire charge is free for now on every plan.";
-  if (free.length === 0) return "The fixed ₹5,000 (or $50) per-hire charge is paid when the intern is hired.";
-  return `The fixed ₹5,000 (or $50) per-hire charge on ${joinNames(charged)} is paid when the intern is hired; on ${joinNames(free)} the per-hire charge is free for now.`;
+  if (free.length === 0) return `The fixed ${amount.inr} (or ${amount.usd}) per-hire charge is paid when the intern is hired.`;
+  return `The fixed ${amount.inr} (or ${amount.usd}) per-hire charge on ${joinNames(charged)} is paid when the intern is hired; on ${joinNames(free)} the per-hire charge is free for now.`;
 }

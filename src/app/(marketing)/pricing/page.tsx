@@ -3,23 +3,31 @@ import type { Metadata } from "next";
 import { PageHero } from "@/components/marketing/page-hero";
 import { ButtonLink } from "@/components/ui/button";
 import { PricingCta, PricingContent } from "@/components/marketing/pricing-content";
-import { getPerHireFeeSetting } from "@/lib/platform-settings";
+import { feeSettingOf, type PricingConfig } from "@/lib/pricing-config";
+import { getRenderPricingConfig } from "@/lib/pricing-config-server";
+import { hireFeeText, perHireMetaClause, rateRangeText } from "@/lib/pricing-copy";
 import { JsonLd } from "@/components/seo/json-ld";
 import { getHappyFaces, getPlans } from "@/lib/content";
 import { PageSection } from "@/components/marketing/page-hero";
 import { SectionHeading } from "@/components/ui/section-heading";
 import { TestimonialCarousel } from "@/components/marketing/testimonial-carousel";
 import { pricingFaq } from "@/lib/content/pricing-faq";
-import { formatMoney } from "@/lib/format";
 import { breadcrumbJsonLd, faqJsonLd, pricingJsonLd, webPageJsonLd } from "@/lib/seo";
 import { CurrencyPicker } from "@/components/marketing/region-rates";
 
-export const metadata: Metadata = {
-  title: "Intern Hiring Pricing: Free to ₹200/hr, Per-Hire Fee Free for Now",
-  description:
-    "Findtern's published rate card for hiring interns in India. Three plans named after coffee (Espresso, Cappuccino, Latte) priced by Findtern Score band, a ₹5,000 per-hire fee on Espresso (free for now on Cappuccino and Latte), GST included, and a monthly cost calculator.",
-  alternates: { canonical: "/pricing" },
-};
+/** Meta description: the prices are the live config's, so an admin edit reaches search results too. */
+const metaDescription = (config: PricingConfig) =>
+  `Findtern's published rate card for hiring interns in India. Three plans named after coffee (Espresso, Cappuccino, Latte) priced by Findtern Score band, ${perHireMetaClause(config)}, GST included, and a monthly cost calculator.`;
+
+// Reads the config under the marketing layout's ISR (revalidate = 300): the page stays prerendered.
+export async function generateMetadata(): Promise<Metadata> {
+  const config = await getRenderPricingConfig();
+  return {
+    title: `Intern Hiring Pricing: ${rateRangeText(config, { capital: true })}, Per-Hire Fee Free for Now`,
+    description: metaDescription(config),
+    alternates: { canonical: "/pricing" },
+  };
+}
 
 /* Amounts come from the `pricing_plans` table (seeded from the same figures
    the legacy client hardcoded, now admin-editable). Both rate cards are
@@ -27,17 +35,18 @@ export const metadata: Metadata = {
    visitors abroad. Exactly three plans per region, never six. */
 
 export default async function PricingPage() {
-  const [plansInr, plansUsd, faces, feeSetting] = await Promise.all([getPlans(true), getPlans(false), getHappyFaces(), getPerHireFeeSetting()]);
-  const perHire = formatMoney(plansInr[0]?.perHireChargeMinor ?? 500000, "INR");
+  const [plansInr, plansUsd, faces, config] = await Promise.all([getPlans(true), getPlans(false), getHappyFaces(), getRenderPricingConfig()]);
+  const feeSetting = feeSettingOf(config);
+  const perHire = hireFeeText(config).inr;
 
   return (
     <>
       <JsonLd
         data={[
-          webPageJsonLd({ path: "/pricing", name: "Findtern pricing", description: String(metadata.description) }),
+          webPageJsonLd({ path: "/pricing", name: "Findtern pricing", description: metaDescription(config) }),
           breadcrumbJsonLd([{ name: "Pricing", path: "/pricing" }]),
           pricingJsonLd(plansInr, feeSetting),
-          faqJsonLd(pricingFaq(perHire, feeSetting)),
+          faqJsonLd(pricingFaq(perHire, feeSetting, config)),
         ]}
       />
       <PageHero

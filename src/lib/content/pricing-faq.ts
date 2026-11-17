@@ -1,13 +1,16 @@
 import type { CmsFaqItem } from "./types";
-import { perHireAnswer } from "../per-hire-copy.ts";
+import { feePlans, joinNames, perHireAnswer } from "../per-hire-copy.ts";
 import { PER_HIRE_FEE_DEFAULT, type PerHireFeeSetting } from "../per-hire-fee.ts";
+import { monthlyText, rateText } from "../pricing-copy.ts";
+import { PRICING_DEFAULTS, type PricingConfig } from "../pricing-config.ts";
 
 /**
  * The pricing page's short FAQ. Shared between the accordion (client, with the
  * visitor's currency) and the FAQPage structured data (server, INR), so the
- * answers Google indexes are the answers a visitor reads.
+ * answers Google indexes are the answers a visitor reads. The monthly figures
+ * in "How much does an intern cost per month?" are computed from `config`.
  */
-export function pricingFaq(perHire: string, feeSetting: PerHireFeeSetting = PER_HIRE_FEE_DEFAULT): CmsFaqItem[] {
+export function pricingFaq(perHire: string, feeSetting: PerHireFeeSetting = PER_HIRE_FEE_DEFAULT, config: PricingConfig = PRICING_DEFAULTS): CmsFaqItem[] {
   return [
     {
       id: "p1",
@@ -42,7 +45,7 @@ export function pricingFaq(perHire: string, feeSetting: PerHireFeeSetting = PER_
       category: "Pricing",
       question: "How much does an intern cost per month?",
       answer:
-        "Multiply the hourly rate by the hours you need. A Monday-to-Friday month is billed as 22 working days of 8 hours, 176 hours: ₹17,600 a month on Cappuccino (₹100/hr) and ₹35,200 on Latte (₹200/hr), plus the one-time per-hire fee on Espresso (free for now on Cappuccino and Latte). The calculator on the pricing page does this for your own schedule.",
+        `Multiply the hourly rate by the hours you need. A Monday-to-Friday month is billed as 22 working days of 8 hours, 176 hours: ${monthlyText(config, "skilled")} a month on Cappuccino (${rateText(config, "skilled")}) and ${monthlyText(config, "assured")} on Latte (${rateText(config, "assured")}), ${feeClause(feeSetting)}. The calculator on the pricing page does this for your own schedule.`,
       sortOrder: 3,
       isActive: true,
     },
@@ -65,4 +68,12 @@ export function pricingFaq(perHire: string, feeSetting: PerHireFeeSetting = PER_
       isActive: true,
     },
   ];
+}
+
+/** "plus the one-time per-hire fee on Espresso (free for now on Cappuccino and Latte)", following the admin switch. */
+function feeClause(setting: PerHireFeeSetting): string {
+  const { charged, free } = feePlans(setting);
+  if (charged.length === 0) return "with no per-hire fee for now";
+  if (free.length === 0) return "plus the one-time per-hire fee on every plan";
+  return `plus the one-time per-hire fee on ${joinNames(charged)} (free for now on ${joinNames(free)})`;
 }
