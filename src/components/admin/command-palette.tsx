@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
-import { invoiceHref, SEARCH_MIN, type SearchResponse } from "@/lib/admin/palette-search";
+import { candidateHref, invoiceHref, SEARCH_MIN, type SearchResponse } from "@/lib/admin/palette-search";
 import { cn } from "@/lib/utils";
 
 /** One sidebar link the signed-in admin may open (already permission-filtered by the layout). */
@@ -118,7 +118,7 @@ function sections(items: PaletteItem[], q: string, search: SearchState | null): 
           icon: g.icon,
           href:
             g.key === "candidates"
-              ? `/admin/interns/${encodeURIComponent(h.id)}`
+              ? candidateHref(h)
               : g.key === "companies"
                 ? `/admin/companies/${encodeURIComponent(h.id)}`
                 : invoiceHref(h as SearchResponse["invoices"][number]),

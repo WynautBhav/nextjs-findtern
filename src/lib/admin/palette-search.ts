@@ -49,3 +49,8 @@ export function invoiceHref(hit: Pick<InvoiceHit, "kind" | "label">): string {
   const base = hit.kind === "intern" ? "/admin/intern-invoices" : "/admin/orders";
   return `${base}?q=${encodeURIComponent(hit.label)}`;
 }
+
+/** Where a candidate result opens: the candidates list filtered to the name, not the profile. */
+export function candidateHref(hit: Pick<SearchHit, "label">): string {
+  return `/admin/interns?q=${encodeURIComponent(hit.label)}`;
+}

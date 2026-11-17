@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { allowedGroups, cleanQuery, escapeLike, invoiceHref, likePattern } from "./palette-search.ts";
+import { allowedGroups, candidateHref, cleanQuery, escapeLike, invoiceHref, likePattern } from "./palette-search.ts";
 
 test("escapeLike makes %, _ and backslash literal", () => {
   assert.equal(escapeLike("50%_off\\"), "50\\%\\_off\\\\");
@@ -28,4 +28,8 @@ test("allowedGroups follows the session permissions", () => {
 test("invoiceHref opens the right list with the number as the search", () => {
   assert.equal(invoiceHref({ kind: "order", label: "FT/2026-27/0001" }), "/admin/orders?q=FT%2F2026-27%2F0001");
   assert.equal(invoiceHref({ kind: "intern", label: "021126-124" }), "/admin/intern-invoices?q=021126-124");
+});
+
+test("candidateHref shows the candidate in the filtered list, not the profile", () => {
+  assert.equal(candidateHref({ label: "Asha Rao" }), "/admin/interns?q=Asha%20Rao");
 });
