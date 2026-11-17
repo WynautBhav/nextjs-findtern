@@ -249,8 +249,9 @@ test("a refunded or partially refunded order is not 'unpaid': the company does n
     assert.equal(f.ledgerPaid, 0);
   }
   for (const status of ["refunded", "partially_refunded"]) {
+    // Paying hires the proposal, so a paid-then-refunded order belongs to a hired hire.
     const o = { ...order("o1", 2_900_000, ["h1"], "total"), status };
-    const f = figures(H, [o]);
+    const f = figures(hire("h1", 8000), [o]);
     say(`order ${status}`, "paid stays recorded, nothing owed again", { paid: money(f.ledgerPaid), due: money(f.listDue) });
     assert.equal(f.listDue, 0);
     assert.equal(f.reportDue, 0);
