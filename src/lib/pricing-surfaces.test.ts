@@ -2,12 +2,14 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { brandContext, platformHelpContext, systemPrompt } from "./chatbot/knowledge-text.ts";
+import { FAQ_EMPLOYER, FAQ_INTERN } from "./content/faq.ts";
 import { pricingFaq } from "./content/pricing-faq.ts";
 import { doorPoints } from "./auth-doors.ts";
 import { perHireEmployerPayAnswer } from "./per-hire-copy.ts";
 import {
   activationFeeText,
   hireFeeText,
+  llmsFaqs,
   llmsInternMoneyLines,
   monthlyText,
   perHireMetaClause,
@@ -88,10 +90,9 @@ test("edited (hourly 12300, fee 650000, stipend 900000): every text surface foll
   assert.match(p4.answer, /₹21,648 a month on Cappuccino \(₹123\/hr\) and ₹21,648 on Latte \(₹123\/hr\), plus the one-time per-hire fee on every plan/);
   assert.match(doorPoints(hireFeeText(EDITED)).employer.at(-1)!.text, /^₹6,500 \(or \$65\)/);
   assert.match(perHireEmployerPayAnswer(fee, hireFeeText(EDITED)), /₹6,500 \(or \$65\)/);
-  assert.deepEqual(llmsInternMoneyLines(EDITED), [
-    "- Candidate AI interview fee: ₹3,499 one-time, paid by the candidate (INR)",
-    "- Intern stipend: a fixed monthly stipend of ₹9,000 at a score of 6 to 8 and ₹9,000 at 8 to 10; none below a score of 6",
-  ]);
+  // llms.txt is read by employers' tools and public crawlers: the interview fee only, never intern pay.
+  assert.deepEqual(llmsInternMoneyLines(EDITED), ["- Candidate AI interview fee: ₹3,499 one-time, paid by the candidate (INR)"]);
+  assert.doesNotMatch(llmsInternMoneyLines(EDITED).join("\n"), /stipend|₹\s?9,000|900000/i);
 });
 
 test("different fees on the charged plans are quoted as a range, not one band's fee for another", () => {
@@ -102,11 +103,20 @@ test("different fees on the charged plans are quoted as a range, not one band's 
   assert.equal(hireFeeText(cfg).inr, "₹5,000 to ₹6,500");
 });
 
-test("llms.txt default lines carry the activation fee and the stipends", () => {
-  assert.deepEqual(llmsInternMoneyLines(PRICING_DEFAULTS), [
-    "- Candidate AI interview fee: ₹2,499 one-time, paid by the candidate (INR)",
-    "- Intern stipend: a fixed monthly stipend of ₹8,000 at a score of 6 to 8 and ₹15,000 at 8 to 10; none below a score of 6",
-  ]);
+test("llms.txt default lines carry the activation fee and no stipend text", () => {
+  const lines = llmsInternMoneyLines(PRICING_DEFAULTS);
+  assert.deepEqual(lines, ["- Candidate AI interview fee: ₹2,499 one-time, paid by the candidate (INR)"]);
+  assert.doesNotMatch(lines.join("\n"), /stipend|₹\s?8,000|₹\s?15,000/i);
+});
+
+test("llms.txt text (money lines + emitted FAQs), default and edited config: no stipend word or amount, fee and plan lines kept", () => {
+  const faqs = llmsFaqs([...FAQ_INTERN, ...FAQ_EMPLOYER]).slice(0, 16);
+  for (const [cfg, fee] of [[PRICING_DEFAULTS, "₹2,499"], [EDITED, "₹3,499"]] as const) {
+    const text = [...llmsInternMoneyLines(cfg), `- Pricing: ${pricingMetaSentence(cfg)}`, ...faqs.map((f) => `${f.question} ${f.answer}`)].join("\n");
+    assert.doesNotMatch(text, /stipend|₹\s?8,000|₹\s?15,000|₹\s?9,000/i);
+    assert.match(text, new RegExp(`AI interview fee: ${fee} one-time`));
+    assert.match(text, /Three published plans from/);
+  }
 });
 
 test("client bands: score card and plan cards read the live config, in both currencies", () => {

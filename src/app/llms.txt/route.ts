@@ -3,7 +3,7 @@ import { SITE } from "@/lib/content/site";
 import { formatMoney, formatRate } from "@/lib/format";
 import { perHireFreeForNow } from "@/lib/plan-offer";
 import { getPricingConfig } from "@/lib/platform-settings";
-import { llmsInternMoneyLines } from "@/lib/pricing-copy";
+import { llmsFaqs, llmsInternMoneyLines } from "@/lib/pricing-copy";
 import { feeSettingOf } from "@/lib/pricing-config";
 import { plainTextExcerpt } from "@/lib/richtext";
 import { SITE_URL } from "@/lib/seo";
@@ -22,8 +22,8 @@ export async function GET() {
   const [plans, posts, faqs, config] = await Promise.all([getPlans(true), getBlogPosts().catch(() => []), getFaqItems(), getPricingConfig()]);
   const feeSetting = feeSettingOf(config);
   const isEmployerFaq = (f: (typeof faqs)[number]) => f.category.trim().toLowerCase().startsWith("employer");
-  const employerFaqs = faqs.filter(isEmployerFaq);
-  const internFaqs = faqs.filter((f) => !isEmployerFaq(f));
+  const employerFaqs = llmsFaqs(faqs.filter(isEmployerFaq));
+  const internFaqs = llmsFaqs(faqs.filter((f) => !isEmployerFaq(f)));
 
   const lines: string[] = [
     `# ${SITE.name}`,

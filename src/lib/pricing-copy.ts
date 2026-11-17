@@ -76,17 +76,18 @@ export function stipendText(config: PricingConfig, id: BandId): string | null {
   return minor === null ? null : formatMoney(minor, "INR");
 }
 
-/** The intern-side money lines for llms.txt, from the config: the AI interview fee and the fixed monthly stipends. */
+/**
+ * The intern-side money lines for llms.txt: the AI interview fee only. llms.txt is read by employers'
+ * tools and public crawlers, and the owner's rule is that employers never see what an intern is paid,
+ * so no stipend or bonus text goes here.
+ */
 export function llmsInternMoneyLines(config: PricingConfig): string[] {
-  const skilled = stipendText(config, "skilled");
-  const assured = stipendText(config, "assured");
-  const stipends = [skilled ? `${skilled} at a score of 6 to 8` : null, assured ? `${assured} at 8 to 10` : null].filter(Boolean);
-  return [
-    `- Candidate AI interview fee: ${activationFeeText(config)} one-time, paid by the candidate (INR)`,
-    stipends.length
-      ? `- Intern stipend: a fixed monthly stipend of ${stipends.join(" and ")}; none below a score of 6`
-      : "- Intern stipend: none is currently published",
-  ];
+  return [`- Candidate AI interview fee: ${activationFeeText(config)} one-time, paid by the candidate (INR)`];
+}
+
+/** FAQ entries safe for llms.txt: drops any that state intern pay (stipend, completion bonus, payout). */
+export function llmsFaqs<T extends { question: string; answer: string }>(faqs: readonly T[]): T[] {
+  return faqs.filter((f) => !/stipend|bonus|payout/i.test(`${f.question} ${f.answer}`));
 }
 
 /**

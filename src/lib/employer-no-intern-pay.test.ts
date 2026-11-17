@@ -4,7 +4,7 @@ import { join } from "node:path";
 import test from "node:test";
 
 import { systemPrompt } from "./chatbot/knowledge-text.ts";
-import { FAQ_EMPLOYER } from "./content/faq.ts";
+import { FAQ_EMPLOYER, FAQ_INTERN } from "./content/faq.ts";
 import { PRICING_PLANS } from "./content/home.ts";
 import type { Proposal } from "./db/schema.ts";
 import { toEmployerProposal } from "./employer-proposal-view.ts";
@@ -12,6 +12,7 @@ import { emails } from "./emails.ts";
 import { hireInvoiceLines } from "./invoice-lines.ts";
 import { buildOffer, parseOffer } from "./offer.ts";
 import { PRICING_DEFAULTS } from "./pricing-config.ts";
+import { llmsFaqs, llmsInternMoneyLines } from "./pricing-copy.ts";
 
 const ROOT = join(import.meta.dirname, "..", "..");
 // Owner rule (6 Nov 2026): an employer never sees what the intern is paid.
@@ -104,6 +105,19 @@ test("source guard: employer code, checkout and employer marketing never referen
     const hit = stripComments(readFileSync(f, "utf8")).match(banned);
     assert.equal(hit, null, `${f.slice(ROOT.length)} mentions "${hit?.[0]}"`);
   }
+});
+
+test("/llms.txt (read by employers' tools and public crawlers) never states intern pay", () => {
+  const amounts = /stipend|bonus|payout|₹\s?8,000|₹\s?15,000/i;
+  // The intern FAQs do mention pay, so the route must emit its FAQ list through llmsFaqs.
+  assert.ok(FAQ_INTERN.some((f) => amounts.test(`${f.question} ${f.answer}`)), "fixture: some intern FAQ mentions pay");
+  const emitted = llmsFaqs([...FAQ_INTERN, ...FAQ_EMPLOYER]);
+  assert.ok(emitted.length > 20);
+  for (const f of emitted) assert.doesNotMatch(`${f.question} ${f.answer}`, amounts, f.question);
+  assert.doesNotMatch(llmsInternMoneyLines(PRICING_DEFAULTS).join("\n"), amounts);
+  const route = stripComments(readFileSync(join(ROOT, "src/app/llms.txt/route.ts"), "utf8"));
+  assert.match(route, /llmsFaqs\(/);
+  assert.doesNotMatch(route, /\bstipends?\b|bonus|payout/i);
 });
 
 test("employer proposal routes answer with id and status only, never the whole row", () => {
