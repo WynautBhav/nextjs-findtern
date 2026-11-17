@@ -2,8 +2,11 @@
 
 import { useRef, useState } from "react";
 import { CalendarDays } from "lucide-react";
+import { Popover } from "radix-ui";
 
 import { cn } from "@/lib/utils";
+import { DayCalendar } from "./day-calendar";
+import { nextOpenDay } from "./day-calendar-model";
 
 /**
  * A date field in DD/MM/YYYY, the one format the product shows (bug sheet 7,
@@ -16,6 +19,11 @@ import { cn } from "@/lib/utils";
  * A calendar button sits at the end of the field (bug sheet 9: "add calendar in
  * start date"): it opens the browser's own picker through a hidden date input,
  * as the intern forms do, and the picked day lands in the text as DD/MM/YYYY.
+ *
+ * `isDisabled` (days a rule forbids, such as weekends) swaps that native picker for a month calendar that greys those
+ * days out, because the native control cannot. The button is then a real, focusable control (the typed field still
+ * works too). The field reports the typed date as it is; the caller decides what to do with a day it refuses (it can
+ * move it and say so).
  */
 
 function toIso(text: string): string {
@@ -37,6 +45,7 @@ export function DmyDateInput({
   onChange,
   min,
   max,
+  isDisabled,
   className,
   ...rest
 }: Omit<React.ComponentProps<"input">, "value" | "onChange" | "type" | "min" | "max"> & {
@@ -44,6 +53,8 @@ export function DmyDateInput({
   onChange: (iso: string) => void;
   min?: string;
   max?: string;
+  /** Days that cannot be picked; given, the calendar button opens a month grid with them greyed out. */
+  isDisabled?: (iso: string) => boolean;
 }) {
   const [text, setText] = useState(() => toDmy(value));
   // Follow a value set from outside (a reset, a prefill) without fighting
@@ -55,6 +66,9 @@ export function DmyDateInput({
   }
   const field = useRef<HTMLInputElement>(null);
   const picker = useRef<HTMLInputElement>(null);
+  const [open, setOpen] = useState(false);
+  // India's today, read when the calendar opens (not on every render).
+  const [today, setToday] = useState("");
 
   function commit(next: string) {
     setText(next);
@@ -98,33 +112,77 @@ export function DmyDateInput({
         onChange={(e) => commit(e.target.value)}
         className={cn(className, "pr-12")}
       />
-      {/* The picker never shows itself: the button below opens it. */}
-      <input
-        ref={picker}
-        type="date"
-        tabIndex={-1}
-        aria-hidden
-        value={toIso(text)}
-        min={min}
-        max={max}
-        onChange={(e) => {
-          if (e.target.value) commit(toDmy(e.target.value));
-        }}
-        className="pointer-events-none absolute bottom-0.5 right-0.5 size-10 opacity-0"
-      />
-      <button
-        type="button"
-        onClick={openPicker}
-        disabled={rest.disabled}
-        // A mouse shortcut, hidden from assistive technology: the field itself takes the typed date, and inside a
-        // <label> a visible button would be read out as part of the field's name ("Paid from Open calendar").
-        aria-hidden
-        aria-label={name ? `Open calendar, ${name}` : "Open calendar"}
-        tabIndex={-1}
-        className="apple-spring absolute bottom-0.5 right-0.5 grid size-10 place-items-center rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-brand-700 disabled:pointer-events-none"
-      >
-        <CalendarDays className="size-[1.125rem]" aria-hidden />
-      </button>
+      {isDisabled ? (
+        <Popover.Root
+          open={open}
+          onOpenChange={(o) => {
+            if (o) setToday(new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10));
+            setOpen(o);
+          }}
+        >
+          <Popover.Trigger asChild>
+            <button
+              type="button"
+              disabled={rest.disabled}
+              aria-label={name ? `Open calendar, ${name}` : "Open calendar"}
+              className="apple-spring absolute bottom-0.5 right-0.5 grid size-10 place-items-center rounded-apple-sm text-text-subtle outline-none hover:bg-ink-100 hover:text-brand-700 focus-visible:ring-2 focus-visible:ring-brand-600 disabled:pointer-events-none"
+            >
+              <CalendarDays className="size-[1.125rem]" aria-hidden />
+            </button>
+          </Popover.Trigger>
+          <Popover.Portal>
+            <Popover.Content
+              align="end"
+              sideOffset={6}
+              collisionPadding={16}
+              aria-label="Choose a date"
+              className="z-[70] rounded-apple-lg border border-ink-200 bg-white p-3 shadow-lg outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 motion-reduce:animate-none"
+            >
+              <DayCalendar
+                selected={toIso(text)}
+                startDay={toIso(text) || nextOpenDay(today, isDisabled)}
+                today={today}
+                isDisabled={isDisabled}
+                note="Greyed-out days are unavailable."
+                onPick={(iso) => {
+                  commit(toDmy(iso));
+                  setOpen(false);
+                }}
+              />
+            </Popover.Content>
+          </Popover.Portal>
+        </Popover.Root>
+      ) : (
+        <>
+          {/* The picker never shows itself: the button below opens it. */}
+          <input
+            ref={picker}
+            type="date"
+            tabIndex={-1}
+            aria-hidden
+            value={toIso(text)}
+            min={min}
+            max={max}
+            onChange={(e) => {
+              if (e.target.value) commit(toDmy(e.target.value));
+            }}
+            className="pointer-events-none absolute bottom-0.5 right-0.5 size-10 opacity-0"
+          />
+          <button
+            type="button"
+            onClick={openPicker}
+            disabled={rest.disabled}
+            // A mouse shortcut, hidden from assistive technology: the field itself takes the typed date, and inside a
+            // <label> a visible button would be read out as part of the field's name ("Paid from Open calendar").
+            aria-hidden
+            aria-label={name ? `Open calendar, ${name}` : "Open calendar"}
+            tabIndex={-1}
+            className="apple-spring absolute bottom-0.5 right-0.5 grid size-10 place-items-center rounded-apple-sm text-text-subtle hover:bg-ink-100 hover:text-brand-700 disabled:pointer-events-none"
+          >
+            <CalendarDays className="size-[1.125rem]" aria-hidden />
+          </button>
+        </>
+      )}
     </div>
   );
 }

@@ -1,16 +1,13 @@
 /** Pure pieces of the proposal composer, moved verbatim out of the form. */
 
+import { startDateIssue } from "../start-date-model.ts";
+
 export const DURATIONS = [
   { value: "1m", label: "1 month" },
   { value: "2m", label: "2 months" },
   { value: "3m", label: "3 months" },
   { value: "6m", label: "6 months" },
 ] as const;
-
-/** Tomorrow in India, as YYYY-MM-DD. */
-export function tomorrowIst(): string {
-  return new Date(Date.now() + 330 * 60_000 + 86_400_000).toISOString().slice(0, 10);
-}
 
 /* ── Validation ──────────────────────────────────────────────────────────── */
 
@@ -19,7 +16,6 @@ export type Draft = {
   roleTitle: string;
   duration: string;
   startDate: string;
-  minStart: string;
   mode: string;
   city: string;
   state: string;
@@ -40,13 +36,8 @@ export function validate(draft: Draft): Record<string, string> {
   if (!draft.projectId) errors.projectId = "A proposal must attach to one of your projects.";
   if (draft.roleTitle.trim().length < 2) errors.roleTitle = "Give the role a title.";
   if (!DURATIONS.some((d) => d.value === draft.duration)) errors.duration = "Pick a duration.";
-  if (!draft.startDate) {
-    errors.startDate = "Pick a start date after today, as DD/MM/YYYY.";
-  } else if (Number.isNaN(Date.parse(draft.startDate))) {
-    errors.startDate = "That is not a date.";
-  } else if (draft.startDate < draft.minStart) {
-    errors.startDate = "Pick a date after today.";
-  }
+  const startIssue = startDateIssue(draft.startDate, new Date());
+  if (startIssue) errors.startDate = startIssue;
 
   if (draft.mode !== "remote" && !draft.city.trim()) {
     errors.city = "An on-site or hybrid role needs a city.";

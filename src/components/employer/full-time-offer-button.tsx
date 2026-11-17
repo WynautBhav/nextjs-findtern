@@ -9,6 +9,8 @@ import { FileUpload } from "@/components/app/file-upload";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { buttonClass } from "@/components/ui/button";
 import { CityField, StateField } from "@/components/employer/location-fields";
+import { StartDateField } from "@/components/employer/start-date-field";
+import { startDateIssue } from "@/components/employer/start-date-model";
 import { fieldClass, labelClass } from "@/components/employer/ui-tokens";
 import { fullTimeFeeMinor } from "@/lib/checkout";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -68,10 +70,13 @@ export function FullTimeOfferButton({
     shiftTo: "18:00",
     ctcCurrency: "INR",
     annualCtc: "",
+    /** Optional joining date, YYYY-MM-DD; "" when none. */
+    startDate: "",
   });
   const [letter, setLetter] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [startError, setStartError] = useState<string | undefined>(undefined);
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setV((s) => ({ ...s, [k]: e.target.value }));
   const usdBlocked = v.ctcCurrency === "USD" && fte !== "approved";
   const ctc = Number(v.annualCtc);
@@ -97,16 +102,26 @@ export function FullTimeOfferButton({
     e.preventDefault();
     if (!letter) return setError("Upload the offer letter (PDF) first.");
     if (v.jobMode !== "remote" && (!v.jobLocationState || !v.jobLocationCity)) return setError("Pick the city and state of the role.");
+    const startIssue = v.startDate ? startDateIssue(v.startDate, new Date()) : null;
+    if (startIssue) {
+      setStartError(startIssue);
+      return setError(startIssue);
+    }
     setBusy(true);
     setError(null);
+    setStartError(undefined);
     try {
       const res = await csrfFetch(`/api/employer/${employerId}/full-time-offer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...v, proposalId, annualCtc: ctc, offerLetterKey: letter }),
+        body: JSON.stringify({ ...v, startDate: v.startDate || undefined, proposalId, annualCtc: ctc, offerLetterKey: letter }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) return setError(data.error ?? "Couldn't send the offer.");
+      if (!res.ok) {
+        // The server judged the date against its own clock: show its words under the field too.
+        if (v.startDate && /start date/i.test(data.error ?? "")) setStartError(data.error);
+        return setError(data.error ?? "Couldn't send the offer.");
+      }
       setOpen(false);
       router.refresh();
     } catch {
@@ -191,6 +206,16 @@ export function FullTimeOfferButton({
                 </select>
               </label>
             </div>
+            <StartDateField
+              label="Joining date (optional)"
+              hint="Leave it blank if the date is not fixed yet."
+              value={v.startDate}
+              error={startError}
+              onChange={(startDate) => {
+                setStartError(undefined);
+                setV((s) => ({ ...s, startDate }));
+              }}
+            />
             <div className="grid gap-3 sm:grid-cols-[8rem_1fr]">
               <label className={labelClass}>
                 Currency

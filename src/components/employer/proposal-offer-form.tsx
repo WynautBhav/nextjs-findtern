@@ -27,7 +27,8 @@ import { shiftInIst, TIMEZONES } from "@/lib/timezones";
 import type { FeeDisplay } from "@/lib/fee-display";
 import { LEARN_LABEL, learnIssue } from "@/lib/proposal-copy";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
-import { DmyDateInput } from "@/components/app/dmy-date-input";
+import { StartDateField } from "@/components/employer/start-date-field";
+import { startDateIssue } from "@/components/employer/start-date-model";
 import { fieldClass } from "@/components/employer/ui-tokens";
 import { cn } from "@/lib/utils";
 
@@ -59,11 +60,6 @@ const MODE_OPTIONS = [
 ];
 
 const DURATIONS = ["1m", "2m", "3m", "6m"] as const;
-
-/** Tomorrow in India: an offer lapses on its start date. */
-function tomorrowIst(): string {
-  return new Date(Date.now() + 330 * 60_000 + 86_400_000).toISOString().slice(0, 10);
-}
 
 const INPUT = fieldClass;
 const LABEL = "mb-1.5 block text-sm font-medium text-ink-800";
@@ -117,7 +113,9 @@ export function ProposalOfferForm({
   const [open, setOpen] = useState(defaultOpen);
   const [roleTitle, setRoleTitle] = useState(initial.roleTitle ?? "");
   const [duration, setDuration] = useState(initial.duration ?? "3m");
-  const [startDate, setStartDate] = useState(/^\d{4}-\d{2}-\d{2}$/.test(initial.startDate ?? "") ? initial.startDate! : "");
+  // The date the offer went out with: kept as it is unless the employer picks another.
+  const initialStart = /^\d{4}-\d{2}-\d{2}$/.test(initial.startDate ?? "") ? initial.startDate! : "";
+  const [startDate, setStartDate] = useState(initialStart);
   const [schedule, setSchedule] = useState<WeeklySchedule>(weeklyScheduleOf(initial.weeklySchedule));
   // Older offers could carry any leave count; snap to the half-day choices.
   const [leaves, setLeaves] = useState(String(Math.min(3, Math.round((initial.paidLeavesPerMonth ?? 0) * 2) / 2)));
@@ -166,7 +164,10 @@ export function ProposalOfferForm({
     setError("");
     setErrorField("");
     if (roleTitle.trim().length < 2) return fail("title", "Give the role a title.");
-    if (!startDate || startDate < tomorrowIst()) return fail("start", "Pick a start date after today.");
+    // The start date the offer already has was valid when it went out and is never judged again; a changed one is
+    // held to the weekday-and-two-days rule, from now (the same words as the server).
+    const startIssue = startDateIssue(startDate, new Date(), initialStart);
+    if (startIssue) return fail("start", startIssue);
     if (mode !== "remote" && (!city.trim() || !state.trim())) return fail(city.trim() ? "state" : "city", "An on-site or hybrid role needs a city and state.");
     if (mode === "hybrid" && !(Number(officeDays) >= 1 && homeDays >= 1)) return fail("office", `Split the ${week} working days between office and home.`);
     if (!shiftFrom || !shiftTo || shiftFrom === shiftTo) return fail(shiftFrom ? "shiftTo" : "shiftFrom", "Pick a start and end time.");
@@ -211,6 +212,8 @@ export function ProposalOfferForm({
       const json = (await res.json().catch(() => null)) as { error?: string } | null;
       if (!res.ok) {
         setError(json?.error ?? "Couldn't save. Nothing changed - try again.");
+        // The server judged the date against its own clock: its words go under the field.
+        if (/start date/i.test(json?.error ?? "")) setErrorField("start");
         return;
       }
       setOpen(false);
@@ -253,10 +256,19 @@ export function ProposalOfferForm({
             ))}
           </select>
         </label>
-        <label className="block">
-          <span className={LABEL}>Start date</span>
-          <DmyDateInput {...fieldProps("start")} min={tomorrowIst()} value={startDate} onChange={setStartDate} className={INPUT} />
-        </label>
+        <StartDateField
+          id={`${uid}-start`}
+          value={startDate}
+          keep={initialStart}
+          error={errorField === "start" ? error : undefined}
+          onChange={(v) => {
+            setStartDate(v);
+            if (errorField === "start") {
+              setError("");
+              setErrorField("");
+            }
+          }}
+        />
         <label className="col-span-2 block">
           <span className={LABEL}>Working week</span>
           <select
@@ -415,7 +427,7 @@ export function ProposalOfferForm({
           className={cn(fieldClass, "py-2.5 leading-relaxed")}
         />
       </label>
-      {error ? (
+      {error && errorField !== "start" ? (
         <p id={errId} role="alert" className="text-sm font-medium text-danger">
           {error}
         </p>

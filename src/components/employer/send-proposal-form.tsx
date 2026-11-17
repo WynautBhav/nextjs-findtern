@@ -22,7 +22,8 @@ import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
 import { CountdownAgreement, EMPLOYER_HIRING_POLICY } from "@/components/app/countdown-agreement";
-import { DmyDateInput } from "@/components/app/dmy-date-input";
+import { StartDateField } from "@/components/employer/start-date-field";
+import { startDateIssue } from "@/components/employer/start-date-model";
 import { onRadioKeys, radioTab } from "@/components/intern/onboarding/fields";
 import { fieldClass } from "@/components/employer/ui-tokens";
 
@@ -176,8 +177,6 @@ export function SendProposalForm({
   const rate = pricing[currency];
   // The intern reads the hours in India time (legacy composer; EMH-31).
   const istHours = shiftInIst(shiftFrom, shiftTo, timezone, startDate || null);
-  // An offer lapses on its start date, so the earliest start is tomorrow (IST).
-  const minStart = useMemo(() => tomorrowIst(), []);
 
   // The same sum the server does: (working days − paid leave) × 8 h × rate.
   const monthlyHours = scheduledMonthlyHours(schedule, Number(paidLeaves) || 0);
@@ -200,7 +199,7 @@ export function SendProposalForm({
       document.getElementById("projectId")?.focus();
       return;
     }
-    const problems = validate({ projectId, roleTitle, duration, startDate, minStart, mode, city, state, officeDays, homeDays, week, laptop, message, additionalInfo, shiftFrom, shiftTo, timezone });
+    const problems = validate({ projectId, roleTitle, duration, startDate, mode, city, state, officeDays, homeDays, week, laptop, message, additionalInfo, shiftFrom, shiftTo, timezone });
     setErrors(problems);
     if (Object.keys(problems).length > 0) {
       setNotice({ tone: "bad", text: "Some details need attention before this can be sent." });
@@ -367,11 +366,8 @@ export function SendProposalForm({
                 <p className="mt-1.5 text-xs text-text-subtle">Candidates scoring below 6 can be offered up to 2 months.</p>
               ) : null}
             </div>
-            <Field
+            <StartDateField
               id="startDate"
-              label="Start date"
-              type="date"
-              min={minStart}
               value={startDate}
               error={errors.startDate}
               hint="The offer closes on this date if unanswered."
@@ -746,11 +742,6 @@ function Step({
   );
 }
 
-/** Tomorrow in India, as YYYY-MM-DD. */
-function tomorrowIst(): string {
-  return new Date(Date.now() + 330 * 60_000 + 86_400_000).toISOString().slice(0, 10);
-}
-
 function Row({
   label,
   children,
@@ -800,33 +791,19 @@ function Field({
         {label}
       </label>
       {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
-      {type === "date" ? (
-        // DD/MM/YYYY, not the browser's native date control (QA-126).
-        <DmyDateInput
-          id={id}
-          name={id}
-          value={value}
-          min={min}
-          onChange={onChange}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? `${id}-error` : undefined}
-          className={fieldCls(Boolean(error))}
-        />
-      ) : (
-        <input
-          id={id}
-          name={id}
-          type={type}
-          value={value}
-          placeholder={placeholder}
-          inputMode={inputMode}
-          min={min}
-          onChange={(e) => onChange(e.target.value)}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={error ? `${id}-error` : undefined}
-          className={fieldCls(Boolean(error))}
-        />
-      )}
+      <input
+        id={id}
+        name={id}
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        inputMode={inputMode}
+        min={min}
+        onChange={(e) => onChange(e.target.value)}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={fieldCls(Boolean(error))}
+      />
       {error ? (
         <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
           {error}
@@ -967,7 +944,6 @@ type Draft = {
   roleTitle: string;
   duration: string;
   startDate: string;
-  minStart: string;
   mode: string;
   city: string;
   state: string;
@@ -989,13 +965,9 @@ function validate(draft: Draft): Record<string, string> {
   if (!draft.projectId) errors.projectId = "A proposal must attach to one of your projects.";
   if (draft.roleTitle.trim().length < 2) errors.roleTitle = "Give the role a title.";
   if (!DURATIONS.some((d) => d.value === draft.duration)) errors.duration = "Pick a duration.";
-  if (!draft.startDate) {
-    errors.startDate = "Pick a start date after today, as DD/MM/YYYY.";
-  } else if (Number.isNaN(Date.parse(draft.startDate))) {
-    errors.startDate = "That is not a date.";
-  } else if (draft.startDate < draft.minStart) {
-    errors.startDate = "Pick a date after today.";
-  }
+  // A weekday, two days after today at least: the words the server answers with too (lib/business-days.ts).
+  const startIssue = startDateIssue(draft.startDate, new Date());
+  if (startIssue) errors.startDate = startIssue;
 
   if (draft.mode !== "remote" && !draft.city.trim()) {
     errors.city = "An on-site or hybrid role needs a city.";
