@@ -75,7 +75,7 @@ export async function GET(req: Request) {
     case "proposals":
       return exportProposals(req2.search, params);
     case "payments":
-      return exportPayments(req2.search, params);
+      return exportPayments(req2.search, params, session.uid);
     case "payouts":
       return exportPayouts(req2.search, params);
     case "intern-payments":
@@ -378,7 +378,7 @@ async function exportCollegeBatches(search: string, params: Record<string, strin
   return csvResponse(toCsv(rows, columns), csvFilename("college-payments"));
 }
 
-async function exportPayments(search: string, params: Record<string, string>) {
+async function exportPayments(search: string, params: Record<string, string>, adminId?: string) {
   if (params.source === "college") return exportCollegeBatches(search, params);
   const db = getDb();
 
@@ -457,6 +457,13 @@ async function exportPayments(search: string, params: Record<string, string>) {
     { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
   ];
 
+  // Billing data (company emails, GSTINs, amounts): fail closed like the candidate export, no audit row, no file.
+  try {
+    await recordAdminAudit(getDb(), { adminId: adminId ?? "unknown", action: "export.payments", targetType: "employer_payments", targetId: null, meta: { rows: rows.length, filters: params } }, { strict: true });
+  } catch (err) {
+    console.error("[admin/export] audit insert failed", err);
+    return NextResponse.json({ error: "Could not record the export" }, { status: 500 });
+  }
   return csvResponse(toCsv(rows, columns), csvFilename("payments"));
 }
 

@@ -20,6 +20,7 @@ export const AUDIT_ACTIONS = {
   "export.audit_log": "Exported the audit log",
   "export.users": "Exported registered users",
   "export.payouts": "Exported payouts or employer dues",
+  "export.payments": "Exported employer payments (orders and invoices)",
   "export.hired": "Exported hired candidates",
   "payout.resend_email": "Resent a payout email",
   "payout.mark_paid": "Marked a payout paid",

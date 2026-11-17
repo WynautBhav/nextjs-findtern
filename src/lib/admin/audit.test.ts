@@ -91,6 +91,7 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "refund.reconcile": { refundId: "r-1", from: "initiated", to: "refunded", gatewayRefundId: "rfnd_1", gatewayStatus: "processed", gatewayAmountMinor: 250000, storedAmountMinor: 250000 },
   "refund.webhook": { refundId: "r-1", from: "initiated", to: "refunded", gatewayRefundId: "rfnd_1", reason: "drive_entitlement_after_payment", trigger: "razorpay webhook" },
   "refund.employer_recorded": { orderId: "o-1", gatewayRefundId: "rfnd_1", amountMinor: 1000000, currency: "INR", refundedAfterMinor: 1000000, paidMinor: 2900000, trigger: "razorpay webhook" },
+  "export.payments": { rows: 12, filters: { status: "paid" } },
   "payment.duplicate_flagged": { orderId: "order_1", paymentId: "pay_2", amountMinor: 3520000, currency: "INR" },
   "payment.amount_mismatch": { orderId: "order_1", paymentId: "pay_2", reason: "amount_mismatch", expectedMinor: 3520000, paidMinor: 100, expectedCurrency: "INR", paidCurrency: "INR" },
   "pricing.update": { plan: "Standard", changes: { monthlyPriceMinor: { from: 100000, to: 120000 }, featureList: { from: ["a"], to: ["a", "b"] } } },
