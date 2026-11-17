@@ -73,7 +73,8 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
         const base = offerState(item.proposal, offer);
         // A taken-down project's offers are view only: no pay, edit or withdraw, and they leave the Waiting / To pay groups.
         const down = Boolean(item.project?.takenDown);
-        const state = down ? { ...base, canPay: false, canEdit: false, canWithdraw: false } : base;
+        const open = !base.lapsed && ["sent", "interview_scheduled", "accepted", "processing"].includes(item.proposal.status);
+        const state = down ? { ...base, canPay: false, canEdit: false, canWithdraw: false, ...(open ? { label: "View only · taken down", tone: "closed" as const } : {}) } : base;
         return { item, offer, state, down };
       })
         // Offers waiting on your payment come first: they are the only rows that need you.

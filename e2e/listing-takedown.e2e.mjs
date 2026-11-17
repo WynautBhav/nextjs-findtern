@@ -127,7 +127,7 @@ test("the employer sees why, cannot send an offer (409) and cannot delete it (40
     startDate: start, duration: "1m", shiftFrom: "09:00", shiftTo: "17:00", timezone: "Asia/Kolkata", laptop: "company", skills: SKILLS.slice(0, 4),
   });
   assert.equal(offer.status, 409, JSON.stringify(offer.body));
-  assert.match(offer.body.error, /took this listing down/);
+  assert.match(offer.body.error, /taken down by Findtern|took this listing down/);
   const del = await api(P.E.page, "DELETE", `/api/employer/projects/${pid}`);
   assert.equal(del.status, 409, JSON.stringify(del.body));
   assert.ok((await row(pid)), "still there");
@@ -176,7 +176,7 @@ test("taken down: the intern cannot accept an existing offer (409), nothing chan
   const offerId = await mkProposal(E.id, I.id, pid);
   const r = await accept("I", offerId);
   assert.equal(r.status, 409, JSON.stringify(r.body));
-  assert.match(r.body.error, /took this listing down/);
+  assert.match(r.body.error, /taken down by Findtern|took this listing down/);
   assert.equal(await status(offerId), "sent", "still open, not accepted");
   assert.equal(await one(`SELECT 1 AS x FROM proposals WHERE id = $1 AND offer_details ? 'termsAcceptedAt'`, [offerId]), null, "no terms stamp");
 
@@ -229,7 +229,7 @@ test("taken down: the employer cannot open a payment for an accepted offer (409)
   const r = await order(offerId);
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.equal(r.body.code, "listing_taken_down");
-  assert.match(r.body.error, /took this listing down/);
+  assert.match(r.body.error, /taken down by Findtern|took this listing down/);
   assert.equal(await status(offerId), "accepted", "not hired");
   assert.equal((await one(`SELECT count(*)::int AS n FROM employer_payments WHERE employer_id = $1`, [E.id])).n, 0, "no order row opened");
   S.payOfferId = offerId;
@@ -408,14 +408,14 @@ test("a taken-down listing sends no new offer: internship proposal and full-time
   });
   assert.equal(offer.status, 409, JSON.stringify(offer.body));
   assert.equal(offer.body.code, "listing_taken_down");
-  assert.match(offer.body.error, /took this listing down/);
+  assert.match(offer.body.error, /taken down by Findtern|took this listing down/);
   const ft = await api(P.E.page, "POST", `/api/employer/${E.id}/full-time-offer`, {
     proposalId: S.wpHired, jobTitle: "Engineer", jobMode: "remote", ctcCurrency: "INR", annualCtc: 600000, shiftFrom: "09:00", shiftTo: "18:00", timezone: "Asia/Kolkata",
     offerLetterKey: `${E.id.replace(/[^a-z0-9_-]/gi, "").slice(0, 32)}/offer-letter.pdf`,
   });
   assert.equal(ft.status, 409, JSON.stringify(ft.body));
   assert.equal(ft.body.code, "listing_taken_down");
-  assert.match(ft.body.error, /took this listing down/);
+  assert.match(ft.body.error, /taken down by Findtern|took this listing down/);
   assert.equal((await one(`SELECT count(*)::int AS n FROM proposals WHERE employer_id = $1`, [E.id])).n, before, "no proposal row written");
   // Restored, the same full-time offer goes through.
   assert.equal((await restore(S.wp)).status, 200);

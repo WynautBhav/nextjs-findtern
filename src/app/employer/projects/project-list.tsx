@@ -157,8 +157,7 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
                 <div className="min-w-0 space-y-1.5">
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
                     <h2 className="break-words text-base font-semibold text-ink-900">{p.projectName}</h2>
-                    <StatusPill status={p.status} />
-                    {p.takenDown && <TakedownBadge />}
+                    {p.takenDown ? <TakedownBadge /> : <StatusPill status={p.status} />}
                   </div>
                   <MetaList
                     items={[

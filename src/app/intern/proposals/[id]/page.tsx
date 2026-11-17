@@ -186,7 +186,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
         }
         action={
           <div className="flex flex-wrap gap-2">
-            <Pill tone={status.tone}>{status.label}</Pill>
+            {takedownBlock(project.row, "accept") && ["sent", "interview_scheduled", "accepted"].includes(facts.key) ? <Pill tone="neutral">On hold</Pill> : <Pill tone={status.tone}>{status.label}</Pill>}
             <Pill tone="neutral">{fullTime ? "Full-time role" : "Internship"}</Pill>
             {facts.edited ? <Pill tone="new">Updated</Pill> : null}
             <MessageButton proposalId={proposal.id} counterpartId={proposal.employerId} label="Message the company" />

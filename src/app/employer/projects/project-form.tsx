@@ -118,10 +118,10 @@ export function ProjectForm({
         void save(false);
       }}
     >
-      <fieldset disabled={readOnly} aria-describedby={readOnly ? "takedown-readonly-note" : undefined} className="m-0 min-w-0 border-0 p-0">
+      <fieldset disabled={readOnly} aria-describedby={readOnly ? "takedown-readonly-note" : undefined} className={`m-0 min-w-0 border-0 p-0${readOnly ? " opacity-70" : ""}`}>
       <div className={lockedFields ? "max-w-2xl" : "lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-8"}>
         <div className="min-w-0 space-y-5">
-          {lockedFields && (
+          {lockedFields && !readOnly && (
             <FormNotice tone="info">This project is live. You can change how long it runs, preferred locations and the full-time offer.</FormNotice>
           )}
           <p className="text-sm text-text-subtle">
