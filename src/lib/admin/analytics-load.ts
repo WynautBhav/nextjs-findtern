@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { SETTLED_STATUSES } from "@/lib/refund-accounting";
@@ -26,7 +26,8 @@ export function analyticsRange(params: Record<string, string | undefined>): { si
  */
 export async function loadAnalytics(range: { since: Date | null; until: Date | null }) {
   const db = getDb();
-  const [interns, onboarding, employers, projects, proposals, interviews, employerPayments, internPayments, collegeBatches] = await Promise.all([
+  const hasCity = sql`trim(coalesce(${schema.internOnboarding.city}, '')) <> ''`;
+  const [interns, onboarding, employers, projects, proposals, interviews, employerPayments, internPayments, collegeBatches, cityRows, [cityTotal]] = await Promise.all([
     db
       .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName, createdAt: schema.users.createdAt })
       .from(schema.users)
@@ -112,6 +113,20 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
       })
       .from(schema.collegeSeatBatches)
       .where(eq(schema.collegeSeatBatches.status, "paid")),
+    // Interns by city (legacy's Geographic Distribution): grouped and limited in SQL, spelling and case folded.
+    db
+      .select({ city: sql<string>`min(trim(${schema.internOnboarding.city}))`, c: count() })
+      .from(schema.internOnboarding)
+      .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
+      .where(and(eq(schema.users.role, "intern"), hasCity))
+      .groupBy(sql`lower(trim(${schema.internOnboarding.city}))`)
+      .orderBy(sql`count(*) desc`, sql`min(trim(${schema.internOnboarding.city}))`)
+      .limit(6),
+    db
+      .select({ c: count() })
+      .from(schema.internOnboarding)
+      .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
+      .where(and(eq(schema.users.role, "intern"), hasCity)),
   ]);
 
   // Paid either way legacy records it: a paid intern_payments row or the flag.
@@ -139,6 +154,8 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
     // A college-drive waiver marks the fee covered (paidInterns above) but is not money received.
     internPayments: internPayments.filter(isMoneyReceived),
     collegeBatches,
+    cities: cityRows.map((r) => ({ city: r.city, count: Number(r.c) })),
+    citiesTotal: Number(cityTotal?.c ?? 0),
   };
   return computeAnalytics(input);
 }

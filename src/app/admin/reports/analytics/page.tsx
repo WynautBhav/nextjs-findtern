@@ -14,9 +14,10 @@ import { StatStrip, trendOf } from "@/components/admin/reports/stat-strip";
 import { formatPercentDelta } from "@/lib/admin/reports-shape";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ButtonAnchor, ButtonLink } from "@/components/ui/button";
-import { filterHires, type Analytics, type HireFilter } from "@/lib/admin/analytics";
+import { filterCompanies, filterHires, type Analytics, type HireFilter } from "@/lib/admin/analytics";
 import { analyticsRange, loadAnalytics } from "@/lib/admin/analytics-load";
-import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
+import { Pager } from "@/components/admin/pagination";
+import { flattenParams, toPage, type RawSearchParams } from "@/lib/admin/params";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -38,6 +39,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
   const rate = (v: number | null, suffix = "%") => (v == null ? "-" : `${v}${suffix}`);
   const link = (patch: Record<string, string>) => {
     const q = new URLSearchParams({ ...params, ...patch });
+    if (!("hp" in patch)) q.delete("hp");
     for (const [k, v] of [...q.entries()]) if (!v) q.delete(k);
     const s = q.toString();
     return s ? `${BASE}?${s}` : BASE;
@@ -79,7 +81,8 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
 
   // Top companies: legacy "active" = has a project (ADM-15).
   const companyStatus = params.companies === "active" || params.companies === "inactive" ? params.companies : "";
-  const companies = a.topCompanies.filter((c) => !companyStatus || c.status === companyStatus).slice(0, 10);
+  const companyQuery = (params.cq ?? "").trim();
+  const companies = filterCompanies(a.topCompanies, { status: companyStatus, q: companyQuery }).slice(0, 10);
 
   const hireFilter: HireFilter = {
     kind: params.hired === "internship" || params.hired === "full-time" ? params.hired : "",
@@ -87,7 +90,11 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
     to: /^\d{4}-\d{2}-\d{2}$/.test(params.hiredTo ?? "") ? params.hiredTo! : "",
     q: params.hq ?? "",
   };
-  const hires = filterHires(a.hiredList, hireFilter);
+  const allHires = filterHires(a.hiredList, hireFilter);
+  // Ten to a page, as the legacy hires table did; the filters above reset to page 1 through the links.
+  const HIRES_PER_PAGE = 10;
+  const hiresPage = toPage([], allHires.length, Math.max(1, Number.parseInt(params.hp ?? "1", 10) || 1), HIRES_PER_PAGE);
+  const hires = allHires.slice((hiresPage.page - 1) * HIRES_PER_PAGE, hiresPage.page * HIRES_PER_PAGE);
 
   return (
     <div className="space-y-5 lg:space-y-6">
@@ -174,6 +181,18 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
                 { label: "Hires", tone: "previous", points: a.trend.map((t) => ({ x: t.month, y: t.hires })) },
               ],
             },
+            {
+              key: "growth",
+              tab: "Interns and companies",
+              title: "Is the platform growing?",
+              note: "New interns (profile started) and new companies per month in the range.",
+              unit: "Count per month",
+              format: "count",
+              series: [
+                { label: "New interns", tone: "current", points: a.trend.map((t) => ({ x: t.month, y: t.interns })) },
+                { label: "New companies", tone: "previous", points: a.trend.map((t) => ({ x: t.month, y: t.companies })) },
+              ],
+            },
           ]}
         />
         <details className="group mt-2 overflow-hidden rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel)] shadow-[var(--admin-shadow)]">
@@ -183,9 +202,9 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
           </summary>
           <SimpleTable
             minWidth="lg:min-w-[32rem]"
-            head={["Month", "Offers", "Hires", "Success", "Interview rate"]}
-            right={[1, 2, 3, 4]}
-            rows={a.trend.map((t) => [t.month, String(t.proposals), String(t.hires), `${t.successRate}%`, `${t.interviewRate}%`])}
+            head={["Month", "Offers", "Hires", "Success", "Interview rate", "New interns", "New companies"]}
+            right={[1, 2, 3, 4, 5, 6]}
+            rows={a.trend.map((t) => [t.month, String(t.proposals), String(t.hires), `${t.successRate}%`, `${t.interviewRate}%`, String(t.interns), String(t.companies)])}
             empty={{ title: "No months to show", body: "There is no activity between these dates. Choose a wider range to see more." }}
           />
         </details>
@@ -201,12 +220,38 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
         ]}
       />
 
+      <RankCard
+        title="Offers and where interns are"
+        description="Both are all time, not limited to the range."
+        groups={[
+          { title: "Offer status", note: "Every offer sent, grouped as the old report did", rows: a.applicationStatus.map((x) => ({ label: x.name, value: x.value })) },
+          { title: "Interns by city", note: "Top six cities; Others is the rest", rows: a.cities.map((x) => ({ label: x.city, value: x.count, display: `${formatNumber(x.count)} \u00b7 ${x.percentage}%` })) },
+        ]}
+      />
+
       <div className="grid gap-[var(--admin-gap)] xl:grid-cols-2">
         <Panel>
           <PanelHeader
             title="Top companies"
             description="By hires in the range, then offers sent. Active means the company has posted a project."
             action={
+              <div className="flex flex-wrap items-center gap-2">
+              <form method="get">
+                <input
+                  type="search"
+                  name="cq"
+                  defaultValue={companyQuery}
+                  placeholder="Search company"
+                  aria-label="Search companies"
+                  className="h-10 w-44 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+                />
+                {Object.entries(params)
+                  .filter(([k, v]) => v && k !== "cq")
+                  .map(([k, v]) => (
+                    <input key={k} type="hidden" name={k} value={v} />
+                  ))}
+                <button type="submit" className="sr-only">Search companies</button>
+              </form>
               <ChipLinks
                 label="Company status"
                 items={[
@@ -215,6 +260,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
                   { href: link({ companies: "inactive" }), label: "Inactive", current: companyStatus === "inactive" },
                 ]}
               />
+              </div>
             }
           />
           <SimpleTable
@@ -230,8 +276,8 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
               `${c.conversion}%`,
             ])}
             empty={{
-              title: companyStatus ? `No ${companyStatus} companies` : "No company activity",
-              body: companyStatus ? "No company with this status was active between these dates. Choose another status or a wider range." : "No company sent offers or hired between these dates. Choose a wider range to see more.",
+              title: companyStatus || companyQuery ? "No company matches" : "No company activity",
+              body: companyStatus || companyQuery ? "No company fits this status or name between these dates. Clear a filter or choose a wider range." : "No company sent offers or hired between these dates. Choose a wider range to see more.",
             }}
           />
         </Panel>
@@ -256,7 +302,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
 
       <Panel>
         <PanelHeader
-          title={`Hires in this range (${hires.length})`}
+          title={`Hires in this range (${allHires.length})`}
           description="Internship and full-time, newest first. Filter by type, hire date or name."
         />
         <div className="flex flex-wrap items-end justify-between gap-3 border-b border-[color:var(--admin-rule)] px-[var(--admin-pad-panel)] py-3.5">
@@ -278,7 +324,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
               className="h-10 w-52 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
             />
             {Object.entries(params)
-              .filter(([k, v]) => v && !["hq", "hiredFrom", "hiredTo"].includes(k))
+              .filter(([k, v]) => v && !["hq", "hiredFrom", "hiredTo", "hp"].includes(k))
               .map(([k, v]) => (
                 <input key={k} type="hidden" name={k} value={v} />
               ))}
@@ -305,6 +351,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
               : { title: "No hires in this range", body: "No hire was made between these dates. Choose a wider range to see more." }
           }
         />
+        <Pager page={hiresPage.page} pages={hiresPage.pages} total={allHires.length} perPage={HIRES_PER_PAGE} rowsShown={hires.length} params={params} basePath={BASE} noun="hires" pageKey="hp" />
       </Panel>
     </div>
   );
