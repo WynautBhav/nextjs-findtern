@@ -18,6 +18,7 @@ import { employerNoShow, isMeetingLinkLive, isStaleInterview } from "@/lib/emplo
 import { formatIst } from "@/lib/format";
 import { HIDDEN_COMPANY, loadInternData, projectNames } from "@/lib/intern-data";
 import { feedbackForIntern } from "@/lib/interview-feedback";
+import { serializeJoinInput } from "@/lib/interview-join";
 import { isPast, slotOf, type InterviewRow } from "@/lib/journey";
 import { isInternPaid } from "@/lib/payments";
 
@@ -38,6 +39,7 @@ export const metadata: Metadata = {
  */
 export default async function InternInterviews() {
   const session = await requireRole("intern");
+  const serverNow = new Date().toISOString();
 
   const [data, paid] = await Promise.all([loadInternData(session.uid), isInternPaid(session.uid)]);
 
@@ -88,7 +90,7 @@ export default async function InternInterviews() {
         status={booked ? <Pill tone="live">Booked</Pill> : slots.length > 0 ? <Pill tone="waiting">Pick a time</Pill> : <Pill tone="neutral">Times to follow</Pill>}
       >
         {slots.length > 0 ? (
-          <SlotPicker interviewId={i.id} slots={slots} timezone={i.timezone} chosen={i.selectedSlot} meetUrl={isMeetingLinkLive(i) ? i.meetingLink : null} />
+          <SlotPicker interviewId={i.id} slots={slots} timezone={i.timezone} chosen={i.selectedSlot} join={serializeJoinInput(i)} serverNow={serverNow} />
         ) : (
           <p className="text-pretty text-sm text-text-subtle">The company has not sent its times yet. They appear here as soon as they are set.</p>
         )}

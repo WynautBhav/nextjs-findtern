@@ -311,10 +311,19 @@ export function CandidateCard({
   }
 
   if (layout === "grid") {
-    // The compact card: who, the two numbers that decide a shortlist, the skills, then the actions.
+    // The compact card, divided: header (who), body (the numbers and skills), footer (the actions).
+    // Its own edge, shadow, hover and focus ring: on the white page a hairline alone made neighbours run together.
     return (
-      <li className="group/row relative flex min-w-0 flex-col gap-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-xs transition-colors hover:border-ink-300">
-        <div className="flex items-start justify-between gap-2">
+      <li
+        data-selected={selected || undefined}
+        data-shortlisted={shortlisted || undefined}
+        className={cn(
+          "group/row relative flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-white shadow-sm transition-[border-color,box-shadow] duration-150",
+          "hover:shadow-md focus-within:border-brand-600 focus-within:ring-2 focus-within:ring-brand-600/25",
+          selected ? "border-brand-600 ring-2 ring-brand-600/30" : "border-ink-300 hover:border-ink-400",
+        )}
+      >
+        <div className={cn("flex items-start justify-between gap-2 border-b px-4 py-3.5", shortlisted ? "border-brand-200 bg-brand-50" : "border-ink-300 bg-ink-100")}>
           <div className="flex min-w-0 items-center gap-3">
             <RowAvatar square photoUrl={candidate.photoUrl} initials={candidate.initials} seed={candidate.id} presence={presence} />
             <div className="min-w-0">
@@ -332,41 +341,44 @@ export function CandidateCard({
           ) : null}
         </div>
 
-        {status || interested ? (
-          <div className="flex flex-wrap gap-1.5">
-            {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
-            {interested ? (
-              <Pill tone="live" className="shrink-0 whitespace-nowrap">
-                Interested in this role
-              </Pill>
-            ) : null}
-          </div>
-        ) : null}
+        <div className="flex flex-1 flex-col gap-3 px-4 py-4">
+          {status || interested || selected ? (
+            <div className="flex flex-wrap gap-1.5">
+              {selected ? <Pill tone="new" className="shrink-0 whitespace-nowrap">In compare</Pill> : null}
+              {status ? <Pill tone={status.tone} className="shrink-0 whitespace-nowrap">{status.label}</Pill> : null}
+              {interested ? (
+                <Pill tone="live" className="shrink-0 whitespace-nowrap">
+                  Interested in this role
+                </Pill>
+              ) : null}
+            </div>
+          ) : null}
 
-        {headline ? <p className="line-clamp-2 text-pretty text-sm font-semibold leading-snug text-ink-900">{headline}</p> : null}
-        {wanted.total > 0 ? (
-          <p className="-mt-1.5 text-xs text-ink-600">
-            <span className="nums font-medium text-ink-900">{wanted.matched.length} of {wanted.total}</span> skills you asked for
-          </p>
-        ) : null}
-
-        <div className="grid grid-cols-2 gap-3 rounded-xl border border-ink-200 bg-ink-50 p-3">
-          <div className="flex flex-col gap-1">
-            <span className={cellLabel}>Findtern Score</span>
-            <ScoreBadge size="cell" score={candidate.score} scored={candidate.scored} />
-          </div>
-          <div className="flex flex-col gap-1 border-l border-ink-200 pl-3">
-            <span className={cn(cellLabel, "whitespace-nowrap")}>Hourly rate</span>
-            <p className="nums flex items-baseline gap-1 text-lg font-bold leading-7 text-ink-900">
-              {formatMoney(pricing.hourlyRateMinor, currency)}
-              <span className="text-xs font-normal text-text-subtle">/ hr</span>
+          {headline ? <p className="line-clamp-2 text-pretty text-sm font-semibold leading-snug text-ink-900">{headline}</p> : null}
+          {wanted.total > 0 ? (
+            <p className="-mt-1.5 text-xs text-ink-600">
+              <span className="nums font-medium text-ink-900">{wanted.matched.length} of {wanted.total}</span> skills you asked for
             </p>
+          ) : null}
+
+          <div className="grid grid-cols-2 gap-3 rounded-xl border border-ink-200 bg-ink-50 p-3">
+            <div className="flex flex-col gap-1">
+              <span className={cellLabel}>Findtern Score</span>
+              <ScoreBadge size="cell" score={candidate.score} scored={candidate.scored} />
+            </div>
+            <div className="flex flex-col gap-1 border-l border-ink-200 pl-3">
+              <span className={cn(cellLabel, "whitespace-nowrap")}>Hourly rate</span>
+              <p className="nums flex items-baseline gap-1 text-lg font-bold leading-7 text-ink-900">
+                {formatMoney(pricing.hourlyRateMinor, currency)}
+                <span className="text-xs font-normal text-text-subtle">/ hr</span>
+              </p>
+            </div>
           </div>
+
+          <SkillChips heading skills={candidate.skills} wanted={wantedSkills} />
         </div>
 
-        <SkillChips heading skills={candidate.skills} wanted={wantedSkills} />
-
-        <div className="mt-auto flex flex-col gap-2 border-t border-ink-100 pt-3">
+        <div className="mt-auto flex flex-col gap-2 border-t border-ink-300 bg-ink-50 px-4 py-3">
           <div className="flex flex-wrap items-center gap-2 [&>*]:flex-1">
             <CompareToggle href={compareHref} selected={selected} name={displayName} />
             {quickView}

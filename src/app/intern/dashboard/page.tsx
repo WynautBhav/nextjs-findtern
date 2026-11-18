@@ -11,7 +11,7 @@ import { DismissedGuard } from "@/components/dismissed-guard";
 import { GettingStarted } from "@/components/intern/getting-started";
 import { HiddenProfileBanner } from "@/components/intern/hidden-profile-banner";
 import { JoinGate } from "@/components/intern/ai-interview-join-card";
-import { MeetingJoinButton } from "@/components/intern/meeting-join";
+import { InterviewJoin } from "@/components/intern/interview-join";
 import { OpenToWorkToggle } from "@/components/intern/open-to-work-toggle";
 import { VisibilityPill } from "@/components/intern/visibility-pill";
 import { visibilityState } from "@/components/intern/visibility-state";
@@ -30,7 +30,7 @@ import { pendingClaimFor } from "@/lib/drives/claim";
 import { driveCodeSecret } from "@/lib/drives/code-derive";
 import { eq } from "drizzle-orm";
 import { loadInternData } from "@/lib/intern-data";
-import { isMeetingLinkLive } from "@/lib/employer-interview-rules";
+import { joinState, serializeJoinInput } from "@/lib/interview-join";
 import { companyIn, hoursByMonth, hoursIn, nextAction, roleOf, slotOf } from "@/lib/journey";
 import { formatMoney, formatSlotTime, shortDate } from "@/lib/format";
 import { internPaidMinor, isInternPaid } from "@/lib/payments";
@@ -150,6 +150,7 @@ export default async function InternHome() {
   const openToWork =
     !extra || typeof extra !== "object" || (extra as Record<string, unknown>).openToWork !== false;
 
+  const now = new Date();
   // Next interview: company meetings with a booked slot only. AI interview
   // rows have no slot and ~210 live ones sit in "scheduled" forever, so they
   // stay out of this rail (INT-33); the AI interview has its own step.
@@ -163,8 +164,8 @@ export default async function InternHome() {
       )
       .map((i) => ({ interview: i, when: slotOf(i) }))
       .filter((x): x is { interview: (typeof data.interviews)[number]; when: Date } =>
-        // A booked meeting keeps its Join link until slot + 60 min (legacy).
-        Boolean(x.when && isMeetingLinkLive(x.interview)),
+        // A booked meeting stays here, with its Join button, until the join window closes (slot + 60 min).
+        Boolean(x.when && !["ended", "unavailable"].includes(joinState(now, x.interview).state)),
       )
       .sort((a, b) => a.when.getTime() - b.when.getTime())[0] ?? null;
 
@@ -196,7 +197,6 @@ export default async function InternHome() {
   // Hours open only once the company has paid (bug sheet 7, S1 r65); an
   // accepted, unpaid offer is "working" but has nothing to log yet.
   const hired = data.proposals.some((p) => isHiredProposal(p));
-  const now = new Date();
   const today = todayIst(now);
 
   // The one dated thing coming: an interview, a stipend payout, or the next
@@ -275,11 +275,7 @@ export default async function InternHome() {
   const nextUp = canOpen && !preComplete && next ? (
     next.kind === "interview" && upcomingInterviewItem ? (
       <NextUpTile next={next} today={today} heading={`Interview with ${interviewCompany}`} href="/intern/interviews" hrefLabel="Interviews">
-        {upcomingInterviewItem.interview.meetingLink ? (
-          <MeetingJoinButton link={upcomingInterviewItem.interview.meetingLink} block />
-        ) : (
-          <p className="text-sm text-ink-600">The meeting link arrives before the start time.</p>
-        )}
+        <InterviewJoin interview={serializeJoinInput(upcomingInterviewItem.interview)} serverNow={now.toISOString()} block />
       </NextUpTile>
     ) : next.kind === "payout" ? (
       <NextUpTile
@@ -422,13 +418,9 @@ export default async function InternHome() {
             {/* Interns always see India time, labelled (bug sheet 7, S2 r7). */}
             {formatSlotTime(upcomingInterviewItem.when, IST)}
           </p>
-          {upcomingInterviewItem.interview.meetingLink ? (
-            <div className="mt-4">
-              <MeetingJoinButton link={upcomingInterviewItem.interview.meetingLink} block />
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-text-subtle">The meeting link arrives before the start time.</p>
-          )}
+          <div className="mt-4">
+            <InterviewJoin interview={serializeJoinInput(upcomingInterviewItem.interview)} serverNow={now.toISOString()} block />
+          </div>
         </Tile>
       ) : null}
 

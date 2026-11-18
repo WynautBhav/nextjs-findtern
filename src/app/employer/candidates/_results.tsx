@@ -404,7 +404,7 @@ export function Results({
           </div>
           <ul
             aria-label="Candidates"
-            className={cn("mt-3", filters.view === "grid" ? "grid gap-4 sm:grid-cols-2 2xl:grid-cols-3" : filters.view === "rows" ? "flex flex-col gap-2.5" : "flex flex-col gap-4 lg:gap-5")}
+            className={cn("mt-3", filters.view === "grid" ? "grid gap-5 sm:grid-cols-2 2xl:grid-cols-3" : filters.view === "rows" ? "flex flex-col gap-2.5" : "flex flex-col gap-4 lg:gap-5")}
           >
             {candidates.map((candidate) => {
               const rel = data.relations.get(candidate.id);

@@ -5,6 +5,7 @@ import { CountUp } from "@/components/app/count-up";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { ButtonLink } from "@/components/ui/button";
+import type { JoinInput } from "@/lib/interview-join";
 
 export type NextMeetingData = {
   /** Initials and photo only, as everywhere before a hire. Null when the candidate row is gone. */
@@ -18,6 +19,12 @@ export type NextMeetingData = {
   joinLink: string | null;
   /** The interview, so Join records that the employer joined. */
   interviewId: string;
+  /** The booking, so Join follows the same window as the intern's (15 min before the start). */
+  join: JoinInput;
+  /** ISO time on the server. */
+  serverNow: string;
+  /** The meeting's own zone, for "Join opens at ...". */
+  zone: string;
   /** "/employer/schedule". */
   scheduleHref: string;
 };
@@ -41,7 +48,7 @@ const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-accent focus
  */
 export function NextMeeting({ meeting, hired, offersOut }: NextMeetingProps) {
   if (!meeting) return <Fallback hired={hired} offersOut={offersOut} />;
-  const { with: who, whenLabel, untilLabel, projectName, joinLink, interviewId, scheduleHref } = meeting;
+  const { with: who, whenLabel, untilLabel, projectName, interviewId, scheduleHref } = meeting;
   return (
     <section aria-labelledby="next-meeting-h" className={CARD}>
       <div className="flex items-center justify-between gap-3">
@@ -75,9 +82,9 @@ export function NextMeeting({ meeting, hired, offersOut }: NextMeetingProps) {
 
       <div className="mt-4 grid gap-2">
         {/* The page's one amber button is the queue's; the join button is solid white on the dark card. The wrapper restyles the trigger only (the rules dialog is portaled out of it). */}
-        {joinLink ? (
+        {meeting.join.status ? (
           <div className="[&_button]:border-transparent [&_button]:bg-white [&_button]:text-brand-950 [&_button]:shadow-sm [&_button:hover]:bg-brand-50">
-            <JoinMeetingButton link={joinLink} interviewId={interviewId} size="sm" variant="outline" block />
+            <JoinMeetingButton link={meeting.joinLink} interviewId={interviewId} size="sm" variant="outline" block interview={meeting.join} serverNow={meeting.serverNow} zone={meeting.zone} />
           </div>
         ) : null}
         <ButtonLink href={scheduleHref} variant="outlineLight" size="sm" block className={FOCUS}>

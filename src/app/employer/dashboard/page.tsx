@@ -15,6 +15,7 @@ import { rowSkills, skillBaseName } from "@/components/employer/candidate-view";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { kickProposalExpiry } from "@/lib/proposal-expiry-kick";
 import { gated } from "@/lib/request-gate";
+import { serializeJoinInput } from "@/lib/interview-join";
 import { isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { payableCheckoutForRequest } from "@/lib/employer-payable";
 import { getEmployerRows } from "@/lib/employer-request";
@@ -236,6 +237,9 @@ export default async function EmployerDashboard() {
             projectName: data.nextWith?.projectName ?? null,
             joinLink: joinLive && next.meetingLink ? next.meetingLink : null,
             interviewId: next.id,
+            join: serializeJoinInput(next),
+            serverNow: new Date().toISOString(),
+            zone: projectZone(data.projects.find((p) => p.id === next.projectId)?.timezone, next.timezone, data.timezone),
             scheduleHref: "/employer/schedule",
           }
         : null,

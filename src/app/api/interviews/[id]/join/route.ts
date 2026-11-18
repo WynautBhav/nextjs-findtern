@@ -5,7 +5,8 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { assertInterviewActionable } from "@/lib/projects/takedown-guard-server";
 import { interviewLifecycle } from "@/lib/interview-lifecycle";
-import { employerNoShow, isMeetingLinkLive, joinCounts, normalizeMeetingLink } from "@/lib/employer-interview-rules";
+import { safeMeetingHref } from "@/lib/interview-join";
+import { employerNoShow, isMeetingLinkLive, joinCounts } from "@/lib/employer-interview-rules";
 
 /**
  * The employer pressed "Join meeting". Records the first time it counted
@@ -37,7 +38,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   // Time passed and nobody marked it: it reads Expired everywhere, so there is nothing to join.
   if (interviewLifecycle(interview).expired) return NextResponse.json({ error: "This interview's time has passed. Schedule it again instead." }, { status: 409 });
-  const link = isMeetingLinkLive(interview) ? normalizeMeetingLink(interview.meetingLink) : null;
+  const link = isMeetingLinkLive(interview) ? safeMeetingHref(interview.meetingLink) : null;
   if (!link) return NextResponse.json({ error: "The meeting link is not ready. We'll email it." }, { status: 409 });
 
   if (joinCounts(interview)) {

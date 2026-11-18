@@ -11,6 +11,7 @@ import { initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { formatDate as formatWords, formatMoney, formatSlotTime } from "@/lib/format";
 import { interviewStage, meetingTime } from "@/lib/employer-interview-rules";
+import { serializeJoinInput } from "@/lib/interview-join";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { fullTimeFeeMinor, hireFeeMinor } from "@/lib/checkout";
 import { feeDisplay } from "@/lib/fee-display";
@@ -449,7 +450,7 @@ export default async function EmployerProposalDetail({
               </h2>
               <p className="nums mt-1 text-sm text-ink-600">{formatSlotTime(new Date(meetingTime(interview) ?? 0), projectZone(projectTimezone, interview.timezone))}</p>
               <div className="mt-3">
-                <JoinMeetingButton interviewId={interview.id} link={interview.meetingLink} ready={Boolean(interview.meetingLink)} variant="outline" />
+                <JoinMeetingButton interviewId={interview.id} link={interview.meetingLink} ready={Boolean(interview.meetingLink)} variant="outline" interview={serializeJoinInput(interview)} serverNow={new Date().toISOString()} zone={projectZone(projectTimezone, interview.timezone)} />
               </div>
             </section>
           ) : null}
