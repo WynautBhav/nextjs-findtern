@@ -1,7 +1,7 @@
 import { and, eq, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
 
 import { dbPoolBusy, getDb, schema } from "@/lib/db";
-import { SCHEDULER_BUSY_RETRIES, SCHEDULER_BUSY_RETRY_MS, schedulerStartDelayMs } from "@/lib/db/pool-config";
+import { SCHEDULER_BUSY_RETRIES, SCHEDULER_BUSY_RETRY_MS, inProcessSchedulersAllowed, schedulerStartDelayMs } from "@/lib/db/pool-config";
 import { readSkills, scoreOf } from "@/lib/employer-candidates";
 import { activeProject } from "@/lib/admin/scope";
 import { notify } from "@/lib/notify";
@@ -15,11 +15,17 @@ import { hasFeedbackText } from "@/lib/interview-feedback";
  * exactly, so the two apps never double-notify while they share a database.
  */
 
-let started = false;
+/**
+ * Once per process, not once per module copy: the flag lives on globalThis so a second evaluation of this module
+ * (another bundle, a dev-server reload) cannot start a second set of timers.
+ */
+const STARTED = Symbol.for("findtern.schedulers.started");
+const g = globalThis as unknown as Record<symbol, boolean | undefined>;
 
-export function startSchedulers() {
-  if (started) return;
-  started = true;
+export function startSchedulers(env: Record<string, string | undefined> = process.env) {
+  if (!inProcessSchedulersAllowed(env)) return; // Vercel: /api/cron/tick covers every job below
+  if (g[STARTED]) return;
+  g[STARTED] = true;
   // A cold serverless instance boots because a request arrived. Starting the jobs now would fire their first
   // queries in parallel with that request and with every other cold start, so the first run is 45-90 s away.
   setTimeout(begin, schedulerStartDelayMs()).unref?.();
@@ -68,7 +74,7 @@ function weekKey(d: Date) {
 const REMINDER_HOURS = [24, 12, 1] as const;
 const AI_EMPLOYER_EMAIL = "ai-interview@findtern.ai";
 
-async function interviewReminders() {
+export async function interviewReminders() {
   const db = getDb();
   const now = Date.now();
   const rows = await db
@@ -165,8 +171,7 @@ function timeLeft(hours: number): string {
 
 /* ── Six-hourly notification jobs ────────────────────────────────────── */
 
-async function notificationJobs() {
-  const now = new Date();
+export async function notificationJobs(now: Date = new Date()) {
   for (const [name, job] of [
     ["monthly profile views", monthlyProfileViews],
     ["cart inactivity", cartInactivity],

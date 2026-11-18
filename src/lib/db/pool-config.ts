@@ -37,3 +37,13 @@ export function schedulerStartDelayMs(random: () => number = Math.random): numbe
 /** A job that finds the pool busy waits this long and tries again, up to SKIP_RETRIES times, then waits for its next interval. */
 export const SCHEDULER_BUSY_RETRY_MS = 30_000;
 export const SCHEDULER_BUSY_RETRIES = 4;
+
+/**
+ * May this process run the in-process timers (interview reminders, daily notification jobs, offer expiry, email outbox)?
+ * Only a long-running server (the KVM, local dev) with SCHEDULERS=on. A Vercel instance boots per route bundle and per
+ * scale-out, is frozen between requests (its timers stop and then fire in a burst on thaw) and may live a few seconds, so
+ * timers there only add queries beside user requests; on Vercel the hourly /api/cron/tick route runs the same jobs.
+ */
+export function inProcessSchedulersAllowed(env: Record<string, string | undefined>): boolean {
+  return env.SCHEDULERS === "on" && !env.VERCEL;
+}
