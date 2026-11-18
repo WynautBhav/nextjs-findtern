@@ -103,8 +103,9 @@ test("feedback opens only once the meeting is over", () => {
   assert.equal(isMeetingOver({ status: "completed", slot1: h(5), slot2: null, slot3: null }, NOW), true);
 });
 
-test("a booked meeting whose time is over reads completed, an unpicked one expired", () => {
-  assert.equal(displayInterviewStatus({ status: "scheduled", slot1: h(-2), slot2: null, slot3: null, selectedSlot: 1 }, NOW), "completed");
+test("a booked meeting whose time is over and was never marked reads expired, like an unpicked one; a completed one stays completed", () => {
+  assert.equal(displayInterviewStatus({ status: "scheduled", slot1: h(-2), slot2: null, slot3: null, selectedSlot: 1 }, NOW), "expired");
+  assert.equal(displayInterviewStatus({ status: "completed", slot1: h(-2), slot2: null, slot3: null, selectedSlot: 1 }, NOW), "completed");
   assert.equal(displayInterviewStatus({ status: "pending", slot1: h(-2), slot2: null, slot3: null }, NOW), "expired");
 });
 
@@ -117,7 +118,9 @@ test("interview stage drives the schedule's actions", async () => {
   assert.equal(interviewStage({ status: "pending", slot1: null, slot2: null, slot3: null, selectedSlot: null }, NOW), "awaiting_pick");
   assert.equal(interviewStage(at("scheduled", h(1)), NOW), "upcoming");
   assert.equal(interviewStage(at("scheduled", h(-0.25)), NOW), "live");
-  assert.equal(interviewStage(at("scheduled", h(-1)), NOW), "over");
+  assert.equal(interviewStage(at("scheduled", h(-1)), NOW), "expired", "ended and never marked complete");
+  assert.equal(interviewStage(at("completed", h(-1)), NOW), "over");
+  assert.equal(interviewStage(at("expired", h(-1)), NOW), "expired", "already swept");
   assert.equal(interviewStage(at("missed", h(-1)), NOW), "missed");
   assert.equal(interviewStage(at("cancelled", h(-1)), NOW), "closed");
   assert.equal(canLeaveFeedback(at("missed", h(-1)), NOW), true);
@@ -200,8 +203,8 @@ test("employer no-show: an interview the employer joined is never a no-show", ()
   const start = AFTER_CUTOVER;
   const iv = booked(start, { employerJoinedAt: new Date(min(start, 2)) });
   assert.equal(employerNoShow(iv, min(start, 90)), false);
-  assert.equal(interviewStage(iv, min(start, 90)), "over");
-  assert.equal(displayInterviewStatus(iv, min(start, 90)), "completed");
+  assert.equal(interviewStage(iv, min(start, 90)), "expired", "joined, but nobody marked it complete");
+  assert.equal(displayInterviewStatus(iv, min(start, 90)), "expired");
   assert.equal(canMarkMissed(iv, min(start, 90)), true);
 });
 
@@ -209,7 +212,7 @@ test("employer no-show: interviews created before the cutover are exempt", () =>
   const start = NO_SHOW_RULE_FROM - 2 * 86_400_000;
   const legacy = booked(start, { createdAt: new Date(start - 86_400_000) });
   assert.equal(employerNoShow(legacy, min(start, 300)), false);
-  assert.equal(interviewStage(legacy, min(start, 300)), "over");
+  assert.equal(interviewStage(legacy, min(start, 300)), "expired");
   // A legacy interview booked for after the cutover is still exempt: createdAt decides.
   const late = booked(AFTER_CUTOVER, { createdAt: new Date(NO_SHOW_RULE_FROM - 1) });
   assert.equal(employerNoShow(late, min(AFTER_CUTOVER, 60)), false);

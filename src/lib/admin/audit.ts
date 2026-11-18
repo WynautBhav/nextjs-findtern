@@ -99,6 +99,7 @@ export const AUDIT_ACTIONS = {
   "proposal.takedown_withdraw": "Offer withdrawn because its posting was taken down",
   "proposal.expired_unpaid": "Offer expired: accepted but not paid before its start date (automatic)",
   "proposal.expired_no_reply": "Offer expired: no reply before its start date (automatic)",
+  "interview.expired": "Interview expired: its time passed and it was never marked complete (automatic)",
   "cgpa.verified": "Verified a candidate's CGPA",
   "cgpa.marked_incorrect": "Marked a candidate's CGPA incorrect and corrected it",
   "subscription.granted": "Granted an employer subscription",

@@ -4,6 +4,7 @@ import { withLock } from "@/lib/advisory-lock";
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { initialsOf } from "@/lib/employer-candidates";
+import { expireInterviewsPastTime, type InterviewSweep } from "@/lib/interview-expiry-db";
 import { openOrderProposalIds } from "@/lib/employer-payable";
 import { employerNames, notify, resolveOfferNotifications } from "@/lib/notify";
 import { parseOffer, todayIst } from "@/lib/offer";
@@ -228,11 +229,19 @@ async function notifyNoReply(rows: Expired[]): Promise<number> {
   return sent;
 }
 
-/** Both sweeps. The unpaid result keeps its original top-level shape (the cron route's JSON and the e2e read it). */
-export async function sweepProposalExpiry(now: Date = new Date()): Promise<ExpirySweep & { noReply: NoReplySweep }> {
+/**
+ * Every sweep: the two offer sweeps and the interview one (interviews whose time passed read Expired; interview-expiry-db.ts).
+ * The unpaid result keeps its original top-level shape (the cron route's JSON and the e2e read it); `interviews` is additive.
+ */
+export async function sweepProposalExpiry(now: Date = new Date()): Promise<ExpirySweep & { noReply: NoReplySweep; interviews: InterviewSweep }> {
   const unpaid = await expireUnpaidPastStart(now);
   const noReply = await expireNoReplyPastStart(now);
-  return { ...unpaid, noReply };
+  // An interview failure must not fail the offer sweeps' result (they have already committed).
+  const interviews = await expireInterviewsPastTime(now).catch((err) => {
+    console.error("[interview-expiry] sweep failed", err);
+    return { expired: 0, ids: [], notified: 0 } satisfies InterviewSweep;
+  });
+  return { ...unpaid, noReply, interviews };
 }
 
 /**

@@ -23,6 +23,7 @@ export const SEM_NOTIFICATION_TYPES: { type: string; label: string; audience: ("
   { type: "cgpa_incorrect", label: "CGPA corrected", audience: ["intern", "employer"] },
   { type: "proposal_expired_unpaid", label: "Offer expired before payment", audience: ["employer", "intern"] },
   { type: "proposal_expired_no_reply", label: "Offer expired with no reply", audience: ["employer", "intern"] },
+  { type: "interview_time_passed", label: "Interview time passed", audience: ["employer", "intern"] },
   { type: "subscription_started", label: "Findtern Pro subscription started", audience: ["employer"] },
 ];
 

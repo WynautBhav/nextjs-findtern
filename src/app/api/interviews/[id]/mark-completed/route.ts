@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
@@ -30,7 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const updated = await db
     .update(schema.interviews)
     .set({ status: "completed", updatedAt: new Date() })
-    .where(and(eq(schema.interviews.id, id), eq(schema.interviews.status, "scheduled"), eq(schema.interviews.selectedSlot, interview.selectedSlot!)))
+    .where(and(eq(schema.interviews.id, id), inArray(schema.interviews.status, ["scheduled", "expired"]), eq(schema.interviews.selectedSlot, interview.selectedSlot!)))
     .returning({ id: schema.interviews.id });
   if (updated.length === 0) return NextResponse.json({ error: "This interview changed; refresh and try again." }, { status: 409 });
   return NextResponse.json({ ok: true });

@@ -165,12 +165,14 @@ export function InterviewActions({
   const missedShown = canMarkMissed && (stage === "live" || stage === "over");
   // Join is offered on every booked row; with no link yet it is disabled and says why (bug sheet 12 Nov, row 12).
   const linkShown = stage === "upcoming" || stage === "live";
+  const timePassed = stage === "expired" || stage === "employer_no_show";
+  // An expired interview offers no Join and no reminder: "Schedule again" leads (feedback and "Mark completed" stay in the menu).
   const primary: "join" | "feedback" | "remind" | "reschedule" | null = linkShown
     ? "join"
-    : canFeedback
-      ? "feedback"
-      : stage === "expired" || stage === "employer_no_show"
-        ? "reschedule"
+    : timePassed
+      ? "reschedule"
+      : canFeedback
+        ? "feedback"
         : canRemind
           ? "remind"
           : canReschedule
@@ -237,7 +239,7 @@ export function InterviewActions({
             className={buttonClass({ variant: stage === "expired" || stage === "employer_no_show" ? "primary" : "outline", size: "sm" })}
           >
             <CalendarClock className="size-4" aria-hidden />
-            {stage === "upcoming" ? "Reschedule" : "Offer new times"}
+            {stage === "upcoming" ? "Reschedule" : timePassed ? "Schedule again" : "Offer new times"}
           </button>
         ) : null}
         <RowMenu
@@ -246,8 +248,9 @@ export function InterviewActions({
           items={[
             ...(canRemind && primary !== "remind" ? [{ label: "Send reminder", onSelect: () => void remind(), icon: <Bell />, disabled: busy !== null }] : []),
             ...(canReschedule && primary !== "reschedule"
-              ? [{ label: stage === "upcoming" ? "Reschedule" : "Offer new times", onSelect: () => toggle("reschedule"), icon: <CalendarClock />, disabled: busy !== null }]
+              ? [{ label: stage === "upcoming" ? "Reschedule" : timePassed ? "Schedule again" : "Offer new times", onSelect: () => toggle("reschedule"), icon: <CalendarClock />, disabled: busy !== null }]
               : []),
+            ...(canMarkCompleted && stage === "expired" ? [{ label: "Mark completed", onSelect: () => void markCompleted(), icon: <CalendarCheck />, disabled: busy !== null }] : []),
             ...(canFeedback && primary !== "feedback" ? [{ label: "Leave feedback", onSelect: () => toggle("feedback"), icon: <MessageSquare /> }] : []),
             { label: "Open profile", href: internHref, icon: <UserRound /> },
             ...(missedShown ? [{ label: "Mark missed", onSelect: () => toggle("missed"), icon: <X />, destructive: true, disabled: busy !== null }] : []),

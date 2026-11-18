@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
@@ -22,7 +22,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (employerNoShow(interview)) return NextResponse.json({ error: "This interview expired: the employer did not join within 30 minutes of the start. Offer new times instead." }, { status: 409 });
   // Only a scheduled interview, and only once its start plus a 15-minute
   // grace period has passed (legacy R:11851).
-  if (interview.status !== "scheduled" || !interview.selectedSlot || !canMarkMissed(interview)) {
+  if (!["scheduled", "expired"].includes(interview.status) || !interview.selectedSlot || !canMarkMissed(interview)) {
     return NextResponse.json(
       { error: `You can mark an interview missed ${MISSED_GRACE_MINUTES} minutes after its start time.` },
       { status: 409 },
@@ -31,7 +31,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const updated = await db
     .update(schema.interviews)
     .set({ status: "missed", updatedAt: new Date() })
-    .where(and(eq(schema.interviews.id, id), eq(schema.interviews.status, "scheduled"), eq(schema.interviews.selectedSlot, interview.selectedSlot)))
+    .where(and(eq(schema.interviews.id, id), inArray(schema.interviews.status, ["scheduled", "expired"]), eq(schema.interviews.selectedSlot, interview.selectedSlot)))
     .returning({ id: schema.interviews.id });
   if (updated.length === 0) return NextResponse.json({ error: "This interview changed; refresh and try again." }, { status: 409 });
   return NextResponse.json({ ok: true });

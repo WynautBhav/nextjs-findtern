@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { desc, eq, inArray } from "drizzle-orm";
-import { CalendarDays, Search } from "lucide-react";
+import { CalendarDays, CalendarX2, Search } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -193,7 +193,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
       if (a.sortAt === null) return 1;
       if (b.sortAt === null) return -1;
       // Upcoming soonest first; finished ones most recent first.
-      return stageRank(a.stage) >= 3 ? b.sortAt - a.sortAt : a.sortAt - b.sortAt;
+      return stageRank(a.stage) >= 2 ? b.sortAt - a.sortAt : a.sortAt - b.sortAt;
     });
 
   /** This page's URL with some query values replaced; "" removes one. */
@@ -446,7 +446,9 @@ function ScheduleRow({ r, now, past }: { r: Row; now: number; past: boolean }) {
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-600">
             <span>{r.project ?? "No project"}</span>
             <span aria-hidden>·</span>
-            <Pill tone={STAGE[stage].tone}>{STAGE[stage].label}</Pill>
+            <Pill tone={STAGE[stage].tone} icon={stage === "expired" ? <CalendarX2 /> : undefined}>
+              {STAGE[stage].label}
+            </Pill>
           </p>
           {waiting && offered.length ? (
             <p className="nums mt-1 text-sm text-ink-600">

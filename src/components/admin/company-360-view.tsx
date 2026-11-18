@@ -6,6 +6,7 @@ import { fteOf } from "@/lib/admin/fte";
 import { DataTable } from "@/components/admin/data-table";
 import { ProposalStatusEditor } from "@/components/admin/proposal-status-editor";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { interviewLifecycle } from "@/lib/interview-lifecycle";
 import { DetailRow, Pill, SectionHead } from "@/components/app/primitives";
 import { AdminAvatar } from "@/components/admin/avatar";
 import { AdminTabs } from "@/components/admin/admin-tabs";
@@ -84,7 +85,7 @@ export function Company360View({
   const nameOf = (id: string) => internName.get(id) ?? "Candidate";
 
   const now = new Date().getTime();
-  const upcoming = interviews.filter((i) => i.status === "scheduled" && (slotOf(i)?.getTime() ?? 0) > now).length;
+  const upcoming = interviews.filter((i) => interviewLifecycle(i, now).state === "upcoming" && (slotOf(i)?.getTime() ?? 0) > now).length;
   const hired = proposals.filter((p) => p.status === "hired");
   const activeProjects = projects.filter((p) => ACTIVE_PROJECT(p.status)).length;
   const projectStatus = STATUS_ORDER.find((s) => s === params.status);
@@ -382,7 +383,7 @@ export function Company360View({
                   <span className="text-text-subtle">No link</span>
                 ),
             },
-            { header: "Status", cell: (i) => <StatusBadge value={i.status} /> },
+            { header: "Status", cell: (i) => <StatusBadge value={interviewLifecycle(i).status} /> },
             { header: "Created", cell: (i) => <span className="nums whitespace-nowrap">{formatDate(i.createdAt)}</span> },
           ]}
         />

@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ChevronDown } from "lucide-react";
+import { CalendarX2, ChevronDown } from "lucide-react";
 
 import { EmptyScene, PageHead, Pill, SectionHead, Surface, type Tone } from "@/components/app/primitives";
 import { SlotPicker } from "@/components/app/slot-picker";
 import { AiInterviewJoinCard } from "@/components/intern/ai-interview-join-card";
 import { isScored } from "@/lib/ai-interview";
+import { interviewLifecycle } from "@/lib/interview-lifecycle";
 import { AiInterviewButton } from "@/components/intern/activation-card";
 import { AgendaRow } from "@/components/intern/interviews/agenda";
 import { splitUpcoming } from "@/components/intern/interviews/order";
@@ -47,13 +48,9 @@ export default async function InternInterviews() {
   const company = data.interviews.filter((i) => !isAi(i));
   const projects = await projectNames(company.map((i) => i.projectId ?? ""));
 
-  // A booked meeting stays upcoming, with its Join button, until the link
-  // window closes (legacy: slot + 60 min), not the moment it starts. An open
-  // invite whose times have all passed is over.
-  const joinable = (i: InterviewRow) => Boolean(i.selectedSlot) && isMeetingLinkLive(i) && !employerNoShow(i);
-  const upcoming = company.filter(
-    (i) => (i.status === "scheduled" || i.status === "pending") && !employerNoShow(i) && (!isStaleInterview(i) || joinable(i)),
-  );
+  // A booked meeting stays upcoming until it ends (slot + the meeting length), an open invite until its last offered time
+  // passes: after that the shared interview rules read it Expired, even before the sweep has stored it.
+  const upcoming = company.filter((i) => (i.status === "scheduled" || i.status === "pending") && !employerNoShow(i) && !interviewLifecycle(i).expired);
   const past = company.filter((i) => !upcoming.includes(i) && i.status !== "draft");
 
   const extra = (data.onboarding?.extraData ?? {}) as Record<string, unknown>;
@@ -109,7 +106,7 @@ export default async function InternInterviews() {
         iso={when ? when.toISOString() : null}
         title={titleOf(i)}
         company={companyLine(i)}
-        status={<Pill tone={outcome.tone}>{outcome.label}</Pill>}
+        status={<Pill tone={outcome.tone} icon={outcome.icon}>{outcome.label}</Pill>}
       >
         {when ? <p className="nums text-sm text-ink-700">{formatIst(when, { year: true })}</p> : null}
         {/* The pill already says "Interview done"; its generic sentence would repeat on every row. */}
@@ -262,7 +259,7 @@ function toIso(d: Date | string | null | undefined): string | null {
  * How a finished company round reads (INW-20): a picked time that has passed
  * is an interview that happened; an invite nobody picked a time for expired.
  */
-function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: React.ReactNode } {
+function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: React.ReactNode; icon?: React.ReactNode } {
   const status = (i.status ?? "").toLowerCase();
   if (status === "missed") {
     return {
@@ -286,6 +283,14 @@ function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: Reac
       label: "Employer didn't join",
       tone: "closed",
       detail: "The company did not join within 30 minutes of the start, so this round expired. It does not count against you.",
+    };
+  }
+  if (interviewLifecycle(i).expired) {
+    return {
+      label: "Expired",
+      tone: "closed",
+      icon: <CalendarX2 />,
+      detail: i.selectedSlot ? "This interview's time passed and it was not marked complete. The company can schedule it again." : "Every offered time passed before one was picked, so this invite expired.",
     };
   }
   if (status === "completed" || i.selectedSlot) {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CalendarX2 } from "lucide-react";
 
 import { AdminTabs } from "@/components/admin/admin-tabs";
 import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
@@ -32,6 +33,8 @@ export type TrackerTab = (typeof TRACKER_TABS)[number];
 type ProposalItem = {
   id: string;
   status: string;
+  /** What the database holds when `status` is the computed (true) one. */
+  storedStatus?: string;
   flowType: string | null;
   currency: string | null;
   offerDetails: unknown;
@@ -52,6 +55,8 @@ type ProposalItem = {
 type InterviewItem = {
   id: string;
   status: string;
+  /** From the shared interview lifecycle: why a row reads Expired. */
+  lifecycle?: { reason: string | null };
   slot1: Date | null;
   slot2: Date | null;
   slot3: Date | null;
@@ -296,7 +301,9 @@ function ProposalsTab({ params, search, pickers, rows }: Pick<TabProps, "params"
       sentLabel: `Sent ${formatDayLabel(p.createdAt)}`,
       details: {
         id: p.id,
-        status: p.status,
+        // The stored status drives the override editor; `shownStatus` is the true one the badge prints.
+        status: p.storedStatus ?? p.status,
+        shownStatus: p.status,
         currency: p.currency,
         offerDetails: p.offerDetails,
         candidate: nameOf(p),
@@ -509,7 +516,8 @@ function InterviewsTab({ params, page, perPage, search, pickers, rows }: TabProp
           sort: "created",
           cell: (i) => (
             <div className="flex flex-col items-start gap-1">
-              <StatusBadge value={i.status} />
+              <StatusBadge value={i.status} icon={i.status === "expired" ? <CalendarX2 /> : undefined} />
+              {i.status === "expired" && i.lifecycle?.reason ? <span className="text-xs text-text-subtle">{i.lifecycle.reason}</span> : null}
               <span className="nums whitespace-nowrap text-xs text-text-subtle">requested {formatDate(i.createdAt)}</span>
             </div>
           ),

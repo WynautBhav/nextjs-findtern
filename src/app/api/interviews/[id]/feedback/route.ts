@@ -29,7 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   // A meeting marked missed can still get feedback (legacy allowed it, e.g.
   // after marking missed by mistake; EMB-22).
-  if (!["scheduled", "completed", "missed"].includes(interview.status)) {
+  if (!["scheduled", "expired", "completed", "missed"].includes(interview.status)) {
     return NextResponse.json({ error: "Feedback can be added after a scheduled interview." }, { status: 409 });
   }
   // Once, and only after the meeting is over.

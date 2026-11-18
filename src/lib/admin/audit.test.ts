@@ -162,6 +162,7 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "proposal.takedown_withdraw": { projectId: "p-1", projectName: "x", internId: "i-1", previousStatus: "sent" },
   "proposal.expired_unpaid": { proposalId: "pr-1", employerId: "e-1", internId: "i-1", startDate: "2026-11-23", reason: "unpaid_past_start" },
   "proposal.expired_no_reply": { proposalId: "pr-1", employerId: "e-1", internId: "i-1", startDate: "2026-11-23", reason: "no_reply_past_start" },
+  "interview.expired": { interviewId: "iv-1", employerId: "e-1", internId: "i-1", previousStatus: "scheduled", reason: "time_passed_not_completed", endedAt: "2026-11-18T09:15:00Z" },
   "cgpa.verified": { internId: "i-1", semester: 5, claimedScore: "8.2" },
   "cgpa.marked_incorrect": { internId: "i-1", semester: 5, claimedScore: "8.9", correctedScore: "7.9", note: "Marksheet shows 7.9" },
   "subscription.granted": { employerId: "e-1", grantedUntil: "2027-11-17T00:00:00.000Z", note: "pilot customer" },

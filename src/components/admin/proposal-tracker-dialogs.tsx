@@ -18,6 +18,8 @@ export function ProposalDetailsButton({
   proposal: {
     id: string;
     status: string;
+    /** The true status when the stored one is stale (an offer past its start day). */
+    shownStatus?: string;
     currency: string | null;
     offerDetails: unknown;
     candidate: string;
@@ -45,7 +47,7 @@ export function ProposalDetailsButton({
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)] p-3">
-            <StatusBadge value={proposal.status} />
+            <StatusBadge value={proposal.shownStatus ?? proposal.status} />
             <ProposalStatusEditor proposalId={proposal.id} status={proposal.status} />
           </div>
           <ProposalOfferSummary proposalId={proposal.id} offerDetails={proposal.offerDetails} currency={proposal.currency} />
