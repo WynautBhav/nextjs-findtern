@@ -1,9 +1,8 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { Download, Eye, FileText } from "lucide-react";
+import { Download, Eye } from "lucide-react";
 
-import { Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RowMenu } from "@/components/app/row-menu";
@@ -19,7 +18,7 @@ import { LiveCount, ResetButton, SearchField, TOOLBAR_CARD } from "./shared";
 
 /* ── Invoices (legacy payment history) ─────────────────────────────── */
 
-export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
+export function InvoicesPanel({ invoices, emptyPrimary = true }: { invoices: InvoiceRow[]; emptyPrimary?: boolean }) {
   const [q, setQ] = useState("");
   const [currency, setCurrency] = useState("all");
   const [from, setFrom] = useState("");
@@ -43,7 +42,7 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
   if (invoices.length === 0) {
     return (
       <OrdersEmpty
-        icon={<FileText />}
+        primary={emptyPrimary}
         title="No invoices yet"
         body="A tax invoice is issued for every completed payment. Cancelled or failed checkouts don't create one."
         hint="Next: complete a payment"
@@ -90,9 +89,9 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
       {filtered.length === 0 ? (
         <OrdersEmpty compact title="No invoice matches" body="Try another name or ID, or reset the filters to see every invoice." />
       ) : (
-        <Surface data-stack tabIndex={0} role="region" aria-label="Invoices" className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+        <div data-stack tabIndex={0} role="region" aria-label="Invoices" className="relative overflow-x-auto border-b border-ink-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700">
           <table className="w-full border-collapse lg:min-w-[42rem]">
-            <thead className="border-b border-ink-100 bg-ink-50">
+            <thead className="border-b border-ink-200">
               <tr>
                 <th scope="col" className={thClass}>Invoice</th>
                 <th scope="col" className={thClass}>Candidate</th>
@@ -100,34 +99,34 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                 <th scope="col" className={cn(thClass, "text-right")}>Amount</th>
                 <th scope="col" className={thClass}>Paid on</th>
                 {/* From lg the wide table can scroll sideways, so the actions stay pinned to the right edge; below lg rows stack and nothing scrolls. */}
-                <th scope="col" className={cn(thClass, "text-right lg:sticky lg:right-0 lg:bg-ink-50 lg:shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
+                <th scope="col" className={cn(thClass, "text-right lg:sticky lg:right-0 lg:bg-canvas")}>
                   <span className="sr-only">View or download</span>
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-ink-100">
+            <tbody className="divide-y divide-ink-200">
               {filtered.map((i) => (
                 <tr key={i.id}>
                   <td data-title className={tdClass}>
                     <div className="min-w-0 [overflow-wrap:anywhere]">
-                      <p className="nums font-medium text-ink-900">{i.number}</p>
-                      <p className="break-all font-mono text-xs text-text-subtle lg:max-w-[14rem] lg:truncate" title={i.orderId}>
+                      <p className="nums font-display text-base font-semibold text-ink-900">{i.number}</p>
+                      <p className="break-all font-mono text-xs text-ink-600 lg:max-w-[14rem] lg:truncate" title={i.orderId}>
                         {i.orderId}
                       </p>
                     </div>
                   </td>
                   <td data-label="Candidate" className={cn(tdClass, "[overflow-wrap:anywhere]")}>{i.candidates.join(", ") || "-"}</td>
                   <td data-label="Project" className={cn(tdClass, "[overflow-wrap:anywhere]")}>{i.projects.join(", ") || "-"}</td>
-                  <td data-label="Amount" className={cn(tdClass, "nums text-right font-semibold text-ink-900")}>
+                  <td data-label="Amount" className={cn(tdClass, "nums text-right font-display text-lg font-semibold text-ink-900")}>
                     {formatMoney(i.amountMinor, i.currency, { zeroLabel: false })}
                     {(i.refundedMinor ?? 0) > 0 ? (
-                      <span className="block text-xs font-normal text-text-subtle">
+                      <span className="block font-sans text-xs font-normal text-ink-600">
                         Refunded {formatMoney(i.refundedMinor ?? 0, i.currency, { zeroLabel: false })} · net {formatMoney(Math.max(0, i.amountMinor - (i.refundedMinor ?? 0)), i.currency, { zeroLabel: false })}
                       </span>
                     ) : null}
                   </td>
                   <td data-label="Paid on" className={cn(tdClass, "nums whitespace-nowrap")}>{i.paidAt ? formatDate(i.paidAt) : "-"}</td>
-                  <td className={cn(tdClass, "text-right lg:sticky lg:right-0 lg:bg-white lg:shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
+                  <td className={cn(tdClass, "text-right lg:sticky lg:right-0 lg:bg-canvas")}>
                     <div className="flex justify-end gap-2">
                       <button
                         type="button"
@@ -151,7 +150,7 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
               ))}
             </tbody>
           </table>
-        </Surface>
+        </div>
       )}
 
       <Dialog open={viewing !== null} onOpenChange={(open) => !open && setViewing(null)}>
@@ -174,7 +173,7 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
           {viewing ? (
             // A full HTML page the server rendered. Sandboxed with no permissions, so
             // nothing inside it can run script or reach this page.
-            <iframe title={`Invoice ${viewing.number}`} sandbox="" srcDoc={viewing.html} className="h-[65vh] w-full rounded-apple-sm border border-ink-200 bg-white" />
+            <iframe title={`Invoice ${viewing.number}`} sandbox="" srcDoc={viewing.html} className="h-[65vh] w-full rounded-md border border-ink-200 bg-white" />
           ) : null}
           <div className="flex justify-end">
             <button

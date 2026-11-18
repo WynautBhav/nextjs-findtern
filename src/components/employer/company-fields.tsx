@@ -22,9 +22,9 @@ export function controlClass(error?: boolean, className?: string) {
   return cn(
     // fieldClass, with the 15px reading size, a wider inset and an error state.
     fieldClass,
-    "block px-3.5 shadow-xs",
+    "block bg-surface-raised px-3.5",
     // aria-readonly, not :read-only - a <select> always matches :read-only.
-    "aria-readonly:cursor-default aria-readonly:bg-ink-50 aria-readonly:text-ink-600 aria-readonly:shadow-none",
+    "aria-readonly:cursor-default aria-readonly:bg-ink-100 aria-readonly:text-ink-700",
     error && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger",
     className,
   );
@@ -74,7 +74,7 @@ export function FieldLabel({
           {" "}*
         </span>
       ) : null}
-      {optional ? <span className="font-normal text-text-subtle"> (optional)</span> : null}
+      {optional ? <span className="font-normal text-ink-600"> (optional)</span> : null}
     </As>
   );
 }
@@ -276,7 +276,7 @@ export function ChoiceGroup({
               )}
             >
               {o.label}
-              {o.detail ? <span className={cn("text-xs", active ? "text-white/80" : "text-text-subtle")}>{o.detail}</span> : null}
+              {o.detail ? <span className={cn("text-xs", active ? "text-white/80" : "text-ink-600")}>{o.detail}</span> : null}
             </button>
           );
         })}
@@ -300,9 +300,10 @@ export function FormSection({
 }) {
   return (
     <fieldset className={cn("min-w-0", className)}>
-      <legend className="text-base font-semibold text-ink-900">{title}</legend>
-      {hint ? <p className="mt-1 max-w-prose text-sm leading-relaxed text-ink-600">{hint}</p> : null}
-      <div className="mt-5 space-y-5">{children}</div>
+      {/* A heading on a hairline, as everywhere else: the legend floats so its rule spans the section. */}
+      <legend className="float-left mb-1 w-full border-b border-ink-200 pb-2 font-display text-lg font-semibold text-ink-900">{title}</legend>
+      {hint ? <p className="clear-left max-w-prose pt-1 text-sm leading-relaxed text-ink-700">{hint}</p> : null}
+      <div className={cn("space-y-5 pt-4", hint ? "" : "clear-left")}>{children}</div>
     </fieldset>
   );
 }
@@ -327,10 +328,10 @@ export function FormNotice({
     <p
       role={tone === "error" ? "alert" : undefined}
       className={cn(
-        "flex items-start gap-2.5 rounded-apple-md border px-4 py-3 text-sm leading-relaxed",
-        tone === "error" && "border-danger/25 bg-danger-soft text-danger",
-        tone === "success" && "border-brand-200 bg-brand-50 text-brand-800",
-        tone === "info" && "border-ink-200/80 bg-ink-50 text-ink-700",
+        "flex items-start gap-2.5 py-3 text-sm leading-relaxed",
+        tone === "error" && "border-y border-danger/40 text-danger",
+        tone === "success" && "font-medium text-success",
+        tone === "info" && "text-ink-700",
         className,
       )}
     >

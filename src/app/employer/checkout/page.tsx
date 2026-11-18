@@ -11,6 +11,8 @@ import { initialsOf } from "@/lib/employer-candidates";
 import { expireStaleEmployerOrders } from "@/lib/payments";
 import { paymentsAreFree } from "@/lib/razorpay";
 import { PageHead } from "@/components/app/primitives";
+import { SuccessMoment } from "@/components/app/success-moment";
+import { buttonClass } from "@/components/ui/button";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { HireFlow, type HireFlowCounts } from "@/components/employer/hire-flow";
@@ -107,7 +109,7 @@ export default async function EmployerCheckout({
     <div>
       <PageHead
         title="Checkout"
-        lede="Pay for an accepted offer to complete the hire. Each payment covers one candidate, on the terms they accepted."
+        lede="Paying completes the hire. Each payment covers one candidate, on the terms they accepted."
       />
       {counts ? <HireFlow counts={counts} current="checkout" /> : null}
       <VerifyingHeld count={verifyingHeld.length} needsConfirm={verifyingHeld.filter((p) => p.state.gate?.state === "incorrect_unacked").length} />
@@ -128,6 +130,7 @@ export default async function EmployerCheckout({
           body="Your hire is confirmed. The placement and its invoice are under Orders."
           next={{ label: "Open orders and invoice", href: "/employer/orders" }}
           who="You - open Orders for the invoice"
+          success
           secondary={payable.length > 0 ? { label: `See what is still due (${payable.length})`, href: "/employer/checkout" } : undefined}
         />
       ) : view === "missing" && heldTarget ? (
@@ -175,15 +178,27 @@ export default async function EmployerCheckout({
               ? { label: "Proposals awaiting a reply", href: "/employer/proposals" }
               : { label: "Open your shortlist", href: "/employer/cart" }
           }
-          who={counts && counts.awaitingReply > 0 ? "Candidates - reply to your offers" : "You - send a proposal"}
+          path={[
+            { label: "You send a proposal", note: undefined },
+            { label: "The candidate accepts", note: counts && counts.awaitingReply > 0 ? `${counts.awaitingReply} waiting on a reply` : undefined },
+            { label: "It lands here, ready to pay" },
+          ]}
           secondary={{ label: counts && counts.awaitingReply > 0 ? "Open your shortlist" : "Browse candidates", href: counts && counts.awaitingReply > 0 ? "/employer/cart" : "/employer/candidates" }}
         />
       ) : (
         <>
         {paid ? (
-          <p role="status" className="mb-4 rounded-apple-md border border-brand-200 bg-brand-50 p-4 text-sm text-brand-800">
-            Payment received. The hire and its invoice are under <Link href="/employer/orders" className="font-semibold underline underline-offset-4">Orders</Link>. Your other accepted offers are still waiting below.
-          </p>
+          <div className="mb-8 border-b border-ink-200 pb-8">
+            <SuccessMoment
+              title="Payment received"
+              body="The hire and its invoice are under Orders. Your other accepted offers are still waiting below."
+              actions={
+                <Link href="/employer/orders" className={buttonClass({ variant: "outline", className: "min-h-11" })}>
+                  Open orders and invoice
+                </Link>
+              }
+            />
+          </div>
         ) : null}
         <CheckoutSummary
           employerId={uid}
@@ -215,9 +230,9 @@ export default async function EmployerCheckout({
           }))}
         />
         {othersDue > 0 ? (
-          <p className="mt-4 text-sm text-ink-600">
+          <p className="mt-4 text-sm text-ink-700">
             This page shows the placement from your link.{" "}
-            <Link href="/employer/checkout" className="font-medium text-brand-700 underline-offset-4 hover:underline">
+            <Link href="/employer/checkout" className="inline-flex min-h-11 items-center font-medium text-brand-700 underline underline-offset-4">
               See everything due ({payable.length})
             </Link>
           </p>
