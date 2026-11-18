@@ -21,7 +21,7 @@ export function SegmentLink({ href, active, label, children }: { href: string; a
       title={label}
       className={cn(
         "apple-spring inline-flex min-h-9 min-w-9 items-center justify-center rounded-full px-2.5 text-sm font-medium touch:min-h-11 touch:min-w-11",
-        active ? "bg-surface-raised text-brand-800 shadow-[0_1px_3px_rgb(7_47_36/0.18)]" : "text-ink-600 hover:text-ink-900",
+        active ? "bg-white text-brand-800 shadow-[0_1px_3px_rgb(7_47_36/0.18)]" : "text-ink-600 hover:text-ink-900",
       )}
     >
       {children}

@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { buttonClass } from "@/components/ui/button";
 import { DetailRow } from "@/components/app/primitives";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { scopeLabel, type Project } from "@/lib/db/schema";
 import { formatDate } from "@/lib/format";
 import { statusMeta } from "@/app/employer/projects/status";
@@ -16,7 +17,7 @@ export function ProjectDetailsButton({ project: p }: { project: Project }) {
   const list = (v: string[] | null) => (v?.length ? v.join(", ") : "-");
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "outline", size: "sm" })}>
+      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
         View details
       </button>
       <Dialog open={open} onOpenChange={setOpen}>

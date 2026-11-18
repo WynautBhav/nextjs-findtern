@@ -4,22 +4,22 @@ import { notFound } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { AlertCircle, ArrowLeft, Download, Info, Phone, User } from "lucide-react";
 
-import { DetailRow, PageHead, Pill } from "@/components/app/primitives";
-import { LeadStat, Overview, StatList } from "@/components/app/stat";
-import { ScoreScale } from "@/components/app/tiles";
-import { DecisionPanel } from "@/components/intern/offer/decision-panel";
+import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { ScoreScale, STAT_ROW, StatTile } from "@/components/app/tiles";
+import { OfferDecision } from "@/components/app/offer-decision";
 import { proposalStatus } from "@/components/app/status";
 import { ImportantInstructions } from "@/components/intern/offer/important-instructions";
 import { modeLabel, offerFacts } from "@/components/intern/offer/offer-facts";
 import { ButtonAnchor, ButtonLink, buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import { canAccess } from "@/lib/security/guards";
 import { getDb, hasDb, schema } from "@/lib/db";
 import { scopeValue } from "@/lib/db/schema";
 import { loadInternData } from "@/lib/intern-data";
 import { rawScore } from "@/lib/employer-candidates";
 import { offerBonusMinor } from "@/lib/completion-bonus";
-import { formatDate, formatMoney } from "@/lib/format";
+import { formatDate, formatMoney, shortDate } from "@/lib/format";
 import { canDecide, hybridSplit, internOfferOverlay, offerJoiningDay, shiftInIst } from "@/lib/intern-offer-view";
 import { toArray } from "@/lib/journey";
 import { sanitizeRichText } from "@/lib/richtext";
@@ -164,6 +164,8 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   // One joining date for the whole page: the IST day the first shift starts (can differ from the employer's calendar day).
   const joiningDay = offerJoiningDay(offer);
   const joining = joiningDay ? formatDate(joiningDay) : "To be agreed";
+  const startsOn = joiningDay && !Number.isNaN(new Date(joiningDay).getTime()) ? new Date(joiningDay) : null;
+  const durationParts = /^(\d+)\s+(.+)$/.exec(String(facts.duration ?? ""));
 
   return (
     <div>
@@ -192,85 +194,80 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
         }
       />
 
-      {/* The offer as a ledger: the money is the one lead figure, the other terms are ruled lines beside it. */}
-      <Overview
-        className="mb-10"
-        lead={
-          <LeadStat
-            label={fullTime ? "Annual CTC" : "Monthly stipend"}
-            tone="brand"
-            value={
-              <>
-                {facts.amount}
-                {facts.per ? <span className="ml-1 text-lg font-medium text-ink-600">{facts.per.replace(/^\/\s*/, "/")}</span> : null}
-              </>
-            }
-            note={bonusLabel ?? undefined}
-          />
-        }
-        rest={
-          <StatList
-            items={[
-              { label: "Joining date", value: joining },
-              ...(fullTime ? [{ label: "Job mode", value: modeLabel(facts.mode) }] : facts.duration ? [{ label: "Duration", value: facts.duration }] : []),
-              { label: fullTime ? "Location" : "Work mode", value: fullTime ? facts.location : modeLabel(facts.mode) },
-            ]}
-          />
-        }
-      />
+      {/* The terms that decide an offer, as key numbers; the money is the brand tile. */}
+      <div className={cn(STAT_ROW, "mb-6 lg:mb-8")}>
+        {[
+          { label: fullTime ? "Annual CTC" : "Monthly stipend", value: facts.amount, unit: facts.per ? facts.per.replace(/^\/\s*/, "/") : undefined, quiet: facts.amountIsText },
+          // A value and a smaller unit, so a 2-up tile on a phone never clips ("11 Oct" + "2026").
+          startsOn
+            ? { label: "Joining date", value: shortDate(startsOn, { day: "numeric", month: "short", timeZone: "Asia/Kolkata" }), unit: shortDate(startsOn, { year: "numeric", timeZone: "Asia/Kolkata" }) }
+            : { label: "Joining date", value: joining },
+          fullTime
+            ? { label: "Job mode", value: modeLabel(facts.mode) }
+            : durationParts
+              ? { label: "Duration", value: durationParts[1], unit: durationParts[2] }
+              : { label: "Duration", value: facts.duration },
+          { label: fullTime ? "Location" : "Work mode", value: fullTime ? facts.location : modeLabel(facts.mode) },
+        ].map((s, i) => (
+          <StatTile key={s.label} {...s} featured={i === 0} index={i} />
+        ))}
+      </div>
+      {bonusLabel ? <p className="-mt-3 mb-6 text-sm font-medium text-ink-700 lg:-mt-5 lg:mb-8">{bonusLabel}</p> : null}
 
-      <div className="grid items-start gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         {/* ── The decision (focal point; first on a phone) ─────────── */}
         <aside className="lg:sticky lg:top-24 lg:order-2">
-          <div className="rounded-lg border border-ink-300 bg-surface-raised p-5 lg:p-6">
-            <h2 className="font-display text-lg font-semibold text-ink-900">{open ? "Your decision" : "Where this stands"}</h2>
+          <Surface className="p-5 lg:p-6">
+            <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
+              {open ? "Your decision" : "Where this stands"}
+            </h2>
 
             {facts.edited && open ? (
-              <p className="mt-4 rounded-md bg-info-soft px-4 py-3 text-sm leading-relaxed text-info">
+              <p className="mt-4 rounded-apple-sm bg-info-soft px-4 py-3 text-sm leading-relaxed text-info">
                 The company changed this offer after sending it. Read it again before you answer.
               </p>
             ) : null}
 
             <div className="mt-4">
-              <DecisionPanel
-                open={open}
-                proposalId={proposal.id}
-                roleTitle={facts.role}
-                company={facts.company ?? "The company"}
-                startDate={offer.startDate}
-                joiningDate={joiningDay}
-                fullTime={fullTime}
-                declinesUsed={misses.total}
-                freeDeclines={FREE_DECLINES}
-                guaranteeEnded={guaranteeEnded(extra, misses)}
-                bonusLabel={bonusLabel}
-                acceptBlocked={takedownBlock(project.row, "accept")}
-                after={
-                  <div className="space-y-4">
-                    <p className="text-pretty text-sm leading-relaxed text-ink-700">{status.detail}</p>
-                    {overlay.disclaimer ? (
-                      <div className="flex items-start gap-2.5 rounded-md bg-ink-100 px-4 py-3 text-sm leading-relaxed text-ink-800">
-                        <Info className="mt-0.5 size-4 shrink-0 text-ink-600" aria-hidden />
-                        <p className="text-pretty">{overlay.disclaimer}</p>
-                      </div>
-                    ) : null}
-                    {facts.key === "hired" ? (
-                      <ButtonLink href="/intern/timesheets" variant="primary" block className="text-sm font-semibold">
-                        Log your hours
-                      </ButtonLink>
-                    ) : null}
-                  </div>
-                }
-              />
+              {open ? (
+                <OfferDecision
+                  proposalId={proposal.id}
+                  roleTitle={facts.role}
+                  company={facts.company ?? "The company"}
+                  startDate={offer.startDate}
+                  joiningDate={joiningDay}
+                  fullTime={fullTime}
+                  declinesUsed={misses.total}
+                  freeDeclines={FREE_DECLINES}
+                  guaranteeEnded={guaranteeEnded(extra, misses)}
+                  bonusLabel={bonusLabel}
+                  acceptBlocked={takedownBlock(project.row, "accept")}
+                />
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-pretty text-sm leading-relaxed text-ink-700">{status.detail}</p>
+                  {overlay.disclaimer ? (
+                    <div className="flex items-start gap-2.5 rounded-apple-sm bg-ink-50 px-4 py-3 text-sm leading-relaxed text-ink-800">
+                      <Info className="mt-0.5 size-4 shrink-0 text-ink-600" aria-hidden />
+                      <p className="text-pretty">{overlay.disclaimer}</p>
+                    </div>
+                  ) : null}
+                  {facts.key === "hired" ? (
+                    <ButtonLink href="/intern/timesheets" variant="primary" block className="text-sm font-semibold">
+                      Log your hours
+                    </ButtonLink>
+                  ) : null}
+                </div>
+              )}
             </div>
-          </div>
+          </Surface>
         </aside>
 
         {/* ── The terms ────────────────────────────────────────────── */}
-        <div className="min-w-0 space-y-10">
+        <div className="min-w-0 space-y-6">
           {ft ? (
-            <section>
-              <Head
+            <Surface className="p-5 lg:p-6">
+              <SectionHead
                 title="Job details"
                 hint="Shared by the company as part of this full-time offer."
                 action={
@@ -288,10 +285,10 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                 <DetailRow label="Shift (IST)" value={shift ?? "Not specified"} />
                 <DetailRow label="Company timezone" value={timezone} />
               </dl>
-            </section>
+            </Surface>
           ) : (
-            <section>
-              <Head title="Internship details" />
+            <Surface className="p-5 lg:p-6">
+              <SectionHead title="Internship details" />
               <dl className="divide-y divide-ink-200/80">
                 {/* Joining date, duration and work mode are the tiles above.
                     Rows the company left empty are left out, not "Not specified". */}
@@ -309,12 +306,12 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                 <DetailRow label="Location" value={facts.location} />
                 <DetailRow label="Laptop" value={laptopLabel(offer.laptop)} />
               </dl>
-            </section>
+            </Surface>
           )}
 
           {/* ── Company ──────────────────────────────────────────── */}
-          <section>
-            <Head title="Company details" hint={facts.company ?? "Hidden until hire"} />
+          <Surface className="p-5 lg:p-6">
+            <SectionHead title="Company details" hint={facts.company ?? "Hidden until hire"} />
             {!employer.ok ? (
               <p className="flex items-start gap-2 text-sm text-danger">
                 <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -333,11 +330,11 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                 {!revealed ? <p className="mt-3 text-pretty text-sm leading-relaxed text-ink-600">{COMPANY_LOCKED}</p> : null}
               </>
             )}
-          </section>
+          </Surface>
 
           {/* ── Roles & responsibilities ─────────────────────────── */}
-          <section>
-            <Head title="Roles and responsibilities" />
+          <Surface className="p-5 lg:p-6">
+            <SectionHead title="Roles and responsibilities" />
             {!project.ok && !jd ? (
               <p className="flex items-start gap-2 text-sm text-danger">
                 <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -350,19 +347,19 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
             ) : (
               <p className="text-sm leading-relaxed text-ink-600">The company did not add a description to this offer.</p>
             )}
-          </section>
+          </Surface>
 
           {offer.additionalInfo ? (
-            <section>
-              <Head title="What the intern will learn" />
+            <Surface className="p-5 lg:p-6">
+              <SectionHead title="What the intern will learn" />
               <p className="whitespace-pre-line text-pretty text-base leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{offer.additionalInfo}</p>
-            </section>
+            </Surface>
           ) : null}
 
           {!fullTime ? (
             <>
-              <section>
-                <Head title="Required key skills" />
+              <Surface className="p-5 lg:p-6">
+                <SectionHead title="Required key skills" />
                 {skills.length > 0 ? (
                   <ul className="flex flex-wrap gap-2">
                     {skills.map((skill) => (
@@ -376,13 +373,13 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
                 ) : (
                   <p className="text-sm text-ink-600">No skills highlighted in this offer.</p>
                 )}
-              </section>
+              </Surface>
 
-              <section>
+              <Surface className="p-5 lg:p-6">
                 {/* The snapshot this offer was made on (QA-004 keeps it here). */}
-                <Head title={fromSnapshot ? "Your ratings when this was sent" : "Your ratings now"} />
+                <SectionHead title={fromSnapshot ? "Your ratings when this was sent" : "Your ratings now"} />
                 <ScoreScale rows={ratingRows.map(([label, value]) => ({ label, value }))} />
-              </section>
+              </Surface>
 
               {/* In full while the offer waits on an answer; afterwards folded,
                   not a 1,000px wall above a running internship. */}
@@ -402,18 +399,5 @@ function Locked({ icon }: { icon: "user" | "phone" }) {
       <Icon className="size-3.5" aria-hidden />
       Shared after hire
     </span>
-  );
-}
-
-/** A section heading on a hairline, with an optional action on the right. */
-function Head({ title, hint, action }: { title: string; hint?: string; action?: React.ReactNode }) {
-  return (
-    <div className="mb-3 flex items-baseline justify-between gap-4 border-b border-ink-200 pb-2">
-      <div className="min-w-0">
-        <h2 className="font-display text-lg font-semibold text-ink-900">{title}</h2>
-        {hint ? <p className="mt-0.5 text-sm text-ink-600">{hint}</p> : null}
-      </div>
-      {action ? <div className="shrink-0">{action}</div> : null}
-    </div>
   );
 }

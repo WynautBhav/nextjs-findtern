@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { FIRST_PAYMENT_EXPLAINER } from "@/lib/first-payment-copy";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
-import { EmptyScene, PageHead } from "@/components/app/primitives";
-import { Section } from "@/components/app/stat";
+import { EmptyScene, PageHead, SURFACE_CLASS } from "@/components/app/primitives";
+import { cn } from "@/lib/utils";
 import { requireRole } from "@/lib/auth";
 import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
@@ -26,13 +25,12 @@ import { heldIds, internExtraForRequest, openOrdersForRequest, stateForRow } fro
 import { projectZone, timezoneForLocation } from "@/lib/timezones";
 import { formatSlotTime } from "@/lib/format";
 import { buildActivity, buildFunnel, buildProjectStats, untilLabel, type Activity as ActivityData, type DashProposal, type Funnel as FunnelData } from "@/lib/employer-dashboard";
-import { Masthead, Queue, type HeroQueueItem } from "@/components/employer/dashboard/hero";
-import { NextMeeting } from "@/components/employer/dashboard/next-meeting";
+import { Hero, type HeroQueueItem } from "@/components/employer/dashboard/hero";
 import { Funnel } from "@/components/employer/dashboard/funnel";
 import { Activity } from "@/components/employer/dashboard/activity";
 import { MatchCard, type MatchCardProps } from "@/components/employer/dashboard/match-card";
 import { ProjectProgress } from "@/components/employer/dashboard/project-progress";
-import { ScoreBands } from "./_parts";
+import { ScoreBands, SectionHead } from "./_parts";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -244,113 +242,88 @@ export default async function EmployerDashboard() {
     hired: hiredInterns,
     offersOut: awaiting,
   };
-  const waiting = theirs.map((t) => ({ count: t.count, label: t.label, detail: t.detail, href: t.href, cta: t.cta }));
+  const waitingOnCandidates = theirs[0] ? { count: theirs[0].count, label: theirs[0].label, href: theirs[0].href } : null;
   const dateLabel = dashDate(data.timezone);
 
   return (
-    // Two independent columns from xl (8 + 4), so neither leaves a gap beside the other: the ledger of
-    // what needs you, the funnel and the matches on the left; the meeting, activity and projects on the
-    // right. Below xl the columns dissolve and `order` gives the phone sequence.
-    <div className="flex min-w-0 flex-col gap-10 xl:gap-8">
-      <Masthead companyName={data.companyName} dateLabel={dateLabel} showFind={total > 0} />
-
-      <div className="flex min-w-0 flex-col gap-10 xl:grid xl:grid-cols-12 xl:items-start xl:gap-x-14 xl:gap-y-14">
-        <div className="contents xl:col-span-8 xl:flex xl:min-w-0 xl:flex-col xl:gap-12">
-          <div className="min-w-0 max-xl:order-1">
-            <Queue total={total} queue={mine} waiting={waiting} hasProposals={proposals.length > 0} />
-          </div>
-          <div className="min-w-0 max-xl:order-3">
-            <Funnel funnel={funnel} />
-          </div>
-        </div>
-
-        <div className="contents xl:col-span-4 xl:flex xl:min-w-0 xl:flex-col xl:gap-12">
-          <div className="min-w-0 max-xl:order-2">
-            <NextMeeting {...nextMeeting} />
-          </div>
-          <div className="min-w-0 max-xl:order-5">
-            <Activity activity={activity} />
-          </div>
-        </div>
-
-        <section aria-labelledby="matches-h" className="min-w-0 max-xl:order-4 xl:col-span-12">
-          <Section
-            title="Top matches"
-            hint="Finished their AI interview and fit your open projects, best score first"
-            action={
-              <Link href="/employer/candidates" className="inline-flex min-h-11 items-center gap-1 font-medium text-ink-700 underline-offset-4 hover:text-ink-900 hover:underline">
-                All candidates
-              </Link>
-            }
-          >
-            {data.candidates.length === 0 ? (
-              <EmptyScene
-                title="No matches to show"
-                body="Top matches are candidates who have finished their AI interview and fit your projects. New ones appear here as they finish."
-                next={{ label: "Browse all candidates", href: "/employer/candidates" }}
-              />
-            ) : (
-              <ul className="grid gap-x-14 border-t border-ink-200 lg:grid-cols-2 lg:[&>li:nth-child(2)]:border-t-0 max-sm:[&>li:nth-child(n+4)]:hidden">
-                {matches.map((m) => (
-                  <MatchCard key={m.id} {...m} />
-                ))}
-              </ul>
-            )}
-          </Section>
-        </section>
-
-        <section aria-labelledby="projects-h" className="min-w-0 max-xl:order-6 xl:col-span-12">
-          <Section
-            title="Projects"
-            hint={projects.length ? (openProjects.length > shownProjects.length ? `Newest ${shownProjects.length} of ${openProjects.length} open` : `${openProjects.length} open of ${projects.length}`) : undefined}
-            action={
-              <Link href="/employer/projects" className="inline-flex min-h-11 items-center gap-1 font-medium text-ink-700 underline-offset-4 hover:text-ink-900 hover:underline">
-                All projects
-              </Link>
-            }
-          >
-            {projects.length === 0 ? (
-              <EmptyScene
-                title="No projects yet"
-                body="A project tells us the skills you need, so candidates are matched to it. It takes about five minutes."
-                next={{ label: "Create a project", href: "/employer/projects/new" }}
-                who="You - about five minutes"
-              />
-            ) : (
-              <>
-                <div aria-hidden className="hidden grid-cols-[minmax(0,1fr)_5rem_5rem_5rem_10rem] gap-x-4 border-t border-ink-200 pb-1 pt-2 text-xs text-ink-600 sm:grid">
-                  <span>Project</span>
-                  <span className="text-right">Hired</span>
-                  <span className="text-right">Offers open</span>
-                  <span className="text-right">Declined</span>
-                  <span />
-                </div>
-                <ul className="border-t border-ink-200">
-                  {shownProjects.map((p, i) => {
-                    const stats = byProject.get(p.id) ?? { hired: 0, open: 0, declined: 0, toPay: 0 };
-                    const open = isProjectOpen(p.status, p.takenDownAt);
-                    const action = stats.toPay
-                      ? { label: "Pay now", href: "/employer/checkout" }
-                      : !open
-                        ? null
-                        : stats.open
-                          ? { label: "View proposals", href: "/employer/proposals" }
-                          : { label: "Find candidates", href: `/employer/candidates?project=${encodeURIComponent(p.id)}` };
-                    // Three on a phone, so the list stays a short scroll.
-                    return <ProjectProgress key={p.id} id={p.id} name={p.projectName} closed={!open} hired={stats.hired} open={stats.open} declined={stats.declined} action={action} hiddenOnPhone={i >= 3} />;
-                  })}
-                </ul>
-              </>
-            )}
-          </Section>
-        </section>
-
-        {data.candidates.length ? (
-          <div className="min-w-0 max-xl:order-7 xl:col-span-12">
-            <ScoreBands />
-          </div>
-        ) : null}
+    // 12 columns from xl (1104px of content at 1440: 8 + 4 columns under the hero). Below that one column.
+    // The phone order is hero, funnel, matches, activity, projects; the next meeting lives in the hero.
+    <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-12">
+      <div className="min-w-0 scroll-mt-20 xl:col-span-12">
+        <Hero
+          companyName={data.companyName}
+          dateLabel={dateLabel}
+          total={total}
+          queue={mine}
+          waitingOnCandidates={waitingOnCandidates}
+          hasProposals={proposals.length > 0}
+          nextMeeting={nextMeeting}
+        />
       </div>
+
+      <div className="min-w-0 max-xl:order-1 xl:col-span-8">
+        <Funnel funnel={funnel} />
+      </div>
+      <div className="min-w-0 max-xl:order-3 xl:col-span-4">
+        <Activity activity={activity} />
+      </div>
+
+      <section aria-labelledby="matches-h" className="flex min-w-0 flex-col max-xl:order-2 xl:col-span-8">
+        <SectionHead id="matches-h" title="Top matches" href="/employer/candidates" link="All candidates" />
+        {data.candidates.length === 0 ? (
+          <EmptyScene
+            title="No matches to show"
+            body="Top matches are candidates who have finished their AI interview and fit your projects. New ones appear here as they finish."
+            next={{ label: "Browse all candidates", href: "/employer/candidates" }}
+          />
+        ) : (
+          // Four cards from sm, three on a phone so the page stays a short scroll.
+          <ul className="grid gap-4 sm:grid-cols-2 max-sm:[&>li:nth-child(n+4)]:hidden">
+            {matches.map((m) => (
+              <MatchCard key={m.id} {...m} />
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section aria-labelledby="projects-h" className="flex min-w-0 flex-col max-xl:order-4 xl:col-span-4">
+        <SectionHead id="projects-h" title="Projects" href="/employer/projects" link="All projects" />
+        {projects.length === 0 ? (
+          <EmptyScene
+            title="No projects yet"
+            body="A project tells us the skills you need, so candidates are matched to it. It takes about five minutes."
+            next={{ label: "Create a project", href: "/employer/projects/new" }}
+            who="You - about five minutes"
+          />
+        ) : (
+          <div className={cn(SURFACE_CLASS, "flex-1 px-5 py-2")}>
+            <p className="pt-3 text-sm text-text-subtle">
+              {openProjects.length > shownProjects.length ? `Newest ${shownProjects.length} of ${openProjects.length} open` : `${openProjects.length} open of ${projects.length}`}
+            </p>
+            <ul className="divide-y divide-ink-100">
+              {shownProjects.map((p, i) => {
+                const stats = byProject.get(p.id) ?? { hired: 0, open: 0, declined: 0, toPay: 0 };
+                const open = isProjectOpen(p.status, p.takenDownAt);
+                const action = stats.toPay
+                  ? { label: "Pay now", href: "/employer/checkout" }
+                  : !open
+                    ? null
+                    : stats.open
+                      ? { label: "View proposals", href: "/employer/proposals" }
+                      : { label: "Find candidates", href: `/employer/candidates?project=${encodeURIComponent(p.id)}` };
+                // Three on a phone, so the list stays a short scroll.
+                return <ProjectProgress key={p.id} id={p.id} name={p.projectName} closed={!open} hired={stats.hired} open={stats.open} declined={stats.declined} action={action} hiddenOnPhone={i >= 3} />;
+              })}
+            </ul>
+          </div>
+        )}
+      </section>
+
+      {data.candidates.length ? (
+        <div className="min-w-0 max-xl:order-5 xl:col-span-12">
+          <ScoreBands />
+        </div>
+      ) : null}
     </div>
   );
 }

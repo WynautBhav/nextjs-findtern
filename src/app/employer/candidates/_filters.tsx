@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { RotateCcw } from "lucide-react";
+import { Plus, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import { RATING_META } from "@/lib/employer-candidates";
 import { DEFAULT_PAGE_SIZE } from "@/components/employer/candidate-view";
@@ -28,6 +28,7 @@ const SELECT = cn(fieldClass, "mt-2");
  */
 export function FilterColumn({
   filters,
+  projects,
   activeProjectId,
   includeRemote,
   plans,
@@ -41,8 +42,7 @@ export function FilterColumn({
   pro,
 }: {
   filters: Filters;
-  /** Kept for the page's call; the project is picked in the page header now. */
-  projects?: { id: string; projectName: string }[];
+  projects: { id: string; projectName: string }[];
   activeProjectId: string | null;
   includeRemote: boolean;
   plans: (typeof schema.pricingPlans.$inferSelect)[];
@@ -60,7 +60,14 @@ export function FilterColumn({
   pro: ProData;
 }) {
   return (
-    <aside aria-label="Filters">
+    <aside
+      aria-label="Filters"
+      className={cn(
+        "lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-6 lg:shadow-xs",
+        // Still scrollable, but the track only shows on hover or focus, so it does not read as a nested box.
+        "lg:[scrollbar-color:transparent_transparent] lg:[scrollbar-width:thin] lg:hover:[scrollbar-color:var(--color-ink-300)_transparent] lg:focus-within:[scrollbar-color:var(--color-ink-300)_transparent]",
+      )}
+    >
       <FilterPanel key={queryOf(filters)} activeCount={activeFilterCount(filters, effectiveSkills, projectCity)} total={total}>
         {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
         {filters.view !== "list" ? <input type="hidden" name="view" value={filters.view} /> : null}
@@ -72,15 +79,40 @@ export function FilterColumn({
         {filters.dir === "asc" ? <input type="hidden" name="dir" value="asc" /> : null}
 
         {/* lg: the card's own header. Phones get "Filters" from the sheet title. */}
-        <div className="flex items-center justify-between pb-1 max-lg:hidden">
-          <h2 className="font-display text-lg font-semibold text-ink-900">Filters</h2>
-          <Link href={resetHref(activeProjectId)} className="inline-flex min-h-11 items-center px-1 text-sm font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900">
+        <div className="flex items-center justify-between pb-3 max-lg:hidden">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-ink-900">
+            <SlidersHorizontal className="size-[18px] text-ink-600" aria-hidden />
+            Filters
+          </h2>
+          <Link href={resetHref(activeProjectId)} className="inline-flex min-h-9 items-center px-1 text-[13px] font-medium text-text-subtle underline-offset-4 hover:text-ink-900 hover:underline touch:min-h-11">
             Reset
           </Link>
         </div>
         <div>
-          {/* The project is picked in the page header at every width. Phones keep the one link that belongs to it here. */}
-          {projectToggle ? <div className="lg:hidden">{projectToggle}</div> : null}
+          {/* Project: the results bar picks it from lg up; the phone sheet needs it here. */}
+          <div className="lg:hidden">
+            <div className="flex items-center justify-between">
+              <label htmlFor="filter-project" className="text-sm font-semibold text-ink-900">
+                Project
+              </label>
+              <Link href="/employer/projects" className="inline-flex min-h-11 items-center gap-1 text-sm font-medium text-ink-700 hover:text-ink-900">
+                <Plus className="size-4" aria-hidden />
+                New project
+              </Link>
+            </div>
+            {projects.length > 0 ? (
+              <select id="filter-project" name="project" defaultValue={activeProjectId ?? ""} className={SELECT}>
+                {projects.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.projectName}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <p className="mt-2 text-sm text-ink-600">No open projects. Create one to save and match candidates.</p>
+            )}
+            {projectToggle ? <div className="mt-1">{projectToggle}</div> : null}
+          </div>
 
           <FilterSection title="Location">
             <CityFilter key={filters.city} defaultValue={filters.city} label="Preferred work city" autoApply />
@@ -92,7 +124,7 @@ export function FilterColumn({
                 name="remote"
                 value="1"
                 defaultChecked={includeRemote}
-                className="size-4 rounded-sm border-ink-300 accent-ink-900"
+                className="size-4 rounded-[4px] border-ink-300 accent-ink-900"
               />
               Include remote-only candidates
             </label>
@@ -143,7 +175,7 @@ export function FilterColumn({
                 name="laptop"
                 value="yes"
                 defaultChecked={filters.laptop === "yes"}
-                className="size-4 rounded-sm border-ink-300 accent-ink-900"
+                className="size-4 rounded-[4px] border-ink-300 accent-ink-900"
               />
               Has own laptop
             </label>
@@ -161,7 +193,7 @@ export function FilterColumn({
               <input type="checkbox" role="switch" name="sm" value="1" defaultChecked={filters.skillPriority} className="peer sr-only" />
               <span
                 aria-hidden
-                className="relative h-6 w-10 shrink-0 rounded-full bg-ink-300 transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-surface-raised after:shadow-xs after:transition-transform peer-checked:bg-ink-900 peer-checked:after:translate-x-4 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-600 motion-reduce:after:transition-none"
+                className="relative h-6 w-10 shrink-0 rounded-full bg-ink-300 transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:shadow-xs after:transition-transform peer-checked:bg-ink-900 peer-checked:after:translate-x-4 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-600 motion-reduce:after:transition-none"
               />
             </label>
           </FilterSection>

@@ -8,8 +8,7 @@ import { companyMoney } from "@/lib/admin/company-money";
 import { flattenParams, parsePageRequest, searchAny, toPage, toQueryString } from "@/lib/admin/params";
 import { activeProject, inrMinorSql, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
-import { FilterTabs, type FilterTab } from "@/components/app/primitives";
-import { LeadStat } from "@/components/app/stat";
+import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
 import { CompanyActiveToggle, CompanyFteSelect } from "@/components/admin/company-controls";
 import { getSession } from "@/lib/auth";
@@ -19,6 +18,7 @@ import { fteOf } from "@/lib/admin/fte";
 import { canWrite } from "@/lib/admin/permissions";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ButtonAnchor } from "@/components/ui/button";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 
 /**
  * Companies (legacy admin-companies.tsx). Money per company is computed for
@@ -179,13 +179,20 @@ export default async function AdminCompaniesPage({
   }
 
   const exportHref = `/api/admin/export?type=companies&${new URLSearchParams(params).toString()}`;
-  const headerAction = (
-    <ButtonAnchor href={exportHref} variant="outline" size="sm">
-      <Download className="size-4" aria-hidden />
-      Export CSV
-    </ButtonAnchor>
+  const headerWith = (subtitle?: string) => (
+    <AdminPageHeader
+      title="Companies"
+      subtitle={subtitle}
+      action={
+        <ButtonAnchor href={exportHref} variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
+          <Download className="size-4" aria-hidden />
+          Export CSV
+        </ButtonAnchor>
+      }
+    />
   );
-  const header = <AdminPageHeader title="Companies" action={headerAction} />;
+
+  const header = headerWith();
   if (!loaded) {
     return (
       <div className="space-y-6">
@@ -202,27 +209,20 @@ export default async function AdminCompaniesPage({
 
   // Onboarding is a set of views (the counts were stat tiles); the rest stay filters.
   const viewHref = (setup: string) => `/admin/companies${toQueryString({ ...params, setup, page: "" })}`;
-  const pending = Math.max(0, loaded.totalCompanies - loaded.setupComplete);
-  const views: FilterTab[] = [
-    { key: "", label: "All companies", count: loaded.totalCompanies },
-    { key: "complete", label: "Onboarded", count: loaded.setupComplete },
-    { key: "incomplete", label: "Onboarding pending", count: pending },
-  ].filter((v) => v.count > 0 || v.key === "" || params.setup === v.key);
+  const views: AdminTabItem[] = [
+    { key: "", label: "All companies", count: loaded.totalCompanies, href: viewHref("") },
+    { key: "complete", label: "Onboarded", count: loaded.setupComplete, href: viewHref("complete") },
+    { key: "incomplete", label: "Onboarding pending", count: Math.max(0, loaded.totalCompanies - loaded.setupComplete), href: viewHref("incomplete") },
+  ];
   const activeView = params.setup === "complete" || params.setup === "incomplete" ? params.setup : "";
 
   return (
-    <div className="space-y-6">
-      <AdminPageHeader title="Companies" action={headerAction} className="mb-0 lg:mb-0" />
+    <div className="space-y-4">
+      {headerWith(
+        `${formatNumber(loaded.totalCompanies)} companies, ${formatNumber(loaded.withHires)} have hired and ${formatNumber(loaded.activeProjects)} projects are open to candidates.`,
+      )}
 
-      <LeadStat
-        className="pt-1"
-        label={loaded.withHires === 1 ? "Company that has hired" : "Companies that have hired"}
-        value={formatNumber(loaded.withHires)}
-        tone="brand"
-        note={`Of ${formatNumber(loaded.totalCompanies)} on Findtern. ${formatNumber(loaded.activeProjects)} projects are open to candidates${pending ? `, and ${formatNumber(pending)} ${pending === 1 ? "company has" : "companies have"} not finished onboarding` : ""}.`}
-      />
-
-      <FilterTabs label="Company views" tabs={views} value={activeView} hrefFor={viewHref} />
+      <AdminTabs items={views} active={activeView} label="Company views" />
 
       <DataTable
         basePath="/admin/companies"
@@ -266,10 +266,10 @@ export default async function AdminCompaniesPage({
             sort: "name",
             cell: (row) => {
               const where = [row.city, row.country].filter(Boolean).join(", ");
-              const sub = [row.primaryContactName || row.companyEmail, where].filter(Boolean).join(" · ");
+              const sub = [row.primaryContactName || row.name || row.companyEmail, where].filter(Boolean).join(" · ");
               const phone = `${row.countryCode ?? ""} ${row.phoneNumber ?? ""}`.trim();
               return (
-                <div className="min-w-0 lg:max-w-44">
+                <div className="min-w-0 lg:max-w-72">
                   <IdentityCell
                     name={row.companyName}
                     id={row.id}
@@ -278,16 +278,16 @@ export default async function AdminCompaniesPage({
                   />
                   {row.onboardingCompleted ? null : (
                     <div className="mt-1.5 pl-[3.25rem]">
-                      <StatusBadge tone="warning" label="Onboarding pending" dot={false} className="h-5 rounded-md" />
+                      <StatusBadge tone="warning" label="Onboarding" dot={false} className="h-5" />
                     </div>
                   )}
                 </div>
               );
             },
           },
-          { header: "Projects", sort: "projects", align: "right", cell: (row) => row.projectCount || <span className="text-text-subtle">-</span> },
-          { header: "Proposals", sort: "proposals", align: "right", cell: (row) => row.proposalCount || <span className="text-text-subtle">-</span> },
-          { header: "Hires", sort: "hires", align: "right", cell: (row) => row.hireCount || <span className="text-text-subtle">-</span> },
+          { header: "Projects", sort: "projects", align: "right", cell: (row) => row.projectCount },
+          { header: "Proposals", sort: "proposals", align: "right", cell: (row) => row.proposalCount },
+          { header: "Hires", sort: "hires", align: "right", cell: (row) => row.hireCount },
           {
             header: "Paid",
             sort: "paid",
@@ -296,13 +296,13 @@ export default async function AdminCompaniesPage({
               const m = money.get(row.id);
               return Number(row.paidTotal) > 0 ? (
                 <div>
-                  <p className="whitespace-nowrap font-medium text-ink-900">{formatMoney(Number(row.paidTotal), "INR")}</p>
+                  <p className="font-medium text-ink-900">{formatMoney(Number(row.paidTotal), "INR")}</p>
                   {m && m.refundedInrMinor > 0 ? (
                     <p className="text-xs text-text-subtle">
                       refunded {formatMoney(m.refundedInrMinor, "INR")} · net {formatMoney(Math.max(0, Number(row.paidTotal) - m.refundedInrMinor), "INR")}
                     </p>
                   ) : null}
-                  {m?.lastPaymentAt ? <p className="whitespace-nowrap text-xs text-text-subtle">last {formatDate(m.lastPaymentAt)}</p> : null}
+                  {m?.lastPaymentAt ? <p className="text-xs text-text-subtle">last {formatDate(m.lastPaymentAt)}</p> : null}
                 </div>
               ) : (
                 <span className="text-text-subtle">-</span>
@@ -316,11 +316,11 @@ export default async function AdminCompaniesPage({
               const m = money.get(row.id);
               return m && m.amountLeftInrMinor > 0 ? (
                 <div>
-                  <p className="whitespace-nowrap font-semibold text-signal">{formatMoney(m.amountLeftInrMinor, "INR")}</p>
-                  {m.nextDueDate ? <p className="whitespace-nowrap text-xs text-text-subtle">next {formatDate(m.nextDueDate)}</p> : null}
+                  <p className="font-semibold text-ink-900">{formatMoney(m.amountLeftInrMinor, "INR")}</p>
+                  {m.nextDueDate ? <p className="text-xs text-text-subtle">next {formatDate(m.nextDueDate)}</p> : null}
                 </div>
               ) : (
-                <span className="text-text-subtle">-</span>
+                <span className="text-text-subtle">–</span>
               );
             },
           },

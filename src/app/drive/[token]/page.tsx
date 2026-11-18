@@ -9,8 +9,7 @@ import { eligibleStudents } from "@/lib/college/scope";
 import { hashDriveToken } from "@/lib/college/tokens";
 import { getDb, schema } from "@/lib/db";
 import { ButtonLink } from "@/components/ui/button";
-import { DetailRow } from "@/components/app/primitives";
-import { APP_FONT_CLASSES } from "@/components/layout/app-fonts";
+import { Surface, DetailRow } from "@/components/app/primitives";
 import { Logo } from "@/components/brand/logo";
 import {
   CollegeMark,
@@ -53,12 +52,10 @@ export default async function DriveLandingPage({ params }: { params: Promise<{ t
   } catch (err) {
     console.error("[drive landing]", err);
     return (
-      <div data-app="1" className={`${APP_FONT_CLASSES} min-h-[100dvh] bg-canvas`}>
-        <main id="main" className="mx-auto max-w-xl px-4 py-24">
-          <h1 className="text-balance text-2xl font-semibold text-ink-900">We couldn&apos;t open this drive just now</h1>
-          <p className="mt-3 text-base text-ink-700">Nothing is wrong with your link. Try again in a moment.</p>
-        </main>
-      </div>
+      <main id="main" className="mx-auto max-w-xl px-4 py-24 text-center">
+        <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink-900">We couldn&apos;t open this drive just now</h1>
+        <p className="mt-3 text-[0.9375rem] leading-relaxed text-ink-600">Nothing is wrong with your link. Try again in a moment.</p>
+      </main>
     );
   }
   if (!row || !row.college.isActive) notFound();
@@ -73,57 +70,57 @@ export default async function DriveLandingPage({ params }: { params: Promise<{ t
   const here = `/drive/${token}`;
 
   return (
-    <div data-app="1" className={`${APP_FONT_CLASSES} min-h-[100dvh] bg-canvas`}>
-      <header className="border-b border-ink-200">
-        <div className="container-page flex h-14 items-center justify-between gap-4 sm:h-16">
+    <div className="min-h-[100dvh] bg-ink-50">
+      <header className="border-b border-ink-200/80 bg-white">
+        <div className="container-page flex h-16 items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-3">
-            <CollegeMark name={college.name} logoUrl={college.logoUrl} className="size-9 rounded-md text-xs" />
+            <CollegeMark name={college.name} logoUrl={college.logoUrl} className="size-9 rounded-lg text-xs" />
             <span className="truncate text-sm font-semibold text-ink-900">{college.name}</span>
           </div>
-          <div className="flex shrink-0 items-center gap-2 text-xs text-ink-600">
+          <div className="flex shrink-0 items-center gap-2 text-xs text-text-subtle">
             <span className="hidden sm:inline">Placement drive on</span>
-            <Logo variant="green" className="h-5" alt="Findtern" priority />
+            <Logo className="h-5" alt="Findtern" priority />
           </div>
         </div>
       </header>
 
-      <main id="main" className="container-page pb-28 pt-8 sm:py-14">
-        {/* One column on a phone: what it is, then the way in, then the facts.
-            From lg the way in sits beside the title and stays in view. */}
-        <div className="mx-auto grid max-w-5xl gap-x-14 gap-y-8 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <main id="main" className="container-page py-10 sm:py-16">
+        <div className="mx-auto grid max-w-5xl gap-8 lg:grid-cols-[1fr_22rem] lg:items-start">
           <section aria-labelledby="drive-title" className="min-w-0">
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <div className="flex flex-wrap items-center gap-2">
               <DriveStatePill state={state} />
-              <span className="text-sm font-medium text-ink-700">{KIND_LABEL[drive.kind] ?? "Campus drive"}</span>
+              <span className="text-sm font-medium text-ink-600">{KIND_LABEL[drive.kind] ?? "Campus drive"}</span>
             </div>
-            <h1 id="drive-title" className="mt-4 text-balance text-2xl font-semibold leading-tight text-ink-900 sm:text-4xl">
+            <h1
+              id="drive-title"
+              className="mt-4 text-balance text-3xl font-semibold tracking-[-0.025em] text-ink-900 sm:text-4xl"
+            >
               {drive.title}
             </h1>
-            <p className="mt-3 max-w-xl text-pretty text-base text-ink-700">
+            <p className="mt-3 text-pretty text-[0.9375rem] leading-relaxed text-ink-600">
               {college.name}
               {college.city ? `, ${college.city}` : ""} is inviting employers to meet its students on Findtern.
               {drive.description ? ` ${drive.description}` : ""}
             </p>
+
+            {/* One quiet list, not four equal cards with an icon each (a §0 tell). */}
+            <Surface className="mt-8 px-5">
+              <dl className="divide-y divide-ink-100">
+                <DetailRow label="Opens" value={driveTime(drive.startsAt)} mono />
+                <DetailRow label="Closes" value={`${driveTime(drive.endsAt)}${left ? ` · ${left}` : ""}`} mono />
+                {studentCount !== null ? (
+                  <DetailRow label="Students in this drive" value={`${studentCount.toLocaleString("en-IN")} eligible`} mono />
+                ) : null}
+                {studentCount ? (
+                  <DetailRow label="AI-interviewed" value={`${scoredCount.toLocaleString("en-IN")} with a Findtern Score`} mono />
+                ) : null}
+              </dl>
+            </Surface>
           </section>
 
-          <div className="lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:self-start">
-            <div className="rounded-lg border border-ink-200 bg-surface-raised p-5 sm:p-6">
-              <EntryPanel state={state} role={session?.role ?? null} token={token} here={here} />
-            </div>
-          </div>
-
-          <section aria-label="Drive details" className="min-w-0 lg:col-start-1 lg:row-start-2">
-            <dl className="divide-y divide-ink-200 border-y border-ink-200">
-              <DetailRow label={state === "live" || state === "ended" ? "Opened" : "Opens"} value={driveTime(drive.startsAt)} mono />
-              <DetailRow label="Closes" value={`${driveTime(drive.endsAt)}${left ? ` · ${left}` : ""}`} mono />
-              {studentCount !== null ? (
-                <DetailRow label="Eligible students" value={studentCount.toLocaleString("en-IN")} mono />
-              ) : null}
-              {studentCount ? (
-                <DetailRow label="With a Findtern Score" value={`${scoredCount.toLocaleString("en-IN")} of ${studentCount.toLocaleString("en-IN")}`} mono />
-              ) : null}
-            </dl>
-          </section>
+          <Surface className="p-6">
+            <EntryPanel state={state} role={session?.role ?? null} token={token} here={here} />
+          </Surface>
         </div>
       </main>
     </div>
@@ -190,7 +187,7 @@ function EntryPanel({
         </ButtonLink>
         <Link
           href={`/signup?as=employer&next=${next}`}
-          className="inline-flex min-h-11 items-center justify-center rounded-md text-sm font-semibold text-brand-800 underline decoration-brand-300 decoration-2 underline-offset-4 hover:decoration-brand-700"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
         >
           Create an employer account
         </Link>
@@ -202,8 +199,8 @@ function EntryPanel({
 function PanelCopy({ title, body, children }: { title: string; body: string; children?: React.ReactNode }) {
   return (
     <div>
-      <h2 className="text-lg font-semibold text-ink-900">{title}</h2>
-      <p className="mt-1.5 text-sm leading-relaxed text-ink-700">{body}</p>
+      <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
+      <p className="mt-1.5 text-sm leading-relaxed text-ink-600">{body}</p>
       {children ? <div className="mt-5">{children}</div> : null}
     </div>
   );

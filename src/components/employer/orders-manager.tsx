@@ -54,18 +54,16 @@ export function OrdersManager({
   // name them here so "N payments due" never sits beside a clean slate (QA-007).
   const offers = offersToPay > 0 ? `${offersToPay} accepted offer${offersToPay === 1 ? "" : "s"} to pay for` : "";
 
-  const hasPay = payableCount + earlyCount > 0;
-
   return (
-    <div className="pb-20 lg:pb-0">
+    <div>
       <PageHead
         title="Orders"
-        // The money is in the summary below; the line says only what it does not.
+        // The money is in the summary card below; the line says only what it does not.
         lede={hires.length === 0 && offers ? `${offers}. A hire starts once you pay.` : "Your hires, what you owe on each, and every invoice."}
-        className="mb-8"
+        className="mb-3 sm:mb-4 lg:mb-5 [&_h1]:text-[32px] [&_h1]:leading-10"
         action={
-          hasPay ? (
-            <ButtonLink href="/employer/checkout" variant="primary" size="md">
+          payableCount + earlyCount > 0 ? (
+            <ButtonLink href="/employer/checkout" variant="primary">
               {paymentsBadge(payableCount, earlyCount)}
               <ArrowRight className="size-4" aria-hidden />
             </ButtonLink>
@@ -73,13 +71,11 @@ export function OrdersManager({
         }
       />
 
-      {hires.length > 0 ? <OrdersSummary hires={hires} /> : null}
-
-      {/* Tabs on a hairline: the active one is underlined. A count is shown only when there is something to count. */}
+      {/* The same green strip with a white selected step as Candidates and Compare. */}
       <div
         role="tablist"
         aria-label="Orders"
-        className="mb-6 flex gap-6 overflow-x-auto border-b border-ink-200"
+        className="mb-4 grid grid-cols-3 items-stretch gap-1 rounded-xl border border-brand-200 bg-brand-100/60 p-1 text-[13px] sm:mb-5 sm:text-sm"
         onKeyDown={(e) => {
           // APG tabs: arrows, Home and End move between tabs; Tab leaves the list.
           const i = tabs.findIndex((t) => t.id === tab);
@@ -104,24 +100,26 @@ export function OrdersManager({
               aria-controls={on ? `orders-panel-${t.id}` : undefined}
               onClick={() => setTab(t.id)}
               className={cn(
-                "-mb-px inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap border-b-2 px-0.5 text-base font-medium outline-none transition-colors duration-[var(--motion-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700",
-                on ? "border-brand-800 font-semibold text-ink-900" : "border-transparent text-ink-700 hover:text-ink-900",
+                "apple-spring inline-flex min-h-11 w-full min-w-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg px-1.5 outline-none focus-visible:ring-2 focus-visible:ring-brand-600 sm:min-h-10 sm:gap-2 sm:px-4 sm:touch:min-h-11",
+                on ? "bg-white font-bold text-brand-900 shadow-sm ring-1 ring-brand-200" : "font-medium text-ink-700 hover:bg-white/60 hover:text-ink-900",
               )}
             >
               {t.label}
-              {t.count > 0 ? <span className="nums text-sm font-normal text-ink-600">{t.count}</span> : null}
+              <span className={cn("nums min-w-5 rounded-full px-1.5 py-px text-center text-xs font-bold", on ? "bg-brand-700 text-white" : "bg-white text-ink-700 ring-1 ring-brand-200")}>{t.count}</span>
             </button>
           );
         })}
       </div>
 
+      {hires.length > 0 ? <OrdersSummary hires={hires} /> : null}
+
       <div role="tabpanel" id={`orders-panel-${tab}`} aria-labelledby={`orders-tab-${tab}`}>
         {tab === "hires" ? (
-          <HiresPanel hires={hires} employerId={employerId} fteStatus={fteStatus} timezone={timezone} payableIds={payableIds} emptyPrimary={!hasPay} />
+          <HiresPanel hires={hires} employerId={employerId} fteStatus={fteStatus} timezone={timezone} payableIds={payableIds} />
         ) : tab === "schedule" ? (
-          <SchedulePanel hires={hires} payableIds={payableIds} emptyPrimary={!hasPay} />
+          <SchedulePanel hires={hires} payableIds={payableIds} />
         ) : (
-          <InvoicesPanel invoices={invoices} emptyPrimary={!hasPay} />
+          <InvoicesPanel invoices={invoices} />
         )}
       </div>
     </div>

@@ -3,14 +3,13 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Clock, CreditCard, Eye, Hourglass, Loader2, Pencil, RotateCcw, Search, Send, TriangleAlert, X } from "lucide-react";
+import { Clock, CreditCard, Eye, Hourglass, Loader2, Pencil, RotateCcw, Search, Send, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatDate, formatIst, formatMoney } from "@/lib/format";
+import { formatIst, formatMoney } from "@/lib/format";
 import type { CgpaGate } from "@/lib/cgpa-verification";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
-import { EmptyScene, FilterTabs, Pill, type Tone } from "@/components/app/primitives";
-import { LeadStat } from "@/components/app/stat";
+import { EmptyScene, Pill } from "@/components/app/primitives";
 import { RowMenu, type RowMenuItem } from "@/components/app/row-menu";
 import { ProposalAvatar } from "@/components/employer/proposal-avatar";
 import type { PresenceLabel } from "@/lib/presence";
@@ -21,15 +20,12 @@ import { parseOffer } from "@/lib/offer";
 import { counterRow, EXPIRED_CARD_NOTE, offerState } from "@/components/employer/proposal-state";
 import { closedBreakdown, proposalCounts } from "@/components/employer/proposal-bucket";
 import { closedSummary, inTab, TAB_EMPTY, TAB_EXPLAINER, TAB_LABEL, tabFromParam, type TabKey } from "@/components/employer/proposal-tabs";
-import { daysUntil, stageTrail } from "@/components/employer/proposal-trail";
-import { StageTrail } from "@/components/employer/proposal-trail-view";
-import { StageFunnel } from "@/components/employer/proposal-detail/stage-funnel";
 import { CgpaAckButton } from "@/components/employer/proposal-actions";
-import { btnOutline, searchFieldClass } from "@/components/employer/proposal-ui";
 import { cn } from "@/lib/utils";
 import { TakedownBadge } from "@/components/employer/takedown-badge";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { TAKEN_DOWN_SHORT } from "@/components/employer/takedown-ui";
+import { fieldClass } from "@/components/employer/ui-tokens";
 
 export type ProposalItem = {
   proposal: EmployerProposal;
@@ -58,7 +54,13 @@ function nameOf(item: ProposalItem): string {
 /** Rows shown at a time; "Show more" adds another page (as Projects). */
 const PAGE = 20;
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function formatStart(iso: string | null): string | null {
+  if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return null;
+  const [y, m, d] = iso.slice(0, 10).split("-");
+  return `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}`;
+}
 
 export function ProposalsManager({ initialProposals, initialStatus = "all" }: { initialProposals: ProposalItem[]; initialStatus?: TabKey }) {
   const router = useRouter();
@@ -174,49 +176,6 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
   // A handful of offers reads at a glance; search only earns its place on a longer list.
   const showTools = proposals.length > 5;
 
-  // The funnel: how far the offers sent got. Drafts were never sent; every accepted offer (paid or not) counts as accepted.
-  const sentRows = rows.filter((r) => r.item.proposal.status !== "draft");
-  const acceptedN = sentRows.filter((r) => ["accepted", "processing", "hired"].includes(r.item.proposal.status)).length;
-  const paidN = sentRows.filter((r) => r.item.proposal.status === "hired").length;
-
-  // The one lead figure: what needs the employer, else what they are waiting on, else what is done.
-  const payable = rows.filter((r) => r.state.canPay).length;
-  const confirming = rows.filter((r) => !r.down && r.state.gate?.state === "incorrect_unacked").length;
-  const mine = payable + confirming;
-  const lead =
-    mine > 0
-      ? {
-          label: "Needs you",
-          value: mine,
-          tone: "signal" as const,
-          note: payable > 0 ? `${plural(payable, "accepted offer")} to pay. Names and contact details unlock once a hire is paid.` : `${plural(confirming, "corrected CGPA")} to confirm before you can pay.`,
-          action: payable > 0 ? { label: "Pay now", href: "/employer/checkout" } : undefined,
-        }
-      : counts.awaiting > 0
-        ? (() => {
-            const waiting = rows
-              .filter((r) => r.state.bucket === "open" && !r.down)
-              .map((r) => ({ who: nameOf(r.item), days: daysUntil(r.offer.startDate) }))
-              .sort((a, b) => (a.days ?? 1e9) - (b.days ?? 1e9));
-            const first = waiting[0];
-            const names = waiting.slice(0, 3).map((w) => w.who);
-            const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
-            const more = waiting.length > 3 ? ` and ${waiting.length - 3} more` : "";
-            const closes = first?.days && first.days > 0 ? ` ${waiting.length > 1 ? `${first.who}'s` : "The"} offer closes first, in ${plural(first.days, "day")}.` : "";
-            return {
-              label: "Waiting on a reply",
-              value: counts.awaiting,
-              tone: "ink" as const,
-              note: `${list}${more} ${waiting.length === 1 ? "has" : "have"} not answered yet.${closes}`,
-              action: undefined,
-            };
-          })()
-        : (counts.verifying ?? 0) > 0
-          ? { label: "CGPA being confirmed", value: counts.verifying ?? 0, tone: "ink" as const, note: "Findtern confirms it, usually in 24-48 h. You can pay once it is done.", action: undefined }
-          : counts.hired > 0
-            ? { label: "Hired", value: counts.hired, tone: "brand" as const, note: "Paid and placed. Timesheets run monthly from each start date.", action: { label: "Open timesheets", href: "/employer/timesheets" } }
-            : null;
-
   return (
     <div>
       <div className="mb-4">
@@ -224,79 +183,81 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
           projects={Array.from(new Map(proposals.filter((p) => p.project?.takenDown).map((p) => [p.project!.id, { id: p.project!.id, name: p.project!.projectName }])).values())}
         />
       </div>
-
-      {/* The page's one lead figure beside where the offers got to (Sent > Accepted > Paid) on a single scale. */}
-      <div className="grid items-start gap-x-14 gap-y-8 border-b border-ink-200 pb-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
-        {lead ? <LeadStat label={lead.label} value={lead.value} tone={lead.tone} note={lead.note} action={lead.action} /> : <div />}
-        <div>
-          <p className="mb-2 text-sm font-medium text-ink-600">How your offers have moved</p>
-          <StageFunnel
-            stages={[
-              { label: "Sent", count: sentRows.length },
-              { label: "Accepted", count: acceptedN },
-              { label: "Paid", count: paidN },
-            ]}
-          />
+      {showTools ? (
+        <div className="mb-4 flex gap-2">
+          <label className="relative min-w-0 flex-1 sm:max-w-xl">
+            <span className="sr-only">Search proposals</span>
+            <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-ink-500" aria-hidden />
+            <input
+              ref={searchRef}
+              type="search"
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setShown(PAGE);
+              }}
+              placeholder="Search by role, project or initials"
+              className={cn(fieldClass, "rounded-xl pl-10")}
+            />
+          </label>
+          {projectOptions.length > 1 ? (
+            <select
+              value={projectFilter}
+              onChange={(e) => {
+                setProjectFilter(e.target.value);
+                setShown(PAGE);
+              }}
+              className={cn(fieldClass, "w-36 shrink-0 truncate rounded-xl sm:w-56")}
+              aria-label="Project"
+            >
+              <option value="all">All projects</option>
+              {projectOptions.map(([id, name]) => (
+                <option key={id} value={id}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          ) : null}
         </div>
-      </div>
+      ) : null}
 
-      <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <FilterTabs
-          label="Show proposals"
-          tabs={tabs.map((t) => ({ key: t.key, label: TAB_LABEL[t.key].short, count: t.count }))}
-          value={statusFilter}
-          onChange={(k) => {
-            setStatusFilter(k as TabKey);
-            setShown(PAGE);
-          }}
-          className="-ml-3"
-        />
-        {showTools ? (
-          <div className="flex gap-2 sm:w-96">
-            <label className="relative min-w-0 flex-1">
-              <span className="sr-only">Search proposals</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-500" aria-hidden />
-              <input
-                ref={searchRef}
-                type="search"
-                value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setShown(PAGE);
-                }}
-                placeholder="Role, project or initials"
-                className={cn(searchFieldClass, "pl-9")}
-              />
-            </label>
-            {projectOptions.length > 1 ? (
-              <select
-                value={projectFilter}
-                onChange={(e) => {
-                  setProjectFilter(e.target.value);
-                  setShown(PAGE);
-                }}
-                className={cn(searchFieldClass, "w-32 shrink-0 truncate sm:w-40")}
-                aria-label="Project"
-              >
-                <option value="all">All projects</option>
-                {projectOptions.map(([id, name]) => (
-                  <option key={id} value={id}>
-                    {name}
-                  </option>
-                ))}
-              </select>
-            ) : null}
-          </div>
-        ) : null}
+      {/* Status tabs with counts, underlined like candidate search. Toggle
+          buttons, not role=tab: they narrow one list, they don't switch panels. */}
+      <div role="group" aria-label="Show proposals" aria-describedby="proposal-tab-explainer" className="flex flex-wrap gap-x-3 border-b border-ink-100 sm:gap-x-7">
+        {tabs.map((t) => {
+          const on = statusFilter === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              aria-pressed={on}
+              aria-label={`${TAB_LABEL[t.key].label}, ${t.count}`}
+              onClick={() => {
+                setStatusFilter(t.key);
+                setShown(PAGE);
+              }}
+              className={cn(
+                "relative -mb-px inline-flex min-h-12 min-w-11 items-center justify-center gap-1 whitespace-nowrap sm:gap-1.5 text-sm outline-none transition-colors",
+                "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
+                "focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent",
+                on ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-700 hover:text-ink-900",
+              )}
+            >
+              <span aria-hidden className="sm:hidden">{TAB_LABEL[t.key].short}</span>
+              <span aria-hidden className="max-sm:hidden">{TAB_LABEL[t.key].label}</span>
+              <span aria-hidden className={cn("nums", on ? "text-ink-900" : "text-ink-600")}>{t.count}</span>
+            </button>
+          );
+        })}
       </div>
       {/* What the open tab holds, in one line: a tab at 0 beside an All of 2 means the two sit in another tab. */}
-      <p aria-live="polite" className="mt-3 max-w-3xl text-sm leading-relaxed text-ink-700">
+      <p id="proposal-tab-explainer" aria-live="polite" className="mt-3 max-w-3xl text-sm leading-relaxed text-ink-700">
         {TAB_EXPLAINER[statusFilter]}
         {closedLine ? <span className="nums block text-ink-600">{closedLine}</span> : null}
       </p>
 
       {errorMsg ? (
-        <p role="alert" className="mt-4 rounded-md border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-ink-900">
+        <p role="alert" className="mt-4 rounded-apple-md border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-ink-800">
           {errorMsg}
         </p>
       ) : null}
@@ -306,15 +267,14 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
       </p>
 
       {filtered.length === 0 ? (
-        <div className="pt-6">
+        <div className="pt-8">
           <EmptyScene
             title={narrowing ? "No proposals here" : TAB_EMPTY[statusFilter].title}
             body={narrowing ? "Nothing fits this search and status." : TAB_EMPTY[statusFilter].body}
             who={narrowing ? "You - clear the search or project filter" : undefined}
-            next={narrowing ? undefined : { label: statusFilter === "closed" || statusFilter === "hired" ? "Find more candidates" : "Browse candidates", href: "/employer/candidates" }}
           />
           {narrowing ? (
-            <p className="mt-3">
+            <p className="mt-3 text-center">
               <button
                 type="button"
                 onClick={() => {
@@ -325,7 +285,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                   // The button unmounts with the empty state: keep focus on the toolbar.
                   searchRef.current?.focus();
                 }}
-                className={btnOutline}
+                className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}
               >
                 <RotateCcw className="size-4" aria-hidden />
                 Clear filters
@@ -334,7 +294,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
           ) : null}
         </div>
       ) : (
-        <ul className="-mx-3 mt-5 before:mx-3 before:block before:h-px before:bg-ink-200 before:content-['']">
+        <ul className="space-y-4 pt-5">
           {filtered.slice(0, shown).map(({ item, offer, state, down }) => {
             const ini = initialsOf(item.user?.firstName?.trim() || "", item.user?.lastName?.trim() || "");
             const ft = offer.fullTime;
@@ -347,127 +307,89 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
               : offer.monthlyMinor != null
                 ? { amount: formatMoney(offer.monthlyMinor, offer.currency), per: "a month" }
                 : null;
+            const start = formatStart(offer.startDate);
             const href = `/employer/proposal/${item.proposal.id}`;
             const title = offer.roleTitle || item.project?.projectName || "Internship";
             const who = nameOf(item);
-            const status = item.proposal.status;
-            const closed = state.tone === "closed";
-            const mineNow = needsYou(state);
-            // Amber is for what the employer owes or must confirm; waiting on someone else is neutral; Hired is green.
-            const tone: Tone = status === "hired" ? "live" : mineNow ? "waiting" : closed ? "closed" : "neutral";
-            const icon =
-              status === "hired" ? <Check /> : state.canPay ? <CreditCard /> : state.gate?.state === "incorrect_unacked" ? <TriangleAlert /> : state.verifying ? <Hourglass /> : closed ? <X /> : status === "draft" ? <Pencil /> : <Clock />;
-            const n = daysUntil(offer.startDate);
-            const clock =
-              closed || down || n === null
-                ? null
-                : state.bucket === "open"
-                  ? n > 0
-                    ? `${plural(n, "day")} left to reply`
-                    : null
-                  : state.canPay
-                    ? n > 0
-                      ? `${plural(n, "day")} left to pay`
-                      : null
-                    : status === "hired"
-                      ? n > 0
-                        ? `Starts in ${plural(n, "day")}`
-                        : n === 0
-                          ? "Starts today"
-                          : null
-                      : null;
-            const trail = stageTrail(
-              item.proposal,
-              { startDate: offer.startDate },
-              { closed: closed && !down, acceptedBeforeClose: status === "accepted" && closed },
-              formatDate,
+            // One colour per meaning on this list: Hired green, Waiting amber, To pay blue, Closed grey.
+            // A verifying or expired offer is still status "accepted" but is not to pay: it keeps its own tone.
+            const chipTone = item.proposal.status === "hired" ? "paid" : state.canPay || (item.proposal.status === "accepted" && !state.verifying && state.expiredReason === null) ? "new" : state.tone;
+            // A long label wraps inside its column instead of running into the price beside it.
+            const pill = (
+              <Pill tone={chipTone} className={cn("max-w-full text-left leading-snug", state.label.length > 24 ? "rounded-xl" : "whitespace-nowrap")}>
+                {state.label}
+              </Pill>
             );
-            // The note under a row that needs more than a pill: CGPA being confirmed, a correction to confirm, an expired offer.
+            const closed = state.tone === "closed";
+            const label = "text-[11px] font-semibold uppercase tracking-wider text-text-subtle";
+            // The note under a card that needs more than a pill: CGPA being confirmed, a correction to confirm, an expired offer.
             const gate = down ? null : state.gate;
             const sendNew = !down && state.canSendNew ? `/employer/send-proposal?intern=${encodeURIComponent(item.proposal.internId)}&project=${encodeURIComponent(item.proposal.projectId)}` : null;
             const note = gate || sendNew ? { gate, sendNew } : null;
-            const menu = menuFor(item, state, href);
             return (
-              <li key={item.proposal.id} className="relative grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-6 gap-y-4 px-3 py-5 transition-colors after:pointer-events-none after:absolute after:inset-x-3 after:bottom-0 after:h-px after:bg-ink-200 after:content-['']  duration-[var(--motion-fast)] hover:bg-ink-200/30 min-[1360px]:grid-cols-[minmax(0,1.15fr)_19rem_10rem_8.5rem_9rem] min-[1360px]:items-center">
-                {/* Who: the whole row opens the offer through this link, stretched over it. */}
-                <div className="flex min-w-0 items-center gap-3 min-[1360px]:order-1">
-                  <ProposalAvatar photoUrl={item.photoUrl} initials={ini === "?" ? "C" : ini} presence={item.presence} className="size-10 text-sm" />
-                  <div className="min-w-0">
-                    <p className="text-base leading-snug">
-                      <Link
-                        href={href}
-                        className={cn(
-                          "break-words font-semibold outline-none after:absolute after:inset-0 after:content-[''] hover:underline hover:decoration-ink-400 hover:underline-offset-4 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-700",
-                          closed ? "text-ink-700" : "text-ink-900",
-                        )}
-                      >
-                        {who}
-                        <span className="sr-only">, {title}</span>
-                      </Link>
-                    </p>
-                    <p className="break-words text-sm text-ink-700">{title}</p>
-                    {item.project ? <p className="break-words text-xs text-ink-600">{item.project.projectName}</p> : null}
-                    {down ? (
-                      <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-700">
-                        <TakedownBadge /> <span>{TAKEN_DOWN_SHORT}</span>
-                      </p>
-                    ) : null}
-                  </div>
-                </div>
-
-                {/* Money: the monthly price in display figures. */}
-                <div className="text-right min-[1360px]:order-4">
-                  {money ? (
-                    <>
-                      <p className="nums font-display text-lg font-semibold leading-tight text-ink-900">{money.amount}</p>
-                      <p className="nums text-xs text-ink-600">
-                        {money.per}
-                        {ft ? "" : ` · ${plural(offer.months, "month")}`}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-ink-700">{ft ? "CTC not set" : "Price not set"}</p>
-                  )}
-                </div>
-
-                {/* Stage trail with dates. */}
-                <StageTrail stages={trail} attention={mineNow} className="col-span-2 min-[1360px]:order-2 min-[1360px]:col-span-1" />
-
-                {/* Where it stands, and the clock. */}
-                <div className="min-w-0 min-[1360px]:order-3">
-                  <Pill tone={tone} icon={icon} className="max-w-full text-left leading-snug">
-                    {state.label}
-                  </Pill>
-                  {clock ? <p className="nums mt-1 text-xs text-ink-700">{clock}</p> : null}
-                </div>
-
-                {/* Above the stretched link, so these stay clickable. */}
-                <div className="relative z-10 flex items-center justify-end gap-1.5 min-[1360px]:order-5">
-                  {state.canPay ? (
-                    <Link href="/employer/checkout" className={btnOutline}>
-                      Pay now
+              <li
+                key={item.proposal.id}
+                className="relative grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-4 gap-y-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-xs transition-colors hover:border-ink-300 sm:p-5 lg:grid-cols-[3.5rem_minmax(0,1fr)_11rem_13.5rem_auto] lg:items-center lg:gap-x-6"
+              >
+                <ProposalAvatar photoUrl={item.photoUrl} initials={ini === "?" ? "C" : ini} presence={item.presence} />
+                <div className="min-w-0">
+                  <p className="text-base leading-snug text-ink-900">
+                    {/* The whole card opens the offer: the name's link is
+                        stretched over it, and keeps its own focus ring. */}
+                    <Link
+                      href={href}
+                      aria-label={`${title}, ${who}`}
+                      className={cn(
+                        "break-words font-semibold outline-none after:absolute after:inset-0 after:rounded-2xl after:content-[''] hover:text-brand-700 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-600",
+                        closed ? "text-ink-700" : "text-ink-900",
+                      )}
+                    >
+                      {who}
                     </Link>
-                  ) : null}
-                  {menu.length > 0 ? <RowMenu label={`More actions for ${title}, ${who}`} items={menu} className="touch:size-11" /> : null}
+                  </p>
+                  <p className="mt-0.5 break-words text-sm font-medium text-ink-800">{title}</p>
+                  {item.project ? <p className="mt-0.5 break-words text-sm text-ink-700">{item.project.projectName}</p> : null}
+                  {down ? <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-700"><TakedownBadge /> <span>{TAKEN_DOWN_SHORT}</span></p> : null}
                 </div>
-
+                <div className="col-span-2 flex flex-col items-start gap-1 lg:col-span-1">
+                  <span className={cn(label, "lg:sr-only")}>Status</span>
+                  {pill}
+                </div>
+                <div className="nums col-span-2 flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm text-ink-700 lg:col-span-1 lg:flex-col lg:gap-y-0.5">
+                  {money ? (
+                    <span>
+                      <span className="text-base font-semibold text-ink-900">{money.amount}</span> {money.per}
+                    </span>
+                  ) : (
+                    <span className="text-ink-700">{ft ? "CTC not set" : "Price not set"}</span>
+                  )}
+                  <span className="lg:whitespace-nowrap">
+                    {ft ? "Full-time" : `${offer.months} month${offer.months === 1 ? "" : "s"}`}
+                    {start ? ` · ${ft ? "Joins" : "Starts"} ${start}` : ""}
+                  </span>
+                </div>
                 {note ? (
-                  <div className="relative z-10 col-span-full flex flex-col gap-3 text-sm text-ink-800 sm:flex-row sm:items-center sm:justify-between min-[1360px]:order-6 min-[1360px]:pl-[3.25rem]">
-                    <p className="flex min-w-0 items-start gap-2 text-pretty leading-relaxed">
-                      {note.gate && note.gate.state !== "incorrect_unacked" ? <Hourglass className="mt-0.5 size-4 shrink-0 text-ink-600" aria-hidden /> : null}
-                      <span>
+                  <div
+                    className={cn(
+                      "relative z-10 col-span-2 flex flex-col gap-3 rounded-xl px-4 py-3 sm:flex-row sm:items-center sm:justify-between lg:order-last lg:col-span-full",
+                      note.gate?.state === "incorrect_unacked" ? "bg-info-soft" : note.gate ? "bg-accent-100/60" : "bg-ink-50",
+                    )}
+                  >
+                    <div className="flex min-w-0 items-start gap-2.5 text-sm leading-relaxed text-ink-800">
+                      {note.gate && note.gate.state !== "incorrect_unacked" ? <Hourglass className="mt-0.5 size-4 shrink-0 text-accent-700" aria-hidden /> : null}
+                      <p className="min-w-0 text-pretty">
                         {note.sendNew && state.expiredReason && EXPIRED_CARD_NOTE[state.expiredReason] ? EXPIRED_CARD_NOTE[state.expiredReason] : state.next}
                         {note.gate && note.gate.state !== "incorrect_unacked" && note.gate.dueBy ? (
                           <span className="nums mt-0.5 block font-medium text-ink-900">
                             {note.gate.state === "overdue" ? "Was due by" : "Due by"} {formatIst(note.gate.dueBy)}
                           </span>
                         ) : null}
-                      </span>
-                    </p>
+                      </p>
+                    </div>
                     <div className="flex shrink-0 flex-col gap-2 sm:w-60">
                       {note.gate?.state === "incorrect_unacked" ? <CgpaAckButton proposalId={item.proposal.id} /> : null}
                       {note.sendNew ? (
-                        <Link href={note.sendNew} className={btnOutline}>
+                        <Link href={note.sendNew} className={buttonClass({ block: true, className: "min-h-11" })}>
                           <Send className="size-4" aria-hidden />
                           Send a new proposal
                         </Link>
@@ -475,14 +397,36 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                     </div>
                   </div>
                 ) : null}
+                {/* Above the stretched link, so these stay clickable. */}
+                <div className="relative z-10 col-span-2 flex items-center gap-3 border-t border-ink-100 pt-3 lg:col-span-1 lg:border-0 lg:pt-0">
+                  {/* One visible action, chosen by the state (QA-120); the menu holds the rest. */}
+                  <div className="min-w-0 max-sm:flex-1 [&_a]:rounded-xl [&_button]:rounded-xl [&_button]:max-sm:w-full [&_a]:max-sm:w-full lg:w-36 [&_button]:lg:w-full [&_a]:lg:w-full">
+                    {state.canPay ? (
+                      <Link href="/employer/checkout" className={buttonClass({ variant: "primary" })}>
+                        <CreditCard className="size-4" aria-hidden />
+                        Pay now
+                      </Link>
+                    ) : (
+                      <Link href={href} className={buttonClass({ variant: "outline" })} aria-label={`View ${title}, ${who}`}>
+                        View
+                      </Link>
+                    )}
+                  </div>
+                  {menuFor(item, state, href).length > 0 ? (
+                    <RowMenu label={`More actions for ${title}, ${who}`} items={menuFor(item, state, href)} className="touch:size-11" />
+                  ) : (
+                    // Keeps the visible actions in one column when a row has no menu.
+                    <span aria-hidden className="size-10 shrink-0 touch:size-11" />
+                  )}
+                </div>
               </li>
             );
           })}
         </ul>
       )}
       {filtered.length > shown ? (
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pt-6">
-          <button type="button" onClick={() => setShown((n) => n + PAGE)} className={btnOutline}>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-ink-100 pt-6">
+          <button type="button" onClick={() => setShown((n) => n + PAGE)} className={buttonClass({ variant: "outline", size: "md", className: "min-h-11" })}>
             Show {Math.min(PAGE, filtered.length - shown)} more
           </button>
           <p className="nums text-sm text-ink-600">
@@ -490,30 +434,30 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
           </p>
         </div>
       ) : filtering && filtered.length > 0 ? (
-        <p className="mt-3 text-sm text-ink-600">
+        <p className="mt-2 text-sm text-ink-600">
           Showing <span className="nums font-semibold text-ink-900">{filtered.length}</span> of <span className="nums">{proposals.length}</span>
         </p>
       ) : null}
 
       <Dialog open={Boolean(withdrawTarget)} onOpenChange={(open) => !open && !busy && setWithdrawTarget(null)}>
-        <DialogContent className="rounded-lg sm:max-w-md">
+        <DialogContent className="rounded-apple-xl sm:max-w-md">
           <DialogHeader className="text-left">
             <DialogTitle className="text-lg font-semibold text-ink-900">Withdraw this offer?</DialogTitle>
-            <DialogDescription className="text-sm leading-relaxed text-ink-700">
+            <DialogDescription className="text-sm leading-relaxed text-ink-600">
               {withdrawTarget?.proposal.status === "accepted"
                 ? "The candidate already accepted. Withdrawing tells them it won't go ahead. This can't be undone."
                 : "The candidate can no longer accept it, and they are told. This can't be undone."}
             </DialogDescription>
           </DialogHeader>
           {withdrawTarget ? (
-            <p className="rounded-md bg-ink-100 px-4 py-3 text-sm text-ink-900">
+            <p className="rounded-apple-md bg-ink-50 px-4 py-3 text-sm text-ink-800">
               <span className="font-semibold">{parseOffer(withdrawTarget.proposal.offerDetails).roleTitle || "Internship"}</span>
               {" · "}
               {nameOf(withdrawTarget)}
             </p>
           ) : null}
           <DialogFooter className="gap-2">
-            <button type="button" onClick={() => setWithdrawTarget(null)} disabled={busy} className={btnOutline}>
+            <button type="button" onClick={() => setWithdrawTarget(null)} disabled={busy} className={buttonClass({ variant: "outline", size: "sm" })}>
               Keep it
             </button>
             <button type="button" onClick={handleWithdraw} disabled={busy} className={buttonClass({ variant: "dark", size: "sm" })}>

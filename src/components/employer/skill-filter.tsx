@@ -94,7 +94,7 @@ export function SkillFilter({
 
   return (
     <section aria-labelledby="skills-heading" className={cn("flex flex-wrap items-center gap-x-1.5 gap-y-0", className)}>
-      <h2 id="skills-heading" className="mr-1 text-sm font-medium text-ink-600 max-sm:sr-only">
+      <h2 id="skills-heading" className="mr-1 text-[13px] font-medium text-ink-600 max-sm:sr-only">
         {title}
       </h2>
       <p id={`${listId}-note`} className="sr-only">
@@ -109,7 +109,7 @@ export function SkillFilter({
               scroll={false}
               className="group inline-flex min-h-9 items-center outline-none touch:min-h-11"
             >
-              <span className="inline-flex h-7 items-center gap-1 rounded-lg bg-brand-100 pl-2.5 pr-1.5 text-sm font-medium text-brand-900 transition-colors group-hover:bg-brand-200 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
+              <span className="inline-flex h-7 items-center gap-1 rounded-lg bg-brand-100 pl-2.5 pr-1.5 text-[13px] font-medium text-brand-900 transition-colors group-hover:bg-brand-200 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
                 {skill}
                 <X className="size-3.5 text-brand-800/70" aria-hidden />
               </span>
@@ -117,11 +117,11 @@ export function SkillFilter({
             </Link>
           </li>
         ))}
-        {active.length === 0 ? <li className="inline-flex min-h-9 items-center text-sm text-text-subtle">None</li> : null}
+        {active.length === 0 ? <li className="inline-flex min-h-9 items-center text-[13px] text-text-subtle">None</li> : null}
       </ul>
 
       {/* Always mounted so the screen reader hears the note appear; empty it takes no room. */}
-      <p aria-live="polite" className={limit ? "inline-flex min-h-9 items-center text-sm text-ink-700 touch:min-h-11" : "sr-only"}>
+      <p aria-live="polite" className={limit ? "inline-flex min-h-9 items-center text-[13px] text-ink-700 touch:min-h-11" : "sr-only"}>
         {limit}
       </p>
 
@@ -167,7 +167,7 @@ export function SkillFilter({
             }}
             placeholder="Type a skill…"
             aria-label="Add a required skill"
-            className="h-9 w-full rounded-lg border border-ink-200 bg-surface-raised px-3.5 text-base text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm touch:h-11"
+            className="h-9 w-full rounded-xl border border-ink-200 bg-white px-3.5 text-base text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm touch:h-11"
           />
           {open && (options.length > 0 || custom) ? (
             <ul
@@ -176,7 +176,7 @@ export function SkillFilter({
               aria-label="Skill suggestions"
               // The scrollbar and padding are part of the list: a press there must not blur the input and close it.
               onMouseDown={(e) => e.preventDefault()}
-              className="absolute left-0 z-30 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-ink-200 bg-surface-raised py-1 shadow-lg"
+              className="absolute left-0 z-30 mt-1 max-h-64 w-64 overflow-y-auto rounded-lg border border-ink-200 bg-white py-1 shadow-lg"
             >
               {options.map((skill, i) => (
                 <li
@@ -217,7 +217,7 @@ export function SkillFilter({
           onClick={() => setAdding(true)}
           className="group inline-flex min-h-9 items-center outline-none touch:min-h-11"
         >
-          <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-sm font-medium border border-dashed border-ink-300 text-ink-700 transition-colors group-hover:border-ink-400 group-hover:text-ink-900 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
+          <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium border border-dashed border-ink-300 text-ink-700 transition-colors group-hover:border-ink-400 group-hover:text-ink-900 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
             <Plus className="size-3.5" aria-hidden />
             Add skill
           </span>
@@ -225,12 +225,12 @@ export function SkillFilter({
       )}
 
       {active.length === 0 && projectSkills.length > 0 ? (
-        <Link href={hrefWith(null)} scroll={false} className="inline-flex min-h-9 items-center px-1.5 text-sm font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
+        <Link href={hrefWith(null)} scroll={false} className="inline-flex min-h-9 items-center px-1.5 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
           <Check className="mr-1 size-3.5" aria-hidden />
           Restore project skills
         </Link>
       ) : restore ? (
-        <Link href={hrefWith(null)} scroll={false} className="inline-flex min-h-9 items-center px-1.5 text-sm font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
+        <Link href={hrefWith(null)} scroll={false} className="inline-flex min-h-9 items-center px-1.5 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
           Restore project skills
         </Link>
       ) : null}

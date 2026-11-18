@@ -6,12 +6,8 @@ import { AUTO_NOTIFICATION_TYPES } from "@/lib/admin/notification-types";
 import { realEmployers } from "@/lib/admin/scope";
 
 import { getDb, schema } from "@/lib/db";
-import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
-import { humanizeStatus } from "@/components/admin/status-badge";
-import { EmptyScene, Pill } from "@/components/app/primitives";
-import { Section } from "@/components/app/stat";
-import { ageOf } from "@/lib/admin/age-label";
-import { formatNumber } from "@/lib/format";
+import { AdminEmpty, AdminLoadError, AdminPageHeader, Panel, PanelHeader, PanelBody } from "@/components/admin/panel";
+import { StatusBadge, humanizeStatus } from "@/components/admin/status-badge";
 import { NotificationComposer } from "@/components/admin/notification-composer";
 
 export const metadata: Metadata = { title: "Notifications" };
@@ -46,7 +42,7 @@ export default async function AdminNotifications({
   );
 
   try {
-    return await render(query);
+    return await render(query, header);
   } catch (error) {
     console.error("admin notifications load failed", error);
     return (
@@ -60,7 +56,7 @@ export default async function AdminNotifications({
   }
 }
 
-async function render(query: string) {
+async function render(query: string, header: React.ReactNode) {
   const db = getDb();
   // Names as well as emails, every word must match (legacy picker behaviour).
   const internSearch = searchAny([sql`${schema.users.firstName}`, sql`${schema.users.lastName}`, sql`${schema.users.email}`], query);
@@ -128,59 +124,57 @@ async function render(query: string) {
       .limit(15),
   ]);
 
-  const now = new Date();
-  const internCount = Number(internTotal?.c ?? 0);
-  const employerCount = Number(employerTotal?.c ?? 0);
-
   return (
-    <div className="space-y-10">
-      <AdminPageHeader
-        title="Send notification"
-        subtitle={`${formatNumber(internCount)} active candidates and ${formatNumber(employerCount)} companies can get one. It shows in their bell; nothing is emailed.`}
-      />
+    <div className="space-y-6">
+      {header}
 
       <NotificationComposer
         interns={interns.map((i) => ({ id: i.id, label: `${i.name} ${i.last}`.trim(), email: i.email }))}
         employers={employers.map((e) => ({ id: e.id, label: e.name, email: e.email }))}
-        totals={{ intern: internCount, employer: employerCount }}
+        totals={{ intern: Number(internTotal?.c ?? 0), employer: Number(employerTotal?.c ?? 0) }}
         query={query}
       />
 
-      <Section
-        title="Recently sent"
-        hint="The 15 newest that people sent, newest first. Automatic reminders are left out."
-        action={
-          <Link href="/admin/notification-history" className="inline-flex min-h-8 items-center font-medium text-brand-700 underline underline-offset-4 hover:text-brand-900">
-            Full history
-          </Link>
-        }
-      >
-        {history.length === 0 ? (
-          <EmptyScene title="Nothing sent yet" body="Notifications you send from the form above are listed here, with how long ago and whether they were read." next={{ label: "Write the first one", href: "#notif-title" }} />
-        ) : (
-          <ol className="divide-y divide-ink-200 border-b border-ink-200">
-            {history.map((n) => {
-              const age = ageOf(n.createdAt, now);
-              return (
-                <li key={n.id} className="grid grid-cols-[3.5rem_minmax(0,1fr)] gap-x-4 gap-y-1 py-3 sm:grid-cols-[4rem_minmax(0,1fr)_auto]">
-                  <span className="nums pt-0.5 text-sm text-ink-600" title={n.createdAt ? new Date(n.createdAt).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" }) : undefined}>
-                    {age.label}
-                    <span className="sr-only"> ago</span>
-                  </span>
-                  <div className="min-w-0">
-                    <p className="break-words text-sm font-medium text-ink-900">{n.title}</p>
-                    <p className="mt-0.5 line-clamp-2 break-words text-sm text-ink-600">{n.message}</p>
+      <Panel>
+        <PanelHeader
+          title="Recently sent"
+          description="The 15 newest notifications people sent (automatic reminders are left out)."
+          action={<Link href="/admin/notification-history" className="text-sm font-medium text-foreground underline underline-offset-4 hover:text-brand-700 touch:inline-flex touch:min-h-11 touch:items-center">Full history</Link>}
+        />
+        <PanelBody className="p-0">
+          {history.length === 0 ? (
+            <AdminEmpty
+              title="Nothing sent yet"
+              body="Notifications you send from the composer above will be listed here."
+            />
+          ) : (
+            <ul className="divide-y divide-[color:var(--admin-rule)]">
+              {history.map((n) => (
+                <li key={n.id} className="px-[var(--admin-pad-panel)] py-3.5">
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <p className="min-w-0 text-sm font-medium text-foreground">{n.title}</p>
+                    <p className="nums flex items-center gap-2 text-xs text-text-subtle">
+                      <StatusBadge tone="neutral" dot={false} label={n.recipientType === "employer" ? "Company" : "Candidate"} />
+                      <StatusBadge tone="info" dot={false} label={humanizeStatus(n.type)} />
+                      {n.createdAt
+                        ? new Date(n.createdAt).toLocaleString("en-IN", {
+                            day: "2-digit",
+                            month: "2-digit",
+                            year: "numeric",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            timeZone: "Asia/Kolkata",
+                          })
+                        : "-"}
+                    </p>
                   </div>
-                  <p className="col-start-2 flex flex-wrap items-center gap-1.5 sm:col-start-3 sm:row-start-1 sm:justify-end">
-                    <Pill tone="neutral">{n.recipientType === "employer" ? "Company" : "Candidate"}</Pill>
-                    <Pill tone="new">{humanizeStatus(n.type)}</Pill>
-                  </p>
+                  <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-text-subtle">{n.message}</p>
                 </li>
-              );
-            })}
-          </ol>
-        )}
-      </Section>
+              ))}
+            </ul>
+          )}
+        </PanelBody>
+      </Panel>
     </div>
   );
 }

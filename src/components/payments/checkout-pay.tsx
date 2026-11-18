@@ -185,7 +185,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
 
   if (state === "paid") {
     return (
-      <div role="status" className="border-t border-ink-200 pt-4 text-sm leading-relaxed text-ink-900">
+      <div role="status" className="rounded-apple-md border border-brand-200 bg-brand-50 p-4 text-sm leading-relaxed text-brand-800">
         {waived ? "Payment received (complimentary, full waiver). The hire is under" : "Payment received. The hire and its invoice are under"}{" "}
         <a href="/employer/orders" className="font-semibold underline underline-offset-4">
           Orders
@@ -197,7 +197,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
 
   return (
     <div>
-      <div className="mb-4">
+      <div className="mb-3">
         <label htmlFor={`promo-${currency}`} className="sr-only">
           Promo code
         </label>
@@ -227,17 +227,17 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
           </button>
         </div>
         {promoError ? (
-          <p className="mt-1.5 text-sm text-danger" role="alert">
+          <p className="mt-1.5 text-xs text-danger" role="alert">
             {promoError}
           </p>
         ) : promo ? (
-          <p className="mt-1.5 text-sm font-medium text-success" role="status">
+          <p className="mt-1.5 text-xs text-success" role="status">
             {waived
               ? `FULL WAIVER applied: ${formatMoney(promo.discountMinor, currency)} waived. Nothing is charged.`
               : `${promo.code} applied: ${formatMoney(promo.discountMinor, currency)} off`}
           </p>
         ) : needsUpfront ? (
-          <p id={hintId} className="mt-1.5 text-xs text-ink-600">
+          <p id={hintId} className="mt-1.5 text-xs text-text-subtle">
             An ordinary promo code only works when the whole engagement is paid upfront. A full-waiver code works on any plan.
           </p>
         ) : null}
@@ -246,7 +246,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
         type="button"
         onClick={() => pay()}
         disabled={state === "busy"}
-        className={buttonClass({ variant: "primary", block: true, size: "md", className: "nums" })}
+        className={buttonClass({ variant: "primary", block: true, className: "nums" })}
       >
         {state === "busy" ? (
           <Loader2 className="size-4 animate-spin" aria-hidden />
@@ -263,13 +263,13 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
         ) : null}
       </button>
       {error ? (
-        <p role="alert" className="mt-2 text-pretty text-sm leading-relaxed text-danger">{error}</p>
+        <p className="mt-2 text-pretty text-xs leading-relaxed text-danger">{error}</p>
       ) : testMode || waived ? (
-        <p className="mt-2 text-xs leading-relaxed text-ink-600">
+        <p className="mt-2 text-xs leading-relaxed text-text-subtle">
           {waived ? "No payment is taken. The hire completes as if it were paid." : "Test mode: no payment is taken. The hire completes as if it were paid."}
         </p>
       ) : (
-        <p className="mt-2 text-xs leading-relaxed text-ink-600">
+        <p className="mt-2 text-xs leading-relaxed text-text-subtle">
           Razorpay handles the card details; this site never sees them. The signature is verified
           server-side before the payment counts.
         </p>

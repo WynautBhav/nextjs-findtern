@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { EmptyScene, PageHead, SectionHead } from "@/components/app/primitives";
-import { NotificationTimeline as NotificationList, type NotificationRow } from "@/components/intern/kit/notification-timeline";
+import { NotificationList, type NotificationRow } from "@/components/app/notification-list";
 import { and, desc, eq, sql } from "drizzle-orm";
 
 import { requireRole } from "@/lib/auth";
@@ -101,7 +101,7 @@ export default async function InternNotifications({
                 )}
               >
                 {t.label}
-                <span className={cn("nums", on ? "text-ink-900" : "text-ink-700")}>{t.count}</span>
+                <span className={cn("nums", on ? "text-ink-900" : "text-text-subtle")}>{t.count}</span>
               </Link>
             );
           })}
@@ -140,7 +140,7 @@ export default async function InternNotifications({
           ) : null}
 
           {shown > list.length ? (
-            <p className="nums text-sm text-ink-700">
+            <p className="nums text-sm text-text-subtle">
               Showing the latest {list.length} of {shown}. Older ones are not listed here.
             </p>
           ) : null}

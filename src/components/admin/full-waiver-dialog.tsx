@@ -153,7 +153,7 @@ export function FullWaiverDialog({ open, onOpenChange, onCreated }: { open: bool
                 <legend className="block text-sm font-semibold text-ink-800">Who can use it</legend>
                 <div className="mt-1.5 flex flex-wrap gap-2">
                   {AUDIENCES.map((a) => (
-                    <label key={a.value} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-md border border-ink-200 px-4 text-sm text-ink-900 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+                    <label key={a.value} className="flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-ink-200 px-4 text-sm text-ink-900 has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
                       <input type="radio" name="waiver-audience" value={a.value} checked={appliesTo === a.value} onChange={() => setAppliesTo(a.value)} className="size-4" />
                       {a.label}
                     </label>

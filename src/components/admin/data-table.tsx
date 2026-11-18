@@ -141,7 +141,7 @@ export function IdentityCell({
         ) : (
           <span className={nameClass}>{label}</span>
         )}
-        {sub ? <span className="block truncate text-xs text-ink-600">{sub}</span> : null}
+        {sub ? <span className="block truncate text-[0.8125rem] text-text-subtle">{sub}</span> : null}
       </div>
     </div>
   );
@@ -166,8 +166,7 @@ export function DataTable<T>({
   empty,
   dense = false,
   density,
-  stickyHeader = true,
-  scrollX = false,
+  stickyHeader = false,
   keyboardNav = false,
   onRowOpen,
   onRowPeek,
@@ -204,13 +203,8 @@ export function DataTable<T>({
    * `numeric` columns, reads as a ledger of right-aligned figures.
    */
   density?: DataTableDensity;
-  /** Pins the header under the top bar while the page scrolls (lg+). On by default. */
+  /** Pins the header while the body scrolls (the table gets a viewport-bound scroll area on desktop). */
   stickyHeader?: boolean;
-  /**
-   * For a table with many optional columns: it keeps its own sideways scroller (columns never
-   * wrap or clip) and gives up the pinned header, which cannot pin to the page inside a scroller.
-   */
-  scrollX?: boolean;
   /**
    * Roving-focus list: j / ArrowDown and k / ArrowUp move the active row, Enter
    * opens it (`onRowOpen`, else `rowHref`), `x` toggles the row's selection
@@ -254,10 +248,11 @@ export function DataTable<T>({
   })();
   const resolvedDensity: DataTableDensity = density ?? (dense ? "compact" : "comfortable");
   const cellPad = CELL_PAD[resolvedDensity];
-  // From lg the Table container stops scrolling sideways so the header can pin to the page
-  // (columns wrap instead); below lg the table stacks into one block per row.
-  const pinned = stickyHeader && !scrollX;
-  const wrapperClass = pinned ? "lg:[&_[data-slot=table-container]]:overflow-visible" : undefined;
+  const wrapperClass = stickyHeader
+    ? // The Table primitive's own container is the scroller, so the cap goes
+      // on it. Desktop only: below lg the table stacks and the header is hidden.
+      "lg:[&_[data-slot=table-container]]:max-h-[calc(100dvh-14rem)] lg:[&_[data-slot=table-container]]:overflow-auto lg:[&_[data-slot=table-container]]:scroll-pt-10"
+    : undefined;
   // Stacked phone layout: the first plain-text column is the row's title,
   // the others carry their header as a label.
   // keyboardNav wraps the rows in a small client component; otherwise this stays a plain div.
@@ -285,8 +280,7 @@ export function DataTable<T>({
   return (
     <div
       className={cn(
-        // overflow-clip, not hidden: hidden makes the panel a scroll container and the pinned header would have nothing to stick to.
-        "apple-admin overflow-clip",
+        "apple-admin overflow-hidden",
         ADMIN_SURFACE,
         // Rows a caller renders itself (`renderRow`) get the same rule and hover.
         "[&_[data-slot=table-row]]:border-[color:var(--admin-rule)] [&_tbody_[data-slot=table-row]:hover]:bg-[color:var(--admin-panel-2)]",
@@ -340,7 +334,7 @@ export function DataTable<T>({
             one block per row (data-stack, globals.css) instead of scrolling
             sideways with only the name column in view. */}
         {wrapTable(
-        <Table className={pinned ? "lg:min-w-0" : "lg:min-w-[40rem]"}>
+        <Table className="lg:min-w-[40rem]">
           {caption ? <caption className="sr-only">{caption}</caption> : null}
           <TableHeader>
             <TableRow className="hover:bg-transparent">
@@ -354,10 +348,10 @@ export function DataTable<T>({
                     scope="col"
                     aria-sort={dir === "asc" ? "ascending" : dir === "desc" ? "descending" : undefined}
                     className={cn(
-                      "h-10 bg-[color:var(--admin-panel)] px-3 py-2 text-xs font-medium text-ink-600",
+                      "h-11 bg-transparent px-3 py-2.5 text-[0.8125rem] font-medium text-text-subtle",
                       EDGE_PAD,
-                      // Pinned under the 3.5rem top bar while the page scrolls (lg+, where the table is not its own scroller).
-                      pinned && "lg:sticky lg:top-14 lg:z-10 shadow-[inset_0_-1px_0_var(--admin-rule)]",
+                      stickyHeader &&
+                        "sticky top-0 z-10 bg-[color:var(--admin-panel)] shadow-[inset_0_-1px_0_var(--admin-rule)]",
                       (column.align === "right" || column.numeric) && "text-right",
                       column.headerClassName,
                     )}

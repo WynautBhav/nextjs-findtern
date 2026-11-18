@@ -18,7 +18,7 @@ import OverviewTab from "./_tabs/overview";
 export const metadata: Metadata = { title: "Reports" };
 
 const SUBTITLE: Record<(typeof REPORT_TABS)[number], string> = {
-  overview: "How the platform is growing, where hiring drops off, and what came in. Money comes after the funnel, detail last.",
+  overview: "How the platform is growing: new interns and employers, who paid, and where people drop off.",
   interns: "Every intern: where they are, what they know, how far they got.",
   employers: "Companies, their projects and proposals, and which skills employers ask for.",
   finance: "Money in and out: orders, activation fees, stipends, refunds, in rupees and dollars.",
@@ -42,7 +42,7 @@ export default async function AdminReportsPage({ searchParams }: { searchParams?
   const boundary = `${tab}|${window.kind}|${params.period ?? ""}|${params.from ?? ""}|${params.to ?? ""}`;
 
   return (
-    <div className="space-y-5" data-rp="page">
+    <div className="space-y-5 lg:space-y-6" data-rp="page">
       <AdminPageHeader title="Reports" subtitle={SUBTITLE[tab]} className="!mb-0 lg:!mb-0" />
       <ReportTabs
         active={tab}
@@ -54,7 +54,7 @@ export default async function AdminReportsPage({ searchParams }: { searchParams?
         }))}
       />
       <RangeBar window={window} params={params} resetKeys={RESET[tab]} />
-      <div role="tabpanel" id={REPORT_PANEL_ID} aria-labelledby={reportTabId(tab)} tabIndex={-1} className="space-y-10 pt-3 outline-none lg:space-y-12">
+      <div role="tabpanel" id={REPORT_PANEL_ID} aria-labelledby={reportTabId(tab)} tabIndex={-1} className="space-y-5 outline-none lg:space-y-6">
         <Suspense key={boundary} fallback={<SectionSkeleton label={`Loading ${TAB_LABELS[tab]}`} strip />}>
           {tab === "overview" ? <OverviewTab {...props} /> : tab === "interns" ? <InternsTab {...props} /> : tab === "employers" ? <EmployersTab {...props} /> : <FinanceTab {...props} />}
         </Suspense>

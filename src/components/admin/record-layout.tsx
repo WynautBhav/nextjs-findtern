@@ -51,17 +51,17 @@ export function RecordLayout({
             href={backHref}
             aria-label={backLabel}
             title={backLabel}
-            className="mt-0.5 grid size-10 shrink-0 place-items-center rounded-md border border-ink-300 text-foreground transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+            className="apple-spring mt-0.5 grid size-11 shrink-0 place-items-center rounded-full bg-[color:var(--admin-panel)] text-foreground hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             <ArrowLeft className="size-5" aria-hidden />
           </Link>
           <div className="min-w-0 flex-1">
-            <h1 className="text-balance font-display text-2xl font-semibold leading-tight text-foreground [overflow-wrap:anywhere]">
+            <h1 className="text-balance text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] text-foreground [overflow-wrap:anywhere] sm:text-[2rem]">
               {title}
             </h1>
             {subtitle || actions ? (
               <div className="mt-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-                {subtitle ? <p className="text-sm text-ink-700">{subtitle}</p> : <span />}
+                {subtitle ? <p className="text-sm text-text-subtle">{subtitle}</p> : <span />}
                 {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
               </div>
             ) : null}
@@ -85,7 +85,7 @@ export function RecordLayout({
 
 /** A 44px square tile: Mail, Call, View as. Children is the icon. */
 export const QUICK_ACTION_CLASS =
-  "grid size-10 shrink-0 place-items-center rounded-md border border-ink-300 text-foreground transition-colors duration-[var(--motion-fast)] hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60";
+  "apple-spring grid size-11 shrink-0 place-items-center rounded-2xl bg-[color:var(--admin-panel-2)] text-foreground hover:bg-[color:var(--admin-tile)] hover:text-[color:var(--admin-tile-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60";
 
 export function QuickAction({ href, label, children }: { href: string; label: string; children: React.ReactNode }) {
   return (
@@ -99,7 +99,7 @@ export function QuickAction({ href, label, children }: { href: string; label: st
 export function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="py-3 first:pt-0 last:pb-0">
-      <dt className="text-xs font-medium text-ink-700">{label}</dt>
+      <dt className="text-xs font-medium text-text-subtle">{label}</dt>
       <dd className="mt-1 min-w-0 text-sm font-medium text-foreground [overflow-wrap:anywhere]">{children}</dd>
     </div>
   );
@@ -161,16 +161,12 @@ export function RecordCard({
 
   return (
     <Panel>
-      <div className="px-5 pb-5 pt-5">
-        <div className="flex items-center gap-4">
-          <div className="shrink-0 [&>*]:size-16 [&>*]:text-xl">{avatar}</div>
-          <div className="min-w-0">
-            <h2 className="max-w-full text-lg font-semibold leading-snug text-foreground [overflow-wrap:anywhere]">{name}</h2>
-            <p className="max-w-full text-sm text-ink-700 [overflow-wrap:anywhere]">{idLine}</p>
-          </div>
-        </div>
-        {quickActions ? <div className="mt-4 flex flex-wrap items-center gap-2">{quickActions}</div> : null}
-        <p className="mt-4 text-sm text-ink-700">
+      <div className="flex flex-col items-center px-5 pb-5 pt-6 text-center">
+        <div className="[&>*]:size-24 [&>*]:text-3xl">{avatar}</div>
+        <h2 className="mt-4 max-w-full text-xl font-semibold leading-snug tracking-[-0.01em] text-foreground [overflow-wrap:anywhere]">{name}</h2>
+        <p className="mt-0.5 max-w-full text-sm text-text-subtle [overflow-wrap:anywhere]">{idLine}</p>
+        {quickActions ? <div className="mt-4 flex flex-wrap items-center justify-center gap-3">{quickActions}</div> : null}
+        <p className="mt-4 text-sm text-text-subtle">
           Last activity{" "}
           <span className="font-medium text-foreground">{lastActivityAt ? formatDate(lastActivityAt) : "none recorded"}</span>
         </p>
@@ -180,7 +176,7 @@ export function RecordCard({
         <div
           role="tablist"
           aria-label="Record summary"
-          className="grid grid-cols-2 gap-1 rounded-md bg-[color:var(--admin-panel-2)] p-1"
+          className="grid grid-cols-2 gap-1 rounded-full bg-[color:var(--admin-panel-2)] p-1"
         >
           {VIEWS.map((v, index) => {
             const selected = view === v.key;
@@ -199,11 +195,11 @@ export function RecordCard({
                 onClick={() => setView(v.key)}
                 onKeyDown={(e) => onKeyDown(e, index)}
                 className={cn(
-                  "min-h-9 rounded-md px-3 text-sm transition-colors touch:min-h-11",
+                  "min-h-9 rounded-full px-3 text-sm transition-colors touch:min-h-11",
                   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
                   selected
                     ? "bg-[color:var(--admin-panel)] font-semibold text-foreground"
-                    : "font-medium text-ink-700 hover:text-foreground",
+                    : "font-medium text-text-subtle hover:text-foreground",
                 )}
               >
                 {v.label}

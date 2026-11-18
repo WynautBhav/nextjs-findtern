@@ -31,7 +31,7 @@ export function CgpaExport({ rows, now }: { rows: CgpaQueueRow[]; now: string })
       type="button"
       disabled={rows.length === 0}
       onClick={() => downloadCsv("cgpa-verifications", rows, columns)}
-      className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-10 px-4 disabled:opacity-50")}
+      className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11 rounded-full px-4 disabled:opacity-50")}
     >
       <Download className="size-4" aria-hidden />
       Download CSV

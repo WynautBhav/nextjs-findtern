@@ -15,6 +15,7 @@ import { PageHead } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { ButtonLink } from "@/components/ui/button";
+import { HireFlow } from "@/components/employer/hire-flow";
 import { ProposalTabs } from "@/components/employer/section-tabs";
 import { hireFlowCountsFor, internExtraForRequest, openOrdersForRequest, stateForRow } from "@/lib/employer-flow";
 import { tabFromParam } from "@/components/employer/proposal-tabs";
@@ -112,18 +113,20 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
   const { proposals, loadFailed } = list;
 
   return (
-    <div className="pb-20 lg:pb-0">
+    <div>
       <PageHead
         title="Proposals"
         action={
-          <ButtonLink href="/employer/candidates" size="sm" variant="outline" className="min-h-11 border-ink-300 bg-surface-raised text-ink-900 backdrop-blur-none hover:border-ink-400 hover:bg-ink-100 hover:shadow-none sm:min-h-9">
+          <ButtonLink href="/employer/candidates" size="sm" variant="outline">
             <Send className="size-4" aria-hidden />
             Send a proposal
           </ButtonLink>
         }
-        className="mb-2 lg:mb-3"
+        className="mb-4 lg:mb-5"
       />
       <ProposalTabs active="proposals" proposals={flow?.proposals} />
+      {/* No step is lit here: the tabs below are the stages (Waiting, Verifying, To pay, Hired), and the strip links into them. */}
+      {flow ? <HireFlow counts={flow} current={null} /> : null}
 
       {loadFailed ? (
         <LoadError what="your proposals" retryHref="/employer/proposals" email={SITE.adminEmail} />

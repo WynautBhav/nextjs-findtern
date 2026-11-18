@@ -254,21 +254,19 @@ export function EmployerOnboardingForm({
   const current = STAGES[stage];
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-x-14 gap-y-8 pb-6 lg:grid-cols-[16rem_minmax(0,1fr)] lg:items-start">
-      <div className="lg:sticky lg:top-24">
-        <Stepper
-          steps={STAGES}
-          stage={stage}
-          // Skipping ahead still saves the company first.
-          onStep={(i) => (i === 1 && stage === 0 ? void onContinue() : goTo(i as StageIndex))}
-        />
-      </div>
+    <div className="mx-auto max-w-4xl">
+      <Stepper
+        steps={STAGES}
+        stage={stage}
+        // Skipping ahead still saves the company first.
+        onStep={(i) => (i === 1 && stage === 0 ? void onContinue() : goTo(i as StageIndex))}
+      />
 
-      <div className="min-w-0">
-        <h2 ref={headingRef} tabIndex={-1} className="font-display text-2xl font-semibold tracking-[-0.02em] text-ink-900 outline-none">
+      <div className="rise rounded-[24px] border border-ink-200/70 bg-white p-5 shadow-tile sm:p-8">
+        <h2 ref={headingRef} tabIndex={-1} className="text-xl font-semibold text-ink-900 outline-none">
           {current.title}
         </h2>
-        <p className="mt-1 text-base text-ink-700">{current.blurb}</p>
+        <p className="mt-1 text-sm leading-relaxed text-ink-600">{current.blurb}</p>
         <div className="mt-8">
           {stage === 0 ? (
             <CompanyStage values={values.company} errors={errors} setCompany={setCompany} />
@@ -284,37 +282,43 @@ export function EmployerOnboardingForm({
           )}
         </div>
 
-        {/* The action bar stays at the foot of the screen (above the phone tab bar) while the form scrolls. */}
-        <div className="sticky bottom-[4.5rem] z-20 mt-10 border-t border-ink-300 bg-canvas py-3 lg:bottom-0">
-          <div role="status">
-            {notice?.tone === "success" ? <FormNotice tone="success">{notice.text}</FormNotice> : null}
-          </div>
-          {notice?.tone === "error" ? <FormNotice tone="error">{notice.text}</FormNotice> : null}
-          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:items-center">
-            {stage > 0 ? (
-              <button type="button" onClick={() => goTo(0)} className={buttonClass({ variant: "outline", size: "md" })}>
-                <ArrowLeft className="size-4" aria-hidden />
-                Back
-              </button>
-            ) : (
-              <button type="button" onClick={saveCompany} disabled={busy} className={buttonClass({ variant: "outline", size: "md" })}>
-                <Save className="size-4" aria-hidden />
-                Save for later
-              </button>
-            )}
-            <p className="text-sm text-ink-700 sm:mr-auto sm:pl-1">Unsaved answers are kept in this browser.</p>
-            {stage === 0 ? (
-              <button type="button" onClick={onContinue} disabled={busy} className={buttonClass({ variant: "primary", size: "md" })}>
-                {busy ? "Saving…" : "Save and continue"}
-                <ArrowRight className="size-4" aria-hidden />
-              </button>
-            ) : (
-              <button type="button" onClick={saveProject} disabled={busy} className={buttonClass({ variant: "primary", size: "md" })}>
-                {busy ? "Saving…" : hasExistingProject ? "Save project" : "Create project and finish"}
-                <ArrowRight className="size-4" aria-hidden />
-              </button>
-            )}
-          </div>
+        <div role="status">
+          {notice?.tone === "success" ? (
+            <FormNotice tone="success" className="mt-8">
+              {notice.text}
+            </FormNotice>
+          ) : null}
+        </div>
+        {notice?.tone === "error" ? (
+          <FormNotice tone="error" className="mt-8">
+            {notice.text}
+          </FormNotice>
+        ) : null}
+
+        <div className="mt-8 flex flex-col-reverse gap-3 border-t border-ink-100 pt-6 sm:flex-row sm:items-center">
+          {stage > 0 ? (
+            <button type="button" onClick={() => goTo(0)} className={buttonClass({ variant: "light", size: "md" })}>
+              <ArrowLeft className="size-4" aria-hidden />
+              Back
+            </button>
+          ) : (
+            <button type="button" onClick={saveCompany} disabled={busy} className={buttonClass({ variant: "outline", size: "md" })}>
+              <Save className="size-4" aria-hidden />
+              Save for later
+            </button>
+          )}
+          <p className="text-xs text-ink-600 sm:mr-auto sm:pl-1">Unsaved answers are kept in this browser.</p>
+          {stage === 0 ? (
+            <button type="button" onClick={onContinue} disabled={busy} className={buttonClass({ variant: "primary", size: "md" })}>
+              {busy ? "Saving…" : "Save and continue"}
+              <ArrowRight className="size-4" aria-hidden />
+            </button>
+          ) : (
+            <button type="button" onClick={saveProject} disabled={busy} className={buttonClass({ variant: "primary", size: "md" })}>
+              {busy ? "Saving…" : hasExistingProject ? "Save project" : "Create project and finish"}
+              <ArrowRight className="size-4" aria-hidden />
+            </button>
+          )}
         </div>
       </div>
     </div>

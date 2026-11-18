@@ -29,7 +29,7 @@ export function Label({ htmlFor, children, optional }: { htmlFor?: string; child
   return (
     <Tag htmlFor={htmlFor} className={LABEL}>
       {children}
-      {optional ? <span className="ml-1.5 font-normal text-ink-700">(optional)</span> : null}
+      {optional ? <span className="ml-1.5 font-normal text-text-subtle">(optional)</span> : null}
     </Tag>
   );
 }
@@ -46,7 +46,7 @@ export function FieldNote({ id, error, hint }: { id: string; error?: React.React
     );
   }
   return hint ? (
-    <p id={`${id}-hint`} className="mt-1.5 text-xs text-ink-700">
+    <p id={`${id}-hint`} className="mt-1.5 text-xs text-text-subtle">
       {hint}
     </p>
   ) : null;
@@ -244,7 +244,7 @@ export function Select({
         onChange={(e) => onChange(e.target.value)}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(id, error, hint)}
-        className={controlClass(error, cn("appearance-none pr-10", !value && "text-ink-700"))}
+        className={controlClass(error, cn("appearance-none pr-10", !value && "text-text-subtle"))}
       >
         {placeholder !== undefined ? (
           <option value="" disabled={Boolean(value)}>
@@ -260,7 +260,7 @@ export function Select({
       <svg
         aria-hidden
         viewBox="0 0 20 20"
-        className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-700"
+        className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-text-subtle"
         fill="none"
         stroke="currentColor"
         strokeWidth="1.75"
@@ -323,25 +323,25 @@ export function Choice<T extends string>({
               data-field={id}
               onClick={() => onChange(o.value)}
               className={cn(
-                "apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-md border px-4 text-sm font-medium",
+                "apple-spring apple-pressable inline-flex min-h-11 items-center gap-2 rounded-apple-sm border px-4 text-sm font-medium",
                 active
                   ? "border-brand-600 bg-brand-50 text-brand-800 shadow-xs ring-1 ring-brand-600/25"
                   : error
-                    ? "border-danger/60 bg-surface-raised text-ink-700 hover:bg-ink-50"
-                    : "border-ink-200 bg-surface-raised text-ink-700 hover:border-ink-300 hover:bg-ink-50",
+                    ? "border-danger/60 bg-white text-ink-700 hover:bg-ink-50"
+                    : "border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50",
               )}
             >
               <span
                 aria-hidden
                 className={cn(
                   "grid size-4 shrink-0 place-items-center rounded-full border",
-                  active ? "border-brand-600 bg-brand-600" : "border-ink-300 bg-surface-raised",
+                  active ? "border-brand-600 bg-brand-600" : "border-ink-300 bg-white",
                 )}
               >
-                {active ? <span className="size-1.5 rounded-full bg-surface-raised" /> : null}
+                {active ? <span className="size-1.5 rounded-full bg-white" /> : null}
               </span>
               <span>{o.label}</span>
-              {o.detail ? <span className="text-xs font-normal text-ink-700">{o.detail}</span> : null}
+              {o.detail ? <span className="text-xs font-normal text-text-subtle">{o.detail}</span> : null}
             </button>
           );
         })}
@@ -369,7 +369,7 @@ export function Section({
     <section className={cn("space-y-4", !first && "border-t border-ink-200/70 pt-8")}>
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0 max-w-xl">
-          <h3 className="text-base font-semibold  text-ink-900">{title}</h3>
+          <h3 className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</h3>
           {hint ? <p className="mt-1 text-sm leading-relaxed text-ink-600">{hint}</p> : null}
         </div>
         {action}
@@ -418,7 +418,7 @@ export function RemoveButton({ label, onClick }: { label: string; onClick: () =>
       onClick={onClick}
       aria-label={label}
       title={label}
-      className="apple-spring -mr-2 grid size-11 shrink-0 place-items-center rounded-md text-ink-700 hover:bg-danger-soft hover:text-danger"
+      className="apple-spring -mr-2 grid size-11 shrink-0 place-items-center rounded-apple-sm text-text-subtle hover:bg-danger-soft hover:text-danger"
     >
       <Trash2 className="size-4" aria-hidden />
     </button>
@@ -437,7 +437,7 @@ export function AddButton({ onClick, children, disabled }: { onClick: () => void
 /** A quiet empty state inside a step: what goes here and the one action. */
 export function EmptyEntries({ title, body, action }: { title: string; body: string; action: React.ReactNode }) {
   return (
-    <div className="flex flex-col items-center rounded-lg border border-dashed border-ink-200 bg-ink-50/40 px-6 py-9 text-center">
+    <div className="flex flex-col items-center rounded-apple-xl border border-dashed border-ink-200 bg-ink-50/40 px-6 py-9 text-center">
       <p className="text-base font-semibold text-ink-900">{title}</p>
       <p className="mt-1.5 max-w-sm text-pretty text-sm leading-relaxed text-ink-600">{body}</p>
       <div className="mt-5">{action}</div>

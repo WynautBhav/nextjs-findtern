@@ -35,9 +35,9 @@ const buttonVariants = cva(
         accent:
           "bg-accent text-brand-950 shadow-sm hover:bg-accent-600 hover:text-white hover:shadow-md",
         outline:
-          "border border-brand-200 bg-surface-raised text-primary hover:border-brand-400 hover:bg-brand-50",
+          "border border-brand-200 bg-white/70 text-primary backdrop-blur-sm hover:border-brand-400 hover:bg-brand-50 hover:shadow-sm",
         outlineLight:
-          "border border-white/25 bg-white/5 text-white hover:border-white/50 hover:bg-white/10",
+          "border border-white/25 bg-white/5 text-white backdrop-blur-sm hover:border-white/50 hover:bg-white/10",
         ghost: "text-primary hover:bg-brand-50",
         dark: "bg-brand-950 text-white shadow-sm hover:bg-brand-900 hover:shadow-md",
         white:

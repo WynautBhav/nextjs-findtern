@@ -8,11 +8,9 @@
  */
 
 import { useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, CreditCard, Loader2, Tag } from "lucide-react";
 
-import { SuccessMoment } from "@/components/app/success-moment";
 import { fieldClass, labelClass } from "@/components/employer/ui-tokens";
 import { buttonClass } from "@/components/ui/button";
 import { loadRazorpay, RAZORPAY_THEME_COLOR } from "@/components/payments/razorpay-client";
@@ -48,8 +46,6 @@ export function SubscriptionBuy({ employerId, currency, listMinor, durationDays,
   const [checking, setChecking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice>(null);
-  // Set once a purchase has gone through: the form gives way to the one celebratory moment.
-  const [success, setSuccess] = useState<string | null>(null);
   // A second click in the same tick, before `busy` has re-rendered, must not start a second payment.
   const inFlight = useRef(false);
 
@@ -81,7 +77,6 @@ export function SubscriptionBuy({ employerId, currency, listMinor, durationDays,
   }
 
   function done(text: string) {
-    setSuccess(text);
     setNotice({ kind: "ok", text });
     setApplied(null);
     setCode("");
@@ -154,26 +149,12 @@ export function SubscriptionBuy({ employerId, currency, listMinor, durationDays,
     }
   }
 
-  if (success) {
-    return (
-      <SuccessMoment
-        title="Findtern Pro is on"
-        body={success}
-        actions={
-          <Link href="/employer/candidates" className={buttonClass({ variant: "outline", className: "min-h-11" })}>
-            Open candidates
-          </Link>
-        }
-      />
-    );
-  }
-
   const payLabel = renewing ? `Renew · add ${durationDays} days · ${formatMoney(payable, currency)}` : `Pay ${formatMoney(payable, currency)}`;
   return (
     <div className="space-y-4">
       <div>
         <label htmlFor="subscription-promo" className={labelClass}>
-          Promo code <span className="font-normal text-ink-600">(optional)</span>
+          Promo code <span className="font-normal text-text-subtle">(optional)</span>
         </label>
         <div className="mt-1.5 flex gap-2">
           <div className="relative min-w-0 flex-1">
@@ -205,18 +186,18 @@ export function SubscriptionBuy({ employerId, currency, listMinor, durationDays,
       </div>
 
       {applied ? (
-        <dl className="divide-y divide-ink-200 border-y border-ink-200 text-sm">
-          <div className="flex items-baseline justify-between gap-4 py-3">
+        <dl className="divide-y divide-ink-100 rounded-apple-md border border-ink-200/80 text-sm">
+          <div className="flex items-baseline justify-between gap-4 px-4 py-3">
             <dt className="text-ink-700">Findtern Pro, {durationDays} days</dt>
             <dd className="nums font-medium text-ink-900">{formatMoney(listMinor, currency)}</dd>
           </div>
-          <div className="flex items-baseline justify-between gap-4 py-3">
+          <div className="flex items-baseline justify-between gap-4 px-4 py-3">
             <dt className="min-w-0 break-words text-ink-700">Code {applied.code}</dt>
             <dd className="nums font-medium text-success">−{formatMoney(applied.discountMinor, currency)}</dd>
           </div>
-          <div className="flex items-baseline justify-between gap-4 py-3">
+          <div className="flex items-baseline justify-between gap-4 px-4 py-3">
             <dt className="font-semibold text-ink-900">{waived ? "To pay (full waiver)" : "To pay, GST included"}</dt>
-            <dd className="nums font-display text-2xl font-semibold text-signal">{formatMoney(payable, currency, { zeroLabel: false })}</dd>
+            <dd className="nums text-lg font-semibold text-ink-900">{formatMoney(payable, currency, { zeroLabel: false })}</dd>
           </div>
         </dl>
       ) : null}

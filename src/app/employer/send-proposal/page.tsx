@@ -12,7 +12,8 @@ import { hiredInternIds } from "@/lib/employer-visibility";
 import { employerRegion, resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { PER_HIRE_FEE_DEFAULT } from "@/lib/per-hire-fee";
-import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill, Surface } from "@/components/app/primitives";
+import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { offerState } from "@/components/employer/proposal-state";
@@ -25,7 +26,6 @@ import { timezoneForLocation } from "@/lib/timezones";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
 import { isBlockingInterview } from "@/lib/employer-interview-rules";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
-import { btnOutline } from "@/components/employer/proposal-ui";
 
 export const metadata: Metadata = {
   title: "Send a proposal",
@@ -249,8 +249,8 @@ export default async function SendProposal({
           next={{ label: "Browse candidates", href: "/employer/candidates" }}
           who="You - from their profile or your shortlist"
         />
-        <div className="mt-4">
-          <ButtonLink href="/employer/cart" variant="ghost" size="sm" className="min-h-11">
+        <div className="mt-6 flex justify-center">
+          <ButtonLink href="/employer/cart" variant="ghost" size="sm">
             Open your shortlist
           </ButtonLink>
         </div>
@@ -261,7 +261,7 @@ export default async function SendProposal({
   const back = (
     <Link
       href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
-      className="mb-3 inline-flex min-h-11 items-center gap-1.5 rounded-sm text-sm font-medium text-brand-800 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand-700"
+      className="apple-spring mb-3 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm text-sm font-medium text-brand-700 hover:underline"
     >
       <ArrowLeft className="size-4" aria-hidden />
       {candidate.name}
@@ -273,14 +273,14 @@ export default async function SendProposal({
       <div>
         {back}
         <PageHead title="Send a proposal" />
-        <section className="max-w-2xl border-t border-ink-200 pt-6">
+        <Surface className="max-w-2xl p-6 sm:p-7">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-display text-lg font-semibold text-ink-900">
+            <h2 className="text-lg font-semibold text-ink-900">
               {existing.hired ? "Already hired" : "Proposal already sent"}
             </h2>
             <Pill tone={existing.hired ? "live" : "waiting"}>{existing.label}</Pill>
           </div>
-          <p className="mt-2 text-sm leading-relaxed text-ink-800">
+          <p className="mt-2 text-sm leading-relaxed text-ink-700">
             {existing.hired
               ? `${candidate.name} already works with you, so a second internship offer isn't possible. Their placement is on Orders.`
               : `${candidate.name} already has a live offer from you. One offer per candidate: edit or withdraw that one before sending another.`}
@@ -291,12 +291,12 @@ export default async function SendProposal({
               <ArrowRight className="size-4" aria-hidden />
             </Link>
             {existing.hired ? (
-              <Link href="/employer/orders" className={btnOutline}>
+              <Link href="/employer/orders" className={buttonClass({ variant: "outline", size: "sm" })}>
                 Orders
               </Link>
             ) : null}
           </div>
-        </section>
+        </Surface>
       </div>
     );
   }
@@ -306,12 +306,12 @@ export default async function SendProposal({
       <div>
         {back}
         <PageHead title="Send a proposal" />
-        <section className="max-w-2xl border-t border-ink-200 pt-6">
+        <Surface className="max-w-2xl p-6 sm:p-7">
           <div className="flex flex-wrap items-center gap-2">
-            <h2 className="font-display text-lg font-semibold text-ink-900">Meeting first</h2>
+            <h2 className="text-lg font-semibold text-ink-900">Meeting first</h2>
             <Pill tone="waiting">Meeting booked</Pill>
           </div>
-          <p className="mt-2 text-sm leading-relaxed text-ink-800">
+          <p className="mt-2 text-sm leading-relaxed text-ink-700">
             You have a meeting with {candidate.name} that hasn&apos;t happened yet. The offer opens once it has.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -320,7 +320,7 @@ export default async function SendProposal({
               <ArrowRight className="size-4" aria-hidden />
             </Link>
           </div>
-        </section>
+        </Surface>
       </div>
     );
   }
@@ -328,10 +328,12 @@ export default async function SendProposal({
   return (
     <div>
       {back}
-      <header className="mb-8 max-w-3xl">
-        <h1 className="text-balance break-words font-display text-2xl font-semibold text-ink-900 sm:text-4xl">Send a proposal to {candidate.name}</h1>
-        <p className="mt-3 max-w-xl text-pretty text-base text-ink-700">Pay follows the candidate&apos;s Findtern Score band. Nothing is charged until they accept.</p>
-      </header>
+      <HeroPanel className="rise mb-6 sm:p-10">
+        <h1 className="text-balance text-3xl font-medium leading-[1.05] tracking-[-0.03em] sm:text-5xl">Send a proposal</h1>
+        <p className="mt-3 max-w-xl text-pretty text-base text-on-dark-subtle sm:text-lg">
+          Pay follows the candidate&apos;s Findtern Score band. Nothing is charged until they accept.
+        </p>
+      </HeroPanel>
 
       <SendProposalForm
         candidate={candidate}

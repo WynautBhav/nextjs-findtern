@@ -1,58 +1,92 @@
-import { AlertCircle, Check, Clock3 } from "lucide-react";
-
 import { Pill } from "@/components/app/primitives";
 import { formatMoney, shortDate } from "@/lib/format";
 import { payoutState, readScheduledForDate, type PayoutRow } from "@/lib/journey";
 
-import { STIPEND_CURRENCY } from "./months";
+import { STIPEND_CURRENCY, totalsByCurrency } from "./months";
 
 const date = (d: Date) => shortDate(d, { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 
 const STATE = {
-  paid: { label: "Paid", tone: "paid", icon: <Check strokeWidth={3} /> },
-  pending: { label: "Scheduled", tone: "waiting", icon: <Clock3 /> },
-  failed: { label: "Failed", tone: "closed", icon: <AlertCircle /> },
+  paid: { label: "Paid", tone: "paid" },
+  pending: { label: "Scheduled", tone: "waiting" },
+  failed: { label: "Failed", tone: "closed" },
 } as const;
 
 /**
- * Every payout, newest first, the way a bank statement reads: the date as the title, the bank reference under it
- * (the thing you match against your statement), the amount right-aligned in its own currency and the status beside
- * it with an icon. One row layout for every width, so a phone never scrolls sideways.
+ * Every payout, newest first, as a ledger: date, bank reference, status and
+ * amount in its own currency. On a phone the reference sits under the date
+ * and the status under the amount, so nothing scrolls sideways.
  */
 export function PaymentLedger({ payouts }: { payouts: PayoutRow[] }) {
+  const paidTotals = totalsByCurrency(payouts, "paid");
   return (
-    <ul className="divide-y divide-ink-200 border-b border-ink-200">
-      {payouts.map((p) => {
-        const state = payoutState(p.status);
-        const s = state ? STATE[state] : null;
-        const scheduled = readScheduledForDate(p);
-        const when = state === "paid" ? date(p.paidAt ?? p.createdAt) : state === "pending" ? (scheduled ? date(scheduled) : "Date to be set") : date(p.createdAt);
-        const ref = state === "failed" ? p.notes || "The transfer did not go through" : p.referenceId ? p.referenceId : "No bank reference yet";
-        return (
-          <li key={p.id} className="flex items-start justify-between gap-4 py-3.5">
-            <div className="min-w-0">
-              <p className="nums text-base font-medium text-ink-900">
-                {when}
-                {p.kind === "completion_bonus" ? <span className="ml-2 text-sm font-normal text-ink-600">Completion bonus</span> : null}
-              </p>
-              <p className="nums mt-0.5 break-all text-sm text-ink-600">
-                <span className="sr-only">Bank reference </span>
-                {ref}
-              </p>
-            </div>
-            <div className="flex shrink-0 flex-col items-end gap-1.5 sm:flex-row-reverse sm:items-baseline sm:gap-6">
-              <p className="nums whitespace-nowrap text-base font-semibold text-ink-900">{formatMoney(p.amountMinor ?? 0, p.currency ?? STIPEND_CURRENCY, { zeroLabel: false })}</p>
-              {s ? (
-                <Pill tone={s.tone} icon={s.icon} className="sm:w-28">
-                  {s.label}
-                </Pill>
-              ) : (
-                <Pill>Recorded</Pill>
-              )}
-            </div>
-          </li>
-        );
-      })}
-    </ul>
+    <div className="overflow-hidden">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-ink-100 text-left text-xs text-text-subtle">
+            <th scope="col" className="py-2 pr-3 font-medium">
+              Date
+            </th>
+            <th scope="col" className="hidden px-3 py-2 font-medium sm:table-cell">
+              Reference
+            </th>
+            <th scope="col" className="hidden px-3 py-2 font-medium sm:table-cell">
+              Status
+            </th>
+            <th scope="col" className="py-2 pl-3 text-right font-medium">
+              Amount
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-ink-100">
+          {payouts.map((p) => {
+            const state = payoutState(p.status);
+            const s = state ? STATE[state] : { label: "Recorded", tone: "neutral" as const };
+            const scheduled = readScheduledForDate(p);
+            const when =
+              state === "paid" ? date(p.paidAt ?? p.createdAt) : state === "pending" ? (scheduled ? date(scheduled) : "Date to be set") : date(p.createdAt);
+            const ref = state === "failed" ? p.notes || "The transfer did not go through" : p.referenceId ? `Ref ${p.referenceId}` : "No reference yet";
+            return (
+              <tr key={p.id} className="align-top">
+                <td className="py-3 pr-3">
+                  <p className="nums font-medium text-ink-900">{when}</p>
+                  {p.kind === "completion_bonus" ? <p className="mt-0.5 text-xs font-medium text-brand-800">Completion bonus</p> : null}
+                  <p className="mt-1 break-all text-xs text-text-subtle sm:hidden">{ref}</p>
+                </td>
+                <td className="nums hidden break-all px-3 py-3 text-ink-700 sm:table-cell">{ref}</td>
+                <td className="hidden px-3 py-3 sm:table-cell">
+                  <Pill tone={s.tone}>{s.label}</Pill>
+                </td>
+                <td className="py-3 pl-3 text-right">
+                  <p className="nums whitespace-nowrap font-semibold text-ink-900">
+                    {formatMoney(p.amountMinor ?? 0, p.currency ?? STIPEND_CURRENCY, { zeroLabel: false })}
+                  </p>
+                  <Pill tone={s.tone} className="mt-1 sm:hidden">
+                    {s.label}
+                  </Pill>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+        {payouts.length > 1 && paidTotals.length > 0 ? (
+          <tfoot className="border-t border-ink-200">
+            {paidTotals.map((t) => (
+              <tr key={t.currency}>
+                {/* Two label cells: the phone shows two columns, wider screens four. */}
+                {[" sm:hidden", " hidden sm:table-cell"].map((show, i) => (
+                  <th key={show} scope="row" colSpan={i ? 3 : 1} className={`py-3 pr-3 text-left font-medium text-ink-700${show}`}>
+                    Paid in total{paidTotals.length > 1 ? ` (${t.currency})` : ""}
+                  </th>
+                ))}
+                <td className="nums whitespace-nowrap py-3 pl-3 text-right font-semibold text-ink-900">
+                  {formatMoney(t.minor, t.currency, { zeroLabel: false })}
+                </td>
+              </tr>
+            ))}
+          </tfoot>
+        ) : null}
+      </table>
+    </div>
   );
 }

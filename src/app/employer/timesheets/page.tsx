@@ -9,10 +9,11 @@ import { requireEmployerSetup } from "@/lib/employer-setup";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { dayDetails, formatDay, formatPeriod } from "@/lib/employer-timesheets";
+import { Avatar } from "@/components/app/avatar";
 import { StatusPill } from "@/components/employer/timesheet-parts";
-import { RollingNumber } from "@/components/app/rolling-number";
-import { LeadStat, Overview, Section, StatList } from "@/components/app/stat";
-import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { HeroFigure, HeroPanel } from "@/components/employer/kit/hero-panel";
+import { RevealItem, RevealList } from "@/components/employer/kit/reveal";
+import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { buttonClass } from "@/components/ui/button";
@@ -118,9 +119,6 @@ export default async function EmployerTimesheets({
     .filter((r) => r.status === "submitted")
     .sort((a, b) => (a.submittedAt?.getTime() ?? 0) - (b.submittedAt?.getTime() ?? 0));
   const rest = rows.filter((r) => r.status !== "submitted");
-  const queueHours = queue.reduce((n, r) => n + r.hours, 0);
-  const approvedHours = rows.filter((r) => r.status === "approved").reduce((n, r) => n + r.hours, 0);
-  const oldest = queue[0]?.submittedAt ?? null;
 
   return (
     <div>
@@ -131,7 +129,9 @@ export default async function EmployerTimesheets({
             ? rows[0]
               ? `Showing ${rows[0].name}'s timesheets only.`
               : "Showing one intern's timesheets only."
-            : "Interns are paid on approved hours only."
+            : queue.length
+            ? `${queue.length} timesheet${queue.length === 1 ? " is" : "s are"} waiting for your review. Interns are paid on approved days only.`
+            : "Your interns log their days here each month. Approving locks them for billing."
         }
         action={
           onlyIntern ? (
@@ -144,78 +144,56 @@ export default async function EmployerTimesheets({
 
       {rows.length === 0 && onlyIntern ? (
         <EmptyScene
+          art
           title="No sent timesheets for this intern"
           body="Nothing from them is waiting here yet. A month shows up once they send it for approval. Use Show everyone, above, to see all your interns."
-          next={{ label: "Show everyone", href: "/employer/timesheets" }}
           who="Your intern - nothing sent yet"
         />
       ) : rows.length === 0 ? (
         <EmptyScene
+          art
           title="No timesheets yet"
           body="Once a hire starts work, they send a timesheet for each month of the internship. It lands here for you to approve."
           next={{ label: "See your hires", href: "/employer/orders" }}
           who="Your interns - nothing submitted yet"
         />
       ) : (
-        <div className="space-y-10">
-          <Overview
-            lead={
-              queue.length > 0 ? (
-                <LeadStat
-                  label="Hours waiting for your approval"
-                  value={
-                    <>
-                      <RollingNumber value={queueHours} />
-                      <span className="ml-1.5 font-sans text-lg font-medium tracking-normal text-ink-700">h</span>
-                    </>
-                  }
-                  note={`${queue.length} timesheet${queue.length === 1 ? "" : "s"} to decide${oldest ? `, the oldest sent ${formatDay(oldest)}` : ""}.`}
-                  tone="signal"
-                />
-              ) : (
-                <LeadStat
-                  label="Hours approved"
-                  value={
-                    <>
-                      <RollingNumber value={approvedHours} />
-                      <span className="ml-1.5 font-sans text-lg font-medium tracking-normal text-ink-700">h</span>
-                    </>
-                  }
-                  note="Nothing is waiting on you. A new sheet lands here when an intern sends their month."
-                  tone="brand"
-                />
-              )
-            }
-            rest={
-              <StatList
-                items={[
-                  ...(queue.length > 0 && approvedHours > 0 ? [{ label: "Hours approved", value: approvedHours, hint: "Locked for billing" }] : []),
-                  { label: "Timesheets sent", value: rows.length, hint: "Drafts stay with the intern" },
-                ]}
-              />
-            }
-          />
-
+        <div className="space-y-8">
+          <HeroPanel>
+            <div className="grid gap-8 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] lg:items-end">
+              <HeroFigure lead label="Hours awaiting review" value={queue.reduce((n, r) => n + r.hours, 0)} hint={`${queue.length} timesheet${queue.length === 1 ? "" : "s"} to decide`} />
+              <div className="grid grid-cols-2 gap-6">
+                <HeroFigure label="Hours approved" value={rows.filter((r) => r.status === "approved").reduce((n, r) => n + r.hours, 0)} hint="Locked for billing" />
+                <HeroFigure label="Sheets sent" value={rows.length} hint="Drafts stay with the intern" />
+              </div>
+            </div>
+          </HeroPanel>
           {queue.length > 0 ? (
-            <Section title="Waiting for your review" hint="Oldest first.">
-              <SheetHead />
-              <ul>
-                {queue.map((r, i) => (
-                  <SheetRow key={r.id} row={r} review primary={i === 0} />
-                ))}
-              </ul>
-            </Section>
+            <section>
+              <SectionHead title="Waiting for your review" hint="Oldest first." />
+              <Surface className="overflow-hidden">
+                <SheetHead />
+                <RevealList className="divide-y divide-ink-100">
+                  {queue.map((r) => (
+                    <SheetRow key={r.id} row={r} review />
+                  ))}
+                </RevealList>
+              </Surface>
+            </section>
           ) : null}
 
           {rest.length > 0 ? (
-            <Section title={queue.length ? "Everything else" : "All timesheets"}>
-              <SheetHead />
-              <ul>
-                {rest.map((r) => (
-                  <SheetRow key={r.id} row={r} />
-                ))}
-              </ul>
-            </Section>
+            <section>
+              <SectionHead title={queue.length ? "Everything else" : "All timesheets"} />
+              <Surface className="overflow-hidden">
+                <SheetHead />
+                <RevealList className="divide-y divide-ink-100">
+                  {rest.map((r) => (
+                    <SheetRow key={r.id} row={r} />
+                  ))}
+                </RevealList>
+              </Surface>
+            </section>
           ) : null}
         </div>
       )}
@@ -223,14 +201,14 @@ export default async function EmployerTimesheets({
   );
 }
 
-/** Intern and period · days · hours · status · action, aligned down the list. */
-const SHEET_GRID = "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_9rem_5.5rem_8rem_7.5rem]";
+/** Intern · period · days · hours · status · action, aligned down the list. */
+const SHEET_GRID = "grid-cols-[minmax(0,1fr)_auto] lg:grid-cols-[minmax(0,1fr)_7rem_5rem_8rem_7rem]";
 
 function SheetHead() {
   return (
-    <div aria-hidden className={`${SHEET_GRID} hidden gap-x-6 pb-2 text-xs text-ink-600 lg:grid`}>
+    <div aria-hidden className={`${SHEET_GRID} hidden gap-x-6 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle lg:grid`}>
       <span>Intern and period</span>
-      <span>Days present</span>
+      <span className="text-right">Days present</span>
       <span className="text-right">Hours</span>
       <span>Status</span>
       <span />
@@ -238,53 +216,55 @@ function SheetHead() {
   );
 }
 
-function SheetRow({ row, review = false, primary = false }: { row: Row; review?: boolean; primary?: boolean }) {
+function SheetRow({ row, review = false }: { row: Row; review?: boolean }) {
   const href = `/employer/timesheets/${encodeURIComponent(row.id)}`;
   return (
-    <li className={`${SHEET_GRID} relative grid items-center gap-x-6 gap-y-2 border-t border-ink-200 py-4 transition-colors duration-[var(--motion-fast)] hover:bg-ink-200/30`}>
-      <div className="min-w-0">
-        {/* The row opens the sheet; the link is stretched over it. */}
-        <Link
-          href={href}
-          className="block break-words font-display text-lg font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-700"
-        >
-          {row.name}
-        </Link>
-        <p className="nums text-sm text-ink-700">
-          {row.period}
-          {row.project ? ` · ${row.project}` : ""}
-          {review && row.submittedAt ? ` · sent ${formatDay(row.submittedAt)}` : ""}
-        </p>
-        {row.internNote && review ? <p className="mt-1 line-clamp-1 text-sm text-ink-600">Intern says: {row.internNote}</p> : null}
+    <RevealItem className={`${SHEET_GRID} relative grid items-center gap-x-6 gap-y-1.5 px-5 py-4 transition-colors hover:bg-ink-50/70`}>
+      <div className="flex min-w-0 items-center gap-3">
+        <Avatar masked={row.masked} name={row.masked ? undefined : row.name} initials={row.initials} size="md" />
+        <div className="min-w-0">
+          {/* The row opens the sheet; the link is stretched over it. */}
+          <Link
+            href={href}
+            className="block break-words text-base font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+          >
+            {row.name}
+          </Link>
+          <p className="nums text-sm text-ink-600">
+            {row.period}
+            {row.project ? ` · ${row.project}` : ""}
+            {review && row.submittedAt ? ` · sent ${formatDay(row.submittedAt)}` : ""}
+          </p>
+          {row.days > 0 ? (
+            <div aria-hidden className="mt-2 flex h-1.5 max-w-56 gap-px overflow-hidden rounded-full">
+              {row.ribbon.map((on, i) => (
+                <span key={i} className={on ? "flex-1 bg-brand-600" : "flex-1 bg-ink-200"} />
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
-      <div className="max-lg:order-2 max-lg:col-span-2">
-        <p className="nums text-sm text-ink-700">
-          <span className="font-semibold text-ink-900">{row.present}</span> of {row.days}
-          <span className="sr-only"> days present</span>
-        </p>
-        {row.days > 0 ? (
-          <div aria-hidden className="mt-1.5 flex h-2.5 max-w-56 gap-px">
-            {row.ribbon.map((on, i) => (
-              <span key={i} className={on ? "flex-1 rounded-sm bg-brand-700" : "flex-1 rounded-sm bg-ink-300"} />
-            ))}
-          </div>
-        ) : null}
-      </div>
-      <p className="nums font-display text-2xl font-semibold leading-none text-ink-900 max-lg:hidden lg:text-right">
-        {row.hours}
-        <span className="ml-1 font-sans text-sm font-medium text-ink-600">h<span className="sr-only">ours</span></span>
+      <p className="nums text-sm text-ink-700 max-lg:col-span-2 max-lg:pl-12 lg:text-right">
+        <span className="font-semibold text-ink-900">{row.present}</span>
+        <span className="text-text-subtle"> / {row.days}</span>
+        <span className="lg:sr-only"> days present</span>
+        <span className="lg:hidden"> · {row.hours} h</span>
       </p>
-      <div className="max-lg:col-start-2 max-lg:row-start-1 max-lg:justify-self-end">
+      <p className="nums text-sm font-semibold text-ink-900 max-lg:hidden lg:text-right">
+        {row.hours}
+        <span className="sr-only"> hours</span>
+      </p>
+      <div className="max-lg:col-start-2 max-lg:row-start-1 max-lg:justify-self-end lg:col-auto">
         <StatusPill status={row.status} />
       </div>
-      <div className="relative z-10 flex justify-end max-lg:order-3 max-lg:col-span-2 max-lg:justify-start">
+      <div className="relative z-10 flex justify-end max-lg:col-span-2 max-lg:justify-start max-lg:pl-12">
         {review ? (
-          <Link href={href} className={buttonClass({ size: "sm", variant: primary ? "primary" : "outline", className: "min-h-11" })} aria-label={`Review ${row.name}, ${row.period}`}>
+          <Link href={href} className={buttonClass({ size: "sm" })} aria-label={`Review ${row.name}, ${row.period}`}>
             Review
             <ArrowRight className="size-4" aria-hidden />
           </Link>
         ) : null}
       </div>
-    </li>
+    </RevealItem>
   );
 }

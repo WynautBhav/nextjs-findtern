@@ -26,10 +26,10 @@ export const STATUS: Record<PlacementLedger["status"], { label: string; tone: To
   unpaid: { label: "No instalment paid", tone: "waiting" },
 };
 
-/** The search and filters sit on the canvas above the ledger, on a hairline: no box. */
-export const TOOLBAR_CARD = "mb-2 border-b border-ink-200 pb-4";
+/** The white card the search and filters sit in, as on Candidates. */
+export const TOOLBAR_CARD = "mb-4 rounded-2xl border border-ink-200 bg-white p-3 shadow-xs sm:p-4";
 
-export const INLINE_LINK = "inline-flex min-h-11 items-center font-medium text-brand-700 underline underline-offset-4 hover:text-brand-900";
+export const INLINE_LINK = "font-medium text-brand-700 underline underline-offset-4 touch:inline-flex touch:min-h-11 touch:items-center";
 
 /** "25 Jan 2027 – 24 Apr 2027": one date format, kept on one line wherever it is shown. */
 export function dateRange(start: string | null, end: string | null): string {

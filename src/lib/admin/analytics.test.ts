@@ -126,7 +126,7 @@ test("application status buckets follow legacy's seven groups, all time, largest
   };
   const a = computeAnalytics(input);
   assert.deepEqual(a.applicationStatus, [
-    { name: "Sent", value: 2 },
+    { name: "Sent", value: 3 },
     { name: "Under Review", value: 2 },
     { name: "Interviewed", value: 2 },
     { name: "Hired (Internship)", value: 2 },
@@ -185,53 +185,4 @@ test("filterCompanies: status chip and name search together", () => {
   assert.deepEqual(filterCompanies(list, { status: "active", q: "acme" }).map((c) => c.name), ["Acme Labs"]);
   assert.deepEqual(filterCompanies(list, { status: "", q: "  BETA " }).map((c) => c.name), ["Beta"]);
   assert.equal(filterCompanies(list, { status: "", q: "" }).length, 3);
-});
-
-test("drafts are not offers sent: they leave the totals, rates, trend, company counts and status groups; sent ones are unchanged", () => {
-  const mk = (status: string, id: string, intern: string) => ({ id, employerId: "e1", internId: intern, projectId: "p1", status, currency: "INR", offerDetails: { monthlyAmount: 100, duration: "1m" }, createdAt: d("2026-02-01"), hiredAt: null });
-  const base = {
-    since: d("2026-01-01"),
-    until: d("2026-04-01"),
-    interns: [],
-    onboarding: [{ userId: "i1", createdAt: d("2026-01-05"), meaningful: true, feePaid: false, score: null }],
-    employers: [{ id: "e1", companyName: "Acme", createdAt: d("2025-01-02") }],
-    projects: [],
-    interviews: [],
-    employerPayments: [],
-    internPayments: [],
-  };
-  // Without drafts the figures are exactly what they were.
-  const sentOnly = computeAnalytics({ ...base, proposals: [mk("sent", "a", "i1"), mk("rejected", "b", "i2")] });
-  assert.equal(sentOnly.totals.proposals, 2);
-  assert.deepEqual(sentOnly.applicationStatus, [{ name: "Sent", value: 1 }, { name: "Rejected", value: 1 }]);
-  // The same plus two drafts: nothing moves.
-  const withDrafts = computeAnalytics({ ...base, proposals: [mk("sent", "a", "i1"), mk("rejected", "b", "i2"), mk("draft", "c", "i3"), mk(" Draft ", "d", "i4")] });
-  assert.equal(withDrafts.totals.proposals, 2);
-  assert.equal(withDrafts.rates.avgAppsPerUser, sentOnly.rates.avgAppsPerUser);
-  assert.deepEqual(withDrafts.applicationStatus, sentOnly.applicationStatus);
-  assert.equal(withDrafts.trend[1].proposals, 2);
-  assert.equal(withDrafts.topCompanies[0].proposals, 2);
-  assert.equal(withDrafts.topInterns.length, 2);
-});
-
-test("projects per company uses the range on both sides; with every project inside the range it is the same as before", () => {
-  const proj = (id: string, createdAt: Date) => ({ id, employerId: "e1", status: "active", skills: [], city: null, state: null, createdAt });
-  const base = {
-    since: d("2026-02-01"),
-    until: d("2026-03-01"),
-    interns: [],
-    onboarding: [],
-    employers: [
-      { id: "e1", companyName: "Acme", createdAt: d("2026-02-02") },
-      { id: "e2", companyName: "Beta", createdAt: d("2026-02-10") },
-    ],
-    proposals: [],
-    interviews: [],
-    employerPayments: [],
-    internPayments: [],
-  };
-  // All three projects inside the range: 3 projects over 2 companies, as it always was.
-  assert.equal(computeAnalytics({ ...base, projects: [proj("a", d("2026-02-03")), proj("b", d("2026-02-04")), proj("c", d("2026-02-05"))] }).rates.projectsPerCompany, 1.5);
-  // Two of the three are older than the range: only the one posted in the range counts (it used to say 1.5 here too).
-  assert.equal(computeAnalytics({ ...base, projects: [proj("a", d("2026-02-03")), proj("b", d("2025-11-04")), proj("c", d("2025-12-05"))] }).rates.projectsPerCompany, 0.5);
 });

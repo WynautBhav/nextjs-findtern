@@ -25,10 +25,19 @@ export function SignatureHero({
   return (
     <section
       className={cn(
-        "rounded-lg bg-brand-800 px-6 py-8 text-white sm:px-9 sm:py-10",
+        "relative isolate overflow-hidden rounded-apple-xl bg-brand-950 px-6 py-8 text-white shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_1px_2px_rgba(4,29,23,0.25),0_18px_40px_-18px_rgba(4,29,23,0.5)] sm:px-9 sm:py-10",
         className,
       )}
     >
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(135deg,var(--color-brand-600)_-20%,var(--color-brand-950)_62%)]" />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute -right-24 -top-32 -z-10 size-[26rem] rounded-full bg-[radial-gradient(closest-side,rgba(127,212,178,0.28),transparent)]"
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10 opacity-[0.07] [background-image:repeating-radial-gradient(circle_at_85%_0%,#fff_0_1px,transparent_1px_22px)]"
+      />
       <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 max-w-2xl flex-col gap-6">
           <div>
@@ -49,10 +58,12 @@ export function FigurePanel({ children, className }: { children: React.ReactNode
   return (
     <section
       className={cn(
-        "rounded-lg bg-brand-800 text-white",
+        "relative isolate overflow-hidden rounded-apple-xl bg-brand-950 text-white shadow-[0_1px_0_rgba(255,255,255,0.08)_inset,0_18px_40px_-20px_rgba(4,29,23,0.55)]",
         className,
       )}
     >
+      <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-[linear-gradient(135deg,var(--color-brand-600)_-30%,var(--color-brand-950)_65%)]" />
+      <div aria-hidden className="pointer-events-none absolute -left-20 -top-28 -z-10 size-80 rounded-full bg-[radial-gradient(closest-side,rgba(127,212,178,0.22),transparent)]" />
       {children}
     </section>
   );

@@ -12,9 +12,7 @@ import { formatNumber } from "@/lib/format";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { DateRangeForm } from "@/components/admin/date-range-form";
 import { ProposalTrackerView, TRACKER_TABS, type TrackerTab } from "@/components/admin/proposal-tracker-view";
-import { LeadStat, Overview, StatList, type StatItem } from "@/components/app/stat";
-import { OPEN_STATUSES } from "@/components/admin/proposal-stages";
-import { daysSince } from "@/lib/admin/ai-interview-expiry";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { isAiInterview } from "@/lib/admin/interview-notes";
 import { ButtonAnchor } from "@/components/ui/button";
 
@@ -47,7 +45,6 @@ async function load() {
         currency: schema.proposals.currency,
         offerDetails: schema.proposals.offerDetails,
         createdAt: schema.proposals.createdAt,
-        updatedAt: schema.proposals.updatedAt,
         hiredAt: schema.proposals.hiredAt,
         internId: schema.proposals.internId,
         internFirstName: schema.users.firstName,
@@ -135,6 +132,7 @@ export default async function AdminProposalTrackerPage({
           }
           variant="outline"
           size="sm"
+          className={ADMIN_PILL_SECONDARY}
         >
           <Download className="size-4" aria-hidden />
           {tab === "hired" ? "Export hires" : tab === "expired" ? "Export expired" : "Export CSV"}
@@ -199,45 +197,30 @@ export default async function AdminProposalTrackerPage({
   const rangeLabel = filters.from || filters.to ? `${params.from ?? "start"} to ${params.to ?? "today"}` : "All time";
   const req = parsePageRequest(params);
 
-  // The page's one lead figure: offers still moving, and how long the oldest has sat in its stage.
-  const open = proposals.filter((p) => OPEN_STATUSES.includes(p.status));
-  const oldest = open.reduce<(typeof open)[number] | null>((o, p) => ((p.updatedAt ?? p.createdAt)! < ((o?.updatedAt ?? o?.createdAt) ?? new Date(8.64e15)) ? p : o), null);
-  const oldestDays = oldest ? daysSince(oldest.updatedAt ?? oldest.createdAt, expiredNow) : null;
-  const queueHref = `/admin/proposal-tracker${toQueryString({ ...params, tab: "proposals", lane: "", sort: "", dir: "", page: "" })}`;
-  const rest: StatItem[] = tab === "expired"
-    ? [{ label: filters.from || filters.to ? `Expired ${rangeLabel}` : "Expired, all time", value: formatNumber(expiredHeadline) }]
-    : [
-        { label: "Accepted or hired", value: formatNumber(won), hint: rate === null ? undefined : `${rate}% of decided offers` },
-        ...(lost ? [{ label: "Declined", value: formatNumber(lost) }] : []),
-        ...(upcoming ? [{ label: "Interviews upcoming", value: formatNumber(upcoming) }] : []),
-      ];
-
   return (
     <div className="space-y-6">
       {header}
 
-      <Overview
-        lead={
-          <LeadStat
-            label={open.length === 1 ? "Offer still moving" : "Offers still moving"}
-            value={formatNumber(open.length)}
-            tone={open.length ? "signal" : "ink"}
-            note={
-              oldest
-                ? oldestDays
-                  ? `The oldest has sat ${oldestDays} ${oldestDays === 1 ? "day" : "days"} in its stage: ${name(oldest.internFirstName, oldest.internLastName, oldest.internEmail)} at ${oldest.companyName ?? "a company"}.`
-                  : "Nothing has sat longer than a day."
-                : "Every offer in this period has been decided."
-            }
-            action={open.length ? { label: "Work the queue, oldest first", href: queueHref } : undefined}
-          />
-        }
-        rest={<StatList items={rest} />}
-      />
-
-      <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+      {/* Date range and the period's figures in one row; the four tiles
+          repeated the tab counts below (critique). */}
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
         <DateRangeForm params={params} fromLabel={tab === "expired" ? "Expired from" : "From"} toLabel={tab === "expired" ? "Expired to" : "To"} />
-        <p className="nums pb-2 text-sm text-text-subtle">{rangeLabel}</p>
+        {tab === "expired" ? (
+          <p className="nums pb-2 text-sm text-text-subtle">
+            <span className="font-medium text-foreground">{filters.from || filters.to ? `Expired ${rangeLabel}` : "All time"}</span>
+            {" · "}
+            {formatNumber(expiredHeadline)} expired
+          </p>
+        ) : (
+          <p className="nums pb-2 text-sm text-text-subtle">
+            <span className="font-medium text-foreground">{rangeLabel}</span>
+            {" · "}
+            {formatNumber(won)} accepted or hired
+            {rate === null ? "" : ` (${rate}% of decided offers, ${formatNumber(lost)} declined)`}
+            {" · "}
+            {upcoming ? `${formatNumber(upcoming)} interviews upcoming` : "no interviews upcoming"}
+          </p>
+        )}
       </div>
 
       <ProposalTrackerView

@@ -39,9 +39,9 @@ export function ShareLink({
   ].join("\n");
 
   return (
-    <div className="space-y-4 border-y border-ink-200 py-4">
+    <div className="space-y-4 rounded-xl border border-brand-200 bg-brand-50/60 p-5">
       <div>
-        <h3 className="text-base font-semibold text-ink-900">Your drive link</h3>
+        <h3 className="text-[0.9375rem] font-semibold text-ink-900">Your drive link</h3>
         <p className="mt-0.5 text-sm text-ink-700">
           Copy it now: for security Findtern doesn&apos;t keep a readable copy. Lost it? Issue a new link from the drive page.
         </p>
@@ -52,13 +52,13 @@ export function ShareLink({
           value={url}
           aria-label="Drive link"
           onFocus={(e) => e.currentTarget.select()}
-          className="h-11 min-w-0 flex-1 rounded-md border border-ink-300 bg-surface-raised px-3 font-mono text-sm text-ink-800"
+          className="h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-3 font-mono text-sm text-ink-800"
         />
         <CopyText primary text={url} label="Copy link" />
       </div>
       <details className="group">
-        <summary className="min-h-10 cursor-pointer py-2 text-sm font-semibold text-brand-800">Invitation message for employers</summary>
-        <pre tabIndex={0} aria-label="Invitation message" className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-md border border-ink-200 bg-surface-raised p-3 font-sans text-sm leading-relaxed text-ink-800">
+        <summary className="cursor-pointer text-sm font-medium text-brand-800">Invitation message for employers</summary>
+        <pre tabIndex={0} aria-label="Invitation message" className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-apple-sm border border-ink-200 bg-white p-3 font-sans text-sm leading-relaxed text-ink-800">
           {message}
         </pre>
         <div className="mt-2">

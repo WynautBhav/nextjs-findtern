@@ -177,7 +177,7 @@ export function ExtracurricularStep({ values, update, errors }: StepProps) {
         <AddButton onClick={add} disabled={full}>
           Add another
         </AddButton>
-        <p className="nums text-xs text-ink-700">
+        <p className="nums text-xs text-text-subtle">
           {rows.length} of {MAX_EXTRACURRICULARS}
         </p>
       </div>

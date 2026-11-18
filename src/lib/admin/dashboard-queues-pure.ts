@@ -146,13 +146,3 @@ export function failedGroup(group: Omit<QueueGroup, "count" | "fresh" | "records
 export function totalOf(groups: Pick<QueueGroup, "count" | "fresh" | "error">[]): { total: number; fresh: number } {
   return attentionTotal(groups.filter((g) => !g.error));
 }
-
-/**
- * The hero count and the queue panel must say the same number. `total` counts an active flag (the Google
- * calendar not being connected) as one, but a flag is a setting to fix, not an item of work: so the figure
- * shown is `items` (total minus flags) and the flags are named beside it ("17 items · 1 setting to fix").
- */
-export function itemsAndFlags(groups: Pick<QueueGroup, "count" | "flag" | "error">[], total: number): { items: number; flags: number } {
-  const flags = groups.filter((g) => g.flag && !g.error && g.count > 0).length;
-  return { items: Math.max(0, total - flags), flags };
-}

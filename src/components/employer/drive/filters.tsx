@@ -26,7 +26,7 @@ export function Select({
       >
         {children}
       </select>
-      <ChevronDown aria-hidden className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-600" />
+      <ChevronDown aria-hidden className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" />
     </label>
   );
 }
@@ -41,7 +41,7 @@ export type DriveFilters = {
   onlyOnline: boolean;
 };
 
-/** The drive list's filters: a ruled block, no card. */
+/** Sticky, glass filter bar for the drive list. */
 export function FilterBar({
   f,
   patch,
@@ -68,11 +68,11 @@ export function FilterBar({
   yearLabel: (y: number) => string;
 }) {
   return (
-    <div className="border-t border-ink-300 pt-4">
+    <div className="rounded-[24px] border border-ink-200/70 bg-white/85 p-4 shadow-tile backdrop-blur-md lg:sticky lg:top-3 lg:z-10">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_repeat(3,minmax(0,1fr))]">
         <label className="relative block">
           <span className="sr-only">Search skills or branch</span>
-          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-600" />
+          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" />
           <input
             type="search"
             value={f.q}
@@ -112,7 +112,7 @@ export function FilterBar({
             type="checkbox"
             checked={f.onlyShortlisted}
             onChange={(e) => patch({ onlyShortlisted: e.target.checked })}
-            className="size-4 rounded border-ink-400 accent-brand-700"
+            className="size-4 rounded border-ink-300 accent-brand-700"
           />
           Shortlisted only ({shortlistCount})
         </label>
@@ -121,17 +121,17 @@ export function FilterBar({
             type="checkbox"
             checked={f.onlyOnline}
             onChange={(e) => patch({ onlyOnline: e.target.checked })}
-            className="size-4 rounded border-ink-400 accent-brand-700"
+            className="size-4 rounded border-ink-300 accent-brand-700"
           />
           Online now ({onlineCount})
         </label>
-        <p className="nums text-sm text-ink-700" aria-live="polite">
+        <p className="nums text-sm text-ink-600" aria-live="polite">
           Showing {shown} of {total} students
           {active ? (
             <button
               type="button"
               onClick={onClear}
-              className="ml-2 inline-flex min-h-11 items-center font-medium text-brand-800 underline-offset-4 hover:underline"
+              className="ml-2 inline-flex min-h-11 items-center font-medium text-brand-700 underline-offset-4 hover:underline"
             >
               Clear filters
             </button>

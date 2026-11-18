@@ -2,15 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, desc, eq } from "drizzle-orm";
 
-import { ArrowLeft } from "lucide-react";
-
-import { FilterTabs, type FilterTab } from "@/components/app/primitives";
-import { LeadStat, Overview, Section, StatList } from "@/components/app/stat";
+import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { CollegeDetailsForm, CollegeLogins, CollegeSwitches } from "@/components/admin/college-partners-manager";
 import { CopyText } from "@/components/college/copy-text";
 import { CollegeSeatBatches } from "@/components/admin/college-seat-batches";
 import { CollegeWalletPanel } from "@/components/admin/college-wallet-panel";
-import { DetailRow } from "@/components/app/primitives";
+import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { InfoList, InfoRow, RecordLayout } from "@/components/admin/record-layout";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { flattenParams, toQueryString } from "@/lib/admin/params";
 import { allows, canWrite } from "@/lib/admin/permissions";
@@ -75,123 +73,127 @@ export default async function AdminCollegePage({
 
   const base = `/admin/colleges/${id}`;
   const tabHref = (t: Tab) => `${base}${toQueryString({ tab: t === "seats" ? "" : t })}`;
-  const tabs: FilterTab[] = [
-    { key: "seats", label: "Seats" },
-    { key: "drives", label: "Drives", count: reviews.length || undefined },
-    { key: "wallet", label: "Wallet", count: summary.openRequest ? 1 : undefined },
-    { key: "logins", label: "Logins", count: loginRows.length },
-    { key: "details", label: "Details" },
+  const tabs: AdminTabItem[] = [
+    { key: "seats", label: "Seats", href: tabHref("seats") },
+    { key: "drives", label: "Drives", count: reviews.length || undefined, href: tabHref("drives") },
+    { key: "wallet", label: "Wallet", count: summary.openRequest ? 1 : undefined, href: tabHref("wallet") },
+    { key: "logins", label: "Logins", count: loginRows.length, href: tabHref("logins") },
+    { key: "details", label: "Details", href: tabHref("details") },
   ];
   // Only when something is waiting on staff; each line jumps to the tab where it is handled.
-  const waiting: { label: string; value: string; note: string; href: string; cta: string }[] = [];
-  if (summary.openRequest) waiting.push({ label: "Withdrawal waiting to be paid", value: formatMoney(summary.openRequest.amountMinor, "INR", { zeroLabel: false }), note: "The college asked for its wallet balance. Check the bank account, pay it, then mark it paid.", href: tabHref("wallet"), cta: "Open the wallet" });
-  if (reviews.length) waiting.push({ label: reviews.length === 1 ? "Student match to review" : "Student matches to review", value: String(reviews.length), note: "A roster row looks like a student who signed up with a different email. Nothing links until you approve it.", href: tabHref("drives"), cta: "Open drives" });
-  const [first, ...others] = waiting;
+  const waiting: { text: string; href: string; cta: string }[] = [];
+  if (summary.openRequest) waiting.push({ text: `Withdrawal of ${formatMoney(summary.openRequest.amountMinor, "INR", { zeroLabel: false })} requested.`, href: tabHref("wallet"), cta: "Open Wallet" });
+  if (reviews.length) waiting.push({ text: `${reviews.length} ${reviews.length === 1 ? "student match needs" : "student matches need"} your review.`, href: tabHref("drives"), cta: "Open Drives" });
+
+  // The Wallet tab shows the withdrawal itself, so a banner pointing at it from there repeats it.
+  const waitingElsewhere = waiting.filter((w) => w.href !== tabHref(tab));
 
   const place = [college.city, college.state].filter(Boolean).join(", ");
-  const seat = promo ? { cap: promo.maxUsages ?? 0, used: promo.usedCount } : null;
-  const nothing = <span className="font-normal text-text-subtle">-</span>;
   return (
-    <div className="min-w-0 space-y-6">
-      <header className="min-w-0">
-        <Link href="/admin/colleges" className="inline-flex min-h-8 items-center gap-1.5 rounded-md text-sm font-medium text-ink-700 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-          <ArrowLeft className="size-4" aria-hidden />
-          All colleges
-        </Link>
-        <h1 className="mt-2 text-balance font-display text-2xl font-semibold tracking-[-0.02em] text-foreground [overflow-wrap:anywhere] sm:text-4xl">{college.name}</h1>
-        <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-subtle">
-          {place ? <span>{place}</span> : null}
-          {college.aisheCode ? <span>AISHE {college.aisheCode}</span> : null}
-          {college.code ? (
-            <span className="flex items-center gap-2">
-              <span>College code</span>
-              <span className="font-mono text-foreground">{college.code}</span>
-              <CopyText text={college.code} label="Copy" />
-            </span>
-          ) : null}
-        </p>
-        <p className="mt-3 flex flex-wrap items-center gap-2">
-          <StatusBadge tone={college.isPartner ? "success" : "neutral"} label={college.isPartner ? "Partner" : "Not a partner"} dot={false} className="rounded-md" />
-          {college.isActive ? null : <StatusBadge tone="neutral" label="Inactive" dot={false} className="rounded-md" />}
-          {college.code && /^FT[A-Z2-9]{5}$/.test(college.code) ? <StatusBadge tone="warning" label="Old code format: rotate before sharing" dot={false} className="rounded-md" /> : null}
-        </p>
-      </header>
+    <RecordLayout
+      title={college.name}
+      subtitle={
+        <span className="flex flex-wrap items-center gap-2">
+          <StatusBadge tone={college.isPartner ? "success" : "neutral"} label={college.isPartner ? "Partner" : "Not a partner"} dot={false} />
+          {college.isActive ? null : <StatusBadge tone="neutral" label="Inactive" dot={false} />}
+        </span>
+      }
+      backHref="/admin/colleges"
+      backLabel="All colleges"
+      left={
+        <Panel>
+          <PanelBody className="space-y-5">
+            <InfoList>
+              <InfoRow label="College code">
+                {college.code ? (
+                  <span className="flex flex-wrap items-center gap-2">
+                    <span className="font-mono tracking-wider">{college.code}</span>
+                    <CopyText text={college.code} label="Copy" />
+                    {/^FT[A-Z2-9]{5}$/.test(college.code) ? <StatusBadge tone="neutral" label="Old format: rotate before sharing" dot={false} /> : null}
+                  </span>
+                ) : (
+                  "-"
+                )}
+              </InfoRow>
+              <InfoRow label="AISHE code">{college.aisheCode ?? "-"}</InfoRow>
+              <InfoRow label="Place">{place || "-"}</InfoRow>
+              <InfoRow label="GSTIN">{college.gstin ?? "-"}</InfoRow>
+              <InfoRow label="Student email domains">{college.emailDomains.length ? college.emailDomains.map((d) => `@${d}`).join(", ") : "-"}</InfoRow>
+            </InfoList>
+            <CollegeSwitches college={{ id, name: college.name, isPartner: college.isPartner, showOnWebsite: college.showOnWebsite, isActive: college.isActive }} canEdit={canEdit} />
+          </PanelBody>
+        </Panel>
+      }
+    >
+      {waitingElsewhere.length ? (
+        <div role="status" className="space-y-2 rounded-[var(--radius-admin-card)] bg-warning-soft px-5 py-4 text-sm">
+          {waitingElsewhere.map((w) => (
+            <p key={w.href} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-foreground">
+              <span>{w.text}</span>
+              <Link href={w.href} className="inline-flex min-h-11 items-center font-medium underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">{w.cta}</Link>
+            </p>
+          ))}
+        </div>
+      ) : null}
 
-      <Overview
-        lead={
-          first ? (
-            <LeadStat label={first.label} value={first.value} tone="signal" note={first.note} action={first.href === tabHref(tab) ? undefined : { label: first.cta, href: first.href }} />
-          ) : (
-            <LeadStat
-              label="Seats used"
-              value={seat ? `${seat.used} of ${seat.cap}` : "None yet"}
-              tone={seat ? "brand" : "ink"}
-              note={seat ? "Students who signed up with the college's shared code." : hasPaid ? "No seat code was found for this college." : "The shared code is issued once the first seat batch is paid."}
-            />
-          )
-        }
-        rest={
-          <StatList
-            items={[
-              ...others.map((w) => ({ label: w.label, value: w.value })),
-              ...(first && seat ? [{ label: "Seats used", value: `${seat.used} of ${seat.cap}` }] : []),
-              { label: "Wallet balance", value: formatMoney(summary.balanceMinor, "INR", { zeroLabel: "₹0" }) },
-              { label: "Placement officers", value: loginRows.length || "None yet" },
-            ]}
-          />
-        }
-      />
-
-      <FilterTabs label="College sections" tabs={tabs} value={tab} hrefFor={(k) => tabHref(k as Tab)} />
+      <AdminTabs items={tabs} active={tab} label="College sections" />
 
       {tab === "seats" ? (
-        <Section title="Seats" hint={hasPaid ? "One shared code for the whole college. Each paid batch adds seats to it." : "One shared code for the whole college. It is issued, with the placement officer login, once the first batch is paid."}>
-          <CollegeSeatBatches collegeId={id} batches={rows} seat={promo ? { code: promo.code, cap: promo.maxUsages, used: promo.usedCount } : null} canMoney={canMoney} />
-        </Section>
+        <Panel>
+          <PanelHeader
+            title="Seats"
+            description={hasPaid ? "One shared code for the whole college. Each paid batch adds seats to it." : "One shared code for the whole college. It is issued, with the placement officer login, once the first batch is paid."}
+          />
+          <PanelBody>
+            <CollegeSeatBatches collegeId={id} batches={rows} seat={promo ? { code: promo.code, cap: promo.maxUsages, used: promo.usedCount } : null} canMoney={canMoney} />
+          </PanelBody>
+        </Panel>
       ) : null}
 
       {tab === "drives" ? (
-        <div className="space-y-10">
-          <Section title="Drive orders" hint="One personal code per student. Create an order, record its payment, upload the roster, then confirm to issue the codes.">
-            <DriveOrdersPanel collegeId={id} collegeName={college.name} orders={orders} canMoney={canMoney} canWrite={canDrives} />
-          </Section>
+        <>
+          <Panel>
+            <PanelHeader title="Drive orders" description="One personal code per student. Create an order, record its payment, upload the roster, then confirm to issue the codes." />
+            <PanelBody>
+              <DriveOrdersPanel collegeId={id} collegeName={college.name} orders={orders} canMoney={canMoney} canWrite={canDrives} />
+            </PanelBody>
+          </Panel>
           <CampaignPanel orderIds={orders.filter((o) => o.status === "paid").map((o) => o.id)} canWrite={canDrives} />
-          <Section title="Identity review" hint="Roster rows whose phone and name match a student with a different email. Nothing links until you approve it.">
-            <IdentityReviewQueue reviews={reviews} canWrite={canWrite(perms, "/api/admin/identity-reviews")} />
-          </Section>
-        </div>
+          <Panel>
+            <PanelHeader title="Identity review" description="Roster rows whose phone and name match a student with a different email. Nothing links until you approve it." />
+            <PanelBody>
+              <IdentityReviewQueue reviews={reviews} canWrite={canWrite(perms, "/api/admin/identity-reviews")} />
+            </PanelBody>
+          </Panel>
+        </>
       ) : null}
 
       {tab === "wallet" ? (
-        <Section title="Wallet" hint="Incentives the college has earned, its bank account and any withdrawal waiting to be paid.">
-          <CollegeWalletPanel collegeId={id} summary={summary} ledger={ledger} bank={bank} canMoney={canMoney} />
-        </Section>
+        <Panel>
+          <PanelHeader title="Wallet" description="Incentives the college has earned, its bank account and any withdrawal waiting to be paid." />
+          <PanelBody>
+            <CollegeWalletPanel collegeId={id} summary={summary} ledger={ledger} bank={bank} canMoney={canMoney} />
+          </PanelBody>
+        </Panel>
       ) : null}
 
       {tab === "logins" ? (
-        <Section title="Placement officer logins" hint="The people at the college who sign in to its console.">
-          <CollegeLogins collegeId={id} officers={loginRows} hasPaidBatch={hasPaid} canEdit={canEdit} />
-        </Section>
+        <Panel>
+          <PanelHeader title="Placement officer logins" description="The people at the college who sign in to its console." />
+          <PanelBody>
+            <CollegeLogins collegeId={id} officers={loginRows} hasPaidBatch={hasPaid} canEdit={canEdit} />
+          </PanelBody>
+        </Panel>
       ) : null}
 
       {tab === "details" ? (
-        <div className="grid items-start gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
-          <Section title="Details" hint="How the college is named and billed.">
+        <Panel>
+          <PanelHeader title="Details" description="How the college is named and billed." />
+          <PanelBody>
             <CollegeDetailsForm college={{ id, name: college.name, city: college.city, state: college.state, gstin: college.gstin, aisheCode: college.aisheCode, isPartner: college.isPartner }} canEdit={canEdit} />
-          </Section>
-          <div className="min-w-0 space-y-10">
-            <Section title="Record">
-              <dl className="divide-y divide-ink-200">
-                <DetailRow label="GSTIN" value={college.gstin ?? nothing} mono />
-                <DetailRow label="Student email domains" value={college.emailDomains.length ? college.emailDomains.map((d) => `@${d}`).join(", ") : nothing} />
-              </dl>
-            </Section>
-            <Section title="Switches" hint="Each one saves as soon as you change it.">
-              <CollegeSwitches college={{ id, name: college.name, isPartner: college.isPartner, showOnWebsite: college.showOnWebsite, isActive: college.isActive }} canEdit={canEdit} />
-            </Section>
-          </div>
-        </div>
+          </PanelBody>
+        </Panel>
       ) : null}
-    </div>
+    </RecordLayout>
   );
 }

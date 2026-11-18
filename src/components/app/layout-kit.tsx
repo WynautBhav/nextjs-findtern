@@ -43,7 +43,7 @@ export function SkeletonRow({ className }: { className?: string }) {
 
 export function SkeletonCard({ className }: { className?: string }) {
   return (
-    <div className={cn("space-y-3 rounded-lg border border-ink-200 bg-surface-raised p-5", className)}>
+    <div className={cn("space-y-3 rounded-apple-xl border border-ink-200/80 bg-white p-5", className)}>
       <Skeleton className="h-5 w-1/2" />
       <Skeleton className="h-3 w-full" />
       <Skeleton className="h-3 w-4/5" />
@@ -56,52 +56,6 @@ export function SkeletonList({ rows = 5, className }: { rows?: number; className
   return (
     <div role="status" aria-label="Loading" className={cn("divide-y divide-ink-200/70", className)}>
       {Array.from({ length: rows }, (_, i) => <SkeletonRow key={i} />)}
-    </div>
-  );
-}
-
-/**
- * Loading shape for the ledger layouts: a masthead (title and lede), the lead figure with its note,
- * a ruled list beside it, then ruled rows. Flat blocks on hairlines, no cards, so what lands in
- * their place does not move. Announced once.
- */
-export function LedgerSkeleton({ rows = 5, label = "Loading this page", className }: { rows?: number; label?: string; className?: string }) {
-  return (
-    <div role="status" aria-busy="true" className={className}>
-      <span className="sr-only">{label}</span>
-      <div className="mb-8 space-y-3 lg:mb-10">
-        <Skeleton className="h-9 w-64 max-w-full sm:h-11 sm:w-96" />
-        <Skeleton className="h-4 w-80 max-w-full" />
-      </div>
-      <div className="grid items-start gap-x-14 gap-y-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]">
-        <div className="space-y-3">
-          <Skeleton className="h-4 w-32" />
-          <Skeleton className="h-12 w-48 sm:h-[2.75rem]" />
-          <Skeleton className="h-4 w-72 max-w-full" />
-        </div>
-        <div className="border-y border-ink-200">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="flex items-center justify-between gap-4 border-b border-ink-200 py-3 last:border-b-0">
-              <Skeleton className="h-4 w-32" />
-              <Skeleton className="h-5 w-12" />
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="mt-10">
-        <div className="mb-1 flex items-center justify-between border-b border-ink-200 pb-2">
-          <Skeleton className="h-5 w-40" />
-        </div>
-        <div className="divide-y divide-ink-200">
-          {Array.from({ length: rows }, (_, i) => (
-            <div key={i} className="flex items-center gap-4 py-3.5">
-              <Skeleton className="h-4 w-1/4" />
-              <Skeleton className="h-4 flex-1" />
-              <Skeleton className="h-4 w-16 shrink-0" />
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   );
 }
@@ -137,7 +91,7 @@ export function Callout({
   const c = CALLOUT[tone];
   const Icon = c.icon;
   return (
-    <div role={tone === "warning" ? "alert" : "note"} className={cn("flex gap-3 rounded-md p-4 text-sm", c.box, className)}>
+    <div role={tone === "warning" ? "alert" : "note"} className={cn("flex gap-3 rounded-apple-md p-4 text-sm", c.box, className)}>
       <Icon aria-hidden className={cn("mt-0.5 size-5 shrink-0", c.ic)} />
       <div className="min-w-0">
         {title ? <p className="font-semibold">{title}</p> : null}

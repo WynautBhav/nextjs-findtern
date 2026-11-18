@@ -31,13 +31,13 @@ export function CompareBar({
       <KeepFocusClear of="compare-bar" />
       <span aria-hidden className="flex items-center gap-1.5">
         {Array.from({ length: max }, (_, i) => (
-          <span key={i} className={cn("size-2.5 rounded-full transition-colors", i < count ? "bg-accent" : "bg-surface-raised/25")} />
+          <span key={i} className={cn("size-2.5 rounded-full transition-colors", i < count ? "bg-accent" : "bg-white/25")} />
         ))}
       </span>
       <span className="text-sm font-medium">
         {count === 1 ? "1 selected · pick one more to compare" : `${count} of ${max} selected${full ? " · limit reached" : ""}`}
       </span>
-      <Link href={clearHref} scroll={false} className="apple-spring inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-white/80 hover:bg-surface-raised/10 hover:text-white">
+      <Link href={clearHref} scroll={false} className="apple-spring inline-flex min-h-11 items-center rounded-full px-3 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white">
         Clear
       </Link>
       {count >= 2 ? (

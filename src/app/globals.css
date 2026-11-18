@@ -1456,6 +1456,33 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     text-wrap: balance;
   }
 
+  /* Frosted sidebar + top bars. Ultra-thin material, saturate boost. */
+  .apple-material-sidebar {
+    background: rgb(255 255 255 / 0.72);
+    backdrop-filter: blur(20px) saturate(190%);
+    -webkit-backdrop-filter: blur(20px) saturate(190%);
+    border-right: 1px solid rgb(7 47 36 / 0.08);
+  }
+
+  .dark .apple-material-sidebar {
+    background: rgb(20 31 27 / 0.75);
+    backdrop-filter: blur(25px) saturate(190%);
+    -webkit-backdrop-filter: blur(25px) saturate(190%);
+    border-right: 1px solid rgb(255 255 255 / 0.1);
+  }
+
+  .apple-material-bar {
+    background: rgb(255 255 255 / 0.72);
+    backdrop-filter: blur(20px) saturate(190%);
+    -webkit-backdrop-filter: blur(20px) saturate(190%);
+  }
+
+  .dark .apple-material-bar {
+    background: rgb(15 26 23 / 0.72);
+    backdrop-filter: blur(25px) saturate(190%);
+    -webkit-backdrop-filter: blur(25px) saturate(190%);
+  }
+
   /* Apple card: squircle, hairline, ambient diffusion. No harsh shadows. */
   .apple-panel {
     border-radius: var(--radius-apple-lg);
@@ -1935,309 +1962,3 @@ html {
 }
 .range-brand:focus-visible::-webkit-slider-thumb { outline: 3px solid rgb(22 107 84 / 0.35); outline-offset: 2px; }
 .range-brand:focus-visible::-moz-range-thumb { outline: 3px solid rgb(22 107 84 / 0.35); outline-offset: 2px; }
-
-/* ==========================================================================
-   APP IDENTITY (signed-in areas: intern, employer, admin, college)
-   --------------------------------------------------------------------------
-   One scoped token layer. Everything under [data-app] (the shell root, and <html> while a shell is
-   mounted so portalled dialogs match) re-points the shared theme variables, so every existing
-   page picks it up and marketing is untouched.
-
-   Type    display Bricolage Grotesque, text Figtree. Six sizes: 12 / 14 / 16 / 20 / 28 / 44.
-           Tabular numerals for money and tables.
-   Colour  one brand green, a warm paper neutral ramp, one signal colour (amber) for money and
-           alerts, near-black warm ink for text.
-   Radius  two shapes + pill: 6px controls, 12px panels, 9999px for chips and the avatar.
-   Shadow  two: --shadow-rest (a hairline lift) and --shadow-float (menus, dialogs, toasts).
-   Motion  transform and opacity only, 120 / 200 / 300 ms, one ease. Reduced motion switches it off.
-   ========================================================================== */
-
-@theme {
-  --font-display: var(--font-app-display), var(--font-app-text), ui-sans-serif, system-ui, sans-serif;
-  --color-paper: #f3f0e9;
-  --color-signal: #9f4d08;
-  --motion-fast: 120ms;
-  --motion-base: 200ms;
-  --motion-slow: 300ms;
-  --ease-app: cubic-bezier(0.2, 0.7, 0.2, 1);
-}
-
-[data-app] {
-  --font-sans: var(--font-app-text), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-
-  /* Type: six sizes. */
-  --text-2xs: 0.75rem;
-  --text-2xs--line-height: 1.125rem;
-  --text-xs: 0.75rem;
-  --text-xs--line-height: 1.125rem;
-  --text-sm: 0.875rem;
-  --text-sm--line-height: 1.375rem;
-  --text-base: 1rem;
-  --text-base--line-height: 1.6;
-  --text-lg: 1.25rem;
-  --text-lg--line-height: 1.5;
-  --text-xl: 1.25rem;
-  --text-xl--line-height: 1.5;
-  --text-2xl: 1.75rem;
-  --text-2xl--line-height: 1.2;
-  --text-3xl: 1.75rem;
-  --text-3xl--line-height: 1.2;
-  --text-4xl: 2.75rem;
-  --text-4xl--line-height: 1.05;
-  --text-5xl: 2.75rem;
-  --text-5xl--line-height: 1.05;
-
-  /* Radius: 6 / 12 / pill. */
-  --radius-xs: 0.375rem;
-  --radius-sm: 0.375rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 0.75rem;
-  --radius-2xl: 0.75rem;
-  --radius-3xl: 0.75rem;
-  --radius-apple-sm: 0.375rem;
-  --radius-apple-md: 0.375rem;
-  --radius-apple-lg: 0.75rem;
-  --radius-apple-xl: 0.75rem;
-  --radius-admin-control: 0.375rem;
-  --radius-admin-panel: 0.75rem;
-  --radius-admin-overlay: 0.75rem;
-  --radius-admin-card: 0.75rem;
-  --radius-admin-frame: 0;
-
-  /* Shadow: rest and float. */
-  --shadow-rest: 0 1px 0 rgb(43 36 20 / 0.05);
-  --shadow-float: 0 2px 4px rgb(43 36 20 / 0.06), 0 12px 28px -6px rgb(43 36 20 / 0.18);
-  --shadow-xs: var(--shadow-rest);
-  --shadow-sm: var(--shadow-rest);
-  --shadow-tile: var(--shadow-rest);
-  --shadow-tile-brand: var(--shadow-rest);
-  --shadow-md: var(--shadow-float);
-  --shadow-lg: var(--shadow-float);
-  --shadow-xl: var(--shadow-float);
-  --shadow-admin-float: var(--shadow-float);
-  --shadow-admin-lift: var(--shadow-rest);
-
-  /* Motion. */
-  --duration-admin-fast: var(--motion-fast);
-  --duration-admin-base: var(--motion-base);
-  --duration-admin-slow: var(--motion-slow);
-  --dur-instant: var(--motion-fast);
-  --dur-quick: var(--motion-fast);
-  --dur-standard: var(--motion-base);
-  --dur-slow: var(--motion-slow);
-
-  /* Spacing rhythm used by the primitives. */
-  --space-page: clamp(1rem, 3vw, 2.5rem);
-  --space-section: 2rem;
-  --space-block: 1.25rem;
-
-  font-family: var(--font-sans);
-  font-feature-settings: "kern", "liga", "calt";
-  font-variant-numeric: normal;
-  -webkit-font-smoothing: antialiased;
-  text-rendering: optimizeLegibility;
-}
-
-[data-app]:not(.dark) {
-  /* Warm paper neutrals. */
-  --color-canvas: #f3f0e9;
-  --color-ink-50: #faf8f4;
-  --color-ink-100: #f0ede5;
-  --color-ink-200: #e3dfd4;
-  --color-ink-300: #cbc6b8;
-  --color-ink-400: #9b9586;
-  --color-ink-500: #67625a;
-  --color-ink-600: #57524a;
-  --color-ink-700: #433f38;
-  --color-ink-800: #2c2924;
-  --color-ink-900: #1a1814;
-  --color-ink-950: #12110e;
-  --color-text-subtle: #5f5a50;
-  --color-background: #fbf9f5;
-  --color-surface: #faf8f4;
-  --color-surface-raised: #fffefb;
-  --color-card: #fffefb;
-  --color-popover: #fffefb;
-  --color-border: #e3dfd4;
-  --color-border-strong: #cbc6b8;
-  --color-input: #cbc6b8;
-  --color-secondary: #f0ede5;
-  --color-muted: #f0ede5;
-  --color-rail: #f3f0e9;
-  --color-rail-line: #e3dfd4;
-  --color-rail-active: #e3dfd4;
-  --color-primary-soft: #eaf3ee;
-  /* The admin's own variables follow the same paper. */
-  --admin-canvas: #f3f0e9;
-  --admin-frame: #f3f0e9;
-  --admin-panel: #fffefb;
-  --admin-panel-2: #f0ede5;
-  --admin-panel-edge: #e3dfd4;
-  --admin-rule: #e3dfd4;
-  --admin-shadow: var(--shadow-rest);
-  --admin-tile: #0e6049;
-  --admin-deep: #1a1814;
-  --admin-deep-ink: #fbf9f5;
-  background-color: var(--color-canvas);
-  color: var(--color-ink-900);
-}
-
-[data-app] :is(h1, h2) {
-  font-family: var(--font-display);
-  font-optical-sizing: auto;
-  letter-spacing: -0.015em;
-}
-[data-app] :is(table, td, th, .nums, .money) {
-  font-variant-numeric: tabular-nums;
-  font-feature-settings: "tnum";
-}
-[data-app] ::selection {
-  background: var(--color-brand-200);
-  color: var(--color-ink-950);
-}
-[data-app] :focus-visible {
-  outline: 2px solid var(--color-brand-700);
-  outline-offset: 2px;
-}
-
-/* Page enter: one soft arrival per navigation. */
-@keyframes app-page-enter {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.page-enter {
-  animation: app-page-enter var(--motion-slow) var(--ease-app) both;
-}
-@keyframes app-check-draw {
-  to {
-    stroke-dashoffset: 0;
-  }
-}
-@keyframes app-ring-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.6);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .page-enter {
-    animation: none;
-  }
-}
-
-/* Dark: the paper ramp flips with the console theme. */
-[data-app].dark,
-.dark [data-app] {
-  --color-canvas: #0b1512;
-  --color-paper: #0b1512;
-  --color-signal: #f5bb63;
-  background-color: var(--color-canvas);
-}
-@media (prefers-reduced-motion: reduce) {
-  [data-app] [style*="app-check-draw"] {
-    animation: none !important;
-    stroke-dashoffset: 0 !important;
-  }
-}
-
-/* No ALL-CAPS labels in the app areas: sentence case with normal tracking, whatever a page asks for. */
-[data-app] :is(.uppercase, [class*="tracking-wide"], [class*="tracking-[0."]) {
-  text-transform: none;
-  letter-spacing: normal;
-}
-
-/* Score bars fill once from the left (replaces a motion.div). */
-@keyframes score-grow {
-  from {
-    transform: scaleX(0);
-  }
-}
-.score-grow {
-  animation: score-grow var(--motion-slow) var(--ease-app) both;
-}
-
-/* ── Chrome identity (E0b) ───────────────────────────────────────────────────
-   Ledger double rule under the top bar: a 2px deep-green line with a hairline 4px below it.
-   Dark admin uses the ink ramp instead of the (light mint) brand-800 so it stays quiet. */
-.ledger-head {
-  border-bottom: 2px solid var(--color-brand-800);
-}
-.ledger-head::after {
-  content: "";
-  position: absolute;
-  inset-inline: 0;
-  bottom: -6px;
-  height: 1px;
-  background: var(--color-ink-300);
-  pointer-events: none;
-}
-[data-app].dark .ledger-head,
-.dark [data-app] .ledger-head {
-  border-bottom-color: var(--color-ink-300);
-}
-
-/* Paper: a barely-there fibre grain on the canvas (static, no blur, no gradient). */
-[data-app]:not(.dark) {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
-}
-
-/* Page titles: the display face, set large and tight. The one h1 of a page is the masthead. */
-[data-app] main h1 {
-  font-family: var(--font-display);
-  letter-spacing: -0.025em;
-  font-weight: 600;
-  text-wrap: balance;
-}
-
-/* The masthead tab: a short deep-green bar above the page's one h1, like the tab on a ledger heading. */
-[data-app] main h1::before {
-  content: "";
-  display: block;
-  width: 2.25rem;
-  height: 3px;
-  margin-bottom: 0.75rem;
-  background: var(--color-brand-800);
-}
-[data-app].dark main h1::before,
-.dark [data-app] main h1::before {
-  background: var(--color-brand-700);
-}
-
-/* Branded focus ring: a deep-green outline held off the control by a paper-coloured gap. */
-[data-app] :focus-visible {
-  outline: 2px solid var(--color-brand-700);
-  outline-offset: 3px;
-}
-[data-app] :is(nav[aria-label="Main"], nav[aria-label="Primary"]) :focus-visible {
-  outline-offset: -2px;
-}
-[data-app] :is(input, textarea, select):focus-visible {
-  outline-offset: 1px;
-}
-
-/* Press: controls sink 1px. */
-[data-app] :is(button, [role="button"], a.btn):not(:disabled):active {
-  translate: 0 1px;
-}
-@media (prefers-reduced-motion: reduce) {
-  [data-app] :is(button, [role="button"], a.btn):not(:disabled):active {
-    translate: none;
-  }
-}
-
-/* Loading skeleton that mimics the ledger layouts (components/app/layout-kit.tsx LedgerSkeleton). */
-.ledger-skel-rule {
-  height: 1px;
-  background: var(--color-ink-200);
-}

@@ -2,9 +2,9 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ExternalLink, Upload } from "lucide-react";
+import { ExternalLink, Upload, X } from "lucide-react";
 
-import { Section } from "@/components/app/stat";
+import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { StatusBadge, type StatusTone } from "@/components/admin/status-badge";
 import { buttonClass } from "@/components/ui/button";
 import {
@@ -346,107 +346,105 @@ export function AiReportBatch({ drive }: { drive: DriveState }) {
       {drive !== "ready" ? (
         <div
           role="status"
-          className="flex items-start gap-2 rounded-md border border-ink-300 px-3 py-2.5 text-sm leading-relaxed text-ink-900"
+          className="rounded-apple-lg border border-accent-300/70 bg-accent-100/60 px-4 py-3 text-sm leading-relaxed text-foreground"
         >
-          <AlertTriangle
-            className="mt-0.5 size-4 shrink-0 text-signal"
-            aria-hidden
-          />
-          <span>
-            {drive === "not_configured"
-              ? "Google is not configured on this server, so reports can be matched and checked but not saved to Drive."
-              : drive === "reconnect"
-                ? "Google needs to be reconnected (it now also needs Drive). Reports can be matched and checked until then."
-                : "Couldn't check the Google connection just now."}{" "}
-            <Link
-              href="/admin/settings"
-              className="font-medium underline underline-offset-4"
-            >
-              Open Settings
-            </Link>
-          </span>
+          {drive === "not_configured"
+            ? "Google is not configured on this server, so reports can be matched and checked but not saved to Drive."
+            : drive === "reconnect"
+              ? "Google needs to be reconnected (it now also needs Drive). Reports can be matched and checked until then."
+              : "Couldn't check the Google connection just now."}{" "}
+          <Link
+            href="/admin/settings"
+            className="font-medium underline underline-offset-4"
+          >
+            Open Settings
+          </Link>
         </div>
       ) : null}
 
-      <Section
-        title="Add Incruiter reports"
-        hint="Drop the PDFs you downloaded. Each one is read in this browser and matched to a candidate by phone and name. Nothing is uploaded until you publish."
-      >
-        <div
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragging(true);
-          }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            void addFiles(e.dataTransfer.files);
-          }}
-          className={cn(
-            "flex flex-wrap items-center gap-x-4 gap-y-2 rounded-md border border-dashed p-4 transition-colors",
-            dragging ? "border-brand-700 bg-brand-100" : "border-ink-300",
-          )}
-        >
-          <label
+      <Panel>
+        <PanelHeader
+          title="1 · Add Incruiter reports"
+          description="Drop the PDFs you downloaded. Each one is read in this browser and matched to a candidate by phone and name. Nothing is uploaded until you publish."
+        />
+        <PanelBody>
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragging(true);
+            }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragging(false);
+              void addFiles(e.dataTransfer.files);
+            }}
             className={cn(
-              buttonClass({ variant: "outline", size: "md" }),
-              "cursor-pointer text-sm focus-within:outline-2 focus-within:outline-brand-600",
+              "rounded-apple-lg border-2 border-dashed p-6 text-center",
+              dragging ? "border-brand-600 bg-brand-50" : "border-ink-200",
             )}
           >
-            <Upload className="size-4" aria-hidden />
-            Choose PDF reports
-            <input
-              ref={input}
-              type="file"
-              accept="application/pdf,.pdf"
-              multiple
-              className="sr-only"
-              onChange={(e) => {
-                void addFiles(e.target.files);
-                e.target.value = "";
-              }}
-            />
-          </label>
-          <p className="text-sm text-ink-700">
-            or drag them here · up to {MAX_FILES} at a time
-          </p>
-        </div>
-      </Section>
+            <label
+              className={cn(
+                buttonClass({ variant: "outline", size: "md" }),
+                "cursor-pointer text-sm focus-within:outline-2 focus-within:outline-brand-600",
+              )}
+            >
+              <Upload className="size-4" aria-hidden />
+              Choose PDF reports
+              <input
+                ref={input}
+                type="file"
+                accept="application/pdf,.pdf"
+                multiple
+                className="sr-only"
+                onChange={(e) => {
+                  void addFiles(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <p className="mt-2 text-sm text-ink-600">
+              or drag them here · up to {MAX_FILES} at a time
+            </p>
+          </div>
+        </PanelBody>
+      </Panel>
 
       <div aria-live="polite" className="min-h-5 text-sm text-ink-700">
         {notice}
       </div>
 
       {rows.length > 0 ? (
-        <Section
-          title="Check and publish"
-          hint={`${rows.length} report${rows.length === 1 ? "" : "s"} · ${done.length} published`}
-          action={
-            <>
-              {done.length > 0 ? (
+        <Panel>
+          <PanelHeader
+            title="2 · Check and publish"
+            description={`${rows.length} report${rows.length === 1 ? "" : "s"} · ${done.length} published`}
+            action={
+              <>
+                {done.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={copyLinks}
+                    className={buttonClass({ variant: "outline", size: "sm" })}
+                  >
+                    Copy links
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  onClick={copyLinks}
-                  className={buttonClass({ variant: "outline", size: "sm" })}
+                  onClick={() => void publishAll()}
+                  disabled={busy || !driveReady || publishable.length === 0}
+                  className={buttonClass({ variant: "primary", size: "sm" })}
                 >
-                  Copy links
+                  {busy
+                    ? "Publishing…"
+                    : `Redact & publish ${publishable.length || ""}`.trim()}
                 </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={() => void publishAll()}
-                disabled={busy || !driveReady || publishable.length === 0}
-                className={buttonClass({ variant: "primary", size: "sm" })}
-              >
-                {busy
-                  ? "Publishing…"
-                  : `Redact & publish ${publishable.length || ""}`.trim()}
-              </button>
-            </>
-          }
-        >
-          <ul className="divide-y divide-ink-200">
+              </>
+            }
+          />
+          <ul className="divide-y divide-border">
             {rows.map((r) => {
               const chosen = r.candidates.find((c) => c.id === r.internId);
               const blocked = dupes.has(r.key);
@@ -455,7 +453,7 @@ export function AiReportBatch({ drive }: { drive: DriveState }) {
               return (
                 <li
                   key={r.key}
-                  className="grid gap-3 py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto] md:items-start"
+                  className="grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)_auto] md:items-start"
                 >
                   <div className="min-w-0">
                     <p
@@ -501,7 +499,7 @@ export function AiReportBatch({ drive }: { drive: DriveState }) {
                               match: "check",
                             })
                           }
-                          className="min-h-10 w-full rounded-md border border-ink-300 bg-surface-raised px-3 text-sm text-foreground"
+                          className="min-h-11 w-full rounded-apple-md border border-ink-200 bg-card px-3 text-sm text-foreground"
                         >
                           <option value="">
                             {r.candidates.length
@@ -531,7 +529,7 @@ export function AiReportBatch({ drive }: { drive: DriveState }) {
                               onKeyDown={(e) =>
                                 e.key === "Enter" && void lookUp(r.key)
                               }
-                              className="min-h-10 min-w-0 flex-1 rounded-md border border-ink-300 bg-surface-raised px-3 text-sm"
+                              className="min-h-11 min-w-0 flex-1 rounded-apple-md border border-ink-200 bg-card px-3 text-sm"
                             />
                             <button
                               type="button"
@@ -553,7 +551,7 @@ export function AiReportBatch({ drive }: { drive: DriveState }) {
                     {r.leaks?.length ? (
                       <div
                         role="alert"
-                        className="rounded-md border border-danger px-3 py-2 text-danger"
+                        className="rounded-apple-md border border-danger/30 bg-danger-soft px-3 py-2 text-danger"
                       >
                         <p className="font-medium">
                           Still readable after redaction:
@@ -572,7 +570,7 @@ export function AiReportBatch({ drive }: { drive: DriveState }) {
                             onChange={(e) =>
                               patch(r.key, { allowLeaks: e.target.checked })
                             }
-                            className="size-5"
+                            className="size-4"
                           />
                           I have looked, publish anyway
                         </label>
@@ -584,7 +582,7 @@ export function AiReportBatch({ drive }: { drive: DriveState }) {
                       <img
                         src={r.previewUrl}
                         alt={`Redacted first page of ${r.file.name}`}
-                        className="max-h-44 rounded-md border border-ink-300"
+                        className="max-h-44 rounded-apple-md border border-border"
                       />
                     ) : null}
                     {r.note ? (
@@ -673,12 +671,9 @@ export function AiReportBatch({ drive }: { drive: DriveState }) {
                           setRows((all) => all.filter((x) => x.key !== r.key))
                         }
                         aria-label={`Remove ${r.file.name}`}
-                        className={cn(
-                          buttonClass({ variant: "ghost", size: "sm" }),
-                          "text-ink-700 hover:text-danger",
-                        )}
+                        className="inline-flex size-11 items-center justify-center rounded-apple-md text-ink-600 hover:text-foreground"
                       >
-                        Remove
+                        <X className="size-4" aria-hidden />
                       </button>
                     ) : null}
                   </div>
@@ -686,7 +681,7 @@ export function AiReportBatch({ drive }: { drive: DriveState }) {
               );
             })}
           </ul>
-        </Section>
+        </Panel>
       ) : null}
     </div>
   );

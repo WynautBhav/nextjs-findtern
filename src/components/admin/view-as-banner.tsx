@@ -46,7 +46,7 @@ export function ViewAsBanner({ viewing, admin }: { viewing: string; admin: strin
         type="button"
         onClick={exit}
         disabled={busy}
-        className={buttonClass({ variant: "white", size: "sm", className: "rounded-md px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-300" })}
+        className={buttonClass({ variant: "white", size: "sm", className: "rounded-full px-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-300" })}
       >
         {busy ? <Loader2 className="size-3.5 animate-spin" aria-hidden /> : <LogOut className="size-3.5" aria-hidden />}
         Exit

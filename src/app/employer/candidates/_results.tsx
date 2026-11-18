@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, Info, LayoutGrid, List, Plus, Rows3, Search, X } from "lucide-react";
+import { ChevronDown, Info, LayoutGrid, List, Rows3, Search, X } from "lucide-react";
 
 import { redactForEmployer } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
@@ -37,18 +37,18 @@ import {
  * Keyword search: skills or city - never a name or bio (the pool is redacted).
  * The one search bar at the top of the page; the skill tokens sit under it.
  */
-export function CandidateSearch({ filters, className, id = "candidate-search" }: { filters: Filters; className?: string; id?: string }) {
+export function CandidateSearch({ filters, className }: { filters: Filters; className?: string }) {
   return (
     <form method="get" role="search" className={cn("relative min-w-0", className)}>
       {Array.from(new URLSearchParams(queryOf({ ...filters, q: "", page: 1, saved: false }).slice(1)).entries()).map(([k, v], i) => (
         <input key={`${k}-${i}`} type="hidden" name={k} value={v} />
       ))}
-      <label htmlFor={id} className="sr-only">
+      <label htmlFor="candidate-search" className="sr-only">
         Search by skill or city
       </label>
-      <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-600" aria-hidden />
+      <Search className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-ink-500" aria-hidden />
       <input
-        id={id}
+        id="candidate-search"
         name="q"
         type="search"
         defaultValue={filters.q}
@@ -93,8 +93,8 @@ export function ActiveFilters({ data, filters, className }: { data: CandidatesDa
   if (chips.length === 0) return null;
   return (
     <div className={cn("flex flex-wrap items-center gap-x-1", className)}>
-      <span aria-hidden className="mr-1 text-sm text-ink-700 max-lg:hidden">
-        Narrowed by
+      <span aria-hidden className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-text-subtle max-lg:hidden">
+        Active filters
       </span>
       <ul aria-label="Active filters" className="contents">
         {chips.map((chip) => (
@@ -105,7 +105,7 @@ export function ActiveFilters({ data, filters, className }: { data: CandidatesDa
               aria-label={`Remove filter: ${chip.label}`}
               className="group inline-flex min-h-9 items-center outline-none touch:min-h-11"
             >
-              <span className="inline-flex h-7 items-center gap-1 rounded-md border border-ink-300 bg-surface-raised pl-2.5 pr-2 text-sm font-medium text-ink-900 transition-colors group-hover:bg-ink-100 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
+              <span className="inline-flex h-7 items-center gap-1 rounded-lg border border-ink-200 bg-ink-100 pl-2.5 pr-2 text-[13px] font-medium text-ink-800 transition-colors group-hover:bg-ink-200 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
                 {chip.label}
                 <X className="size-3.5 text-ink-500" aria-hidden />
               </span>
@@ -114,7 +114,7 @@ export function ActiveFilters({ data, filters, className }: { data: CandidatesDa
         ))}
       </ul>
       {showClearAll(chips.map((chip) => chip.key)) ? (
-        <Link href={resetHref(data.activeProjectId)} className="inline-flex min-h-9 items-center px-2 text-sm font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11 lg:ml-auto">
+        <Link href={resetHref(data.activeProjectId)} className="inline-flex min-h-9 items-center px-2 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11 lg:ml-auto">
           Clear all
         </Link>
       ) : null}
@@ -123,52 +123,8 @@ export function ActiveFilters({ data, filters, className }: { data: CandidatesDa
 }
 
 /**
- * The project switcher: the main control of the page, in the header. It names the project every number below
- * is matched against. One project is just its name; several make a native select (keyboard and screen readers
- * for free) that carries its own URL per option, and each project keeps its own compare picks.
- */
-export function ProjectSwitch({ data, className }: { data: CandidatesData; className?: string }) {
-  const projectKeep = (id: string) => {
-    // No `ids`: each project keeps its own compare picks, so the new project shows its own.
-    const next = new URLSearchParams({ project: id });
-    return `/employer/candidates?${next.toString()}`;
-  };
-  if (data.projects.length === 0) {
-    return (
-      <Link href="/employer/projects" className={cn("inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-brand-700 underline underline-offset-4 hover:text-brand-800", className)}>
-        <Plus className="size-4" aria-hidden />
-        Create a project to match and shortlist
-      </Link>
-    );
-  }
-  const current = data.projects.find((p) => p.id === data.activeProjectId);
-  return (
-    <div className={cn("flex min-w-0 items-center gap-2 text-sm text-ink-700", className)}>
-      <span aria-hidden className="shrink-0">
-        Project
-      </span>
-      {data.projects.length > 1 && data.activeProjectId ? (
-        <SortSelect
-          id="results-project"
-          label="Project"
-          prefix=""
-          value={data.activeProjectId}
-          options={data.projects.map((p) => ({ value: p.id, label: p.projectName, href: projectKeep(p.id) }))}
-          className="h-11 min-w-0 max-w-full flex-1 rounded-md border-ink-300 bg-surface-raised pl-3 font-medium text-ink-900 sm:w-[24rem] sm:flex-none"
-        />
-      ) : (
-        <span className="min-w-0 truncate font-medium text-ink-900">{current?.projectName ?? "No project selected"}</span>
-      )}
-      <Link href="/employer/projects" className="inline-flex min-h-11 shrink-0 items-center px-1.5 text-sm font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 max-sm:sr-only">
-        New project
-      </Link>
-    </div>
-  );
-}
-
-/**
- * Sort and the layout toggle, one line. Sort is hidden on the shortlist tab, as before. Its select takes the
- * free width on a phone (it used to be capped at 9rem and read "Sort: Bes…").
+ * Sort and the project picker, inside the toolbar card (beside the search at lg; its own row on a phone,
+ * where the project lives in the Filters sheet). Sort is hidden on the shortlist tab, as before.
  */
 export function ToolbarSort({ data, filters, className }: { data: CandidatesData; filters: Filters; className?: string }) {
   const saved = filters.saved && Boolean(data.activeProjectId);
@@ -177,15 +133,25 @@ export function ToolbarSort({ data, filters, className }: { data: CandidatesData
     : filters.sorts[0]
       ? `${filters.sorts[0]}${filters.dir === "asc" ? ":asc" : ""}`
       : "";
+  const projectKeep = (id: string) => {
+    // No `ids`: each project keeps its own compare picks, so the new project shows its own.
+    const next = new URLSearchParams({ project: id });
+    return `/employer/candidates?${next.toString()}`;
+  };
+  const select = "h-11 min-w-0 rounded-xl border-ink-200 bg-white pl-3.5 max-sm:max-w-[9rem] [field-sizing:content] sm:h-9 sm:min-h-9 sm:touch:h-11";
   return (
     <div className={cn("flex min-w-0 max-w-full items-center gap-2", className)}>
-      {saved ? null : (
+      {data.projects.length > 1 && data.activeProjectId ? (
         <SortSelect
-          className="h-11 min-w-0 flex-1 rounded-md border-ink-300 bg-surface-raised pl-3 sm:w-52 sm:flex-none"
-          value={sortValue}
-          options={sortOptions(filters, data.pro.active)}
+          id="results-project"
+          label="Project"
+          prefix="Project: "
+          value={data.activeProjectId}
+          options={data.projects.map((p) => ({ value: p.id, label: p.projectName, href: projectKeep(p.id) }))}
+          className={cn(select, "max-w-[min(28rem,100%)] max-lg:hidden")}
         />
-      )}
+      ) : null}
+      {saved ? null : <SortSelect className={select} value={sortValue} options={sortOptions(filters, data.pro.active)} />}
       <ViewToggle filters={filters} />
     </div>
   );
@@ -216,7 +182,7 @@ function ViewToggle({ filters }: { filters: Filters }) {
             title={label}
             className={cn(
               "grid size-10 place-items-center rounded-[10px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 sm:size-8 sm:touch:size-11",
-              active ? "bg-ink-900 text-white" : "text-ink-700 hover:bg-ink-100 hover:text-ink-900",
+              active ? "bg-ink-900 text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
             )}
           >
             <Icon className="size-4" aria-hidden />
@@ -231,7 +197,7 @@ function ViewToggle({ filters }: { filters: Filters }) {
 function PageSizeControl({ filters, className }: { filters: Filters; className?: string }) {
   return (
     <div className={cn("flex items-center gap-2 text-sm text-ink-600", className)}>
-      <span>Show</span>
+      <span>Per page</span>
       <Segmented label="Candidates per page">
         {PAGE_SIZES.map((size) => (
           <SegmentLink key={size} href={withFilters(filters, { pageSize: size, page: "" })} active={filters.pageSize === size} label={`${size} per page`}>
@@ -244,37 +210,26 @@ function PageSizeControl({ filters, className }: { filters: Filters; className?:
 }
 
 /**
- * The lead figure of the page: how many candidates the project and filters leave, as a display numeral, and
- * what the list is ranked by. The count is the page's own total (hired candidates already left out), never a
- * made-up figure. lg and up also carry the button that hides the filter column.
+ * The real count, above the columns: "Showing 31 candidates matched to your filters". The
+ * count is the page's own total (hired candidates already left out), never a made-up figure.
+ * Phones get the short form; lg and up also carry the button that hides the filter column.
  */
 export function StatusRow({ data, filters, className }: { data: CandidatesData; filters: Filters; className?: string }) {
   const { total, loadFailed } = data;
   const saved = filters.saved && Boolean(data.activeProjectId);
-  const project = data.projects.find((p) => p.id === data.activeProjectId)?.projectName;
-  const sortLabel = SORT_OPTIONS.find((o) => o.value === filters.sorts[0])?.label;
-  const ranked = filters.collegeSort
-    ? "Sorted by college"
-    : filters.sorts[0]
-      ? `Sorted by ${filters.sorts[0] === "score" ? "Findtern Score" : sortLabel}, ${filters.dir === "asc" ? "lowest" : "highest"} first`
-      : "Best match first";
   return (
-    <div className={cn("flex min-w-0 flex-wrap items-end gap-x-6 gap-y-2", className)}>
-      {loadFailed ? null : (
-        <div className="min-w-0">
-          <h2 className="text-ink-900">
-            <span role="status">
-              <span className="nums font-display text-4xl font-semibold leading-none">{total}</span>{" "}
-              <span className="text-lg font-medium">{saved ? "shortlisted" : `candidate${total === 1 ? "" : "s"}`}</span>
-            </span>
-          </h2>
-          <p className="mt-1 text-sm text-ink-700">
-            {saved ? "On this project's shortlist." : `${project ? `For ${project}. ` : ""}${ranked}.`}
-          </p>
-        </div>
-      )}
+    <div className={cn("flex min-w-0 items-center gap-x-4 gap-y-2", className)}>
       {/* lg and up: hide or show the filter column (phones have the Filters sheet). */}
       <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(filters, data.effectiveSkills, data.projectApplied?.city ?? "")} />
+      {loadFailed ? null : (
+        <h2 className="min-w-0 text-sm text-ink-600 max-sm:text-base max-sm:font-semibold max-sm:text-ink-900">
+          <span className="max-sm:hidden">Showing </span>
+          <span role="status" className="nums font-semibold text-ink-900">
+            {total} {saved ? "shortlisted" : `candidate${total === 1 ? "" : "s"}`}
+          </span>
+          <span className="max-sm:hidden">{saved ? " for this project" : " matched to your filters"}</span>
+        </h2>
+      )}
     </div>
   );
 }
@@ -324,7 +279,7 @@ function ProNotes({ data, filters }: { data: CandidatesData; filters: Filters })
         </div>
       ) : null}
       {parts.length > 0 ? (
-        <p className="flex items-start gap-2 text-sm leading-relaxed text-ink-700">
+        <p className="flex items-start gap-2 text-[13px] leading-relaxed text-ink-700">
           <Info className="mt-0.5 size-3.5 shrink-0 text-ink-500" aria-hidden />
           <span>{parts.join(" ")}</span>
         </p>
@@ -357,15 +312,15 @@ export function Results({
 
   return (
     <>
-      {/* All | Shortlist. The count and Sort sit above the columns. */}
+      {/* All | Shortlist. The count and Sort sit above the columns now. */}
       {data.activeProjectId ? (
-        <div className="flex border-b border-ink-200">
+        <div className={cn("border-b border-ink-100 pb-3 sm:pb-4 lg:border-b-0 lg:pb-5", saved ? "flex" : "flex max-sm:hidden")}>
           <nav aria-label="Show" className="flex items-center gap-5">
             <TabLink href={withFilters(filters, { saved: false, page: "" })} active={!saved}>
-              All{saved ? null : <span className="nums font-normal text-ink-700"> {total}</span>}
+              All{saved ? null : <span className="nums font-normal text-ink-600"> {total}</span>}
             </TabLink>
             <TabLink href={withFilters(filters, { saved: true, page: "" })} active={saved}>
-              Shortlist <span className="nums text-ink-700">({data.savedCount})</span>
+              Shortlist <span className="nums text-ink-600">({data.savedCount})</span>
             </TabLink>
           </nav>
         </div>
@@ -378,6 +333,7 @@ export function Results({
       ) : candidates.length === 0 ? (
         saved ? (
           <EmptyScene
+            art
             title="Nobody shortlisted for this project yet"
             body="Press Save on a candidate to add them to this project's shortlist."
             next={{ label: "Browse all candidates", href: withFilters(filters, { saved: false, page: "" }) }}
@@ -386,6 +342,7 @@ export function Results({
         ) : filters.cgpaMin > 0 || filters.cgpaVerified || filters.colleges.length > 0 ? (
           // Findtern Pro filters are the likeliest cause of nobody matching: name them and offer to drop just those.
           <EmptyScene
+            art
             title="No candidates match your CGPA or college filters"
             body={
               data.pro.hiddenNoScore > 0
@@ -400,7 +357,8 @@ export function Results({
           // candidates" right on the empty result.
           <div>
             <EmptyScene
-                title={`No candidates for ${data.cityList.map(titleCase).join(", ")}`}
+              art
+              title={`No candidates for ${data.cityList.map(titleCase).join(", ")}`}
               body="Nobody in the pool has picked this city as a place to work yet. Clear the location, or include candidates who work remotely."
               next={{ label: "Clear location", href: withoutCity(filters, data.effectiveSkills) }}
               who="You - widen the search"
@@ -419,6 +377,7 @@ export function Results({
         ) : filters.q ? (
           // The typed keyword is the likeliest cause: name it and offer to drop just that.
           <EmptyScene
+            art
             title={`No candidates match “${filters.q}”`}
             body="Search looks at skills and cities, for example React or Pune. Names and profiles are not searched."
             next={{ label: "Clear the search", href: withFilters(filters, { q: "", page: "" }) }}
@@ -426,6 +385,7 @@ export function Results({
           />
         ) : (
           <EmptyScene
+            art
             title="No candidates match"
             body="Lower a score floor, drop a skill or turn on remote candidates. New interns join the pool as soon as their AI interview is scored."
             next={{ label: "Reset filters", href: reset }}
@@ -434,25 +394,17 @@ export function Results({
         )
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-x-4">
-            <ScoreLegend />
-            <p className="nums py-2 text-sm text-ink-700">
+          <ScoreLegend />
+          {/* Chunks, not one endless scroll: how many to a page is the employer's choice. */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2 lg:mt-1">
+            <p className="nums text-sm text-ink-600">
               Showing <strong className="font-semibold text-ink-900">{firstShown}&ndash;{lastShown}</strong> of <strong className="font-semibold text-ink-900">{total}</strong>
             </p>
+            <PageSizeControl filters={filters} />
           </div>
-          {/* Column heads for the ledger; each row names the same things in its own order. */}
-          {filters.view === "list" ? (
-            <div aria-hidden className="hidden grid-cols-[5.25rem_minmax(0,1fr)_12.5rem] gap-x-5 border-t border-ink-300 pb-2 pt-2 text-xs text-ink-600 md:grid">
-              <span>Findtern Score</span>
-              <span>Candidate and project fit</span>
-              <span className="pl-5">What they cost</span>
-            </div>
-          ) : null}
           <ul
             aria-label="Candidates"
-            className={cn(
-              filters.view === "grid" ? "grid border-t border-ink-300 sm:grid-cols-2 sm:gap-x-10" : filters.view === "rows" ? "flex flex-col border-t border-ink-300" : "flex flex-col max-md:border-t max-md:border-ink-300",
-            )}
+            className={cn("mt-3", filters.view === "grid" ? "grid gap-4 sm:grid-cols-2 2xl:grid-cols-3" : filters.view === "rows" ? "flex flex-col gap-2.5" : "flex flex-col gap-4 lg:gap-5")}
           >
             {candidates.map((candidate) => {
               const rel = data.relations.get(candidate.id);
@@ -482,9 +434,9 @@ export function Results({
             })}
           </ul>
 
-          {/* Page size and the page links; a hairline, not a card. */}
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-            <p className="nums text-sm text-ink-700">
+          {/* "Showing 1-4 of 24", then the page links when there is more than one page. */}
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-2xl border border-ink-200 bg-white p-4 shadow-xs sm:p-5">
+            <p className="nums text-sm text-ink-600">
               Showing <strong className="font-semibold text-ink-900">{firstShown}&ndash;{lastShown}</strong> of <strong className="font-semibold text-ink-900">{total}</strong> candidate{total === 1 ? "" : "s"}
             </p>
             <PageSizeControl filters={filters} className="max-sm:w-full" />
@@ -499,13 +451,13 @@ export function Results({
                   .filter((page) => page === 1 || page === pages || Math.abs(page - currentPage) <= 1)
                   .map((page, i, visible) => (
                     <span key={page} className="flex items-center gap-1.5">
-                      {i > 0 && visible[i - 1] !== page - 1 ? <span className="px-1 text-ink-600">…</span> : null}
+                      {i > 0 && visible[i - 1] !== page - 1 ? <span className="px-1 text-ink-500">…</span> : null}
                       <Link
                         href={withFilters(filters, { page: page === 1 ? "" : page })}
                         aria-current={page === currentPage ? "page" : undefined}
                         aria-label={`Page ${page}`}
                         className={cn(
-                          "nums grid size-11 place-items-center rounded-md text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 focus-visible:ring-offset-paper",
+                          "nums grid size-10 place-items-center rounded-xl text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 touch:size-11",
                           page === currentPage ? "bg-ink-900 text-white" : "text-ink-800 hover:bg-ink-100",
                         )}
                       >
@@ -534,9 +486,9 @@ function TabLink({ href, active, children }: { href: string; active: boolean; ch
       scroll={false}
       aria-current={active ? "page" : undefined}
       className={cn(
-        "relative -mx-1 inline-flex h-11 min-w-6 items-center justify-center whitespace-pre rounded-sm px-1 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500",
-        "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:content-['']",
-        active ? "font-semibold text-ink-900 after:bg-ink-900" : "font-medium text-ink-700 hover:text-ink-900",
+        "relative -mx-1 inline-flex h-11 min-w-6 items-center justify-center whitespace-pre rounded-sm px-1 text-sm outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:h-9 sm:touch:h-11",
+        "after:absolute after:inset-x-0 after:-bottom-[13px] after:h-0.5 after:rounded-full after:content-[''] max-sm:after:bottom-0",
+        active ? "font-semibold text-ink-900 after:bg-ink-900" : "font-medium text-ink-600 hover:text-ink-900",
       )}
     >
       {children}
@@ -548,18 +500,18 @@ function TabLink({ href, active, children }: { href: string; active: boolean; ch
 function ScoreLegend() {
   return (
     // Phones: every card already names its tier and what it means, so the legend only takes room above the first one.
-    <details className="group/legend relative text-sm max-sm:hidden">
+    <details className="group/legend mt-1 border-b border-ink-100 text-sm max-sm:hidden">
       <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1 rounded-sm font-medium text-ink-700 outline-none hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
         What the score bands mean
         <ChevronDown className="size-4 text-ink-500 transition-transform group-open/legend:rotate-180 motion-reduce:transition-none" aria-hidden />
       </summary>
-      <dl className="absolute z-20 mt-1 grid max-w-3xl gap-x-6 gap-y-2 rounded-lg border border-ink-200 bg-surface-raised p-4 shadow-md sm:grid-cols-3">
+      <dl className="grid gap-x-6 gap-y-2 pb-4 sm:grid-cols-3">
         {[...BANDS].reverse().map((band) => (
           <div key={band.id}>
             <dt className="font-semibold text-ink-900">
               {PLAN_NAME[band.id]} <span className="nums font-normal text-ink-600">{band.max >= 10 ? `${band.min} or above` : `${band.min} to under ${band.max}`}</span>
             </dt>
-            <dd className="text-ink-700">{band.blurb}</dd>
+            <dd className="text-ink-600">{band.blurb}</dd>
           </div>
         ))}
       </dl>

@@ -19,7 +19,7 @@ export default function InternsTab(props: TabProps) {
       <Suspense fallback={<SectionSkeleton label="Loading cities" />}>
         <Geography {...props} />
       </Suspense>
-      <div className="grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,1fr)_minmax(0,2fr)]">
+      <div className="grid gap-5 lg:gap-6 xl:grid-cols-2">
         <Suspense fallback={<SectionSkeleton label="Loading education" />}>
           <Education />
         </Suspense>

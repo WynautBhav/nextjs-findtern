@@ -1,6 +1,6 @@
 "use client";
 
-import { GraduationCap, MapPin } from "lucide-react";
+import { Eye, GraduationCap, MapPin } from "lucide-react";
 
 import { formatMoney } from "@/lib/format";
 import { HOURS_PER_MONTH } from "@/lib/plan-offer";
@@ -48,21 +48,22 @@ export function CandidateQuickView({
   const wanted = skillMatch(candidate.skills, wantedSkills);
   const rated = RATING_META.map((m) => ({ label: m.label, value: candidate.ratings[m.key] })).filter((r) => r.value > 0);
   const monthly = pricing.hourlyRateMinor > 0 ? formatMoney(pricing.hourlyRateMinor * HOURS_PER_MONTH, currency) : "";
-  const box = "min-w-0 border-t border-ink-200 pt-3";
-  const label = "text-xs font-medium text-ink-600";
+  const box = "rounded-xl border border-ink-200 bg-ink-50 p-3";
+  const label = "text-[11px] font-semibold uppercase tracking-wider text-text-subtle";
 
   return (
     <Dialog>
       <DialogTrigger
         aria-label={`Quick view of ${displayName}`}
-        className={className}
+        className={cn(buttonClass({ variant: "ghost", size: "sm", className: "relative z-10 h-11 rounded-xl sm:h-10 sm:touch:h-11" }), className)}
       >
+        <Eye className="size-4" aria-hidden />
         Quick view
       </DialogTrigger>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader className="text-left">
           <div className="flex items-center gap-3 pr-8">
-            <CandidateAvatar photoUrl={candidate.photoUrl} initials={candidate.initials} className="size-12 rounded-full bg-ink-100 text-base text-ink-800" />
+            <CandidateAvatar photoUrl={candidate.photoUrl} initials={candidate.initials} seed={candidate.id} className="size-14 rounded-2xl text-base ring-1 ring-inset ring-black/5" />
             <div className="min-w-0">
               <DialogTitle className="text-lg font-bold leading-6 text-ink-900">{displayName}</DialogTitle>
               <DialogDescription className="mt-1 flex items-center gap-1 text-sm text-ink-600">
@@ -73,11 +74,11 @@ export function CandidateQuickView({
           </div>
         </DialogHeader>
 
-        <div className="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-3">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           <div className={box}>
             <p className={label}>Findtern Score</p>
             {candidate.scored ? (
-              <p className="nums mt-1 font-display text-4xl font-semibold leading-none text-brand-800">
+              <p className="nums mt-1 text-2xl font-semibold leading-none text-brand-700">
                 {candidate.score.toFixed(1)}
                 <span className="ml-1 text-xs font-normal text-text-subtle">/ 10</span>
               </p>
@@ -88,7 +89,7 @@ export function CandidateQuickView({
           </div>
           <div className={box}>
             <p className={label}>Hourly rate</p>
-            <p className="nums mt-1 font-display text-2xl font-semibold leading-none text-ink-900">
+            <p className="nums mt-1 text-xl font-bold leading-6 text-ink-900">
               {formatMoney(pricing.hourlyRateMinor, currency)}
               <span className="ml-1 text-xs font-normal text-text-subtle">/ hr</span>
             </p>
@@ -155,8 +156,8 @@ export function CandidateQuickView({
         ) : null}
 
         <DialogFooter className="sm:items-center">
-          <DialogClose className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}>Close</DialogClose>
-          <ButtonLink href={profileHref} variant="primary" size="sm" className="min-h-11 px-4">
+          <DialogClose className={buttonClass({ variant: "light", size: "sm", className: "h-11 rounded-xl" })}>Close</DialogClose>
+          <ButtonLink href={profileHref} variant="primary" size="sm" className="h-11 rounded-xl px-4">
             Open full profile
           </ButtonLink>
         </DialogFooter>

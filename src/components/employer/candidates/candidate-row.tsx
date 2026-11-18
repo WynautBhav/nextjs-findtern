@@ -71,7 +71,7 @@ export function CandidateRow({
   return (
     <li
       style={{ ["--i" as string]: Math.min(index, 12) }}
-      className="rise tile-lift group relative overflow-hidden rounded-[22px] bg-surface-raised py-4 pl-6 pr-4 transition-[background-color] hover:bg-[linear-gradient(95deg,var(--color-brand-50),#fff_45%)] focus-within:ring-2 focus-within:ring-brand-600/30 sm:pr-6"
+      className="rise tile-lift group relative overflow-hidden rounded-[22px] bg-white py-4 pl-6 pr-4 transition-[background-color] hover:bg-[linear-gradient(95deg,var(--color-brand-50),#fff_45%)] focus-within:ring-2 focus-within:ring-brand-600/30 sm:pr-6"
     >
       {/* Spine: fills from the bottom to the score. */}
       <span aria-hidden className="absolute inset-y-3 left-2 w-1 overflow-hidden rounded-full bg-ink-100">
@@ -111,7 +111,7 @@ export function CandidateRow({
         {c.scored ? (
           <ScoreDial score={c.score} axes={axes} size="sm" showBand={false} />
         ) : (
-          <span className="grid size-14 shrink-0 place-items-center rounded-full border border-dashed border-ink-200 text-center text-xs leading-tight text-text-subtle">Not scored</span>
+          <span className="grid size-14 shrink-0 place-items-center rounded-full border border-dashed border-ink-200 text-center text-[11px] leading-tight text-text-subtle">Not scored</span>
         )}
 
         <div className="min-w-[6.5rem] text-right max-sm:text-left">

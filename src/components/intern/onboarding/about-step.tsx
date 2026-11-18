@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 import { Lock } from "lucide-react";
 
 import { FileUpload } from "@/components/app/file-upload";
@@ -16,48 +15,7 @@ const MB = 1024 * 1024;
 /** Card images: JPG or PNG only (no PDF). Shrunk in the browser first, so the 1 MB cap only trips on a file that cannot be made smaller; the server stores them as WebP. */
 const CARD_TYPES = "image/jpeg,image/png";
 
-/**
- * An identity number already on file shows as its last four with a Replace action; the number itself never reaches
- * the browser. Typing a new one sends it; leaving it alone keeps the stored one.
- */
-function MaskedId({ id, label, masked, value, onChange, replacing, setReplacing, children }: {
-  id: string;
-  label: string;
-  masked: string | null;
-  value: string;
-  onChange: (v: string) => void;
-  replacing: boolean;
-  setReplacing: (v: boolean) => void;
-  children: React.ReactNode;
-}) {
-  if (!masked || replacing || value) return <>{children}</>;
-  return (
-    <div className="min-w-0">
-      <Label htmlFor={`${id}-on-file`}>{label}</Label>
-      <div className="flex min-h-11 items-center justify-between gap-3 rounded-md border border-ink-300 bg-ink-50 px-3">
-        <p id={`${id}-on-file`} className="nums text-base text-ink-900">
-          {masked} <span className="text-sm text-ink-600">on file</span>
-        </p>
-        <button
-          type="button"
-          onClick={() => {
-            onChange("");
-            setReplacing(true);
-          }}
-          aria-label={`Replace ${label}`}
-          className="min-h-11 px-2 text-sm font-medium text-brand-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-brand-600"
-        >
-          Replace
-        </button>
-      </div>
-      <FieldNote id={id} hint="Only the last four are shown. The full number stays on our server." />
-    </div>
-  );
-}
-
-export function AboutStep({ values, update, errors, documents, account, idOnFile, onUploaded }: StepProps) {
-  const [replaceAadhaar, setReplaceAadhaar] = useState(false);
-  const [replacePan, setReplacePan] = useState(false);
+export function AboutStep({ values, update, errors, documents, account, onUploaded }: StepProps) {
   const onFile = (label: string) => (documents.find((d) => d.label === label) ? `${label} card on file` : null);
   // A locally cached draft can carry an empty photoUrl; the stored avatar wins.
   const photoSrc = values.photoUrl || (documents.some((d) => d.label === "Profile photo") ? "/api/intern/avatar" : "");
@@ -95,32 +53,28 @@ export function AboutStep({ values, update, errors, documents, account, idOnFile
 
       <Section title="Identity documents" hint="Used to verify you and to pay your stipend. Never shown to employers.">
         <Grid>
-          <MaskedId id="aadhaarNumber" label="Aadhaar number" masked={idOnFile.aadhaar} value={values.aadhaarNumber || ""} onChange={(v) => update("aadhaarNumber", v)} replacing={replaceAadhaar} setReplacing={setReplaceAadhaar}>
-            <Field
-              id="aadhaarNumber"
-              label="Aadhaar number"
-              placeholder="2345 6789 0123"
-              inputMode="numeric"
-              autoComplete="off"
-              inputClassName="nums tracking-wide"
-              value={formatAadhaar(values.aadhaarNumber || "")}
-              error={errors.aadhaarNumber}
-              onChange={(v) => update("aadhaarNumber", v.replace(/\D/g, "").slice(0, 12))}
-            />
-          </MaskedId>
-          <MaskedId id="panNumber" label="PAN" masked={idOnFile.pan} value={values.panNumber || ""} onChange={(v) => update("panNumber", v)} replacing={replacePan} setReplacing={setReplacePan}>
-            <Field
-              id="panNumber"
-              label="PAN"
-              placeholder="ABCDE1234F"
-              autoComplete="off"
-              maxLength={10}
-              inputClassName="nums uppercase tracking-wide"
-              value={values.panNumber || ""}
-              error={errors.panNumber}
-              onChange={(v) => update("panNumber", v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10))}
-            />
-          </MaskedId>
+          <Field
+            id="aadhaarNumber"
+            label="Aadhaar number"
+            placeholder="2345 6789 0123"
+            inputMode="numeric"
+            autoComplete="off"
+            inputClassName="nums tracking-wide"
+            value={formatAadhaar(values.aadhaarNumber || "")}
+            error={errors.aadhaarNumber}
+            onChange={(v) => update("aadhaarNumber", v.replace(/\D/g, "").slice(0, 12))}
+          />
+          <Field
+            id="panNumber"
+            label="PAN"
+            placeholder="ABCDE1234F"
+            autoComplete="off"
+            maxLength={10}
+            inputClassName="nums uppercase tracking-wide"
+            value={values.panNumber || ""}
+            error={errors.panNumber}
+            onChange={(v) => update("panNumber", v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10))}
+          />
           <DocSlot id="aadhaarImage" label="Aadhaar card image" optional error={errors.aadhaarImage}>
             <FileUpload
               kind="aadhaar"
@@ -263,7 +217,7 @@ function PhonePrefixed({
         aria-hidden
         className="nums pointer-events-none absolute inset-y-0 left-0 flex items-center gap-1.5 border-r border-ink-200 pl-3.5 pr-3 text-base font-medium text-ink-600"
       >
-        {disabled ? <Lock className="size-3.5 text-ink-700" /> : null}
+        {disabled ? <Lock className="size-3.5 text-text-subtle" /> : null}
         {code}
       </span>
       <input
@@ -293,7 +247,7 @@ function DocSlot({ id, label, optional, error, children }: { id: string; label: 
       <Label optional={optional}>{label}</Label>
       <div
         className={cn(
-          "mt-2 rounded-md border border-dashed p-3",
+          "mt-2 rounded-apple-sm border border-dashed p-3",
           error ? "border-danger bg-danger-soft/40" : "border-ink-200 bg-ink-50/40",
         )}
       >

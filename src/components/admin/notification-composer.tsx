@@ -13,8 +13,9 @@ import { useMemo, useState } from "react";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Loader2, Search, Send } from "lucide-react";
 
-import { pillTabClass } from "@/components/app/primitives";
-import { Section } from "@/components/app/stat";
+import { AdminTabs } from "@/components/admin/admin-tabs";
+import { Panel } from "@/components/admin/panel";
+import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { useConfirm } from "@/components/app/use-confirm";
 import { buttonClass } from "@/components/ui/button";
 import { NOTIFICATION_LINK_RULE, isSafeNotificationLink } from "@/lib/admin/notification-types";
@@ -25,8 +26,9 @@ type Person = { id: string; label: string; email: string };
 type Side = "intern" | "employer";
 
 const field =
-  "mt-1.5 min-h-11 w-full rounded-md border border-ink-300 bg-surface-raised px-3 text-base text-ink-900 transition-colors duration-[var(--motion-fast)] placeholder:text-ink-600 hover:border-ink-400 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-700 aria-[invalid=true]:border-danger sm:text-sm";
-const area = "py-2.5";
+  "mt-1.5 min-h-11 w-full rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle";
+/** Multi-line fields keep a soft card corner; a pill clips the text. */
+const area = "rounded-2xl py-2.5";
 
 export function NotificationComposer({
   interns,
@@ -192,11 +194,20 @@ export function NotificationComposer({
     }
   }
 
+  const segment = (active: boolean) =>
+    cn(
+      "inline-flex min-h-10 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-sm font-medium max-lg:min-h-11 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+      active ? "bg-[color:var(--admin-tile)] text-[color:var(--admin-tile-ink)]" : "text-text-subtle hover:text-foreground",
+    );
+
   return (
-    <div className="grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,24rem)_minmax(0,1fr)]">
+    <div className="grid gap-6 xl:grid-cols-[24rem_minmax(0,1fr)]">
       {dialog}
-      <Section title="Who gets it" className="min-w-0">
-        <div role="group" aria-label="Audience" className="flex flex-wrap gap-1">
+      <Panel aria-labelledby="recipients-title" className="min-w-0 p-[var(--admin-pad-panel)]">
+        <h2 id="recipients-title" className="text-lg font-semibold text-foreground">
+          Recipients
+        </h2>
+        <div role="group" aria-label="Audience" className="mt-3 flex gap-0.5 rounded-full bg-[color:var(--admin-panel-2)] p-1">
           {(["intern", "employer", "both"] as const).map((value) => (
             <button
               key={value}
@@ -206,7 +217,7 @@ export function NotificationComposer({
                 setAudience(value);
                 if (value !== "both") setViewing(value);
               }}
-              className={pillTabClass(audience === value)}
+              className={segment(audience === value)}
             >
               {value === "intern" ? "Candidates" : value === "employer" ? "Companies" : "Both"}
             </button>
@@ -214,31 +225,34 @@ export function NotificationComposer({
         </div>
 
         {audience === "both" ? (
-          <div role="group" aria-label="Pick from" className="mt-3 flex flex-wrap gap-1">
-            {(["intern", "employer"] as const).map((v) => (
-              <button key={v} type="button" aria-pressed={viewing === v} onClick={() => setViewing(v)} className={pillTabClass(viewing === v)}>
-                {v === "intern" ? "Candidates" : "Companies"}
-                <span className={cn("nums text-xs", viewing === v ? "text-paper/75" : "text-ink-600")}>{everyone[v] ? "all" : picked[v].size}</span>
-              </button>
-            ))}
-          </div>
+          <AdminTabs
+            label="Pick from"
+            className="mt-3"
+            active={viewing}
+            onSelect={(key) => setViewing(key as Side)}
+            items={(["intern", "employer"] as const).map((s) => ({
+              key: s,
+              label: s === "intern" ? "Candidates" : "Companies",
+              count: everyone[s] ? "all" : picked[s].size,
+            }))}
+          />
         ) : null}
 
-        <label className="mt-4 flex min-h-11 items-center gap-2.5 rounded-md bg-ink-100 px-3 text-sm font-medium text-ink-900">
+        <label className="mt-4 flex min-h-11 items-center gap-2.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground">
           <input
             type="checkbox"
-            className="size-4 accent-[color:var(--color-brand-800)]"
+            className="size-4 accent-[color:var(--admin-tile)]"
             checked={everyone[side]}
             onChange={(e) => setEveryone((prev) => ({ ...prev, [side]: e.target.checked }))}
           />
           Every active {side === "intern" ? "candidate" : "company"}
-          <span className="nums ml-auto text-ink-600">{totals[side].toLocaleString("en-IN")}</span>
+          <span className="nums ml-auto text-text-subtle">{totals[side].toLocaleString("en-IN")}</span>
         </label>
 
         <fieldset disabled={everyone[side]} className="mt-3 disabled:opacity-50">
           <legend className="sr-only">Pick {side === "intern" ? "candidates" : "companies"}</legend>
           <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-600" aria-hidden />
+            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-text-subtle" aria-hidden />
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
@@ -257,27 +271,27 @@ export function NotificationComposer({
           </div>
 
           <div className="mt-2 flex items-center justify-between gap-3 text-sm">
-            <span className="nums text-ink-600">
+            <span className="nums text-text-subtle">
               {picked[side].size} picked
             </span>
-            <button type="button" onClick={toggleShown} disabled={filtered.length === 0} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-9 px-3 hover:bg-ink-200/60" })}>
+            <button type="button" onClick={toggleShown} disabled={filtered.length === 0} className={buttonClass({ variant: "ghost", size: "sm", className: "rounded-full px-4 hover:bg-[color:var(--admin-panel-2)]" })}>
               {allShownPicked ? "Clear shown" : "Pick all shown"}
             </button>
           </div>
           {roster.length >= 50 ? (
-            <p className="mt-1 text-xs text-ink-600">Showing the 50 newest. Search and press Enter to find anyone else.</p>
+            <p className="mt-1 text-xs text-text-subtle">Showing the 50 newest. Search and press Enter to find anyone else.</p>
           ) : null}
           <ul className="mt-2 max-h-80 space-y-0.5 overflow-y-auto">
             {filtered.length === 0 ? (
-              <li className="py-4 text-sm text-ink-600">Nobody matches that search.</li>
+              <li className="py-4 text-sm text-text-subtle">Nobody matches that search.</li>
             ) : (
               filtered.map((p) => (
                 <li key={p.id}>
-                  <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 transition-colors duration-[var(--motion-fast)] hover:bg-ink-100">
-                    <input type="checkbox" checked={picked[side].has(p.id)} onChange={() => toggle(p.id)} className="size-4 shrink-0 accent-[color:var(--color-brand-800)]" />
+                  <label className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-2xl px-2.5 py-1.5 hover:bg-[color:var(--admin-panel-2)]">
+                    <input type="checkbox" checked={picked[side].has(p.id)} onChange={() => toggle(p.id)} className="size-4 shrink-0 accent-[color:var(--admin-tile)]" />
                     <span className="min-w-0">
-                      <span className="block break-words text-sm text-ink-900">{p.label || p.email}</span>
-                      <span className="block break-all text-xs text-ink-600">{p.email}</span>
+                      <span className="block break-words text-sm text-foreground">{p.label || p.email}</span>
+                      <span className="block break-all text-xs text-text-subtle">{p.email}</span>
                     </span>
                   </label>
                 </li>
@@ -285,18 +299,21 @@ export function NotificationComposer({
             )}
           </ul>
         </fieldset>
-      </Section>
+      </Panel>
 
-      <Section title="What it says" className="min-w-0">
-        <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_12rem]">
+      <Panel aria-labelledby="message-title" className="min-w-0 p-[var(--admin-pad-panel)]">
+        <h2 id="message-title" className="text-lg font-semibold text-foreground">
+          Message
+        </h2>
+        <div className="mt-3 grid gap-4 md:grid-cols-[minmax(0,1fr)_12rem]">
           <div>
-            <label htmlFor="notif-title" className="block text-sm font-medium text-ink-900">
+            <label htmlFor="notif-title" className="block text-sm font-medium text-foreground">
               Title
             </label>
             <input id="notif-title" {...bad("notif-title")} value={title} maxLength={200} onChange={(e) => setTitle(e.target.value)} placeholder="Timesheets are open for this month" className={field} />
           </div>
           <div>
-            <label htmlFor="notif-type" className="block text-sm font-medium text-ink-900">
+            <label htmlFor="notif-type" className="block text-sm font-medium text-foreground">
               Type
             </label>
             {/* A choice, not free text: the stored values are the legacy ones. */}
@@ -317,7 +334,7 @@ export function NotificationComposer({
           </div>
         </div>
 
-        <label htmlFor="notif-message" className="mt-4 block text-sm font-medium text-ink-900">
+        <label htmlFor="notif-message" className="mt-4 block text-sm font-medium text-foreground">
           Message
         </label>
         <textarea
@@ -331,14 +348,14 @@ export function NotificationComposer({
           className={cn(field, area)}
         />
 
-        <label htmlFor="notif-link" className="mt-4 block text-sm font-medium text-ink-900">
-          Link <span className="font-normal text-ink-600">(optional)</span>
+        <label htmlFor="notif-link" className="mt-4 block text-sm font-medium text-foreground">
+          Link <span className="font-normal text-text-subtle">(optional)</span>
         </label>
         <input id="notif-link" {...bad("notif-link")} value={link} onChange={(e) => setLink(e.target.value)} placeholder="/intern/proposals" className={field} />
-        <p className="mt-1 text-xs text-ink-600">Where tapping the notification takes them: a page on this site.</p>
+        <p className="mt-1 text-xs text-text-subtle">Where tapping the notification takes them: a page on this site.</p>
 
-        <details className="mt-4 rounded-md bg-ink-100 px-3 py-2.5">
-          <summary className="cursor-pointer text-sm font-medium text-ink-900">Advanced: data for developers</summary>
+        <details className="mt-4 rounded-2xl bg-[color:var(--admin-panel-2)] px-4 py-2.5">
+          <summary className="cursor-pointer text-sm font-medium text-foreground">Advanced: data for developers</summary>
           <textarea
             id="notif-data"
             {...bad("notif-data")}
@@ -349,15 +366,15 @@ export function NotificationComposer({
             placeholder='{"proposalId": "…"}'
             className={cn(field, area)}
           />
-          <p className="mt-1 text-xs text-ink-600">Stored on the notification as legacy did. Leave empty if unsure.</p>
+          <p className="mt-1 text-xs text-text-subtle">Stored on the notification as legacy did. Leave empty if unsure.</p>
         </details>
 
         <div className="mt-5 flex flex-wrap items-center gap-3">
-          <button type="button" onClick={send} disabled={busy} className={buttonClass({ variant: "primary" })}>
+          <button type="button" onClick={send} disabled={busy} className={buttonClass({ variant: "primary", className: ADMIN_PILL_PRIMARY })}>
             {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Send className="size-4" aria-hidden />}
             Send to <span className="nums">{total.toLocaleString("en-IN")}</span>
           </button>
-          <p className="text-sm text-ink-600">Shows in each recipient&apos;s bell. Nothing is emailed.</p>
+          <p className="text-sm text-text-subtle">Shows in each recipient&apos;s bell. Nothing is emailed.</p>
         </div>
 
         {error ? (
@@ -370,7 +387,7 @@ export function NotificationComposer({
             {sent}
           </p>
         ) : null}
-      </Section>
+      </Panel>
     </div>
   );
 }

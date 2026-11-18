@@ -24,11 +24,11 @@ import { placeOfSupply, splitGst } from "@/lib/gst";
 import { downloadInvoice, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoice";
 import { adminInvoiceInput } from "@/lib/admin/invoice-print";
 
-/** Flat text actions with an icon, as the rest of the admin ledgers use; 44px on touch. */
+/** Tonal pill actions, as the table toolbar's (no outline); 44px on touch. */
 const PILL =
-  "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-ink-900 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:opacity-60 touch:min-h-11 max-lg:min-h-11";
-const PILL_TONAL = cn(PILL, "border border-ink-300 hover:bg-ink-200/60");
-const PILL_QUIET = cn(PILL, "hover:bg-ink-200/60");
+  "apple-spring inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60 touch:min-h-11";
+const PILL_TONAL = cn(PILL, "bg-[color:var(--admin-panel-2)] hover:bg-[color:var(--admin-bar-tint)]");
+const PILL_QUIET = cn(PILL, "hover:bg-[color:var(--admin-panel-2)]");
 
 /**
  * Row actions for the two admin ledgers: the tax invoice (paid rows with
@@ -111,7 +111,7 @@ export function InvoiceRowActions({ row, kind, seller }: { row: AdminInvoiceRow;
             <DialogDescription className="text-sm text-ink-600">{k.description}</DialogDescription>
           </DialogHeader>
           <dl className="divide-y divide-ink-100 text-sm">
-            <Detail label="Invoice no.">{displayInvoiceNumber(row, k.invoicePrefix) ?? (row.flagOnly ? "No invoice (marked paid by an admin)" : row.status === "paid" ? "No invoice (nothing was charged)" : "No invoice (not paid)")}</Detail>
+            <Detail label="Invoice no.">{displayInvoiceNumber(row, k.invoicePrefix) ?? "No invoice (not paid)"}</Detail>
             <Detail label="Order ID">
               <span className="nums text-xs break-all">{row.orderId}</span>
             </Detail>
@@ -167,7 +167,7 @@ export function InvoiceRowActions({ row, kind, seller }: { row: AdminInvoiceRow;
                 ) : null}
               </span>
             ) : (
-              <span className="text-sm text-ink-600">No tax invoice for unpaid, ₹0 or marked-paid rows.</span>
+              <span className="text-sm text-ink-600">No tax invoice for unpaid or ₹0 rows.</span>
             )}
             <button type="button" onClick={() => setOpen(false)} className={buttonClass({ variant: "light", size: "sm" })}>
               Close

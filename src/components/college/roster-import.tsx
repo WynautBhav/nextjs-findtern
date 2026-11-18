@@ -61,22 +61,22 @@ export function RosterImport() {
         <label
           htmlFor="roster-file"
           className={cn(
-            "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-md bg-brand-800 px-4 text-sm font-semibold text-white transition-colors hover:bg-brand-900 focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-700",
+            "apple-spring apple-pressable inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-apple-sm bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 focus-within:outline-2",
             busy && "pointer-events-none opacity-60",
           )}
         >
           <Upload className="size-4" aria-hidden /> {busy ? "Importing…" : "Upload CSV"}
         </label>
-        <span className="text-sm text-ink-600">From Excel: File → Save as → CSV.</span>
+        <span className="text-sm text-text-subtle">From Excel: File → Save as → CSV.</span>
       </div>
       <details>
-        <summary className="min-h-10 cursor-pointer py-2 text-sm font-semibold text-brand-800">Or paste rows</summary>
+        <summary className="cursor-pointer text-sm font-medium text-brand-800">Or paste rows</summary>
         <textarea
           value={csv}
           onChange={(e) => setCsv(e.target.value)}
           aria-label="Roster rows"
           placeholder={"Email,Name,Roll No,Year,Branch\nasha.sharma@college.edu.in,Asha Sharma,22CS014,3,CSE"}
-          className="mt-2 min-h-36 w-full rounded-md border border-ink-300 bg-surface-raised px-3 py-2.5 font-mono text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
+          className="mt-2 min-h-36 w-full rounded-apple-sm border border-ink-200 bg-white px-3 py-2.5 font-mono text-sm text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
         />
         <button
           type="button"
@@ -89,7 +89,7 @@ export function RosterImport() {
       </details>
       <div role="status" aria-live="polite">
         {result ? (
-          <div className={cn("rounded-md border px-4 py-3 text-sm", result.ok ? "border-brand-100 bg-brand-100 text-brand-900" : "border-danger/30 bg-danger-soft text-danger")}>
+          <div className={cn("rounded-apple-sm border px-4 py-3 text-sm", result.ok ? "border-brand-200 bg-brand-50 text-brand-900" : "border-danger/30 bg-danger-soft text-danger")}>
             <p>{result.text}</p>
             {result.errors.length ? (
               <ul className="mt-2 list-disc space-y-0.5 pl-5 text-sm text-ink-700">

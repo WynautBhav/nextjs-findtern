@@ -14,7 +14,7 @@ export const SUBSCRIPTION_HREF = "/employer/subscription";
 /** "Pro" beside a control a subscriber has. Text, not colour alone. */
 export function ProBadge({ className }: { className?: string }) {
   return (
-    <span className={cn("inline-flex h-5 items-center rounded-md bg-brand-100 px-1.5 text-xs font-semibold leading-none text-brand-900", className)}>
+    <span className={cn("inline-flex h-5 items-center rounded-md bg-brand-50 px-1.5 text-[11px] font-semibold leading-none text-brand-800 ring-1 ring-inset ring-brand-200/70", className)}>
       Pro
     </span>
   );
@@ -35,7 +35,7 @@ export function periodLabel(days: number | null): string {
 export function ProLockedCard({ offered, priceMinor, periodDays, currency }: { offered: boolean; priceMinor: number | null; periodDays: number | null; currency: Currency }) {
   const why = "pro-locked-why";
   return (
-    <section aria-labelledby="pro-locked-title" className="mt-4 border-t border-ink-100 pt-4">
+    <section aria-labelledby="pro-locked-title" className="mt-4 rounded-xl bg-brand-50/60 p-3.5 ring-1 ring-inset ring-brand-200/70">
       <h3 id="pro-locked-title" className="flex items-center gap-2 text-sm font-semibold text-ink-900">
         <Lock className="size-4 shrink-0 text-brand-700" aria-hidden />
         Findtern Pro filters
@@ -47,7 +47,7 @@ export function ProLockedCard({ offered, priceMinor, periodDays, currency }: { o
       </p>
 
       {/* Disabled previews: they show what is behind the lock. They never submit and cannot be focused. */}
-      <div className="mt-2">
+      <div className="mt-2 border-t border-brand-200/60 pt-2">
         <RatingSlider name="cgpaMin" label="Minimum CGPA" defaultValue={0} disabled describedBy={why} />
         <SwitchField name="cgpaVerified" value="1" defaultChecked={false} label="Verified CGPA only" disabled describedBy={why} />
         <div className="py-1.5">
@@ -61,7 +61,7 @@ export function ProLockedCard({ offered, priceMinor, periodDays, currency }: { o
             aria-disabled="true"
             aria-describedby={why}
             placeholder="Search colleges"
-            className="mt-1 block h-11 w-full cursor-not-allowed rounded-md border border-ink-200 bg-surface-raised/70 px-3 text-sm text-ink-900 opacity-60 placeholder:text-text-subtle"
+            className="mt-1 block h-11 w-full cursor-not-allowed rounded-xl border border-ink-200 bg-white/70 px-3 text-sm text-ink-900 opacity-60 placeholder:text-text-subtle"
           />
         </div>
       </div>
@@ -73,7 +73,7 @@ export function ProLockedCard({ offered, priceMinor, periodDays, currency }: { o
               <span className="nums font-semibold text-ink-900">{formatMoney(priceMinor, currency)}</span> {periodLabel(periodDays)}
             </p>
           ) : null}
-          <ButtonLink href={SUBSCRIPTION_HREF} variant="primary" size="md" block className="h-auto min-h-11 whitespace-normal px-3 py-2 text-center text-sm leading-snug">
+          <ButtonLink href={SUBSCRIPTION_HREF} variant="primary" size="md" block className="h-auto min-h-11 whitespace-normal rounded-xl px-3 py-2 text-center text-sm leading-snug">
             Unlock with Findtern Pro
           </ButtonLink>
         </div>

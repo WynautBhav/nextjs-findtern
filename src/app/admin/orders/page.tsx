@@ -3,16 +3,15 @@ import { desc, eq } from "drizzle-orm";
 
 import { orderRefunds } from "@/lib/refund-accounting";
 import { getDb, schema } from "@/lib/db";
-import { AdminLoadError } from "@/components/admin/panel";
-import { PageHeader } from "@/components/layout/page-header";
+import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { ButtonLink } from "@/components/ui/button";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { orderProposalIds } from "@/lib/order-ids";
 import { orderReview } from "@/lib/payment-flags";
 import { employerInvoices, needsLegacyNumber } from "@/lib/employer-invoice";
 import { loadInvoiceHires } from "@/lib/employer-invoice-hires";
-import { OrdersView } from "@/components/admin/money/orders-view";
-import type { AdminInvoiceRow } from "@/lib/admin/invoice-rows";
+import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admin-invoices-view";
 import { discountLabel, paymentPromo } from "@/lib/admin/payment-promo";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { isTestEmployer } from "@/lib/admin/scope";
@@ -124,17 +123,23 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
   }
 
   return (
-    <div className="space-y-8">
-      <PageHeader
+    <div>
+      <AdminPageHeader
         title="Orders"
         subtitle="Every employer checkout, paid or not. Test employers are listed but never counted as revenue."
         action={
-          <ButtonLink href="/admin/transactions" variant="outline" size="sm">
+          <ButtonLink href="/admin/transactions" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
             Transactions
           </ButtonLink>
         }
       />
-      {rows ? <OrdersView rows={rows} seller={getInvoiceSeller()} params={params} basePath="/admin/orders" uncounted={uncounted} /> : <AdminLoadError what="employer orders" retryHref="/admin/orders" />}
+      {rows ? (
+        <AdminInvoicesView kind="employer" rows={rows} seller={getInvoiceSeller()} params={params} basePath="/admin/orders" uncounted={uncounted} />
+      ) : (
+        <Panel>
+          <AdminLoadError what="employer orders" retryHref="/admin/orders" />
+        </Panel>
+      )}
     </div>
   );
 }

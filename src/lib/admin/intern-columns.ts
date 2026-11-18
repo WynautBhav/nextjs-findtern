@@ -71,6 +71,7 @@ export const INTERN_COLUMNS: Def[] = [
     key: "interview",
     label: "AI interview",
     group: "Candidate",
+    defaultOn: true,
     export: [
       { header: "AI interview", value: (r) => aiStatusLabel(r.aiStatus) },
       { header: "AI interview date (IST)", value: (r) => (r.aiStatus === "scheduled" || r.aiStatus === "completed" ? istStamp(r.interviewAt ?? null) : "") },
@@ -80,7 +81,7 @@ export const INTERN_COLUMNS: Def[] = [
   { key: "profile", label: "Profile", group: "Candidate", export: one("Profile", (r) => (r.hasProfile ? "Complete" : "Incomplete")) },
   { key: "onboarded", label: "Onboarding", group: "Hiring", export: one("Onboarding", (r) => (r.hired ? "Onboarded" : "Not onboarded")) },
   { key: "pending", label: "Pending payout", group: "Money", export: one("Pending payout (INR)", (r) => rupees(r.money?.pendingPayoutMinor), "money") },
-  { key: "next", label: "Upcoming payment date", group: "Money", sort: "next", export: one("Upcoming payment date", (r) => r.money?.nextDate ?? "") },
+  { key: "next", label: "Upcoming payment date", group: "Money", defaultOn: true, sort: "next", export: one("Upcoming payment date", (r) => r.money?.nextDate ?? "") },
   { key: "total", label: "Total to pay", group: "Money", export: one("Total to pay (INR)", (r) => rupees(r.money?.totalMinor), "money") },
   { key: "paid", label: "Paid till now", group: "Money", export: one("Paid till now (INR)", (r) => rupees(r.money?.paidMinor), "money") },
   { key: "left", label: "Left to pay", group: "Money", defaultOn: true, sort: "owed", export: one("Left to pay (INR)", (r) => rupees(r.money?.owedMinor), "money") },
@@ -96,7 +97,7 @@ export const INTERN_COLUMNS: Def[] = [
   { key: "bankUpi", label: "UPI", group: "Bank", export: one("UPI", (r) => r.bank?.upi ?? "") },
   { key: "account", label: "Status", group: "Account", defaultOn: true, export: one("Status", (r) => (r.isActive ? "Active" : "Inactive")) },
   { key: "review", label: "Review", group: "Candidate", defaultOn: true, export: one("Review", (r) => r.approval ?? "Pending") },
-  { key: "joined", label: "Joined", group: "Candidate", sort: "created", export: one("Joined", (r) => istDay(r.createdAt)) },
+  { key: "joined", label: "Joined", group: "Candidate", defaultOn: true, sort: "created", export: one("Joined", (r) => istDay(r.createdAt)) },
 ];
 
 const KEYS = INTERN_COLUMNS.map((c) => c.key);

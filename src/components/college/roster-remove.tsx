@@ -49,7 +49,7 @@ export function RosterRemove({ email, name }: { email: string; name: string }) {
         onClick={remove}
         disabled={busy}
         aria-label={`Remove ${name || email} from roster`}
-        className="inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-danger hover:bg-danger-soft focus-visible:outline-2 focus-visible:outline-brand-700 disabled:opacity-60"
+        className="inline-flex min-h-11 items-center rounded-apple-sm px-3 text-sm font-medium text-danger hover:bg-danger/10 focus-visible:outline-2 focus-visible:outline-brand-700 disabled:opacity-60"
       >
         {busy ? "Removing…" : "Remove"}
       </button>

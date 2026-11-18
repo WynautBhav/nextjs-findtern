@@ -9,8 +9,7 @@ import { MAX_SKILL_CHIPS, headlineOf } from "@/components/employer/candidate-vie
 import { OpenToWorkToggle } from "@/components/intern/open-to-work-toggle";
 import { linkedinHref, type OnboardingDraft } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
-import { CardEmpty } from "./card";
-import { CvSection as ProfileCard } from "./cv-section";
+import { CardEmpty, ProfileCard } from "./card";
 import {
   dateRange,
   degreeLine,
@@ -67,12 +66,12 @@ export function VisibilityCard({
           <div
             role="group"
             aria-label="Your row in an employer's search"
-            className="mt-3 rounded-lg border border-ink-200 bg-surface-raised px-4 py-4 sm:px-5"
+            className="mt-3 rounded-xl border border-ink-200 px-4 py-4 sm:px-5"
           >
             <div className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3.5 gap-y-3 sm:gap-x-5">
               <RowAvatar photoUrl={photoUrl} initials={initials} />
               <div className="min-w-0 self-center sm:self-start">
-                <p className="text-base font-semibold text-ink-900">{initials}</p>
+                <p className="text-[15px] font-semibold text-ink-900">{initials}</p>
                 {headline ? (
                   <p className="mt-0.5 line-clamp-2 text-pretty text-base font-medium leading-snug text-ink-900 sm:text-lg">{headline}</p>
                 ) : null}
@@ -124,7 +123,7 @@ export function InterviewCard({
           {ratings.map(([label, value]) => (
             <div key={label} className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4">
               <dt className="text-sm font-medium text-ink-800">{label}</dt>
-              <dd className="nums font-display text-2xl font-semibold leading-none text-ink-900">
+              <dd className="nums text-2xl font-light leading-none tracking-[-0.04em] text-ink-900">
                 {value.toFixed(1)}
                 <span className="ml-0.5 text-xs font-normal tracking-normal text-ink-600">/10</span>
               </dd>
@@ -221,8 +220,8 @@ export function SkillsCard({ skills }: { skills: string[] }) {
             <li
               key={skill}
               className={cn(
-                "inline-flex h-8 items-center rounded-md px-3 text-sm font-medium ring-1 ring-inset",
-                i < MAX_SKILL_CHIPS ? "bg-brand-50 text-brand-900 ring-brand-200" : "bg-surface-raised text-ink-700 ring-ink-300",
+                "inline-flex h-8 items-center rounded-lg px-3 text-sm font-medium ring-1 ring-inset",
+                i < MAX_SKILL_CHIPS ? "bg-brand-50 text-brand-900 ring-brand-200" : "bg-white text-ink-700 ring-ink-300",
               )}
             >
               {skill}

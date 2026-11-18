@@ -134,7 +134,7 @@ export function DayCalendar({
                         day === selected
                           ? "bg-brand-700 font-semibold text-white"
                           : isDisabled(day)
-                            ? "cursor-not-allowed text-ink-500"
+                            ? "cursor-not-allowed text-ink-300"
                             : "text-ink-900 hover:bg-brand-50 hover:text-brand-800",
                         day === today && day !== selected && "ring-1 ring-inset ring-ink-300",
                       )}

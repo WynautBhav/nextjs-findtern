@@ -13,12 +13,14 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { buttonClass } from "@/components/ui/button";
+import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { cn } from "@/lib/utils";
 import { csrfFetch } from "@/lib/client-fetch";
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
 import { DIAL_CODE_VALUES } from "@/lib/data/dial-codes";
 
 const fieldBase =
-  "mt-1.5 h-11 rounded-md border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle";
+  "mt-1.5 h-11 rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle";
 // Width is decided per use: the phone row mixes a fixed-width select with a flexible input, and two width classes on one element do not reliably resolve.
 const inputClass = `${fieldBase} w-full`;
 
@@ -83,7 +85,7 @@ export function ContactEditor({
           setError(null);
           setOpen(true);
         }}
-        className={buttonClass({ variant: "outline", size: "sm" })}
+        className={cn(buttonClass({ variant: "outline", size: "sm" }), ADMIN_PILL_SECONDARY)}
       >
         <Pencil className="size-4" aria-hidden />
         Edit contact
@@ -153,7 +155,7 @@ export function ContactEditor({
               type="button"
               onClick={save}
               disabled={saving || !phoneOk}
-              className={buttonClass({ variant: "primary", size: "sm" })}
+              className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}
             >
               {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
               Save changes

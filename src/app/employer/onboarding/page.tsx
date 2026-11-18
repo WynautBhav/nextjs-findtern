@@ -76,7 +76,7 @@ export default async function EmployerOnboarding({
     console.error("Failed to load employer onboarding:", err);
     // Not a blank form: saving one would overwrite the profile we couldn't read.
     return (
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-4xl">
         <PageHead title="Set up your hiring account" />
         <LoadError what="your company details" retryHref={stage === "project" ? "/employer/onboarding?stage=project" : "/employer/onboarding"} email={SITE.adminEmail} />
       </div>
@@ -86,7 +86,7 @@ export default async function EmployerOnboarding({
   return (
     <div>
       <PageHead
-        className="mx-auto max-w-5xl"
+        className="mx-auto max-w-4xl"
         title="Set up your hiring account"
         lede="Two short steps: your company, then the first role you're hiring for. Then you can browse scored candidates."
       />

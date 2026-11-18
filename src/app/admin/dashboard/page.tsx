@@ -1,18 +1,18 @@
-import { RollingNumber } from "@/components/app/rolling-number";
-import { LeadStat, Overview, StatList } from "@/components/app/stat";
 import { ArrowLeft } from "lucide-react";
 
 import { AiLinkCard } from "@/components/admin/dashboard/ai-link-card";
+import { DashTile } from "@/components/admin/dashboard/dash-tile";
 import { GreetingHeader, type StripItem } from "@/components/admin/dashboard/greeting-header";
+import { MoneyCard } from "@/components/admin/dashboard/money-card";
+import { NeedsYouPanel } from "@/components/admin/dashboard/needs-you-panel";
 import { NextInterviewCard } from "@/components/admin/dashboard/next-interview-card";
+import { PipelineBandCard } from "@/components/admin/dashboard/pipeline-band";
+import { PlacementsGauge } from "@/components/admin/dashboard/placements-gauge";
 import { RecentActivity } from "@/components/admin/dashboard/recent-activity";
+import { WeekPanel } from "@/components/admin/dashboard/week-panel";
 import { Arrive } from "@/components/admin/motion";
-import { MoneyLedger } from "@/components/admin/money/money-ledger";
-import { PipelineLedger } from "@/components/admin/money/pipeline-ledger";
-import { QueueLedger } from "@/components/admin/money/queue-ledger";
-import { WeekLedger } from "@/components/admin/money/week-ledger";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
-import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { findingSentence } from "@/components/admin/triage/format";
 import { IncompleteProfilesLine } from "@/components/admin/triage/incomplete-profiles-line";
 import { MoneyStrip } from "@/components/admin/triage/money-strip";
@@ -20,13 +20,13 @@ import { TriageDesk } from "@/components/admin/triage/triage-desk";
 import { WorkQueueButton } from "@/components/admin/triage/work-queue-button";
 import { ButtonLink } from "@/components/ui/button";
 import { getSession } from "@/lib/auth";
+import { cn } from "@/lib/utils";
 import { buildActivity, buildKpis } from "@/lib/admin/dashboard-overview-pure";
 import { loadActivityAndCounts, loadOverview } from "@/lib/admin/dashboard-overview";
 import { loadDashboardQueues, QUEUE_ORDER } from "@/lib/admin/dashboard-queues";
 import type { QueueKey } from "@/lib/admin/dashboard-queues.types";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { allows, canWrite as mayWrite, requiredPermissions } from "@/lib/admin/permissions";
-import { itemsAndFlags } from "@/lib/admin/dashboard-queues-pure";
 import { pickQueue } from "@/lib/admin/ai-link-queue";
 import { loadAiLinkRows } from "@/lib/admin/ai-link-queue-load";
 import { adminFullName } from "@/lib/admin/admin-name";
@@ -117,14 +117,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
 
   const { week, nextInterview, placements, companies, pipeline } = overview ?? { week: null, nextInterview: null, placements: null, companies: null, pipeline: null };
   const queuesFailed = groups.some((g) => g.error);
-  // One figure for hero and queue: items of work; the calendar setting is named beside it, never added in.
-  const { items: queueItems, flags: queueFlags } = itemsAndFlags(groups, total);
-  const oldest = (key: string) => {
-    const ages = (groups.find((g) => g.key === key)?.records ?? []).map((r) => r.ageDays).filter((a): a is number => a != null && Number.isFinite(a));
-    return ages.length ? Math.max(...ages) : null;
-  };
   const { kpis } = buildKpis({
-    queueTotal: queueItems,
+    queueTotal: total,
     queueFresh: fresh,
     queueFailed: queuesFailed,
     signups: base.signups,
@@ -135,7 +129,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     placements,
   });
   const tileHref: Record<string, string | null> = {
-    needs: null,
+    needs: `${DASHBOARD}?desk=1`,
     candidates: gate("/admin/interns"),
     companies: gate("/admin/companies"),
     placements: gate(TRACKER_PROPOSALS),
@@ -152,6 +146,9 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
       : null,
   ].filter((x): x is StripItem => x !== null);
 
+  // Phone order: figures, pipeline, what needs you, interview, activity, then the week, placements and money.
+  // From xl the page is a main column and a right rail (the wrappers below are `contents` until then).
+  const cell = "min-w-0 md:col-span-2 xl:col-auto";
   return (
     <div data-admin-dash className="space-y-[var(--admin-gap)] [&_[data-panel-header]_h2]:text-xl">
       <GreetingHeader
@@ -160,6 +157,9 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         strip={strip}
         action={
           <>
+            <ButtonLink href={`${DASHBOARD}?desk=1`} variant="primary" size="md" className={ADMIN_PILL_PRIMARY}>
+              Work the queue
+            </ButtonLink>
             {can("/admin/proposal-tracker") ? (
               <ButtonLink href="/admin/proposal-tracker" variant="outline" size="md" className={ADMIN_PILL_SECONDARY}>
                 Proposal pipeline
@@ -169,54 +169,43 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         }
       />
 
-      {aiQueue && can("/admin/interns") && (aiQueue.waiting.length > 0 || aiQueue.unpaid > 0) ? (
+      {aiQueue && can("/admin/interns") ? (
         <AiLinkCard waiting={aiQueue.waiting} unpaid={aiQueue.unpaid} now={now} canWrite={mayWrite(session?.permissions, "/admin/ai-interviews")} listHref={gate("/admin/ai-interviews")} />
       ) : null}
 
-      <Arrive index={0}>
-        {(() => {
-          const by = Object.fromEntries(kpis.map((k) => [k.key, k]));
-          const lead = by.needs;
-          const rest = kpis.filter((k) => k.key !== "needs");
-          const num = (v: number | string | null) => (typeof v === "number" ? <RollingNumber value={v} /> : (v ?? "–"));
-          return (
-            <Overview
-              lead={
-                <LeadStat
-                  label={lead.label}
-                  value={queuesFailed && lead.value === 0 ? "?" : num(lead.value)}
-                  note={queuesFailed && lead.value === 0 ? "Some queues did not load. Open the desk to retry." : `${lead.caption}${queueFlags > 0 ? ` · ${queueFlags} ${queueFlags === 1 ? "setting" : "settings"} to fix` : ""}`}
-                  tone={lead.value ? "signal" : "brand"}
-                  action={{ label: "Work the queue", href: `${DASHBOARD}?desk=1` }}
-                />
-              }
-              rest={<StatList items={rest.map((k) => ({ label: k.label, value: num(k.value), hint: k.caption ?? undefined, href: tileHref[k.key] ?? undefined }))} />}
-            />
-          );
-        })()}
-      </Arrive>
-
-      <div className="grid grid-cols-1 gap-x-12 gap-y-[var(--admin-gap)] xl:grid-cols-[minmax(0,1fr)_24rem]">
-        <div className="flex min-w-0 flex-col gap-[var(--admin-gap)]">
-          <Arrive index={1}>
-            <PipelineLedger band={pipeline} href={gate(TRACKER_PROPOSALS)} />
+      <div className="grid grid-cols-1 items-start gap-[var(--admin-gap)] md:grid-cols-2 xl:items-stretch xl:grid-cols-[minmax(0,1fr)_21.5rem]">
+        <div className="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-[var(--admin-gap)]">
+          <Arrive index={0} className={cn(cell, "order-1 xl:order-none")}>
+            <div className="grid grid-cols-2 gap-[var(--admin-gap)] md:grid-cols-4">
+              {kpis.map((k) => (
+                <DashTile key={k.key} label={k.label} value={k.value} hint={k.caption} href={tileHref[k.key] ?? undefined} featured={k.key === "needs"} clear={k.key === "needs" && k.value === 0 && !queuesFailed} unknown={k.key === "needs" && k.value === 0 && queuesFailed} />
+              ))}
+            </div>
           </Arrive>
-          <Arrive index={2}>
-            <MoneyLedger money={money} oldestOfferDays={oldest("accepted")} oldestPayoutDays={oldest("payouts")} payoutsHref={gate("/admin/payouts")} />
+          <Arrive index={1} className={cn(cell, "order-2 xl:order-none")}>
+            <PipelineBandCard band={pipeline} href={gate(TRACKER_PROPOSALS)} />
           </Arrive>
-          <Arrive index={3}>
-            <WeekLedger week={week} placements={placements} />
+          <div className="contents xl:grid xl:grid-cols-2 xl:items-stretch xl:gap-[var(--admin-gap)]">
+            <Arrive index={5} className="order-6 min-w-0 md:col-span-1 xl:order-none xl:[&>*]:h-full">
+              <WeekPanel data={week} href={gate(TRACKER_PROPOSALS)} />
+            </Arrive>
+            <Arrive index={6} className="order-7 min-w-0 md:col-span-1 xl:order-none xl:[&>*]:h-full">
+              <PlacementsGauge summary={placements} href={gate(TRACKER_PROPOSALS)} />
+            </Arrive>
+          </div>
+          <Arrive index={7} className={cn(cell, "order-8 xl:order-none xl:flex-1 xl:[&>*]:h-full")}>
+            <MoneyCard money={money} payoutsHref={gate("/admin/payouts")} />
           </Arrive>
         </div>
 
-        <aside aria-label="Today" className="flex min-w-0 flex-col gap-[var(--admin-gap)]">
-          <Arrive index={1}>
-            <QueueLedger groups={groups} nowMs={now.getTime()} canOpen={can} />
+        <aside aria-label="Today" className="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-[var(--admin-gap)]">
+          <Arrive index={2} className="order-3 min-w-0 md:col-span-1 xl:order-none">
+            <NeedsYouPanel groups={groups} total={total} nowMs={now.getTime()} canOpen={can} />
           </Arrive>
-          <Arrive index={2}>
+          <Arrive index={3} className="order-4 min-w-0 md:col-span-1 xl:order-none">
             <NextInterviewCard interview={nextInterview} trackerHref={gate(TRACKER_INTERVIEWS)} now={now} />
           </Arrive>
-          <Arrive index={3}>
+          <Arrive index={4} className={cn(cell, "order-5 xl:order-none xl:flex-1 xl:[&>*]:h-full")}>
             <RecentActivity items={activity} now={now} />
           </Arrive>
         </aside>

@@ -11,11 +11,6 @@ import { funnelSteps, type FunnelStage } from "@/lib/admin/dashboard";
  * while the dashboard counted people. Now there is one definition, people at
  * the furthest step they reached in the window, so a step can never exceed
  * the one above it. Reports shows it; the dashboard links there.
- *
- * "Sent an offer" leaves drafts out: a draft has not been sent (the dashboard and the
- * Proposals page already say so), and counting it put 35 here against 33 sent.
- * "Hired (employer paid)" is the employer paying for the hire; the intern's own
- * activation fee is a different payment and a different figure.
  */
 
 export const FUNNEL_LABELS = ["Viewed by an employer", "Shortlisted", "Interviewed", "Sent an offer", "Hired (employer paid)"];
@@ -40,7 +35,6 @@ export async function hiringFunnel(since: Date | null, until: Date | null): Prom
         UNION ALL
         SELECT intern_id, 4 FROM ${schema.proposals}
          WHERE ${win(sql`created_at`)} AND ${realEmployerId(sql`employer_id`)}
-           AND lower(status) <> 'draft'
         UNION ALL
         SELECT intern_id, 5 FROM ${schema.proposals}
          WHERE lower(status) = 'hired' AND ${win(sql`coalesce(hired_at, updated_at)`)}

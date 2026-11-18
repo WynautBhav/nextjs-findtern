@@ -18,8 +18,7 @@ import {
   stageRank,
   type InterviewStage,
 } from "@/lib/employer-interview-rules";
-import { EmptyScene, FilterTabs, PageHead, Pill, type Tone } from "@/components/app/primitives";
-import { LeadStat } from "@/components/app/stat";
+import { EmptyScene, PageHead, Pill, type Tone } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { AutoSubmitForm } from "@/components/app/auto-submit-form";
@@ -208,28 +207,21 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
     return qs ? `/employer/schedule?${qs}` : "/employer/schedule";
   };
 
-  // Groups, in each meeting's own time zone: booked by day, then waiting on the candidate, then past.
+  // Day sections, in each meeting's own time zone: booked by day, then waiting, then past.
   const bySoonest = (a: Row, b: Row) => (a.sortAt ?? Infinity) - (b.sortAt ?? Infinity);
-  const days = new Map<string, { rows: Row[]; lead: Lead }>();
+  const days = new Map<string, Row[]>();
   for (const r of shown.filter((x) => x.stage === "upcoming" || x.stage === "live").sort(bySoonest)) {
-    const key = r.sortAt === null ? "tbc" : `${r.tz}|${dayKey(r.sortAt, r.tz)}`;
-    const found = days.get(key);
-    if (found) found.rows.push(r);
-    else days.set(key, { rows: [r], lead: r.sortAt === null ? { big: "?", small: "Time to be confirmed", sr: "Time to be confirmed" } : dayLead(r.sortAt, r.tz, now) });
+    const label = r.sortAt === null ? "Time to be confirmed" : dayLabel(r.sortAt, r.tz, now);
+    days.set(label, [...(days.get(label) ?? []), r]);
   }
   const waiting = shown.filter((x) => x.stage === "awaiting_pick").sort(bySoonest);
   const past = shown.filter((x) => x.stage === "over" || x.stage === "missed" || x.stage === "expired" || x.stage === "employer_no_show" || x.stage === "closed").sort((a, b) => (b.sortAt ?? 0) - (a.sortAt ?? 0));
   const pastShown = sp.past === "all" ? past : past.slice(0, PAST_PAGE);
-  const sections: { key: string; lead: Lead; rows: Row[]; kind: "day" | "waiting" | "past"; more: number }[] = [
-    ...Array.from(days, ([key, d]) => ({ key, lead: d.lead, rows: d.rows, kind: "day" as const, more: 0 })),
-    ...(waiting.length ? [{ key: "waiting", lead: { big: String(waiting.length), small: "waiting on the candidate", sr: "Waiting on the candidate to pick" }, rows: waiting, kind: "waiting" as const, more: 0 }] : []),
-    ...(past.length ? [{ key: "past", lead: { big: String(past.length), small: "past", sr: "Past meetings" }, rows: pastShown, kind: "past" as const, more: past.length - pastShown.length }] : []),
+  const sections: { title: string; rows: Row[]; past?: boolean; more: number }[] = [
+    ...Array.from(days, ([title, rows]) => ({ title, rows, more: 0 })),
+    ...(waiting.length ? [{ title: "Waiting on the candidate to pick", rows: waiting, more: 0 }] : []),
+    ...(past.length ? [{ title: "Past", rows: pastShown, past: true, more: past.length - pastShown.length }] : []),
   ];
-  // The side column: the next booked meeting across everything (not the filtered view), else who is still to pick.
-  const nextUp = all
-    .filter((r) => (r.stage === "upcoming" || r.stage === "live") && r.sortAt !== null)
-    .sort(bySoonest)[0];
-  const waitingAll = all.filter((r) => r.stage === "awaiting_pick").length;
   const filtering = Boolean(q || dateFilter || chosen || projectFilter || tzFilter);
   const field = fieldClass;
 
@@ -237,7 +229,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
     <div>
       <PageHead
         title="Schedule"
-        lede={all.length === 0 ? "Interviews you book with candidates land here, with what to do about each one." : undefined}
+        lede={all.length === 0 ? "Interviews you book with candidates land here, with what to do about each one." : "Times show in each meeting's own time zone. The join link works from here."}
         action={
           <Link href="/employer/cart" className={buttonClass({ variant: "outline", size: "sm" })}>
             <CalendarDays className="size-4" aria-hidden />
@@ -255,57 +247,44 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
 
       {all.length === 0 ? (
         <EmptyScene
+          art
           title="No interviews yet"
           body="Shortlist a candidate, then book a meeting from your shortlist: you offer three times and they pick one."
           next={{ label: "Browse candidates", href: "/employer/candidates" }}
           who="You - shortlist someone first"
         />
       ) : (
-        <div className={cn("grid gap-x-14 gap-y-8", (nextUp || waitingAll > 0) && "lg:grid-cols-[minmax(0,1fr)_17rem]")}>
-          {/* Phone: the next meeting leads. Desktop: it sits beside the agenda. */}
-          {nextUp || waitingAll > 0 ? (
-            <aside aria-label="Up next" className="lg:order-2 lg:sticky lg:top-24 lg:self-start">
-              {nextUp ? (
-                <LeadStat
-                  label={nextUp.stage === "live" ? "Happening now" : "Next interview"}
-                  value={nextUp.sortAt === null ? "" : clockOf(nextUp.sortAt, nextUp.tz).time}
-                  note={
-                    <>
-                      <span className="font-medium text-ink-900">{nextUp.name}</span>
-                      {nextUp.project ? `, ${nextUp.project}` : ""}
-                      <span className="mt-1 block text-ink-700">
-                        {nextUp.sortAt === null ? "" : `${dayLabel(nextUp.sortAt, nextUp.tz, now)} · ${clockOf(nextUp.sortAt, nextUp.tz).zone}`}
-                      </span>
-                    </>
-                  }
-                  tone="brand"
-                />
-              ) : (
-                <LeadStat
-                  label="Waiting on candidates"
-                  value={waitingAll}
-                  note="They have your offered times. Remind them, or offer new ones."
-                  action={{ label: "See who", href: hrefWith({ status: "sent", past: "" }) }}
-                  tone="signal"
-                />
-              )}
-              <p className="mt-6 border-t border-ink-200 pt-3 text-sm text-ink-700">Times show in each meeting&apos;s own time zone. The join link works from here.</p>
-            </aside>
-          ) : null}
-
-          <div className="min-w-0 lg:order-1">
-            <FilterTabs
-              label="Show interviews"
-              value={statusFilter?.value ?? "all"}
-              hrefFor={(key) => hrefWith({ status: key, past: "" })}
-              tabs={[
+        <>
+          {/* Status as tabs with counts; the rest of the filters apply as
+              they change, so there is no Filter button. */}
+          <div className="mb-5 flex flex-col gap-3">
+            <nav aria-label="Show interviews" className="flex flex-wrap gap-x-3 border-b border-ink-100 sm:gap-x-7">
+              {[
                 { key: "all", label: "All", count: all.length },
                 ...STATUS_FILTERS.map((f) => ({ key: f.value, label: f.label, count: all.filter((r) => f.stages.includes(r.stage)).length })).filter(
                   (t) => t.count > 0 || t.key === statusFilter?.value,
                 ),
-              ]}
-            />
-            <AutoSubmitForm className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-[minmax(0,1.4fr)_9rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
+              ].map((t) => {
+                const on = (statusFilter?.value ?? "all") === t.key;
+                return (
+                  <Link
+                    key={t.key}
+                    href={hrefWith({ status: t.key, past: "" })}
+                    aria-current={on ? "page" : undefined}
+                    className={cn(
+                      "relative -mb-px inline-flex min-h-12 min-w-11 items-center justify-center gap-1 whitespace-nowrap text-sm outline-none transition-colors sm:gap-1.5",
+                      "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
+                      "focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent",
+                      on ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-600 hover:text-ink-900",
+                    )}
+                  >
+                    {t.label}
+                    <span className={cn("nums", on ? "text-ink-900" : "text-text-subtle")}>{t.count}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+            <AutoSubmitForm className="grid grid-cols-2 gap-2 lg:grid-cols-[minmax(0,1.4fr)_10rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
               {sp.status !== undefined || statusFilter ? <input type="hidden" name="status" value={statusFilter?.value ?? "all"} /> : null}
               <label className="relative col-span-2 block lg:col-span-1">
                 <span className="sr-only">Search by initials or project</span>
@@ -353,54 +332,42 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
                 </Link>
               ) : null}
             </AutoSubmitForm>
-
-            {filtering ? (
-              <p className="mt-3 text-sm text-ink-700" aria-live="polite">
-                Showing <span className="nums font-semibold text-ink-900">{shown.length}</span> of{" "}
-                <span className="nums">{all.length}</span> interview{all.length === 1 ? "" : "s"}
-              </p>
-            ) : null}
-
-            {shown.length === 0 ? (
-              <EmptyScene
-                className="mt-6"
-                title="No interviews match these filters"
-                body="Try another date or status, or clear the filters to see everything."
-                next={{ label: "Clear filters", href: "/employer/schedule" }}
-                who="You - loosen the filters"
-              />
-            ) : (
-              <div className="mt-6">
-                {sections.map((sec) => (
-                  <section
-                    key={sec.key}
-                    aria-label={sec.lead.sr}
-                    className={cn("grid gap-x-6 border-t pb-8 pt-4 sm:grid-cols-[5.5rem_minmax(0,1fr)]", sec.kind === "waiting" ? "border-signal" : "border-ink-300")}
-                  >
-                    <h2 className="mb-2 flex items-baseline gap-3 sm:mb-0 sm:block">
-                      <span aria-hidden className={cn("nums block font-display text-4xl font-semibold leading-none tracking-[-0.03em]", sec.kind === "waiting" ? "text-signal" : sec.kind === "past" ? "text-ink-600" : "text-ink-900")}>
-                        {sec.lead.big}
-                      </span>
-                      <span aria-hidden className="block text-sm text-ink-700 sm:mt-1.5">{sec.lead.small}</span>
-                    </h2>
-                    <div className="min-w-0">
-                      <ul className="divide-y divide-ink-200">
-                        {sec.rows.map((r) => (
-                          <ScheduleRow key={r.iv.id} r={r} now={now} past={sec.kind === "past"} />
-                        ))}
-                      </ul>
-                      {sec.more > 0 ? (
-                        <Link href={hrefWith({ past: "all" })} className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-11" })}>
-                          Show {sec.more} more past meeting{sec.more === 1 ? "" : "s"}
-                        </Link>
-                      ) : null}
-                    </div>
-                  </section>
-                ))}
-              </div>
-            )}
           </div>
-        </div>
+
+          {filtering ? (
+            <p className="mb-3 text-sm text-ink-600" aria-live="polite">
+              Showing <span className="nums font-semibold text-ink-900">{shown.length}</span> of{" "}
+              <span className="nums">{all.length}</span> interview{all.length === 1 ? "" : "s"}
+            </p>
+          ) : null}
+
+          {shown.length === 0 ? (
+            <EmptyScene
+              title="No interviews match these filters"
+              body="Try another date or status, or clear the filters to see everything."
+              next={{ label: "Clear filters", href: "/employer/schedule" }}
+              who="You - loosen the filters"
+            />
+          ) : (
+            <div>
+              {sections.map((sec) => (
+                <section key={sec.title} aria-label={sec.title} className="mt-8 first:mt-0">
+                  <h2 className="mb-1 text-sm font-semibold text-ink-900">{sec.title}</h2>
+                  <ul className="divide-y divide-ink-100 border-y border-ink-100">
+                    {sec.rows.map((r) => (
+                      <ScheduleRow key={r.iv.id} r={r} now={now} past={sec.past === true} />
+                    ))}
+                  </ul>
+                  {sec.more > 0 ? (
+                    <Link href={hrefWith({ past: "all" })} className={buttonClass({ variant: "outline", size: "sm", className: "mt-3 min-h-11" })}>
+                      Show {sec.more} more past meeting{sec.more === 1 ? "" : "s"}
+                    </Link>
+                  ) : null}
+                </section>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -434,17 +401,6 @@ function dayLabel(t: number, tz: string, now: number): string {
   return formatSlotDay(new Date(t), tz);
 }
 
-type Lead = { big: string; small: string; sr: string };
-
-/** A day heading as a big numeral with the weekday and month under it ("20", "Today, Fri Nov"). */
-function dayLead(t: number, tz: string, now: number): Lead {
-  const p = new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "numeric", month: "short", timeZone: tz }).formatToParts(t);
-  const get = (type: string) => p.find((x) => x.type === type)?.value ?? "";
-  const k = dayKey(t, tz);
-  const rel = k === dayKey(now, tz) ? "Today, " : k === dayKey(now + 86_400_000, tz) ? "Tomorrow, " : "";
-  return { big: get("day"), small: `${rel}${get("weekday")} ${get("month").replace(/^Sept$/, "Sep")}`, sr: dayLabel(t, tz, now) };
-}
-
 /** "5:13 pm" in the meeting's zone, and the zone's abbreviation ("IST"). */
 function clockOf(t: number, tz: string): { time: string; zone: string } {
   const parts = new Intl.DateTimeFormat("en-IN", { hour: "numeric", minute: "2-digit", hour12: true, timeZone: tz, timeZoneName: "short" }).formatToParts(t);
@@ -471,40 +427,45 @@ function ScheduleRow({ r, now, past }: { r: Row; now: number; past: boolean }) {
   const feedbackShown = r.feedback && (stage === "over" || stage === "missed");
 
   return (
-    <li className="grid gap-y-3 py-4 sm:grid-cols-[6.5rem_minmax(0,1fr)_auto] sm:items-center sm:gap-x-5">
+    <li className="grid gap-y-3 py-4 sm:grid-cols-[6rem_minmax(0,1fr)_auto] sm:items-center sm:gap-x-5">
       <div className="max-sm:hidden">
-        <p className="nums font-display text-lg font-semibold leading-tight text-ink-900">{lead}</p>
+        <p className="nums text-base font-semibold text-ink-900">{lead}</p>
         {sub ? <p className="nums text-xs text-ink-600">{sub}</p> : null}
       </div>
-      <div className="min-w-0">
-        <p className="font-display text-lg font-semibold leading-tight text-ink-900">
-          <span className="nums sm:hidden">{lead} · </span>
-          <Link href={`/employer/intern/${encodeURIComponent(iv.internId)}`} className="hover:text-brand-700 hover:underline touch:inline-flex touch:min-h-11 touch:min-w-11 touch:items-center">
-            {r.name}
-          </Link>
-        </p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-700">
-          <span>{r.project ?? "No project"}</span>
-          <span aria-hidden>·</span>
-          <Pill tone={STAGE[stage].tone}>{STAGE[stage].label}</Pill>
-        </p>
-        {waiting && offered.length ? (
-          <p className="nums mt-1 text-sm text-ink-700">
-            <span className="sr-only">Offered times: </span>
-            {offered.join(" · ")}
+      <div className="flex min-w-0 items-center gap-3">
+        <span aria-hidden className="grid size-10 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
+          {r.initials}
+        </span>
+        <div className="min-w-0">
+          <p className="text-base font-semibold text-ink-900">
+            <span className="nums sm:hidden">{lead} · </span>
+            <Link href={`/employer/intern/${encodeURIComponent(iv.internId)}`} className="hover:text-brand-700 hover:underline touch:inline-flex touch:min-h-11 touch:min-w-11 touch:items-center">
+              {r.name}
+            </Link>
           </p>
-        ) : null}
-        {waiting && offered.length === 0 ? <p className="mt-1 text-sm text-ink-700">The candidate asked to reschedule. Offer three new times.</p> : null}
-        {feedbackShown ? (
-          <details className="group mt-1 text-sm text-ink-700">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 sm:min-h-0 [&::-webkit-details-marker]:hidden">
-              <span className="line-clamp-1 group-open:hidden">Your feedback: {r.feedback}</span>
-              <span className="shrink-0 font-medium text-brand-700 group-open:hidden">Read</span>
-              <span className="hidden font-medium text-brand-700 group-open:inline">Your feedback · Hide</span>
-            </summary>
-            <p className="whitespace-pre-line pb-1 text-ink-800">{r.feedback}</p>
-          </details>
-        ) : null}
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-600">
+            <span>{r.project ?? "No project"}</span>
+            <span aria-hidden>·</span>
+            <Pill tone={STAGE[stage].tone}>{STAGE[stage].label}</Pill>
+          </p>
+          {waiting && offered.length ? (
+            <p className="nums mt-1 text-sm text-ink-600">
+              <span className="sr-only">Offered times: </span>
+              {offered.join(" · ")}
+            </p>
+          ) : null}
+          {waiting && offered.length === 0 ? <p className="mt-1 text-sm text-ink-600">The candidate asked to reschedule. Offer three new times.</p> : null}
+          {feedbackShown ? (
+            <details className="group mt-1 text-sm text-ink-600">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 sm:min-h-0 [&::-webkit-details-marker]:hidden">
+                <span className="line-clamp-1 group-open:hidden">Your feedback: {r.feedback}</span>
+                <span className="shrink-0 font-medium text-brand-700 group-open:hidden">Read</span>
+                <span className="hidden font-medium text-brand-700 group-open:inline">Your feedback · Hide</span>
+              </summary>
+              <p className="whitespace-pre-line pb-1 text-ink-800">{r.feedback}</p>
+            </details>
+          ) : null}
+        </div>
       </div>
       <InterviewActions
         interviewId={iv.id}

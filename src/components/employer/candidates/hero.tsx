@@ -53,15 +53,15 @@ export function CandidatesHero({
           <div className="mt-6 flex flex-wrap items-center gap-2">
             <Link
               href="/employer/cart"
-              className="apple-spring inline-flex min-h-11 items-center gap-2 rounded-full bg-surface-raised/12 px-4 text-sm font-medium text-white ring-1 ring-inset ring-white/20 backdrop-blur-md hover:bg-surface-raised/20"
+              className="apple-spring inline-flex min-h-11 items-center gap-2 rounded-full bg-white/12 px-4 text-sm font-medium text-white ring-1 ring-inset ring-white/20 backdrop-blur-md hover:bg-white/20"
             >
               <Bookmark className="size-4" aria-hidden />
               Shortlist
-              <span className="nums rounded-full bg-surface-raised px-2 py-0.5 text-xs font-semibold text-brand-900">{shortlistedCount}</span>
+              <span className="nums rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-brand-900">{shortlistedCount}</span>
             </Link>
             <Link
               href="/employer/projects"
-              className="apple-spring inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-medium text-white/90 hover:bg-surface-raised/10"
+              className="apple-spring inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-medium text-white/90 hover:bg-white/10"
             >
               <Plus className="size-4" aria-hidden />
               New project

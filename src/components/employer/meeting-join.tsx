@@ -119,7 +119,7 @@ export function JoinMeetingButton({
         {label}
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-lg sm:max-w-2xl">
+        <DialogContent className="max-h-[90vh] overflow-y-auto rounded-apple-xl sm:max-w-2xl">
           <DialogHeader className="text-left">
             <DialogTitle className="flex items-center gap-2 text-lg font-semibold text-ink-900">
               <ShieldAlert className="size-5 text-brand-700" aria-hidden />

@@ -58,15 +58,12 @@ export function computeAnalytics(input: AnalyticsInput) {
     return (!since || t >= since.getTime()) && (!until || t < until.getTime());
   };
 
-  // A draft has not been sent to anyone: it is not an offer, an application or a "Sent" status (the dashboard and the
-  // Proposals pages already leave drafts out). Counting them put 35 "offers sent" here against 33 on the dashboard.
-  const proposals = input.proposals.filter((p) => p.status.trim().toLowerCase() !== "draft");
   const onboardingIn = input.onboarding.filter((o) => inRange(o.createdAt));
-  const proposalsIn = proposals.filter((p) => inRange(p.createdAt));
+  const proposalsIn = input.proposals.filter((p) => inRange(p.createdAt));
   const interviewsIn = input.interviews.filter((i) => inRange(i.createdAt));
   const employersIn = input.employers.filter((e) => inRange(e.createdAt));
   const projectsIn = input.projects.filter((p) => inRange(p.createdAt));
-  const hiresIn = proposals.filter((p) => p.status === "hired" && inRange(p.hiredAt));
+  const hiresIn = input.proposals.filter((p) => p.status === "hired" && inRange(p.hiredAt));
   const isFullTime = (p: { offerDetails: unknown; currency: string | null }) => Boolean(parseOffer(p.offerDetails, p.currency).fullTime);
 
   const signups = onboardingIn.length;
@@ -135,9 +132,7 @@ export function computeAnalytics(input: AnalyticsInput) {
   const rates = {
     avgAppsPerUser: ratio(proposalsIn.length, signups),
     placementRate: pct(placed.size, applied.size),
-    // Projects posted in the range over companies that joined in the range: the same window on both sides (it was every
-    // project ever over the range's companies, which inflated the figure for any period shorter than the platform's life).
-    projectsPerCompany: ratio(projectsIn.length, companies),
+    projectsPerCompany: ratio(input.projects.length, companies),
     hiresPerCompany: ratio(hiresIn.length, companies),
     successRate: pct(hiresIn.length, proposalsIn.length),
     interviewRate: pct(interviewed.size, applied.size),
@@ -161,7 +156,7 @@ export function computeAnalytics(input: AnalyticsInput) {
     stage("Fee paid", onboardingIn.filter((o) => o.feePaid).length),
     stage("AI interview scored", onboardingIn.filter((o) => (o.score ?? 0) > 0).length),
     stage("Received an offer", onboardingIn.filter((o) => applied.has(o.userId)).length),
-    stage("Hired", onboardingIn.filter((o) => proposals.some((p) => p.internId === o.userId && p.status === "hired")).length),
+    stage("Hired", onboardingIn.filter((o) => input.proposals.some((p) => p.internId === o.userId && p.status === "hired")).length),
   ];
 
   // Monthly trend over the range (or the last 6 months when open-ended).
@@ -176,10 +171,10 @@ export function computeAnalytics(input: AnalyticsInput) {
   ) {
     const next = new Date(Date.UTC(m.getUTCFullYear(), m.getUTCMonth() + 1, 1));
     const within = (d: Date | null) => d != null && new Date(d) >= m && new Date(d) < next;
-    const props = proposals.filter((p) => within(p.createdAt));
+    const props = input.proposals.filter((p) => within(p.createdAt));
     const app = new Set(props.map((p) => p.internId));
     const intv = new Set(input.interviews.filter((i) => within(i.createdAt)).map((i) => i.internId));
-    const hires = proposals.filter((p) => p.status === "hired" && within(p.hiredAt)).length;
+    const hires = input.proposals.filter((p) => p.status === "hired" && within(p.hiredAt)).length;
     trend.push({
       month: shortDateTime(m, { month: "short", year: "2-digit", timeZone: "UTC" }),
       proposals: props.length,
@@ -224,7 +219,7 @@ export function computeAnalytics(input: AnalyticsInput) {
   const topCompanies = input.employers
     .map((e) => {
       const hires = hiresIn.filter((p) => p.employerId === e.id);
-      const sent = proposals.filter((p) => p.employerId === e.id).length;
+      const sent = input.proposals.filter((p) => p.employerId === e.id).length;
       const fullTime = hires.filter(isFullTime).length;
       return {
         id: e.id,
@@ -244,7 +239,7 @@ export function computeAnalytics(input: AnalyticsInput) {
 
   const internName = new Map(input.interns.map((u) => [u.id, `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim() || "Candidate"]));
   const byIntern = new Map<string, { applications: number; offers: number }>();
-  for (const p of proposals) {
+  for (const p of input.proposals) {
     const cur = byIntern.get(p.internId) ?? { applications: 0, offers: 0 };
     cur.applications++;
     if (HIRED.has(p.status)) cur.offers++;
@@ -278,7 +273,7 @@ export function computeAnalytics(input: AnalyticsInput) {
     .sort((a, b) => String(b.hiredAt).localeCompare(String(a.hiredAt)));
 
   // Legacy's "Application status" tiles: every proposal ever, whatever the period (legacy server/routes.ts:6461-6497).
-  const applicationStatus = applicationStatusBuckets(proposals.map((p) => ({ status: p.status, fullTime: isFullTime(p) })));
+  const applicationStatus = applicationStatusBuckets(input.proposals.map((p) => ({ status: p.status, fullTime: isFullTime(p) })));
   const cities = topWithOthers(input.cities ?? [], input.citiesTotal ?? 0);
 
   return { totals, rates, funnel, trend, skillDemand, regionDemand, highestPayingSkills, topCompanies, topInterns, hiredList, applicationStatus, cities };
@@ -291,7 +286,7 @@ export function applicationStatusBuckets(rows: { status: string; fullTime: boole
   const counts = new Map<string, number>();
   for (const r of rows) {
     const raw = r.status.trim().toLowerCase();
-    if (!raw || raw === "draft") continue;
+    if (!raw) continue;
     const name =
       raw === "accepted" || raw === "hired" ? (r.fullTime ? "Hired (Full-time)" : "Hired (Internship)")
       : raw === "rejected" ? "Rejected"

@@ -16,14 +16,14 @@ export function CgpaNotice({ proposalId, state, canConfirm }: { proposalId: stri
 
   if (gate.state === "incorrect_unacked") {
     return (
-      <section aria-labelledby="cgpa-notice-h" className="mt-6 flex flex-col gap-4 rounded-lg border border-ink-200 bg-surface-raised px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <section aria-labelledby="cgpa-notice-h" className="mt-6 flex flex-col gap-4 rounded-2xl bg-info-soft px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <Info className="mt-0.5 size-5 shrink-0 text-info" aria-hidden />
           <div className="min-w-0">
             <h2 id="cgpa-notice-h" className="nums text-base font-semibold text-ink-900">
               {gate.correctedFrom && gate.correctedTo ? `CGPA corrected from ${gate.correctedFrom} to ${gate.correctedTo}` : "CGPA corrected"}
             </h2>
-            <p className="mt-1 max-w-prose text-pretty text-sm leading-relaxed text-ink-900">
+            <p className="mt-1 max-w-prose text-pretty text-sm leading-relaxed text-ink-800">
               Findtern checked the candidate&apos;s CGPA and corrected it. Confirm to continue to payment, or withdraw the proposal.
             </p>
           </div>
@@ -35,13 +35,13 @@ export function CgpaNotice({ proposalId, state, canConfirm }: { proposalId: stri
 
   const overdue = gate.state === "overdue";
   return (
-    <section aria-labelledby="cgpa-notice-h" className="mt-6 flex items-start gap-3 rounded-lg border border-ink-200 bg-surface-raised px-5 py-4">
-      <Hourglass className="mt-0.5 size-5 shrink-0 text-signal" aria-hidden />
+    <section aria-labelledby="cgpa-notice-h" className="mt-6 flex items-start gap-3 rounded-2xl bg-accent-100/60 px-5 py-4">
+      <Hourglass className="mt-0.5 size-5 shrink-0 text-accent-700" aria-hidden />
       <div className="min-w-0">
         <h2 id="cgpa-notice-h" className="text-base font-semibold text-ink-900">
           Verifying CGPA
         </h2>
-        <p className="mt-1 max-w-prose text-pretty text-sm leading-relaxed text-ink-900">{state.next}</p>
+        <p className="mt-1 max-w-prose text-pretty text-sm leading-relaxed text-ink-800">{state.next}</p>
         {gate.dueBy ? (
           <p className="nums mt-1 text-sm font-medium text-ink-900">
             {overdue ? "Was due by" : "Due by"} {formatIst(gate.dueBy)}
@@ -56,9 +56,9 @@ export function CgpaNotice({ proposalId, state, canConfirm }: { proposalId: stri
 export function ExpiredNotice({ state }: { state: OfferState }) {
   if (!state.canSendNew) return null;
   return (
-    <section aria-label="Why this offer expired" className="mt-6 flex items-start gap-3 rounded-lg border border-ink-200 bg-surface-raised px-5 py-4">
+    <section aria-label="Why this offer expired" className="mt-6 flex items-start gap-3 rounded-2xl bg-ink-50 px-5 py-4">
       <TimerOff className="mt-0.5 size-5 shrink-0 text-ink-600" aria-hidden />
-      <p className="max-w-prose text-pretty text-sm leading-relaxed text-ink-900">{state.next}</p>
+      <p className="max-w-prose text-pretty text-sm leading-relaxed text-ink-800">{state.next}</p>
     </section>
   );
 }

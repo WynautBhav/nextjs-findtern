@@ -7,9 +7,10 @@ import { KeyRound, Loader2, Pencil, Plus, Trash2, UserPlus } from "lucide-react"
 import { PERMISSIONS } from "@/lib/admin/permissions";
 import { csrfFetch } from "@/lib/client-fetch";
 import type { Admin } from "@/lib/db/schema";
-import { Pill } from "@/components/app/primitives";
-import { Section } from "@/components/app/stat";
-import { UserDot } from "@/components/layout/shell-parts";
+import { Panel, PanelHeader } from "@/components/admin/panel";
+import { AdminAvatar } from "@/components/admin/avatar";
+import { StatusBadge } from "@/components/admin/status-badge";
+import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -51,7 +52,7 @@ export interface RoleDef {
 type Staff = Omit<Admin, "password">;
 
 const field =
-  "mt-1.5 min-h-11 w-full rounded-md border border-ink-300 bg-surface-raised px-3 text-base text-ink-900 transition-colors duration-[var(--motion-fast)] placeholder:text-ink-600 hover:border-ink-400 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-700 sm:text-sm";
+  "mt-1.5 min-h-11 w-full rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle";
 
 const permsOf = (r: RoleDef): string[] => (Array.isArray(r.permissions) ? (r.permissions as string[]) : []);
 
@@ -220,38 +221,39 @@ export function StaffRolesManager({
     <div className="space-y-6">
       {dialog}
       {/* Staff */}
-      <Section
-        title="Staff"
-        hint="Change a role from the list; it applies within a minute."
-        action={
-          <button type="button" onClick={() => setStaffSheet(true)} className={buttonClass({ variant: "primary", size: "sm" })}>
-            <UserPlus className="size-4" aria-hidden />
-            Add staff
-          </button>
-        }
-      >
+      <Panel>
+        <PanelHeader
+          title="Staff"
+          description={`${staff.length} ${staff.length === 1 ? "person" : "people"} can sign in to this console. Change a role from the list; it applies within a minute.`}
+          action={
+            <button type="button" onClick={() => setStaffSheet(true)} className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}>
+              <UserPlus className="size-4" aria-hidden />
+              Add staff
+            </button>
+          }
+        />
         {staffError ? (
-          <p role="alert" className="mb-2 rounded-md bg-danger-soft px-3 py-2.5 text-sm font-medium text-danger">
+          <p role="alert" className="mx-[var(--admin-pad-panel)] mt-2 rounded-2xl bg-danger-soft px-4 py-2.5 text-sm font-medium text-danger">
             {staffError}
           </p>
         ) : null}
         {staffNote ? (
-          <p role="status" className="mb-2 rounded-md bg-success-soft px-3 py-2.5 text-sm font-medium text-success">
+          <p role="status" className="mx-[var(--admin-pad-panel)] mt-2 rounded-2xl bg-success-soft px-4 py-2.5 text-sm font-medium text-success">
             {staffNote}
           </p>
         ) : null}
-        <ul className="divide-y divide-ink-200 border-b border-ink-200">
+        <ul className="mt-2 divide-y divide-[color:var(--admin-rule)]">
           {staff.map((s) => {
             const self = s.id === currentAdminId;
             return (
-              <li key={s.id} className="flex flex-wrap items-center gap-3 py-3">
-                <UserDot name={s.name || s.email} className="size-10 text-sm" />
+              <li key={s.id} className="flex flex-wrap items-center gap-3 px-[var(--admin-pad-panel)] py-3.5">
+                <AdminAvatar name={s.name || s.email} id={s.id} size="md" />
                 <span className="min-w-0 flex-1 basis-[calc(100%-3rem)] sm:basis-auto">
                   <span className="flex items-center gap-2">
-                    <span className="break-words text-sm font-semibold text-ink-900">{s.name || "Staff member"}</span>
-                    {self ? <Pill tone="new">You</Pill> : null}
+                    <span className="break-words text-[0.9375rem] font-medium text-foreground">{s.name || "Staff member"}</span>
+                    {self ? <StatusBadge tone="info" dot={false} label="You" /> : null}
                   </span>
-                  <span className="block break-all text-sm text-ink-600">{s.email}</span>
+                  <span className="block break-all text-sm text-text-subtle">{s.email}</span>
                 </span>
                 <label className="sr-only" htmlFor={`role-${s.id}`}>
                   Role for {s.email}
@@ -264,7 +266,7 @@ export function StaffRolesManager({
                   disabled={busyId === s.id || self}
                   title={self ? "You can't change your own role" : undefined}
                   onChange={(e) => void changeRole(s, e.target.value)}
-                  className="h-10 min-w-0 flex-1 rounded-md border border-ink-300 bg-surface-raised px-3 text-base text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-700 disabled:opacity-60 max-lg:h-11 max-sm:basis-full sm:w-48 sm:flex-none"
+                  className="h-10 min-w-0 flex-1 rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-3.5 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60 max-lg:h-11 max-sm:basis-full sm:w-48 sm:flex-none"
                 >
                   {roles.map((r) => (
                     <option key={r.key} value={r.key}>
@@ -281,7 +283,7 @@ export function StaffRolesManager({
                         setStaffNote(null);
                         setResetTarget(s);
                       }}
-                      className={buttonClass({ variant: "ghost", size: "sm", className: "px-3" })}
+                      className={buttonClass({ variant: "ghost", size: "sm", className: "rounded-full px-4 hover:bg-[color:var(--admin-panel-2)]" })}
                     >
                       <KeyRound className="size-4" aria-hidden />
                       Reset password
@@ -291,10 +293,9 @@ export function StaffRolesManager({
                       disabled={busyId === s.id}
                       onClick={() => removeStaff(s)}
                       aria-label={`Revoke access for ${s.email}`}
-                      className={cn(buttonClass({ variant: "ghost", size: "sm", className: "px-3 max-lg:min-h-11" }), "text-danger hover:bg-danger-soft hover:text-danger")}
+                      className={cn(buttonClass({ variant: "ghost", size: "iconSm", className: "rounded-full hover:bg-[color:var(--admin-panel-2)]" }), "text-text-subtle hover:bg-danger-soft hover:text-danger max-lg:size-11")}
                     >
                       {busyId === s.id ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Trash2 className="size-4" aria-hidden />}
-                      Revoke access
                     </button>
                   </>
                 ) : null}
@@ -302,37 +303,37 @@ export function StaffRolesManager({
             );
           })}
         </ul>
-      </Section>
+      </Panel>
 
       {/* Permissions matrix */}
-      <Section
-        title="What each role can do"
-        hint="Tick to grant, untick to take away, then save. Read lets staff see an area; Handle or Edit lets them change it. Super admin always has everything."
-        action={
-          <button type="button" onClick={() => setRoleSheet({ mode: "new" })} className={buttonClass({ variant: "outline", size: "sm" })}>
-            <Plus className="size-4" aria-hidden />
-            New role
-          </button>
-        }
-      >
-       <div className="overflow-hidden rounded-lg border border-ink-200 bg-surface-raised">
+      <Panel>
+        <PanelHeader
+          title="What each role can do"
+          description="Tick to grant, untick to take away, then save. Read lets staff see an area; Handle or Edit lets them change it. Super admin always has everything."
+          action={
+            <button type="button" onClick={() => setRoleSheet({ mode: "new" })} className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
+              <Plus className="size-4" aria-hidden />
+              New role
+            </button>
+          }
+        />
         <div
           tabIndex={0}
           role="region"
           aria-label="Permissions by role"
-          className="max-h-[70vh] overflow-auto focus-visible:outline-2 focus-visible:outline-brand-700"
+          className="overflow-x-auto focus-visible:outline-2 focus-visible:outline-ring"
         >
           <table className="w-full min-w-[40rem] border-separate border-spacing-0 text-sm">
             <caption className="sr-only">Permissions by role</caption>
             <thead>
               <tr>
-                <th scope="col" className="sticky left-0 top-0 z-30 border-b border-ink-300 bg-ink-100 px-4 py-2.5 text-left text-sm font-semibold text-ink-700">
+                <th scope="col" className="sticky left-0 z-10 bg-[color:var(--admin-panel-2)] px-4 py-2.5 text-left text-xs font-semibold text-text-subtle">
                   Permission
                 </th>
                 {roles.map((r) => (
-                  <th key={r.key} scope="col" className="sticky top-0 z-20 min-w-36 border-b border-ink-300 bg-ink-100 px-3 py-2.5 text-center align-bottom">
-                    <span className="block text-sm font-semibold text-ink-900">{r.name}</span>
-                    <span className="nums block text-xs font-normal text-ink-600">
+                  <th key={r.key} scope="col" className="min-w-36 bg-[color:var(--admin-panel-2)] px-3 py-2.5 text-center align-bottom">
+                    <span className="block text-sm font-semibold text-foreground">{r.name}</span>
+                    <span className="nums block text-xs font-normal text-text-subtle">
                       {members.get(r.key) ?? 0} {(members.get(r.key) ?? 0) === 1 ? "person" : "people"}
                     </span>
                     {r.key !== "super_admin" ? (
@@ -341,19 +342,17 @@ export function StaffRolesManager({
                           type="button"
                           onClick={() => setRoleSheet({ mode: "rename", key: r.key })}
                           aria-label={`Rename ${r.name}`}
-                          className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-8 px-2 text-xs max-lg:min-h-11" })}
+                          className={cn(buttonClass({ variant: "ghost", size: "iconSm", className: "rounded-full hover:bg-[color:var(--admin-panel-2)]" }), "size-8 max-lg:size-11")}
                         >
                           <Pencil className="size-3.5" aria-hidden />
-                          Rename
                         </button>
                         <button
                           type="button"
                           onClick={() => deleteRole(r)}
                           aria-label={`Delete ${r.name}`}
-                          className={cn(buttonClass({ variant: "ghost", size: "sm", className: "min-h-8 px-2 text-xs max-lg:min-h-11" }), "text-danger hover:bg-danger-soft hover:text-danger")}
+                          className={cn(buttonClass({ variant: "ghost", size: "iconSm", className: "rounded-full hover:bg-[color:var(--admin-panel-2)]" }), "size-8 text-text-subtle hover:bg-danger-soft hover:text-danger max-lg:size-11")}
                         >
                           <Trash2 className="size-3.5" aria-hidden />
-                          Delete
                         </button>
                       </span>
                     ) : null}
@@ -368,14 +367,14 @@ export function StaffRolesManager({
                     <th
                       scope="rowgroup"
                       colSpan={roles.length + 1}
-                      className="bg-surface-raised px-4 pt-5 pb-1.5 text-left text-sm font-semibold text-ink-900"
+                      className="bg-[color:var(--admin-panel)] px-4 pt-4 pb-1.5 text-left text-xs font-semibold text-foreground"
                     >
                       {group.area}
                     </th>
                   </tr>
                   {group.perms.map((perm) => (
-                    <tr key={perm.key} className="hover:bg-ink-100">
-                      <th scope="row" className="sticky left-0 z-10 border-b border-ink-200 bg-surface-raised px-4 py-2 text-left font-normal text-ink-900">
+                    <tr key={perm.key} className="hover:bg-[color:var(--admin-panel-2)]">
+                      <th scope="row" className="sticky left-0 z-10 border-b border-[color:var(--admin-rule)] bg-[color:var(--admin-panel)] px-4 py-2 text-left font-normal text-foreground">
                         {perm.label}
                       </th>
                       {roles.map((r) => {
@@ -383,7 +382,7 @@ export function StaffRolesManager({
                         const on = all || current(r).includes(perm.key);
                         const changed = draft[r.key] !== undefined && permsOf(r).includes(perm.key) !== on;
                         return (
-                          <td key={r.key} className={cn("border-b border-ink-200 px-3 py-1 text-center", changed && "bg-warning-soft")}>
+                          <td key={r.key} className={cn("border-b border-[color:var(--admin-rule)] px-3 py-1 text-center", changed && "bg-warning-soft")}>
                             <label className="inline-flex size-11 cursor-pointer items-center justify-center lg:size-9">
                               <input
                                 type="checkbox"
@@ -391,7 +390,7 @@ export function StaffRolesManager({
                                 disabled={all || matrixBusy}
                                 onChange={() => toggle(r, perm.key)}
                                 aria-label={`${r.name}: ${perm.label}`}
-                                className="size-4 accent-[color:var(--color-brand-800)] disabled:opacity-60"
+                                className="size-4 accent-[color:var(--admin-tile)] disabled:opacity-60"
                               />
                             </label>
                           </td>
@@ -404,8 +403,8 @@ export function StaffRolesManager({
             </tbody>
           </table>
         </div>
-        <div className="sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-ink-200 bg-surface-raised px-4 py-3">
-          <p className="min-w-0 flex-1 text-sm text-ink-600" role="status">
+        <div className="sticky bottom-0 flex flex-wrap items-center gap-3 bg-[color:var(--admin-panel)] px-[var(--admin-pad-panel)] py-3 shadow-[inset_0_1px_0_var(--admin-rule)]">
+          <p className="min-w-0 flex-1 text-sm text-text-subtle" role="status">
             {matrixSaved ??
               (dirtyKeys.length
                 ? `Unsaved changes on ${dirtyKeys.map((k) => roles.find((r) => r.key === k)?.name ?? k).join(", ")}.`
@@ -420,11 +419,11 @@ export function StaffRolesManager({
               setDraft({});
               setMatrixError(null);
             }}
-            className={buttonClass({ variant: "ghost", size: "sm", className: "px-3" })}
+            className={buttonClass({ variant: "ghost", size: "sm", className: "rounded-full px-4 hover:bg-[color:var(--admin-panel-2)]" })}
           >
             Discard
           </button>
-          <button type="button" disabled={!dirtyKeys.length || matrixBusy} onClick={saveMatrix} className={buttonClass({ variant: "primary", size: "sm" })}>
+          <button type="button" disabled={!dirtyKeys.length || matrixBusy} onClick={saveMatrix} className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}>
             {matrixBusy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
             Save changes
           </button>
@@ -434,8 +433,7 @@ export function StaffRolesManager({
             </p>
           ) : null}
         </div>
-       </div>
-      </Section>
+      </Panel>
 
       <ResetPasswordDialog
         target={resetTarget}
@@ -533,7 +531,7 @@ function ResetPasswordDialog({
             </DialogDescription>
           </DialogHeader>
           <div>
-            <label htmlFor={`${uid}-pw`} className="block text-sm font-medium text-ink-900">
+            <label htmlFor={`${uid}-pw`} className="block text-sm font-medium text-foreground">
               New password
             </label>
             <input
@@ -549,12 +547,12 @@ function ResetPasswordDialog({
               aria-describedby={error?.field === "password" ? `${rulesId} ${errorId}` : rulesId}
               className={field}
             />
-            <p id={rulesId} className="mt-1 text-xs text-ink-600">
+            <p id={rulesId} className="mt-1 text-xs text-text-subtle">
               {PASSWORD_HINT}
             </p>
           </div>
           <div>
-            <label htmlFor={`${uid}-confirm`} className="block text-sm font-medium text-ink-900">
+            <label htmlFor={`${uid}-confirm`} className="block text-sm font-medium text-foreground">
               Confirm new password
             </label>
             <input
@@ -577,10 +575,10 @@ function ResetPasswordDialog({
             </p>
           ) : null}
           <DialogFooter>
-            <button type="button" onClick={onClose} disabled={busy} className={buttonClass({ variant: "ghost", size: "sm", className: "px-3" })}>
+            <button type="button" onClick={onClose} disabled={busy} className={buttonClass({ variant: "ghost", size: "sm", className: "rounded-full px-4 hover:bg-[color:var(--admin-panel-2)]" })}>
               Cancel
             </button>
-            <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "sm" })}>
+            <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}>
               {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <KeyRound className="size-4" aria-hidden />}
               Set password
             </button>
@@ -631,30 +629,30 @@ function AddStaffSheet({
       <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-md">
         <form onSubmit={submit} className="space-y-4 p-5 sm:p-6">
           <SheetHeader className="p-0 text-left">
-            <SheetTitle className="text-lg font-semibold text-ink-900">Add staff</SheetTitle>
-            <SheetDescription className="text-sm text-ink-600">They can sign in to this console straight away with the email and password below.</SheetDescription>
+            <SheetTitle className="text-lg font-semibold text-foreground">Add staff</SheetTitle>
+            <SheetDescription className="text-sm text-text-subtle">They can sign in to this console straight away with the email and password below.</SheetDescription>
           </SheetHeader>
           <div>
-            <label htmlFor="staff-name" className="block text-sm font-medium text-ink-900">
+            <label htmlFor="staff-name" className="block text-sm font-medium text-foreground">
               Full name
             </label>
             <input id="staff-name" required minLength={2} value={name} onChange={(e) => setName(e.target.value)} className={field} />
           </div>
           <div>
-            <label htmlFor="staff-email" className="block text-sm font-medium text-ink-900">
+            <label htmlFor="staff-email" className="block text-sm font-medium text-foreground">
               Email
             </label>
             <input id="staff-email" type="email" required value={email} placeholder="name@findtern.in" onChange={(e) => setEmail(e.target.value)} className={field} />
           </div>
           <div>
-            <label htmlFor="staff-password" className="block text-sm font-medium text-ink-900">
+            <label htmlFor="staff-password" className="block text-sm font-medium text-foreground">
               Temporary password
             </label>
             <input id="staff-password" type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} className={field} />
-            <p className="mt-1 text-xs text-ink-600">{PASSWORD_HINT}</p>
+            <p className="mt-1 text-xs text-text-subtle">{PASSWORD_HINT}</p>
           </div>
           <div>
-            <label htmlFor="staff-role" className="block text-sm font-medium text-ink-900">
+            <label htmlFor="staff-role" className="block text-sm font-medium text-foreground">
               Role
             </label>
             <select id="staff-role" value={role} onChange={(e) => setRole(e.target.value)} className={field}>
@@ -671,10 +669,10 @@ function AddStaffSheet({
             </p>
           ) : null}
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={() => onOpenChange(false)} className={buttonClass({ variant: "ghost", size: "sm", className: "px-3" })}>
+            <button type="button" onClick={() => onOpenChange(false)} className={buttonClass({ variant: "ghost", size: "sm", className: "rounded-full px-4 hover:bg-[color:var(--admin-panel-2)]" })}>
               Cancel
             </button>
-            <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "sm" })}>
+            <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}>
               {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <UserPlus className="size-4" aria-hidden />}
               Add staff
             </button>
@@ -733,20 +731,20 @@ function RoleSheet({
       <SheetContent side="right" className="w-full overflow-y-auto p-0 sm:max-w-md">
         <form onSubmit={submit} className="space-y-4 p-5 sm:p-6">
           <SheetHeader className="p-0 text-left">
-            <SheetTitle className="text-lg font-semibold text-ink-900">{renaming ? "Rename role" : "New role"}</SheetTitle>
-            <SheetDescription className="text-sm text-ink-600">
+            <SheetTitle className="text-lg font-semibold text-foreground">{renaming ? "Rename role" : "New role"}</SheetTitle>
+            <SheetDescription className="text-sm text-text-subtle">
               {renaming ? "Staff in this role keep their access." : "Name it, optionally copy another role's access, then adjust the ticks in the table."}
             </SheetDescription>
           </SheetHeader>
           <div>
-            <label htmlFor="role-name" className="block text-sm font-medium text-ink-900">
+            <label htmlFor="role-name" className="block text-sm font-medium text-foreground">
               Name
             </label>
             <input id="role-name" required minLength={2} maxLength={60} value={name} placeholder="Finance executive" onChange={(e) => setName(e.target.value)} className={field} />
           </div>
           {!renaming ? (
             <div>
-              <label htmlFor="role-copy" className="block text-sm font-medium text-ink-900">
+              <label htmlFor="role-copy" className="block text-sm font-medium text-foreground">
                 Start from
               </label>
               <select id="role-copy" value={copyFrom} onChange={(e) => setCopyFrom(e.target.value)} className={field}>
@@ -767,10 +765,10 @@ function RoleSheet({
             </p>
           ) : null}
           <div className="flex justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className={buttonClass({ variant: "ghost", size: "sm", className: "px-3" })}>
+            <button type="button" onClick={onClose} className={buttonClass({ variant: "ghost", size: "sm", className: "rounded-full px-4 hover:bg-[color:var(--admin-panel-2)]" })}>
               Cancel
             </button>
-            <button type="submit" disabled={busy || name.trim().length < 2} className={buttonClass({ variant: "primary", size: "sm" })}>
+            <button type="submit" disabled={busy || name.trim().length < 2} className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}>
               {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
               {renaming ? "Save name" : "Create role"}
             </button>

@@ -26,8 +26,6 @@ const TEASER_KEY = "findtern:chat-teaser-seen";
 const FORM_ROUTE =
   /^\/(?:login|signup|forgot-password|reset-password|verify-email|(?:intern|employer)\/onboarding)(?:\/|$)/;
 /** The nudge goes away by itself; it used to sit over the page until dismissed (QA-102). */
-/** The public college drive page is a long form-like list: the launcher sat over its last rows, so it stays out of it entirely. */
-const DRIVE_ROUTE = /^\/drive(?:\/|$)/;
 const TEASER_MS = 12_000;
 
 const GREETING: Msg = {
@@ -374,7 +372,7 @@ export function ChatWidget() {
   const hasBottomNav = !isForm && /^\/(intern|college)(\/|$)/.test(pathname ?? "");
   // The intern and employer consoles have "Ask me" in their top bar on every
   // width, so no launcher floats over their cards on a phone; the panel opens from there.
-  const headerOnly = !isForm && /^\/(intern|employer|college)(\/|$)/.test(pathname ?? "");
+  const headerOnly = !isForm && /^\/(intern|employer)(\/|$)/.test(pathname ?? "");
 
   return (
     <div
@@ -382,7 +380,6 @@ export function ChatWidget() {
       className={cn(
         "pointer-events-none fixed z-[80] flex flex-col items-end gap-3",
         isForm && "max-lg:hidden",
-        DRIVE_ROUTE.test(pathname ?? "") && "hidden",
         typing && !open && "max-lg:hidden",
         hasBottomNav ? "bottom-20 right-4" : "bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))]",
         inApp ? "lg:bottom-auto lg:right-6 lg:top-[4.5rem]" : "lg:bottom-6 lg:right-6",

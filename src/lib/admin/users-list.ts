@@ -1,7 +1,6 @@
 import { sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { type AccountCounts } from "@/lib/admin/account-views";
 import { AI_INTERVIEW_EMAIL, TEST_EMPLOYER_ID } from "@/lib/admin/scope";
 
 /**
@@ -36,11 +35,11 @@ function accounts(showStaff: boolean): SQL {
     sql`SELECT ${u.id}::text AS id, 'intern' AS kind,
         trim(coalesce(${u.firstName}, '') || ' ' || coalesce(${u.lastName}, '')) AS name, NULL::text AS company,
         ${u.email} AS email, trim(coalesce(${u.countryCode}, '') || ' ' || coalesce(${u.phoneNumber}, '')) AS phone,
-        coalesce(${u.isActive}, true) AS is_active, coalesce(${u.emailVerified}, false) AS email_verified, ${u.createdAt} AS created_at
+        ${u.isActive} AS is_active, coalesce(${u.emailVerified}, false) AS email_verified, ${u.createdAt} AS created_at
       FROM ${u} WHERE coalesce(${u.role}, 'intern') = 'intern'`,
     sql`SELECT ${e.id}::text, 'employer', coalesce(nullif(trim(${e.name}), ''), ${e.companyName}), ${e.companyName},
         ${e.companyEmail}, trim(coalesce(${e.countryCode}, '') || ' ' || coalesce(${e.phoneNumber}, '')),
-        coalesce(${e.isActive}, true), coalesce(${e.emailVerified}, false), ${e.createdAt}
+        ${e.isActive}, coalesce(${e.emailVerified}, false), ${e.createdAt}
       FROM ${e} WHERE ${e.id} <> ${TEST_EMPLOYER_ID} AND lower(coalesce(${e.companyEmail}, '')) <> ${AI_INTERVIEW_EMAIL}`,
   ];
   if (showStaff) {
@@ -99,26 +98,15 @@ const toRow = (r: Raw): AccountRow => ({
 export async function loadAccounts(
   params: Record<string, string>,
   opts: { showStaff: boolean; sort: UserSort; dir: "asc" | "desc"; limit: number; offset: number },
-): Promise<{ rows: AccountRow[]; total: number; byKind: AccountCounts; inactive: number; unverified: number }> {
+): Promise<{ rows: AccountRow[]; total: number; byKind: Record<AccountKind, number> }> {
   const db = getDb();
   const base = sql`(${accounts(opts.showStaff)}) AS acct`;
   const [rows, totals, kinds] = await Promise.all([
     db.execute<Raw>(sql`SELECT * FROM ${base} WHERE ${where(params)} ORDER BY ${orderBy(opts.sort, opts.dir)} LIMIT ${opts.limit} OFFSET ${opts.offset}`),
     db.execute<{ c: string | number }>(sql`SELECT count(*) AS c FROM ${base} WHERE ${where(params)}`),
-    db.execute<{ kind: AccountKind; c: string | number; inactive: string | number; unverified: string | number }>(
-      sql`SELECT kind, count(*) AS c, count(*) FILTER (WHERE NOT is_active) AS inactive, count(*) FILTER (WHERE NOT email_verified) AS unverified FROM ${base} GROUP BY kind`,
-    ),
+    db.execute<{ kind: AccountKind; c: string | number }>(sql`SELECT kind, count(*) AS c FROM ${base} GROUP BY kind`),
   ]);
-  const byKind: AccountCounts = { intern: 0, employer: 0, admin: 0 };
-  let inactive = 0;
-  let unverified = 0;
-  for (const k of kinds.rows) {
-    byKind[k.kind] = Number(k.c);
-    // Staff are never deactivated or unverified here and are not the queue this counts.
-    if (k.kind !== "admin") {
-      inactive += Number(k.inactive);
-      unverified += Number(k.unverified);
-    }
-  }
-  return { rows: rows.rows.map(toRow), total: Number(totals.rows[0]?.c ?? 0), byKind, inactive, unverified };
+  const byKind: Record<AccountKind, number> = { intern: 0, employer: 0, admin: 0 };
+  for (const k of kinds.rows) byKind[k.kind] = Number(k.c);
+  return { rows: rows.rows.map(toRow), total: Number(totals.rows[0]?.c ?? 0), byKind };
 }

@@ -17,9 +17,9 @@ const PRESETS = [
   { value: "365d", label: "Last 12 months" },
 ] as const;
 
-const PILL = "inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors duration-[var(--motion-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11";
-const ON = "bg-ink-900 text-canvas";
-const OFF = "text-ink-700 hover:bg-ink-200/60 hover:text-ink-900";
+const PILL = "apple-spring inline-flex h-9 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11";
+const ON = "bg-[color:var(--admin-tile)] text-[color:var(--admin-tile-ink)]";
+const OFF = "text-text-subtle hover:bg-[color:var(--admin-panel-2)] hover:text-foreground";
 
 /**
  * The period control shared by every tab: Today, This week, This month (India days, week from Monday),
@@ -38,28 +38,28 @@ export function RangeBar({ window: w, params, resetKeys = [] }: { window: Report
   );
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-rp="period">
-      <nav aria-label="Period" className="flex max-w-full gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <nav aria-label="Period" className="flex max-w-full gap-1 overflow-x-auto rounded-full bg-[color:var(--admin-panel)] p-1 shadow-[var(--admin-shadow)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {VIEWS.map((v) => item(v.label, { range: v.value }, w.kind === v.value))}
-        <span aria-hidden className="mx-1 my-2 w-px shrink-0 bg-ink-300" />
+        <span aria-hidden className="mx-1 my-2 w-px shrink-0 bg-[color:var(--admin-rule)]" />
         {PRESETS.map((p) => item(p.label, { period: p.value }, w.kind === "preset" && w.param.period === p.value))}
         {item("All time", { range: "all" }, w.kind === "all")}
       </nav>
       <details className="group relative" open={custom || undefined}>
         <summary
           className={cn(
-            "inline-flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors duration-[var(--motion-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 [&::-webkit-details-marker]:hidden",
-            custom ? "border-ink-900 bg-ink-900 text-canvas" : "border-ink-300 text-ink-900 hover:bg-ink-100",
+            "apple-spring inline-flex h-11 cursor-pointer list-none items-center gap-1.5 rounded-full px-4 text-sm font-medium shadow-[var(--admin-shadow)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden",
+            custom ? ON : "bg-[color:var(--admin-panel)] text-foreground hover:bg-[color:var(--admin-panel-2)]",
           )}
         >
           <CalendarRange className="size-4" aria-hidden />
           Custom range
         </summary>
-        <div className="mt-2 rounded-lg border border-ink-200 bg-surface-raised p-4 shadow-[var(--shadow-float)] sm:absolute sm:left-0 sm:z-20 sm:w-max">
+        <div className="mt-2 rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel)] p-4 shadow-[var(--admin-shadow)] sm:absolute sm:left-0 sm:z-20 sm:w-max">
           <DateRangeForm params={{ ...keep, from: params.from ?? "", to: params.to ?? "" }} drop={["period", "range", ...resetKeys]} />
         </div>
       </details>
-      <p className="text-sm text-ink-600" data-rp="window-label">
-        Showing <span className="font-medium text-ink-900">{w.label}</span> (India time{w.kind === "week" ? ", week from Monday" : ""})
+      <p className="text-sm text-text-subtle" data-rp="window-label">
+        Showing <span className="font-medium text-foreground">{w.label}</span> (India time{w.kind === "week" ? ", week from Monday" : ""})
       </p>
     </div>
   );

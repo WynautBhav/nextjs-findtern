@@ -134,7 +134,7 @@ export default async function AdminCompanyDetailPage({
         </>
         ) : null
       }
-      viewAs={viewAs ? <ViewAsButton targetType="employer" targetId={data.company.id} label="View as company" /> : null}
+      viewAs={viewAs ? <ViewAsButton targetType="employer" targetId={data.company.id} label="View as company" appearance="tile" /> : null}
     />
   );
 }

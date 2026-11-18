@@ -82,7 +82,7 @@ function ToastItem({ toast, dismiss }: { toast: Toast; dismiss: (id: number) => 
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      className="pointer-events-auto flex items-start gap-3 rounded-lg border border-ink-300 bg-surface-raised p-3.5 text-sm shadow-[var(--shadow-float)] motion-safe:animate-[app-page-enter_var(--motion-base)_var(--ease-app)_both]"
+      className="pointer-events-auto flex items-start gap-3 rounded-apple-lg border border-border bg-surface-raised p-3.5 text-sm shadow-lg motion-safe:animate-tile-in"
     >
       <Icon aria-hidden className={cn("mt-0.5 size-4.5 shrink-0", ICON_CLASS[tone])} />
       <div className="min-w-0 flex-1 break-words">

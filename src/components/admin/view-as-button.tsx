@@ -6,6 +6,8 @@ import { Eye, Loader2 } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { QUICK_ACTION_CLASS } from "@/components/admin/record-layout";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { cn } from "@/lib/utils";
 
 /** Starts a read-only "View as" session; the API audit-logs it. */
 export function ViewAsButton({
@@ -59,7 +61,7 @@ export function ViewAsButton({
         onClick={start}
         disabled={busy}
         title="Browse their dashboard read-only, with names and contacts unmasked"
-        className={buttonClass({ variant: "outline", size: "sm" })}
+        className={cn(buttonClass({ variant: "outline" }), ADMIN_PILL_SECONDARY)}
       >
         {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Eye className="size-4" aria-hidden />}
         {label}

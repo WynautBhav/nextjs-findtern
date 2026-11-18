@@ -1,6 +1,5 @@
 "use client";
 
-import { clearOnFileErrors, NO_ID_ON_FILE, saveBody, type IdOnFile } from "./onboarding/id-mask";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
@@ -62,7 +61,6 @@ const STEP_VIEWS: React.ComponentType<StepProps>[] = [
  */
 export function OnboardingForm({
   initial,
-  idOnFile = NO_ID_ON_FILE,
   documents,
   email,
   serverUpdatedAt = null,
@@ -82,8 +80,6 @@ export function OnboardingForm({
   /** When the saved profile last changed (ISO). A local draft older than this is stale. */
   serverUpdatedAt?: string | null;
   account?: { countryCode: string; phoneNumber: string } | null;
-  /** Last four of the Aadhaar and PAN already stored; the numbers themselves are never sent to the browser. */
-  idOnFile?: IdOnFile;
   /** A PAN card image is already on file. */
   hasPanImage?: boolean;
   /** An Aadhaar card image is already on file. */
@@ -173,7 +169,7 @@ export function OnboardingForm({
   );
 
   // Which steps pass right now, and the first that does not.
-  const stepErrors = useMemo(() => STEPS.map((_, i) => clearOnFileErrors(validateStep(values, i, ctx), values, idOnFile)), [values, ctx, idOnFile]);
+  const stepErrors = useMemo(() => STEPS.map((_, i) => validateStep(values, i, ctx)), [values, ctx]);
   const passes = stepErrors.map((e) => Object.keys(e).length === 0);
   const firstOpen = passes.findIndex((ok) => !ok);
   // A step that already passes is always reachable, so a live profile that
@@ -268,7 +264,7 @@ export function OnboardingForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // Bank details are not asked for here (bug sheet 8); Settings saves them.
-        body: JSON.stringify({ ...saveBody(values, idOnFile), bank: undefined, final }),
+        body: JSON.stringify({ ...values, bank: undefined, final }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; step?: number; fields?: Record<string, string> };
       if (!res.ok) {
@@ -343,7 +339,7 @@ export function OnboardingForm({
           <MobileSteps step={step} passes={done} reachable={reachable} onSelect={goTo} />
 
           {submittedBefore && needs.length > 0 ? (
-            <p className="mb-4 flex items-start gap-2 rounded-md border border-accent-200 bg-accent-50 px-4 py-3 text-sm text-ink-800">
+            <p className="mb-4 flex items-start gap-2 rounded-apple-sm border border-accent-200 bg-accent-50 px-4 py-3 text-sm text-ink-800">
               <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent-500" />
               <span>
                 {needs.length === 1 ? "One step still needs something: " : `${needs.length} steps still need something: `}
@@ -352,10 +348,10 @@ export function OnboardingForm({
             </p>
           ) : null}
 
-          <section aria-labelledby="step-title" className="rounded-lg border border-ink-300 bg-surface-raised">
+          <section aria-labelledby="step-title" className="rounded-apple-xl border border-ink-200/80 bg-white shadow-[0_1px_0_rgb(255_255_255)_inset,0_1px_2px_rgb(15_40_30/0.05),0_12px_32px_-12px_rgb(15_40_30/0.14)]">
             <header className="border-b border-ink-200/70 px-5 py-5 sm:px-8 sm:py-6">
               {/* The step count lives in the progress above (desktop rail, MobileSteps on phones), once. */}
-              <h2 id="step-title" ref={headingRef} tabIndex={-1} className="font-display text-xl font-semibold text-ink-900 outline-none">
+              <h2 id="step-title" ref={headingRef} tabIndex={-1} className="text-xl font-semibold tracking-[-0.015em] text-ink-900 outline-none">
                 {STEPS[step].title}
               </h2>
               <p className="mt-1.5 max-w-2xl text-pretty text-sm leading-relaxed text-ink-600">{STEPS[step].blurb}</p>
@@ -381,7 +377,6 @@ export function OnboardingForm({
                 documents={documents}
                 email={email}
                 account={account}
-                idOnFile={idOnFile}
                 hasPanImage={hasPanImage}
                 hasAadhaarImage={hasAadhaarImage}
                 skillsLocked={skillsLocked}
@@ -397,13 +392,13 @@ export function OnboardingForm({
 
             {/* ── Actions ─────────────────────────────────────────────── */}
             {/* Phones: pinned just above the tab bar (4rem + its border) so Continue and the save status stay in reach. */}
-            <footer className="rounded-b-lg border-t border-ink-300 bg-surface-raised px-5 py-4 max-sm:sticky max-sm:bottom-[calc(4.0625rem+env(safe-area-inset-bottom))] max-sm:z-30 sm:px-8">
+            <footer className="rounded-b-apple-xl border-t border-ink-200/70 bg-ink-50/60 px-5 py-4 max-sm:sticky max-sm:bottom-[calc(4.0625rem+env(safe-area-inset-bottom))] max-sm:z-30 max-sm:bg-ink-50 sm:px-8">
               {/* Mounted empty, then filled, so the message is announced. */}
               <div role="status" className={notice ? "mb-3" : undefined}>
                 {notice ? (
                   <p
                     className={cn(
-                      "flex items-start gap-3 rounded-md border px-4 py-3 text-sm",
+                      "flex items-start gap-3 rounded-apple-sm border px-4 py-3 text-sm",
                       notice.ok ? "border-brand-200 bg-brand-50 text-brand-900" : "border-danger/30 bg-danger-soft text-ink-900",
                     )}
                   >
@@ -463,7 +458,7 @@ export function OnboardingForm({
               </div>
             </footer>
           </section>
-          <p className="mt-4 text-center text-xs text-ink-700 lg:text-left">Signed in as {email}. Your progress on this device is kept as you type.</p>
+          <p className="mt-4 text-center text-xs text-text-subtle lg:text-left">Signed in as {email}. Your progress on this device is kept as you type.</p>
         </div>
       </div>
     </div>

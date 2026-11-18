@@ -19,14 +19,14 @@ const FILE_TYPES = "image/jpeg,image/png";
 export function CgpaDisclaimer({ compact = false, className }: { compact?: boolean; className?: string }) {
   if (compact) {
     return (
-      <p className={cn("flex items-start gap-2 text-xs leading-relaxed text-ink-700", className)}>
+      <p className={cn("flex items-start gap-2 text-xs leading-relaxed text-text-subtle", className)}>
         <Info className="mt-0.5 size-3.5 shrink-0 text-info" aria-hidden />
         <span>{CGPA_DISCLAIMER}</span>
       </p>
     );
   }
   return (
-    <div className={cn("flex items-start gap-3 rounded-md border border-info/25 bg-info-soft px-4 py-3", className)}>
+    <div className={cn("flex items-start gap-3 rounded-apple-sm border border-info/25 bg-info-soft px-4 py-3", className)}>
       <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
       <p className="text-sm leading-relaxed text-ink-900">{CGPA_DISCLAIMER}</p>
     </div>
@@ -77,7 +77,7 @@ export function SemesterProofs({ a, errors, onChange }: { a: Academics; errors: 
     <div className="space-y-4">
       <CgpaDisclaimer />
       {!haveScore ? (
-        <p className="rounded-md border border-ink-200 bg-ink-50 px-4 py-3 text-sm text-ink-700">
+        <p className="rounded-apple-sm border border-ink-200 bg-ink-50 px-4 py-3 text-sm text-ink-700">
           Enter your score above and we will ask for the {slots.length} proof photo{slots.length === 1 ? "" : "s"} for semester {semester}.
         </p>
       ) : (
@@ -100,7 +100,7 @@ export function SemesterProofs({ a, errors, onChange }: { a: Academics; errors: 
                   tabIndex={-1}
                   aria-describedby={error ? `${id}-error` : undefined}
                   className={cn(
-                    "rounded-md border bg-surface-raised p-4 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600",
+                    "rounded-apple-sm border bg-white p-4 outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600",
                     error ? "border-danger" : u ? "border-brand-200" : "border-ink-200",
                   )}
                 >

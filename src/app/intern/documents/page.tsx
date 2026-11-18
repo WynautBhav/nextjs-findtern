@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { eq, desc } from "drizzle-orm";
-import { Check, CircleAlert, ExternalLink, FileImage, FileText, Upload, Video } from "lucide-react";
+import { ExternalLink, FileImage, FileText, Upload, Video } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { PageHead } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
+import { Tile } from "@/components/app/tiles";
+import { cn } from "@/lib/utils";
 import { ButtonLink } from "@/components/ui/button";
 import { formatDate } from "@/lib/format";
 import { DocImagePreview } from "@/components/intern/doc-preview";
@@ -85,120 +87,110 @@ export default async function InternDocuments() {
   });
   rows = rows.map((r) => ({ ...r, href: `/intern/documents/open?key=${encodeURIComponent(r.key ?? r.fileName)}` }));
 
-  // What every intern needs on file, in the order it matters: PAN (so payouts can go out), photo, Aadhaar.
-  const REQUIRED = ["PAN", "Profile photo", "Aadhaar"];
-  const have = (label: string) => rows.find((r) => r.label === label);
-  const missing = REQUIRED.filter((l) => !have(l));
-  const extras = rows.filter((r) => !REQUIRED.includes(r.label));
-  const onFile = REQUIRED.length - missing.length;
-
   return (
     <div>
       <PageHead
         title="Documents"
         lede="The files attached to your profile. Only you and the Findtern team can open them."
         action={
-          <ButtonLink href="/intern/onboarding" variant={missing.length > 0 ? "primary" : "outline"}>
-            <Upload className="size-4" aria-hidden />
-            {missing.length > 0 ? "Add missing files" : "Replace or add files"}
-          </ButtonLink>
+          rows.length > 0 ? (
+            <ButtonLink href="/intern/onboarding" variant="outline">
+              <Upload className="size-4" aria-hidden />
+              Replace or add files
+            </ButtonLink>
+          ) : null
         }
       />
 
-      <div className="grid gap-x-12 gap-y-6 lg:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
-        <div className="min-w-0">
-          <p className="nums font-display text-4xl font-bold leading-none text-ink-900">
-            {onFile}
-            <span className="ml-1 text-base font-medium text-ink-600">of {REQUIRED.length} on file</span>
-          </p>
-          <p className="mt-3 max-w-xs text-pretty text-sm text-ink-700">
-            {missing.length === 0
-              ? "Everything your stipend and profile need is here. Employers never see these files."
-              : `Still needed: ${missing.join(", ")}.${missing.includes("PAN") ? " Payouts cannot go out without your PAN image." : ""}`}
-          </p>
+      {rows.length === 0 ? (
+        <EmptyScene
+          art
+          title="No documents uploaded yet"
+          body="Your profile photo, Aadhaar, PAN and marksheets appear here once you add them in the profile editor."
+          next={{ label: "Add them in your profile", href: "/intern/onboarding" }}
+        />
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {/* What the files are for, in the order they matter: being paid, then the profile, then education. */}
+          {GROUPS.map((g) => {
+            const docs = rows.filter((r) => g.has(r.label));
+            if (docs.length === 0 && g.title !== "For your stipend") return null;
+            const pan = rows.some((r) => r.label === "PAN");
+            return (
+              <Tile
+                key={g.title}
+                title={g.title}
+                className={g.wide ? "lg:col-span-2" : undefined}
+                aside={g.title === "For your stipend" ? <Pill tone={pan ? "paid" : "waiting"}>{pan ? "PAN on file" : "PAN missing"}</Pill> : null}
+                description={
+                  g.title !== "For your stipend" ? undefined : pan ? (
+                    "Your PAN image is what payouts need, so your stipend can go out. Employers never see these files."
+                  ) : (
+                    <>
+                      Payouts need your PAN image.{" "}
+                      <Link href="/intern/onboarding" className="font-medium text-brand-700 underline underline-offset-2 hover:text-brand-800">
+                        Add it in your profile
+                      </Link>{" "}
+                      so your stipend can go out.
+                    </>
+                  )
+                }
+              >
+                {docs.length > 0 ? (
+                  <ul className={cn("grid gap-4", g.wide ? "grid-cols-2 sm:grid-cols-3 xl:grid-cols-5" : "grid-cols-2")}>
+                    {docs.map((doc) => (
+                      <DocCard key={doc.id} doc={doc} />
+                    ))}
+                  </ul>
+                ) : null}
+              </Tile>
+            );
+          })}
         </div>
-
-        <div className="min-w-0">
-          <ul className="divide-y divide-ink-200 border-y border-ink-300">
-            {REQUIRED.map((label) => {
-              const doc = have(label);
-              return doc ? <LedgerRow key={label} doc={doc} /> : <MissingRow key={label} label={label} />;
-            })}
-          </ul>
-          {extras.length > 0 ? (
-            <section className="mt-8" aria-labelledby="docs-more">
-              <h2 id="docs-more" className="font-display text-lg font-semibold text-ink-900">
-                Education and certificates
-              </h2>
-              <ul className="mt-3 divide-y divide-ink-200 border-y border-ink-300">
-                {extras.map((doc) => (
-                  <LedgerRow key={doc.id} doc={doc} />
-                ))}
-              </ul>
-            </section>
-          ) : null}
-        </div>
-      </div>
+      )}
     </div>
   );
 }
 
-/** One file on the ledger: a small preview, what it is, its state in words and an icon, and the one action. */
-function LedgerRow({ doc }: { doc: DocumentRow }) {
+const GROUPS: { title: string; wide?: boolean; has: (label: string) => boolean }[] = [
+  { title: "For your stipend", has: (l) => l === "Aadhaar" || l === "PAN" },
+  { title: "Your profile", has: (l) => l === "Profile photo" || l === "Intro video" },
+  { title: "Education and certificates", wide: true, has: (l) => !["Aadhaar", "PAN", "Profile photo", "Intro video"].includes(l) },
+];
+
+/** One file as itself: the image or the video's first frame, large enough to recognise. */
+function DocCard({ doc }: { doc: DocumentRow }) {
   const type = (doc.contentType ?? "").toLowerCase();
   return (
-    <li className="flex items-center gap-4 py-4">
-      <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-md bg-ink-100 text-ink-700 ring-1 ring-inset ring-ink-200">
+    <li className="group relative min-w-0">
+      <span className="grid aspect-[4/3] place-items-center overflow-hidden rounded-apple-sm bg-ink-50 text-text-subtle ring-1 ring-inset ring-ink-200/70 apple-spring group-hover:ring-brand-400">
         {type.startsWith("image/") ? (
           <DocImagePreview href={doc.href} fit={doc.label === "Profile photo" ? "cover" : "contain"} />
+        ) : type.startsWith("video/") ? (
+          <video muted preload="metadata" src={doc.href} className="size-full object-cover" aria-hidden />
         ) : (
-          <DocIcon contentType={doc.contentType} />
+          <span className="flex flex-col items-center gap-2 text-xs">
+            <DocIcon contentType={doc.contentType} />
+            {kindLabel(doc.contentType)}
+          </span>
         )}
       </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-base font-medium text-ink-900">{doc.label}</p>
-        <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-ink-700">
-          <span className="inline-flex items-center gap-1 font-medium text-brand-800">
-            <Check className="size-4" strokeWidth={3} aria-hidden />
-            On file
-          </span>
-          <span className="nums [overflow-wrap:anywhere]">
-            {doc.fileName} · {formatBytes(doc.size)}
-            {doc.stampedAt ? ` · ${formatDate(doc.stampedAt)}` : ""}
-          </span>
-        </p>
-      </div>
-      <a
-        href={doc.href}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-brand-700 hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-      >
-        View
-        <ExternalLink className="size-3.5" aria-hidden />
-        <span className="sr-only"> {doc.label} (opens in a new tab)</span>
-      </a>
-    </li>
-  );
-}
-
-function MissingRow({ label }: { label: string }) {
-  return (
-    <li className="flex items-center gap-4 py-4">
-      <span className="grid size-14 shrink-0 place-items-center rounded-md border border-dashed border-ink-400 text-signal">
-        <CircleAlert className="size-5" aria-hidden />
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="text-base font-medium text-ink-900">{label}</p>
-        <p className="mt-0.5 text-sm font-medium text-signal">Missing</p>
-      </div>
-      <Link
-        href="/intern/onboarding"
-        className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-brand-700 hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-      >
-        Add
-        <span className="sr-only"> {label} in your profile</span>
-      </Link>
+      <p className="mt-2.5 flex items-center gap-1.5 text-sm font-medium text-ink-900">
+        <a
+          href={doc.href}
+          target="_blank"
+          rel="noreferrer"
+          className="break-words rounded-apple-sm hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 after:absolute after:inset-0"
+        >
+          {doc.label}
+          <span className="sr-only"> (opens in a new tab)</span>
+        </a>
+        <ExternalLink className="size-3.5 shrink-0 text-text-subtle" aria-hidden />
+      </p>
+      <p className="nums mt-0.5 text-xs text-text-subtle [overflow-wrap:anywhere]">
+        {doc.fileName} · {formatBytes(doc.size)}
+        {doc.stampedAt ? ` · ${formatDate(doc.stampedAt)}` : ""}
+      </p>
     </li>
   );
 }

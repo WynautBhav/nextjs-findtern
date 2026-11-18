@@ -82,7 +82,7 @@ export async function scanAndCreate(actor: string): Promise<{ created: number; r
 
 export interface RefundListRow {
   id: string; status: string; amountMinor: number; reason: string | null; createdAt: string | null;
-  paidAt: string | null; settledAt: string | null; studentName: string; studentEmail: string | null; gatewayRefundId: string | null;
+  paidAt: string | null; studentName: string; studentEmail: string | null; gatewayRefundId: string | null;
 }
 
 export async function listRefunds(f: { status?: string; reason?: string; limit: number; offset: number }): Promise<{ rows: RefundListRow[]; total: number }> {
@@ -95,7 +95,7 @@ export async function listRefunds(f: { status?: string; reason?: string; limit: 
   const total = await pool.query(`SELECT count(*)::int AS n FROM payment_refunds r ${w}`, args);
   args.push(f.limit, f.offset);
   const res = await pool.query(
-    `SELECT r.id, r.status, r.amount_minor, r.reason, r.created_at, r.gateway_refund_id, r.settled_at, p.paid_at,
+    `SELECT r.id, r.status, r.amount_minor, r.reason, r.created_at, r.gateway_refund_id, p.paid_at,
             trim(coalesce(u.first_name,'')||' '||coalesce(u.last_name,'')) AS name, u.email
        FROM payment_refunds r JOIN intern_payments p ON p.id=r.intern_payment_id LEFT JOIN users u ON u.id=p.intern_id
        ${w} ORDER BY r.created_at DESC LIMIT $${args.length - 1} OFFSET $${args.length}`,
@@ -107,7 +107,6 @@ export async function listRefunds(f: { status?: string; reason?: string; limit: 
       id: r.id, status: r.status, amountMinor: r.amount_minor, reason: r.reason,
       createdAt: r.created_at ? new Date(r.created_at).toISOString() : null,
       paidAt: r.paid_at ? new Date(r.paid_at).toISOString() : null,
-      settledAt: r.settled_at ? new Date(r.settled_at).toISOString() : null,
       studentName: r.name || "Unknown student", studentEmail: r.email ?? null, gatewayRefundId: r.gateway_refund_id,
     })),
   };

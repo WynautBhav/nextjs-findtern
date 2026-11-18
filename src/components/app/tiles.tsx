@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  * tile only. Every tile's action is the round arrow in its top-right corner. */
 
 const TILE =
-  "min-w-0 rounded-lg border border-ink-200 bg-surface-raised";
+  "min-w-0 rounded-apple-xl border border-ink-200/70 bg-white";
 
 /** The round corner action. 36px, with a 44px hit area on touch. */
 export function CornerLink({ href, label, onDark = false, prefetch }: { href: string; label: string; onDark?: boolean; prefetch?: boolean }) {
@@ -23,7 +23,7 @@ export function CornerLink({ href, label, onDark = false, prefetch }: { href: st
       title={label}
       className={cn(
         "apple-spring inline-flex min-h-9 shrink-0 items-center rounded-full px-3 text-sm font-medium touch:min-h-11",
-        onDark ? "text-white hover:bg-white/10" : "text-ink-600 hover:bg-ink-200/60 hover:text-ink-900",
+        onDark ? "text-white hover:bg-white/10" : "text-brand-700 hover:bg-brand-50",
       )}
     >
       Open<span className="sr-only"> {label}</span>
@@ -55,7 +55,7 @@ export function Tile({
   return (
     <section className={cn(TILE, "flex flex-col p-5 lg:p-6", className)}>
       <div className={cn("flex min-h-9 items-center justify-between gap-3", description ? "mb-1" : "mb-4")}>
-        <h2 className="font-display text-base font-semibold text-ink-900">{title}</h2>
+        <h2 className="text-base font-medium text-ink-900">{title}</h2>
         <div className="flex items-center gap-2">
           {aside}
           {action && corner ? <CornerLink {...action} /> : null}
@@ -112,10 +112,11 @@ export function StatTile({
         // No @container here: its layout containment switches subgrid off; the figure has its own.
         "relative isolate row-span-3 grid grid-rows-subgrid gap-0 overflow-hidden p-4 motion-safe:animate-tile-in sm:p-5",
         // The one brand tile is an owner decision (SPECS §2 dashboard exception).
-        featured && "max-sm:col-span-2 border-transparent bg-brand-800 text-white",
+        featured && "max-sm:col-span-2 bg-[linear-gradient(140deg,var(--color-brand-600)_0%,var(--color-brand-800)_55%,var(--color-brand-950)_100%)] border-transparent text-white", // taste-skill-ignore
       )}
     >
-            <div className="flex items-start justify-between gap-3">
+      {featured ? <Contours /> : null}
+      <div className="flex items-start justify-between gap-3">
         <p className={cn("pt-1.5 text-sm font-medium", featured ? "text-white/85" : "text-ink-700")}>{label}</p>
         {href && corner ? <CornerLink href={href} label={label} onDark={featured} /> : null}
       </div>
@@ -123,7 +124,7 @@ export function StatTile({
       <div className="@container self-end pt-3">
         <p
           className={cn(
-            "nums font-display font-medium",
+            "nums font-light",
             quiet
               ? "text-lg leading-snug"
               : cn("text-[clamp(var(--fig-min),16cqi,3.25rem)] leading-none tracking-[-0.03em]", long ? "break-words [--fig-min:1.25rem]" : "whitespace-nowrap [--fig-min:2rem]"),
@@ -139,6 +140,32 @@ export function StatTile({
   );
 }
 
+/** Topographic lines over the brand tile: the one textured surface on the screen. */
+function Contours() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 400 240"
+      preserveAspectRatio="xMaxYMax slice"
+      className="pointer-events-none absolute inset-0 -z-10 size-full text-white/[0.09]"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.25"
+    >
+      {Array.from({ length: 9 }, (_, i) => (
+        <path
+          key={i}
+          d={`M${150 + i * 14} 260 C ${190 + i * 10} ${190 - i * 12}, ${250 + i * 6} ${150 - i * 14}, 420 ${120 - i * 16}`}
+        />
+      ))}
+      {Array.from({ length: 5 }, (_, i) => (
+        <ellipse key={`e${i}`} cx="360" cy="40" rx={26 + i * 22} ry={18 + i * 16} />
+      ))}
+    </svg>
+  );
+}
+
+// A hatch is a pattern mark for "not sent yet", not a gradient fill.
 const HATCH = "bg-[repeating-linear-gradient(135deg,var(--color-brand-300)_0_2px,transparent_2px_7px)] ring-1 ring-inset ring-brand-300"; // taste-skill-ignore
 
 /**

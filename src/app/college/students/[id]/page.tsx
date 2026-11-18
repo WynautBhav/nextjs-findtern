@@ -3,8 +3,7 @@ import { after } from "next/server";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { FileText, PlayCircle, ShieldCheck } from "lucide-react";
 
-import { Meter } from "@/components/college/meter";
-import { LeadStat, Section } from "@/components/app/stat";
+import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
 import { NudgeButton } from "@/components/college/nudge-button";
 import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { humanizeStatus } from "@/components/app/status";
@@ -99,22 +98,10 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
   const ai = aiStatusLabel(student.aiStatus);
   const name = `${student.firstName} ${student.lastName}`.trim();
 
-  const facts = profile
-    ? ([
-        ["Phone", profile.phone],
-        ["City", profile.city],
-        ["Skills", profile.skills.join(", ")],
-        ["Languages", profile.languages.join(", ")],
-        ["Education", profile.education ? [profile.education.degree, profile.education.branch, profile.education.institution, profile.education.year].filter(Boolean).join(" · ") : ""],
-        ["LinkedIn", profile.links.linkedin],
-      ] as const)
-    : [];
-  const when = (d: Date) => shortDateTime(d, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
-  const rowCls = "flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-3";
-
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* The breadcrumb leads back to Students (crumbParents). */}
+
       <PageHead
         title={name || student.email}
         lede={
@@ -139,146 +126,183 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
         action={!ai.done ? <NudgeButton kind="interview" userIds={[id]} label="Nudge to take the interview" /> : null}
       />
 
-      <div className="grid gap-x-14 gap-y-8 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
-        <Section title="AI interview" hint={ai.done ? "Scored by Findtern's AI interview. The student sees the same report." : `Status: ${ai.label}`}>
-          {ai.done && student.score !== null ? (
-            <div className="space-y-5">
-              <LeadStat label="Findtern score" value={<>{student.score.toFixed(1)}<span className="text-2xl text-ink-600"> / 10</span></>} />
-              <dl className="space-y-3">
-                {AXES.map(([key, label]) =>
-                  typeof ratings[key] === "number" ? (
-                    <div key={key}>
-                      <dt className="flex justify-between text-sm text-ink-700">
-                        {label}
-                        <span className="nums font-semibold text-ink-900">{ratings[key].toFixed(1)}</span>
-                      </dt>
-                      <dd className="mt-1.5">
-                        <Meter value={ratings[key]} max={10} label={`${label} score`} className="h-2" />
-                      </dd>
-                    </div>
-                  ) : null,
-                )}
-              </dl>
-            </div>
+      <Panel>
+        <PanelHeader title="Profile" description={profile ? "Shown because this student is verified with your college." : undefined} />
+        <PanelBody>
+          {profile ? (
+            <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+              {([
+                ["Phone", profile.phone],
+                ["City", profile.city],
+                ["Skills", profile.skills.join(", ")],
+                ["Languages", profile.languages.join(", ")],
+                ["Education", profile.education ? [profile.education.degree, profile.education.branch, profile.education.institution, profile.education.year].filter(Boolean).join(" · ") : ""],
+                ["LinkedIn", profile.links.linkedin],
+              ] as const).map(([k, v]) => (
+                <div key={k}>
+                  <dt className="text-text-subtle">{k}</dt>
+                  <dd className="break-words text-ink-900">{v || "—"}</dd>
+                </div>
+              ))}
+              {profile.experience.length > 0 ? (
+                <div className="sm:col-span-2">
+                  <dt className="text-text-subtle">Experience</dt>
+                  <dd className="space-y-1 text-ink-900">
+                    {profile.experience.map((e, n) => (
+                      <p key={n}>{[e.role, e.company].filter(Boolean).join(" at ")} <span className="text-text-subtle">{e.from} – {e.to}</span></p>
+                    ))}
+                  </dd>
+                </div>
+              ) : null}
+            </dl>
           ) : (
-            <EmptyScene
-              compact
-              title="No AI interview score"
-              body="This student has not taken the AI interview. Employers in drives filter on this score, so a nudge is worth sending."
-              who="You - use the nudge button above"
-            />
+            <p className="text-sm text-text-subtle">Full profile shows once the student is verified with your student code.</p>
           )}
-          {links.feedbackLink || links.recordingLink ? (
-            <div className="mt-5 space-y-3">
-              <div className="flex flex-wrap gap-2">
-                {links.feedbackLink ? (
-                  <a href={`/api/college/students/${id}/report`} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>
-                    <FileText className="size-4" aria-hidden /> Open report
-                  </a>
-                ) : null}
-                {links.recordingLink ? (
-                  <a href={`/api/college/students/${id}/recording`} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>
-                    <PlayCircle className="size-4" aria-hidden /> Watch recording
-                  </a>
-                ) : null}
-              </div>
-              <p className="text-xs text-ink-600">
-                Each time someone opens the report or recording, Findtern records who and when. The student can&apos;t view the recording themselves.
-              </p>
-            </div>
-          ) : null}
-          {views.length > 0 ? (
-            <details className="mt-4 border-t border-ink-200 pt-2">
-              <summary className="min-h-10 cursor-pointer py-2 text-sm font-medium text-ink-800">
-                Opened by your team <span className="nums text-ink-600">({views.length})</span>
-              </summary>
-              <ul className="space-y-2 pb-1 text-sm">
-                {views.map((v, i) => (
-                  <li key={i} className="flex justify-between gap-3">
-                    <span className="text-ink-800">
-                      {v.who ?? "Findtern staff"} · {v.action === "view_recording" ? "recording" : "report"}
-                    </span>
-                    <span className="shrink-0 text-ink-600">{ago(v.at.toISOString())}</span>
-                  </li>
-                ))}
-              </ul>
-            </details>
-          ) : null}
-        </Section>
+        </PanelBody>
+      </Panel>
 
-        <div className="min-w-0 space-y-8">
-          <Section title="Profile" hint={profile ? "Shown because this student is verified with your college." : undefined}>
-            {profile ? (
-              <dl className="divide-y divide-ink-200 border-y border-ink-200 text-sm">
-                {facts.map(([k, v]) => (
-                  <div key={k} className="grid gap-x-6 gap-y-0.5 py-2.5 sm:grid-cols-[8rem_minmax(0,1fr)]">
-                    <dt className="text-ink-600">{k}</dt>
-                    <dd className="break-words text-ink-900">{v || "—"}</dd>
-                  </div>
-                ))}
-                {profile.experience.length > 0 ? (
-                  <div className="grid gap-x-6 gap-y-0.5 py-2.5 sm:grid-cols-[8rem_minmax(0,1fr)]">
-                    <dt className="text-ink-600">Experience</dt>
-                    <dd className="space-y-1 text-ink-900">
-                      {profile.experience.map((e, n) => (
-                        <p key={n}>{[e.role, e.company].filter(Boolean).join(" at ")} <span className="text-ink-600">{e.from} – {e.to}</span></p>
-                      ))}
-                    </dd>
-                  </div>
-                ) : null}
-              </dl>
+        <Panel>
+          <PanelHeader
+            title="AI interview"
+            description={ai.done ? "Scored by Findtern's AI interview. The student sees the same report." : `Status: ${ai.label}`}
+          />
+          <PanelBody className="space-y-5">
+            {ai.done && student.score !== null ? (
+              <>
+                <p className="flex items-baseline gap-2">
+                  <span className="nums text-4xl font-bold leading-none tracking-[-0.03em] text-ink-900">{student.score.toFixed(1)}</span>
+                  <span className="text-sm text-text-subtle">Findtern score / 10</span>
+                </p>
+                <dl className="grid gap-3 sm:grid-cols-2">
+                  {AXES.map(([key, label]) =>
+                    typeof ratings[key] === "number" ? (
+                      <div key={key}>
+                        <dt className="flex justify-between text-sm text-ink-700">
+                          {label}
+                          <span className="nums font-semibold text-ink-900">{ratings[key].toFixed(1)}</span>
+                        </dt>
+                        <dd className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink-100">
+                          <div className="h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, ratings[key] * 10)}%` }} />
+                        </dd>
+                      </div>
+                    ) : null,
+                  )}
+                </dl>
+              </>
             ) : (
-              <p className="max-w-md text-sm text-ink-700">Full profile shows once the student is verified with your student code.</p>
-            )}
-          </Section>
-
-          <Section
-            title="Offers and meetings"
-            hint="From employers on Findtern and in your drives."
-            action={student.offersPending > 0 ? <NudgeButton kind="offer" userIds={[id]} label="Nudge to reply" /> : undefined}
-          >
-            {proposals.length + interviews.length + calls.length === 0 ? (
               <EmptyScene
                 compact
-                title="No offers or meetings"
-                body="Offers, interview invitations and drive calls from employers appear here once they reach out to this student."
-                next={{ label: "See your drives", href: "/college/drives" }}
+                title="No AI interview score"
+                body="This student has not taken the AI interview. Employers in drives filter on this score, so a nudge is worth sending."
+                who="You - use the nudge button above"
               />
-            ) : (
-              <ul className="divide-y divide-ink-200 border-y border-ink-200">
-                {proposals.map(({ p }) => {
-                  const offer = parseOffer(p.offerDetails, p.currency);
-                  const waiting = p.status === "sent";
-                  return (
-                    <li key={p.id} className={rowCls}>
-                      <div className="min-w-0">
-                        <p className="font-medium text-ink-900">Offer · {offer.roleTitle || "Internship"}</p>
-                        <p className="text-sm text-ink-600">Sent {ago(p.createdAt?.toISOString() ?? null)}</p>
-                      </div>
-                      <Pill tone={waiting ? "waiting" : "neutral"}>{waiting ? "Waiting for the student's reply" : humanizeStatus(p.status)}</Pill>
-                    </li>
-                  );
-                })}
-                {calls.map(({ m, drive }) => (
-                  <li key={m.id} className={rowCls}>
-                    <div className="min-w-0">
-                      <p className="font-medium text-ink-900">Drive call · {drive}</p>
-                      <p className="text-sm text-ink-600">{when(m.startsAt)} IST</p>
-                    </div>
-                    <Pill tone="neutral">{humanizeStatus(m.status)}</Pill>
-                  </li>
-                ))}
-                {interviews.map(({ i }) => (
-                  <li key={i.id} className={rowCls}>
-                    <p className="font-medium text-ink-900">Interview · {i.createdAt ? shortDateTime(i.createdAt, { day: "numeric", month: "short" }) : "requested"}</p>
-                    <Pill tone="neutral">{humanizeStatus(i.status)}</Pill>
-                  </li>
-                ))}
-              </ul>
             )}
-          </Section>
-        </div>
-      </div>
+
+            <div className="flex flex-wrap gap-2">
+              {links.feedbackLink ? (
+                <a
+                  href={`/api/college/students/${id}/report`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={buttonClass({ variant: "outline", size: "sm" })}
+                >
+                  <FileText className="size-4 text-brand-700" aria-hidden /> Open report
+                </a>
+              ) : null}
+              {links.recordingLink ? (
+                <a
+                  href={`/api/college/students/${id}/recording`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={buttonClass({ variant: "outline", size: "sm" })}
+                >
+                  <PlayCircle className="size-4 text-brand-700" aria-hidden /> Watch recording
+                </a>
+              ) : null}
+            </div>
+            {links.feedbackLink || links.recordingLink ? (
+              <p className="text-xs text-text-subtle">
+                Each time someone opens the report or recording, Findtern records who and when. The student can&apos;t view the recording themselves.
+              </p>
+            ) : null}
+            {/* Folded here, and only when there is something to list: a full
+                side card said "Nobody has opened them yet" most of the time. */}
+            {views.length > 0 ? (
+              <details className="border-t border-ink-100 pt-4">
+                <summary className="cursor-pointer text-sm font-medium text-ink-800">
+                  Opened by your team <span className="nums text-text-subtle">({views.length})</span>
+                </summary>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {views.map((v, i) => (
+                    <li key={i} className="flex justify-between gap-3">
+                      <span className="text-ink-800">
+                        {v.who ?? "Findtern staff"} · {v.action === "view_recording" ? "recording" : "report"}
+                      </span>
+                      <span className="shrink-0 text-text-subtle">{ago(v.at.toISOString())}</span>
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            ) : null}
+          </PanelBody>
+        </Panel>
+
+      {/* One card for what employers have done with this student (two cards
+          each had its own empty line); a Pill per row for the state. */}
+      <Panel>
+        <PanelHeader
+          title="Offers and meetings"
+          description="From employers on Findtern and in your drives."
+          action={student.offersPending > 0 ? <NudgeButton kind="offer" userIds={[id]} label="Nudge to reply" /> : undefined}
+        />
+        {proposals.length + interviews.length + calls.length === 0 ? (
+          <PanelBody>
+            <EmptyScene
+              compact
+              title="No offers or meetings"
+              body="Offers, interview invitations and drive calls from employers appear here once they reach out to this student."
+              next={{ label: "See your drives", href: "/college/drives" }}
+            />
+          </PanelBody>
+        ) : (
+          <ul className="divide-y divide-ink-100">
+            {proposals.map(({ p }) => {
+              const offer = parseOffer(p.offerDetails, p.currency);
+              const waiting = p.status === "sent";
+              return (
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+                  <div className="min-w-0">
+                    <p className="font-medium text-ink-900">Offer · {offer.roleTitle || "Internship"}</p>
+                    <p className="text-sm text-text-subtle">
+                      Sent {ago(p.createdAt?.toISOString() ?? null)}
+                    </p>
+                  </div>
+                  <Pill tone={waiting ? "waiting" : "neutral"}>{waiting ? "Waiting for the student's reply" : humanizeStatus(p.status)}</Pill>
+                </li>
+              );
+            })}
+            {calls.map(({ m, drive }) => (
+              <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+                <div className="min-w-0">
+                  <p className="font-medium text-ink-900">Drive call · {drive}</p>
+                  <p className="text-sm text-text-subtle">
+                    {shortDateTime(m.startsAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} IST
+                  </p>
+                </div>
+                <Pill tone="neutral">{humanizeStatus(m.status)}</Pill>
+              </li>
+            ))}
+            {interviews.map(({ i }) => (
+              <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+                <div className="min-w-0">
+                  <p className="font-medium text-ink-900">Interview · {i.createdAt ? shortDateTime(i.createdAt, { day: "numeric", month: "short" }) : "requested"}</p>
+                </div>
+                <Pill tone="neutral">{humanizeStatus(i.status)}</Pill>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Panel>
     </div>
   );
 }

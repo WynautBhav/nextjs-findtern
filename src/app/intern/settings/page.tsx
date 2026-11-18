@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { and, desc, eq, gt, isNotNull, sql } from "drizzle-orm";
 import { ArrowRight } from "lucide-react";
 
-import { DetailRow, PageHead, SectionHead } from "@/components/app/primitives";
+import { DetailRow, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { CopyIdButton } from "@/components/intern/copy-id-button";
 import { ActivityVisibilityToggle } from "@/components/intern/activity-visibility-toggle";
@@ -140,7 +140,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
             <li key={id}>
               <a
                 href={`#${id}`}
-                className="inline-flex h-9 items-center rounded-md px-3 text-sm font-medium text-ink-800 underline-offset-4 transition-colors hover:bg-ink-100 hover:text-brand-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 touch:h-11"
+                className="inline-flex h-9 items-center rounded-full px-3.5 text-sm font-medium text-ink-700 ring-1 ring-inset ring-ink-200 transition-colors hover:bg-ink-100 hover:text-ink-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 touch:h-11"
               >
                 {label}
               </a>
@@ -153,9 +153,9 @@ export default async function InternSettings({ searchParams }: { searchParams: P
         <div className="min-w-0 space-y-10">
           <section id="details" className="scroll-mt-24">
             <SectionHead title="Your details" hint="Your email is how you sign in, so it can't be changed here." />
-            <div className="max-w-2xl">
+            <Surface className="p-5 lg:p-6">
               <ContactDetailsForm userId={uid} initial={contact} />
-            </div>
+            </Surface>
           </section>
 
           <section id="bank" className="scroll-mt-24">
@@ -176,51 +176,51 @@ export default async function InternSettings({ searchParams }: { searchParams: P
 
           <section id="privacy" className="scroll-mt-24">
             <SectionHead title="Privacy" hint="What employers can see about you while you browse." />
-            <div className="max-w-2xl">
+            <Surface className="p-5 lg:p-6">
               <ActivityVisibilityToggle initial={presenceRow?.show ?? true} />
-            </div>
+            </Surface>
           </section>
 
           <section id="notifications" className="scroll-mt-24">
             <SectionHead title="Notifications" hint="Choose which optional emails you get." />
-            <div className="max-w-2xl">
+            <Surface className="p-5 lg:p-6">
               <NotificationPrefs role="intern" initial={{ emailMessages: prefsRow?.emailMessages ?? true, pushMessages: prefsRow?.pushMessages ?? true }} />
-            </div>
+            </Surface>
           </section>
 
           <section id="invoices" className="scroll-mt-24">
             <SectionHead title="Invoices" hint="Tax invoices for your activation fee." />
-            <div className="max-w-2xl">
+            <Surface className="p-5 lg:p-6">
               <InvoiceList invoices={invoices} />
-            </div>
+            </Surface>
           </section>
 
           <section id="password" className="scroll-mt-24">
             <SectionHead title="Password" hint="Used when you sign in with your email instead of Google." />
-            <div className="max-w-2xl">
+            <Surface className="p-5 lg:p-6">
               <ChangePasswordForm endpoint={`/api/users/${encodeURIComponent(uid)}/change-password`} />
-            </div>
+            </Surface>
           </section>
         </div>
 
-        <aside className="grid content-start gap-x-8 gap-y-8 sm:grid-cols-2 xl:grid-cols-1">
-          <section aria-labelledby="account-head" className="border-t border-ink-300 pt-5">
-            <h2 id="account-head" className="text-base font-semibold text-ink-900">
+        <aside className="grid content-start gap-4 sm:grid-cols-2 xl:grid-cols-1">
+          <Surface as="section" aria-labelledby="account-head" className="p-5">
+            <h2 id="account-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
               Your account
             </h2>
             <dl className="mt-2 divide-y divide-ink-100">
               <div className="py-3">
-                <dt className="text-sm text-ink-700">Sign-in email</dt>
+                <dt className="text-sm text-text-subtle">Sign-in email</dt>
                 <dd className="mt-1 break-all text-sm font-medium text-ink-900">{user?.email ?? session.email}</dd>
               </div>
               {/* Support finds you by this; quote it when you write in (INT-31). */}
               <div className="py-3">
-                <dt className="text-sm text-ink-700">Findtern ID</dt>
+                <dt className="text-sm text-text-subtle">Findtern ID</dt>
                 <dd className="mt-1 flex flex-wrap items-center gap-x-3">
                   <span className="select-all break-all font-mono text-sm font-medium text-ink-900">{uid}</span>
                   <CopyIdButton id={uid} />
                 </dd>
-                <dd className="mt-1 text-pretty text-xs text-ink-700">Your account&apos;s reference number. Quote it when you write to support so we can find you.</dd>
+                <dd className="mt-1 text-pretty text-xs text-text-subtle">Your account&apos;s reference number. Quote it when you write to support so we can find you.</dd>
               </div>
               {user?.createdAt ? (
                 <DetailRow
@@ -237,13 +237,13 @@ export default async function InternSettings({ searchParams }: { searchParams: P
               See your profile as employers do
               <ArrowRight className="size-4" aria-hidden />
             </Link>
-          </section>
+          </Surface>
 
-          <section aria-labelledby="help-head" className="border-t border-ink-300 pt-5">
-            <h2 id="help-head" className="text-base font-semibold text-ink-900">
+          <Surface as="section" aria-labelledby="help-head" className="p-5">
+            <h2 id="help-head" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
               Need help?
             </h2>
-            <p className="mt-2 text-pretty text-sm leading-relaxed text-ink-700">
+            <p className="mt-2 text-pretty text-sm leading-relaxed text-text-subtle">
               Write to{" "}
               <a href={`mailto:${SITE.email}`} className="font-medium text-primary underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
                 {SITE.email}
@@ -258,7 +258,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
                 Contact page
               </NewTabLink>
             </div>
-          </section>
+          </Surface>
         </aside>
       </div>
     </div>

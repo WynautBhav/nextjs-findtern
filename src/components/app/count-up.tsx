@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useReducedMotion } from "@/components/app/use-reduced-motion";
+import { useReducedMotion } from "motion/react";
 
 export function CountUp({
   value,

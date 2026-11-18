@@ -1,7 +1,7 @@
 import Link from "next/link";
+import { CalendarClock, CalendarPlus, FolderKanban, Handshake, Send } from "lucide-react";
 
 import { CountUp } from "@/components/app/count-up";
-import { Section } from "@/components/app/stat";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { ButtonLink } from "@/components/ui/button";
@@ -31,63 +31,99 @@ export type NextMeetingProps = {
   offersOut: number;
 };
 
-const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-brand-700 focus-visible:ring-offset-2 focus-visible:ring-offset-canvas";
+const CARD = "rounded-2xl border border-white/12 bg-white/8 p-5 shadow-[0_1px_0_rgba(255,255,255,0.08)_inset] backdrop-blur-sm";
+const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-brand-900";
 
 /**
- * The next booked meeting as a ruled block: how far away it is as the figure, then who, when and
- * which project, then join. With none booked, where hiring stands as two ruled figures that open
- * their Proposals tab.
+ * The hero's right column: the next booked meeting (face, time, a countdown
+ * the server computed, project, join) or, with none booked, the two figures
+ * that say where hiring stands. Lives on the dark hero: translucent inset card.
  */
 export function NextMeeting({ meeting, hired, offersOut }: NextMeetingProps) {
   if (!meeting) return <Fallback hired={hired} offersOut={offersOut} />;
   const { with: who, whenLabel, untilLabel, projectName, joinLink, interviewId, scheduleHref } = meeting;
   return (
-    <Section title="Next meeting">
-      <p className="nums font-display text-4xl font-semibold leading-none tracking-[-0.03em] text-ink-900">{untilLabel}</p>
-      <p className="nums mt-2 text-sm text-ink-700">{whenLabel}</p>
+    <section aria-labelledby="next-meeting-h" className={CARD}>
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="next-meeting-h" className="text-sm font-medium text-on-dark">
+          Next meeting
+        </h2>
+        <CalendarClock className="size-4 text-on-dark-subtle" aria-hidden />
+      </div>
 
-      <div className="mt-5 flex items-center gap-3 border-t border-ink-200 pt-4">
-        {who ? <CandidateAvatar photoUrl={who.photoUrl} initials={who.initials} className="size-10 rounded-full bg-ink-800 text-sm text-white" /> : null}
+      <div className="mt-4 flex items-center gap-3">
+        {who ? (
+          <CandidateAvatar photoUrl={who.photoUrl} initials={who.initials} seed={who.initials} className="size-12 rounded-full text-base ring-2 ring-white/25" />
+        ) : null}
         <div className="min-w-0">
-          {who ? <p className="nums text-base font-medium text-ink-900">{who.initials}</p> : null}
-          {projectName ? <p className="line-clamp-2 break-words text-sm text-ink-700">{projectName}</p> : null}
+          {who ? <p className="nums text-base font-semibold leading-6 text-white">With {who.initials}</p> : null}
+          <p className="nums text-sm leading-5 text-on-dark">{whenLabel}</p>
         </div>
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2">
-        {joinLink ? <JoinMeetingButton link={joinLink} interviewId={interviewId} size="sm" variant="outline" /> : null}
-        <Link href={scheduleHref} className={`inline-flex min-h-11 items-center text-sm font-medium text-ink-900 underline underline-offset-4 ${FOCUS}`}>
-          Open schedule
-        </Link>
+      <div className="mt-4 rounded-xl bg-brand-950/35 px-4 py-3 ring-1 ring-inset ring-white/10">
+        <p className="text-xs font-medium text-on-dark">Starts</p>
+        <p className="nums mt-0.5 text-[32px] font-normal leading-[1.15] tracking-[-0.03em] text-white">{untilLabel}</p>
       </div>
-    </Section>
+
+      {projectName ? (
+        <p className="mt-3 flex items-start gap-2 text-sm leading-5 text-on-dark">
+          <FolderKanban className="mt-0.5 size-4 shrink-0 text-on-dark-subtle" aria-hidden />
+          <span className="line-clamp-2 min-w-0 break-words">{projectName}</span>
+        </p>
+      ) : null}
+
+      <div className="mt-4 grid gap-2">
+        {/* The page's one amber button is the queue's; the join button is solid white on the dark card. The wrapper restyles the trigger only (the rules dialog is portaled out of it). */}
+        {joinLink ? (
+          <div className="[&_button]:border-transparent [&_button]:bg-white [&_button]:text-brand-950 [&_button]:shadow-sm [&_button:hover]:bg-brand-50">
+            <JoinMeetingButton link={joinLink} interviewId={interviewId} size="sm" variant="outline" block />
+          </div>
+        ) : null}
+        <ButtonLink href={scheduleHref} variant="outlineLight" size="sm" block className={FOCUS}>
+          Open schedule
+        </ButtonLink>
+      </div>
+    </section>
   );
 }
 
-/** No meeting booked: where hiring stands instead, as two ruled figures. */
+/** No meeting booked: where hiring stands instead, as two figures that open their Proposals tab. */
 function Fallback({ hired, offersOut }: { hired: number; offersOut: number }) {
-  const rows = [
-    { href: "/employer/proposals?status=hired", label: "Hired so far", value: hired },
-    { href: "/employer/proposals?status=open", label: "Offers out", value: offersOut },
-  ];
   return (
-    <Section title="Next meeting" hint="None booked">
-      <ul className="border-t border-ink-200">
-        {rows.map((r) => (
-          <li key={r.href} className="border-b border-ink-200">
-            <Link href={r.href} className={`flex min-h-14 items-baseline justify-between gap-4 py-3 text-sm text-ink-700 hover:text-ink-900 ${FOCUS}`}>
-              {r.label}
-              <span className="nums font-display text-2xl font-semibold text-ink-900">
-                <span aria-hidden><CountUp value={r.value} /></span>
-                <span className="sr-only">{r.value}</span>
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <ButtonLink href="/employer/candidates" variant="outline" size="sm" className={`mt-4 ${FOCUS}`}>
-        Find candidates to meet
-      </ButtonLink>
-    </Section>
+    <section aria-labelledby="next-meeting-h" className={CARD}>
+      <div className="flex items-center justify-between gap-3">
+        <h2 id="next-meeting-h" className="text-sm font-medium text-on-dark">
+          Next meeting
+        </h2>
+        <CalendarPlus className="size-4 text-on-dark-subtle" aria-hidden />
+      </div>
+      <p className="mt-1 text-sm leading-5 text-on-dark">No meeting booked.</p>
+
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <Tile href="/employer/proposals?status=hired" icon={<Handshake className="size-4" aria-hidden />} label="Hired so far" value={hired} />
+        <Tile href="/employer/proposals?status=open" icon={<Send className="size-4" aria-hidden />} label="Offers out" value={offersOut} />
+      </div>
+    </section>
+  );
+}
+
+function Tile({ href, icon, label, value }: { href: string; icon: React.ReactNode; label: string; value: number }) {
+  return (
+    <Link
+      href={href}
+      className={`group block min-w-0 rounded-xl bg-brand-950/35 px-4 py-3 ring-1 ring-inset ring-white/10 transition-colors duration-150 hover:bg-brand-950/55 ${FOCUS}`}
+    >
+      <span className="flex items-center gap-1.5 text-xs font-medium text-on-dark">
+        <span className="text-on-dark-subtle">{icon}</span>
+        {label}
+      </span>
+      <span className="nums mt-2 block text-[32px] font-normal leading-none tracking-[-0.03em] text-white">
+        <span aria-hidden>
+          <CountUp value={value} />
+        </span>
+        <span className="sr-only">{value}</span>
+      </span>
+    </Link>
   );
 }

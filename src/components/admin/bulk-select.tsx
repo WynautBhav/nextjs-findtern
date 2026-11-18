@@ -193,7 +193,7 @@ export function BulkSelectProvider({
             type="button"
             onClick={() => setError(null)}
             aria-label="Dismiss error"
-            className="grid size-6 place-items-center rounded-md transition-colors hover:bg-danger/15 focus-visible:outline-2 focus-visible:outline-ring touch:size-11"
+            className="grid size-6 place-items-center rounded-full transition-colors hover:bg-danger/15 focus-visible:outline-2 focus-visible:outline-ring touch:size-11"
           >
             <X className="size-3.5" />
           </button>
@@ -212,7 +212,7 @@ export function BulkSelectProvider({
             }}
             role="region"
             aria-label={`Actions for ${selected.size} selected ${noun}`}
-            className="apple-admin pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-lg bg-[color:var(--admin-pop)] py-1.5 pr-1.5 pl-5 text-[color:var(--admin-pop-ink)] shadow-lg"
+            className="apple-admin pointer-events-auto flex max-w-full flex-wrap items-center gap-1.5 rounded-[1.75rem] bg-[color:var(--admin-pop)] py-1.5 pr-1.5 pl-5 text-[color:var(--admin-pop-ink)] shadow-lg"
           >
             <p className="text-sm font-medium whitespace-nowrap">
               <span className="tabular-nums">{selected.size}</span> selected
@@ -229,7 +229,7 @@ export function BulkSelectProvider({
                   disabled={running !== null}
                   onClick={() => run(action)}
                   className={cn(
-                    "inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md px-3 transition-colors duration-[var(--motion-fast)] text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[color:var(--admin-pop-ink)] disabled:cursor-not-allowed disabled:opacity-50 touch:min-h-11 touch:min-w-11 touch:px-4",
+                    "apple-spring inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full px-3.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[color:var(--admin-pop-ink)] disabled:cursor-not-allowed disabled:opacity-50 touch:min-h-11 touch:min-w-11 touch:px-4",
                     action.tone === "danger"
                       ? "bg-danger-soft text-danger hover:opacity-90"
                       : "hover:bg-[color:var(--admin-pop-ink)]/15",
@@ -245,7 +245,7 @@ export function BulkSelectProvider({
               type="button"
               onClick={clear}
               aria-label="Clear selection"
-              className="inline-flex size-9 cursor-pointer items-center justify-center rounded-md opacity-80 hover:bg-[color:var(--admin-pop-ink)]/15 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[color:var(--admin-pop-ink)] touch:size-11"
+              className="apple-spring inline-flex size-9 cursor-pointer items-center justify-center rounded-full opacity-80 hover:bg-[color:var(--admin-pop-ink)]/15 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[color:var(--admin-pop-ink)] touch:size-11"
             >
               <X className="size-4" />
             </button>

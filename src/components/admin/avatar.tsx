@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { initialsOf } from "@/lib/admin/person-tint";
+import { initialsOf, personTint } from "@/lib/admin/person-tint";
 import { cn } from "@/lib/utils";
 
 const SIZES = {
@@ -13,12 +13,13 @@ const SIZES = {
 } as const;
 
 /**
- * A person in the admin: their own photo, or their initials on a flat ink disc (the same
- * `UserDot` look as the shell; never a pastel tint). A missing photo never renders as somebody
- * else's face. `id` is kept for callers and no longer changes the colour. Decorative: the name is always printed next to it, so it is hidden from assistive tech.
+ * A person in the admin: their own photo, or their initials on a pale tint that is theirs alone
+ * (stable per `id`, falling back to the name). A missing photo never renders as somebody else's
+ * face. Decorative: the name is always printed next to it, so it is hidden from assistive tech.
  */
 export function AdminAvatar({
   name,
+  id,
   photoUrl,
   size = "md",
   className,
@@ -49,8 +50,13 @@ export function AdminAvatar({
       />
     );
   }
+  const tint = personTint(id ?? name);
   return (
-    <span aria-hidden className={cn("grid shrink-0 place-items-center rounded-full bg-ink-900 font-semibold text-paper", SIZES[size], className)}>
+    <span
+      aria-hidden
+      style={{ backgroundColor: `var(--admin-person-${tint})`, color: `var(--admin-person-ink-${tint})` }}
+      className={cn("grid shrink-0 place-items-center rounded-full font-semibold", SIZES[size], className)}
+    >
       {initialsOf(name)}
     </span>
   );

@@ -125,10 +125,10 @@ test("buildKpis: with-profile plus incomplete equals signups, and the placement 
   assert.equal(by.needs.value, 17);
   assert.equal(by.needs.caption, "4 new this week");
   assert.equal(by.candidates.value, 900);
-  assert.equal(by.candidates.caption, "finished · 25 new this week");
+  assert.equal(by.candidates.caption, "with a profile · 25 new this week");
   assert.equal(by.companies.caption, "3 new this week");
   assert.equal(by.placements.value, placements.total);
-  assert.equal(by.placements.caption, "22 hired and paid, 13 accepted, awaiting payment");
+  assert.equal(by.placements.caption, "22 paid, 13 awaiting payment");
 });
 
 test("buildKpis: a failed read drops its tile, a failed queue is said, an empty queue is honest", () => {
@@ -136,9 +136,7 @@ test("buildKpis: a failed read drops its tile, a failed queue is said, an empty 
   const empty = buildKpis(base);
   assert.deepEqual(empty.kpis.map((k) => k.key), ["needs", "candidates"]);
   assert.equal(empty.kpis[0].caption, "Nothing waiting on the team");
-  assert.equal(empty.kpis[1].caption, "No sign-ups yet");
-  // Sign-ups exist but none finished: the tile is 0 and says why, so it cannot read against the hires.
-  assert.equal(buildKpis({ ...base, signups: 60, incompleteProfiles: 60 }).kpis[1].caption, "none of 60 sign-ups has finished yet");
+  assert.equal(empty.kpis[1].caption, "No finished profiles yet");
   assert.equal(buildKpis({ ...base, queueTotal: 3, queueFailed: true }).kpis[0].caption, "Some queues did not load");
   // New this week can never exceed the total it is part of.
   assert.equal(buildKpis({ ...base, queueTotal: 2, queueFresh: 9 }).kpis[0].caption, "2 new this week");
@@ -310,8 +308,8 @@ import { greetingFor, groupActivity, relativeWhen, untilWhen } from "./dashboard
 
 test("candidate caption says 'all new this week' when every profile is new", () => {
   const base = { queueTotal: 0, queueFresh: 0, queueFailed: false, signups: 5, incompleteProfiles: 0, profilesThisWeek: 5, companies: null, companiesThisWeek: null, placements: null };
-  assert.equal(buildKpis(base).kpis[1].caption, "finished · all new this week");
-  assert.equal(buildKpis({ ...base, signups: 9, profilesThisWeek: 5 }).kpis[1].caption, "finished · 5 new this week");
+  assert.equal(buildKpis(base).kpis[1].caption, "with a profile · all new this week");
+  assert.equal(buildKpis({ ...base, signups: 9, profilesThisWeek: 5 }).kpis[1].caption, "with a profile · 5 new this week");
 });
 
 test("groupActivity folds consecutive events of one kind and leaves single ones", () => {
@@ -355,12 +353,4 @@ test("a group as large as the fetch limit reads 'N+' because older events may be
   const run = (n: number) => buildActivity({ recentUsers: [], recentProjects: [], recentAccepted: offers(n), recentPayments: [] }, 3)[0];
   assert.equal(run(ACTIVITY_FETCH_LIMIT).name, `${ACTIVITY_FETCH_LIMIT}+ offers`);
   assert.equal(run(ACTIVITY_FETCH_LIMIT - 1).name, `${ACTIVITY_FETCH_LIMIT - 1} offers`);
-});
-
-import { UNSENT_PROPOSAL_STATUSES } from "./dashboard-overview-pure.ts";
-
-test("the week count leaves out proposals never sent, and no pipeline stage is one of them", () => {
-  assert.deepEqual([...UNSENT_PROPOSAL_STATUSES], ["draft"]);
-  const staged = BAND_STAGES.flatMap((s) => [...s.statuses]);
-  for (const st of UNSENT_PROPOSAL_STATUSES) assert.ok(!staged.includes(st as never), `${st} is a pipeline stage`);
 });

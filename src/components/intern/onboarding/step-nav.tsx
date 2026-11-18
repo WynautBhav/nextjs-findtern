@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { motion, useReducedMotion } from "motion/react";
 import { Check, Lock } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -9,24 +10,42 @@ import { STEPS } from "./types";
 
 const LAST = STEPS.length - 1;
 
-/** The wizard's one figure: how much of the CV is written, as a number and one segment per step (desktop rail). */
+/** Progress ring on a brand-gradient card: the one hero of the wizard (desktop rail). */
 export function Progress({ step, done, total }: { step: number; done: number; total: number }) {
   const pct = Math.round((done / total) * 100);
+  const reduce = useReducedMotion();
+  const R = 26;
+  const C = 2 * Math.PI * R;
   return (
-    <div className="mb-5 border-t border-ink-300 pt-4">
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-sm font-medium text-ink-800">
-          Step <span className="nums">{step + 1}</span> of <span className="nums">{STEPS.length}</span>
-        </p>
-        <p className="nums font-display text-4xl font-bold leading-none text-ink-900">
-          {pct}
-          <span className="text-lg font-semibold text-ink-700">%</span>
-        </p>
-      </div>
-      <div className="mt-3 flex gap-1" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-valuetext={`${done} of ${total} steps complete`} aria-label="Steps complete">
-        {Array.from({ length: total }, (_, i) => (
-          <span key={i} aria-hidden className={cn("h-2 flex-1 rounded-md transition-colors duration-300", i < done ? "bg-brand-800" : "bg-ink-200")} />
-        ))}
+    <div className="relative isolate mb-4 overflow-hidden rounded-apple-xl bg-gradient-to-br from-brand-600 to-brand-950 p-4 text-white shadow-[0_1px_0_rgb(255_255_255/0.12)_inset,0_14px_32px_-14px_rgb(10_40_30/0.55)]">
+      <div aria-hidden className="pointer-events-none absolute -right-8 -top-10 -z-10 size-36 rounded-full bg-brand-400/30 blur-2xl" />
+      <div className="flex items-center gap-4">
+        <div className="relative size-16 shrink-0">
+          <svg viewBox="0 0 64 64" className="size-16 -rotate-90" aria-hidden>
+            <circle cx="32" cy="32" r={R} fill="none" stroke="rgb(255 255 255 / 0.18)" strokeWidth="5" />
+            <motion.circle
+              cx="32"
+              cy="32"
+              r={R}
+              fill="none"
+              stroke="white"
+              strokeWidth="5"
+              strokeLinecap="round"
+              strokeDasharray={C}
+              initial={reduce ? false : { strokeDashoffset: C }}
+              animate={{ strokeDashoffset: C * (1 - pct / 100) }}
+              transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
+            />
+          </svg>
+          <span className="nums absolute inset-0 grid place-items-center text-sm font-medium">{pct}%</span>
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-white">Profile</p>
+          <p className="nums mt-0.5 text-sm text-on-dark-subtle">
+            Step <span className="font-semibold text-white">{step + 1}</span> of {STEPS.length}
+          </p>
+          <p className="sr-only" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-valuetext={`${done} of ${total} steps complete`} aria-label="Steps complete" />
+        </div>
       </div>
     </div>
   );
@@ -49,9 +68,10 @@ function LockNote({ id, show }: { id: string; show: boolean }) {
 export function StepRail({ step, passes, reachable, onSelect }: RailProps) {
   const anyLocked = STEPS.some((_, i) => !reachable(i));
   return (
-    <nav aria-label="Profile steps" className="border-y border-ink-300">
-      <ol className="relative divide-y divide-ink-200">
+    <nav aria-label="Profile steps" className="rounded-apple-xl border border-ink-200/80 bg-white p-2 shadow-[0_1px_2px_rgb(15_40_30/0.05)]">
+      <ol className="relative space-y-0.5">
         {/* The spine the dots hang on. */}
+        <span aria-hidden className="absolute bottom-5 left-[1.375rem] top-5 w-px bg-ink-200" />
         {STEPS.map((s, i) => {
           const current = i === step;
           const open = reachable(i);
@@ -65,10 +85,11 @@ export function StepRail({ step, passes, reachable, onSelect }: RailProps) {
                 aria-describedby={open ? undefined : "rail-lock-note"}
                 aria-current={current ? "step" : undefined}
                 className={cn(
-                  "apple-spring relative flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm",
-                  current ? "font-semibold text-ink-900" : open ? "text-ink-700 hover:bg-ink-50" : "cursor-not-allowed text-ink-700",
+                  "apple-spring relative flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 text-left text-sm",
+                  current ? "bg-brand-50 font-semibold text-brand-900" : open ? "text-ink-700 hover:bg-ink-50" : "cursor-not-allowed text-text-subtle",
                 )}
               >
+                {current ? <span aria-hidden className="absolute inset-y-2 left-0 w-0.5 rounded-full bg-brand-600" /> : null}
                 <StepDot index={i} current={current} done={done} open={open} />
                 <span className="truncate">{s.title}</span>
               </button>
@@ -87,7 +108,7 @@ function StepDot({ index, current, done, open }: { index: number; current: boole
       aria-hidden
       className={cn(
         "nums relative z-10 grid size-6 shrink-0 place-items-center rounded-full text-xs font-semibold ring-4",
-        current ? "bg-brand-800 text-white ring-surface" : done ? "bg-brand-100 text-brand-700 ring-surface" : open ? "bg-ink-100 text-ink-600 ring-surface" : "bg-ink-50 text-ink-700 ring-surface",
+        current ? "bg-brand-700 text-white ring-brand-50" : done ? "bg-brand-100 text-brand-700 ring-white" : open ? "bg-ink-100 text-ink-600 ring-white" : "bg-ink-50 text-text-subtle ring-white",
       )}
     >
       {done && !current ? <Check className="size-3.5" /> : !open ? <Lock className="size-3" /> : index + 1}
@@ -102,7 +123,7 @@ export function MobileSteps({ step, passes, reachable, onSelect }: RailProps) {
     <div className="mb-4 lg:hidden">
       <div className="flex gap-1" aria-hidden>
         {STEPS.map((s, i) => (
-          <span key={s.id} className={cn("h-2 flex-1 rounded-md transition-colors duration-300", i === step ? "bg-brand-800" : passes[i] && i !== LAST ? "bg-brand-700/50" : "bg-ink-200")} />
+          <span key={s.id} className={cn("h-1.5 flex-1 rounded-full transition-colors duration-300", i === step ? "bg-brand-700" : passes[i] && i !== LAST ? "bg-brand-300" : "bg-ink-200")} />
         ))}
       </div>
       <button
@@ -118,8 +139,8 @@ export function MobileSteps({ step, passes, reachable, onSelect }: RailProps) {
         <span className="font-medium text-brand-700">{open ? "Hide steps" : "All steps"}</span>
       </button>
       {open ? (
-        <div id="mobile-steps" className="mt-1 border-y border-ink-300">
-          <ol className="divide-y divide-ink-200">
+        <div id="mobile-steps" className="mt-1 rounded-apple-xl border border-ink-200/80 bg-white p-2 shadow-[0_1px_2px_rgb(15_40_30/0.05)]">
+          <ol className="space-y-0.5">
             {STEPS.map((s, i) => {
               const current = i === step;
               const can = reachable(i);
@@ -136,8 +157,8 @@ export function MobileSteps({ step, passes, reachable, onSelect }: RailProps) {
                       onSelect(i);
                     }}
                     className={cn(
-                      "apple-spring flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-left text-sm",
-                      current ? "font-semibold text-ink-900" : can ? "text-ink-700 hover:bg-ink-50" : "cursor-not-allowed text-ink-700",
+                      "apple-spring flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 text-left text-sm",
+                      current ? "bg-brand-50 font-semibold text-brand-900" : can ? "text-ink-700 hover:bg-ink-50" : "cursor-not-allowed text-text-subtle",
                     )}
                   >
                     <StepDot index={i} current={current} done={passes[i] && i !== LAST} open={can} />

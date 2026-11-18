@@ -3,20 +3,21 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
-import { Info, Send, TriangleAlert } from "lucide-react";
+import { CircleGauge, Info, Send, TriangleAlert } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { RATING_META, type CandidateSummary } from "@/lib/employer-candidates";
 import { type Currency, type Pricing } from "@/lib/employer-pricing";
-import { formatDate, formatMoney, formatPerHire, formatRate } from "@/lib/format";
+import { formatMoney, formatPerHire, formatRate } from "@/lib/format";
 import type { PlaceOfSupply } from "@/lib/gst";
 import { firstPaymentNote } from "@/lib/first-payment-copy";
 import { offerBreakdown } from "@/lib/offer-breakdown";
-import { RollingNumber } from "@/components/app/rolling-number";
+import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
 import { billableWorkingDays, isClockTime, latestShiftEnd, MAX_SHIFT_MINUTES, PAID_LEAVE_OPTIONS, scheduledMonthlyHours, shiftMinutes, WEEKLY_SCHEDULES, workingDaysPerWeek, type WeeklySchedule } from "@/lib/offer";
 import { shiftInIst, TIMEZONES } from "@/lib/timezones";
 import { feeDisplay } from "@/lib/fee-display";
 import { JD_HINT, JD_LABEL, LEARN_HINT, LEARN_LABEL, learnIssue } from "@/lib/proposal-copy";
+import { SURFACE_CLASS } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
@@ -24,7 +25,7 @@ import { CountdownAgreement, EMPLOYER_HIRING_POLICY } from "@/components/app/cou
 import { StartDateField } from "@/components/employer/start-date-field";
 import { startDateIssue } from "@/components/employer/start-date-model";
 import { onRadioKeys, radioTab } from "@/components/intern/onboarding/fields";
-import { inputClass } from "@/components/employer/proposal-ui";
+import { fieldClass } from "@/components/employer/ui-tokens";
 
 /**
  * Proposal composer.
@@ -277,28 +278,20 @@ export function SendProposalForm({
         : null;
   const durationLabel = DURATIONS.find((d) => d.value === duration)?.label ?? "";
 
-  const startLabel = /^\d{4}-\d{2}-\d{2}/.test(startDate) ? formatDate(startDate) : null;
-  const inr = currency === "INR";
-  // The hero figure of the page: it rolls as the schedule, leave or project changes the sum.
-  const monthlyNode =
-    inr && totals.monthly > 0 && Number.isInteger(totals.monthly) ? <RollingNumber value={totals.monthly} currency="INR" /> : formatMoney(Math.round(totals.monthly * 100), currency);
-  const summaryLines = breakdown.lines.filter((l) => l.key !== "monthly");
-  const ratingBits = RATING_META.filter((r) => candidate.ratings[r.key] > 0).map((r) => `${SHORT_RATING[r.key] ?? r.label} ${candidate.ratings[r.key].toFixed(1)}`);
-
   return (
-    <div className="grid gap-x-14 gap-y-10 pb-20 lg:grid-cols-[minmax(0,1fr)_22rem] lg:pb-0">
+    <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_21rem]">
       <form
         noValidate
         onSubmit={(e) => {
           e.preventDefault();
           review();
         }}
-        className="min-w-0"
+        className={cn("min-w-0 overflow-hidden", SURFACE_CLASS)}
       >
         {/* ── 1. The role ─────────────────────────────────────────────── */}
-        <Step title="The role" hint="What the candidate is being offered, and from when.">
+        <Step n={1} title="The role" hint="What the candidate is being offered, and from when.">
           {projects.length === 0 ? (
-            <p className="rounded-md border border-warning/25 bg-warning-soft px-3.5 py-3 text-sm text-ink-900">
+            <p className="rounded-apple-md border border-warning/25 bg-warning-soft px-3.5 py-3 text-sm text-ink-700">
               You have no open project. A proposal has to attach to one, so{" "}
               <Link href="/employer/projects" className="font-medium text-brand-700 underline underline-offset-4">
                 open or create one first
@@ -358,10 +351,10 @@ export function SendProposalForm({
                       disabled={disabled}
                       onClick={() => setDuration(d.value)}
                       className={cn(
-                        "nums min-h-11 rounded-md border text-sm font-medium transition-colors duration-[var(--motion-fast)] disabled:cursor-not-allowed disabled:opacity-40",
+                        "apple-spring apple-pressable nums min-h-11 rounded-apple-sm border text-sm font-medium disabled:cursor-not-allowed disabled:opacity-40",
                         duration === d.value
-                          ? "border-ink-900 bg-ink-900 text-paper"
-                          : "border-ink-300 bg-surface-raised text-ink-800 hover:border-ink-400 hover:bg-ink-100",
+                          ? "border-brand-700 bg-brand-700 text-white"
+                          : "border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50",
                       )}
                     >
                       {d.value.replace("m", "")} mo
@@ -370,7 +363,7 @@ export function SendProposalForm({
                 })}
               </div>
               {shortOnly ? (
-                <p className="mt-1.5 text-xs text-ink-700">Candidates scoring below 6 can be offered up to 2 months.</p>
+                <p className="mt-1.5 text-xs text-text-subtle">Candidates scoring below 6 can be offered up to 2 months.</p>
               ) : null}
             </div>
             <StartDateField
@@ -384,28 +377,27 @@ export function SendProposalForm({
         </Step>
 
         {/* ── 2. Pay ──────────────────────────────────────────────────── */}
-        <Step title="Pay" hint={`The hourly rate is fixed by the candidate's score band. Billed in ${currency}, set by your company's country.`}>
-          <div className="border-y border-ink-200 py-3.5">
-            <p className="nums flex flex-wrap items-baseline gap-x-3 gap-y-1 text-sm text-ink-700">
-              <span className="font-semibold text-ink-900">{rate.bandName} band</span>
-              <span>
-                <span className="font-display text-lg font-semibold text-ink-900">{formatRate(rate.hourlyRateMinor, currency)}</span>
-              </span>
-              <span>
-                {fee.kind === "free" ? (
-                  <>
-                    <s className="text-ink-600">{formatMoney(fee.listMinor, currency)}</s> <span className="font-semibold text-brand-800">(FREE)</span> one-time hiring fee
-                  </>
-                ) : (
-                  <>{formatPerHire(rate.perHireMinor, currency)} one-time hiring fee</>
-                )}
-              </span>
+        <Step n={2} title="Pay" hint={`The hourly rate is fixed by the candidate's score band. Billed in ${currency}, set by your company's country.`}>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-apple-lg bg-brand-50 px-4 py-3.5">
+            <p className="text-sm font-medium text-brand-700">{rate.bandName} band</p>
+            <p className="nums text-sm text-ink-700">
+              <span className="font-semibold text-ink-900">{formatRate(rate.hourlyRateMinor, currency)}</span>
+              {" · "}
+              {fee.kind === "free" ? (
+                <>
+                  <s className="text-text-subtle">{formatMoney(fee.listMinor, currency)}</s>{" "}
+                  <span className="font-semibold text-success">(FREE)</span> one-time hiring fee
+                </>
+              ) : (
+                <>
+                  <span>{formatPerHire(rate.perHireMinor, currency)}</span> one-time hiring fee
+                </>
+              )}
             </p>
-            <p className="mt-1.5 flex items-start gap-1.5 text-sm text-ink-700">
-              <Info className="mt-0.5 size-3.5 shrink-0 text-ink-600" aria-hidden />
-              <span>
-                {rateCardSource === "plan" ? "Rates come from your plan." : "Standard published rates apply."} {rate.bandBlurb}
-              </span>
+            <p className="flex w-full items-start gap-1.5 text-sm text-ink-600">
+              <Info className="mt-0.5 size-3.5 shrink-0 text-ink-500" aria-hidden />
+              {rateCardSource === "plan" ? "Rates come from your plan." : "Standard published rates apply."}{" "}
+              {rate.bandBlurb}
             </p>
           </div>
 
@@ -446,7 +438,7 @@ export function SendProposalForm({
         </Step>
 
         {/* ── 3. Work setup ───────────────────────────────────────────── */}
-        <Step title="Work setup" hint="Based on where the candidate said they can work. Shown before they accept.">
+        <Step n={3} title="Work setup" hint="Based on where the candidate said they can work. Shown before they accept.">
           <fieldset>
             <legend className="text-sm font-medium text-ink-800">Work mode</legend>
             <p className="mt-0.5 text-sm text-ink-600">
@@ -464,10 +456,10 @@ export function SendProposalForm({
                   aria-pressed={mode === option.value}
                   onClick={() => setMode(option.value)}
                   className={cn(
-                    "min-h-11 rounded-md border text-sm font-medium transition-colors duration-[var(--motion-fast)]",
+                    "apple-spring apple-pressable min-h-11 rounded-apple-sm border text-sm font-medium",
                     mode === option.value
-                      ? "border-ink-900 bg-ink-900 text-paper"
-                      : "border-ink-300 bg-surface-raised text-ink-800 hover:border-ink-400 hover:bg-ink-100",
+                      ? "border-brand-700 bg-brand-700 text-white"
+                      : "border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:bg-ink-50",
                   )}
                 >
                   {option.label}
@@ -539,10 +531,10 @@ export function SendProposalForm({
                     setShiftTo(p.to);
                   }}
                   className={cn(
-                    "nums min-h-11 rounded-md border px-3 text-sm font-medium transition-colors duration-[var(--motion-fast)]",
+                    "apple-spring nums min-h-11 rounded-apple-sm border px-3 text-sm font-medium",
                     shiftFrom === p.from && shiftTo === p.to
-                      ? "border-ink-900 bg-ink-100 text-ink-900"
-                      : "border-ink-300 bg-surface-raised text-ink-800 hover:bg-ink-100",
+                      ? "border-brand-600 bg-brand-50 text-brand-800"
+                      : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
                   )}
                 >
                   {p.label}
@@ -586,7 +578,7 @@ export function SendProposalForm({
         </Step>
 
         {/* ── 4. Message ──────────────────────────────────────────────── */}
-        <Step title="Message" hint="Plain text. This is the part candidates read to decide.">
+        <Step n={4} title="Message" hint="Plain text. This is the part candidates read to decide." last>
           <TextArea
             id="message"
             label={JD_LABEL}
@@ -609,98 +601,101 @@ export function SendProposalForm({
           />
         </Step>
 
+        <div className="flex flex-wrap items-center gap-3 border-t border-ink-100 bg-ink-50/60 px-6 py-4 lg:hidden">
+          <button
+            type="submit"
+            disabled={Boolean(blockedReason)}
+            aria-describedby={blockedReason ? "send-blocked-form" : undefined}
+            className={buttonClass({ block: true })}
+          >
+            <Send className="size-4" aria-hidden />
+            Review and send
+          </button>
+          {blockedReason ? (
+            <p id="send-blocked-form" className="basis-full text-sm text-ink-700">
+              {blockedReason}
+            </p>
+          ) : null}
+        </div>
       </form>
 
-      {/* ── Summary: the offer as a ledger, live as the form changes ───── */}
-      <aside aria-label="Offer summary" className="lg:sticky lg:top-24 lg:self-start">
-        <div className="flex items-center gap-3 border-b border-ink-200 pb-4">
-          <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-ink-900 text-sm font-semibold text-paper">
-            {candidate.initials}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="break-words text-base font-semibold text-ink-900">{candidate.name}</p>
-            <p className="nums text-sm text-ink-700">{candidate.scored ? `${candidate.score.toFixed(1)}/10 Findtern Score` : "Not scored"}</p>
-          </div>
-          <Link
-            href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-800 underline decoration-brand-300 decoration-2 underline-offset-4 outline-none hover:decoration-brand-700 focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-700"
-          >
-            Profile
-          </Link>
-        </div>
-        {ratingBits.length > 0 ? <p className="nums border-b border-ink-200 py-3 text-sm text-ink-700">{ratingBits.join(" · ")}</p> : null}
-
-        <div className="pt-5">
-          <p className="text-sm font-medium text-ink-600">{inr && totals.monthly > 0 ? "Monthly, incl. GST" : "Monthly amount"}</p>
-          {/* One month's figure only (client QA), not monthly × months. */}
-          <p className="nums mt-1 break-words font-display text-4xl font-semibold leading-none text-ink-900">{monthlyNode}</p>
-          <p className="mt-2 text-sm text-ink-700">
-            {durationLabel || "No duration yet"}
-            {startLabel ? `, from ${startLabel}` : ""}
-          </p>
-        </div>
-
-        <dl className="mt-5 divide-y divide-ink-200 border-y border-ink-200">
-          {summaryLines.map((line) => (
-            <div key={line.key} className="flex items-baseline justify-between gap-4 py-2.5">
-              <dt className={cn("text-sm", line.key === "gst" ? "pl-3 text-ink-600" : "text-ink-700")}>{line.key === "fee" ? "Findtern hiring fee, one-time" : line.label}</dt>
-              <dd className="nums text-right text-sm font-medium text-ink-900">
-                {line.struck ? (
-                  <>
-                    <s className="mr-1.5 font-normal text-ink-600">{line.struck}</s>
-                    <span className="font-semibold text-brand-800">{line.value}</span>
-                  </>
-                ) : (
-                  line.value
-                )}
-              </dd>
+      {/* ── Summary ─────────────────────────────────────────────────── */}
+      <aside className="space-y-4 lg:sticky lg:top-8 lg:self-start">
+        <section className={cn("overflow-hidden", SURFACE_CLASS)}>
+          <div className="flex items-center gap-3 border-b border-ink-100 p-5">
+            <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800">
+              {candidate.initials}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="break-words font-semibold text-ink-900">{candidate.name}</p>
+              <p className="nums flex items-center gap-1.5 text-sm text-ink-600">
+                <CircleGauge className="size-4" aria-hidden />
+                {candidate.scored ? `${candidate.score.toFixed(1)}/10 Findtern Score` : "Not scored"}
+              </p>
             </div>
-          ))}
-          <div className="flex items-baseline justify-between gap-4 py-2.5">
-            <dt className="text-sm text-ink-700">Duration</dt>
-            <dd className="nums text-right text-sm font-medium text-ink-900">{durationLabel || "-"}</dd>
+            <Link
+              href={`/employer/intern/${encodeURIComponent(candidate.id)}`}
+              className="apple-spring inline-flex min-h-11 items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline"
+            >
+              Profile
+            </Link>
           </div>
-          <div className="flex items-baseline justify-between gap-4 py-2.5">
-            <dt className="text-sm text-ink-700">Starts</dt>
-            <dd className="nums text-right text-sm font-medium text-ink-900">{startLabel ?? "Pick a date"}</dd>
+          {RATING_META.some((r) => candidate.ratings[r.key] > 0) ? (
+            <dl className="grid grid-cols-4 border-b border-ink-100">
+              {RATING_META.map((r, i) => (
+                <div key={r.key} className={cn("px-3 py-3 text-center", i > 0 && "border-l border-ink-100")}>
+                  <dt className="truncate text-xs text-text-subtle">{SHORT_RATING[r.key] ?? r.label}</dt>
+                  <dd className="nums mt-0.5 text-sm font-semibold text-ink-900">{candidate.ratings[r.key] > 0 ? candidate.ratings[r.key].toFixed(1) : "-"}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+
+          <div className="p-5">
+            <h2 className="text-base font-semibold text-ink-900">Offer amount</h2>
+            {/* One month's figure only (client QA), not monthly × months. */}
+            <OfferBreakdownList lines={breakdown.lines} className="mt-4" />
+            <dl className="mt-2.5">
+              <Row label="Duration">{durationLabel || "-"}</Row>
+            </dl>
+            <p className="mt-3 text-sm leading-relaxed text-ink-600">
+              Nothing is charged now. You pay once the candidate accepts.
+              {firstNote ? ` ${firstNote}` : ""}
+            </p>
+
+            {/* Always mounted, so the result is announced when it fills in. */}
+            <p
+              role="status"
+              className={
+                notice
+                  ? cn(
+                      "mt-4 flex items-start gap-2 rounded-apple-md px-3 py-2.5 text-sm",
+                      notice.tone === "ok" ? "bg-success-soft text-ink-800" : "border border-warning/25 bg-warning-soft text-ink-700",
+                    )
+                  : "sr-only"
+              }
+            >
+              {notice?.tone === "bad" ? <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden /> : null}
+              {notice ? <span>{notice.text}</span> : null}
+            </p>
+
+            <button
+              type="button"
+              onClick={review}
+              disabled={Boolean(blockedReason)}
+              aria-describedby={blockedReason ? "send-blocked-aside" : undefined}
+              className={buttonClass({ block: true, className: "mt-4 hidden lg:inline-flex" })}
+            >
+              <Send className="size-4" aria-hidden />
+              Review and send
+            </button>
+            {blockedReason ? (
+              <p id="send-blocked-aside" className="mt-2 hidden text-sm text-ink-700 lg:block">
+                {blockedReason}
+              </p>
+            ) : null}
           </div>
-        </dl>
-        <p className="mt-3 text-pretty text-sm leading-relaxed text-ink-700">
-          Nothing is charged now. You pay once the candidate accepts.
-          {firstNote ? ` ${firstNote}` : ""}
-        </p>
-
-        {/* Always mounted, so the result is announced when it fills in. */}
-        <p
-          role="status"
-          className={
-            notice
-              ? cn(
-                  "mt-4 flex items-start gap-2 rounded-md px-3 py-2.5 text-sm text-ink-900",
-                  notice.tone === "ok" ? "bg-success-soft" : "border border-warning/25 bg-warning-soft",
-                )
-              : "sr-only"
-          }
-        >
-          {notice?.tone === "bad" ? <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" aria-hidden /> : null}
-          {notice ? <span>{notice.text}</span> : null}
-        </p>
-
-        <button
-          type="button"
-          onClick={review}
-          disabled={Boolean(blockedReason)}
-          aria-describedby={blockedReason ? "send-blocked-aside" : undefined}
-          className={buttonClass({ block: true, className: "mt-4 min-h-11" })}
-        >
-          <Send className="size-4" aria-hidden />
-          Review and send
-        </button>
-        {blockedReason ? (
-          <p id="send-blocked-aside" className="mt-2 text-sm text-ink-700">
-            {blockedReason}
-          </p>
-        ) : null}
+        </section>
       </aside>
 
       <CountdownAgreement
@@ -718,20 +713,54 @@ export function SendProposalForm({
   );
 }
 
-function Step({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+function Step({
+  n,
+  title,
+  hint,
+  last,
+  children,
+}: {
+  n: number;
+  title: string;
+  hint?: string;
+  last?: boolean;
+  children: React.ReactNode;
+}) {
   return (
-    <section className="border-t border-ink-200 py-8 first:border-t-0 first:pt-0">
-      <h2 className="font-display text-lg font-semibold text-ink-900">{title}</h2>
-      {hint ? <p className="mt-0.5 max-w-prose text-sm text-ink-700">{hint}</p> : null}
-      <div className="mt-5 space-y-5">{children}</div>
+    <section className={cn("grid gap-5 p-6 sm:grid-cols-[2rem_minmax(0,1fr)] sm:gap-x-4", !last && "border-b border-ink-100")}>
+      <span aria-hidden className="nums hidden size-8 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800 sm:grid">
+        {n}
+      </span>
+      <div className="min-w-0 space-y-5">
+        <div>
+          <h2 className="text-base font-semibold text-ink-900">{title}</h2>
+          {hint ? <p className="mt-0.5 text-sm text-ink-600">{hint}</p> : null}
+        </div>
+        {children}
+      </div>
     </section>
+  );
+}
+
+function Row({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-sm text-ink-600">{label}</dt>
+      <dd className="nums text-right text-sm font-medium text-ink-800">{children}</dd>
+    </div>
   );
 }
 
 /* ── Form primitives ────────────────────────────────────────────────────── */
 
 const fieldCls = (error?: boolean, extra?: string) =>
-  cn(inputClass, "mt-2 px-3.5", error && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger", extra);
+  cn(fieldClass, "mt-2 px-3.5", error && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger", extra);
 
 function Field({
   id,
@@ -761,7 +790,7 @@ function Field({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-ink-700">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <input
         id={id}
         name={id}
@@ -804,14 +833,14 @@ function ReadOnlyField({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-ink-700">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <input
         id={id}
         name={id}
         value={value}
         readOnly
         inputMode={inputMode}
-        className={fieldCls(false, "cursor-not-allowed bg-ink-100 text-ink-700")}
+        className={fieldCls(false, "cursor-not-allowed bg-ink-50 text-ink-600")}
       />
     </div>
   );
@@ -839,7 +868,7 @@ function SelectField({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-ink-700">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <select
         id={id}
         name={id}
@@ -887,7 +916,7 @@ function TextArea({
       <label htmlFor={id} className="block text-sm font-medium text-ink-800">
         {label}
       </label>
-      {hint ? <p className="mt-0.5 text-xs text-ink-700">{hint}</p> : null}
+      {hint ? <p className="mt-0.5 text-xs text-text-subtle">{hint}</p> : null}
       <textarea
         id={id}
         name={id}

@@ -7,9 +7,11 @@
 import Link from "next/link";
 import { ArrowUpRight, Award, Briefcase, Clock, MessagesSquare, Wallet, type LucideIcon } from "lucide-react";
 
+import { HeroFigure, HeroPanel } from "@/components/employer/kit/hero-panel";
 import { CopyFact } from "@/components/app/proof";
 import { buttonClass } from "@/components/ui/button";
 import { formatMoney, shortDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { PROOF_META, proofAsText, type Proof, type ProofKind, type recordTotals } from "@/lib/journey";
 
 const ICON: Record<ProofKind, LucideIcon> = {
@@ -21,6 +23,23 @@ const ICON: Record<ProofKind, LucideIcon> = {
 };
 
 const day = (d: Date) => shortDate(d, { day: "numeric", month: "short", year: "numeric" });
+
+/** A rosette: 24 scallops, a ring, a tick. Drawn, not an emoji or a badge image. */
+function Seal({ className }: { className?: string }) {
+  const points = Array.from({ length: 48 }, (_, i) => {
+    const r = i % 2 ? 34 : 38;
+    const a = (i / 48) * Math.PI * 2;
+    return `${(40 + r * Math.cos(a)).toFixed(2)},${(40 + r * Math.sin(a)).toFixed(2)}`;
+  }).join(" ");
+  return (
+    <svg viewBox="0 0 80 80" className={className} aria-hidden>
+      <polygon points={points} className="fill-white/15 stroke-white/50" strokeWidth="1" strokeLinejoin="round" />
+      <circle cx="40" cy="40" r="26" className="fill-none stroke-white/50" strokeWidth="1" strokeDasharray="2 3" />
+      <circle cx="40" cy="40" r="20" className="fill-none stroke-white" strokeWidth="1.5" />
+      <path d="M31 40.5l6 6 12-13" className="fill-none stroke-white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 export function RecordCertificate({
   name,
@@ -34,33 +53,36 @@ export function RecordCertificate({
   asOf: Date;
   totals: ReturnType<typeof recordTotals>;
 }) {
-  const facts = [
-    ...(totals.paid.length ? [{ label: "Stipend paid", value: totals.paid.map((p) => formatMoney(p.minor, p.currency, { zeroLabel: false })).join(" + ") }] : []),
+  const strip = [
+    ...(totals.paid.length
+      ? [{ label: "Stipend paid", value: totals.paid.map((p) => formatMoney(p.minor, p.currency, { zeroLabel: false })).join(" + ") }]
+      : []),
     ...(totals.hours > 0 ? [{ label: "Hours approved", value: `${totals.hours.toLocaleString("en-IN", { maximumFractionDigits: 2 })} h` }] : []),
-    { label: "Confirmed entries", value: String(totals.items) },
+    { label: "Confirmed items", value: String(totals.items) },
   ];
 
-  // A document, not a card: paper, a double rule top and bottom, the name set large, the facts ruled, and a verification line.
   return (
-    <article aria-label="Record summary" className="border-y-[3px] border-double border-ink-400 bg-surface-raised px-5 py-8 sm:px-12 sm:py-12">
-      <p className="text-sm text-ink-600">Findtern record of internship</p>
-      <h2 className="mt-3 text-balance font-display text-4xl font-semibold tracking-[-0.03em] text-ink-900">{name}</h2>
-      {internship ? <p className="mt-2 text-pretty text-lg text-ink-700">{internship}</p> : null}
+    <HeroPanel className="sm:p-10">
+      <div className="flex items-start gap-4 sm:gap-6">
+        <Seal className="size-14 shrink-0 sm:size-20" />
+        <div className="min-w-0">
+          <p className="text-balance text-2xl font-medium tracking-[-0.02em] sm:text-3xl">{name}</p>
+          {internship ? <p className="mt-1 text-pretty text-base text-white/85">{internship}</p> : null}
+          <p className="nums mt-2 text-sm text-on-dark-subtle">Findtern record as of {day(asOf)}</p>
+        </div>
+      </div>
 
-      <dl className="mt-8 grid max-w-2xl divide-y divide-ink-200 border-y border-ink-200">
-        {facts.map((f) => (
-          <div key={f.label} className="flex items-baseline justify-between gap-6 py-3">
-            <dt className="text-sm text-ink-700">{f.label}</dt>
-            <dd className="nums text-right font-display text-xl font-semibold text-ink-900">{f.value}</dd>
+      <dl className={cn("mt-8 grid gap-x-6 gap-y-6 border-t border-white/15 pt-6 sm:mt-10", strip.length === 1 ? "grid-cols-1" : strip.length === 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3")}>
+        {strip.map((s, i) => (
+          <div key={s.label} className={cn(i === 0 && strip.length === 3 && "col-span-2 sm:col-span-1")}>
+            <dt className="sr-only">{s.label}</dt>
+            <dd>
+              <HeroFigure label={s.label} value={s.value} lead={i === 0} />
+            </dd>
           </div>
         ))}
       </dl>
-
-      <p className="nums mt-6 max-w-2xl text-pretty text-sm text-ink-600">
-        As of <time dateTime={asOf.toISOString()}>{day(asOf)}</time>. Each entry below is confirmed by a person or a payment on Findtern, not claimed. Anyone you share the downloaded file with can ask
-        communicate@findtern.in to verify it.
-      </p>
-    </article>
+    </HeroPanel>
   );
 }
 
@@ -75,13 +97,13 @@ export function RecordTimeline({ proofs }: { proofs: Proof[] }) {
         return (
           <li key={proof.id} style={{ "--i": Math.min(i, 8) } as React.CSSProperties} className="rise relative grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-4 pb-8 last:pb-0 sm:gap-x-4">
             {last ? null : <span aria-hidden className="absolute bottom-0 left-5 top-11 w-px -translate-x-1/2 bg-ink-200" />}
-            <span className="relative grid size-10 place-items-center rounded-full bg-surface-raised text-brand-800 ring-1 ring-inset ring-ink-300">
+            <span className="relative grid size-10 place-items-center rounded-full bg-primary-soft text-primary ring-1 ring-inset ring-primary/15">
               <Icon className="size-4.5" aria-hidden />
             </span>
             <div className="min-w-0 pt-1.5">
               {/* h2 under the page h1; kind and date follow the title. */}
-              <h2 className="text-pretty font-display text-base font-semibold text-ink-900">{proof.title}</h2>
-              <p className="nums mt-0.5 text-sm text-ink-600">
+              <h2 className="text-pretty text-base font-medium text-ink-900">{proof.title}</h2>
+              <p className="nums mt-0.5 text-xs text-text-subtle">
                 {meta.label}
                 {proof.at ? (
                   <>
@@ -93,13 +115,13 @@ export function RecordTimeline({ proofs }: { proofs: Proof[] }) {
               <dl className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
                 {proof.facts.map((fact) => (
                   <div key={fact.label} className="min-w-0 max-w-full">
-                    <dt className="text-xs text-ink-600">{fact.label}</dt>
+                    <dt className="text-xs text-text-subtle">{fact.label}</dt>
                     <dd className="nums text-pretty break-words text-sm font-medium text-ink-800">{fact.value}</dd>
                   </div>
                 ))}
               </dl>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-                <p className="text-xs text-ink-600">
+                <p className="text-xs text-text-subtle">
                   {proof.issuedBy ? `Confirmed by ${proof.issuedBy}` : "On your record"}
                 </p>
                 <div className="-ml-3 flex items-center gap-1 sm:ml-0">

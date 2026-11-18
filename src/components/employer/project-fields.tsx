@@ -160,7 +160,7 @@ export function ProjectFields({
         onChange={(v) => set({ scopeOfWork: v })}
       />
 
-      <label className="flex cursor-pointer items-start gap-3 border-y border-ink-200 py-3.5">
+      <label className="flex cursor-pointer items-start gap-3 rounded-apple-md border border-ink-200/80 bg-white px-4 py-3.5">
         <input
           type="checkbox"
           checked={values.fullTimeOffer}
@@ -209,7 +209,7 @@ export function ProjectFields({
       />
 
       {onsite ? (
-        <div className="space-y-4 border-t border-ink-200 pt-4">
+        <div className="space-y-4 rounded-apple-lg border border-ink-200/80 bg-ink-50/60 p-4 sm:p-5">
           <p className="flex items-start gap-2 text-sm text-ink-700">
             <Info className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
             <span>

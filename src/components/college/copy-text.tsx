@@ -26,7 +26,7 @@ export function CopyText({ text, label, primary = false }: { text: string; label
       }}
       className={buttonClass({ variant: primary && state === "idle" ? "primary" : "outline", size: "sm" })}
     >
-      {state === "done" ? <Check className="size-4" aria-hidden /> : <Copy className="size-4" aria-hidden />}
+      {state === "done" ? <Check className="size-4 text-brand-700" aria-hidden /> : <Copy className="size-4" aria-hidden />}
       <span aria-live="polite">{state === "done" ? "Copied" : state === "failed" ? "Couldn't copy: select it instead" : label}</span>
     </button>
   );

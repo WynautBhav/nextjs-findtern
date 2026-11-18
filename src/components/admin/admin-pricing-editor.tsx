@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, Loader2, Plus, Save, Star } from "lucide-react";
+import { AlertTriangle, IndianRupee, Loader2, Plus, Save, Star, Trash2 } from "lucide-react";
 
-import { Pill } from "@/components/app/primitives";
+import { EmptyScene } from "@/components/app/primitives";
+import { Panel, PanelHeader } from "@/components/admin/panel";
 import { AutosaveStatus, useAutosave, type SaveResult } from "@/components/admin/use-autosave";
 import { buttonClass } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -60,20 +61,7 @@ export type EditablePlan = {
 };
 
 const inputClass =
-  "mt-1.5 h-10 w-full rounded-md border border-ink-300 bg-surface-raised px-3 text-base sm:text-sm text-ink-900 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-ink-600 focus:border-brand-700 read-only:bg-transparent aria-invalid:border-danger aria-invalid:focus:border-danger";
-
-/** A ruled block: the name and what it does on the left, the controls on the right. Not a card. */
-function Block({ title, hint, children, className }: { title: string; hint?: string; children: React.ReactNode; className?: string }) {
-  return (
-    <section className={cn("grid gap-x-12 gap-y-4 border-t border-ink-200 py-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]", className)}>
-      <div className="min-w-0">
-        <h2 className="font-display text-lg font-semibold text-ink-900">{title}</h2>
-        {hint ? <p className="mt-1 max-w-prose text-pretty text-sm text-ink-700">{hint}</p> : null}
-      </div>
-      <div className="min-w-0">{children}</div>
-    </section>
-  );
-}
+  "mt-1.5 h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500 aria-invalid:border-danger aria-invalid:focus:border-danger";
 
 const toMinor = (rupees: string) => Math.round(Number(rupees || 0) * 100);
 const toMinorOrNull = (rupees: string) => (rupees.trim() === "" ? null : toMinor(rupees));
@@ -150,47 +138,55 @@ export function AdminPricingEditor({
   }
 
   return (
-    <div>
-      <ActivationFeePanel initialMinor={activationFeeMinor} />
+    <div className="space-y-6">
+      {/* Header band: the fee on the left, a read-only summary of the saved rate card on the right. */}
+      <div className="grid items-stretch gap-[var(--admin-gap,1rem)] lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <ActivationFeePanel initialMinor={activationFeeMinor} />
+        <RateCardSummary plans={plans} />
+      </div>
       <PerHireFeePanel initial={perHireFee} />
       <StipendPanel initial={stipendBands} />
       {subscription ? <SubscriptionPanel initial={subscription} editable={mayEditSubscription} /> : null}
 
       {plans.length === 0 ? (
-        <Block title="No plans in the database" hint="The public pages are showing the built-in rate card. Create editable rows from it to start changing prices.">
-          <button
-            type="button"
-            onClick={seed}
-            disabled={seeding}
-            // Wraps on a phone; the label ran 24px past its box (QA-143).
-            className={buttonClass({ variant: "primary", size: "sm", className: "h-auto min-h-9 whitespace-normal py-2 text-left" })}
-          >
-            {seeding ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-            Create plans from the built-in rate card
-          </button>
-          {seedError ? <p role="alert" className="mt-2 text-sm text-danger">{seedError}</p> : null}
-        </Block>
+        <Panel>
+          <PanelHeader
+            title="No plans in the database"
+            description="The public pages are showing the built-in rate card. Create editable rows from it to start changing prices."
+            icon={IndianRupee}
+          />
+          <div className="px-5 py-4">
+            <button
+              type="button"
+              onClick={seed}
+              disabled={seeding}
+              // Wraps on a phone; the label ran 24px past its box (QA-143).
+              className={buttonClass({ variant: "primary", size: "sm", className: "h-auto min-h-9 whitespace-normal py-2 text-left" })}
+            >
+              {seeding ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+              Create plans from the built-in rate card
+            </button>
+            {seedError ? <p role="alert" className="mt-2 text-sm text-danger">{seedError}</p> : null}
+          </div>
+        </Panel>
       ) : (
-        <section className="border-t border-ink-200 py-6">
-          <div className="flex flex-wrap items-start justify-between gap-x-10 gap-y-4">
-            <div className="min-w-0">
-              <h2 className="font-display text-lg font-semibold text-ink-900">Plans</h2>
-              <p className="mt-1 max-w-prose text-pretty text-sm text-ink-700">
-                What the public pricing page shows. Each plan saves on its own. One plan at a time is marked Most popular; ticking another moves it.
-              </p>
-            </div>
-            <div className="flex min-w-0 flex-col gap-1 text-sm">
-              <p className="text-ink-700">
-                Most popular: <strong className="font-semibold text-ink-900">{plans.find((p) => p.id === featuredId)?.displayName ?? "none marked"}</strong>
-              </p>
-              <AutosaveStatus auto={featured} />
-            </div>
+        <div className="space-y-[var(--admin-gap,1rem)]">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-apple-sm border border-[color:var(--admin-rule)] bg-surface px-4 py-3">
+            <p className="flex items-center gap-2 text-sm text-ink-800">
+              <Star className="size-4 text-accent-700" aria-hidden />
+              <span>
+                Most popular:{" "}
+                <strong className="font-semibold">{plans.find((p) => p.id === featuredId)?.displayName ?? "none marked"}</strong>
+                <span className="ml-2 text-xs text-text-subtle">One plan at a time. Ticking another card moves it.</span>
+              </span>
+            </p>
+            <AutosaveStatus auto={featured} />
           </div>
           {/* Columns follow the width of this area, not the viewport: the admin sidebar takes ~340px,
               so a viewport breakpoint left the third card alone on its own row at 1440. One column
-              when narrow, two from 36rem, three from 56rem. Each plan saves on its own. */}
-          <div className="@container mt-6">
-            <div className="grid items-start gap-x-10 gap-y-10 @xl:grid-cols-2 @4xl:grid-cols-3">
+              when narrow, two from 36rem, three from 56rem. Each card saves on its own. */}
+          <div className="@container">
+            <div className="grid items-start gap-[var(--admin-gap,1rem)] @xl:grid-cols-2 @4xl:grid-cols-3">
               {plans.map((plan) => (
                 <PlanEditor
                   key={plan.id}
@@ -201,9 +197,36 @@ export function AdminPricingEditor({
               ))}
             </div>
           </div>
-        </section>
+        </div>
       )}
     </div>
+  );
+}
+
+/** The saved rate card at a glance (from the loaded rows; edits show here after a save). */
+function RateCardSummary({ plans }: { plans: EditablePlan[] }) {
+  return (
+    <Panel>
+      <PanelHeader title="Rate card" description="As saved: what the public pricing page shows." icon={IndianRupee} />
+      {plans.length === 0 ? (
+        <EmptyScene compact title="No plans on the rate card" body="Plans show here, and on the public pricing page, once one is saved in the editor." />
+      ) : (
+        <ul className="divide-y divide-[color:var(--admin-rule)] px-5 pb-2 text-sm">
+          {plans.map((p) => (
+            <li key={p.id} className="flex items-center justify-between gap-3 py-2.5">
+              <span className="min-w-0 truncate font-medium text-ink-800">
+                {p.displayName}
+                {p.isFeatured ? <Star className="ml-1.5 inline size-3.5 text-accent-700" aria-label="Most popular" /> : null}
+                {!p.isActive ? <span className="ml-2 text-xs font-normal text-text-subtle">off</span> : null}
+              </span>
+              <span className="nums shrink-0 text-ink-600">
+                {formatMoney(p.priceHourlyMinor, "INR")}/hr · {formatMoney(p.perHireChargeMinor, "INR")}/hire
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Panel>
   );
 }
 
@@ -223,17 +246,22 @@ function ActivationFeePanel({ initialMinor }: { initialMinor: number }) {
   const error = auto.status === "invalid" && !check.ok ? check.message : null;
 
   return (
-    <Block title="Intern activation fee" hint="Charged once to a candidate for the AI interview and onboarding. GST-inclusive. Promo codes apply on top.">
+    <Panel>
+      <PanelHeader
+        title="Intern activation fee"
+        description="Charged once to a candidate for the AI interview and onboarding. GST-inclusive. Promo codes apply on top."
+        icon={IndianRupee}
+      />
       <form
         onSubmit={(e) => {
           e.preventDefault();
           auto.flush();
         }}
         noValidate
-        className="space-y-3"
+        className="space-y-3 px-5 py-4"
       >
         <div className="flex flex-wrap items-end gap-3">
-          <label className="block w-full max-w-48 text-sm font-medium text-ink-900">
+          <label className="block w-full max-w-48 text-sm font-medium text-ink-800">
             Fee (₹)
             <input
               id="activation-fee"
@@ -254,7 +282,7 @@ function ActivationFeePanel({ initialMinor }: { initialMinor: number }) {
         {error ? <p id="activation-fee-error" role="alert" className="text-sm text-danger">{error}</p> : null}
         <AutosaveStatus auto={auto} />
       </form>
-    </Block>
+    </Panel>
   );
 }
 
@@ -268,20 +296,25 @@ function PerHireFeePanel({ initial }: { initial: PerHireFeeSetting }) {
   const stored = auto.state.draft;
 
   return (
-    <Block title="Charge one-time hiring fee" hint="Applies to offers not yet paid and to new payments. Invoices already paid are never changed.">
-      <div className="space-y-1">
-        <p className="text-sm text-ink-700">
+    <Panel>
+      <PanelHeader
+        title="Charge one-time hiring fee"
+        description="Applies to offers not yet paid and to new payments. Invoices already paid are never changed."
+        icon={IndianRupee}
+      />
+      <div className="space-y-1 px-5 py-4">
+        <p className="text-sm text-text-subtle">
           Espresso hires with no stipend (score under 6) have nothing else to pay, so switching Espresso off leaves them with nothing payable at checkout.
         </p>
-        <ul className="divide-y divide-ink-200">
+        <ul className="divide-y divide-[color:var(--admin-rule)]">
           {FEE_BANDS.map((band: FeeBand) => {
             const label = FEE_BAND_LABEL[band];
             const id = `per-hire-fee-${band}`;
             return (
               <li key={band} className="flex items-center justify-between gap-4 py-3">
-                <label htmlFor={id} className="text-sm font-medium text-ink-900">
+                <label htmlFor={id} className="text-sm font-medium text-ink-800">
                   {label.plan} (score {label.scores})
-                  <span className="block text-xs font-normal text-ink-600">
+                  <span className="block text-xs font-normal text-text-subtle">
                     {stored[band] ? "Charged with the first payment" : "Free for now"}
                   </span>
                 </label>
@@ -292,7 +325,7 @@ function PerHireFeePanel({ initial }: { initial: PerHireFeeSetting }) {
         </ul>
         <AutosaveStatus auto={auto} />
       </div>
-    </Block>
+    </Panel>
   );
 }
 
@@ -322,31 +355,36 @@ function StipendPanel({ initial }: { initial: StipendBands }) {
   ];
 
   return (
-    <Block title="Intern monthly stipend" hint="The fixed amount a hired intern is paid each month, by Findtern Score. Cappuccino and Latte only.">
+    <Panel>
+      <PanelHeader
+        title="Intern monthly stipend"
+        description="The fixed amount a hired intern is paid each month, by Findtern Score. Cappuccino and Latte only."
+        icon={IndianRupee}
+      />
       <form
         onSubmit={(e) => {
           e.preventDefault();
           auto.flush();
         }}
         noValidate
-        className="space-y-4"
+        className="space-y-4 px-5 py-4"
       >
-        <ul className="divide-y divide-ink-200">
+        <ul className="divide-y divide-[color:var(--admin-rule)]">
           <li className="flex items-center justify-between gap-4 py-3">
-            <span className="text-sm font-medium text-ink-900">
+            <span className="text-sm font-medium text-ink-800">
               {FEE_BAND_LABEL.standard.plan} (score {FEE_BAND_LABEL.standard.scores.replace("-", "–")})
-              <span className="block text-xs font-normal text-ink-600">No stipend: a score under 6 is not paid one</span>
+              <span className="block text-xs font-normal text-text-subtle">No stipend: a score under 6 is not paid one</span>
             </span>
-            <span className="text-sm text-ink-700">None</span>
+            <span className="text-sm text-text-subtle">None</span>
           </li>
           {fields.map((f) => {
             const id = `stipend-${f.band}`;
             const label = FEE_BAND_LABEL[f.band];
             return (
               <li key={f.band} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
-                <label htmlFor={id} className="text-sm font-medium text-ink-900">
+                <label htmlFor={id} className="text-sm font-medium text-ink-800">
                   {label.plan} (score {label.scores.replace("-", "–")})
-                  <span className="block text-xs font-normal text-ink-600">Per month, in whole rupees</span>
+                  <span className="block text-xs font-normal text-text-subtle">Per month, in whole rupees</span>
                 </label>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-ink-600" aria-hidden>₹</span>
@@ -368,14 +406,14 @@ function StipendPanel({ initial }: { initial: StipendBands }) {
             );
           })}
         </ul>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--admin-rule)] pt-4">
           <p className="text-xs text-ink-600">The score ranges and the USD rate (₹{INR_PER_USD} = $1) are fixed.</p>
           <SaveNowButton enabled={auto.state.sending === null && auto.status === "pending"} />
         </div>
         {bad ? <p id="stipend-error" role="alert" className="text-sm text-danger">{bad.message}</p> : null}
         <AutosaveStatus auto={auto} />
       </form>
-    </Block>
+    </Panel>
   );
 }
 
@@ -401,20 +439,25 @@ function SubscriptionPanel({ initial, editable }: { initial: SubscriptionConfig;
   const usd = usdPreviewMinor(draft.price);
 
   return (
-    <Block title="Findtern Pro employer subscription" hint="Unlocks the CGPA filter and the college filter and sort on Candidates. Paying while active adds the days to the current end.">
+    <Panel>
+      <PanelHeader
+        title="Findtern Pro employer subscription"
+        description="Unlocks the CGPA filter and the college filter and sort on Candidates. Paying while active adds the days to the current end."
+        icon={IndianRupee}
+      />
       <form
         onSubmit={(e) => {
           e.preventDefault();
           auto.flush();
         }}
         noValidate
-        className="space-y-4"
+        className="space-y-4 px-5 py-4"
       >
-        <ul className="divide-y divide-ink-200">
+        <ul className="divide-y divide-[color:var(--admin-rule)]">
           <li className="flex items-center justify-between gap-4 py-3">
-            <label htmlFor="subscription-enabled" className="text-sm font-medium text-ink-900">
+            <label htmlFor="subscription-enabled" className="text-sm font-medium text-ink-800">
               On sale
-              <span className="block text-xs font-normal text-ink-600">
+              <span className="block text-xs font-normal text-text-subtle">
                 {draft.enabled ? "Employers can buy it and active ones keep their access" : "Off: nobody has access and nobody can buy it. Paid orders stay on record"}
               </span>
             </label>
@@ -426,9 +469,9 @@ function SubscriptionPanel({ initial, editable }: { initial: SubscriptionConfig;
             />
           </li>
           <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
-            <label htmlFor="subscription-price" className="text-sm font-medium text-ink-900">
+            <label htmlFor="subscription-price" className="text-sm font-medium text-ink-800">
               Price
-              <span className="block text-xs font-normal text-ink-600">
+              <span className="block text-xs font-normal text-text-subtle">
                 Rupees, GST-inclusive.{" "}
                 {usd !== null ? <span className="nums">Charged as {formatMoney(usd, "USD")} to employers outside India.</span> : "Dollars are derived at ₹100 = $1."}
               </span>
@@ -452,9 +495,9 @@ function SubscriptionPanel({ initial, editable }: { initial: SubscriptionConfig;
             </div>
           </li>
           <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
-            <label htmlFor="subscription-days" className="text-sm font-medium text-ink-900">
+            <label htmlFor="subscription-days" className="text-sm font-medium text-ink-800">
               Length
-              <span className="block text-xs font-normal text-ink-600">Days of access per purchase, 1 to 1095. A paid order keeps the length it was bought with.</span>
+              <span className="block text-xs font-normal text-text-subtle">Days of access per purchase, 1 to 1095. A paid order keeps the length it was bought with.</span>
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -476,16 +519,16 @@ function SubscriptionPanel({ initial, editable }: { initial: SubscriptionConfig;
           </li>
         </ul>
         {editable ? (
-          <div className="flex flex-wrap items-center justify-end gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[color:var(--admin-rule)] pt-4">
             <SaveNowButton enabled={auto.state.sending === null && auto.status === "pending"} />
           </div>
         ) : (
-          <p className="text-sm text-ink-700">Changing the Findtern Pro price needs the Accounts permission. You can see it here.</p>
+          <p className="border-t border-[color:var(--admin-rule)] pt-4 text-xs text-ink-600">Changing the Findtern Pro price needs the Accounts permission. You can see it here.</p>
         )}
         {bad ? <p id="subscription-error" role="alert" className="text-sm text-danger">{bad.message}</p> : null}
         <AutosaveStatus auto={auto} live="Live: employers see this now" />
       </form>
-    </Block>
+    </Panel>
   );
 }
 
@@ -524,27 +567,24 @@ function PlanEditor({
   const bandChange = legacyBandChange(saved.features[1], d.features[1]);
 
   return (
-    <div className="@container min-w-0">
-      <div className="flex items-start justify-between gap-3 border-b border-ink-200 pb-2">
-        <div className="min-w-0">
-          <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-display text-lg font-semibold text-ink-900">
-            {plan.displayName}
-            {featured ? <Pill tone="live" icon={<Star aria-hidden />}>Most popular</Pill> : null}
-          </h3>
-          <p className="mt-0.5 text-sm text-ink-600">{`slug: ${plan.slug}`}</p>
-        </div>
-        <label className="flex min-h-8 shrink-0 items-center gap-2 text-sm font-medium text-ink-700">
-          Active
-          <Switch checked={d.active} onCheckedChange={(active) => change({ active }, true)} aria-label="Plan is active" />
-        </label>
-      </div>
+    <Panel className={cn("@container", featured && "ring-2 ring-brand-500")}>
+      <PanelHeader
+        title={plan.displayName}
+        description={`slug: ${plan.slug}`}
+        action={
+          <label className="flex items-center gap-2 text-sm font-medium text-ink-700">
+            Active
+            <Switch checked={d.active} onCheckedChange={(active) => change({ active }, true)} aria-label="Plan is active" />
+          </label>
+        }
+      />
       <form
         onSubmit={(e) => {
           e.preventDefault();
           auto.flush();
         }}
         noValidate
-        className="space-y-4 pt-4"
+        className="space-y-4 px-5 py-4"
       >
         {saved.active && !d.active && isLegacyTier(saved.features[1]) ? (
           <Warning>
@@ -552,7 +592,7 @@ function PlanEditor({
             (still the rollback target). Candidates in that band would be priced from another plan there.
           </Warning>
         ) : null}
-        <label className="block text-sm font-medium text-ink-900">
+        <label className="block text-sm font-medium text-ink-800">
           Display name
           <input value={d.name} onChange={(e) => change({ name: e.target.value })} {...bad("name")} className={inputClass} />
         </label>
@@ -580,13 +620,13 @@ function PlanEditor({
           errorId={fid("error")}
         />
 
-        <label className="block text-sm font-medium text-ink-900">
+        <label className="block text-sm font-medium text-ink-800">
           Internship duration
           <input value={d.duration} onChange={(e) => change({ duration: e.target.value })} {...bad("duration")} className={inputClass} />
         </label>
 
         <fieldset className="space-y-2">
-          <legend className="text-sm font-medium text-ink-900">Comparison table rows</legend>
+          <legend className="text-sm font-medium text-ink-800">Comparison table rows</legend>
           {["Who is it for", "Findtern Score", "What you get"].map((label, i) => (
             <label key={label} className="block text-xs font-medium text-ink-600">
               {label}
@@ -603,7 +643,7 @@ function PlanEditor({
         </fieldset>
 
         <fieldset>
-          <legend className="text-sm font-medium text-ink-900">Card checklist <span className="font-normal text-ink-600">(switch on: the plan includes it)</span></legend>
+          <legend className="text-sm font-medium text-ink-800">Card checklist <span className="font-normal text-ink-600">(switch on: the plan includes it)</span></legend>
           <ul className="mt-1.5 space-y-2">
             {d.featureList.map((f, i) => (
               <li key={i} className="flex items-center gap-2">
@@ -622,10 +662,10 @@ function PlanEditor({
                 <button
                   type="button"
                   onClick={() => change({ featureList: d.featureList.filter((_, j) => j !== i) }, true)}
-                  className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-10 shrink-0 px-1.5 text-ink-700 hover:text-danger")}
+                  className={cn(buttonClass({ variant: "ghost", size: "iconSm" }), "text-text-subtle hover:bg-danger-soft hover:text-danger")}
                   aria-label={`Remove checklist row ${i + 1}`}
                 >
-                  Remove
+                  <Trash2 className="size-4" />
                 </button>
               </li>
             ))}
@@ -633,23 +673,24 @@ function PlanEditor({
           <button
             type="button"
             onClick={() => change({ featureList: [...d.featureList, { label: "", included: true }] })}
-            className={cn(buttonClass({ variant: "outline", size: "sm" }), "mt-2")}
+            className={cn(buttonClass({ variant: "ghost", size: "sm" }), "mt-2")}
           >
-            <Plus className="size-3.5" aria-hidden /> Add checklist row
+            <Plus className="size-3.5" /> Add row
           </button>
         </fieldset>
 
-        <label className="flex min-h-8 items-center gap-2 text-sm text-ink-900 touch:min-h-11">
+        <label className="flex items-center gap-2 text-sm text-ink-700 touch:min-h-11">
           <input
             type="checkbox"
             checked={featured}
             onChange={(e) => onFeatured(e.target.checked)}
-            className="size-5 accent-brand-700"
+            className="size-4 accent-brand-700"
           />
+          <Star className="size-4 text-accent-700" aria-hidden />
           Mark as &ldquo;Most popular&rdquo;
         </label>
 
-        <div className="space-y-3 border-t border-ink-200 pt-4">
+        <div className="space-y-3 border-t border-[color:var(--admin-rule)] pt-4">
           <div className="flex items-center justify-between gap-3">
             <p className="nums text-xs text-ink-600">
               USD: {formatMoney(inrMinorToUsdMinor(toMinor(d.hourly)), "USD")}/hr ·{" "}
@@ -663,7 +704,7 @@ function PlanEditor({
           <AutosaveStatus auto={auto} live={d.active ? "Live on the site" : "Switched off: not shown on the site"} />
         </div>
       </form>
-    </div>
+    </Panel>
   );
 }
 
@@ -694,11 +735,11 @@ function PriceRow({
   const clean = (v: string) => v.replace(/[^\d.]/g, "");
   return (
     <div className="grid grid-cols-1 gap-3 @md:grid-cols-2">
-      <label className="block text-sm font-medium text-ink-900">
+      <label className="block text-sm font-medium text-ink-800">
         {label}
         <input id={ids[0]} {...bad(ids[0])} inputMode="decimal" value={now} onChange={(e) => onNow(clean(e.target.value))} className={inputClass} />
       </label>
-      <label className="block text-sm font-medium text-ink-900">
+      <label className="block text-sm font-medium text-ink-800">
         Struck-through &ldquo;was&rdquo;
         <input
           id={ids[1]}
@@ -720,9 +761,8 @@ function PriceRow({
 /** Saves what is waiting right now instead of after the pause; also what Enter does in a form. */
 function SaveNowButton({ enabled }: { enabled: boolean }) {
   return (
-    // Primary only while something is waiting; otherwise a quiet disabled outline, so the page has one primary at a time.
-    <button type="submit" disabled={!enabled} className={buttonClass({ variant: enabled ? "primary" : "outline", size: "sm" })}>
-      <Save className="size-3.5" aria-hidden />
+    <button type="submit" disabled={!enabled} className={buttonClass({ variant: "outline", size: "sm" })}>
+      <Save className="size-3.5" />
       Save now
     </button>
   );
@@ -734,11 +774,11 @@ function Warning({ children, id, danger }: { children: React.ReactNode; id?: str
       id={id}
       role={danger ? "alert" : undefined}
       className={cn(
-        "flex items-start gap-2 rounded-md border px-3 py-2.5 text-sm leading-relaxed",
-        danger ? "border-danger text-danger" : "border-ink-300 text-ink-900",
+        "flex items-start gap-2 rounded-apple-sm px-3 py-2.5 text-sm leading-relaxed",
+        danger ? "bg-danger-soft text-danger" : "bg-accent-100 text-accent-700",
       )}
     >
-      <AlertTriangle className={cn("mt-0.5 size-4 shrink-0", !danger && "text-signal")} aria-hidden />
+      <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
       <span>{children}</span>
     </p>
   );

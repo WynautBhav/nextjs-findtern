@@ -1,13 +1,14 @@
 import { Check } from "lucide-react";
 
+import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { cn } from "@/lib/utils";
 
 export type Step = { id: string; title: string; blurb: string };
 
 /**
- * The setup ledger: each step is an entry with its number at display size, what it covers, and where it stands (Done,
- * Now, Next) in words. From lg it is a rail beside the form; on a phone it is the same list above it. The caller
- * decides what a click does, so jumping ahead still saves the company first.
+ * The wizard header: one brand hero carrying the step title and a progress
+ * rail. The step buttons keep their old behaviour (the caller decides what a
+ * click does); only the look changed.
  */
 export function Stepper({
   steps,
@@ -18,35 +19,46 @@ export function Stepper({
   stage: number;
   onStep: (i: number) => void;
 }) {
+  const pct = ((stage + 1) / steps.length) * 100;
   return (
-    <nav aria-label="Setup steps">
-      <ol className="divide-y divide-ink-200 border-y border-ink-200">
-        {steps.map((item, i) => {
-          const state = i === stage ? "current" : i < stage ? "done" : "todo";
-          return (
-            <li key={item.id}>
-              <button
-                type="button"
-                onClick={() => onStep(i)}
-                aria-current={state === "current" ? "step" : undefined}
-                className="group flex min-h-11 w-full items-start gap-4 py-4 text-left outline-none transition-colors duration-[var(--motion-fast)] hover:bg-ink-200/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-700"
-              >
-                <span aria-hidden className={cn("nums w-8 shrink-0 font-display text-4xl font-semibold leading-none", state === "current" ? "text-brand-800" : "text-ink-600")}>
-                  {i + 1}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className={cn("block font-display text-lg leading-tight", state === "current" ? "font-semibold text-ink-900" : "font-medium text-ink-800")}>{item.title}</span>
-                  <span className="mt-1 block text-sm text-ink-700 max-lg:hidden">{item.blurb}</span>
-                </span>
-                <span className={cn("inline-flex shrink-0 items-center gap-1 pt-1 text-sm font-medium", state === "current" ? "text-[#9a4a08]" : state === "done" ? "text-brand-800" : "text-ink-600")}>
-                  {state === "done" ? <Check className="size-4" aria-hidden /> : null}
-                  {state === "done" ? "Done" : state === "current" ? "Now" : "Next"}
-                </span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-    </nav>
+    <HeroPanel className="mb-5 p-5 sm:p-7">
+      <p className="nums text-[13px] font-medium text-on-dark-subtle">
+        Step {stage + 1} of {steps.length}
+      </p>
+      <p className="mt-1 text-[clamp(1.5rem,3.4vw,2.25rem)] font-light leading-tight tracking-[-0.03em]">{steps[stage].title}</p>
+      <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-white/15" role="progressbar" aria-label="Setup progress" aria-valuemin={0} aria-valuemax={100} aria-valuenow={pct}>
+        <div className="h-full origin-left rounded-full bg-white transition-[width] duration-300 ease-out motion-reduce:transition-none" style={{ width: `${pct}%` }} />
+      </div>
+      <nav aria-label="Setup steps" className="mt-4">
+        <ol className="grid grid-cols-2 gap-2 sm:gap-3">
+          {steps.map((item, i) => {
+            const state = i === stage ? "current" : i < stage ? "done" : "todo";
+            return (
+              <li key={item.id}>
+                <button
+                  type="button"
+                  onClick={() => onStep(i)}
+                  aria-current={state === "current" ? "step" : undefined}
+                  className={cn(
+                    "apple-spring flex min-h-11 w-full items-center gap-3 rounded-apple-lg px-3 py-2.5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white",
+                    state === "current" ? "bg-white/15 ring-1 ring-inset ring-white/30" : "hover:bg-white/10",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "nums grid size-7 shrink-0 place-items-center rounded-full text-sm font-semibold",
+                      state === "todo" ? "bg-transparent text-white ring-1 ring-inset ring-white/40" : "bg-white text-brand-800",
+                    )}
+                  >
+                    {state === "done" ? <Check className="size-4" aria-hidden /> : i + 1}
+                  </span>
+                  <span className="min-w-0 break-words text-sm font-medium">{item.title}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
+    </HeroPanel>
   );
 }

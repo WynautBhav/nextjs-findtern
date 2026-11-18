@@ -29,7 +29,7 @@ export function CopyValue({ value, label, className }: { value: string; label: s
         type="button"
         onClick={() => void copy()}
         aria-label={`Copy ${label}`}
-        className="-my-1 grid size-8 shrink-0 place-items-center rounded-md text-ink-600 outline-none transition-colors hover:bg-ink-100 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring max-sm:size-11"
+        className="-my-2 grid size-11 shrink-0 place-items-center rounded-full text-text-subtle outline-none transition-colors hover:bg-ink-100 hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-ring sm:size-9"
       >
         {state === "copied" ? <Check className="size-4 text-success" aria-hidden /> : <Copy className="size-4" aria-hidden />}
       </button>

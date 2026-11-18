@@ -1,7 +1,4 @@
-import { EmptyScene, PageHead } from "@/components/app/primitives";
-import { DataTable } from "@/components/app/data-table";
-import { RollingNumber } from "@/components/app/rolling-number";
-import { LeadStat, Overview, Section, StatList } from "@/components/app/stat";
+import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
 import { BankForm } from "@/components/college/bank-form";
 import { WithdrawForm } from "@/components/college/withdraw-form";
 import { collegeBank } from "@/lib/college/bank-read";
@@ -27,71 +24,59 @@ export default async function EarningsPage() {
         : null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHead title="Earnings" lede="Credited when a verified student of your college completes an internship." />
-      <Overview
-        lead={
-          <LeadStat
-            label="Available to withdraw"
-            value={<RollingNumber value={s.availableMinor / 100} currency="INR" />}
-            note={blocked ?? "Ready to withdraw to your bank account."}
-          />
-        }
-        rest={
-          <StatList
-            items={[
-              ...(s.balanceMinor !== s.availableMinor ? [{ label: "Balance", value: inr(s.balanceMinor) }] : []),
-              { label: "Waiting for payout", value: s.openRequest ? inr(s.openRequest.amountMinor) : "None" },
-            ]}
-          />
-        }
-      />
-      <div className="grid gap-x-14 gap-y-8 lg:grid-cols-2">
-        <Section title="Withdraw">
-          <WithdrawForm key={s.availableMinor} availableMinor={s.availableMinor} blockedReason={blocked} />
-        </Section>
-        <Section title="Bank account">
-          <BankForm bank={bank} locked={Boolean(s.openRequest)} />
-        </Section>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Surface className="p-5">
+          <p className="text-sm text-text-subtle">Balance</p>
+          <p className="nums text-3xl font-semibold">{inr(s.balanceMinor)}</p>
+        </Surface>
+        <Surface className="p-5">
+          <p className="text-sm text-text-subtle">Waiting for payout</p>
+          <p className="nums text-3xl font-semibold">{inr(s.openRequest?.amountMinor ?? 0)}</p>
+        </Surface>
+        <Surface className="p-5">
+          <p className="text-sm text-text-subtle">Available to withdraw</p>
+          <p className="nums text-3xl font-semibold">{inr(s.availableMinor)}</p>
+        </Surface>
       </div>
-      <Section title="Activity">
-        <DataTable
-          caption="Earnings activity"
-          rows={rows}
-          rowKey={(r) => r.id}
-          empty={
-            <EmptyScene
-              compact
-              title="No earnings activity"
-              body="A credit shows up here when a verified student of your college completes an internship. Withdrawals you request show up here too."
-              next={{ label: "Go to your students", href: "/college" }}
-            />
-          }
-          columns={[
-            {
-              key: "what",
-              header: "Entry",
-              primary: true,
-              cell: (r) => (
-                <>
-                  <span className="block font-medium text-ink-900">
-                    {r.kind === "payout" ? "Withdrawal paid" : r.kind === "payout_rejected" ? "Withdrawal declined" : r.kind === "adjustment" ? "Adjustment" : r.student}
-                  </span>
-                  <span className="block text-xs font-normal text-ink-600">
-                    {r.kind === "incentive"
-                      ? `${r.role || "Internship"} · Score ${BAND[r.bandId ?? ""] ?? "n/a"}`
-                      : r.kind === "payout"
-                        ? `Reference ${r.referenceId ?? "n/a"}`
-                        : r.rejectReason ?? ""}
-                  </span>
-                </>
-              ),
-            },
-            { key: "date", header: "Date", cell: (r) => formatDate(r.at) },
-            { key: "amt", header: "Amount", align: "right", cell: (r) => <span className="money font-semibold">{r.amountMinor > 0 ? "+" : ""}{inr(r.amountMinor)}</span> },
-          ]}
-        />
-      </Section>
+      <Surface className="space-y-4 p-5">
+        <h2 className="font-semibold">Withdraw</h2>
+        <WithdrawForm key={s.availableMinor} availableMinor={s.availableMinor} blockedReason={blocked} />
+      </Surface>
+      <Surface className="space-y-4 p-5">
+        <h2 className="font-semibold">Bank account</h2>
+        <BankForm bank={bank} locked={Boolean(s.openRequest)} />
+      </Surface>
+      <Surface className="divide-y divide-ink-200/80">
+        {rows.length === 0 ? (
+          <EmptyScene
+            compact
+            title="No earnings activity"
+            body="A credit shows up here when a verified student of your college completes an internship. Withdrawals you request show up here too."
+            next={{ label: "Go to your students", href: "/college" }}
+          />
+        ) : (
+          rows.map((r) => (
+            <div key={r.id} className="flex items-start justify-between gap-3 p-4">
+              <div className="min-w-0">
+                <p className="truncate font-medium">
+                  {r.kind === "payout" ? "Withdrawal paid" : r.kind === "payout_rejected" ? "Withdrawal declined" : r.kind === "adjustment" ? "Adjustment" : r.student}
+                </p>
+                <p className="truncate text-sm text-text-subtle">
+                  {r.kind === "incentive"
+                    ? `${r.role || "Internship"} · Score ${BAND[r.bandId ?? ""] ?? "n/a"}`
+                    : r.kind === "payout"
+                      ? `Reference ${r.referenceId ?? "n/a"}`
+                      : r.rejectReason ?? ""}
+                </p>
+                <p className="text-xs text-text-subtle">{formatDate(r.at)}</p>
+              </div>
+              <p className="nums shrink-0 font-semibold">{r.amountMinor > 0 ? "+" : ""}{inr(r.amountMinor)}</p>
+            </div>
+          ))
+        )}
+      </Surface>
     </div>
   );
 }

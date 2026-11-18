@@ -43,7 +43,7 @@ export function AiLinkAction({ interviewId, current = "", label = "Add link" }: 
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-9 border-brand-700 text-brand-800 hover:bg-brand-100 max-sm:min-h-11 max-sm:w-full")}>
+      <button type="button" onClick={() => setOpen(true)} className={cn(buttonClass({ variant: "primary", size: "sm" }), "min-h-11 max-sm:w-full")}>
         {label}
       </button>
     );

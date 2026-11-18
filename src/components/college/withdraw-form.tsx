@@ -47,7 +47,7 @@ export function WithdrawForm({ availableMinor, blockedReason }: { availableMinor
   return (
     <form onSubmit={submit} className="flex flex-wrap items-end gap-3">
       <label className="text-sm">
-        <span className="block text-ink-700">Amount (₹)</span>
+        <span className="block text-text-subtle">Amount (₹)</span>
         <input
           type="number"
           min="0"
@@ -56,11 +56,11 @@ export function WithdrawForm({ availableMinor, blockedReason }: { availableMinor
           value={rupees}
           disabled={Boolean(blockedReason)}
           onChange={(e) => setRupees(e.target.value)}
-          className="nums mt-1 h-10 w-40 rounded-md border border-ink-300 bg-surface-raised px-3 max-lg:h-11"
+          className="nums mt-1 w-40 rounded-md border border-ink-200 px-3 py-2 touch:min-h-11"
         />
       </label>
       <button type="submit" disabled={busy || Boolean(blockedReason)} className={buttonClass({ size: "sm" })}>{busy ? "Requesting…" : "Request withdrawal"}</button>
-      {blockedReason || msg ? <p role="status" className="basis-full text-sm text-ink-700">{blockedReason ?? msg}</p> : null}
+      {blockedReason || msg ? <p role="status" className="basis-full text-sm text-text-subtle">{blockedReason ?? msg}</p> : null}
       {dialog}
     </form>
   );

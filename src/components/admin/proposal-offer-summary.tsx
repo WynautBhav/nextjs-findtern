@@ -1,6 +1,7 @@
 import { FileDown } from "lucide-react";
 
 import { DetailRow } from "@/components/app/primitives";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { ButtonAnchor } from "@/components/ui/button";
 import { formatDate, formatMoney } from "@/lib/format";
 import { parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
@@ -46,7 +47,7 @@ export function ProposalOfferSummary({
           <DetailRow label="Timezone" value={ft.timezone || offer.timezone || "-"} />
         </dl>
         {ft.offerLetterKey || ft.offerLetterUrl ? (
-          <ButtonAnchor href={`/api/proposals/${proposalId}/offer-letter`} target="_blank" rel="noopener noreferrer" variant="outline" size="sm">
+          <ButtonAnchor href={`/api/proposals/${proposalId}/offer-letter`} target="_blank" rel="noopener noreferrer" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
             <FileDown className="size-4" aria-hidden />
             Offer letter
           </ButtonAnchor>
@@ -96,7 +97,7 @@ function AdditionalInfo({ text }: { text: string }) {
   return (
     <div>
       <p className="mb-2 text-sm font-semibold text-foreground">What the intern will learn</p>
-      <p className="whitespace-pre-line rounded-lg bg-[color:var(--admin-panel-2)] p-4 text-sm leading-relaxed text-foreground [overflow-wrap:anywhere]">{text}</p>
+      <p className="whitespace-pre-line rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)] p-4 text-sm leading-relaxed text-foreground [overflow-wrap:anywhere]">{text}</p>
     </div>
   );
 }
@@ -106,7 +107,7 @@ function JobDescription({ html }: { html: string }) {
     <div>
       <p className="mb-2 text-sm font-semibold text-foreground">Job description</p>
       <div
-        className="prose-sm max-h-72 overflow-y-auto rounded-lg bg-[color:var(--admin-panel-2)] p-4 text-sm leading-relaxed text-foreground [&_li]:ml-5 [&_ol]:list-decimal [&_p+p]:mt-2 [&_ul]:list-disc"
+        className="prose-sm max-h-72 overflow-y-auto rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)] p-4 text-sm leading-relaxed text-foreground [&_li]:ml-5 [&_ol]:list-decimal [&_p+p]:mt-2 [&_ul]:list-disc"
         // Allowlist-sanitised (lib/richtext), the same as blog bodies.
         dangerouslySetInnerHTML={{ __html: html }}
       />
