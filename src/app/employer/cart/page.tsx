@@ -50,20 +50,26 @@ export default async function EmployerCartPage({
   searchParams: Promise<{ tab?: string; proposalId?: string; proposal?: string }>;
 }) {
   const session = await requireRole("employer");
-  await requireEmployerSetup(session.uid);
+  // The setup check runs beside the page's reads, not ahead of them (one round trip less); its redirect still wins.
+  const setup = requireEmployerSetup(session.uid);
+  setup.catch(() => undefined);
   const sp = await searchParams;
   // EMH-43: old "Proceed to hire" links were /employer/cart?tab=checkout&proposalId=…
   if (sp.tab === "checkout") {
     const id = sp.proposalId ?? sp.proposal;
+    await setup;
     redirect(id ? `/employer/checkout?proposal=${encodeURIComponent(id)}` : "/employer/checkout");
   }
 
   const unlockAll = await isAdminViewing();
   const compareCount = (await rememberedSelection(session.uid)).compare.length;
-  const data = await loadCart(session.uid, unlockAll).catch((err) => {
-    console.error("[employer/cart] load failed", err);
-    return null;
-  });
+  const [, data] = await Promise.all([
+    setup,
+    loadCart(session.uid, unlockAll).catch((err) => {
+      console.error("[employer/cart] load failed", err);
+      return null;
+    }),
+  ]);
 
   if (!data) {
     return (
