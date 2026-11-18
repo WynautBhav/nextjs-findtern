@@ -20,6 +20,7 @@ export async function POST(req: Request) {
   const visible = new Set((await studentsForCollegeAdmin(g.ctx)).map((s) => s.userId));
   let sent = 0;
   let pushed = 0;
+  let emailed = 0;
   let skipped = 0;
   const targets = [...new Set(parsed.data.userIds)].filter((id) => {
     if (visible.has(id)) return true;
@@ -43,10 +44,13 @@ export async function POST(req: Request) {
       if (r.ok) {
         sent++;
         if (r.pushed) pushed++;
+        if (r.emailed) emailed++;
       } else skipped++;
     }
   }
-  // `pushed`: reached a phone right now. The rest see it in Findtern (and, for
-  // offer/interview chases, by email): the officer is told which is which.
-  return NextResponse.json({ sent, pushed, skipped, emailed: parsed.data.kind !== "online" });
+  // `pushed`: reached a phone right now. `emailed`: how many were handed to email (an online nudge is
+  // emailed at most once per student per 3 hours, so a repeat is bell and push only; a student who
+  // switched email off is still counted). The rest see it in Findtern. A number, so the console's
+  // truthy check (`body.emailed`) keeps working.
+  return NextResponse.json({ sent, pushed, skipped, emailed });
 }
