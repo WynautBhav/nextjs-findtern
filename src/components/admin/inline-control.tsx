@@ -12,6 +12,8 @@ import { csrfFetch } from "@/lib/client-fetch";
 import {
   bodyForDraft,
   bodyForValue,
+  emailNoteFrom,
+  toggleResultLine,
   draftFrom,
   typedDraft,
   type InlineDraft,
@@ -43,18 +45,18 @@ export type { InlineField, InlineRequest, InlineValue } from "@/lib/admin/inline
 export async function sendInline(
   req: InlineRequest,
   body: Record<string, unknown> | undefined = req.body,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<{ ok: true; note?: string } | { ok: false; error: string }> {
   try {
     const res = await csrfFetch(req.url, {
       method: req.method ?? "POST",
       headers: body === undefined ? undefined : { "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
-    const data = (await res.json().catch(() => null)) as { error?: string } | null;
+    const data = (await res.json().catch(() => null)) as { error?: string; emailed?: boolean; emailFailed?: boolean } | null;
     if (!res.ok) return { ok: false, error: data?.error || `Not saved (HTTP ${res.status})` };
     // Some bulk endpoints answer 200 with a partial-success `error`.
     if (data?.error) return { ok: false, error: data.error };
-    return { ok: true };
+    return { ok: true, note: emailNoteFrom(data) };
   } catch {
     return { ok: false, error: "Not saved: the network request failed." };
   }
@@ -212,6 +214,7 @@ export function InlineToggle({
   const [state, setState] = useState(on);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resultLine, setResultLine] = useState<string | null>(null);
   const [seen, setSeen] = useState(on);
   // The in-page confirm for the destructive direction (it was window.confirm,
   // which a browser driver auto-dismisses and which looks like a dead button; QA-145).
@@ -248,6 +251,7 @@ export function InlineToggle({
     setState(next);
     setSaving(true);
     setError(null);
+    setResultLine(null);
     const result = spec ? await sendInline(spec) : await sendInline(request!, bodyForValue(request!, next));
     setSaving(false);
     if (!result.ok) {
@@ -255,6 +259,7 @@ export function InlineToggle({
       setError(result.error);
       return;
     }
+    setResultLine(toggleResultLine(next, result.note));
     if (refresh) router.refresh();
   }
 
@@ -312,6 +317,7 @@ export function InlineToggle({
         </span>
         {asking && confirmOff ? <span className="max-w-64 whitespace-normal text-xs text-text-subtle">{confirmOff}</span> : null}
         <ErrorText id={errorId} message={error} />
+        {resultLine ? <span role="status" className="block max-w-56 whitespace-normal text-xs text-text-subtle">{resultLine}</span> : null}
       </span>
     );
   }
@@ -369,6 +375,7 @@ export function InlineToggle({
       </span>
       {asking && confirmOff ? <span className="max-w-64 whitespace-normal text-xs text-ink-600">{confirmOff}</span> : null}
       <ErrorText id={errorId} message={error} />
+      {resultLine ? <span role="status" className="block max-w-56 whitespace-normal text-xs text-text-subtle">{resultLine}</span> : null}
     </span>
   );
 }

@@ -1,3 +1,4 @@
+import { AccountGuard } from "@/components/app/account-guard";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { LayoutDashboard, ListChecks, Megaphone, Ticket, Wallet } from "lucide-react";
@@ -51,6 +52,7 @@ export default async function CollegeLayout({ children }: { children: React.Reac
       crumbParents={{ "/college/students": { label: "Students", href: "/college" } }}
     >
       {children}
+      <AccountGuard role="college" />
       <TermsGate role="college" initialOpen={shouldShowTermsPrompt({ acceptedVersion: ctx.admin.termsAcceptedVersion })} />
     </ConsoleShell>
   );

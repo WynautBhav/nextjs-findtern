@@ -4,6 +4,7 @@
  * tokens, read the profile.
  */
 
+import { ACCOUNT_DISABLED_MESSAGE } from "./account-disabled.ts";
 import { requirePublicOrigin } from "./origin.ts";
 
 const AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -247,7 +248,7 @@ export function oauthErrorMessage(code: string | undefined): string | null {
     case "no_email":
       return "Google did not share a verified email address for that account. Try another account, or sign up with your email.";
     case "inactive":
-      return "This account has been deactivated. Contact support if you think that is a mistake.";
+      return ACCOUNT_DISABLED_MESSAGE;
     case "not_configured":
       return "Google sign-in is not available right now. Use your email and password instead.";
     case "bad_state":

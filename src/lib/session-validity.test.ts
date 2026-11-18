@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { validateSession } = await import("./session-validity.ts");
+const { validateSession, sessionVerdict } = await import("./session-validity.ts");
 
 type Checks = Parameters<typeof validateSession>[1];
 
@@ -90,4 +90,24 @@ test("an admin whose permissions could not be read is signed out", async () => {
 test("an impersonated admin session never needs the permission read", async () => {
   const viewing = { ...session, role: "admin", impersonator: "root" } as unknown as typeof session;
   assert.equal(await validateSession(viewing, checks({ adminPermissions: async () => undefined })), viewing);
+});
+
+test("verdict: a deactivated account with an otherwise good session is 'disabled', everything else 'signed_out'", async () => {
+  assert.deepEqual(await sessionVerdict(session, checks({ isActive: async () => false })), { session: null, denied: "disabled" });
+  // Revoked or password-changed sessions never learn the account state, even if it is also disabled.
+  assert.deepEqual(await sessionVerdict(session, checks({ isActive: async () => false, isRevoked: async () => true })), { session: null, denied: "signed_out" });
+  assert.deepEqual(await sessionVerdict(session, checks({ isActive: async () => false, isPasswordCurrent: async () => false })), { session: null, denied: "signed_out" });
+  assert.deepEqual(await sessionVerdict(session, checks({ isRevoked: async () => { throw new Error("pool timeout"); } })), { session: null, denied: "signed_out" });
+  assert.equal((await sessionVerdict(session, checks())).session, session);
+});
+
+test("one shared facts read still means one round trip: the three checks resolve together", async () => {
+  let reads = 0;
+  const read = async () => { reads++; await new Promise((r) => setTimeout(r, 10)); return { revoked: false, active: true }; };
+  const t0 = Date.now();
+  let facts: Promise<{ revoked: boolean; active: boolean }> | undefined;
+  const once = () => (facts ??= read());
+  await validateSession(session, checks({ isRevoked: async () => (await once()).revoked, isActive: async () => (await once()).active, isPasswordCurrent: async () => (await once(), true) }));
+  assert.equal(reads, 1);
+  assert.ok(Date.now() - t0 < 40, "checks must not run one after another");
 });

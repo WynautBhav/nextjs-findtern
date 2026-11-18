@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { getSession } from "@/lib/auth";
+import { getSession, unauthenticatedResponse } from "@/lib/auth";
 import { hasAnyPermission } from "@/lib/security/guards";
 import { getDb, schema } from "@/lib/db";
 import { parseOffer } from "@/lib/offer";
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "Sign in" }, { status: 401 });
+  if (!session) return unauthenticatedResponse("Sign in");
   const locked = await internLockResponse(session);
   if (locked) return locked;
 

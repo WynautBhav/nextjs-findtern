@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
-import { getSession } from "@/lib/auth";
+import { getSession, unauthenticatedResponse } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { readAny } from "@/lib/security/store";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
@@ -17,7 +17,7 @@ function noAvatar() {
 export async function GET(req: Request) {
   const session = await getSession();
   if (!session) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return unauthenticatedResponse("Unauthorized");
   }
 
   // Intern can read their own avatar; admins or employers can read candidate's avatar if id is passed in searchParams

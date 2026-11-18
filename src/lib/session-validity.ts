@@ -22,7 +22,18 @@ export interface SessionChecks {
   adminPermissions(uid: string): Promise<string[] | null | undefined>;
 }
 
+/**
+ * Why a session was refused. "disabled" is only ever answered for a session that was otherwise good (signed by us, not
+ * revoked, password current): its holder has proven who they are, so telling them the account was switched off leaks
+ * nothing. Everything else is plain "signed out".
+ */
+export type SessionVerdict = { session: SessionData } | { session: null; denied: "signed_out" | "disabled" };
+
 export async function validateSession(session: SessionData, checks: SessionChecks): Promise<SessionData | null> {
+  return (await sessionVerdict(session, checks)).session;
+}
+
+export async function sessionVerdict(session: SessionData, checks: SessionChecks): Promise<SessionVerdict> {
   const wantsPermissions = session.role === "admin" && !session.impersonator;
   let results: [boolean, boolean, boolean, string[] | null | undefined];
   try {
@@ -34,13 +45,14 @@ export async function validateSession(session: SessionData, checks: SessionCheck
     ]);
   } catch (err) {
     console.error("[session] validity check failed; treating the request as signed out:", err instanceof Error ? err.message : err);
-    return null;
+    return { session: null, denied: "signed_out" };
   }
   const [revoked, active, passwordCurrent, perms] = results;
-  if (revoked || !active || !passwordCurrent) return null;
+  if (revoked || !passwordCurrent) return { session: null, denied: "signed_out" };
+  if (!active) return { session: null, denied: "disabled" };
   if (wantsPermissions) {
-    if (!perms) return null; // admin removed (null) or permission lookup failed (undefined)
-    return { ...session, permissions: perms };
+    if (!perms) return { session: null, denied: "signed_out" }; // admin removed (null) or permission lookup failed (undefined)
+    return { session: { ...session, permissions: perms } };
   }
-  return session;
+  return { session };
 }

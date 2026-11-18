@@ -23,7 +23,8 @@ import { ViewAsBanner } from "@/components/admin/view-as-banner";
 import { PresenceHeartbeat } from "@/components/app/presence-heartbeat";
 import { TermsGate } from "@/components/app/terms-gate";
 import { ToastProvider } from "@/components/app/toast";
-import { getSession } from "@/lib/auth";
+import { getSession, loginRedirectFor } from "@/lib/auth";
+import { AccountGuard } from "@/components/app/account-guard";
 import { getDb, schema } from "@/lib/db";
 import { SITE } from "@/lib/content/site";
 import { shouldShowTermsPrompt } from "@/lib/terms";
@@ -68,7 +69,7 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
 
 export default async function EmployerLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-  if (!session || session.role !== "employer") redirect("/login?as=employer");
+  if (!session || session.role !== "employer") redirect(await loginRedirectFor("employer"));
 
   let companyName = "Company Account";
   let unreadAlerts = 0;
@@ -169,6 +170,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
       banner={session.impersonator ? <ViewAsBanner viewing={companyName} admin={session.impersonator.email} /> : null}
     >
       <PresenceHeartbeat />
+      {session.impersonator ? null : <AccountGuard role="employer" />}
       {children}
       <TermsGate role="employer" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>

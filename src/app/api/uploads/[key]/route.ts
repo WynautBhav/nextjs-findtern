@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { isSessionRevoked } from "@/lib/account-status";
-import { readSession, readCookie } from "@/lib/security/session";
+import { getSessionState } from "@/lib/auth";
+import { accountDisabledBody, SESSION_EXPIRED_CODE } from "@/lib/account-disabled";
 import { canAccess } from "@/lib/security/guards";
 import { verify, replayGuard, TokenError } from "@/lib/security/sign";
 import { read, contentTypeFor } from "@/lib/security/store";
@@ -56,9 +56,11 @@ export async function GET(req: Request, ctx: { params: Promise<{ key: string }> 
   }
 
   // 2. Ownership. Admins pass; everyone else must be the subject.
-  const session = readSession(readCookie(req.headers.get("cookie")));
-  if (!session || (await isSessionRevoked(session.sid))) {
-    return NextResponse.json({ error: "Sign in to view this document" }, { status: 401, headers: noStore });
+  const state = await getSessionState();
+  const session = state.session;
+  if (!session) {
+    if (state.disabled) return NextResponse.json(accountDisabledBody(), { status: 403, headers: noStore });
+    return NextResponse.json({ error: "Sign in to view this document", code: SESSION_EXPIRED_CODE }, { status: 401, headers: noStore });
   }
   if (!canAccess(session, payload.s)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403, headers: noStore });

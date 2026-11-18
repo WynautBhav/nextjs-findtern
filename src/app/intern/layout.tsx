@@ -25,7 +25,8 @@ import { CollegeLive } from "@/components/intern/college-live";
 import { DismissedGuard } from "@/components/dismissed-guard";
 import { driveBannerKey } from "@/lib/dismissed-keys";
 import { liveDriveForMember } from "@/lib/college/live-drive";
-import { getSession } from "@/lib/auth";
+import { getSession, loginRedirectFor } from "@/lib/auth";
+import { AccountGuard } from "@/components/app/account-guard";
 import { getDb, schema } from "@/lib/db";
 import { membershipOf } from "@/lib/college/membership";
 import { loadInternData } from "@/lib/intern-data";
@@ -107,7 +108,7 @@ const PRECOMPLETE_STAGE_NAV: ConsoleNavItem[] = [
  */
 export default async function InternLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
-  if (!session || session.role !== "intern") redirect("/login?as=intern");
+  if (!session || session.role !== "intern") redirect(await loginRedirectFor("intern"));
 
   // Independent reads, in parallel. loadInternData is cache()d, so the page's own call reuses this one.
   // The live drive rides along (found from the student's id, not from the membership row), so the layout is one wave.
@@ -205,6 +206,7 @@ export default async function InternLayout({ children }: { children: React.React
       ) : null}
       {liveDrive ? <DismissedGuard store="session" storageKey={driveBannerKey(liveDrive.id)} name="drive" /> : null}
       {lockedNav ? null : <PresenceHeartbeat />}
+      {session.impersonator ? null : <AccountGuard role="intern" />}
       {children}
       <TermsGate role="intern" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>

@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { accountDisabledBody } from "@/lib/account-disabled";
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { verifyPassword, needsRehash, hashPassword } from "@/lib/security/password";
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Email not verified" }, { status: 403 });
   }
   if (!user.isActive) {
-    return NextResponse.json({ error: "Account deactivated" }, { status: 403 });
+    return NextResponse.json(accountDisabledBody(), { status: 403 });
   }
 
   let storedPassword = user.password;

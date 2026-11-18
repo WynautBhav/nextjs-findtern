@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { getSession } from "@/lib/auth";
+import { getSession, unauthenticatedResponse } from "@/lib/auth";
 import { maskCode, parseCollegeCode } from "@/lib/college/code";
 import { takeCodeAttempt } from "@/lib/college/code-throttle";
 import { BAD_COLLEGE_CODE, joinCollegeByCode, leaveCollege, membershipOf } from "@/lib/college/membership";
@@ -22,7 +22,7 @@ const bodySchema = z
 
 export async function GET() {
   const session = await getSession();
-  if (!session || session.role !== "intern") return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  if (!session || session.role !== "intern") return unauthenticatedResponse();
   return NextResponse.json({ college: await membershipOf(session.uid) });
 }
 

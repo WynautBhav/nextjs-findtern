@@ -2,8 +2,8 @@ import { eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { accountDisabledBody } from "@/lib/account-disabled";
 import { getDb, schema } from "@/lib/db";
-import { SITE } from "@/lib/content/site";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { verifyPassword, needsRehash, hashPassword } from "@/lib/security/password";
 import { limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
   }
 
   if (!employer.isActive) {
-    return NextResponse.json({ error: `This account has been deactivated. Contact ${SITE.adminEmail}.` }, { status: 403 });
+    return NextResponse.json(accountDisabledBody(), { status: 403 });
   }
 
   let storedPassword = employer.password;

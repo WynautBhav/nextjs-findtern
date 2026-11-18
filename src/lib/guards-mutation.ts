@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { checkCsrf } from "@/lib/security/session";
-import { getSession } from "@/lib/auth";
+import { getSession, unauthenticatedResponse } from "@/lib/auth";
 import type { SessionData } from "@/lib/security/session";
 import { canAccess } from "@/lib/security/guards";
 import { isTermsCurrent } from "@/lib/account-status";
@@ -53,7 +53,7 @@ export async function requireMutation(input: {
   if (!session) {
     return {
       ok: false,
-      response: NextResponse.json({ error: "Unauthenticated" }, { status: 401 }),
+      response: await unauthenticatedResponse(),
     };
   }
 

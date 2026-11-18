@@ -1,4 +1,4 @@
-import { eq, lt } from "drizzle-orm";
+import { eq, lt, sql } from "drizzle-orm";
 
 import { getDb, schema } from "./db/index.ts";
 import { isRevoked } from "./security/session-revocation.ts";
@@ -6,9 +6,9 @@ import { acceptsPvlessSession, passwordVersion } from "./security/session.ts";
 import { CURRENT_TERMS_VERSION } from "./terms.ts";
 
 /**
- * Deactivated accounts lose their existing sessions, not just future logins.
- * Checked on every session read, so the answer is cached briefly per account;
- * the (de)activate routes clear the entry so the change applies at once.
+ * The 30 s cache below now serves only the terms-accepted answer (isTermsCurrent) and admin permissions. It must NOT
+ * decide whether an account may use a session: that is loadSessionFacts, read fresh on every request, because the
+ * admin's deactivate request can only clear the cache of the one instance it ran on (Vercel runs many).
  */
 const TTL_MS = 30_000;
 
@@ -79,19 +79,48 @@ async function loadStatus(role: string, uid: string, key: string): Promise<Statu
   return status;
 }
 
-export async function isAccountActive(role: string, uid: string): Promise<boolean> {
-  if (role !== "intern" && role !== "employer" && role !== "college") return true;
-  return (await readStatus(role, uid)).active;
+/**
+ * Everything the per-request session check needs, in ONE statement and never cached:
+ * is the sid on the revoked list, is the account (and for a college officer, the college) active, and what is the
+ * stored password's version. A deactivation, a logout or a password change written by the admin's request, on any
+ * instance, is therefore seen by the very next request on every instance; there is no per-process window to close.
+ * Cost: one indexed primary-key read per request, run inside validateSession's Promise.all (no extra round trip),
+ * and shared by every getSession() call of that request (see getSessionState).
+ */
+export type SessionFacts = { revoked: boolean; active: boolean; pv: string | null };
+
+export async function loadSessionFacts(role: string, uid: string, sid: string | undefined): Promise<SessionFacts> {
+  const revoked = sid
+    ? sql<boolean>`exists (select 1 from ${schema.revokedSessions} where ${schema.revokedSessions.sid} = ${sid})`
+    : sql<boolean>`false`;
+  const db = getDb();
+  if (role === "admin") {
+    const [row] = await db.select({ password: schema.admins.password, revoked }).from(schema.admins).where(eq(schema.admins.id, uid)).limit(1);
+    return { revoked: Boolean(row?.revoked), active: Boolean(row), pv: row ? passwordVersion(row.password) : null };
+  }
+  if (role === "college") {
+    // A placement officer is locked out when either they or their college is switched off.
+    const [row] = await db
+      .select({ admin: schema.collegeAdmins.isActive, college: schema.colleges.isActive, password: schema.collegeAdmins.password, revoked })
+      .from(schema.collegeAdmins)
+      .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeAdmins.collegeId))
+      .where(eq(schema.collegeAdmins.id, uid))
+      .limit(1);
+    return { revoked: Boolean(row?.revoked), active: Boolean(row?.admin && row?.college), pv: row ? passwordVersion(row.password) : null };
+  }
+  const table = role === "intern" ? schema.users : schema.employers;
+  const [row] = await db.select({ isActive: table.isActive, password: table.password, revoked }).from(table).where(eq(table.id, uid)).limit(1);
+  return { revoked: Boolean(row?.revoked), active: Boolean(row?.isActive), pv: row ? passwordVersion(row.password) : null };
 }
 
 /**
- * Whether a session minted with password version `pv` is still current: a
- * password change (here or on the legacy site) ends every other session on
- * the account (INT-26). Sessions without a version predate the check; for colleges they are rejected.
+ * Whether a session minted with password version `pv` is still current: a password change (here or on the legacy
+ * site) ends every other session on the account (INT-26). Sessions without a version predate the check; for colleges
+ * they are rejected.
  */
-export async function isPasswordVersionCurrent(role: string, uid: string, pv: string | undefined): Promise<boolean> {
-  if (!pv) return acceptsPvlessSession(role);
-  return (await readStatus(role, uid)).pv === pv;
+export function passwordVersionCurrent(role: string, sessionPv: string | undefined, storedPv: string | null): boolean {
+  if (!sessionPv) return acceptsPvlessSession(role);
+  return storedPv === sessionPv;
 }
 
 /**
@@ -156,30 +185,20 @@ export async function currentAdminPermissions(uid: string): Promise<string[] | n
 }
 
 /**
- * Logout and sid revocation. A revoked sid stays refused until its cookie
- * would have expired anyway. Per sid the answer is cached for TTL_MS; a revoke
- * on this process lands in the cache at once, another instance learns within TTL_MS.
+ * Logout and sid revocation. A revoked sid stays refused until its cookie would have expired anyway. Read from the
+ * database every time (no per-process cache): a revoke written on one instance is honoured by all of them at once.
  */
-const revokedStore = globalThis as typeof globalThis & { __ftRevokedSids?: Map<string, { revoked: boolean; at: number }> };
-const revokedCache = (revokedStore.__ftRevokedSids ??= new Map());
-
 export async function isSessionRevoked(sid: string | undefined | null): Promise<boolean> {
   if (!sid) return false;
-  const hit = revokedCache.get(sid);
-  if (hit && (hit.revoked || Date.now() - hit.at < TTL_MS)) return hit.revoked;
-  // A failed lookup rejects (nothing cached): the caller must not read it as "not revoked".
+  // A failed lookup rejects: the caller must not read it as "not revoked".
   const [row] = await getDb().select({ sid: schema.revokedSessions.sid }).from(schema.revokedSessions).where(eq(schema.revokedSessions.sid, sid)).limit(1);
-  const revoked = isRevoked(new Set(row ? [row.sid] : []), sid);
-  if (revokedCache.size > 5000) revokedCache.clear();
-  revokedCache.set(sid, { revoked, at: Date.now() });
-  return revoked;
+  return isRevoked(new Set(row ? [row.sid] : []), sid);
 }
 
-/** End a session: record the sid until `exp` (ms) and refuse it on this process immediately. */
+/** End a session: record the sid until `exp` (ms); every instance refuses it from its next request. */
 export async function revokeSession(sid: string, exp: number): Promise<void> {
   const db = getDb();
   await db.insert(schema.revokedSessions).values({ sid, exp: new Date(exp) }).onConflictDoNothing();
-  revokedCache.set(sid, { revoked: true, at: Date.now() });
   // Rows past their cookie's expiry can never matter again.
   await db.delete(schema.revokedSessions).where(lt(schema.revokedSessions.exp, new Date())).catch(() => undefined);
 }

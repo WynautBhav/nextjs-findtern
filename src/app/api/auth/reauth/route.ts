@@ -6,7 +6,7 @@ import { z } from "zod";
 import { forgetAccountStatus } from "@/lib/account-status";
 import { checkCsrf, readSession } from "@/lib/security/session";
 import { getDb, schema } from "@/lib/db";
-import { withSession } from "@/lib/auth";
+import { withSession, unauthenticatedResponse } from "@/lib/auth";
 import { verifyPassword } from "@/lib/security/password";
 import { bucketKey, clientIp, limiters } from "@/lib/security/rate-limit";
 
@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid or missing CSRF token" }, { status: 403 });
   }
   const session = readSession((await cookies()).get("ft_sid")?.value);
-  if (!session || session.impersonator) return NextResponse.json({ error: "Unauthenticated" }, { status: 401 });
+  if (!session || session.impersonator) return unauthenticatedResponse();
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
