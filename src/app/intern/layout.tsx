@@ -191,7 +191,6 @@ export default async function InternLayout({ children }: { children: React.React
       // Detail pages read "Offers", not "Offers / Details": the title names the record.
       crumbParents={{}}
       width="reading"
-      tone="light"
       banner={session.impersonator ? <ViewAsBanner viewing={name} admin={session.impersonator.email} /> : null}
     >
       {/* Presence, drive banner and call alerts only exist for partner colleges. */}

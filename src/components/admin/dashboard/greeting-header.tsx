@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { greetingFor } from "@/lib/admin/dashboard-overview-pure";
 
 export type StripItem = { key: string; value: string; label: string; href: string | null };
 
@@ -24,10 +23,8 @@ export function GreetingHeader({
   return (
     <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
       <div className="min-w-0">
-        <p className="text-sm font-medium text-text-subtle">{date}</p>
-        <h1 className="mt-0.5 text-balance break-words text-[1.5rem] font-semibold leading-tight tracking-[-0.02em] text-foreground sm:text-[2rem]">
-          {greetingFor(now)}, {name}
-        </h1>
+        <h1 className="text-balance break-words text-2xl font-semibold leading-tight tracking-[-0.02em] text-foreground">{date}</h1>
+        <p className="mt-1 text-sm text-ink-600">{name}&apos;s desk</p>
         {strip.length > 0 ? (
           <ul aria-label="At a glance" className="mt-2 flex flex-wrap items-center gap-x-1 gap-y-1 text-sm text-text-subtle">
             {strip.map((item, i) => {

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { and, count, countDistinct, eq, inArray, sql } from "drizzle-orm";
@@ -14,7 +13,7 @@ import {
   KeyRound,
   Receipt,
   CalendarClock,
-  Sparkles,
+  Award,
 } from "lucide-react";
 
 import { ConsoleShell, type ConsoleNavGroup, type ConsoleNavItem } from "@/components/layout/console-shell";
@@ -61,7 +60,7 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
     items: [
       { href: "/employer/timesheets", label: "Timesheets", icon: <Clock /> },
       { href: "/employer/orders", label: "Orders", icon: <ShoppingCart />, also: ["/employer/checkout"] },
-      { href: "/employer/subscription", label: "Findtern Pro", icon: <Sparkles /> },
+      { href: "/employer/subscription", label: "Findtern Pro", icon: <Award /> },
     ],
   },
 ];
@@ -139,7 +138,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     icon: <ShoppingBag />,
     ...(cartCount > 0 ? { badge: cartCount > 99 ? "99+" : cartCount } : {}),
   };
-  const tabs = ["/employer/dashboard", "/employer/candidates", "/employer/proposals", "/employer/cart"]
+  const tabs = ["/employer/dashboard", "/employer/candidates", "/employer/projects", "/employer/proposals", "/employer/cart"]
     .map((href) => (href === shortlistTab.href ? shortlistTab : flat.find((i) => i.href === href)))
     .filter((i): i is ConsoleNavItem => Boolean(i));
 
@@ -147,8 +146,6 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     <ToastProvider>
     <ConsoleShell
       roleLabel="Employer"
-      tone="light"
-      flush
       homeHref="/employer/dashboard"
       groups={groups}
       tabs={tabs}
@@ -158,21 +155,6 @@ export default async function EmployerLayout({ children }: { children: React.Rea
         { href: "/employer/orders", label: "Orders & invoices", icon: <Receipt /> },
         { href: "/employer/account#security", label: "Change password", icon: <KeyRound /> },
       ]}
-      topActions={
-        <Link
-          href="/employer/cart"
-          aria-label={cartCount > 0 ? `Shortlist, ${cartCount} candidates` : "Shortlist"}
-          title="Shortlist"
-          className="apple-spring relative grid size-11 place-items-center rounded-apple-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900"
-        >
-          <ShoppingBag className="size-5" aria-hidden />
-          {cartCount > 0 ? (
-            <span className="nums absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand-700 px-1 text-2xs font-semibold text-white ring-2 ring-surface">
-              {cartCount > 99 ? "99+" : cartCount}
-            </span>
-          ) : null}
-        </Link>
-      }
       alerts={{ href: "/employer/alerts", count: unreadAlerts, label: "Alerts" }}
       help={{ faqHref: "/faq#employers", contactHref: "/contact", email: SITE.adminEmail }}
       signOutTo="/login?as=employer"

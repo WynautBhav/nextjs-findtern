@@ -1,101 +1,49 @@
 "use client";
 
 /**
- * The one frame every signed-in page sits in: intern, employer and admin.
+ * The frame for intern, employer and college pages (admin has its own, `AdminShell`, built from the
+ * same parts in `shell-parts.tsx`).
  *
- * Before this there were three shells (intern, employer, admin) that agreed
- * on almost nothing: three logos at three sizes, a text wordmark on the
- * employer's phone header, a light admin rail beside two dark ones, a desktop
- * top bar for two roles and not the third, three content paddings. The same
- * product read as three. This file is the only place the frame is decided.
- *
- * - The rail is the marketing hero's green, with the real logo, so signing in
- *   feels like walking further into the same site.
- * - It collapses to an icon rail (bug sheet 7, S2 r4). The choice lives in a
- *   cookie the server layout reads, so the first paint is already right.
- * - One breakpoint (lg) for every role: a tablet gets the same frame whether
- *   it belongs to a candidate or a company.
- * - `tone="light"` (intern, SPECS §9 30 Oct): a white rail inset in a framed
- *   canvas; FAQ in the rail footer, contact and email in the account menu.
- *   Other consoles keep the dark rail until they get their own pass.
+ * - Rail on the left, flat on warm paper with a hairline edge. It collapses to an icon rail; the
+ *   choice lives in a cookie the server layout reads, so the first paint is right.
+ * - Top bar: where you are (a trail only on detail pages), then "Ask Findy", extra actions, alerts
+ *   and the account menu. No blur, no pill.
+ * - Phones: a bottom bar with the role's real destinations and a "More" for the rest.
+ * - One breakpoint (lg) for every role.
+ * - `tone` and `flush` are accepted for old callers and ignored: there is one look now.
  */
 
 import Link from "next/link";
-
-import { RAIL_COOKIE } from "@/lib/rail";
 import { usePathname, useRouter } from "next/navigation";
-import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
-import { MotionConfig, motion } from "motion/react";
-import { Bell, ChevronDown, ChevronsLeft, ChevronsRight, CircleQuestionMark, LogOut, Mail, Menu, MessageSquareText, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { MotionConfig } from "motion/react";
+import { Bell, ChevronsLeft, ChevronsRight, CircleQuestionMark, LogOut, Mail, Menu, MessageSquareText, X } from "lucide-react";
 
-import { Logo, LogoMark } from "@/components/brand/logo";
 import { FeedbackFab } from "@/components/app/feedback-fab";
-import { InternAvatar } from "@/components/intern/avatar";
+import { Logo, LogoMark } from "@/components/brand/logo";
+import { APP_FONT_CLASSES } from "@/components/layout/app-fonts";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+  AskLauncher,
+  RAIL_FOOT,
+  RailGroups,
+  RailLink,
+  RailScroller,
+  TabBar,
+  UserMenu,
+  activeHrefOf,
+  type MenuLink,
+  type NavGroup,
+  type NavItem,
+} from "@/components/layout/shell-parts";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { breadcrumbsFor } from "@/lib/breadcrumbs";
-import { initialsOf as personInitials } from "@/lib/admin/person-tint";
-import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { csrfFetch } from "@/lib/client-fetch";
+import { RAIL_COOKIE } from "@/lib/rail";
 import { cn } from "@/lib/utils";
-import { newTabAttrs } from "@/components/ui/new-tab";
-import { NewTabHint } from "@/components/ui/new-tab-link";
 
-// The owl avatar pulls in `motion`; load it after the shell paints (the chat widget is lazy for the same reason).
-const MascotAvatar = dynamic(() => import("@/components/chat/mascot").then((m) => m.MascotAvatar), {
-  ssr: false,
-  loading: () => <span aria-hidden className="size-10 shrink-0 rounded-full bg-brand-100" />,
-});
-
-export type ConsoleNavItem = {
-  href: string;
-  label: string;
-  icon: React.ReactNode;
-  /** A count shown beside the label (unread, items waiting). */
-  badge?: number | string;
-  /** What the badge counts, for the collapsed rail's screen-reader text (default "unread"). */
-  badgeLabel?: string;
-  /** A quiet dot: this needs the user, without turning it into a score. */
-  attention?: boolean;
-  /** Other paths this item stands for (one "Legal texts" item for four pages). */
-  also?: string[];
-  /** false for links out to the marketing site: prefetching one downloads that page's scripts on every console page. */
-  prefetch?: boolean;
-  /** Opens in a new tab (marketing pages linked from the console). */
-  newTab?: boolean;
-  /** Not open yet (intern before payment): lock icon, "Unlocks after payment", and the href points at the page that explains it. */
-  locked?: boolean;
-  /** Replaces "Unlocks after payment" in the lock's title and screen-reader text (e.g. "Complete your profile first"). */
-  lockedNote?: string;
-};
-
-/** lucide's Lock, inline: a nav lock icon without touching the import block. */
-function LockGlyph({ className }: { className?: string }) {
-  return (
-    <svg aria-hidden viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  );
-}
-
-const LOCKED_TEXT = "Unlocks after payment";
-
-export type ConsoleNavGroup = { title?: string; items: ConsoleNavItem[] };
-
-export type ConsoleMenuLink = { href: string; label: string; icon: React.ReactNode; prefetch?: boolean; newTab?: boolean };
-
-// The cookie name lives in `@/lib/rail`: this file is `"use client"`, and a
-// server layout importing a constant from it would receive a client reference
-// instead of the string (which is why the collapsed rail never persisted).
+export type ConsoleNavItem = NavItem;
+export type ConsoleNavGroup = NavGroup;
+export type ConsoleMenuLink = MenuLink;
 
 export function ConsoleShell({
   roleLabel,
@@ -113,36 +61,33 @@ export function ConsoleShell({
   crumbParents,
   rootCrumb,
   width = "wide",
-  tone = "dark",
-  flush = false,
   banner,
   children,
 }: {
-  /** Shown as a small chip beside the logo ("Employer", "Admin"). */
+  /** Said under the logo ("Employer", "College"). Plain text, not a badge. */
   roleLabel?: string;
   homeHref: string;
-  groups: ConsoleNavGroup[];
-  /** Phone bottom bar (up to 5). Without it, phones use the drawer only. */
-  tabs?: ConsoleNavItem[];
+  groups: NavGroup[];
+  /** Phone bottom bar (up to 5). The rest sit behind "More". */
+  tabs?: NavItem[];
   account: { name: string; email: string; subtitle?: string; photoUrl?: string | null };
-  menu?: ConsoleMenuLink[];
-  /** The bell. Consoles with no inbox (college) leave it out. */
+  menu?: MenuLink[];
+  /** The bell. Consoles with no inbox leave it out. */
   alerts?: { href: string; count: number; label?: string };
-  /** Extra controls in the top bar (cart, command palette). */
+  /** Extra controls in the top bar (the shortlist bag). */
   topActions?: React.ReactNode;
-  /** FAQ / contact / email links under the nav. Staff consoles leave it out. */
+  /** FAQ / contact / email. Present means the console has the assistant. */
   help?: { faqHref: string; contactHref: string; email: string };
   signOutTo: string;
   initialCollapsed?: boolean;
   crumbLabels?: Record<string, string>;
-  /** Detail-page parent segments → the list they belong to; ids are then dropped. */
   crumbParents?: Record<string, { label: string; href: string }>;
   rootCrumb: { label: string; href: string };
   /** `reading` keeps prose screens to a comfortable measure; `wide` is for tables. */
   width?: "reading" | "wide";
-  /** `light` is the intern frame; everyone else keeps the dark rail. */
+  /** @deprecated accepted for old callers; ignored. */
   tone?: "dark" | "light";
-  /** With `tone="light"`: a full-height mint column instead of a floating card, and header and page share one grid line. */
+  /** @deprecated accepted for old callers; ignored. */
   flush?: boolean;
   banner?: React.ReactNode;
   children: React.ReactNode;
@@ -152,25 +97,22 @@ export function ConsoleShell({
   const [drawer, setDrawer] = useState(false);
   const [collapsed, setCollapsed] = useState(initialCollapsed);
 
-  const allItems = groups.flatMap((g) => g.items);
-  // The longest matching href wins, so /admin/interns/terms doesn't also
-  // light up /admin/interns.
-  const activeHref = allItems
-    .flatMap((i) => [i.href, ...(i.also ?? [])].map((p) => ({ path: p.split("#")[0], href: i.href.split("#")[0] })))
-    .filter(({ path }) => pathname === path || pathname.startsWith(`${path}/`))
-    .sort((a, b) => b.path.length - a.path.length)[0]?.href;
-  // The root crumb already names the home page; don't repeat it.
-  const crumbs = breadcrumbsFor(
-    pathname,
-    { ...Object.fromEntries(allItems.map((i) => [i.href, i.label])), ...crumbLabels },
-    crumbParents ? "" : "Details",
-    crumbParents,
-  ).filter(
-    (c) => c.href !== rootCrumb.href,
-  );
+  // Portalled dialogs and menus live under <body>: give <html> the same fonts and tokens.
+  useEffect(() => {
+    const root = document.documentElement;
+    const classes = APP_FONT_CLASSES.split(" ");
+    root.classList.add(...classes);
+    root.dataset.app = "1";
+    return () => {
+      root.classList.remove(...classes);
+      delete root.dataset.app;
+    };
+  }, []);
 
-  // Employer: "Home / Candidates" above a "Candidates" title says nothing; trails show from two levels deep.
-  const showCrumbs = !flush || crumbs.length > 1;
+  const allItems = groups.flatMap((g) => g.items);
+  const crumbs = breadcrumbsFor(pathname, { ...Object.fromEntries(allItems.map((i) => [i.href, i.label])), ...crumbLabels }, crumbParents ? "" : "Details", crumbParents).filter((c) => c.href !== rootCrumb.href);
+  const showCrumbs = crumbs.length > 1;
+  const waitingElsewhere = allItems.filter((i) => !tabs?.some((t) => t.href === i.href)).reduce((n, i) => n + (typeof i.badge === "number" ? i.badge : 0), 0);
 
   function toggleRail() {
     const next = !collapsed;
@@ -194,463 +136,152 @@ export function ConsoleShell({
     router.refresh();
   }
 
-  const light = tone === "light";
-  const column = light && flush;
-  // Header and page body share this left/right line (a breadcrumb used to start 60px left of the title).
-  const gridLine = cn("mx-auto w-full min-w-0 px-[clamp(1rem,4vw,2.5rem)]", width === "reading" ? "max-w-[75rem]" : "max-w-[90rem]");
-  // Intern and employer carry "Ask me" in the top bar at every width; the floating launcher is off there (chat-widget).
-  const askInBar = light || /^\/employer(\/|$)/.test(pathname);
-  // The global ring (brand-700) is 2.3:1 on the dark rail; the accent clears 3:1 there.
-  const darkRing = light ? undefined : "focus-visible:outline-accent-300";
-  const helpLinks: ConsoleNavItem[] = help
+  const gridLine = cn("mx-auto w-full min-w-0 px-[var(--space-page)]", width === "reading" ? "max-w-[72rem]" : "max-w-[88rem]");
+  // Intern and employer carry the launcher at every width; the others only from lg (their phones keep the floating one).
+  const askEverywhere = /^\/(intern|employer|college)(\/|$)/.test(pathname);
+  const helpLinks: NavItem[] = help
     ? [
-        { href: help.faqHref, label: "FAQ", icon: <CircleQuestionMark className="size-5" aria-hidden />, prefetch: false, newTab: true },
-        { href: help.contactHref, label: "Contact us", icon: <MessageSquareText className="size-5" aria-hidden />, prefetch: false, newTab: true },
-        { href: `mailto:${help.email}`, label: "Email us", icon: <Mail className="size-5" aria-hidden /> },
+        { href: help.faqHref, label: "Help & FAQ", icon: <CircleQuestionMark />, prefetch: false, newTab: true },
+        { href: help.contactHref, label: "Contact us", icon: <MessageSquareText />, prefetch: false, newTab: true },
+        { href: `mailto:${help.email}`, label: "Email us", icon: <Mail /> },
       ]
     : [];
 
   const rail = (compact: boolean, onNavigate?: () => void) => (
     <>
-      <RailScroller light={light} column={column}>
-        {groups.map((group, i) => (
-          <div key={group.title ?? i}>
-            {group.title ? (
-              compact ? (
-                <div aria-hidden className={cn("mx-auto mb-2 h-px w-6", light ? "bg-ink-200" : "bg-white/10")} />
-              ) : (
-                <p className={cn("mb-2 px-3 text-xs font-semibold tracking-[0.04em]", light ? "text-ink-600" : "text-on-dark")}>{group.title}</p>
-              )
-            ) : null}
-            <ul className="flex flex-col gap-0.5">
-              {group.items.map((item) => (
-                <li key={item.href}>
-                  <RailLink item={item} active={activeHref === item.href.split("#")[0]} compact={compact} light={light} column={column} onNavigate={onNavigate} />
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-        {helpLinks.length && !light ? <div>
-          {compact ? (
-            <div aria-hidden className="mx-auto mb-2 h-px w-6 bg-white/10" />
-          ) : (
-            <p className="mb-2 px-3 text-xs font-semibold tracking-[0.04em] text-on-dark">Help</p>
-          )}
-          <ul className="flex flex-col gap-0.5">
-            {helpLinks.map((item) => (
-              <li key={item.href}>
-                <RailLink item={item} active={false} compact={compact} light={light} column={column} onNavigate={onNavigate} />
-              </li>
-            ))}
-          </ul>
-        </div> : null}
+      <RailScroller>
+        <RailGroups groups={groups} pathname={pathname} compact={compact} onNavigate={onNavigate} />
       </RailScroller>
-
-      <div className={cn("mt-4 shrink-0 space-y-1 border-t pt-3", column ? cn("border-rail-line bg-rail-active/40", onNavigate ? "-mx-4 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]" : "-mx-3 px-3 pb-4") : light ? "border-ink-100" : "border-white/10")}>
-        {column && !compact ? <p className="px-3 pb-1 text-xs font-semibold tracking-[0.04em] text-ink-600">Help &amp; account</p> : null}
-        {/* Light rail: FAQ stays one click away; contact and email sit in the account menu. */}
-        {light && helpLinks[0] ? <RailLink item={{ ...helpLinks[0], label: "Help & FAQ" }} active={false} compact={compact} light column={column} onNavigate={onNavigate} /> : null}
-        <FeedbackFab variant="link" deepLink={!onNavigate} className={cn("w-full gap-3 [&>svg]:size-5", darkRing, light && (column ? "text-ink-700 hover:bg-rail-active/50 hover:text-ink-900" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"), compact && "justify-center px-0 [&>span]:sr-only")} />
-        <button
-          type="button"
-          onClick={signOut}
-          title={compact ? "Sign out" : undefined}
-          className={cn(
-            "apple-spring flex min-h-11 w-full items-center gap-3 rounded-apple-sm px-3 text-sm",
-            darkRing,
-            light ? (column ? "text-ink-700 hover:bg-rail-active/50 hover:text-ink-900" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900") : "text-on-dark-subtle hover:bg-white/8 hover:text-white",
-            compact && "justify-center px-0",
-          )}
-        >
-          <LogOut className="size-5 shrink-0" aria-hidden />
+      <div className="mt-3 shrink-0 space-y-0.5 pb-1">
+        {helpLinks[0] ? <RailLink item={helpLinks[0]} active={false} compact={compact} onNavigate={onNavigate} /> : null}
+        <FeedbackFab variant="link" deepLink={!onNavigate} className={cn(RAIL_FOOT, compact && "justify-center px-0 [&>span]:sr-only")} />
+        <button type="button" onClick={signOut} title={compact ? "Sign out" : undefined} className={cn(RAIL_FOOT, compact && "justify-center px-0")}>
+          <LogOut aria-hidden />
           <span className={cn(compact && "sr-only")}>Sign out</span>
         </button>
       </div>
     </>
   );
 
+  const brand = (compact: boolean) => (
+    <div className={cn("flex min-h-12 items-center", compact ? "justify-center" : "px-2")}>
+      <Link href={homeHref} aria-label="Findtern home" className="flex min-w-0 flex-col justify-center">
+        {compact ? <LogoMark variant="green" alt="" className="size-8" /> : <Logo variant="green" priority className="h-8" />}
+        {!compact && roleLabel ? <span className="mt-1 text-xs font-medium text-ink-600">{roleLabel}</span> : null}
+      </Link>
+    </div>
+  );
+
   return (
     <MotionConfig reducedMotion="user">
-    <div data-tone={tone} className={cn(
-        "apple-admin min-h-[100dvh] overflow-x-clip lg:flex",
-        column ? "bg-canvas" : light ? "bg-canvas lg:gap-3 lg:p-3" : "bg-canvas",
-        // Rail width for fixed bars that centre on the content column (employer Compare pill).
-        column ? (collapsed ? "lg:[--console-rail:4.75rem]" : "lg:[--console-rail:16rem]") : light ? (collapsed ? "lg:[--console-rail:6.25rem]" : "lg:[--console-rail:17.5rem]") : collapsed ? "lg:[--console-rail:4.75rem]" : "lg:[--console-rail:16rem]",
-      )}>
-      {/* ── Desktop rail ─────────────────────────────────────────────── */}
-      <aside
-        aria-label="Sidebar"
+      <div
+        data-app="1"
+        data-tone="light"
         className={cn(
-          "relative sticky hidden shrink-0 flex-col px-3 transition-[width] duration-200 ease-[cubic-bezier(.22,1,.36,1)] motion-reduce:transition-none lg:flex",
-          column ? "top-0 h-[100dvh] border-r border-rail-line bg-rail pt-5" : light ? "top-3 h-[calc(100dvh-1.5rem)] rounded-apple-xl bg-white py-5" : "top-0 h-[100dvh] bg-brand-950 py-5",
-          collapsed ? "w-[4.75rem]" : "w-64",
+          APP_FONT_CLASSES,
+          "min-h-[100dvh] overflow-x-clip lg:flex",
+          collapsed ? "lg:[--console-rail:4.5rem]" : "lg:[--console-rail:15rem]",
         )}
       >
-        {/* The hero's wash, so the rail is the same green the site greets you with. */}
-        {light ? null : <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_120%_45%_at_0%_0%,rgb(22_107_84/0.45)_0%,transparent_70%)]" />}
-        <div className={cn("relative flex min-h-12 items-center", collapsed ? "justify-center" : "justify-between gap-2 px-2")}>
-          <Link href={homeHref} aria-label="Findtern home" className={cn("flex min-w-0 items-center", darkRing)}>
-            {collapsed ? (
-              <span className={cn("grid size-11 place-items-center rounded-apple-md ring-1", light ? "bg-brand-50 ring-brand-100" : "bg-white/[0.06] ring-white/10")}>
-                <LogoMark variant={light ? "green" : "white"} alt="" className="size-7" />
-              </span>
-            ) : (
-              <Logo variant={light ? "green" : "white"} priority className="h-10" />
-            )}
-          </Link>
-          {!collapsed && roleLabel ? <RoleChip label={roleLabel} light={light} column={column} /> : null}
-        </div>
-        <div className="relative flex min-h-0 flex-1 flex-col">{rail(collapsed)}</div>
-        <button
-          type="button"
-          onClick={toggleRail}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-expanded={!collapsed}
-          className="apple-spring absolute -right-3.5 top-[4.25rem] z-10 grid size-7 place-items-center rounded-full border border-ink-200 bg-white text-ink-600 shadow-sm hover:text-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 focus-visible:shadow-[0_0_0_2px_#fff]"
-        >
-          {collapsed ? <ChevronsRight className="size-4" aria-hidden /> : <ChevronsLeft className="size-4" aria-hidden />}
-        </button>
-      </aside>
-
-      {/* ── Content column ───────────────────────────────────────────── */}
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className={cn("sticky top-0 z-30 backdrop-blur-md", light ? "bg-canvas/85" : "border-b border-ink-200/70 bg-canvas/85")}>
-          <div className={cn("flex h-16 items-center gap-2", column ? gridLine : "px-[clamp(1rem,3vw,2rem)]")}>
-            {/* Phone / tablet: drawer + logo */}
-            <Sheet open={drawer} onOpenChange={setDrawer}>
-              <SheetTrigger asChild>
-                <button type="button" aria-label="Open navigation" className="apple-spring -ml-2 grid size-11 place-items-center rounded-apple-sm text-ink-700 hover:bg-ink-100 lg:hidden">
-                  <Menu className="size-5" aria-hidden />
-                </button>
-              </SheetTrigger>
-              <SheetContent side="left" showCloseButton={false} aria-modal="true" className={cn("flex w-[19rem] flex-col border-r-0 p-4", column ? "bg-rail pb-0 text-ink-900" : light ? "bg-white text-ink-900" : "bg-brand-950 text-white")}>
-                <SheetTitle className="sr-only">Navigation</SheetTitle>
-                <div className="flex min-h-12 items-center justify-between gap-2 px-2">
-                  <Logo variant={light ? "green" : "white"} className="h-9" />
-                  <button type="button" onClick={() => setDrawer(false)} aria-label="Close navigation" className={cn("apple-spring grid size-11 place-items-center rounded-apple-sm", darkRing, light ? "text-ink-600 hover:bg-ink-100 hover:text-ink-900" : "text-on-dark-subtle hover:bg-white/10 hover:text-white")}>
-                    <X className="size-5" aria-hidden />
-                  </button>
-                </div>
-                {rail(false, () => setDrawer(false))}
-              </SheetContent>
-            </Sheet>
-            <Link href={homeHref} aria-label="Findtern home" className="flex min-h-11 min-w-0 items-center lg:hidden">
-              {/* Light (intern) phones also carry "Ask me" up here: the mark alone leaves room for it. */}
-              {askInBar ? <LogoMark variant="green" alt="" className="size-8 sm:hidden" /> : null}
-              <Logo variant="green" priority className={cn("h-8", askInBar && "max-sm:hidden")} />
-            </Link>
-
-            {/* Desktop: where you are */}
-            {showCrumbs ? <nav aria-label="Breadcrumb" className="hidden min-w-0 flex-1 items-center gap-1.5 text-sm lg:flex">
-              <Link href={rootCrumb.href} className="apple-spring shrink-0 font-medium text-ink-600 hover:text-brand-700">
-                {rootCrumb.label}
-              </Link>
-              {crumbs.map((crumb, index) => (
-                <span key={crumb.href} className="flex min-w-0 items-center gap-1.5">
-                  <span aria-hidden className="text-ink-300">/</span>
-                  {index === crumbs.length - 1 ? (
-                    <span aria-current="page" className="truncate font-semibold text-ink-900">{crumb.label}</span>
-                  ) : crumb.link ? (
-                    <Link href={crumb.href} className="apple-spring truncate font-medium text-ink-600 hover:text-brand-700">{crumb.label}</Link>
-                  ) : (
-                    <span className="truncate font-medium text-ink-600">{crumb.label}</span>
-                  )}
-                </span>
-              ))}
-            </nav> : null}
-
-            <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
-              {/* Customer consoles (the ones with `help`) open the chat from
-                  here on desktop rather than from a floating button that
-                  covers tables and rails; phones keep the floating one. */}
-              {help ? (
-                <button
-                  type="button"
-                  onClick={() => window.dispatchEvent(new Event(OPEN_CHAT_EVENT))}
-                  aria-label="Ask Findy - chat with Findy"
-                  // A dark green pill with the animated owl; on the intern and employer consoles it shows on phones too, in place of the floating launcher.
-                  className={cn(
-                    "apple-spring mr-1 h-12 items-center gap-2.5 rounded-full bg-brand-800 py-1 pl-1 pr-4 text-base font-semibold text-white shadow-md hover:bg-brand-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:pr-5",
-                    askInBar ? "inline-flex" : "hidden lg:inline-flex",
-                  )}
-                >
-                  <MascotAvatar className="size-10" />
-                  Ask Findy
-                </button>
-              ) : null}
-              {topActions}
-              {alerts ? (
-                <Link
-                  href={alerts.href}
-                  aria-label={alerts.count > 0 ? `${alerts.label ?? "Notifications"}, ${alerts.count} unread` : alerts.label ?? "Notifications"}
-                  title={alerts.label ?? "Notifications"}
-                  className="apple-spring relative grid size-11 shrink-0 place-items-center rounded-apple-sm text-ink-600 hover:bg-ink-100 hover:text-ink-900"
-                >
-                  <Bell className="size-5" aria-hidden />
-                  {alerts.count > 0 ? (
-                    <span className={cn("nums absolute right-0 top-0 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-2xs font-semibold ring-2 ring-surface", light ? "bg-brand-700 text-white" : "bg-accent-500 text-brand-950")}>
-                      {alerts.count > 99 ? "99+" : alerts.count}
-                    </span>
-                  ) : null}
-                </Link>
-              ) : null}
-              <AccountMenu account={account} menu={light ? [...menu, ...helpLinks.slice(1)] : menu} onSignOut={signOut} />
-            </div>
-          </div>
-        </header>
-
-        <main
-          id="main"
-          tabIndex={-1}
+        <aside
+          aria-label="Sidebar"
           className={cn(
-            gridLine,
-            "flex-1 pt-6 outline-none lg:pt-9",
-            // Clears the floating "Ask me" on phones: it sits above the tab
-            // bar (top edge 136px up) or in the corner (76px) (QA-136).
-            tabs ? "pb-40 lg:pb-24" : "pb-24",
+            "sticky top-0 hidden h-[100dvh] shrink-0 flex-col border-r border-ink-200 px-3 py-4 transition-[width] duration-[var(--motion-base)] ease-[var(--ease-app)] motion-reduce:transition-none lg:flex",
+            collapsed ? "w-[4.5rem]" : "w-60",
           )}
         >
-          {children}
-        </main>
+          {brand(collapsed)}
+          <div className="flex min-h-0 flex-1 flex-col">{rail(collapsed)}</div>
+          <button
+            type="button"
+            onClick={toggleRail}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!collapsed}
+            className="absolute -right-3 top-[3.75rem] z-10 grid size-6 place-items-center rounded-full border border-ink-300 bg-paper text-ink-600 transition-colors hover:text-ink-900"
+          >
+            {collapsed ? <ChevronsRight className="size-3.5" aria-hidden /> : <ChevronsLeft className="size-3.5" aria-hidden />}
+          </button>
+        </aside>
 
-        {tabs ? <TabBar tabs={tabs} pathname={pathname} /> : null}
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="sticky top-0 z-30 border-b border-ink-200 bg-canvas">
+            <div className={cn("flex h-14 items-center gap-1.5", gridLine)}>
+              <Sheet open={drawer} onOpenChange={setDrawer}>
+                <SheetTrigger asChild>
+                  <button type="button" aria-label="Open navigation" className="-ml-2 grid size-11 place-items-center rounded-md text-ink-700 hover:bg-ink-200/60 lg:hidden">
+                    <Menu className="size-5" aria-hidden />
+                  </button>
+                </SheetTrigger>
+                <SheetContent side="left" showCloseButton={false} aria-modal="true" className={cn(APP_FONT_CLASSES, "flex w-[19rem] flex-col border-r-0 bg-canvas p-4 text-ink-900")}>
+                  <SheetTitle className="sr-only">Navigation</SheetTitle>
+                  <div className="flex items-center justify-between gap-2">
+                    {brand(false)}
+                    <button type="button" onClick={() => setDrawer(false)} aria-label="Close navigation" className="grid size-11 place-items-center rounded-md text-ink-600 hover:bg-ink-200/60 hover:text-ink-900">
+                      <X className="size-5" aria-hidden />
+                    </button>
+                  </div>
+                  {rail(false, () => setDrawer(false))}
+                </SheetContent>
+              </Sheet>
+              <Link href={homeHref} aria-label="Findtern home" className="flex min-h-11 items-center lg:hidden">
+                <LogoMark variant="green" alt="" className="size-8" />
+              </Link>
+
+              {showCrumbs ? (
+                <nav aria-label="Breadcrumb" className="hidden min-w-0 flex-1 items-center gap-1.5 text-sm lg:flex">
+                  <Link href={rootCrumb.href} className="shrink-0 font-medium text-ink-600 hover:text-ink-900">
+                    {rootCrumb.label}
+                  </Link>
+                  {crumbs.map((crumb, index) => (
+                    <span key={crumb.href} className="flex min-w-0 items-center gap-1.5">
+                      <span aria-hidden className="text-ink-500">/</span>
+                      {index === crumbs.length - 1 ? (
+                        <span aria-current="page" className="truncate font-medium text-ink-900">{crumb.label}</span>
+                      ) : crumb.link ? (
+                        <Link href={crumb.href} className="truncate font-medium text-ink-600 hover:text-ink-900">{crumb.label}</Link>
+                      ) : (
+                        <span className="truncate text-ink-600">{crumb.label}</span>
+                      )}
+                    </span>
+                  ))}
+                </nav>
+              ) : null}
+
+              <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
+                {help ? <AskLauncher className={askEverywhere ? undefined : "max-lg:hidden"} /> : null}
+                {topActions}
+                {alerts ? (
+                  <Link
+                    href={alerts.href}
+                    aria-label={alerts.count > 0 ? `${alerts.label ?? "Notifications"}, ${alerts.count} unread` : alerts.label ?? "Notifications"}
+                    title={alerts.label ?? "Notifications"}
+                    className="relative grid size-11 shrink-0 place-items-center rounded-md text-ink-600 transition-colors hover:bg-ink-200/60 hover:text-ink-900"
+                  >
+                    <Bell className="size-5" aria-hidden />
+                    {alerts.count > 0 ? (
+                      <span className="nums absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-signal px-1 text-xs font-semibold leading-none text-white ring-2 ring-canvas">
+                        {alerts.count > 99 ? "99+" : alerts.count}
+                      </span>
+                    ) : null}
+                  </Link>
+                ) : null}
+                <UserMenu account={account} menu={[...menu, ...helpLinks.slice(1)]} onSignOut={signOut} />
+              </div>
+            </div>
+          </header>
+
+          <main id="main" tabIndex={-1} className={cn(gridLine, "flex-1 pt-6 outline-none lg:pt-8", tabs ? "pb-28 lg:pb-20" : "pb-20")}>
+            <div key={pathname} className="page-enter">
+              {children}
+            </div>
+          </main>
+
+          {tabs ? <TabBar tabs={tabs} pathname={pathname} onMore={() => setDrawer(true)} moreBadge={waitingElsewhere} /> : null}
+        </div>
+        {banner}
       </div>
-      {banner}
-    </div>
     </MotionConfig>
   );
 }
 
-/**
- * The rail's scroller (admin has 20 links; a laptop shows about 16). The
- * links keep their size and the list scrolls (QA-144): a thin scrollbar is
- * always visible, the bottom fades only while there is more below, and the
- * current page is scrolled into view, so it is never hidden under the fold.
- */
-function RailScroller({ light, column, children }: { light: boolean; column: boolean; children: React.ReactNode }) {
-  const ref = useRef<HTMLElement>(null);
-  const [more, setMore] = useState(false);
-
-  useEffect(() => {
-    const nav = ref.current;
-    if (!nav) return;
-    const update = () => setMore(nav.scrollTop + nav.clientHeight < nav.scrollHeight - 1);
-    // Centre the current page when it would sit under the fold or the fade.
-    const current = nav.querySelector('[aria-current="page"]')?.getBoundingClientRect();
-    const box = nav.getBoundingClientRect();
-    if (current && current.bottom > box.bottom - 48) {
-      nav.scrollTop += current.top - box.top - (box.height - current.height) / 2;
-    }
-    update();
-    nav.addEventListener("scroll", update, { passive: true });
-    const resize = new ResizeObserver(update);
-    resize.observe(nav);
-    return () => {
-      nav.removeEventListener("scroll", update);
-      resize.disconnect();
-    };
-  }, []);
-
-  return (
-    <nav
-      ref={ref}
-      aria-label="Main"
-      className={cn(
-        "mt-6 min-h-0 flex-1 space-y-5 overflow-y-auto overflow-x-hidden overscroll-contain pb-6 [scrollbar-width:thin]",
-        light ? (column ? "[scrollbar-color:var(--color-rail-line)_transparent]" : "[scrollbar-color:var(--color-ink-200)_transparent]") : "[scrollbar-color:rgb(255_255_255/0.2)_transparent]",
-        more && "[mask-image:linear-gradient(to_bottom,black_calc(100%-1.25rem),transparent)]",
-      )}
-    >
-      {children}
-    </nav>
-  );
-}
-
-function RailLink({ item, active, compact, light, column = false, onNavigate }: { item: ConsoleNavItem; active: boolean; compact: boolean; light: boolean; column?: boolean; onNavigate?: () => void }) {
-  const external = item.href.startsWith("mailto:");
-  const className = cn(
-    // 44px on touch; 40px with a mouse. A short window scrolls the rail
-    // rather than squeezing the links (QA-144).
-    "apple-spring apple-pressable group relative flex min-h-11 items-center gap-3 rounded-apple-sm px-3 text-[0.9375rem] tracking-[-0.01em] [@media(pointer:fine)]:min-h-10",
-    light
-      ? column
-        ? active ? "bg-rail-active font-bold text-brand-900" : "text-ink-700 hover:bg-rail-active/50 hover:text-ink-900"
-        : active ? "bg-brand-50 font-medium text-brand-800" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900"
-      : cn("focus-visible:outline-accent-300", active ? "bg-white/[0.12] font-semibold text-white" : "text-on-dark-subtle hover:bg-white/[0.06] hover:text-white"),
-    compact && "justify-center px-0",
-  );
-  const locked = Boolean(item.locked);
-  const body = (
-    <>
-      {active ? <span aria-hidden className={cn("absolute inset-y-2 left-0 w-[3px] rounded-full", light ? (column ? "bg-brand-700" : "bg-brand-600") : "bg-accent-400")} /> : null}
-      <span
-        className={cn(
-          "relative shrink-0 [&_svg]:size-5",
-          light
-            ? active ? (column ? "text-brand-800" : "text-brand-700") : column ? "text-ink-600 group-hover:text-ink-900" : "text-ink-500 group-hover:text-ink-900"
-            : active ? "text-accent-300" : "text-on-dark-subtle group-hover:text-white",
-        )}
-      >
-        {item.icon}
-        {compact && locked ? (
-          <LockGlyph className={cn("absolute -right-1.5 -top-1.5 !size-3.5 rounded-full p-px", light ? "bg-white text-ink-700" : "bg-brand-950 text-on-dark-subtle")} />
-        ) : null}
-        {compact && !locked && (item.attention || item.badge) ? (
-          <span aria-hidden className={cn("absolute -right-1 -top-1 size-2 rounded-full ring-2", item.attention ? "bg-accent-400" : light ? "bg-brand-700" : "bg-accent-400", column ? "ring-rail" : light ? "ring-white" : "ring-brand-950")} />
-        ) : null}
-      </span>
-      <span className={cn("min-w-0 flex-1 truncate", compact && "sr-only")}>
-        {item.label}
-        {locked ? `, locked. ${item.lockedNote ?? LOCKED_TEXT}` : ""}
-        {compact && item.attention ? ", needs you" : ""}
-        {compact && item.badge ? `, ${item.badge} ${item.badgeLabel ?? "unread"}` : ""}
-      </span>
-      {!compact && locked ? (
-        <LockGlyph className={cn("size-4 shrink-0", light ? "text-ink-600" : "text-on-dark-subtle")} />
-      ) : !compact && item.badge ? (
-        <span className={cn("nums rounded-full px-2 py-0.5 text-2xs font-semibold", light ? "bg-brand-700 text-white" : "bg-accent-500/20 text-accent-300")}>{item.badge}</span>
-      ) : !compact && item.attention ? (
-        <span className="size-1.5 shrink-0 rounded-full bg-accent-400">
-          <span className="sr-only">Needs you</span>
-        </span>
-      ) : null}
-    </>
-  );
-  return external ? (
-    <a href={item.href} title={compact ? item.label : item.href.slice(7)} className={className}>
-      {body}
-    </a>
-  ) : (
-    <Link
-      href={item.href}
-      prefetch={item.prefetch}
-      onClick={onNavigate}
-      aria-current={active ? "page" : undefined}
-      aria-disabled={locked ? true : undefined}
-      title={locked ? `${item.label}: ${item.lockedNote ?? LOCKED_TEXT}` : compact ? item.label : undefined}
-      className={className}
-      {...newTabAttrs(item.newTab)}
-    >
-      {body}
-      {item.newTab ? <NewTabHint /> : null}
-    </Link>
-  );
-}
-
-function AccountMenu({
-  account,
-  menu,
-  onSignOut,
-}: {
-  account: { name: string; email: string; subtitle?: string; photoUrl?: string | null };
-  menu: ConsoleMenuLink[];
-  onSignOut: () => void;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        {/* Named by its text, not an aria-label: the label never matched the
-            initials a phone shows (axe label-content-name-mismatch). */}
-        <button type="button" className="apple-spring flex min-h-11 items-center gap-2 rounded-apple-sm pl-1 pr-1 text-sm font-medium text-ink-800 hover:bg-ink-100 sm:pr-2">
-          <span aria-hidden>
-            <Avatar name={account.name} photoUrl={account.photoUrl} />
-          </span>
-          <span className="sr-only md:not-sr-only md:block md:max-w-[11rem] md:truncate">{account.name}</span>
-          <span className="sr-only">, account menu</span>
-          <ChevronDown className="hidden size-4 text-text-subtle md:block" aria-hidden />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64 p-1.5">
-        <DropdownMenuLabel className="px-2 py-2 font-normal">
-          <p className="truncate text-sm font-semibold text-ink-900">{account.name}</p>
-          {account.subtitle ? <p className="truncate text-xs text-ink-600">{account.subtitle}</p> : null}
-          <p className="truncate text-xs text-text-subtle">{account.email}</p>
-        </DropdownMenuLabel>
-        {menu.length ? <DropdownMenuSeparator /> : null}
-        {menu.map((m) => (
-          <DropdownMenuItem key={m.href} asChild>
-            <Link href={m.href} prefetch={m.prefetch} {...newTabAttrs(m.newTab)} className="flex min-h-10 cursor-pointer items-center gap-2.5 [&_svg]:size-4 [&_svg]:text-ink-500">
-              {m.icon}
-              {m.label}
-              {m.newTab ? <NewTabHint /> : null}
-            </Link>
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={onSignOut} className="flex min-h-10 cursor-pointer items-center gap-2.5 text-danger focus:bg-danger-soft focus:text-danger">
-          <LogOut className="size-4" aria-hidden />
-          Sign out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-function TabBar({ tabs, pathname }: { tabs: ConsoleNavItem[]; pathname: string }) {
-  return (
-    <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
-      <ul className="grid" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
-        {tabs.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                aria-disabled={item.locked ? true : undefined}
-                title={item.locked ? `${item.label}: ${item.lockedNote ?? LOCKED_TEXT}` : undefined}
-                className={cn(
-                  "apple-spring relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-[0.6875rem] font-medium [&_svg]:size-5",
-                  active ? "text-brand-700" : "text-ink-600 hover:text-ink-800",
-                )}
-              >
-                <span className="relative">
-                  {item.icon}
-                  {item.locked ? <LockGlyph className="absolute -right-2 -top-1 !size-3.5 rounded-full bg-white p-px text-ink-700" /> : null}
-                  {item.attention ? (
-                    <span className="absolute -right-1.5 -top-0.5 size-2 rounded-full bg-accent-500 ring-2 ring-white">
-                      <span className="sr-only">, needs you</span>
-                    </span>
-                  ) : null}
-                </span>
-                <span className="max-w-full truncate">{item.label}</span>
-                {item.locked ? <span className="sr-only">, locked. {item.lockedNote ?? LOCKED_TEXT}</span> : null}
-                {active ? (
-                  <motion.span
-                    layoutId="tab-indicator"
-                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-brand-700"
-                    aria-hidden
-                  />
-                ) : null}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
-  );
-}
-
-function RoleChip({ label, light, column }: { label: string; light: boolean; column: boolean }) {
-  return (
-    <span
-      className={cn(
-        "shrink-0 rounded-full border px-2 py-0.5 text-2xs font-semibold uppercase tracking-wider",
-        // accent-300 is 1.6:1 on white; the light rail takes the "waiting" pill colours.
-        column ? "border-brand-300 bg-brand-700 px-2.5 text-xs text-white" : light ? "border-accent-300/70 bg-accent-100 text-accent-700" : "border-accent-400/30 bg-accent-500/15 text-accent-300",
-      )}
-    >
-      {label}
-    </span>
-  );
-}
-
-/**
- * The person's own photo, or their initials. A missing photo never renders
- * as somebody else's face.
- */
-function Avatar({ name, photoUrl }: { name: string; photoUrl?: string | null }) {
-  return <InternAvatar src={photoUrl ?? null} initials={personInitials(name)} className="size-9 rounded-full text-xs" />;
-}
+export { activeHrefOf };
