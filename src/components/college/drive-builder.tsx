@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 
@@ -9,7 +9,7 @@ import { fromLocalInput } from "@/lib/college/ist";
 import { COHORTS, yearLabel } from "@/lib/college/labels";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
-import { PageHead, SURFACE_CLASS } from "@/components/app/primitives";
+import { PageHead } from "@/components/app/primitives";
 
 import { ShareLink } from "./share-link";
 import type { StudentRow } from "./types";
@@ -32,7 +32,9 @@ export type DriveDraft = {
 };
 
 const field =
-  "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
+  "h-11 w-full rounded-md border border-ink-300 bg-surface-raised px-3 text-sm text-ink-900 placeholder:text-ink-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700";
+
+const JUST_CREATED = "college:just-created-drive";
 
 export function DriveBuilder({
   initial,
@@ -60,6 +62,25 @@ export function DriveBuilder({
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
+
+  // The app shell remounts the page when the address changes, which would drop
+  // the one-time link after create. Carry it across the remount for this tab only.
+  useEffect(() => {
+    if (initial.id) return;
+    try {
+      const raw = sessionStorage.getItem(JUST_CREATED);
+      sessionStorage.removeItem(JUST_CREATED);
+      const saved = raw ? (JSON.parse(raw) as { draft: DriveDraft; link: string | null }) : null;
+      if (saved?.draft.id && window.location.pathname === `/college/drives/${saved.draft.id}`) {
+        queueMicrotask(() => {
+          setD(saved.draft);
+          setLink(saved.link);
+        });
+      }
+    } catch {}
+    // Once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [q, setQ] = useState("");
   const [view, setView] = useState<"in" | "out">("in");
 
@@ -120,9 +141,13 @@ export function DriveBuilder({
       return;
     }
     if (!d.id && body?.id) {
+      const href = body.url ? new URL(body.url, window.location.origin).href : null;
       setD((x) => ({ ...x, id: body.id }));
-      setLink(body.url ? new URL(body.url, window.location.origin).href : null);
-      // Update the address without remounting, so the one-time link stays on screen.
+      setLink(href);
+      try {
+        sessionStorage.setItem(JUST_CREATED, JSON.stringify({ draft: { ...d, id: body.id }, link: href }));
+      } catch {}
+      // Update the address (the shell remounts the page; the effect above restores the link).
       window.history.replaceState(null, "", `/college/drives/${body.id}`);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -140,16 +165,14 @@ export function DriveBuilder({
         <PageHead title={heading.title} lede={heading.lede} />
       )
     ) : null}
-    <form onSubmit={save} className="space-y-6" noValidate>
+    <form onSubmit={save} className="max-w-3xl space-y-8" noValidate>
       {link ? (
         <ShareLink url={link} collegeName={collegeName} driveTitle={d.title} startsAt={fromLocalInput(d.startsAt)} endsAt={fromLocalInput(d.endsAt)} kind={d.kind} />
       ) : null}
 
-      <section className={SURFACE_CLASS}>
-        <header className="border-b border-ink-100 px-5 py-4">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">The drive</h2>
-        </header>
-        <div className="grid gap-5 px-5 py-5 md:grid-cols-2">
+      <section className="border-t border-ink-200 pt-4">
+        <h2 className="text-lg font-semibold text-ink-900">The drive</h2>
+        <div className="mt-4 grid gap-5 md:grid-cols-2">
           <label className="block md:col-span-2">
             <span className="text-sm font-medium text-ink-800">Name</span>
             <input className={cn(field, "mt-1.5")} value={d.title} onChange={(e) => set("title", e.target.value)} required maxLength={120} placeholder="e.g. Summer internship drive 2027" />
@@ -167,14 +190,14 @@ export function DriveBuilder({
                 <label
                   key={value}
                   className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-apple-sm border p-3.5",
-                    d.kind === value ? "border-brand-600 bg-brand-50/60" : "border-ink-200 hover:border-ink-300",
+                    "flex cursor-pointer items-start gap-3 rounded-md border p-3.5",
+                    d.kind === value ? "border-brand-800 bg-brand-100" : "border-ink-300 bg-surface-raised hover:border-ink-900",
                   )}
                 >
                   <input type="radio" name="kind" value={value} checked={d.kind === value} onChange={() => set("kind", value)} className="mt-1 accent-brand-700" />
                   <span>
                     <span className="block text-sm font-semibold text-ink-900">{label}</span>
-                    <span className="block text-sm text-text-subtle">{hint}</span>
+                    <span className="block text-sm text-ink-700">{hint}</span>
                   </span>
                 </label>
               ))}
@@ -185,9 +208,9 @@ export function DriveBuilder({
           <IstDateTime label="Closes (IST)" value={d.endsAt} onChange={(v) => set("endsAt", v)} field={field} hint="The link stops working at this time." />
 
           <label className="block md:col-span-2">
-            <span className="text-sm font-medium text-ink-800">Note for employers <span className="font-normal text-text-subtle">(optional)</span></span>
+            <span className="text-sm font-medium text-ink-800">Note for employers <span className="font-normal text-ink-600">(optional)</span></span>
             <textarea
-              className="mt-1.5 min-h-24 w-full rounded-apple-sm border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
+              className="mt-1.5 min-h-24 w-full rounded-md border border-ink-300 bg-surface-raised px-3 py-2.5 text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
               value={d.description}
               onChange={(e) => set("description", e.target.value)}
               maxLength={2000}
@@ -197,32 +220,32 @@ export function DriveBuilder({
         </div>
       </section>
 
-      <section className={SURFACE_CLASS}>
+      <section className="border-t border-ink-200 pt-4">
         {live ? (
-          <p role="note" className="border-b border-accent-300/60 bg-accent-100/60 px-5 py-3 text-sm text-accent-700">
+          <p role="note" className="mb-4 rounded-md border border-ink-300 bg-surface-raised px-4 py-3 text-sm text-signal">
             This drive is live. Tightening the rules removes students from employers&apos; lists, including anyone they shortlisted or are about to call.
           </p>
         ) : null}
-        <header className="flex flex-wrap items-end justify-between gap-3 border-b border-ink-100 px-5 py-4">
+        <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Who employers can see</h2>
-            <p className="mt-0.5 text-sm text-text-subtle">Leave a box empty to not filter on it. You can hand-pick students either way below.</p>
+            <h2 className="text-lg font-semibold text-ink-900">Who employers can see</h2>
+            <p className="mt-0.5 text-sm text-ink-700">Leave a box empty to not filter on it. You can hand-pick students either way below.</p>
           </div>
           <p className="text-right" aria-live="polite">
-            <span className="nums text-3xl font-bold leading-none text-ink-900">{split.inside.length}</span>
-            <span className="text-sm text-text-subtle"> of {students.length} students</span>
+            <span className="nums font-display text-2xl font-semibold leading-none text-ink-900">{split.inside.length}</span>
+            <span className="text-sm text-ink-600"> of {students.length} students</span>
           </p>
         </header>
-        <div className="grid gap-5 px-5 py-5 md:grid-cols-2">
+        <div className="mt-4 grid gap-5 md:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-ink-800">Minimum CGPA</span>
             <input inputMode="decimal" className={cn(field, "mt-1.5")} value={d.minCgpa} onChange={(e) => set("minCgpa", e.target.value)} placeholder="Any" />
-            <span className="mt-1 block text-xs text-text-subtle">Students who reported a percentage, not a CGPA, are left out unless you add them by hand.</span>
+            <span className="mt-1 block text-xs text-ink-600">Students who reported a percentage, not a CGPA, are left out unless you add them by hand.</span>
           </label>
           <label className="block">
             <span className="text-sm font-medium text-ink-800">Minimum Findtern score</span>
             <input inputMode="decimal" className={cn(field, "mt-1.5")} value={d.minScore} onChange={(e) => set("minScore", e.target.value)} placeholder="Any" />
-            <span className="mt-1 block text-xs text-text-subtle">Out of 10, from the AI interview. No interview means no score.</span>
+            <span className="mt-1 block text-xs text-ink-600">Out of 10, from the AI interview. No interview means no score.</span>
           </label>
 
           <fieldset>
@@ -236,7 +259,7 @@ export function DriveBuilder({
                     type="button"
                     aria-pressed={on}
                     onClick={() => set("years", on ? d.years.filter((v) => v !== y) : [...d.years, y].sort())}
-                    className={cn("min-h-11 rounded-apple-sm border px-3.5 text-sm font-medium", on ? "border-brand-700 bg-brand-50 text-brand-800" : "border-ink-200 text-ink-700 hover:bg-ink-50")}
+                    className={cn("min-h-11 rounded-md border px-3.5 text-sm font-medium", on ? "border-brand-800 bg-brand-100 text-brand-900" : "border-ink-300 bg-surface-raised text-ink-800 hover:border-ink-900")}
                   >
                     {yearLabel(y)}
                   </button>
@@ -248,7 +271,7 @@ export function DriveBuilder({
           <fieldset>
             <legend className="text-sm font-medium text-ink-800">Branch</legend>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {branches.length === 0 ? <span className="text-sm text-text-subtle">No branches recorded yet.</span> : null}
+              {branches.length === 0 ? <span className="text-sm text-ink-600">No branches recorded yet.</span> : null}
               {branches.map((b) => {
                 const on = d.branches.some((x) => x.toLowerCase() === b.toLowerCase());
                 return (
@@ -257,7 +280,7 @@ export function DriveBuilder({
                     type="button"
                     aria-pressed={on}
                     onClick={() => set("branches", on ? d.branches.filter((x) => x.toLowerCase() !== b.toLowerCase()) : [...d.branches, b])}
-                    className={cn("min-h-11 rounded-apple-sm border px-3.5 text-sm font-medium", on ? "border-brand-700 bg-brand-50 text-brand-800" : "border-ink-200 text-ink-700 hover:bg-ink-50")}
+                    className={cn("min-h-11 rounded-md border px-3.5 text-sm font-medium", on ? "border-brand-800 bg-brand-100 text-brand-900" : "border-ink-300 bg-surface-raised text-ink-800 hover:border-ink-900")}
                   >
                     {b}
                   </button>
@@ -267,7 +290,7 @@ export function DriveBuilder({
           </fieldset>
         </div>
 
-        <div className="border-t border-ink-100 px-5 py-4">
+        <div className="mt-6 border-t border-ink-200 pt-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div role="tablist" aria-label="Students" className="flex gap-1">
               {(
@@ -282,7 +305,7 @@ export function DriveBuilder({
                   role="tab"
                   aria-selected={view === v}
                   onClick={() => setView(v)}
-                  className={cn("min-h-11 rounded-apple-sm px-3.5 text-sm font-medium", view === v ? "bg-brand-950 text-white" : "text-ink-700 hover:bg-ink-100")}
+                  className={cn("min-h-11 rounded-md px-3.5 text-sm font-medium", view === v ? "bg-ink-900 text-paper" : "text-ink-700 hover:bg-ink-100")}
                 >
                   {label}
                 </button>
@@ -290,12 +313,12 @@ export function DriveBuilder({
             </div>
             <label className="relative w-full sm:w-64">
               <span className="sr-only">Search students</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-subtle" aria-hidden />
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-600" aria-hidden />
               <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className={cn(field, "pl-9")} />
             </label>
           </div>
-          <ul className="mt-3 max-h-[28rem] divide-y divide-ink-100 overflow-y-auto rounded-apple-sm border border-ink-100">
-            {list.length === 0 ? <li className="px-4 py-8 text-center text-sm text-text-subtle">Nobody here.</li> : null}
+          <ul className="mt-3 max-h-[28rem] divide-y divide-ink-200 overflow-y-auto rounded-md border border-ink-200 bg-surface-raised">
+            {list.length === 0 ? <li className="px-4 py-8 text-sm text-ink-600">Nobody here.</li> : null}
             {list.map((s) => {
               const included = d.includeUserIds.includes(s.userId);
               const excluded = d.excludeUserIds.includes(s.userId);
@@ -303,18 +326,18 @@ export function DriveBuilder({
                 <li key={s.userId} className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink-900">{s.name}</p>
-                    <p className="nums text-xs text-text-subtle">
+                    <p className="nums text-xs text-ink-600">
                       {[s.rollNo, yearLabel(s.year), s.branch, s.cgpa !== null ? `CGPA ${s.cgpa.toFixed(1)}` : "CGPA —", s.score !== null ? `Score ${s.score.toFixed(1)}` : "No score"].filter(Boolean).join(" · ")}
                       {included ? <span className="ml-1.5 font-medium text-brand-800">· added by you</span> : null}
-                      {excluded ? <span className="ml-1.5 font-medium text-accent-700">· removed by you</span> : null}
+                      {excluded ? <span className="ml-1.5 font-medium text-signal">· removed by you</span> : null}
                     </p>
                   </div>
                   {view === "in" ? (
-                    <button type="button" onClick={() => toggle(s.userId, included ? "rules" : "exclude")} className="min-h-11 rounded-apple-sm px-3 text-sm font-medium text-ink-700 hover:bg-ink-100">
+                    <button type="button" onClick={() => toggle(s.userId, included ? "rules" : "exclude")} className="min-h-11 rounded-md px-3 text-sm font-medium text-ink-700 hover:bg-ink-100">
                       {included ? "Undo add" : "Remove"}
                     </button>
                   ) : (
-                    <button type="button" onClick={() => toggle(s.userId, excluded ? "rules" : "include")} className="min-h-11 rounded-apple-sm px-3 text-sm font-medium text-brand-700 hover:bg-brand-50">
+                    <button type="button" onClick={() => toggle(s.userId, excluded ? "rules" : "include")} className="min-h-11 rounded-md px-3 text-sm font-semibold text-brand-800 hover:bg-brand-100">
                       {excluded ? "Undo remove" : "Add anyway"}
                     </button>
                   )}
@@ -365,7 +388,7 @@ function IstDateTime({
   return (
     <fieldset className="min-w-0">
       <legend className="text-sm font-medium text-ink-800">{label}</legend>
-      <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_7.5rem] gap-2">
+      <div className="mt-1.5 grid grid-cols-[minmax(0,1fr)_8.75rem] gap-2">
         <DmyDateInput
           aria-label={`${label}, date`}
           className={field}
@@ -383,7 +406,7 @@ function IstDateTime({
           required
         />
       </div>
-      {hint ? <span className="mt-1 block text-xs text-text-subtle">{hint}</span> : null}
+      {hint ? <span className="mt-1 block text-xs text-ink-600">{hint}</span> : null}
     </fieldset>
   );
 }
