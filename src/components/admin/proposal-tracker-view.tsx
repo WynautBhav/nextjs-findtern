@@ -527,6 +527,15 @@ function InterviewsTab({ params, page, perPage, search, pickers, rows }: TabProp
   );
 }
 
+/** "View proposal" on a table row: the read-only proposal page (same read permission as this pipeline). */
+function ViewProposalLink({ id }: { id: string }) {
+  return (
+    <Link href={`/admin/proposal-tracker/${encodeURIComponent(id)}`} className="whitespace-nowrap text-sm font-medium text-brand-700 hover:underline max-lg:inline-flex max-lg:min-h-11 max-lg:items-center">
+      View proposal
+    </Link>
+  );
+}
+
 function HiredTab({ params, page, perPage, search, pickers, rows }: TabProps & { rows: ProposalItem[] }) {
   const filtered = rows.filter((p) => {
     const offer = parseOffer(p.offerDetails, p.currency);
@@ -620,6 +629,7 @@ function HiredTab({ params, page, perPage, search, pickers, rows }: TabProps & {
           },
           { header: "Start", sort: "start", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(parseOffer(p.offerDetails, p.currency).startDate)}</span> },
           { header: "Hired on", sort: "hired", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.hiredAt ?? p.createdAt)}</span> },
+          { header: "", cell: (p) => <ViewProposalLink id={p.id} /> },
         ]}
       />
     </div>
@@ -768,6 +778,7 @@ function ExpiredTab({ params, page, perPage, search, pickers, rows }: TabProps &
               );
             },
           },
+          { header: "", cell: (r) => <ViewProposalLink id={r.id} /> },
         ]}
       />
     </div>

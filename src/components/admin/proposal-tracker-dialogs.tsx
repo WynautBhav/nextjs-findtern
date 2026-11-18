@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Eye, Video } from "lucide-react";
 
 import { InlineEditor } from "@/components/admin/inline-control";
@@ -32,7 +33,7 @@ export function ProposalDetailsButton({
     <>
       <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "ghost", size: "sm", className: "rounded-full px-3 hover:bg-[color:var(--admin-panel-2)] max-lg:h-11" })}>
         <Eye className="size-4" aria-hidden />
-        View
+        View proposal
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-2xl">
@@ -48,6 +49,9 @@ export function ProposalDetailsButton({
             <StatusBadge value={proposal.status} />
             <ProposalStatusEditor proposalId={proposal.id} status={proposal.status} offerDetails={proposal.offerDetails} />
           </div>
+          <Link href={`/admin/proposal-tracker/${encodeURIComponent(proposal.id)}`} className="text-sm font-medium text-brand-700 hover:underline">
+            Open the full proposal page (timeline and interview)
+          </Link>
           <ProposalOfferSummary proposalId={proposal.id} offerDetails={proposal.offerDetails} currency={proposal.currency} />
         </DialogContent>
       </Dialog>
