@@ -71,10 +71,14 @@ export function displayStatus(r: Pick<AdminInvoiceRow, "status" | "amountMinor" 
 /** A complimentary order completed by a full-waiver code (gateway 'promo_full_waiver'). */
 export const isWaivedRow = (r: Pick<AdminInvoiceRow, "gateway">) => r.gateway === "promo_full_waiver";
 
-export const hasTaxInvoice = (r: Pick<AdminInvoiceRow, "status" | "amountMinor">) => isPaidRow(r) && r.amountMinor > 0;
+export const hasTaxInvoice = (r: Pick<AdminInvoiceRow, "status" | "amountMinor"> & { flagOnly?: boolean }) => isPaidRow(r) && r.amountMinor > 0 && !r.flagOnly;
+
+/** Statuses where the money reached us (a refund comes after it). Nothing else may show an invoice number. */
+const RECEIVED_STATUSES = new Set(["paid", "refunded", "partially_refunded"]);
 
 /** The number shown in the table and searched: the stored serial, or the PDF's fallback for paid rows. */
-export function displayInvoiceNumber(r: Pick<AdminInvoiceRow, "id" | "invoiceNumber" | "displayNumber" | "status" | "amountMinor">, prefix: string): string | null {
+export function displayInvoiceNumber(r: Pick<AdminInvoiceRow, "id" | "invoiceNumber" | "displayNumber" | "status" | "amountMinor"> & { flagOnly?: boolean }, prefix: string): string | null {
+  if (!RECEIVED_STATUSES.has(r.status)) return null;
   if (r.displayNumber) return r.displayNumber;
   if (r.invoiceNumber) return r.invoiceNumber;
   return hasTaxInvoice(r) ? `${prefix}-${r.id.slice(0, 8).toUpperCase()}` : null;

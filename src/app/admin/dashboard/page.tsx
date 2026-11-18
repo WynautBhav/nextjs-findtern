@@ -27,6 +27,7 @@ import { loadDashboardQueues, QUEUE_ORDER } from "@/lib/admin/dashboard-queues";
 import type { QueueKey } from "@/lib/admin/dashboard-queues.types";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { allows, canWrite as mayWrite, requiredPermissions } from "@/lib/admin/permissions";
+import { itemsAndFlags } from "@/lib/admin/dashboard-queues-pure";
 import { pickQueue } from "@/lib/admin/ai-link-queue";
 import { loadAiLinkRows } from "@/lib/admin/ai-link-queue-load";
 import { adminFullName } from "@/lib/admin/admin-name";
@@ -117,8 +118,10 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
 
   const { week, nextInterview, placements, companies, pipeline } = overview ?? { week: null, nextInterview: null, placements: null, companies: null, pipeline: null };
   const queuesFailed = groups.some((g) => g.error);
+  // One figure for hero and queue panel: items of work; the calendar setting is a flag, never added in.
+  const { items: queueItems } = itemsAndFlags(groups, total);
   const { kpis } = buildKpis({
-    queueTotal: total,
+    queueTotal: queueItems,
     queueFresh: fresh,
     queueFailed: queuesFailed,
     signups: base.signups,

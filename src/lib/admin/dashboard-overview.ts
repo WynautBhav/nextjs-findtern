@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gte, inArray, notInArray, sql } from "drizzle-orm";
 
 import { dbTimestamp, getDb, schema } from "@/lib/db";
 import { loadCompleteProfileIds } from "@/lib/admin/profile-state-load";
@@ -6,6 +6,7 @@ import { realEmployerId, realEmployers } from "@/lib/admin/scope";
 import {
   ACTIVITY_FETCH_LIMIT,
   buildPipelineBand,
+  UNSENT_PROPOSAL_STATUSES,
   istWeekStart,
   placementSummary,
   toNextInterview,
@@ -114,7 +115,7 @@ async function settleNull<T>(what: string, run: () => Promise<T>): Promise<T | n
   }
 }
 
-/** Proposals created per India day of the current Monday-to-Sunday week (real employers only). */
+/** Proposals sent (created and not a draft) per India day of the current Monday-to-Sunday week (real employers only). */
 async function loadWeekProposals(now: Date): Promise<{ bars: WeekBar[]; total: number }> {
   const start = istWeekStart(now);
   if (!start) return weekBars(now, []);
@@ -123,7 +124,7 @@ async function loadWeekProposals(now: Date): Promise<{ bars: WeekBar[]; total: n
   const rows = await getDb()
     .select({ day, value: count() })
     .from(pr)
-    .where(and(gte(pr.createdAt, start), realEmployerId(pr.employerId)))
+    .where(and(gte(pr.createdAt, start), notInArray(pr.status, [...UNSENT_PROPOSAL_STATUSES]), realEmployerId(pr.employerId)))
     .groupBy(day);
   return weekBars(now, rows.map((r) => ({ day: r.day, value: Number(r.value) })));
 }

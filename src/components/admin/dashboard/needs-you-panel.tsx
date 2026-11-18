@@ -7,6 +7,7 @@ import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { OwedBar } from "@/components/admin/triage/owed-bar";
 import { TickCount } from "@/components/admin/triage/tick-count";
 import type { QueueGroup, QueueKey } from "@/lib/admin/dashboard-queues.types";
+import { itemsAndFlags } from "@/lib/admin/dashboard-queues-pure";
 import { queueRowHref, queueRows } from "@/lib/admin/dashboard-overview-pure";
 import { cn } from "@/lib/utils";
 
@@ -46,8 +47,7 @@ export function NeedsYouPanel({
   const clear = all.filter((r) => r.state === "clear");
   // The calendar flag is a state, not a share of the work: it stays out of the bar.
   // The total counts the calendar flag as one; the rows add up to it only when the flag is named.
-  const flags = groups.filter((g) => g.flag && !g.error && g.count > 0).length;
-  const items = Math.max(0, total - flags);
+  const { items, flags } = itemsAndFlags(groups, total);
   // Every queue failed: there is no count to give, and "0 items waiting" would read as good news.
   const allFailed = groups.length > 0 && groups.every((g) => g.error);
   const hidden = Math.max(0, rows.length - 3);

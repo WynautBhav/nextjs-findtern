@@ -15,6 +15,12 @@ const DAY_MS = 86_400_000;
 
 // ------------------------------------------------------------------ week
 
+/**
+ * Statuses of a proposal the employer never sent. The week count leaves them out so "sent this week" is
+ * true; rejected and withdrawn ones were sent, so they stay in it.
+ */
+export const UNSENT_PROPOSAL_STATUSES = ["draft"] as const;
+
 /** The seven India days of the current Monday-to-Sunday week, as `YYYY-MM-DD`. */
 export function istWeekKeys(now: Date): string[] {
   const today = istDayKey(now);
