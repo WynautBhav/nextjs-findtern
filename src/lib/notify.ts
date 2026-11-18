@@ -14,7 +14,7 @@ import { categoryOf, channelAllowed, type PrefsRow } from "@/lib/notify-prefs";
  * Preferences (notification_prefs): only message, offer and tips-style types can be switched off (see
  * lib/notify-prefs.ts); anything else, money and security included, is sent regardless. No row means all on.
  */
-export async function notify(n: {
+export type NotifyInput = {
   to: { type: "intern" | "employer"; id: string };
   type: string;
   title: string;
@@ -23,12 +23,24 @@ export async function notify(n: {
   dedupeKey?: string;
   email?: EmailContent;
   attachments?: SmtpAttachment[];
-}): Promise<boolean> {
+};
+
+/** Resolves true when the in-app notification was written (the mail is best-effort on top). */
+export async function notify(n: NotifyInput): Promise<boolean> {
+  return (await notifyDetailed(n)).inApp;
+}
+
+/**
+ * notify() that also says what happened to the email: `emailed` is true only when the mail was handed to SMTP
+ * and accepted; `emailFailed` is true when a send was tried and SMTP errored or refused (unconfigured included).
+ * MAIL_MODE=log (nothing real sent), a missing address and a switched-off preference are neither.
+ */
+export async function notifyDetailed(n: NotifyInput): Promise<{ inApp: boolean; emailed: boolean; emailFailed: boolean }> {
   const db = getDb();
   const { type, data } = legacyShape(n.to.type, n.type, n.data ?? {});
   const category = categoryOf(n.type);
   const prefs = category === "required" ? null : await prefsOf(n.to.id);
-  if (!channelAllowed(prefs, category, "inApp")) return false;
+  if (!channelAllowed(prefs, category, "inApp")) return { inApp: false, emailed: false, emailFailed: false };
   const inserted = await db
     .insert(schema.notifications)
     .values({
@@ -44,18 +56,24 @@ export async function notify(n: {
     // or another tick already wrote is a quiet no-op, never an error.
     .onConflictDoNothing()
     .returning({ id: schema.notifications.id });
-  if (inserted.length === 0) return false;
-  if (!n.email || !channelAllowed(prefs, category, "email")) return true;
+  if (inserted.length === 0) return { inApp: false, emailed: false, emailFailed: false };
+  if (!n.email || !channelAllowed(prefs, category, "email")) return { inApp: true, emailed: false, emailFailed: false };
 
+  let emailed = false;
+  let emailFailed = false;
   try {
     const address = await emailOf(n.to.type, n.to.id);
-    if (!address) return true;
-    const mail = renderEmail(n.email);
-    await sendSmtpMail({ to: address, ...mail, attachments: n.attachments });
+    if (address) {
+      const mail = renderEmail(n.email);
+      const res = await sendSmtpMail({ to: address, ...mail, attachments: n.attachments });
+      emailed = res.ok && res.mode === "send";
+      emailFailed = !res.ok;
+    }
   } catch (err) {
+    emailFailed = true;
     console.error(`[notify] ${n.type} email failed`, err);
   }
-  return true;
+  return { inApp: true, emailed, emailFailed };
 }
 
 /**

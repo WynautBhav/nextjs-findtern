@@ -24,7 +24,7 @@ export function NudgeButton({
   kind: Kind;
   label?: string;
   size?: "sm" | "xs";
-  /** The one action on a board (Nudge all during a live drive): a firmer outline, never louder than the count it acts on. */
+  /** The one thing to do on the screen (Nudge all during a live drive): amber. */
   emphasis?: boolean;
   className?: string;
 }) {
@@ -39,25 +39,26 @@ export function NudgeButton({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind, userIds }),
     }).catch(() => null);
-    const body = (await res?.json().catch(() => null)) as { sent?: number; pushed?: number; skipped?: number; emailed?: number; error?: string } | null;
+    const body = (await res?.json().catch(() => null)) as { sent?: number; pushed?: number; skipped?: number; emailed?: number; emailFailed?: number; error?: string } | null;
     if (!res?.ok || !body) {
       setState("error");
       setNote(body?.error ?? "Couldn't send. Try again.");
       return;
     }
     setState("done");
-    // Say how it travelled: a phone alert reaches them now, an email when they check mail, the bell when they next open Findtern. Never imply more reach than happened.
+    // Say how it travelled: a phone alert reaches them now; the bell only
+    // when they next open Findtern. Never imply more reach than happened.
     const sent = body.sent ?? 0;
     const pushed = body.pushed ?? 0;
-    const emailed = body.emailed ?? 0;
     setNote(
       sent === 0
-        ? "Already nudged recently"
+        ? "Already nudged in the last 10 min"
         : [
             `${sent} nudged`,
             pushed ? `${pushed} by phone alert` : null,
-            emailed ? `${emailed} emailed` : null,
-            sent - pushed - emailed > 0 ? `${sent - pushed - emailed} in-app` : null,
+            sent - pushed > 0 ? `${sent - pushed} in-app only` : null,
+            body.emailed ? `${body.emailed} emailed` : null,
+            body.emailFailed ? `${body.emailFailed} email failed` : null,
             body.skipped ? `${body.skipped} nudged recently` : null,
           ]
             .filter(Boolean)
@@ -73,20 +74,20 @@ export function NudgeButton({
         onClick={send}
         disabled={state === "sending" || done || userIds.length === 0}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-md border font-medium transition-colors duration-[var(--motion-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-default",
-          size === "sm" ? "min-h-10 px-3 text-sm max-lg:min-h-11" : "min-h-10 px-2.5 text-xs max-lg:min-h-11",
+          "apple-spring apple-pressable inline-flex items-center gap-1.5 rounded-apple-sm border font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-default",
+          size === "sm" ? "min-h-11 px-3 text-sm" : "min-h-11 px-2.5 text-xs",
           done
-            ? "border-brand-100 bg-brand-100 text-brand-900"
+            ? "border-brand-200 bg-brand-50 text-brand-800"
             : emphasis
-              ? "border-ink-900 bg-surface-raised text-ink-900 hover:bg-ink-900 hover:text-paper"
-              : "border-ink-300 bg-surface-raised text-ink-800 hover:border-ink-900 hover:bg-ink-100",
+              ? "border-transparent bg-accent text-brand-950 shadow-sm hover:bg-accent-600 hover:text-white [&_svg]:text-current"
+              : "border-ink-200 bg-white text-ink-800 shadow-2xs hover:border-ink-300 hover:bg-ink-50",
           className,
         )}
       >
-        {done ? <Check className="size-3.5" aria-hidden /> : <BellRing className="size-3.5" aria-hidden />}
+        {done ? <Check className="size-3.5" aria-hidden /> : <BellRing className="size-3.5 text-brand-700" aria-hidden />}
         {state === "sending" ? "Sending…" : done ? "Nudged" : label}
       </button>
-      <span role="status" aria-live="polite" className={cn("text-xs", state === "error" ? "text-danger" : "text-ink-600")}>
+      <span role="status" aria-live="polite" className={cn("text-xs", state === "error" ? "text-danger" : "text-text-subtle")}>
         {note}
       </span>
     </span>

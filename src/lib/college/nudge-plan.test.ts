@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { NUDGE_COOLDOWN_MS, NUDGE_ONLINE_EMAIL_WINDOW_MS, planNudge } from "./nudge-plan.ts";
+import { NUDGE_COOLDOWN_MS, planNudge, tallyNudges } from "./nudge-plan.ts";
 
 const now = new Date("2026-11-18T10:00:00Z");
 const ago = (ms: number) => new Date(now.getTime() - ms);
@@ -20,25 +21,19 @@ test("online nudge emails the student with subject, one line and the dashboard C
   assert.deepEqual(plan.email.cta, { label: "Open Findtern", url: "https://findtern.in/intern/dashboard" });
 });
 
-test("a second online nudge after the 10-minute cooldown but inside 3 hours: bell and push, no email", () => {
+test("a second online nudge 11 minutes later emails again", () => {
   const plan = planNudge({ ...base, kind: "online", lastSameKindAt: ago(NUDGE_COOLDOWN_MS + 60_000) });
   assert.equal(plan.cooldown, false);
   if (plan.cooldown) return;
-  assert.equal(plan.email, undefined);
+  assert.ok(plan.email);
+  assert.equal(plan.email.cta?.url, "https://findtern.in/intern/dashboard");
 });
 
 test("online nudge is blocked inside the 10-minute cooldown", () => {
   assert.equal(planNudge({ ...base, kind: "online", lastSameKindAt: ago(NUDGE_COOLDOWN_MS - 1000) }).cooldown, true);
 });
 
-test("online nudge emails again once 3 hours have passed", () => {
-  const plan = planNudge({ ...base, kind: "online", lastSameKindAt: ago(NUDGE_ONLINE_EMAIL_WINDOW_MS + 1000) });
-  assert.equal(plan.cooldown, false);
-  if (plan.cooldown) return;
-  assert.ok(plan.email);
-});
-
-test("offer and interview keep their email and 10-minute cooldown, unaffected by the 3-hour rule", () => {
+test("offer and interview email 11 minutes after the last one and keep the 10-minute cooldown", () => {
   for (const kind of ["offer", "interview"] as const) {
     const first = planNudge({ ...base, kind, lastSameKindAt: ago(NUDGE_COOLDOWN_MS + 60_000) });
     assert.equal(first.cooldown, false);
@@ -57,4 +52,26 @@ test("no PUBLIC_ORIGIN (link is null): no email for any kind", () => {
     assert.equal(plan.cooldown, false);
     if (!plan.cooldown) assert.equal(plan.email, undefined);
   }
+});
+
+test("tallyNudges: emailed = SMTP accepted, emailFailed = SMTP error, neither counts in sent only; skipped covers failures and invisible students", () => {
+  const tally = tallyNudges(
+    [
+      { ok: true, pushed: true, emailed: true, emailFailed: false },
+      { ok: true, pushed: false, emailed: true, emailFailed: false },
+      { ok: true, pushed: false, emailed: false, emailFailed: true },
+      { ok: true, pushed: true, emailed: false, emailFailed: false }, // MAIL_MODE=log, no link or no address
+      { ok: false }, // cooldown or a nudge that threw
+    ],
+    2,
+  );
+  assert.deepEqual(tally, { sent: 4, pushed: 2, emailed: 2, emailFailed: 1, skipped: 3 });
+  assert.deepEqual(Object.keys(tally).sort(), ["emailFailed", "emailed", "pushed", "sent", "skipped"]);
+});
+
+test("the nudge route has the 60s window, per-student allSettled and sends the tally", () => {
+  const src = readFileSync(new URL("../../app/api/college/nudge/route.ts", import.meta.url), "utf8");
+  assert.match(src, /export const maxDuration = 60;/);
+  assert.match(src, /Promise\.allSettled/);
+  assert.match(src, /NextResponse\.json\(tally\)/);
 });
