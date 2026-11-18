@@ -47,6 +47,10 @@ export async function requireRole(role: "intern" | "employer" | "admin"): Promis
  * so sign in returns there (INT-07 / EMH-37). The proxy stamps the path on
  * the request as `x-ft-path`; without it this is the plain login page.
  */
+export async function loginRedirectFor(role: "intern" | "employer" | "college"): Promise<string> {
+  return `/login?as=${role}`;
+}
+
 export async function loginUrlFor(role: "intern" | "employer" | "admin"): Promise<string> {
   const base = role === "admin" ? "/admin/login" : `/login?as=${role}`;
   let path: string | null = null;
