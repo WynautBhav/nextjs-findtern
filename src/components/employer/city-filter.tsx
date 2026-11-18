@@ -128,7 +128,7 @@ export function CityFilter({
             id={listId}
             role="listbox"
             aria-label={`${label} suggestions`}
-            className="absolute left-0 z-20 mt-1 w-max min-w-full max-w-[18rem] overflow-hidden rounded-apple-sm border border-ink-200 bg-white shadow-sm"
+            className="absolute left-0 z-20 mt-1 w-max min-w-full max-w-[18rem] overflow-hidden rounded-md border border-ink-200 bg-surface-raised shadow-sm"
           >
             {options.map((d, i) => (
               <li

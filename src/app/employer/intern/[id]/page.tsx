@@ -10,13 +10,15 @@ import { requireRole } from "@/lib/auth";
 import { candidateRelations, isAdminViewing, type CandidateRelation } from "@/lib/employer-visibility";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { PLAN_NAME, bandFor } from "@/lib/score";
-import { formatDate, formatMoney, formatRate } from "@/lib/format";
+import { formatDate, formatMoney } from "@/lib/format";
 import { RATING_META, displayNameOf, isCatalogSkill, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { hideContactText } from "@/lib/contact-scrub";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { CandidateAvatar } from "@/components/employer/candidate-avatar";
-import { SkillChips } from "@/components/employer/candidate-row-parts";
+import { FitTicks, SkillChips } from "@/components/employer/candidate-row-parts";
+import { ProposalTrail } from "@/components/employer/intern-detail/proposal-trail";
+import { Section } from "@/components/app/stat";
 import { skillBaseName, studyOf } from "@/components/employer/candidate-view";
 import { candidateStatusPill } from "@/components/employer/candidate-status";
 import { CompareToggle } from "@/components/employer/compare-toggle";
@@ -30,7 +32,6 @@ import { parseOffer } from "@/lib/offer";
 import { timezoneForLocation } from "@/lib/timezones";
 import { dateLabel, draftFromRecord, linkedinHref, type OnboardingDraft } from "@/lib/onboarding";
 import { PageHead, Pill } from "@/components/app/primitives";
-import { ScoreBar } from "@/components/app/score-bar";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
@@ -75,7 +76,7 @@ export default async function EmployerInternDetail({
   const employerId = session.uid;
 
   let profile: CandidateProfile | null = null;
-  let appliedProjects: { id: string; projectName: string | null; status: string; fullTime: boolean }[] = [];
+  let appliedProjects: { id: string; projectName: string | null; status: string; fullTime: boolean; sentAt: Date | null; movedAt: Date | null }[] = [];
   /** The project the shown offer belongs to: the status pill names it, so it never reads as the person's state. */
   let statusProjectName: string | null = null;
   let currency: "INR" | "USD" = "INR";
@@ -191,6 +192,9 @@ export default async function EmployerInternDetail({
           status: schema.proposals.status,
           offerDetails: schema.proposals.offerDetails,
           currency: schema.proposals.currency,
+          createdAt: schema.proposals.createdAt,
+          updatedAt: schema.proposals.updatedAt,
+          hiredAt: schema.proposals.hiredAt,
         })
         .from(schema.proposals)
         .where(and(eq(schema.proposals.employerId, employerId), eq(schema.proposals.internId, id)))
@@ -202,10 +206,15 @@ export default async function EmployerInternDetail({
         nameUnlocked = nameUnlocked || Boolean(relation?.hired);
 
         // Collapse to one row per project, keeping the most recent status.
-        const latest = new Map<string, { status: string; fullTime: boolean }>();
+        const latest = new Map<string, { status: string; fullTime: boolean; sentAt: Date | null; movedAt: Date | null }>();
         for (const proposal of proposals) {
           if (!latest.has(proposal.projectId))
-            latest.set(proposal.projectId, { status: proposal.status, fullTime: Boolean(parseOffer(proposal.offerDetails, proposal.currency).fullTime) });
+            latest.set(proposal.projectId, {
+              status: proposal.status,
+              fullTime: Boolean(parseOffer(proposal.offerDetails, proposal.currency).fullTime),
+              sentAt: proposal.createdAt,
+              movedAt: proposal.status === "hired" ? (proposal.hiredAt ?? proposal.updatedAt) : proposal.updatedAt,
+            });
         }
         const projectIds = Array.from(latest.keys());
         const named = await db
@@ -218,6 +227,8 @@ export default async function EmployerInternDetail({
           projectName: projectNameById.get(projectId) ?? null,
           status: latest.get(projectId)?.status ?? "sent",
           fullTime: latest.get(projectId)?.fullTime ?? false,
+          sentAt: latest.get(projectId)?.sentAt ?? null,
+          movedAt: latest.get(projectId)?.movedAt ?? null,
         }));
         const shownProjectId = proposals.find((p) => p.id === relation?.proposal?.id)?.projectId;
         statusProjectName = (shownProjectId && projectNameById.get(shownProjectId)) || null;
@@ -327,21 +338,21 @@ export default async function EmployerInternDetail({
   const sendHref = `/employer/send-proposal?intern=${encodeURIComponent(profile.id)}${shortlist ? `&project=${encodeURIComponent(shortlist.projectId)}` : ""}`;
   /** Free text with contact details hidden until hire. */
   const t = (value: string | null | undefined) => (value ? profileText(value, nameUnlocked) : "");
-  const SECTION = "rounded-2xl border border-ink-200 bg-white p-5 shadow-xs sm:p-6";
-  const H2 = "text-lg font-semibold tracking-[-0.01em] text-ink-900";
+  const range = band.max >= 10 ? `${band.min} or above` : `${band.min} to under ${band.max}`;
+  const stat = "flex items-baseline justify-between gap-4 py-2.5 text-sm";
 
   return (
     <div className="pb-12">
       <Link
         href={`/employer/candidates${shortlist ? `?project=${encodeURIComponent(shortlist.projectId)}` : ""}`}
-        className="-ml-1 mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm px-1 text-sm font-medium text-brand-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+        className="-ml-1 mb-5 inline-flex min-h-11 items-center gap-1.5 rounded-md px-1 text-sm font-medium text-ink-700 underline-offset-4 hover:text-ink-900 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
       >
         <ArrowLeft className="size-4" aria-hidden />
         Back to candidates
       </Link>
 
       {adminContact ? (
-        <p className="mb-6 rounded-apple-md border border-accent-300 bg-accent-100/60 px-4 py-2.5 text-sm text-ink-800">
+        <p className="mb-6 rounded-lg border border-accent-300 bg-accent-100/60 px-4 py-2.5 text-sm text-ink-800">
           <span className="font-semibold">Admin view:</span>{" "}
           <a href={`mailto:${adminContact.email}`} className="underline underline-offset-4">
             {adminContact.email}
@@ -350,40 +361,28 @@ export default async function EmployerInternDetail({
         </p>
       ) : null}
 
-      {/* Left: who they are, then the evidence. Right (lg): the sticky hire box. A phone reads header, hire box, evidence. */}
-      <div className="grid gap-x-12 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      {/* Left: who they are, then the evidence. Right (lg): the sticky hire column. A phone reads header, hire column, evidence. */}
+      <div className="grid gap-x-14 lg:grid-cols-[minmax(0,1fr)_21rem]">
         <header className="min-w-0 pb-8 lg:col-start-1">
-          <div className="flex min-w-0 items-start gap-4 sm:gap-6">
+          <div className="flex min-w-0 items-start gap-4 sm:gap-5">
             <span className="relative shrink-0">
-              <CandidateAvatar
-                photoUrl={profile.photoUrl}
-                initials={profile.initials}
-                seed={profile.id}
-                className="size-18 rounded-full text-xl ring-1 ring-inset ring-black/5 sm:size-24 sm:text-2xl"
-              />
+              <CandidateAvatar photoUrl={profile.photoUrl} initials={profile.initials} className="size-14 rounded-full bg-ink-100 text-lg text-ink-800 sm:size-16 sm:text-xl" />
               {presence ? (
                 <span
                   aria-hidden
-                  className={`absolute bottom-0.5 right-0.5 size-4 rounded-full ring-[3px] ring-white sm:bottom-1 sm:right-1 ${presence === PRESENCE_ONLINE ? "bg-success" : "bg-ink-300"}`}
+                  className={`absolute bottom-0 right-0 size-3.5 rounded-full ring-2 ring-paper ${presence === PRESENCE_ONLINE ? "bg-success" : "bg-ink-300"}`}
                 />
               ) : null}
             </span>
-            <div className="min-w-0 pt-1">
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                <h1 className="break-words text-2xl font-semibold leading-tight tracking-[-0.02em] text-ink-900 sm:text-3xl">
-                  {displayName}
-                  {nameUnlocked ? null : <span className="sr-only">. Names and contact details unlock once your hire is paid.</span>}
-                </h1>
-                {status && statusProjectName ? (
-                  <Pill tone={status.tone} className="max-w-full">
-                    <span className="truncate">{statusProjectName}: {status.label}</span>
-                  </Pill>
-                ) : null}
-              </div>
-              {headline ? <p className="mt-1 break-words text-lg leading-snug text-ink-800 sm:text-xl">{headline}</p> : null}
-              <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-600">
+            <div className="min-w-0">
+              <h1 className="break-words font-display text-2xl font-semibold leading-[1.1] sm:text-4xl sm:leading-[1.05] tracking-[-0.02em] text-ink-900">
+                {displayName}
+                {nameUnlocked ? null : <span className="sr-only">. Names and contact details unlock once your hire is paid.</span>}
+              </h1>
+              {headline ? <p className="mt-2 break-words text-lg leading-snug text-ink-800">{headline}</p> : null}
+              <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm text-ink-700">
                 <span className="inline-flex items-center gap-1.5">
-                  <MapPin className="size-4 shrink-0 text-ink-500" aria-hidden />
+                  <MapPin className="size-4 shrink-0 text-ink-600" aria-hidden />
                   {profile.location || "Location not stated"}
                 </span>
                 {prefers.length > 0 ? <span>Also works in {prefers.join(", ")}</span> : null}
@@ -400,58 +399,31 @@ export default async function EmployerInternDetail({
                   </a>
                 ) : null}
               </p>
+              {status && statusProjectName ? (
+                <Pill tone={status.tone} className="mt-2 max-w-full">
+                  <span className="truncate">{statusProjectName}: {status.label}</span>
+                </Pill>
+              ) : null}
             </div>
           </div>
-
-          {/* The stats line, as on the candidate list: score and band, rate, how they work. */}
-          <dl className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-xs">
-              <dt className="text-sm text-ink-600">Findtern Score</dt>
-              <dd className="nums mt-0.5 text-4xl font-semibold leading-none tracking-[-0.02em] text-ink-900">
-                {profile.scored ? (
-                  <>
-                    {profile.score.toFixed(1)}
-                    <span className="ml-0.5 text-base font-medium tracking-normal text-text-subtle">/10</span>
-                  </>
-                ) : (
-                  <span className="text-base font-medium text-ink-700">Not scored yet</span>
-                )}
-              </dd>
-            </div>
-            <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-xs">
-              <dt className="text-sm text-ink-600">Works</dt>
-              <dd className="mt-1.5 text-base font-medium text-ink-900">{profile.workModes.join(" / ") || "Not stated"}</dd>
-            </div>
-            <div className="rounded-2xl border border-ink-200 bg-white p-4 shadow-xs">
-              <dt className="text-sm text-ink-600">Laptop</dt>
-              <dd className="mt-1.5 text-base font-medium text-ink-900">
-                {profile.hasLaptop === null ? "Not stated" : profile.hasLaptop ? "Own" : "Needs one"}
-              </dd>
-            </div>
-          </dl>
-          {profile.scored ? (
-            // The band's own published meaning (lib/score BANDS), not a made-up label.
-            <p className="mt-3 text-sm text-ink-600">
-              <span className="mr-2 inline-flex items-center rounded-full bg-brand-50 px-2.5 py-0.5 text-sm font-medium text-brand-800 ring-1 ring-inset ring-brand-200/70">
-                {plan}
-              </span>
-              Score {band.max >= 10 ? `${band.min}+` : `${band.min}–${band.max}`}. {band.blurb}
-            </p>
-          ) : null}
         </header>
 
         <aside aria-label="Hire" className="min-w-0 pb-8 lg:col-start-2 lg:row-span-2 lg:row-start-1 lg:pb-0">
-          <div className="space-y-5 rounded-apple-xl border border-ink-200/80 bg-white p-5 lg:sticky lg:top-20">
-            <div>
-              <p className="nums text-3xl font-semibold leading-none text-ink-900">{formatRate(pricing.hourlyRateMinor, currency)}</p>
-              <p className="mt-2 text-sm text-ink-600">What you pay, set by the {profile.scored ? `${plan} ` : ""}band</p>
+          <div className="space-y-6 lg:sticky lg:top-20">
+            <div className="border-t-2 border-ink-900 pt-4">
+              <p className="text-sm text-ink-700">What you pay</p>
+              <p className="nums mt-1 font-display text-4xl font-semibold leading-none text-ink-900">
+                {formatMoney(pricing.hourlyRateMinor, currency)}
+                <span className="ml-1 font-sans text-base font-normal text-ink-700">/ hr</span>
+              </p>
+              <p className="mt-2 text-sm text-ink-700">Set by the {profile.scored ? `${plan} ` : ""}band</p>
               {pricing.perHireMinor > 0 ? (
-                <p className="nums mt-0.5 text-sm text-ink-600">
+                <p className="nums text-sm text-ink-700">
                   plus <span className="font-medium text-ink-900">{formatMoney(pricing.perHireMinor, currency)}</span> one-time hiring charge
                 </p>
               ) : (
-                <p className="nums mt-0.5 text-sm text-ink-600">
-                  plus <s className="text-text-subtle">{formatMoney(pricing.perHireListMinor, currency)}</s>{" "}
+                <p className="nums text-sm text-ink-700">
+                  plus <s className="text-ink-600">{formatMoney(pricing.perHireListMinor, currency)}</s>{" "}
                   <span className="font-semibold text-success">(FREE)</span> one-time hiring charge
                 </p>
               )}
@@ -468,7 +440,7 @@ export default async function EmployerInternDetail({
                   View sent proposal
                 </ButtonLink>
               ) : relation?.hired ? null : (
-                <p className="rounded-apple-sm bg-ink-100 px-4 py-2.5 text-sm text-ink-700">{action.reason}</p>
+                <p className="rounded-md bg-ink-100 px-4 py-2.5 text-sm text-ink-800">{action.reason}</p>
               )}
               {relation?.hired && relation.proposal ? (
                 <ButtonLink href={`/employer/proposal/${encodeURIComponent(relation.proposal.id)}`} variant="primary" block className="min-h-11">
@@ -491,22 +463,30 @@ export default async function EmployerInternDetail({
               {compareBlocked ? null : <CompareToggle employerId={employerId} internId={profile.id} projectId={shortlist?.projectId ?? null} picked={comparePicks} />}
             </div>
 
+            <dl className="divide-y divide-ink-200 border-y border-ink-200">
+              <div className={stat}>
+                <dt className="text-ink-700">Works</dt>
+                <dd className="text-right font-medium text-ink-900">{profile.workModes.join(" / ") || "Not stated"}</dd>
+              </div>
+              <div className={stat}>
+                <dt className="text-ink-700">Laptop</dt>
+                <dd className="text-right font-medium text-ink-900">{profile.hasLaptop === null ? "Not stated" : profile.hasLaptop ? "Own" : "Needs one"}</dd>
+              </div>
+            </dl>
+
             {appliedProjects.length > 0 ? (
-              <div className="border-t border-ink-100 pt-4">
-                <h2 className="text-sm font-semibold text-ink-900">Your proposals to them</h2>
-                <ul className="mt-2 space-y-2">
-                  {appliedProjects.slice(0, PROPOSALS_SHOWN).map((entry) => {
-                    const pill = proposalPill(entry.status, entry.fullTime);
-                    return (
-                      <li key={entry.id} className="flex min-w-0 items-start justify-between gap-3 text-sm">
-                        <span className="min-w-0 break-words text-ink-800">{entry.projectName ?? "Project no longer listed"}</span>
-                        <Pill tone={pill.tone} className="shrink-0">
-                          {pill.label}
-                        </Pill>
-                      </li>
-                    );
-                  })}
-                </ul>
+              <div>
+                <h2 className="mb-2 font-display text-lg font-semibold text-ink-900">Your proposals to them</h2>
+                <ProposalTrail
+                  rows={appliedProjects.slice(0, PROPOSALS_SHOWN).map((entry) => ({
+                    id: entry.id,
+                    projectName: entry.projectName,
+                    status: entry.status,
+                    pill: proposalPill(entry.status, entry.fullTime),
+                    sentAt: entry.sentAt,
+                    movedAt: entry.movedAt,
+                  }))}
+                />
                 {appliedProjects.length > PROPOSALS_SHOWN ? (
                   <Link href="/employer/proposals" className="mt-2 inline-flex min-h-11 items-center text-sm font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900">
                     See all {appliedProjects.length} in Proposals
@@ -517,88 +497,94 @@ export default async function EmployerInternDetail({
           </div>
         </aside>
 
-        <div className="min-w-0 space-y-4 lg:col-start-1">
-          {skills.length > 0 ? (
-            <section aria-labelledby="skills-h" className={SECTION}>
-              <div className="mb-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                <h2 id="skills-h" className={H2}>
-                  Skills
-                </h2>
-                {wanted && wanted.skills.length > 0 ? (
-                  <p className="text-sm text-ink-600">
-                    <span className="nums">{matchCount}</span> of {wanted.skills.length} match {wanted.project}
-                  </p>
-                ) : null}
-              </div>
-              {/* The same chips as the candidate list: project matches first and ticked, at most seven, then +N. */}
-              <SkillChips skills={skills} wanted={wanted?.skills ?? []} />
-            </section>
-          ) : null}
-
-          <section id="ai-report" aria-labelledby="ai-h" className={`${SECTION} scroll-mt-24`}>
-            <h2 id="ai-h" className={H2}>
-              AI interview
-            </h2>
-            {/* The bars are the evidence; the sentence only names the spread. All parts tied: the bars say it. */}
-            {rated.length === 0 ? (
-              <p className="mt-1 text-sm text-ink-600">No AI interview score yet. The breakdown appears once the interview is reviewed.</p>
-            ) : rated.length > 1 && rated[0].value !== rated[rated.length - 1].value ? (
-              <p className="mt-1 text-sm text-ink-600">
-                Strongest in {rated[0].label} (<span className="nums">{rated[0].value.toFixed(1)}</span>), lowest in {rated[rated.length - 1].label} (
-                <span className="nums">{rated[rated.length - 1].value.toFixed(1)}</span>).
-              </p>
-            ) : null}
-            <dl className="mt-4 max-w-2xl divide-y divide-ink-100">
-              {axes.map(({ label, value }) => (
-                <div key={label} className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-x-4 py-2 sm:grid-cols-[8rem_minmax(0,1fr)]">
-                  <dt className="text-sm text-ink-700">{label}</dt>
-                  {value !== null ? (
-                    <dd className="grid grid-cols-[minmax(0,1fr)_3rem] items-center gap-x-4 sm:grid-cols-[minmax(0,1fr)_3.5rem]">
-                      <div className="[&>div]:mt-0">
-                        <ScoreBar value={value} />
-                      </div>
-                      <span className="nums text-right text-sm">
-                        <span className="font-semibold text-ink-900">{value.toFixed(1)}</span>
-                        <span className="text-text-subtle">/10</span>
-                      </span>
-                    </dd>
+        <div className="min-w-0 space-y-10 lg:col-start-1">
+          <div id="ai-report" className="scroll-mt-24">
+            <Section title="Findtern Score" hint="From the AI interview, coding and aptitude rounds, and communication.">
+              <div className="grid gap-x-12 gap-y-6 sm:grid-cols-[auto_minmax(0,1fr)]">
+                <div className="max-w-56">
+                  {profile.scored ? (
+                    <>
+                      <p className="nums font-display text-4xl font-semibold leading-none text-brand-800">
+                        {profile.score.toFixed(1)}
+                        <span className="ml-1 text-lg font-medium text-ink-600">/10</span>
+                      </p>
+                      <p className="mt-3 text-sm text-ink-700">
+                        <span className="font-semibold text-ink-900">{plan}</span>, score {range}. {band.blurb}
+                      </p>
+                    </>
                   ) : (
-                    <dd className="text-sm text-text-subtle">Not rated yet</dd>
+                    <p className="text-base text-ink-700">Not scored yet</p>
                   )}
                 </div>
-              ))}
-            </dl>
-            {rated.length > 0 && (aiLinks.feedbackLink || (nameUnlocked && aiLinks.recordingLink)) ? (
-              <div className="-ml-3 mt-3 flex flex-wrap items-center gap-1 print:hidden">
-                {aiLinks.feedbackLink ? (
-                  <a href={aiLinks.feedbackLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
-                    <FileText className="size-4" aria-hidden />
-                    Feedback report
-                    <ExternalLink className="size-3.5" aria-hidden />
-                  </a>
-                ) : null}
-                {/* Recording only after hire; the written report before (legacy). */}
-                {nameUnlocked && aiLinks.recordingLink ? (
-                  <a href={aiLinks.recordingLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
-                    <Video className="size-4" aria-hidden />
-                    Recording
-                    <ExternalLink className="size-3.5" aria-hidden />
-                  </a>
-                ) : null}
+                <div className="min-w-0">
+                  {/* The bars are the evidence; the sentence only names the spread. All parts tied: the bars say it. */}
+                  {rated.length === 0 ? (
+                    <p className="text-sm text-ink-700">No AI interview score yet. The breakdown appears once the interview is reviewed.</p>
+                  ) : rated.length > 1 && rated[0].value !== rated[rated.length - 1].value ? (
+                    <p className="text-sm text-ink-700">
+                      Strongest in {rated[0].label} (<span className="nums">{rated[0].value.toFixed(1)}</span>), lowest in {rated[rated.length - 1].label} (
+                      <span className="nums">{rated[rated.length - 1].value.toFixed(1)}</span>).
+                    </p>
+                  ) : null}
+                  <dl className="mt-2 divide-y divide-ink-200 border-y border-ink-200">
+                    {axes.map(({ label, value }) => (
+                      <div key={label} className="grid grid-cols-[6.5rem_minmax(0,1fr)_3.25rem] items-center gap-x-4 py-2.5 sm:grid-cols-[8rem_minmax(0,1fr)_3.5rem]">
+                        <dt className="text-sm text-ink-800">{label}</dt>
+                        {value !== null ? (
+                          <>
+                            <dd aria-hidden className="h-1.5 overflow-hidden rounded-sm bg-ink-200">
+                              <div className="h-full rounded-sm bg-brand-700" style={{ width: `${value * 10}%` }} />
+                            </dd>
+                            <dd className="nums text-right font-display text-lg font-semibold leading-none text-ink-900">{value.toFixed(1)}</dd>
+                          </>
+                        ) : (
+                          <dd className="col-span-2 text-sm text-ink-600">Not rated yet</dd>
+                        )}
+                      </div>
+                    ))}
+                  </dl>
+                  {rated.length > 0 && (aiLinks.feedbackLink || (nameUnlocked && aiLinks.recordingLink)) ? (
+                    <div className="-ml-3 mt-2 flex flex-wrap items-center gap-1 print:hidden">
+                      {aiLinks.feedbackLink ? (
+                        <a href={aiLinks.feedbackLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
+                          <FileText className="size-4" aria-hidden />
+                          Feedback report
+                          <ExternalLink className="size-3.5" aria-hidden />
+                        </a>
+                      ) : null}
+                      {/* Recording only after hire; the written report before (legacy). */}
+                      {nameUnlocked && aiLinks.recordingLink ? (
+                        <a href={aiLinks.recordingLink} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
+                          <Video className="size-4" aria-hidden />
+                          Recording
+                          <ExternalLink className="size-3.5" aria-hidden />
+                        </a>
+                      ) : null}
+                    </div>
+                  ) : null}
+                </div>
               </div>
-            ) : null}
-          </section>
+            </Section>
+          </div>
+
+          {skills.length > 0 ? (
+            <Section
+              title="Skills"
+              hint={wanted && wanted.skills.length > 0 ? `${matchCount} of ${wanted.skills.length} match ${wanted.project}` : undefined}
+            >
+              {wanted && wanted.skills.length > 0 ? <FitTicks className="mb-3" matched={matchCount} total={wanted.skills.length} /> : null}
+              {/* The same chips as the candidate list: project matches first and ticked, at most seven, then +N. */}
+              <SkillChips skills={skills} wanted={wanted?.skills ?? []} />
+            </Section>
+          ) : null}
 
           {academics ? (
-            <section aria-labelledby="edu-h" className={SECTION}>
-              <h2 id="edu-h" className={`${H2} mb-4`}>
-                Education
-              </h2>
+            <Section title="Education">
               <p className="break-words text-base font-medium text-ink-900">{academics.institution || "Institution not stated"}</p>
               <p className="mt-0.5 break-words text-sm text-ink-700">
                 {[headline, academics.level ? humanise(academics.level) : ""].filter(Boolean).join(" · ") || "Degree not stated"}
               </p>
-              <p className="nums mt-0.5 text-sm text-ink-600">
+              <p className="nums mt-0.5 text-sm text-ink-700">
                 {[
                   [academics.startYear, academics.endYear].filter(Boolean).join(" – "),
                   academics.score ? `${academics.score}${academics.scoreType ? ` ${academics.scoreType.toUpperCase()}` : ""}` : "",
@@ -607,89 +593,79 @@ export default async function EmployerInternDetail({
                   .filter(Boolean)
                   .join(" · ")}
               </p>
-            </section>
+            </Section>
           ) : null}
 
           {experiences.length > 0 ? (
-            <section aria-labelledby="exp-h" className={SECTION}>
-              <h2 id="exp-h" className={`${H2} mb-2`}>
-                Experience and projects
-              </h2>
-              <ul className="divide-y divide-ink-100">
+            <Section title="Experience and projects">
+              <ul className="divide-y divide-ink-200">
                 {experiences.map((exp) => (
-                  <li key={exp.id} className="py-4">
+                  <li key={exp.id} className="py-4 first:pt-1">
                     <p className="break-words text-base font-medium text-ink-900">{[t(exp.role), t(exp.company)].filter(Boolean).join(" · ")}</p>
                     {exp.type || exp.from || exp.to || exp.current ? (
-                      <p className="nums mt-0.5 text-sm text-ink-600">
+                      <p className="nums mt-0.5 text-sm text-ink-700">
                         {[exp.type, [dateLabel(exp.from), exp.current ? "Present" : dateLabel(exp.to)].filter(Boolean).join(" – ")]
                           .filter(Boolean)
                           .join(" · ")}
                       </p>
                     ) : null}
-                    {exp.description ? <p className="mt-2 max-w-prose whitespace-pre-line break-words text-sm leading-relaxed text-ink-700">{t(exp.description)}</p> : null}
+                    {exp.description ? <p className="mt-2 max-w-prose whitespace-pre-line break-words text-sm leading-relaxed text-ink-800">{t(exp.description)}</p> : null}
                   </li>
                 ))}
               </ul>
-            </section>
+            </Section>
           ) : null}
 
           {qualifications.length > 0 || (academics && academics.courses.length > 0) ? (
-            <section aria-labelledby="cert-h" className={SECTION}>
-              <h2 id="cert-h" className={`${H2} mb-2`}>
-                Certificates and courses
-              </h2>
-              <ul className="divide-y divide-ink-100">
+            <Section title="Certificates and courses">
+              <ul className="divide-y divide-ink-200">
                 {qualifications.map((q) => (
-                  <li key={q.id} className="py-3">
+                  <li key={q.id} className="py-3 first:pt-1">
                     <p className="break-words text-base font-medium text-ink-900">{t(q.name)}</p>
-                    <p className="nums mt-0.5 text-sm text-ink-600">
+                    <p className="nums mt-0.5 text-sm text-ink-700">
                       {[t(q.issuer), q.completionDate && formatDate(q.completionDate)].filter(Boolean).join(" · ") || "No further detail recorded"}
                     </p>
                   </li>
                 ))}
                 {(academics?.courses ?? []).map((course, i) => (
-                  <li key={`${course.name}-${i}`} className="py-3">
+                  <li key={`${course.name}-${i}`} className="py-3 first:pt-1">
                     <p className="break-words text-base font-medium text-ink-900">{t(course.name)}</p>
-                    <p className="nums mt-0.5 text-sm text-ink-600">
+                    <p className="nums mt-0.5 text-sm text-ink-700">
                       {[t(course.institution), course.level, course.completed, course.score].filter(Boolean).join(" · ") || "No further detail recorded"}
                     </p>
                   </li>
                 ))}
               </ul>
-            </section>
+            </Section>
           ) : null}
 
           {languages.length > 0 || activities.length > 0 ? (
-            <section aria-label="Languages and activities" className={`${SECTION} grid gap-8 sm:grid-cols-2`}>
+            <div className="grid gap-x-12 gap-y-10 sm:grid-cols-2">
               {languages.length > 0 ? (
-                <div className="min-w-0">
-                  <h2 className={`${H2} mb-3`}>Languages</h2>
-                  <ul className="space-y-3">
+                <Section title="Languages">
+                  <ul className="divide-y divide-ink-200">
                     {languages.map((l) => (
-                      <li key={l.id} className="text-sm">
+                      <li key={l.id} className="py-2.5 text-sm first:pt-1">
                         <span className="font-medium text-ink-900">{l.language}</span>
-                        <span className="block text-ink-600">
-                          {[l.level, l.read && "Read", l.write && "Write", l.speak && "Speak"].filter(Boolean).join(", ")}
-                        </span>
+                        <span className="block text-ink-700">{[l.level, l.read && "Read", l.write && "Write", l.speak && "Speak"].filter(Boolean).join(", ")}</span>
                       </li>
                     ))}
                   </ul>
-                </div>
+                </Section>
               ) : null}
               {activities.length > 0 ? (
-                <div className="min-w-0">
-                  <h2 className={`${H2} mb-3`}>Activities</h2>
-                  <ul className="space-y-3">
+                <Section title="Activities">
+                  <ul className="divide-y divide-ink-200">
                     {activities.map((a) => (
-                      <li key={a.id} className="text-sm">
+                      <li key={a.id} className="py-2.5 text-sm first:pt-1">
                         <span className="font-medium text-ink-900">{t(a.activity)}</span>
-                        <span className="block text-ink-600">{[a.category, a.level].filter(Boolean).join(", ")}</span>
+                        <span className="block text-ink-700">{[a.category, a.level].filter(Boolean).join(", ")}</span>
                       </li>
                     ))}
                   </ul>
-                </div>
+                </Section>
               ) : null}
-            </section>
+            </div>
           ) : null}
         </div>
       </div>

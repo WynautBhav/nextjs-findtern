@@ -31,7 +31,7 @@ export function ScrollRegion({ label, className, children }: { label: string; cl
   return (
     <div>
       {more ? (
-        <p className="mb-2 text-xs text-text-subtle" aria-hidden>
+        <p className="mb-2 text-sm text-ink-700" aria-hidden>
           Scroll sideways to see every candidate.
         </p>
       ) : null}
@@ -49,7 +49,7 @@ export function ScrollRegion({ label, className, children }: { label: string; cl
         {more ? (
           <span
             aria-hidden
-            className="pointer-events-none absolute inset-y-px right-px w-10 rounded-r-2xl bg-gradient-to-l from-white via-white/70 to-transparent"
+            className="pointer-events-none absolute inset-y-px right-0 w-10 bg-gradient-to-l from-paper via-paper/70 to-transparent"
           />
         ) : null}
       </div>

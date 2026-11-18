@@ -58,13 +58,13 @@ export function CollegePicker({ options, selected }: { options: CollegeOption[];
               setQuery("");
             }
           }}
-          className="block h-11 w-full rounded-xl border border-ink-200 bg-ink-50 pl-9 pr-3 text-base text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:bg-white focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm"
+          className="block h-11 w-full rounded-lg border border-ink-200 bg-ink-50 pl-9 pr-3 text-base text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:bg-surface-raised focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm"
         />
       </div>
       <p id={statusId} role="status" className="mt-1.5 text-xs text-text-subtle">
         {needle ? `${shown.length} of ${rows.length} colleges match` : `${rows.length} college${rows.length === 1 ? "" : "s"}${selected.length > 0 ? `, ${selected.length} chosen` : ""}`}
       </p>
-      <ul id={listId} aria-label="Colleges" className="mt-1 max-h-56 overflow-y-auto overscroll-contain rounded-xl border border-ink-200 bg-white p-1">
+      <ul id={listId} aria-label="Colleges" className="mt-1 max-h-56 overflow-y-auto overscroll-contain rounded-lg border border-ink-200 bg-surface-raised p-1">
         {rows.map((row) => {
           const hidden = needle !== "" && !collegeKey(row.name).includes(needle);
           return (
@@ -75,7 +75,7 @@ export function CollegePicker({ options, selected }: { options: CollegeOption[];
                   name="colleges"
                   value={row.name}
                   defaultChecked={chosen.has(collegeKey(row.name))}
-                  className="mt-0.5 size-4 shrink-0 rounded-[4px] border-ink-300 accent-ink-900"
+                  className="mt-0.5 size-4 shrink-0 rounded-sm border-ink-300 accent-ink-900"
                 />
                 <span className="min-w-0 flex-1 break-words">{row.name}</span>
                 <span className={cn("nums shrink-0 text-xs leading-5 text-text-subtle", row.count === 0 && "text-ink-500")} aria-label={`${row.count} candidate${row.count === 1 ? "" : "s"}`}>
