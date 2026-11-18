@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { NUDGE_COOLDOWN_MS, planNudge } from "./nudge-plan.ts";
+import { NUDGE_COOLDOWN_MS, planNudge, tallyNudges } from "./nudge-plan.ts";
 
 const now = new Date("2026-11-18T10:00:00Z");
 const ago = (ms: number) => new Date(now.getTime() - ms);
@@ -51,4 +52,26 @@ test("no PUBLIC_ORIGIN (link is null): no email for any kind", () => {
     assert.equal(plan.cooldown, false);
     if (!plan.cooldown) assert.equal(plan.email, undefined);
   }
+});
+
+test("tallyNudges: emailed = SMTP accepted, emailFailed = SMTP error, neither counts in sent only; skipped covers failures and invisible students", () => {
+  const tally = tallyNudges(
+    [
+      { ok: true, pushed: true, emailed: true, emailFailed: false },
+      { ok: true, pushed: false, emailed: true, emailFailed: false },
+      { ok: true, pushed: false, emailed: false, emailFailed: true },
+      { ok: true, pushed: true, emailed: false, emailFailed: false }, // MAIL_MODE=log, no link or no address
+      { ok: false }, // cooldown or a nudge that threw
+    ],
+    2,
+  );
+  assert.deepEqual(tally, { sent: 4, pushed: 2, emailed: 2, emailFailed: 1, skipped: 3 });
+  assert.deepEqual(Object.keys(tally).sort(), ["emailFailed", "emailed", "pushed", "sent", "skipped"]);
+});
+
+test("the nudge route has the 60s window, per-student allSettled and sends the tally", () => {
+  const src = readFileSync(new URL("../../app/api/college/nudge/route.ts", import.meta.url), "utf8");
+  assert.match(src, /export const maxDuration = 60;/);
+  assert.match(src, /Promise\.allSettled/);
+  assert.match(src, /NextResponse\.json\(tally\)/);
 });

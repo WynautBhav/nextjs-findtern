@@ -28,6 +28,28 @@ const COPY: Record<NudgeKind, (college: string) => { title: string; message: str
   }),
 };
 
+export type NudgeResult = { ok: true; pushed: boolean; emailed: boolean; emailFailed: boolean } | { ok: false };
+export type NudgeTally = { sent: number; pushed: number; emailed: number; emailFailed: number; skipped: number };
+
+/**
+ * The officer-facing counts. `emailed`: accepted by SMTP. `emailFailed`: SMTP errored or refused. A nudge that
+ * was neither (cooldown excluded, no link, MAIL_MODE=log, no address) counts in `sent` only. `skipped` covers
+ * students outside the college's view, the cooldown and nudges that threw before anything was written.
+ */
+export function tallyNudges(results: NudgeResult[], notVisible = 0): NudgeTally {
+  const t: NudgeTally = { sent: 0, pushed: 0, emailed: 0, emailFailed: 0, skipped: notVisible };
+  for (const r of results) {
+    if (!r.ok) t.skipped++;
+    else {
+      t.sent++;
+      if (r.pushed) t.pushed++;
+      if (r.emailed) t.emailed++;
+      if (r.emailFailed) t.emailFailed++;
+    }
+  }
+  return t;
+}
+
 export type NudgePlan =
   | { cooldown: true }
   | { cooldown: false; copy: { title: string; message: string; url: string }; email: EmailContent | undefined };

@@ -31,16 +31,16 @@ export async function notify(n: NotifyInput): Promise<boolean> {
 }
 
 /**
- * notify() that also says whether an email really left: `emailed` is true only when the mail was handed to SMTP
- * and accepted. MAIL_MODE=log (nothing real sent), a missing address, a switched-off preference, an unconfigured
- * SMTP or a send failure all give false.
+ * notify() that also says what happened to the email: `emailed` is true only when the mail was handed to SMTP
+ * and accepted; `emailFailed` is true when a send was tried and SMTP errored or refused (unconfigured included).
+ * MAIL_MODE=log (nothing real sent), a missing address and a switched-off preference are neither.
  */
-export async function notifyDetailed(n: NotifyInput): Promise<{ inApp: boolean; emailed: boolean }> {
+export async function notifyDetailed(n: NotifyInput): Promise<{ inApp: boolean; emailed: boolean; emailFailed: boolean }> {
   const db = getDb();
   const { type, data } = legacyShape(n.to.type, n.type, n.data ?? {});
   const category = categoryOf(n.type);
   const prefs = category === "required" ? null : await prefsOf(n.to.id);
-  if (!channelAllowed(prefs, category, "inApp")) return { inApp: false, emailed: false };
+  if (!channelAllowed(prefs, category, "inApp")) return { inApp: false, emailed: false, emailFailed: false };
   const inserted = await db
     .insert(schema.notifications)
     .values({
@@ -56,21 +56,24 @@ export async function notifyDetailed(n: NotifyInput): Promise<{ inApp: boolean; 
     // or another tick already wrote is a quiet no-op, never an error.
     .onConflictDoNothing()
     .returning({ id: schema.notifications.id });
-  if (inserted.length === 0) return { inApp: false, emailed: false };
-  if (!n.email || !channelAllowed(prefs, category, "email")) return { inApp: true, emailed: false };
+  if (inserted.length === 0) return { inApp: false, emailed: false, emailFailed: false };
+  if (!n.email || !channelAllowed(prefs, category, "email")) return { inApp: true, emailed: false, emailFailed: false };
 
   let emailed = false;
+  let emailFailed = false;
   try {
     const address = await emailOf(n.to.type, n.to.id);
     if (address) {
       const mail = renderEmail(n.email);
       const res = await sendSmtpMail({ to: address, ...mail, attachments: n.attachments });
       emailed = res.ok && res.mode === "send";
+      emailFailed = !res.ok;
     }
   } catch (err) {
+    emailFailed = true;
     console.error(`[notify] ${n.type} email failed`, err);
   }
-  return { inApp: true, emailed };
+  return { inApp: true, emailed, emailFailed };
 }
 
 /**

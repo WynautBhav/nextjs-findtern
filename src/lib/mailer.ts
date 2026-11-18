@@ -1,7 +1,7 @@
 import { appendFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 
-import nodemailer from "nodemailer";
+import nodemailer, { type Transporter } from "nodemailer";
 
 export type SmtpAttachment = {
   filename: string;
@@ -25,6 +25,24 @@ export function mailMode(): "log" | "send" {
 /** True when every SMTP setting a real send needs is present (log mode ignores them). */
 export function smtpConfigured(): boolean {
   return ["SMTP_FROM", "SMTP_HOST", "SMTP_USER", "SMTP_PASS"].every((k) => (process.env[k] ?? "").trim() !== "");
+}
+
+type SmtpSettings = { host: string; port: number; secure: boolean; auth: { user: string; pass: string } };
+
+let pooled: { key: string; transport: Transporter } | null = null;
+
+/**
+ * One pooled transporter per SMTP setting set, reused across messages: a bulk send (the officer's "Nudge all 490
+ * offline") opens at most 5 connections instead of a fresh TCP/TLS + auth handshake per mail. A changed
+ * setting builds a new one.
+ */
+export function pooledTransport(s: SmtpSettings): Transporter {
+  const key = JSON.stringify(s);
+  if (pooled?.key !== key) {
+    pooled?.transport.close();
+    pooled = { key, transport: nodemailer.createTransport({ ...s, pool: true, maxConnections: 5, maxMessages: 100 }) };
+  }
+  return pooled.transport;
 }
 
 export type MailResult = { ok: true; mode: "log" | "send" } | { ok: false; error: string };
@@ -64,7 +82,7 @@ export async function sendSmtpMail(opts: {
     return { ok: false, error: "SMTP is not configured" };
   }
 
-  const transporter = nodemailer.createTransport({
+  const transporter = pooledTransport({
     host,
     port: portRaw ? Number(portRaw) : 587,
     secure: secureRaw === "true" || secureRaw === "1",

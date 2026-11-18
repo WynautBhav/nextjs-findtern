@@ -39,7 +39,7 @@ export function NudgeButton({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind, userIds }),
     }).catch(() => null);
-    const body = (await res?.json().catch(() => null)) as { sent?: number; pushed?: number; skipped?: number; emailed?: boolean; error?: string } | null;
+    const body = (await res?.json().catch(() => null)) as { sent?: number; pushed?: number; skipped?: number; emailed?: number; emailFailed?: number; error?: string } | null;
     if (!res?.ok || !body) {
       setState("error");
       setNote(body?.error ?? "Couldn't send. Try again.");
@@ -50,14 +50,15 @@ export function NudgeButton({
     // when they next open Findtern. Never imply more reach than happened.
     const sent = body.sent ?? 0;
     const pushed = body.pushed ?? 0;
-    const via = body.emailed ? "email and in-app" : "in-app";
     setNote(
       sent === 0
         ? "Already nudged in the last 10 min"
         : [
             `${sent} nudged`,
             pushed ? `${pushed} by phone alert` : null,
-            sent - pushed > 0 ? `${sent - pushed} by ${via} only` : null,
+            sent - pushed > 0 ? `${sent - pushed} in-app only` : null,
+            body.emailed ? `${body.emailed} emailed` : null,
+            body.emailFailed ? `${body.emailFailed} email failed` : null,
             body.skipped ? `${body.skipped} nudged recently` : null,
           ]
             .filter(Boolean)
