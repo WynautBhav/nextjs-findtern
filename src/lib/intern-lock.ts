@@ -142,7 +142,7 @@ export function isInternPage(pathname: string): boolean {
 
 /**
  * API prefixes an unpaid intern is refused. These are the calls the locked pages
- * make (offers, interviews, timesheets, messages, payouts). The open
+ * make (offers, interviews, timesheets, payouts). The open
  * pages and the pay flow call none of them. Matched on the normalized path,
  * so case and trailing slashes don't matter; stricter than the router on purpose.
  */
@@ -150,7 +150,6 @@ const LOCKED_API = [
   /^\/api\/proposals(\/|$)/, // offer answer, offer letter
   /^\/api\/interviews(\/|$)/, // pick a slot
   /^\/api\/timesheets(\/|$)/,
-  /^\/api\/threads(\/|$)/, // messages
   /^\/api\/intern\/timesheets(\/|$)/,
   /^\/api\/intern\/[^/]+\/payouts(\/|$)/, // stipend
 ] as const;
@@ -194,7 +193,6 @@ export function lockVerdict(input: { pathname: string; isApi: boolean; enabled: 
 /** Names for the locked page, keyed by normalized page prefix. Unknown pages just read "This page". */
 const PAGE_NAMES: [string, string][] = [
   ["/intern/proposals", "Offers"],
-  ["/intern/messages", "Messages"],
   ["/intern/interviews", "Interviews"],
   ["/intern/record", "Record"],
   ["/intern/timesheets", "Timesheets"],

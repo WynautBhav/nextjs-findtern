@@ -36,7 +36,6 @@ const ALLOWED: Record<string, string> = {
   "presence/heartbeat/route.ts": "presence ping; not project data",
   "terms/accept/route.ts": "accepts the platform terms; not project data",
   "uploads/route.ts": "file upload session; attaches to nothing until a guarded route references the file",
-  "threads/[id]/read/route.ts": "read receipts on a thread; the send route (guarded for project threads) is the action",
   "employer/[id]/subscription/order/route.ts": "employer-level, not project-scoped: buys the employer's own subscription (no project, no proposal)",
   "employer/[id]/subscription/verify/route.ts": "employer-level, not project-scoped: records the employer's own subscription payment the gateway already captured",
 };
@@ -115,7 +114,7 @@ test("the guard is never applied to an admin route (admin can always restore and
 });
 
 test("routes that run for admin or intern as well only apply the guard to an employer caller", () => {
-  for (const p of ["proposals/[id]/route.ts", "proposals/[id]/status/route.ts", "timesheets/[id]/decision/route.ts", "threads/[id]/messages/route.ts"]) {
+  for (const p of ["proposals/[id]/route.ts", "proposals/[id]/status/route.ts", "timesheets/[id]/decision/route.ts"]) {
     const src = readFileSync(join(API, p), "utf8");
     assert.match(src, /role (===|!==) "(employer|admin)"[\s\S]{0,200}Actionable\(|if \(session\.role[^\n]*\{\n\s*const td = await assert/, `${p} must gate the guard on the employer role`);
   }

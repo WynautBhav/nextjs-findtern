@@ -84,7 +84,6 @@ describe("isOpenInternPage: the allowlist", () => {
   const locked = [
     "/intern/proposals",
     "/intern/proposals/123",
-    "/intern/messages",
     "/intern/interviews",
     "/intern/record",
     "/intern/timesheets",
@@ -115,9 +114,6 @@ describe("isLockedApi: what an unpaid intern is refused", () => {
     "/api/proposals/1/offer-letter",
     "/api/interviews/1/select-slot",
     "/api/timesheets/1",
-    "/api/threads",
-    "/api/threads/1/messages",
-    "/api/threads/1/read",
     "/api/intern/timesheets",
     "/api/intern/timesheets/1/submit",
     "/api/intern/abc/payouts",
@@ -161,12 +157,12 @@ describe("lockVerdict: state x path", () => {
     assert.equal(v("/intern/documents/../proposals", "locked"), "redirect_locked");
   });
   it("unlocked intern (paid, college-redeemed or grandfathered) reaches everything", () => {
-    for (const p of ["/intern/proposals", "/intern/messages", "/intern/timesheets", "/intern/record/x"]) assert.equal(v(p, "unlocked"), "allow");
-    assert.equal(v("/api/threads", "unlocked", true), "allow");
+    for (const p of ["/intern/proposals", "/intern/timesheets", "/intern/record/x"]) assert.equal(v(p, "unlocked"), "allow");
+    assert.equal(v("/api/timesheets/1", "unlocked", true), "allow");
   });
   it("API: locked is a 403, unknown is a 503 (fails closed), open APIs are untouched", () => {
     assert.equal(v("/api/proposals/1/status", "locked", true), "deny_locked");
-    assert.equal(v("/api/threads", "unknown", true), "deny_unverified");
+    assert.equal(v("/api/timesheets/1", "unknown", true), "deny_unverified");
     assert.equal(v("/api/intern/abc/payment/razorpay/order", "locked", true), "allow");
     assert.equal(v("/api/intern/abc/payment/razorpay/order", "unknown", true), "allow");
     assert.equal(v("/api/intern/onboarding", "locked", true), "allow");
@@ -176,7 +172,7 @@ describe("lockVerdict: state x path", () => {
   });
   it("kill switch off: everything allowed, no lookup", () => {
     assert.equal(v("/intern/proposals", "locked", false, false), "allow");
-    assert.equal(v("/api/threads", "locked", true, false), "allow");
+    assert.equal(v("/api/timesheets/1", "locked", true, false), "allow");
     assert.equal(needsLookup({ pathname: "/intern/proposals", isApi: false, enabled: false }), false);
   });
   it("open pages and open APIs never need a lookup", () => {
@@ -190,7 +186,7 @@ describe("lockVerdict: state x path", () => {
 describe("nav and locked page helpers", () => {
   it("nav: locks everything but the open pages, only before payment", () => {
     assert.equal(isNavLocked("/intern/proposals", false), true);
-    assert.equal(isNavLocked("/intern/messages", false), true);
+    assert.equal(isNavLocked("/intern/interviews", false), true);
     assert.equal(isNavLocked("/intern/dashboard", false), false);
     assert.equal(isNavLocked("/intern/documents", false), false);
     assert.equal(isNavLocked("/intern/profile", false), false);

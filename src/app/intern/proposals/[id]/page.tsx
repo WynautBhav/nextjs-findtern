@@ -6,7 +6,6 @@ import { AlertCircle, ArrowLeft, Download, Info, Phone, User } from "lucide-reac
 
 import { DetailRow, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
 import { ScoreScale, STAT_ROW, StatTile } from "@/components/app/tiles";
-import { MessageButton } from "@/components/app/message-button";
 import { OfferDecision } from "@/components/app/offer-decision";
 import { proposalStatus } from "@/components/app/status";
 import { ImportantInstructions } from "@/components/intern/offer/important-instructions";
@@ -191,7 +190,6 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
             {takedownBlock(project.row, "accept") && ["sent", "interview_scheduled", "accepted"].includes(facts.key) ? <Pill tone="neutral">On hold</Pill> : <Pill tone={status.tone}>{status.label}</Pill>}
             <Pill tone="neutral">{fullTime ? "Full-time role" : "Internship"}</Pill>
             {facts.edited ? <Pill tone="new">Updated</Pill> : null}
-            <MessageButton proposalId={proposal.id} counterpartId={proposal.employerId} label="Message the company" />
           </div>
         }
       />

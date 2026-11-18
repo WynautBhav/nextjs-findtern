@@ -45,7 +45,6 @@ import { canSwitchBackToCollege } from "@/lib/college/identity-match";
 import { membershipOf } from "@/lib/college/membership";
 import { presenceNoticeKey } from "@/lib/dismissed-keys";
 import { paidSeatTotal } from "@/lib/college/seat-gate";
-import { listThreads } from "@/lib/messaging/store";
 
 export const metadata: Metadata = {
   title: "Home",
@@ -100,7 +99,7 @@ export default async function InternHome() {
   const session = await requireRole("intern");
 
   // Independent reads, in parallel. loadInternData is cache()d: the layout's call already did the work.
-  const [data, [user], activated, activationFeeMinor, paidMinor, college, counts, [presenceRow], lockState, acct] = await Promise.all([
+  const [data, [user], activated, activationFeeMinor, paidMinor, college, [presenceRow], lockState, acct] = await Promise.all([
     loadInternData(session.uid),
     getDb()
       .select({
@@ -119,13 +118,6 @@ export default async function InternHome() {
     getInternActivationFeeMinor(),
     internPaidMinor(session.uid),
     membershipOf(session.uid).catch(() => null),
-    // Unread messages for "What next". A failed read only drops that line.
-    listThreads(session.uid, "intern")
-      .then((threads) => ({ messages: threads.reduce((sum, t) => sum + t.unread, 0) }))
-      .catch((err: unknown) => {
-        console.error("[intern/dashboard] unread messages", err);
-        return null;
-      }),
     // The one-time "employers can see when you're active" notice shows only while this is still on.
     getDb()
       .select({ show: schema.userPresence.showActivity })
@@ -310,18 +302,9 @@ export default async function InternHome() {
     )
   ) : null;
 
-  // What needs this person next, in one fixed order: messages, an offer waiting,
+  // What needs this person next, in one fixed order: an offer waiting,
   // the AI interview, the college's cover, the profile. Each line has one action.
   const nextSteps: { key: string; title: string; detail?: string; href?: string; label?: string; joinLink?: string }[] = [];
-  if (canOpen && counts && counts.messages > 0) {
-    nextSteps.push({
-      key: "messages",
-      title: `${counts.messages} unread message${counts.messages === 1 ? "" : "s"}`,
-      detail: "Reply in your inbox.",
-      href: "/intern/messages",
-      label: "Open messages",
-    });
-  }
   // nextAction() returns one node; the count comes from the thread.
   const waitingOffers = action?.kind === "proposal" ? data.thread.filter((n) => n.tone === "action" && n.kind === action.kind).length : 0;
   // Locked: no offer line can exist (an offer is a proposal, which unlocks), and none may link out.
@@ -360,7 +343,7 @@ export default async function InternHome() {
     });
   }
 
-  // No status line while anything is pending (an offer, unread messages, a profile step): the "What next" card says it,
+  // No status line while anything is pending (an offer, a profile step): the "What next" card says it,
   // and "Nothing is waiting" above it would contradict it.
   const pending = nextSteps.length > 0;
   const status = working

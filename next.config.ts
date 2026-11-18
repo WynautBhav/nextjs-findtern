@@ -89,6 +89,10 @@ const LEGACY_REDIRECTS: { from: string; to: string }[] = [
   { from: "/intern/edit-profile", to: "/intern/onboarding" },
   { from: "/intern/dashboard/documents", to: "/intern/documents" },
 
+  // ── Employer–intern Messages was removed. Bookmarks and old notification rows land on the dashboard. ──
+  { from: "/employer/messages/:path*", to: "/employer/dashboard" },
+  { from: "/intern/messages/:path*", to: "/intern/dashboard" },
+
   // ── Admin: legacy aliases ────────────────────────────────────────────────
   { from: "/admin", to: "/admin/dashboard" },
   { from: "/admin/contact", to: "/admin/messages" },

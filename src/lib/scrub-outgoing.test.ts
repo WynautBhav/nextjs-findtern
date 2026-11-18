@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { CONTACT_MASK, NAME_MASK, OUTGOING_HIDDEN, denyTermsFor, findContact, hasDeniedName, scrubOutgoing } from "../contact-scrub.ts";
+import { CONTACT_MASK, NAME_MASK, OUTGOING_HIDDEN, denyTermsFor, findContact, hasDeniedName, scrubOutgoing } from "./contact-scrub.ts";
 
 // One pair: company "Qorvex Labs Pvt Ltd" run by Meera Kapoor (escalation: Dev Rathore); intern Rahul Sharma.
 const terms = denyTermsFor({

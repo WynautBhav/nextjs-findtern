@@ -26,7 +26,6 @@
     "test:e2e:college-money": "node --test e2e/college-money.e2e.mjs",
     "test:e2e:drive": "node --test --test-concurrency=1 e2e/drive-journey.e2e.mjs",
     "e2e:admin": "node --test e2e/admin.e2e.mjs",
-    "test:e2e:messaging": "node --test --test-concurrency=1 e2e/messaging.e2e.mjs",
     "test:e2e:notify": "node --test --test-concurrency=1 e2e/notify-prefs.e2e.mjs",
     "test:e2e:upload": "node --test --test-concurrency=1 e2e/upload-progress.e2e.mjs",
     "test:e2e:presence": "node --test --test-concurrency=1 e2e/presence.e2e.mjs",

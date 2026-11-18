@@ -14,8 +14,6 @@ const samples = (n: string): [name: keyof typeof emails, content: EmailContent, 
   ["proposalReceived", emails.proposalReceived({ internName: n, companyName: n, role: n, proposalId: "p1" }), false],
   ["proposalDecision", emails.proposalDecision({ employerName: n, candidate: n, role: n, accepted: true, proposalId: "p1" }), true],
   ["proposalDecision", emails.proposalDecision({ employerName: n, candidate: n, role: n, accepted: false, proposalId: "p1", fullTime: true }), true],
-  ["unreadMessages", emails.unreadMessages({ name: n, count: 2, from: "a candidate", url: "https://example.com/m", settingsUrl: "https://example.com/s" }), true],
-  ["unreadMessages", emails.unreadMessages({ name: n, count: 1, from: "an employer", url: "https://example.com/m", settingsUrl: "https://example.com/s" }), false],
   ["unreadOffer", emails.unreadOffer({ name: n, url: "https://example.com/p", settingsUrl: "https://example.com/s" }), false],
   ["proposalWithdrawn", emails.proposalWithdrawn({ internName: n, role: n }), false],
   ["proposalClosed", emails.proposalClosed({ internName: n, role: n }), false],
@@ -110,17 +108,14 @@ test("no exclamation-mark cheer in any subject, heading or text", () => {
   }
 });
 
-test("unread fallback mail makes no claim about how long it was unread", () => {
+test("unread offer fallback mail makes no claim about how long it was unread", () => {
   const urls = { url: "https://example.com/m", settingsUrl: "https://example.com/s" };
   for (const c of [
-    emails.unreadMessages({ name: "A", count: 1, from: "an employer", ...urls }),
-    emails.unreadMessages({ name: "A", count: 3, from: "a candidate", ...urls }),
     emails.unreadOffer({ name: "A", ...urls }),
   ]) {
     const r = renderEmail(c);
     assert.ok(!/\b15\s*min|minutes/i.test(r.text + r.html), r.subject);
   }
-  assert.match(renderEmail(emails.unreadMessages({ name: "A", count: 2, from: "an employer", url: "https://example.com/m", settingsUrl: "https://example.com/s" })).text, /because you have unread messages on Findtern/);
 });
 
 test("production with PUBLIC_ORIGIN unset: building any template never throws (they run after the write has committed)", () => {
@@ -145,10 +140,9 @@ test("production with PUBLIC_ORIGIN unset: building any template never throws (t
   }
 });
 
-test("the notification-settings address in the unread mails is a link in the html and still a full URL in the text", () => {
+test("the notification-settings address in the unread offer mail is a link in the html and still a full URL in the text", () => {
   const settingsUrl = "https://example.com/intern/settings#notifications";
   for (const c of [
-    emails.unreadMessages({ name: "A", count: 2, from: "an employer", url: "https://example.com/m", settingsUrl }),
     emails.unreadOffer({ name: "A", url: "https://example.com/p", settingsUrl }),
   ]) {
     const { html, text } = renderEmail(c);

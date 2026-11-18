@@ -14,7 +14,7 @@ function routes(dir: string): string[] {
   );
 }
 
-/** A concrete URL for a route file: api/threads/[id]/read/route.ts -> /api/threads/x/read */
+/** A concrete URL for a route file: api/timesheets/[id]/route.ts -> /api/timesheets/x */
 const urlOf = (f: string) => "/api/" + relative(API, f).replace(/\/?route\.ts$/, "").replace(/\[[^\]]+\]/g, "x");
 
 test("every API an unpaid intern is refused at the proxy also re-checks in the route (a second line, not just the proxy)", () => {
@@ -24,13 +24,13 @@ test("every API an unpaid intern is refused at the proxy also re-checks in the r
     if (!isLockedApi(urlOf(f))) continue;
     const src = readFileSync(f, "utf8");
     // Only routes an intern session can reach: roles list names "intern", or the route reads the session itself
-    // (threads and the offer letter are shared by both parties).
-    const reachableByIntern = /roles:\s*\[[^\]]*"intern"/.test(src) || /\/threads|offer-letter/.test(urlOf(f));
+    // (the offer letter is shared by both parties).
+    const reachableByIntern = /roles:\s*\[[^\]]*"intern"/.test(src) || /offer-letter/.test(urlOf(f));
     if (!reachableByIntern) continue;
     checked++;
     if (!/internLockResponse\(/.test(src)) missing.push(relative(API, f));
   }
-  assert.ok(checked >= 10, `expected to check the locked intern routes, checked ${checked}`);
+  assert.ok(checked >= 7, `expected to check the locked intern routes, checked ${checked}`);
   assert.deepEqual(missing, []);
 });
 

@@ -21,7 +21,6 @@ import type { PlaceOfSupply } from "@/lib/gst";
 import { offerBreakdown, offerPlace } from "@/lib/offer-breakdown";
 import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
 import { DetailRow, Pill } from "@/components/app/primitives";
-import { MessageButton } from "@/components/app/message-button";
 import { ProposalAvatar } from "@/components/employer/proposal-avatar";
 import { avatarUrl } from "@/lib/employer-pool";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
@@ -34,7 +33,6 @@ import { CgpaNotice, ExpiredNotice } from "@/components/employer/proposal-detail
 import { proposalCgpaGate } from "@/lib/cgpa-verification";
 import { hasOpenOrderFor } from "@/lib/payments";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
-import { TAKEN_DOWN_EXPLAIN, TAKEN_DOWN_SHORT } from "@/components/employer/takedown-ui";
 import { offerTimeline } from "@/components/employer/proposal-timeline";
 import { MeetingRulesList } from "@/components/employer/meeting-rules";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
@@ -309,15 +307,6 @@ export default async function EmployerProposalDetail({
               Send a new proposal
             </Link>
           ) : null}
-          <div className="max-sm:[&_button]:w-full">
-            {projectDown ? (
-              <button type="button" disabled aria-disabled="true" title={TAKEN_DOWN_EXPLAIN} tabIndex={-1} className={buttonClass({ variant: "outline", className: "max-sm:w-full" })}>
-                Message unavailable: {TAKEN_DOWN_SHORT}
-              </button>
-            ) : (
-              <MessageButton proposalId={proposal.id} counterpartId={proposal.internId} />
-            )}
-          </div>
         </div>
       </header>
 

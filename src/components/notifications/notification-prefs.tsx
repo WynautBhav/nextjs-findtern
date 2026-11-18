@@ -13,10 +13,10 @@ const COPY: Record<"intern" | "employer", { key: Key; title: string; help: strin
   intern: [
     {
       key: "emailMessages",
-      title: "Email me about messages and offers I haven't seen",
-      help: "If a message or an updated proposal sits unread for 15 minutes, we send one email with a link. Never while you're online.",
-      on: "You'll get an email if a message or proposal update goes unread.",
-      off: "No reminder emails for unread messages or proposal updates. They still show in the app, and new proposals and offers are still emailed.",
+      title: "Email me about proposal updates I haven't seen",
+      help: "If an updated proposal sits unread for 15 minutes, we send one email with a link. Never while you're online.",
+      on: "You'll get an email if a proposal update goes unread.",
+      off: "No reminder emails for unread proposal updates. They still show in the app, and new proposals and offers are still emailed.",
     },
     {
       key: "pushMessages",
@@ -27,13 +27,6 @@ const COPY: Record<"intern" | "employer", { key: Key; title: string; help: strin
     },
   ],
   employer: [
-    {
-      key: "emailMessages",
-      title: "Email me about messages I haven't seen",
-      help: "If a candidate's message sits unread for 15 minutes, we send one email with a link. Never while you're online.",
-      on: "You'll get an email if a message goes unread.",
-      off: "No emails for unread messages. They still show in the app.",
-    },
     {
       key: "pushMessages",
       title: "Tips and reminders",

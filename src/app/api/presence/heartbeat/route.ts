@@ -3,11 +3,11 @@ import { sql } from "drizzle-orm";
 
 import { requireMutation } from "@/lib/guards-mutation";
 import { getDb, schema } from "@/lib/db";
-import { heartbeatLimiter } from "@/lib/messaging/store";
+import { heartbeatLimiter } from "@/lib/heartbeat-limit";
 
 export const dynamic = "force-dynamic";
 
-/** Any signed-in role, every 30 s while a tab is visible. Online is computed on read (lib/messaging/logic.ts). */
+/** Any signed-in role, every 30 s while a tab is visible. Online is computed on read (lib/presence-logic.ts). */
 export async function POST(req: Request) {
   const guard = await requireMutation({ req, roles: ["intern", "employer", "admin", "college"] });
   if (!guard.ok) return guard.response;

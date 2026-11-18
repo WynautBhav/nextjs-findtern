@@ -10,7 +10,6 @@ import {
   ClipboardCheck,
   House,
   LayoutList,
-  MessageSquare,
   ReceiptIndianRupee,
   ScrollText,
   Settings2,
@@ -19,7 +18,7 @@ import {
 import { ConsoleShell, type ConsoleNavItem } from "@/components/layout/console-shell";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
-import { MessagingLive } from "@/components/messaging";
+import { PresenceHeartbeat } from "@/components/app/presence-heartbeat";
 import { TermsGate } from "@/components/app/terms-gate";
 import { ToastProvider } from "@/components/app/toast";
 import { CollegeLive } from "@/components/intern/college-live";
@@ -43,38 +42,33 @@ export const metadata = { title: "Findtern" };
  * Navigation follows the stage: someone whose first offer is sitting unread
  * doesn't need Timesheets in front of them, and someone three weeks into a
  * role doesn't need Offers. The stage is derived from the rows, never
- * stored, so it can't disagree with the data. These five are also the phone
- * tab bar, so Messages is one of them at every stage (a company that sent an
- * offer is waiting on a reply); everything else sits under "More".
+ * stored, so it can't disagree with the data. These are also the phone
+ * tab bar; everything else sits under "More".
  */
 const STAGE_NAV: Record<Stage, ConsoleNavItem[]> = {
   seeking: [
     { href: "/intern/dashboard", label: "Home", icon: <House /> },
     { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
-    { href: "/intern/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
     { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 /> },
   ],
   working: [
     { href: "/intern/dashboard", label: "Home", icon: <House /> },
     { href: "/intern/timesheets", label: "Timesheets", icon: <LayoutList /> },
     { href: "/intern/earnings", label: "Stipend", icon: <ReceiptIndianRupee /> },
-    { href: "/intern/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
     { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 /> },
   ],
 };
 
-/** The tab bar before payment: the three open entries first, then two locked ones, Offers and Messages (the rest sit under More). */
+/** The tab bar before payment: the three open entries first, then Offers, locked (the rest sit under More). */
 const LOCKED_STAGE_NAV: ConsoleNavItem[] = [
   { href: "/intern/dashboard", label: "Home", icon: <House /> },
   { href: "/intern/documents", label: "Documents", icon: <BadgeCheck /> },
   { href: "/intern/profile", label: "Your profile", icon: <CircleUserRound /> },
   { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
-  { href: "/intern/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
 ];
 
 const MORE_NAV: ConsoleNavItem[] = [
   { href: "/intern/proposals", label: "Offers", icon: <BriefcaseBusiness /> },
-  { href: "/intern/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
   { href: "/intern/interviews", label: "Interviews", icon: <CalendarCheck2 /> },
   { href: "/intern/record", label: "Record", icon: <ScrollText /> },
   { href: "/intern/timesheets", label: "Timesheets", icon: <LayoutList /> },
@@ -164,9 +158,9 @@ export default async function InternLayout({ children }: { children: React.React
     // Open under the payment lock, closed only until the profile is complete: lock it. The href stays, so every entry
     // has its own link; the page sends the intern to onboarding.
     if (precomplete && (i.href === "/intern/documents" || i.href === "/intern/profile")) {
-      return { ...i, locked: true, lockedNote: PRECOMPLETE_LOCK_TEXT, liveUnread: false };
+      return { ...i, locked: true, lockedNote: PRECOMPLETE_LOCK_TEXT };
     }
-    return isNavLocked(i.href, !lockedNav) ? { ...i, href: lockedHref(i.href), locked: true, liveUnread: false } : i;
+    return isNavLocked(i.href, !lockedNav) ? { ...i, href: lockedHref(i.href), locked: true } : i;
   };
   const main = mainSource.map((item) => ({
     ...lock(item),
@@ -209,8 +203,7 @@ export default async function InternLayout({ children }: { children: React.React
         />
       ) : null}
       {liveDrive ? <DismissedGuard store="session" storageKey={driveBannerKey(liveDrive.id)} name="drive" /> : null}
-      {/* Messages are locked until payment: the live feed reads /api/threads, which is refused too. */}
-      {lockedNav ? null : <MessagingLive />}
+      {lockedNav ? null : <PresenceHeartbeat />}
       {children}
       <TermsGate role="intern" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>

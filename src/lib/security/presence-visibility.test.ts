@@ -3,7 +3,6 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
-import { shapeEvent } from "../realtime/events.ts";
 import { presenceText, presenceView } from "../presence-logic.ts";
 import { visibilityBody } from "../presence-input.ts";
 
@@ -26,15 +25,8 @@ describe("hidden candidates never leak last seen", () => {
     }
   });
 
-  it("presence.changed and other SSE frames carry no presence", () => {
-    const frame = shapeEvent({ id: 9, type: "presence.changed", payload: { userId: "intern-1", lastSeenAt: hidden.lastSeenAt, online: true } });
-    assert.ok(!/lastSeen|online|intern-1/.test(frame), frame);
-    const msg = shapeEvent({ id: 10, type: "message.new", payload: { threadId: "t", counterpartOnline: true, nested: { last_seen_at: "x" } } });
-    assert.ok(!/online|last_seen/i.test(msg), msg);
-  });
-
   it("the presence queries select last_seen_at behind the show_activity CASE", () => {
-    for (const f of ["lib/presence.ts", "lib/messaging/store.ts"]) {
+    for (const f of ["lib/presence.ts"]) {
       const s = read(f);
       assert.match(s, /CASE WHEN \$\{\w+\.showActivity\} THEN \$\{\w+\.lastSeenAt\} ELSE NULL END/, f);
       assert.doesNotMatch(s, /\.select\(\)\s*\.from\((schema\.)?(up|p|schema\.userPresence)\)/, `${f} selects every presence column`);
@@ -44,25 +36,13 @@ describe("hidden candidates never leak last seen", () => {
   it("no employer-facing screen or API serializes a raw last-seen timestamp", () => {
     // The drive page reads college_presence only to compute a boolean, which it blanks for hidden students.
     const allow = new Set([join("app", "employer", "drives", "[id]", "page.tsx")]);
-    const offenders = ["app/employer", "app/api/employer", "app/api/threads", "components/employer", "components/messaging", "app/api/realtime"]
+    const offenders = ["app/employer", "app/api/employer", "components/employer"]
       .flatMap(walk)
       .filter((f) => !allow.has(f) && /last_?seen/i.test(read(f)));
     assert.deepEqual(offenders, []);
     const drive = read(join("app", "employer", "drives", "[id]", "page.tsx"));
     assert.match(drive, /showActivity, false/);
     assert.match(drive, /online: !hidingIds\.has\(s\.userId\)/);
-  });
-
-  it("a candidate's thread list never receives an employer's last-seen (server-side, not just hidden in the UI)", () => {
-    const store = read("lib/messaging/store.ts");
-    assert.match(store, /role === "employer"\s*\?/, "the timestamp query is chosen by viewer role");
-    assert.match(store, /localtimestamp - make_interval/, "intern side: only timestamps inside the online window are selected");
-    assert.match(store, /threadPresence\(role,/);
-  });
-
-  it("the threads route and the realtime stream apply the same rules (store.listThreads, shapeEvent)", () => {
-    assert.match(read("app/api/threads/route.ts"), /listThreads\(/);
-    assert.match(read("app/api/realtime/stream/route.ts"), /shapeEvent\(r\)/);
   });
 });
 

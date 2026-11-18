@@ -53,7 +53,6 @@ const ALLOW = [
   ["intern/onboarding/preview-step.tsx", "No skills yet", "field fallback in a block that carries its own Edit button"],
   ["intern/interviews/page.tsx", "No written feedback yet", "detail string on an interview status"],
   ["intern/stipend/payment-ledger.tsx", "No reference yet", "reference text in a ledger row"],
-  ["messaging/thread-list.tsx", "No messages yet", "last-message preview inside a conversation row"],
   ["college/drive-builder.tsx", "No branches recorded yet", "inline hint beside the branch chips in a form"],
 ];
 

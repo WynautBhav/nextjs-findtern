@@ -220,18 +220,6 @@ const INTERNAL_REASON = "This is an internal alert from the Findtern platform.";
 const hi = (name: string) => `Hi ${name || "there"},`;
 
 export const emails = {
-  /** Sent once per thread when messages sit unread. Generic on purpose: no sender name, no message text. */
-  unreadMessages: (o: { name: string; count: number; from: "an employer" | "a candidate"; url: string; settingsUrl: string }): EmailContent => ({
-    subject: o.count === 1 ? "You have an unread message on Findtern" : `You have ${o.count} unread messages on Findtern`,
-    preheader: `${o.count === 1 ? "A message is" : `${o.count} messages are`} waiting for you.`,
-    heading: o.count === 1 ? "You have an unread message" : "You have unread messages",
-    greeting: hi(o.name),
-    lines: [`You have ${o.count === 1 ? "1 unread message" : `${o.count} unread messages`} from ${o.from} on Findtern.`],
-    status: "Waiting for your reply",
-    cta: { label: "Open messages", url: o.url },
-    reason: `You’re getting this because you have unread messages on Findtern. Turn these emails off in your notification settings: ${o.settingsUrl}`,
-  }),
-
   /** Sent once per proposal when an update sits unread. Generic: the company stays hidden until a hire. */
   unreadOffer: (o: { name: string; url: string; settingsUrl: string }): EmailContent => ({
     subject: "Your Findtern proposal has an update",
