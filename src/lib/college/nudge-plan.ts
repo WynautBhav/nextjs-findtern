@@ -9,8 +9,6 @@ import type { EmailContent } from "../emails";
 export const NUDGE_KINDS = ["online", "offer", "interview"] as const;
 export type NudgeKind = (typeof NUDGE_KINDS)[number];
 export const NUDGE_COOLDOWN_MS = 10 * 60_000;
-/** The drive-day "come online" nudge goes out by the hundred: at most one EMAIL per student per 3 hours. */
-export const NUDGE_ONLINE_EMAIL_WINDOW_MS = 3 * 3_600_000;
 
 const COPY: Record<NudgeKind, (college: string) => { title: string; message: string; url: string }> = {
   online: (c) => ({
@@ -30,20 +28,14 @@ const COPY: Record<NudgeKind, (college: string) => { title: string; message: str
   }),
 };
 
-/** How far back sendNudge must look for the last nudge of this kind. */
-export function nudgeLookbackMs(kind: NudgeKind): number {
-  return kind === "online" ? NUDGE_ONLINE_EMAIL_WINDOW_MS : NUDGE_COOLDOWN_MS;
-}
-
 export type NudgePlan =
   | { cooldown: true }
   | { cooldown: false; copy: { title: string; message: string; url: string }; email: EmailContent | undefined };
 
 /**
- * `lastSameKindAt`: this student's most recent nudge of this kind (null if none within nudgeLookbackMs).
+ * `lastSameKindAt`: this student's most recent nudge of this kind (null if none within NUDGE_COOLDOWN_MS).
  * `link`: absolute URL for a path, or null when PUBLIC_ORIGIN is unset (then no email at all).
- * Inside the cooldown nothing is sent. Online nudges inside the 3-hour email window still get the bell and
- * push but no second email; offer and interview chases always email.
+ * Inside the cooldown nothing is sent. Past it, every kind gets bell, push and email (when `link` yields a URL).
  */
 export function planNudge(input: {
   kind: NudgeKind;
@@ -57,9 +49,8 @@ export function planNudge(input: {
   if (age < NUDGE_COOLDOWN_MS) return { cooldown: true };
   const copy = COPY[kind](input.collegeName);
   const url = input.link(copy.url);
-  const emailDue = kind !== "online" || age >= NUDGE_ONLINE_EMAIL_WINDOW_MS;
   const email: EmailContent | undefined =
-    url === null || !emailDue
+    url === null
       ? undefined
       : { subject: copy.title, heading: copy.title, greeting: "Hi,", lines: [copy.message], cta: { label: "Open Findtern", url } };
   return { cooldown: false, copy, email };

@@ -1,9 +1,9 @@
 import { and, desc, eq, gt } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { notify } from "@/lib/notify";
+import { notifyDetailed } from "@/lib/notify";
 import { linkTo } from "@/lib/origin";
-import { NUDGE_KINDS, nudgeLookbackMs, planNudge, type NudgeKind } from "./nudge-plan";
+import { NUDGE_COOLDOWN_MS, NUDGE_KINDS, planNudge, type NudgeKind } from "./nudge-plan";
 import { sendPush } from "./push";
 
 export { NUDGE_KINDS };
@@ -25,7 +25,7 @@ export async function sendNudge(input: {
       and(
         eq(schema.collegeNudges.userId, input.userId),
         eq(schema.collegeNudges.kind, input.kind),
-        gt(schema.collegeNudges.createdAt, new Date(now.getTime() - nudgeLookbackMs(input.kind))),
+        gt(schema.collegeNudges.createdAt, new Date(now.getTime() - NUDGE_COOLDOWN_MS)),
       ),
     )
     .orderBy(desc(schema.collegeNudges.createdAt))
@@ -41,8 +41,9 @@ export async function sendNudge(input: {
   });
   const { copy, email } = plan;
   // The nudge row is committed: with no PUBLIC_ORIGIN the student gets the bell and push, not an email.
-  // An online nudge emails at most once per 3 hours per student (planNudge); notify still applies the student's email preference.
-  const inApp = await notify({
+  // Every nudge past the 10-minute cooldown emails; notify still applies the student's email preference.
+  // `emailed` is true only when SMTP accepted the mail.
+  const { emailed } = await notifyDetailed({
     to: { type: "intern", id: input.userId },
     type: `college_nudge_${input.kind}`,
     title: copy.title,
@@ -51,8 +52,8 @@ export async function sendNudge(input: {
     email,
   }).catch((err) => {
     console.error("[nudge] notify failed", err);
-    return false;
+    return { inApp: false, emailed: false };
   });
   const pushed = await sendPush(input.userId, { title: copy.title, body: copy.message, url: copy.url, tag: `nudge-${input.kind}` }).catch(() => 0);
-  return { ok: true, pushed: pushed > 0, emailed: inApp && email !== undefined };
+  return { ok: true, pushed: pushed > 0, emailed };
 }

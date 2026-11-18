@@ -22,6 +22,11 @@ export function mailMode(): "log" | "send" {
   return process.env.NODE_ENV === "production" ? "send" : "log";
 }
 
+/** True when every SMTP setting a real send needs is present (log mode ignores them). */
+export function smtpConfigured(): boolean {
+  return ["SMTP_FROM", "SMTP_HOST", "SMTP_USER", "SMTP_PASS"].every((k) => (process.env[k] ?? "").trim() !== "");
+}
+
 export type MailResult = { ok: true; mode: "log" | "send" } | { ok: false; error: string };
 
 export async function sendSmtpMail(opts: {

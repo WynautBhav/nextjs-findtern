@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireCollegeMutation } from "@/lib/college/guard";
 import { NUDGE_KINDS, sendNudge } from "@/lib/college/nudge";
 import { studentsForCollegeAdmin } from "@/lib/college/scope";
+import { mailMode, smtpConfigured } from "@/lib/mailer";
 
 const bodySchema = z.object({
   kind: z.enum(NUDGE_KINDS),
@@ -48,9 +49,14 @@ export async function POST(req: Request) {
       } else skipped++;
     }
   }
-  // `pushed`: reached a phone right now. `emailed`: how many were handed to email (an online nudge is
-  // emailed at most once per student per 3 hours, so a repeat is bell and push only; a student who
-  // switched email off is still counted). The rest see it in Findtern. A number, so the console's
-  // truthy check (`body.emailed`) keeps working.
+  if (emailed === 0 && sent > 0) {
+    const mode = mailMode();
+    if (mode === "log" || !smtpConfigured()) {
+      console.warn(`[nudge] ${sent} nudged, 0 emailed: ${mode === "log" ? "MAIL_MODE=log (mail is only logged)" : "SMTP is not configured"}`);
+    }
+  }
+  // `pushed`: reached a phone right now. `emailed`: how many emails SMTP actually accepted (not students
+  // with email switched off, no PUBLIC_ORIGIN, no address, MAIL_MODE=log or a send failure). The rest see
+  // it in Findtern. A number, so the console's truthy check (`body.emailed`) keeps working.
   return NextResponse.json({ sent, pushed, skipped, emailed });
 }
