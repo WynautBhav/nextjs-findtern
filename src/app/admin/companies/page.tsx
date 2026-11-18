@@ -1,3 +1,4 @@
+import { activeAccountSql } from "@/lib/admin/account-views";
 import { and, asc, count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { Download } from "lucide-react";
 
@@ -57,7 +58,7 @@ export default async function AdminCompaniesPage({
     ),
     // The internal "admin" and AI-interview employers are not companies.
     realEmployers(),
-    params.status ? eq(schema.employers.isActive, params.status === "active") : undefined,
+    params.status ? sql`${activeAccountSql(schema.employers.isActive)} = ${params.status === "active"}` : undefined,
     // Legacy status: Complete = onboarded (first project created), Pending = not yet.
     params.setup === "complete" ? eq(schema.employers.onboardingCompleted, true) : undefined,
     params.setup === "incomplete" ? eq(schema.employers.onboardingCompleted, false) : undefined,
@@ -100,7 +101,7 @@ export default async function AdminCompaniesPage({
           gstNumber: schema.employers.gstNumber,
           onboardingCompleted: schema.employers.onboardingCompleted,
           internationalFteStatus: schema.employers.internationalFteStatus,
-          isActive: schema.employers.isActive,
+          isActive: activeAccountSql(schema.employers.isActive).mapWith(Boolean),
           createdAt: schema.employers.createdAt,
           projectCount,
           proposalCount,

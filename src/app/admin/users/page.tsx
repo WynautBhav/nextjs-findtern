@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Download } from "lucide-react";
 
 import { getSession } from "@/lib/auth";
+import { accountViews } from "@/lib/admin/account-views";
 import { allows } from "@/lib/admin/permissions";
 import { flattenParams, parsePageRequest, toPage, toQueryString } from "@/lib/admin/params";
 import { loadAccounts, USER_SORTS, type AccountRow, type UserSort } from "@/lib/admin/users-list";
@@ -102,12 +103,8 @@ export default async function AdminUsersPage({
   // The account type is a set of views, not a facet: tabs with the unfiltered counts.
   const roleHref = (role: string) => `/admin/users${toQueryString({ ...params, role, page: "" })}`;
   const kinds = data.byKind;
-  const views: AdminTabItem[] = [
-    { key: "", label: "Everyone", count: kinds.intern + kinds.employer + (showStaff ? kinds.admin : 0), href: roleHref("") },
-    { key: "intern", label: "Candidates", count: kinds.intern, href: roleHref("intern") },
-    { key: "employer", label: "Companies", count: kinds.employer, href: roleHref("employer") },
-    ...(showStaff ? [{ key: "admin", label: "Staff", count: kinds.admin, href: roleHref("admin") }] : []),
-  ];
+  // "Everyone" is built from the same counts as the other tabs, so the four always add up.
+  const views: AdminTabItem[] = accountViews(kinds, showStaff).map((v) => ({ key: v.key, label: v.label, count: v.count, href: roleHref(v.key) }));
   const activeRole = views.some((v) => v.key === params.role) ? (params.role ?? "") : "";
 
   const columns: Column<AccountRow>[] = [
