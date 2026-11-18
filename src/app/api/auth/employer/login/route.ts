@@ -5,7 +5,7 @@ import { z } from "zod";
 import { accountDisabledBody } from "@/lib/account-disabled";
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
-import { verifyPassword, needsRehash, hashPassword } from "@/lib/security/password";
+import { verifyPasswordOrDummy, needsRehash, hashPassword } from "@/lib/security/password";
 import { limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
 
 const bodySchema = z.object({
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     .where(sql`lower(${schema.employers.companyEmail}) = ${parsed.data.email}`)
     .limit(1);
 
-  if (!employer || !(await verifyPassword(parsed.data.password, employer.password))) {
+  if (!(await verifyPasswordOrDummy(parsed.data.password, employer?.password)) || !employer) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
   if (!employer.emailVerified) {
