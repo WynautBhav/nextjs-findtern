@@ -61,7 +61,7 @@ export function LinkActions(props: {
         <ShareLink url={url} {...props} />
       ) : !props.revoked ? (
         // Only a fingerprint of the link is stored, so it can't be shown again.
-        <p className="text-sm text-ink-600">
+        <p className="text-sm text-ink-700">
           The link was shown once, when it was made, and can&apos;t be shown again. If you&apos;ve lost it, issue a new one.
         </p>
       ) : null}
@@ -75,7 +75,7 @@ export function LinkActions(props: {
               cancel();
             }
           }}
-          className="rounded-apple-md border border-ink-200 bg-ink-50 p-4"
+          className="rounded-lg border border-ink-200 bg-surface-raised p-4"
         >
           <p className="text-sm text-ink-800">{consequence}</p>
           <div className="mt-3 flex flex-wrap gap-2">

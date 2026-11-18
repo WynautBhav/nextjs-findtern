@@ -24,7 +24,7 @@ export function NudgeButton({
   kind: Kind;
   label?: string;
   size?: "sm" | "xs";
-  /** The one thing to do on the screen (Nudge all during a live drive): amber. */
+  /** The one action on a board (Nudge all during a live drive): a firmer outline, never louder than the count it acts on. */
   emphasis?: boolean;
   className?: string;
 }) {
@@ -73,20 +73,20 @@ export function NudgeButton({
         onClick={send}
         disabled={state === "sending" || done || userIds.length === 0}
         className={cn(
-          "apple-spring apple-pressable inline-flex items-center gap-1.5 rounded-apple-sm border font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-default",
-          size === "sm" ? "min-h-11 px-3 text-sm" : "min-h-11 px-2.5 text-xs",
+          "inline-flex items-center gap-1.5 rounded-md border font-medium transition-colors duration-[var(--motion-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 disabled:cursor-default",
+          size === "sm" ? "min-h-10 px-3 text-sm max-lg:min-h-11" : "min-h-10 px-2.5 text-xs max-lg:min-h-11",
           done
-            ? "border-brand-200 bg-brand-50 text-brand-800"
+            ? "border-brand-100 bg-brand-100 text-brand-900"
             : emphasis
-              ? "border-transparent bg-accent text-brand-950 shadow-sm hover:bg-accent-600 hover:text-white [&_svg]:text-current"
-              : "border-ink-200 bg-white text-ink-800 shadow-2xs hover:border-ink-300 hover:bg-ink-50",
+              ? "border-ink-900 bg-surface-raised text-ink-900 hover:bg-ink-900 hover:text-paper"
+              : "border-ink-300 bg-surface-raised text-ink-800 hover:border-ink-900 hover:bg-ink-100",
           className,
         )}
       >
-        {done ? <Check className="size-3.5" aria-hidden /> : <BellRing className="size-3.5 text-brand-700" aria-hidden />}
+        {done ? <Check className="size-3.5" aria-hidden /> : <BellRing className="size-3.5" aria-hidden />}
         {state === "sending" ? "Sending…" : done ? "Nudged" : label}
       </button>
-      <span role="status" aria-live="polite" className={cn("text-xs", state === "error" ? "text-danger" : "text-text-subtle")}>
+      <span role="status" aria-live="polite" className={cn("text-xs", state === "error" ? "text-danger" : "text-ink-600")}>
         {note}
       </span>
     </span>

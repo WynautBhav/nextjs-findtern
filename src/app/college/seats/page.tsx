@@ -1,6 +1,9 @@
 import { desc, eq } from "drizzle-orm";
 
-import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { DataTable } from "@/components/app/data-table";
+import { Section } from "@/components/app/stat";
+import { CopyText } from "@/components/college/copy-text";
 import { InvoiceDownload } from "@/components/college/invoice-download";
 import { seatInvoiceInput } from "@/lib/college/seat-invoice";
 import { requireCollegeContext } from "@/lib/college/scope";
@@ -30,45 +33,64 @@ export default async function SeatsPage() {
   const visible = batches.filter((b) => b.status !== "void");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <PageHead title="Seats" lede="Each seat waives one student's AI interview fee." />
       {seat && !hasDriveOrder ? (
-        <Surface className="p-5">
-          <p className="text-sm text-text-subtle">Legacy code (read-only). Existing students keep using it.</p>
-          <code className="select-all font-mono text-xl font-semibold tracking-widest">{seat.code}</code>
-          <p className="nums mt-1 text-sm text-text-subtle">
-            {seat.used} used · {seat.cap ?? "unlimited"} total · {seat.cap === null ? "unlimited" : Math.max(0, seat.cap - seat.used)} left
+        <Section title="Legacy seat code" hint="Read-only. Existing students keep using it.">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+            <code className="select-all break-all font-mono text-2xl font-semibold text-ink-900">{seat.code}</code>
+            <CopyText text={seat.code} label="Copy code" />
+          </div>
+          <p className="nums mt-3 text-sm text-ink-700">
+            {seat.used} used · {seat.cap ?? "unlimited"} total{seat.cap === null ? "" : ` · ${Math.max(0, seat.cap - seat.used)} left`}
           </p>
-        </Surface>
+        </Section>
       ) : null}
-      <Surface className="divide-y divide-ink-200/80">
-        {visible.length === 0 ? (
-          <EmptyScene
-            compact
-            title="No seat batches"
-            body="A batch appears here when your college buys seats, with its invoice once it is paid."
-            who="Findtern - adds a batch when your college buys seats"
-          />
-        ) : (
-          visible.map((b) => (
-            <div key={b.id} className="flex flex-wrap items-start justify-between gap-3 p-4">
-              <div className="min-w-0">
-                <p className="font-medium">{b.seats} seats · {money(b.amountMinor)}</p>
-                <p className="text-sm text-text-subtle">{formatDate(b.paidAt ?? b.createdAt)} · {b.status === "paid" ? `Paid · Invoice ${b.invoiceNumber}` : "Awaiting payment"}</p>
-                {b.status === "pending" && seller.bank ? (
-                  <p className="mt-1 text-sm">Pay {money(b.amountMinor)} to Findtern: {seller.bank.bankName}, a/c {seller.bank.accountNumber}, IFSC {seller.bank.ifsc}</p>
-                ) : null}
-              </div>
-              {b.status === "paid" ? (
-                <InvoiceDownload
-                  html={taxInvoiceHtml(seatInvoiceInput(b, ctx.college, seller))}
-                  fileName={`Invoice-${b.invoiceNumber}.pdf`}
-                />
-              ) : null}
-            </div>
-          ))
-        )}
-      </Surface>
+      <Section title="Seat batches">
+        <DataTable
+          caption="Seat batches"
+          rows={visible}
+          rowKey={(b) => b.id}
+          empty={
+            <EmptyScene
+              compact
+              title="No seat batches"
+              body="A batch appears here when your college buys seats, with its invoice once it is paid."
+              who="Findtern - adds a batch when your college buys seats"
+            />
+          }
+          columns={[
+            {
+              key: "batch",
+              header: "Batch",
+              primary: true,
+              cell: (b) => (
+                <>
+                  <span className="block font-medium text-ink-900">{b.seats} seats</span>
+                  {b.status === "pending" && seller.bank ? (
+                    <span className="mt-1 block text-xs font-normal text-ink-700">
+                      Pay {money(b.amountMinor)} to Findtern: {seller.bank.bankName}, a/c {seller.bank.accountNumber}, IFSC {seller.bank.ifsc}
+                    </span>
+                  ) : null}
+                </>
+              ),
+            },
+            { key: "date", header: "Date", cell: (b) => formatDate(b.paidAt ?? b.createdAt) },
+            { key: "status", header: "Status", cell: (b) => (b.status === "paid" ? `Paid · Invoice ${b.invoiceNumber}` : "Awaiting payment") },
+            { key: "amt", header: "Amount", align: "right", cell: (b) => <span className="money">{money(b.amountMinor)}</span> },
+            {
+              key: "inv",
+              header: "Invoice",
+              cell: (b) =>
+                b.status === "paid" ? (
+                  <InvoiceDownload html={taxInvoiceHtml(seatInvoiceInput(b, ctx.college, seller))} fileName={`Invoice-${b.invoiceNumber}.pdf`} />
+                ) : (
+                  "—"
+                ),
+            },
+          ]}
+        />
+      </Section>
     </div>
   );
 }

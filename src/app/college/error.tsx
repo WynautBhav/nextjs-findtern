@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { RotateCw } from "lucide-react";
 
-import { Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { recoverFromChunkError, retryOrReload } from "@/lib/chunk-error";
 
@@ -19,15 +18,15 @@ export default function CollegeError({ error, retry }: { error: Error & { digest
   }, [error]);
 
   return (
-    <Surface role="alert" className="mx-auto mt-6 max-w-xl p-8 text-center sm:p-10">
-      <h1 className="text-balance text-2xl font-semibold tracking-[-0.02em] text-ink-900">
+    <div role="alert" className="mt-6 max-w-xl border-t border-ink-200 pt-8">
+      <h1 className="text-balance text-2xl font-semibold text-ink-900">
         This page could not load
       </h1>
-      <p className="mx-auto mt-3 max-w-md text-pretty text-[0.9375rem] leading-relaxed text-ink-600">
+      <p className="mt-3 max-w-md text-pretty text-base text-ink-700">
         Your data is safe; we just could not read it right now. Try again in a moment. If it keeps happening, write to
         communicate@findtern.in{error.digest ? ` and mention code ${error.digest}` : ""}.
       </p>
-      <div className="mt-7 flex flex-wrap justify-center gap-3">
+      <div className="mt-6 flex flex-wrap gap-3">
         <button type="button" onClick={() => retryOrReload(error, retry)} className={buttonClass({})}>
           <RotateCw className="size-4" aria-hidden />
           Try again
@@ -36,6 +35,6 @@ export default function CollegeError({ error, retry }: { error: Error & { digest
           Back to students
         </Link>
       </div>
-    </Surface>
+    </div>
   );
 }
