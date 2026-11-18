@@ -35,7 +35,7 @@ export default async function Growth({ window: w, now }: TabProps) {
         stats={[
           { label: "New interns", value: formatNumber(c.internSignups.window), note: `signed up ${label} · ${formatNumber(c.totalInterns)} in all`, accent: true, ...statDelta(c.internSignups.window, c.internSignups.prev) },
           { label: "New employers", value: formatNumber(c.employerSignups.window), note: `joined ${label} · ${formatNumber(c.totalEmployers)} in all`, ...statDelta(c.employerSignups.window, c.employerSignups.prev) },
-          { label: "Interns who paid", value: formatNumber(sp.paidInWindow), note: `paid the activation fee ${label} (any signup date; ${formatNumber(sp.signups)} signed up ${label})`, ...statDelta(c.internPayers.window, c.internPayers.prev) },
+          { label: "Interns who paid the activation fee", value: formatNumber(sp.paidInWindow), note: `paid the activation fee ${label} (any signup date; ${formatNumber(sp.signups)} signed up ${label})`, ...statDelta(c.internPayers.window, c.internPayers.prev) },
           { label: "Employers who paid", value: formatNumber(c.employerPayers.window), note: `placed a paid order ${label}`, ...statDelta(c.employerPayers.window, c.employerPayers.prev) },
         ]}
       />

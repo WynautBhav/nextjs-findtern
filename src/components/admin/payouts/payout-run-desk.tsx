@@ -67,7 +67,7 @@ function Hero({ run, today }: { run: PayoutRun; today: string }) {
   return (
     <article
       aria-labelledby="run-hero-title"
-      className="relative flex min-w-0 flex-col justify-between gap-5 overflow-hidden rounded-[var(--radius-admin-card)] bg-[color:var(--admin-tile)] bg-[linear-gradient(145deg,color-mix(in_srgb,var(--admin-tile),white_16%)_0%,var(--admin-tile)_65%)] p-[var(--admin-pad-panel)] text-[color:var(--admin-tile-ink)] shadow-[0_14px_30px_-16px_rgb(14_96_73/0.7)]"
+      className="relative flex min-w-0 flex-col justify-between gap-5 overflow-hidden rounded-[var(--radius-admin-card)] bg-[color:var(--admin-tile)] p-[var(--admin-pad-panel)] text-[color:var(--admin-tile-ink)]"
     >
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
         <div className="min-w-0">
@@ -86,7 +86,7 @@ function Hero({ run, today }: { run: PayoutRun; today: string }) {
           )}
           {run.overdue.count > 0 ? (
             <p className="nums mt-2 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning">
-              Overdue: {inr(run.overdue.amountMinor)} across {people(run.overdue.count)}
+              Already overdue, apart from this run: {inr(run.overdue.amountMinor)} across {people(run.overdue.count)}
             </p>
           ) : null}
         </div>
@@ -95,11 +95,11 @@ function Hero({ run, today }: { run: PayoutRun; today: string }) {
 
       <dl className="grid grid-cols-2 gap-3">
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wider">Due on the run</dt>
+          <dt className="text-xs font-medium">Due on the run</dt>
           <dd className="nums mt-1 text-[1.5rem] font-semibold leading-none tracking-[-0.02em] sm:text-[1.75rem]">{inr(amount)}</dd>
         </div>
         <div>
-          <dt className="text-xs font-medium uppercase tracking-wider">Interns to pay</dt>
+          <dt className="text-xs font-medium">Interns to pay</dt>
           <dd className="nums mt-1 text-[1.5rem] font-semibold leading-none tracking-[-0.02em] sm:text-[1.75rem]">{count.toLocaleString("en-IN")}</dd>
         </div>
       </dl>
@@ -113,11 +113,11 @@ function Standing({ run }: { run: PayoutRun }) {
   return (
     <dl className="grid w-full shrink-0 grid-cols-2 gap-x-4 gap-y-3 rounded-2xl bg-white/15 p-4 sm:w-auto sm:min-w-[15rem] sm:grid-cols-1">
       <div>
-        <dt className="text-xs font-medium uppercase tracking-wider">Paid out (all time)</dt>
+        <dt className="text-xs font-medium">Paid out (all time)</dt>
         <dd className="nums mt-1 text-[1.25rem] font-semibold leading-none tracking-[-0.02em] sm:text-[1.5rem]">{inr(run.flow.paidMinor)}</dd>
       </div>
       <div>
-        <dt className="text-xs font-medium uppercase tracking-wider">Still owed on placements</dt>
+        <dt className="text-xs font-medium">Still owed on placements</dt>
         <dd className="nums mt-1 text-[1.25rem] font-semibold leading-none tracking-[-0.02em] sm:text-[1.5rem]">{inr(run.flow.dueMinor)}</dd>
       </div>
     </dl>
@@ -210,7 +210,7 @@ function FlowStep({ step }: { step: { key: string; label: string; value: number;
   return (
     <li className={cn("flex min-w-0 items-center justify-between gap-3 rounded-2xl px-4 py-3", step.done ? "bg-[color:var(--admin-bar-tint)]" : "bg-[color:var(--admin-panel-2)]", step.warn && "ring-2 ring-accent-500/70")}>
       <div className="min-w-0">
-        <p className={cn("text-xs font-semibold uppercase tracking-wider", step.done ? "text-brand-900" : "text-text-subtle")}>{step.label}</p>
+        <p className={cn("text-xs font-semibold", step.done ? "text-brand-900" : "text-text-subtle")}>{step.label}</p>
         <p className={cn("mt-1 text-xs leading-4", step.done ? "text-brand-900" : "text-text-subtle")}>{step.hint}</p>
       </div>
       <p className="nums shrink-0 text-xl font-semibold leading-none tracking-[-0.02em] text-foreground sm:text-[1.5rem]">{inr(step.value)}</p>

@@ -1,3 +1,4 @@
+import { itemsAndFlags } from "./dashboard-queues-pure.ts";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
@@ -210,4 +211,17 @@ test("a failed queue adds nothing to the total and is flagged, not zero", () => 
   assert.equal(failed.count, 0);
   assert.deepEqual(failed.records, []);
   assert.deepEqual(totalOf([failed, group("messages", 4, 1)]), { total: 4, fresh: 1 });
+});
+
+test("itemsAndFlags: the calendar flag is a setting, not an item, so hero and panel agree", () => {
+  const groups = [
+    { count: 5, flag: false, error: false },
+    { count: 12, flag: false, error: false },
+    { count: 1, flag: true, error: false },
+  ];
+  assert.deepEqual(itemsAndFlags(groups, 18), { items: 17, flags: 1 });
+  // no active flag: total is items, unchanged
+  assert.deepEqual(itemsAndFlags([{ count: 4, flag: false }], 4), { items: 4, flags: 0 });
+  // a flag at zero (connected) or failed does not count
+  assert.deepEqual(itemsAndFlags([{ count: 0, flag: true }, { count: 3, flag: true, error: true }], 0), { items: 0, flags: 0 });
 });
