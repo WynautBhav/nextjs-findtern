@@ -45,6 +45,6 @@ test("post-commit call sites no longer use the throwing origin()", () => {
 });
 
 test("nudge and meeting emails are dropped, not thrown, when there is no link", () => {
-  assert.match(read("lib/college/nudge.ts"), /link === null\s*\? undefined/);
+  assert.match(read("lib/college/nudge-plan.ts"), /url === null\s*\|\|[^;]*\? undefined/);
   assert.match(read("lib/college/meetings.ts"), /dashboard === null \? undefined/);
 });
