@@ -33,11 +33,11 @@ export function PreviewStep({ values, update, errors, documents, onJumpStep }: S
         This is what employers see when they search: your photo, initials, city, score and up to 7 skills. Your name and contact details stay hidden until a company hires you.
       </p>
 
-      <article className="overflow-hidden rounded-apple-xl border border-ink-200/80 bg-white">
+      <article className="overflow-hidden rounded-lg border border-ink-200/80 bg-surface-raised">
         <header className="flex items-center gap-4 bg-brand-950 px-5 py-5 text-white sm:px-6">
           <RowAvatar photoUrl={photoSrc} initials={initialsOf(values.firstName ?? "", values.lastName ?? "")} />
           <div className="min-w-0">
-            <p className="[overflow-wrap:anywhere] text-lg font-semibold tracking-[-0.01em]">
+            <p className="[overflow-wrap:anywhere] text-lg font-semibold ">
               {[a.degree, a.branch].filter(Boolean).join(", ") || "Your degree"}
             </p>
             <p className="mt-0.5 flex flex-wrap items-center gap-x-2 text-sm text-on-dark-subtle">
@@ -70,8 +70,8 @@ export function PreviewStep({ values, update, errors, documents, onJumpStep }: S
                   <li key={q.id}>
                     <span className="font-medium text-ink-900">{q.name}</span>
                     {q.level ? ` ${q.level}` : ""}
-                    {q.issuer ? <span className="text-text-subtle"> · {q.issuer}</span> : null}
-                    {q.completionDate ? <span className="nums text-text-subtle"> · {dateLabel(q.completionDate)}</span> : q.status === "Pursuing" ? <span className="text-text-subtle"> · pursuing</span> : null}
+                    {q.issuer ? <span className="text-ink-700"> · {q.issuer}</span> : null}
+                    {q.completionDate ? <span className="nums text-ink-700"> · {dateLabel(q.completionDate)}</span> : q.status === "Pursuing" ? <span className="text-ink-700"> · pursuing</span> : null}
                   </li>
                 ))}
               </ul>
@@ -90,7 +90,7 @@ export function PreviewStep({ values, update, errors, documents, onJumpStep }: S
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-text-subtle">No skills yet.</p>
+              <p className="text-sm text-ink-700">No skills yet.</p>
             )}
           </Block>
 
@@ -103,11 +103,11 @@ export function PreviewStep({ values, update, errors, documents, onJumpStep }: S
                       <p className="min-w-0 text-base font-medium text-ink-900 [overflow-wrap:anywhere]">
                         {e.role || "Role"} <span className="font-normal text-ink-600">at {e.company || "-"}</span>
                       </p>
-                      <p className="nums text-xs text-text-subtle">
+                      <p className="nums text-xs text-ink-700">
                         {dateLabel(e.from)} – {e.current ? "Present" : dateLabel(e.to)}
                       </p>
                     </div>
-                    {e.type ? <p className="text-xs text-text-subtle [overflow-wrap:anywhere]">{e.type}</p> : null}
+                    {e.type ? <p className="text-xs text-ink-700 [overflow-wrap:anywhere]">{e.type}</p> : null}
                     {e.description ? <p className="mt-1 line-clamp-3 whitespace-pre-line text-sm leading-relaxed text-ink-700 [overflow-wrap:anywhere]">{e.description}</p> : null}
                   </li>
                 ))}
@@ -121,7 +121,7 @@ export function PreviewStep({ values, update, errors, documents, onJumpStep }: S
                 {languages.map((l) => (
                   <li key={l.id}>
                     <span className="font-medium">{l.language}</span>
-                    <span className="text-text-subtle"> · {l.level || "-"}</span>
+                    <span className="text-ink-700"> · {l.level || "-"}</span>
                   </li>
                 ))}
               </ul>
@@ -141,7 +141,7 @@ export function PreviewStep({ values, update, errors, documents, onJumpStep }: S
                 {activities.map((x) => (
                   <li key={x.id}>
                     <span className="font-medium">{x.activity}</span>
-                    {x.level ? <span className="text-text-subtle"> · {x.level}</span> : null}
+                    {x.level ? <span className="text-ink-700"> · {x.level}</span> : null}
                   </li>
                 ))}
               </ul>
@@ -154,7 +154,7 @@ export function PreviewStep({ values, update, errors, documents, onJumpStep }: S
         id="ndaAccepted"
         tabIndex={-1}
         className={cn(
-          "rounded-apple-xl border p-4 outline-none sm:p-5",
+          "rounded-lg border p-4 outline-none sm:p-5",
           errors.ndaAccepted ? "border-danger bg-danger-soft/40" : "border-ink-200/80 bg-ink-50/50",
         )}
       >
@@ -182,7 +182,7 @@ function Block({ title, onEdit, children, className }: { title: string; onEdit: 
         <button
           type="button"
           onClick={onEdit}
-          className="apple-spring -mr-2 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm px-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
+          className="apple-spring -mr-2 inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm font-medium text-brand-700 hover:bg-brand-50"
         >
           <Pencil className="size-3.5" aria-hidden />
           Edit

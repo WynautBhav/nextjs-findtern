@@ -124,7 +124,7 @@ export function ExperienceStep({ values, update, errors }: StepProps) {
         <AddButton onClick={add} disabled={full}>
           Add another
         </AddButton>
-        <p className="nums text-xs text-text-subtle">
+        <p className="nums text-xs text-ink-700">
           {experiences.length} of {MAX_EXPERIENCES}
         </p>
       </div>

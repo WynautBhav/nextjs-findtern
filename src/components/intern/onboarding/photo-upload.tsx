@@ -92,7 +92,7 @@ export function PhotoUpload({
     <div id="photo" tabIndex={-1} className="flex flex-col gap-4 outline-none sm:flex-row sm:items-center">
       <div
         className={cn(
-          "grid size-28 shrink-0 place-items-center overflow-hidden rounded-apple-xl border bg-ink-50",
+          "grid size-28 shrink-0 place-items-center overflow-hidden rounded-lg border bg-ink-50",
           shownError ? "border-danger" : "border-ink-200/80",
         )}
       >
@@ -136,7 +136,7 @@ export function PhotoUpload({
       </div>
 
       <Dialog open={Boolean(loaded)} onOpenChange={(open) => (open ? null : setLoaded(null))}>
-        <DialogContent className="max-w-[calc(100%-2rem)] gap-0 rounded-apple-xl border-ink-200/80 bg-white p-0 sm:max-w-md">
+        <DialogContent className="max-w-[calc(100%-2rem)] gap-0 rounded-lg border-ink-200/80 bg-surface-raised p-0 sm:max-w-md">
           {loaded ? (
             <Cropper
               source={loaded}
@@ -263,7 +263,7 @@ function Cropper({ source, onCancel, onDone }: { source: Loaded; onCancel: () =>
           // A trailing no-break space flips on each press so a repeated message is announced again.
           setMoved((prev) => (next.x === at.x && next.y === at.y ? `Photo is at the ${dir} edge` : `Photo moved ${dir}`) + (prev.endsWith("\u00a0") ? "" : "\u00a0"));
         }}
-        className="relative mx-auto mt-5 aspect-square w-full max-w-[18rem] cursor-grab touch-none select-none overflow-hidden rounded-apple-sm bg-ink-900 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:cursor-grabbing"
+        className="relative mx-auto mt-5 aspect-square w-full max-w-[18rem] cursor-grab touch-none select-none overflow-hidden rounded-md bg-ink-900 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:cursor-grabbing"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
