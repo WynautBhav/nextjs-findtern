@@ -5,6 +5,7 @@ import { Send } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
+import { kickProposalExpiry } from "@/lib/proposal-expiry-kick";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { avatarUrl } from "@/lib/employer-pool";
 import { initialsOf } from "@/lib/employer-candidates";
@@ -41,6 +42,7 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
   // The dashboard's figures and the hire strip open a tab here (?status=open|draft|verifying|accepted|viewonly|hired|closed).
   const initialStatus = tabFromParam((await searchParams).status);
   const session = await requireRole("employer");
+  kickProposalExpiry(); // queued after the response; throttled to one sweep per 10 minutes
   await requireEmployerSetup(session.uid);
   const employerId = session.uid;
 

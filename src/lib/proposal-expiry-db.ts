@@ -8,8 +8,8 @@ import { openOrderProposalIds } from "@/lib/employer-payable";
 import { employerNames, notify, resolveOfferNotifications } from "@/lib/notify";
 import { parseOffer, todayIst } from "@/lib/offer";
 import { tryPublicOrigin } from "@/lib/origin";
-import { expiryDedupeKey, expiryNotices, planExpiry } from "@/lib/proposal-expiry-plan";
-import { expiredStamp } from "@/lib/proposal-expiry";
+import { expiryDedupeKey, expiryNotices, noReplyDedupeKey, noReplyNotices, planExpiry } from "@/lib/proposal-expiry-plan";
+import { expiredStamp, noReplyStamp } from "@/lib/proposal-expiry";
 
 /**
  * The unpaid-offer sweeper: persists what the pay gate already enforces. An ACCEPTED offer that is not hired, has no open
@@ -33,6 +33,9 @@ import { expiredStamp } from "@/lib/proposal-expiry";
 const MAX_EMPLOYERS_PER_RUN = 200;
 const MAX_ROWS_PER_EMPLOYER = 200;
 const SYSTEM_ACTOR = "system";
+const MAX_NO_REPLY_ROWS = 500;
+const SWEEP_WINDOW_KEY = "proposal_expiry_sweep";
+export const SWEEP_WINDOW_MS = 10 * 60_000;
 
 export type ExpirySweep = { expired: number; employers: number; ids: string[]; notified: number };
 
@@ -139,4 +142,112 @@ export async function expireUnpaidPastStart(now: Date = new Date()): Promise<Exp
   const notified = await notifyExpired(all);
   if (all.length > 0) console.log(`[proposal-expiry] expired ${all.length} unpaid offer(s) for ${employers.length} employer(s)`);
   return { expired: all.length, employers: employers.length, ids: all.map((r) => r.id), notified };
+}
+
+/* ── Unanswered offers: sent / interview_scheduled past their start day ───────────────────────────── */
+
+export type NoReplySweep = { expired: number; ids: string[]; notified: number };
+
+/**
+ * Persists what every screen already computes (proposal-expiry.ts noReplyExpired): a `sent` or `interview_scheduled` offer whose
+ * start day has begun (00:00 IST) becomes status `expired`, `offerDetails.expiredReason = "no_reply_past_start"`. No payment is
+ * involved (only an accepted offer can have an order), so no employer lock is taken; the safety is the statement itself:
+ * one bounded UPDATE of at most MAX_NO_REPLY_ROWS ids picked `for update skip locked` (a row an intern is answering right now is
+ * left for the next run, never overwritten), with status, hired_at and the start day re-asserted in the UPDATE. Idempotent: a
+ * second run finds nothing. `lapsedAt` is stamped for `sent` only (noReplyStamp), so the guarantee miss count does not change.
+ * One strict audit row per expired offer in the same transaction; notices after commit, deduped per proposal and side.
+ */
+export async function expireNoReplyPastStart(now: Date = new Date()): Promise<NoReplySweep> {
+  const today = todayIst(now);
+  const nowIso = now.toISOString();
+  const stampSent = JSON.stringify(noReplyStamp("sent", now));
+  const stampBooked = JSON.stringify(noReplyStamp("interview_scheduled", now));
+  const rows = await getDb().transaction(async (tx) => {
+    const res = await tx.execute(sql`
+      update proposals p
+         set status = 'expired',
+             updated_at = ${nowIso}::timestamp,
+             offer_details = coalesce(p.offer_details, '{}'::jsonb) || (case when p.status = 'sent' then ${stampSent}::jsonb else ${stampBooked}::jsonb end)
+       where p.id in (
+               select id from proposals
+                where status in ('sent', 'interview_scheduled') and hired_at is null and ${startBegun(today)}
+                order by id limit ${MAX_NO_REPLY_ROWS} for update skip locked)
+         and p.status in ('sent', 'interview_scheduled') and p.hired_at is null
+      returning p.id, p.employer_id as "employerId", p.intern_id as "internId", p.project_id as "projectId", p.offer_details as "offerDetails", p.currency`);
+    const done = res.rows as Expired[];
+    for (const p of done) {
+      await recordAdminAudit(
+        tx,
+        {
+          adminId: SYSTEM_ACTOR,
+          action: "proposal.expired_no_reply",
+          targetType: "proposal",
+          targetId: p.id,
+          meta: { proposalId: p.id, employerId: p.employerId, internId: p.internId, startDate: String(p.offerDetails?.startDate ?? "").slice(0, 10), reason: "no_reply_past_start" },
+        },
+        { strict: true },
+      );
+    }
+    return done;
+  });
+  const notified = await notifyNoReply(rows);
+  if (rows.length > 0) console.log(`[proposal-expiry] expired ${rows.length} unanswered offer(s)`);
+  return { expired: rows.length, ids: rows.map((r) => r.id), notified };
+}
+
+async function notifyNoReply(rows: Expired[]): Promise<number> {
+  if (rows.length === 0) return 0;
+  const db = getDb();
+  const projects = await db
+    .select({ id: schema.projects.id, takenDownAt: schema.projects.takenDownAt })
+    .from(schema.projects)
+    .where(inArray(schema.projects.id, [...new Set(rows.map((r) => r.projectId))]));
+  const down = new Set(projects.filter((p) => p.takenDownAt).map((p) => p.id));
+  const users = await db
+    .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName })
+    .from(schema.users)
+    .where(inArray(schema.users.id, [...new Set(rows.map((r) => r.internId))]));
+  const initials = new Map(users.map((u) => [u.id, initialsOf((u.firstName || "").trim(), (u.lastName || "").trim())]));
+  const site = tryPublicOrigin();
+  let sent = 0;
+  for (const r of rows) {
+    try {
+      const offer = parseOffer(r.offerDetails, r.currency);
+      const n = noReplyNotices({ proposalId: r.id, role: offer.roleTitle || "your internship", initials: initials.get(r.internId) ?? "the candidate", startDate: offer.startDate ?? "", site, projectTakenDown: down.has(r.projectId) });
+      if (n.employer) {
+        await notify({ to: { type: "employer", id: r.employerId }, type: "proposal_expired_no_reply", title: n.employer.title, message: n.employer.message, data: n.employer.data, dedupeKey: noReplyDedupeKey(r.id, "employer"), email: n.employer.email });
+        sent++;
+      }
+      await notify({ to: { type: "intern", id: r.internId }, type: "proposal_expired_no_reply", title: n.intern.title, message: n.intern.message, data: n.intern.data, dedupeKey: noReplyDedupeKey(r.id, "intern") });
+      sent++;
+      await resolveOfferNotifications(r.internId, [r.id]);
+    } catch (err) {
+      console.error("[proposal-expiry] no-reply notify failed", r.id, err);
+    }
+  }
+  return sent;
+}
+
+/** Both sweeps. The unpaid result keeps its original top-level shape (the cron route's JSON and the e2e read it). */
+export async function sweepProposalExpiry(now: Date = new Date()): Promise<ExpirySweep & { noReply: NoReplySweep }> {
+  const unpaid = await expireUnpaidPastStart(now);
+  const noReply = await expireNoReplyPastStart(now);
+  return { ...unpaid, noReply };
+}
+
+/**
+ * The database half of the opportunistic sweep's guard: one row in platform_settings, claimed by a conditional upsert. Exactly one
+ * caller across all instances wins a window (the row's updated_at moves forward only when it is older than the window).
+ * `*_at` columns hold UTC without a zone, so the instants go in as UTC ISO text.
+ */
+export async function claimSweepWindow(now: Date = new Date(), windowMs: number = SWEEP_WINDOW_MS): Promise<boolean> {
+  const nowIso = now.toISOString();
+  const cutoff = new Date(now.getTime() - windowMs).toISOString();
+  const res = await getDb().execute(sql`
+    insert into platform_settings (key, value, updated_by, updated_at)
+    values (${SWEEP_WINDOW_KEY}, '{}'::jsonb, 'system', ${nowIso}::timestamp)
+    on conflict (key) do update set updated_at = ${nowIso}::timestamp
+      where platform_settings.updated_at is null or platform_settings.updated_at < ${cutoff}::timestamp
+    returning key`);
+  return res.rows.length > 0;
 }

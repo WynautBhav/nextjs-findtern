@@ -13,6 +13,7 @@ import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-po
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { rowSkills, skillBaseName } from "@/components/employer/candidate-view";
 import { requireEmployerSetup } from "@/lib/employer-setup";
+import { kickProposalExpiry } from "@/lib/proposal-expiry-kick";
 import { gated } from "@/lib/request-gate";
 import { isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { payableCheckout } from "@/lib/employer-payable";
@@ -105,6 +106,7 @@ type Fit = {
  */
 export default async function EmployerDashboard() {
   const session = await requireRole("employer");
+  kickProposalExpiry(); // queued after the response; throttled to one sweep per 10 minutes
   const employerId = session.uid;
   // No company profile or no project yet: finish onboarding first.
   // The setup check redirects if setup is unfinished; the load does not depend on it, so they run together.

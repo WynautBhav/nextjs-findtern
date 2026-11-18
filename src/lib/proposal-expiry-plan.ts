@@ -65,3 +65,43 @@ export function expiryNotices(i: ExpiryNoticeInput): { employer: (Notice & { ema
     },
   };
 }
+
+export const noReplyDedupeKey = (proposalId: string, who: "employer" | "intern") => `proposal_expired_no_reply:${proposalId}:${who}`;
+
+export type NoReplyNoticeInput = Omit<ExpiryNoticeInput, "company">;
+
+/**
+ * What each side is told when an unanswered offer passes its start date. The intern's text names no company (an employer is
+ * hidden from a candidate until it hires them); the employer sees initials only.
+ */
+export function noReplyNotices(i: NoReplyNoticeInput): ReturnType<typeof expiryNotices> {
+  const when = dayLabel(i.startDate);
+  const data = { proposalId: i.proposalId, reason: "no_reply_past_start", startDate: i.startDate };
+  const employerMessage = `Your offer to ${i.initials} for ${i.role} expired: there was no reply before its start date, ${when}. Send a new proposal if you still want to hire.`;
+  return {
+    employer: i.projectTakenDown
+      ? null
+      : {
+          title: "Offer expired with no reply",
+          message: employerMessage,
+          data,
+          email:
+            i.site === null
+              ? undefined
+              : {
+                  subject: `Your offer for ${i.role} expired with no reply`,
+                  heading: "Offer expired with no reply",
+                  greeting: "Hello,",
+                  lines: [employerMessage, "Nothing was charged. A new proposal needs the candidate to accept."],
+                  status: "Expired",
+                  tone: "wait",
+                  cta: { label: "Open your proposals", url: `${i.site}/employer/proposals` },
+                },
+        },
+    intern: {
+      title: "An offer expired",
+      message: `An offer for ${i.role} expired because it was not answered before its start date, ${when}. There is nothing you need to do.`,
+      data,
+    },
+  };
+}

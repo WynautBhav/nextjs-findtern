@@ -24,7 +24,7 @@ export function startSchedulers() {
 
   const reminders = run("interview reminders", interviewReminders);
   const daily = run("notification jobs", notificationJobs);
-  const expiry = run("unpaid offer expiry", async () => void (await import("@/lib/proposal-expiry-db").then((m) => m.expireUnpaidPastStart())));
+  const expiry = run("offer expiry", async () => void (await import("@/lib/proposal-expiry-db").then((m) => m.sweepProposalExpiry())));
   reminders();
   daily();
   expiry();
