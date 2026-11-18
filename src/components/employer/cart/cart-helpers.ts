@@ -1,4 +1,5 @@
 import { shortDateTime } from "@/lib/format";
+import type { JoinInput } from "@/lib/interview-join";
 import type { CandidateProfile } from "@/lib/employer-candidates";
 
 export type CartLineItem = {
@@ -22,6 +23,10 @@ export type CartLineItem = {
   /** The booked meeting's link while it is live, for "Join meeting". */
   meetingLink?: string | null;
   meetingInterviewId?: string | null;
+  /** The booking behind `meetingLink`, for the same Join window the intern sees. */
+  meetingJoin?: JoinInput | null;
+  /** ISO time on the server, with `meetingJoin`. */
+  meetingNow?: string | null;
 };
 
 /** The clock, read in event handlers only. */

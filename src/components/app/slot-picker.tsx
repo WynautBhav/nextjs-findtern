@@ -14,18 +14,16 @@
  * Join button behind the meeting rules gate (INW-10).
  */
 
-import { useEffect, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 
-import { MeetingJoinButton } from "@/components/intern/meeting-join";
+import { InterviewJoin } from "@/components/intern/interview-join";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatIst, formatIstClock, formatIstDay, IST_ZONE } from "@/lib/format";
+import type { JoinInput } from "@/lib/interview-join";
 import { cn } from "@/lib/utils";
-
-/** Join opens this long before the start; until then the card says when. */
-const JOIN_OPENS_MIN = 15;
 
 type Slot = { index: number; iso: string; passed?: boolean };
 
@@ -34,7 +32,8 @@ export function SlotPicker({
   slots,
   timezone,
   chosen,
-  meetUrl,
+  join,
+  serverNow,
 }: {
   interviewId: string;
   slots: Slot[];
@@ -42,7 +41,10 @@ export function SlotPicker({
   timezone: string | null;
   /** 1, 2 or 3 once they have answered. */
   chosen: number | null;
-  meetUrl: string | null;
+  /** The booking as the join rules read it (`serializeJoinInput`); the Join button and its reasons come from it. */
+  join: JoinInput;
+  /** ISO time on the server, so the first client render matches. */
+  serverNow: string;
 }) {
   const router = useRouter();
   // Two steps: select a time, then confirm it. Booking is final (the API
@@ -94,7 +96,7 @@ export function SlotPicker({
   if (bookedSlot) {
     return (
       <div>
-        <Booked iso={bookedSlot.iso} meetUrl={meetUrl} justBooked={Boolean(booked && !chosen)} />
+        <Booked iso={bookedSlot.iso} join={join} serverNow={serverNow} justBooked={Boolean(booked && !chosen)} />
         <ul className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="The three offered times">
           {slots.map((slot) => {
             const mine = slot.index === bookedSlot.index;
@@ -198,39 +200,26 @@ export function SlotPicker({
   );
 }
 
-/** The booked time, and Join from 15 minutes before it until the link closes. */
-function Booked({ iso, meetUrl, justBooked }: { iso: string; meetUrl: string | null; justBooked: boolean }) {
-  const opensAt = new Date(iso).getTime() - JOIN_OPENS_MIN * 60_000;
-  const [open, setOpen] = useState(false);
-  useEffect(() => {
-    // Read the clock after mount so server and client render the same.
-    const wait = opensAt - Date.now();
-    // setTimeout overflows past ~24.8 days; a page left open that long reloads anyway.
-    if (wait > 2 ** 31 - 1) return;
-    const t = window.setTimeout(() => setOpen(true), Math.max(0, wait));
-    return () => window.clearTimeout(t);
-  }, [opensAt]);
-
+/** The booked time, and Join from 15 minutes before it until the meeting window closes. */
+function Booked({ iso, join, serverNow, justBooked }: { iso: string; join: JoinInput; serverNow: string; justBooked: boolean }) {
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div className="min-w-0">
         <p className="nums text-sm font-medium text-ink-900">{formatIst(iso)}</p>
-        <p className="mt-1 text-pretty text-sm text-text-subtle">
-          {justBooked ? (
+        {justBooked ? (
+          <p className="mt-1 text-pretty text-sm text-text-subtle">
             <span className="inline-flex items-center gap-1.5 font-medium text-success">
               <Check className="size-4 shrink-0" aria-hidden />
               Booked. The company has your time and a calendar invite is on its way.
             </span>
-          ) : meetUrl && open ? (
-            "Join a few minutes early. The meeting rules open when you press Join."
-          ) : meetUrl ? (
-            `Join opens at ${formatIstClock(new Date(opensAt))}, ${JOIN_OPENS_MIN} minutes before the start.`
-          ) : (
-            "The meeting link appears here and in your email before the interview."
-          )}
-        </p>
+          </p>
+        ) : null}
       </div>
-      {meetUrl && open ? <MeetingJoinButton link={meetUrl} /> : null}
+      {justBooked ? null : (
+        <div className="sm:max-w-xs sm:shrink-0">
+          <InterviewJoin interview={join} serverNow={serverNow} />
+        </div>
+      )}
     </div>
   );
 }

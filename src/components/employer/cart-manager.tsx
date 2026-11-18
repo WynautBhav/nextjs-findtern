@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { RowMenu } from "@/components/app/row-menu";
 import { projectZone } from "@/lib/timezones";
+import type { JoinInput } from "@/lib/interview-join";
 
 export type CartLineItem = {
   id: string;
@@ -54,6 +55,8 @@ export type CartLineItem = {
   meetingLink?: string | null;
   /** The booked interview behind `meetingLink`; Join records through it. */
   meetingInterviewId?: string | null;
+  meetingJoin?: JoinInput | null;
+  meetingNow?: string | null;
 };
 
 export function CartManager({
@@ -519,7 +522,7 @@ function CartLine({
               Book meeting
             </button>
           ) : null}
-          {line.meetingLink ? <JoinMeetingButton link={line.meetingLink} interviewId={line.meetingInterviewId ?? undefined} variant="outline" /> : null}
+          {line.meetingLink ? <JoinMeetingButton link={line.meetingLink} interviewId={line.meetingInterviewId ?? undefined} variant="outline" interview={line.meetingJoin ?? undefined} serverNow={line.meetingNow ?? undefined} /> : null}
         </div>
 
         {/* Profile and remove stay in the menu (QA-124). */}

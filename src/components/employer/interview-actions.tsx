@@ -31,6 +31,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { isQuarterHourWall, suggestedSlots, type InterviewStage } from "@/lib/employer-interview-rules";
 import { MeetingSlots, type Slots } from "@/components/employer/meeting-slots";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
+import type { JoinInput } from "@/lib/interview-join";
 import { RowMenu } from "@/components/app/row-menu";
 import { fieldClass } from "@/components/employer/ui-tokens";
 import { cn } from "@/lib/utils";
@@ -48,7 +49,13 @@ export function InterviewActions({
   internHref,
   soon = false,
   takenDown = false,
+  joinInput,
+  serverNow,
 }: {
+  /** The booking as `joinState` reads it: Join is gated to 15 minutes before the start, like the intern's. */
+  joinInput?: JoinInput;
+  /** ISO time on the server, with `joinInput`. */
+  serverNow?: string;
   interviewId: string;
   /** The project is taken down by Findtern: no join, remind, reschedule, feedback or mark: view only. */
   takenDown?: boolean;
@@ -202,6 +209,9 @@ export function InterviewActions({
             interviewId={interviewId}
             link={meetingLink}
             ready={Boolean(meetingLink)}
+            interview={joinInput}
+            serverNow={serverNow}
+            zone={timezone}
             {...(soon ? {} : { variant: "outline" as const })}
           />
         ) : null}

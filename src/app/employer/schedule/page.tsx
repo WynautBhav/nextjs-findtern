@@ -30,6 +30,7 @@ import { projectZone } from "@/lib/timezones";
 import { ProposalTabs } from "@/components/employer/section-tabs";
 import { InterviewActions } from "@/components/employer/interview-actions";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
+import { serializeJoinInput } from "@/lib/interview-join";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
 
@@ -478,6 +479,8 @@ function ScheduleRow({ r, now, past }: { r: Row; now: number; past: boolean }) {
         canFeedback={!r.feedback && canLeaveFeedback(iv)}
         internHref={`/employer/intern/${encodeURIComponent(iv.internId)}`}
         takenDown={r.down}
+        joinInput={serializeJoinInput(iv)}
+        serverNow={new Date(now).toISOString()}
       />
     </li>
   );

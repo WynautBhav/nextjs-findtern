@@ -15,6 +15,37 @@ import {
 import { MeetingRulesList } from "@/components/employer/meeting-rules";
 import { csrfFetch } from "@/lib/client-fetch";
 import { normalizeMeetingLink } from "@/lib/employer-interview-rules";
+import type { JoinInput } from "@/lib/interview-join";
+import { useJoinState } from "@/components/app/use-join-state";
+
+type BaseProps = {
+  /** The link to open. With `interviewId` the server's answer wins and this only decides whether to show the button. */
+  link?: string | null;
+  /** The interview being joined; its join is recorded server-side. */
+  interviewId?: string;
+  /** False: the booking has no link yet. Shown disabled, with the reason. */
+  ready?: boolean;
+  /** Why it is disabled (default: the link is not ready). */
+  reason?: string;
+  size?: "sm" | "md";
+  variant?: "primary" | "outline";
+  block?: boolean;
+  label?: string;
+};
+
+type JoinMeetingButtonProps = BaseProps & {
+  /**
+   * The interview's booking. With it the button follows `joinState`, the same
+   * rule the intern sees: disabled with "Join opens at ... (in n min)" until
+   * 15 minutes before the start, the button until the window closes, nothing
+   * for a cancelled, completed or expired interview.
+   */
+  interview?: JoinInput;
+  /** ISO time on the server (first client render must match it). Required with `interview`. */
+  serverNow?: string;
+  /** The zone the opening time is shown in (the interview's own). */
+  zone?: string | null;
+};
 
 /**
  * "Join meeting" that first shows the mandatory conduct rules with a tick
@@ -28,26 +59,31 @@ import { normalizeMeetingLink } from "@/lib/employer-interview-rules";
  * With `ready={false}` (the booking has no link yet, bug sheet row 12) the
  * button is shown disabled with the reason beside it.
  */
-export function JoinMeetingButton({
+export function JoinMeetingButton({ interview, serverNow, zone, ...rest }: JoinMeetingButtonProps) {
+  if (interview && serverNow) return <GatedJoin interview={interview} serverNow={serverNow} zone={zone} {...rest} />;
+  return <BaseJoin {...rest} />;
+}
+
+function GatedJoin({ interview, serverNow, zone, ...rest }: BaseProps & { interview: JoinInput; serverNow: string; zone?: string | null }) {
+  const join = useJoinState(interview, serverNow, zone);
+  if (join.state === "unavailable") return null;
+  if (join.state === "ended") return <span className="text-xs text-text-subtle">{join.label}</span>;
+  if (join.state === "too_early") return <BaseJoin {...rest} ready={false} reason={join.label} link={null} />;
+  // No link yet: the employer is told it will be emailed (the company is who shares it).
+  if (join.state === "no_link") return <BaseJoin {...rest} ready={false} link={null} />;
+  return <BaseJoin {...rest} ready link={join.href} />;
+}
+
+function BaseJoin({
   link = null,
   interviewId,
   ready = true,
+  reason,
   size = "sm",
   variant = "primary",
   block = false,
   label = "Join meeting",
-}: {
-  /** The link to open. With `interviewId` the server's answer wins and this only decides whether to show the button. */
-  link?: string | null;
-  /** The interview being joined; its join is recorded server-side. */
-  interviewId?: string;
-  /** False: the booking has no link yet. Shown disabled, with the reason. */
-  ready?: boolean;
-  size?: "sm" | "md";
-  variant?: "primary" | "outline";
-  block?: boolean;
-  label?: string;
-}) {
+}: BaseProps) {
   const [open, setOpen] = useState(false);
   const [agreed, setAgreed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -63,7 +99,7 @@ export function JoinMeetingButton({
           {label}
         </button>
         <span id={`${id}-wait`} className="text-xs text-text-subtle">
-          Link not ready, we&apos;ll email it
+          {reason ?? "Link not ready, we'll email it"}
         </span>
       </span>
     );
