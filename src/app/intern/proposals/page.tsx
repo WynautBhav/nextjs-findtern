@@ -2,13 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-import {
-  EmptyScene,
-  PageHead,
-  Pill,
-  SectionHead,
-  Surface,
-} from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { OfferDecision } from "@/components/app/offer-decision";
 import { proposalStatus } from "@/components/app/status";
 import {
@@ -111,7 +105,7 @@ export default async function InternProposals({ searchParams }: { searchParams: 
           who="Companies come to you"
         />
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {tabs.length > 2 ? (
             <nav aria-label="Show offers" className="flex flex-wrap gap-x-3 border-b border-ink-200 sm:gap-x-6">
               {tabs.map((t) => {
@@ -123,7 +117,7 @@ export default async function InternProposals({ searchParams }: { searchParams: 
                     scroll={false}
                     aria-current={on ? "page" : undefined}
                     className={cn(
-                      "relative -mb-px inline-flex min-h-12 items-center justify-center gap-1 whitespace-nowrap text-[13px] outline-none transition-colors sm:gap-1.5 sm:text-sm",
+                      "relative -mb-px inline-flex min-h-12 items-center justify-center gap-1 whitespace-nowrap text-sm outline-none transition-colors sm:gap-1.5",
                       "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
                       "focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 focus-visible:ring-offset-4 focus-visible:ring-offset-transparent",
                       on ? "font-semibold text-ink-900 after:bg-brand-700" : "font-medium text-ink-600 hover:text-ink-900",
@@ -179,14 +173,15 @@ function Group({
   if (rows.length === 0) return null;
   return (
     <section aria-label={title}>
-      {showTitle ? <SectionHead title={`${title} · ${rows.length}`} hint={hint} /> : null}
-      <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
+      {showTitle ? <div className="mb-1 border-b border-ink-200 pb-2"><h2 className="font-display text-lg font-semibold text-ink-900">{title} · {rows.length}</h2>{hint ? <p className="mt-0.5 text-sm text-ink-600">{hint}</p> : null}</div> : null}
+      {/* A ledger: one ruled line per offer, the stipend in the right-hand column. */}
+      <ul className="divide-y divide-ink-200 border-y border-ink-200">
         {rows.map((row) => (
           <li key={row.p.id} className="min-w-0">
             <OfferRow {...row} decision={decision} compact={compact} hideStatus={showTitle ? undefined : title} />
           </li>
         ))}
-      </Surface>
+      </ul>
     </section>
   );
 }
@@ -215,14 +210,14 @@ function OfferRow({
   ].filter(Boolean);
 
   return (
-    <article className={cn("px-5 py-4 lg:px-6", compact && "py-3")}>
+    <article className={cn("py-5", compact && "py-3")}>
       {/* Role and status left, the stipend right: a long role wraps in its column and the figure stays put. */}
       <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 gap-y-1">
         <div className="min-w-0">
-          <h3 className={cn("text-pretty font-semibold text-ink-900", compact ? "text-sm" : "text-base")}>
+          <h3 className={cn("text-pretty font-display font-semibold text-ink-900", compact ? "text-base" : "text-lg")}>
             <Link
               href={href}
-              className="rounded-apple-sm hover:text-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 touch:inline-flex touch:min-h-11 touch:items-center"
+              className="rounded-md hover:text-brand-800 hover:underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 touch:inline-flex touch:min-h-11 touch:items-center"
             >
               {facts.role}
             </Link>
@@ -230,7 +225,7 @@ function OfferRow({
         </div>
         <p className="text-right">
           <span className="sr-only">{facts.moneyLabel}: </span>
-          <span className={cn("nums font-semibold text-ink-900", facts.amountIsText ? "text-sm font-medium text-ink-600" : compact ? "text-base text-ink-600" : "text-lg")}>
+          <span className={cn("nums font-semibold text-ink-900", facts.amountIsText ? "text-sm font-medium text-ink-600" : compact ? "text-base text-ink-600" : "font-display text-xl")}>
             {facts.amount}
           </span>
           {facts.per ? <span className="ml-1 text-sm text-text-subtle">{facts.per}</span> : null}
@@ -266,7 +261,7 @@ function OfferRow({
             aside={
               <Link
                 href={href}
-                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-apple-sm px-1 text-sm font-medium text-brand-700 hover:text-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:ml-1"
+                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-1 text-sm font-medium text-brand-700 hover:text-brand-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:ml-1"
               >
                 Read the full offer
                 <ArrowRight className="size-4" aria-hidden />

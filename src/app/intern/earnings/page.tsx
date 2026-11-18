@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { AlertCircle, ChevronDown, Landmark } from "lucide-react";
+import { AlertCircle, ChevronDown } from "lucide-react";
 
-import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
-import { Tile } from "@/components/app/tiles";
-import { MonthRail } from "@/components/intern/stipend/month-rail";
-import { STIPEND_CURRENCY, orderEngagements, stipendPlan, stipendTotalsLine, totalsByCurrency, type StipendPlan } from "@/components/intern/stipend/months";
+import { EmptyScene, PageHead } from "@/components/app/primitives";
+import { RollingNumber } from "@/components/app/rolling-number";
+import { LeadStat, Overview, Section, StatList, type StatItem } from "@/components/app/stat";
+import { bankOnFileOf, maskAccount } from "@/components/intern/bank-mask";
+import { StipendTimeline } from "@/components/intern/stipend/stipend-timeline";
+import { STIPEND_CURRENCY, orderEngagements, stipendPlan, totalsByCurrency, type StipendPlan } from "@/components/intern/stipend/months";
 import { PaymentLedger } from "@/components/intern/stipend/payment-ledger";
 import { buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
-import { bankPrompt, earningsEngagements, earningsView, type EngagementEarnings } from "@/lib/earnings-view";
+import { earningsEngagements, earningsView, type EngagementEarnings } from "@/lib/earnings-view";
 import { formatDate, formatMoney } from "@/lib/format";
 import { isHiredProposal } from "@/lib/hire-status";
 import { loadInternData } from "@/lib/intern-data";
@@ -24,6 +26,7 @@ export const metadata: Metadata = {
 const BANK_HREF = "/intern/settings#bank";
 /** Internships shown before "Show all N": the running and next ones, not sixteen identical rows. */
 const SHOWN = 6;
+const money = (n: number, currency: string = STIPEND_CURRENCY) => formatMoney(n, currency, { zeroLabel: false });
 
 /**
  * Stipend (legacy earnings.tsx).
@@ -53,10 +56,9 @@ export default async function InternEarnings() {
     const offer = waitingOnPayment[0];
     return (
       <div>
-        <PageHead title="Your stipend" lede="What has been paid to you, what is scheduled, and for which internship." />
+        <PageHead title="Stipend" />
         {offer ? (
           <EmptyScene
-            art
             title="Your stipend starts once the company pays"
             body={`You accepted the ${parseOffer(offer.offerDetails, offer.currency).roleTitle || "internship"} offer. Once the company completes the payment you are hired, and your stipend and its payment dates appear here.`}
             who="Waiting on the company"
@@ -64,7 +66,6 @@ export default async function InternEarnings() {
           />
         ) : (
           <EmptyScene
-            art
             title="No stipend yet"
             body="Your stipend starts when a company hires you. It is agreed in the offer, at a rate you see before you accept, and Findtern pays it to the bank account in your settings."
             who="Payment dates are set by the company, not by us"
@@ -76,137 +77,161 @@ export default async function InternEarnings() {
   }
 
   // Only the bank's name and the last 4 digits reach the page; the full number stays on the server.
-  const bank = (extra.bankDetails ?? extra.bank ?? {}) as { bankName?: unknown; accountNumber?: unknown };
-  const last4 = String(bank.accountNumber ?? "").replace(/\D/g, "").slice(-4);
-  const bankName = typeof bank.bankName === "string" ? bank.bankName.trim() : "";
+  const bank = bankOnFileOf(extra);
   const failed = totalsByCurrency(data.payouts, "failed");
-  const prompt = bankPrompt({ last4, paidCount: data.payouts.filter((p) => payoutState(p.status) === "paid").length });
+  const paidTotals = totalsByCurrency(data.payouts, "paid");
+  const paidCount = data.payouts.filter((p) => payoutState(p.status) === "paid").length;
   const soleId = cards.length === 1 ? cards[0].proposalId : null;
   const plans = cards.map((card) =>
     card.eligible && card.monthlyMinor
       ? stipendPlan({ months: card.months, monthlyMinor: card.monthlyMinor, startDate: card.startDate, payouts: stipends.filter((p) => belongsTo(p, card.proposalId, soleId)) })
       : null,
   );
-
   const rows = orderEngagements(cards.map((card, i) => ({ card, plan: plans[i], startDate: card.startDate, months: card.months })));
+
+  const planSum = (k: "pendingMinor" | "toComeMinor") => plans.reduce((n, p) => n + (p?.[k] ?? 0), 0);
+  const inrPaid = paidTotals.find((t) => t.currency === STIPEND_CURRENCY)?.minor ?? 0;
+  const scheduled = planSum("pendingMinor");
+  const toCome = planSum("toComeMinor");
+  const lastPaid = data.payouts
+    .filter((p) => payoutState(p.status) === "paid")
+    .map((p) => p.paidAt ?? p.createdAt)
+    .sort((a, b) => b.getTime() - a.getTime())[0];
+  const nextPayout = cards.map((c) => c.nextPayoutAt).filter((d): d is Date => d !== null).sort((a, b) => a.getTime() - b.getTime())[0];
+  const running = rows.find((r) => r.plan?.months.some((m) => m.current));
+  const monthly = running?.card.monthlyMinor ?? (rows.length === 1 ? rows[0].card.monthlyMinor : null);
+
+  // Lead: what has reached you. Before the first payment, what is coming instead (a zero is not a figure).
+  const lead =
+    inrPaid > 0 ? (
+      <LeadStat
+        label="Paid to you"
+        tone="brand"
+        value={
+          <>
+            ₹<RollingNumber value={inrPaid / 100} />
+          </>
+        }
+        note={
+          paidTotals.filter((t) => t.currency !== STIPEND_CURRENCY).length
+            ? `Rupees only. ${paidTotals.filter((t) => t.currency !== STIPEND_CURRENCY).map((t) => money(t.minor, t.currency)).join(" and ")} was paid in another currency and sits in the list below.`
+            : `${paidCount === 1 ? "One transfer" : `${paidCount} transfers`} received${lastPaid ? `, the latest on ${formatDate(lastPaid)}` : ""}.`
+        }
+      />
+    ) : (
+      <LeadStat
+        label="Not yet scheduled"
+        value={
+          <>
+            ₹<RollingNumber value={(scheduled + toCome) / 100} />
+          </>
+        }
+        note="Nothing has been paid yet. Each month is paid after it ends and its timesheet is approved."
+      />
+    );
+  const rest: StatItem[] = [
+    ...(inrPaid > 0 && scheduled > 0 ? [{ label: "Scheduled", value: money(scheduled), hint: nextPayout ? `Next on ${formatDate(nextPayout)}` : "Date to be set" }] : []),
+    ...(inrPaid > 0 && toCome > 0 ? [{ label: "Not yet scheduled", value: money(toCome), hint: "The months after the last scheduled one" }] : []),
+    ...(inrPaid === 0 && scheduled > 0 ? [{ label: "Scheduled", value: money(scheduled), hint: nextPayout ? `Next on ${formatDate(nextPayout)}` : "Date to be set" }] : []),
+    ...(monthly ? [{ label: "Each month", value: money(monthly) }] : []),
+  ];
+
+  const bankNotice =
+    paidCount > 0 && !bank.accountLast4
+      ? {
+          title: "Paid, but we have no bank account to match it to",
+          body: `${paidTotals.map((t) => money(t.minor, t.currency)).join(" and ")} is marked paid, and no bank account is saved in your settings. Add the account it went to so the payment can be checked. If it has not reached you, write to Findtern with the reference below.`,
+        }
+      : !bank.accountLast4
+        ? { title: "Add a bank account to be paid", body: "Your stipend goes to the account in your settings. Add it before the first month ends." }
+        : null;
 
   return (
     <div>
       <PageHead
-        title="Your stipend"
+        title="Stipend"
         lede={
-          last4 ? (
+          bank.accountLast4 ? (
             <>
-              Paid into your {bankName || "bank"} account ending <span className="nums font-medium text-ink-700">{last4}</span>.
+              Paid into your {bank.bankName || "bank"} account <span className="nums font-medium text-ink-700">{maskAccount(bank.accountLast4)}</span>.{" "}
+              <Link href={BANK_HREF} className="font-medium text-brand-800 underline underline-offset-4">
+                Change
+              </Link>
             </>
-          ) : (
-            prompt.text
-          )
-        }
-        action={
-          <Link href={BANK_HREF} className={buttonClass({ variant: "outline" })}>
-            <Landmark className="size-4" aria-hidden />
-            {prompt.button}
-          </Link>
+          ) : null
         }
       />
 
-      <div className="space-y-6 lg:space-y-8">
+      <div className="space-y-10">
         {failed.length > 0 ? (
-          <Surface role="alert" className="flex flex-col gap-4 border-danger/25 bg-danger-soft/50 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex gap-3">
-              <AlertCircle className="mt-1 size-5 shrink-0 text-danger" aria-hidden />
-              <div>
-                <p className="text-base font-medium text-ink-900">
-                  <span className="nums">{failed.map((f) => formatMoney(f.minor, f.currency, { zeroLabel: false })).join(" and ")}</span> did not go
-                  through
-                </p>
-                <p className="mt-1 text-pretty text-sm text-ink-700">
-                  A transfer to your bank failed. It is not counted as paid or scheduled. Check your bank details; Findtern&apos;s team follows up on
-                  every failed transfer.
-                </p>
-              </div>
-            </div>
-            <Link href={BANK_HREF} className={buttonClass({ variant: "outline", size: "md", className: "shrink-0" })}>
-              Check your bank details
-            </Link>
-          </Surface>
+          <Notice
+            tone="danger"
+            title={`${failed.map((f) => money(f.minor, f.currency)).join(" and ")} did not go through`}
+            body="A transfer to your bank failed. It is not counted as paid or scheduled. Check your bank details; Findtern's team follows up on every failed transfer."
+            action="Check your bank details"
+          />
         ) : null}
+        {bankNotice ? <Notice tone="signal" {...bankNotice} action="Add bank details" /> : null}
+
+        <Overview lead={lead} rest={rest.length ? <StatList items={rest} /> : null} />
 
         {cards.length === 0 ? (
-          <Tile title="Your internships">
-            <EmptyScene
-              title="No paid internship right now"
-              body="Payments from an earlier internship are listed here. A new stipend appears once a company hires you and completes the payment."
-              next={{ label: "See your offers", href: "/intern/proposals" }}
-              className="border-0 bg-transparent px-0 py-6"
-            />
-          </Tile>
+          <EmptyScene
+            title="No paid internship right now"
+            body="Payments from an earlier internship are listed below. A new stipend appears once a company hires you and completes the payment."
+            next={{ label: "See your offers", href: "/intern/proposals" }}
+          />
         ) : (
-          <section data-first-content aria-label="Your internships">
-            <SectionHead
-              title={cards.length === 1 ? "Your internship" : `Your internships (${cards.length})`}
-              hint={stipendTotalsLine(plans)}
-              className="mb-0 border-b border-ink-200/70 pb-3"
-            />
-            {/* Thin dividers, one row per internship: the employer candidate list's language. */}
-            <ul className="divide-y divide-ink-200/70 border-b border-ink-200/70">
-              {rows.slice(0, SHOWN).map(({ card, plan }) => (
-                <Engagement key={card.proposalId} card={card} plan={plan} />
-              ))}
-            </ul>
+          <section data-first-content aria-label="Month by month" className="space-y-10">
+            {rows.slice(0, SHOWN).map(({ card, plan }, i) => (
+              <Engagement key={card.proposalId} card={card} plan={plan} open={i === 0} />
+            ))}
             {rows.length > SHOWN ? (
               <details className="group">
-                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-md text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
-                  <span className="group-open:hidden">Show all {rows.length}</span>
+                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-md text-sm font-medium text-brand-800 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
+                  <span className="group-open:hidden">Show all {rows.length} internships</span>
                   <span className="hidden group-open:inline">Show fewer</span>
                   <ChevronDown className="size-4 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
                 </summary>
-                <ul className="divide-y divide-ink-200/70 border-t border-ink-200/70">
+                <div className="mt-6 space-y-10">
                   {rows.slice(SHOWN).map(({ card, plan }) => (
-                    <Engagement key={card.proposalId} card={card} plan={plan} />
+                    <Engagement key={card.proposalId} card={card} plan={plan} open={false} />
                   ))}
-                </ul>
+                </div>
               </details>
             ) : null}
           </section>
         )}
 
         {waitingOnPayment.length > 0 && cards.length > 0 ? (
-          <p className="text-pretty px-1 text-sm text-text-subtle">
-            {waitingOnPayment.length === 1 ? "One accepted offer is" : `${waitingOnPayment.length} accepted offers are`} waiting on the
-            company&apos;s payment. Its stipend appears here once they pay.
+          <p className="max-w-prose text-pretty text-sm text-ink-700">
+            {waitingOnPayment.length === 1 ? "One accepted offer is" : `${waitingOnPayment.length} accepted offers are`} waiting on the company&apos;s payment. Its
+            stipend appears here once they pay.
           </p>
         ) : null}
 
-        {data.payouts.length === 0 ? (
-          <Tile title="How payment works">
-            <ol className="space-y-3">
-              {[
-                "You mark your days on Timesheets and send each month to your manager.",
-                "Each month's stipend (score 6 and above) is paid after that month ends. Once the month is approved, Findtern schedules the payment. Its date shows here as soon as it is set.",
-                "Each payment carries a bank reference so you can match it against your statement.",
-                "It goes to the bank account in your settings, so keep those details right.",
-              ].map((line, i) => (
-                <li key={i} className="flex gap-3">
-                  <span className="nums grid size-6 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800">{i + 1}</span>
-                  <span className="text-pretty text-sm text-ink-700">{line}</span>
-                </li>
-              ))}
-            </ol>
-          </Tile>
-        ) : (
-          <section aria-labelledby="ledger-head">
-            <h2 id="ledger-head" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
-              Every payment
-            </h2>
-            <p className="mt-1 text-sm text-text-subtle">Newest first, in the currency it was paid in.</p>
-            <div className="mt-3 border-t border-ink-200/70">
-              <PaymentLedger payouts={data.payouts} />
-            </div>
-          </section>
-        )}
+        <Section title="Every payment" hint="Newest first. Match the reference against your bank statement.">
+          <PaymentLedger payouts={data.payouts} />
+        </Section>
       </div>
+    </div>
+  );
+}
+
+/** A real notice with its action beside it. Signal for something owed to you, danger for a failed transfer. */
+function Notice({ tone, title, body, action }: { tone: "signal" | "danger"; title: string; body: string; action: string }) {
+  return (
+    <div role={tone === "danger" ? "alert" : "status"} className="flex flex-col gap-4 rounded-lg border border-ink-300 bg-surface-raised p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-8">
+      <div className="flex min-w-0 gap-3">
+        <AlertCircle className={tone === "danger" ? "mt-0.5 size-5 shrink-0 text-danger" : "mt-0.5 size-5 shrink-0 text-signal"} aria-hidden />
+        <div className="min-w-0">
+          <h2 className="font-display text-lg font-semibold text-ink-900">{title}</h2>
+          <p className="mt-1 max-w-xl text-pretty text-sm text-ink-700">{body}</p>
+        </div>
+      </div>
+      <Link href={BANK_HREF} className={buttonClass({ variant: "primary", className: "shrink-0" })}>
+        {action}
+      </Link>
     </div>
   );
 }
@@ -218,84 +243,55 @@ function belongsTo(p: PayoutRow, proposalId: string, soleId: string | null): boo
   return pid ? pid === proposalId : proposalId === soleId;
 }
 
-function Engagement({ card, plan }: { card: EngagementEarnings; plan: StipendPlan | null }) {
-  const description = `${card.company} · ${card.months} month${card.months === 1 ? "" : "s"}${card.joiningDate ? ` from ${formatDate(card.joiningDate)}` : ""}`;
-  const title = (
-    <div className="min-w-0">
-      <Link
-        href={`/intern/proposals/${encodeURIComponent(card.proposalId)}`}
-        className="inline-flex min-h-11 items-center text-[15px] font-semibold text-ink-900 underline-offset-4 hover:text-brand-800 hover:underline sm:min-h-0"
-      >
-        {card.roleTitle}
-        <span className="sr-only">: open the offer</span>
-      </Link>
-      <p className="nums text-sm text-ink-600">{description}</p>
-    </div>
+function Engagement({ card, plan, open }: { card: EngagementEarnings; plan: StipendPlan | null; open: boolean }) {
+  const title = `${card.roleTitle} at ${card.company}`;
+  const hint = `${card.months} month${card.months === 1 ? "" : "s"}${card.joiningDate ? ` from ${formatDate(card.joiningDate).replace(/ /g, "\u00a0")}` : ""}`;
+  const offerLink = (
+    <Link href={`/intern/proposals/${encodeURIComponent(card.proposalId)}`} className="font-medium text-brand-800 underline-offset-4 hover:underline">
+      See the offer
+    </Link>
   );
 
   if (!plan) {
     return (
-      <li className="py-5">
-        {title}
-        <p className="mt-2 max-w-prose text-pretty text-sm text-text-subtle">
+      <Section title={title} hint={hint} action={offerLink}>
+        <p className="max-w-prose text-pretty text-sm text-ink-700">
           {!card.eligible
             ? "Candidates with a Findtern Score below 6 are not paid a stipend. A higher score makes later internships paid."
             : "The monthly stipend is not set on this offer, so there is nothing to track here yet."}
         </p>
-      </li>
+      </Section>
     );
   }
 
-  const pct = (n: number) => (plan.totalMinor > 0 ? `${(n / plan.totalMinor) * 100}%` : "0%");
-  const current = plan.months.some((m) => m.current);
+  const timeline = <StipendTimeline months={plan.months} monthlyMinor={card.monthlyMinor ?? 0} />;
+  const link = "font-medium text-brand-800 underline-offset-4 hover:underline";
   return (
-    <li className="py-5">
-      <div className="grid gap-x-6 gap-y-3 sm:grid-cols-[minmax(0,1fr)_15rem] sm:items-start">
-        {title}
-        <div className="sm:text-right">
-          {plan.paidMinor > 0 ? (
-            <>
-              <p className="nums text-sm text-ink-600">
-                <span className="text-base font-semibold text-ink-900">{formatMoney(plan.paidMinor, STIPEND_CURRENCY, { zeroLabel: false })}</span> paid of{" "}
-                {formatMoney(plan.totalMinor, STIPEND_CURRENCY, { zeroLabel: false })}
-              </p>
-              {/* Paid solid, scheduled lighter, the rest is the track. Decorative: the figures say it in words. */}
-              <div aria-hidden className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-ink-200">
-                <span className="h-full bg-brand-700" style={{ width: pct(plan.paidMinor) }} />
-                <span className="h-full bg-brand-300" style={{ width: pct(plan.pendingMinor) }} />
-              </div>
-            </>
-          ) : (
-            // Nothing paid yet: an empty bar says nothing, the amount to come does.
-            <>
-              <p className="nums text-base font-semibold text-ink-900">{formatMoney(plan.totalMinor, STIPEND_CURRENCY, { zeroLabel: false })}</p>
-              <p className="text-xs text-ink-600">to come</p>
-            </>
-          )}
+    <section>
+      <div className="mb-4 border-b border-ink-200 pb-3">
+        <h2 className="font-display text-lg font-semibold text-ink-900">{title}</h2>
+        <div className="mt-0.5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 text-sm">
+          <p className="nums text-ink-600">{hint ?? "\u00a0"}</p>
+          <p className="flex gap-5">
+            {offerLink}
+            <Link href={`/intern/timesheets?proposalId=${encodeURIComponent(card.proposalId)}`} className={link}>
+              Timesheets
+            </Link>
+          </p>
         </div>
       </div>
-      <details className="group mt-1">
-        <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-1.5 rounded-md py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
-          {/* One run of text, so a phone wraps it as a sentence, not as two columns. */}
-          <span>
-            <span className="font-medium text-primary group-hover:underline">Month by month</span>
-            <span className="nums text-ink-600">
-              {" "}
-              · {formatMoney(card.monthlyMinor ?? 0, STIPEND_CURRENCY, { zeroLabel: false })} a month{current ? ", running now" : ""}
-            </span>
-          </span>
-          <ChevronDown className="size-4 shrink-0 text-primary transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
-        </summary>
-        <div className="mt-3 grid max-w-2xl gap-3">
-          <MonthRail months={plan.months} monthlyMinor={card.monthlyMinor ?? 0} />
-          <Link
-            href={`/intern/timesheets?proposalId=${encodeURIComponent(card.proposalId)}`}
-            className="inline-flex min-h-11 w-fit items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
-          >
-            Timesheets for this internship
-          </Link>
-        </div>
-      </details>
-    </li>
+      {open ? (
+        timeline
+      ) : (
+        <details className="group">
+          <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-1.5 rounded-md text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
+            <span className="font-medium text-brand-800 group-hover:underline">Month by month</span>
+            <span className="nums text-ink-600">· {money(plan.paidMinor)} paid of {money(plan.totalMinor)}</span>
+            <ChevronDown className="size-4 shrink-0 text-brand-800 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
+          </summary>
+          <div className="mt-3">{timeline}</div>
+        </details>
+      )}
+    </section>
   );
 }

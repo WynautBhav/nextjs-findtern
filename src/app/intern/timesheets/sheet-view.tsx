@@ -1,5 +1,5 @@
-import { Pill, Surface, WaitingNote } from "@/components/app/primitives";
-import { STAT_ROW, StatTile } from "@/components/app/tiles";
+import { Pill, WaitingNote } from "@/components/app/primitives";
+import { LeadStat, Overview, StatList } from "@/components/app/stat";
 import { dayTone } from "@/components/intern/day-status";
 import { LEGACY_DAY_STATUSES, sheetHours } from "@/lib/employer-timesheets";
 import { formatDayLabel } from "@/lib/format";
@@ -32,19 +32,26 @@ export function SheetView({ sheet, backHref }: { sheet: TimesheetRow; backHref: 
 
   return (
     <div className="space-y-6">
-      {/* Key numbers on the shared stat row; Present is counted there, so its pill is not repeated below. */}
-      <div className={cn(STAT_ROW, "max-sm:[&>:only-child]:col-span-2")}>
-        <StatTile
-          label="Days present"
-          value={counts.Present ?? 0}
-          unit={`/${days.length}`}
-          meta={`${status === "approved" ? "Approved" : "Sent"} ${whenLabel((status === "approved" ? sheet.approvedAt : sheet.submittedAt) ?? sheet.createdAt)}`}
-        />
-        {hours > 0 ? <StatTile label="Hours logged" value={Number(hours.toFixed(1))} unit="h" index={1} /> : null}
-      </div>
+      {/* Statement header: the hours as the one lead figure, days and state as ruled lines. */}
+      <Overview
+        lead={
+          <LeadStat
+            label={status === "approved" ? "Hours approved" : "Hours logged"}
+            tone={status === "approved" ? "brand" : "ink"}
+            value={
+              <>
+                {Number(hours.toFixed(1))}
+                <span className="ml-1 text-lg font-medium text-ink-600">h</span>
+              </>
+            }
+            note={`${status === "approved" ? "Approved" : "Sent"} ${whenLabel((status === "approved" ? sheet.approvedAt : sheet.submittedAt) ?? sheet.createdAt)}`}
+          />
+        }
+        rest={<StatList items={[{ label: "Days present", value: `${counts.Present ?? 0} of ${days.length}` }]} />}
+      />
 
       {others.length > 0 || status === "submitted" ? (
-      <Surface className="p-5 sm:p-6">
+      <div className="space-y-5">
         {others.length > 0 ? (
           <ul className="flex flex-wrap gap-2" aria-label="Other days by status">
             {others.map((s) => (
@@ -57,25 +64,25 @@ export function SheetView({ sheet, backHref }: { sheet: TimesheetRow; backHref: 
           </ul>
         ) : null}
         {status === "submitted" ? (
-          <div className={cn("flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between", others.length > 0 && "mt-5 border-t border-ink-100 pt-5")}>
+          <div className={cn("flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between", others.length > 0 && "border-t border-ink-200 pt-5")}>
             <WaitingNote who="Your manager" typical="Reviews usually take about two working days, and you are notified either way." />
             <DeleteSheetButton timesheetId={sheet.id} withdraw redirectTo={backHref} size="md" />
           </div>
         ) : null}
-      </Surface>
+      </div>
       ) : null}
 
       {adjusted.length > 0 ? (
-        <Surface className="border-info/25 bg-info-soft/60 p-5">
+        <div className="rounded-lg bg-info-soft p-5">
           <p className="text-base font-semibold text-ink-900">
             Your manager changed {adjusted.length} day{adjusted.length === 1 ? "" : "s"}
           </p>
           <p className="mt-1 text-sm text-ink-700">Each one is marked below with what you had sent.</p>
-        </Surface>
+        </div>
       ) : null}
 
-      <Surface as="section" aria-label="Days of this period" className="overflow-hidden">
-        <ul className="divide-y divide-ink-100">
+      <section aria-label="Days of this period">
+        <ul className="divide-y divide-ink-200 border-y border-ink-200">
           {days.map((d) => {
             const parts = dayParts(d.date);
             const changed = d.sentAs !== null && d.sentAs !== d.status;
@@ -84,8 +91,8 @@ export function SheetView({ sheet, backHref }: { sheet: TimesheetRow; backHref: 
               <li
                 key={d.date}
                 className={cn(
-                  "flex flex-wrap items-center gap-x-4 gap-y-1.5 px-4 py-3.5 sm:px-5",
-                  changed && "bg-info-soft/40",
+                  "flex flex-wrap items-center gap-x-4 gap-y-1.5 py-3.5",
+                  changed && "bg-info-soft",
                 )}
               >
                 <p className="w-28 shrink-0 text-sm font-semibold text-ink-900">
@@ -108,13 +115,13 @@ export function SheetView({ sheet, backHref }: { sheet: TimesheetRow; backHref: 
             );
           })}
         </ul>
-      </Surface>
+      </section>
 
       {sheet.internNote || sheet.managerNote ? (
-        <Surface className="divide-y divide-ink-100 px-5">
+        <div className="divide-y divide-ink-200 border-y border-ink-200">
           {sheet.internNote ? <Note label="Your note" body={sheet.internNote} /> : null}
           {sheet.managerNote ? <Note label="Your manager's note" body={sheet.managerNote} /> : null}
-        </Surface>
+        </div>
       ) : null}
     </div>
   );
