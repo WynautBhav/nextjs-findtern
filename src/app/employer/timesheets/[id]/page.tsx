@@ -10,14 +10,14 @@ import { TimesheetDecision } from "@/components/employer/decision-button";
 import { TimesheetReview } from "@/components/employer/timesheet-review";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { canAccess } from "@/lib/security/guards";
-import { Avatar } from "@/components/app/avatar";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { dayDetails, formatDay, formatPeriod, unfilledDays } from "@/lib/employer-timesheets";
 import { periodDays } from "@/lib/timesheet-days";
-import { HeroPanel } from "@/components/employer/kit/hero-panel";
+import { RollingNumber } from "@/components/app/rolling-number";
+import { LeadStat, Overview, Section, StatList } from "@/components/app/stat";
 import { StatusPill } from "@/components/employer/timesheet-parts";
-import { DetailRow, SectionHead, Surface } from "@/components/app/primitives";
+import { DetailRow } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -50,8 +50,6 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
   if (!timesheet || !session || !canAccess(session, timesheet.employerId)) notFound();
 
   let name = "Intern";
-  let initials = "I";
-  let masked = true;
   let projectName: string | null = null;
   let down: { id: string; reason: string | null } | null = null;
   try {
@@ -68,11 +66,9 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
       const first = (row.firstName ?? "").trim();
       const last = (row.lastName ?? "").trim();
       const ini = initialsOf(first, last);
-      initials = ini === "?" ? "I" : ini;
       projectName = row.projectName ?? null;
       down = row.takenDownAt && row.projectId ? { id: row.projectId, reason: row.takenDownReason } : null;
       const unlocked = (await hiredInternIds(db, timesheet.employerId)).has(timesheet.internId);
-      masked = !unlocked;
       name = !unlocked && ini !== "?" ? `Candidate ${ini}` : displayNameOf({ id: timesheet.internId, fullName: `${first} ${last}`.trim() || "Intern", initials: ini }, unlocked);
     }
   } catch (err) {
@@ -90,12 +86,7 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
   const status = timesheet.status;
   const decided = status === "approved" || status === "rejected";
 
-  const totals: [string, number, string?][] = [
-    ["Present", present],
-    ["Hours", hours],
-    ["Absent", absent],
-    ["Off / holiday", off],
-  ];
+  const periodText = formatPeriod(timesheet.periodStart, timesheet.periodEnd);
 
   return (
     <div>
@@ -106,96 +97,103 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
       ) : null}
       <Link
         href="/employer/timesheets"
-        className="apple-spring mb-3 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm text-sm font-medium text-brand-700 hover:underline"
+        className="mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-medium text-brand-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700"
       >
         <ArrowLeft className="size-4" aria-hidden />
         All timesheets
       </Link>
 
-      <HeroPanel className="p-0 sm:p-0">
-        <div className="flex flex-wrap items-start justify-between gap-4 p-6 sm:p-8">
-          <div className="flex min-w-0 items-start gap-4">
-            <Avatar masked={masked} name={masked ? undefined : name} initials={initials} size="lg" />
-            <div className="min-w-0">
-              <h1 className="text-balance text-2xl font-medium tracking-[-0.02em] sm:text-3xl">{name}</h1>
-              <p className="nums mt-1 text-sm text-on-dark-subtle">
-                Timesheet for {formatPeriod(timesheet.periodStart, timesheet.periodEnd)}
-                {projectName ? ` · ${projectName}` : ""}
-              </p>
-            </div>
-          </div>
-          <StatusPill status={status} />
+      <header className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="text-balance font-display text-2xl font-semibold tracking-[-0.02em] text-ink-900">{name}</h1>
+          <p className="nums mt-1 text-base text-ink-700">
+            {periodText}
+            {projectName ? ` · ${projectName}` : ""}
+          </p>
         </div>
-        <dl className="grid grid-cols-2 border-t border-white/15 bg-black/10 sm:grid-cols-4">
-          {totals.map(([label, value], i) => (
-            <div
-              key={label}
-              className={[
-                "px-6 py-5 sm:px-8",
-                i % 2 === 1 ? "border-l border-white/15" : "",
-                i >= 2 ? "border-t border-white/15 sm:border-t-0" : "",
-                i === 2 ? "sm:border-l" : "",
-              ].join(" ")}
-            >
-              <dt className="text-[13px] text-on-dark-subtle">{label}</dt>
-              <dd className="nums mt-1 text-3xl font-light tracking-[-0.03em]">{value}</dd>
-            </div>
-          ))}
-        </dl>
-      </HeroPanel>
+        <StatusPill status={status} />
+      </header>
 
-      <div className="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_21rem]">
-        <Surface as="section" className="min-w-0 p-5 sm:p-6">
-          <SectionHead
-            title="Days"
-            hint={
-              unfilled
-                ? `${unfilled} day${unfilled === 1 ? " was" : "s were"} left empty. Worth asking about before you approve.`
-                : `${days.length} days, every one filled.`
+      <Overview
+        className="mt-8"
+        lead={
+          <LeadStat
+            label="Hours worked"
+            value={
+              <>
+                <RollingNumber value={hours} />
+                <span className="ml-1.5 font-sans text-lg font-medium tracking-normal text-ink-700">h</span>
+              </>
             }
+            note={`${present} day${present === 1 ? "" : "s"} present out of ${days.length}. Interns are paid on approved hours only.`}
+            tone={status === "approved" ? "brand" : "ink"}
           />
-          <TimesheetReview timesheetId={timesheet.id} days={days} editable={status !== "approved" && !down} />
-        </Surface>
+        }
+        rest={
+          <StatList
+            items={[
+              { label: "Days present", value: present },
+              ...(absent > 0 ? [{ label: "Absent", value: absent }] : []),
+              ...(off > 0 ? [{ label: "Fixed off or holiday", value: off }] : []),
+              ...(unfilled > 0 ? [{ label: "Days not filled", value: <span className="text-[#9a4a08]">{unfilled}</span> }] : []),
+            ]}
+          />
+        }
+      />
 
-        <aside className="min-w-0 space-y-4 xl:sticky xl:top-24 xl:self-start">
-          <Surface as="section" className="p-5">
-            <h2 className="text-base font-semibold text-ink-900">Decision</h2>
-            <div className="mt-3">
-              {down ? (
-                <p className="text-sm leading-relaxed text-ink-700">
-                  Taken down by Findtern: view only. This timesheet cannot be approved or sent back while the project is taken down. Use Contact admin above.
+      <div className="mt-10 grid gap-x-14 gap-y-10 xl:grid-cols-[minmax(0,1fr)_20rem]">
+        <Section
+          className="xl:order-1"
+          title="Days"
+          hint={
+            unfilled
+              ? `${unfilled} day${unfilled === 1 ? " was" : "s were"} left empty. Worth asking about before you approve.`
+              : `${days.length} days, every one filled.`
+          }
+        >
+          <TimesheetReview timesheetId={timesheet.id} days={days} editable={status !== "approved" && !down} />
+        </Section>
+
+        <aside className="min-w-0 space-y-8 xl:order-2 xl:sticky xl:top-24 xl:self-start">
+          <Section title="Decision">
+            {down ? (
+              <p className="text-sm leading-relaxed text-ink-700">
+                Taken down by Findtern: view only. This timesheet cannot be approved or sent back while the project is taken down. Use Contact admin above.
+              </p>
+            ) : status === "submitted" ? (
+              <>
+                <p className="mb-4 text-sm leading-relaxed text-ink-700">
+                  Approving covers <span className="nums font-semibold text-ink-900">{hours} hours</span> over <span className="nums font-semibold text-ink-900">{present} days</span> and locks them for billing. Sending back locks nothing: the intern corrects the days and sends it again.
                 </p>
-              ) : status === "submitted" ? (
                 <TimesheetDecision timesheetId={timesheet.id} unfilled={unfilled} />
-              ) : decided ? (
-                <p className="text-sm leading-relaxed text-ink-700">
-                  {status === "approved"
-                    ? `Approved on ${formatDay(timesheet.approvedAt)}. These days are locked for billing.`
-                    : `Sent back on ${formatDay(timesheet.rejectedAt)}. The intern corrects it and sends it again.`}
-                </p>
-              ) : (
-                <p className="text-sm leading-relaxed text-ink-700">
-                  Still with the intern. There is nothing to approve until they send it; you can adjust days meanwhile.
-                </p>
-              )}
-            </div>
+              </>
+            ) : decided ? (
+              <p className="text-sm leading-relaxed text-ink-700">
+                {status === "approved"
+                  ? `Approved on ${formatDay(timesheet.approvedAt)}. These days are locked for billing.`
+                  : `Sent back on ${formatDay(timesheet.rejectedAt)}. The intern corrects it and sends it again.`}
+              </p>
+            ) : (
+              <p className="text-sm leading-relaxed text-ink-700">
+                Still with the intern. There is nothing to approve until they send it; you can adjust days meanwhile.
+              </p>
+            )}
             {timesheet.managerNote ? (
-              <div className="mt-4 rounded-apple-md bg-ink-50 px-4 py-3">
-                <p className="text-sm font-medium text-text-subtle">Your note</p>
-                <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink-800">{timesheet.managerNote}</p>
+              <div className="mt-4 border-t border-ink-200 pt-3">
+                <p className="text-sm font-medium text-ink-900">Your note</p>
+                <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink-700">{timesheet.managerNote}</p>
               </div>
             ) : null}
-          </Surface>
+          </Section>
 
           {timesheet.internNote ? (
-            <Surface as="section" className="p-5">
-              <h2 className="text-base font-semibold text-ink-900">From the intern</h2>
-              <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-ink-700">{timesheet.internNote}</p>
-            </Surface>
+            <Section title="From the intern">
+              <p className="whitespace-pre-line text-sm leading-relaxed text-ink-700">{timesheet.internNote}</p>
+            </Section>
           ) : null}
 
-          <Surface as="section" className="px-5 pb-2 pt-4">
-            <dl className="divide-y divide-ink-100">
+          <section aria-label="Record">
+            <dl className="divide-y divide-ink-200 border-y border-ink-200">
               <DetailRow label="Sent" value={formatDay(timesheet.submittedAt)} mono />
               <DetailRow label="Approved" value={formatDay(timesheet.approvedAt)} mono />
               {timesheet.rejectedAt ? <DetailRow label="Sent back" value={formatDay(timesheet.rejectedAt)} mono /> : null}
@@ -203,29 +201,25 @@ export default async function EmployerTimesheetDetail({ params }: { params: Prom
             <a
               href={`/api/timesheets/${encodeURIComponent(timesheet.id)}/export`}
               download
-              className={buttonClass({ variant: "outline", size: "sm", block: true, className: "mb-3 mt-2" })}
+              className={buttonClass({ variant: "outline", size: "sm", block: true, className: "mt-3 min-h-11" })}
             >
               <Download className="size-4" aria-hidden />
               Export to Excel
             </a>
-          </Surface>
-
-          <div className="grid gap-2">
-            <Link
-              href={`/employer/intern/${encodeURIComponent(timesheet.internId)}`}
-              className="apple-spring flex min-h-11 items-center justify-between gap-2 rounded-apple-xl border border-dashed border-ink-200 px-5 py-3.5 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
-            >
-              {name}&apos;s profile
-              <ArrowUpRight className="size-4 text-ink-500" aria-hidden />
-            </Link>
-            <Link
-              href={`/employer/proposal/${encodeURIComponent(timesheet.proposalId)}`}
-              className="apple-spring flex min-h-11 items-center justify-between gap-2 rounded-apple-xl border border-dashed border-ink-200 px-5 py-3.5 text-sm font-medium text-ink-700 hover:border-brand-300 hover:bg-white"
-            >
-              The offer this bills against
-              <ArrowUpRight className="size-4 text-ink-500" aria-hidden />
-            </Link>
-          </div>
+            <ul className="mt-4 divide-y divide-ink-200 border-y border-ink-200 text-sm font-medium">
+              {[
+                [`${name}'s profile`, `/employer/intern/${encodeURIComponent(timesheet.internId)}`],
+                ["The offer this bills against", `/employer/proposal/${encodeURIComponent(timesheet.proposalId)}`],
+              ].map(([label, href]) => (
+                <li key={href}>
+                  <Link href={href} className="flex min-h-11 items-center justify-between gap-2 text-brand-800 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700">
+                    {label}
+                    <ArrowUpRight className="size-4 text-ink-600" aria-hidden />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </section>
         </aside>
       </div>
     </div>

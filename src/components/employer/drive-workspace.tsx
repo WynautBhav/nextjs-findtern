@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { EmptyScene, Surface } from "@/components/app/primitives";
+import { EmptyScene } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 import { CallsPanel } from "@/components/employer/drive/calls-panel";
 import { CandidateRow } from "@/components/employer/drive/candidate-row";
@@ -195,10 +195,10 @@ export function DriveWorkspace({
 
   if (locked) {
     return (
-      <Surface className="p-6" role="alert">
-        <p className="font-semibold text-ink-900">This drive is no longer open to you</p>
-        <p className="mt-1 text-sm text-ink-600">The drive has ended or the college closed its link. Reload to see the details.</p>
-      </Surface>
+      <div role="alert" className="border-t border-ink-300 py-6">
+        <p className="font-display text-lg font-semibold text-ink-900">This drive is no longer open to you</p>
+        <p className="mt-1 text-sm text-ink-700">The drive has ended or the college closed its link. Reload to see the details.</p>
+      </div>
     );
   }
 
@@ -206,8 +206,19 @@ export function DriveWorkspace({
   const onlineCount = candidates.filter((c) => c.online).length;
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
+    <div className="grid gap-x-12 gap-y-8 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
       <div className="min-w-0">
+        <div className="mb-6 flex flex-wrap items-end gap-x-10 gap-y-3">
+          <p className="nums font-display text-4xl font-semibold leading-none tracking-[-0.03em] text-ink-900">
+            {candidates.length}
+            <span className="ml-2 font-sans text-lg font-medium tracking-normal text-ink-700">{candidates.length === 1 ? "student" : "students"} in this drive</span>
+          </p>
+          {candidates.length > 0 ? (
+            <p className="nums text-sm text-ink-700">
+              {[shortlist.size ? `${shortlist.size} shortlisted` : null, onlineCount ? `${onlineCount} online now` : null, meetings.length ? `${meetings.length} ${meetings.length === 1 ? "call" : "calls"}` : null].filter(Boolean).join(" · ") || "Nothing shortlisted yet"}
+            </p>
+          ) : null}
+        </div>
         <FilterBar
           f={{ q, minScore, year, branch, onlyShortlisted, onlyOnline }}
           patch={(p) => {
@@ -237,35 +248,31 @@ export function DriveWorkspace({
         />
 
         {notice?.tone === "error" ? (
-          <p role="alert" className="mt-4 rounded-lg border border-danger/25 bg-danger-soft px-4 py-3 text-sm text-danger">
+          <p role="alert" className="mt-4 rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">
             {notice.text}
           </p>
         ) : null}
         {/* Always mounted, so a success is announced when it fills in. */}
-        <p role="status" className={notice?.tone === "ok" ? "mt-4 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-sm text-brand-800" : "sr-only"}>
+        <p role="status" className={notice?.tone === "ok" ? "mt-4 rounded-md bg-brand-100 px-4 py-3 text-sm text-brand-900" : "sr-only"}>
           {notice?.tone === "ok" ? notice.text : null}
         </p>
 
         {candidates.length === 0 ? (
-          <Surface className="mt-4 rounded-[24px]">
-            <EmptyScene
-              compact
-              title="No students in this drive yet"
-              body="Students appear here as they join Findtern and agree to be shown in drives."
-              who="The college - decides who is eligible"
-            />
-          </Surface>
+          <EmptyScene
+            className="mt-4"
+            title="No students in this drive yet"
+            body="Students appear here as they join Findtern and agree to be shown in drives. You will see them on this board without reloading the college's link."
+            next={{ label: "Browse all candidates", href: "/employer/candidates" }}
+            who="The college - decides who is eligible"
+          />
         ) : visible.length === 0 ? (
-          <Surface className="mt-4 rounded-[24px]">
-            <EmptyScene
-              compact
-              title="No students match these filters"
-              body="Loosen a filter or clear them to see everyone in the drive."
-            />
-          </Surface>
+          <EmptyScene
+            className="mt-4"
+            title="No students match these filters"
+            body="Loosen a filter or clear them to see everyone in the drive."
+          />
         ) : (
-          // One column beside the 20rem aside at xl: two left ~86px for the name next to Shortlist.
-          <ul className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+          <ul className="mt-2 border-t border-ink-300">
             {visible.map((c) => (
               <CandidateRow
                 key={c.id}
@@ -281,8 +288,8 @@ export function DriveWorkspace({
         )}
       </div>
 
-      <aside className="flex min-w-0 flex-col gap-4 xl:sticky xl:top-3">
-      <div className="flex flex-col gap-1 rounded-[24px] border border-ink-200/70 bg-white p-4 shadow-tile">
+      <aside className="flex min-w-0 flex-col gap-6 xl:sticky xl:top-24">
+      <div className="flex flex-col gap-1">
         <label htmlFor="manual-link" className="text-sm font-medium text-ink-900">
           Your own meeting link (optional)
         </label>
@@ -293,7 +300,7 @@ export function DriveWorkspace({
           value={manualLink}
           onChange={(e) => setManualLink(e.target.value)}
           placeholder="https://meet.google.com/… Leave empty to get one from Findtern"
-          className="min-h-11 w-full min-w-0 rounded-lg border border-ink-200 bg-white px-3 text-base text-ink-900 focus-visible:outline-2 focus-visible:outline-brand-600"
+          className="min-h-11 w-full min-w-0 rounded-md border border-ink-300 bg-surface-raised px-3 text-base text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 md:text-sm"
         />
       </div>
       <CallsPanel meetings={meetings} nameOf={nameOf} onCancel={cancelCall} headingRef={callsHeadingRef} />

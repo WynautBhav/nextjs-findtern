@@ -39,7 +39,7 @@ export const metadata: Metadata = {
 };
 
 /** The same heading size and spacing as the Candidates page. */
-const HEAD_CLASS = "mb-3 sm:mb-4 lg:mb-5 [&_h1]:text-[32px] [&_h1]:leading-10";
+const HEAD_CLASS = "mb-4 lg:mb-6";
 
 type Search = { ids?: string | string[]; project?: string | string[]; skills?: string | string[] };
 
@@ -261,12 +261,21 @@ export default async function CompareCandidates({ searchParams }: { searchParams
     leaders(scoreValues).size > 0 ||
     RATING_META.some((m) => leaders(candidates.map((c) => c.ratings[m.key])).size > 0);
   const anyPerHire = candidates.some((c) => (pricing.get(c.id)?.perHireMinor ?? 0) > 0);
+  // Rows that have a leader, and in how many of them each candidate leads: the one-glance answer to "who is ahead".
+  const leaderRows = [
+    requiredSkills.length > 0 ? leaders(fitValues) : null,
+    leaders(scoreValues),
+    leaders(rateValues, { lowerIsBetter: true }),
+    anyPerHire ? leaders(hireValues, { lowerIsBetter: true }) : null,
+    ...RATING_META.map((m) => leaders(candidates.map((c) => c.ratings[m.key]))),
+  ].filter((set): set is Set<number> => set !== null && set.size > 0);
+  const wins = candidates.map((_, i) => leaderRows.filter((set) => set.has(i)).length);
   // Label column + one column per candidate: the width a section band spans.
   const span = candidates.length + 1;
-  const chip = "inline-flex min-h-7 items-center gap-1 rounded-lg px-2.5 py-0.5 text-[13px] font-medium";
-  const chipHit = `${chip} bg-brand-100 text-brand-900`;
-  const chipOther = `${chip} bg-ink-50 text-ink-700 ring-1 ring-inset ring-ink-200`;
-  const muted = "text-sm text-ink-600";
+  const chip = "inline-flex min-h-7 items-center gap-1 rounded-md py-0.5 text-sm font-medium";
+  const chipHit = `${chip} text-brand-800`;
+  const chipOther = `${chip} px-2 bg-ink-100 text-ink-800`;
+  const muted = "text-sm text-ink-700";
 
   return (
     <div>
@@ -330,7 +339,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       </div>
 
       {/* The page scrolls down; only the width scrolls here, with the label column pinned at every width. */}
-      <ScrollRegion label="Candidate comparison" className="rounded-2xl border border-ink-200 bg-white shadow-xs focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
+      <ScrollRegion label="Candidate comparison" className="border-b border-ink-300 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
         {/* Fixed layout: every candidate column is the same width. The minimum width (label column + n columns) is what makes the region scroll sideways instead of squeezing. */}
         <table
           style={{ "--n": candidates.length } as React.CSSProperties}
@@ -341,7 +350,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
             <tr>
               <th
                 scope="col"
-                className="sticky left-0 z-20 w-32 min-w-32 border-b border-r border-ink-200 bg-white px-2.5 py-3 text-left align-bottom text-[11px] font-semibold uppercase tracking-wider text-ink-700 sm:w-40 sm:min-w-40 sm:p-4 xl:w-44 xl:min-w-44 xl:p-5"
+                className="sticky left-0 z-20 w-28 min-w-28 border-b border-ink-300 bg-paper pb-4 pr-3 text-left align-bottom text-sm font-medium text-ink-700 after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-ink-200 after:content-[''] sm:w-40 sm:min-w-40 xl:w-44 xl:min-w-44"
               >
                 Compared on
               </th>
@@ -371,6 +380,18 @@ export default async function CompareCandidates({ searchParams }: { searchParams
           </thead>
 
           <tbody>
+            {candidates.length > 1 && leaderRows.length > 0 ? (
+              <MatrixRow label="Best in" hint="Rows where each leads">
+                {candidates.map((c, i) => (
+                  <Cell key={c.id}>
+                    <span className="nums flex items-baseline gap-1.5">
+                      <span className="font-display text-2xl font-semibold leading-none text-ink-900">{wins[i]}</span>
+                      <span className="text-sm text-ink-700">of {leaderRows.length} rows</span>
+                    </span>
+                  </Cell>
+                ))}
+              </MatrixRow>
+            ) : null}
             <SectionRow label="Fit and score" span={span} />
             {requiredSkills.length > 0 ? (
               <MatrixRow
@@ -417,14 +438,14 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                   <Cell key={c.id} leader={lowest}>
                     <div className="flex flex-col gap-2">
                       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                        <span className="nums flex items-baseline gap-1 text-[22px] font-semibold leading-none text-ink-900 sm:text-2xl">
+                        <span className="nums flex items-baseline gap-1 font-display text-2xl font-semibold leading-none text-ink-900">
                           {formatMoney(minor, currency)}
-                          <span className="text-xs font-normal text-text-subtle">/ hr</span>
+                          <span className="font-sans text-xs font-normal text-ink-600">/ hr</span>
                         </span>
                         {lowest ? <BestBadge label="Lowest" /> : null}
                       </div>
                       {minor > 0 ? (
-                        <p className="nums text-xs leading-4 text-text-subtle" title={`${formatMoney(minor, currency)} x ${HOURS_PER_MONTH} hours a month (Mon-Fri)`}>
+                        <p className="nums text-xs leading-4 text-ink-600" title={`${formatMoney(minor, currency)} x ${HOURS_PER_MONTH} hours a month (Mon-Fri)`}>
                           <span aria-hidden>≈ {formatMoney(minor * HOURS_PER_MONTH, currency)}/mo</span>
                           <span className="sr-only">About {formatMoney(minor * HOURS_PER_MONTH, currency)} a month at {HOURS_PER_MONTH} hours</span>
                         </p>
@@ -444,7 +465,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                   return (
                     <Cell key={c.id} leader={lowest}>
                       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                        <span className="nums text-lg font-semibold leading-none text-ink-900">{minor > 0 ? formatMoney(minor, currency) : "None"}</span>
+                        <span className="nums font-display text-lg font-semibold leading-none text-ink-900">{minor > 0 ? formatMoney(minor, currency) : "None"}</span>
                         {lowest ? <BestBadge label="Lowest" /> : null}
                       </div>
                     </Cell>
@@ -480,7 +501,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                         Has it
                       </span>
                     ) : (
-                      <span className={`${chipOther} text-ink-700`}>
+                      <span className={`${chip} text-ink-600`}>
                         <Minus className="size-3.5 text-ink-600" aria-hidden />
                         Not listed
                       </span>
@@ -505,7 +526,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                           </li>
                         ))}
                         {more > 0 ? (
-                          <li className="inline-flex min-h-7 items-center px-2 text-[13px] font-medium text-ink-600">
+                          <li className="inline-flex min-h-7 items-center px-2 text-sm font-medium text-ink-700">
                             +{more}
                             <span className="sr-only"> more skills</span>
                           </li>

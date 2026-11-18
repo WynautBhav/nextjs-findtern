@@ -198,7 +198,7 @@ export function CompanyProfileForm({
   const domain = companyDomainOf(values.companyEmail);
 
   return (
-    <form className="space-y-10" noValidate onSubmit={submit}>
+    <form className="space-y-12" noValidate onSubmit={submit}>
       <FormSection title="Company">
         <FileUpload
           kind="employer_logo"
@@ -368,13 +368,16 @@ export function CompanyProfileForm({
         />
       </FormSection>
 
-      <div className="space-y-4 border-t border-ink-100 pt-6">
+      {/* The save bar stays at the foot of the screen while the form is long (above the phone tab bar). */}
+      <div className="sticky bottom-[4.5rem] z-20 -mx-1 border-t border-ink-300 bg-canvas px-1 py-3 lg:bottom-0">
         {error ? <FormNotice tone="error">{error}</FormNotice> : null}
-        <div role="status">{saved ? <FormNotice tone="success">Company details saved.</FormNotice> : null}</div>
-        <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "md" })}>
-          {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-          Save company details
-        </button>
+        <div className="flex flex-wrap items-center gap-4">
+          <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "md" })}>
+            {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+            Save company details
+          </button>
+          <div role="status" className="min-w-0">{saved ? <FormNotice tone="success" className="!py-0">Company details saved.</FormNotice> : null}</div>
+        </div>
       </div>
     </form>
   );

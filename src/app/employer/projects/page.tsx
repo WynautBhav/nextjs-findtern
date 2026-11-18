@@ -9,6 +9,7 @@ import { SITE } from "@/lib/content/site";
 import { PageHeader } from "@/components/layout/page-header";
 import { ButtonLink } from "@/components/ui/button";
 import { proposalOutcome } from "@/lib/proposals";
+import { normalizeStatus } from "@/lib/projects/lifecycle";
 import { ProjectList, type ListProject } from "./project-list";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
 
@@ -60,18 +61,28 @@ export default async function EmployerProjectsPage() {
   } catch (err) {
     console.error("Failed to load employer projects:", err);
     return (
-      <div className="container-page section-y">
+      <div>
         <PageHeader title="Projects" />
         <LoadError what="your projects" retryHref="/employer/projects" email={SITE.adminEmail} />
       </div>
     );
   }
 
+  const live = rows.filter((r) => normalizeStatus(r.status) === "published").length;
+  const sent = rows.reduce((n, r) => n + r.sent, 0);
+  const accepted = rows.reduce((n, r) => n + r.accepted, 0);
+  const lede = rows.length === 0
+    ? "Post a project and it goes live as soon as you submit. Pause or close it any time."
+    : [
+        live ? `${live} live` : "Nothing live right now",
+        sent ? `${sent} proposal${sent === 1 ? "" : "s"} sent, ${accepted} accepted` : "no proposals sent yet",
+      ].join(". ") + ".";
+
   return (
-    <div className="container-page section-y space-y-6">
+    <div className="space-y-6">
       <PageHeader
         title="Projects"
-        subtitle="Post a project and it goes live as soon as you submit. Pause or close it any time."
+        subtitle={lede}
         action={
           <ButtonLink href="/employer/projects/new" className="max-sm:hidden">
             <Plus className="size-4" aria-hidden /> Post a project

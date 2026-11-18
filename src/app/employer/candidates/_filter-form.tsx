@@ -143,7 +143,21 @@ export function FilterPanel({
     </form>
   );
 
-  if (desktop) return <div className="max-lg:hidden">{formEl}</div>;
+  // The server paints this branch (it cannot know the width): the form for lg and up, and an inert copy of the
+  // phone button so a phone never loads without its Filters control. Hydration swaps in the live one below.
+  if (desktop)
+    return (
+      <>
+        <span aria-hidden className="lg:hidden">
+          <span className="inline-flex h-11 items-center gap-2 rounded-md border border-ink-300 bg-surface-raised px-4 text-sm font-medium text-ink-900 outline-none hover:border-ink-400 focus-visible:ring-2 focus-visible:ring-brand-500">
+            <SlidersHorizontal className="size-4" aria-hidden />
+            Filters
+            {activeCount > 0 ? <span className="nums rounded-full bg-ink-900 px-2 text-xs font-semibold leading-5 text-white">{activeCount} active</span> : null}
+          </span>
+        </span>
+        <div className="max-lg:hidden">{formEl}</div>
+      </>
+    );
 
   return (
     <>
@@ -151,7 +165,7 @@ export function FilterPanel({
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        className="inline-flex h-11 items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 text-sm font-medium text-ink-900 outline-none hover:border-ink-300 focus-visible:ring-2 focus-visible:ring-brand-500"
+        className="inline-flex h-11 items-center gap-2 rounded-md border border-ink-300 bg-surface-raised px-4 text-sm font-medium text-ink-900 outline-none hover:border-ink-400 focus-visible:ring-2 focus-visible:ring-brand-500"
       >
         <SlidersHorizontal className="size-4" aria-hidden />
         Filters
@@ -160,10 +174,12 @@ export function FilterPanel({
         ) : null}
       </button>
       <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent side="left" className="w-full max-w-sm gap-0 overflow-y-auto p-0 sm:max-w-sm">
-          <div className="border-b border-ink-100 px-5 py-4 pr-14">
-            <SheetTitle className="text-base text-ink-900">Filters</SheetTitle>
-            <SheetDescription className="mt-0.5 nums">
+        {/* A bottom sheet: it rises from the thumb, leaves the page's top edge visible, and scrolls on its own. */}
+        <SheetContent side="bottom" className="max-h-[88dvh] gap-0 overflow-y-auto rounded-t-lg border-ink-200 bg-paper p-0">
+          <div aria-hidden className="mx-auto mt-2 h-1 w-10 shrink-0 rounded-full bg-ink-300" />
+          <div className="border-b border-ink-200 px-5 pb-3 pt-2 pr-14">
+            <SheetTitle className="font-display text-lg text-ink-900">Filters</SheetTitle>
+            <SheetDescription className="mt-0.5 nums text-ink-700">
               {total} candidate{total === 1 ? "" : "s"} match
               {activeCount > 0 ? (
                 <span className="block font-normal">

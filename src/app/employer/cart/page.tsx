@@ -82,7 +82,7 @@ export default async function EmployerCartPage({
         lede={<span className="max-sm:sr-only">Book a meeting or send a proposal. You pay only once a candidate accepts.</span>}
         action={
           // Compare lives here, not in a second tab bar: the pipeline strip below already has Candidates and Shortlist.
-          <ButtonLink href="/employer/compare" size="sm" variant="outline" className="h-11 rounded-xl sm:h-10 sm:touch:h-11">
+          <ButtonLink href="/employer/compare" size="sm" variant="outline" className="min-h-11">
             <Scale className="size-4" aria-hidden />
             Compare{compareCount > 0 ? ` (${compareCount})` : ""}
           </ButtonLink>

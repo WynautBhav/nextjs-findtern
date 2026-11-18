@@ -17,7 +17,7 @@ export default async function NewProjectPage() {
     .where(eq(schema.employers.id, session.uid))
     .limit(1);
   return (
-    <div className="container-page section-y space-y-6">
+    <div className="space-y-6">
       <PageHeader title="Post a project" subtitle="Save a draft any time. Submit when the checklist is complete and it goes live." />
       <ProjectForm
         employerId={session.uid}

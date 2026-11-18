@@ -15,11 +15,11 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /** Cell colour per status, through the status tokens (no ad-hoc hues). */
 const CELL: Record<string, string> = {
-  Present: "border-success/25 bg-success-soft text-success",
-  Absent: "border-danger/25 bg-danger-soft text-danger",
-  "Fixed off": "border-ink-200 bg-ink-100 text-ink-600",
-  Holiday: "border-accent-300/70 bg-accent-100 text-accent-700",
-  Leave: "border-info/25 bg-info-soft text-info",
+  Present: "border-transparent bg-brand-100 text-brand-900",
+  Absent: "border-transparent bg-danger-soft text-danger",
+  "Fixed off": "border-transparent bg-ink-200 text-ink-700",
+  Holiday: "border-transparent bg-accent-100 text-accent-700",
+  Leave: "border-transparent bg-info-soft text-info",
 };
 
 function dayLabel(iso: string, opts: Intl.DateTimeFormatOptions): string {
@@ -101,14 +101,14 @@ export function TimesheetReview({
         <ul className="flex flex-wrap gap-x-4 gap-y-1.5 text-sm text-ink-600" aria-label="Key">
           {(usedCodes.length ? usedCodes : ["Present"]).map((s) => (
             <li key={s} className="inline-flex items-center gap-1.5">
-              <span className={cn("grid size-5 place-items-center rounded-apple-sm border text-2xs font-semibold", CELL[s] ?? "border-ink-200 bg-white text-ink-700")} aria-hidden>
-                {DAY_CODE[s] ?? s.charAt(0).toUpperCase()}
+              <span className={cn("grid size-5 place-items-center rounded-md border text-xs font-semibold", CELL[s] ?? "border-ink-300 bg-surface-raised text-ink-700")} aria-hidden>
+                {s === "Present" ? "8" : (DAY_CODE[s] ?? s.charAt(0).toUpperCase())}
               </span>
-              {s}
+              {s === "Present" ? "Present, hours worked" : s}
             </li>
           ))}
           <li className="inline-flex items-center gap-1.5">
-            <span className="size-5 rounded-apple-sm border border-dashed border-ink-300 bg-white" aria-hidden />
+            <span className="size-5 rounded-md border border-dashed border-ink-400" aria-hidden />
             Not filled
           </li>
         </ul>
@@ -120,8 +120,19 @@ export function TimesheetReview({
         ) : null}
       </div>
 
-      <div ref={grid} className="mt-4 space-y-3">
-        {weeks.map((w, wi) => {
+      <div ref={grid} className="mt-5">
+        <div aria-hidden className="grid grid-cols-[minmax(0,1fr)] gap-3 pb-1 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:gap-6">
+          <span className="max-sm:hidden" />
+          <div className="grid grid-cols-7 gap-1.5 text-center text-xs text-ink-600 sm:gap-2">
+            {WEEKDAYS.map((w) => (
+              <span key={w}>
+                <span className="sm:hidden">{w[0]}</span>
+                <span className="max-sm:hidden">{w}</span>
+              </span>
+            ))}
+          </div>
+        </div>
+        {weeks.map((w) => {
           // Pad the week to Monday-Sunday so columns line up across weeks.
           const cells: (DayDetail | null)[] = Array.from({ length: 7 }, (_, i) => {
             const t = new Date(`${w.weekOf}T00:00:00Z`);
@@ -129,37 +140,32 @@ export function TimesheetReview({
             const iso = t.toISOString().slice(0, 10);
             return w.days.find((d) => d.date === iso) ?? null;
           });
+          const weekName = `Week of ${dayLabel(w.weekOf, { day: "numeric", month: "short" })}`;
           return (
-            <div key={w.weekOf} style={{ "--i": wi } as React.CSSProperties} className="rise rounded-[24px] border border-ink-200/70 bg-white p-4 shadow-tile sm:p-5">
-              <div className="mb-3 flex items-baseline justify-between gap-3">
-                <p className="text-sm font-semibold text-ink-900">
-                  Week of <span className="nums">{dayLabel(w.weekOf, { day: "numeric", month: "short" })}</span>
+            <div key={w.weekOf} className="grid gap-3 border-t border-ink-300 py-3 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:gap-6">
+              <div className="flex items-baseline justify-between gap-3 sm:block">
+                <p className="text-sm text-ink-700">
+                  Week of <span className="nums font-medium text-ink-900">{dayLabel(w.weekOf, { day: "numeric", month: "short" })}</span>
                 </p>
-                <p className="nums text-sm text-ink-600">
-                  <span className="text-lg font-light tracking-tight text-ink-900">{w.hours}</span> h · {w.present} present
-                  {w.unclaimed ? <span className="font-medium text-accent-700"> · {w.unclaimed} not filled</span> : null}
+                <p className="nums sm:mt-1">
+                  <span className="font-display text-2xl font-semibold leading-none text-ink-900">{w.hours}</span>
+                  <span className="ml-1 text-sm text-ink-700">h</span>
                 </p>
+                {w.unclaimed ? <p className="text-sm font-semibold text-ink-900 sm:mt-1">{w.unclaimed} not filled</p> : null}
               </div>
-              <div aria-hidden className="mb-4 h-1.5 overflow-hidden rounded-full bg-ink-100">
-                <div className="h-full rounded-full bg-gradient-to-r from-brand-600 to-brand-400" style={{ width: `${Math.min(100, (w.hours / 40) * 100)}%` }} />
-              </div>
-              <ol className="grid grid-cols-7 gap-1.5 sm:gap-2" aria-label={`Week of ${dayLabel(w.weekOf, { day: "numeric", month: "short" })}`}>
+              <ol className="grid grid-cols-7 gap-1.5 sm:gap-2" aria-label={weekName}>
                 {cells.map((d, i) =>
                   d ? (
                     <li key={d.date} className="min-w-0">
-                      <span className="block break-words text-center text-2xs font-medium uppercase tracking-wide text-text-subtle">
-                        <span className="sm:hidden">{WEEKDAYS[i][0]}</span>
-                        <span className="hidden sm:inline">{WEEKDAYS[i]}</span> <span className="nums">{dayLabel(d.date, { day: "numeric" })}</span>
-                      </span>
                       {editing ? (
                         <select
                           aria-label={`Status for ${dayLabel(d.date, { weekday: "long", day: "numeric", month: "long" })}`}
                           value={values[d.date] ?? ""}
                           onChange={(e) => setValues((v) => ({ ...v, [d.date]: e.target.value }))}
                           className={cn(
-                            "mt-1 h-14 w-full appearance-none sm:h-16 rounded-apple-sm border text-center text-base md:text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-600",
-                            CELL[values[d.date] ?? ""] ?? "border-dashed border-ink-300 bg-white text-text-subtle",
-                            values[d.date] !== d.status && "ring-2 ring-accent-400",
+                            "h-16 w-full appearance-none rounded-md border text-center text-base font-semibold outline-none focus-visible:ring-2 focus-visible:ring-brand-700 md:text-sm",
+                            CELL[values[d.date] ?? ""] ?? "border-dashed border-ink-400 bg-surface-raised text-ink-700",
+                            values[d.date] !== d.status && "ring-2 ring-signal",
                           )}
                         >
                           {!values[d.date] ? <option value="">–</option> : null}
@@ -176,23 +182,23 @@ export function TimesheetReview({
                         <span
                           title={`${dayLabel(d.date, { weekday: "long", day: "numeric", month: "long" })}: ${d.status || "not filled"}${d.status === "Present" ? `, ${d.hours} h` : ""}${d.note ? ` (${d.note})` : ""}`}
                           className={cn(
-                            "mt-1 flex h-14 flex-col sm:h-16 items-center justify-center rounded-apple-sm border text-sm font-semibold leading-none",
-                            CELL[d.status] ?? "border-dashed border-ink-500 bg-white text-text-subtle",
+                            "relative flex h-16 flex-col items-center justify-center rounded-md border text-sm font-semibold leading-none",
+                            CELL[d.status] ?? "border-dashed border-ink-400 bg-surface-raised text-ink-700",
                           )}
                         >
-                          {d.status ? (DAY_CODE[d.status] ?? d.status.charAt(0).toUpperCase()) : "–"}
-                          {d.status === "Present" && d.hours !== 8 ? <span className="nums mt-0.5 text-2xs font-medium">{d.hours}h</span> : null}
-                          <span className="sr-only">{d.status || "Not filled"}</span>
+                          <span className="nums absolute left-1.5 top-1 text-xs font-normal opacity-80">{dayLabel(d.date, { day: "numeric" })}</span>
+                          {d.status === "Present" ? (
+                            <span className="nums font-display text-lg">{d.hours}</span>
+                          ) : (
+                            <span>{d.status ? (DAY_CODE[d.status] ?? d.status.charAt(0).toUpperCase()) : "–"}</span>
+                          )}
+                          <span className="sr-only">{d.status ? `${d.status}${d.status === "Present" ? `, ${d.hours} hours` : ""}` : "Not filled"}</span>
                         </span>
                       )}
                     </li>
                   ) : (
                     <li key={i} aria-hidden className="min-w-0">
-                      <span className="block text-center text-2xs font-medium uppercase tracking-wide text-text-subtle">
-                        <span className="sm:hidden">{WEEKDAYS[i][0]}</span>
-                        <span className="hidden sm:inline">{WEEKDAYS[i]}</span>
-                      </span>
-                      <span className="mt-1 block h-14 rounded-apple-sm bg-ink-50 sm:h-16" />
+                      <span className="block h-16 rounded-md bg-ink-200/40" />
                     </li>
                   ),
                 )}
@@ -200,10 +206,11 @@ export function TimesheetReview({
             </div>
           );
         })}
+        <div className="border-t border-ink-300" />
       </div>
 
       {editing ? (
-        <div id="timesheet-save-bar" className="sticky bottom-4 z-10 mt-4 flex flex-wrap items-center gap-2 rounded-[20px] border border-ink-200/80 bg-white/85 p-3 shadow-tile backdrop-blur-md transition-[opacity,translate] duration-[var(--dur-quick)] ease-[var(--ease-out-quart)] starting:translate-y-2 starting:opacity-0">
+        <div id="timesheet-save-bar" className="sticky bottom-20 z-10 mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-ink-300 bg-surface-raised p-3 shadow-[var(--shadow-float)] transition-[opacity,translate] duration-[var(--motion-base)] starting:translate-y-2 starting:opacity-0 lg:bottom-4">
           <button type="button" disabled={busy || changed.length === 0} onClick={save} className={buttonClass({ size: "sm" })}>
             {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
             {changed.length ? `Save ${changed.length} change${changed.length === 1 ? "" : "s"}` : "No changes yet"}
@@ -231,10 +238,10 @@ export function TimesheetReview({
       {notes.length > 0 ? (
         <details className="group mt-6" open={notes.length <= 5}>
           <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-ink-900 [&::-webkit-details-marker]:hidden">
-            Day notes from the intern <span className="nums font-normal text-text-subtle">({notes.length})</span>
+            Day notes from the intern <span className="nums font-normal text-ink-600">({notes.length})</span>
             <span aria-hidden className="text-ink-500 transition-transform group-open:rotate-90 motion-reduce:transition-none">›</span>
           </summary>
-          <ul className="mt-1 divide-y divide-ink-100 rounded-apple-lg border border-ink-200/80">
+          <ul className="mt-1 divide-y divide-ink-200 border-y border-ink-200">
             {notes.map((d) => (
               <li key={d.date} className="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-3 px-4 py-2.5 text-sm">
                 <span className="nums text-ink-600">{dayLabel(d.date, { weekday: "short", day: "numeric", month: "short" })}</span>

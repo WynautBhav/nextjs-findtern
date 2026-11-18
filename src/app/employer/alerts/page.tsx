@@ -1,15 +1,13 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { and, count, desc, eq } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { EmptyScene } from "@/components/app/primitives";
+import { EmptyScene, FilterTabs, PageHead } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { NotificationList, type NotificationRow } from "@/components/app/notification-list";
-import { PageHeader } from "@/components/layout/page-header";
-import { cn } from "@/lib/utils";
+import { AlertsList } from "./_list";
 
 export const metadata: Metadata = {
   title: "Alerts",
@@ -116,7 +114,7 @@ export default async function EmployerAlerts({
     console.error("Failed to load employer alerts:", err);
     return (
       <div>
-        <PageHeader title="Alerts" />
+        <PageHead title="Alerts" />
         <LoadError what="your alerts" retryHref={unreadOnly ? "/employer/alerts?show=unread" : "/employer/alerts"} email={SITE.adminEmail} />
       </div>
     );
@@ -125,36 +123,25 @@ export default async function EmployerAlerts({
   const shown = unreadOnly ? unread : total;
 
   return (
-    <div>
-      <PageHeader
+    <div className="pb-20 lg:pb-0">
+      <PageHead
         title="Alerts"
         // Nothing to mark: no control, rather than a disabled one.
         action={unread > 0 ? <NotificationList mode="mark-all" /> : undefined}
+        className="mb-6"
       />
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <nav aria-label="Filter alerts" className="inline-flex rounded-apple-md border border-ink-200/80 bg-white p-1 shadow-xs">
-          {(
-            [
-              ["All", "/employer/alerts", !unreadOnly, total],
-              ["Unread", "/employer/alerts?show=unread", unreadOnly, unread],
-            ] as const
-          ).map(([label, href, active, n]) => (
-            <Link
-              key={label}
-              href={href}
-              aria-current={active ? "page" : undefined}
-              className={cn(
-                "apple-spring inline-flex min-h-10 items-center gap-1.5 rounded-apple-sm px-3.5 text-sm font-medium touch:min-h-11",
-                active ? "bg-brand-700 text-white shadow-xs" : "text-ink-600 hover:bg-ink-50 hover:text-ink-900",
-              )}
-            >
-              {label}
-              <span className={cn("nums text-xs", active ? "text-white/80" : "text-text-subtle")}>{n}</span>
-            </Link>
-          ))}
-        </nav>
-        {shown > PAGE ? <p className="nums text-sm text-ink-600">Showing the newest {PAGE} of {shown}</p> : null}
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <FilterTabs
+          label="Filter alerts"
+          value={unreadOnly ? "unread" : "all"}
+          hrefFor={(k) => (k === "unread" ? "/employer/alerts?show=unread" : "/employer/alerts")}
+          tabs={[
+            { key: "all", label: "All", count: total },
+            { key: "unread", label: "Unread", count: unread },
+          ]}
+        />
+        {shown > PAGE ? <p className="nums text-sm text-ink-700">Showing the newest {PAGE} of {shown}</p> : null}
       </div>
 
       {rows.length === 0 ? (
@@ -175,7 +162,7 @@ export default async function EmployerAlerts({
           />
         )
       ) : (
-        <NotificationList rows={rows} />
+        <AlertsList rows={rows} />
       )}
     </div>
   );

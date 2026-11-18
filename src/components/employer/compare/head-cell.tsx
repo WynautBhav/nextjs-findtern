@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MapPin, Send, X } from "lucide-react";
+import { MapPin, X } from "lucide-react";
 
 import { Pill } from "@/components/app/primitives";
 import { RowAvatar } from "@/components/employer/candidate-row-parts";
@@ -47,10 +47,10 @@ export function CompareHeadCell({
 }) {
   const place = c.city || c.location || "City not stated";
   return (
-    <th scope="col" className="relative min-w-44 border-b border-r border-ink-200 bg-white p-3 text-left align-top font-normal last:border-r-0 sm:min-w-52 sm:p-4 xl:p-5">
+    <th scope="col" className="relative min-w-44 border-b border-ink-300 px-3 pb-4 pt-2 text-left align-top font-normal sm:min-w-52 sm:px-4 xl:px-5">
       {/* Top line: the tile (a mouse-only link to the profile; the name below is the focusable one) and the two quiet controls. */}
       <div className="flex items-start justify-between gap-2">
-        <Link href={profileHref} tabIndex={-1} aria-hidden className="rounded-2xl outline-none">
+        <Link href={profileHref} tabIndex={-1} aria-hidden className="rounded-full outline-none">
           <RowAvatar square photoUrl={c.photoUrl} initials={c.initials} seed={c.id} />
         </Link>
         <div className="-mr-2 -mt-2 flex items-center gap-0.5 sm:-mr-1 sm:-mt-1">
@@ -66,8 +66,8 @@ export function CompareHeadCell({
         </div>
       </div>
       <Link href={profileHref} className="group/id mt-3 block rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
-        <span className="block break-words text-base font-bold leading-6 text-ink-900 underline-offset-4 group-hover/id:underline sm:text-lg">{name}</span>
-        <span className="mt-0.5 flex items-start gap-1 text-sm font-normal text-ink-600">
+        <span className="block break-words font-display text-lg font-semibold leading-6 text-ink-900 underline-offset-4 group-hover/id:underline">{name}</span>
+        <span className="mt-0.5 flex items-start gap-1 text-sm font-normal text-ink-700">
           <MapPin className="mt-[3px] size-3.5 shrink-0 text-ink-500" aria-hidden />
           <span className="min-w-0 break-words">{place}</span>
         </span>
@@ -87,7 +87,7 @@ export function CompareHeadCell({
       {/* One filled button per column at its normal size (it only fills a narrow phone column); the star sits beside Remove. */}
       <div className="mt-4 flex flex-col items-stretch sm:items-start">
         {proposal ? (
-          <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="primary" size="sm" className="h-11 rounded-xl max-sm:w-full sm:h-10 sm:touch:h-11">
+          <ButtonLink href={`/employer/proposal/${encodeURIComponent(proposal.id)}`} variant="outline" size="sm" className="min-h-11 max-sm:w-full">
             {proposalActionLabel(proposal)}
           </ButtonLink>
         ) : (
@@ -95,8 +95,7 @@ export function CompareHeadCell({
             {pendingMeetingAt ? (
               <SendProposalHold pendingMeetingAt={pendingMeetingAt} className="min-w-0" controlClassName="max-sm:w-full max-sm:justify-center" />
             ) : (
-              <ButtonLink href={sendHref} variant="primary" size="sm" className="h-11 rounded-xl px-4 max-sm:w-full sm:h-10 sm:touch:h-11">
-                <Send className="size-4" aria-hidden />
+              <ButtonLink href={sendHref} variant="outline" size="sm" className="min-h-11 max-sm:w-full">
                 Send proposal
               </ButtonLink>
             )}

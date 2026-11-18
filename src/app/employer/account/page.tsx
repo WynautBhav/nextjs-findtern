@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
-import { DetailRow, SectionHead, Surface } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { PageHeader } from "@/components/layout/page-header";
@@ -11,7 +10,6 @@ import { CompanyProfileForm, type CompanyProfile } from "@/components/employer/c
 import { ChangePasswordForm } from "@/components/auth/change-password-form";
 import { NotificationPrefs } from "@/components/notifications/notification-prefs";
 import { missingProfileFields } from "@/lib/employer-onboarding";
-import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { formatDate } from "@/lib/format";
 import { timezoneForLocation } from "@/lib/timezones";
 
@@ -71,64 +69,60 @@ export default async function EmployerAccount() {
   };
   const missing = employer ? missingProfileFields(employer) : [];
 
+  const profileStatus =
+    missing.length === 0 ? (
+      <span className="text-success">Complete</span>
+    ) : (
+      <span className="text-[#9a4a08]">{missing.every((m) => m.startsWith("Escalation")) ? "Escalation contact to add" : `${missing.length} to fill in`}</span>
+    );
+
   return (
-    <div>
-      <PageHeader
-        title="Company profile"
-        subtitle="Candidates never see your contacts."
-      />
+    <div className="pb-6 lg:pb-0">
+      <PageHeader title="Company profile" subtitle="Candidates never see your contacts." />
 
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_22rem]">
-        <Surface as="section" className="p-5 sm:p-8" aria-label="Company details">
+      <div className="grid gap-x-14 gap-y-12 xl:grid-cols-[minmax(0,1fr)_21rem]">
+        <section aria-label="Company details" className="min-w-0">
           <CompanyProfileForm employerId={uid} profile={profile} hasLogo={Boolean(employer?.logoUrl)} />
-        </Surface>
+        </section>
 
-        <aside className="min-w-0 space-y-4 xl:sticky xl:top-24 xl:self-start">
-          <HeroPanel className="p-6">
-            <span aria-hidden className="grid size-14 place-items-center rounded-apple-lg bg-white/15 text-xl font-medium ring-1 ring-white/25">
-              {(profile.companyName.trim()[0] ?? "C").toUpperCase()}
-            </span>
-            <p className="mt-4 break-words text-xl font-medium tracking-[-0.02em]">{profile.companyName || "Your company"}</p>
-            <p className="mt-1 text-sm text-on-dark-subtle">
+        <aside className="min-w-0 space-y-10 xl:sticky xl:top-24 xl:self-start">
+          {/* Who you are on a proposal, said once, then the account's facts as a ruled list. */}
+          <section aria-label="Your company">
+            <p className="break-words font-display text-2xl font-semibold tracking-[-0.02em] text-ink-900">{profile.companyName || "Your company"}</p>
+            <p className="mt-1 text-sm text-ink-700">
               {[profile.city, profile.country].filter(Boolean).join(", ") || "Location not set"}
               {profile.companySize ? ` · ${profile.companySize} people` : ""}
             </p>
-            <p className="mt-4 text-xs text-on-dark-subtle">How you appear on proposals. Contacts stay private.</p>
-          </HeroPanel>
-          <Surface className="p-5">
-            <SectionHead title="Account" />
-            <dl className="divide-y divide-ink-100">
-              <DetailRow label="Timezone" value={timezoneForLocation(profile)} />
-              <DetailRow label="Member since" value={employer?.createdAt ? formatDate(employer.createdAt) : "-"} mono />
-              <DetailRow
-                label="Profile"
-                value={
-                  missing.length === 0 ? (
-                    <span className="text-success">Complete</span>
-                  ) : (
-                    <span className="text-accent-700">
-                      {missing.every((m) => m.startsWith("Escalation")) ? "Escalation contact to add" : `${missing.length} to fill in`}
-                    </span>
-                  )
-                }
-              />
+            <p className="mt-1 text-sm text-ink-600">How you appear on proposals. Contacts stay private.</p>
+            <dl className="mt-4 divide-y divide-ink-200 border-y border-ink-200">
+              <div className="flex items-baseline justify-between gap-4 py-2.5">
+                <dt className="text-sm text-ink-700">Timezone</dt>
+                <dd className="text-sm font-medium text-ink-900">{timezoneForLocation(profile)}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-4 py-2.5">
+                <dt className="text-sm text-ink-700">Member since</dt>
+                <dd className="nums text-sm font-medium text-ink-900">{employer?.createdAt ? formatDate(employer.createdAt) : "-"}</dd>
+              </div>
+              <div className="flex items-baseline justify-between gap-4 py-2.5">
+                <dt className="text-sm text-ink-700">Profile</dt>
+                <dd className="text-sm font-medium">{profileStatus}</dd>
+              </div>
             </dl>
-          </Surface>
+          </section>
 
-          <Surface as="section" id="notifications" className="scroll-mt-24 p-5" aria-labelledby="notifications-title">
-            <h2 id="notifications-title" className="mb-4 text-base font-semibold text-ink-900">
+          <section id="notifications" className="scroll-mt-24" aria-labelledby="notifications-title">
+            <h2 id="notifications-title" className="mb-3 border-b border-ink-200 pb-2 font-display text-lg font-semibold text-ink-900">
               Notifications
             </h2>
             <NotificationPrefs role="employer" initial={{ emailMessages: prefs?.emailMessages ?? true, pushMessages: prefs?.pushMessages ?? true }} />
-          </Surface>
+          </section>
 
-          <Surface as="section" id="security" className="scroll-mt-24 p-5" aria-labelledby="security-title">
-            <h2 id="security-title" className="mb-4 text-base font-semibold text-ink-900">
+          <section id="security" className="scroll-mt-24" aria-labelledby="security-title">
+            <h2 id="security-title" className="mb-3 border-b border-ink-200 pb-2 font-display text-lg font-semibold text-ink-900">
               Password
             </h2>
             <ChangePasswordForm endpoint={`/api/employer/${encodeURIComponent(uid)}/change-password`} />
-          </Surface>
-
+          </section>
         </aside>
       </div>
     </div>

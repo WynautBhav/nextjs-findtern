@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
-import { ArrowLeft, Check, ChevronDown, Clock, CreditCard, Download, Send, X } from "lucide-react";
+import { ArrowLeft, ChevronDown, Clock, CreditCard, Download, Send } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -21,10 +21,11 @@ import type { PlaceOfSupply } from "@/lib/gst";
 import { offerBreakdown, offerPlace } from "@/lib/offer-breakdown";
 import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
 import { DetailRow, Pill } from "@/components/app/primitives";
+import { LeadStat, Section, StatList, Overview } from "@/components/app/stat";
+import { RollingNumber } from "@/components/app/rolling-number";
 import { ProposalAvatar } from "@/components/employer/proposal-avatar";
 import { avatarUrl } from "@/lib/employer-pool";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
-import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
 import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
@@ -33,7 +34,9 @@ import { CgpaNotice, ExpiredNotice } from "@/components/employer/proposal-detail
 import { proposalCgpaGate } from "@/lib/cgpa-verification";
 import { hasOpenOrderFor } from "@/lib/payments";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
-import { offerTimeline } from "@/components/employer/proposal-timeline";
+import { stageTrail } from "@/components/employer/proposal-trail";
+import { MoneyLedger, type LedgerRow } from "@/components/employer/proposal-detail/money-ledger";
+import { btnOutline } from "@/components/employer/proposal-ui";
 import { MeetingRulesList } from "@/components/employer/meeting-rules";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
 
@@ -220,21 +223,6 @@ export default async function EmployerProposalDetail({
   // "Free" only for a real zero (fee-only band stores hourly 0); a missing value stays "-".
   const monthlyFree = offer.monthlyMinor === 0 || (offer.monthlyMinor == null && offer.hourlyRateMinor === 0);
 
-  const strip: [string, string][] = ft
-    ? [
-        ["Annual CTC", ft.annualCtcMinor ? formatMoney(ft.annualCtcMinor, currency) : "-"],
-        ["Hiring fee", ft.annualCtcMinor ? formatMoney(fullTimeFeeMinor(ft.annualCtcMinor), currency) : "-"],
-        ["Joining", formatDate(offer.startDate)],
-        ["Type", "Full-time"],
-      ]
-    : [
-        // One month's amount only (client QA) - no monthly × months total.
-        ["Monthly", offer.monthlyMinor ? formatMoney(offer.monthlyMinor, currency) : monthlyFree ? "Free" : "-"],
-        ["Hours a month", offer.monthlyHours ? `${offer.monthlyHours} h` : "-"],
-        ["Starts", formatDate(offer.startDate)],
-        ["Length", `${offer.months} month${offer.months === 1 ? "" : "s"}`],
-      ];
-
   const breakdown = offerBreakdown({
     currency,
     hourlyRateMinor: offer.hourlyRateMinor,
@@ -244,18 +232,156 @@ export default async function EmployerProposalDetail({
     place,
   });
 
-  // An expired offer ends the timeline at its closed step, like an unanswered one.
-  const timeline = offerTimeline(proposal, { startDate: offer.startDate, fullTime: Boolean(ft) }, { label: state.label, lapsed: state.lapsed || state.expiredReason === "unpaid_past_start" }, formatDate).map((step) =>
-    // While Findtern confirms the CGPA the next step is not yours yet.
-    state.verifying && /^You pay/.test(step.label) ? { ...step, label: state.gate?.state === "incorrect_unacked" ? "You confirm the CGPA, then pay" : "Findtern confirms the CGPA, then you pay" } : step,
-  );
   const profileHref = `/employer/intern/${encodeURIComponent(proposal.internId)}`;
+  const closedOffer = state.bucket === "closed";
+  const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
+
+  // The statement the page opens with: where this offer stands, in one line.
+  const headline =
+    proposal.status === "hired"
+      ? `${internName} is hired`
+      : state.canPay
+        ? `${internName} accepted your offer`
+        : state.verifying
+          ? `${internName} accepted. Their CGPA is being confirmed`
+          : proposal.status === "processing"
+            ? `Payment for ${internName} is in progress`
+            : state.bucket === "open"
+              ? `Waiting for ${internName} to answer`
+              : proposal.status === "draft"
+                ? `Draft offer for ${internName}`
+                : state.canSendNew
+                  ? `This offer to ${internName} expired`
+                  : proposal.status === "rejected"
+                    ? `${internName} declined`
+                    : proposal.status === "withdrawn"
+                      ? "You withdrew this offer"
+                      : `${internName}: ${state.label}`;
+  // Amber is for what the employer owes or must confirm; waiting on the candidate is neutral; Hired is green.
+  const statusTone = proposal.status === "hired" ? "live" : state.canPay || confirmingCgpa ? "waiting" : closedOffer ? "closed" : "neutral";
+
+  // The lead figure and the three quiet ones beside it (one lead per page, never a row of equal tiles).
+  const priceMinor = ft ? ft.annualCtcMinor : offer.monthlyMinor;
+  const leadValue = priceMinor ? (
+    currency.toUpperCase() === "INR" ? <RollingNumber value={priceMinor / 100} currency="INR" /> : formatMoney(priceMinor, currency)
+  ) : monthlyFree && !ft ? (
+    "Free"
+  ) : (
+    "-"
+  );
+  const rateLine = breakdown.lines.find((l) => l.key === "rate");
+  const facts = ft
+    ? [
+        { label: "Hiring fee", value: ft.annualCtcMinor ? formatMoney(fullTimeFeeMinor(ft.annualCtcMinor), currency) : "-", hint: "8.33% of CTC, separate from it" },
+        { label: "Joining", value: formatDate(offer.startDate) },
+        { label: "Type", value: "Full-time" },
+      ]
+    : [
+        { label: "Hours a month", value: offer.monthlyHours ? `${offer.monthlyHours} h` : "-" },
+        { label: "Starts", value: formatDate(offer.startDate) },
+        { label: "Length", value: plural(offer.months, "month") },
+      ];
+
+  // The money trail: one row per stage, the rupees where they move. Only dates the rows hold are printed.
+  const trail = stageTrail(proposal, { startDate: offer.startDate }, { closed: closedOffer, acceptedBeforeClose: closedOffer && state.expiredReason === "unpaid_past_start" }, formatDate);
+  const priceText = priceMinor ? formatMoney(priceMinor, currency) : null;
+  const ledger: LedgerRow[] = [];
+  for (const t of trail) {
+    // A closed offer's trail stops where it stopped: the stages that never happened are not listed.
+    if (closedOffer && (t.key === "paid" || t.key === "starts" || (t.key === "accepted" && t.state === "closed"))) continue;
+    if (t.key === "sent") {
+      ledger.push({
+        key: t.key,
+        state: t.state,
+        date: t.date,
+        title: "Offer sent",
+        detail: `${offer.roleTitle || projectName || "Internship"}${proposal.status === "interview_scheduled" ? ". Interview booked." : ""}`,
+        amount: priceText,
+        amountNote: ft ? "a year" : "a month",
+      });
+    } else if (t.key === "accepted") {
+      ledger.push({ key: t.key, state: t.state, date: null, title: t.state === "done" ? `Accepted by ${internName}` : `${internName} decides`, detail: t.state === "current" ? "They can accept until the start date." : undefined });
+    } else if (t.key === "paid") {
+      const feeRow =
+        ft?.annualCtcMinor
+          ? { amount: formatMoney(fullTimeFeeMinor(ft.annualCtcMinor), currency), amountNote: "hiring fee" }
+          : fee.kind === "charged"
+            ? { amount: formatMoney(fee.amountMinor, currency), amountNote: "hiring fee, one-time" }
+            : fee.kind === "free"
+              ? { struck: formatMoney(fee.listMinor, currency), amount: "Free", amountNote: "hiring fee, one-time" }
+              : {};
+      ledger.push({
+        key: t.key,
+        state: t.state,
+        date: t.date,
+        title:
+          t.state === "done"
+            ? "Paid, hire confirmed"
+            : proposal.status === "processing"
+              ? "Payment in progress"
+              : state.verifying
+                ? confirmingCgpa
+                  ? "You confirm the CGPA, then pay"
+                  : "Findtern confirms the CGPA, then you pay"
+                : ft
+                  ? "You pay the hiring fee"
+                  : "You pay to confirm the hire",
+        detail: t.state === "done" ? "The candidate's name and contact details are visible to you." : t.state === "current" && state.canPay ? "Names and contact details unlock once it is paid." : undefined,
+        ...feeRow,
+      });
+    } else {
+      ledger.push({
+        key: t.key,
+        state: t.state,
+        date: t.date,
+        title: ft ? (t.label === "Started" ? "Joined" : "Joins") : t.label,
+        detail: ft ? undefined : `${plural(offer.months, "month")} from this day, billed monthly. Timesheets run monthly.`,
+      });
+    }
+  }
+  if (closedOffer) {
+    ledger.push({ key: "closed", state: "closed", date: !state.lapsed && proposal.updatedAt ? formatDate(proposal.updatedAt) : null, title: state.label, detail: state.next || undefined });
+  }
+
+  const ratingRows = (
+    <dl className="divide-y divide-ink-200">
+      {ratings.map(([key, value]) => (
+        <DetailRow key={key} label={key === "overall" ? "Findtern Score" : humanizeKey(key)} value={`${value}/10`} mono />
+      ))}
+    </dl>
+  );
+  // Who the offer is for: on a desktop in the side column, on a phone after the terms.
+  const candidateInfo = (
+    <>
+      <Section title="Candidate">
+        <div className="flex items-center gap-3">
+          <ProposalAvatar photoUrl={photoUrl} initials={initials} presence={presence} className="size-12" />
+          <div className="min-w-0">
+            <p className="break-words text-base font-semibold text-ink-900">{internName}</p>
+            <p className="nums text-sm text-ink-700">{score > 0 ? `${score.toFixed(1)} Findtern Score` : "Not scored"}</p>
+          </div>
+        </div>
+        <Link
+          href={profileHref}
+          className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-brand-800 underline decoration-brand-300 decoration-2 underline-offset-4 outline-none hover:decoration-brand-700 focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-700"
+        >
+          View profile
+        </Link>
+      </Section>
+      {ratings.length > 0 ? (
+        <Section title="Assessment at sending">{ratingRows}</Section>
+      ) : null}
+    </>
+  );
+
+  const nextStepTitle = proposal.status === "hired" ? "Hire" : state.expiredReason ? "Close this offer" : state.canPay || state.canSendNew || confirmingCgpa ? "Your move" : "This offer";
+  const actionsNeeded = state.canPay || Boolean(sendNewHref) || state.canEdit || state.canWithdraw || proposal.status === "hired";
 
   return (
-    <div>
+    <div className="pb-20 lg:pb-0">
       <Link
         href="/employer/proposals"
-        className="apple-spring mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm text-sm font-medium text-brand-700 hover:underline"
+        className="mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-sm text-sm font-medium text-brand-800 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand-700"
       >
         <ArrowLeft className="size-4" aria-hidden />
         All proposals
@@ -266,123 +392,90 @@ export default async function EmployerProposalDetail({
           <TakedownBanner projects={[{ id: projectDown.id, name: projectName ?? "This project", reason: projectDown.reason }]} />
         </div>
       ) : null}
-      {/* ── Header: who, what, status, and the one thing to do ───────── */}
-      <header className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 items-start gap-4">
-          <ProposalAvatar photoUrl={photoUrl} initials={initials} presence={presence} />
-          <div className="min-w-0">
-            <p className="text-sm text-ink-600">
-              <Link
-                href={profileHref}
-                className="inline-flex min-h-11 items-center font-semibold text-ink-900 underline decoration-ink-300 underline-offset-4 outline-none hover:text-brand-700 hover:decoration-brand-500 focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 sm:min-h-0"
-              >
-                {internName}
-              </Link>
-              {projectName ? <span> · {projectName}</span> : null}
-            </p>
-            <h1 className="text-balance break-words text-2xl font-semibold tracking-[-0.02em] text-ink-900 sm:text-3xl">
-              {offer.roleTitle || projectName || "Proposal"}
-            </h1>
-            <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-600">
-              <Pill tone={state.tone}>{state.label}</Pill>
-              <span>{ft ? "Full-time offer" : "Internship offer"}</span>
-              {score > 0 ? (
-                <span className="nums">
-                  <span className="font-semibold text-ink-900">{score.toFixed(1)}</span> Findtern Score
-                </span>
-              ) : null}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start lg:shrink-0">
-          {state.canPay ? (
-            <Link href="/employer/checkout" className={buttonClass({ className: "max-sm:w-full" })}>
-              <CreditCard className="size-4" aria-hidden />
-              {ft ? "Pay the hiring fee" : "Pay to confirm hire"}
-            </Link>
-          ) : null}
-          {sendNewHref ? (
-            <Link href={sendNewHref} className={buttonClass({ className: "max-sm:w-full" })}>
-              <Send className="size-4" aria-hidden />
-              Send a new proposal
-            </Link>
-          ) : null}
-        </div>
+
+      {/* ── The statement: where this offer stands ───────────────────── */}
+      <header className="max-w-4xl">
+        <h1 className="text-balance break-words font-display text-2xl font-semibold text-ink-900 sm:text-4xl">{headline}</h1>
+        <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-700">
+          <Pill tone={statusTone}>{state.label}</Pill>
+          <span className="break-words">
+            {offer.roleTitle || projectName || "Proposal"}
+            {projectName && offer.roleTitle ? ` · ${projectName}` : ""}
+          </span>
+          <span>{ft ? "Full-time offer" : "Internship offer"}</span>
+        </p>
       </header>
 
       <CgpaNotice proposalId={proposal.id} state={state} canConfirm={confirmingCgpa} />
       <ExpiredNotice state={state} />
 
-      {/* ── The four numbers the decision rests on ───────────────────── */}
-      <dl className="mt-8 grid grid-cols-2 border-y border-ink-100 sm:grid-cols-4">
-        {strip.map(([label, value], i) => (
-          <div
-            key={label}
-            className={[
-              "py-5 sm:px-6 sm:first:pl-0",
-              i % 2 === 1 ? "border-l border-ink-100 pl-5" : "",
-              i >= 2 ? "border-t border-ink-100 sm:border-t-0" : "",
-              i === 2 ? "sm:border-l" : "",
-            ].join(" ")}
-          >
-            <dt className="text-sm text-ink-600">{label}</dt>
-            <dd className="nums mt-1 text-xl font-semibold text-ink-900">{value}</dd>
-          </div>
-        ))}
-      </dl>
-
-      <div className="mt-10 grid gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="mt-8 grid gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,1fr)_21rem]">
         <div className="min-w-0 space-y-10">
+          <Overview
+            className="lg:grid-cols-[minmax(0,1fr)_minmax(0,17rem)]"
+            lead={
+              <LeadStat
+                label={ft ? "Annual CTC" : currency.toUpperCase() === "INR" && offer.monthlyMinor ? "Monthly, incl. GST" : "Monthly"}
+                value={leadValue}
+                tone={proposal.status === "hired" ? "brand" : "ink"}
+                note={ft ? undefined : rateLine ? rateLine.value : undefined}
+              />
+            }
+            rest={<StatList items={facts} />}
+          />
+
+          <Section title="The money trail" hint="Each stage, with the date it happened and the rupees that moved.">
+            <MoneyLedger rows={ledger} attention={state.canPay || confirmingCgpa} />
+          </Section>
+
           {!ft ? (
-            <section>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Amount</h2>
-              <OfferBreakdownList lines={breakdown.lines} className="mt-4" />
-              <h2 className="mt-10 text-lg font-semibold tracking-[-0.01em] text-ink-900">Terms</h2>
-              <dl className="mt-2 divide-y divide-ink-100 border-b border-ink-100">
-                <DetailRow label="Working week" value={WEEKLY_SCHEDULES[offer.weeklySchedule].label} />
-                <DetailRow label="Paid leave" value={offer.paidLeavesPerMonth ? `${offer.paidLeavesPerMonth} day${offer.paidLeavesPerMonth === 1 ? "" : "s"} a month` : "None"} />
-                <DetailRow
-                  label="Working hours"
-                  value={
-                    flexible ? (
-                      "Flexible, set by the intern"
-                    ) : (
-                      <>
-                        {offer.shiftFrom}–{offer.shiftTo}
-                        {ist ? <span className="block text-xs font-normal text-text-subtle">{ist} for the intern</span> : null}
-                      </>
-                    )
-                  }
-                  mono
-                />
-                <DetailRow label="Timezone" value={offer.timezone || "Asia/Kolkata"} />
-                <DetailRow label="Mode" value={MODE[offer.mode] ?? "-"} />
-                {offer.mode !== "remote" ? (
-                  <DetailRow label="Location" value={[offer.city, offer.state].filter(Boolean).join(", ") || offer.location || "-"} />
-                ) : null}
-                {offer.mode === "hybrid" ? (
-                  <DetailRow label="Hybrid split" value={`${offer.officeDays ?? 0} office · ${offer.homeDays ?? 0} home days a week`} />
-                ) : null}
-                <DetailRow label="Laptop" value={laptopLabel(offer.laptop)} />
-              </dl>
-            </section>
+            <>
+              <Section title="What you pay">
+                <OfferBreakdownList lines={breakdown.lines} />
+              </Section>
+              <Section title="Terms">
+                <dl className="divide-y divide-ink-200">
+                  <DetailRow label="Working week" value={WEEKLY_SCHEDULES[offer.weeklySchedule].label} />
+                  <DetailRow label="Paid leave" value={offer.paidLeavesPerMonth ? `${offer.paidLeavesPerMonth} day${offer.paidLeavesPerMonth === 1 ? "" : "s"} a month` : "None"} />
+                  <DetailRow
+                    label="Working hours"
+                    value={
+                      flexible ? (
+                        "Flexible, set by the intern"
+                      ) : (
+                        <>
+                          {offer.shiftFrom}–{offer.shiftTo}
+                          {ist ? <span className="block text-xs font-normal text-ink-700">{ist} for the intern</span> : null}
+                        </>
+                      )
+                    }
+                    mono
+                  />
+                  <DetailRow label="Timezone" value={offer.timezone || "Asia/Kolkata"} />
+                  <DetailRow label="Mode" value={MODE[offer.mode] ?? "-"} />
+                  {offer.mode !== "remote" ? (
+                    <DetailRow label="Location" value={[offer.city, offer.state].filter(Boolean).join(", ") || offer.location || "-"} />
+                  ) : null}
+                  {offer.mode === "hybrid" ? (
+                    <DetailRow label="Hybrid split" value={`${offer.officeDays ?? 0} office · ${offer.homeDays ?? 0} home days a week`} />
+                  ) : null}
+                  <DetailRow label="Laptop" value={laptopLabel(offer.laptop)} />
+                </dl>
+              </Section>
+            </>
           ) : (
-            <section>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Full-time terms</h2>
-                {ft.offerLetterKey || ft.offerLetterUrl ? (
-                  <a
-                    href={`/api/proposals/${encodeURIComponent(proposal.id)}/offer-letter`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={buttonClass({ variant: "outline", size: "sm" })}
-                  >
+            <Section
+              title="Full-time terms"
+              action={
+                ft.offerLetterKey || ft.offerLetterUrl ? (
+                  <a href={`/api/proposals/${encodeURIComponent(proposal.id)}/offer-letter`} target="_blank" rel="noreferrer" className={btnOutline}>
                     <Download className="size-4" aria-hidden />
                     Offer letter
                   </a>
-                ) : null}
-              </div>
-              <dl className="mt-2 divide-y divide-ink-100 border-b border-ink-100">
+                ) : undefined
+              }
+            >
+              <dl className="divide-y divide-ink-200">
                 <DetailRow label="Job mode" value={MODE[ft.jobMode] ?? (ft.jobMode || "-")} />
                 <DetailRow label="Location" value={ft.jobMode === "remote" ? "Remote" : ft.location || "-"} />
                 <DetailRow label="Timezone" value={ft.timezone || offer.timezone || "-"} />
@@ -394,125 +487,80 @@ export default async function EmployerProposalDetail({
                   mono
                 />
               </dl>
-            </section>
+            </Section>
           )}
 
           {offer.jd ? (
-            <section>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Job description</h2>
+            <Section title="Job description">
               {/* Text: legacy Quill HTML is read back as plain text (EMH-28). */}
-              <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-base leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{offer.jd}</p>
-            </section>
+              <p className="max-w-prose whitespace-pre-line text-pretty text-base leading-relaxed text-ink-900 [overflow-wrap:anywhere]">{offer.jd}</p>
+            </Section>
           ) : null}
 
           {offer.additionalInfo ? (
-            <section>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">What the intern will learn</h2>
-              <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-base leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{offer.additionalInfo}</p>
-            </section>
+            <Section title="What the intern will learn">
+              <p className="max-w-prose whitespace-pre-line text-pretty text-base leading-relaxed text-ink-900 [overflow-wrap:anywhere]">{offer.additionalInfo}</p>
+            </Section>
           ) : null}
 
           {skills.length > 0 ? (
-            <section>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Skills</h2>
-              <ul className="mt-3 flex flex-wrap gap-2">
+            <Section title="Skills">
+              <ul className="flex flex-wrap gap-2">
                 {skills.map((skill) => (
-                  <li key={skill} className="rounded-full border border-ink-200 px-3 py-1 text-sm font-medium text-ink-700">
+                  <li key={skill} className="rounded-md bg-ink-100 px-2.5 py-1 text-sm font-medium text-ink-800">
                     {skill}
                   </li>
                 ))}
               </ul>
-            </section>
-          ) : null}
-
-          {/* Phones: the assessment after the terms, not above them. */}
-          {ratings.length > 0 ? (
-            <section className="border-t border-ink-100 pt-8 lg:hidden">
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Assessment at sending</h2>
-              <dl className="mt-1 divide-y divide-ink-100">
-                {ratings.map(([key, value]) => (
-                  <DetailRow
-                    key={key}
-                    label={key === "overall" ? "Findtern Score" : humanizeKey(key)}
-                    value={`${value}/10`}
-                    mono
-                  />
-                ))}
-              </dl>
-            </section>
+            </Section>
           ) : null}
 
           {interview ? (
-            <section className="border-t border-ink-100 pt-8" aria-labelledby="proposal-interview-h">
-              <h2 id="proposal-interview-h" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
-                Interview
-              </h2>
-              <p className="nums mt-1 text-sm text-ink-600">{formatSlotTime(new Date(meetingTime(interview) ?? 0), projectZone(projectTimezone, interview.timezone))}</p>
-              <div className="mt-3">
-                <JoinMeetingButton interviewId={interview.id} link={interview.meetingLink} ready={Boolean(interview.meetingLink)} variant="outline" />
+            <section aria-labelledby="proposal-interview-h">
+              <div className="mb-3 border-b border-ink-200 pb-2">
+                <h2 id="proposal-interview-h" className="font-display text-lg font-semibold text-ink-900">
+                  Interview
+                </h2>
+                <p className="nums mt-0.5 text-sm text-ink-700">{formatSlotTime(new Date(meetingTime(interview) ?? 0), projectZone(projectTimezone, interview.timezone))}</p>
               </div>
+              <JoinMeetingButton interviewId={interview.id} link={interview.meetingLink} ready={Boolean(interview.meetingLink)} variant="outline" />
             </section>
           ) : null}
 
           {/* Meeting rules are for interviews; a full-time offer is not one (bug sheet 12 Nov, row 16). */}
           {!ft ? (
-          <details className="group border-t border-ink-100 pt-2">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-sm text-lg font-semibold tracking-[-0.01em] text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 [&::-webkit-details-marker]:hidden">
-              Meeting rules
-              <ChevronDown className="size-5 shrink-0 text-ink-500 transition-transform group-open:rotate-180" aria-hidden />
-            </summary>
-            <p className="mt-1 text-sm text-text-subtle">By joining any meeting scheduled through Findtern, you agree to this conduct policy.</p>
-            <MeetingRulesList className="mt-4" />
-          </details>
+            <details className="group border-b border-ink-200 pb-2">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-sm font-display text-lg font-semibold text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 [&::-webkit-details-marker]:hidden">
+                Meeting rules
+                <ChevronDown className="size-5 shrink-0 text-ink-500 transition-transform group-open:rotate-180" aria-hidden />
+              </summary>
+              <p className="mt-1 text-sm text-ink-700">By joining any meeting scheduled through Findtern, you agree to this conduct policy.</p>
+              <MeetingRulesList className="mt-4" />
+            </details>
           ) : null}
+
+          {/* Phones: the candidate after the terms, not above them. */}
+          <div className="space-y-10 lg:hidden">{candidateInfo}</div>
         </div>
 
         <aside className="order-first space-y-10 lg:order-none lg:sticky lg:top-24 lg:self-start">
-          {/* ── Timeline: what happened, what is next ─────────────────── */}
-          <section>
-            <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Offer timeline</h2>
-            <ol className="mt-4">
-              {timeline.map((step, i) => {
-                const last = i === timeline.length - 1;
-                return (
-                  <li key={step.label} className="relative flex gap-3.5 pb-6 last:pb-0" aria-current={step.state === "current" ? "step" : undefined}>
-                    {!last ? (
-                      <span aria-hidden className={cn("absolute left-[0.6875rem] top-7 bottom-1 w-px", step.state === "done" ? "bg-brand-300" : "bg-ink-200")} />
-                    ) : null}
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "relative mt-0.5 grid size-6 shrink-0 place-items-center rounded-full",
-                        step.state === "done" && "bg-brand-700 text-white",
-                        step.state === "current" && "bg-white ring-2 ring-inset ring-brand-700",
-                        step.state === "todo" && "bg-white ring-1 ring-inset ring-ink-300",
-                        step.state === "closed" && "bg-ink-200 text-ink-700",
-                      )}
-                    >
-                      {step.state === "done" ? <Check className="size-3.5" strokeWidth={3} /> : null}
-                      {step.state === "current" ? <span className="size-2 rounded-full bg-brand-700" /> : null}
-                      {step.state === "closed" ? <X className="size-3.5" strokeWidth={3} /> : null}
-                    </span>
-                    <div className="min-w-0">
-                      <p className={cn("text-sm", step.state === "todo" ? "text-ink-600" : "font-semibold text-ink-900")}>
-                        {step.label}
-                        <span className="sr-only">{step.state === "done" ? " (done)" : step.state === "current" ? " (next)" : ""}</span>
-                      </p>
-                      {step.date ? <p className="nums text-sm text-ink-600">{step.date}</p> : null}
-                      {step.state === "current" || step.state === "closed" ? (
-                        state.next ? <p className="mt-1.5 text-pretty text-sm leading-relaxed text-ink-700">{state.next}</p> : null
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
-
-          {state.canWithdraw || state.canEdit || proposal.status === "hired" ? (
-            <section className="border-t border-ink-100 pt-8">
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{proposal.status === "hired" ? "Hire" : state.expiredReason ? "Close this offer" : "Change this offer"}</h2>
-              <div className="mt-4 grid gap-2">
+          {actionsNeeded || state.next ? (
+            <Section title={nextStepTitle}>
+              {/* The CGPA and expiry notices above already say it in full. */}
+              {!state.gate && !state.canSendNew && proposal.status !== "hired" && state.next ? <p className="mb-4 text-pretty text-sm leading-relaxed text-ink-700">{state.next}</p> : null}
+              <div className="grid gap-2">
+                {state.canPay ? (
+                  <Link href="/employer/checkout" className={buttonClass({ block: true, className: "min-h-11" })}>
+                    <CreditCard className="size-4" aria-hidden />
+                    {ft ? "Pay the hiring fee" : "Pay to confirm hire"}
+                  </Link>
+                ) : null}
+                {sendNewHref ? (
+                  <Link href={sendNewHref} className={buttonClass({ block: true, className: "min-h-11" })}>
+                    <Send className="size-4" aria-hidden />
+                    Send a new proposal
+                  </Link>
+                ) : null}
                 {state.canEdit ? (
                   <ProposalOfferForm
                     proposalId={proposal.id}
@@ -555,30 +603,16 @@ export default async function EmployerProposalDetail({
                   {...(confirmingCgpa ? { withdrawLabel: "Withdraw proposal", withdrawSecondary: true } : {})}
                 />
                 {proposal.status === "hired" && !ft ? (
-                  <Link href="/employer/timesheets" className={buttonClass({ variant: "outline", block: true })}>
+                  <Link href="/employer/timesheets" className={btnOutline}>
                     <Clock className="size-4" aria-hidden />
                     Timesheets
                   </Link>
                 ) : null}
               </div>
-            </section>
+            </Section>
           ) : null}
 
-          {ratings.length > 0 ? (
-            <section className="border-t border-ink-100 pt-8 max-lg:hidden">
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Assessment at sending</h2>
-              <dl className="mt-1 divide-y divide-ink-100">
-                {ratings.map(([key, value]) => (
-                  <DetailRow
-                    key={key}
-                    label={key === "overall" ? "Findtern Score" : humanizeKey(key)}
-                    value={`${value}/10`}
-                    mono
-                  />
-                ))}
-              </dl>
-            </section>
-          ) : null}
+          <div className="space-y-10 max-lg:hidden">{candidateInfo}</div>
         </aside>
       </div>
     </div>

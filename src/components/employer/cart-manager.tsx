@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AlertCircle, CheckCircle2, CreditCard, Loader2, MapPin, Send, Trash2, UserRound, Video } from "lucide-react";
 
 import { EmptyScene, Pill } from "@/components/app/primitives";
+import { Section } from "@/components/app/stat";
 import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
 import { groupByCandidate, projectsLabel } from "@/components/employer/shortlist-group";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
@@ -200,49 +201,58 @@ export function CartManager({
       <EmptyScene
         art
         title="No one on your shortlist yet"
-        body="Tap the heart on a candidate to keep them here for a project."
+        body="Tap the heart on a candidate to save them here. They wait, grouped by project, until you book a meeting or send a proposal."
         next={{ label: "Find candidates", href: "/employer/candidates" }}
       />
     );
   }
 
-  return (
-    <div>
-      {errorMsg ? (
-        <p role="alert" className="mb-4 flex items-center gap-2 rounded-apple-md border border-danger/30 bg-danger-soft px-4 py-3 text-sm text-danger">
-          <AlertCircle className="size-4 shrink-0" aria-hidden />
-          {errorMsg}
-        </p>
-      ) : null}
+  // People per project among those not yet proposed to: the figure beside each project in the summary column.
+  const peopleByProject = new Map<string, Set<string>>();
+  for (const l of cartLines) {
+    if (l.openProposalId || l.acceptedProposalId) continue;
+    (peopleByProject.get(l.projectId) ?? peopleByProject.set(l.projectId, new Set()).get(l.projectId)!).add(l.candidate.id);
+  }
+  const projectName = projectOptions.find(([id]) => id === selectedProject)?.[1] ?? "this project";
 
-      {/* One results bar, as on Candidates: the count (of everyone saved, when a project is picked), then the project picker. */}
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <p className="min-w-0 text-sm text-ink-700">
-          <span className="nums text-base font-semibold text-ink-900">{shownPeople}</span>
+  return (
+    <div className="grid gap-x-12 gap-y-8 pb-20 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:pb-0">
+      <div className="min-w-0">
+        {errorMsg ? (
+          <p role="alert" className="mb-4 flex items-center gap-2 border-y border-danger/40 py-3 text-sm text-danger">
+            <AlertCircle className="size-4 shrink-0" aria-hidden />
+            {errorMsg}
+          </p>
+        ) : null}
+
+        {/* The statement: how many people, of everyone saved when one project is picked. Phones also get the project picker here. */}
+        <div className="mb-1 flex flex-wrap items-end justify-between gap-x-4 gap-y-2 border-b border-ink-200 pb-3">
+          <h2 className="min-w-0 font-display text-2xl font-semibold tracking-[-0.02em] text-ink-900">
+            <span className="nums">{shownPeople}</span>
+            {filtered ? (
+              <>
+                {" "}of <span className="nums">{allPeople}</span>
+              </>
+            ) : null}{" "}
+            {allPeople === 1 ? "candidate" : "candidates"}
+            <span className="font-sans text-sm font-normal text-ink-700">
+              {filtered ? <> for {projectName}</> : null}
+              {!filtered && shownProjects > 1 ? <span className="max-sm:hidden"> · across {shownProjects} projects</span> : null}
+            </span>
+          </h2>
           {filtered ? (
-            <>
-              {" "}of <span className="nums font-semibold text-ink-900">{allPeople}</span>
-            </>
-          ) : null}{" "}
-          {allPeople === 1 ? "candidate" : "candidates"}
-          {filtered ? <> shown for <span className="font-medium text-ink-900">{projectOptions.find(([id]) => id === selectedProject)?.[1] ?? "this project"}</span></> : null}
-          {!filtered && shownProjects > 1 ? <span className="max-sm:hidden"> · across {shownProjects} projects</span> : null}
-          {filtered ? (
-            <>
-              {" · "}
-              <button type="button" onClick={() => setSelectedProject("all")} className="inline-flex min-h-11 items-center rounded-sm font-medium text-brand-700 underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand-600 sm:min-h-9 sm:touch:min-h-11">
-                Show all projects
-              </button>
-            </>
+            <button type="button" onClick={() => setSelectedProject("all")} className="inline-flex min-h-11 items-center rounded-md px-1 text-sm font-medium text-brand-700 underline underline-offset-4 outline-none hover:text-brand-900 focus-visible:ring-2 focus-visible:ring-brand-600">
+              Show all projects
+            </button>
           ) : null}
-        </p>
+        </div>
         {projectOptions.length > 1 ? (
-          <label className="flex min-w-0 items-center">
+          <label className="flex min-w-0 items-center py-3 lg:hidden">
             <span className="sr-only">Project</span>
             <select
               value={selectedProject}
               onChange={(e) => setSelectedProject(e.target.value)}
-              className={cn(fieldClass, "h-11 w-auto min-w-0 max-w-52 rounded-xl pl-3.5 [field-sizing:content] sm:h-9 sm:max-w-72 sm:touch:h-11")}
+              className={cn(fieldClass, "h-11 w-full")}
             >
               <option value="all">All projects</option>
               {projectOptions.map(([id, name]) => (
@@ -253,50 +263,74 @@ export function CartManager({
             </select>
           </label>
         ) : null}
+
+        <ul className="divide-y divide-ink-200 border-b border-ink-200">
+          {shownGroups.map((group) => (
+            <CartLine
+              key={group.primary.id}
+              group={group}
+              name={nameOf(group.primary)}
+              currency={currency}
+              busy={group.lines.some((l) => l.id === busyId)}
+              onMeeting={() => openMeeting(group.primary)}
+              onRemove={setRemoving}
+            />
+          ))}
+        </ul>
+        {inProject.length === 0 ? (
+          <div className="border-b border-ink-200 py-10">
+            <p className="font-display text-xl font-semibold text-ink-900">No one saved for {projectName}</p>
+            <p className="mt-1 text-sm text-ink-700">Save candidates to this project from Candidates, or look at everyone you have saved.</p>
+            <button type="button" onClick={() => setSelectedProject("all")} className={buttonClass({ variant: "outline", className: "mt-4 min-h-11" })}>
+              Show all projects
+            </button>
+          </div>
+        ) : shown.length === 0 ? <p className="border-b border-ink-200 py-6 text-base text-ink-800">Everyone saved here already has a proposal. They are listed under Already proposed.</p> : null}
+
+        {proposed.length > 0 ? (
+          <section aria-labelledby="proposed-heading" className="mt-10">
+            <h2 id="proposed-heading" className="mb-1 border-b border-ink-200 pb-2 font-display text-lg font-semibold text-ink-900">
+              Already proposed <span className="nums font-sans text-sm font-normal text-ink-600">{proposedGroups.length}</span>
+            </h2>
+            <ul className="divide-y divide-ink-200 border-b border-ink-200">
+              {proposedGroups.map((group) => (
+                <CartLine
+                  key={group.primary.id}
+                  group={group}
+                  name={nameOf(group.primary)}
+                  currency={currency}
+                  busy={group.lines.some((l) => l.id === busyId)}
+                  onMeeting={() => openMeeting(group.primary)}
+                  onRemove={setRemoving}
+                />
+              ))}
+            </ul>
+          </section>
+        ) : null}
       </div>
 
-      <ul className="space-y-4">
-        {shownGroups.map((group) => (
-          <CartLine
-            key={group.primary.id}
-            group={group}
-            name={nameOf(group.primary)}
-            currency={currency}
-            busy={group.lines.some((l) => l.id === busyId)}
-            onMeeting={() => openMeeting(group.primary)}
-            onRemove={setRemoving}
-          />
-        ))}
-      </ul>
-      {inProject.length === 0 ? (
-        <div className="py-12 text-center">
-          <p className="text-lg font-semibold text-ink-900">No one saved for {projectOptions.find(([id]) => id === selectedProject)?.[1] ?? "this project"}</p>
-          <button type="button" onClick={() => setSelectedProject("all")} className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 min-h-11" })}>
-            Show all projects
-          </button>
-        </div>
-      ) : shown.length === 0 ? <p className="rounded-2xl border border-ink-200 bg-white p-5 text-sm text-ink-700 shadow-xs">Everyone saved here already has a proposal. They are listed under Already proposed.</p> : null}
-
-      {proposed.length > 0 ? (
-        <section aria-labelledby="proposed-heading" className="mt-8">
-          <h2 id="proposed-heading" className="mb-3 text-base font-semibold text-ink-900">
-            Already proposed <span className="nums font-normal text-text-subtle">{proposedGroups.length}</span>
-          </h2>
-          <ul className="space-y-4">
-            {proposedGroups.map((group) => (
-              <CartLine
-                key={group.primary.id}
-                group={group}
-                name={nameOf(group.primary)}
-                currency={currency}
-                busy={group.lines.some((l) => l.id === busyId)}
-                onMeeting={() => openMeeting(group.primary)}
-                onRemove={setRemoving}
-              />
+      {/* The summary column (desktop): where the shortlist sits by project, and what each step does. One list, sticky. */}
+      <aside aria-label="Shortlist summary" className="hidden min-w-0 space-y-8 lg:sticky lg:top-24 lg:block">
+        <Section title="By project" hint={projectOptions.length > 1 ? "Pick one to narrow the list." : undefined}>
+          <ul className="divide-y divide-ink-200">
+            <li>
+              <ProjectRow label="All projects" count={allPeople} on={!filtered} onClick={() => setSelectedProject("all")} />
+            </li>
+            {projectOptions.map(([id, name]) => (
+              <li key={id}>
+                <ProjectRow label={name} count={peopleByProject.get(id)?.size ?? 0} on={selectedProject === id} onClick={() => setSelectedProject(id)} />
+              </li>
             ))}
           </ul>
-        </section>
-      ) : null}
+        </Section>
+        <Section title="From here">
+          <ol className="divide-y divide-ink-200 text-sm text-ink-800">
+            <li className="py-2.5">Book a meeting if you want to talk first.</li>
+            <li className="py-2.5">Send a proposal with the terms.</li>
+            <li className="py-2.5">Pay once the candidate accepts.</li>
+          </ol>
+        </Section>
+      </aside>
 
       {/* Remove: confirmed, as legacy did (EMB-16). */}
       <Dialog open={Boolean(removing)} onOpenChange={(open) => !open && setRemoving(null)}>
@@ -412,6 +446,24 @@ export function CartManager({
   );
 }
 
+/** One project in the summary column: the name, how many people are saved to it, and whether it is the current filter. */
+function ProjectRow({ label, count, on, onClick }: { label: string; count: number; on: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={cn(
+        "flex min-h-11 w-full items-baseline justify-between gap-4 py-2.5 text-left outline-none transition-colors duration-[var(--motion-fast)] hover:bg-ink-200/40 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-700",
+        on ? "font-semibold text-ink-900" : "text-ink-700",
+      )}
+    >
+      <span className="min-w-0 break-words text-sm">{label}</span>
+      {count > 0 ? <span className="nums shrink-0 font-display text-lg font-semibold text-ink-900">{count}</span> : null}
+    </button>
+  );
+}
+
 function CartLine({
   group,
   name,
@@ -434,97 +486,75 @@ function CartLine({
   const locked = meetingLocked(line);
   const closed = Boolean(line.projectClosed);
   const profileHref = `/employer/intern/${encodeURIComponent(c.id)}?project=${encodeURIComponent(line.projectId)}`;
-  const cellLabel = "text-[11px] font-semibold uppercase tracking-wider text-text-subtle";
-  const pill = "h-11 rounded-xl px-4 sm:h-10 sm:touch:h-11 xl:w-full max-[400px]:[&>svg]:hidden";
+  const action = "min-h-11 sm:touch:min-h-11";
 
-  // One card per person. xl: avatar | who | score and terms | actions, the same columns on every card.
-  // Below xl the metrics sit under the identity and the actions close the card.
+  // One ruled row per person: photo | who, for which project, skills | the score as a numeral with the rate under it;
+  // the actions close the row, outline all of them (the page has at most one filled button).
   return (
-    <li className="group/row relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-4 rounded-2xl border border-ink-200 bg-white p-4 shadow-xs transition-colors hover:border-ink-300 sm:p-5 xl:grid-cols-[auto_minmax(0,1fr)_20rem_14.5rem] xl:gap-x-6">
-      <RowAvatar photoUrl={c.photoUrl} initials={c.initials} seed={c.id} square className="sm:size-14" />
-      <div className="min-w-0 self-center xl:self-start">
-        <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          {/* The whole card opens the profile: this link is stretched over it; the controls sit above. */}
-          <Link
-            href={profileHref}
-            className="text-[15px] font-semibold text-ink-900 outline-none after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
-          >
+    <li className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-4 gap-y-3 py-6">
+      <RowAvatar photoUrl={c.photoUrl} initials={c.initials} seed={c.id} square className="size-12 sm:size-14" />
+      <div className="min-w-0">
+        <p className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+          <Link href={profileHref} className="inline-flex min-h-11 items-center font-display text-lg font-semibold text-ink-900 underline-offset-4 outline-none hover:text-brand-800 hover:underline focus-visible:ring-2 focus-visible:ring-brand-600 sm:min-h-0">
             {name}
           </Link>
-          {line.acceptedProposalId ? (
-            <Pill tone="waiting">Offer accepted</Pill>
-          ) : line.openProposalId ? (
-            <Pill tone="new">Proposal sent</Pill>
-          ) : null}
+          {line.acceptedProposalId ? <Pill tone="waiting">Offer accepted</Pill> : line.openProposalId ? <Pill tone="new">Proposal sent</Pill> : null}
           {closed ? <Pill tone="closed">Project closed</Pill> : null}
         </p>
-        {headline ? <p className="mt-0.5 line-clamp-2 text-pretty text-base font-medium leading-snug text-ink-900 group-hover/row:text-brand-800 sm:text-lg">{headline}</p> : null}
+        {headline ? <p className="line-clamp-2 text-pretty text-base text-ink-900">{headline}</p> : null}
         <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-sm text-ink-700">
           <span className="inline-flex items-center gap-1">
-            <MapPin className="size-3.5 shrink-0 text-ink-500" aria-hidden />
+            <MapPin className="size-3.5 shrink-0 text-ink-600" aria-hidden />
             {c.city || c.location || "City not stated"}
           </span>
           <span className="min-w-0 max-w-full">For {forProjects}</span>
         </p>
       </div>
 
-      {/* Score once, with its tier; rate and mode beside it. */}
-      <div className="col-span-2 grid grid-cols-[minmax(0,1fr)_7.5rem] items-start gap-x-4 rounded-xl border border-ink-200 bg-ink-50 p-3 xl:col-span-1 xl:col-start-3 xl:row-start-1 xl:self-start">
-        <div className="flex min-w-0 flex-col gap-1">
-          <span className={cellLabel}>Findtern Score</span>
-          <ScoreBadge size="cell" score={c.score} scored={c.scored} />
-        </div>
-        <div className="flex flex-col gap-1">
-          <span className={cellLabel}>Rate</span>
-          <span className="nums whitespace-nowrap text-[15px] font-semibold text-ink-900">{formatRate(line.hourlyRateMinor, currency)}</span>
-          <span className="text-[13px] text-ink-700">{c.workModes.length ? c.workModes.join(" / ") : "Mode not stated"}</span>
-        </div>
+      {/* The score as a numeral with its tier; the rate under it. */}
+      <div className="flex min-w-[6.5rem] flex-col items-end gap-1 text-right">
+        <ScoreBadge size="cell" score={c.score} scored={c.scored} />
+        <span className="nums whitespace-nowrap text-sm font-medium text-ink-900">{formatRate(line.hourlyRateMinor, currency)}</span>
+        <span className="text-xs text-ink-600">{c.workModes.length ? c.workModes.join(" / ") : "Mode not stated"}</span>
       </div>
 
-      <div className="col-span-2 min-w-0 xl:col-span-2 xl:col-start-2 xl:row-start-2">
+      <div className="col-span-3 min-w-0 sm:col-span-2 sm:col-start-2">
         <SkillChips skills={c.skills} wanted={[]} />
       </div>
 
-      {/* Phone: the card's last line. xl: one tight column on the right, the main action on top. */}
-      <div className="relative z-10 col-span-2 flex flex-wrap items-center gap-2 border-t border-ink-100 pt-4 xl:col-span-1 xl:col-start-4 xl:row-span-2 xl:row-start-1 xl:grid xl:grid-cols-[minmax(0,1fr)_auto] xl:content-start xl:gap-2 xl:border-0 xl:pt-0">
-        <div className="min-w-0 max-xl:order-2 xl:col-start-1 xl:row-start-1 xl:flex xl:flex-col">
-          {line.acceptedProposalId ? (
-            <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(line.acceptedProposalId)}`} size="sm" className={pill}>
-              <CreditCard className="size-4" aria-hidden />
-              Pay to complete the hire
-            </ButtonLink>
-          ) : line.openProposalId ? (
-            <ButtonLink href={`/employer/proposal/${encodeURIComponent(line.openProposalId)}`} variant="outline" size="sm" className={pill}>
-              <Send className="size-4" aria-hidden />
-              View proposal
-            </ButtonLink>
-          ) : closed ? (
-            <span className="inline-flex min-h-11 items-center text-sm text-ink-700 sm:min-h-9">Reopen the project to send a proposal.</span>
-          ) : locked ? (
-            // EMB-07: legacy kept Send Proposal off until the meeting was over; the date and reason are visible text.
-            <SendProposalHold pendingMeetingAt={line.meetingAt ?? line.meetingUntil} className="items-stretch max-xl:items-end" controlClassName="justify-center rounded-xl sm:h-10 sm:touch:h-11" />
-          ) : (
-            <ButtonLink href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}&project=${encodeURIComponent(line.projectId)}`} size="sm" className={pill}>
-              <Send className="size-4" aria-hidden />
-              Send proposal
-            </ButtonLink>
-          )}
-        </div>
-
-        {/* Its own button, not in the menu (bug sheet 8). Secondary, so it follows the main action. */}
-        <div className="flex items-center gap-2 max-xl:order-1 xl:col-span-2 xl:row-start-2 xl:[&>*]:flex-1">
-          {!line.acceptedProposalId && !closed && !locked ? (
-            <button type="button" onClick={onMeeting} className={buttonClass({ variant: "outline", size: "sm", className: pill })}>
-              <Video className="size-4" aria-hidden />
-              Book meeting
-            </button>
-          ) : null}
-          {line.meetingLink ? <JoinMeetingButton link={line.meetingLink} interviewId={line.meetingInterviewId ?? undefined} variant="outline" /> : null}
-        </div>
-
+      <div className="col-span-3 flex flex-wrap items-center gap-2 sm:col-span-2 sm:col-start-2">
+        {line.acceptedProposalId ? (
+          <ButtonLink href={`/employer/checkout?proposal=${encodeURIComponent(line.acceptedProposalId)}`} size="sm" variant="outline" className={action}>
+            <CreditCard className="size-4" aria-hidden />
+            Pay to complete the hire
+          </ButtonLink>
+        ) : line.openProposalId ? (
+          <ButtonLink href={`/employer/proposal/${encodeURIComponent(line.openProposalId)}`} variant="outline" size="sm" className={action}>
+            <Send className="size-4" aria-hidden />
+            View proposal
+          </ButtonLink>
+        ) : closed ? (
+          <span className="inline-flex min-h-11 items-center text-sm text-ink-700">Reopen the project to send a proposal.</span>
+        ) : locked ? (
+          // EMB-07: legacy kept Send Proposal off until the meeting was over; the date and reason are visible text.
+          <SendProposalHold pendingMeetingAt={line.meetingAt ?? line.meetingUntil} controlClassName="justify-center rounded-md" />
+        ) : (
+          <ButtonLink href={`/employer/send-proposal?intern=${encodeURIComponent(c.id)}&project=${encodeURIComponent(line.projectId)}`} size="sm" variant="outline" className={action}>
+            <Send className="size-4" aria-hidden />
+            Send proposal
+          </ButtonLink>
+        )}
+        {/* Its own button, not in the menu (bug sheet 8). */}
+        {!line.acceptedProposalId && !closed && !locked ? (
+          <button type="button" onClick={onMeeting} className={buttonClass({ variant: "outline", size: "sm", className: action })}>
+            <Video className="size-4" aria-hidden />
+            Book meeting
+          </button>
+        ) : null}
+        {line.meetingLink ? <JoinMeetingButton link={line.meetingLink} interviewId={line.meetingInterviewId ?? undefined} variant="outline" /> : null}
         {/* Profile and remove stay in the menu (QA-124). */}
-        <div className="ml-auto flex items-center gap-2 max-xl:order-3 xl:col-start-2 xl:row-start-1 xl:ml-0">
-          {busy ? <Loader2 className="size-4 animate-spin text-text-subtle motion-reduce:animate-none" aria-label="Removing" /> : null}
+        <div className="ml-auto flex items-center gap-2">
+          {busy ? <Loader2 className="size-4 animate-spin text-ink-600 motion-reduce:animate-none" aria-label="Removing" /> : null}
           <RowMenu
             label={`More actions for ${name}`}
             items={[

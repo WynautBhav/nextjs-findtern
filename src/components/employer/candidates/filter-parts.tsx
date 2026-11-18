@@ -59,7 +59,7 @@ export function SwitchField({
       <span
         aria-hidden
         className={cn(
-          "relative h-6 w-10 shrink-0 rounded-full bg-ink-300 transition-colors peer-disabled:opacity-60 after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:shadow-sm after:transition-transform",
+          "relative h-6 w-10 shrink-0 rounded-full bg-ink-300 transition-colors peer-disabled:opacity-60 after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-surface-raised after:shadow-sm after:transition-transform",
           "peer-checked:bg-brand-700 peer-checked:after:translate-x-4 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-600 motion-reduce:transition-none motion-reduce:after:transition-none",
         )}
       />
@@ -84,7 +84,7 @@ export function PillRadios({
           <input type="radio" name={name} value={o.value} defaultChecked={value === o.value} className="peer sr-only" />
           <span
             className={cn(
-              "apple-spring flex min-h-11 flex-col justify-center rounded-apple-sm bg-ink-50 px-3 py-1.5 text-sm font-medium text-ink-800 ring-1 ring-inset ring-ink-200",
+              "apple-spring flex min-h-11 flex-col justify-center rounded-md bg-ink-50 px-3 py-1.5 text-sm font-medium text-ink-800 ring-1 ring-inset ring-ink-200",
               "hover:bg-ink-100 peer-checked:bg-brand-700 peer-checked:text-white peer-checked:ring-brand-700 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-600",
               "peer-checked:[&_.sub]:text-white/75",
             )}

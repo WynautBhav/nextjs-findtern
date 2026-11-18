@@ -3,14 +3,14 @@ import { Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
- * Pieces of the comparison matrix. One visual language for every row:
- * a white card, ink-200 rules, section bands in the same small caps as the
- * Candidates stat strip, and one metric cell (number, unit, bar) for every
- * 0-10 and percent value. The leader of a row gets a green top edge, a tint and a "Best" badge.
+ * Pieces of the comparison matrix, set like a ledger on the page canvas: hairline rows, no card, no vertical
+ * rules, section names as plain headings, and one metric cell (numeral, unit, thin bar) for every 0-10 and
+ * percent value. The leader of a row gets a faint green wash, a bold green numeral and the word "Best" (or
+ * "Lowest" for a price), so the mark never rests on colour alone.
  */
 
 /** Width of the pinned label column, shared by the header corner, rows and section bands. */
-const LABEL_COL = "w-32 min-w-32 sm:w-40 sm:min-w-40 xl:w-44 xl:min-w-44";
+const LABEL_COL = "w-28 min-w-28 sm:w-40 sm:min-w-40 xl:w-44 xl:min-w-44";
 
 export function SectionRow({ label, span }: { label: string; span: number }) {
   return (
@@ -18,10 +18,10 @@ export function SectionRow({ label, span }: { label: string; span: number }) {
       <th
         scope="colgroup"
         colSpan={span}
-        className="border-b border-ink-200 bg-ink-50 px-4 py-2 text-left align-middle text-[11px] font-semibold uppercase tracking-wider text-ink-700 sm:px-5"
+        className="border-b border-ink-300 px-0 pb-2 pt-8 text-left align-bottom font-display text-lg font-semibold text-ink-900"
       >
         {/* Pinned so the band's name stays put while the candidates scroll. */}
-        <span className="sticky left-4 inline-block sm:left-5">{label}</span>
+        <span className="sticky left-0 inline-block">{label}</span>
       </th>
     </tr>
   );
@@ -46,14 +46,14 @@ export function MatrixRow({
       <th
         scope="row"
         className={cn(
-          "sticky left-0 z-10 border-r border-ink-200 bg-white px-2.5 py-3 text-left align-top text-xs font-semibold leading-5 text-ink-900 sm:p-4 sm:text-sm xl:p-5",
+          "sticky left-0 z-10 bg-paper py-3 pr-3 text-left align-top text-sm font-semibold leading-5 text-ink-900 after:absolute after:inset-y-0 after:right-0 after:w-px after:bg-ink-200 after:content-[''] sm:py-4 sm:pr-4",
           LABEL_COL,
-          !last && "border-b",
+          !last && "border-b border-ink-200",
         )}
       >
         <span className="[overflow-wrap:normal] hyphens-none">{label}</span>
-        {hint ? <span className="mt-0.5 block break-words text-xs font-normal leading-4 text-text-subtle">{hint}</span> : null}
-        {level ? <span className="mt-0.5 block text-xs font-normal leading-4 text-text-subtle">All level</span> : null}
+        {hint ? <span className="mt-0.5 block break-words text-xs font-normal leading-4 text-ink-600">{hint}</span> : null}
+        {level ? <span className="mt-0.5 block text-xs font-normal leading-4 text-ink-600">All level</span> : null}
       </th>
       {children}
     </tr>
@@ -64,9 +64,9 @@ export function Cell({ leader, last, children }: { leader?: boolean; last?: bool
   return (
     <td
       className={cn(
-        "min-w-0 border-r border-ink-200 p-3 align-top text-sm text-ink-800 last:border-r-0 sm:p-4 xl:p-5",
-        !last && "border-b",
-        leader && "bg-brand-50 shadow-[inset_0_3px_0_0_var(--color-brand-600)]",
+        "min-w-0 px-3 py-3 align-top text-sm text-ink-800 sm:px-4 sm:py-4 xl:px-5",
+        !last && "border-b border-ink-200",
+        leader && "bg-brand-50",
       )}
     >
       {children}
@@ -74,10 +74,10 @@ export function Cell({ leader, last, children }: { leader?: boolean; last?: bool
   );
 }
 
-/** "Best" (or "Lowest" for price) as words and a check, never colour alone. */
+/** "Best" (or "Lowest" for price) as a word and a check, never colour alone. */
 export function BestBadge({ label = "Best" }: { label?: string }) {
   return (
-    <span className="inline-flex h-6 items-center gap-1 rounded-full bg-brand-700 px-2 text-xs font-semibold text-white">
+    <span className="inline-flex items-center gap-1 text-sm font-semibold text-brand-800">
       <Check className="size-3.5" strokeWidth={3} aria-hidden />
       {label}
       <span className="sr-only"> in this row</span>
@@ -113,17 +113,17 @@ export function MetricCell({
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
         <span className="flex items-baseline gap-1">
-          <span className={cn("nums text-[22px] font-semibold leading-none sm:text-2xl", leader ? "text-brand-800" : "text-ink-900")}>
+          <span className={cn("nums font-display text-2xl font-semibold leading-none", leader ? "text-brand-800" : "text-ink-900")}>
             {unit === "%" ? Math.round(value) : value.toFixed(1)}
           </span>
-          <span className="text-xs text-text-subtle">{unit === "%" ? "%" : "/ 10"}</span>
+          <span className="text-xs text-ink-600">{unit === "%" ? "%" : "/ 10"}</span>
         </span>
         {leader ? <BestBadge /> : null}
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-ink-200" aria-hidden>
-        <div className="h-full rounded-full bg-brand-600" style={{ width: `${pct}%` }} />
+      <div className="h-1 overflow-hidden rounded-sm bg-ink-200" aria-hidden>
+        <div className={cn("h-full rounded-sm", leader ? "bg-brand-800" : "bg-brand-600")} style={{ width: `${pct}%` }} />
       </div>
-      {note ? <p className="nums text-xs leading-4 text-text-subtle">{note}</p> : null}
+      {note ? <p className="nums text-xs leading-4 text-ink-600">{note}</p> : null}
     </div>
   );
 }

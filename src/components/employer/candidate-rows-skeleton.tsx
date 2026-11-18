@@ -13,22 +13,22 @@ export function CandidateRowsSkeleton({ label }: { label: string }) {
       <span className="sr-only" role="status">
         {label}
       </span>
-      <Skeleton className={`mb-4 h-8 w-44 rounded-apple-sm lg:mb-6 ${bar}`} />
+      <Skeleton className={`mb-4 h-8 w-44 rounded-md lg:mb-6 ${bar}`} />
       <ul className="divide-y divide-ink-100 border-t border-ink-100">
         {Array.from({ length: 4 }).map((_, i) => (
           <li key={i} className="grid grid-cols-[auto_minmax(0,1fr)_auto] gap-x-3.5 gap-y-3 py-5 sm:gap-x-5 sm:py-6">
             <Skeleton className={`size-12 rounded-full sm:size-14 ${bar}`} />
             <div className="min-w-0 space-y-2">
-              <Skeleton className={`h-4 w-10 rounded-apple-sm ${bar}`} />
-              <Skeleton className={`h-5 w-64 max-w-full rounded-apple-sm ${bar}`} />
-              <Skeleton className={`h-3.5 w-24 rounded-apple-sm ${bar}`} />
+              <Skeleton className={`h-4 w-10 rounded-md ${bar}`} />
+              <Skeleton className={`h-5 w-64 max-w-full rounded-md ${bar}`} />
+              <Skeleton className={`h-3.5 w-24 rounded-md ${bar}`} />
             </div>
-            <Skeleton className={`size-11 rounded-full sm:h-9 sm:w-36 ${bar}`} />
+            <Skeleton className={`size-11 rounded-md sm:h-11 sm:w-36 ${bar}`} />
             <div className="col-span-3 space-y-3 sm:col-span-2 sm:col-start-2">
-              <Skeleton className={`h-4 w-72 max-w-full rounded-apple-sm ${bar}`} />
+              <Skeleton className={`h-4 w-72 max-w-full rounded-md ${bar}`} />
               <div className="flex flex-wrap gap-1.5">
                 {Array.from({ length: 4 }).map((__, j) => (
-                  <Skeleton key={j} className={`h-7 w-20 rounded-full ${bar}`} />
+                  <Skeleton key={j} className={`h-7 w-20 rounded-md ${bar}`} />
                 ))}
               </div>
             </div>
