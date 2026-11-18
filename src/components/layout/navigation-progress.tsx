@@ -21,7 +21,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
  */
 const SHOW_AFTER_MS = 100;
 const GIVE_UP_MS = 15_000;
-const START_EVENT = "findtern:navigation-start";
+/** Fired when a real navigation begins (link click, back/forward, useProgressRouter). The shells use it to tell a page change from a same-page URL update. */
+export const START_EVENT = "findtern:navigation-start";
 
 /** Tells the bar a navigation to `href` is starting. Does nothing when `href` is the page already showing. */
 export function startNavigationProgress(href: string | URL) {

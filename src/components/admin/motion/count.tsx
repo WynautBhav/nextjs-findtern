@@ -15,7 +15,7 @@
  */
 
 import { useEffect, useRef, useState } from "react";
-import { useReducedMotion } from "motion/react";
+import { useReducedMotion } from "@/components/app/use-reduced-motion";
 
 import { ADMIN_DUR, seconds } from "./constants";
 

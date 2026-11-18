@@ -28,6 +28,7 @@ import {
   Zap,
 } from "lucide-react";
 
+import { PALETTE_KBD, PALETTE_TRIGGER } from "@/components/layout/shell-palette";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { candidateHref, invoiceHref, SEARCH_MIN, type SearchResponse } from "@/lib/admin/palette-search";
 import { cn } from "@/lib/utils";
@@ -277,7 +278,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
         aria-haspopup="dialog"
         aria-keyshortcuts="Control+K Meta+K"
         onClick={openPalette}
-        className="apple-spring flex min-h-11 w-full items-center gap-2.5 rounded-full border border-[var(--admin-panel-edge)] bg-[var(--admin-panel)] px-4 py-2 text-sm text-text-subtle hover:text-foreground md:max-w-[26rem]"
+        className={PALETTE_TRIGGER}
       >
         <Search className="size-4 shrink-0" aria-hidden />
         {/* No aria-label: the name comes from the visible words plus the hidden hint, so the two can
@@ -287,7 +288,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
           <span className="hidden md:inline">Search candidates, companies, pages</span>
         </span>
         <span className="sr-only"> (Command K)</span>
-        <kbd aria-hidden className="hidden shrink-0 rounded-md bg-[var(--admin-panel-2)] px-1.5 py-1 font-sans text-2xs font-semibold text-ink-600 md:inline">
+        <kbd aria-hidden className={PALETTE_KBD}>
           {hint}
         </kbd>
       </button>
@@ -298,13 +299,13 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             e.preventDefault();
             (returnFocus.current ?? triggerRef.current)?.focus();
           }}
-          className="top-[12%] translate-y-0 gap-0 overflow-hidden rounded-apple-xl border-ink-200 bg-card p-0 shadow-tile sm:max-w-lg">
+          className="top-[12%] translate-y-0 gap-0 overflow-hidden rounded-lg border-ink-300 bg-card p-0 shadow-[var(--shadow-float)] sm:max-w-lg">
           <DialogTitle className="sr-only">Search the admin portal</DialogTitle>
           <DialogDescription className="sr-only">
             Type to filter pages and actions. With two or more characters, candidates, companies and invoices are searched too. Use the arrow keys to move and Enter to open.
           </DialogDescription>
-          <div className="flex items-center border-b border-ink-200 py-1 pl-3 pr-14">
-            <Search className="mr-3 size-4 shrink-0 text-ink-600" aria-hidden />
+          <div className="flex items-center border-b border-ink-300 py-2 pl-4 pr-14">
+            <Search className="mr-3 size-5 shrink-0 text-ink-600" aria-hidden />
             <input
               type="text"
               role="combobox"
@@ -322,7 +323,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
               onKeyDown={onInputKeyDown}
               placeholder="Jump to a page, or find a candidate, company or invoice"
               autoComplete="off"
-              className="min-h-11 w-full bg-transparent text-base text-ink-900 placeholder:text-text-subtle focus:outline-hidden sm:text-sm"
+              className="min-h-11 w-full bg-transparent font-display text-base text-ink-900 placeholder:text-ink-600 focus:outline-hidden sm:text-lg"
             />
           </div>
 
@@ -330,8 +331,9 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
             <div id="admin-command-list" role="listbox" aria-label="Results">
               {list.map((section, n) => (
                 <div key={section.key} role="group" aria-labelledby={`admin-command-group-${section.key}`} className="pb-2">
-                  <div id={`admin-command-group-${section.key}`} className="px-3 py-1.5 text-xs font-medium text-text-subtle">
+                  <div id={`admin-command-group-${section.key}`} className="flex items-center gap-2 px-3 py-1.5 text-xs font-medium text-ink-600">
                     {section.title}
+                    <span aria-hidden className="h-px flex-1 bg-ink-200" />
                   </div>
                   {section.entries.map((entry, k) => {
                     const i = starts[n] + k;
@@ -346,11 +348,11 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
                         onClick={() => navigateTo(entry.href)}
                         onMouseMove={() => setActive(i)}
                         className={cn(
-                          "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-apple-sm px-3 py-2 text-left text-sm",
-                          i === current ? "bg-ink-100 text-ink-900" : "text-ink-700",
+                          "flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-md border px-2 py-1.5 text-left text-sm",
+                          i === current ? "border-ink-300 bg-canvas text-ink-900" : "border-transparent text-ink-700",
                         )}
                       >
-                        <span aria-hidden className="grid size-6 shrink-0 place-items-center rounded-apple-sm bg-ink-100 text-ink-600">
+                        <span aria-hidden className={cn("grid size-7 shrink-0 place-items-center rounded-md", i === current ? "bg-brand-800 text-canvas" : "text-ink-500")}>
                           <Icon className="size-4" />
                         </span>
                         <span className="min-w-0 flex-1">

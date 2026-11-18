@@ -5,9 +5,11 @@
  * from, so the four roles read as one product: one rail look, one top bar, one phone tab bar,
  * one account menu, one quiet "Ask Findy" launcher.
  *
- * Rail: flat on the paper canvas, a hairline on its right edge. The current page is a solid
- * deep-green block with white text (readable at a glance, no coloured edge stripes). Group names
- * are sentence case. A count is a plain number in the signal colour, not a pill.
+ * Rail: flat on the paper canvas, a hairline on its right edge. The current page is a raised
+ * paper "tab" with a deep-green stamp behind its icon (the stamp reads in a collapsed rail too, and
+ * its icon colour is the canvas, so it holds in the admin's dark theme as well). Group names are
+ * sentence case on a ruled line, like a ledger heading. A count is a plain number in the signal
+ * colour, not a pill.
  */
 
 import Link from "next/link";
@@ -33,6 +35,8 @@ export type NavItem = {
   href: string;
   label: string;
   icon: React.ReactNode;
+  /** The label on the phone tab bar when the full one would be cut off ("Home" for "Dashboard"). */
+  shortLabel?: string;
   /** A count beside the label (unread, items waiting). Zero shows nothing. */
   badge?: number | string;
   /** Replaces the badge text when set (the admin rail ticks its numbers). `badge` must still be set. */
@@ -112,7 +116,10 @@ export function RailGroup({ title, compact, children }: { title?: string; compac
   return (
     <div>
       {title ? (
-        compact ? <div aria-hidden className="mx-auto mb-2 h-px w-5 bg-ink-300" /> : <p className="mb-1.5 px-3 text-xs font-medium text-ink-500">{title}</p>
+        compact ? <div aria-hidden className="mx-auto mb-2 h-px w-5 bg-ink-300" /> : <p className="mb-1.5 flex items-center gap-2 px-3 text-xs font-medium text-ink-600">
+          {title}
+          <span aria-hidden className="h-px flex-1 bg-ink-200" />
+        </p>
       ) : null}
       <ul className="flex flex-col gap-0.5">{children}</ul>
     </div>
@@ -123,16 +130,21 @@ export function RailLink({ item, active, compact, onNavigate }: { item: NavItem;
   const locked = Boolean(item.locked);
   const mail = item.href.startsWith("mailto:");
   const className = cn(
-    "group relative flex min-h-11 items-center gap-3 rounded-md px-3 text-sm transition-colors duration-[var(--motion-fast)] [@media(pointer:fine)]:min-h-10",
-    active ? "bg-brand-800 font-medium text-white" : "text-ink-700 hover:bg-ink-200/60 hover:text-ink-900",
+    "group relative flex min-h-11 items-center gap-3 rounded-md border px-2 text-sm transition-[background-color,color,transform] duration-[var(--motion-fast)] active:scale-[0.985] motion-reduce:active:scale-100 [@media(pointer:fine)]:min-h-10",
+    active ? "border-ink-300 bg-surface-raised font-semibold text-ink-900" : "border-transparent text-ink-700 hover:bg-ink-200/60 hover:text-ink-900",
     compact && "justify-center px-0",
   );
   const body = (
     <>
-      <span className={cn("relative shrink-0 [&_svg]:size-[1.125rem]", active ? "text-white" : "text-ink-500 group-hover:text-ink-800")}>
+      <span
+        className={cn(
+          "relative grid size-7 shrink-0 place-items-center rounded-md transition-colors duration-[var(--motion-fast)] [&_svg]:size-[1.125rem]",
+          active ? "bg-brand-800 text-canvas" : "text-ink-500 group-hover:text-ink-800",
+        )}
+      >
         {item.icon}
-        {compact && locked ? <LockGlyph className="absolute -right-1.5 -top-1.5 size-3 rounded-full bg-paper p-px text-ink-700" /> : null}
-        {compact && !locked && (item.attention || item.badge) ? <span aria-hidden className="absolute -right-1 -top-1 size-2 rounded-full bg-signal ring-2 ring-paper" /> : null}
+        {compact && locked ? <LockGlyph className="absolute -right-1.5 -top-1.5 size-3 rounded-full bg-canvas p-px text-ink-700" /> : null}
+        {compact && !locked && (item.attention || item.badge) ? <span aria-hidden className="absolute -right-1 -top-1 size-2 rounded-full bg-signal ring-2 ring-canvas" /> : null}
       </span>
       <span className={cn("min-w-0 flex-1 truncate", compact && "sr-only")}>
         {item.label}
@@ -141,9 +153,9 @@ export function RailLink({ item, active, compact, onNavigate }: { item: NavItem;
         {compact && item.badge ? `, ${item.badge} ${item.badgeLabel ?? "unread"}` : ""}
       </span>
       {!compact && locked ? (
-        <LockGlyph className={cn("size-3.5 shrink-0", active ? "text-white/80" : "text-ink-500")} />
+        <LockGlyph className="size-3.5 shrink-0 text-ink-600" />
       ) : !compact && item.badge ? (
-        <span className={cn("nums text-xs font-semibold", active ? "text-white" : "text-signal")}>
+        <span className="nums text-xs font-semibold text-signal">
           {item.badgeNode ?? item.badge}
           <span className="sr-only"> {item.badgeLabel ?? "unread"}</span>
         </span>
@@ -194,7 +206,7 @@ export function RailGroups({ groups, pathname, compact, onNavigate }: { groups: 
 }
 
 /** Rail footer row (Sign out, FAQ): same metrics as a RailLink, never active. */
-export const RAIL_FOOT = "flex min-h-11 w-full items-center gap-3 rounded-md px-3 text-sm text-ink-600 transition-colors duration-[var(--motion-fast)] hover:bg-ink-200/60 hover:text-ink-900 [@media(pointer:fine)]:min-h-10 [&>svg]:size-[1.125rem]";
+export const RAIL_FOOT = "flex min-h-11 w-full items-center gap-3 rounded-md border border-transparent px-2 text-sm text-ink-600 transition-colors duration-[var(--motion-fast)] hover:bg-ink-200/60 hover:text-ink-900 [@media(pointer:fine)]:min-h-10 [&>svg]:mx-1 [&>svg]:size-[1.125rem]";
 
 /**
  * "Ask Findy": one quiet launcher, always the first control on the right of the top bar. Plain text
@@ -277,14 +289,17 @@ export function UserMenu({
 
 /**
  * Phone bottom bar: the role's real destinations (up to five) and a "More" that opens the full
- * navigation. The current page sits in a soft green capsule behind its icon.
+ * navigation. The current page has a deep-green stamp behind its icon.
  */
+/** Phone tab labels that do not fit a 60px cell at 360px (bold when current). Everything else uses its nav label. */
+const TAB_SHORT: Record<string, string> = { Dashboard: "Home", "Proposal pipeline": "Pipeline", Students: "Home" };
+
 export function TabBar({ tabs, pathname, onMore, moreBadge }: { tabs: NavItem[]; pathname: string; onMore?: () => void; moreBadge?: number }) {
   const active = activeHrefOf(tabs, pathname);
   const cols = tabs.length + (onMore ? 1 : 0);
-  const cell = "relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-1 py-2 text-xs";
+  const cell = "relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-0.5 py-2 text-xs";
   return (
-    <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-200 bg-paper pb-[env(safe-area-inset-bottom)] lg:hidden">
+    <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-300 bg-canvas pb-[env(safe-area-inset-bottom)] lg:hidden">
       <ul className="grid" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
         {tabs.map((item) => {
           const on = isActive(item.href, active);
@@ -295,18 +310,18 @@ export function TabBar({ tabs, pathname, onMore, moreBadge }: { tabs: NavItem[];
                 aria-current={on ? "page" : undefined}
                 aria-disabled={item.locked ? true : undefined}
                 title={item.locked ? `${item.label}: ${item.lockedNote ?? LOCKED_TEXT}` : undefined}
-                className={cn(cell, on ? "font-semibold text-brand-800" : "text-ink-600")}
+                className={cn(cell, on ? "font-semibold text-ink-900" : "text-ink-600")}
               >
-                <span className={cn("relative grid h-7 w-14 place-items-center rounded-full transition-colors duration-[var(--motion-fast)] [&_svg]:size-5", on && "bg-brand-100")}>
+                <span className={cn("relative grid h-7 w-12 place-items-center rounded-md transition-colors duration-[var(--motion-fast)] [&_svg]:size-5", on && "bg-brand-800 text-canvas")}>
                   {item.icon}
-                  {item.locked ? <LockGlyph className="absolute right-1.5 top-0 size-3 rounded-full bg-paper p-px text-ink-700" /> : null}
+                  {item.locked ? <LockGlyph className="absolute right-1.5 top-0 size-3 rounded-full bg-canvas p-px text-ink-700" /> : null}
                   {item.attention || item.badge ? (
-                    <span className="absolute right-2 top-0 size-2 rounded-full bg-signal ring-2 ring-paper">
+                    <span className="absolute right-2 top-0 size-2 rounded-full bg-signal ring-2 ring-canvas">
                       <span className="sr-only">{item.badge ? `${item.badge} ${item.badgeLabel ?? "waiting"}` : "needs you"}</span>
                     </span>
                   ) : null}
                 </span>
-                <span className="max-w-full truncate">{item.label}</span>
+                <span className="max-w-full whitespace-nowrap">{item.shortLabel ?? TAB_SHORT[item.label] ?? item.label}</span>
                 {item.locked ? <span className="sr-only">, locked. {item.lockedNote ?? LOCKED_TEXT}</span> : null}
               </Link>
             </li>
@@ -315,9 +330,9 @@ export function TabBar({ tabs, pathname, onMore, moreBadge }: { tabs: NavItem[];
         {onMore ? (
           <li>
             <button type="button" onClick={onMore} className={cn(cell, "w-full text-ink-600")} aria-label={moreBadge ? `More, ${moreBadge} waiting` : "More"}>
-              <span className="relative grid h-7 w-14 place-items-center rounded-full [&_svg]:size-5">
+              <span className="relative grid h-7 w-12 place-items-center rounded-md [&_svg]:size-5">
                 <Ellipsis aria-hidden />
-                {moreBadge ? <span aria-hidden className="absolute right-2 top-0 size-2 rounded-full bg-signal ring-2 ring-paper" /> : null}
+                {moreBadge ? <span aria-hidden className="absolute right-2 top-0 size-2 rounded-full bg-signal ring-2 ring-canvas" /> : null}
               </span>
               <span>More</span>
             </button>

@@ -33,4 +33,8 @@ describe("breadcrumbsFor", () => {
       { href: "/employer/proposals", label: "Proposals", link: true },
     ]);
   });
+
+  it("keeps short acronyms upper case in an unlabelled segment: 'AI reports', not 'Ai reports'", () => {
+    assert.deepEqual(breadcrumbsFor("/admin/ai-reports", {}), [{ href: "/admin/ai-reports", label: "AI reports", link: false }]);
+  });
 });

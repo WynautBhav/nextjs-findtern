@@ -6,8 +6,9 @@
  *
  * - Rail on the left, flat on warm paper with a hairline edge. It collapses to an icon rail; the
  *   choice lives in a cookie the server layout reads, so the first paint is right.
- * - Top bar: where you are (a trail only on detail pages), then "Ask Findy", extra actions, alerts
- *   and the account menu. No blur, no pill.
+ * - Top bar: search first (Ctrl K jumps to any page), then where you are (a dateline, or a trail on
+ *   detail pages), then "Ask Findy", extra actions, alerts and the account menu. A double rule under
+ *   it (`.ledger-head`). No blur, no pill.
  * - Phones: a bottom bar with the role's real destinations and a "More" for the rest.
  * - One breakpoint (lg) for every role.
  * - `tone` and `flush` are accepted for old callers and ignored: there is one look now.
@@ -16,12 +17,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { MotionConfig } from "motion/react";
 import { Bell, ChevronsLeft, ChevronsRight, CircleQuestionMark, LogOut, Mail, Menu, MessageSquareText, X } from "lucide-react";
 
 import { FeedbackFab } from "@/components/app/feedback-fab";
 import { Logo, LogoMark } from "@/components/brand/logo";
 import { APP_FONT_CLASSES } from "@/components/layout/app-fonts";
+import { Folio } from "@/components/layout/folio";
+import { usePageEnter } from "@/components/layout/page-enter";
+import { ShellPalette } from "@/components/layout/shell-palette";
 import {
   AskLauncher,
   RAIL_FOOT,
@@ -94,6 +97,7 @@ export function ConsoleShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const enterRef = usePageEnter(pathname);
   const [drawer, setDrawer] = useState(false);
   const [collapsed, setCollapsed] = useState(initialCollapsed);
 
@@ -147,6 +151,8 @@ export function ConsoleShell({
       ]
     : [];
 
+  const paletteItems = groups.flatMap((g) => g.items.filter((i) => !i.locked && !i.href.startsWith("mailto:")).map((i) => ({ href: i.href, label: i.label, group: g.title ?? rootCrumb.label, icon: i.icon })));
+
   const rail = (compact: boolean, onNavigate?: () => void) => (
     <>
       <RailScroller>
@@ -163,9 +169,10 @@ export function ConsoleShell({
     </>
   );
 
+  const homeLabel = roleLabel ? `Findtern ${roleLabel} home` : "Findtern home";
   const brand = (compact: boolean) => (
     <div className={cn("flex min-h-12 items-center", compact ? "justify-center" : "px-2")}>
-      <Link href={homeHref} aria-label="Findtern home" className="flex min-w-0 flex-col justify-center">
+      <Link href={homeHref} aria-label={homeLabel} className="flex min-w-0 flex-col justify-center">
         {compact ? <LogoMark variant="green" alt="" className="size-8" /> : <Logo variant="green" priority className="h-8" />}
         {!compact && roleLabel ? <span className="mt-1 text-xs font-medium text-ink-600">{roleLabel}</span> : null}
       </Link>
@@ -173,7 +180,7 @@ export function ConsoleShell({
   );
 
   return (
-    <MotionConfig reducedMotion="user">
+    <>
       <div
         data-app="1"
         data-tone="light"
@@ -204,7 +211,7 @@ export function ConsoleShell({
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 border-b border-ink-200 bg-canvas">
+          <header className="ledger-head sticky top-0 z-30 bg-canvas">
             <div className={cn("flex h-14 items-center gap-1.5", gridLine)}>
               <Sheet open={drawer} onOpenChange={setDrawer}>
                 <SheetTrigger asChild>
@@ -223,12 +230,16 @@ export function ConsoleShell({
                   {rail(false, () => setDrawer(false))}
                 </SheetContent>
               </Sheet>
-              <Link href={homeHref} aria-label="Findtern home" className="flex min-h-11 items-center lg:hidden">
+              <Link href={homeHref} aria-label={homeLabel} className="flex min-h-11 items-center lg:hidden">
                 <LogoMark variant="green" alt="" className="size-8" />
               </Link>
 
+              <div className="min-w-0 flex-1 md:flex-none md:basis-[22rem]">
+                <ShellPalette items={paletteItems} withAssistant={Boolean(help)} />
+              </div>
+
               {showCrumbs ? (
-                <nav aria-label="Breadcrumb" className="hidden min-w-0 flex-1 items-center gap-1.5 text-sm lg:flex">
+                <nav aria-label="Breadcrumb" className="ml-3 hidden min-w-0 flex-1 items-center gap-1.5 text-sm lg:flex">
                   <Link href={rootCrumb.href} className="shrink-0 font-medium text-ink-600 hover:text-ink-900">
                     {rootCrumb.label}
                   </Link>
@@ -245,7 +256,9 @@ export function ConsoleShell({
                     </span>
                   ))}
                 </nav>
-              ) : null}
+              ) : (
+                <Folio className="ml-3 hidden min-w-0 flex-1 truncate text-sm text-ink-600 xl:block" />
+              )}
 
               <div className="ml-auto flex shrink-0 items-center gap-0.5 sm:gap-1">
                 {help ? <AskLauncher className={askEverywhere ? undefined : "max-lg:hidden"} /> : null}
@@ -271,7 +284,7 @@ export function ConsoleShell({
           </header>
 
           <main id="main" tabIndex={-1} className={cn(gridLine, "flex-1 pt-6 outline-none lg:pt-8", tabs ? "pb-28 lg:pb-20" : "pb-20")}>
-            <div key={pathname} className="page-enter">
+            <div ref={enterRef}>
               {children}
             </div>
           </main>
@@ -280,7 +293,7 @@ export function ConsoleShell({
         </div>
         {banner}
       </div>
-    </MotionConfig>
+    </>
   );
 }
 

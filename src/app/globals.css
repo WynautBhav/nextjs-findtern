@@ -1456,33 +1456,6 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
     text-wrap: balance;
   }
 
-  /* Frosted sidebar + top bars. Ultra-thin material, saturate boost. */
-  .apple-material-sidebar {
-    background: rgb(255 255 255 / 0.72);
-    backdrop-filter: blur(20px) saturate(190%);
-    -webkit-backdrop-filter: blur(20px) saturate(190%);
-    border-right: 1px solid rgb(7 47 36 / 0.08);
-  }
-
-  .dark .apple-material-sidebar {
-    background: rgb(20 31 27 / 0.75);
-    backdrop-filter: blur(25px) saturate(190%);
-    -webkit-backdrop-filter: blur(25px) saturate(190%);
-    border-right: 1px solid rgb(255 255 255 / 0.1);
-  }
-
-  .apple-material-bar {
-    background: rgb(255 255 255 / 0.72);
-    backdrop-filter: blur(20px) saturate(190%);
-    -webkit-backdrop-filter: blur(20px) saturate(190%);
-  }
-
-  .dark .apple-material-bar {
-    background: rgb(15 26 23 / 0.72);
-    backdrop-filter: blur(25px) saturate(190%);
-    -webkit-backdrop-filter: blur(25px) saturate(190%);
-  }
-
   /* Apple card: squircle, hairline, ambient diffusion. No harsh shadows. */
   .apple-panel {
     border-radius: var(--radius-apple-lg);
@@ -1982,7 +1955,7 @@ html {
 @theme {
   --font-display: var(--font-app-display), var(--font-app-text), ui-sans-serif, system-ui, sans-serif;
   --color-paper: #f3f0e9;
-  --color-signal: #b4570a;
+  --color-signal: #9f4d08;
   --motion-fast: 120ms;
   --motion-base: 200ms;
   --motion-slow: 300ms;
@@ -2182,4 +2155,89 @@ html {
 [data-app] :is(.uppercase, [class*="tracking-wide"], [class*="tracking-[0."]) {
   text-transform: none;
   letter-spacing: normal;
+}
+
+/* Score bars fill once from the left (replaces a motion.div). */
+@keyframes score-grow {
+  from {
+    transform: scaleX(0);
+  }
+}
+.score-grow {
+  animation: score-grow var(--motion-slow) var(--ease-app) both;
+}
+
+/* ── Chrome identity (E0b) ───────────────────────────────────────────────────
+   Ledger double rule under the top bar: a 2px deep-green line with a hairline 4px below it.
+   Dark admin uses the ink ramp instead of the (light mint) brand-800 so it stays quiet. */
+.ledger-head {
+  border-bottom: 2px solid var(--color-brand-800);
+}
+.ledger-head::after {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: -6px;
+  height: 1px;
+  background: var(--color-ink-300);
+  pointer-events: none;
+}
+[data-app].dark .ledger-head,
+.dark [data-app] .ledger-head {
+  border-bottom-color: var(--color-ink-300);
+}
+
+/* Paper: a barely-there fibre grain on the canvas (static, no blur, no gradient). */
+[data-app]:not(.dark) {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+/* Page titles: the display face, set large and tight. The one h1 of a page is the masthead. */
+[data-app] main h1 {
+  font-family: var(--font-display);
+  letter-spacing: -0.025em;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+/* The masthead tab: a short deep-green bar above the page's one h1, like the tab on a ledger heading. */
+[data-app] main h1::before {
+  content: "";
+  display: block;
+  width: 2.25rem;
+  height: 3px;
+  margin-bottom: 0.75rem;
+  background: var(--color-brand-800);
+}
+[data-app].dark main h1::before,
+.dark [data-app] main h1::before {
+  background: var(--color-brand-700);
+}
+
+/* Branded focus ring: a deep-green outline held off the control by a paper-coloured gap. */
+[data-app] :focus-visible {
+  outline: 2px solid var(--color-brand-700);
+  outline-offset: 3px;
+}
+[data-app] :is(nav[aria-label="Main"], nav[aria-label="Primary"]) :focus-visible {
+  outline-offset: -2px;
+}
+[data-app] :is(input, textarea, select):focus-visible {
+  outline-offset: 1px;
+}
+
+/* Press: controls sink 1px. */
+[data-app] :is(button, [role="button"], a.btn):not(:disabled):active {
+  translate: 0 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-app] :is(button, [role="button"], a.btn):not(:disabled):active {
+    translate: none;
+  }
+}
+
+/* Loading skeleton that mimics the ledger layouts (components/app/layout-kit.tsx LedgerSkeleton). */
+.ledger-skel-rule {
+  height: 1px;
+  background: var(--color-ink-200);
 }

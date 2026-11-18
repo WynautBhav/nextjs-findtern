@@ -18,13 +18,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { useEffect, useState } from "react";
-import { MotionConfig } from "motion/react";
 import { ChevronsLeft, ChevronsRight, LogOut, Menu, MessageSquare, Moon, Sun, X } from "lucide-react";
 
-import { Count } from "@/components/admin/motion";
+import { Count } from "@/components/admin/motion/count";
 import { FeedbackFab } from "@/components/app/feedback-fab";
 import { Logo, LogoMark } from "@/components/brand/logo";
 import { APP_FONT_CLASSES } from "@/components/layout/app-fonts";
+import { Folio } from "@/components/layout/folio";
+import { usePageEnter } from "@/components/layout/page-enter";
 import { RAIL_FOOT, RailGroups, RailScroller, TabBar, UserMenu, type NavGroup, type NavItem } from "@/components/layout/shell-parts";
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { breadcrumbsFor } from "@/lib/breadcrumbs";
@@ -99,6 +100,7 @@ export function AdminShell({
 }) {
   const pathname = usePathname();
   const router = useProgressRouter();
+  const enterRef = usePageEnter(pathname);
   const [drawer, setDrawer] = useState(false);
   const [collapsed, setCollapsed] = useState(initialCollapsed);
   const [theme, setTheme] = useState<AdminTheme>(initialTheme);
@@ -177,7 +179,7 @@ export function AdminShell({
 
   const brand = (compact: boolean) => (
     <div className={cn("flex min-h-12 items-center", compact ? "justify-center" : "px-2")}>
-      <Link href={homeHref} aria-label="Findtern home" className="flex min-w-0 flex-col justify-center">
+      <Link href={homeHref} aria-label="Findtern Admin home" className="flex min-w-0 flex-col justify-center">
         {compact ? <LogoMark variant={logoVariant} alt="" className="size-8" /> : <Logo variant={logoVariant} priority className="h-8" />}
         {!compact ? <span className="mt-1 text-xs font-medium text-ink-600">Admin</span> : null}
       </Link>
@@ -187,7 +189,7 @@ export function AdminShell({
   const iconBtn = "relative grid size-11 shrink-0 place-items-center rounded-md text-ink-600 transition-colors duration-[var(--motion-fast)] hover:bg-ink-200/60 hover:text-ink-900";
 
   return (
-    <MotionConfig reducedMotion="user">
+    <>
       <div
         data-app="1"
         data-console="admin"
@@ -216,7 +218,7 @@ export function AdminShell({
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 border-b border-ink-200 bg-canvas">
+          <header className="ledger-head sticky top-0 z-30 bg-canvas">
             <div className="mx-auto flex h-14 w-full max-w-[90rem] items-center gap-1.5 px-[var(--space-page)]">
               <Sheet open={drawer} onOpenChange={setDrawer}>
                 <SheetTrigger asChild>
@@ -236,7 +238,9 @@ export function AdminShell({
                 </SheetContent>
               </Sheet>
 
-              <div className="min-w-0 flex-1">{topActions}</div>
+              <div className="min-w-0 flex-1 md:flex-none md:basis-[22rem]">{topActions}</div>
+              <Folio className="ml-3 hidden min-w-0 flex-1 truncate text-sm text-ink-600 xl:block" />
+              <div className="hidden flex-1 md:block xl:hidden" />
 
               <div className="flex shrink-0 items-center gap-0.5 sm:gap-1">
                 {messagesHref ? (
@@ -273,7 +277,7 @@ export function AdminShell({
                 ))}
               </nav>
             ) : null}
-            <div key={pathname} className="page-enter">
+            <div ref={enterRef}>
               {children}
             </div>
           </main>
@@ -281,6 +285,6 @@ export function AdminShell({
           <TabBar tabs={tabs} pathname={pathname} onMore={() => setDrawer(true)} moreBadge={waiting} />
         </div>
       </div>
-    </MotionConfig>
+    </>
   );
 }
