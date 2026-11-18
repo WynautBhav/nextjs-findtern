@@ -35,7 +35,7 @@ export function breadcrumbsFor(
     if (ID_LIKE.test(part) && idLabel === "") continue;
     const label = ID_LIKE.test(part)
       ? idLabel
-      : (labels[href] ?? part.replace(/[-_]/g, " ").replace(/^\w/, (c) => c.toUpperCase()));
+      : (labels[href] ?? part.replace(/[-_]/g, " ").replace(/^\w/, (c) => c.toUpperCase()).replace(/\b(Ai|Cgpa|Cms|Faq)\b/g, (w) => w.toUpperCase()));
     // Only a known route gets a link: "/employer/intern" is a URL segment,
     // not a page, and linking it 404s (and makes the router prefetch a 404).
     out.push({ href, label, link: href in labels });

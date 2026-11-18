@@ -34,6 +34,7 @@ const ratio = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) +
 const css = readFileSync(join(root, "src/app/globals.css"), "utf8");
 const theme = css.slice(css.indexOf("@theme"), css.indexOf("@theme") + css.slice(css.indexOf("@theme")).search(/\n}\n/));
 const raw = new Map([...theme.matchAll(/--color-([\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+if (!raw.has("signal")) { const m = css.match(/--color-signal:\s*(#[0-9a-f]{6})/i); if (m) raw.set("signal", m[1]); } // declared in the app block, not the first @theme
 const val = (name, depth = 0) => {
   const v = raw.get(name);
   if (v === undefined || depth > 6) return undefined;
@@ -47,7 +48,7 @@ const fail = (m) => findings.push(m);
 
 // ── 1. tokens ────────────────────────────────────────────────────────────────
 const SURFACES = { canvas: val("canvas"), white: "#ffffff", "brand-100": val("brand-100") };
-const TEXT = ["ink-500", "ink-600", "ink-700", "text-subtle", "muted-foreground", "subtle-foreground", "accent-700", "brand-700", "success", "danger", "info", "warning"];
+const TEXT = ["ink-500", "ink-600", "ink-700", "text-subtle", "muted-foreground", "subtle-foreground", "accent-700", "brand-700", "success", "danger", "info", "warning", "signal"];
 /** On its own soft fill too. */
 const ON_SOFT = { warning: "warning-soft", success: "success-soft", danger: "danger-soft", info: "info-soft" };
 /** success is 4.37:1 on brand-100 and is not part of this pass (nothing sets it on that fill); it is held to canvas and white. */

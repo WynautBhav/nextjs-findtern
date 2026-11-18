@@ -123,7 +123,9 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   };
   const tabs = ["/employer/dashboard", "/employer/candidates", "/employer/projects", "/employer/proposals", "/employer/cart"]
     .map((href) => (href === shortlistTab.href ? shortlistTab : flat.find((i) => i.href === href)))
-    .filter((i): i is ConsoleNavItem => Boolean(i));
+    .filter((i): i is ConsoleNavItem => Boolean(i))
+    // Six equal cells on a 360px phone: the long names are cut off, so the bar uses short ones.
+    .map((i) => ({ ...i, shortLabel: ({ Dashboard: "Home", Candidates: "Talent" } as Record<string, string>)[i.label] }));
 
   return (
     <ToastProvider>

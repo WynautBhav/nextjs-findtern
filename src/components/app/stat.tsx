@@ -60,13 +60,22 @@ export function StatList({ items, className }: { items: StatItem[]; className?: 
             <dd className="nums shrink-0 font-display text-lg font-semibold text-ink-900">{it.value}</dd>
           </>
         );
-        return it.href ? (
-          <Link key={it.label} href={it.href} className="flex items-baseline justify-between gap-4 py-2.5 transition-colors duration-[var(--motion-fast)] hover:bg-ink-200/40 -mx-2 px-2 rounded-md">
-            {row}
-          </Link>
-        ) : (
-          <div key={it.label} className="flex items-baseline justify-between gap-4 py-2.5">
-            {row}
+        // A <dl> may hold only <div> groups of dt/dd: the link goes inside them, never around them.
+        return (
+          <div key={it.label} className={cn("flex items-baseline justify-between gap-4 py-2.5", it.href && "relative -mx-2 rounded-md px-2 transition-colors duration-[var(--motion-fast)] hover:bg-ink-200/40")}>
+            {it.href ? (
+              <>
+                <dt className="min-w-0 text-sm text-ink-700">
+                  <Link href={it.href} className="block after:absolute after:inset-0 after:content-['']">
+                    {it.label}
+                    {it.hint ? <span className="mt-0.5 block text-xs text-ink-600">{it.hint}</span> : null}
+                  </Link>
+                </dt>
+                <dd className="nums shrink-0 font-display text-lg font-semibold text-ink-900">{it.value}</dd>
+              </>
+            ) : (
+              row
+            )}
           </div>
         );
       })}

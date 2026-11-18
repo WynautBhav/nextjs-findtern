@@ -7,10 +7,10 @@ export const ADMIN_SURFACE =
   "rounded-[var(--radius-admin-card)] border border-[color:var(--admin-panel-edge)] bg-[color:var(--admin-panel)] shadow-[var(--admin-shadow)]";
 
 /**
- * Pill shapes for page and panel actions, applied to `ButtonLink` / `ButtonAnchor` via `className`
+ * Rounded-md shapes for page and panel actions, applied to `ButtonLink` / `ButtonAnchor` via `className`
  * (no new button variants): `<ButtonLink variant="primary" className={ADMIN_PILL_PRIMARY}>`.
- * Primary is the filled brand pill; secondary is a quiet outline pill with a hover tone step.
+ * Primary is the filled brand button; secondary is a quiet outline button with a hover tone step.
  */
-export const ADMIN_PILL_PRIMARY = "rounded-full px-5 shadow-none hover:shadow-none";
+export const ADMIN_PILL_PRIMARY = "rounded-md px-5 shadow-none hover:shadow-none";
 export const ADMIN_PILL_SECONDARY =
-  "rounded-full border-ink-300 bg-transparent px-5 text-foreground shadow-none backdrop-blur-none hover:border-ink-400 hover:bg-[color:var(--admin-panel-2)] hover:shadow-none";
+  "rounded-md border-ink-300 bg-transparent px-5 text-foreground shadow-none hover:border-ink-400 hover:bg-[color:var(--admin-panel-2)] hover:shadow-none";

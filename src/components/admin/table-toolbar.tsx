@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -31,6 +31,19 @@ export type ToolbarFilter = {
   allLabel?: string;
 };
 
+const PHONE = "(max-width: 639px)";
+function usePhone(): boolean {
+  return useSyncExternalStore(
+    (cb) => {
+      const mq = window.matchMedia(PHONE);
+      mq.addEventListener("change", cb);
+      return () => mq.removeEventListener("change", cb);
+    },
+    () => window.matchMedia(PHONE).matches,
+    () => false,
+  );
+}
+
 export function TableToolbar({
   searchPlaceholder = "Search…",
   filters = [],
@@ -53,6 +66,9 @@ export function TableToolbar({
   sortOptions?: SortOption[];
 }) {
   const { searchParams, set: setParam, clear, keys } = useUrlTableState({ searchKey, pageKey });
+  // A long placeholder is cut off mid-word on a phone: show a short one there; the accessible name stays the full text.
+  const phone = usePhone();
+  const shownPlaceholder = phone && searchPlaceholder.length > 24 ? "Search" : searchPlaceholder;
 
   const [term, setTerm] = useState(searchParams.get(searchKey) ?? "");
   const filtersId = useId();
@@ -123,7 +139,7 @@ export function TableToolbar({
           value={value}
           onChange={(e) => setParam(filter.key, e.target.value || null)}
           className={cn(
-            "apple-spring h-10 max-w-56 cursor-pointer truncate rounded-full pr-9 pl-4 text-base sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 max-sm:w-full max-sm:max-w-full",
+            "apple-spring h-10 max-w-56 cursor-pointer truncate rounded-md pr-9 pl-4 text-base sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 max-sm:w-full max-sm:max-w-full",
             value
               ? "bg-[color:var(--admin-bar-tint)] font-medium text-foreground"
               : "bg-[color:var(--admin-panel-2)] text-foreground",
@@ -162,9 +178,9 @@ export function TableToolbar({
                 setTerm("");
               }
             }}
-            placeholder={searchPlaceholder}
+            placeholder={shownPlaceholder}
             aria-label={searchPlaceholder}
-            className="h-10 w-full rounded-full bg-[color:var(--admin-panel-2)] pr-11 pl-10 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 [&::-webkit-search-cancel-button]:hidden"
+            className="h-10 w-full rounded-md bg-[color:var(--admin-panel-2)] pr-11 pl-10 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 [&::-webkit-search-cancel-button]:hidden"
           />
           {term ? (
             <button
@@ -192,11 +208,11 @@ export function TableToolbar({
             onClick={() => setFiltersOpen((o) => !o)}
             aria-expanded={filtersOpen}
             aria-controls={filtersId}
-            className="apple-spring inline-flex h-10 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+            className="apple-spring inline-flex h-10 items-center gap-1.5 rounded-md bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
           >
             <SlidersHorizontal className="size-4" aria-hidden />
             {filtersOpen ? "Fewer filters" : "More filters"}
-            {foldedActive ? <span className="nums rounded-full bg-[color:var(--admin-bar-tint)] px-1.5 text-xs text-foreground">{foldedActive}</span> : null}
+            {foldedActive ? <span className="nums rounded-md bg-[color:var(--admin-bar-tint)] px-1.5 text-xs text-foreground">{foldedActive}</span> : null}
           </button>
         ) : null}
         {foldable && filtersOpen ? (
@@ -210,7 +226,7 @@ export function TableToolbar({
         {exportHref ? (
           <a
             href={exportHref}
-            className="apple-spring apple-pressable ml-auto inline-flex h-10 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+            className="apple-spring apple-pressable ml-auto inline-flex h-10 items-center gap-1.5 rounded-md bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
           >
             CSV
           </a>
@@ -226,7 +242,7 @@ export function TableToolbar({
               key={chip.key}
               type="button"
               onClick={() => setParam(chip.key, null)}
-              className="apple-spring group inline-flex min-h-11 items-center gap-1 rounded-full bg-[color:var(--admin-bar-tint)] py-0.5 pr-2.5 pl-3 text-xs font-medium text-foreground hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="apple-spring group inline-flex min-h-11 items-center gap-1 rounded-md bg-[color:var(--admin-bar-tint)] py-0.5 pr-2.5 pl-3 text-xs font-medium text-foreground hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               <span className="text-text-subtle">{chip.label}:</span>
               {chip.value}
