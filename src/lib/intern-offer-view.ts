@@ -41,6 +41,8 @@ export function internOfferKey(p: Row, now: Date = new Date()): InternOfferKey {
   const fullTime = Boolean(offer.fullTime);
   if (isHiredProposal({ status, hiredAt: p.hiredAt ?? null })) return fullTime ? "fulltime_hired" : "hired";
   if ((status === "sent" || status === "interview_scheduled") && offerPastStart(offer.startDate, now)) return "lapsed";
+  // The sweeper storing a no-reply expiry must not change what the intern reads (it said "Rejected · no response" a minute before).
+  if (status === "expired" && expiryOf({ status, hiredAt: p.hiredAt ?? null, offerDetails: p.offerDetails }).reason === "no_reply_past_start") return "lapsed";
   if (status === "accepted" || status === "processing") return fullTime ? "fulltime_hired" : "accepted";
   if (["sent", "interview_scheduled", "rejected", "withdrawn", "expired", "draft"].includes(status)) {
     return status as InternOfferKey;

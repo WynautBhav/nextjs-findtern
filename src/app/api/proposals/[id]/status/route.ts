@@ -19,7 +19,7 @@ import { FREE_DECLINES, offerPastStart, parseOffer, todayIst } from "@/lib/offer
 import { hasOpenOrderFor, OPEN_ORDER_MINUTES } from "@/lib/payments";
 import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
 import { internLockResponse } from "@/lib/intern-unlock";
-import { withdrawRefusal } from "@/lib/proposal-expiry";
+import { expiredStamp, withdrawRefusal } from "@/lib/proposal-expiry";
 
 /**
  * Which role may set which status.
@@ -220,7 +220,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     if (internDecline) return { ...base, declinedBy: "intern", declinedAt: now };
     // Keep a lapsed `sent` offer countable once it leaves `sent` (withdraw / admin expire).
     const lapse = proposal.status === "sent" && offerPastStart(offer.startDate) ? { lapsedAt: now } : {};
-    if (session.role === "admin") return { ...base, ...lapse, closedByAdminAt: now, closedByAdminStatus: status };
+    if (session.role === "admin") return { ...base, ...lapse, closedByAdminAt: now, closedByAdminStatus: status, ...(status === "expired" ? expiredStamp("admin_closed") : {}) };
     return lapse.lapsedAt ? { ...base, ...lapse } : null;
   };
   const details = stampedDetails();
@@ -274,9 +274,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
 
     // Accepting closes the intern's other open offers from every company (one
     // internship at a time) and takes them off this employer's shortlist.
-    if (status === "rejected" || status === "expired") {
-      // A declined or expired candidate leaves the employer's shortlist
-      // (legacy routes.ts:14481).
+    if (status === "rejected") {
+      // A declined candidate leaves the employer's shortlist (legacy routes.ts:14481). An expired offer does not:
+      // the employer keeps the candidate shortlisted and re-proposes in one click.
       await tx
         .delete(schema.employerCartItems)
         .where(

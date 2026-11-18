@@ -10,7 +10,7 @@ import { HOURS_PER_MONTH } from "@/lib/plan-offer";
 import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
 import { resolvePricing, type Currency, type Pricing } from "@/lib/employer-pricing";
 import { PER_HIRE_FEE_DEFAULT } from "@/lib/per-hire-fee";
-import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
+import { candidateStatusPill, proposalActionLabel, type CandidateProposal, type ExpiredProposal } from "@/components/employer/candidate-status";
 import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
 import { type ListView } from "@/components/employer/candidate-view";
 import { CandidateQuickView } from "@/components/employer/candidate-quick-view";
@@ -41,6 +41,8 @@ export interface CandidateCardProps {
   pricing?: Pricing;
   /** This employer's live or hired offer to the candidate, if any. */
   proposal?: CandidateProposal | null;
+  /** Newest expired offer while nothing live shows: an "Expired" pill and a link to it; Send proposal stays. */
+  expired?: ExpiredProposal | null;
   /** Skills the list is filtered by: matching chips are filled and listed first. */
   wantedSkills?: string[];
   /** "Active now" / "Last seen 2h ago" / "Offline"; null when the candidate hides it. */
@@ -174,6 +176,7 @@ export function CandidateCard({
   nameUnlocked = false,
   pricing: resolved,
   proposal = null,
+  expired = null,
   wantedSkills = [],
   presence = null,
   interested = false,
@@ -182,7 +185,7 @@ export function CandidateCard({
 }: CandidateCardProps) {
   const pricing = resolved ?? resolvePricing(candidate.score, [], currency, region, PER_HIRE_FEE_DEFAULT);
   const displayName = displayNameOf(candidate, nameUnlocked);
-  const status = candidateStatusPill(proposal);
+  const status = candidateStatusPill(proposal, expired);
   // The headline is the degree and field (else the top two skills). The skills are listed once, in full, in the
   // "Skills" block below: they used to lead the headline and then drop out of the chips, so only four showed.
   const headline = headlineOf(candidate);

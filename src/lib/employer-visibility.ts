@@ -6,6 +6,7 @@ import { interviews, proposals, users } from "./db/schema";
 import { isHiredProposal } from "./hire-status";
 import { parseOffer } from "./offer";
 import { LIVE_STATUSES } from "./employer-offer-status";
+import { EXPIRY_LABEL, expiryOf, type ExpiryReason } from "./proposal-expiry";
 import { pendingMeetingAtFor } from "./proposal-guard";
 
 export { isLiveOffer } from "./employer-offer-status";
@@ -100,6 +101,11 @@ export type CandidateRelation = {
    * "Send proposal" until the interview is over (lib/proposal-guard).
    */
   pendingMeetingAt: string | null;
+  /**
+   * The newest expired offer (no reply, unpaid or closed by Findtern), only while nothing live or hired shows. The card keeps
+   * its history ("Expired") instead of reading as never contacted; "Send proposal" stays open for a new offer.
+   */
+  expired: { id: string; reason: ExpiryReason; label: string } | null;
 };
 
 const CLOSED_STATUSES = ["rejected", "withdrawn", "expired"];
@@ -141,7 +147,11 @@ export async function candidateRelations(
     const mine = rows.filter((r) => r.internId === id);
     const withOffer = mine.map((r) => ({ ...r, fullTime: Boolean(parseOffer(r.offerDetails, r.currency).fullTime) }));
     const hires = withOffer.filter((r) => isHiredProposal(r));
-    const live = withOffer.find((r) => LIVE_STATUSES.includes((r.status ?? "").toLowerCase()) && !isHiredProposal(r));
+    const expiry = (r: (typeof withOffer)[number]) => expiryOf({ status: r.status, hiredAt: r.hiredAt, offerDetails: r.offerDetails, currency: r.currency });
+    // A sent or accepted offer whose start day passed is expired even before the sweeper stores it.
+    const live = withOffer.find((r) => LIVE_STATUSES.includes((r.status ?? "").toLowerCase()) && !isHiredProposal(r) && !expiry(r).expired);
+    const lapsedRow = live || hires.length > 0 ? null : withOffer.find((r) => !isHiredProposal(r) && ["no_reply_past_start", "unpaid_past_start", "admin_closed"].includes(expiry(r).reason ?? ""));
+    const lapsedReason = lapsedRow ? expiry(lapsedRow).reason : null;
     const shown = live ?? hires[0] ?? null;
     const internship = hires.find((r) => !r.fullTime);
     const fullTimeOut = withOffer.some((r) => r.fullTime && !CLOSED_STATUSES.includes((r.status ?? "").toLowerCase()));
@@ -149,6 +159,7 @@ export async function candidateRelations(
       proposal: shown ? { id: shown.id, status: isHiredProposal(shown) ? "hired" : shown.status, fullTime: shown.fullTime } : null,
       hired: hires.length > 0,
       fullTimeFrom: internship && !fullTimeOut ? internship.id : null,
+      expired: lapsedRow && lapsedReason ? { id: lapsedRow.id, reason: lapsedReason, label: EXPIRY_LABEL[lapsedReason] } : null,
       pendingMeetingAt: pendingMeetingAtFor(
         meetings.filter((m) => m.internId === id),
         { projectId },

@@ -424,6 +424,7 @@ export function Results({
                   nameUnlocked={data.nameUnlocked.has(candidate.id)}
                   pricing={resolvePricing(candidate.score, data.plans, data.currency, data.region, PER_HIRE_FEE_DEFAULT)}
                   proposal={rel?.proposal ?? null}
+                  expired={rel?.expired ?? null}
                   wantedSkills={data.effectiveSkills}
                   presence={data.presence[candidate.id] ?? null}
                   interested={data.saved.has(candidate.id)}
