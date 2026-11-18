@@ -21,8 +21,10 @@ test("the loader asks for the entitlement before anything is restored or filtere
     assert.ok(i > 0, needle);
     return i;
   };
-  assert.ok(at("await proAccess(uid)") < at("restorableFilters(await rememberedFilters"));
-  assert.ok(at("await proAccess(uid)") < at("enforcePro("));
+  // The entitlement read starts in the first wave (`proP = early(proAccess(uid))`) and is awaited before anything is restored or filtered.
+  assert.ok(at("early(proAccess(uid))") < at("const proActive = await proP"));
+  assert.ok(at("const proActive = await proP") < at("restorableFilters(await rememberedFilters"));
+  assert.ok(at("const proActive = await proP") < at("enforcePro("));
   assert.match(query, /if \(!proActive\) \{[\s\S]*?Object\.assign\(filters, \{ \.\.\.EMPTY_PRO_REQUEST, colleges: \[\] \}\)/);
 });
 

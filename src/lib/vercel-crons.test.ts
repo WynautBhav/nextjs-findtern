@@ -20,10 +20,16 @@ test("vercel.json: every cron path has an App Router route file", () => {
   }
 });
 
-test("vercel.json: cron paths are unique and daily (Hobby-safe)", () => {
+test("vercel.json: cron paths are unique and daily (Hobby-safe), except the hourly tick", () => {
   const crons = config.crons ?? [];
   assert.equal(new Set(crons.map((c) => c.path)).size, crons.length);
   for (const { path, schedule } of crons) {
+    // /api/cron/tick carries the interview reminders (1 h before the call) and the daily jobs, so it runs hourly. Hourly crons need
+    // a Vercel plan above Hobby; on Hobby change its schedule to a daily one (the 1 h reminder then needs the KVM timers).
+    if (path === "/api/cron/tick") {
+      assert.match(schedule, /^\d{1,2} \* \* \* \*$/, `${path}: ${schedule} is not hourly`);
+      continue;
+    }
     assert.match(schedule, /^\d{1,2} \d{1,2} \* \* \*$/, `${path}: ${schedule} is not a once-a-day schedule`);
   }
 });
