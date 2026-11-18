@@ -234,8 +234,8 @@ Two mechanisms run the same work, and which one is live depends on where the app
   short-lived and frozen between requests, so timers there would only add queries. Use it on exactly one long-running server.
 - `GET /api/cron/tick` (`src/lib/cron-tick.ts`) runs the timers' jobs once, in order: interview reminders, proposal/interview
   expiry, notification jobs, email outbox (skipped when `OUTBOX_CRON=off`). Each step is idempotent and the whole tick stops
-  starting steps after 40 s. The notification jobs run only on ticks whose UTC hour is 0, 6, 12 or 18, so the daily 03:10 UTC tick does
-  not run them; they need an hourly ping.
+  starting steps after 40 s. The notification jobs run only on ticks whose UTC hour is 0, 6, 12 or 18, so the daily 06:00 UTC tick runs them once a day;
+  more frequent runs need an hourly ping.
 - **The 1-hour interview reminder** therefore needs either a long-running server with `SCHEDULERS=on` or an **hourly external
   ping** to `/api/cron/tick` with the bearer secret. On Hobby's daily cron it is late, and the reminder text states the real time left.
 - Activation and turn-off steps for the money crons: [`docs/cron-activation.md`](docs/cron-activation.md) (written before
@@ -394,7 +394,7 @@ ap-southeast-1 database.
 
   | Path | Schedule | What it does |
   |---|---|---|
-  | `/api/cron/tick` | 03:10 | Reminders, expiry, notification jobs (only on ticks at 00/06/12/18 UTC, see [Background jobs](#background-jobs)), email outbox |
+  | `/api/cron/tick` | 06:00 | Reminders, expiry, notification jobs (only on ticks at 00/06/12/18 UTC, see [Background jobs](#background-jobs)), email outbox |
   | `/api/cron/payment-reminders` | 03:30 | Payment reminder emails |
   | `/api/cron/roster-import-purge` | 04:15 | Deletes expired college roster imports; ignores `SCHEDULERS=off` |
   | `/api/cron/refund-reconcile` | 04:30 | Settles refunds stuck in `initiated` by reading Razorpay. **Does nothing (`{skipped:true}`) unless `REFUND_RECONCILE=1`** and the Razorpay keys are set. Design: `src/lib/refunds/refund-reconcile.ts` |
