@@ -5,7 +5,7 @@ import { z } from "zod";
 import { accountDisabledBody } from "@/lib/account-disabled";
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
-import { verifyPassword, needsRehash, hashPassword } from "@/lib/security/password";
+import { verifyPasswordOrDummy, needsRehash, hashPassword } from "@/lib/security/password";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
 
 const bodySchema = z.object({
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     .limit(1);
 
   // Same answer for unknown email and wrong password, so accounts can't be probed.
-  if (!row || !(await verifyPassword(parsed.data.password, row.admin.password))) {
+  if (!(await verifyPasswordOrDummy(parsed.data.password, row?.admin.password)) || !row) {
     return NextResponse.json({ error: "That email and password don't match" }, { status: 401 });
   }
   if (!row.admin.isActive || !row.collegeActive) {

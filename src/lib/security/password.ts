@@ -98,6 +98,20 @@ export async function hashPassword(plain: string): Promise<string> {
  * on, every existing account still logs in - and `needsRehash` reports true
  * so the caller re-hashes it on the way through, upgrading the row in place.
  */
+let dummyHash: Promise<string> | undefined;
+
+/**
+ * Same as verifyPassword, but when no account matched (`stored` undefined) it still hashes against a throwaway
+ * hash. Without it an unknown email answers in ~1 ms and a real one in tens of ms, which tells an attacker which
+ * addresses have accounts even though both reply "Invalid credentials". Always returns false for no account.
+ */
+export async function verifyPasswordOrDummy(plain: string, stored: string | undefined | null): Promise<boolean> {
+  if (stored) return verifyPassword(plain, stored);
+  dummyHash ??= hashPassword(randomBytes(16).toString("hex"));
+  await verifyPassword(plain || "x", await dummyHash);
+  return false;
+}
+
 export async function verifyPassword(
   plain: string,
   stored: string,

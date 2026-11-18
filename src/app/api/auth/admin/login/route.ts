@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
-import { verifyPassword, needsRehash, hashPassword } from "@/lib/security/password";
+import { verifyPasswordOrDummy, needsRehash, hashPassword } from "@/lib/security/password";
 import { limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
 
 const bodySchema = z.object({
@@ -30,7 +30,7 @@ export async function POST(req: Request) {
     .where(sql`lower(${schema.admins.email}) = ${parsed.data.email}`)
     .limit(1);
 
-  if (!admin || !(await verifyPassword(parsed.data.password, admin.password))) {
+  if (!(await verifyPasswordOrDummy(parsed.data.password, admin?.password)) || !admin) {
     return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
   }
 

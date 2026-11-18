@@ -8,9 +8,9 @@ const src = (p: string) => readFileSync(join(root, p), "utf8");
 
 // The "this account is disabled" answer tells the asker the account exists, so it may only follow proof of who they are.
 for (const [name, file, credential] of [
-  ["intern", "login/route.ts", "verifyPassword("],
-  ["employer", "employer/login/route.ts", "verifyPassword("],
-  ["college", "college/login/route.ts", "verifyPassword("],
+  ["intern", "login/route.ts", "verifyPasswordOrDummy("],
+  ["employer", "employer/login/route.ts", "verifyPasswordOrDummy("],
+  ["college", "college/login/route.ts", "verifyPasswordOrDummy("],
 ] as const) {
   test(`${name} login: disabled is answered only after the password is verified, with the shared message`, () => {
     const s = src(file);

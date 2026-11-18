@@ -188,3 +188,26 @@ test("the upload route delegates to the rules module and stores only what prepar
   // No other put() or raw `bytes` store in the route.
   assert.equal((src.match(/\bput\(/g) ?? []).length, 1);
 });
+
+import { readBodyCapped } from "./upload-rules.ts";
+
+test("readBodyCapped stops reading a chunked body that passes the cap and returns small bodies whole", async () => {
+  let pulled = 0;
+  const big = new ReadableStream<Uint8Array>({
+    pull(c) {
+      pulled += 1;
+      c.enqueue(new Uint8Array(1024 * 1024));
+      if (pulled > 50) c.close();
+    },
+  });
+  assert.equal(await readBodyCapped({ body: big }, 2 * 1024 * 1024), null);
+  assert.ok(pulled < 10, `kept pulling after the cap (${pulled} chunks)`);
+  const small = new Request("http://x.test", { method: "POST", body: new Uint8Array([1, 2, 3]) });
+  assert.deepEqual([...((await readBodyCapped(small, 10)) ?? [])], [1, 2, 3]);
+});
+
+test("the upload route reads the body through the capped reader, never req.arrayBuffer()", () => {
+  const src = readFileSync(join(import.meta.dirname, "../../app/api/uploads/route.ts"), "utf8");
+  assert.match(src, /readBodyCapped\(req, kind\.max\)/);
+  assert.doesNotMatch(src, /req\.arrayBuffer\(\)/);
+});
