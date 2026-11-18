@@ -160,3 +160,12 @@ test("the expired-offers CSV needs interns:read and nothing else gets it", () =>
   assert.equal(allows(["interns:read"], requiredPermissions("/api/admin/expired", "GET")), true);
   assert.equal(allows(["transactions:read", "companies:read"], requiredPermissions("/api/admin/expired", "GET")), false);
 });
+
+test("editing a candidate's education needs interns:write (the proxy and requireMutation read the same rule)", () => {
+  const path = "/api/admin/interns/i1/academics";
+  assert.deepEqual(requiredPermissions(path, "PUT"), ["interns:write"]);
+  assert.equal(allows(["interns:read", "interns:write"], requiredPermissions(path, "PUT")), true);
+  assert.equal(allows(["*"], requiredPermissions(path, "PUT")), true);
+  assert.equal(allows(["interns:read"], requiredPermissions(path, "PUT")), false);
+  assert.equal(allows(["transactions:read", "reports:read"], requiredPermissions(path, "PUT")), false);
+});

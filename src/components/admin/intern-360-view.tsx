@@ -14,6 +14,8 @@ import { InternPayoutTools } from "@/components/admin/intern-payout-tools";
 import { owedMinor, stipendDues } from "@/lib/admin/stipend-dues";
 import { InternSkillsEditor } from "@/components/admin/intern-skills-editor";
 import { RatingsEditor } from "@/components/admin/ratings-editor";
+import { AcademicsEditor } from "@/components/admin/academics-editor";
+import { readAcademicsValues } from "@/lib/admin/academics-edit";
 import { DOCUMENT_SLOTS, type CandidateDocument } from "@/lib/admin/candidate-documents-list";
 import { normaliseEntries, countStatuses, sheetHours } from "@/lib/employer-timesheets";
 import { offerScore, parseOffer } from "@/lib/offer";
@@ -546,8 +548,10 @@ function ProfileTab({
         </div>
 
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
-          <SectionHead title="Education" />
-          {a?.institution || a?.degree ? (
+          <SectionHead title="Education" hint={canWrite ? "Employers see the score on the candidate card." : undefined} />
+          {canWrite ? (
+            <AcademicsEditor internId={internId} initial={readAcademicsValues(extra)} />
+          ) : a?.institution || a?.degree ? (
             <div>
               <p className="font-semibold text-ink-900">{a.institution || "Institution not given"}</p>
               <p className="text-sm text-ink-700">{[a.qualificationLevel, a.degree, a.branch].filter(Boolean).join(" · ")}</p>
@@ -564,6 +568,7 @@ function ProfileTab({
           ) : (
             <p className="text-sm text-ink-600">No academics added.</p>
           )}
+          {!canWrite ? <p className="mt-2 text-xs text-text-subtle">Needs the Edit candidates permission to change these details.</p> : null}
           {[...(a?.professional ?? []).map((q) => ({ ...q, kind: "Professional course" })), ...(a?.certifications ?? []).map((q) => ({ ...q, kind: "Certification" }))].length ? (
             <ul className="mt-4 divide-y divide-ink-100 border-t border-ink-100">
               {[...(a?.professional ?? []).map((q) => ({ ...q, kind: "Professional course" })), ...(a?.certifications ?? []).map((q) => ({ ...q, kind: "Certification" }))].map((q, i) => (
@@ -1207,6 +1212,7 @@ function CgpaVerificationBlock({ extra }: { extra: Record<string, unknown> }) {
                   {HISTORY_LABEL[h.event] ?? h.event}
                   {h.semester ? `, semester ${h.semester}` : ""}: {h.claimedScore}
                   {h.correctedScore ? ` → ${h.correctedScore}` : ""}
+                  {h.note ? ` (${h.note})` : ""}
                 </span>
               </li>
             ))}

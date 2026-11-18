@@ -201,3 +201,41 @@ export function withCgpaCorrection(offerDetails: unknown, c: { from: string; to:
   void _ack;
   return { ...rest, cgpaCorrection: { from: c.from, to: c.to, scoreType: c.scoreType, at: c.at } };
 }
+
+export const ADMIN_EDIT_NOTE = "edited by admin";
+
+export type AdminScoreEditResult =
+  | { ok: true; verification: StoredCgpaVerification | null; previousScore: string; scoreChanged: boolean }
+  | { ok: false; status: 400 | 409; error: string };
+
+/**
+ * What an admin's edit of the profile score does to `cgpaVerification`. The admin's number is the decision: it is
+ * recorded exactly as an "incorrect" decision with the new score as the correction (history entry `by` the admin,
+ * note "edited by admin"), whatever state the check was in, by running `applyCgpaDecision` on the check as it
+ * would stand if the stored score were still the claim. An intern with no check on file gets none made (the
+ * admin, not the intern, wrote the number, so there is nothing to verify). `score` is what the profile holds now.
+ */
+export function applyAdminScoreEdit(
+  extraData: unknown,
+  edit: { previousScore: string; score: string; scoreType: ScoreType | ""; by: string; now?: Date },
+): AdminScoreEditResult {
+  const previousScore = edit.previousScore.trim();
+  const score = edit.score.trim();
+  const prev = readCgpaVerification(extraData);
+  const scoreChanged = !sameScore(previousScore, score);
+  if (prev.status === "not_required") return { ok: true, verification: null, previousScore, scoreChanged };
+  const history = readCgpaHistory(extraData);
+  if (!scoreChanged) {
+    // Same number: only a changed unit needs recording on the check, and it is not a new decision.
+    if (prev.scoreType === edit.scoreType) return { ok: true, verification: null, previousScore, scoreChanged };
+    return { ok: true, verification: { ...prev, scoreType: edit.scoreType, history }, previousScore, scoreChanged };
+  }
+  if (!score) return { ok: false, status: 409, error: "A CGPA check is on file for this candidate, so the score can be corrected but not cleared." };
+  const standing: Record<string, unknown> = {
+    ...(isRecord(extraData) ? extraData : {}),
+    cgpaVerification: { ...prev, status: "pending", claimedScore: previousScore, scoreType: edit.scoreType, history },
+  };
+  const decided = applyCgpaDecision(standing, { decision: "incorrect", correctedScore: score, note: ADMIN_EDIT_NOTE, by: edit.by, now: edit.now });
+  if (!decided.ok) return decided;
+  return { ok: true, verification: decided.verification, previousScore, scoreChanged };
+}

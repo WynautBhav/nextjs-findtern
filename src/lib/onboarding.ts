@@ -277,7 +277,7 @@ type OnboardingRow = typeof internOnboarding.$inferSelect;
  * `draftFromRecord` reads it (and the shapes early builds of this app wrote);
  * `storedFromDraft` always writes it. */
 
-const LEVELS: [string, string][] = [
+export const LEVELS: [string, string][] = [
   ["bachelors", "Bachelor's"],
   ["masters", "Master's"],
   ["diploma", "Diploma"],
@@ -793,7 +793,7 @@ const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
  * is stored; null clears the semester (and its proofs); proofs for slots the semester does not have are dropped.
  * A completed course or a Ph.D keeps no semester.
  */
-function semesterPatch(a: Partial<OnboardingDraft["academics"]>, prev: Record<string, unknown>, level: string | undefined): Record<string, unknown> {
+export function semesterPatch(a: Partial<OnboardingDraft["academics"]>, prev: Record<string, unknown>, level: string | undefined): Record<string, unknown> {
   const status = a.status ?? text(prev.status);
   const semester = a.currentSemester === undefined ? readSemester(prev.currentSemester) : a.currentSemester;
   if (!semesterApplies(level, status) || semester === null || semester === undefined || !proofSlots(semester).length) {

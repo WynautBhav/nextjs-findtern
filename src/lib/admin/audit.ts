@@ -66,6 +66,7 @@ export const AUDIT_ACTIONS = {
   "intern.completed_auto": "Internship completed automatically on final timesheet approval",
   "intern.approval_update": "Changed a candidate's review status",
   "intern.ratings_update": "Edited a candidate's scores",
+  "intern.academics_update": "Edited a candidate's education details",
   "interview.ai_link_added": "Added an AI interview link",
   "intern.ratings_import": "Imported candidate scores",
   "company.update": "Edited a company",
