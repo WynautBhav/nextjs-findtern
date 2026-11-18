@@ -1,4 +1,4 @@
-import { ageOf, type Age } from "./ageing";
+import { ageFromDays, ageOf, type Age } from "./ageing";
 import { cn } from "@/lib/utils";
 
 /**
@@ -106,6 +106,13 @@ const BAND: Record<Age["band"], string> = {
   aging: "font-medium text-ink-900",
   late: "font-semibold text-signal",
 };
+
+/** Age cell from a whole-day count: "today" for 0, so a figure never reads "0 d". */
+export function AgeDays({ days }: { days: number | null | undefined }) {
+  const age = ageFromDays(days);
+  if (!age) return <span className="text-ink-600">–</span>;
+  return <span className={cn("nums", BAND[age.band])}>{age.label}</span>;
+}
 
 /** The age column cell: "5 d" in ink, signal once past a week, "–" when there is no date. */
 export function AgeCell({ from, now }: { from: Date | string | number | null | undefined; now?: Date }) {

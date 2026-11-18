@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { ageOf } from "./ageing.ts";
+import { ageFromDays, ageOf } from "./ageing.ts";
 
 const now = new Date("2026-11-18T10:00:00Z");
 
@@ -18,4 +18,11 @@ test("ageOf: months past 60 days, future dates clamp to 0, junk is null", () => 
   assert.equal(ageOf("2026-12-01T00:00:00Z", now)?.days, 0);
   assert.equal(ageOf(null, now), null);
   assert.equal(ageOf("nope", now), null);
+});
+
+test("ageFromDays: 0 reads today, never 0 d; junk is null", () => {
+  assert.equal(ageFromDays(0)?.label, "today");
+  assert.equal(ageFromDays(17)?.band, "late");
+  assert.equal(ageFromDays(NaN), null);
+  assert.equal(ageFromDays(null), null);
 });

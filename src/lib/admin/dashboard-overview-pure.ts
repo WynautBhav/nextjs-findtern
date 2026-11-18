@@ -156,11 +156,13 @@ export type KpiInput = {
 
 /** "with a profile", then what is new and what is not finished; zero parts are left out. */
 function candidateCaption(withProfile: number, fresh: number, incomplete: number): string {
-  const parts = ["with a profile"];
+  // Zero finished profiles is not "no candidates": say how many sign-ups there are, so it never reads against the hires.
+  if (withProfile <= 0) return incomplete > 0 ? `none of ${COUNT.format(incomplete)} sign-ups has finished yet` : "No sign-ups yet";
+  const parts = ["finished"];
   if (fresh > 0 && fresh >= withProfile) parts.push("all new this week");
   else if (fresh > 0) parts.push(`${COUNT.format(fresh)} new this week`);
   else if (incomplete > 0) parts.push(`${COUNT.format(incomplete)} incomplete`);
-  return withProfile > 0 ? parts.join(" · ") : "No finished profiles yet";
+  return parts.join(" · ");
 }
 
 /** Greeting by India clock hour. */
@@ -215,7 +217,7 @@ export function buildKpis(input: KpiInput): { kpis: Kpi[]; withProfile: number }
     },
     {
       key: "candidates",
-      label: "Candidates",
+      label: "Finished profiles",
       value: withProfile,
       caption: candidateCaption(withProfile, Math.min(whole(input.profilesThisWeek), withProfile), incomplete),
     },
@@ -235,7 +237,7 @@ export function buildKpis(input: KpiInput): { kpis: Kpi[]; withProfile: number }
       key: "placements",
       label: "Placements",
       value: p.total,
-      caption: `${COUNT.format(p.paid)} paid, ${COUNT.format(p.awaiting)} awaiting payment`,
+      caption: `${COUNT.format(p.paid)} hired and paid, ${COUNT.format(p.awaiting)} accepted, awaiting payment`,
     });
   }
   return { kpis, withProfile };
