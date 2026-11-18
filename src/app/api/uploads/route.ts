@@ -8,7 +8,7 @@ import { bucketKey, clientIp, limiters } from "@/lib/security/rate-limit";
 import type { SessionData } from "@/lib/security/session";
 import { signedUrl } from "@/lib/security/sign";
 import { put, type StoredFile } from "@/lib/security/store";
-import { KINDS, MB, checkType, prepareUpload } from "@/lib/security/upload-rules";
+import { KINDS, MB, checkType, prepareUpload, readBodyCapped } from "@/lib/security/upload-rules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +49,9 @@ export async function POST(req: Request): Promise<Response> {
 
   let bytes: Buffer;
   try {
-    bytes = Buffer.from(await req.arrayBuffer());
+    const read = await readBodyCapped(req, kind.max);
+    if (!read) return NextResponse.json({ error: `The file must be under ${limitMb} MB` }, { status: 413 });
+    bytes = read;
   } catch {
     return NextResponse.json({ error: "Could not read upload" }, { status: 400 });
   }

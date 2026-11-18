@@ -136,3 +136,26 @@ export async function prepareUpload(
   }
   return { ok: true, bytes: out, contentType, fileName: name };
 }
+
+/**
+ * Reads a request body, giving up as soon as it passes `max` bytes. `req.arrayBuffer()` buffers the whole body, and a
+ * chunked upload sends no Content-Length to refuse early, so without this one request could hold unbounded memory.
+ * Returns null when the body is larger than `max`.
+ */
+export async function readBodyCapped(req: Pick<Request, "body">, max: number): Promise<Buffer | null> {
+  if (!req.body) return Buffer.alloc(0);
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel().catch(() => {});
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks, total);
+}
