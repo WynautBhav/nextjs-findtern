@@ -497,6 +497,23 @@ export async function markInternPaidFlag(internId: string, ref: { orderId?: stri
 }
 
 /** Paid if either app says so. Pass a transaction to read inside it. */
+/**
+ * `isInternPaid` for a caller that already holds the intern's onboarding `extra_data` (the profile page loads the row for
+ * other reasons): one statement (the payment row) instead of two in sequence. The legacy flag is read exactly as below.
+ */
+export async function isInternPaidGiven(internId: string, extraData: unknown | Promise<unknown>): Promise<boolean> {
+  // The payment read starts before `extraData` has resolved, so the two overlap.
+  const paidRows = getDb()
+    .select({ id: schema.internPayments.id })
+    .from(schema.internPayments)
+    .where(and(eq(schema.internPayments.internId, internId), eq(schema.internPayments.status, "paid")))
+    .limit(1);
+  const [[paid], extra] = await Promise.all([paidRows, extraData]);
+  if (paid) return true;
+  const flag = (extra as Record<string, any> | null)?.payment?.isPaid; // eslint-disable-line @typescript-eslint/no-explicit-any
+  return flag === true || flag === "true";
+}
+
 export async function isInternPaid(internId: string, db: ReturnType<typeof getDb> | Parameters<Parameters<ReturnType<typeof getDb>["transaction"]>[0]>[0] = getDb()): Promise<boolean> {
   const [paid] = await db
     .select({ id: schema.internPayments.id })

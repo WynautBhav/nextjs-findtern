@@ -24,7 +24,7 @@ import { ToastProvider } from "@/components/app/toast";
 import { CollegeLive } from "@/components/intern/college-live";
 import { DismissedGuard } from "@/components/dismissed-guard";
 import { driveBannerKey } from "@/lib/dismissed-keys";
-import { liveDriveFor } from "@/lib/college/live-drive";
+import { liveDriveForMember } from "@/lib/college/live-drive";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { membershipOf } from "@/lib/college/membership";
@@ -110,7 +110,8 @@ export default async function InternLayout({ children }: { children: React.React
   if (!session || session.role !== "intern") redirect("/login?as=intern");
 
   // Independent reads, in parallel. loadInternData is cache()d, so the page's own call reuses this one.
-  const [data, { name, termsVersion }, [unread], college, lockState] = await Promise.all([
+  // The live drive rides along (found from the student's id, not from the membership row), so the layout is one wave.
+  const [data, { name, termsVersion }, [unread], college, lockState, liveDrive] = await Promise.all([
     loadInternData(session.uid),
     fullName(session.uid),
     getDb()
@@ -127,6 +128,8 @@ export default async function InternLayout({ children }: { children: React.React
     session.impersonator ? null : membershipOf(session.uid).catch(() => null),
     // Payment lock (WP2): paid or grandfathered = unlocked. A failed lookup shows the nav unlocked; the proxy and the APIs decide on their own.
     lockEnabled() ? internUnlockState(session.uid) : "unlocked",
+    // The drive banner is rendered by the server too, so it is in the first paint instead of arriving with the first heartbeat.
+    session.impersonator ? null : liveDriveForMember(session.uid).catch(() => null),
   ]);
   const lockedNav = lockState === "locked";
   // Second line behind the proxy: the same decision, for a page the proxy let through (it only fails open on a database error).
@@ -140,8 +143,6 @@ export default async function InternLayout({ children }: { children: React.React
   if (precomplete && here && precompleteVerdict({ pathname: here, complete: profileComplete, locked: lockedNav }) === "redirect_onboarding") {
     redirect("/intern/onboarding");
   }
-  // The drive banner is rendered by the server too, so it is in the first paint instead of arriving with the first heartbeat.
-  const liveDrive = college?.isPartner ? await liveDriveFor(college.collegeId).catch(() => null) : null;
   const action = nextAction(data.thread);
   const attentionHrefs = action ? [action.href ?? "/intern/dashboard"] : [];
 

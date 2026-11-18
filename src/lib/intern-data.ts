@@ -1,5 +1,5 @@
 import { cache } from "react";
-import { and, desc, eq, inArray, isNotNull, isNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 
 import { getDb, hasDb, schema } from "@/lib/db";
 import { realEmployers } from "@/lib/admin/scope";
@@ -49,13 +49,24 @@ export const AI_INTERVIEW_NAME = "AI Interview";
 export const loadInternData = cache(async (uid: string) => {
   const db = getDb();
 
-  const [proposals, interviews, timesheets, payouts, onboarding, document] = await Promise.all([
+  const [proposals, interviews, timesheets, payouts, onboarding, document, employerRows] = await Promise.all([
     db.select().from(schema.proposals).where(eq(schema.proposals.internId, uid)).orderBy(desc(schema.proposals.createdAt)),
     db.select().from(schema.interviews).where(eq(schema.interviews.internId, uid)).orderBy(desc(schema.interviews.createdAt)),
     db.select().from(schema.timesheets).where(eq(schema.timesheets.internId, uid)).orderBy(desc(schema.timesheets.createdAt)),
     db.select().from(schema.internPayouts).where(eq(schema.internPayouts.internId, uid)).orderBy(desc(schema.internPayouts.createdAt)),
     db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, uid)).limit(1),
     db.select().from(schema.internDocuments).where(eq(schema.internDocuments.userId, uid)).limit(1),
+    // The employers behind this intern's proposals and interviews, in the same round trip (a sub-select, not a second
+    // wave keyed on the rows above): the names below are only read for ids in those two lists, so a superset-free exact set.
+    db
+      .select({ id: schema.employers.id, companyName: schema.employers.companyName, email: schema.employers.companyEmail })
+      .from(schema.employers)
+      .where(
+        or(
+          inArray(schema.employers.id, db.select({ id: schema.proposals.employerId }).from(schema.proposals).where(eq(schema.proposals.internId, uid))),
+          inArray(schema.employers.id, db.select({ id: schema.interviews.employerId }).from(schema.interviews).where(eq(schema.interviews.internId, uid))),
+        ),
+      ),
   ]);
 
   const p = proposals as ProposalRow[];
@@ -67,10 +78,7 @@ export const loadInternData = cache(async (uid: string) => {
   const names: Record<string, string> = {};
   const aiEmployerIds = new Set<string>();
   if (employerIds.length > 0) {
-    const rows = await db
-      .select({ id: schema.employers.id, companyName: schema.employers.companyName, email: schema.employers.companyEmail })
-      .from(schema.employers)
-      .where(inArray(schema.employers.id, employerIds));
+    const rows = employerRows;
     // Non-bypass masking (legacy routes.ts:14169): the company stays hidden
     // until it has hired this intern, or has sent a full-time offer (which
     // only follows a hire). Every intern screen reads names from here.

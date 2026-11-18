@@ -22,7 +22,7 @@ import { employerInvoices } from "@/lib/employer-invoice";
 import { loadInvoiceHires } from "@/lib/employer-invoice-hires";
 import { timezoneForLocation } from "@/lib/timezones";
 import { parseOffer, todayIst } from "@/lib/offer";
-import { payableCheckout } from "@/lib/employer-payable";
+import { payableCheckoutForRequest } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders } from "@/lib/payments";
 import { isPaidRow } from "@/lib/admin/invoice-rows";
 
@@ -83,7 +83,7 @@ async function loadOrders(employerId: string) {
       .leftJoin(schema.projects, eq(schema.proposals.projectId, schema.projects.id))
       .where(eq(schema.proposals.employerId, employerId))
       .orderBy(desc(schema.proposals.createdAt)),
-    payableCheckout(employerId).catch(() => null),
+    payableCheckoutForRequest(employerId).catch(() => null),
   ]);
 
   const fteStatus = employer?.internationalFteStatus ?? "none";

@@ -12,7 +12,7 @@ import { getDb, schema } from "@/lib/db";
 import { loadInternData } from "@/lib/intern-data";
 import { initialsOf } from "@/lib/employer-candidates";
 import { draftFromRecord, emptyDraft, profileCompletion, type OnboardingDraft } from "@/lib/onboarding";
-import { isInternPaid } from "@/lib/payments";
+import { isInternPaidGiven } from "@/lib/payments";
 import { readCgpaVerification } from "@/lib/cgpa-verification";
 import { CgpaVerificationCard } from "@/components/intern/profile/cgpa-card";
 import { guardPrecomplete } from "@/lib/intern-precomplete";
@@ -40,22 +40,28 @@ const RATING_LABELS: [key: string, label: string][] = [
  */
 export default async function InternProfile() {
   const session = await requireRole("intern");
-  // Closed until the profile is complete (unpaid interns only); the layout's check does not run on a client-side move.
-  await guardPrecomplete(session.uid, "/intern/profile");
-
-  const data = await loadInternData(session.uid);
-  const [user] = await getDb()
-    .select({
-      first: schema.users.firstName,
-      last: schema.users.lastName,
-      email: schema.users.email,
-      countryCode: schema.users.countryCode,
-      phone: schema.users.phoneNumber,
-    })
-    .from(schema.users)
-    .where(eq(schema.users.id, session.uid))
-    .limit(1);
-  const activated = await isInternPaid(session.uid);
+  // Every read starts together (the old chain was seven round trips). The guard redirects by throwing, so nothing renders
+  // for a closed page; the rest are wasted only in that case. loadInternData is cache()d: the layout's call is shared.
+  const dataP = loadInternData(session.uid);
+  const extraP = dataP.then((d) => d.onboarding?.extraData);
+  const [, data, [user], activated, aiLinks] = await Promise.all([
+    // Closed until the profile is complete (unpaid interns only); the layout's check does not run on a client-side move.
+    guardPrecomplete(session.uid, "/intern/profile"),
+    dataP,
+    getDb()
+      .select({
+        first: schema.users.firstName,
+        last: schema.users.lastName,
+        email: schema.users.email,
+        countryCode: schema.users.countryCode,
+        phone: schema.users.phoneNumber,
+      })
+      .from(schema.users)
+      .where(eq(schema.users.id, session.uid))
+      .limit(1),
+    isInternPaidGiven(session.uid, extraP),
+    aiInterviewLinks(session.uid, extraP as Promise<Record<string, unknown> | null | undefined>),
+  ]);
 
   // The exact initials an employer's row shows (never the full name before a hire).
   const initials = initialsOf(user?.first ?? "", user?.last ?? "");
@@ -101,7 +107,6 @@ export default async function InternProfile() {
     hasAadhaarImage: Boolean(data.document?.aadhaarImageName),
     hasPhoto: Boolean(data.document?.profilePhotoName),
   });
-  const aiLinks = await aiInterviewLinks(session.uid, extra);
 
   const emergency = draft?.emergencyPhone
     ? [

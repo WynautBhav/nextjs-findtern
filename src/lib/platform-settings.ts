@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { eq } from "drizzle-orm";
 
 import { getDb, hasDb, schema } from "@/lib/db";
@@ -28,7 +29,24 @@ export const SETTING_DEFAULTS = {
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;
 
-export async function getSetting<K extends SettingKey>(key: K): Promise<(typeof SETTING_DEFAULTS)[K]> {
+/**
+ * One page render reads the same key several times (per-hire fee from the layout strip, the checkout and the page body).
+ * `cache` makes this map per request (outside a render it is a fresh map every call, i.e. no memo), and `setSetting`
+ * drops the key, so a write followed by a read in the same request still sees the new value.
+ */
+const requestSettings = cache(() => new Map<string, Promise<unknown>>());
+
+export function getSetting<K extends SettingKey>(key: K): Promise<(typeof SETTING_DEFAULTS)[K]> {
+  const memo = requestSettings();
+  let hit = memo.get(key);
+  if (!hit) {
+    hit = readSetting(key);
+    memo.set(key, hit);
+  }
+  return hit as Promise<(typeof SETTING_DEFAULTS)[K]>;
+}
+
+async function readSetting<K extends SettingKey>(key: K): Promise<(typeof SETTING_DEFAULTS)[K]> {
   if (!hasDb()) return SETTING_DEFAULTS[key];
   try {
     const db = getDb();
@@ -52,6 +70,7 @@ export async function setSetting(key: SettingKey, value: unknown, adminId: strin
       target: schema.platformSettings.key,
       set: { value, updatedBy: adminId, updatedAt: new Date() },
     });
+  requestSettings().delete(key);
 }
 
 export function getInternActivationFeeMinor(): Promise<number> {

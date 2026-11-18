@@ -102,6 +102,8 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   devIndicators: false,
+  // Import only the icons / primitives a page uses, not the whole barrel (lucide-react, the radix-ui meta-package).
+  experimental: { optimizePackageImports: ["lucide-react", "radix-ui"] },
   async redirects() {
     return [
       // The legacy admin "reconnect Meet calendar" links (SYS-12). Both start

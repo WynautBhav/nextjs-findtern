@@ -738,16 +738,21 @@ export async function loadCandidates(
     const paged = pageWindow(data.total, filters.page, filters.pageSize);
     data.pages = paged.pages;
     data.candidates = ranked.slice(paged.start, paged.end);
-    await attachPhotos(db, data.candidates);
-
-    data.plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
+    // Photos, plans, offer relations and presence only need the page's candidates: one round trip, not four.
     const pageIds = data.candidates.map((c) => c.id);
-    data.relations = await candidateRelations(db, uid, pageIds, activeProjectId);
-    // Labels like "Active now" / "Last seen 2h ago"; hidden candidates get null (lib/presence.ts). Optional, like the saved roles.
-    data.presence = await presenceOf(pageIds).catch((err) => {
-      console.error("[employer/candidates] presence", err);
-      return {};
-    });
+    const [, plans, relations, presence] = await Promise.all([
+      attachPhotos(db, data.candidates),
+      db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true)),
+      candidateRelations(db, uid, pageIds, activeProjectId),
+      // Labels like "Active now" / "Last seen 2h ago"; hidden candidates get null (lib/presence.ts). Optional, like the saved roles.
+      presenceOf(pageIds).catch((err) => {
+        console.error("[employer/candidates] presence", err);
+        return {};
+      }),
+    ]);
+    data.plans = plans;
+    data.relations = relations;
+    data.presence = presence;
   } catch (err) {
     console.error("[employer/candidates] load failed", err);
     data.loadFailed = true;
