@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { RecordExport } from "@/components/app/proof";
 import { RecordCertificate, RecordTimeline } from "@/components/intern/record/record-certificate";
 import { buttonClass } from "@/components/ui/button";
@@ -86,24 +86,24 @@ export default async function InternRecord({ searchParams }: { searchParams: Pro
 
       {data.proofs.length === 0 ? (
         <EmptyScene
-          art
           title="Nothing on your record yet"
           body="The first item appears the moment something real happens to you here: an interview you complete, hours a manager approves, or a stipend that reaches your account. Nothing is added for logging in."
           next={{ label: "See what is waiting", href: "/intern/dashboard" }}
         />
       ) : (
-        <div className="space-y-4 lg:space-y-6">
+        <div className="space-y-10">
           <RecordCertificate name={candidate} internship={internship} asOf={new Date()} totals={totals} />
-          <Surface className="p-5 shadow-tile sm:p-8">
+          <section aria-label="Every entry">
+            <h2 className="mb-5 border-b border-ink-200 pb-2 font-display text-lg font-semibold text-ink-900">Entries, newest first</h2>
             <RecordTimeline proofs={shown} />
             {older > 0 ? (
-              <div className="mt-6 border-t border-ink-100 pt-5 pl-14 sm:pl-15">
+              <div className="mt-6 border-t border-ink-200 pt-5 pl-14">
                 <Link href="/intern/record?all=1" scroll={false} className={buttonClass({ variant: "outline", size: "sm" })}>
                   Show {older} older {older === 1 ? "item" : "items"}
                 </Link>
               </div>
             ) : null}
-          </Surface>
+          </section>
         </div>
       )}
     </div>

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CalendarClock } from "lucide-react";
 
-import { EmptyScene, PageHead, Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
+import { Section } from "@/components/app/stat";
 import { sheetLabel, sheetTone } from "@/components/app/status";
 import { TimesheetGrid, type Entry } from "@/components/app/timesheet-grid";
 import { buttonClass } from "@/components/ui/button";
@@ -193,7 +194,7 @@ export default async function InternTimesheets({
               id="ts-internship"
               name="proposalId"
               defaultValue={selected.id}
-              className="mt-1.5 h-11 w-full min-w-0 rounded-apple-sm border border-ink-200 bg-white px-3 text-base text-ink-900 outline-none hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 sm:text-sm"
+              className="mt-1.5 h-11 w-full min-w-0 rounded-md border border-ink-200 bg-white px-3 text-base text-ink-900 outline-none hover:border-ink-300 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 sm:text-sm"
             >
               {hires.map((p) => {
                 const o = parseOffer(p.offerDetails, p.currency);
@@ -232,7 +233,7 @@ export default async function InternTimesheets({
       ) : (
         // The next-timesheet line above already says when the first one opens; this is the how, once.
         <section aria-labelledby="ts-how" className="max-w-2xl">
-          <h2 id="ts-how" className="text-base font-semibold tracking-[-0.01em] text-ink-900">
+          <h2 id="ts-how" className="font-display text-lg font-semibold text-ink-900">
             How timesheets work
           </h2>
           <ol className="mt-3 space-y-3">
@@ -267,9 +268,9 @@ function SheetsOverview({ sheets, periods, today }: { sheets: TimesheetRow[]; pe
 
   return (
     <div className="grid items-start gap-4 lg:gap-6 xl:grid-cols-[minmax(0,1fr)_24rem]">
-      <Surface as="section" aria-labelledby="heat-title" className="p-4 sm:p-6">
+      <section aria-labelledby="heat-title">
         <div className="mb-5 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
-          <h2 id="heat-title" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
+          <h2 id="heat-title" className="font-display text-lg font-semibold text-ink-900">
             Hours by day
           </h2>
           <p className="nums text-sm text-ink-600">
@@ -278,16 +279,15 @@ function SheetsOverview({ sheets, periods, today }: { sheets: TimesheetRow[]; pe
           </p>
         </div>
         <HoursHeatmap days={days} today={today} />
-      </Surface>
+      </section>
 
-      <Surface as="section" aria-label="Every timesheet" className="p-5 lg:p-6">
-        <SectionHead title="Every timesheet" hint="Newest first" />
+      <Section title="Every timesheet" hint="Newest first">
         <ol className="relative space-y-6 before:absolute before:inset-y-2 before:left-[0.4375rem] before:w-px before:bg-ink-200">
           {sheets.map((sheet) => (
             <SheetStep key={sheet.id} sheet={sheet} />
           ))}
         </ol>
-      </Surface>
+      </Section>
     </div>
   );
 }
@@ -319,7 +319,7 @@ function SheetStep({ sheet }: { sheet: TimesheetRow }) {
       <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <Link
           href={href}
-          className="nums rounded-apple-sm text-base font-medium text-ink-900 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+          className="nums rounded-md text-base font-medium text-ink-900 underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
         >
           {formatPeriodDays(sheet.periodStart, sheet.periodEnd) || "A period"}
         </Link>
@@ -341,7 +341,7 @@ function SheetStep({ sheet }: { sheet: TimesheetRow }) {
       </ol>
 
       {editable && sheet.managerNote ? (
-        <div className="mt-3 rounded-apple-sm bg-accent-50 px-4 py-3">
+        <div className="mt-3 rounded-md bg-accent-50 px-4 py-3">
           <p className="text-xs font-semibold text-accent-700">From your manager</p>
           <p className="mt-1 whitespace-pre-wrap text-pretty text-sm text-ink-800">{sheet.managerNote}</p>
         </div>
@@ -390,7 +390,7 @@ function BackLink({ href }: { href: string }) {
   return (
     <Link
       href={href}
-      className="apple-spring mb-5 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
+      className="apple-spring mb-5 inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-medium text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-400"
     >
       <ArrowLeft className="size-4" aria-hidden />
       All timesheets

@@ -3,11 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 
-import { DetailRow, Surface } from "@/components/app/primitives";
+import { DetailRow } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { bankErrors } from "@/lib/onboarding";
 
+import { accountLast4, maskAccount } from "./bank-mask";
 import { BankFields, type BankErrorKeys, type BankValues } from "./bank-fields";
 
 export type BankDetails = {
@@ -124,7 +125,7 @@ export function BankDetailsForm({ initialBank }: { initialBank?: BankDetails }) 
       setStored({
         bankName: bank.bankName.trim(),
         accountHolderName: bank.accountHolderName.trim(),
-        accountLast4: bank.accountNumber ? bank.accountNumber.slice(-4) : stored.accountLast4,
+        accountLast4: bank.accountNumber ? accountLast4(bank.accountNumber) : stored.accountLast4,
         ifscCode: bank.ifscCode,
         upiId: bank.upiId,
       });
@@ -140,12 +141,12 @@ export function BankDetailsForm({ initialBank }: { initialBank?: BankDetails }) 
   if (!editing) {
     const last4 = stored.accountLast4;
     return (
-      <Surface className="p-5 sm:p-6">
+      <div>
         {/* Plain rows: the facts someone checks against their passbook, not a picture of a card. */}
-        <dl className="divide-y divide-ink-100">
+        <dl className="divide-y divide-ink-200 border-y border-ink-200">
           <DetailRow label="Account holder" value={stored.accountHolderName || "Not added"} />
           <DetailRow label="Bank" value={stored.bankName || "Not added"} />
-          <DetailRow label="Account number" mono value={last4 ? `Ending ${last4}` : "Not added"} />
+          <DetailRow label="Account number" mono value={last4 ? maskAccount(last4) : "Not added"} />
           <DetailRow label="IFSC" mono value={stored.ifscCode || "Not added"} />
           {stored.upiId ? <DetailRow label="UPI ID" value={stored.upiId} /> : null}
         </dl>
@@ -170,12 +171,13 @@ export function BankDetailsForm({ initialBank }: { initialBank?: BankDetails }) 
             {saved ? "Bank details saved." : ""}
           </span>
         </div>
-      </Surface>
+        <p className="mt-3 max-w-prose text-pretty text-sm text-ink-600">Only the last four digits are shown. To change the account, enter the new number in full.</p>
+      </div>
     );
   }
 
   return (
-    <Surface className="p-5 sm:p-6">
+    <div>
       <form onSubmit={handleSubmit} noValidate className="space-y-6">
         <BankFields
           value={bank}
@@ -183,7 +185,7 @@ export function BankDetailsForm({ initialBank }: { initialBank?: BankDetails }) 
           onChange={(patch) => setBank((b) => ({ ...b, ...patch }))}
           errors={errors}
         />
-        <div className="flex flex-wrap items-center gap-3 border-t border-ink-200/70 pt-5">
+        <div className="flex flex-wrap items-center gap-3 border-t border-ink-200 pt-5">
           <button type="submit" disabled={saving} className={buttonClass({ variant: "primary", size: "md" })}>
             {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
             {saving ? "Saving…" : "Save bank details"}
@@ -200,6 +202,6 @@ export function BankDetailsForm({ initialBank }: { initialBank?: BankDetails }) 
           ) : null}
         </div>
       </form>
-    </Surface>
+    </div>
   );
 }

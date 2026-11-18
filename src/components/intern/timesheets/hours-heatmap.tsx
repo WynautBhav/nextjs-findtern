@@ -99,13 +99,13 @@ export function HoursHeatmap({ days, today }: { days: HeatDay[]; today: string }
                           setShown(cell.i);
                         }}
                         onMouseEnter={() => setShown(cell.i)}
-                        className="rounded-apple-sm p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+                        className="rounded-md p-0 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
                       >
                         {/* Table cells ignore aspect-ratio, so the square is the span inside. */}
                         <span
                           aria-hidden
                           className={cn(
-                            "nums grid aspect-square place-items-center rounded-apple-sm text-xs font-medium",
+                            "nums grid aspect-square place-items-center rounded-md text-xs font-medium",
                             tone(cell.day, today, k >= 5),
                             cell.day.date === today && "ring-2 ring-ink-900 ring-offset-2 ring-offset-surface-raised",
                           )}
