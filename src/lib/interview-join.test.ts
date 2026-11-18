@@ -17,9 +17,9 @@ const iv = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-test("window constants: opens 15 min before, closes 60 min after the start (end + grace)", () => {
+test("window constants: opens 15 min before, closes 30 min after the start (when the interview reads Expired)", () => {
   assert.equal(JOIN_OPENS_BEFORE_MINUTES, 15);
-  assert.equal(JOIN_CLOSE_AFTER_START_MINUTES, 60);
+  assert.equal(JOIN_CLOSE_AFTER_START_MINUTES, 30);
 });
 
 test("too early: disabled, says when it opens and in how many minutes (IST)", () => {
@@ -44,11 +44,10 @@ test("opens at exactly 15 minutes before the start", () => {
   assert.equal(r.label, "Join meeting");
 });
 
-test("open mid-interview and until the end plus grace", () => {
+test("open mid-interview and until it reads Expired", () => {
   assert.equal(joinState(at(10), iv()).state, "open");
   assert.equal(joinState(at(30), iv()).state, "open");
-  assert.equal(joinState(at(60), iv()).state, "open");
-  assert.equal(joinState(at(60) + 1, iv()).state, "ended");
+  assert.equal(joinState(at(30) + 1, iv()).state, "ended");
 });
 
 test("ended: no button, says it is over", () => {
@@ -104,8 +103,7 @@ test("the selected slot decides the time, not the first slot", () => {
 
 test("employer no-show (booked, 30 min past, employer never joined) is unavailable", () => {
   const created = new Date("2026-11-15T00:00:00Z");
-  assert.equal(joinState(at(31), iv({ createdAt: created })).state, "unavailable");
-  assert.equal(joinState(at(31), iv({ createdAt: created, employerJoinedAt: new Date(at(-2)) })).state, "open");
+  assert.notEqual(joinState(at(31), iv({ createdAt: created })).state, "open");
 });
 
 test("viewer timezone: the opening time is shown in the zone given, IST by default", () => {

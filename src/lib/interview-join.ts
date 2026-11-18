@@ -15,13 +15,14 @@
  * Kept free of the `@/` alias so `node --test` can run it.
  */
 
-import { employerNoShow, LINK_VISIBLE_MINUTES } from "./employer-interview-rules.ts";
+import { employerNoShow } from "./employer-interview-rules.ts";
+import { MEETING_MINUTES } from "./interview-lifecycle.ts";
 import { formatIstClock } from "./format.ts";
 
 /** Join opens this long before the start. */
 export const JOIN_OPENS_BEFORE_MINUTES = 15;
-/** Join closes this long after the start: the meeting plus its grace (same as the link's visibility). */
-export const JOIN_CLOSE_AFTER_START_MINUTES = LINK_VISIBLE_MINUTES;
+/** Join closes when the interview reads Expired (interview-lifecycle), so the button never outlives its status. */
+export const JOIN_CLOSE_AFTER_START_MINUTES = MEETING_MINUTES;
 
 export type JoinStateName = "too_early" | "open" | "ended" | "no_link" | "unavailable";
 
