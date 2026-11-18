@@ -4,7 +4,7 @@ import { Download } from "lucide-react";
 import { getDb, schema } from "@/lib/db";
 import { flattenParams, parsePageRequest, toQueryString } from "@/lib/admin/params";
 import { isTestEmployer } from "@/lib/admin/scope";
-import { expiredCounts, expiredProposals, filterExpired, filterInterviews, filterProposals, headlineCount, ineligibleInterns, parseExpiredFilters, parseIstDay, proposalTimezone, type TrackerFilters } from "@/lib/admin/tracker";
+import { expiredCounts, expiredProposals, filterExpired, filterInterviews, filterProposals, headlineCount, ineligibleInterns, parseExpiredFilters, parseIstDay, proposalTimezone, upcomingInterviewCount, withTrueInterviewStatus, withTrueProposalStatus, type TrackerFilters } from "@/lib/admin/tracker";
 import { loadExpiredSources } from "@/lib/admin/expired-load";
 import { kickProposalExpiry } from "@/lib/proposal-expiry-kick";
 import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
@@ -159,8 +159,11 @@ export default async function AdminProposalTrackerPage({
   // The internal "admin" and AI-interview employers are not hiring activity.
   const testIds = new Set(data.employers.filter((e) => isTestEmployer(e)).map((e) => e.id));
   testIds.add("admin");
-  const realProposals = data.proposals.filter((p) => !testIds.has(p.employerId));
-  const realInterviews = data.interviews.filter((i) => !testIds.has(i.employerId));
+  // Every row carries its TRUE status (the shared proposal and interview rules), so nothing past its time reads Sent or
+  // Scheduled before the sweep has run; the stored status rides along as `storedStatus` for the actions.
+  const nowDate = new Date();
+  const realProposals = withTrueProposalStatus(data.proposals, nowDate, data.expiredSources.openOrderIds).filter((p) => !testIds.has(p.employerId));
+  const realInterviews = withTrueInterviewStatus(data.interviews, nowDate.getTime()).filter((i) => !testIds.has(i.employerId));
 
   const proposals = filterProposals(realProposals, filters);
   const interviews = filterInterviews(realInterviews, filters);
@@ -186,10 +189,7 @@ export default async function AdminProposalTrackerPage({
   const lost = proposals.filter((p) => proposalOutcome(p.status) === "lost").length;
   const rate = acceptanceRate(won, lost);
   const now = new Date().getTime();
-  const upcoming = interviews.filter((i) => {
-    const s = i.selectedSlot === 1 ? i.slot1 : i.selectedSlot === 2 ? i.slot2 : i.selectedSlot === 3 ? i.slot3 : null;
-    return i.status === "scheduled" && s && s.getTime() > now;
-  }).length;
+  const upcoming = upcomingInterviewCount(interviews, now);
   // Expired offers: on this tab the date range is the EXPIRY date (every other tab filters on when the offer was sent).
   const expiredNow = new Date();
   const expired = filterExpired(expiredProposals(data.expiredSources.rows, expiredNow, data.expiredSources.openOrderIds), { ...parseExpiredFilters(params), reason: "", q: "" });

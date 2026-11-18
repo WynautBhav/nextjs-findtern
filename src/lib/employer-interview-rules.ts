@@ -5,7 +5,10 @@
  * Kept free of the `@/` alias so `node --test` can exercise it without the `@/` alias.
  */
 
+import { interviewLifecycle, MEETING_MINUTES } from "./interview-lifecycle.ts";
 import { MAX_DAYS_AHEAD } from "./offer.ts";
+
+export { MEETING_MINUTES };
 
 type SlotLike = {
   status: string | null;
@@ -25,8 +28,8 @@ const OPEN_STATUSES = ["pending", "scheduled", "waiting"];
 export const MISSED_GRACE_MINUTES = 15;
 /** The meeting link is hidden this long after the slot starts. */
 export const LINK_VISIBLE_MINUTES = 60;
-/** How long a meeting runs (legacy employer-schedule.tsx:898, start + 30 min). */
-export const MEETING_MINUTES = 30;
+/** A booked interview that has not been decided: still `scheduled`, or already swept to `expired` by the time-passed sweep. */
+const isBookedOpen = (iv: SlotLike): boolean => ["scheduled", "expired"].includes((iv.status ?? "").toLowerCase()) && Boolean(iv.selectedSlot);
 
 /** How long after the start the employer has to join before the interview expires (bug sheet 12 Nov, row 13). */
 export const NO_SHOW_MINUTES = 30;
@@ -90,7 +93,7 @@ export function meetingEndsAt(iv: SlotLike): number | null {
  * a missing or unreadable creation date (cannot prove it is newer than the rule).
  */
 export function employerNoShow(iv: SlotLike, now: number = Date.now()): boolean {
-  if ((iv.status ?? "").toLowerCase() !== "scheduled" || !iv.selectedSlot) return false;
+  if (!isBookedOpen(iv)) return false;
   if (iv.employerId === AI_EMPLOYER_ID) return false;
   if (toTime(iv.employerJoinedAt) !== null) return false;
   const created = toTime(iv.createdAt);
@@ -122,7 +125,7 @@ export function isBlockingInterview(iv: SlotLike, now: number = Date.now()): boo
 export function isMeetingOver(iv: SlotLike, now: number = Date.now()): boolean {
   const status = (iv.status ?? "").toLowerCase();
   if (status === "completed") return true;
-  if (status !== "scheduled" || !iv.selectedSlot) return false;
+  if (!isBookedOpen(iv)) return false;
   // A meeting the employer never joined did not happen.
   if (employerNoShow(iv, now)) return false;
   const end = meetingEndsAt(iv);
@@ -130,14 +133,11 @@ export function isMeetingOver(iv: SlotLike, now: number = Date.now()): boolean {
 }
 
 /**
- * Status to display: a booked meeting whose time is over reads "completed"
- * (legacy isEffectivelyCompleted, employer-schedule.tsx:901); an invite whose
- * slots all passed unpicked reads "expired".
+ * Status to display. A booked meeting whose time is over and that nobody marked completed reads "expired", like an invite
+ * whose slots all passed unpicked (interview-lifecycle.ts holds the rule; every screen shares it).
  */
 export function displayInterviewStatus(iv: SlotLike, now: number = Date.now()): string {
-  if (employerNoShow(iv, now)) return "expired";
-  if ((iv.status ?? "") === "scheduled" && isMeetingOver(iv, now)) return "completed";
-  return isStaleInterview(iv, now) ? "expired" : (iv.status ?? "");
+  return interviewLifecycle(iv, now).status;
 }
 
 /** Whether the join link should still be offered (until 1h after the start). */
@@ -155,7 +155,7 @@ export function canMarkMissed(iv: SlotLike, now: number = Date.now()): boolean {
 
 /** "Mark completed" ends a booked meeting early, once its start time has come (bug sheet 8). */
 export function canMarkCompleted(iv: SlotLike, now: number = Date.now()): boolean {
-  if ((iv.status ?? "").toLowerCase() !== "scheduled" || !iv.selectedSlot) return false;
+  if (!isBookedOpen(iv)) return false;
   if (employerNoShow(iv, now)) return false;
   const t = meetingTime(iv);
   return t !== null && now >= t;
@@ -228,11 +228,11 @@ export function suggestedSlots(now: number, timeZone: string): [string, string, 
  * shows only the actions that mean something at each stage (DESIGN.md §7.5):
  *
  *   awaiting_pick  invite sent, candidate hasn't picked  → remind, reschedule
- *   expired        every offered slot passed unpicked     → reschedule
+ *   expired        every offered slot passed unpicked, or a booked meeting ended unmarked → schedule again
  *   employer_no_show  booked, 30 min past start, employer never joined → reschedule
  *   upcoming       a slot is booked and still ahead       → join, remind, reschedule
  *   live           the booked half hour is running         → join, mark missed (after grace)
- *   over           the meeting is done                     → feedback, mark missed
+ *   over           marked completed                        → feedback
  *   missed         marked missed                           → feedback (legacy allowed it, EMB-22)
  *   closed         cancelled or otherwise finished         → read feedback only
  */
@@ -243,12 +243,14 @@ export function interviewStage(iv: SlotLike, now: number = Date.now()): Intervie
   if (status === "missed") return "missed";
   if (status === "completed") return "over";
   if (status === "pending" || status === "waiting") return isStaleInterview(iv, now) ? "expired" : "awaiting_pick";
+  if (status === "expired") return employerNoShow(iv, now) ? "employer_no_show" : "expired";
   if (status === "scheduled") {
     if (employerNoShow(iv, now)) return "employer_no_show";
     const t = meetingTime(iv);
-    if (!iv.selectedSlot || t === null) return "upcoming";
+    if (!iv.selectedSlot || t === null) return interviewLifecycle(iv, now).expired ? "expired" : "upcoming";
     if (now < t) return "upcoming";
-    return now < t + MEETING_MINUTES * 60_000 ? "live" : "over";
+    // Over and never marked completed: expired (it was "over", which read "Completed", before).
+    return now < t + MEETING_MINUTES * 60_000 ? "live" : "expired";
   }
   return "closed";
 }

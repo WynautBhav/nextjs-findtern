@@ -74,6 +74,14 @@ export function expiryOf(p: ExpiryInput, now: Date = new Date()): { expired: boo
   return { ...NOT_EXPIRED };
 }
 
+/**
+ * The status a screen should show: `expired` for an offer that is expired, stored or not yet swept (expiryOf's rules, so an open
+ * payment order, `processing` and `hired` keep their meaning); otherwise the stored status. The stored one still decides actions.
+ */
+export function effectiveProposalStatus(p: ExpiryInput, now: Date = new Date()): string {
+  return expiryOf(p, now).expired ? "expired" : (p.status ?? "");
+}
+
 /** The offerDetails keys a new expiry writes (alongside status `expired`). Never `lapsedAt`. */
 export function expiredStamp(reason: ExpiryReason, now: Date = new Date()): { expiredReason: ExpiryReason; expiredAt: string } {
   return { expiredReason: reason, expiredAt: now.toISOString() };

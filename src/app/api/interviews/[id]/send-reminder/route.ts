@@ -28,6 +28,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (interview.employerId !== guard.session.uid) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const td = await assertInterviewActionable(id, guard.session.uid);
   if (!td.ok) return td.response;
+  if (interview.status === "expired") {
+    return NextResponse.json({ error: "This interview's time has passed. Offer new times instead." }, { status: 409 });
+  }
   if (interview.status !== "scheduled" && interview.status !== "pending") {
     return NextResponse.json({ error: `This interview is already ${interview.status}` }, { status: 409 });
   }

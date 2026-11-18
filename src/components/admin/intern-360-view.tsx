@@ -8,6 +8,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { toInrMinor } from "@/lib/admin/money";
 import { formatDate, formatMoney, formatSlotTime, shortDate } from "@/lib/format";
 import { StatusBadge, humanizeStatus } from "@/components/admin/status-badge";
+import { interviewLifecycle } from "@/lib/interview-lifecycle";
 import { MarkPaidButton } from "@/components/admin/mark-paid-button";
 import { CompletionBonusButton } from "@/components/admin/completion-bonus-button";
 import { InternPayoutTools } from "@/components/admin/intern-payout-tools";
@@ -144,7 +145,7 @@ export function Intern360View({
     .reduce((sum, p) => sum + toInrMinor(p.amountMinor, p.currency), 0);
   const owedTotalMinor = owedMinor(dues, unlinkedPendingMinor);
   const hiredCount = proposals.filter((p) => p.status === "hired" || p.hiredAt).length;
-  const scheduledCount = interviews.filter((i) => i.status === "scheduled").length;
+  const scheduledCount = interviews.filter((i) => interviewLifecycle(i).state === "upcoming" || interviewLifecycle(i).state === "live").length;
 
   const company = (id: string | null | undefined) => (id && employerNames[id]) || null;
   const project = (id: string | null | undefined) => (id && projectNames[id]) || null;
@@ -163,8 +164,8 @@ export function Intern360View({
     { key: "bank", label: "Bank details" },
   ];
 
-  const interviewStatuses = [...new Set(interviews.map((i) => i.status))];
-  const filteredInterviews = interviews.filter((i) => interviewFilter === "all" || i.status === interviewFilter);
+  const interviewStatuses = [...new Set(interviews.map((i) => interviewLifecycle(i).status))];
+  const filteredInterviews = interviews.filter((i) => interviewFilter === "all" || interviewLifecycle(i).status === interviewFilter);
   const proposalStatuses = [...new Set([...PROPOSAL_STATUSES, ...proposals.map((p) => p.status)])];
   const filteredProposals = proposals.filter((p) => proposalFilter === "all" || p.status === proposalFilter);
 
@@ -736,7 +737,7 @@ function InterviewCard({
           )}
           <p className="text-sm text-ink-600">{project ?? (company ? "No project linked" : "Findtern assessment")}</p>
         </div>
-        <StatusBadge value={i.status} />
+        <StatusBadge value={interviewLifecycle(i).status} />
       </div>
       <ul className="space-y-1.5 text-sm">
         {slots.every((s) => !s) ? <li className="text-ink-600">No time slots offered yet.</li> : null}

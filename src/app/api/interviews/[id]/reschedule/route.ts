@@ -36,7 +36,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   const td = await assertInterviewActionable(id, session.uid);
   if (!td.ok) return td.response;
-  if (!["pending", "scheduled"].includes(interview.status)) {
+  if (!["pending", "scheduled", "expired"].includes(interview.status)) {
     return NextResponse.json({ error: `This interview is already ${interview.status}` }, { status: 409 });
   }
 
@@ -74,7 +74,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       employerJoinedAt: null,
       updatedAt: new Date(),
     })
-    .where(and(eq(schema.interviews.id, id), inArray(schema.interviews.status, ["pending", "scheduled"])))
+    .where(and(eq(schema.interviews.id, id), inArray(schema.interviews.status, ["pending", "scheduled", "expired"])))
     .returning({ id: schema.interviews.id });
   if (reset.length === 0) return NextResponse.json({ error: "This interview changed; refresh and try again." }, { status: 409 });
 
@@ -89,7 +89,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // A booked slot put an invite in each side's calendar; withdraw the
   // recipient's copy (same per-party uid as select-slot sent).
   const bookedStart =
-    interview.status === "scheduled" && interview.selectedSlot
+    ["scheduled", "expired"].includes(interview.status) && interview.selectedSlot
       ? [interview.slot1, interview.slot2, interview.slot3][interview.selectedSlot - 1]
       : null;
   await notify({

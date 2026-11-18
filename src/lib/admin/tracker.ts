@@ -1,6 +1,7 @@
 import { guaranteeEnded, guaranteeMisses } from "../guarantee.ts";
+import { interviewLifecycle, type InterviewLifecycle } from "../interview-lifecycle.ts";
 import { parseOffer } from "../offer.ts";
-import { expiryOf, type ExpiryReason } from "../proposal-expiry.ts";
+import { effectiveProposalStatus, expiryOf, type ExpiryReason } from "../proposal-expiry.ts";
 
 /**
  * Proposal tracker filters (legacy admin-proposal-tracker.tsx), as pure
@@ -30,6 +31,42 @@ export type ProposalRow = {
   employerId: string;
   projectTimezone: string | null;
 };
+
+/**
+ * Every proposal with its TRUE status: an offer past its start day that was never answered or paid reads `expired` before the
+ * sweep has run (same rule as the Expired tab and the intern's own page). `storedStatus` keeps what the database says, because
+ * the row's actions (withdraw, edit) still follow that.
+ */
+export function withTrueProposalStatus<P extends { id: string; status: string; hiredAt: Date | string | null; offerDetails: unknown; currency: string | null }>(
+  rows: P[],
+  now: Date,
+  openOrderIds: ReadonlySet<string> = new Set(),
+): (P & { storedStatus: string })[] {
+  return rows.map((p) => ({
+    ...p,
+    storedStatus: p.status,
+    status: effectiveProposalStatus({ status: p.status, hiredAt: p.hiredAt, offerDetails: p.offerDetails, currency: p.currency, hasOpenOrder: p.status === "accepted" && openOrderIds.has(p.id) }, now),
+  }));
+}
+
+/** Every interview with its true status (interview-lifecycle.ts): a meeting whose time passed unmarked reads `expired`, never `scheduled`. */
+export function withTrueInterviewStatus<I extends { status: string; slot1: Date | null; slot2: Date | null; slot3: Date | null; selectedSlot: number | null; employerId: string; isAi?: boolean }>(
+  rows: I[],
+  now: number,
+): (I & { storedStatus: string; lifecycle: InterviewLifecycle })[] {
+  return rows.map((i) => {
+    const lifecycle = interviewLifecycle(i, now);
+    return { ...i, storedStatus: i.status, status: lifecycle.status || i.status, lifecycle };
+  });
+}
+
+/** Interviews still to come: a booked slot in the future. The page header's count and the Scheduled status filter share it. */
+export function upcomingInterviewCount(rows: { lifecycle: InterviewLifecycle; slot1: Date | null; slot2: Date | null; slot3: Date | null; selectedSlot: number | null }[], now: number): number {
+  return rows.filter((i) => {
+    const s = i.selectedSlot === 1 ? i.slot1 : i.selectedSlot === 2 ? i.slot2 : i.selectedSlot === 3 ? i.slot3 : null;
+    return i.lifecycle.state === "upcoming" && s !== null && s.getTime() > now;
+  }).length;
+}
 
 export type InterviewRow = {
   id: string;

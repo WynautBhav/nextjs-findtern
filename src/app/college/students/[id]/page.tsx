@@ -8,6 +8,7 @@ import { NudgeButton } from "@/components/college/nudge-button";
 import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
 import { humanizeStatus } from "@/components/app/status";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
+import { interviewLifecycle } from "@/lib/interview-lifecycle";
 import { aiStatusLabel, cohortGoal, membershipLabel, yearLabel, ago } from "@/lib/college/labels";
 import { auditCollegeView, requireCollegeContext, studentForCollegeAdmin } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
@@ -63,7 +64,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
     db
       .select({ i: schema.interviews })
       .from(schema.interviews)
-      .where(and(eq(schema.interviews.internId, id), realEmployerId(schema.interviews.employerId), inArray(schema.interviews.status, ["scheduled", "completed", "pending"])))
+      .where(and(eq(schema.interviews.internId, id), realEmployerId(schema.interviews.employerId), inArray(schema.interviews.status, ["scheduled", "completed", "pending", "expired"])))
       .orderBy(desc(schema.interviews.createdAt)),
     db
       .select({ m: schema.collegeDriveMeetings, drive: schema.collegeDrives.title, d: schema.collegeDrives })
@@ -297,7 +298,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                 <div className="min-w-0">
                   <p className="font-medium text-ink-900">Interview · {i.createdAt ? shortDateTime(i.createdAt, { day: "numeric", month: "short" }) : "requested"}</p>
                 </div>
-                <Pill tone="neutral">{humanizeStatus(i.status)}</Pill>
+                <Pill tone="neutral">{interviewLifecycle(i).label === "Waiting on candidate" ? humanizeStatus(i.status) : interviewLifecycle(i).label}</Pill>
               </li>
             ))}
           </ul>

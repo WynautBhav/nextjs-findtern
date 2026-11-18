@@ -12,6 +12,7 @@ export function StatusBadge({
   tone,
   label,
   dot = true,
+  icon,
   className,
 }: {
   /** Raw status from the database. Ignored when `tone` is given. */
@@ -23,6 +24,8 @@ export function StatusBadge({
   label?: string;
   /** The 6px leading dot (default on). Colour is never the only signal: the label is always printed. */
   dot?: boolean;
+  /** A small icon in place of the dot, for a status that must not rest on colour alone (Expired). */
+  icon?: React.ReactNode;
   className?: string;
 }) {
   const val = value ?? status;
@@ -38,7 +41,13 @@ export function StatusBadge({
         className,
       )}
     >
-      {dot ? <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", classes.dot)} /> : null}
+      {icon ? (
+        <span aria-hidden className="inline-flex size-3.5 shrink-0 items-center justify-center [&>svg]:size-3.5">
+          {icon}
+        </span>
+      ) : dot ? (
+        <span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", classes.dot)} />
+      ) : null}
       {text}
     </span>
   );

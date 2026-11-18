@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CalendarX2 } from "lucide-react";
 
 import { AdminAvatar } from "@/components/admin/avatar";
 import { ProposalDetailsButton } from "@/components/admin/proposal-tracker-dialogs";
@@ -45,6 +46,7 @@ export type PipelineCard = {
   details: {
     id: string;
     status: string;
+    shownStatus?: string;
     currency: string | null;
     offerDetails: unknown;
     candidate: string;
@@ -167,7 +169,7 @@ export function ProposalPipelineLanes({
                     </div>
                     <div className="mt-3 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                       <div className="flex min-w-0 flex-col items-start gap-1">
-                        {c.fullTimeHired ? <StatusBadge tone="success" label="Full-time hired" /> : <StatusBadge value={c.status} />}
+                        {c.fullTimeHired ? <StatusBadge tone="success" label="Full-time hired" /> : <StatusBadge value={c.status} icon={c.status === "expired" ? <CalendarX2 /> : undefined} />}
                         <span className="text-xs text-text-subtle">{c.flow}</span>
                       </div>
                       <ProposalDetailsButton proposal={c.details} />
