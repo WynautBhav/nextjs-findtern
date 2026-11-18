@@ -4,6 +4,7 @@ import { asc, desc, getTableColumns } from "drizzle-orm";
 import { getDb, schema, withoutPassword } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
+import { LeadStat, Overview, StatList } from "@/components/app/stat";
 import { StaffRolesManager } from "@/components/admin/staff-roles-manager";
 import { ensureAdminRoles } from "@/lib/admin/roles-seed";
 
@@ -33,9 +34,27 @@ export default async function AdminRolesPage() {
 
   return (
     <div className="space-y-6">
-      <AdminPageHeader
-        title="Roles and access"
-      />
+      <AdminPageHeader title="Roles and access" subtitle="Who can sign in to this console and what each role may open or change." />
+      {data ? (
+        (() => {
+          const filled = data.roles
+            .map((r) => ({ label: r.name, value: data.staff.filter((x) => x.role === r.key).length }))
+            .filter((r) => r.value > 0);
+          const empty = data.roles.length - filled.length;
+          return (
+            <Overview
+              lead={
+                <LeadStat
+                  label="Staff who can sign in"
+                  value={String(data.staff.length)}
+                  note={`${data.roles.length} ${data.roles.length === 1 ? "role" : "roles"}${empty ? `, ${empty} with nobody in ${empty === 1 ? "it" : "them"} yet` : ""}.`}
+                />
+              }
+              rest={filled.length ? <StatList items={filled.map((r) => ({ label: r.label, value: String(r.value) }))} /> : undefined}
+            />
+          );
+        })()
+      ) : null}
       {data ? (
         <StaffRolesManager initialStaff={data.staff} initialRoles={data.roles} currentAdminId={session?.uid ?? null} />
       ) : (

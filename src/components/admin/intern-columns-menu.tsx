@@ -58,7 +58,7 @@ export function InternColumnsMenu({ visible, adminUid }: { visible: InternColKey
 
   return (
     <DropdownMenu.Root>
-      <DropdownMenu.Trigger className="apple-spring inline-flex h-10 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11">
+      <DropdownMenu.Trigger className="inline-flex h-10 items-center gap-1.5 rounded-md border border-ink-300 bg-surface-raised px-3 text-sm font-medium text-foreground transition-colors duration-[var(--motion-fast)] hover:border-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11">
         <Columns3 className="size-4" aria-hidden />
         Columns{hidden ? ` · ${hidden} hidden` : ""}
       </DropdownMenu.Trigger>
@@ -66,12 +66,12 @@ export function InternColumnsMenu({ visible, adminUid }: { visible: InternColKey
         <DropdownMenu.Content
           align="start"
           sideOffset={6}
-          className="z-50 flex max-h-[min(32rem,var(--radix-dropdown-menu-content-available-height))] w-60 flex-col rounded-2xl border border-border bg-popover p-1.5 text-foreground shadow-lg"
+          className="z-50 flex max-h-[min(32rem,var(--radix-dropdown-menu-content-available-height))] w-60 flex-col rounded-lg border border-border bg-popover p-1.5 text-foreground shadow-lg"
         >
           <div className="min-h-0 flex-1 overflow-y-auto">
           {GROUPS.map((group) => (
             <DropdownMenu.Group key={group}>
-              <DropdownMenu.Label className="px-2.5 pt-2 pb-1 text-xs font-medium text-text-subtle">{group}</DropdownMenu.Label>
+              <DropdownMenu.Label className="px-2.5 pt-2 pb-1 text-xs font-medium text-ink-600">{group}</DropdownMenu.Label>
               {INTERN_COLUMNS.filter((c) => c.group === group).map((c) => (
                 <DropdownMenu.CheckboxItem
                   key={c.key}
@@ -80,7 +80,7 @@ export function InternColumnsMenu({ visible, adminUid }: { visible: InternColKey
                   onSelect={(e) => e.preventDefault()}
                   className={ITEM}
                 >
-                  <span className="grid size-4 place-items-center rounded border border-border">
+                  <span className="grid size-4 place-items-center rounded-md border border-ink-400">
                     <DropdownMenu.ItemIndicator>
                       <Check className="size-3" aria-hidden />
                     </DropdownMenu.ItemIndicator>

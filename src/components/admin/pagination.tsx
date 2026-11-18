@@ -70,14 +70,14 @@ export function Pagination({
     `${basePath}${toQueryString({ ...params, [pageParam]: String(target) })}`;
 
   const linkBase =
-    "apple-spring apple-pressable inline-flex h-9 min-w-9 items-center justify-center rounded-full px-3 text-sm font-medium nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 touch:min-w-11";
+    "inline-flex h-9 min-w-9 items-center justify-center rounded-md px-3 transition-colors duration-[var(--motion-fast)] text-sm font-medium nums focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 touch:min-w-11";
 
   return (
     <nav
       aria-label="Pagination"
       className="flex flex-wrap items-center justify-between gap-3 border-t border-[color:var(--admin-rule)] px-[var(--admin-pad-panel)] py-3"
     >
-      <p className="text-sm text-text-subtle">
+      <p className="text-sm text-ink-700">
         Showing{" "}
         <span className="nums font-medium text-foreground">
           {from.toLocaleString("en-IN")}–{to.toLocaleString("en-IN")}
@@ -97,10 +97,10 @@ export function Pagination({
           tabIndex={page <= 1 ? -1 : undefined}
           className={cn(
             linkBase,
-            "bg-[color:var(--admin-panel-2)] text-foreground",
+            "border border-ink-300 text-foreground",
             page <= 1
               ? "pointer-events-none opacity-40"
-              : "hover:bg-[color:var(--admin-bar-tint)]",
+              : "hover:bg-[color:var(--admin-panel-2)]",
           )}
         >
           Previous
@@ -136,10 +136,10 @@ export function Pagination({
           tabIndex={page >= pages ? -1 : undefined}
           className={cn(
             linkBase,
-            "bg-[color:var(--admin-panel-2)] text-foreground",
+            "border border-ink-300 text-foreground",
             page >= pages
               ? "pointer-events-none opacity-40"
-              : "hover:bg-[color:var(--admin-bar-tint)]",
+              : "hover:bg-[color:var(--admin-panel-2)]",
           )}
         >
           Next

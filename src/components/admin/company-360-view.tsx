@@ -1,25 +1,22 @@
 import Link from "next/link";
-import { ExternalLink, Globe, Mail, Phone } from "lucide-react";
+import { ArrowLeft, ExternalLink, Globe } from "lucide-react";
 
 import { CompanyActiveToggle, CompanyDeleteButton, CompanyFteSelect } from "@/components/admin/company-controls";
 import { fteOf } from "@/lib/admin/fte";
 import { DataTable } from "@/components/admin/data-table";
 import { ProposalStatusEditor } from "@/components/admin/proposal-status-editor";
 import { StatusBadge } from "@/components/admin/status-badge";
-import { DetailRow, Pill, SectionHead } from "@/components/app/primitives";
-import { AdminAvatar } from "@/components/admin/avatar";
-import { AdminTabs } from "@/components/admin/admin-tabs";
-import { InfoList, InfoRow, QuickAction, RecordCard, RecordLayout } from "@/components/admin/record-layout";
+import { DetailRow, FilterTabs, Pill } from "@/components/app/primitives";
+import { LeadStat, Overview, Section, StatList } from "@/components/app/stat";
+import { ActivityTimeline } from "@/components/admin/record-activity-timeline";
+import { buttonClass } from "@/components/ui/button";
 import { latestActivityAt, telHref } from "@/lib/admin/record-activity-format";
 import type { ActivityEntry } from "@/lib/admin/record-activity.types";
-import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { toQueryString } from "@/lib/admin/params";
 import type { CompanyLedger, HireLedger } from "@/lib/admin/company-ledger";
 import type { Employer, EmployerPayment, Interview, Project, Proposal } from "@/lib/db/schema";
 import { formatDate, formatMoney, formatSlotTime } from "@/lib/format";
 import { parseOffer } from "@/lib/offer";
-import { cn } from "@/lib/utils";
-import { StatCard } from "@/components/admin/stat-card";
 import { ProjectDetailsButton } from "@/components/admin/project-details";
 import { normalizeStatus } from "@/lib/projects/lifecycle";
 import { STATUS_ORDER, statusMeta } from "@/app/employer/projects/status";
@@ -104,114 +101,85 @@ export function Company360View({
 
   const location = [company.city, company.state, company.country].filter(Boolean).join(", ");
   const callHref = telHref(company.countryCode, company.phoneNumber);
-  const logo = company.logoUrl && /^(\/(?!\/)|https:\/\/)/.test(company.logoUrl) ? company.logoUrl : null;
-  const website = company.websiteUrl ? (/^https?:\/\//i.test(company.websiteUrl) ? company.websiteUrl : `https://${company.websiteUrl}`) : null;
-
-  const info = (
-    <InfoList>
-      <InfoRow label="Status">
-        <span className="flex flex-wrap items-center gap-2">
-          <StatusBadge value={company.isActive ? "active" : "inactive"} />
-          <Pill tone={company.onboardingCompleted ? "live" : "waiting"}>
-            {company.onboardingCompleted ? "Onboarding complete" : "Onboarding pending"}
-          </Pill>
-          {fte !== "none" ? <Pill tone={fte === "approved" ? "paid" : "waiting"}>International FTE {fte}</Pill> : null}
-        </span>
-      </InfoRow>
-      <InfoRow label="Primary contact">{company.primaryContactName || company.name || <span className="font-normal text-text-subtle">Not given</span>}</InfoRow>
-      <InfoRow label="Email">
-        <a href={`mailto:${company.companyEmail}`} className="break-all underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
-          {company.companyEmail}
-        </a>
-      </InfoRow>
-      <InfoRow label="Phone">
-        {company.phoneNumber ? (
-          <span className="nums">
-            {company.countryCode} {company.phoneNumber}
-          </span>
-        ) : (
-          <span className="font-normal text-text-subtle">Not given</span>
-        )}
-      </InfoRow>
-      <InfoRow label="Location">{location || <span className="font-normal text-text-subtle">Not given</span>}</InfoRow>
-      <InfoRow label="Website">
-        {website ? (
-          <a href={website} target="_blank" rel="noopener noreferrer" className="break-all underline-offset-4 hover:underline touch:inline-flex touch:min-h-11 touch:items-center">
-            {company.websiteUrl}
-          </a>
-        ) : (
-          <span className="font-normal text-text-subtle">Not given</span>
-        )}
-      </InfoRow>
-      <InfoRow label="Company size">{company.companySize || <span className="font-normal text-text-subtle">Not given</span>}</InfoRow>
-    </InfoList>
-  );
+  const lastActivity = latestActivityAt(activities);
+  const { totals } = ledger;
+  const owes = totals.remainingInrMinor > 0;
+  const noteBits = [
+    owes ? `of ${formatMoney(totals.billedInrMinor, "INR")} billed` : "Nothing is due",
+    totals.paidInrMinor > 0 ? `${formatMoney(totals.paidInrMinor, "INR")} paid so far` : null,
+    totals.refundedInrMinor > 0 ? `${formatMoney(totals.refundedInrMinor, "INR")} refunded, net ${formatMoney(totals.netPaidInrMinor, "INR")}` : null,
+  ].filter(Boolean);
 
   return (
-    <RecordLayout
-      title={company.companyName}
-      subtitle={`Created on ${formatDate(company.createdAt)}`}
-      backHref="/admin/companies"
-      backLabel="All companies"
-      actions={actions}
-      left={
-        <RecordCard
-          avatar={<AdminAvatar name={company.companyName} id={company.id} photoUrl={logo} size="xl" />}
-          name={company.companyName}
-          idLine={`Company · ID ${company.id.slice(0, 8)}`}
-          lastActivityAt={latestActivityAt(activities)}
-          quickActions={
-            <>
-              <QuickAction href={`mailto:${company.companyEmail}`} label={`Email ${company.companyName}`}>
-                <Mail className="size-5" aria-hidden />
-              </QuickAction>
-              {callHref ? (
-                <QuickAction href={callHref} label={`Call ${company.companyName}`}>
-                  <Phone className="size-5" aria-hidden />
-                </QuickAction>
-              ) : null}
-              {viewAs}
-            </>
-          }
-          info={info}
-          activities={activities}
-        />
-      }
-    >
-      <div className="@container min-w-0 space-y-[var(--admin-gap)]">
-        {/* Link tabs: ?tab= stays in the URL, so a tab can be shared and the back button works. */}
-        <AdminTabs
-          label="Company records"
-          active={tab}
-          items={tabs.map((t) => ({
-            key: t.key,
-            label: t.label,
-            count: t.count,
-            href: `${base}${toQueryString({ tab: t.key === "profile" ? "" : t.key })}`,
-          }))}
-        />
-
-        {/* Four figures; two across until the column is wide enough for four. */}
-        <div className="grid grid-cols-2 gap-[var(--admin-gap)] @2xl:grid-cols-4 [&_.leading-none]:text-[1.75rem]">
-          <StatCard label="Projects" value={projects.length} hint={`${activeProjects} active`} href={`${base}?tab=projects`} />
-          <StatCard label="Proposals sent" value={proposals.length} hint={`${hired.length} hired`} href={`${base}?tab=proposals`} />
-          <StatCard label="Interviews" value={interviews.length} hint={upcoming ? `${upcoming} upcoming` : "None upcoming"} href={`${base}?tab=interviews`} />
-          <StatCard
-            featured
-            label="Paid to date"
-            value={formatMoney(ledger.totals.paidInrMinor, "INR", { zeroLabel: "₹0" })}
-            hint={
-              (ledger.totals.refundedInrMinor > 0 ? `${formatMoney(ledger.totals.refundedInrMinor, "INR")} refunded, net ${formatMoney(ledger.totals.netPaidInrMinor, "INR")}. ` : "") +
-              (ledger.totals.remainingInrMinor > 0
-                ? `${formatMoney(ledger.totals.remainingInrMinor, "INR")} still due of ${formatMoney(ledger.totals.billedInrMinor, "INR")}`
-                : "Nothing due")
-            }
-            tone={ledger.totals.remainingInrMinor > 0 ? "warning" : "neutral"}
-            href={`${base}?tab=dues`}
-          />
+    <div className="min-w-0 space-y-6">
+      <header className="min-w-0">
+        <Link href="/admin/companies" className="inline-flex min-h-8 items-center gap-1.5 rounded-md text-sm font-medium text-ink-700 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+          <ArrowLeft className="size-4" aria-hidden />
+          All companies
+        </Link>
+        <div className="mt-2 flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
+          <div className="min-w-0">
+            <h1 className="text-balance font-display text-2xl font-semibold tracking-[-0.02em] text-foreground [overflow-wrap:anywhere] sm:text-4xl">{company.companyName}</h1>
+            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-text-subtle">
+              {location ? <span>{location}</span> : null}
+              <span>Joined {formatDate(company.createdAt)}</span>
+              <span>Last activity {lastActivity ? formatDate(lastActivity) : "none recorded"}</span>
+              <span className="nums">ID {company.id.slice(0, 8)}</span>
+            </p>
+            <p className="mt-3 flex flex-wrap items-center gap-2">
+              <StatusBadge value={company.isActive ? "active" : "inactive"} />
+              <Pill tone={company.onboardingCompleted ? "live" : "waiting"}>{company.onboardingCompleted ? "Onboarding complete" : "Onboarding pending"}</Pill>
+              {fte !== "none" ? <Pill tone={fte === "approved" ? "paid" : "waiting"}>International FTE {fte}</Pill> : null}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 max-sm:w-full">
+            {actions}
+            <a href={`mailto:${company.companyEmail}`} className={buttonClass({ variant: "outline", size: "sm" })}>
+              Email
+              <span className="sr-only"> {company.companyName}</span>
+            </a>
+            {callHref ? (
+              <a href={callHref} className={buttonClass({ variant: "outline", size: "sm" })}>
+                Call
+                <span className="sr-only"> {company.companyName}</span>
+              </a>
+            ) : null}
+            {viewAs}
+          </div>
         </div>
+      </header>
 
-      {tab === "profile" ? <ProfileTab company={company} fte={fte} canWrite={canWrite} /> : null}
+      <Overview
+        lead={
+          <LeadStat
+            label={owes ? "Still due from this company" : "Paid to date"}
+            value={formatMoney(owes ? totals.remainingInrMinor : totals.paidInrMinor, "INR", { zeroLabel: "₹0" })}
+            tone={owes ? "signal" : "ink"}
+            note={`${noteBits.join(", ")}.`}
+            action={owes ? { label: "See what each hire owes", href: `${base}?tab=dues` } : undefined}
+          />
+        }
+        rest={
+          <StatList
+            items={[
+              { label: "Projects", value: projects.length, hint: projects.length ? `${activeProjects} live` : undefined },
+              { label: "Proposals sent", value: proposals.length, hint: hired.length ? `${hired.length} hired` : undefined },
+              { label: "Interviews", value: interviews.length, hint: upcoming ? `${upcoming} upcoming` : undefined },
+            ].filter((i) => i.value > 0)}
+          />
+        }
+      />
+
+      <div className="min-w-0 space-y-6">
+        {/* Link tabs: ?tab= stays in the URL, so a tab can be shared and the back button works. */}
+        <FilterTabs
+          label="Company records"
+          value={tab}
+          tabs={tabs}
+          hrefFor={(k) => `${base}${toQueryString({ tab: k === "profile" ? "" : k })}`}
+        />
+
+      {tab === "profile" ? <ProfileTab company={company} fte={fte} canWrite={canWrite} activities={activities} /> : null}
 
       {tab === "projects" ? (
         <DataTable
@@ -432,7 +400,7 @@ export function Company360View({
                 const refunded = ledger.payments.get(p.id)?.refundedMinor ?? 0;
                 return (
                   <div>
-                    <span className="font-semibold text-ink-900">{money(p.amountMinor, p.currency)}</span>
+                    <span className="whitespace-nowrap font-semibold text-ink-900">{money(p.amountMinor, p.currency)}</span>
                     {refunded > 0 ? <p className="text-xs text-text-subtle">refunded {money(refunded, p.currency)} · net {money(Math.max(0, p.amountMinor - refunded), p.currency)}</p> : null}
                   </div>
                 );
@@ -477,102 +445,99 @@ export function Company360View({
         />
       ) : null}
       </div>
-    </RecordLayout>
+    </div>
   );
 }
 
-function ProfileTab({ company, fte, canWrite }: { company: Omit<Employer, "password">; fte: "none" | "applied" | "approved"; canWrite: boolean }) {
+function ProfileTab({ company, fte, canWrite, activities }: { company: Omit<Employer, "password">; fte: "none" | "applied" | "approved"; canWrite: boolean; activities: ActivityEntry[] | null }) {
   const website = company.websiteUrl ? (/^https?:\/\//i.test(company.websiteUrl) ? company.websiteUrl : `https://${company.websiteUrl}`) : null;
+  const noEscalation = !company.escalationContactName && !company.escalationContactPhone && !company.escalationContactEmail;
   return (
-    <div className="grid gap-[var(--admin-gap)] @3xl:grid-cols-2">
-      <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 @3xl:row-span-2")}>
-        <SectionHead title="Company information" />
-        <dl className="divide-y divide-ink-100">
-          <DetailRow label="Company name" value={company.companyName} />
-          <DetailRow label="Account holder" value={company.name || "-"} />
-          <DetailRow label="Email" value={<span className="break-all">{company.companyEmail}</span>} />
-          <DetailRow
-            label="Website"
-            value={
-              website ? (
-                <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 break-all text-brand-700 hover:underline">
-                  <Globe className="size-3.5 shrink-0" aria-hidden />
-                  {company.websiteUrl}
-                </a>
-              ) : (
-                "-"
-              )
-            }
-          />
-          <DetailRow label="Company size" value={company.companySize || "-"} />
-          <DetailRow label="City / state" value={[company.city, company.state].filter(Boolean).join(", ") || "-"} />
-          <DetailRow label="Country" value={company.country || "-"} />
-          <DetailRow label="Billing PIN" value={company.billingPincode || "-"} mono />
-          <DetailRow label="GSTIN" value={company.gstNumber ? <span className="nums">{company.gstNumber}</span> : "-"} />
-          <DetailRow label="Member since" value={formatDate(company.createdAt)} />
-        </dl>
-      </div>
-
-      <div className={cn(ADMIN_SURFACE, "min-w-0 p-5")}>
-        <SectionHead title="Primary contact" hint="First point of contact" />
-        <dl className="divide-y divide-ink-100">
-          <DetailRow label="Name" value={company.primaryContactName || company.name || "-"} />
-          <DetailRow label="Role" value={company.primaryContactRole || "-"} />
-          <DetailRow label="Phone" value={`${company.countryCode} ${company.phoneNumber}`} mono />
-          <DetailRow label="Email" value={<span className="break-all">{company.companyEmail}</span>} />
-        </dl>
-        <div className="mt-6">
-          <SectionHead title="Escalation contact" hint="Second point of contact" />
-          {/* Four dashes said "not given" four times; say it once. */}
-          {!company.escalationContactName && !company.escalationContactPhone && !company.escalationContactEmail ? (
-            <p className="text-sm text-ink-600">Not given yet.</p>
-          ) : (
-          <dl className="divide-y divide-ink-100">
-            <DetailRow label="Name" value={company.escalationContactName || "-"} />
-            <DetailRow label="Role" value={company.escalationContactRole || "-"} />
+    <div className="grid items-start gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
+      <div className="min-w-0 space-y-10">
+        <Section title="Company information">
+          <dl className="divide-y divide-ink-200">
+            <DetailRow label="Company name" value={company.companyName} />
+            <DetailRow label="Account holder" value={company.name || "-"} />
+            <DetailRow label="Email" value={<span className="break-all">{company.companyEmail}</span>} />
             <DetailRow
-              label="Phone"
-              value={[company.escalationContactCountryCode, company.escalationContactPhone].filter(Boolean).join(" ") || "-"}
-              mono
+              label="Website"
+              value={
+                website ? (
+                  <a href={website} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-6 items-center gap-1 break-all text-brand-700 hover:underline">
+                    <Globe className="size-3.5 shrink-0" aria-hidden />
+                    {company.websiteUrl}
+                  </a>
+                ) : (
+                  "-"
+                )
+              }
             />
-            <DetailRow label="Email" value={company.escalationContactEmail ? <span className="break-all">{company.escalationContactEmail}</span> : "-"} />
+            <DetailRow label="Company size" value={company.companySize || "-"} />
+            <DetailRow label="City / state" value={[company.city, company.state].filter(Boolean).join(", ") || "-"} />
+            <DetailRow label="Country" value={company.country || "-"} />
+            <DetailRow label="Billing PIN" value={company.billingPincode || "-"} mono />
+            <DetailRow label="GSTIN" value={company.gstNumber ? <span className="nums">{company.gstNumber}</span> : "-"} />
+            <DetailRow label="Member since" value={formatDate(company.createdAt)} />
           </dl>
+        </Section>
+
+        <Section title="Primary contact" hint="First point of contact">
+          <dl className="divide-y divide-ink-200">
+            <DetailRow label="Name" value={company.primaryContactName || company.name || "-"} />
+            <DetailRow label="Role" value={company.primaryContactRole || "-"} />
+            <DetailRow label="Phone" value={`${company.countryCode} ${company.phoneNumber}`} mono />
+            <DetailRow label="Email" value={<span className="break-all">{company.companyEmail}</span>} />
+          </dl>
+        </Section>
+
+        <Section title="Escalation contact" hint="Second point of contact">
+          {noEscalation ? (
+            <p className="py-2 text-sm text-ink-600">No escalation contact has been given yet.</p>
+          ) : (
+            <dl className="divide-y divide-ink-200">
+              <DetailRow label="Name" value={company.escalationContactName || "-"} />
+              <DetailRow label="Role" value={company.escalationContactRole || "-"} />
+              <DetailRow label="Phone" value={[company.escalationContactCountryCode, company.escalationContactPhone].filter(Boolean).join(" ") || "-"} mono />
+              <DetailRow label="Email" value={company.escalationContactEmail ? <span className="break-all">{company.escalationContactEmail}</span> : "-"} />
+            </dl>
           )}
-        </div>
+        </Section>
       </div>
 
-      <div className={cn(ADMIN_SURFACE, "min-w-0 p-5")}>
-        <SectionHead title="Account and access" hint="Changes save as soon as you make them." />
-        <dl className="divide-y divide-ink-100">
-          <div className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <dt className="text-sm text-ink-600">Sign-in</dt>
-            <dd>
-              {canWrite ? <CompanyActiveToggle id={company.id} isActive={company.isActive} refresh /> : <span className="text-sm">{company.isActive ? "Active" : "Inactive"}</span>}
-            </dd>
-          </div>
-          <div className="flex flex-wrap items-center justify-between gap-3 py-3">
-            <dt className="text-sm text-ink-600">
-              International FTE
-              <span className="block text-xs text-text-subtle">
-                {fte === "applied" ? "Requested; approve, or set back to Not approved to decline." : "Lets the company send full-time offers in USD."}
-              </span>
-            </dt>
-            <dd>
-              {canWrite ? <CompanyFteSelect id={company.id} value={company.internationalFteStatus} refresh /> : <span className="text-sm">{fte === "approved" ? "Approved" : fte === "applied" ? "Applied" : "Not approved"}</span>}
-            </dd>
-          </div>
-        </dl>
-      </div>
+      <div className="min-w-0 space-y-10">
+        <Section title="Account and access" hint="Changes save as soon as you make them.">
+          <dl className="divide-y divide-ink-200">
+            <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <dt className="text-sm text-ink-600">Sign-in</dt>
+              <dd>{canWrite ? <CompanyActiveToggle id={company.id} isActive={company.isActive} refresh /> : <span className="text-sm">{company.isActive ? "Active" : "Inactive"}</span>}</dd>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+              <dt className="min-w-0 text-sm text-ink-600">
+                International FTE
+                <span className="block max-w-56 text-xs text-text-subtle">
+                  {fte === "applied" ? "Requested; approve, or set back to Not approved to decline." : "Lets the company send full-time offers in USD."}
+                </span>
+              </dt>
+              <dd>{canWrite ? <CompanyFteSelect id={company.id} value={company.internationalFteStatus} refresh /> : <span className="text-sm">{fte === "approved" ? "Approved" : fte === "applied" ? "Applied" : "Not approved"}</span>}</dd>
+            </div>
+          </dl>
+        </Section>
 
-      {/* Apart from the routine switches above (critique A: Delete sat
-          among them in the Account card). */}
-      {canWrite ? <div className={cn(ADMIN_SURFACE, "min-w-0 flex flex-wrap items-center justify-between gap-3 p-5")}>
-        <div>
-          <p className="text-sm font-semibold text-ink-900">Delete company</p>
-          <p className="text-sm text-ink-600">Only possible before any proposal, interview or payment.</p>
-        </div>
-        <CompanyDeleteButton id={company.id} />
-      </div> : null}
+        <Section title="Recent activity" hint="Newest first">
+          <ActivityTimeline entries={activities} />
+        </Section>
+
+        {/* Apart from the routine switches above: Delete does not sit among them. */}
+        {canWrite ? (
+          <Section title="Delete company">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="max-w-56 text-sm text-ink-600">Only possible before any proposal, interview or payment.</p>
+              <CompanyDeleteButton id={company.id} />
+            </div>
+          </Section>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -595,12 +560,15 @@ function DuesTab({
   const { totals } = ledger;
   return (
     <div className="space-y-4">
-      <div className={cn("grid grid-cols-1 gap-[var(--admin-gap)] [&_.leading-none]:text-[1.75rem]", totals.refundedInrMinor > 0 ? "@xl:grid-cols-4" : "@xl:grid-cols-3")}>
-        <StatCard label="Billed" value={formatMoney(totals.billedInrMinor, "INR", { zeroLabel: "₹0" })} hint={totals.refundedInrMinor > 0 ? "Net paid plus still due, in INR" : "Paid plus still due, in INR"} />
-        <StatCard label="Paid" value={formatMoney(totals.paidInrMinor, "INR", { zeroLabel: "₹0" })} hint="Every paid order, as recorded" />
-        {totals.refundedInrMinor > 0 ? <StatCard label="Refunded" value={formatMoney(totals.refundedInrMinor, "INR", { zeroLabel: "₹0" })} hint={`Net paid ${formatMoney(totals.netPaidInrMinor, "INR", { zeroLabel: "₹0" })}`} /> : null}
-        <StatCard label="Remaining" value={formatMoney(totals.remainingInrMinor, "INR", { zeroLabel: "₹0" })} hint="Unpaid offers and monthly instalments left" />
-      </div>
+      <StatList
+        className="max-w-md"
+        items={[
+          { label: "Billed", value: formatMoney(totals.billedInrMinor, "INR", { zeroLabel: "₹0" }), hint: totals.refundedInrMinor > 0 ? "Net paid plus still due" : "Paid plus still due" },
+          { label: "Paid", value: formatMoney(totals.paidInrMinor, "INR", { zeroLabel: "₹0" }) },
+          ...(totals.refundedInrMinor > 0 ? [{ label: "Refunded", value: formatMoney(totals.refundedInrMinor, "INR", { zeroLabel: "₹0" }), hint: `Net paid ${formatMoney(totals.netPaidInrMinor, "INR", { zeroLabel: "₹0" })}` }] : []),
+          { label: "Remaining", value: formatMoney(totals.remainingInrMinor, "INR", { zeroLabel: "₹0" }), hint: "Unpaid offers and monthly instalments left" },
+        ]}
+      />
       <DataTable
         basePath={base}
         params={params}
@@ -642,7 +610,7 @@ function DuesTab({
           {
             header: "Due",
             align: "right",
-            cell: (h) => (h.dueMinor > 0 ? <span className="font-semibold text-ink-900">{money(h.dueMinor, h.currency)}</span> : <span className="text-text-subtle">Nothing</span>),
+            cell: (h) => (h.dueMinor > 0 ? <span className="font-semibold text-signal">{money(h.dueMinor, h.currency)}</span> : <span className="text-text-subtle">Nothing</span>),
           },
           {
             header: "Months",

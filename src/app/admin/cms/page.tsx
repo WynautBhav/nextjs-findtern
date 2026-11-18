@@ -2,11 +2,13 @@ import type { Metadata } from "next";
 import { asc, count, desc } from "drizzle-orm";
 
 import { CmsAddButton, CmsEditorProvider, CmsRowActions, type CmsItem } from "@/components/admin/cms-editor";
-import { AdminTabs } from "@/components/admin/admin-tabs";
 import { DataTable, type Column } from "@/components/admin/data-table";
 import { InlineToggle } from "@/components/admin/inline-control";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
-import { StatusBadge } from "@/components/admin/status-badge";
+import { FilterTabs, Pill } from "@/components/app/primitives";
+import { LeadStat } from "@/components/app/stat";
+import { UserDot } from "@/components/layout/shell-parts";
+import { formatNumber } from "@/lib/format";
 import { CMS_COLLECTIONS, CMS_TYPES, cmsImageSrc, matchesCmsSearch, type CmsType } from "@/lib/admin/cms-collections";
 import { CMS_TABLES, cmsListColumns } from "@/lib/admin/cms-tables";
 import { withLiveBenchCounts } from "@/lib/content";
@@ -41,15 +43,19 @@ async function loadCollection(type: CmsType): Promise<CmsItem[]> {
   return rows as unknown as CmsItem[];
 }
 
+const lc = (label: string) => (label === "FAQs" ? label : label.toLowerCase());
+
 function dateIn(value: unknown): string {
   const d = value instanceof Date ? value : typeof value === "string" ? new Date(value) : null;
   if (!d || Number.isNaN(d.getTime())) return "-";
   return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" });
 }
 
-function Thumb({ src }: { src: string | null }) {
+function Thumb({ src, name }: { src: string | null; name: string }) {
+  // A person without a photo gets the flat initials disc, never an empty box.
+  if (!src && name) return <UserDot name={name} className="size-10 text-sm" />;
   return (
-    <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-xl bg-[color:var(--admin-panel-2)]">
+    <span className="grid size-10 shrink-0 place-items-center overflow-hidden rounded-md bg-ink-100">
       {src ? (
         // eslint-disable-next-line @next/next/no-img-element -- stored CMS images, any origin or inline
         <img src={src} alt="" loading="lazy" className="size-full object-contain" />
@@ -89,12 +95,12 @@ function columnsFor(type: CmsType, mayEdit: boolean): Column<CmsItem>[] {
     className: "max-w-[24rem]",
     cell: (row) => (
       <span className="flex min-w-0 items-center gap-3">
-        {def.image ? <Thumb src={cmsImageSrc(type, row.id, def.image, row[def.image])} /> : null}
+        {def.image ? <Thumb src={cmsImageSrc(type, row.id, def.image, row[def.image])} name={type === "testimonial" ? String(row[def.title] ?? "") : ""} /> : null}
         <span className="min-w-0">
-          <span className="block truncate font-medium text-foreground" title={String(row[def.title] ?? "")}>
+          <span className="block truncate font-medium text-ink-900" title={String(row[def.title] ?? "")}>
             {String(row[def.title] ?? "") || "Untitled"}
           </span>
-          {type === "testimonial" && row.title ? <span className="block truncate text-xs text-text-subtle">{String(row.title)}</span> : null}
+          {type === "testimonial" && row.title ? <span className="block truncate text-xs text-ink-600">{String(row.title)}</span> : null}
         </span>
       </span>
     ),
@@ -104,7 +110,7 @@ function columnsFor(type: CmsType, mayEdit: boolean): Column<CmsItem>[] {
     className: cn("max-w-[18rem]", cls),
     cell: (row) => (
       <span className="block truncate" title={String(row[key] ?? "")}>
-        {String(row[key] ?? "") || <span className="text-text-subtle">-</span>}
+        {String(row[key] ?? "") || <span className="text-ink-600">-</span>}
       </span>
     ),
   });
@@ -119,7 +125,7 @@ function columnsFor(type: CmsType, mayEdit: boolean): Column<CmsItem>[] {
         titled("Question"),
         {
           header: "Shown to",
-          cell: (row) => <StatusBadge tone={row.category === "Employer" ? "info" : "success"} dot={false} label={String(row.category ?? "-").trim() || "-"} />,
+          cell: (row) => <Pill tone={row.category === "Employer" ? "new" : "paid"}>{String(row.category ?? "-").trim() || "-"}</Pill>,
         },
         order,
         status,
@@ -128,14 +134,11 @@ function columnsFor(type: CmsType, mayEdit: boolean): Column<CmsItem>[] {
     case "blog":
       return [
         titled("Post"),
-        text("Slug", "slug", "text-xs text-text-subtle"),
+        text("Slug", "slug", "text-xs text-ink-600"),
         {
           header: "Status",
           cell: (row) => (
-            <StatusBadge
-              tone={row.status === "published" ? "success" : "neutral"}
-              label={row.status === "published" ? "Published" : "Draft"}
-            />
+            <Pill tone={row.status === "published" ? "paid" : "closed"}>{row.status === "published" ? "Published" : "Draft"}</Pill>
           ),
         },
         { header: "Published", align: "right", cell: (row) => dateIn(row.publishedAt) },
@@ -184,23 +187,40 @@ export default async function AdminCmsPage({
   // toPage re-clamps the page; slice again if the request overshot.
   const rows = page.page === req.page ? page.rows : filtered.slice((page.page - 1) * req.perPage, page.page * req.perPage);
 
+  // What visitors see now: blog posts by status, everything else by the on/off switch.
+  const liveCount = all ? all.filter((i) => (active === "blog" ? i.status === "published" : i.isActive !== false)).length : 0;
+  const offCount = all ? all.length - liveCount : 0;
+
   return (
-    <div>
+    <div className="space-y-6">
       <AdminPageHeader
         title="Website content"
         subtitle="Prices live under Pricing and fees; legal texts under Settings."
       />
 
-      <AdminTabs
-        label="Content types"
-        className="mb-6"
-        active={active}
-        items={CMS_TYPES.map((t) => ({ key: t, label: CMS_COLLECTIONS[t].label, count: counts[t], href: `/admin/cms?tab=${t}` }))}
-      />
+      <div className="grid items-start gap-x-14 gap-y-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        {all ? (
+          <LeadStat
+            label={`${def.label} on the website`}
+            value={all.length === 0 ? "None" : formatNumber(liveCount)}
+            note={all.length === 0 ? `Nothing added yet. Add the first ${def.noun} below.` : offCount ? `${formatNumber(offCount)} ${active === "blog" ? (offCount === 1 ? "draft is" : "drafts are") : offCount === 1 ? "is" : "are"} ${active === "blog" ? "not shown to visitors" : "hidden from visitors"}.` : `Every ${def.noun} you have is showing.`}
+          />
+        ) : (
+          <div />
+        )}
+        <div className="lg:pt-6">
+          <FilterTabs
+            label="Content types"
+            value={active}
+            hrefFor={(t) => `/admin/cms?tab=${t}`}
+            tabs={CMS_TYPES.map((t) => ({ key: t, label: CMS_COLLECTIONS[t].label, count: counts[t] }))}
+          />
+        </div>
+      </div>
 
       {all === null ? (
         <Panel>
-          <AdminLoadError what={def.label.toLowerCase()} retryHref={`/admin/cms?tab=${active}`} />
+          <AdminLoadError what={lc(def.label)} retryHref={`/admin/cms?tab=${active}`} />
         </Panel>
       ) : (
         <CmsEditorProvider type={active} items={rows}>
@@ -213,14 +233,14 @@ export default async function AdminCmsPage({
             perPage={req.perPage}
             columns={columnsFor(active, mayEdit)}
             rows={rows}
-            noun={def.label.toLowerCase()}
+            noun={lc(def.label)}
             caption={def.label}
-            searchPlaceholder={`Search ${def.label.toLowerCase()}…`}
+            searchPlaceholder={`Search ${lc(def.label)}…`}
             extraControls={mayEdit ? <CmsAddButton noun={def.noun} /> : undefined}
             empty={
               req.search
-                ? { title: `No ${def.label.toLowerCase()} match "${req.search}"`, body: "Try a shorter search, or clear it to see every entry." }
-                : { title: `No ${def.label.toLowerCase()} yet`, body: `Use "Add ${def.noun}" above. It shows on the public site as soon as it is saved.` }
+                ? { title: `No ${lc(def.label)} match "${req.search}"`, body: "Try a shorter search, or clear it to see every entry." }
+                : { title: `No ${lc(def.label)} yet`, body: `Use "Add ${def.noun}" above. It shows on the public site as soon as it is saved.` }
             }
           />
         </CmsEditorProvider>

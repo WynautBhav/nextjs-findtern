@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
 import { asc, eq } from "drizzle-orm";
-import { CalendarDays } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 
-import { AdminLoadError, AdminPageHeader, Panel, PanelHeader } from "@/components/admin/panel";
-import { StatusBadge } from "@/components/admin/status-badge";
-import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
+import { LeadStat, Overview, Section, StatList } from "@/components/app/stat";
 import { buttonClass } from "@/components/ui/button";
+import { formatMoney } from "@/lib/format";
 import { calendarConnected as checkCalendar } from "@/lib/calendar-status";
 import { AdminPricingEditor, type EditablePlan } from "@/components/admin/admin-pricing-editor";
 import { getSession } from "@/lib/auth";
@@ -74,26 +74,22 @@ const HAND_EDITED: { what: string; where: string; href?: string }[] = [
 
 function HandEditedTexts() {
   return (
-    <Panel>
-      <PanelHeader
-        title="Texts that still quote figures and must be edited by hand"
-        description="Prices, stipends and fees saved above do not rewrite these. Check them after a change."
-      />
-      <ul className="divide-y divide-[color:var(--admin-rule)] px-5 pb-2 text-sm">
+    <Section title="Texts that quote figures" hint="Prices, stipends and fees saved above do not rewrite these. Check them after a change.">
+      <ul className="divide-y divide-ink-200 border-b border-ink-200 text-sm">
         {HAND_EDITED.map((t) => (
-          <li key={t.what} className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 py-2.5">
-            <span className="font-medium text-ink-800">{t.what}</span>
+          <li key={t.what} className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-3">
+            <span className="font-medium text-ink-900">{t.what}</span>
             {t.href ? (
-              <Link href={t.href} className="text-brand-700 underline underline-offset-2">
+              <Link href={t.href} className="inline-flex min-h-8 items-center text-brand-700 underline underline-offset-4 hover:text-brand-900">
                 {t.where}
               </Link>
             ) : (
-              <span className="text-text-subtle">{t.where}</span>
+              <span className="text-ink-600">{t.where}</span>
             )}
           </li>
         ))}
       </ul>
-    </Panel>
+    </Section>
   );
 }
 
@@ -104,45 +100,74 @@ export default async function AdminSettingsPage() {
   const mayEditSubscription = mayEdit && canWrite(permissions, "/api/admin/subscriptions");
 
   const calendar = (
-      <Panel>
-        <PanelHeader
-          title="Google Calendar (Meet links)"
-          icon={CalendarDays}
-          description={
-            calendarConnected === null
-              ? "Couldn't check the connection just now. Reload to try again."
-              : calendarConnected
-                ? "Connected. Interviews get a Meet link automatically when the candidate picks a slot."
-                : "Not connected. Meet links have to be added by hand until it is."
-          }
-          action={
-            <>
-              {calendarConnected !== null ? (
-                <StatusBadge
-                  tone={calendarConnected ? "success" : "warning"}
-                  label={calendarConnected ? "Connected" : "Not connected"}
-                />
-              ) : null}
-              <a href="/api/admin/google/connect" className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
-                {calendarConnected ? "Reconnect Google" : "Connect Google"}
-              </a>
-            </>
-          }
-        />
-      </Panel>
+    <Section
+      title="Google Calendar"
+      hint="Meet links for interviews"
+      action={
+        <a href="/api/admin/google/connect" className={buttonClass({ variant: "outline", size: "sm" })}>
+          {calendarConnected ? "Reconnect Google" : "Connect Google"}
+        </a>
+      }
+    >
+      <p className="flex items-start gap-2 border-b border-ink-200 pb-3 text-sm text-ink-800">
+        {calendarConnected === true ? (
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-success" aria-hidden />
+        ) : (
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-signal" aria-hidden />
+        )}
+        <span>
+          <span className="font-medium">{calendarConnected === null ? "Status unknown. " : calendarConnected ? "Connected. " : "Not connected. "}</span>
+          {calendarConnected === null
+            ? "Couldn't check the connection just now. Reload to try again."
+            : calendarConnected
+              ? "Interviews get a Meet link automatically when the candidate picks a slot."
+              : "Meet links have to be added by hand until it is."}
+        </span>
+      </p>
+    </Section>
   );
 
+  const rate = pricing
+    ? {
+        featured: pricing.plans.find((p) => p.isFeatured)?.displayName ?? null,
+        charged: pricing.plans.filter((p) => p.priceHourlyMinor > 0 || p.perHireChargeMinor > 0).length,
+      }
+    : null;
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <AdminPageHeader
         title="Pricing and fees"
-        subtitle="Prices are in rupees (the employer subscription included); USD is derived at ₹100 = $1. Changes save by themselves a moment after you stop typing and go live on the site as soon as they save."
+        subtitle="Prices are in rupees, the employer subscription included; USD is derived at ₹100 = $1. Changes save a moment after you stop typing and go live on the site as soon as they save."
       />
       {/* While disconnected it is the dashboard's top attention item, so it
           leads here too; once connected it sits at the end. */}
       {calendarConnected === false ? calendar : null}
+
+      {pricing ? (
+        <Overview
+          lead={
+            <LeadStat
+              label="Intern activation fee"
+              value={formatMoney(pricing.activationFeeMinor, "INR", { zeroLabel: "Free" })}
+              note="Charged once to a candidate for the AI interview and onboarding, GST included. Promo codes apply on top."
+            />
+          }
+          rest={
+            <StatList
+              items={[
+                { label: "Employer subscription", value: pricing.subscription.enabled ? formatMoney(pricing.subscription.priceInrMinor, "INR") : "Off", hint: pricing.subscription.enabled ? `${pricing.subscription.durationDays} days of access` : "Employers cannot buy it" },
+                ...(rate?.featured ? [{ label: "Most popular plan", value: rate.featured }] : []),
+                { label: "Cappuccino stipend", value: formatMoney(pricing.stipendBands.skilled ?? 0, "INR", { zeroLabel: "None" }), hint: "Per month, by Findtern Score 6 to 8" },
+                { label: "Latte stipend", value: formatMoney(pricing.stipendBands.assured ?? 0, "INR", { zeroLabel: "None" }), hint: "Per month, by Findtern Score 8 to 10" },
+              ]}
+            />
+          }
+        />
+      ) : null}
+
       {pricing && !mayEdit ? (
-        <p className="text-sm text-text-subtle">Editing prices needs the Edit website content permission.</p>
+        <p className="text-sm text-ink-600">Editing prices needs the Edit website content permission.</p>
       ) : pricing ? (
         <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} perHireFee={pricing.perHireFee} stipendBands={pricing.stipendBands} subscription={pricing.subscription} mayEditSubscription={mayEditSubscription} />
       ) : (

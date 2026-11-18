@@ -32,7 +32,7 @@ export function SortSelect({
   );
 
   return (
-    <div className={className ?? "flex items-center gap-1.5 lg:hidden"}>
+    <div className={className ?? "flex items-center gap-1.5 max-sm:min-w-[calc(50%-0.25rem)] max-sm:flex-1 lg:hidden"}>
       <label htmlFor={id} className="sr-only">
         Sort by
       </label>
@@ -44,7 +44,7 @@ export function SortSelect({
           if (parsed) setSort(parsed.sort, parsed.dir);
           else setSort(null);
         }}
-        className="apple-spring h-10 max-w-56 cursor-pointer truncate rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:text-sm touch:min-h-11 max-sm:w-full max-sm:max-w-full"
+        className="h-10 max-w-56 cursor-pointer truncate rounded-md border border-ink-300 bg-surface-raised pr-9 pl-3 text-base text-foreground hover:border-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:text-sm touch:min-h-11 max-sm:w-full max-sm:max-w-full"
       >
         <option value="">Default order</option>
         {options.map((option) => (

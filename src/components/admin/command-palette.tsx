@@ -357,7 +357,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium text-ink-900">{entry.label}</span>
-                          {entry.sublabel ? <span className="block truncate text-xs text-text-subtle">{entry.sublabel}</span> : null}
+                          {entry.sublabel ? <span className="block truncate text-xs text-ink-600">{entry.sublabel}</span> : null}
                         </span>
                       </div>
                     );
@@ -366,7 +366,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
               ))}
             </div>
             {status ? (
-              <p role="status" className={cn("px-3 text-center text-sm text-text-subtle", flat.length ? "py-2" : "py-6")}>
+              <p role="status" className={cn("px-3 text-center text-sm text-ink-600", flat.length ? "py-2" : "py-6")}>
                 {status}
               </p>
             ) : null}
@@ -389,7 +389,7 @@ export function CommandPalette({ items }: { items: PaletteItem[] }) {
               ))}
             </dl>
           ) : null}
-          <div className="flex items-center justify-between border-t border-ink-200 px-3 py-1.5 text-xs text-text-subtle">
+          <div className="flex items-center justify-between border-t border-ink-200 px-3 py-1.5 text-xs text-ink-600">
             <span aria-hidden className="hidden sm:inline">↑↓ to move · Enter to open</span>
             <span className="ml-auto flex items-center gap-3">
               <button

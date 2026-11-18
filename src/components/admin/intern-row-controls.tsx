@@ -17,7 +17,7 @@ const APPROVAL = [
 
 const APPROVAL_TONES: Record<string, StatusTone> = Object.fromEntries(APPROVAL.map((o) => [o.value, toneForStatus(o.value)]));
 
-/** `pill` draws the select as a pastel pill tinted by the review state (lists); it stays a labelled `<select>`. */
+/** `pill` draws the select as a flat chip with a status dot for the review state (lists); it stays a labelled `<select>`. */
 export function InternApprovalCell({ internId, value, pill = false }: { internId: string; value: string; pill?: boolean }) {
   return (
     <InlineSelect
@@ -59,7 +59,7 @@ export function AccountActiveCell({ id, kind, active, compact = false }: { id: s
       on={active}
       onLabel="Active"
       offLabel="Inactive"
-      turnOnLabel="Activate"
+      turnOnLabel="Reactivate"
       turnOffLabel="Deactivate"
       confirmOff="Deactivate this account? They will not be able to sign in until it is activated again."
       {...(kind === "intern"
@@ -105,11 +105,11 @@ export function InternRatingsCell({
       note="Empty clears that rating. The score is their mean."
       display={
         score === null ? (
-          <span className="text-text-subtle">Not scored</span>
+          <span className="text-ink-600">Not scored</span>
         ) : (
           <span className="nums font-semibold text-ink-900">
             {score.toFixed(1)}
-            <span className="ml-0.5 text-xs font-normal text-text-subtle">/10</span>
+            <span className="ml-0.5 text-xs font-normal text-ink-600">/10</span>
           </span>
         )
       }

@@ -5,7 +5,6 @@ import { Check, ExternalLink, Loader2, Save } from "lucide-react";
 
 import { Panel, PanelHeader } from "@/components/admin/panel";
 import { RichTextField } from "@/components/admin/rich-text-field";
-import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 import { pickNdaClause, type NdaClause as Clause } from "@/lib/admin/legal-docs";
 import { csrfFetch } from "@/lib/client-fetch";
@@ -123,7 +122,7 @@ export function LegalDocEditor({
         action={
           <>
             {publicHref ? (
-              <a href={publicHref} target="_blank" rel="noreferrer" className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
+              <a href={publicHref} target="_blank" rel="noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>
                 View live <ExternalLink className="size-3.5" aria-hidden />
               </a>
             ) : null}
@@ -132,7 +131,7 @@ export function LegalDocEditor({
               type="button"
               onClick={save}
               disabled={saving || !loaded}
-              className={buttonClass({ variant: "primary", size: "sm", className: ADMIN_PILL_PRIMARY })}
+              className={buttonClass({ variant: "primary", size: "sm" })}
             >
               {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Save className="size-4" aria-hidden />}
               {saving ? "Saving…" : "Save changes"}
@@ -144,9 +143,9 @@ export function LegalDocEditor({
 
       <div className="space-y-5 p-[var(--admin-pad-panel)]">
         {loadFailed ? (
-          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger">
             <span>Couldn&apos;t load the live version, so saving is off to protect it. Nothing was changed.</span>
-            <button type="button" onClick={() => setAttempt((n) => n + 1)} className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
+            <button type="button" onClick={() => setAttempt((n) => n + 1)} className={buttonClass({ variant: "outline", size: "sm" })}>
               Try again
             </button>
           </div>
@@ -155,9 +154,9 @@ export function LegalDocEditor({
             <Loader2 className="size-4 animate-spin" aria-hidden /> Loading the live version…
           </p>
         ) : null}
-        {readOnly ? <p className="rounded-2xl bg-warning-soft px-4 py-3 text-sm text-warning">View only: your role can read this document but not edit it.</p> : null}
+        {readOnly ? <p className="rounded-lg bg-warning-soft px-4 py-3 text-sm text-warning">View only: your role can read this document but not edit it.</p> : null}
         {error ? (
-          <p role="alert" className="rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">
+          <p role="alert" className="rounded-lg bg-danger-soft px-4 py-3 text-sm text-danger">
             {error}
           </p>
         ) : null}
@@ -168,7 +167,7 @@ export function LegalDocEditor({
           </p>
         ) : null}
         {clauseInactive ? (
-          <p className="rounded-2xl bg-warning-soft px-4 py-3 text-sm text-warning">
+          <p className="rounded-lg bg-warning-soft px-4 py-3 text-sm text-warning">
             No clause is switched on, so the public page shows the built-in text. Saving edits this inactive clause.
           </p>
         ) : null}
@@ -184,7 +183,7 @@ export function LegalDocEditor({
             disabled={!loaded || readOnly}
             onChange={(e) => setTitle(e.target.value)}
             className={cn(
-              "h-11 w-full rounded-full border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-[0.9375rem] font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
+              "h-11 w-full rounded-md border border-ink-300 bg-[color:var(--admin-panel)] px-4 text-base sm:text-sm font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring",
               "disabled:opacity-60",
             )}
           />

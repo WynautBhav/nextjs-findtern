@@ -23,7 +23,7 @@ import { InternColumnsMenu } from "@/components/admin/intern-columns-menu";
 import { flattenParams, parsePageRequest, toPage, toQueryString } from "@/lib/admin/params";
 import { INTERN_SORTS as SORTS, loadInterns, type InternRow as Row } from "@/lib/admin/intern-query";
 import { matchesDue, todayIstIso } from "@/lib/admin/intern-list";
-import { AdminLoadError, AdminPageHeader } from "@/components/admin/panel";
+import { AdminLoadError, AdminPageHeader, PageLead } from "@/components/admin/panel";
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { DataTable, IdentityCell, type Column } from "@/components/admin/data-table";
 import type { ToolbarFilter } from "@/components/admin/table-toolbar";
@@ -35,7 +35,7 @@ import {
   InternRatingsCell,
   InternVisibilityCell,
 } from "@/components/admin/intern-row-controls";
-import { ADMIN_PILL_SECONDARY, ADMIN_SURFACE } from "@/components/admin/surface";
+import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 
 /**
@@ -145,6 +145,9 @@ const FILTERS: ToolbarFilter[] = [
   },
 ];
 
+/** Most columns that fit the panel at 1440 wide without a sideways scroll (and so a pinned header). */
+const FIT_COLUMNS = 6;
+
 const ACTIONS: BulkActionSpec[] = [
   {
     label: "Show",
@@ -197,29 +200,28 @@ export default async function AdminInterns({
   const filterParams = Object.fromEntries(Object.entries(params).filter(([k]) => k !== "cols"));
   const exportHref = `/api/admin/export?${new URLSearchParams({ ...filterParams, type: "interns", cols: visible.join(",") }).toString()}`;
 
-  const headerWith = (subtitle?: string, noRows = false) => (
+  const headerWith = (noRows = false) => (
     <AdminPageHeader
       title="Candidates"
-      subtitle={subtitle}
       action={
         <div className="flex flex-wrap items-center gap-2">
           {mayWrite ? <RatingsImport /> : null}
-          <Link href="/admin/interns/ai-reports" className={buttonClass({ variant: "outline", className: ADMIN_PILL_SECONDARY })}>
+          <Link href="/admin/interns/ai-reports" className={buttonClass({ variant: "outline" })}>
             AI reports
           </Link>
           {noRows || bankBlocked ? (
-            <button type="button" disabled className={buttonClass({ variant: "outline", className: ADMIN_PILL_SECONDARY })}>
+            <button type="button" disabled className={buttonClass({ variant: "outline" })}>
               <Download className="size-4" aria-hidden />
               Export
             </button>
           ) : (
-            <a href={exportHref} className={buttonClass({ variant: "outline", className: ADMIN_PILL_SECONDARY })}>
+            <a href={exportHref} className={buttonClass({ variant: "outline" })}>
               <Download className="size-4" aria-hidden />
               Export
             </a>
           )}
           {bankBlocked ? (
-            <p className="w-full text-xs text-text-subtle">
+            <p className="w-full text-xs text-ink-700">
               Exporting account numbers needs the Record payouts permission. Hide Account number to export the rest.
             </p>
           ) : null}
@@ -270,13 +272,13 @@ export default async function AdminInterns({
             : "";
   const finding =
     incomplete > 0
-      ? `${incomplete.toLocaleString("en-IN")} of ${signups.toLocaleString("en-IN")} candidates have not finished onboarding, so employers can't see them yet.`
-      : `${signups.toLocaleString("en-IN")} candidates.`;
+      ? `${incomplete.toLocaleString("en-IN")} of them have not finished onboarding, so employers cannot see them yet.`
+      : "All of them have finished onboarding.";
 
   const money = (row: Row, pick: (m: NonNullable<Row["money"]>) => number) => (
     <span className="whitespace-nowrap">{formatMoney(row.money ? pick(row.money) : 0, "INR", { zeroLabel: "₹0" })}</span>
   );
-  const text = (value: string) => value || <span className="text-text-subtle">–</span>;
+  const text = (value: string) => value || <span className="text-ink-600">–</span>;
   const nameOf = (row: Row) => `${row.firstName} ${row.lastName}`.trim();
 
   // Cells for every optional column; the catalog decides which render and in what order.
@@ -288,7 +290,7 @@ export default async function AdminInterns({
         <div className="flex flex-col items-start gap-0.5 whitespace-nowrap">
           <StatusBadge value={row.aiStatus} label={aiStatusLabel(row.aiStatus)} dot={false} />
           {(row.aiStatus === "scheduled" || row.aiStatus === "completed") && row.interviewAt ? (
-            <span className="nums text-xs text-text-subtle">{formatIstStamp(row.interviewAt).slice(0, 16)} IST</span>
+            <span className="nums text-xs text-ink-600">{formatIstStamp(row.interviewAt).slice(0, 16)} IST</span>
           ) : null}
         </div>
       ),
@@ -298,7 +300,7 @@ export default async function AdminInterns({
         row.hasOnboarding ? (
           !mayWrite ? <span className="nums">{row.score ?? "–"}</span> : <InternRatingsCell internId={row.id} name={nameOf(row)} ratings={row.ratings ?? {}} score={row.score} />
         ) : (
-          <span className="text-text-subtle">No profile</span>
+          <span className="text-ink-600">No profile</span>
         ),
     },
     profile: { cell: (row) => <StatusBadge tone={row.hasProfile ? "success" : "warning"} label={row.hasProfile ? "Complete" : "Incomplete"} dot={false} /> },
@@ -312,7 +314,7 @@ export default async function AdminInterns({
             {formatDate(row.money.nextDate)}
           </span>
         ) : (
-          <span className="text-text-subtle">–</span>
+          <span className="text-ink-600">–</span>
         ),
     },
     total: { numeric: true, cell: (row) => money(row, (m) => m.totalMinor) },
@@ -322,7 +324,7 @@ export default async function AdminInterns({
       cell: (row) => (
         <div className="flex flex-col items-start gap-1">
           {mayWrite ? <InternVisibilityCell internId={row.id} live={row.visibility !== "hidden"} compact /> : <span>{row.visibility !== "hidden" ? "Live" : "Hidden"}</span>}
-          {row.visibility !== "hidden" && !row.openToWork ? <span className="text-xs text-text-subtle">{liveLabel(row)}</span> : null}
+          {row.visibility !== "hidden" && !row.openToWork ? <span className="text-xs text-ink-600">{liveLabel(row)}</span> : null}
         </div>
       ),
     },
@@ -330,7 +332,7 @@ export default async function AdminInterns({
     internship: { cell: (row) => text(internshipLabel(row)) },
     fee: { cell: (row) => (row.feePaid ? "Paid" : <StatusBadge tone="warning" label="Unpaid" dot={false} />) },
     offerStatus: {
-      cell: (row) => (row.offerStatus ? <StatusBadge value={row.hired ? "hired" : row.offerStatus} /> : <span className="text-text-subtle">–</span>),
+      cell: (row) => (row.offerStatus ? <StatusBadge value={row.hired ? "hired" : row.offerStatus} /> : <span className="text-ink-600">–</span>),
     },
     bankHolder: { cell: (row) => text(row.bank?.holder ?? "") },
     bankAccount: { cell: (row) => text(row.bank?.account ?? "") },
@@ -340,9 +342,9 @@ export default async function AdminInterns({
     account: { cell: (row) => (mayWrite ? <AccountActiveCell id={row.id} kind="intern" active={row.isActive} compact /> : <StatusBadge value={row.isActive ? "active" : "inactive"} dot={false} />) },
     review: {
       cell: (row) =>
-        row.hasOnboarding ? (mayWrite ? <InternApprovalCell internId={row.id} value={row.approval ?? "Pending"} pill /> : <StatusBadge value={row.approval ?? "Pending"} dot={false} />) : <span className="text-text-subtle">-</span>,
+        row.hasOnboarding ? (mayWrite ? <InternApprovalCell internId={row.id} value={row.approval ?? "Pending"} /> : <StatusBadge value={row.approval ?? "Pending"} dot={false} />) : <span className="text-ink-600">-</span>,
     },
-    joined: { cell: (row) => <span className="nums whitespace-nowrap text-text-subtle">{row.createdAt ? formatDate(row.createdAt) : "-"}</span> },
+    joined: { cell: (row) => <span className="nums whitespace-nowrap text-ink-600">{row.createdAt ? formatDate(row.createdAt) : "-"}</span> },
   };
 
   const columns: Column<Row>[] = [
@@ -359,7 +361,7 @@ export default async function AdminInterns({
       className: "lg:sticky lg:left-0 z-[1] bg-[color:var(--admin-panel)]",
       headerClassName: "lg:sticky lg:left-0 z-[1] bg-[color:var(--admin-panel)]",
       cell: (row) => (
-        <div className="min-w-0 lg:max-w-60">
+        <div className="min-w-0 lg:max-w-52">
           <IdentityCell
             name={nameOf(row)}
             id={row.id}
@@ -394,7 +396,8 @@ export default async function AdminInterns({
 
   return (
     <div>
-      {headerWith(finding, total === 0)}
+      {headerWith(total === 0)}
+      <PageLead value={signups.toLocaleString("en-IN")} label="candidates" note={finding} tone={incomplete > 0 ? "signal" : "ink"} />
       <div className="space-y-4">
         <AdminTabs items={views} active={activeView} label="Candidate views" />
         <BulkSelectProvider actions={mayWrite ? ACTIONS : []} noun="interns">
@@ -409,10 +412,12 @@ export default async function AdminInterns({
             columns={columns}
             noun="candidates"
             caption="Candidates"
-            searchPlaceholder="Search name, email or phone…"
+            searchPlaceholder="Search name, email or phone"
             filters={FILTERS}
             extraControls={<InternColumnsMenu visible={visible} adminUid={adminUid} />}
             rowClassName="group/row"
+            // Few enough columns to fit: the header pins under the top bar. With more, the table scrolls sideways instead.
+            scrollX={visible.length > FIT_COLUMNS}
             empty={{
               title: "No candidates match",
               body: "Try a different search, or clear the filters to see everyone.",
