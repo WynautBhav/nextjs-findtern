@@ -7,9 +7,12 @@ import { proposalPill } from "@/components/employer/proposal-state";
  */
 export type CandidateProposal = { id: string; status: string; fullTime: boolean };
 
-export function candidateStatusPill(proposal: CandidateProposal | null): { label: string; tone: Tone } | null {
-  if (!proposal) return null;
-  // Only the live relations get a pill on a candidate; closed ones leave the card as it was.
+/** The newest expired offer to this candidate (employer-visibility `expired`): the card shows it instead of reading as never contacted. */
+export type ExpiredProposal = { id: string; label: string };
+
+export function candidateStatusPill(proposal: CandidateProposal | null, expired: ExpiredProposal | null = null): { label: string; tone: Tone } | null {
+  if (!proposal) return expired ? { label: expired.label, tone: "closed" } : null;
+  // Only the live relations get a pill on a candidate; a declined or withdrawn one leaves the card as it was.
   if (!["hired", "accepted", "processing", "interview_scheduled", "sent"].includes(proposal.status.toLowerCase())) return null;
   return proposalPill(proposal.status, proposal.fullTime);
 }

@@ -95,3 +95,12 @@ export function expiredStamp(reason: ExpiryReason, now: Date = new Date()): { ex
 export function noReplyStamp(status: string, now: Date = new Date()): { expiredReason: ExpiryReason; expiredAt: string; lapsedAt?: string } {
   return { ...expiredStamp("no_reply_past_start", now), ...(status === "sent" ? { lapsedAt: now.toISOString() } : {}) };
 }
+
+/**
+ * Why an offer cannot be withdrawn, or null when it can. An expired offer (stored `expired`, or one the clock has expired
+ * but the sweeper has not persisted yet) is already closed: withdrawing it would email the candidate about an offer that
+ * lapsed and overwrite the expiry reason. The employer re-proposes instead. Every withdraw entry point reads this one rule.
+ */
+export function withdrawRefusal(p: Pick<ExpiryInput, "status" | "hiredAt" | "offerDetails">, now: Date = new Date()): string | null {
+  return expiryOf(p, now).expired ? "This offer has expired, so it can't be withdrawn. Send a new proposal instead." : null;
+}

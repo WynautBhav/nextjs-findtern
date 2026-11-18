@@ -306,7 +306,7 @@ export default async function EmployerInternDetail({
   const activities = (details.extracurriculars ?? []).filter((a) => a.activity);
   const academics = profile.academics;
   const displayName = displayNameOf(profile, nameUnlocked);
-  const status = candidateStatusPill(relation?.proposal ?? null);
+  const status = candidateStatusPill(relation?.proposal ?? null, relation?.expired ?? null);
   const compareBlocked = relation?.hired
     ? "Hired - not compared"
     : relation?.proposal?.fullTime

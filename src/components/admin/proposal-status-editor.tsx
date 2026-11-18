@@ -8,6 +8,7 @@ import { useConfirm } from "@/components/app/use-confirm";
 import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
+import { withdrawRefusal } from "@/lib/proposal-expiry";
 
 /**
  * Admin override for one proposal row, through the same guarded status route
@@ -41,9 +42,12 @@ const CONFIRM: Record<string, { title: string; body: string; confirmLabel: strin
 export function ProposalStatusEditor({
   proposalId,
   status,
+  offerDetails,
 }: {
   proposalId: string;
   status: string;
+  /** When given, an accepted offer whose start day has passed is expired and offers no Cancel (withdraw). */
+  offerDetails?: unknown;
 }) {
   const router = useRouter();
   const { ask, dialog } = useConfirm();
@@ -51,7 +55,8 @@ export function ProposalStatusEditor({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const options = OPEN.includes(status) ? OPEN_OPTIONS : status === "accepted" ? ACCEPTED_OPTIONS : [];
+  const expired = offerDetails !== undefined && withdrawRefusal({ status, hiredAt: null, offerDetails }) !== null;
+  const options = OPEN.includes(status) ? OPEN_OPTIONS : status === "accepted" && !expired ? ACCEPTED_OPTIONS : [];
   if (options.length === 0) {
     return <span className="text-sm text-text-subtle">-</span>;
   }

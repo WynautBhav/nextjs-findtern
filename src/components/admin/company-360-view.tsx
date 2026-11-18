@@ -327,7 +327,7 @@ export function Company360View({
             { header: "Start", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(parseOffer(p.offerDetails, p.currency).startDate)}</span> },
             { header: "Status", cell: (p) => <StatusBadge value={p.status} /> },
             { header: "Sent", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.createdAt)}</span> },
-            { header: "Change", cell: (p) => <ProposalStatusEditor proposalId={p.id} status={p.status} /> },
+            { header: "Change", cell: (p) => <ProposalStatusEditor proposalId={p.id} status={p.status} offerDetails={p.offerDetails} /> },
           ]}
         />
       ) : null}

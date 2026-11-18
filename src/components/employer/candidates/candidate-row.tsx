@@ -11,7 +11,7 @@ import { skillMatch } from "@/components/app/match-line";
 import { Pill } from "@/components/app/primitives";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
-import { candidateStatusPill, proposalActionLabel, type CandidateProposal } from "@/components/employer/candidate-status";
+import { candidateStatusPill, proposalActionLabel, type CandidateProposal, type ExpiredProposal } from "@/components/employer/candidate-status";
 import { cn } from "@/lib/utils";
 
 const INITIAL: Record<string, string> = { communication: "C", coding: "D", aptitude: "A", interview: "I" };
@@ -28,6 +28,7 @@ export function CandidateRow({
   rank,
   nameUnlocked,
   proposal,
+  expired = null,
   hired,
   pricing,
   currency,
@@ -43,6 +44,7 @@ export function CandidateRow({
   rank: number;
   nameUnlocked: boolean;
   proposal: CandidateProposal | null;
+  expired?: ExpiredProposal | null;
   hired: boolean;
   pricing: Pricing;
   currency: Currency;
@@ -52,7 +54,7 @@ export function CandidateRow({
   compareHref: string | null;
   wantedSkills: string[];
 }) {
-  const status = candidateStatusPill(proposal);
+  const status = candidateStatusPill(proposal, expired);
   const name = displayNameOf(c, nameUnlocked);
   const meta = [c.city, c.workModes.join(" / "), c.hasLaptop === false ? "Needs a laptop" : ""].filter(Boolean).join(" · ");
   const band = PLAN_NAME[bandFor(c.score).id];

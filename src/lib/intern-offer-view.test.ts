@@ -126,3 +126,12 @@ test("a full-time offer's own joining date (fullTimeOffer.startDate) is the join
   const without = parseOffer({ ...fullTime({ startDate: "2026-11-01" }), fullTimeOffer: { jobTitle: "Designer", annualCtc: 600000, jobMode: "onsite", shiftFrom: "10:00", shiftTo: "18:00", timezone: "Asia/Kolkata" } }, "INR");
   assert.equal(offerJoiningDay(without), "2026-11-01");
 });
+
+test("a stored no-reply expiry reads like the unswept lapsed offer: the sweeper never changes what the intern sees", () => {
+  const swept = { status: "expired", offerDetails: internship({ startDate: "2026-10-01", expiredReason: "no_reply_past_start", expiredAt: "2026-09-30T18:30:00.000Z" }) };
+  assert.equal(internOfferKey(swept, now), "lapsed");
+  assert.equal(internOfferKey({ status: "sent", offerDetails: internship({ startDate: "2026-10-01" }) }, now), "lapsed");
+  assert.equal(offerGroup(internOfferKey(swept, now)), "closed");
+  // Another expiry kind keeps its own key.
+  assert.equal(internOfferKey({ status: "expired", offerDetails: internship({ expiredReason: "accepted_elsewhere" }) }, now), "expired");
+});
