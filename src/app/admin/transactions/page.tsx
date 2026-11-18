@@ -14,6 +14,7 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import { DateRangeForm } from "@/components/admin/report-range";
 import { dateRangeConditions } from "@/lib/admin/date-range";
 import { displayStatus } from "@/lib/admin/invoice-rows";
+import { viewInvoice } from "@/lib/admin/view-invoice";
 import { orderRefunds } from "@/lib/refund-accounting";
 import { orderReview } from "@/lib/payment-flags";
 import { gatewayLabel } from "@/lib/admin/invoice-rows";
@@ -33,6 +34,14 @@ import { RevenueChart, VolumeBars, type RevenuePoint, type VolumePoint } from "@
  */
 
 type View = "employer" | "intern" | "college" | "payouts";
+
+function ViewInvoiceLink({ v }: { v: ReturnType<typeof viewInvoice> }) {
+  return v.href ? (
+    <a href={v.href} className="whitespace-nowrap text-sm font-medium text-brand-700 hover:underline max-lg:inline-flex max-lg:min-h-11 max-lg:items-center">View invoice</a>
+  ) : (
+    <span title={v.reason ?? undefined} aria-disabled="true" className="whitespace-nowrap text-sm text-text-subtle">{v.reason}</span>
+  );
+}
 
 const money = (minor: number, currency: string) => formatMoney(minor, currency === "USD" ? "USD" : "INR", { zeroLabel: false });
 
@@ -214,6 +223,7 @@ async function EmployerPaymentsTable({ params }: { params: Record<string, string
       .select({
         id: schema.employerPayments.id,
         orderId: schema.employerPayments.orderId,
+        invoiceNumber: schema.employerPayments.invoiceNumber,
         amountMinor: schema.employerPayments.amountMinor,
         currency: schema.employerPayments.currency,
         gateway: schema.employerPayments.gateway,
@@ -273,6 +283,7 @@ async function EmployerPaymentsTable({ params }: { params: Record<string, string
             </>
           ),
         },
+        { header: "Invoice", cell: (row) => <ViewInvoiceLink v={viewInvoice({ kind: "employer", ...row })} /> },
         { header: "Gateway", cell: (row) => gatewayLabel(row.gateway) },
         { header: "Order ID", cell: (row) => <span className="nums break-all text-[0.8125rem] text-text-subtle">{row.orderId}</span> },
         {
@@ -377,6 +388,7 @@ async function InternFeesTable({ params }: { params: Record<string, string> }) {
         id: schema.internPayments.id,
         internId: schema.internPayments.internId,
         orderId: schema.internPayments.orderId,
+        invoiceNumber: schema.internPayments.invoiceNumber,
         amountMinor: schema.internPayments.amountMinor,
         currency: schema.internPayments.currency,
         gateway: schema.internPayments.gateway,
@@ -418,6 +430,7 @@ async function InternFeesTable({ params }: { params: Record<string, string> }) {
           cell: (row) => <IdentityCell name={row.name.trim() || "Candidate"} id={row.internId} sub={row.email} href={`/admin/interns/${row.internId}`} />,
         },
         { header: "Amount", numeric: true, sort: "amount", cell: (row) => <span className="font-semibold">{money(row.amountMinor, row.currency)}</span> },
+        { header: "Invoice", cell: (row) => <ViewInvoiceLink v={viewInvoice({ kind: "intern", ...row })} /> },
         { header: "Gateway", cell: (row) => gatewayLabel(row.gateway) },
         { header: "Order ID", cell: (row) => <span className="nums break-all text-[0.8125rem] text-text-subtle">{row.orderId}</span> },
         { header: "Status", cell: (row) => <StatusBadge value={row.status} /> },
