@@ -94,3 +94,13 @@ test("displayStatus: a paid order with money back reads partially refunded or re
   assert.equal(displayStatus({ status: "failed", amountMinor: 1000, refundedMinor: 0 }), "failed");
   assert.equal(displayStatus({ status: "created", amountMinor: 1000 }), "created");
 });
+
+test("an intern marked paid only by the profile flag has no tax invoice and no made-up number", () => {
+  const flagged = row({ id: "flag-3d2538bd-9f25", flagOnly: true });
+  assert.equal(hasTaxInvoice(flagged), false);
+  assert.equal(displayInvoiceNumber(flagged, "FT-INT"), null);
+  // The same row with a real settlement is unchanged.
+  assert.equal(hasTaxInvoice(row({ id: "abcdef12-0000" })), true);
+  assert.equal(displayInvoiceNumber(row({ id: "abcdef12-0000" }), "FT-INT"), "FT-INT-ABCDEF12");
+  assert.equal(displayInvoiceNumber(row({ flagOnly: true, invoiceNumber: "FT/2026-27/0001" }), "FT-INT"), "FT/2026-27/0001");
+});

@@ -36,7 +36,7 @@ export function ReportTabs({ items, active, label = "Report sections" }: { items
   }
 
   return (
-    <div role="tablist" aria-label={label} className="flex gap-4 overflow-x-auto pe-4 shadow-[inset_0_-1px_0_var(--admin-rule)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-7" data-rp="tabs">
+    <div role="tablist" aria-label={label} className="flex gap-4 overflow-x-auto pe-4 border-b border-ink-200 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-7" data-rp="tabs">
       {items.map((item, i) => {
         const selected = item.key === active;
         return (
@@ -55,7 +55,7 @@ export function ReportTabs({ items, active, label = "Report sections" }: { items
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
               "relative inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-md px-0.5 text-sm transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']",
-              selected ? "font-semibold text-foreground after:bg-[color:var(--admin-tile)]" : "font-medium text-text-subtle after:bg-transparent hover:text-foreground",
+              selected ? "font-semibold text-ink-900 after:bg-brand-800" : "font-medium text-ink-700 after:bg-transparent hover:text-ink-900",
             )}
           >
             {item.label}
