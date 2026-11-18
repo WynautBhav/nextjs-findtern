@@ -4,7 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { Check, FileUp, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { announceTermsRequired, readCsrfCookie } from "@/lib/client-fetch";
+import { announceAccountDisabled, announceTermsRequired, readCsrfCookie } from "@/lib/client-fetch";
 import { UnreadableImageError, shrinkImage } from "@/lib/image-shrink";
 import { cn } from "@/lib/utils";
 
@@ -82,7 +82,10 @@ function postFile(
       } catch {
         // not JSON: the caller falls back to the generic message
       }
-      if (xhr.status === 403) announceTermsRequired(data);
+      if (xhr.status === 403) {
+        announceTermsRequired(data);
+        announceAccountDisabled(data);
+      }
       resolve({ ok: xhr.status >= 200 && xhr.status < 300, data });
     };
     xhr.send(file);

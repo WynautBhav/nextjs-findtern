@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
+import { ACCOUNT_DISABLED_REASON } from "@/lib/account-disabled";
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { exchangeCode, fetchProfile, googleConfig, googleLoginEnabled, NONCE_COOKIE, safeNext } from "@/lib/google";
@@ -11,7 +12,9 @@ import { attachOtpProof, type SignupOtpSubject } from "@/lib/signup-otp";
 
 function fail(req: Request, path: string, code: string) {
   const to = new URL(path, req.url);
-  to.searchParams.set("oauthError", code);
+  // A switched-off account is shown the shared "contact admin" banner (login page ?reason=disabled), not an oauth error.
+  if (code === "inactive") to.searchParams.set("reason", ACCOUNT_DISABLED_REASON);
+  else to.searchParams.set("oauthError", code);
   const res = NextResponse.redirect(to);
   res.cookies.delete({ name: NONCE_COOKIE, path: "/" });
   return res;

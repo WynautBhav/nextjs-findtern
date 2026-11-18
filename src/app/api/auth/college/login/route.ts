@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { accountDisabledBody } from "@/lib/account-disabled";
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { verifyPassword, needsRehash, hashPassword } from "@/lib/security/password";
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "That email and password don't match" }, { status: 401 });
   }
   if (!row.admin.isActive || !row.collegeActive) {
-    return NextResponse.json({ error: "This account is switched off. Contact Findtern." }, { status: 403 });
+    return NextResponse.json(accountDisabledBody(), { status: 403 });
   }
 
   const set: Partial<typeof schema.collegeAdmins.$inferInsert> = { lastLoginAt: new Date() };

@@ -22,7 +22,11 @@ export async function csrfFetch(
   if (csrf) headers.set("x-csrf-token", csrf);
 
   const res = await fetch(input, { ...init, headers });
-  if (res.status === 403) announceTermsRequired(await res.clone().json().catch(() => null));
+  if (res.status === 403) {
+    const body = await res.clone().json().catch(() => null);
+    announceTermsRequired(body);
+    announceAccountDisabled(body);
+  }
   return res;
 }
 
@@ -33,6 +37,13 @@ export async function csrfFetch(
 export function announceTermsRequired(body: unknown): void {
   if (typeof window !== "undefined" && (body as { code?: string } | null)?.code === "terms_required") {
     window.dispatchEvent(new CustomEvent("findtern:terms-required"));
+  }
+}
+
+/** A route refused because the account was disabled: the AccountGuard in the shell signs the tab out with an explanation. */
+export function announceAccountDisabled(body: unknown): void {
+  if (typeof window !== "undefined" && (body as { code?: string } | null)?.code === "ACCOUNT_DISABLED") {
+    window.dispatchEvent(new CustomEvent("findtern:account-disabled"));
   }
 }
 

@@ -10,6 +10,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import { DoorSwitch } from "@/components/auth/door-switch";
 import { LoginForm } from "@/components/auth/login-form";
 import { getSession } from "@/lib/auth";
+import { ACCOUNT_DISABLED_MESSAGE, ACCOUNT_DISABLED_REASON } from "@/lib/account-disabled";
 import { hireFeeText } from "@/lib/pricing-copy";
 import { getRenderPricingConfig } from "@/lib/pricing-config-server";
 import { authPath, doorPoints, doorOf, ownNext, LAST_DOOR_COOKIE, type Door } from "@/lib/auth-doors";
@@ -73,7 +74,8 @@ export default async function LoginPage({
   // No `as`: open on the type this browser last signed in as.
   const door = doorOf(params.as ?? (await cookies()).get(LAST_DOOR_COOKIE)?.value);
   const d = doorCopy(doorPoints(hireFeeText(await getRenderPricingConfig())))[door];
-  const oauthError = oauthErrorMessage(one(params.oauthError));
+  // One banner for both: a Google sign-in problem, or a session/sign-in refused because the account was disabled.
+  const oauthError = one(params.reason) === ACCOUNT_DISABLED_REASON ? ACCOUNT_DISABLED_MESSAGE : oauthErrorMessage(one(params.oauthError));
   // Where sign in returns to (INT-07 / EMH-37): the page that sent them here.
   const next = ownNext(safeNext(one(params.next), ""), door);
   // Already signed in as this type: nothing to do here.
