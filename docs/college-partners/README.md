@@ -4,8 +4,6 @@ Colleges get a read-only placement console. They run virtual drives that employe
 
 | Doc | What's in it |
 |---|---|
-| [design-brief.md](design-brief.md) | Personas (placement officer, drive employer, student), principles, scope |
-| [reference-board.md](reference-board.md) | Superset, Handshake, Unstop, HirePro: screens, what to steal, what to avoid; plus AISHE and DPDP |
 | [threat-model.md](threat-model.md) | Threats → guards → the test that proves each |
 | [decisions.md](decisions.md) | Settled decisions, open product decisions, questions for Incruiter |
 | [loadtest-results.md](loadtest-results.md) | 500-student presence test (k6 + SSE probe) |
