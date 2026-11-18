@@ -3,91 +3,89 @@ import Link from "next/link";
 import { Arrive } from "@/components/admin/motion/arrive";
 import { Count } from "@/components/admin/motion/count";
 import { Reveal } from "@/components/admin/motion/reveal";
+import { Section } from "@/components/app/stat";
 import type { Funnel as FunnelData, FunnelStage } from "@/lib/employer-dashboard";
 import { cn } from "@/lib/utils";
 
-import { ChartCard, HATCH } from "./chart-card";
+import { HATCH } from "./chart-card";
 
 /** `funnel.stages` has 4 entries in order: pipeline, offered, accepted, hired. See `FunnelStage` for each field. */
 export type FunnelProps = { funnel: FunnelData };
 
-/** Brand ramp, light to deep: the bar darkens as the candidate gets closer to a hire. Hired is the deepest. */
+/** Brand ramp, light to deep: the block darkens as the candidate gets closer to a hire. Hired is the deepest. */
 const FILL = ["bg-brand-300", "bg-brand-400", "bg-brand-600", "bg-brand-800"] as const;
+const PLOT = 136; // height of the tallest block (the whole pipeline), px
 
-const ROW =
-  "group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 rounded-xl px-2 py-2 transition-colors hover:bg-ink-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600 @xl:grid-cols-[9.25rem_minmax(0,1fr)_8.5rem]";
+const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-700";
 
 function conversion(s: FunnelStage) {
   if (s.conversionOf === null) return null;
-  return s.conversionPct === null ? "—" : `${s.conversionPct}% ${s.conversionOf}`;
+  return s.conversionPct === null ? "none to convert" : `${s.conversionPct}% ${s.conversionOf}`;
 }
 
 /**
- * The hiring funnel: four stages, one bar each, widths proportional to the
- * real counts (the stages nest by construction, so the bars only ever get
- * shorter). The Offered bar ends in a hatched tail for candidates whose every
- * offer was declined, withdrawn or expired. Each row links to its tab.
+ * The hiring funnel as one silhouette: four blocks side by side, each as tall as the number of
+ * candidates at that stage, so the step-down is the funnel. One scale for all four (the tallest is
+ * the whole pipeline, said in a line under the shape); hatching on Offered marks candidates whose
+ * every offer was declined or expired. The conversion into each stage is written under it. What is
+ * waiting at a stage is a ruled list below, each row opening its Proposals tab.
  */
 export function Funnel({ funnel }: FunnelProps) {
   const { stages, hasData } = funnel;
-  const max = Math.max(1, ...stages.map((s) => s.count));
+  const total = Math.max(1, stages[0]?.count ?? 1);
+  const waiting = stages.filter((s) => s.sub || s.lost > 0);
 
   return (
-    <ChartCard
-      title="Hiring funnel"
-      titleId="funnel-title"
-      description="All time, each candidate counted once"
-    >
-      <ol className="-mx-2 mt-4 flex flex-1 flex-col justify-around gap-1">
+    <Section title="Hiring funnel" hint="Every candidate counted once, all time">
+      <ol className="grid grid-cols-4 gap-2 border-b border-ink-400">
         {stages.map((s, i) => {
-          const share = (s.count / max) * 100;
-          const lostShare = s.count > 0 ? (s.lost / s.count) * 100 : 0;
-          const conv = conversion(s);
+          const h = s.count > 0 ? Math.max(6, Math.round((s.count / total) * PLOT)) : 2;
+          const lostH = s.count > 0 ? Math.round((s.lost / s.count) * h) : 0;
           return (
-            <Arrive as="li" key={s.key} index={i}>
-              <Link href={s.href} className={ROW}>
-                <span className="order-1 min-w-0">
-                  <span className="block text-sm font-medium text-ink-900">{s.label}</span>
-                  {s.sub ? <span className="block text-xs text-text-subtle">{s.sub}</span> : null}
-                  {s.lost > 0 ? (
-                    <span className="mt-0.5 flex items-center gap-1.5 text-xs text-text-subtle">
-                      <span aria-hidden className={cn("h-2.5 w-4 shrink-0 rounded-[3px]", HATCH)} />
-                      {s.lost} declined or expired
-                    </span>
-                  ) : null}
+            <Arrive as="li" key={s.key} index={i} className="flex min-w-0 flex-col justify-end">
+              <Link href={s.href} className={cn("group flex h-full flex-col justify-end pt-2 transition-colors hover:bg-ink-100/60", FOCUS)}>
+                <span className="px-1">
+                  <Count value={s.count} className="nums block font-display text-4xl font-semibold leading-none tracking-[-0.03em] text-ink-900" />
+                  <span className="mt-1 block text-sm font-medium text-ink-900">{s.label}</span>
+                  <span className="nums mt-0.5 block min-h-8 text-xs leading-4 text-ink-700">{s.key === "pipeline" ? "Shortlisted, met or offered" : conversion(s)}</span>
                 </span>
-                <span className="order-2 text-right @xl:order-3">
-                  <Count value={s.count} className="nums block text-2xl font-normal leading-8 tracking-[-0.02em] tabular-nums text-ink-900" />
-                  {conv ? <span className="nums block text-sm text-text-subtle">{conv}</span> : null}
-                </span>
-                <span
-                  aria-hidden
-                  className={cn(
-                    "order-3 col-span-2 h-10 overflow-hidden rounded-lg @xl:order-2 @xl:col-span-1",
-                    hasData && s.count > 0 ? "bg-ink-100" : "border border-dashed border-ink-300",
-                  )}
-                >
-                  {s.count > 0 ? (
-                    <Reveal index={i} axis="x" className="h-full w-full">
-                      <span className={cn("flex h-full overflow-hidden rounded-lg", FILL[i] ?? FILL[3])} style={{ width: `max(${share}%, 12px)` }}>
-                        {lostShare > 0 ? <span className={cn("ml-auto h-full", HATCH)} style={{ width: `${lostShare}%` }} /> : null}
-                      </span>
+                <span aria-hidden className="mt-2 block w-full" style={{ height: PLOT }}>
+                  <span className="flex h-full items-end">
+                    <Reveal axis="y" index={i} className={cn("relative block w-full", s.count > 0 ? FILL[i] : "border-t border-dashed border-ink-300")} style={{ height: h }}>
+                      {lostH > 0 ? <span className={cn("absolute inset-x-0 top-0 block", HATCH)} style={{ height: lostH }} /> : null}
                     </Reveal>
-                  ) : null}
+                  </span>
                 </span>
               </Link>
             </Arrive>
           );
         })}
       </ol>
-      {hasData ? null : (
-        <p className="mt-3 text-sm text-text-subtle">
-          Nobody in your pipeline yet.{" "}
-          <Link href="/employer/candidates" className="font-medium text-brand-700 underline underline-offset-4 hover:text-brand-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">
-            Find candidates
-          </Link>
-        </p>
-      )}
-    </ChartCard>
+      {waiting.length ? (
+        <ul className="mt-5 border-t border-ink-200">
+          {waiting.map((s) => (
+            <li key={s.key} className="border-b border-ink-200">
+              <Link href={s.href} className={cn("flex min-h-11 flex-wrap items-baseline gap-x-3 gap-y-0.5 py-2.5 text-sm hover:bg-ink-100/60", FOCUS)}>
+                <span className="font-medium text-ink-900">{s.label}</span>
+                <span className="text-ink-700">{[s.sub, s.lost > 0 ? `${s.lost} declined or expired (hatched)` : null].filter(Boolean).join(" · ")}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      <p className="mt-3 text-sm text-ink-600">
+        {hasData ? (
+          <>One scale: the tallest block is the {stages[0].count} in your pipeline.</>
+        ) : (
+          <>
+            Nobody in your pipeline yet.{" "}
+            <Link href="/employer/candidates" className="font-medium text-brand-700 underline underline-offset-4 hover:text-brand-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-600">
+              Find candidates
+            </Link>
+          </>
+        )}
+      </p>
+    </Section>
   );
 }
