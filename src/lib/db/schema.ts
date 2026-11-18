@@ -654,6 +654,8 @@ export const internOnboarding = pgTable("intern_onboarding", {
 }, (t) => ({
   internOnboardingAadhaarUnique: uniqueIndex("intern_onboarding_aadhaar_unique").on(t.aadhaarNumber),
   internOnboardingPanUnique: uniqueIndex("intern_onboarding_pan_unique").on(t.panNumber),
+  // drizzle/0036: every intern page reads this row by user_id.
+  internOnboardingUserIdx: index("intern_onboarding_user_id_idx").on(t.userId),
 }));
 
 export type InternOnboarding = typeof internOnboarding.$inferSelect;
@@ -701,6 +703,8 @@ export const internPayouts = pgTable("intern_payouts", {
   internPayoutsBonusUnique: uniqueIndex("intern_payouts_bonus_proposal_unique").on(t.bonusProposalId).where(sql`${t.kind} = 'completion_bonus'`),
   // drizzle/0014: without this a NULL bonus_proposal_id slips past the unique index above.
   internPayoutsBonusHasProposal: check("intern_payouts_bonus_has_proposal", sql`${t.kind} <> 'completion_bonus' OR ${t.bonusProposalId} IS NOT NULL`),
+  // drizzle/0040: loadInternData reads the intern's payouts on every intern page.
+  internPayoutsInternIdx: index("intern_payouts_intern_id_idx").on(t.internId),
 }));
 
 export type InternPayout = typeof internPayouts.$inferSelect;
@@ -764,7 +768,10 @@ export const internDocuments = pgTable("intern_document", {
 
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
-});
+}, (t) => ({
+  // drizzle/0037: every intern page reads this row by user_id.
+  internDocumentsUserIdx: index("intern_document_user_id_idx").on(t.userId),
+}));
 
 export type InternDocuments = typeof internDocuments.$inferSelect;
 // --------------------------------------------------
@@ -823,6 +830,9 @@ export const timesheets = pgTable("timesheets", {
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({
   timesheetsProposalIdx: index("timesheets_proposal_id_idx").on(t.proposalId),
+  // drizzle/0038, 0039: the intern's list and the employer's approval queue.
+  timesheetsInternIdx: index("timesheets_intern_id_idx").on(t.internId),
+  timesheetsEmployerIdx: index("timesheets_employer_id_idx").on(t.employerId),
 }));
 
 export type Timesheet = typeof timesheets.$inferSelect;
@@ -855,7 +865,10 @@ export const profileViews = pgTable("profile_views", {
   employerId: varchar("employer_id").notNull(),
   internId: varchar("intern_id").notNull(),
   createdAt: timestamp("created_at").defaultNow(),
-});
+}, (t) => ({
+  // drizzle/0041: the reports funnel and the intern's own views.
+  profileViewsInternIdx: index("profile_views_intern_id_idx").on(t.internId),
+}));
 
 export type ProfileView = typeof profileViews.$inferSelect;
 
