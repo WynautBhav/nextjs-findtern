@@ -49,6 +49,14 @@ export function acceptedUnpaidExpired(p: ExpiryInput, now: Date = new Date()): b
   return p.status === "accepted" && !p.hiredAt && !p.hasOpenOrder && offerPastStart(startDayOf(p.offerDetails), now);
 }
 
+/** The statuses an unanswered offer can sit in. The sweeper's SQL (proposal-expiry-db.ts expireNoReplyPastStart) must list the same two. */
+export const NO_REPLY_STATUSES = ["sent", "interview_scheduled"] as const;
+
+/** Sent or interview-booked, not hired, and the start day has begun: the candidate can no longer answer it. */
+export function noReplyExpired(p: Pick<ExpiryInput, "status" | "hiredAt" | "offerDetails">, now: Date = new Date()): boolean {
+  return (NO_REPLY_STATUSES as readonly string[]).includes(p.status ?? "") && !p.hiredAt && offerPastStart(startDayOf(p.offerDetails), now);
+}
+
 /** Whether an offer is expired (stored or computed) and why. `at` is when: stored `expiredAt`, else the start-day boundary. */
 export function expiryOf(p: ExpiryInput, now: Date = new Date()): { expired: boolean; reason: ExpiryReason | null; at: string | null } {
   if (p.hiredAt || p.status === "hired" || p.status === "processing") return { ...NOT_EXPIRED };
@@ -62,13 +70,20 @@ export function expiryOf(p: ExpiryInput, now: Date = new Date()): { expired: boo
 
   const day = startDayOf(p.offerDetails);
   if (p.status === "accepted" && acceptedUnpaidExpired(p, now)) return { expired: true, reason: "unpaid_past_start", at: startMoment(day) };
-  if ((p.status === "sent" || p.status === "interview_scheduled") && offerPastStart(day, now)) {
-    return { expired: true, reason: "no_reply_past_start", at: startMoment(day) };
-  }
+  if (noReplyExpired(p, now)) return { expired: true, reason: "no_reply_past_start", at: startMoment(day) };
   return { ...NOT_EXPIRED };
 }
 
 /** The offerDetails keys a new expiry writes (alongside status `expired`). Never `lapsedAt`. */
 export function expiredStamp(reason: ExpiryReason, now: Date = new Date()): { expiredReason: ExpiryReason; expiredAt: string } {
   return { expiredReason: reason, expiredAt: now.toISOString() };
+}
+
+/**
+ * The offerDetails keys a no-reply expiry writes. `lapsedAt` only for a `sent` offer: guarantee.ts counts a lapsed `sent`
+ * offer as a miss on read, and that count must not change when the status is persisted (an `interview_scheduled` one never
+ * counted, so it gets none). The unpaid expiry never stamps it: an employer not paying is not the candidate's miss.
+ */
+export function noReplyStamp(status: string, now: Date = new Date()): { expiredReason: ExpiryReason; expiredAt: string; lapsedAt?: string } {
+  return { ...expiredStamp("no_reply_past_start", now), ...(status === "sent" ? { lapsedAt: now.toISOString() } : {}) };
 }

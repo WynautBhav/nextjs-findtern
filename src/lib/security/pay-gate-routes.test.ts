@@ -76,10 +76,14 @@ test("sweeper SQL: the start-date test uses [0-9], not \\d (a bare \\d in a temp
 });
 
 test("cron route: bearer-only, closed without a secret, honours SCHEDULERS=off; scheduler runs the sweep hourly", () => {
-  assert.match(cron, /cronAuthorized\(req\)/);
-  assert.ok(cron.indexOf("cronAuthorized(") < cron.indexOf("expireUnpaidPastStart()"));
-  assert.match(cron, /SCHEDULERS === "off"/);
-  assert.match(sched, /expireUnpaidPastStart/);
+  const handler = read(LIB, "proposal-expiry-cron.ts"); // behaviour is unit tested in proposal-expiry-no-reply.test.ts
+  assert.match(cron, /runExpiryCron\(req/);
+  assert.match(cron, /process\.env\.CRON_SECRET/);
+  assert.match(handler, /cronAuthorized\(req, deps\.secret\)/);
+  assert.ok(handler.indexOf("cronAuthorized(") < handler.indexOf("deps.sweep()"));
+  assert.match(handler, /schedulers === "off"/);
+  assert.match(cron, /sweepProposalExpiry/);
+  assert.match(sched, /sweepProposalExpiry/);
   assert.match(sched, /setInterval\(expiry, 60 \* 60 \* 1000\)/);
   assert.match(read(join(import.meta.dirname, "../../.."), "vercel.json"), /\/api\/cron\/proposal-expiry/);
 });

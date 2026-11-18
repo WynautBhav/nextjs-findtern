@@ -6,6 +6,7 @@ import { flattenParams, parsePageRequest, toQueryString } from "@/lib/admin/para
 import { isTestEmployer } from "@/lib/admin/scope";
 import { expiredCounts, expiredProposals, filterExpired, filterInterviews, filterProposals, headlineCount, ineligibleInterns, parseExpiredFilters, parseIstDay, proposalTimezone, type TrackerFilters } from "@/lib/admin/tracker";
 import { loadExpiredSources } from "@/lib/admin/expired-load";
+import { kickProposalExpiry } from "@/lib/proposal-expiry-kick";
 import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
 import { formatNumber } from "@/lib/format";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
@@ -106,6 +107,7 @@ export default async function AdminProposalTrackerPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  kickProposalExpiry(); // queued after the response; throttled to one sweep per 10 minutes
   const params = flattenParams(await searchParams);
   const tab: TrackerTab = (TRACKER_TABS as readonly string[]).includes(params.tab ?? "") ? (params.tab as TrackerTab) : "proposals";
   const filters: TrackerFilters = {

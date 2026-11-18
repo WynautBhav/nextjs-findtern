@@ -45,7 +45,7 @@ test("semester, CGPA, expiry and subscription notification types: unique slugs, 
   const { SEM_NOTIFICATION_TYPES } = await import("./notification-types.ts");
   assert.deepEqual(
     SEM_NOTIFICATION_TYPES.map((t) => t.type),
-    ["cgpa_verification_requested", "cgpa_verified", "cgpa_incorrect", "proposal_expired_unpaid", "subscription_started"],
+    ["cgpa_verification_requested", "cgpa_verified", "cgpa_incorrect", "proposal_expired_unpaid", "proposal_expired_no_reply", "subscription_started"],
   );
   for (const t of SEM_NOTIFICATION_TYPES) {
     assert.equal(cleanNotificationType(t.type), t.type, `${t.type} is a clean slug`);
