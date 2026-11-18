@@ -1,6 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { activeAccountSql } from "@/lib/admin/account-views";
 import { feePaidSql } from "@/lib/fee-paid-sql";
 import { findternScoreSql, meaningfulProfile, realEmployerId } from "@/lib/admin/scope";
 
@@ -39,7 +40,7 @@ function academic(k: "institution" | "degree" | "year"): SQL {
 export function baseCte(): SQL {
   return sql`base AS (
     SELECT ${U.id} AS id, ${U.firstName} AS first_name, ${U.lastName} AS last_name, ${U.email} AS email, ${U.createdAt} AS created_at,
-      ${U.isActive} AS is_active, ${U.bannedAt} AS banned_at, ${U.profileVisibility} AS visibility, ${U.emailVerified} AS email_verified,
+      ${activeAccountSql(U.isActive)} AS is_active, ${U.bannedAt} AS banned_at, ${U.profileVisibility} AS visibility, ${U.emailVerified} AS email_verified,
       nullif(trim(${O.city}), '') AS city, nullif(trim(${O.state}), '') AS state,
       ${academic("institution")} AS college, ${academic("degree")} AS degree, ${academic("year")} AS grad_year,
       coalesce(${O.skills}, '[]'::jsonb) AS skills,

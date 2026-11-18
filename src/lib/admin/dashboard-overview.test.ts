@@ -354,3 +354,11 @@ test("a group as large as the fetch limit reads 'N+' because older events may be
   assert.equal(run(ACTIVITY_FETCH_LIMIT).name, `${ACTIVITY_FETCH_LIMIT}+ offers`);
   assert.equal(run(ACTIVITY_FETCH_LIMIT - 1).name, `${ACTIVITY_FETCH_LIMIT - 1} offers`);
 });
+
+import { UNSENT_PROPOSAL_STATUSES } from "./dashboard-overview-pure.ts";
+
+test("the week count leaves out proposals never sent, and no pipeline stage is one of them", () => {
+  assert.deepEqual([...UNSENT_PROPOSAL_STATUSES], ["draft"]);
+  const staged = BAND_STAGES.flatMap((s) => [...s.statuses]);
+  for (const st of UNSENT_PROPOSAL_STATUSES) assert.ok(!staged.includes(st as never), `${st} is a pipeline stage`);
+});

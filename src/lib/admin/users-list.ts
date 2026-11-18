@@ -1,6 +1,7 @@
 import { sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { activeAccountSql, isActiveAccount, statusFilterSql } from "@/lib/admin/account-views";
 import { AI_INTERVIEW_EMAIL, TEST_EMPLOYER_ID } from "@/lib/admin/scope";
 
 /**
@@ -35,11 +36,11 @@ function accounts(showStaff: boolean): SQL {
     sql`SELECT ${u.id}::text AS id, 'intern' AS kind,
         trim(coalesce(${u.firstName}, '') || ' ' || coalesce(${u.lastName}, '')) AS name, NULL::text AS company,
         ${u.email} AS email, trim(coalesce(${u.countryCode}, '') || ' ' || coalesce(${u.phoneNumber}, '')) AS phone,
-        ${u.isActive} AS is_active, coalesce(${u.emailVerified}, false) AS email_verified, ${u.createdAt} AS created_at
+        ${activeAccountSql(u.isActive)} AS is_active, coalesce(${u.emailVerified}, false) AS email_verified, ${u.createdAt} AS created_at
       FROM ${u} WHERE coalesce(${u.role}, 'intern') = 'intern'`,
     sql`SELECT ${e.id}::text, 'employer', coalesce(nullif(trim(${e.name}), ''), ${e.companyName}), ${e.companyName},
         ${e.companyEmail}, trim(coalesce(${e.countryCode}, '') || ' ' || coalesce(${e.phoneNumber}, '')),
-        ${e.isActive}, coalesce(${e.emailVerified}, false), ${e.createdAt}
+        ${activeAccountSql(e.isActive)}, coalesce(${e.emailVerified}, false), ${e.createdAt}
       FROM ${e} WHERE ${e.id} <> ${TEST_EMPLOYER_ID} AND lower(coalesce(${e.companyEmail}, '')) <> ${AI_INTERVIEW_EMAIL}`,
   ];
   if (showStaff) {
@@ -52,8 +53,8 @@ function accounts(showStaff: boolean): SQL {
 function where(params: Record<string, string>): SQL {
   const conds: SQL[] = [sql`true`];
   if (params.role === "intern" || params.role === "employer" || params.role === "admin") conds.push(sql`kind = ${params.role}`);
-  if (params.status === "active") conds.push(sql`is_active`);
-  if (params.status === "inactive") conds.push(sql`NOT is_active`);
+  const status = statusFilterSql(params.status);
+  if (status) conds.push(status);
   if (params.verified === "yes") conds.push(sql`email_verified`);
   if (params.verified === "no") conds.push(sql`NOT email_verified`);
   const words = (params.q ?? "").trim().split(/\s+/).filter(Boolean);
@@ -90,7 +91,7 @@ const toRow = (r: Raw): AccountRow => ({
   company: r.company,
   email: r.email ?? "",
   phone: r.phone?.trim() ?? "",
-  isActive: r.is_active !== false,
+  isActive: isActiveAccount(r.is_active),
   emailVerified: Boolean(r.email_verified),
   createdAt: r.created_at ? new Date(r.created_at) : null,
 });

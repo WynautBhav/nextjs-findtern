@@ -9,6 +9,7 @@ import { SITE } from "@/lib/content/site";
 import { skillsLocked } from "@/lib/skills-lock";
 import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { OnboardingForm } from "@/components/intern/onboarding-form";
+import { idOnFileOf, NO_ID_ON_FILE, withoutIdNumbers } from "@/components/intern/onboarding/id-mask";
 
 export const metadata: Metadata = {
   title: "Your profile",
@@ -30,6 +31,7 @@ export default async function InternOnboarding() {
   let onboarded = false;
   // Submitted once, or far enough along that skills are locked (AI interview).
   let submittedBefore = false;
+  let idOnFile = NO_ID_ON_FILE;
   let hasPanImage = false;
   let hasAadhaarImage = false;
   let hasPhoto = false;
@@ -78,6 +80,9 @@ export default async function InternOnboarding() {
       // This form never asks for bank details (Settings does, showing only the last 4), so the
       // stored account number must not ride along in the page payload.
       draft.bank = emptyDraft().bank;
+      // Aadhaar and PAN the same way: the form gets a masked form to show, never the numbers.
+      idOnFile = idOnFileOf(draft);
+      Object.assign(draft, withoutIdNumbers(draft));
       locked = await skillsLocked(db, session.uid, row.extraData);
       serverUpdatedAt = (row.updatedAt ?? row.createdAt)?.toISOString() ?? null;
       onboarded = isOnboarded(row, { hasPanImage, hasAadhaarImage, hasPhoto });
@@ -118,6 +123,7 @@ export default async function InternOnboarding() {
       />
       <OnboardingForm
         initial={draft}
+        idOnFile={idOnFile}
         documents={documents}
         email={session.email ?? "your account"}
         serverUpdatedAt={serverUpdatedAt}

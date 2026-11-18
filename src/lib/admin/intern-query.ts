@@ -6,6 +6,7 @@ import { searchAny } from "@/lib/admin/params";
 import { loadCompleteProfileIds } from "@/lib/admin/profile-state-load";
 import { aiInterviewAt, aiInterviewStatus, findternScoreSql } from "@/lib/admin/scope";
 import { loadLedgerByIntern, loadPlacementDues, type PlacementDueRow } from "@/lib/admin/payout-list";
+import { activeAccountSql } from "@/lib/admin/account-views";
 import { maskTail } from "@/lib/admin/identity-mask";
 import { internMoney, matchesDue, todayIstIso, type DueFilter, type InternMoney } from "@/lib/admin/intern-list";
 
@@ -108,7 +109,7 @@ export async function loadInterns(
   const conditions = [
     eq(u.role, "intern"),
     searchAny([sql`${u.firstName}`, sql`${u.lastName}`, sql`${u.email}`, sql`${u.phoneNumber}`], req.search),
-    params.status ? eq(u.isActive, params.status === "active") : undefined,
+    params.status ? sql`${activeAccountSql(u.isActive)} = ${params.status === "active"}` : undefined,
     params.visibility === "intern_hidden"
       ? sql`not ${openToWork}`
       : params.visibility
@@ -166,7 +167,7 @@ export async function loadInterns(
         lastName: u.lastName,
         email: u.email,
         phone: sql<string>`trim(coalesce(${u.countryCode}, '') || ' ' || coalesce(${u.phoneNumber}, ''))`,
-        isActive: u.isActive,
+        isActive: activeAccountSql(u.isActive).mapWith(Boolean),
         visibility: u.profileVisibility,
         createdAt: u.createdAt,
         hasOnboarding: sql<boolean>`${o.id} IS NOT NULL`,

@@ -112,7 +112,7 @@ export function InvoiceRowActions({ row, kind, seller }: { row: AdminInvoiceRow;
             <DialogDescription className="text-sm text-ink-600">{k.description}</DialogDescription>
           </DialogHeader>
           <dl className="divide-y divide-ink-100 text-sm">
-            <Detail label="Invoice no.">{displayInvoiceNumber(row, k.invoicePrefix) ?? "No invoice (not paid)"}</Detail>
+            <Detail label="Invoice no.">{displayInvoiceNumber(row, k.invoicePrefix) ?? (row.flagOnly ? "No invoice (marked paid by an admin)" : row.status === "paid" ? "No invoice (nothing was charged)" : "No invoice (not paid)")}</Detail>
             <Detail label="Order ID">
               <span className="nums text-xs break-all">{row.orderId}</span>
             </Detail>
@@ -168,7 +168,7 @@ export function InvoiceRowActions({ row, kind, seller }: { row: AdminInvoiceRow;
                 ) : null}
               </span>
             ) : (
-              <span className="text-sm text-ink-600">No tax invoice for unpaid or ₹0 rows.</span>
+              <span className="text-sm text-ink-600">No tax invoice for unpaid, ₹0 or marked-paid rows.</span>
             )}
             <button type="button" onClick={() => setOpen(false)} className={buttonClass({ variant: "light", size: "sm" })}>
               Close
