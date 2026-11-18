@@ -96,3 +96,16 @@ export function typedDraft(
 export function bodyForDraft(req: InlineRequest, values: Record<string, unknown>): Record<string, unknown> {
   return req.valueKey ? { ...(req.body ?? {}), [req.valueKey]: values } : { ...(req.body ?? {}), ...values };
 }
+
+/** What an admin action says about the email it sent: "Email sent.", "Email could not be sent", or nothing. */
+export function emailNoteFrom(body: unknown): "Email sent." | "Email could not be sent" | undefined {
+  const b = (body ?? {}) as { emailed?: unknown; emailFailed?: unknown };
+  if (b.emailed === true) return "Email sent.";
+  if (b.emailFailed === true) return "Email could not be sent";
+  return undefined;
+}
+
+/** The result line under an Activate / Deactivate control: "Deactivated. Email sent." */
+export function toggleResultLine(turnedOn: boolean, note: string | undefined): string | null {
+  return note ? `${turnedOn ? "Activated" : "Deactivated"}. ${note}` : null;
+}

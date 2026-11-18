@@ -33,3 +33,15 @@ test("bodyForDraft spreads or nests the values", () => {
   assert.deepEqual(bodyForDraft({ url: "/x", body: { id: "1" } }, { a: 1 }), { id: "1", a: 1 });
   assert.deepEqual(bodyForDraft({ url: "/x", valueKey: "ratings" }, { a: 1 }), { ratings: { a: 1 } });
 });
+
+import { emailNoteFrom, toggleResultLine } from "./inline-request.ts";
+test("admin result line after (de)activating", () => {
+  assert.equal(emailNoteFrom({ ok: true, emailed: true }), "Email sent.");
+  assert.equal(emailNoteFrom({ ok: true, emailed: false, emailFailed: true }), "Email could not be sent");
+  assert.equal(emailNoteFrom({ ok: true, emailed: false, emailFailed: false }), undefined);
+  assert.equal(emailNoteFrom(null), undefined);
+  assert.equal(toggleResultLine(false, "Email sent."), "Deactivated. Email sent.");
+  assert.equal(toggleResultLine(false, "Email could not be sent"), "Deactivated. Email could not be sent");
+  assert.equal(toggleResultLine(true, "Email sent."), "Activated. Email sent.");
+  assert.equal(toggleResultLine(true, undefined), null);
+});

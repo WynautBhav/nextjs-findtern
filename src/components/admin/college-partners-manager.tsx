@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { gstinStateError } from "@/lib/gst";
 import { GSTIN_HINT, isGstinFormat } from "@/lib/gstin";
 import { csrfFetch } from "@/lib/client-fetch";
+import { emailNoteFrom, toggleResultLine } from "@/lib/admin/inline-request";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
 import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
@@ -134,6 +135,7 @@ export function CollegeSwitches({ college, canEdit }: { college: { id: string; n
   const router = useRouter();
   const { ask, dialog } = useConfirm();
   const [error, setError] = useState<string | null>(null);
+  const [resultLine, setResultLine] = useState<string | null>(null);
 
   async function toggle(key: "isPartner" | "showOnWebsite" | "isActive", value: boolean) {
     if (key === "isActive" && !value) {
@@ -145,8 +147,10 @@ export function CollegeSwitches({ college, canEdit }: { college: { id: string; n
       if (!ok) return;
     }
     setError(null);
+    setResultLine(null);
     const r = await send(`/api/admin/colleges/${college.id}`, "PATCH", { [key]: value });
     if (!r.ok) setError(String(r.json.error ?? "Couldn't save"));
+    else if (key === "isActive") setResultLine(toggleResultLine(value, emailNoteFrom(r.json)));
     router.refresh();
   }
 
@@ -168,6 +172,7 @@ export function CollegeSwitches({ college, canEdit }: { college: { id: string; n
         </label>
       ))}
       {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
+      {resultLine ? <p role="status" className="text-xs text-text-subtle">{resultLine}</p> : null}
     </div>
   );
 }

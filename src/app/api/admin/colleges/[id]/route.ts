@@ -5,6 +5,7 @@ import { z } from "zod";
 import { diffFields, recordAdminAudit } from "@/lib/admin/audit";
 import { requireMutation } from "@/lib/guards-mutation";
 import { forgetAccountStatus } from "@/lib/account-status";
+import { sendAccountNotice, shouldNotify, type NoticeResult } from "@/lib/account-notices";
 import { GSTIN_FORMAT, GSTIN_HINT } from "@/lib/gstin";
 import { gstinStateError } from "@/lib/gst";
 import { isSafeLink } from "@/lib/safe-url";
@@ -67,15 +68,19 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     throw e;
   }
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  let notice: NoticeResult | null = null;
   if (parsed.data.isActive !== undefined) {
-    // Switching a college off signs its officers out within the status cache window.
-    const admins = await db.select({ id: schema.collegeAdmins.id }).from(schema.collegeAdmins).where(eq(schema.collegeAdmins.collegeId, id));
+    // The session check reads the college's flag fresh on every request; the entry is only dropped for the terms cache.
+    const admins = await db.select({ id: schema.collegeAdmins.id, email: schema.collegeAdmins.email, name: schema.collegeAdmins.name, isActive: schema.collegeAdmins.isActive }).from(schema.collegeAdmins).where(eq(schema.collegeAdmins.collegeId, id));
     for (const a of admins) forgetAccountStatus("college", a.id);
+    if (before && shouldNotify(Boolean(before.isActive), parsed.data.isActive)) {
+      notice = await sendAccountNotice({ kind: "college", active: parsed.data.isActive, name: before.name, to: admins.filter((a) => a.isActive).map((a) => ({ email: a.email, name: a.name })) });
+    }
   }
   const { isPartner, state, gstin, ...rest } = parsed.data;
   const was: Record<string, unknown> = before ?? {};
-  if (Object.keys(rest).length) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.update", targetType: "college", targetId: id, meta: { changes: diffFields(was, Object.fromEntries(Object.entries(set).filter(([k]) => k !== "isPartner" && k !== "state" && k !== "gstin"))) } });
+  if (Object.keys(rest).length) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.update", targetType: "college", targetId: id, meta: { changes: diffFields(was, Object.fromEntries(Object.entries(set).filter(([k]) => k !== "isPartner" && k !== "state" && k !== "gstin"))), ...(notice ? { notice } : {}) } });
   if (state !== undefined || gstin !== undefined) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.billing_update", targetType: "college", targetId: id, meta: { changes: diffFields(was, Object.fromEntries(Object.entries(set).filter(([k]) => k === "state" || k === "gstin"))) } });
   if (isPartner !== undefined) await recordAdminAudit(db, { adminId: guard.session.uid, action: "college.partner_toggle", targetType: "college", targetId: id, meta: { isPartner: { from: was.isPartner ?? null, to: isPartner } } });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, emailed: notice?.emailed ?? false, emailFailed: notice?.emailFailed ?? false });
 }

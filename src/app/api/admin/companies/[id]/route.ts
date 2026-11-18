@@ -8,6 +8,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { revalidatePublicRoles } from "@/lib/projects/revalidate-public";
 import { notify } from "@/lib/notify";
+import { sendAccountNotice, shouldNotify, type NoticeResult } from "@/lib/account-notices";
 
 const bodySchema = z
   .object({
@@ -32,7 +33,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const b = parsed.data;
   const db = getDb();
   const [before] = await db
-    .select({ fte: schema.employers.internationalFteStatus })
+    .select({ fte: schema.employers.internationalFteStatus, wasActive: schema.employers.isActive, companyName: schema.employers.companyName, contactName: schema.employers.name, companyEmail: schema.employers.companyEmail })
     .from(schema.employers)
     .where(eq(schema.employers.id, id))
     .limit(1);
@@ -56,12 +57,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (updated.length === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   if (b.isActive !== undefined) forgetAccountStatus("employer", id);
+  // Mail the company only when the flag really flipped; after the write, and a mail problem can never undo or skip it.
+  let notice: NoticeResult | null = null;
+  if (b.isActive !== undefined && shouldNotify(Boolean(before.wasActive), b.isActive)) {
+    notice = await sendAccountNotice({ kind: "employer", active: b.isActive, name: before.companyName, to: [{ email: before.companyEmail, name: before.contactName }] });
+  }
   await recordAdminAudit(db, {
     adminId: guard.session.uid,
     action: "company.update",
     targetType: "employer",
     targetId: id,
-    meta: { ...(b.isActive !== undefined ? { isActive: b.isActive } : {}), ...(b.internationalFteStatus ? { internationalFteStatus: { from: String(before.fte ?? "none"), to: b.internationalFteStatus } } : {}) },
+    meta: { ...(b.isActive !== undefined ? { isActive: b.isActive, wasActive: Boolean(before.wasActive) } : {}), ...(notice ? { notice } : {}), ...(b.internationalFteStatus ? { internationalFteStatus: { from: String(before.fte ?? "none"), to: b.internationalFteStatus } } : {}) },
   });
   const was = String(before.fte ?? "none");
   const now = b.internationalFteStatus;
@@ -81,7 +87,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       message: "Your International FTE request wasn't approved. Contact us for details.",
     });
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, emailed: notice?.emailed ?? false, emailFailed: notice?.emailFailed ?? false });
 }
 
 /** Delete an employer that never sent a proposal or paid; otherwise deactivate instead. */

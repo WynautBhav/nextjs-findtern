@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
-import { getSession } from "@/lib/auth";
+import { getSession, loginRedirectFor } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { aiInterviewStatus, findternScoreSql, realEmployerId } from "@/lib/admin/scope";
 import type { SessionData } from "@/lib/security/session";
@@ -44,7 +44,7 @@ export async function getCollegeContext(): Promise<CollegeContext | null> {
 /** Page guard for /college. */
 export async function requireCollegeContext(): Promise<CollegeContext> {
   const ctx = await getCollegeContext();
-  if (!ctx) redirect("/login?as=college");
+  if (!ctx) redirect(await loginRedirectFor("college"));
   return ctx;
 }
 
