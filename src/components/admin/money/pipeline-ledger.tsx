@@ -59,7 +59,7 @@ export function PipelineLedger({ band, href }: { band: PipelineBand | null; href
             </tbody>
           </table>
           <p className="border-t border-ink-200 pt-3 text-xs text-ink-600">
-            {sum.toLocaleString("en-IN")} proposals sent. Drafts, rejected and withdrawn are not on this list. Accepted and hired ({placed}) together are the placements figure above.
+            {sum.toLocaleString("en-IN")} proposals open or hired, all time. Drafts, rejected and withdrawn are not on this list, so this is not the week&apos;s sent count. Accepted and hired ({placed}) together are the placements figure above.
           </p>
         </>
       )}

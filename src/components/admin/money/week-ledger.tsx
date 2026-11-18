@@ -7,7 +7,7 @@ const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
 /**
  * This week and the placements in two proportional strips. Bars are scaled to the busiest day (a quiet
  * day is a short bar, an empty day a hairline), and the placements bar is paid against awaiting at true share.
- * The count is "created", not "sent": drafts are in it, which the label says.
+ * The count is proposals SENT since Monday (a draft was never sent, so it is out; one the intern rejected or the employer withdrew was sent, so it is in, and the label says so).
  */
 export function WeekLedger({ week, placements }: { week: { bars: WeekBar[]; total: number } | null; placements: PlacementSummary | null }) {
   const max = week ? Math.max(1, ...week.bars.map((b) => b.value)) : 1;
@@ -20,11 +20,11 @@ export function WeekLedger({ week, placements }: { week: { bars: WeekBar[]; tota
         {!week ? (
           <p role="alert" className="py-4 text-sm text-ink-900">Couldn&apos;t load this week&apos;s proposals. Reload to try again.</p>
         ) : week.total === 0 ? (
-          <p className="py-4 text-sm text-ink-700">No proposals created since Monday.</p>
+          <p className="py-4 text-sm text-ink-700">No proposals sent since Monday.</p>
         ) : (
           <>
-            <p className="mt-3 flex items-baseline gap-2"><span className="nums font-display text-2xl font-semibold text-ink-900">{week.total.toLocaleString("en-IN")}</span><span className="text-sm text-ink-700">created since Monday, drafts included</span></p>
-            <ol aria-label="Proposals created per day" className="mt-3 flex h-24 items-end gap-2">
+            <p className="mt-3 flex items-baseline gap-2"><span className="nums font-display text-2xl font-semibold text-ink-900">{week.total.toLocaleString("en-IN")}</span><span className="text-sm text-ink-700">sent since Monday, rejected and withdrawn included</span></p>
+            <ol aria-label="Proposals sent per day" className="mt-3 flex h-24 items-end gap-2">
               {week.bars.map((b, i) => (
                 <li key={`${b.label}-${i}`} className="flex h-full min-w-0 flex-1 flex-col justify-end text-center">
                   <span className="nums mb-1 text-xs text-ink-700">{b.value > 0 ? b.value : ""}</span>
