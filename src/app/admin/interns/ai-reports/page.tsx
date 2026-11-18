@@ -20,7 +20,7 @@ export default async function AdminAiReportsPage() {
       {canWrite((await getSession())?.permissions, "/api/admin/ai-reports") ? (
         <AiReportBatch drive={await driveStatus()} />
       ) : (
-        <p className="text-sm text-text-subtle">Uploading reports needs the Edit candidates permission.</p>
+        <p className="text-sm text-ink-600">Uploading reports needs the Edit candidates permission.</p>
       )}
     </div>
   );

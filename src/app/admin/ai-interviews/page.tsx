@@ -1,23 +1,20 @@
 import { Download } from "lucide-react";
-import Link from "next/link";
 
 import { AiExpiredRows, AiLinkRows } from "@/components/admin/ai-link-rows";
 import { DateRangeForm } from "@/components/admin/date-range-form";
 import { Pagination } from "@/components/admin/pagination";
 import { TableToolbar } from "@/components/admin/table-toolbar";
-import { AdminEmpty, AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
-import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
-import { ButtonAnchor, buttonClass } from "@/components/ui/button";
-import { AI_EXPIRY_REASONS, aiExpiryLabel, aiTabOf, expiredAiCounts, expiredAiRows, filterExpiredAi, parseExpiredAiFilters, type AiExpiryReason, type AiTab } from "@/lib/admin/ai-interview-expiry";
-import { filterAiLinkRows, pickQueue } from "@/lib/admin/ai-link-queue";
+import { AdminEmpty, AdminLoadError, AdminPageHeader, PageLead, Panel } from "@/components/admin/panel";
+import { FilterTabs } from "@/components/app/primitives";
+import { ButtonAnchor } from "@/components/ui/button";
+import { AI_EXPIRY_REASONS, aiTabOf, expiredAiCounts, expiredAiRows, filterExpiredAi, parseExpiredAiFilters, type AiExpiryReason, type AiTab } from "@/lib/admin/ai-interview-expiry";
+import { daysWaiting, filterAiLinkRows, pickQueue } from "@/lib/admin/ai-link-queue";
 import { loadAiLinkRows } from "@/lib/admin/ai-link-queue-load";
 import { flattenParams, parsePageRequest, toQueryString, type RawSearchParams } from "@/lib/admin/params";
 import { canWrite as mayWrite } from "@/lib/admin/permissions";
 import { paginate } from "@/lib/admin/tracker";
 import { getSession } from "@/lib/auth";
-import { formatNumber } from "@/lib/format";
 import { getAiLinkExpiryDays } from "@/lib/platform-settings";
-import { cn } from "@/lib/utils";
 
 const BASE = "/admin/ai-interviews";
 const TABS: { key: AiTab; label: string }[] = [
@@ -70,57 +67,54 @@ export default async function AiInterviewsPage({ searchParams }: { searchParams?
   const pg = paginate(expired, req.page, req.perPage);
   const tabHref = (k: AiTab) => `${BASE}?filter=${k}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
   const chipHref = (r: AiExpiryReason | null) => `${BASE}${toQueryString({ ...params, filter: "expired", reason: r ?? "", page: "" })}`;
+  const oldestDays = waiting.length ? daysWaiting(waiting[0].createdAt, now) : 0;
   const expiredFiltersOn = Boolean(filters.reason || filters.since || filters.until || q);
 
   return (
     <div>
       <AdminPageHeader
         title="AI interviews"
-        subtitle={`${waiting.length} paid applicant${waiting.length === 1 ? "" : "s"} waiting for a link${unpaid ? `, ${unpaid} unpaid not counted` : ""}.`}
         action={
           tab === "expired" ? (
-            <ButtonAnchor href={`/api/admin/expired${toQueryString({ q, reason: params.reason ?? "", from: params.from ?? "", to: params.to ?? "", type: "ai" })}`} variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
+            <ButtonAnchor href={`/api/admin/expired${toQueryString({ q, reason: params.reason ?? "", from: params.from ?? "", to: params.to ?? "", type: "ai" })}`} variant="outline" size="sm">
               <Download className="size-4" aria-hidden />
               Export expired
             </ButtonAnchor>
           ) : undefined
         }
       />
-      <TableToolbar searchPlaceholder="Name, phone or email" />
-      <nav aria-label="Filter" className="mb-4 flex flex-wrap gap-2">
-        {TABS.map((t) => (
-          <Link
-            key={t.key}
-            href={tabHref(t.key)}
-            aria-current={t.key === tab ? "page" : undefined}
-            className={cn(buttonClass({ variant: t.key === tab ? "primary" : "outline", size: "sm" }), "min-h-11 gap-2 max-sm:flex-1")}
-          >
-            {t.label}
-            <span className="nums opacity-80">{formatNumber(counts[t.key])}</span>
-          </Link>
-        ))}
-      </nav>
+      <PageLead
+        value={waiting.length}
+        label={waiting.length === 1 ? "paid applicant waiting for a link" : "paid applicants waiting for a link"}
+        note={
+          waiting.length === 0
+            ? `Nobody is waiting.${unpaid ? ` ${unpaid} unpaid ${unpaid === 1 ? "applicant is" : "applicants are"} not counted.` : ""}`
+            : `Oldest has waited ${oldestDays === 0 ? "since today" : `${oldestDays} ${oldestDays === 1 ? "day" : "days"}`}, listed first.${unpaid ? ` ${unpaid} unpaid not counted.` : ""}`
+        }
+        tone={oldestDays >= 2 ? "signal" : "ink"}
+      />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <FilterTabs label="AI interview views" value={tab} hrefFor={(k) => tabHref(k as AiTab)} tabs={TABS.map((t) => ({ key: t.key, label: t.label, count: counts[t.key] }))} />
+        <div className="w-full min-w-0 sm:w-80">
+          <TableToolbar searchPlaceholder="Name, phone or email" />
+        </div>
+      </div>
 
       {tab === "expired" ? (
         <div className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
             <DateRangeForm params={params} fromLabel="Expired from" toLabel="Expired to" />
-            <p className="max-w-prose text-sm text-text-subtle">
+            <p className="max-w-prose text-sm text-ink-700">
               A link not completed within <span className="nums font-medium text-foreground">{days}</span> {days === 1 ? "day" : "days"} of being sent is expired. Missed, cancelled and no-show interviews are listed here too. Send time is when the link was
               last added or changed.
             </p>
           </div>
-          <nav aria-label="Expiry reason" className="flex flex-wrap gap-2">
-            {[{ key: null, label: "All", n: expiredAll.length }, ...AI_EXPIRY_REASONS.map((r) => ({ key: r, label: REASON_CHIP[r], n: reasonCounts[r] }))].map((c) => {
-              const on = (filters.reason || null) === c.key;
-              return (
-                <Link key={c.key ?? "all"} href={chipHref(c.key)} aria-current={on ? "page" : undefined} className={cn(buttonClass({ variant: on ? "primary" : "outline", size: "sm" }), "min-h-11 gap-2 max-sm:flex-1")} title={c.key ? aiExpiryLabel(c.key, days) : undefined}>
-                  {c.label}
-                  <span className="nums opacity-80">{formatNumber(c.n)}</span>
-                </Link>
-              );
-            })}
-          </nav>
+          <FilterTabs
+            label="Expiry reason"
+            value={filters.reason || "all"}
+            hrefFor={(k) => chipHref(k === "all" ? null : (k as AiExpiryReason))}
+            tabs={[{ key: "all", label: "All", count: expiredAll.length }, ...AI_EXPIRY_REASONS.map((r) => ({ key: r, label: REASON_CHIP[r], count: reasonCounts[r] }))]}
+          />
           <Panel>
             {pg.rows.length === 0 ? (
               <AdminEmpty
@@ -139,7 +133,7 @@ export default async function AiInterviewsPage({ searchParams }: { searchParams?
       ) : (
         <Panel>
           {(tab === "waiting" ? waiting : tab === "sent" ? sent : completed).length === 0 ? (
-            <AdminEmpty title="Nothing here" body={q ? "No AI interview matches that search." : "No AI interviews in this view."} />
+            <AdminEmpty title={q ? "Nothing matches" : "Nothing here"} body={q ? "No AI interview matches that search." : "No AI interviews in this view."} action={q ? { href: tabHref(tab).replace(/&q=.*$/, ""), label: "Clear the search" } : tab === "waiting" ? { href: "/admin/interns?ai=applied", label: "See candidates who applied" } : { href: `${BASE}?filter=waiting`, label: "Open the waiting list" }} />
           ) : (
             <AiLinkRows rows={tab === "waiting" ? waiting : tab === "sent" ? sent : completed} now={now} canWrite={canWrite} state={tab === "sent" ? "sent" : tab === "completed" ? "completed" : "waiting"} />
           )}

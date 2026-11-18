@@ -7,6 +7,7 @@ import { Ban, Check, ChevronDown, Eye, EyeOff, Loader2, Pencil, UserCheck, X } f
 
 import { TONE_CLASS, type StatusTone } from "@/lib/admin/status-tone";
 
+import { Pill } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import {
@@ -92,8 +93,8 @@ export function InlineSelect({
   /** Re-run the server component after a save (when other cells derive from it). */
   refresh?: boolean;
   /**
-   * Draws the select as a pastel pill tinted by its value (`{ Approved: "success" }`).
-   * It stays a real, labelled `<select>`. Omit for the plain field.
+   * Draws the select as a flat chip led by a status dot in its value's tone (`{ Approved: "success" }`):
+   * the word carries the meaning, the dot only the tone. It stays a real, labelled `<select>`. Omit for the plain field.
    */
   tones?: Record<string, StatusTone>;
   className?: string;
@@ -130,6 +131,7 @@ export function InlineSelect({
   return (
     <span className={cn("inline-flex flex-col gap-1", className)}>
       <span className="relative inline-flex items-center">
+        {tones ? <span aria-hidden className={cn("pointer-events-none absolute left-2.5 size-1.5 rounded-full", TONE_CLASS[tones[current] ?? "neutral"].dot)} /> : null}
         <select
           aria-label={label}
           aria-describedby={error ? errorId : undefined}
@@ -140,10 +142,9 @@ export function InlineSelect({
           className={cn(
             tones
               ? cn(
-                  "h-8 min-w-28 cursor-pointer appearance-none rounded-full border-0 pl-3 pr-8 text-base font-medium sm:text-[0.8125rem] hover:opacity-90 [&>option]:bg-[color:var(--admin-panel)] [&>option]:text-foreground",
-                  TONE_CLASS[tones[current] ?? "neutral"].pill,
+                  "h-8 min-w-28 cursor-pointer appearance-none rounded-md border border-ink-300 bg-surface-raised pl-6 pr-8 text-base font-medium text-ink-900 transition-colors hover:border-ink-600 sm:text-sm [&>option]:bg-[color:var(--admin-panel)] [&>option]:text-foreground",
                 )
-              : "h-9 min-w-28 rounded-apple-sm border border-ink-200 bg-surface pl-2.5 pr-8 text-base font-medium sm:text-sm text-ink-800 hover:border-ink-300",
+              : "h-9 min-w-28 rounded-md border border-ink-200 bg-surface pl-2.5 pr-8 text-base font-medium sm:text-sm text-ink-800 hover:border-ink-300",
             "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:opacity-60 max-lg:h-11",
           )}
         >
@@ -153,8 +154,8 @@ export function InlineSelect({
             </option>
           ))}
         </select>
-        {tones ? <ChevronDown className="pointer-events-none absolute right-2.5 size-3.5 opacity-70" aria-hidden /> : null}
-        {saving ? <Loader2 className="pointer-events-none absolute right-7 size-3.5 animate-spin text-text-subtle" aria-hidden /> : null}
+        {tones ? <ChevronDown className="pointer-events-none absolute right-2.5 size-3.5 text-ink-600" aria-hidden /> : null}
+        {saving ? <Loader2 className="pointer-events-none absolute right-7 size-3.5 animate-spin text-ink-600" aria-hidden /> : null}
       </span>
       <ErrorText id={errorId} message={error} />
     </span>
@@ -200,7 +201,7 @@ export function InlineToggle({
   confirmOff?: string;
   refresh?: boolean;
   /**
-   * One line: a pastel state pill and an icon button that flips it. The button
+   * One line: a state chip and a labelled button that flips it. The button
    * keeps its name ("Hide", "Deactivate") as `aria-label` and tooltip.
    */
   compact?: boolean;
@@ -259,16 +260,12 @@ export function InlineToggle({
   }
 
   if (compact) {
-    const tone = TONE_CLASS[state ? "success" : "neutral"];
     const verb = state ? turnOffLabel : turnOnLabel;
     const Icon = icons === "eye" ? (state ? EyeOff : Eye) : state ? Ban : UserCheck;
     return (
       <span className="inline-flex flex-col gap-1">
         <span className="inline-flex items-center gap-1 whitespace-nowrap">
-          <span className={cn("inline-flex h-6 items-center gap-1.5 rounded-full px-2.5 text-xs font-medium", tone.pill)}>
-            <span aria-hidden className={cn("size-1.5 rounded-full", tone.dot)} />
-            {state ? onLabel : offLabel}
-          </span>
+          <Pill tone={state ? "live" : "closed"}>{state ? onLabel : offLabel}</Pill>
           {asking ? (
             <span
               role="group"
@@ -284,11 +281,11 @@ export function InlineToggle({
               <button
                 type="button"
                 onClick={() => void flip(true)}
-                className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-8 rounded-full px-3 text-danger hover:bg-danger-soft max-lg:h-11")}
+                className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-8 rounded-md px-3 text-danger hover:bg-danger-soft max-lg:h-11")}
               >
                 Yes, {turnOffLabel.toLowerCase()}
               </button>
-              <button type="button" autoFocus onClick={cancel} className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-8 rounded-full px-3 max-lg:h-11")}>
+              <button type="button" autoFocus onClick={cancel} className={cn(buttonClass({ variant: "ghost", size: "sm" }), "h-8 rounded-md px-3 max-lg:h-11")}>
                 Cancel
               </button>
             </span>
@@ -298,19 +295,18 @@ export function InlineToggle({
               type="button"
               onClick={() => void flip()}
               disabled={saving}
-              aria-label={verb}
-              title={verb}
               aria-describedby={error ? errorId : undefined}
               className={cn(
-                "grid size-8 shrink-0 cursor-pointer place-items-center rounded-full text-text-subtle hover:bg-[color:var(--admin-panel-2)] hover:text-foreground focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:opacity-60 max-lg:size-11",
+                "inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-sm font-medium text-ink-700 transition-colors duration-[var(--motion-fast)] hover:bg-ink-200/60 hover:text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring disabled:opacity-60 max-lg:min-h-11",
                 state && "hover:bg-danger-soft hover:text-danger",
               )}
             >
               {saving ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Icon className="size-4" aria-hidden />}
+              {verb}
             </button>
           )}
         </span>
-        {asking && confirmOff ? <span className="max-w-64 whitespace-normal text-xs text-text-subtle">{confirmOff}</span> : null}
+        {asking && confirmOff ? <span className="max-w-64 whitespace-normal text-xs text-ink-600">{confirmOff}</span> : null}
         <ErrorText id={errorId} message={error} />
       </span>
     );
@@ -377,7 +373,7 @@ export function InlineToggle({
 
 /** Shared field style for inputs inside an inline form. */
 export const inlineFieldClass =
-  "h-9 w-full rounded-apple-sm border border-ink-200 bg-surface px-2.5 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 max-lg:h-11";
+  "h-9 w-full rounded-md border border-ink-200 bg-surface px-2.5 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 max-lg:h-11";
 
 function FieldInput({
   field,
@@ -399,8 +395,8 @@ function FieldInput({
             aria-checked={value === o.value}
             onClick={() => onChange(o.value)}
             className={cn(
-              "h-9 rounded-apple-sm border px-2 text-sm font-semibold max-lg:h-11",
-              value === o.value ? "border-brand-600 bg-brand-50 text-brand-800" : "border-ink-200 bg-card text-ink-600 hover:bg-ink-50",
+              "h-9 rounded-md border px-2 text-sm font-semibold max-lg:h-11",
+              value === o.value ? "border-brand-700 bg-brand-100 text-brand-900" : "border-ink-300 bg-surface-raised text-ink-700 hover:bg-ink-100",
             )}
           >
             {o.label}
@@ -528,12 +524,12 @@ export function InlineEditor({
             setDraft(start);
             setOpen(true);
           }}
-          className="group inline-flex min-h-9 items-center gap-2 rounded-full px-2.5 text-left text-sm text-ink-800 hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:outline-brand-600 max-lg:min-h-11"
+          className="group inline-flex min-h-9 items-center gap-2 rounded-md px-2.5 text-left text-sm text-ink-800 hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:outline-brand-600 max-lg:min-h-11"
         >
           <span className="min-w-0">{display}</span>
           {/* The name starts with the words on the button (WCAG 2.5.3) and then says what pressing it does. */}
           <span className="sr-only"> (edit {label})</span>
-          <Pencil className="size-3.5 shrink-0 text-text-subtle group-hover:text-brand-700" aria-hidden />
+          <Pencil className="size-3.5 shrink-0 text-ink-600 group-hover:text-brand-700" aria-hidden />
         </button>
       ) : null}
       <AnimatePresence initial={false}>
@@ -554,7 +550,7 @@ export function InlineEditor({
             animate={{ opacity: 1, y: 0 }}
             exit={reduce ? { opacity: 0 } : { opacity: 0, y: -4 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="flex min-w-56 flex-col gap-2 rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)] p-3"
+            className="flex min-w-56 flex-col gap-2 rounded-lg bg-[color:var(--admin-panel-2)] p-3"
           >
             <div className={cn("grid gap-2", columns === 2 && "grid-cols-2")}>
               {fields.map((field) => (

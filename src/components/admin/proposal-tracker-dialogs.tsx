@@ -30,9 +30,9 @@ export function ProposalDetailsButton({
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "ghost", size: "sm", className: "rounded-full px-3 hover:bg-[color:var(--admin-panel-2)] max-lg:h-11" })}>
+      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-8 rounded-md px-3 hover:bg-ink-200/60 max-lg:min-h-11" })}>
         <Eye className="size-4" aria-hidden />
-        View
+        View offer
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[88vh] overflow-y-auto sm:max-w-2xl">
@@ -44,7 +44,7 @@ export function ProposalDetailsButton({
               {proposal.projectName} · {proposal.flow} · sent {proposal.sentAt}
             </DialogDescription>
           </DialogHeader>
-          <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)] p-3">
+          <div className="flex flex-wrap items-center gap-3 rounded-lg bg-[color:var(--admin-panel-2)] p-3">
             <StatusBadge value={proposal.status} />
             <ProposalStatusEditor proposalId={proposal.id} status={proposal.status} />
           </div>
@@ -66,7 +66,7 @@ export function InterviewNotesButton({ title, notes }: { title: string; notes: s
   const employerFeedback = feedbackTextOf(clean);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "ghost", size: "sm", className: "rounded-full px-3 hover:bg-[color:var(--admin-panel-2)] max-lg:h-11" })}>
+      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-8 rounded-md px-3 hover:bg-ink-200/60 max-lg:min-h-11" })}>
         Notes
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -81,7 +81,7 @@ export function InterviewNotesButton({ title, notes }: { title: string; notes: s
               const label = m ? ({ feedback: "AI feedback", recording: "Recording" } as Record<string, string>)[m[1].toLowerCase()] : null;
               const value = m ? m[2] : line;
               return (
-                <li key={n} className="rounded-2xl bg-[color:var(--admin-panel-2)] px-3.5 py-2.5">
+                <li key={n} className="rounded-lg bg-[color:var(--admin-panel-2)] px-3.5 py-2.5">
                   {label ? <span className="block text-xs font-medium text-text-subtle">{label}</span> : null}
                   {/^https?:\/\//.test(value) ? (
                     <a href={value} target="_blank" rel="noopener noreferrer" className="break-all font-medium text-brand-700 hover:underline">
@@ -94,7 +94,7 @@ export function InterviewNotesButton({ title, notes }: { title: string; notes: s
               );
             })}
             {employerFeedback ? (
-              <li className="rounded-2xl bg-[color:var(--admin-panel-2)] px-3.5 py-2.5">
+              <li className="rounded-lg bg-[color:var(--admin-panel-2)] px-3.5 py-2.5">
                 <span className="block text-xs font-medium text-text-subtle">Employer feedback</span>
                 <span className="whitespace-pre-line break-words">{employerFeedback}</span>
               </li>

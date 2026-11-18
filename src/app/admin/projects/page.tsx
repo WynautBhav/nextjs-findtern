@@ -8,11 +8,11 @@ import { formatDate, formatNumber } from "@/lib/format";
 import { flattenParams, parsePageRequest, searchAny, toPage, toQueryString } from "@/lib/admin/params";
 import { activeProject, realEmployerId } from "@/lib/admin/scope";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
-import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
-import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
+import { FilterTabs, type FilterTab } from "@/components/app/primitives";
+import { LeadStat } from "@/components/app/stat";
+import { DataTable, parseSort } from "@/components/admin/data-table";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ButtonAnchor } from "@/components/ui/button";
-import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { TakedownAction } from "./takedown-action";
 
 /**
@@ -102,17 +102,15 @@ export default async function AdminProjectsPage({
   }
 
   const exportHref = `/api/admin/export?type=projects&${new URLSearchParams(params).toString()}`;
-  const headerWith = (subtitle?: string) => (
+  const headerWith = () => (
     <AdminPageHeader
       title="Projects"
-      subtitle={subtitle}
+      className="mb-0 lg:mb-0"
       action={
-        <div className="flex flex-wrap gap-2">
-        <ButtonAnchor href={exportHref} variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
+        <ButtonAnchor href={exportHref} variant="outline" size="sm">
           <Download className="size-4" aria-hidden />
           Export CSV
         </ButtonAnchor>
-        </div>
       }
     />
   );
@@ -133,11 +131,13 @@ export default async function AdminProjectsPage({
 
   // Active / closed / full-time are views (the counts were stat tiles); the filters keep the same URL keys.
   const viewHref = (patch: Record<string, string>) => `/admin/projects${toQueryString({ ...params, status: "", type: "", ...patch, page: "" })}`;
-  const views: AdminTabItem[] = [
-    { key: "all", label: "All projects", count: loaded.all, href: viewHref({}) },
-    { key: "active", label: "Active", count: loaded.active, href: viewHref({ status: "active" }) },
-    { key: "closed", label: "Closed", count: Math.max(0, loaded.all - loaded.active), href: viewHref({ status: "closed" }) },
-    { key: "full_time", label: "Full-time potential", count: loaded.fullTime, href: viewHref({ type: "full_time" }) },
+  const viewPatch: Record<string, Record<string, string>> = { all: {}, active: { status: "active" }, closed: { status: "closed" }, full_time: { type: "full_time" } };
+  const closed = Math.max(0, loaded.all - loaded.active);
+  const views: FilterTab[] = [
+    { key: "all", label: "All projects", count: loaded.all },
+    { key: "active", label: "Active", count: loaded.active },
+    { key: "closed", label: "Closed", count: closed },
+    { key: "full_time", label: "Full-time potential", count: loaded.fullTime },
   ];
   const activeView =
     params.status === "active" && !params.type
@@ -151,12 +151,18 @@ export default async function AdminProjectsPage({
             : "";
 
   return (
-    <div className="space-y-4">
-      {headerWith(
-        `${formatNumber(loaded.all)} projects, ${formatNumber(loaded.active)} open to candidates, with ${formatNumber(loaded.proposals)} proposals sent across them.`,
-      )}
+    <div className="space-y-6">
+      {headerWith()}
 
-      <AdminTabs items={views} active={activeView} label="Project views" />
+      <LeadStat
+        className="pt-1"
+        label={loaded.active === 1 ? "Project open to candidates" : "Projects open to candidates"}
+        value={formatNumber(loaded.active)}
+        tone="brand"
+        note={`Of ${formatNumber(loaded.all)} posted by companies. ${formatNumber(loaded.proposals)} proposals have been sent across them.`}
+      />
+
+      <FilterTabs label="Project views" tabs={views} value={activeView} hrefFor={(k) => viewHref(viewPatch[k] ?? {})} />
 
       <DataTable
         basePath="/admin/projects"
@@ -191,11 +197,11 @@ export default async function AdminProjectsPage({
             cell: (row) => (
               // Long names wrap to two lines rather than widen the table past
               // its card at 1440 (QA-140).
-              <div className="min-w-0 whitespace-normal lg:max-w-xs">
+              <div className="min-w-0 whitespace-normal lg:max-w-60">
                 <p className="line-clamp-2 break-words font-medium text-foreground" title={row.projectName}>
                   {row.projectName}
                 </p>
-                <p className="truncate text-[0.8125rem] text-text-subtle" title={(row.skills ?? []).join(", ")}>
+                <p className="truncate text-xs text-text-subtle" title={(row.skills ?? []).join(", ")}>
                   {row.skills?.length ? row.skills.slice(0, 4).join(", ") : "No skills listed"}
                 </p>
               </div>
@@ -205,21 +211,23 @@ export default async function AdminProjectsPage({
             header: "Company",
             sort: "company",
             cell: (row) => (
-              <IdentityCell name={row.employerName} id={row.employerId} href={`/admin/companies/${row.employerId}?tab=projects`} size="sm" className="lg:max-w-52" />
+              <Link href={`/admin/companies/${row.employerId}?tab=projects`} className="block max-w-44 truncate font-medium text-foreground hover:underline" title={row.employerName}>
+                {row.employerName}
+              </Link>
             ),
           },
           {
-            header: "Where",
+            header: "Where and type",
+            label: "Where and type",
             cell: (row) => (
-              <div className="min-w-0 lg:max-w-36">
-                <p className="truncate capitalize">{row.locationType || "Remote"}</p>
-                {row.city || row.timezone ? <p className="truncate text-[0.8125rem] text-text-subtle">{row.city || row.timezone}</p> : null}
+              <div className="min-w-0 lg:max-w-40">
+                <p className="truncate">
+                  <span className="capitalize">{row.locationType || "Remote"}</span>
+                  {row.city || row.timezone ? <span className="text-text-subtle">, {row.city || row.timezone}</span> : null}
+                </p>
+                <p className="text-xs text-text-subtle">{row.fullTimeOffer ? "Full-time potential" : "Internship only"}</p>
               </div>
             ),
-          },
-          {
-            header: "Type",
-            cell: (row) => <StatusBadge tone={row.fullTimeOffer ? "info" : "neutral"} label={row.fullTimeOffer ? "Full-time potential" : "Internship"} dot={false} />,
           },
           {
             header: "Proposals",
@@ -237,8 +245,8 @@ export default async function AdminProjectsPage({
               row.takenDownAt ? (
                 <div className="min-w-0 whitespace-normal lg:max-w-40">
                   <StatusBadge tone="danger" label="Taken down" />
-                  <p className="mt-1 line-clamp-2 break-words text-[0.8125rem] text-text-subtle" title={row.takenDownReason ?? ""}>{row.takenDownReason}</p>
-                  <Link href={`/admin/messages?q=${encodeURIComponent(row.id)}`} className="mt-1 inline-block text-[0.8125rem] font-medium text-primary underline-offset-4 hover:underline">Messages about this project</Link>
+                  <p className="mt-1 line-clamp-2 break-words text-xs text-text-subtle" title={row.takenDownReason ?? ""}>{row.takenDownReason}</p>
+                  <Link href={`/admin/messages?q=${encodeURIComponent(row.id)}`} className="mt-1 inline-block text-xs font-medium text-primary underline-offset-4 hover:underline">Messages about this project</Link>
                 </div>
               ) : (
                 <StatusBadge value={row.isActive ? "active" : "closed"} />

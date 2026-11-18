@@ -62,6 +62,8 @@ export function TableToolbar({
   const foldedActive = folded.filter((f) => searchParams.get(f.key)).length;
   // Open from the start when a folded filter is already applied.
   const [filtersOpen, setFiltersOpen] = useState(foldedActive > 0);
+  // Phones: every select hides behind one "Filters" button so the rows start high on the screen.
+  const [phoneOpen, setPhoneOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const firstRender = useRef(true);
 
@@ -111,7 +113,7 @@ export function TableToolbar({
     const value = searchParams.get(filter.key) ?? "";
     const id = `filter-${filter.key}`;
     return (
-      <div key={filter.key} className="flex min-w-0 items-center gap-1.5 max-sm:w-full">
+      <div key={filter.key} className="flex min-w-0 items-center gap-1.5 max-sm:min-w-[calc(50%-0.25rem)] max-sm:flex-1">
         <label
           htmlFor={id}
           className="sr-only"
@@ -123,10 +125,10 @@ export function TableToolbar({
           value={value}
           onChange={(e) => setParam(filter.key, e.target.value || null)}
           className={cn(
-            "apple-spring h-10 max-w-56 cursor-pointer truncate rounded-full pr-9 pl-4 text-base sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 max-sm:w-full max-sm:max-w-full",
+            "h-10 max-w-56 cursor-pointer truncate rounded-md border pr-9 pl-3 text-base transition-colors duration-[var(--motion-fast)] sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 max-sm:w-full max-sm:max-w-full",
             value
-              ? "bg-[color:var(--admin-bar-tint)] font-medium text-foreground"
-              : "bg-[color:var(--admin-panel-2)] text-foreground",
+              ? "border-brand-700 bg-[color:var(--admin-bar-tint)] font-medium text-foreground"
+              : "border-ink-300 bg-surface-raised text-foreground hover:border-ink-400",
           )}
         >
           <option value="">{filter.allLabel ?? `All ${lowerFirst(filter.label)}`}</option>
@@ -149,7 +151,7 @@ export function TableToolbar({
         <div className="relative w-full min-w-[12rem] flex-1 sm:w-auto sm:max-w-md">
           <Search
             aria-hidden
-            className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-text-subtle"
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-ink-600"
           />
           <input
             ref={inputRef}
@@ -164,7 +166,7 @@ export function TableToolbar({
             }}
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
-            className="h-10 w-full rounded-full bg-[color:var(--admin-panel-2)] pr-11 pl-10 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 [&::-webkit-search-cancel-button]:hidden"
+            className="h-10 w-full rounded-md border border-ink-300 bg-surface-raised pr-11 pl-9 text-base sm:text-sm text-foreground placeholder:text-ink-600 hover:border-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 [&::-webkit-search-cancel-button]:hidden"
           />
           {term ? (
             <button
@@ -174,7 +176,7 @@ export function TableToolbar({
                 inputRef.current?.focus();
               }}
               aria-label="Clear search"
-              className="apple-spring absolute top-1/2 right-1 flex size-9 -translate-y-1/2 items-center justify-center rounded-full p-1 text-text-subtle hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring touch:size-11"
+              className="absolute top-1/2 right-1 flex size-8 -translate-y-1/2 items-center justify-center rounded-md p-1 text-ink-600 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring touch:size-11"
             >
               <X className="size-3.5" />
             </button>
@@ -184,23 +186,38 @@ export function TableToolbar({
         {/* Facet filters ------------------------------------------------ */}
         {/* Three filters show; the rest fold behind "More filters" at every
             width (eleven selects in three rows pushed the list a screen down). */}
-        {shown.map(renderFilter)}
-        {sortOptions?.length ? <SortSelect options={sortOptions} keys={keys} /> : null}
+        {filters.length || sortOptions?.length ? (
+          <button
+            type="button"
+            onClick={() => setPhoneOpen((o) => !o)}
+            aria-expanded={phoneOpen}
+            aria-controls={`${filtersId}-phone`}
+            className="inline-flex h-10 items-center gap-1.5 rounded-md border border-ink-300 bg-surface-raised px-3 text-sm font-medium text-foreground sm:hidden"
+          >
+            <SlidersHorizontal className="size-4" aria-hidden />
+            {phoneOpen ? "Hide filters" : "Filters and sort"}
+            {activeChips.length ? <span className="nums rounded-md bg-[color:var(--admin-bar-tint)] px-1.5 text-xs">{activeChips.length}</span> : null}
+          </button>
+        ) : null}
+        <div id={`${filtersId}-phone`} className={cn("flex flex-wrap items-center gap-2.5 sm:contents", !phoneOpen && "max-sm:hidden", phoneOpen && "max-sm:w-full")}>
+          {shown.map(renderFilter)}
+          {sortOptions?.length ? <SortSelect options={sortOptions} keys={keys} /> : null}
+        </div>
         {foldable ? (
           <button
             type="button"
             onClick={() => setFiltersOpen((o) => !o)}
             aria-expanded={filtersOpen}
             aria-controls={filtersId}
-            className="apple-spring inline-flex h-10 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+            className={cn("inline-flex h-10 items-center gap-1.5 rounded-md border border-ink-300 bg-surface-raised px-3 text-sm font-medium text-foreground transition-colors duration-[var(--motion-fast)] hover:border-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11", !phoneOpen && "max-sm:hidden")}
           >
             <SlidersHorizontal className="size-4" aria-hidden />
             {filtersOpen ? "Fewer filters" : "More filters"}
-            {foldedActive ? <span className="nums rounded-full bg-[color:var(--admin-bar-tint)] px-1.5 text-xs text-foreground">{foldedActive}</span> : null}
+            {foldedActive ? <span className="nums rounded-md bg-[color:var(--admin-bar-tint)] px-1.5 text-xs text-foreground">{foldedActive}</span> : null}
           </button>
         ) : null}
         {foldable && filtersOpen ? (
-          <div id={filtersId} className="flex w-full flex-wrap items-center gap-2.5">
+          <div id={filtersId} className={cn("flex w-full flex-wrap items-center gap-2.5", !phoneOpen && "max-sm:hidden")}>
             {folded.map(renderFilter)}
           </div>
         ) : null}
@@ -210,7 +227,7 @@ export function TableToolbar({
         {exportHref ? (
           <a
             href={exportHref}
-            className="apple-spring apple-pressable ml-auto inline-flex h-10 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+            className="ml-auto inline-flex h-10 items-center gap-1.5 rounded-md border border-ink-300 bg-surface-raised px-3 text-sm font-medium text-foreground transition-colors duration-[var(--motion-fast)] hover:border-ink-400 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
           >
             CSV
           </a>
@@ -220,19 +237,19 @@ export function TableToolbar({
       {/* Active filter chips ------------------------------------------- */}
       {hasFilters ? (
         <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-          <span className="text-xs text-text-subtle">Filtered by</span>
+          <span className="text-xs text-ink-700">Filtered by</span>
           {activeChips.map((chip) => (
             <button
               key={chip.key}
               type="button"
               onClick={() => setParam(chip.key, null)}
-              className="apple-spring group inline-flex min-h-11 items-center gap-1 rounded-full bg-[color:var(--admin-bar-tint)] py-0.5 pr-2.5 pl-3 text-xs font-medium text-foreground hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              className="group inline-flex min-h-8 items-center gap-1 rounded-md bg-[color:var(--admin-bar-tint)] py-0.5 pr-2 pl-2.5 text-xs font-medium text-foreground hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
-              <span className="text-text-subtle">{chip.label}:</span>
+              <span className="text-ink-700">{chip.label}:</span>
               {chip.value}
               <X
                 aria-hidden
-                className="size-3 text-text-subtle apple-spring group-hover:text-foreground"
+                className="size-3 text-ink-700 group-hover:text-foreground"
               />
               <span className="sr-only">Remove filter</span>
             </button>
@@ -240,7 +257,7 @@ export function TableToolbar({
           <button
             type="button"
             onClick={clearAll}
-            className="apple-spring ml-1 inline-flex min-h-11 items-center rounded-full px-2 text-xs font-medium text-text-subtle underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+            className="ml-1 inline-flex min-h-8 items-center rounded-md px-2 text-xs font-medium text-ink-700 underline underline-offset-2 hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
           >
             Clear all
           </button>

@@ -1,25 +1,25 @@
-import Link from "next/link";
-import { ClipboardCheck } from "lucide-react";
-
 import { CgpaExport } from "@/components/admin/cgpa/export-button";
-import { CgpaRows } from "@/components/admin/cgpa/rows";
-import { AdminEmpty, AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
+import { CgpaRows, waitedFor } from "@/components/admin/cgpa/rows";
+import { AdminEmpty, AdminLoadError, AdminPageHeader, PageLead, Panel } from "@/components/admin/panel";
 import { TableToolbar } from "@/components/admin/table-toolbar";
-import { buttonClass } from "@/components/ui/button";
+import { FilterTabs } from "@/components/app/primitives";
 import { CGPA_FILTERS, countsByFilter, matchesFilter, searchRows, sortRows, type CgpaFilter } from "@/lib/admin/cgpa-queue";
 import { loadCgpaQueue } from "@/lib/admin/cgpa-queue-load";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { canWrite as mayWrite } from "@/lib/admin/permissions";
 import { getSession } from "@/lib/auth";
-import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
-const EMPTY: Record<CgpaFilter, { title: string; body: string }> = {
-  pending: { title: "Nothing to verify", body: "Candidates who pick a semester and enter a score appear here, and the 24 to 48 hour clock starts when they accept an offer." },
-  overdue: { title: "Nothing overdue", body: "Every pending check is inside its 48 hour window." },
-  verified: { title: "No verified checks yet", body: "Checks you mark correct are listed here." },
-  incorrect: { title: "No corrections yet", body: "Checks you mark incorrect, with the corrected score, are listed here." },
+const EMPTY: Record<CgpaFilter, { title: string; body: string; next?: { label: string; href: string } }> = {
+  pending: {
+    title: "Nothing to verify",
+    body: "Candidates who pick a semester and enter a score appear here, and the 24 to 48 hour clock starts when they accept an offer.",
+    next: { label: "See candidates", href: "/admin/interns" },
+  },
+  overdue: { title: "Nothing overdue", body: "Every pending check is inside its 48 hour window.", next: { label: "Open pending checks", href: "/admin/cgpa-verifications" } },
+  verified: { title: "No verified checks yet", body: "Checks you mark correct are listed here.", next: { label: "Open pending checks", href: "/admin/cgpa-verifications" } },
+  incorrect: { title: "No corrections yet", body: "Checks you mark incorrect, with the corrected score, are listed here.", next: { label: "Open pending checks", href: "/admin/cgpa-verifications" } },
 };
 
 /** Candidates waiting on Findtern to check their CGPA against their proofs, with the clock from the offer they accepted. */
@@ -38,7 +38,7 @@ export default async function CgpaVerificationsPage({ searchParams }: { searchPa
     console.error("[admin/cgpa-verifications] load failed", error);
     return (
       <div>
-        <AdminPageHeader title="CGPA checks" subtitle="Candidates waiting for Findtern to verify their CGPA." />
+        <AdminPageHeader title="CGPA checks" />
         <Panel>
           <AdminLoadError what="the CGPA checks" retryHref="/admin/cgpa-verifications" />
         </Panel>
@@ -50,36 +50,40 @@ export default async function CgpaVerificationsPage({ searchParams }: { searchPa
   const rows = sortRows(searchRows(all, q).filter((r) => matchesFilter(r, filter, now)), filter);
   const href = (f: CgpaFilter) => `/admin/cgpa-verifications?filter=${f}${q ? `&q=${encodeURIComponent(q)}` : ""}`;
 
+  // The lead: how many are waiting and how long the oldest has waited (the queue is sorted by it).
+  const pending = all.filter((r) => r.status === "pending");
+  const oldest = pending.flatMap((r) => {
+    const w = waitedFor(r, now);
+    return w ? [{ name: r.name, w }] : [];
+  }).sort((a, b) => b.w.hours - a.w.hours)[0];
+  const oldestText = oldest ? `Oldest has waited ${oldest.w.label} ${oldest.w.unit === "days" && oldest.w.label === "1" ? "day" : oldest.w.unit}${counts.overdue ? `; ${counts.overdue} ${counts.overdue === 1 ? "is" : "are"} past the 48 hour window` : ""}.` : "None has an accepted offer yet, so no clock is running.";
+
   return (
     <div>
-      <AdminPageHeader
-        title="CGPA checks"
-        subtitle={
-          counts.pending === 0
-            ? "No candidate is waiting for a CGPA check."
-            : `${counts.pending} candidate${counts.pending === 1 ? "" : "s"} waiting${counts.overdue ? `, ${counts.overdue} overdue` : ""}.`
-        }
+      <AdminPageHeader title="CGPA checks" action={<CgpaExport rows={rows} now={now.toISOString()} />} />
+      <PageLead
+        value={counts.pending}
+        label={counts.pending === 1 ? "check waiting" : "checks waiting"}
+        note={counts.pending === 0 ? "No candidate is waiting for a CGPA check." : oldestText}
+        tone={counts.overdue ? "signal" : "ink"}
       />
-      <TableToolbar searchPlaceholder="Name, college, company, phone or email" extra={<CgpaExport rows={rows} now={now.toISOString()} />} />
-      <nav aria-label="Filter" className="mb-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
-        {CGPA_FILTERS.map((f) => (
-          <Link
-            key={f.key}
-            href={href(f.key)}
-            aria-current={f.key === filter ? "page" : undefined}
-            className={cn(buttonClass({ variant: f.key === filter ? "primary" : "outline", size: "sm" }), "min-h-11")}
-          >
-            {f.label}
-            <span className="nums ml-1.5 opacity-80">{counts[f.key]}</span>
-          </Link>
-        ))}
-      </nav>
-      <p className="mb-3 text-sm text-text-subtle">
-        The clock starts when the candidate accepts an offer: green for the first 24 hours, amber until hour 48, red after that. Amber start dates are under 48 hours away.
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <FilterTabs
+          label="CGPA check views"
+          value={filter}
+          hrefFor={(k) => href(k as CgpaFilter)}
+          tabs={CGPA_FILTERS.map((f) => ({ key: f.key, label: f.label, count: counts[f.key] }))}
+        />
+        <div className="w-full min-w-0 sm:w-80">
+          <TableToolbar searchPlaceholder="Name, college or company" />
+        </div>
+      </div>
+      <p className="mb-3 max-w-3xl text-sm text-ink-700">
+        Pending checks are listed oldest first. The clock starts when the candidate accepts an offer: under 24 hours is fine, until hour 48 is amber, after that is overdue. Start dates under 48 hours away are flagged.
       </p>
       <Panel>
         {rows.length === 0 ? (
-          <AdminEmpty icon={ClipboardCheck} title={q ? "Nothing matches" : EMPTY[filter].title} body={q ? "No check in this view matches that search." : EMPTY[filter].body} />
+          <AdminEmpty title={q ? "Nothing matches" : EMPTY[filter].title} body={q ? "No check in this view matches that search." : EMPTY[filter].body} action={q ? { href: href(filter).replace(/&q=.*$/, ""), label: "Clear the search" } : EMPTY[filter].next} />
         ) : (
           <CgpaRows rows={rows} now={now} canWrite={canWrite} />
         )}

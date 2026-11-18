@@ -30,10 +30,10 @@ export function ChipLinks({
           scroll={false}
           aria-current={o.current ? "page" : undefined}
           className={cn(
-            "apple-spring inline-flex h-9 items-center rounded-full px-3.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11",
+            "transition-colors duration-[var(--motion-fast)] inline-flex h-9 items-center rounded-md px-3.5 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11",
             o.current
-              ? "bg-[color:var(--admin-tile)] text-[color:var(--admin-tile-ink)]"
-              : "bg-[color:var(--admin-panel-2)] text-foreground hover:bg-[color:var(--admin-bar-tint)]",
+              ? "bg-ink-900 text-paper"
+              : "bg-ink-100 text-ink-900 hover:bg-ink-200",
           )}
         >
           {o.label}

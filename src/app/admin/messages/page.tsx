@@ -1,8 +1,11 @@
-import { count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { asc, count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
-import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
+import { flattenParams, parsePageRequest, searchAny, toPage, toQueryString } from "@/lib/admin/params";
+import { AdminLoadError, AdminPageHeader } from "@/components/admin/panel";
+import { FilterTabs } from "@/components/app/primitives";
+import { LeadStat } from "@/components/app/stat";
+import { ageOf, daysPhrase } from "@/lib/admin/age-label";
 import { Pagination } from "@/components/admin/pagination";
 import { TableToolbar } from "@/components/admin/table-toolbar";
 import { MessagesInbox, type InboxMessage } from "@/components/admin/messages-inbox";
@@ -61,17 +64,8 @@ export default async function AdminMessagesPage({
 
   const filters = (
     <TableToolbar
-      searchPlaceholder="Search sender, subject or message"
+      searchPlaceholder="Search messages"
       filters={[
-        {
-          key: "status",
-          label: "Status",
-          allLabel: "Read and unread",
-          options: [
-            { value: "unread", label: "Unread" },
-            { value: "read", label: "Read" },
-          ],
-        },
         {
           key: "kind",
           label: "Kind",
@@ -95,14 +89,23 @@ export default async function AdminMessagesPage({
     />
   );
 
-  let loaded: { rows: InboxMessage[]; total: number; all: number; unread: number } | null = null;
+  let loaded: { rows: InboxMessage[]; total: number; all: number; unread: number; oldestUnreadDays: number } | null = null;
   try {
     const db = getDb();
-    const [rows, [filtered], [all], [unread]] = await Promise.all([
-      db.select().from(t).where(where).orderBy(desc(t.createdAt)).limit(req.perPage).offset(req.offset),
+    // The unread queue is worked oldest first (what has waited longest); the rest reads newest first.
+    const order = params.status === "unread" ? asc(t.createdAt) : desc(t.createdAt);
+    const now = new Date();
+    const [rows, [filtered], [totals]] = await Promise.all([
+      db.select().from(t).where(where).orderBy(order).limit(req.perPage).offset(req.offset),
       db.select({ c: count() }).from(t).where(where),
-      db.select({ c: count() }).from(t).where(bucket),
-      db.select({ c: count() }).from(t).where(bucket ? sql`${bucket} and ${t.isRead} = false` : eq(t.isRead, false)),
+      db
+        .select({
+          all: count(),
+          unread: sql<number>`count(*) filter (where ${t.isRead} = false)`,
+          oldestUnread: sql<Date | null>`min(${t.createdAt}) filter (where ${t.isRead} = false)`,
+        })
+        .from(t)
+        .where(bucket),
     ]);
 
     const parsed = rows.map((row) => ({ row, meta: parseContactMessage(row.message, row.queryType) }));
@@ -167,12 +170,21 @@ export default async function AdminMessagesPage({
         queryType: row.queryType,
         isRead: row.isRead,
         createdAt: row.createdAt ? row.createdAt.toISOString() : null,
+        ageLabel: ageOf(row.createdAt, now).label,
+        ageDays: ageOf(row.createdAt, now).days,
         meta,
         sender,
       };
     });
 
-    loaded = { rows: enriched, total: Number(filtered?.c ?? 0), all: Number(all?.c ?? 0), unread: Number(unread?.c ?? 0) };
+    const oldest = totals?.oldestUnread ? new Date(totals.oldestUnread) : null;
+    loaded = {
+      rows: enriched,
+      total: Number(filtered?.c ?? 0),
+      all: Number(totals?.all ?? 0),
+      unread: Number(totals?.unread ?? 0),
+      oldestUnreadDays: oldest ? ageOf(oldest, now).days : 0,
+    };
   } catch (error) {
     console.error("admin messages load failed", error);
   }
@@ -180,39 +192,69 @@ export default async function AdminMessagesPage({
   const page = loaded ? toPage(loaded.rows, loaded.total, req.page, req.perPage) : null;
   const filtering = Boolean(req.search || params.status || params.kind || params.role);
 
+  const status = params.status === "unread" || params.status === "read" ? params.status : "";
+  const hrefFor = (key: string) => {
+    const { page: _page, status: _status, ...keep } = params;
+    void _page;
+    void _status;
+    return `/admin/messages${toQueryString(key ? { ...keep, status: key } : keep)}`;
+  };
+
   return (
     <div className="space-y-6">
-      <AdminPageHeader
-        title="Messages"
-        subtitle={
-          loaded
-            ? loaded.unread
-              ? `${formatNumber(loaded.unread)} unread of ${formatNumber(loaded.all)}. Website enquiries, in-app problem reports and feedback, newest first.`
-              : `All ${formatNumber(loaded.all)} read. Website enquiries, in-app problem reports and feedback, newest first.`
-            : "Website enquiries, in-app problem reports and feedback."
-        }
-      />
+      <AdminPageHeader title="Messages" subtitle="Website enquiries, in-app problem reports and feedback." />
 
-      <Panel>
-        <div className="flex flex-wrap items-center gap-2.5 px-[var(--admin-pad-panel)] pt-[var(--admin-pad-panel)] pb-2">{filters}</div>
-        {loaded && page ? (
-          <>
-            <MessagesInbox messages={page.rows} filtering={filtering} />
-            <Pagination
-              page={page.page}
-              pages={page.pages}
-              total={page.total}
-              perPage={page.perPage}
-              rowsShown={page.rows.length}
-              params={params}
-              basePath="/admin/messages"
-              noun="messages"
-            />
-          </>
+      <div className="grid items-start gap-x-14 gap-y-6 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+        {loaded ? (
+          <LeadStat
+            label={loaded.unread ? "Waiting for a reply" : "Inbox"}
+            value={loaded.unread ? formatNumber(loaded.unread) : "All read"}
+            tone={loaded.unread && loaded.oldestUnreadDays >= 3 ? "signal" : "ink"}
+            note={
+              loaded.unread
+                ? `Oldest ${loaded.oldestUnreadDays < 1 ? "came in today" : `has waited ${daysPhrase(loaded.oldestUnreadDays)}`}.`
+                : `${formatNumber(loaded.all)} messages in total, none waiting.`
+            }
+          />
         ) : (
-          <AdminLoadError what="the inbox" retryHref="/admin/messages" />
+          <div />
         )}
-      </Panel>
+        <div className="space-y-3 lg:pt-6">
+          <FilterTabs
+            label="Show messages"
+            value={status}
+            hrefFor={hrefFor}
+            tabs={
+              loaded
+                ? [
+                    { key: "unread", label: "Unread, oldest first", count: loaded.unread },
+                    { key: "", label: "Everything", count: loaded.all },
+                    { key: "read", label: "Read", count: loaded.all - loaded.unread },
+                  ]
+                : [{ key: "", label: "Everything" }]
+            }
+          />
+          <div className="flex flex-wrap items-center gap-2.5">{filters}</div>
+        </div>
+      </div>
+
+      {loaded && page ? (
+        <>
+          <MessagesInbox messages={page.rows} filtering={filtering} />
+          <Pagination
+            page={page.page}
+            pages={page.pages}
+            total={page.total}
+            perPage={page.perPage}
+            rowsShown={page.rows.length}
+            params={params}
+            basePath="/admin/messages"
+            noun="messages"
+          />
+        </>
+      ) : (
+        <AdminLoadError what="the inbox" retryHref="/admin/messages" />
+      )}
     </div>
   );
 }

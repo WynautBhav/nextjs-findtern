@@ -30,11 +30,11 @@ import { InfoList, InfoRow, QuickAction, RecordCard, RecordLayout } from "@/comp
 import { formatPeriodDays } from "@/lib/timesheet-days";
 import { latestActivityAt, telHref } from "@/lib/admin/record-activity-format";
 import type { ActivityEntry } from "@/lib/admin/record-activity.types";
-import { ADMIN_PILL_SECONDARY, ADMIN_SURFACE } from "@/components/admin/surface";
+import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
-import { StatCard } from "@/components/admin/stat-card";
+import { LeadStat, Overview, StatList } from "@/components/app/stat";
 
 /**
  * Candidate 360: everything staff need about one candidate on one page.
@@ -243,27 +243,34 @@ export function Intern360View({
           onSelect={(key) => setTab(key as TabKey)}
         />
 
-        {/* Four figures; two across until the column is wide enough for four. */}
-        <div className="grid grid-cols-2 gap-[var(--admin-gap)] @2xl:grid-cols-4 [&_.leading-none]:text-[1.75rem]">
-          <StatCard
-            featured
-            label="Findtern Score"
-            value={score === null ? "-" : `${score.toFixed(1)}/10`}
-            hint={
-              score === null
-                ? "Not scored yet"
-                : `Comm ${ratings.communication ?? "-"} · Coding ${ratings.coding ?? "-"} · Apt ${ratings.aptitude ?? "-"} · AI ${ratings.interview ?? "-"}`
-            }
-          />
-          <StatCard label="Proposals" value={proposals.length} hint={hiredCount ? `${hiredCount} hired` : proposals.length ? "None hired" : "None yet"} />
-          <StatCard label="Interviews" value={interviews.length} hint={scheduledCount ? `${scheduledCount} scheduled` : interviews.length ? "None scheduled" : "None yet"} />
-          <StatCard
-            label="Paid to candidate"
-            value={formatMoney(paidMinor, "INR", { zeroLabel: "₹0" })}
-            hint={owedTotalMinor > 0 ? `${formatMoney(owedTotalMinor, "INR")} still owed` : paidMinor > 0 ? "Nothing owed" : "Nothing paid yet"}
-            tone={owedTotalMinor > 0 ? "warning" : "neutral"}
-          />
-        </div>
+        {/* One lead figure (the score employers rank on) and the rest as a ruled list: no row of equal tiles. */}
+        <Overview
+          className="py-2"
+          lead={
+            <LeadStat
+              label="Findtern score"
+              value={score === null ? "Not scored" : `${score.toFixed(1)}/10`}
+              note={
+                score === null
+                  ? "Add the four ratings in the Profile tab and the score is their mean."
+                  : `Communication ${ratings.communication ?? "-"}, coding ${ratings.coding ?? "-"}, aptitude ${ratings.aptitude ?? "-"}, AI interview ${ratings.interview ?? "-"}.`
+              }
+            />
+          }
+          rest={
+            <StatList
+              items={[
+                { label: "Proposals", value: proposals.length, hint: hiredCount ? `${hiredCount} hired` : proposals.length ? "None hired" : "None yet" },
+                { label: "Interviews", value: interviews.length, hint: scheduledCount ? `${scheduledCount} scheduled` : interviews.length ? "None scheduled" : "None yet" },
+                {
+                  label: "Paid to candidate",
+                  value: <span className={owedTotalMinor > 0 ? "text-signal" : undefined}>{formatMoney(paidMinor, "INR", { zeroLabel: "₹0" })}</span>,
+                  hint: owedTotalMinor > 0 ? `${formatMoney(owedTotalMinor, "INR")} still owed` : paidMinor > 0 ? "Nothing owed" : "Nothing paid yet",
+                },
+              ]}
+            />
+          }
+        />
 
         <div role="tabpanel" id={`panel-${tab}`} aria-label={tabs.find((t) => t.key === tab)?.label} className="min-w-0">
           {tab === "profile" ? (
@@ -352,7 +359,7 @@ export function Intern360View({
                         <StatusBadge value={p.status} />
                         {/* row actions */}
                         <div className="flex items-center gap-2">
-                          <button type="button" onClick={() => setSelectedProposal(p)} className={cn(buttonClass({ variant: "outline", size: "sm" }), ADMIN_PILL_SECONDARY)}>
+                          <button type="button" onClick={() => setSelectedProposal(p)} className={buttonClass({ variant: "outline", size: "sm" })}>
                             <Eye className="size-4" aria-hidden />
                             View offer
                           </button>
@@ -482,7 +489,7 @@ function ProfileTab({
       <div className="min-w-0 space-y-4">
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
           <SectionHead title="About" />
-          <p className="whitespace-pre-line text-[0.9375rem] leading-relaxed text-ink-800">{draft.previewSummary || "No summary yet."}</p>
+          <p className="whitespace-pre-line text-sm leading-relaxed text-ink-800">{draft.previewSummary || "No summary yet."}</p>
         </div>
 
         <div className={cn(ADMIN_SURFACE, "min-w-0 p-5 sm:p-6")}>
@@ -665,12 +672,12 @@ function DocumentsTab({ internId, documents }: { internId: string; documents: Ca
   const href = (key: string, download = false) =>
     `/admin/interns/${encodeURIComponent(internId)}/documents/open?key=${encodeURIComponent(key)}${download ? "&download=1" : ""}`;
   const round =
-    "apple-spring grid size-9 shrink-0 place-items-center rounded-full bg-[color:var(--admin-panel-2)] text-foreground hover:bg-[color:var(--admin-tile)] hover:text-[color:var(--admin-tile-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:size-11";
+    "grid size-9 shrink-0 place-items-center rounded-md bg-[color:var(--admin-panel-2)] text-foreground hover:bg-[color:var(--admin-tile)] hover:text-[color:var(--admin-tile-ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:size-11";
   return (
     <ul className={cn(ADMIN_SURFACE, "min-w-0 divide-y divide-[color:var(--admin-rule)]")}>
       {documents.map((d) => (
         <li key={d.key} className="flex items-center gap-3 p-[var(--admin-pad-panel)]">
-          <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[color:var(--admin-panel-2)] text-foreground">
+          <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-lg bg-[color:var(--admin-panel-2)] text-foreground">
             <FileIcon className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -689,7 +696,7 @@ function DocumentsTab({ internId, documents }: { internId: string; documents: Ca
       ))}
       {missing.map((slot) => (
         <li key={slot} className="flex items-center gap-3 p-[var(--admin-pad-panel)]">
-          <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl bg-[color:var(--admin-panel-2)] text-text-subtle">
+          <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-lg bg-[color:var(--admin-panel-2)] text-text-subtle">
             <FileIcon className="size-5" />
           </span>
           <div className="min-w-0 flex-1">
@@ -1180,7 +1187,7 @@ function CgpaVerificationBlock({ extra }: { extra: Record<string, unknown> }) {
         title="CGPA verification"
         hint="Checked against the proof photos the candidate uploaded."
         action={
-          <Link href="/admin/cgpa-verifications" className={cn(buttonClass({ variant: "outline", size: "sm" }), ADMIN_PILL_SECONDARY, "min-h-11")}>
+          <Link href="/admin/cgpa-verifications" className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11")}>
             Open the queue
           </Link>
         }
@@ -1198,7 +1205,7 @@ function CgpaVerificationBlock({ extra }: { extra: Record<string, unknown> }) {
       </dl>
       {history.length > 1 ? (
         <div className="mt-4 border-t border-ink-100 pt-3">
-          <p className="text-xs font-medium uppercase tracking-wide text-text-subtle">History</p>
+          <p className="text-sm font-medium text-text-subtle">History</p>
           <ol className="mt-2 space-y-1.5 text-sm text-ink-700">
             {history.map((h, i) => (
               <li key={`${h.at}-${i}`} className="flex flex-wrap gap-x-2">

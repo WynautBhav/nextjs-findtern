@@ -1,6 +1,7 @@
 import { count, inArray, sql } from "drizzle-orm";
 
-import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
+import { FilterTabs, type FilterTab } from "@/components/app/primitives";
+import { LeadStat } from "@/components/app/stat";
 import { AddCollegeButton } from "@/components/admin/college-partners-manager";
 import { DataTable, IdentityCell } from "@/components/admin/data-table";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
@@ -82,9 +83,7 @@ export default async function AdminCollegesPage({
     loaded = null;
   }
 
-  const header = (subtitle?: string) => (
-    <AdminPageHeader title="Colleges" subtitle={subtitle} action={canEdit ? <AddCollegeButton /> : undefined} />
-  );
+  const header = () => <AdminPageHeader title="Colleges" action={canEdit ? <AddCollegeButton /> : undefined} className="mb-0 lg:mb-0" />;
   if (!loaded) {
     return (
       <div className="space-y-4">
@@ -99,21 +98,27 @@ export default async function AdminCollegesPage({
   const { rows, seatCodes, officers } = loaded;
   const pg = toPage(rows, loaded.total, loaded.page, req.perPage);
   const viewHref = (v: View) => `/admin/colleges${toQueryString({ ...params, view: v, q: "", page: "" })}`;
-  const tabs: AdminTabItem[] = [
-    { key: "", label: "Partners", count: loaded.partners, href: viewHref("") },
-    { key: "students", label: "Not partners, with students", count: loaded.withStudents, href: viewHref("students") },
-    { key: "withdrawals", label: "Withdrawals to pay", count: loaded.withdrawals, href: viewHref("withdrawals") },
-  ];
+  const tabs: FilterTab[] = [
+    { key: "", label: "Partners", count: loaded.partners },
+    { key: "students", label: "Not partners, with students", count: loaded.withStudents },
+    { key: "withdrawals", label: "Withdrawals to pay", count: loaded.withdrawals },
+  ].filter((t) => t.count > 0 || t.key === "" || (!req.search && view === t.key));
+  // While searching no tab is selected: the search covers every college.
+  const lead = loaded.withdrawals > 0
+    ? { label: loaded.withdrawals === 1 ? "Withdrawal waiting to be paid" : "Withdrawals waiting to be paid", value: formatNumber(loaded.withdrawals), tone: "signal" as const, note: `${formatNumber(loaded.partners)} partner ${loaded.partners === 1 ? "college is" : "colleges are"} on Findtern.`, action: view === "withdrawals" ? undefined : { label: "Pay them", href: viewHref("withdrawals") } }
+    : { label: loaded.partners === 1 ? "Partner college" : "Partner colleges", value: formatNumber(loaded.partners), tone: "brand" as const, note: loaded.withStudents ? `${formatNumber(loaded.withStudents)} more ${loaded.withStudents === 1 ? "college has" : "colleges have"} students but ${loaded.withStudents === 1 ? "is" : "are"} not a partner yet.` : "No withdrawals are waiting." };
 
   return (
-    <div className="space-y-4">
-      {header(
-        req.search
-          ? `${formatNumber(loaded.total)} ${loaded.total === 1 ? "college matches" : "colleges match"} in the whole directory. Open one to make it a partner.`
-          : `${formatNumber(loaded.partners)} partner ${loaded.partners === 1 ? "college" : "colleges"}. Search to find any college in the directory.`,
+    <div className="space-y-6">
+      {header()}
+      {req.search ? (
+        <p className="text-sm text-ink-700">
+          <span className="nums font-semibold text-ink-900">{formatNumber(loaded.total)}</span> {loaded.total === 1 ? "college matches" : "colleges match"} in the whole directory. Open one to make it a partner.
+        </p>
+      ) : (
+        <LeadStat {...lead} className="pt-1" />
       )}
-      {/* While searching no tab is selected: the search covers every college. */}
-      <AdminTabs items={tabs} active={req.search ? "none" : view} label="College views" />
+      {tabs.length > 1 || req.search ? <FilterTabs label="College views" tabs={tabs} value={req.search ? "none" : view} hrefFor={(k) => viewHref(k as View)} /> : null}
       <DataTable
         basePath="/admin/colleges"
         params={params}
@@ -148,14 +153,14 @@ export default async function AdminCollegesPage({
                 />
                 {openRequest || !r.isActive ? (
                   <div className="mt-1.5 flex flex-wrap gap-1.5 pl-[3.25rem]">
-                    {openRequest ? <StatusBadge tone="warning" label="Withdrawal requested" dot={false} className="h-5" /> : null}
-                    {!r.isActive ? <StatusBadge tone="neutral" label="Inactive" dot={false} className="h-5" /> : null}
+                    {openRequest ? <StatusBadge tone="warning" label="Withdrawal requested" dot={false} className="h-5 rounded-md" /> : null}
+                    {!r.isActive ? <StatusBadge tone="neutral" label="Inactive" dot={false} className="h-5 rounded-md" /> : null}
                   </div>
                 ) : null}
               </div>
             ),
           },
-          { header: "Students", align: "right", cell: (r) => formatNumber(r.members) },
+          { header: "Students", align: "right", cell: (r) => (r.members ? formatNumber(r.members) : <span className="text-text-subtle">-</span>) },
           {
             header: "Seats used",
             align: "right",
@@ -165,7 +170,7 @@ export default async function AdminCollegesPage({
               return r.college.isPartner ? <span className="text-text-subtle">Awaiting payment</span> : <span className="text-text-subtle">-</span>;
             },
           },
-          { header: "Drives", align: "right", cell: (r) => formatNumber(r.drives) },
+          { header: "Drives", align: "right", cell: (r) => (r.drives ? formatNumber(r.drives) : <span className="text-text-subtle">-</span>) },
           { header: "Wallet", align: "right", cell: (r) => <span className="nums">{formatMoney(r.balance, "INR", { zeroLabel: false })}</span> },
           {
             header: "Placement officer",

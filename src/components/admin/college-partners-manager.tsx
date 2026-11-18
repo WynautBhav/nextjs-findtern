@@ -9,7 +9,6 @@ import { GSTIN_HINT, isGstinFormat } from "@/lib/gstin";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
-import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { EmptyScene } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -88,7 +87,7 @@ export function AddCollegeForm({ onDone }: { onDone?: () => void } = {}) {
         <input type="checkbox" name="website" className="size-4 accent-brand-700" /> Show in the website&apos;s College partners strip
       </label>
       <div className="flex items-center gap-3 md:col-span-2">
-        <button disabled={busy} className={buttonClass({ className: cn(ADMIN_PILL_PRIMARY, "disabled:opacity-60") })}>
+        <button disabled={busy} className={buttonClass({ className: "disabled:opacity-60" })}>
           {busy ? "Adding…" : "Add partner college"}
         </button>
         <span role="status" className="text-sm text-danger">
@@ -110,7 +109,7 @@ export function AddCollegeButton() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ size: "sm", className: ADMIN_PILL_PRIMARY })}>
+      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ size: "sm" })}>
         Add college
       </button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -127,7 +126,7 @@ export function AddCollegeButton() {
 }
 
 const pill =
-  "inline-flex min-h-11 cursor-pointer items-center rounded-full bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60";
+  "inline-flex min-h-11 cursor-pointer items-center rounded-md bg-[color:var(--admin-panel-2)] px-5 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60";
 
 /** Partner / On website / Active, in the college card. Switching Active off asks first. */
 export function CollegeSwitches({ college, canEdit }: { college: { id: string; name: string; isPartner: boolean; showOnWebsite: boolean; isActive: boolean }; canEdit: boolean }) {
@@ -159,7 +158,7 @@ export function CollegeSwitches({ college, canEdit }: { college: { id: string; n
     <div className="space-y-2">
       {dialog}
       {items.map(([key, label, hint, value]) => (
-        <label key={key} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-2xl bg-[color:var(--admin-panel-2)] px-4 py-2 text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:disabled]:cursor-default">
+        <label key={key} className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg bg-[color:var(--admin-panel-2)] px-4 py-2 text-foreground has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring has-[:disabled]:cursor-default">
           <input type="checkbox" checked={value} disabled={!canEdit} onChange={(e) => toggle(key, e.target.checked)} className="size-4 shrink-0 accent-brand-700" />
           <span className="min-w-0 text-sm">
             <span className="block font-medium">{label}</span>
@@ -253,7 +252,7 @@ export function CollegeLogins({ collegeId, officers, hasPaidBatch, canEdit }: { 
       )}
       <div role="status" aria-live="polite">
         {issued ? (
-          <p className="rounded-[var(--radius-admin-card)] bg-success-soft px-4 py-3 text-sm text-foreground">
+          <p className="rounded-lg bg-success-soft px-4 py-3 text-sm text-foreground">
             Login for <strong>{issued.email}</strong>: password <code className="rounded bg-[color:var(--admin-panel)] px-1.5 py-0.5 font-mono">{issued.password}</code>. Shown once; send it privately. Sign in at /login?as=college.
           </p>
         ) : null}
@@ -323,7 +322,7 @@ export function CollegeDetailsForm({ college, canEdit }: { college: { id: string
       </p>
       {canEdit ? (
         <div className="flex flex-wrap items-center gap-3">
-          <button disabled={busy} className={buttonClass({ className: cn(ADMIN_PILL_PRIMARY, "disabled:opacity-60") })}>{busy ? "Saving…" : "Save details"}</button>
+          <button disabled={busy} className={buttonClass({ className: "disabled:opacity-60" })}>{busy ? "Saving…" : "Save details"}</button>
           <p role="status" className={cn("text-sm", msg?.ok ? "text-foreground" : "text-danger")}>{msg?.text}</p>
         </div>
       ) : null}

@@ -78,11 +78,11 @@ export function CgpaDecision({ target }: { target: Target }) {
   return (
     <>
       <div className="flex flex-wrap gap-2 max-sm:flex-col max-sm:gap-3">
-        <button type="button" onClick={() => setOpen("verify")} className={cn(buttonClass({ variant: "primary", size: "sm" }), "min-h-11 rounded-full px-5")}>
+        <button type="button" onClick={() => setOpen("verify")} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-9 max-sm:min-h-11 border-brand-700 px-4 text-brand-800 hover:bg-brand-100")}>
           <CheckCircle2 className="size-4" aria-hidden />
-          Verify CGPA correct
+          Verify CGPA
         </button>
-        <button type="button" onClick={() => setOpen("incorrect")} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11 rounded-full border-danger/40 px-5 text-danger hover:bg-danger-soft")}>
+        <button type="button" onClick={() => setOpen("incorrect")} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-9 max-sm:min-h-11 border-danger/40 px-4 text-danger hover:bg-danger-soft")}>
           <TriangleAlert className="size-4" aria-hidden />
           Mark incorrect
         </button>
@@ -104,10 +104,10 @@ export function CgpaDecision({ target }: { target: Target }) {
             </p>
           ) : null}
           <DialogFooter className="gap-2 max-sm:flex-col-reverse">
-            <button type="button" onClick={close} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11 rounded-full px-5")}>
+            <button type="button" onClick={close} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-10 max-sm:min-h-11 px-5")}>
               Cancel
             </button>
-            <button type="button" disabled={busy} onClick={() => void submit("verified")} className={cn(buttonClass({ variant: "primary", size: "sm" }), "min-h-11 rounded-full px-5")}>
+            <button type="button" disabled={busy} onClick={() => void submit("verified")} className={cn(buttonClass({ variant: "primary", size: "sm" }), "min-h-10 max-sm:min-h-11 px-5")}>
               {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
               {busy ? "Saving…" : "Yes, it is correct"}
             </button>
@@ -182,10 +182,10 @@ export function CgpaDecision({ target }: { target: Target }) {
               </p>
             ) : null}
             <DialogFooter className="gap-2 max-sm:flex-col-reverse">
-              <button type="button" onClick={close} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11 rounded-full px-5")}>
+              <button type="button" onClick={close} className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-10 max-sm:min-h-11 px-5")}>
                 Cancel
               </button>
-              <button type="submit" disabled={busy} className={cn(buttonClass({ variant: "primary", size: "sm" }), "min-h-11 rounded-full px-5")}>
+              <button type="submit" disabled={busy} className={cn(buttonClass({ variant: "primary", size: "sm" }), "min-h-10 max-sm:min-h-11 px-5")}>
                 {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
                 {busy ? "Saving…" : "Save correction"}
               </button>

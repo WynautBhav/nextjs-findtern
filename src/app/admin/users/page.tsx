@@ -5,15 +5,16 @@ import { Download } from "lucide-react";
 import { getSession } from "@/lib/auth";
 import { allows } from "@/lib/admin/permissions";
 import { flattenParams, parsePageRequest, toPage, toQueryString } from "@/lib/admin/params";
+import { accountViews } from "@/lib/admin/account-views";
 import { loadAccounts, USER_SORTS, type AccountRow, type UserSort } from "@/lib/admin/users-list";
 import { formatDate } from "@/lib/format";
-import { AdminLoadError, AdminPageHeader } from "@/components/admin/panel";
+import { AdminLoadError, AdminPageHeader, PageLead } from "@/components/admin/panel";
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { DataTable, IdentityCell, type Column } from "@/components/admin/data-table";
 import { StatusBadge } from "@/components/admin/status-badge";
 import type { ToolbarFilter } from "@/components/admin/table-toolbar";
 import { AccountActiveCell } from "@/components/admin/intern-row-controls";
-import { ADMIN_PILL_SECONDARY, ADMIN_SURFACE } from "@/components/admin/surface";
+import { ADMIN_SURFACE } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
 
 export const metadata: Metadata = {
@@ -51,17 +52,11 @@ export default async function AdminUsersPage({
     console.error("[admin/users] list query failed", err);
   }
 
-  const counts = data?.byKind;
   const header = (
     <AdminPageHeader
       title="Users"
-      subtitle={
-        counts
-          ? `${counts.intern.toLocaleString("en-IN")} candidates and ${counts.employer.toLocaleString("en-IN")} companies${showStaff ? `, ${counts.admin} staff` : ""}. Activate or deactivate an account in its row.`
-          : "Every account that can sign in."
-      }
       action={
-        <a href={exportHref} className={buttonClass({ variant: "outline", className: ADMIN_PILL_SECONDARY })}>
+        <a href={exportHref} className={buttonClass({ variant: "outline" })}>
           <Download className="size-4" aria-hidden />
           Export CSV
         </a>
@@ -102,11 +97,13 @@ export default async function AdminUsersPage({
   // The account type is a set of views, not a facet: tabs with the unfiltered counts.
   const roleHref = (role: string) => `/admin/users${toQueryString({ ...params, role, page: "" })}`;
   const kinds = data.byKind;
-  const views: AdminTabItem[] = [
-    { key: "", label: "Everyone", count: kinds.intern + kinds.employer + (showStaff ? kinds.admin : 0), href: roleHref("") },
-    { key: "intern", label: "Candidates", count: kinds.intern, href: roleHref("intern") },
-    { key: "employer", label: "Companies", count: kinds.employer, href: roleHref("employer") },
-    ...(showStaff ? [{ key: "admin", label: "Staff", count: kinds.admin, href: roleHref("admin") }] : []),
+  // "Everyone" is built from the same counts as the other tabs, so the four always add up.
+  const viewCounts = accountViews(kinds, showStaff);
+  const views: AdminTabItem[] = viewCounts.map((v) => ({ key: v.key, label: v.label, count: v.count, href: roleHref(v.key) }));
+  const everyone = viewCounts[0].count;
+  const attention: { label: string; value: number; href: string }[] = [
+    ...(data.unverified ? [{ label: "Email not verified", value: data.unverified, href: `/admin/users${toQueryString({ verified: "no" })}` }] : []),
+    ...(data.inactive ? [{ label: "Deactivated, cannot sign in", value: data.inactive, href: `/admin/users${toQueryString({ status: "inactive" })}` }] : []),
   ];
   const activeRole = views.some((v) => v.key === params.role) ? (params.role ?? "") : "";
 
@@ -140,22 +137,19 @@ export default async function AdminUsersPage({
       ),
     },
     { header: "Phone", cell: (row) => <span className="nums whitespace-nowrap">{row.phone || "-"}</span> },
-    {
-      header: "Type",
-      cell: (row) => <StatusBadge tone={row.kind === "intern" ? "info" : row.kind === "employer" ? "neutral" : "success"} label={KIND_LABEL[row.kind]} dot={false} />,
-    },
+    { header: "Type", cell: (row) => <span className="text-ink-700">{KIND_LABEL[row.kind]}</span> },
     {
       header: "Account",
       cell: (row) =>
         row.kind === "admin" ? (
           <Link
             href="/admin/roles"
-            className="inline-flex h-8 items-center rounded-full bg-[color:var(--admin-panel-2)] px-3 text-xs font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:min-h-11"
+            className="inline-flex h-8 items-center rounded-md px-2 text-sm font-medium text-brand-800 underline decoration-brand-300 underline-offset-4 hover:decoration-brand-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-lg:min-h-11"
           >
             Manage in Roles
           </Link>
         ) : (row.kind === "intern" ? canWrite : canWriteCompanies) ? (
-          <AccountActiveCell id={row.id} kind={row.kind} active={row.isActive} compact />
+          <AccountActiveCell id={row.id} kind={row.kind} active={row.isActive} />
         ) : (
           <StatusBadge value={row.isActive ? "active" : "inactive"} />
         ),
@@ -172,6 +166,25 @@ export default async function AdminUsersPage({
   return (
     <div>
       {header}
+      <PageLead
+        value={everyone.toLocaleString("en-IN")}
+        label="accounts can sign in"
+        note={`${kinds.intern.toLocaleString("en-IN")} candidates, ${kinds.employer.toLocaleString("en-IN")} companies${showStaff ? `, ${kinds.admin} staff` : ""}.`}
+        aside={
+          attention.length ? (
+            <ul className="w-full sm:w-auto sm:min-w-72 divide-y divide-ink-200 border-y border-ink-200">
+              {attention.map((a) => (
+                <li key={a.label}>
+                  <Link href={a.href} className="-mx-2 flex min-h-10 items-baseline justify-between gap-4 rounded-md px-2 py-2 text-ink-700 transition-colors duration-[var(--motion-fast)] hover:bg-ink-200/40">
+                    {a.label}
+                    <span className="nums font-display text-lg font-semibold text-ink-900">{a.value}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : undefined
+        }
+      />
       <div className="space-y-4">
       <AdminTabs items={views} active={activeRole} label="Account types" />
       <DataTable<AccountRow>
@@ -185,7 +198,7 @@ export default async function AdminUsersPage({
         columns={columns}
         noun="accounts"
         caption="Registered accounts"
-        searchPlaceholder="Search name, email, phone or company…"
+        searchPlaceholder="Search name, email or company"
         filters={filters}
         empty={{
           title: "No accounts match",

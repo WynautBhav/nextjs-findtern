@@ -1,11 +1,9 @@
 import Link from "next/link";
 
-import { AdminTabs } from "@/components/admin/admin-tabs";
+import { FilterTabs } from "@/components/app/primitives";
 import { DataTable, IdentityCell, parseSort } from "@/components/admin/data-table";
-import { AdminEmpty, Panel, PanelHeader } from "@/components/admin/panel";
-import { ProposalPipelineLanes, type PipelineCard } from "@/components/admin/proposal-pipeline-lanes";
-import { SortSelect } from "@/components/admin/sort-select";
-import { TableToolbar } from "@/components/admin/table-toolbar";
+import { PIPELINE_STAGES, ProposalStageNav, inLane, parseLane } from "@/components/admin/proposal-stages";
+import { ProposalDetailsButton } from "@/components/admin/proposal-tracker-dialogs";
 import { InterviewNotesButton, MeetingLinkCell } from "@/components/admin/proposal-tracker-dialogs";
 import { StatusBadge } from "@/components/admin/status-badge";
 import type { ToolbarFilter } from "@/components/admin/table-toolbar";
@@ -13,7 +11,7 @@ import { toQueryString } from "@/lib/admin/params";
 import { daysSince } from "@/lib/admin/ai-interview-expiry";
 import { EXPIRED_REASONS, HEADLINE_REASONS, expiredCounts, filterExpired, headlineCount, matchesSearch, offerFacts, paginate, sortBy, type ExpiredRow } from "@/lib/admin/tracker";
 import { EXPIRY_LABEL, type ExpiryReason } from "@/lib/proposal-expiry";
-import { formatDate, formatDayLabel, formatIstStamp, formatMoney, formatNumber, formatSlotTime } from "@/lib/format";
+import { formatDate, formatIstStamp, formatMoney, formatNumber, formatSlotTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
 import { parseOffer } from "@/lib/offer";
@@ -36,6 +34,7 @@ type ProposalItem = {
   currency: string | null;
   offerDetails: unknown;
   createdAt: Date | null;
+  updatedAt: Date | null;
   hiredAt: Date | null;
   internId: string;
   internFirstName: string | null;
@@ -134,14 +133,12 @@ export function ProposalTrackerView({
 
   return (
     <div className="space-y-4">
-      <AdminTabs
-        label="Pipeline view"
-        items={tabs.map((t) => ({ ...t, href: `${BASE}${toQueryString({ ...keep, tab: t.key })}` }))}
-        active={tab}
-      />
+      <div className="border-b border-ink-200 pb-3">
+        <FilterTabs label="Pipeline view" tabs={tabs} value={tab} hrefFor={(k) => `${BASE}${toQueryString({ ...keep, tab: k })}`} />
+      </div>
 
       {tab === "companies" ? <CompaniesTab {...{ params, page, perPage, search, pickers, proposals, interviews }} employers={activeCompanies} /> : null}
-      {tab === "proposals" ? <ProposalsTab {...{ params, search, pickers }} rows={proposals} /> : null}
+      {tab === "proposals" ? <ProposalsTab {...{ params, page, perPage, search, pickers }} rows={proposals} /> : null}
       {tab === "candidates" ? <CandidatesTab {...{ params, page, perPage, search, pickers, proposals, noGuarantee }} /> : null}
       {tab === "interviews" ? <InterviewsTab {...{ params, page, perPage, search, pickers }} rows={interviews} /> : null}
       {tab === "hired" ? <HiredTab {...{ params, page, perPage, search, pickers }} rows={hired} /> : null}
@@ -244,17 +241,22 @@ function CompaniesTab({
   );
 }
 
-function ProposalsTab({ params, search, pickers, rows }: Pick<TabProps, "params" | "search" | "pickers"> & { rows: ProposalItem[] }) {
+function ProposalsTab({ params, page, perPage, search, pickers, rows }: TabProps & { rows: ProposalItem[] }) {
+  const lane = parseLane(params.lane);
+  const now = new Date();
+  // Counts for the stage list come from the period's rows, before search and the kind filter, so a stage never hides its siblings.
+  const statuses = rows.map((p) => p.status);
   const filtered = rows.filter((p) => {
     const offer = parseOffer(p.offerDetails, p.currency);
     return (
+      inLane(lane, p.status) &&
       matchesSearch([nameOf(p), p.internEmail, p.companyName, p.projectName, offer.roleTitle], search) &&
-      (!params.status || p.status === params.status) &&
       (!params.flow || p.flowType === params.flow) &&
       (!params.kind || (params.kind === "fulltime" ? Boolean(offer.fullTime) : !offer.fullTime))
     );
   });
-  const sort = parseSort(params, ["candidate", "company", "start", "sent"] as const, { key: "sent", dir: "desc" });
+  // A work queue reads oldest first; a finished stage reads newest first.
+  const sort = parseSort(params, ["stage", "candidate", "company", "start"] as const, { key: "stage", dir: lane === "hired" || lane === "closed" || lane === "all" ? "desc" : "asc" });
   const sorted = sortBy(
     filtered,
     (p) =>
@@ -264,95 +266,140 @@ function ProposalsTab({ params, search, pickers, rows }: Pick<TabProps, "params"
           ? (p.companyName ?? "").toLowerCase()
           : sort.key === "start"
             ? parseOffer(p.offerDetails, p.currency).startDate
-            : time(p.createdAt),
+            : time(p.updatedAt ?? p.createdAt),
     sort.dir,
   );
-  const filtersOn = Boolean(search || params.status || params.flow || params.kind || params.company || params.intern || params.tz);
+  const pg = paginate(sorted, page, perPage);
+  const filtersOn = Boolean(search || params.flow || params.kind || params.company || params.intern || params.tz);
+  const laneLabel = lane === "open" ? "open" : lane === "all" ? "" : PIPELINE_STAGES.find((s) => s.key === lane)?.label.toLowerCase() ?? "";
 
-  const cards: PipelineCard[] = sorted.map((p) => {
-    const o = parseOffer(p.offerDetails, p.currency);
-    const flow = p.flowType === "interview_first" ? "Interview first" : "Direct offer";
-    const value = o.fullTime ? o.fullTime.annualCtcMinor : (o.totalMinor ?? (o.monthlyMinor != null ? o.monthlyMinor * o.months : null));
-    return {
-      id: p.id,
-      status: p.status,
-      internId: p.internId,
-      name: nameOf(p),
-      email: p.internEmail,
-      employerId: p.employerId,
-      company: p.companyName ?? "Company",
-      project: p.projectName ?? "Project",
-      flow,
-      fullTimeHired: p.status === "hired" && Boolean(o.fullTime),
-      amount: o.fullTime
-        ? `${o.fullTime.annualCtcMinor != null ? formatMoney(o.fullTime.annualCtcMinor, o.currency) : "-"} CTC`
-        : o.monthlyMinor != null
-          ? `${formatMoney(o.monthlyMinor, o.currency)}/mo`
-          : "-",
-      amountSub: o.fullTime ? "Full-time" : `${o.months} mo internship`,
-      valueMinor: value,
-      currency: o.currency,
-      startLabel: formatDate(o.startDate),
-      sentLabel: `Sent ${formatDayLabel(p.createdAt)}`,
-      details: {
-        id: p.id,
-        status: p.status,
-        currency: p.currency,
-        offerDetails: p.offerDetails,
-        candidate: nameOf(p),
-        companyName: p.companyName ?? "Company",
-        projectName: p.projectName ?? "Project",
-        flow,
-        sentAt: formatDate(p.createdAt),
-      },
-    };
-  });
-
-  const statusOptions = [
-    { value: "sent", label: "Sent" },
-    { value: "interview_scheduled", label: "Interview scheduled" },
-    { value: "accepted", label: "Accepted" },
-    { value: "processing", label: "Processing" },
-    { value: "hired", label: "Hired" },
-    { value: "rejected", label: "Rejected" },
-    { value: "expired", label: "Expired" },
-    { value: "withdrawn", label: "Withdrawn" },
-  ];
   const filters: ToolbarFilter[] = [
     ...pickers,
-    { key: "status", label: "Status", options: statusOptions },
     { key: "flow", label: "Flow", options: [{ value: "direct", label: "Direct offer" }, { value: "interview_first", label: "Interview first" }] },
     { key: "kind", label: "Offer type", options: [{ value: "internship", label: "Internship" }, { value: "fulltime", label: "Full-time" }] },
   ];
-  const sortOptions = [
-    { value: "sent", label: "Sent" },
-    { value: "candidate", label: "Candidate" },
-    { value: "company", label: "Company" },
-    { value: "start", label: "Start date" },
-  ];
   const empty = filtersOn
     ? filteredEmpty(params, "proposals")
-    : { title: "No proposals yet", body: "Offers appear here the moment a company sends one." };
+    : lane === "open"
+      ? rows.length === 0
+        ? { title: "No proposals yet", body: "Offers appear here the moment a company sends one." }
+        : { title: "Nothing is waiting", body: "Every proposal in this period has been decided. Look at the hires or the closed offers.", action: { href: `${BASE}${toQueryString({ ...params, tab: "proposals", lane: "all", page: "" })}`, label: "Show all proposals" } }
+      : { title: `No ${laneLabel || ""} proposals`.replace("  ", " "), body: "Nothing sits in this stage for the current period.", action: { href: `${BASE}?tab=proposals`, label: "Back to the open queue" } };
+
+  const queueHeader = (label: string) => <span>{label}</span>;
 
   return (
-    <Panel>
-      <PanelHeader
-        title="Proposals by stage"
-        description={`${filtered.length.toLocaleString("en-IN")} ${filtered.length === 1 ? "proposal" : "proposals"}${filtersOn ? " match these filters" : " in this period"}. Scroll sideways for later stages.`}
+    <div className="grid items-start gap-5 lg:grid-cols-[11.5rem_minmax(0,1fr)] lg:gap-6">
+      <ProposalStageNav statuses={statuses} lane={lane} params={params} basePath={BASE} />
+      <DataTable
+        basePath={BASE}
+        params={params}
+        page={pg.page}
+        pages={pg.pages}
+        total={pg.total}
+        perPage={perPage}
+        rows={pg.rows}
+        rowKey={(p) => p.id}
+        noun="proposals"
+        caption={`Proposals, ${lane === "open" ? "open ones first, oldest at the top" : "by stage"}`}
+        searchPlaceholder="Search candidate, company, project, role…"
+        filters={filters}
+        stickyHeader
+        empty={empty}
+        columns={[
+          {
+            header: queueHeader("In stage"),
+            label: "In stage",
+            sort: "stage",
+            firstDir: "asc",
+            cell: (p) => {
+              const d = daysSince(p.updatedAt ?? p.createdAt, now);
+              return (
+                <div className="whitespace-nowrap">
+                  <p className="nums whitespace-nowrap font-display text-base font-semibold text-foreground">{d === null ? "-" : d === 0 ? "Today" : `${d} ${d === 1 ? "day" : "days"}`}</p>
+                  <p className="nums whitespace-nowrap text-xs text-text-subtle">since {formatDate(p.updatedAt ?? p.createdAt)}</p>
+                </div>
+              );
+            },
+          },
+          {
+            header: "Candidate",
+            sort: "candidate",
+            cell: (p) => <IdentityCell name={nameOf(p)} id={p.internId} href={`/admin/interns/${p.internId}`} sub={p.internEmail ?? "-"} size="sm" className="max-w-36" />,
+          },
+          {
+            header: "Company and project",
+            sort: "company",
+            cell: (p) => (
+              <div className="min-w-0 max-w-36">
+                <Link href={`/admin/companies/${p.employerId}`} className="block truncate font-medium text-foreground hover:underline">
+                  {p.companyName ?? "Company"}
+                </Link>
+                <p className="truncate text-xs text-text-subtle">{p.projectName ?? "Project"}</p>
+              </div>
+            ),
+          },
+          {
+            header: "Offer",
+            sort: "start",
+            cell: (p) => {
+              const o = parseOffer(p.offerDetails, p.currency);
+              return (
+                <div className="whitespace-nowrap">
+                  <p className="nums whitespace-nowrap font-medium text-foreground">
+                    {o.fullTime
+                      ? `${o.fullTime.annualCtcMinor != null ? formatMoney(o.fullTime.annualCtcMinor, o.currency) : "-"} CTC`
+                      : o.monthlyMinor != null
+                        ? `${formatMoney(o.monthlyMinor, o.currency)}/mo`
+                        : "-"}
+                  </p>
+                  <p className="nums whitespace-nowrap text-xs text-text-subtle">
+                    {o.fullTime ? "Full-time" : `${o.months} mo`} · starts {formatDate(o.startDate)}
+                  </p>
+                </div>
+              );
+            },
+          },
+          {
+            header: "Stage",
+            cell: (p) => {
+              const fullTimeHired = p.status === "hired" && Boolean(parseOffer(p.offerDetails, p.currency).fullTime);
+              return (
+                <div className="flex flex-col items-start gap-1">
+                  {fullTimeHired ? <StatusBadge tone="success" label="Full-time hired" /> : <StatusBadge value={p.status} />}
+                  <span className="text-xs text-text-subtle">{p.flowType === "interview_first" ? "Interview first" : "Direct offer"}</span>
+                </div>
+              );
+            },
+          },
+          {
+            header: <span className="sr-only">Actions</span>,
+            label: "",
+            cell: (p) => {
+              const o = parseOffer(p.offerDetails, p.currency);
+              const flow = p.flowType === "interview_first" ? "Interview first" : "Direct offer";
+              return (
+                <div className="flex justify-end">
+                  <ProposalDetailsButton
+                    proposal={{
+                      id: p.id,
+                      status: p.status,
+                      currency: p.currency,
+                      offerDetails: p.offerDetails,
+                      candidate: nameOf(p),
+                      companyName: p.companyName ?? "Company",
+                      projectName: p.projectName ?? o.roleTitle ?? "Project",
+                      flow,
+                      sentAt: formatDate(p.createdAt),
+                    }}
+                  />
+                </div>
+              );
+            },
+          },
+        ]}
       />
-      <div className="px-[var(--admin-pad-panel)] pt-3 pb-4">
-        <TableToolbar
-          searchPlaceholder="Search candidate, company, project, role…"
-          filters={filters}
-          extra={<SortSelect options={sortOptions} className="flex items-center gap-1.5 max-sm:w-full" />}
-        />
-      </div>
-      {cards.length === 0 ? (
-        <AdminEmpty {...empty} />
-      ) : (
-        <ProposalPipelineLanes cards={cards} params={params} basePath={BASE} />
-      )}
-    </Panel>
+    </div>
   );
 }
 
@@ -460,13 +507,13 @@ function InterviewsTab({ params, page, perPage, search, pickers, rows }: TabProp
           header: "Candidate",
           sort: "candidate",
           cell: (i) => (
-            <IdentityCell name={nameOf(i)} id={i.internId} href={`/admin/interns/${i.internId}`} sub={i.internEmail ?? "-"} size="sm" className="max-w-64" />
+            <IdentityCell name={nameOf(i)} id={i.internId} href={`/admin/interns/${i.internId}`} sub={i.internEmail ?? "-"} size="sm" className="max-w-44" />
           ),
         },
         {
           header: "Company and project",
           cell: (i) => (
-            <div className="min-w-0 max-w-60">
+            <div className="min-w-0 max-w-44">
               <Link href={`/admin/companies/${i.employerId}?tab=interviews`} className="block truncate font-medium text-foreground hover:underline">
                 {i.companyName ?? "Company"}
               </Link>
@@ -483,20 +530,20 @@ function InterviewsTab({ params, page, perPage, search, pickers, rows }: TabProp
             if (chosen) {
               return (
                 <div className="whitespace-nowrap">
-                  <p className="nums font-medium text-foreground">{formatSlotTime(chosen, tz)}</p>
-                  <p className="text-xs text-text-subtle">{tz} · picked slot {i.selectedSlot}</p>
+                  <p className="nums whitespace-nowrap font-medium text-foreground">{formatSlotTime(chosen, tz)}</p>
+                  <p className="whitespace-nowrap text-xs text-text-subtle">{tz} · picked slot {i.selectedSlot}</p>
                 </div>
               );
             }
             const offered = [i.slot1, i.slot2, i.slot3].filter((s): s is Date => Boolean(s));
             return offered.length ? (
               <div className="whitespace-nowrap">
-                <ul className="nums space-y-0.5 text-foreground">
+                <ul className="nums space-y-0.5 whitespace-nowrap text-foreground">
                   {offered.map((s, n) => (
                     <li key={n}>{formatSlotTime(s, tz)}</li>
                   ))}
                 </ul>
-                <p className="text-xs text-text-subtle">{tz} · not picked yet</p>
+                <p className="whitespace-nowrap text-xs text-text-subtle">{tz} · not picked yet</p>
               </div>
             ) : (
               <span className="text-text-subtle">No slot offered</span>
@@ -519,7 +566,7 @@ function InterviewsTab({ params, page, perPage, search, pickers, rows }: TabProp
           cell: (i) => <MeetingLinkCell interviewId={i.id} link={i.meetingLink} locked={FINISHED_INTERVIEW.includes(i.status.toLowerCase())} awaitingSlot={!i.isAi && !i.selectedSlot} />,
         },
         {
-          header: "",
+          header: <span className="sr-only">Notes</span>,
           cell: (i) => (i.notes?.trim() ? <InterviewNotesButton title={`${nameOf(i)} · ${i.companyName ?? "Company"}`} notes={i.notes} /> : null),
         },
       ]}
@@ -575,14 +622,14 @@ function HiredTab({ params, page, perPage, search, pickers, rows }: TabProps & {
             header: "Candidate",
             sort: "candidate",
             cell: (p) => (
-              <IdentityCell name={nameOf(p)} id={p.internId} href={`/admin/interns/${p.internId}`} sub={p.internEmail ?? "-"} size="sm" className="max-w-64" />
+              <IdentityCell name={nameOf(p)} id={p.internId} href={`/admin/interns/${p.internId}`} sub={p.internEmail ?? "-"} size="sm" className="max-w-44" />
             ),
           },
           {
             header: "Company and project",
             sort: "company",
             cell: (p) => (
-              <div className="min-w-0 max-w-60">
+              <div className="min-w-0 max-w-44">
                 <Link href={`/admin/companies/${p.employerId}?tab=hired`} className="block truncate font-medium text-foreground hover:underline">
                   {p.companyName ?? "Company"}
                 </Link>
@@ -595,7 +642,7 @@ function HiredTab({ params, page, perPage, search, pickers, rows }: TabProps & {
             cell: (p) => {
               const o = parseOffer(p.offerDetails, p.currency);
               return (
-                <div className="min-w-0 max-w-52">
+                <div className="min-w-0 max-w-40">
                   <p className="truncate">{o.roleTitle || "-"}</p>
                   <p className="text-xs text-text-subtle">{o.fullTime ? "Full-time" : `Internship · ${o.months} mo`}</p>
                 </div>

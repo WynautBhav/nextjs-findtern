@@ -192,9 +192,9 @@ export function InternPayoutTools({
     }
   }
 
-  const th = "sticky top-0 bg-[color:var(--admin-panel)] px-3 py-2.5 text-left text-[0.8125rem] font-medium text-text-subtle";
+  const th = "sticky top-0 bg-[color:var(--admin-panel)] px-3 py-2.5 text-left text-sm font-medium text-text-subtle";
   const td = "px-3 py-3 align-top text-sm text-ink-700";
-  const dt = "text-[0.8125rem] text-text-subtle";
+  const dt = "text-sm text-text-subtle";
 
   return (
     <div className="space-y-8">

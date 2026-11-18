@@ -1,10 +1,9 @@
-import { AlertTriangle, ArrowRight, ArrowUpRight, type LucideIcon } from "lucide-react";
+import { ArrowRight, ArrowUpRight, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 
-import { ThreadMark } from "@/components/app/primitives";
+import { EmptyScene } from "@/components/app/primitives";
 import { ButtonLink } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "./surface.ts";
 
 /**
  * Panel - the one container every admin block sits in.
@@ -181,15 +180,50 @@ export function AdminPageHeader({
   return (
     <header className={cn("mb-6 flex flex-wrap items-end justify-between gap-x-6 gap-y-4 lg:mb-8", className)}>
       <div className="min-w-0 max-w-3xl">
-        <h1 className="text-balance break-words text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] text-foreground sm:text-[2rem]">
+        <h1 className="text-balance break-words font-display text-2xl font-semibold leading-tight text-foreground">
           {title}
         </h1>
         {subtitle ? (
-          <p className="mt-1.5 max-w-2xl text-pretty text-sm leading-relaxed text-text-subtle sm:text-base">{subtitle}</p>
+          <p className="mt-1.5 max-w-2xl text-pretty text-sm leading-relaxed text-ink-700 sm:text-base">{subtitle}</p>
         ) : null}
       </div>
       {action ? <div className="flex flex-wrap items-center gap-2 max-sm:w-full">{action}</div> : null}
     </header>
+  );
+}
+
+/**
+ * The one lead figure of a list page, as a single strip: the number at display size, what it
+ * counts, and one sentence about it. Sits between the header and the table, so the list still
+ * starts high on the page. `tone="signal"` for something waiting or overdue.
+ */
+export function PageLead({
+  value,
+  label,
+  note,
+  tone = "ink",
+  aside,
+  className,
+}: {
+  value: React.ReactNode;
+  label: string;
+  note?: React.ReactNode;
+  tone?: "ink" | "signal";
+  /** Right side: a short ruled list of links or a single action. */
+  aside?: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("mb-6 flex flex-wrap items-end justify-between gap-x-10 gap-y-3 border-b border-ink-200 pb-5", className)}>
+      <div className="flex min-w-0 flex-wrap items-baseline gap-x-4 gap-y-1">
+        <p className={cn("nums font-display text-4xl font-semibold leading-none tracking-[-0.03em]", tone === "signal" ? "text-signal" : "text-ink-900")}>{value}</p>
+        <div className="min-w-0">
+          <p className="text-base font-medium text-ink-900">{label}</p>
+          {note ? <p className="max-w-xl text-pretty text-sm text-ink-700">{note}</p> : null}
+        </div>
+      </div>
+      {aside ? <div className="min-w-0 text-sm max-sm:w-full">{aside}</div> : null}
+    </div>
   );
 }
 
@@ -203,34 +237,14 @@ export function AdminEmpty({
   title,
   body,
   action,
-  icon: Icon,
 }: {
   title: string;
   body: string;
   action?: { href: string; label: string };
+  /** Accepted for old callers; an icon in a circle is not drawn. */
   icon?: LucideIcon;
 }) {
-  return (
-    <div className="flex flex-col items-center px-6 py-14 text-center">
-      {Icon ? (
-        <span
-          aria-hidden
-          className="mb-4 grid size-12 place-items-center rounded-full bg-[color:var(--admin-bar-tint)] text-foreground"
-        >
-          <Icon className="size-5" />
-        </span>
-      ) : (
-        <ThreadMark className="mb-4" />
-      )}
-      <p className="text-balance text-base font-semibold tracking-[-0.01em] text-foreground">{title}</p>
-      <p className="mt-1.5 max-w-md text-pretty text-sm leading-relaxed text-text-subtle">{body}</p>
-      {action ? (
-        <ButtonLink href={action.href} variant="primary" size="sm" className={cn("mt-5", ADMIN_PILL_PRIMARY)}>
-          {action.label}
-        </ButtonLink>
-      ) : null}
-    </div>
-  );
+  return <EmptyScene compact title={title} body={body} next={action} className="px-[var(--admin-pad-panel)] py-8" />;
 }
 
 /**
@@ -246,16 +260,13 @@ export function AdminLoadError({
   retryHref?: string;
 }) {
   return (
-    <div role="alert" className="flex flex-col items-center px-6 py-14 text-center">
-      <span aria-hidden className="mb-4 grid size-12 place-items-center rounded-full bg-danger-soft text-danger">
-        <AlertTriangle className="size-5" />
-      </span>
-      <p className="text-base font-semibold text-foreground">Couldn&apos;t load {what}</p>
-      <p className="mt-1.5 max-w-md text-sm leading-relaxed text-text-subtle">
+    <div role="alert" className="px-[var(--admin-pad-panel)] py-8">
+      <p className="font-display text-base font-semibold text-danger">Couldn&apos;t load {what}</p>
+      <p className="mt-1.5 max-w-md text-sm leading-relaxed text-ink-700">
         The database didn&apos;t answer. Nothing was changed. Try again in a moment; if it keeps failing, check the server logs.
       </p>
       {retryHref ? (
-        <ButtonLink href={retryHref} variant="outline" size="sm" className={cn("mt-5", ADMIN_PILL_SECONDARY)}>
+        <ButtonLink href={retryHref} variant="outline" size="sm" className="mt-4">
           Try again
         </ButtonLink>
       ) : null}
@@ -303,7 +314,7 @@ export function AttentionBanner({
           href={href}
           variant="outline"
           size="sm"
-          className={cn("shrink-0 self-start sm:self-auto", ADMIN_PILL_SECONDARY)}
+          className={"shrink-0 self-start sm:self-auto"}
         >
           Review list
           <ArrowRight className="size-4" aria-hidden />

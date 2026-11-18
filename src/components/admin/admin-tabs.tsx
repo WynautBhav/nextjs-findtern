@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import { cn } from "@/lib/utils";
@@ -46,7 +46,7 @@ export type AdminTabsProps = {
 const TAB_BASE =
   "relative inline-flex min-h-11 shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-0.5 text-sm transition-colors " +
   "focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring " +
-  "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-full after:content-['']";
+  "after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:rounded-sm after:content-['']";
 
 function tabClass(selected: boolean) {
   return cn(
@@ -61,7 +61,7 @@ function Count({ value, selected }: { value: number | string; selected: boolean 
   return (
     <span
       className={cn(
-        "nums inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-medium",
+        "nums inline-flex h-5 min-w-5 items-center justify-center rounded-md px-1.5 text-xs font-medium",
         selected
           ? "bg-[color:var(--admin-tile)] text-[color:var(--admin-tile-ink)]"
           : "bg-[color:var(--admin-rule)] text-ink-700",
@@ -73,15 +73,37 @@ function Count({ value, selected }: { value: number | string; selected: boolean 
 }
 
 const ROW =
-  "flex gap-4 overflow-x-auto pe-4 shadow-[inset_0_-1px_0_var(--admin-rule)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-6";
+  "flex gap-4 overflow-x-auto pe-4 shadow-[inset_0_-1px_0_var(--admin-rule)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-6 " +
+  // Scroll cue: while more tabs sit past the right edge, that edge fades out.
+  "data-[more=true]:[mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)]";
+
+/** True while the row has tabs hidden past its right edge (phone widths). */
+function useMoreToRight() {
+  const ref = useRef<HTMLDivElement & HTMLElement>(null);
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => setMore(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+    check();
+    el.addEventListener("scroll", check, { passive: true });
+    window.addEventListener("resize", check);
+    return () => {
+      el.removeEventListener("scroll", check);
+      window.removeEventListener("resize", check);
+    };
+  }, []);
+  return { ref, more };
+}
 
 export function AdminTabs({ items, active, onSelect, label, className }: AdminTabsProps) {
   const refs = useRef<(HTMLElement | null)[]>([]);
   const linkMode = items.some((item) => item.href);
+  const { ref: rowRef, more } = useMoreToRight();
 
   if (linkMode) {
     return (
-      <nav aria-label={label} className={cn(ROW, className)}>
+      <nav ref={rowRef} data-more={more} aria-label={label} className={cn(ROW, className)}>
         {items.map((item) => {
           const selected = item.key === active;
           const content = (
@@ -126,7 +148,7 @@ export function AdminTabs({ items, active, onSelect, label, className }: AdminTa
   }
 
   return (
-    <div role="tablist" aria-label={label} className={cn(ROW, className)}>
+    <div ref={rowRef} data-more={more} role="tablist" aria-label={label} className={cn(ROW, className)}>
       {items.map((item, index) => {
         const selected = item.key === active;
         return (

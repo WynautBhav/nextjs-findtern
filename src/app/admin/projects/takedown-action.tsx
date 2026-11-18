@@ -80,7 +80,7 @@ export function TakedownAction({ id, name, takenDown }: { id: string; name: stri
           <Textarea id={`td-${id}`} value={reason} onChange={(e) => setReason(e.target.value)} rows={3} maxLength={500} />
           <div className="flex gap-2">
             <button type="button" disabled={busy || !reason.trim()} onClick={() => void takeDown()} className={buttonClass({ size: "sm" })}>
-              Take down…
+              Take down
             </button>
             <button type="button" onClick={() => { setOpen(false); setReason(""); setError(null); }} className={buttonClass({ variant: "outline", size: "sm" })}>
               Cancel
@@ -89,7 +89,7 @@ export function TakedownAction({ id, name, takenDown }: { id: string; name: stri
         </>
       ) : (
         <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "outline", size: "sm" })}>
-          Take down…
+          Take down
         </button>
       )}
       {error && <p role="alert" className="text-xs text-danger">{error}</p>}
