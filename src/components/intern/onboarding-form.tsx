@@ -1,5 +1,6 @@
 "use client";
 
+import { clearOnFileErrors, NO_ID_ON_FILE, saveBody, type IdOnFile } from "./onboarding/id-mask";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
@@ -61,6 +62,7 @@ const STEP_VIEWS: React.ComponentType<StepProps>[] = [
  */
 export function OnboardingForm({
   initial,
+  idOnFile = NO_ID_ON_FILE,
   documents,
   email,
   serverUpdatedAt = null,
@@ -80,6 +82,8 @@ export function OnboardingForm({
   /** When the saved profile last changed (ISO). A local draft older than this is stale. */
   serverUpdatedAt?: string | null;
   account?: { countryCode: string; phoneNumber: string } | null;
+  /** Last four of the Aadhaar and PAN already stored; the numbers themselves are never sent to the browser. */
+  idOnFile?: IdOnFile;
   /** A PAN card image is already on file. */
   hasPanImage?: boolean;
   /** An Aadhaar card image is already on file. */
@@ -169,7 +173,7 @@ export function OnboardingForm({
   );
 
   // Which steps pass right now, and the first that does not.
-  const stepErrors = useMemo(() => STEPS.map((_, i) => validateStep(values, i, ctx)), [values, ctx]);
+  const stepErrors = useMemo(() => STEPS.map((_, i) => clearOnFileErrors(validateStep(values, i, ctx), values, idOnFile)), [values, ctx, idOnFile]);
   const passes = stepErrors.map((e) => Object.keys(e).length === 0);
   const firstOpen = passes.findIndex((ok) => !ok);
   // A step that already passes is always reachable, so a live profile that
@@ -264,7 +268,7 @@ export function OnboardingForm({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         // Bank details are not asked for here (bug sheet 8); Settings saves them.
-        body: JSON.stringify({ ...values, bank: undefined, final }),
+        body: JSON.stringify({ ...saveBody(values, idOnFile), bank: undefined, final }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; step?: number; fields?: Record<string, string> };
       if (!res.ok) {
@@ -377,6 +381,7 @@ export function OnboardingForm({
                 documents={documents}
                 email={email}
                 account={account}
+                idOnFile={idOnFile}
                 hasPanImage={hasPanImage}
                 hasAadhaarImage={hasAadhaarImage}
                 skillsLocked={skillsLocked}
