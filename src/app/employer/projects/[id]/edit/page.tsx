@@ -31,7 +31,7 @@ export default async function EditProjectPage({ params }: { params: Promise<{ id
   const down = isTakenDown(project);
   if (!down && !published && !isEditableByEmployer(project.status)) notFound();
   return (
-    <div className="container-page section-y space-y-6">
+    <div className="space-y-6">
       <PageHeader title={down ? "View project" : "Edit project"} />
       <TakedownBanner projects={down ? [{ id: project.id, name: project.projectName, reason: project.takenDownReason }] : []} />
       <ProjectForm

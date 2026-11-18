@@ -4,11 +4,11 @@ import { useState } from "react";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { CheckCircle2, Circle } from "lucide-react";
 
-import { Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { FormNotice } from "@/components/employer/company-fields";
-import { ProjectFields, projectFormErrors, type ProjectBaseline } from "@/components/employer/project-fields";
+import { ProjectFields, WORK_MODES, projectFormErrors, type ProjectBaseline } from "@/components/employer/project-fields";
 import { csrfFetch } from "@/lib/client-fetch";
+import { scopeLabel, scopeValue } from "@/lib/db/schema";
 import { emptyProject, type ProjectDraft } from "@/lib/employer-onboarding";
 import { MAX_SKILLS_PER_PROJECT, submitReadiness } from "@/lib/projects/lifecycle";
 
@@ -89,17 +89,11 @@ export function ProjectForm({
     }
   }
 
-  const sectionCls = "space-y-5 p-5 sm:p-6";
-  const head = (n: number, title: string, hint?: string, aside?: React.ReactNode) => (
-    <div className="flex items-start justify-between gap-3 border-b border-ink-100 pb-4">
-      <div className="flex min-w-0 items-start gap-3">
-        <span aria-hidden className="nums mt-px grid size-7 shrink-0 place-items-center rounded-full bg-brand-50 text-sm font-semibold text-brand-800 ring-1 ring-inset ring-brand-200/70">
-          {n}
-        </span>
-        <div className="min-w-0">
-          <h2 className="text-base font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
-          {hint ? <p className="mt-0.5 text-sm text-text-subtle">{hint}</p> : null}
-        </div>
+  const head = (title: string, hint?: string, aside?: React.ReactNode) => (
+    <div className="flex items-baseline justify-between gap-3 border-b border-ink-300 pb-2">
+      <div className="min-w-0">
+        <h2 className="font-display text-lg font-semibold text-ink-900">{title}</h2>
+        {hint ? <p className="mt-0.5 text-sm text-ink-700">{hint}</p> : null}
       </div>
       {aside}
     </div>
@@ -107,10 +101,12 @@ export function ProjectForm({
   const errorList = Object.values(errors);
   const overSkills = form.skills.length > MAX_SKILLS_PER_PROJECT;
   const doneCount = CHECKS.length - CHECKS.filter(([key]) => missing.some((m) => m === key || m.startsWith(key))).length;
+  const mode = WORK_MODES.find((m) => m.value === form.locationType)?.label ?? null;
+  const place = form.locationType && form.locationType !== "remote" ? [form.city, form.state].filter(Boolean).join(", ") : "";
 
   return (
     <form
-      className="max-w-5xl"
+      className="max-w-6xl"
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
@@ -119,8 +115,8 @@ export function ProjectForm({
       }}
     >
       <fieldset disabled={readOnly} aria-describedby={readOnly ? "takedown-readonly-note" : undefined} className={`m-0 min-w-0 border-0 p-0${readOnly ? " opacity-70" : ""}`}>
-      <div className={lockedFields ? "max-w-2xl" : "lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-8"}>
-        <div className="min-w-0 space-y-5">
+      <div className={lockedFields ? "max-w-2xl" : "lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start lg:gap-14"}>
+        <div className="min-w-0 space-y-6">
           {lockedFields && !readOnly && (
             <FormNotice tone="info">This project is live. You can change how long it runs, preferred locations and the full-time offer.</FormNotice>
           )}
@@ -129,7 +125,7 @@ export function ProjectForm({
             <span className="sr-only">with an asterisk</span> are required.
           </p>
           {errorList.length > 0 && (
-            <div role="alert" className="rounded-apple-md border border-danger/25 bg-danger-soft p-4 text-sm text-ink-900">
+            <div role="alert" className="rounded-md bg-danger-soft p-4 text-sm text-ink-900">
               <p className="font-semibold">Fix {errorList.length === 1 ? "this" : `these ${errorList.length} things`} to continue</p>
               <ul className="mt-1 list-disc pl-5">
                 {errorList.map((m) => (
@@ -138,53 +134,56 @@ export function ProjectForm({
               </ul>
             </div>
           )}
-          <fieldset disabled={busy !== null} className="min-w-0 space-y-5">
-            <Surface className={sectionCls}>
-              {head(1, "Basics", "Name the work and how long it runs.")}
+          <fieldset disabled={busy !== null} className="min-w-0 space-y-10">
+            <section aria-label="Basics" className="space-y-5">
+              {head("Basics", "Name the work and how long it runs.")}
               <ProjectFields part="basics" values={form} set={set} errors={errors} companyPlace={companyPlace} idPrefix="post" />
-            </Surface>
-            <Surface className={sectionCls}>
+            </section>
+            <section aria-label="Skills" className="space-y-5">
               {head(
-                2,
                 "Skills",
                 "Candidates are matched on these.",
-                <span aria-live="polite" className={`nums shrink-0 rounded-full px-2.5 py-1 text-sm font-medium ring-1 ring-inset ${overSkills ? "bg-danger-soft text-danger ring-danger/25" : "bg-ink-100 text-ink-700 ring-ink-200"}`}>
-                  {form.skills.length}/{MAX_SKILLS_PER_PROJECT}
+                <span aria-live="polite" className={`nums shrink-0 font-display text-lg font-semibold ${overSkills ? "text-danger" : "text-ink-900"}`}>
+                  {form.skills.length}<span className="text-ink-600">/{MAX_SKILLS_PER_PROJECT}</span>
                 </span>,
               )}
               <ProjectFields part="skills" values={form} set={set} errors={errors} companyPlace={companyPlace} idPrefix="post" />
-            </Surface>
-            <Surface className={sectionCls}>
-              {head(3, "Location", "Where the intern works, and your timezone.")}
+            </section>
+            <section aria-label="Location" className="space-y-5">
+              {head("Location", "Where the intern works, and your timezone.")}
               <ProjectFields part="location" values={form} set={set} errors={errors} companyPlace={companyPlace} idPrefix="post" />
-            </Surface>
+            </section>
           </fieldset>
         </div>
 
         {!lockedFields && (
-          <aside aria-labelledby="ready-h" className="mt-5 lg:sticky lg:top-24 lg:mt-0">
-            <Surface className="space-y-4 p-5">
-              <div className="flex items-baseline justify-between gap-3">
-                <h2 id="ready-h" className="text-base font-semibold tracking-[-0.01em] text-ink-900">Ready to publish</h2>
-                <span className="nums text-sm font-medium text-ink-700">{doneCount} of {CHECKS.length} done</span>
-              </div>
-              <div aria-hidden className="h-1.5 overflow-hidden rounded-full bg-ink-100">
-                <div className="h-full rounded-full bg-brand-700 transition-[width]" style={{ width: `${(doneCount / CHECKS.length) * 100}%` }} />
-              </div>
-              <ul className="grid gap-2.5 text-sm max-lg:sm:grid-cols-2">
-                {CHECKS.map(([key, label]) => {
-                  const bad = missing.some((m) => m === key || m.startsWith(key));
-                  return (
-                    <li key={key} className={`flex items-center gap-2 ${bad ? "text-ink-700" : "font-medium text-ink-900"}`}>
-                      {bad ? <Circle className="size-4 text-ink-500" aria-hidden /> : <CheckCircle2 className="size-4 text-brand-700" aria-hidden />}
-                      <span>{label}</span>
-                      <span className="sr-only">{bad ? "missing" : "done"}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-              <p className="border-t border-ink-100 pt-4 text-sm text-text-subtle">Submit publishes the project right away, so matching candidates can see it. You can pause or close it any time.</p>
-            </Surface>
+          <aside aria-labelledby="ready-h" className="mt-10 lg:sticky lg:top-24 lg:mt-0">
+            <div className="flex items-baseline justify-between gap-3 border-b border-ink-300 pb-2">
+              <h2 id="ready-h" className="font-display text-lg font-semibold text-ink-900">Ready to publish</h2>
+              <span className="nums text-sm text-ink-700"><span className="font-display text-lg font-semibold text-ink-900">{doneCount}</span> of {CHECKS.length}</span>
+            </div>
+            <ul className="divide-y divide-ink-200 text-sm">
+              {CHECKS.map(([key, label]) => {
+                const bad = missing.some((m) => m === key || m.startsWith(key));
+                return (
+                  <li key={key} className={`flex items-center gap-2.5 py-2.5 ${bad ? "text-ink-700" : "font-medium text-ink-900"}`}>
+                    {bad ? <Circle className="size-4 text-ink-500" aria-hidden /> : <CheckCircle2 className="size-4 text-brand-700" aria-hidden />}
+                    <span>{label}</span>
+                    <span className="sr-only">{bad ? "missing" : "done"}</span>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <h3 className="mt-6 font-display text-base font-semibold text-ink-900">How candidates will see it</h3>
+            <div className="mt-2 border-t border-ink-200 pt-3">
+              <p className={`break-words font-display text-lg font-semibold ${form.projectName.trim() ? "text-ink-900" : "text-ink-600"}`}>{form.projectName.trim() || "Untitled project"}</p>
+              <p className="mt-1 text-sm text-ink-700">
+                {[scopeValue(form.scopeOfWork) ? scopeLabel(form.scopeOfWork) : null, mode, place || null, form.fullTimeOffer ? "Full-time offer" : null].filter(Boolean).join(" · ") || "Duration and work mode not picked yet"}
+              </p>
+              <p className="mt-1 break-words text-sm text-ink-600">{form.skills.length ? form.skills.join(", ") : "No skills added yet"}</p>
+            </div>
+            <p className="mt-6 text-sm text-ink-700">Submit publishes the project right away, so matching candidates can see it. You can pause or close it any time.</p>
           </aside>
         )}
       </div>
@@ -196,9 +195,9 @@ export function ProjectForm({
           Taken down by Findtern: view only. Nothing here can be saved or published. Use Contact admin above to resolve this.
         </p>
       ) : (
-      <div className="sticky bottom-0 z-20 mt-5 border-t border-ink-200 bg-white/85 backdrop-blur-md">
+      <div className="sticky bottom-16 z-20 mt-10 border-t border-ink-300 bg-paper lg:bottom-0">
         <div className="flex items-center justify-end gap-2 py-3 sm:justify-between">
-          <p className="text-sm text-text-subtle max-sm:hidden">
+          <p className="text-sm text-ink-700 max-sm:hidden">
             {lockedFields ? "Changes apply right away." : missing.length ? `${missing.length} to finish before you can publish.` : "Ready to publish."}
           </p>
           <div className="flex w-full gap-2 sm:w-auto">

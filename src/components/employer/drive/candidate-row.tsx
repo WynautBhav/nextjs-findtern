@@ -4,9 +4,7 @@ import { useState } from "react";
 import { Check, ChevronDown, Loader2, Phone, Plus, Video } from "lucide-react";
 
 import { Pill } from "@/components/app/primitives";
-import { ScoreBar } from "@/components/app/score-bar";
-import { CandidateAvatar } from "@/components/employer/candidate-avatar";
-import { CALL_STATUS, DELAYS, SKILLS_SHOWN, SKILL_CHIP, YEAR_LABEL, clock, type DriveCandidate } from "@/components/employer/drive/shared";
+import { CALL_STATUS, DELAYS, SKILLS_SHOWN, YEAR_LABEL, clock, type DriveCandidate } from "@/components/employer/drive/shared";
 import { buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -45,92 +43,67 @@ export function CandidateRow({
   const meta = [c.year ? YEAR_LABEL(c.year) : null, c.branch].filter(Boolean).join(" · ");
 
   return (
-    <li className="rise flex flex-col rounded-[24px] border border-ink-200/70 bg-white p-5 shadow-tile">
-      <div className="flex items-start gap-3">
-        <CandidateAvatar initials={c.initials} className="size-11 rounded-xl text-sm" />
-        <div className="min-w-0 flex-1">
-          <p className="flex min-w-0 flex-wrap items-center gap-x-2">
-            <span className="min-w-0 break-words font-semibold text-ink-900">{c.name}</span>
-            {c.online ? (
-              <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-brand-800">
-                <span className="size-1.5 rounded-full bg-brand-600" aria-hidden />
-                Online
-              </span>
-            ) : null}
-          </p>
-          <p className="break-words text-sm text-ink-600">{meta || "Year and branch not given"}</p>
+    <li className="grid gap-x-6 gap-y-3 border-b border-ink-200 py-5 sm:grid-cols-[minmax(0,1fr)_5.5rem] lg:grid-cols-[minmax(0,1fr)_5.5rem_14.5rem] lg:items-center">
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-x-3">
+          <span className="min-w-0 break-words font-display text-lg font-semibold text-ink-900">{c.name}</span>
+          {c.online ? (
+            <span className="inline-flex shrink-0 items-center gap-1.5 text-sm font-medium text-brand-800">
+              <span className="size-1.5 rounded-full bg-brand-600" aria-hidden />
+              Online
+            </span>
+          ) : null}
         </div>
+        <p className="break-words text-sm text-ink-700">{meta || "Year and branch not given"}</p>
+        {c.skills.length ? (
+          <p className="mt-1 break-words text-sm text-ink-600">
+            <span className="sr-only">Skills: </span>
+            {c.skills.slice(0, SKILLS_SHOWN).join(", ")}
+            {c.skills.length > SKILLS_SHOWN ? ` +${c.skills.length - SKILLS_SHOWN} more` : ""}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="max-sm:flex max-sm:items-baseline max-sm:gap-3">
+        <p className="text-xs text-ink-600 sm:order-2">{fullTime ? "Score · CGPA" : "Findtern Score"}</p>
+        {c.score !== null ? (
+          <p className="nums font-display text-4xl font-semibold leading-none tracking-[-0.03em] text-ink-900 sm:order-1 sm:mb-1">
+            {c.score.toFixed(1)}
+            <span className="ml-1 font-sans text-sm font-medium tracking-normal text-ink-600">/10</span>
+          </p>
+        ) : (
+          <p className="text-sm text-ink-700 sm:order-1">Interview not taken yet</p>
+        )}
+        {fullTime ? <p className="nums mt-1 text-sm text-ink-700 sm:order-3">CGPA {c.cgpa !== null ? c.cgpa.toFixed(1) : "not given"}</p> : null}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-1 lg:flex-nowrap lg:justify-end">
+        {call ? (
+          <span className="mr-auto flex min-w-0 items-center gap-2 text-sm text-ink-700 lg:mr-0 lg:w-full lg:justify-end">
+            <Pill tone={CALL_STATUS[call.status]?.tone ?? "neutral"}>{CALL_STATUS[call.status]?.label ?? "Call"}</Pill>
+            <span className="nums truncate">{clock(call.startsAt)}</span>
+          </span>
+        ) : null}
         <button
           type="button"
           onClick={onShortlist}
           aria-pressed={shortlisted}
           aria-label={`Shortlist ${c.name}`}
           className={cn(
-            "apple-spring inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium",
-            shortlisted ? "border-brand-200 bg-brand-50 text-brand-800" : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
+            "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border px-3 text-sm font-medium transition-colors duration-[var(--motion-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700",
+            shortlisted ? "border-brand-700 bg-brand-100 text-brand-900" : "border-ink-300 text-ink-800 hover:bg-ink-200/50",
           )}
         >
           {shortlisted ? <Check className="size-4" aria-hidden /> : <Plus className="size-4" aria-hidden />}
           Shortlist
         </button>
-      </div>
-
-      <div className={cn("mt-4 grid gap-4", fullTime ? "grid-cols-2" : "grid-cols-1")}>
-        <div>
-          <div className="flex items-baseline justify-between text-xs font-medium text-text-subtle">
-            <span>Findtern Score</span>
-            {c.score !== null ? <span className="nums text-sm font-semibold text-ink-900">{c.score.toFixed(1)}</span> : null}
-          </div>
-          {c.score !== null ? <ScoreBar value={c.score} /> : <p className="mt-1 text-sm text-text-subtle">AI interview not taken yet</p>}
-        </div>
-        {fullTime ? (
-          <div>
-            <p className="text-xs font-medium text-text-subtle">CGPA</p>
-            <p className="nums mt-0.5 text-sm font-semibold text-ink-900">{c.cgpa !== null ? c.cgpa.toFixed(1) : "Not given"}</p>
-          </div>
-        ) : null}
-      </div>
-
-      {c.skills.length ? (
-        <ul className="mt-4 flex flex-wrap gap-1.5" aria-label="Skills">
-          {c.skills.slice(0, SKILLS_SHOWN).map((s) => (
-            <li key={s} className={SKILL_CHIP}>
-              {s}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {c.skills.length > SKILLS_SHOWN ? (
-        <details className="mt-1.5">
-          <summary className="inline-flex min-h-11 cursor-pointer items-center text-xs font-medium text-brand-700">
-            +{c.skills.length - SKILLS_SHOWN} more
-          </summary>
-          <ul className="flex flex-wrap gap-1.5" aria-label="More skills">
-            {c.skills.slice(SKILLS_SHOWN).map((s) => (
-              <li key={s} className={SKILL_CHIP}>
-                {s}
-              </li>
-            ))}
-          </ul>
-        </details>
-      ) : null}
-
-      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 pt-4">
-        {call ? (
-          <span className="flex min-w-0 items-center gap-2 text-sm text-ink-600">
-            <Pill tone={CALL_STATUS[call.status]?.tone ?? "neutral"}>{CALL_STATUS[call.status]?.label ?? "Call"}</Pill>
-            <span className="nums truncate">{clock(call.startsAt)}</span>
-          </span>
-        ) : (
-          <span />
-        )}
         {open && call?.status === "accepted" && call.meetingLink ? (
           <a
             href={call.meetingLink}
             target="_blank"
             rel="noopener noreferrer"
             // Arrives by poll when the candidate accepts; fade in so it is noticed, not teleported.
-            className={cn(buttonVariants({ size: "sm" }), "starting:scale-[0.97] starting:opacity-0")}
+            className={cn(buttonVariants({ size: "sm" }), "min-h-11 starting:scale-[0.97] starting:opacity-0")}
           >
             <Video className="size-4" aria-hidden />
             Join call
@@ -138,7 +111,7 @@ export function CandidateRow({
         ) : open ? null : (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button type="button" disabled={busy} className={buttonVariants({ size: "sm", variant: "outline" })}>
+              <button type="button" disabled={busy} className={buttonVariants({ size: "sm", variant: "outline", className: "min-h-11" })}>
                 {busy ? <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden /> : <Phone className="size-4" aria-hidden />}
                 Call
                 <ChevronDown className="size-3.5" aria-hidden />
