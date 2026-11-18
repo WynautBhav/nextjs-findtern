@@ -4,12 +4,14 @@ import { cache } from "react";
  * Caps how many database reads one page request has in flight. The pool holds 10 connections for every request
  * on the instance, and a page that starts 15+ independent reads at once (employer dashboard: layout 3, setup 2,
  * load ~10) queues behind itself and starves everyone else, which with a fail-closed session check means
- * other users get signed out for the request. A gate of 5 still overlaps the reads (a few rounds, not a chain).
+ * other users get signed out for the request. At 230 ms per round trip each extra round costs a quarter second, so
+ * the gate is 8: a 11-read dashboard load is two rounds, not three, and still leaves 2 of the pool's 10 connections for the
+ * session checks of other requests. The gate only wraps read-only page loaders.
  *
  * `work` is started only when a slot is free, so pass a function (a Drizzle query is lazy and runs when awaited).
  * Do not call a gated function from inside another gated one: that holds a slot while waiting for a second.
  */
-export const REQUEST_DB_CONCURRENCY = 5;
+export const REQUEST_DB_CONCURRENCY = 8;
 
 export type Gate = <T>(work: () => PromiseLike<T>) => Promise<T>;
 
