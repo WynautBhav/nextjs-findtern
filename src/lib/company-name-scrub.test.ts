@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 
-import { NAME_MASK, denyTermsFor, hasDeniedName, scrubOutgoing } from "../contact-scrub.ts";
+import { NAME_MASK, denyTermsFor, hasDeniedName, scrubOutgoing } from "./contact-scrub.ts";
 
 // Sheet row 9: "I am able to share company name and it shouldn't happen". Company "Qorvex Labs Pvt Ltd".
 const terms = denyTermsFor({

@@ -1,5 +1,13 @@
 // Pure presence rules. Relative imports only: node:test runs this without the @ alias.
-import { isOnline } from "./messaging/logic.ts";
+
+export const ONLINE_WINDOW_MS = 90_000;
+
+/** Online = last seen within 90 s. Computed at read time, never stored. */
+export function isOnline(lastSeenAt: Date | string | null | undefined, now = Date.now()): boolean {
+  if (!lastSeenAt) return false;
+  const t = new Date(lastSeenAt).getTime();
+  return Number.isFinite(t) && now - t >= 0 - 5_000 && now - t <= ONLINE_WINDOW_MS;
+}
 
 /** What an employer-facing screen may say. `hidden` carries nothing: no timestamp, no online bit. */
 export type PresenceView =
@@ -46,19 +54,4 @@ export function presenceText(v: PresenceView, now = Date.now()): string | null {
   if (v.state === "online") return PRESENCE_ONLINE;
   if (v.state === "offline") return lastSeenLabel(v.lastSeenAt, now);
   return null;
-}
-
-/**
- * What a thread participant may see of the other side. Employers get the candidate's label per the candidate's
- * toggle. Candidates get only Online / Offline for an employer: employers have no toggle, so their last-seen is
- * never sent to a candidate (their coarse timestamps stay as private as before the toggle existed).
- */
-export function threadPresence(
-  viewer: "employer" | "intern",
-  v: PresenceView | undefined,
-  now = Date.now(),
-): { online: boolean; label: string | null } {
-  const online = v?.state === "online";
-  if (viewer === "intern") return { online, label: online ? "Online" : "Offline" };
-  return { online, label: v ? presenceText(v, now) : null };
 }

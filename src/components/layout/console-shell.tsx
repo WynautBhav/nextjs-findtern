@@ -45,8 +45,6 @@ import { breadcrumbsFor } from "@/lib/breadcrumbs";
 import { initialsOf as personInitials } from "@/lib/admin/person-tint";
 import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { csrfFetch } from "@/lib/client-fetch";
-import { useUnread } from "@/hooks/use-unread";
-import { badgeText } from "@/lib/messaging/ui-logic";
 import { cn } from "@/lib/utils";
 import { newTabAttrs } from "@/components/ui/new-tab";
 import { NewTabHint } from "@/components/ui/new-tab-link";
@@ -57,17 +55,6 @@ const MascotAvatar = dynamic(() => import("@/components/chat/mascot").then((m) =
   loading: () => <span aria-hidden className="size-10 shrink-0 rounded-full bg-brand-100" />,
 });
 
-function LiveUnreadBadge({ light }: { light: boolean }) {
-  const n = useUnread();
-  if (n <= 0) return null;
-  return (
-    <span className={cn("nums rounded-full px-2 py-0.5 text-2xs font-semibold", light ? "bg-brand-700 text-white" : "bg-accent-500/20 text-accent-300")}>
-      {badgeText(n)}
-      <span className="sr-only"> unread messages</span>
-    </span>
-  );
-}
-
 export type ConsoleNavItem = {
   href: string;
   label: string;
@@ -76,8 +63,6 @@ export type ConsoleNavItem = {
   badge?: number | string;
   /** What the badge counts, for the collapsed rail's screen-reader text (default "unread"). */
   badgeLabel?: string;
-  /** Show the live unread-message count (kept current by the messaging store) instead of a fixed badge. */
-  liveUnread?: boolean;
   /** A quiet dot: this needs the user, without turning it into a score. */
   attention?: boolean;
   /** Other paths this item stands for (one "Legal texts" item for four pages). */
@@ -523,8 +508,6 @@ function RailLink({ item, active, compact, light, column = false, onNavigate }: 
       </span>
       {!compact && locked ? (
         <LockGlyph className={cn("size-4 shrink-0", light ? "text-ink-600" : "text-on-dark-subtle")} />
-      ) : !compact && item.liveUnread ? (
-        <LiveUnreadBadge light={light} />
       ) : !compact && item.badge ? (
         <span className={cn("nums rounded-full px-2 py-0.5 text-2xs font-semibold", light ? "bg-brand-700 text-white" : "bg-accent-500/20 text-accent-300")}>{item.badge}</span>
       ) : !compact && item.attention ? (

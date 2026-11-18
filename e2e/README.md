@@ -170,7 +170,6 @@ have **not been run yet**; expect to adjust selectors on the first run.
 
 | Script | File | Covers |
 | --- | --- | --- |
-| `npm run test:e2e:messaging` | `messaging.e2e.mjs` | thread access rules, both-way messages, 404 for outsiders, 4000-char cap, HTML stripped, live unread badge (SSE, no reload), Read receipt, Online/Offline, stream 401/429/Last-Event-ID, no contact data in payloads |
 | `npm run test:e2e:projects` | `projects-lifecycle.e2e.mjs` | draft → review → reject/approve → pause/resume/close, 7-skill cap, 422 missing fields, race = one winner, ownership, legacy `active`, 390px + axe |
 | `npm run test:e2e:limits` | `profile-limits.e2e.mjs` | `bio` accepted but not stored/shown, 8 skills refused, legacy 9-skill rows (unchanged ok, swap refused, reduce ok), admin skills route |
 

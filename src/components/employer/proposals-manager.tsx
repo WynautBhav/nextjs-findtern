@@ -11,7 +11,6 @@ import type { CgpaGate } from "@/lib/cgpa-verification";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { EmptyScene, Pill } from "@/components/app/primitives";
 import { RowMenu, type RowMenuItem } from "@/components/app/row-menu";
-import { MessageButton } from "@/components/app/message-button";
 import { ProposalAvatar } from "@/components/employer/proposal-avatar";
 import type { PresenceLabel } from "@/lib/presence";
 import { buttonClass } from "@/components/ui/button";
@@ -321,8 +320,6 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                 {state.label}
               </Pill>
             );
-            // Taken-down project: the offer can be viewed, never acted on.
-            const closedLike = state.tone === "closed" || down;
             const closed = state.tone === "closed";
             const label = "text-[11px] font-semibold uppercase tracking-wider text-text-subtle";
             // The note under a card that needs more than a pill: CGPA being confirmed, a correction to confirm, an expired offer.
@@ -409,12 +406,10 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                         <CreditCard className="size-4" aria-hidden />
                         Pay now
                       </Link>
-                    ) : closedLike ? (
+                    ) : (
                       <Link href={href} className={buttonClass({ variant: "outline" })} aria-label={`View ${title}, ${who}`}>
                         View
                       </Link>
-                    ) : (
-                      <MessageButton proposalId={item.proposal.id} counterpartId={item.proposal.internId} />
                     )}
                   </div>
                   {menuFor(item, state, href).length > 0 ? (

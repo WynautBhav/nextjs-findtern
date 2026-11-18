@@ -160,7 +160,6 @@ test("03 every employer API action on the taken-down project answers 409 project
     ["approve timesheet", "PATCH", `/api/timesheets/${tsId}/decision`, { decision: "approved" }],
     ["reject timesheet", "PATCH", `/api/timesheets/${tsId}/decision`, { decision: "rejected", reason: "no" }],
     ["adjust timesheet", "PATCH", `/api/timesheets/${tsId}`, { entries: [{ date: futureDay(-3), status: "Present" }] }],
-    ["message intern (new thread on its proposal)", "POST", `/api/threads`, { counterpartId: I3.id, proposalId: hiredId }],
   ];
   const results = [];
   for (const [label, method, path, body] of calls) {

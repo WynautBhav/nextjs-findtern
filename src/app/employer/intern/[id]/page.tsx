@@ -36,7 +36,6 @@ import { SITE } from "@/lib/content/site";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { profileText } from "@/components/employer/profile-text";
 import { PresenceDot } from "@/components/app/presence-dot";
-import { MessageButton } from "@/components/app/message-button";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { PRESENCE_ONLINE } from "@/lib/presence-logic";
 
@@ -476,7 +475,6 @@ export default async function EmployerInternDetail({
                   View placement
                 </ButtonLink>
               ) : null}
-              {relation?.proposal ? <MessageButton proposalId={relation.proposal.id} counterpartId={profile.id} /> : null}
               {relation?.fullTimeFrom ? (
                 <FullTimeOfferButton
                   employerId={employerId}

@@ -13,10 +13,10 @@ test("the intern nav (stage, locked and More lists) has no Open roles entry", ()
   assert.doesNotMatch(layout, /Open roles/i);
   assert.doesNotMatch(layout, /\/intern\/opportunities/);
   assert.doesNotMatch(layout, /\bCompass\b/);
-  // The phone bar before payment still carries five tabs, the fifth being Messages.
+  // The phone bar before payment carries four tabs; Messages is gone.
   const locked = layout.slice(layout.indexOf("const LOCKED_STAGE_NAV"), layout.indexOf("const MORE_NAV"));
-  assert.equal((locked.match(/href: "/g) ?? []).length, 5);
-  assert.match(locked, /\/intern\/messages/);
+  assert.equal((locked.match(/href: "/g) ?? []).length, 4);
+  assert.doesNotMatch(layout, /\/intern\/messages/);
   // Before the profile is complete: Home, Complete profile, Documents, Your profile, Offers (Documents and Your profile locked).
   const pre = layout.slice(layout.indexOf("const PRECOMPLETE_STAGE_NAV"), layout.indexOf("/**\n * The intern shell."));
   assert.equal((pre.match(/href: "/g) ?? []).length, 5);
@@ -36,7 +36,6 @@ test("no other source file links into the removed intern pages or says See open 
     "app/intern/dashboard/page.tsx",
     "app/intern/proposals/page.tsx",
     "app/intern/interviews/page.tsx",
-    "components/messaging/messages-shell.tsx",
     "components/intern/home/dashboard-cards.tsx",
     "components/intern/college-live.tsx",
     "lib/emails.ts",
@@ -54,13 +53,11 @@ test("the saved-roles API and the lock rules for the removed pages are gone", ()
   assert.equal(isLockedApi("/api/intern/saved-projects"), false);
 });
 
-test("an empty Offers, Messages or Interviews page gives the intern no button to press", () => {
+test("an empty Offers or Interviews page gives the intern no button to press", () => {
   const offers = read("app/intern/proposals/page.tsx");
   const offersEmpty = offers.slice(offers.indexOf('title="No offers yet"'), offers.indexOf('title="No offers yet"') + 600);
   assert.doesNotMatch(offersEmpty.split("/>")[0], /next=/);
   const iv = read("app/intern/interviews/page.tsx");
   const ivEmpty = iv.slice(iv.indexOf('title="No company interviews yet"'), iv.indexOf('title="No company interviews yet"') + 400);
   assert.doesNotMatch(ivEmpty.split("/>")[0], /next=/);
-  const msg = read("components/messaging/messages-shell.tsx");
-  assert.doesNotMatch(msg, /Check your profile/);
 });

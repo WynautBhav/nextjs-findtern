@@ -12,7 +12,6 @@ import {
   ShoppingBag,
   Clock,
   KeyRound,
-  MessageSquare,
   Receipt,
   CalendarClock,
   Sparkles,
@@ -21,7 +20,7 @@ import {
 import { ConsoleShell, type ConsoleNavGroup, type ConsoleNavItem } from "@/components/layout/console-shell";
 import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
-import { MessagingLive } from "@/components/messaging";
+import { PresenceHeartbeat } from "@/components/app/presence-heartbeat";
 import { TermsGate } from "@/components/app/terms-gate";
 import { ToastProvider } from "@/components/app/toast";
 import { getSession } from "@/lib/auth";
@@ -55,7 +54,6 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
         also: ["/employer/proposal", "/employer/send-proposal"],
       },
       { href: "/employer/schedule", label: "Interviews", icon: <CalendarClock /> },
-      { href: "/employer/messages", label: "Messages", icon: <MessageSquare />, liveUnread: true },
     ],
   },
   {
@@ -128,13 +126,12 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     if (res.status === "rejected") console.error(`[employer/layout] ${what} read failed`, res.reason);
   }
 
-  // Messages carries its own live unread count (MessagingLive); nothing else in the sidebar does.
   // The shortlist count rides on its own item, like the bag in the header.
   const groups = NAV_GROUPS.map((g) => ({
     ...g,
     items: g.items.map((i) => (i.href === "/employer/cart" && cartCount > 0 ? { ...i, badge: cartCount > 99 ? "99+" : cartCount, badgeLabel: "saved" } : i)),
   }));
-  // Phone tab bar: the five places an employer returns to (the rest stay in the menu).
+  // Phone tab bar: the places an employer returns to (the rest stay in the menu).
   const flat = groups.flatMap((g) => g.items);
   const shortlistTab: ConsoleNavItem = {
     href: "/employer/cart",
@@ -142,7 +139,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     icon: <ShoppingBag />,
     ...(cartCount > 0 ? { badge: cartCount > 99 ? "99+" : cartCount } : {}),
   };
-  const tabs = ["/employer/dashboard", "/employer/candidates", "/employer/proposals", "/employer/messages", "/employer/cart"]
+  const tabs = ["/employer/dashboard", "/employer/candidates", "/employer/proposals", "/employer/cart"]
     .map((href) => (href === shortlistTab.href ? shortlistTab : flat.find((i) => i.href === href)))
     .filter((i): i is ConsoleNavItem => Boolean(i));
 
@@ -188,7 +185,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
       }}
       banner={session.impersonator ? <ViewAsBanner viewing={companyName} admin={session.impersonator.email} /> : null}
     >
-      <MessagingLive />
+      <PresenceHeartbeat />
       {children}
       <TermsGate role="employer" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>

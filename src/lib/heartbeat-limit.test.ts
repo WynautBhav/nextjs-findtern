@@ -2,18 +2,18 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { RateLimiter } from "../security/rate-limit.ts";
+import { RateLimiter } from "./security/rate-limit.ts";
 
 /**
  * The presence e2e retries past a 429 from the heartbeat limiter, which would also hide someone loosening or
- * tightening it. This pins the numbers. store.ts imports the db through the "@/" alias, which plain node cannot
+ * tightening it. This pins the numbers. heartbeat-limit.ts imports through the "@/" alias, which plain node cannot
  * resolve, so the constructor arguments are read from the source and then exercised on a real RateLimiter.
  */
-const src = readFileSync(new URL("./store.ts", import.meta.url), "utf8");
+const src = readFileSync(new URL("./heartbeat-limit.ts", import.meta.url), "utf8");
 const m = src.match(/export const heartbeatLimiter = new RateLimiter\((\d+),\s*([\d_]+)\)/);
 
 test("heartbeatLimiter is 6 per 60 s", () => {
-  assert.ok(m, "heartbeatLimiter declaration not found in store.ts");
+  assert.ok(m, "heartbeatLimiter declaration not found in heartbeat-limit.ts");
   assert.equal(Number(m[1]), 6);
   assert.equal(Number(m[2].replaceAll("_", "")), 60_000);
 });

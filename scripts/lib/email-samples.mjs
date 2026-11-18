@@ -6,12 +6,10 @@ process.env.PUBLIC_ORIGIN ??= "http://localhost:3000";
 
 const meet = "https://meet.google.com/abc-defg-hij";
 const long = "Bharatiya Vidyapeeth Institute of Management Studies and Research";
-const u = { url: "http://localhost:3000/intern/messages/t1", settingsUrl: "http://localhost:3000/intern/settings#notifications" };
+const u = { url: "http://localhost:3000/intern/proposals/p1", settingsUrl: "http://localhost:3000/intern/settings#notifications" };
 
 /** [file-safe id, content]. "stress" variants use long names / long codes to test narrow widths. */
 export const samples = () => [
-  ["unreadMessages-1", emails.unreadMessages({ name: "Asha", count: 1, from: "an employer", ...u })],
-  ["unreadMessages-3", emails.unreadMessages({ name: "Rohan", count: 3, from: "a candidate", url: "http://localhost:3000/employer/messages/t1", settingsUrl: "http://localhost:3000/employer/account#notifications" })],
   ["unreadOffer", emails.unreadOffer({ name: "Asha", url: "http://localhost:3000/intern/proposals/p1", settingsUrl: u.settingsUrl })],
   ["proposalReceived", emails.proposalReceived({ internName: "Asha", companyName: "Acme Robotics", role: "Frontend Intern", proposalId: "p1" })],
   ["proposalDecision-accepted", emails.proposalDecision({ employerName: "Rohan", candidate: "Asha K.", role: "Frontend Intern", accepted: true, proposalId: "p1" })],
