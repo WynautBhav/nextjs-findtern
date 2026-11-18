@@ -29,7 +29,7 @@ import { LEARN_LABEL, learnIssue } from "@/lib/proposal-copy";
 import { offerableModes, type WorkPreference } from "@/lib/work-preference";
 import { StartDateField } from "@/components/employer/start-date-field";
 import { startDateIssue } from "@/components/employer/start-date-model";
-import { fieldClass } from "@/components/employer/ui-tokens";
+import { btnOutline, inputClass } from "@/components/employer/proposal-ui";
 import { cn } from "@/lib/utils";
 
 export type EditableOffer = {
@@ -61,7 +61,7 @@ const MODE_OPTIONS = [
 
 const DURATIONS = ["1m", "2m", "3m", "6m"] as const;
 
-const INPUT = fieldClass;
+const INPUT = inputClass;
 const LABEL = "mb-1.5 block text-sm font-medium text-ink-800";
 
 /**
@@ -227,7 +227,7 @@ export function ProposalOfferForm({
 
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "outline", block: true })}>
+      <button type="button" onClick={() => setOpen(true)} className={cn(btnOutline, "w-full")}>
         <Pencil className="size-4" aria-hidden />
         Edit offer
       </button>
@@ -235,8 +235,8 @@ export function ProposalOfferForm({
   }
 
   return (
-    <div className="space-y-4 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4">
-      <p className="text-sm leading-relaxed text-ink-600">
+    <div className="space-y-4 rounded-lg border border-ink-300 bg-surface-raised p-4">
+      <p className="text-sm leading-relaxed text-ink-700">
         {accepted
           ? "The candidate accepted the current terms. Saving sends the changed offer back to them to accept again before you can pay."
           : "The candidate is told the offer changed and asked to review it again."}
@@ -369,7 +369,7 @@ export function ProposalOfferForm({
             </label>
             <div>
               <span className={LABEL}>Home days</span>
-              <p className="nums flex min-h-11 items-center rounded-apple-sm border border-ink-200 bg-ink-100/60 px-3 text-sm text-ink-700">{homeDays} a week</p>
+              <p className="nums flex min-h-11 items-center rounded-md border border-ink-300 bg-ink-100 px-3 text-sm text-ink-700">{homeDays} a week</p>
             </div>
           </>
         ) : null}
@@ -413,7 +413,7 @@ export function ProposalOfferForm({
           value={message}
           onChange={(e) => setMessage(e.target.value)}
           rows={5}
-          className={cn(fieldClass, "py-2.5 leading-relaxed")}
+          className={cn(inputClass, "py-2.5 leading-relaxed")}
         />
       </label>
       <label className="block">
@@ -424,7 +424,7 @@ export function ProposalOfferForm({
           onChange={(e) => setAdditionalInfo(e.target.value)}
           rows={3}
           maxLength={2000}
-          className={cn(fieldClass, "py-2.5 leading-relaxed")}
+          className={cn(inputClass, "py-2.5 leading-relaxed")}
         />
       </label>
       {error && errorField !== "start" ? (
