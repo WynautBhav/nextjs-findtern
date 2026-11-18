@@ -69,20 +69,20 @@ export function HeroBand({
   /** Figures under the copy. */
   children?: React.ReactNode;
   className?: string;
-  /** Smaller type and padding, for work screens where the band is a status line, not a greeting. */
+  /** Smaller type, for work screens where the band is a status line, not a greeting. */
   compact?: boolean;
 }) {
   return (
-    <section className={cn("relative isolate mb-8 overflow-hidden rounded-apple-xl bg-brand-950 px-6 text-white sm:px-9", compact ? "py-6 sm:py-7" : "py-8 sm:py-10", className)}>
-      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-6">
+    <section className={cn("mb-8 border-b border-ink-200 pb-6", className)}>
+      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-5">
         <div className="min-w-0 max-w-2xl">
-          {eyebrow ? <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-accent-300">{eyebrow}</p> : null}
-          <h1 className={cn("text-balance font-semibold leading-[1.1] tracking-[-0.025em]", compact ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl")}>{title}</h1>
-          {lede ? <p className={cn("mt-3 max-w-xl text-pretty leading-relaxed text-on-dark-subtle", compact ? "text-base" : "text-base sm:text-lg")}>{lede}</p> : null}
+          {eyebrow ? <p className="mb-1 text-sm font-medium text-ink-600">{eyebrow}</p> : null}
+          <h1 className={cn("text-balance font-semibold leading-[1.1] tracking-[-0.02em] text-ink-900", compact ? "text-2xl" : "text-2xl sm:text-4xl")}>{title}</h1>
+          {lede ? <p className="mt-2 max-w-xl text-pretty text-base leading-relaxed text-ink-600">{lede}</p> : null}
         </div>
         {actions ? <div className="flex w-full flex-wrap gap-3 sm:w-auto">{actions}</div> : null}
       </div>
-      {children ? <div className={compact ? "mt-6" : "mt-8"}>{children}</div> : null}
+      {children ? <div className={compact ? "mt-5" : "mt-6"}>{children}</div> : null}
     </section>
   );
 }
@@ -94,7 +94,7 @@ export function Figure({ label, value, empty, hint }: { label: string; value: Re
       <dt className="text-sm text-text-subtle">{label}</dt>
       <dd className="mt-1">
         {value !== null ? (
-          <span className="nums block text-3xl font-semibold tracking-tight text-ink-900">{value}</span>
+          <span className="nums block font-display text-2xl font-semibold tracking-tight text-ink-900">{value}</span>
         ) : (
           <span className="block text-base font-medium text-ink-700">{empty}</span>
         )}
@@ -117,7 +117,7 @@ export function SectionHead({
   className?: string;
 }) {
   return (
-    <div className={cn("mb-4 flex items-baseline justify-between gap-4", className)}>
+    <div className={cn("mb-3 flex items-baseline justify-between gap-4", className)}>
       <div className="min-w-0">
         <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
         {hint ? <p className="mt-1 text-sm text-text-subtle">{hint}</p> : null}
@@ -135,11 +135,10 @@ export function SectionHead({
  * pixels shipped unnoticed. */
 
 /** On the light console's grey canvas a card is a dashboard tile: no border, one soft shadow. */
-export const LIGHT_TILE =
-  "in-data-[tone=light]:border-transparent in-data-[tone=light]:shadow-tile";
+export const LIGHT_TILE = "";
 
 /** The card look as a class string, for blocks that are not a `Surface` element (Panel, DataTable, a toolbar). */
-export const SURFACE_CLASS = `rounded-apple-xl border border-ink-200/80 bg-white ${LIGHT_TILE}`;
+export const SURFACE_CLASS = "rounded-lg border border-ink-200 bg-surface-raised";
 
 export function Surface({
   children,
@@ -170,14 +169,15 @@ export function Surface({
 export type Tone = "live" | "waiting" | "closed" | "new" | "paid" | "neutral";
 
 const TONE: Record<Tone, string> = {
-  live: "bg-brand-50 text-brand-800 ring-brand-200/70",
-  waiting: "bg-accent-100 text-accent-700 ring-accent-300/70",
-  closed: "bg-ink-100 text-ink-600 ring-ink-200",
-  new: "bg-info-soft text-info ring-info/25",
-  paid: "bg-success-soft text-success ring-success/25",
-  neutral: "bg-ink-100 text-ink-700 ring-ink-200",
+  live: "bg-brand-100 text-brand-900",
+  waiting: "bg-[#f8e7c8] text-[#6e3a05]",
+  closed: "bg-ink-100 text-ink-600",
+  new: "bg-info-soft text-info",
+  paid: "bg-success-soft text-success",
+  neutral: "bg-ink-100 text-ink-700",
 };
 
+/** The one status chip (badge) for every state. Flat, 6px corners, a word: never a bare enum, never colour alone. */
 export function Pill({
   tone = "neutral",
   children,
@@ -195,8 +195,8 @@ export function Pill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset",
-        size === "md" && "px-2.5 py-1.5 text-sm",
+        "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-xs font-medium",
+        size === "md" && "px-2.5 py-1 text-sm",
         icon ? "[&>svg]:size-3.5 [&>svg]:shrink-0" : null,
         TONE[tone],
         className,
@@ -207,6 +207,7 @@ export function Pill({
     </span>
   );
 }
+export const Badge = Pill;
 
 /* ── Empty scene ────────────────────────────────────────────────────────
  * Every empty state in the product teaches the next step and says who acts
@@ -248,16 +249,16 @@ export function EmptyScene({
   return (
     <div
       className={cn(
-        "flex flex-col items-center text-center",
-        compact ? "px-4 py-8" : "rounded-apple-xl border border-dashed border-ink-200 bg-white/60 px-6 py-12",
+        "flex flex-col items-start text-left",
+        compact ? "px-4 py-6" : "border-t border-ink-200 py-8",
         className,
       )}
     >
-      {art ? <ThreadMark className={compact ? "mb-3 scale-90" : "mb-4"} /> : null}
+      {void art}
       <Title
         className={cn(
-          "text-balance font-semibold tracking-[-0.01em] text-ink-900",
-          compact ? "text-base" : "text-lg",
+          "text-balance font-display font-semibold tracking-[-0.01em] text-ink-900",
+          compact ? "text-base" : "text-xl",
         )}
       >
         {title}
@@ -378,11 +379,11 @@ export function DetailRow({
 
 export type FilterTab = { key: string; label: string; count?: number };
 
-/** The one tab look (filters, view switches, record tabs): a filled pill when on. */
+/** The one tab look (filters, view switches, record tabs): the current one is ink on a warm field, the rest are plain text. */
 export function pillTabClass(on: boolean): string {
   return cn(
-    "apple-spring inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-4 text-sm font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 max-lg:min-h-11",
-    on ? "bg-brand-700 text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
+    "inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors duration-[var(--motion-fast)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-700 max-lg:min-h-11",
+    on ? "bg-ink-900 text-paper" : "text-ink-600 hover:bg-ink-200/60 hover:text-ink-900",
   );
 }
 
@@ -417,13 +418,13 @@ export function FilterTabs({
     >
       {tabs.map((t) => {
         const on = t.key === value;
-        const cls = pillTabClass(on);
+        const cls = cn(pillTabClass(on), t.count === 0 && !on && "text-ink-500");
         const inner = (
           <>
             {t.label}
-            {t.count !== undefined ? (
-              <span className={cn("nums text-xs", on ? "text-white/75" : "text-text-subtle")}>{t.count}</span>
-            ) : null}
+            {/* A zero is not shown as a number (it reads as a broken tab); it says "none" to a screen reader and the tab dims. */}
+            {t.count ? <span className={cn("nums text-xs", on ? "text-paper/75" : "text-ink-600")}>{t.count}</span> : null}
+            {t.count === 0 ? <span className="sr-only"> (none right now)</span> : null}
           </>
         );
         return hrefFor ? (

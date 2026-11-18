@@ -372,7 +372,7 @@ export function ChatWidget() {
   const hasBottomNav = !isForm && /^\/(intern|college)(\/|$)/.test(pathname ?? "");
   // The intern and employer consoles have "Ask me" in their top bar on every
   // width, so no launcher floats over their cards on a phone; the panel opens from there.
-  const headerOnly = !isForm && /^\/(intern|employer)(\/|$)/.test(pathname ?? "");
+  const headerOnly = !isForm && /^\/(intern|employer|college)(\/|$)/.test(pathname ?? "");
 
   return (
     <div

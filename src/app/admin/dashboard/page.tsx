@@ -1,7 +1,8 @@
+import { RollingNumber } from "@/components/app/rolling-number";
+import { LeadStat, Overview, StatList } from "@/components/app/stat";
 import { ArrowLeft } from "lucide-react";
 
 import { AiLinkCard } from "@/components/admin/dashboard/ai-link-card";
-import { DashTile } from "@/components/admin/dashboard/dash-tile";
 import { GreetingHeader, type StripItem } from "@/components/admin/dashboard/greeting-header";
 import { MoneyCard } from "@/components/admin/dashboard/money-card";
 import { NeedsYouPanel } from "@/components/admin/dashboard/needs-you-panel";
@@ -12,7 +13,7 @@ import { RecentActivity } from "@/components/admin/dashboard/recent-activity";
 import { WeekPanel } from "@/components/admin/dashboard/week-panel";
 import { Arrive } from "@/components/admin/motion";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
-import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
+import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { findingSentence } from "@/components/admin/triage/format";
 import { IncompleteProfilesLine } from "@/components/admin/triage/incomplete-profiles-line";
 import { MoneyStrip } from "@/components/admin/triage/money-strip";
@@ -157,9 +158,6 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         strip={strip}
         action={
           <>
-            <ButtonLink href={`${DASHBOARD}?desk=1`} variant="primary" size="md" className={ADMIN_PILL_PRIMARY}>
-              Work the queue
-            </ButtonLink>
             {can("/admin/proposal-tracker") ? (
               <ButtonLink href="/admin/proposal-tracker" variant="outline" size="md" className={ADMIN_PILL_SECONDARY}>
                 Proposal pipeline
@@ -169,18 +167,33 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
         }
       />
 
-      {aiQueue && can("/admin/interns") ? (
+      {aiQueue && can("/admin/interns") && (aiQueue.waiting.length > 0 || aiQueue.unpaid > 0) ? (
         <AiLinkCard waiting={aiQueue.waiting} unpaid={aiQueue.unpaid} now={now} canWrite={mayWrite(session?.permissions, "/admin/ai-interviews")} listHref={gate("/admin/ai-interviews")} />
       ) : null}
 
       <div className="grid grid-cols-1 items-start gap-[var(--admin-gap)] md:grid-cols-2 xl:items-stretch xl:grid-cols-[minmax(0,1fr)_21.5rem]">
         <div className="contents xl:flex xl:min-w-0 xl:flex-col xl:gap-[var(--admin-gap)]">
           <Arrive index={0} className={cn(cell, "order-1 xl:order-none")}>
-            <div className="grid grid-cols-2 gap-[var(--admin-gap)] md:grid-cols-4">
-              {kpis.map((k) => (
-                <DashTile key={k.key} label={k.label} value={k.value} hint={k.caption} href={tileHref[k.key] ?? undefined} featured={k.key === "needs"} clear={k.key === "needs" && k.value === 0 && !queuesFailed} unknown={k.key === "needs" && k.value === 0 && queuesFailed} />
-              ))}
-            </div>
+            {(() => {
+              const by = Object.fromEntries(kpis.map((k) => [k.key, k]));
+              const lead = by.needs;
+              const rest = kpis.filter((k) => k.key !== "needs");
+              const num = (v: number | string | null) => (typeof v === "number" ? <RollingNumber value={v} /> : (v ?? "–"));
+              return (
+                <Overview
+                  lead={
+                    <LeadStat
+                      label={lead.label}
+                      value={queuesFailed && lead.value === 0 ? "?" : num(lead.value)}
+                      note={queuesFailed && lead.value === 0 ? "Some queues did not load. Open the desk to retry." : lead.caption}
+                      tone={lead.value ? "signal" : "brand"}
+                      action={{ label: "Work the queue", href: `${DASHBOARD}?desk=1` }}
+                    />
+                  }
+                  rest={<StatList items={rest.map((k) => ({ label: k.label, value: num(k.value), hint: k.caption ?? undefined, href: tileHref[k.key] ?? undefined }))} />}
+                />
+              );
+            })()}
           </Arrive>
           <Arrive index={1} className={cn(cell, "order-2 xl:order-none")}>
             <PipelineBandCard band={pipeline} href={gate(TRACKER_PROPOSALS)} />
