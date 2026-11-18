@@ -12,7 +12,6 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion, useReducedMotion } from "motion/react";
 import { AlertCircle, ArrowRight, Check, CheckCheck } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
@@ -51,7 +50,6 @@ export function NotificationTimeline({
   now?: Date;
 }) {
   const router = useRouter();
-  const reduce = useReducedMotion();
   const [, startTransition] = useTransition();
   const [read, setRead] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
@@ -77,7 +75,7 @@ export function NotificationTimeline({
               setBusy(false);
             }
           }}
-          className={buttonClass({ variant: "outline" })}
+          className={buttonClass({ variant: "outline", className: "touch:min-h-11" })}
         >
           <CheckCheck className="size-4" aria-hidden />
           {busy ? "Marking…" : "Mark all as read"}
@@ -113,75 +111,57 @@ export function NotificationTimeline({
   return (
     <div>
       {error ? (
-        <p role="alert" className="mb-3 flex items-center gap-2 rounded-apple-md bg-danger-soft px-4 py-3 text-sm text-danger">
+        <p role="alert" className="mb-3 flex items-center gap-2 rounded-md bg-danger-soft px-4 py-3 text-sm text-danger">
           <AlertCircle className="size-4 shrink-0" aria-hidden />
           {error}
         </p>
       ) : null}
 
-      {/* A timeline: day on the left, a rail of dots, then the cards. */}
+      {/* A ruled timeline: the day on the left, hairline rows on the right. Unread rows carry a "New" word and a heavier title, never colour alone. */}
       <div className="space-y-8">
         {byDay(rows ?? [], now ?? mountedAt).map(({ day, items }) => (
-          <section key={day} aria-label={day} className="grid gap-3 sm:grid-cols-[6.5rem_minmax(0,1fr)] sm:gap-6">
-            <h2 className="nums text-sm font-semibold text-ink-900 sm:sticky sm:top-24 sm:self-start sm:pt-4">{day}</h2>
-            <ul className="relative space-y-2.5 sm:border-l sm:border-ink-200 sm:pl-6">
-              {items.map((n, idx) => {
+          <section key={day} aria-label={day} className="grid gap-2 sm:grid-cols-[7rem_minmax(0,1fr)] sm:gap-8">
+            <h2 className="font-display text-lg font-semibold text-ink-900 sm:sticky sm:top-24 sm:self-start sm:pt-4">{day}</h2>
+            <ul className="min-w-0 divide-y divide-ink-200 border-y border-ink-300">
+              {items.map((n) => {
                 const isRead = n.isRead || read.has(n.id);
                 const body = (
-                  <>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
-                        <span className={cn("min-w-0 text-pretty text-base", isRead ? "font-medium text-ink-700" : "font-semibold text-ink-900")}>
-                          {n.title}
-                          {!isRead ? <span className="sr-only"> (unread)</span> : null}
-                        </span>
-                        {n.createdAt ? (
-                          <time dateTime={new Date(n.createdAt).toISOString()} className="nums text-xs text-text-subtle sm:shrink-0">
-                            {shortDateTime(new Date(n.createdAt), TIME)} IST
-                          </time>
-                        ) : null}
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between sm:gap-4">
+                      <span className={cn("min-w-0 text-pretty text-base", isRead ? "font-normal text-ink-700" : "font-semibold text-ink-900")}>
+                        {!isRead ? <span className="mr-2 rounded-md bg-brand-100 px-1.5 py-0.5 text-xs font-semibold text-brand-900">New</span> : null}
+                        {n.title}
                       </span>
-                      <span className="mt-1 block text-pretty text-sm leading-relaxed text-ink-600">{n.message}</span>
-                      {n.href ? (
-                        <span className="mt-2 inline-flex items-center gap-1 text-sm font-medium text-brand-700">
-                          Open
-                          <ArrowRight className="size-3.5" aria-hidden />
-                        </span>
+                      {n.createdAt ? (
+                        <time dateTime={new Date(n.createdAt).toISOString()} className="nums text-xs text-ink-700 sm:shrink-0">
+                          {shortDateTime(new Date(n.createdAt), TIME)} IST
+                        </time>
                       ) : null}
                     </span>
-                  </>
+                    <span className="mt-1 block text-pretty text-sm text-ink-700">{n.message}</span>
+                    {n.href ? (
+                      <span className="mt-1.5 inline-flex items-center gap-1 text-sm font-medium text-brand-700">
+                        Open
+                        <ArrowRight className="size-3.5" aria-hidden />
+                      </span>
+                    ) : null}
+                  </span>
                 );
-                const card = cn(
-                  "flex min-w-0 flex-1 items-start gap-4 rounded-apple-lg px-4 py-4 pr-12 transition-[background-color,box-shadow] sm:pr-14",
-                  isRead ? "bg-transparent" : "bg-white shadow-[0_1px_2px_rgb(15_40_30/0.06),0_8px_20px_-12px_rgb(15_40_30/0.2)] ring-1 ring-ink-200/70",
-                );
+                const row = cn("flex min-w-0 flex-1 items-start gap-4 py-4 pr-12 transition-colors duration-150 sm:pr-14");
                 return (
-                  <motion.li
-                    key={n.id}
-                    initial={reduce ? false : { opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: reduce ? 0 : Math.min(idx, 3) * 0.04, duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                    className="group/row relative flex items-center"
-                  >
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "absolute -left-[1.9375rem] top-6 hidden size-2.5 rounded-full ring-4 ring-surface sm:block",
-                        isRead ? "bg-ink-300" : "bg-brand-600",
-                      )}
-                    />
+                  <li key={n.id} className="group/row relative flex items-center">
                     {n.href ? (
                       <Link
                         href={n.href}
                         onClick={() => {
                           if (!isRead) void markOne(n.id, true);
                         }}
-                        className={cn(card, "hover:bg-white hover:ring-1 hover:ring-ink-200 focus-visible:-outline-offset-2")}
+                        className={cn(row, "hover:bg-surface-raised focus-visible:-outline-offset-2")}
                       >
                         {body}
                       </Link>
                     ) : (
-                      <div className={card}>{body}</div>
+                      <div className={row}>{body}</div>
                     )}
                     {!isRead ? (
                       <button
@@ -189,12 +169,12 @@ export function NotificationTimeline({
                         onClick={() => markOne(n.id)}
                         aria-label={`Mark "${n.title}" as read`}
                         title="Mark as read"
-                        className="absolute right-2 top-1/2 grid size-11 -translate-y-1/2 place-items-center rounded-apple-sm text-text-subtle transition-opacity hover:bg-ink-100 hover:text-ink-900 focus-visible:-outline-offset-2 focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover/row:opacity-100"
+                        className="absolute right-0 top-3 grid size-11 place-items-center rounded-md text-ink-700 transition-colors hover:bg-ink-100 hover:text-ink-900 focus-visible:-outline-offset-2"
                       >
                         <Check className="size-4" aria-hidden />
                       </button>
                     ) : null}
-                  </motion.li>
+                  </li>
                 );
               })}
             </ul>

@@ -16,7 +16,7 @@ import {
   SkillsCard,
   VisibilityCard,
 } from "./profile/sections";
-import { ProfileSummary, SectionNav, type ProfileStatus } from "./profile/summary";
+import { CompletenessPanel, CvHeader, SectionNav, type ProfileStatus } from "./profile/summary";
 
 export type { ProfileStatus };
 
@@ -147,33 +147,33 @@ export function ProfileView({
   const shown = sections.filter((s): s is ProfileSection => s !== null);
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[19.5rem_minmax(0,1fr)] xl:items-start xl:gap-8">
-      <aside
-        aria-label="Profile summary"
-        className="min-w-0 xl:sticky xl:top-20 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:overscroll-contain xl:pr-0.5"
-      >
-        <ProfileSummary
-          name={name}
-          initials={initials}
-          photoUrl={photoUrl}
-          degree={a ? degreeLine(a) : ""}
-          institution={a?.institution ?? ""}
-          place={place}
-          status={status}
-          badges={badges}
-          meta={summaryExtra}
-          score={score}
-          ratings={ratings}
-          completion={completion}
-          started={draft !== null}
-        />
-        {/* Only where there is height for it beside the card; otherwise the page itself is the list. */}
-        <SectionNav sections={shown} className="mt-3 hidden xl:[@media(min-height:58rem)]:block" />
-      </aside>
-      <div className="flex min-w-0 flex-col gap-4 sm:gap-5">
-        {shown.map((s) => (
-          <Fragment key={s.id}>{s.node}</Fragment>
-        ))}
+    <div>
+      <CvHeader
+        name={name}
+        initials={initials}
+        photoUrl={photoUrl}
+        degree={a ? degreeLine(a) : ""}
+        institution={a?.institution ?? ""}
+        place={place}
+        status={status}
+        badges={badges}
+        meta={summaryExtra}
+        score={score}
+      />
+      <div className="grid gap-x-12 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start">
+        {/* The meter and the next step come first on a phone; on a wide screen they stay in view beside the CV. */}
+        <aside
+          aria-label="Profile completeness"
+          className="min-w-0 pb-2 xl:sticky xl:top-20 xl:order-2 xl:max-h-[calc(100dvh-6rem)] xl:overflow-y-auto xl:overscroll-contain"
+        >
+          <CompletenessPanel completion={completion} started={draft !== null} />
+          <SectionNav sections={shown} className="mt-6 hidden xl:[@media(min-height:58rem)]:block" />
+        </aside>
+        <div className="min-w-0 xl:order-1">
+          {shown.map((s) => (
+            <Fragment key={s.id}>{s.node}</Fragment>
+          ))}
+        </div>
       </div>
     </div>
   );

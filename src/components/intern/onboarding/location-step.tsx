@@ -57,15 +57,15 @@ export function LocationStep({ values, update, errors }: StepProps) {
                 data-field="locationTypes"
                 onClick={() => pick(value)}
                 className={cn(
-                  "apple-spring apple-pressable flex min-h-11 items-center gap-3 rounded-apple-xl border p-4 text-left",
+                  "apple-spring apple-pressable flex min-h-11 items-center gap-3 rounded-lg border p-4 text-left",
                   on
                     ? "border-brand-600 bg-brand-50 shadow-xs ring-1 ring-brand-600/25"
                     : errors.locationTypes
-                      ? "border-danger/60 bg-white hover:bg-ink-50"
-                      : "border-ink-200 bg-white hover:border-ink-300 hover:bg-ink-50",
+                      ? "border-danger/60 bg-surface-raised hover:bg-ink-50"
+                      : "border-ink-200 bg-surface-raised hover:border-ink-300 hover:bg-ink-50",
                 )}
               >
-                <span className={cn("grid size-10 shrink-0 place-items-center rounded-apple-sm", on ? "bg-brand-700 text-white" : "bg-ink-100 text-ink-600")}>
+                <span className={cn("grid size-10 shrink-0 place-items-center rounded-md", on ? "bg-brand-700 text-white" : "bg-ink-100 text-ink-600")}>
                   <Icon className="size-[1.125rem]" aria-hidden />
                 </span>
                 <span className="min-w-0">
@@ -112,15 +112,15 @@ export function LocationStep({ values, update, errors }: StepProps) {
                 data-field="hasLaptop"
                 onClick={() => update("hasLaptop", o.value)}
                 className={cn(
-                  "apple-spring apple-pressable flex min-h-11 items-start gap-3 rounded-apple-xl border p-4 text-left",
+                  "apple-spring apple-pressable flex min-h-11 items-start gap-3 rounded-lg border p-4 text-left",
                   on
                     ? "border-brand-600 bg-brand-50 shadow-xs ring-1 ring-brand-600/25"
                     : errors.hasLaptop
-                      ? "border-danger/60 bg-white hover:bg-ink-50"
-                      : "border-ink-200 bg-white hover:border-ink-300 hover:bg-ink-50",
+                      ? "border-danger/60 bg-surface-raised hover:bg-ink-50"
+                      : "border-ink-200 bg-surface-raised hover:border-ink-300 hover:bg-ink-50",
                 )}
               >
-                <span className={cn("grid size-10 shrink-0 place-items-center rounded-apple-sm", on ? "bg-brand-700 text-white" : "bg-ink-100 text-ink-600")}>
+                <span className={cn("grid size-10 shrink-0 place-items-center rounded-md", on ? "bg-brand-700 text-white" : "bg-ink-100 text-ink-600")}>
                   <Laptop className="size-[1.125rem]" aria-hidden />
                 </span>
                 <span className="min-w-0">
@@ -173,7 +173,7 @@ function CityPicker({ cities, error, onChange }: { cities: string[]; error?: str
   return (
     <div>
       <Label htmlFor="preferredLocations">
-        Add a city <span className="nums font-normal text-text-subtle">({cities.length} of {MAX_CITIES})</span>
+        Add a city <span className="nums font-normal text-ink-700">({cities.length} of {MAX_CITIES})</span>
       </Label>
       <input
         id="preferredLocations"
@@ -210,9 +210,9 @@ function CityPicker({ cities, error, onChange }: { cities: string[]; error?: str
               <button
                 type="button"
                 onClick={() => add(c)}
-                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink-200 bg-white px-3.5 text-sm text-ink-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 sm:min-h-9"
+                className="apple-spring apple-pressable inline-flex min-h-11 items-center gap-1.5 rounded-full border border-ink-200 bg-surface-raised px-3.5 text-sm text-ink-700 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-800 sm:min-h-9"
               >
-                <Plus className="size-3.5 text-text-subtle" aria-hidden />
+                <Plus className="size-3.5 text-ink-700" aria-hidden />
                 {c === custom ? `Add "${c}"` : c}
               </button>
             </li>
