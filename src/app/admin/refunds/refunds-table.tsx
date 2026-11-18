@@ -1,32 +1,58 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
-import { Loader2 } from "lucide-react";
+import { Check, ClipboardCopy, Loader2, ScanSearch } from "lucide-react";
 
-import { AdminEmpty } from "@/components/admin/panel";
-import { StatusBadge } from "@/components/admin/status-badge";
+import { AgeCell, Ledger, Money, type LedgerColumn } from "@/components/admin/money/ledger";
+import { RecordsLedger, type RecordColumn } from "@/components/admin/money/records-ledger";
+import { StatusChip } from "@/components/admin/money/status-chip";
+import { Section } from "@/components/app/stat";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatDate, formatMoney } from "@/lib/format";
-import { refundGstMinor } from "@/lib/refund-accounting";
+import type { CompanyRefundRow } from "@/lib/admin/company-refunds";
 import type { RefundListRow } from "@/lib/refunds/refunds-db";
 
-const select = "h-9 rounded-apple-sm border border-ink-200 bg-surface px-3 text-sm text-ink-900";
+const REASON_LABEL: Record<string, string> = { drive_entitlement_after_payment: "Drive seat after payment", interview_consumed: "Interview already used" };
 
-export function RefundsTable(props: { rows: RefundListRow[]; total: number; page: number; perPage: number; status: string; reason: string; statuses: string[] }) {
+/** The facts an accountant needs to raise the credit note, as plain text. */
+function creditNoteText(r: CompanyRefundRow): string {
+  return [
+    "Credit note for a refund to a company",
+    `Company: ${r.company}`,
+    `Original invoice: ${r.invoiceNumber ?? "none recorded"} (order ${r.orderId})`,
+    `Refunded: ${formatMoney(r.amountMinor, r.currency)} on ${formatDate(r.at)}`,
+    `GST inside the refund: ${formatMoney(r.gstMinor, r.currency)}`,
+  ].join("\n");
+}
+
+function CopyDetails({ row }: { row: CompanyRefundRow }) {
+  const [done, setDone] = useState(false);
+  return (
+    <button
+      type="button"
+      className={buttonClass({ variant: "outline", size: "sm" })}
+      onClick={async () => {
+        await navigator.clipboard?.writeText(creditNoteText(row)).catch(() => null);
+        setDone(true);
+        setTimeout(() => setDone(false), 2000);
+      }}
+    >
+      {done ? <Check className="size-4" aria-hidden /> : <ClipboardCopy className="size-4" aria-hidden />}
+      {done ? "Copied" : "Copy details"}
+    </button>
+  );
+}
+
+export function RefundsTable(props: { rows: RefundListRow[]; companyRows: CompanyRefundRow[]; total: number; page: number; perPage: number; params: Record<string, string>; statuses: string[]; anyRefunds: boolean }) {
   const router = useProgressRouter();
   const [target, setTarget] = useState<RefundListRow | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
-
-  const go = (next: Record<string, string>) => {
-    const qs = new URLSearchParams(Object.entries(next).filter(([, v]) => v));
-    router.push(`/admin/refunds${qs.size ? `?${qs}` : ""}`);
-  };
-  const filters = { status: props.status, reason: props.reason };
 
   async function scan() {
     setScanning(true);
@@ -55,68 +81,113 @@ export function RefundsTable(props: { rows: RefundListRow[]; total: number; page
   }
 
   const pages = Math.max(1, Math.ceil(props.total / props.perPage));
+  const who = (r: RefundListRow) => (
+    <div className="min-w-0 max-w-72">
+      <span className="block truncate font-medium text-ink-900">{r.studentName}</span>
+      {r.studentEmail ? <span className="block truncate text-xs text-ink-600">{r.studentEmail}</span> : null}
+    </div>
+  );
+
+  const owed = props.companyRows.filter((r) => r.creditNoteNeeded);
+  const creditColumns: LedgerColumn<CompanyRefundRow>[] = [
+    {
+      key: "who",
+      header: "Company",
+      primary: true,
+      cell: (r) => (
+        <div className="min-w-0 max-w-72">
+          <Link href={`/admin/companies/${r.employerId}`} className="block truncate font-medium text-ink-900 underline-offset-4 hover:underline">{r.company}</Link>
+          <span className="nums block truncate text-xs text-ink-600">{r.invoiceNumber ?? r.orderId}</span>
+        </div>
+      ),
+    },
+    { key: "amt", header: "Refunded", align: "right", cell: (r) => (r.currency === "USD" ? <span className="font-semibold">{formatMoney(r.amountMinor, "USD", { zeroLabel: false })}</span> : <Money minor={r.amountMinor} className="font-semibold" />) },
+    { key: "gst", header: "GST inside", align: "right", cell: (r) => <Money minor={r.gstMinor} /> },
+    { key: "on", header: "Refunded on", cell: (r) => <span className="whitespace-nowrap">{formatDate(r.at)}</span> },
+    { key: "age", header: "Waiting", align: "right", cell: (r) => <AgeCell from={r.at} /> },
+    {
+      key: "act",
+      header: "Action",
+      align: "right",
+      cell: (r) => (
+        <div className="flex flex-wrap justify-end gap-2">
+          <CopyDetails row={r} />
+          <Link href={`/admin/orders?q=${encodeURIComponent(r.orderId)}`} className={buttonClass({ variant: "outline", size: "sm" })}>Open order</Link>
+        </div>
+      ),
+    },
+  ];
+
+  const columns: RecordColumn<RefundListRow>[] = [
+    { key: "who", header: "Student", primary: true, cell: who },
+    { key: "amt", header: "Amount", align: "right", cell: (r) => <Money minor={r.amountMinor} className="font-semibold" /> },
+    { key: "reason", header: "Why", cell: (r) => <span className="text-ink-700">{(r.reason && REASON_LABEL[r.reason]) || r.reason || "–"}</span> },
+    { key: "paid", header: "Paid", cell: (r) => <span className="whitespace-nowrap">{formatDate(r.paidAt)}</span> },
+    { key: "status", header: "Status", cell: (r) => <StatusChip status={r.status} /> },
+    {
+      key: "act",
+      header: "Action",
+      align: "right",
+      actions: true,
+      cell: (r) =>
+        r.status === "eligible" || r.status === "review" || r.status === "pending" ? (
+          <button type="button" disabled={busy === r.id} className={buttonClass({ variant: r.status === "review" ? "outline" : "primary", size: "sm" })} onClick={() => setTarget(r)}>
+            {r.status === "review" ? "Review" : `Refund ${formatMoney(r.amountMinor, "INR")}`}
+          </button>
+        ) : r.status === "initiated" ? (
+          <span className="text-xs text-ink-600">Waiting for the gateway</span>
+        ) : r.status === "failed" ? (
+          <span className="text-xs text-ink-700">Run a scan to retry</span>
+        ) : null,
+    },
+  ];
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center gap-2 border-b border-ink-200 p-4">
-        <select aria-label="Status" className={select} value={props.status} onChange={(e) => go({ ...filters, status: e.target.value })}>
-          <option value="">All statuses</option>
-          {props.statuses.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
-        </select>
-        <select aria-label="Reason" className={select} value={props.reason} onChange={(e) => go({ ...filters, reason: e.target.value })}>
-          <option value="">All reasons</option>
-          <option value="drive_entitlement_after_payment">Drive seat after payment</option>
-          <option value="interview_consumed">Interview already used</option>
-        </select>
-        <button type="button" onClick={scan} disabled={scanning} className={`${buttonClass({ variant: "outline", size: "sm" })} sm:ml-auto max-sm:w-full`}>
-          {scanning ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-          Scan for eligible students
-        </button>
-      </div>
-      <p role="status" aria-live="polite" className={notice ? `px-4 pt-3 text-sm font-medium ${notice.ok ? "text-success" : "text-danger"}` : "sr-only"}>{notice?.text}</p>
+    <div className="space-y-10">
+      <p role="status" aria-live="polite" className={notice ? `text-sm font-medium ${notice.ok ? "text-success" : "text-danger"}` : "sr-only"}>
+        {notice?.text}
+      </p>
 
-      {props.rows.length === 0 ? (
-        <AdminEmpty title="No refunds here" body="Run a scan to find students who paid before receiving a drive seat, or clear the filters." />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[48rem] text-left text-sm">
-            <thead className="text-xs text-text-subtle">
-              <tr><th className="p-3">Student</th><th className="p-3">Amount</th><th className="p-3">Paid</th><th className="p-3">Status</th><th className="p-3">GST inside</th><th className="p-3">Credit note</th><th className="p-3 text-right">Action</th></tr>
-            </thead>
-            <tbody>
-              {props.rows.map((r) => {
-                const actionable = r.status === "eligible" || r.status === "review" || r.status === "pending";
-                return (
-                  <tr key={r.id} className="border-t border-ink-200 align-middle">
-                    <td className="p-3"><div className="font-medium">{r.studentName}</div><div className="text-xs text-text-subtle">{r.studentEmail}</div></td>
-                    <td className="p-3 tabular-nums">{formatMoney(r.amountMinor, "INR")}</td>
-                    <td className="p-3">{formatDate(r.paidAt)}</td>
-                    <td className="p-3"><StatusBadge value={r.status} /></td>
-                    <td className="p-3 tabular-nums">{r.status === "refunded" ? formatMoney(refundGstMinor(r.amountMinor, "INR"), "INR") : "-"}</td>
-                    {/* No credit-note column exists yet (open item): every refunded row is flagged until one is recorded. */}
-                    <td className="p-3">{r.status === "refunded" ? <span className="font-medium text-warning">Credit note needed</span> : "-"}</td>
-                    <td className="p-3 text-right">
-                      {actionable ? (
-                        <button type="button" disabled={busy === r.id} className={buttonClass({ variant: r.status === "review" ? "outline" : "primary", size: "sm" })} onClick={() => setTarget(r)}>
-                          {r.status === "review" ? "Review" : `Refund ${formatMoney(r.amountMinor, "INR")}`}
-                        </button>
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      {owed.length > 0 ? (
+        <section id="credit-notes" className="scroll-mt-20">
+          <Section title="Credit notes to issue" hint="Refunds sent back to companies that carried GST. A credit note is owed for each; Findtern does not record the number yet, so copy the details to your accounts tool and open the order for the invoice.">
+            <Ledger caption="Company refunds still needing a credit note" rows={owed} rowKey={(r) => r.key} columns={creditColumns} />
+          </Section>
+        </section>
+      ) : null}
 
-      <div className="flex items-center justify-between gap-2 border-t border-ink-200 p-4 text-sm">
-        <span>{props.total} refund{props.total === 1 ? "" : "s"}, page {props.page} of {pages}</span>
-        <span className="flex gap-2">
-          <button type="button" disabled={props.page <= 1} className={buttonClass({ variant: "outline", size: "sm" })} onClick={() => go({ ...filters, page: String(props.page - 1) })}>Previous</button>
-          <button type="button" disabled={props.page >= pages} className={buttonClass({ variant: "outline", size: "sm" })} onClick={() => go({ ...filters, page: String(props.page + 1) })}>Next</button>
-        </span>
-      </div>
+      <Section
+        title="Student refunds"
+        action={
+          <button id="scan-refunds" type="button" onClick={scan} disabled={scanning} className={buttonClass({ variant: "outline", size: "sm" })}>
+            {scanning ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : <ScanSearch className="size-4" aria-hidden />}
+            Scan for eligible students
+          </button>
+        }
+      >
+        <RecordsLedger
+          basePath="/admin/refunds"
+          params={props.params}
+          page={props.page}
+          pages={pages}
+          total={props.total}
+          perPage={props.perPage}
+          rows={props.rows}
+          rowKey={(r) => r.id}
+          columns={columns}
+          caption="Activation fee refunds"
+          noun="refunds"
+          filters={[
+            { key: "status", label: "Status", options: props.statuses.map((s) => ({ value: s, label: s === "eligible" ? "Ready to refund" : s === "review" ? "Check first" : s[0].toUpperCase() + s.slice(1) })) },
+            { key: "reason", label: "Reason", options: Object.entries(REASON_LABEL).map(([value, label]) => ({ value, label })) },
+          ]}
+          empty={
+            props.anyRefunds
+              ? { title: "No refunds here", body: "Nothing matches this view.", next: { label: "Show every refund", href: "/admin/refunds" } }
+              : { title: "No refunds yet", body: "A student who paid the activation fee and then got a college drive seat is owed it back. Run a scan to find them.", next: { label: "Scan for eligible students", href: "#scan-refunds" } }
+          }
+        />
+      </Section>
 
       <Dialog open={target !== null} onOpenChange={(o) => { if (!o && !busy) setTarget(null); }}>
         <DialogContent>
