@@ -19,6 +19,7 @@ import { FREE_DECLINES, offerPastStart, parseOffer, todayIst } from "@/lib/offer
 import { hasOpenOrderFor, OPEN_ORDER_MINUTES } from "@/lib/payments";
 import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
 import { internLockResponse } from "@/lib/intern-unlock";
+import { withdrawRefusal } from "@/lib/proposal-expiry";
 
 /**
  * Which role may set which status.
@@ -108,6 +109,12 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (session.role === "employer") {
     const td = await assertProposalActionable(id, session.uid);
     if (!td.ok) return td.response;
+  }
+
+  // An expired offer (stored, or past its start day before the sweeper ran) is never withdrawn: 409 with the reason.
+  if (status === "withdrawn") {
+    const refusal = withdrawRefusal(proposal);
+    if (refusal) return NextResponse.json({ error: refusal, code: "proposal_expired" }, { status: 409 });
   }
 
   // State-machine guard. The legacy routes had none, which meant a withdrawn

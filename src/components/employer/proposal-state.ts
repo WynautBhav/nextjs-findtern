@@ -20,7 +20,7 @@ export type OfferState = {
   lapsed: boolean;
   /** Edit terms (internship offers, before payment; EMH-30). */
   canEdit: boolean;
-  /** Withdraw (unpaid; a lapsed offer too, so it stops holding the candidate: EMH-17). */
+  /** Withdraw (unpaid and live). Never an expired offer, stored or lapsed: it is already closed (withdrawRefusal). */
   canWithdraw: boolean;
   /** Accepted, payable now: the CGPA check is clear and the start day has not begun. */
   canPay: boolean;
@@ -104,13 +104,12 @@ export function offerState(p: OfferStateInput, offer: Pick<Offer, "startDate" | 
       ...base,
       label: EXPIRY_LABEL.no_reply_past_start,
       tone: "closed",
-      next: `${EXPIRED_NEXT.no_reply_past_start} You can also withdraw this one.`,
-      canWithdraw: true,
+      next: EXPIRED_NEXT.no_reply_past_start,
     };
   }
   if (unpaidExpired) {
-    // Never a Pay button. Withdrawing stays open so the offer stops holding the candidate until it is closed for good.
-    return { ...base, label: EXPIRY_LABEL.unpaid_past_start, tone: "closed", next: EXPIRED_NEXT.unpaid_past_start, canWithdraw: true };
+    // Never a Pay button and never a Withdraw: the offer is already expired.
+    return { ...base, label: EXPIRY_LABEL.unpaid_past_start, tone: "closed", next: EXPIRED_NEXT.unpaid_past_start };
   }
   if (verifying && gate) {
     const corrected = gate.state === "incorrect_unacked";

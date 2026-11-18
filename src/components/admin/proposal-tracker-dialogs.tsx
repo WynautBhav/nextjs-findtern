@@ -46,7 +46,7 @@ export function ProposalDetailsButton({
           </DialogHeader>
           <div className="flex flex-wrap items-center gap-3 rounded-[var(--radius-admin-card)] bg-[color:var(--admin-panel-2)] p-3">
             <StatusBadge value={proposal.status} />
-            <ProposalStatusEditor proposalId={proposal.id} status={proposal.status} />
+            <ProposalStatusEditor proposalId={proposal.id} status={proposal.status} offerDetails={proposal.offerDetails} />
           </div>
           <ProposalOfferSummary proposalId={proposal.id} offerDetails={proposal.offerDetails} currency={proposal.currency} />
         </DialogContent>

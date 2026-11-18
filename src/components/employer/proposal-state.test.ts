@@ -82,7 +82,7 @@ test("processing and hired never expire and never verify", () => {
 
 test("unanswered past start: Expired · no reply before start, can send a new proposal", () => {
   const s = offerState({ status: "sent", hiredAt: null }, PAST, NOW);
-  assert.deepEqual([s.label, s.lapsed, s.bucket, s.closedReason, s.canSendNew, s.canWithdraw], ["Expired · no reply before start", true, "closed", "expired_no_reply", true, true]);
+  assert.deepEqual([s.label, s.lapsed, s.bucket, s.closedReason, s.canSendNew, s.canWithdraw], ["Expired · no reply before start", true, "closed", "expired_no_reply", true, false]);
 });
 
 test("stored expired rows read by their reason; a row with none is the legacy 'accepted another offer'", () => {
