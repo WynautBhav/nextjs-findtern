@@ -142,7 +142,7 @@ export async function prepareUpload(
  * chunked upload sends no Content-Length to refuse early, so without this one request could hold unbounded memory.
  * Returns null when the body is larger than `max`.
  */
-export async function readBodyCapped(req: Pick<Request, "body">, max: number): Promise<Buffer | null> {
+export async function readBodyCapped(req: { body: ReadableStream<Uint8Array<ArrayBufferLike>> | null }, max: number): Promise<Buffer | null> {
   if (!req.body) return Buffer.alloc(0);
   const reader = req.body.getReader();
   const chunks: Uint8Array[] = [];
