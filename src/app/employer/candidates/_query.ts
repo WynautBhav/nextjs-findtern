@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { getEmployerRows } from "@/lib/employer-request";
 import {
   RATING_META,
   toCandidateProfile,
@@ -439,12 +440,43 @@ export async function loadCandidates(
   // link, a hand-edited one), so no filter, sort, chip or remembered query carries it on.
   const requested = { cgpaMin: filters.cgpaMin, cgpaVerified: filters.cgpaVerified, colleges: filters.colleges, collegeSort: filters.collegeSort };
   let proConfig: Awaited<ReturnType<typeof getEmployerSubscriptionConfig>> | null = null;
-  const proActive = await proAccess(uid);
+  // One wave, not a chain: everything below that does not depend on the pro check or on another read starts now and is awaited
+  // where it was awaited before (inside the try, so a failure still becomes `loadFailed`). The no-op catch only keeps a read that
+  // is never reached (a redirect or an early throw) from becoming an unhandled rejection.
+  const early = <T,>(p: PromiseLike<T>): Promise<T> => {
+    const q = Promise.resolve(p);
+    q.catch(() => undefined);
+    return q;
+  };
+  const db0 = getDb();
+  const hiredP = early(hiredInternIds(db0, uid));
+  const picksP = filters.ids.length > 0 ? early(hiredAmong(db0, uid, filters.ids)) : null;
+  const projectsP = early(
+    db0
+      .select({
+        id: schema.projects.id,
+        projectName: schema.projects.projectName,
+        skills: schema.projects.skills,
+        city: schema.projects.city,
+        preferredLocations: schema.projects.preferredLocations,
+        locationType: schema.projects.locationType,
+        status: schema.projects.status,
+        takenDownAt: schema.projects.takenDownAt,
+      })
+      .from(schema.projects)
+      .where(eq(schema.projects.employerId, uid))
+      .orderBy(desc(schema.projects.createdAt)),
+  );
+  const employerP = early(getEmployerRows(uid));
+  const plansP = early(db0.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true)));
+  const proP = early(proAccess(uid));
+  const configP = early(getEmployerSubscriptionConfig());
+  const proActive = await proP;
   data.pro.active = proActive;
   if (!proActive) {
     data.pro.ignored = hasProRequest(requested) && !filters.saved;
     Object.assign(filters, { ...EMPTY_PRO_REQUEST, colleges: [] });
-    proConfig = await getEmployerSubscriptionConfig();
+    proConfig = await configP;
     data.pro.offered = proConfig.enabled;
   }
 
@@ -452,13 +484,13 @@ export async function loadCandidates(
     const db = getDb();
 
     // Names stay redacted until this employer hires the intern.
-    data.nameUnlocked = await hiredInternIds(db, uid);
+    data.nameUnlocked = await hiredP;
 
     // A hired candidate is not on this list (they live under Hired / Orders), so a compare pick
     // that was hired since (cookie or link) is dropped here: the tray never counts someone the
     // list cannot show. Corrected in place, like `filters.project`.
-    if (filters.ids.length > 0) {
-      const hiredPicks = await hiredAmong(db, uid, filters.ids);
+    if (picksP) {
+      const hiredPicks = await picksP;
       if (hiredPicks.size > 0) filters.ids = filters.ids.filter((id) => !hiredPicks.has(id));
     }
     const compareIds = filters.ids;
@@ -467,20 +499,7 @@ export async function loadCandidates(
     // project. Only open projects are offered, newest first, and the newest
     // open one is the default (EMB-04 / EMH-15, legacy picker).
     const projectRows = (
-      await db
-        .select({
-          id: schema.projects.id,
-          projectName: schema.projects.projectName,
-          skills: schema.projects.skills,
-          city: schema.projects.city,
-          preferredLocations: schema.projects.preferredLocations,
-          locationType: schema.projects.locationType,
-          status: schema.projects.status,
-          takenDownAt: schema.projects.takenDownAt,
-        })
-        .from(schema.projects)
-        .where(eq(schema.projects.employerId, uid))
-        .orderBy(desc(schema.projects.createdAt))
+      await projectsP
     ).filter((p) => isOpenProject(p.status, p.takenDownAt));
     data.projects = projectRows.map((p) => ({ id: p.id, projectName: p.projectName }));
     const activeProjectId =
@@ -506,33 +525,37 @@ export async function loadCandidates(
     }
     if (data.restoreTo) return data;
 
-    if (activeProjectId) {
-      const rows = await db
-        .select({ internId: schema.employerCartItems.internId })
-        .from(schema.employerCartItems)
-        .where(
-          and(
-            eq(schema.employerCartItems.employerId, uid),
-            eq(schema.employerCartItems.projectId, activeProjectId),
-            eq(schema.employerCartItems.listType, "cart"),
-          ),
-        );
-      data.shortlisted = new Set(rows.map((r) => r.internId));
-      // Hired ones left every shortlist (EMB-26) and are not rows below, so they are not counted.
-      const [inPool, hiredOnList] = await Promise.all([poolInternIds(db, [...data.shortlisted]), hiredAmong(db, uid, [...data.shortlisted])]);
-      data.savedCount = [...inPool].filter((id) => !hiredOnList.has(id)).length;
-    }
+    // The shortlist and the saved-roles read start now; the pool query below only needs the shortlist for the Saved tab.
+    const shortlistP = early(
+      (async () => {
+        if (!activeProjectId) return;
+        const rows = await db
+          .select({ internId: schema.employerCartItems.internId })
+          .from(schema.employerCartItems)
+          .where(
+            and(
+              eq(schema.employerCartItems.employerId, uid),
+              eq(schema.employerCartItems.projectId, activeProjectId),
+              eq(schema.employerCartItems.listType, "cart"),
+            ),
+          );
+        data.shortlisted = new Set(rows.map((r) => r.internId));
+        // Hired ones left every shortlist (EMB-26) and are not rows below, so they are not counted.
+        const [inPool, hiredOnList] = await Promise.all([poolInternIds(db, [...data.shortlisted]), hiredAmong(db, uid, [...data.shortlisted])]);
+        data.savedCount = [...inPool].filter((id) => !hiredOnList.has(id)).length;
+      })(),
+    );
+    // Roles students saved for this project (OA3). Optional: a failed read only drops the "Interested in this role" boost, never the list.
+    const savedP = activeProjectId
+      ? early(
+          savedInternIds(activeProjectId).catch((err) => {
+            console.error("[employer/candidates] saved roles", err);
+            return new Set<string>();
+          }),
+        )
+      : null;
 
-    const [employer] = await db
-      .select({
-        country: schema.employers.country,
-        state: schema.employers.state,
-        countryCode: schema.employers.countryCode,
-        phoneNumber: schema.employers.phoneNumber,
-      })
-      .from(schema.employers)
-      .where(eq(schema.employers.id, uid))
-      .limit(1);
+    const [employer] = await employerP; // the request-scoped employer row the layout already reads
     data.region = employerRegion(employer ?? {});
     data.currency = data.region === "IN" ? "INR" : "USD";
     if (proConfig?.enabled) {
@@ -660,7 +683,7 @@ export async function loadCandidates(
     // newest 500 rows, so above 500 interns the score sort and the total
     // were wrong). The ceiling only guards against a runaway table.
     const savedOnly = filters.saved && Boolean(activeProjectId);
-    const rows = await db
+    const readPool = () => db
       .select({ user: schema.users, onboarding: schema.internOnboarding })
       .from(schema.users)
       .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
@@ -679,6 +702,13 @@ export async function loadCandidates(
       // read only the newest row per intern); then id for a total order.
       .orderBy(desc(schema.internOnboarding.updatedAt), desc(schema.users.id))
       .limit(POOL_CEILING);
+    let rows: Awaited<ReturnType<typeof readPool>>;
+    if (savedOnly) {
+      await shortlistP; // the Saved tab is built from the shortlist
+      rows = await readPool();
+    } else {
+      [rows] = await Promise.all([readPool(), shortlistP]);
+    }
 
     // `intern_onboarding` has no unique index on `user_id`: one row per intern.
     const seen = new Set<string>();
@@ -715,12 +745,7 @@ export async function loadCandidates(
 
     // Roles students saved for this project (OA3). Optional: a failed read
     // only drops the "Interested in this role" boost, never the list.
-    data.saved = activeProjectId
-      ? await savedInternIds(activeProjectId).catch((err) => {
-          console.error("[employer/candidates] saved roles", err);
-          return new Set<string>();
-        })
-      : new Set<string>();
+    data.saved = savedP ? await savedP : new Set<string>();
 
     // A sort the employer picked leads; otherwise saved roles do. Skill and
     // city matches then break ties (bug sheet 21 Oct). Initials, never the name.
@@ -742,7 +767,7 @@ export async function loadCandidates(
     const pageIds = data.candidates.map((c) => c.id);
     const [, plans, relations, presence] = await Promise.all([
       attachPhotos(db, data.candidates),
-      db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true)),
+      plansP,
       candidateRelations(db, uid, pageIds, activeProjectId),
       // Labels like "Active now" / "Last seen 2h ago"; hidden candidates get null (lib/presence.ts). Optional, like the saved roles.
       presenceOf(pageIds).catch((err) => {
