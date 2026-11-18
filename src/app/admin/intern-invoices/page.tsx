@@ -6,7 +6,8 @@ import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel
 import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { ButtonLink } from "@/components/ui/button";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
-import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admin-invoices-view";
+import type { AdminInvoiceRow } from "@/lib/admin/invoice-rows";
+import { InternInvoicesView } from "@/components/admin/money/iv-view";
 import { discountLabel, paymentPromo } from "@/lib/admin/payment-promo";
 import { internInvoiceRow } from "@/lib/intern-invoice";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
@@ -113,13 +114,15 @@ export default async function AdminInternInvoicesPage({ searchParams }: { search
         title="Intern invoices"
         subtitle="Activation fees paid by interns, including interns marked paid outside checkout."
         action={
-          <ButtonLink href="/admin/transactions?source=intern" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
-            Transactions
-          </ButtonLink>
+          rows?.length ? (
+            <ButtonLink href="/admin/transactions?source=intern" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
+              Transactions
+            </ButtonLink>
+          ) : undefined
         }
       />
       {rows ? (
-        <AdminInvoicesView kind="intern" rows={rows} seller={getInvoiceSeller()} params={params} basePath="/admin/intern-invoices" />
+        <InternInvoicesView rows={rows} seller={getInvoiceSeller()} params={params} basePath="/admin/intern-invoices" />
       ) : (
         <Panel>
           <AdminLoadError what="intern payments" retryHref="/admin/intern-invoices" />

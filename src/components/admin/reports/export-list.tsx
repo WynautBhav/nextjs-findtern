@@ -1,35 +1,32 @@
 import { Download } from "lucide-react";
 
-import { Panel, PanelHeader } from "@/components/admin/panel";
+import { RP_BUTTON } from "@/components/admin/money/rp-parts";
+import { Section } from "@/components/app/stat";
 
 export type ExportItem = { title: string; body: string; href: string; format?: "CSV" | "XLSX" };
 
-/** CSV downloads as one quiet list: name and what is in it on the left, the action on the right. */
+/** The raw files as one ruled list: what is in it on the left, the download on the right. */
 export function ExportList({ items }: { items: ExportItem[] }) {
+  if (items.length === 0) return null;
   return (
-    <Panel>
-      <PanelHeader title="Raw data exports" description="CSV and Excel files for offline analysis. Each file has every row (up to 10,000), not just one page." />
-      <ul className="mt-2 divide-y divide-[color:var(--admin-rule)] px-[var(--admin-pad-panel)] pb-2">
+    <Section title="Raw data exports" hint="CSV and Excel files for offline analysis. Each file has every row (up to 10,000), all time, not one page and not just the period picked above.">
+      <ul className="divide-y divide-ink-200 border-b border-ink-200">
         {items.map((item) => {
           const format = item.format ?? "CSV";
           return (
-          <li key={item.href} className="flex items-center justify-between gap-4 py-3">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-foreground">{item.title}</p>
-              <p className="text-sm text-text-subtle">{item.body}</p>
-            </div>
-            <a
-              href={item.href}
-              aria-label={`Download ${item.title} as ${format}`}
-              className="apple-spring inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
-            >
-              <Download className="size-4" aria-hidden />
-              <span className="max-sm:sr-only">{format}</span>
-            </a>
-          </li>
+            <li key={item.href} className="flex items-center justify-between gap-4 py-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-ink-900">{item.title}</p>
+                <p className="text-sm text-ink-600">{item.body}</p>
+              </div>
+              <a href={item.href} aria-label={`Download ${item.title} as ${format}`} className={RP_BUTTON}>
+                <Download className="size-4" aria-hidden />
+                {format}
+              </a>
+            </li>
           );
         })}
       </ul>
-    </Panel>
+    </Section>
   );
 }

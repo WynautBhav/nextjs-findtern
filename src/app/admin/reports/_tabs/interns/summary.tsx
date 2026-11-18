@@ -1,17 +1,19 @@
-import { ChartCard } from "@/components/admin/reports/chart-card";
-import { Funnel } from "@/components/admin/reports/funnel";
-import { StatStrip } from "@/components/admin/reports/stat-strip";
-import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
-import { fillSeries, statDelta } from "@/lib/admin/reports/growth";
+import { RollingNumber } from "@/components/app/rolling-number";
+import { LeadStat, Overview, Section, StatList } from "@/components/app/stat";
+import { BarFunnel, BarTrend } from "@/components/admin/money/rp-bars";
+import { countOrNone, windowWords } from "@/components/admin/money/rp-parts";
+import { fillSeries } from "@/lib/admin/reports/growth";
 import { INTERN_STAGES, STAGE_LABEL } from "@/lib/admin/reports/interns";
 import { loadInternSummary, loadInternTrend } from "@/lib/admin/reports/interns-load";
 import { bucketLabel, trendSpec } from "@/lib/admin/reports/window";
 import { formatNumber } from "@/lib/format";
 
+import { changeSentence } from "../overview/growth";
 import type { TabProps } from "../types";
 
-const pct = (a: number, b: number) => (b > 0 ? `${Math.round((a / b) * 100)}%` : "0%");
+const count = countOrNone;
 
+/** Interns: one lead figure (new interns in the period), the quiet list, the trend, where every intern is now, and account status. */
 export default async function Summary({ window: w, now }: TabProps) {
   const spec = trendSpec(w, now);
   const [{ counts: c, apps: a }, trend] = await Promise.all([loadInternSummary(w, now), loadInternTrend(spec)]);
@@ -21,64 +23,52 @@ export default async function Summary({ window: w, now }: TabProps) {
     label: STAGE_LABEL[s],
     count: INTERN_STAGES.slice(i).reduce((sum, later) => sum + (c.stages[later] ?? 0), 0),
   }));
-  const label = w.kind === "all" ? "all time" : w.label.toLowerCase();
+  const label = windowWords(w);
 
   return (
-    <div className="space-y-5 lg:space-y-6" data-rp="interns-summary">
-      <StatStrip
-        label="Intern figures"
-        stats={[
-          { label: "New interns", value: formatNumber(c.newWindow), note: `signed up ${label}`, accent: true, ...statDelta(c.newWindow, c.newPrev) },
-          { label: "Today / week / month", value: `${formatNumber(c.today)} / ${formatNumber(c.week)} / ${formatNumber(c.month)}`, note: "new interns (India time, week from Monday)" },
-          { label: "Applications", value: formatNumber(a.win), note: `from ${formatNumber(a.winInterns)} ${a.winInterns === 1 ? "intern" : "interns"} ${label}`, ...statDelta(a.win, a.prev) },
-          { label: "Applications this week / month", value: `${formatNumber(a.week)} / ${formatNumber(a.month)}`, note: `by ${formatNumber(a.weekInterns)} / ${formatNumber(a.monthInterns)} distinct interns` },
-          { label: "Hired / not hired", value: `${formatNumber(c.hired)} / ${formatNumber(Math.max(0, c.total - c.hired))}`, note: `${pct(c.hired, c.total)} of ${formatNumber(c.total)} interns hired` },
-          { label: "Verified", value: formatNumber(c.approved), note: `admin-approved. KYC details given: ${formatNumber(c.kyc)}. Email verified: ${formatNumber(c.emailVerified)}` },
-        ]}
+    <div className="space-y-10 lg:space-y-12" data-rp="interns-summary">
+      <Overview
+        lead={<LeadStat label={`New interns, ${label}`} value={<RollingNumber value={c.newWindow} />} note={`Signed up ${label}; ${formatNumber(c.total)} interns in all. ${changeSentence(c.newWindow, c.newPrev)}`.trim()} />}
+        rest={
+          <StatList
+            items={[
+              { label: "Applications", value: count(a.win), hint: `Offers sent to interns ${label} (drafts left out), to ${formatNumber(a.winInterns)} ${a.winInterns === 1 ? "intern" : "interns"}. ${changeSentence(a.win, a.prev)}`.trim() },
+              { label: "Hired", value: count(c.hired), hint: `Of all ${formatNumber(c.total)} interns, hired at any date, whatever the period.` },
+              { label: "Verified by an admin", value: count(c.approved), hint: `KYC details given: ${formatNumber(c.kyc)}. Email verified: ${formatNumber(c.emailVerified)}.` },
+            ]}
+          />
+        }
       />
 
-      <ChartCard
-        views={[
-          {
-            key: "new",
-            tab: "New interns",
-            title: "New interns",
-            note: `Signups per ${spec.bucket} in India time${spec.bucket === "week" ? ", weeks start Monday" : ""}.`,
-            unit: "Interns",
-            format: "count",
-            series: [{ label: "New interns", tone: "current", points: spec.keys.map((k, i) => ({ x: bucketLabel(k, spec.bucket), y: series[i] })) }],
-          },
-        ]}
-      />
+      <Section title={`New interns per ${spec.bucket}`} hint={`India time${spec.bucket === "week" ? ", weeks start Monday" : ""}.`}>
+        <BarTrend
+          ariaLabel={`New interns per ${spec.bucket}`}
+          bucket={spec.bucket}
+          unit="new interns"
+          valueHeader="New interns"
+          rows={spec.keys.map((k, i) => ({ key: k, label: bucketLabel(k, spec.bucket), value: series[i] }))}
+          lastIsPartial={!w.until}
+          emptyText="Nobody signed up in this stretch. Pick a longer period above."
+        />
+      </Section>
 
-      <div className="grid gap-5 lg:gap-6 xl:grid-cols-2">
-        <Panel>
-          <PanelHeader title="Where interns are" description="Interns who reached each step or a later one (everyone, all time). Each intern sits at the furthest step reached, so a step is never wider than the one above." />
-          <PanelBody>
-            <Funnel ariaLabel="Interns by furthest step reached" steps={reached} />
-          </PanelBody>
-        </Panel>
-        <Panel>
-          <PanelHeader title="Account status" description="All interns, all time. Banned and admin-hidden interns are included here and labelled in the table." />
-          <PanelBody>
-            <dl className="grid grid-cols-2 gap-x-6 gap-y-4 text-sm">
-              {[
-                ["Active", c.active],
-                ["Hidden by admin", c.hidden],
-                ["Banned", c.banned],
-                ["Switched off (inactive)", c.inactive],
-                ["Total interns", c.total],
-                ["Paid activation", c.paid],
-                ["AI interview scored", c.scored],
-              ].map(([k, v]) => (
-                <div key={k as string}>
-                  <dt className="text-text-subtle">{k}</dt>
-                  <dd className="nums mt-0.5 text-xl font-semibold text-foreground">{formatNumber(v as number)}</dd>
-                </div>
-              ))}
-            </dl>
-          </PanelBody>
-        </Panel>
+      <div className="grid gap-x-12 gap-y-10 xl:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <Section title="Where interns are" hint="Everyone, all time. Each intern sits at the furthest step reached, so a step is never wider than the one above.">
+          <BarFunnel ariaLabel="Interns by furthest step reached" unit="interns" firstNoun="interns" steps={reached} emptyText="No intern has signed up yet." />
+          <p className="mt-3 text-sm text-ink-700">
+            A step counts everyone who reached it or a later one, so Paid activation can be larger than the {formatNumber(c.paid)} interns with a paid fee on record: the others were scored or sent offers without one.
+          </p>
+        </Section>
+        <Section title="Account status" hint="All interns, all time. Banned and admin-hidden interns are included and labelled in the table.">
+          <StatList
+            items={[
+              { label: "Active", value: count(c.active) },
+              { label: "Hidden by an admin", value: count(c.hidden) },
+              { label: "Banned", value: count(c.banned) },
+              { label: "Switched off by the intern", value: count(c.inactive) },
+            ]}
+          />
+        </Section>
       </div>
     </div>
   );
