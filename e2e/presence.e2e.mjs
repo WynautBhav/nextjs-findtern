@@ -7,7 +7,8 @@
  * Needs a migrated DB (0027) and a server started with TRUST_PROXY=1. Creates its own employer / intern accounts
  * by SQL and removes them. PRESENCE_SHOTS=<dir> also writes screenshots at 390 and 1440.
  * Story: the employer sees the candidate by default; stale heartbeats read as offline; the candidate hides it in
- * settings; the employer loses it everywhere (pages, threads API, SSE) and sees nothing in its place.
+ * settings; the employer loses it everywhere (pages, HTML, RSC payload) and sees nothing in its place.
+ * Employer-intern Messages (threads API, SSE stream) is removed; its parts of this story are gone with it.
  */
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
@@ -19,11 +20,11 @@ import { api, url } from "./lib/browser.mjs";
 import { closeDb, one, rows } from "./lib/db.mjs";
 import { seedAdmin } from "./lib/fixtures.mjs";
 import { loginState } from "./lib/session.mjs";
-import { RUN, cleanup, collectFrames, mkEmployer, mkIntern, mkProject, mkProposal, openStream, signedIn } from "./lib/fixtures2.mjs";
+import { RUN, cleanup, mkEmployer, mkIntern, mkProject, mkProposal, signedIn } from "./lib/fixtures2.mjs";
 
 const SHOTS = process.env.PRESENCE_SHOTS;
 let browser;
-let E, I, P = {}, threadId, proposalId;
+let E, I, P = {}, proposalId;
 const VIEWS = [
   ["390", { width: 390, height: 844 }],
   ["1440", { width: 1440, height: 900 }],
@@ -43,11 +44,6 @@ const heartbeat = async (page) => {
     if (r.status !== 429 || Date.now() > deadline) return r;
     await new Promise((res) => setTimeout(res, 5_000));
   }
-};
-const threadsOf = async () => {
-  const r = await api(P.E.page, "GET", "/api/threads");
-  assert.equal(r.status, 200);
-  return r.body.threads.find((t) => t.id === threadId);
 };
 /** The pages hold an SSE stream open, so "networkidle" never comes: load, then give client fetches a moment. */
 const settle = async (page, path) => {
@@ -91,10 +87,6 @@ before(async () => {
   P.N = await signedIn(browser, await mkIntern("prN")); // second candidate: the notice is per user
   const prop = await one(`SELECT id FROM proposals WHERE employer_id = $1 AND intern_id = $2`, [E.id, I.id]);
   proposalId = prop.id;
-  const r = await api(P.E.page, "POST", "/api/threads", { counterpartId: I.id, proposalId: prop.id });
-  assert.equal(r.status, 200, JSON.stringify(r.body));
-  threadId = r.body.thread?.id ?? r.body.id ?? r.body.threadId;
-  assert.ok(threadId, JSON.stringify(r.body));
 });
 
 after(async () => {
@@ -123,20 +115,12 @@ test("toggle API: auth, role, CSRF, validation", async () => {
   await anon.close();
 });
 
-test("default: the employer sees the candidate as active now (threads API, pages)", async () => {
+test("default: the employer sees the candidate as active now (pages)", async () => {
   const hb = await heartbeat(P.I.page);
   assert.equal(hb.status, 200);
   await setSeen("2 seconds");
-  const t = await threadsOf();
-  assert.equal(t.counterpartOnline, true);
-  assert.equal(t.counterpartPresence, "Active now");
 
   for (const [name, vp] of VIEWS) {
-    const msgs = await text(`/employer/messages/${threadId}`, vp);
-    assert.match(msgs.body, /Active now/);
-    await shot(msgs.page, `employer-thread-online-${name}`);
-    await msgs.page.close();
-
     const cands = await text("/employer/candidates", vp);
     assert.match(cands.body, /Active now/, "candidate card shows the presence label");
     await shot(cands.page, `employer-candidates-online-${name}`);
@@ -157,9 +141,6 @@ test("default: the employer sees the candidate as active now (threads API, pages
 
 test("stale heartbeat reads as offline, never online", async () => {
   await setSeen("3 hours 10 minutes");
-  const t = await threadsOf();
-  assert.equal(t.counterpartOnline, false);
-  assert.equal(t.counterpartPresence, "Last seen 3h ago");
   const cands = await text("/employer/candidates");
   assert.match(cands.body, /Last seen 3h ago/);
   assert.doesNotMatch(cands.body, /Active now/);
@@ -167,8 +148,6 @@ test("stale heartbeat reads as offline, never online", async () => {
   await cands.page.close();
 
   await setSeen("40 days");
-  const old = await threadsOf();
-  assert.equal(old.counterpartPresence, "Offline");
   const prof = await text(`/employer/intern/${I.id}`);
   assert.match(prof.body, /Offline/);
   assert.doesNotMatch(prof.body, /Last seen/);
@@ -244,18 +223,7 @@ test("hidden: the employer sees nothing, anywhere, and no timestamp leaks", asyn
   const beat = await one(`SELECT show_activity, last_seen_at > now() - interval '30 seconds' AS fresh FROM user_presence WHERE user_id = $1`, [I.id]);
   assert.equal(beat.show_activity, false, "a heartbeat does not undo the hide");
   assert.equal(beat.fresh, true, "the heartbeat did record (so the hide is applied on read, not by not recording)");
-  const t = await threadsOf();
-  assert.equal(t.counterpartOnline, false);
-  assert.equal(t.counterpartPresence, null);
-  const raw = JSON.stringify((await api(P.E.page, "GET", "/api/threads")).body);
-  assert.doesNotMatch(raw, /lastSeen|last_seen/);
-
   for (const [name, vp] of VIEWS) {
-    const msgs = await text(`/employer/messages/${threadId}`, vp);
-    assert.doesNotMatch(msgs.body, /Active now|Last seen|Offline|Online/);
-    await shot(msgs.page, `employer-thread-hidden-${name}`);
-    await msgs.page.close();
-
     const cands = await text("/employer/candidates", vp);
     assert.doesNotMatch(cands.body, /Active now|Last seen|Offline/);
     await shot(cands.page, `employer-candidates-hidden-${name}`);
@@ -285,65 +253,16 @@ test("hidden: the employer sees nothing, anywhere, and no timestamp leaks", asyn
   assert.doesNotMatch(html, /Last seen|Active now|last_seen|lastSeen/);
 });
 
-test("hidden: SSE for the employer carries no presence while the candidate beats and flips", async () => {
-  // The server allows 3 streams per user; the employer's open tab holds one and closed tabs release theirs a moment late.
-  await P.E.page.goto("about:blank");
-  let es = await openStream(P.E.state);
-  for (let i = 0; i < 10 && es.res.status === 429; i++) {
-    es.close();
-    await new Promise((ok) => setTimeout(ok, 2_000));
-    es = await openStream(P.E.state);
-  }
-  assert.equal(es.res.status, 200);
-  await setSeen("3 seconds");
-  // Even a presence.changed event written for the employer arrives as an empty nudge.
-  await one(
-    `INSERT INTO realtime_events (user_id, type, payload) VALUES ($1, 'presence.changed', $2::jsonb) RETURNING 1 AS x`,
-    [E.id, JSON.stringify({ userId: I.id, lastSeenAt: new Date().toISOString(), online: true })],
-  );
-  const frames = await collectFrames(es.res, 5_000);
-  es.close();
-  const pc = frames.find((f) => f.event === "presence.changed");
-  assert.ok(pc, "the nudge arrives");
-  assert.deepEqual(pc.data, {});
-  assert.doesNotMatch(JSON.stringify(frames), /lastSeen|last_seen|"online"/);
-});
-
-test("turning it back on restores the labels; admin and the candidate are unaffected", async () => {
+test("turning it back on restores the labels", async () => {
   const on = await api(P.I.page, "POST", "/api/intern/presence-visibility", { showActivity: true });
   assert.equal(on.status, 200);
   assert.deepEqual(on.body, { showActivity: true });
   await setSeen("3 seconds");
-  const t = await threadsOf();
-  assert.equal(t.counterpartPresence, "Active now");
-  // The candidate's own thread list still shows the employer (the employer has no toggle).
-  const mine = await api(P.I.page, "GET", "/api/threads");
-  assert.equal(mine.status, 200);
+  const cands = await text("/employer/candidates");
+  assert.match(cands.body, /Active now/);
+  await cands.page.close();
   const beat = await rows(`SELECT show_activity FROM user_presence WHERE user_id = $1`, [I.id]);
   assert.equal(beat.length, 1);
-});
-
-test("candidate side: an employer shows as Online / Offline only, never a last-seen label or timestamp", async () => {
-  const beatE = (ago) =>
-    one(`INSERT INTO user_presence (user_id, last_seen_at) VALUES ($1, now() - $2::interval) ON CONFLICT (user_id) DO UPDATE SET last_seen_at = now() - $2::interval RETURNING 1 AS x`, [E.id, ago]);
-  const mineOf = async () => (await api(P.I.page, "GET", "/api/threads")).body.threads.find((t) => t.id === threadId);
-  await beatE("5 seconds");
-  const on = await mineOf();
-  assert.equal(on.counterpartOnline, true);
-  assert.equal(on.counterpartPresence, "Online");
-  for (const ago of ["3 hours", "2 days", "40 days"]) {
-    await beatE(ago);
-    const off = await mineOf();
-    assert.equal(off.counterpartOnline, false);
-    assert.equal(off.counterpartPresence, "Offline", `employer idle ${ago}`);
-  }
-  const raw = JSON.stringify((await api(P.I.page, "GET", "/api/threads")).body);
-  assert.doesNotMatch(raw, /Last seen|lastSeen|last_seen/);
-  const page = await P.I.ctx.newPage();
-  await settle(page, `/intern/messages/${threadId}`);
-  const body = await page.locator("body").innerText();
-  assert.doesNotMatch(body, /Last seen|Active now/);
-  await page.close();
 });
 
 test("toggle: the 21st change inside a minute is 429 and changes nothing", async () => {

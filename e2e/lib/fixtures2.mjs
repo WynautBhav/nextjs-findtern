@@ -109,8 +109,8 @@ export async function collectFrames(res, ms) {
 export async function cleanup() {
   const ids = [...made.users, ...made.employers];
   if (!ids.length) return;
-  const t = await rows(`SELECT id FROM threads WHERE employer_id = ANY($1) OR intern_id = ANY($1)`, [ids]);
-  const tids = t.map((r) => r.id);
+  // Messaging is removed; its tables may be gone from a newer schema, so this lookup is best effort too.
+  const tids = (await rows(`SELECT id FROM threads WHERE employer_id = ANY($1) OR intern_id = ANY($1)`, [ids]).catch(() => [])).map((r) => r.id);
   const steps = [
     [`DELETE FROM messages WHERE thread_id = ANY($1)`, [tids]],
     [`DELETE FROM threads WHERE id = ANY($1)`, [tids]],
