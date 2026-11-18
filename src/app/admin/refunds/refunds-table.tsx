@@ -7,13 +7,14 @@ import { Loader2 } from "lucide-react";
 import { AdminEmpty } from "@/components/admin/panel";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { buttonClass } from "@/components/ui/button";
+import { FILTER_BUTTON, FILTER_SELECT, FilterBar, FilterField } from "@/components/admin/filter-controls";
+import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatDate, formatMoney } from "@/lib/format";
 import { refundGstMinor } from "@/lib/refund-accounting";
 import type { RefundListRow } from "@/lib/refunds/refunds-db";
 
-const select = "h-9 rounded-apple-sm border border-ink-200 bg-surface px-3 text-sm text-ink-900";
 
 export function RefundsTable(props: { rows: RefundListRow[]; total: number; page: number; perPage: number; status: string; reason: string; statuses: string[] }) {
   const router = useProgressRouter();
@@ -58,20 +59,28 @@ export function RefundsTable(props: { rows: RefundListRow[]; total: number; page
 
   return (
     <div>
-      <div className="flex flex-wrap items-center gap-2 border-b border-ink-200 p-4">
-        <select aria-label="Status" className={select} value={props.status} onChange={(e) => go({ ...filters, status: e.target.value })}>
-          <option value="">All statuses</option>
-          {props.statuses.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
-        </select>
-        <select aria-label="Reason" className={select} value={props.reason} onChange={(e) => go({ ...filters, reason: e.target.value })}>
-          <option value="">All reasons</option>
-          <option value="drive_entitlement_after_payment">Drive seat after payment</option>
-          <option value="interview_consumed">Interview already used</option>
-        </select>
-        <button type="button" onClick={scan} disabled={scanning} className={`${buttonClass({ variant: "outline", size: "sm" })} sm:ml-auto max-sm:w-full`}>
-          {scanning ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-          Scan for eligible students
-        </button>
+      <div className="border-b border-ink-200 p-4">
+        <FilterBar name="refunds">
+          <FilterField label="Status" htmlFor="refund-status" className="max-sm:w-full">
+            <select id="refund-status" className={FILTER_SELECT} value={props.status} onChange={(e) => go({ ...filters, status: e.target.value })}>
+              <option value="">All statuses</option>
+              {props.statuses.map((s) => <option key={s} value={s}>{s[0].toUpperCase() + s.slice(1)}</option>)}
+            </select>
+          </FilterField>
+          <FilterField label="Reason" htmlFor="refund-reason" className="max-sm:w-full">
+            <select id="refund-reason" className={FILTER_SELECT} value={props.reason} onChange={(e) => go({ ...filters, reason: e.target.value })}>
+              <option value="">All reasons</option>
+              <option value="drive_entitlement_after_payment">Drive seat after payment</option>
+              <option value="interview_consumed">Interview already used</option>
+            </select>
+          </FilterField>
+          <FilterField className="max-sm:w-full">
+            <button type="button" onClick={scan} disabled={scanning} className={cn(FILTER_BUTTON, "max-sm:w-full max-sm:justify-center disabled:opacity-60")}>
+              {scanning ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
+              Scan for eligible students
+            </button>
+          </FilterField>
+        </FilterBar>
       </div>
       <p role="status" aria-live="polite" className={notice ? `px-4 pt-3 text-sm font-medium ${notice.ok ? "text-success" : "text-danger"}` : "sr-only"}>{notice?.text}</p>
 

@@ -16,6 +16,7 @@ import { loadReceivables, moneyFilter } from "@/lib/admin/receivables-load";
 import { istDayKey, netMinor } from "@/lib/admin/revenue";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { FILTER_BUTTON, FILTER_CONTROL, FILTER_SELECT, FilterBar, FilterField } from "@/components/admin/filter-controls";
 import { AutoSubmitForm } from "@/components/app/auto-submit-form";
 
 import type { TabProps } from "../types";
@@ -43,9 +44,6 @@ const STATUS_TONE: Record<MoneyRow["status"], string> = {
   upcoming: "sent",
   unpaid: "inactive",
 };
-
-const field =
-  "h-10 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11";
 
 /**
  * The old Money in and out report (legacy receivables / payables, routes.ts:5100-5453), now a section of the Finance
@@ -117,42 +115,40 @@ export default async function MoneyInOut({ window: w, params }: TabProps) {
 
       {/* Candidate / company / status (ADM-15): one GET form, applies to both
           tables as you change it (no Filter button, QA-149). */}
-      <AutoSubmitForm className="flex flex-wrap items-end gap-3">
+      <AutoSubmitForm>
         {Object.entries(params)
           .filter(([k, v]) => v && !["company", "candidate", "status", "page"].includes(k))
           .map(([k, v]) => (
             <input key={k} type="hidden" name={k} value={v} />
           ))}
-        <label className="flex flex-col gap-1 text-xs font-medium text-text-subtle">
-          Company
-          <input name="company" defaultValue={rowFilter.company} placeholder="Any company" className={cn(field, "w-48")} />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-text-subtle">
-          Candidate
-          <input name="candidate" defaultValue={rowFilter.candidate} placeholder="Any candidate" className={cn(field, "w-48")} />
-        </label>
-        <label className="flex flex-col gap-1 text-xs font-medium text-text-subtle">
-          Status
-          <select name="status" defaultValue={rowFilter.status} className={field}>
-            <option value="">Any status</option>
-            {MONEY_STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABEL[s]}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="submit" className="sr-only">
-          Apply filters
-        </button>
-        {filtered ? (
-          <Link
-            href={link({ company: "", candidate: "", status: "" })}
-            className="apple-spring inline-flex h-10 items-center rounded-full px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-panel-2)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
-          >
-            Clear
-          </Link>
-        ) : null}
+        <FilterBar name="money-in-out">
+          <FilterField label="Company" htmlFor="money-company">
+            <input id="money-company" name="company" defaultValue={rowFilter.company} placeholder="Any company" className={cn(FILTER_CONTROL, "w-48 max-sm:w-full")} />
+          </FilterField>
+          <FilterField label="Candidate" htmlFor="money-candidate">
+            <input id="money-candidate" name="candidate" defaultValue={rowFilter.candidate} placeholder="Any candidate" className={cn(FILTER_CONTROL, "w-48 max-sm:w-full")} />
+          </FilterField>
+          <FilterField label="Status" htmlFor="money-status">
+            <select id="money-status" name="status" defaultValue={rowFilter.status} className={FILTER_SELECT}>
+              <option value="">Any status</option>
+              {MONEY_STATUSES.map((s) => (
+                <option key={s} value={s}>
+                  {STATUS_LABEL[s]}
+                </option>
+              ))}
+            </select>
+          </FilterField>
+          <button type="submit" className="sr-only">
+            Apply filters
+          </button>
+          {filtered ? (
+            <FilterField>
+              <Link href={link({ company: "", candidate: "", status: "" })} className={FILTER_BUTTON}>
+                Clear
+              </Link>
+            </FilterField>
+          ) : null}
+        </FilterBar>
       </AutoSubmitForm>
 
       {data ? (

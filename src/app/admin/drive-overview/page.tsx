@@ -3,6 +3,8 @@ import Link from "next/link";
 import { AdminEmpty, AdminPageHeader, Panel, PanelBody } from "@/components/admin/panel";
 import { clampPage, DRIVE_STATUSES, DRIVE_STATUS_LABEL } from "@/lib/college/drive-dashboard";
 import { adminDriveOverview } from "@/lib/drives/dashboard-db";
+import { FILTER_BUTTON, FILTER_CONTROL, FILTER_SELECT, FilterBar, FilterField } from "@/components/admin/filter-controls";
+import { cn } from "@/lib/utils";
 import { flattenParams } from "@/lib/admin/params";
 
 export const dynamic = "force-dynamic";
@@ -31,15 +33,23 @@ export default async function AdminDriveOverviewPage({
   return (
     <div className="space-y-4">
       <AdminPageHeader title="Drive overview" subtitle="Slots, codes sent and activations across all colleges. Read-only." />
-      <form method="get" className="flex flex-wrap gap-2" role="search">
-        <input name="q" defaultValue={q} placeholder="College name" aria-label="Filter by college name" className="h-10 min-w-0 flex-1 rounded-md border px-3 text-sm" />
-        <select name="status" defaultValue={status} aria-label="Has students in status" className="h-10 rounded-md border px-2 text-sm">
-          <option value="">Any status</option>
-          {DRIVE_STATUSES.map((s) => (
-            <option key={s} value={s}>{DRIVE_STATUS_LABEL[s]}</option>
-          ))}
-        </select>
-        <button type="submit" className="h-10 rounded-md border px-4 text-sm font-medium">Filter</button>
+      <form method="get" role="search" aria-label="Filter drive orders">
+        <FilterBar name="drive-overview">
+          <FilterField label="College name" htmlFor="drive-q" className="w-full min-w-[12rem] flex-1 sm:w-auto sm:max-w-md">
+            <input id="drive-q" type="search" name="q" defaultValue={q} placeholder="College name" className={cn(FILTER_CONTROL, "w-full")} />
+          </FilterField>
+          <FilterField label="Has students in status" htmlFor="drive-status" className="max-sm:w-full">
+            <select id="drive-status" name="status" defaultValue={status} className={FILTER_SELECT}>
+              <option value="">Any status</option>
+              {DRIVE_STATUSES.map((s) => (
+                <option key={s} value={s}>{DRIVE_STATUS_LABEL[s]}</option>
+              ))}
+            </select>
+          </FilterField>
+          <FilterField>
+            <button type="submit" className={FILTER_BUTTON}>Filter</button>
+          </FilterField>
+        </FilterBar>
       </form>
       <Panel>
         <PanelBody>

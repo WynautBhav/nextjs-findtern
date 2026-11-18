@@ -1,9 +1,9 @@
 import { Download } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { FILTER_BUTTON, FILTER_CONTROL, FILTER_SELECT, FilterBar, FilterField } from "../filter-controls.tsx";
 
-export const FIELD =
-  "h-10 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11";
+export const FIELD = FILTER_CONTROL;
 
 /**
  * A plain GET search form (works with no JS, Enter submits): every other query key is carried as a
@@ -28,35 +28,42 @@ export function SearchForm({
   children?: React.ReactNode;
 }) {
   const skip = new Set([name, ...drop]);
+  const id = `search-${name}`;
   return (
-    <form method="get" role="search" aria-label={label} className={cn("flex flex-wrap items-center gap-2", className)}>
-      <input type="search" name={name} defaultValue={params[name] ?? ""} placeholder={placeholder} aria-label={label} maxLength={80} className={cn(FIELD, "w-full min-w-0 sm:w-56")} />
-      {Object.entries(params)
-        .filter(([k, v]) => v && !skip.has(k))
-        .map(([k, v]) => (
-          <input key={k} type="hidden" name={k} value={v} />
-        ))}
-      {children}
-      <button type="submit" className="apple-spring inline-flex h-10 items-center rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11">
-        Search
-      </button>
+    <form method="get" role="search" aria-label={label} className={className}>
+      <FilterBar name="search-form">
+        <FilterField label={label} htmlFor={id} className="w-full min-w-0 sm:w-56">
+          <input id={id} type="search" name={name} defaultValue={params[name] ?? ""} placeholder={placeholder} maxLength={80} className={cn(FILTER_CONTROL, "w-full min-w-0")} />
+        </FilterField>
+        {Object.entries(params)
+          .filter(([k, v]) => v && !skip.has(k))
+          .map(([k, v]) => (
+            <input key={k} type="hidden" name={k} value={v} />
+          ))}
+        {children}
+        <FilterField>
+          <button type="submit" className={FILTER_BUTTON}>
+            Search
+          </button>
+        </FilterField>
+      </FilterBar>
     </form>
   );
 }
 
 /** A labelled native select inside a SearchForm (no JS: the Search button applies it). */
 export function SelectField({ name, label, value, options }: { name: string; label: string; value: string; options: { value: string; label: string }[] }) {
+  const id = `select-${name}`;
   return (
-    <label className="flex items-center gap-2 text-sm text-text-subtle">
-      <span className="sr-only sm:not-sr-only">{label}</span>
-      <select name={name} defaultValue={value} aria-label={label} className={cn(FIELD, "pr-8")}>
+    <FilterField label={label} htmlFor={id}>
+      <select id={id} name={name} defaultValue={value} className={FILTER_SELECT}>
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
           </option>
         ))}
       </select>
-    </label>
+    </FilterField>
   );
 }
 
@@ -65,8 +72,8 @@ export function ExportLink({ href, label }: { href: string; label: string }) {
   return (
     <a
       href={href}
-      aria-label={label}
-      className="apple-spring inline-flex h-10 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+      title={label}
+      className={FILTER_BUTTON}
     >
       <Download className="size-4" aria-hidden />
       Export CSV

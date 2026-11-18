@@ -2,6 +2,8 @@ import { Download } from "lucide-react";
 
 import { IdentityCell } from "@/components/admin/data-table";
 import { AdminLoadError, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
+import { FILTER_CONTROL } from "@/components/admin/filter-controls";
+import { cn } from "@/lib/utils";
 import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { ChipLinks, DateRangeForm } from "@/components/admin/report-range";
 import { ChartCard } from "@/components/admin/reports/chart-card";
@@ -228,7 +230,7 @@ export default async function HiringAnalytics({ window: w, params }: TabProps) {
                   defaultValue={companyQuery}
                   placeholder="Search company"
                   aria-label="Search companies"
-                  className="h-10 w-44 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+                  className={cn(FILTER_CONTROL, "w-44")}
                 />
                 {Object.entries(params)
                   .filter(([k, v]) => v && k !== "cq")
@@ -306,7 +308,7 @@ export default async function HiringAnalytics({ window: w, params }: TabProps) {
               defaultValue={hireFilter.q}
               placeholder="Candidate or company"
               aria-label="Search hires"
-              className="h-10 w-52 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
+              className={cn(FILTER_CONTROL, "w-52")}
             />
             {Object.entries(params)
               .filter(([k, v]) => v && !["hq", "hiredFrom", "hiredTo", "hp"].includes(k))

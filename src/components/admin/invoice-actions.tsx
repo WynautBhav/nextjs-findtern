@@ -1,5 +1,6 @@
 "use client";
 
+import { FILTER_BUTTON, FilterField } from "@/components/admin/filter-controls";
 import { useState } from "react";
 import { Download, Eye, Loader2, Mail } from "lucide-react";
 
@@ -194,13 +195,11 @@ function Detail({ label, children }: { label: string; children: React.ReactNode 
 export function InvoiceCsvButton({ rows, kind }: { rows: AdminInvoiceRow[]; kind: InvoiceKind }) {
   const k = INVOICE_KINDS[kind];
   return (
-    <button
-      type="button"
-      onClick={() => downloadCsv(k.csv, rows, invoiceCsvColumns(kind))}
-      className={PILL_TONAL}
-    >
-      <Download className="size-3.5" aria-hidden />
-      Export CSV
-    </button>
+    <FilterField>
+      <button type="button" onClick={() => downloadCsv(k.csv, rows, invoiceCsvColumns(kind))} className={FILTER_BUTTON}>
+        <Download className="size-4" aria-hidden />
+        Export CSV
+      </button>
+    </FilterField>
   );
 }
