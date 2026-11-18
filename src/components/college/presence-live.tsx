@@ -104,10 +104,10 @@ export function PresenceLive({
             {everyone
               ? "Every eligible student has Findtern open. Nobody to chase."
               : snap.alertable === 0
-                ? "A student is ready once Findtern is open on their phone or laptop. None of the rest has call alerts on, so a nudge reaches them when they next open Findtern."
+                ? "A student is ready once Findtern is open on their phone or laptop. None of the rest has call alerts on, so a nudge reaches them by email and in their Findtern notifications."
                 : snap.alertable === snap.offline.length
                   ? "A student is ready once Findtern is open. All of the rest have call alerts on: a nudge reaches their phone now."
-                  : `A student is ready once Findtern is open. ${snap.alertable} of the rest get a nudge on their phone now; the others when they next open Findtern.`}
+                  : `A student is ready once Findtern is open. ${snap.alertable} of the rest get a nudge on their phone now; the others by email and in their Findtern notifications.`}
           </p>
         </div>
 

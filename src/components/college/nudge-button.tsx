@@ -39,25 +39,25 @@ export function NudgeButton({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kind, userIds }),
     }).catch(() => null);
-    const body = (await res?.json().catch(() => null)) as { sent?: number; pushed?: number; skipped?: number; emailed?: boolean; error?: string } | null;
+    const body = (await res?.json().catch(() => null)) as { sent?: number; pushed?: number; skipped?: number; emailed?: number; error?: string } | null;
     if (!res?.ok || !body) {
       setState("error");
       setNote(body?.error ?? "Couldn't send. Try again.");
       return;
     }
     setState("done");
-    // Say how it travelled: a phone alert reaches them now; the bell only
-    // when they next open Findtern. Never imply more reach than happened.
+    // Say how it travelled: a phone alert reaches them now, an email when they check mail, the bell when they next open Findtern. Never imply more reach than happened.
     const sent = body.sent ?? 0;
     const pushed = body.pushed ?? 0;
-    const via = body.emailed ? "email and in-app" : "in-app";
+    const emailed = body.emailed ?? 0;
     setNote(
       sent === 0
-        ? "Already nudged in the last 10 min"
+        ? "Already nudged recently"
         : [
             `${sent} nudged`,
             pushed ? `${pushed} by phone alert` : null,
-            sent - pushed > 0 ? `${sent - pushed} by ${via} only` : null,
+            emailed ? `${emailed} emailed` : null,
+            sent - pushed - emailed > 0 ? `${sent - pushed - emailed} in-app` : null,
             body.skipped ? `${body.skipped} nudged recently` : null,
           ]
             .filter(Boolean)
