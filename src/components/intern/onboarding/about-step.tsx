@@ -15,7 +15,7 @@ const MB = 1024 * 1024;
 /** Card images: JPG or PNG only (no PDF). Shrunk in the browser first, so the 1 MB cap only trips on a file that cannot be made smaller; the server stores them as WebP. */
 const CARD_TYPES = "image/jpeg,image/png";
 
-export function AboutStep({ values, update, errors, documents, account, onUploaded }: StepProps) {
+export function AboutStep({ values, update, errors, documents, account, idOnFile, onUploaded }: StepProps) {
   const onFile = (label: string) => (documents.find((d) => d.label === label) ? `${label} card on file` : null);
   // A locally cached draft can carry an empty photoUrl; the stored avatar wins.
   const photoSrc = values.photoUrl || (documents.some((d) => d.label === "Profile photo") ? "/api/intern/avatar" : "");
@@ -56,7 +56,7 @@ export function AboutStep({ values, update, errors, documents, account, onUpload
           <Field
             id="aadhaarNumber"
             label="Aadhaar number"
-            placeholder="2345 6789 0123"
+            placeholder={idOnFile.aadhaar ?? "2345 6789 0123"}
             inputMode="numeric"
             autoComplete="off"
             inputClassName="nums tracking-wide"
@@ -67,7 +67,7 @@ export function AboutStep({ values, update, errors, documents, account, onUpload
           <Field
             id="panNumber"
             label="PAN"
-            placeholder="ABCDE1234F"
+            placeholder={idOnFile.pan ?? "ABCDE1234F"}
             autoComplete="off"
             maxLength={10}
             inputClassName="nums uppercase tracking-wide"

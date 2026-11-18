@@ -1,4 +1,5 @@
 import type { MyCollege } from "@/lib/college/membership";
+import type { IdOnFile } from "./id-mask";
 import type { OnboardingDraft, StoredDocument } from "@/lib/onboarding";
 
 export const STEPS = [
@@ -23,6 +24,8 @@ export type StepProps = {
   email: string;
   /** The number on the account (captured at signup). */
   account: { countryCode: string; phoneNumber: string } | null;
+  /** Masked Aadhaar and PAN already stored (never the numbers). */
+  idOnFile: IdOnFile;
   hasPanImage: boolean;
   hasAadhaarImage: boolean;
   /** The college this student is linked to, if any. */
