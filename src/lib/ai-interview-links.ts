@@ -11,7 +11,7 @@
  * (employer-intern-detail.tsx:899).
  */
 
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { AI_INTERVIEW_EMAIL } from "@/lib/intern-data";
@@ -36,23 +36,27 @@ function httpUrl(value: unknown): string | null {
 
 export async function aiInterviewLinks(
   internId: string,
-  extra: Record<string, unknown> | null | undefined,
+  // A promise is accepted so a caller can start this read before its own `extra` has loaded (the two are independent).
+  extra: Record<string, unknown> | null | undefined | Promise<Record<string, unknown> | null | undefined>,
 ): Promise<AiInterviewLinks> {
   let feedbackLink: string | null = null;
   let recordingLink: string | null = null;
   try {
     const db = getDb();
-    const aiEmployers = await db
-      .select({ id: schema.employers.id })
-      .from(schema.employers)
-      .where(eq(schema.employers.companyEmail, AI_INTERVIEW_EMAIL));
+    // One statement: the AI employer ids are a sub-select, not a first round trip.
     const rows = await db
       .select({ notes: schema.interviews.notes })
       .from(schema.interviews)
       .where(
         and(
           eq(schema.interviews.internId, internId),
-          inArray(schema.interviews.employerId, ["admin", ...aiEmployers.map((e) => e.id)]),
+          or(
+            eq(schema.interviews.employerId, "admin"),
+            inArray(
+              schema.interviews.employerId,
+              db.select({ id: schema.employers.id }).from(schema.employers).where(eq(schema.employers.companyEmail, AI_INTERVIEW_EMAIL)),
+            ),
+          ),
         ),
       )
       .orderBy(desc(schema.interviews.createdAt));
@@ -63,8 +67,9 @@ export async function aiInterviewLinks(
   } catch {
     // Fall back to what the profile carries.
   }
+  const bag = await extra;
   return {
-    feedbackLink: feedbackLink ?? httpUrl(extra?.aiFeedbackLink),
-    recordingLink: recordingLink ?? httpUrl(extra?.aiRecordingLink),
+    feedbackLink: feedbackLink ?? httpUrl(bag?.aiFeedbackLink),
+    recordingLink: recordingLink ?? httpUrl(bag?.aiRecordingLink),
   };
 }
