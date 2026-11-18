@@ -53,7 +53,7 @@ export function CandidateSearch({ filters, className }: { filters: Filters; clas
         type="search"
         defaultValue={filters.q}
         placeholder="Skill or city"
-        className="h-11 w-full rounded-xl border border-ink-200 bg-ink-50 pl-11 pr-4 text-base text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:bg-white focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm"
+        className="h-11 w-full rounded-apple-sm border border-ink-200 bg-ink-50 pl-11 pr-4 text-base text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:bg-white focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm"
       />
     </form>
   );
@@ -138,7 +138,7 @@ export function ToolbarSort({ data, filters, className }: { data: CandidatesData
     const next = new URLSearchParams({ project: id });
     return `/employer/candidates?${next.toString()}`;
   };
-  const select = "h-11 min-w-0 rounded-xl border-ink-200 bg-white pl-3.5 max-sm:max-w-[9rem] [field-sizing:content] sm:h-9 sm:min-h-9 sm:touch:h-11";
+  const select = "h-11 min-w-0 rounded-apple-sm border-ink-200 bg-white pl-3.5 max-sm:max-w-[9rem] [field-sizing:content]";
   return (
     <div className={cn("flex min-w-0 max-w-full items-center gap-2", className)}>
       {data.projects.length > 1 && data.activeProjectId ? (
@@ -169,7 +169,7 @@ function ViewToggle({ filters }: { filters: Filters }) {
     { view: "rows" as const, label: "List view", Icon: List },
   ];
   return (
-    <nav aria-label="Layout" className="flex shrink-0 items-center gap-0.5 rounded-xl border border-ink-200 bg-white p-0.5">
+    <nav aria-label="Layout" className="flex shrink-0 items-center gap-0.5 rounded-apple-sm border border-ink-200 bg-white p-0.5">
       {options.map(({ view, label, Icon }) => {
         const active = filters.view === view;
         return (
