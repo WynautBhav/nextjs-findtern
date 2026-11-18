@@ -1,4 +1,4 @@
-import { SELLER_STATE_CODE, splitGst, stateCodeFromGstin, type PlaceOfSupply } from "./gst.ts";
+import { LUT_NUMBER, SELLER_STATE_CODE, splitGst, stateCodeFromGstin, type PlaceOfSupply } from "./gst.ts";
 import { formatMoney } from "./format.ts";
 
 /**
@@ -315,7 +315,7 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
   <div class="band">
     <div class="brand">
       <img class="logo" src="/logo.png" alt="Findtern" />
-      <div class="seller"><strong>${esc(seller.name)}</strong><br />${esc(seller.address)}<br />${gstLine}</div>
+      <div class="seller"><strong>${esc(seller.name)}</strong><br />${esc(seller.address)}<br />${gstLine}<br />LUT No.: ${esc(LUT_NUMBER)}</div>
     </div>
     <div class="word">INVOICE</div>
   </div>

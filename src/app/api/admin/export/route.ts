@@ -13,7 +13,7 @@ import { buildXlsx, XLSX_MIME } from "@/lib/xlsx";
 import { flattenParams, parsePageRequest, periodStart, searchAny } from "@/lib/admin/params";
 import { allows, BANK_EXPORT_PERMISSIONS, EXPORT_PERMISSIONS } from "@/lib/admin/permissions";
 import { activeProject, realEmployerId, realEmployers } from "@/lib/admin/scope";
-import { placeOfSupply, sellerStateCode, splitGst } from "@/lib/gst";
+import { LUT_NUMBER, placeOfSupply, sellerStateCode, splitGst } from "@/lib/gst";
 import { formatIstStamp } from "@/lib/format";
 import { placeLabel } from "@/lib/invoice";
 import { dateRangeConditions } from "@/lib/admin/date-range";
@@ -374,6 +374,7 @@ async function exportCollegeBatches(search: string, params: Record<string, strin
     { header: "Status", value: (r) => r.status },
     { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
     { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
+    { header: "LUT number", value: () => LUT_NUMBER },
   ];
   return csvResponse(toCsv(rows, columns), csvFilename("college-payments"));
 }
@@ -455,6 +456,7 @@ async function exportPayments(search: string, params: Record<string, string>, ad
     { header: "Gateway", value: (r) => r.gateway },
     { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
     { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
+    { header: "LUT number", value: () => LUT_NUMBER },
   ];
 
   // Billing data (company emails, GSTINs, amounts): fail closed like the candidate export, no audit row, no file.
@@ -587,6 +589,7 @@ async function exportInternPayments(search: string, params: Record<string, strin
     { header: "Status", value: (r) => r.status },
     { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
     { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
+    { header: "LUT number", value: () => LUT_NUMBER },
   ];
   return csvResponse(toCsv(rows, columns), csvFilename("intern-payments"));
 }

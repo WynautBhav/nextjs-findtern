@@ -1,5 +1,5 @@
 import { formatIstStamp } from "../format.ts";
-import { placeOfSupply, splitGst } from "../gst.ts";
+import { LUT_NUMBER, placeOfSupply, splitGst } from "../gst.ts";
 import type { CsvColumn } from "./csv.ts";
 import { displayInvoiceNumber, INVOICE_KINDS, type AdminInvoiceRow, type InvoiceKind } from "./invoice-rows.ts";
 
@@ -32,5 +32,7 @@ export function invoiceCsvColumns(kind: InvoiceKind): CsvColumn<AdminInvoiceRow>
     { header: "Review reasons", value: (r) => (r.reviewReasons ?? []).join("; ") },
     { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
     { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
+    // Findtern's own LUT number, the same on every invoice (last, so existing column positions hold).
+    { header: "LUT number", value: () => LUT_NUMBER },
   ];
 }

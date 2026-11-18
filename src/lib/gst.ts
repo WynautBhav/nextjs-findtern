@@ -211,6 +211,13 @@ export function splitGst(
 /** Findtern's registered GSTIN (legacy invoices; owner-confirmed 26 Oct). */
 export const DEFAULT_SELLER_GSTIN = "08AAGCF2512F1Z0";
 
+/**
+ * Findtern's GST Letter of Undertaking (LUT) number, for zero-rated export supplies. The company's own, public
+ * number: every invoice (INR and USD, every kind, print and CSV) prints it. The only place it is written; the
+ * guard test (lib/invoice-lut.test.ts) fails if an invoice generator does not use this constant.
+ */
+export const LUT_NUMBER = "AD081126006216G";
+
 /** Seller GSTIN: env, else the registered one; null only when malformed, so
  *  invoices say so instead of printing a bad number. */
 export function sellerGstin(): string | null {
