@@ -23,6 +23,7 @@ import { RememberSelection } from "@/components/employer/remember-selection";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedSelection } from "@/lib/employer-selection";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { hireFlowCounts } from "@/lib/employer-flow";
+import { getEmployerRows } from "@/lib/employer-request";
 import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
@@ -58,7 +59,9 @@ function one(v: string | string[] | undefined): string | undefined {
  */
 export default async function CompareCandidates({ searchParams }: { searchParams: Promise<Search> }) {
   const session = await requireRole("employer");
-  await requireEmployerSetup(session.uid);
+  // Setup check beside the page's reads, not ahead of them (see candidates/page.tsx): its redirect still wins.
+  const setup = requireEmployerSetup(session.uid);
+  setup.catch(() => undefined);
   const sp = await searchParams;
   // Opened from the sidebar (no `ids`), compare shows the candidates ticked
   // on the candidates page, and benchmarks against the project picked there.
@@ -85,77 +88,103 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   let shortlistedFor = new Map<string, string[]>();
   let loadFailed = false;
 
+  // Independent reads start together instead of one after another; each is awaited where it used to run, inside the try below
+  // (a failure is still `loadFailed`). The no-op catch only stops a read nobody reaches from being an unhandled rejection.
+  const early = <T,>(p: PromiseLike<T>): Promise<T> => {
+    const q = Promise.resolve(p);
+    q.catch(() => undefined);
+    return q;
+  };
+  const db0 = getDb();
+  const hiredP = early(hiredInternIds(db0, session.uid));
+  const projectsP = early(
+    db0
+      .select({
+        id: schema.projects.id,
+        projectName: schema.projects.projectName,
+        skills: schema.projects.skills,
+        status: schema.projects.status,
+        takenDownAt: schema.projects.takenDownAt,
+      })
+      .from(schema.projects)
+      .where(eq(schema.projects.employerId, session.uid))
+      .orderBy(desc(schema.projects.createdAt)),
+  );
+  const visibleP = ids.length > 0 ? early(visibleInternIds(db0, session.uid, ids)) : null;
+  const shortlistedForP =
+    ids.length > 0
+      ? early(
+          db0
+            .select({ internId: schema.employerCartItems.internId, projectName: schema.projects.projectName })
+            .from(schema.employerCartItems)
+            .innerJoin(schema.projects, eq(schema.projects.id, schema.employerCartItems.projectId))
+            .where(
+              and(
+                eq(schema.employerCartItems.employerId, session.uid),
+                eq(schema.employerCartItems.listType, "cart"),
+                inArray(schema.employerCartItems.internId, ids),
+              ),
+            ),
+        )
+      : null;
+  const plansP = ids.length > 0 ? early(db0.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true))) : null;
+  const employerP = ids.length > 0 ? early(getEmployerRows(session.uid)) : null;
+  // The tab row's Shortlist figure: the same count the Shortlist page's strip shows.
+  const flowP = early(hireFlowCounts(session.uid, 0).catch(() => null));
+
+  await setup;
+
   try {
-    const db = getDb();
-    nameUnlocked = await hiredInternIds(db, session.uid);
+    const db = db0;
+    nameUnlocked = await hiredP;
 
     // Open projects only, newest first; the newest open one is the default
     // (EMB-04 / EMH-15).
     projects = (
-      await db
-        .select({
-          id: schema.projects.id,
-          projectName: schema.projects.projectName,
-          skills: schema.projects.skills,
-          status: schema.projects.status,
-          takenDownAt: schema.projects.takenDownAt,
-        })
-        .from(schema.projects)
-        .where(eq(schema.projects.employerId, session.uid))
-        .orderBy(desc(schema.projects.createdAt))
+      await projectsP
     ).filter((p) => isOpenProject(p.status, p.takenDownAt));
     activeProject = (projectParam && projects.find((p) => p.id === projectParam)) || projects[0] || null;
 
-    if (activeProject) {
-      const cartRows = await db
-        .select({ internId: schema.employerCartItems.internId })
-        .from(schema.employerCartItems)
-        .where(
-          and(
-            eq(schema.employerCartItems.employerId, session.uid),
-            eq(schema.employerCartItems.projectId, activeProject.id),
-            eq(schema.employerCartItems.listType, "cart"),
-          ),
-        );
-      shortlisted = new Set(cartRows.map((r) => r.internId));
-    }
+    // The project is now known: its shortlist and the offer relations (which depend on it) read together.
+    const [cartRows, rel] = await Promise.all([
+      activeProject
+        ? db
+            .select({ internId: schema.employerCartItems.internId })
+            .from(schema.employerCartItems)
+            .where(
+              and(
+                eq(schema.employerCartItems.employerId, session.uid),
+                eq(schema.employerCartItems.projectId, activeProject.id),
+                eq(schema.employerCartItems.listType, "cart"),
+              ),
+            )
+        : Promise.resolve([] as { internId: string }[]),
+      ids.length > 0 ? candidateRelations(db, session.uid, ids, activeProject?.id ?? null) : Promise.resolve(new Map<string, CandidateRelation>()),
+    ]);
+    shortlisted = new Set(cartRows.map((r) => r.internId));
 
     if (ids.length > 0) {
       // Only candidates this employer may open, minus anyone they already
       // hired - legacy dropped both from compare (employer-compare.tsx:550).
-      const [visible, rel] = await Promise.all([
-        visibleInternIds(db, session.uid, ids),
-        candidateRelations(db, session.uid, ids, activeProject?.id ?? null),
-      ]);
+      const visible = await visibleP!;
       relations = rel;
       // Compare is shared across projects but a shortlist is per project, so say where each one already sits.
-      shortlistedFor = shortlistProjectsByIntern(
-        await db
-          .select({ internId: schema.employerCartItems.internId, projectName: schema.projects.projectName })
-          .from(schema.employerCartItems)
-          .innerJoin(schema.projects, eq(schema.projects.id, schema.employerCartItems.projectId))
-          .where(
-            and(
-              eq(schema.employerCartItems.employerId, session.uid),
-              eq(schema.employerCartItems.listType, "cart"),
-              inArray(schema.employerCartItems.internId, ids),
-            ),
-          ),
-      );
+      shortlistedFor = shortlistProjectsByIntern(await shortlistedForP!);
       const comparable = ids.filter((id) => visible.has(id) && !rel.get(id)?.hired);
-      const rows = comparable.length
-        ? await db
-            .select()
-            .from(schema.users)
-            .where(and(inArray(schema.users.id, comparable), eq(schema.users.isActive, true), eq(schema.users.role, "intern")))
-        : [];
-      const onboardingRows = rows.length
-        ? await db
-            .select()
-            .from(schema.internOnboarding)
-            .where(inArray(schema.internOnboarding.userId, rows.map((row) => row.id)))
-            .orderBy(desc(schema.internOnboarding.updatedAt))
-        : [];
+      // Users and their onboarding rows in one wave: the onboarding read selects through the same user filter.
+      const internFilter = and(inArray(schema.users.id, comparable), eq(schema.users.isActive, true), eq(schema.users.role, "intern"));
+      const [rows, onboardingRows] = comparable.length
+        ? await Promise.all([
+            db.select().from(schema.users).where(internFilter),
+            db
+              .select({ o: schema.internOnboarding })
+              .from(schema.internOnboarding)
+              .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
+              .where(internFilter)
+              .orderBy(desc(schema.internOnboarding.updatedAt))
+              .then((r) => r.map((x) => x.o)),
+          ])
+        : [[], []];
       // Newest onboarding row per intern (the table has no unique user index).
       const onboardingByUser = new Map<string, (typeof onboardingRows)[number]>();
       for (const row of onboardingRows) if (!onboardingByUser.has(row.userId)) onboardingByUser.set(row.userId, row);
@@ -171,16 +200,8 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       candidates = profiles.map((p) => redactForEmployer(p, nameUnlocked.has(p.id)));
       await attachPhotos(db, candidates);
 
-      plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
-      const [employer] = await db
-        .select({
-          country: schema.employers.country,
-          countryCode: schema.employers.countryCode,
-          phoneNumber: schema.employers.phoneNumber,
-        })
-        .from(schema.employers)
-        .where(eq(schema.employers.id, session.uid))
-        .limit(1);
+      plans = await plansP!;
+      const [employer] = await employerP!;
       region = employerRegion(employer ?? {});
       currency = region === "IN" ? "INR" : "USD";
     }
@@ -207,8 +228,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
     );
   }
 
-  // The tab row's Shortlist figure: the same count the Shortlist page's strip shows.
-  const shortlistCount = (await hireFlowCounts(session.uid, 0).catch(() => null))?.shortlisted ?? 0;
+  const shortlistCount = (await flowP)?.shortlisted ?? 0;
 
   if (candidates.length === 0) {
     return (

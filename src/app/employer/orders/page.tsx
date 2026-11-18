@@ -43,11 +43,16 @@ export const metadata: Metadata = {
 export default async function EmployerOrdersPage() {
   const session = await requireRole("employer");
   const employerId = session.uid;
-  await requireEmployerSetup(employerId);
-  const data = await loadOrders(employerId).catch((err) => {
-    console.error("Failed to load employer orders data:", err);
-    return null;
-  });
+  // The setup check runs beside the page's reads, not ahead of them (one round trip less); its redirect still wins.
+  const setup = requireEmployerSetup(employerId);
+  setup.catch(() => undefined);
+  const [, data] = await Promise.all([
+    setup,
+    loadOrders(employerId).catch((err) => {
+      console.error("Failed to load employer orders data:", err);
+      return null;
+    }),
+  ]);
   if (!data) {
     return (
       <div>

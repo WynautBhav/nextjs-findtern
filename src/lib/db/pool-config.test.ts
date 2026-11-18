@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   SCHEDULER_JITTER_MS,
   SCHEDULER_MIN_DELAY_MS,
+  inProcessSchedulersAllowed,
   isPoolerUrl,
   poolIsBusy,
   poolMax,
@@ -47,4 +48,12 @@ test("per-request read gate always leaves two pool connections for other request
   assert.equal(gateLimit({ DATABASE_URL: "postgresql://u:p@db.internal:5432/x" }), 8);
   assert.equal(gateLimit({ VERCEL: "1", DATABASE_URL: "postgresql://u:p@h:5432/x" }), 3);
   assert.equal(gateLimit({ DATABASE_POOL_MAX: "1" }), 2);
+});
+
+test("in-process timers: only a long-running server with SCHEDULERS=on; never on Vercel", () => {
+  assert.equal(inProcessSchedulersAllowed({ SCHEDULERS: "on" }), true);
+  assert.equal(inProcessSchedulersAllowed({ SCHEDULERS: "on", VERCEL: "1" }), false, "Vercel: the hourly cron tick covers the jobs");
+  assert.equal(inProcessSchedulersAllowed({ SCHEDULERS: "on", VERCEL: "" }), true, "empty VERCEL is not Vercel");
+  assert.equal(inProcessSchedulersAllowed({}), false);
+  assert.equal(inProcessSchedulersAllowed({ SCHEDULERS: "off" }), false);
 });

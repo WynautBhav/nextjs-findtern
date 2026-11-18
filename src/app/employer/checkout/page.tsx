@@ -42,7 +42,9 @@ export default async function EmployerCheckout({
   searchParams: Promise<{ proposal?: string; proposalId?: string; paid?: string | string[] }>;
 }) {
   const session = await requireRole("employer");
-  await requireEmployerSetup(session.uid);
+  // The setup check runs beside the page's reads, not ahead of them (one round trip less); its redirect still wins.
+  const setup = requireEmployerSetup(session.uid);
+  setup.catch(() => undefined);
   const uid = session.uid;
   const sp = await searchParams;
 
@@ -61,6 +63,7 @@ export default async function EmployerCheckout({
   } catch (err) {
     console.error("[employer/checkout] load failed", err);
   }
+  await setup;
 
   if (!result) {
     return (

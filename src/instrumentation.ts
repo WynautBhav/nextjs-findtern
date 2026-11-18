@@ -4,6 +4,8 @@
  * when SCHEDULERS=on. Off by default so a local run against a copy of the
  * live database never notifies real users.
  */
+import { inProcessSchedulersAllowed } from "@/lib/db/pool-config";
+
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
@@ -46,7 +48,8 @@ export async function register() {
     }
   }
 
-  if (process.env.SCHEDULERS === "on") {
+  // Not on Vercel: there /api/cron/tick (hourly) runs the same jobs, and instance-local timers only add load.
+  if (inProcessSchedulersAllowed(process.env)) {
     const { startSchedulers } = await import("@/lib/schedulers");
     startSchedulers();
   }

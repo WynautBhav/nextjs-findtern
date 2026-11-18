@@ -3,6 +3,7 @@ import pg from "pg";
 
 import * as schema from "./schema.ts";
 import { poolIsBusy, poolMax, type PoolStats } from "./pool-config.ts";
+import { CONNECT_TIMEOUT_MS, QUERY_TIMEOUT_MS, holdUntilIdle, idleTimeoutMs, withRetry, type RetryablePool } from "./pool-lifecycle.ts";
 
 /**
  * Database client.
@@ -81,23 +82,23 @@ function createDb() {
   // set to Asia/Kolkata that stored local wall time, read back 5h30 late (an
   // OTP cooldown of ~19,850 s). Pinning the session to UTC at connection
   // startup makes now() and JS agree, with no per-connection query to race.
-  // Serverless: each instance holds its own pool, so `max` stays small enough
-  // that N instances cannot exhaust the server. A pool waits forever by default
-  // for a free connection, which shows up as a hung page when the database is
-  // slow or unreachable; fail after a few seconds instead. 8 s, not less: a session check that cannot get a
-  // connection signs the request out (fail closed), so a short wait would log users out during a brief burst;
-  // it stays under a serverless function's 10 s limit so the error surfaces instead of a platform timeout. Idle connections
-  // are kept 15 s (pg's default is 10 s) so a visit a few seconds after the
-  // last one reuses a connection rather than paying TCP + TLS + auth again.
+  // Serverless: each instance holds its own pool, so `max` stays small enough that N instances cannot exhaust the server.
+  // A pool waits forever by default for a free connection, which shows up as a hung page when the database is slow or
+  // unreachable. A connect that has not finished in 5 s is hung (same-region handshakes take tens of ms), so it is
+  // abandoned and tried once more (pool-lifecycle.ts withRetry): two tries, about 10 s worst case, instead of one 8 s wait.
+  // A session check that cannot get a connection signs the request out (fail closed), which is why it is retried, not shortened.
+  // Idle sockets close after 5 s on Vercel (15 s on a long-lived server) and the function is held alive that long after the
+  // last release (holdUntilIdle), so a freeze never leaves dead sockets in the pool for the next request to trip over.
   const max = poolMax(process.env, connectionString);
   const pool = new pg.Pool({
     connectionString,
     ssl,
     max,
-    connectionTimeoutMillis: 8_000,
-    // Short on serverless: an instance frozen between requests leaves idle sockets the pooler closes, and the
-    // next query on one fails with "Connection terminated unexpectedly". 15 s still covers a visit's burst.
-    idleTimeoutMillis: 15_000,
+    connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+    idleTimeoutMillis: idleTimeoutMs(process.env),
+    // Client-side (no startup parameter, which a transaction pooler may refuse): a query on a silently dead socket would
+    // otherwise wait for the platform timeout.
+    query_timeout: QUERY_TIMEOUT_MS,
     keepAlive: true,
     keepAliveInitialDelayMillis: 10_000,
     options: "-c TimeZone=UTC",
@@ -107,6 +108,8 @@ function createDb() {
   // pool; with no listener that is an uncaught exception. The pool discards the client, so log and carry on.
   pool.on("error", (err) => console.error("[db] idle client error:", err.message));
   _pool = pool;
+  withRetry(pool as unknown as RetryablePool);
+  holdUntilIdle(pool, idleTimeoutMs(process.env));
   return drizzle(pool, { schema });
 }
 

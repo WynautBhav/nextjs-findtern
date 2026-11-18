@@ -41,7 +41,10 @@ export default async function CandidatesPage({
 }) {
   const session = await requireRole("employer");
   const uid = session.uid;
-  await requireEmployerSetup(uid);
+  // The setup check (company, then a project) runs beside the page's own reads instead of ahead of them: its redirect still
+  // wins, it just no longer costs a round trip first. A page that was going to redirect throws the work away; nothing else changes.
+  const setup = requireEmployerSetup(uid);
+  setup.catch(() => undefined);
   const params = await searchParams;
   // From lg up the filter column can be hidden; the choice is a cookie, so the server paints it with no flash.
   const filtersHidden = (await cookies()).get(FILTER_PANEL_COOKIE)?.value === "1";
@@ -49,7 +52,10 @@ export default async function CandidatesPage({
   // Legacy `?ftInternId=` opened the full-time offer for a hire: the offer
   // lives on the candidate's profile now.
   const ftIntern = one(params.ftInternId);
-  if (ftIntern) redirect(`/employer/intern/${encodeURIComponent(ftIntern)}`);
+  if (ftIntern) {
+    await setup;
+    redirect(`/employer/intern/${encodeURIComponent(ftIntern)}`);
+  }
 
   const filters = readFilters(params);
   // The project and compare picks carry over from the last visit (cookie)
@@ -58,7 +64,8 @@ export default async function CandidatesPage({
   if (!filters.idsSet) filters.ids = remembered.compare;
   if (!filters.project && remembered.project) filters.project = remembered.project;
 
-  const [data, flow] = await Promise.all([
+  const [, data, flow] = await Promise.all([
+    setup,
     loadCandidates(uid, filters, {
       // A link that names the view is not a bare visit: restoring the remembered filters would drop it.
       hasFilterParams: params.view !== undefined || FILTER_KEYS.some((key) => params[key as keyof SearchParams] !== undefined),
