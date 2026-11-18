@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { and, count, countDistinct, eq, inArray, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import {
   LayoutDashboard,
   FolderKanban,
@@ -26,8 +26,8 @@ import { ToastProvider } from "@/components/app/toast";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { SITE } from "@/lib/content/site";
-import { q } from "@/lib/college/sql";
 import { shouldShowTermsPrompt } from "@/lib/terms";
+import { getEmployerRows } from "@/lib/employer-request";
 import { gated } from "@/lib/request-gate";
 
 // The path in order: find, shortlist, offer, interview, hire, then timesheet and pay.
@@ -78,51 +78,34 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   // Three independent reads, started together (through the per-request gate, so the page's other reads share the pool fairly). Each result is kept or dropped on its own, so one failed read
   // leaves the others (and the fallbacks above) as they were.
   const db = getDb();
-  const [empRes, unreadRes, cartRes] = await Promise.allSettled([
+  // Two statements: the employer row (shared with the setup check and the page, one read per request) and both badge
+  // counts in one round trip.
+  const [empRes, countsRes] = await Promise.allSettled([
+    getEmployerRows(session.uid),
     gated(() =>
-      db
-        .select({ companyName: schema.employers.companyName, termsVersion: schema.employers.termsAcceptedVersion })
-        .from(schema.employers)
-        .where(eq(schema.employers.id, session.uid))
-        .limit(1),
-    ),
-    gated(() =>
-      db
-        .select({ value: count() })
-        .from(schema.notifications)
-        .where(
-          and(
-            eq(schema.notifications.recipientType, "employer"),
-            eq(schema.notifications.recipientId, session.uid),
-            eq(schema.notifications.isRead, false),
-          ),
-        ),
-    ),
-    gated(() =>
-      db
-        // Distinct people, not cart lines: one candidate saved to two projects is one.
-        .select({ value: countDistinct(schema.employerCartItems.internId) })
-        .from(schema.employerCartItems)
-        // Same set as the Shortlist page and its steps strip: saved, legacy
-        // "checkout" rows included, and no live proposal yet (QA-124).
-        .where(
-          and(
-            eq(schema.employerCartItems.employerId, session.uid),
-            inArray(schema.employerCartItems.listType, ["cart", "checkout"]),
-            sql`NOT EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.employer_id = ${q(schema.employerCartItems, schema.employerCartItems.employerId)} AND p.intern_id = ${q(schema.employerCartItems, schema.employerCartItems.internId)} AND lower(btrim(p.status)) NOT IN ('rejected', 'withdrawn', 'expired'))`,
-          ),
-        ),
+      db.execute<{ unread: string | number; cart: string | number }>(sql`
+        SELECT
+          (SELECT count(*) FROM ${schema.notifications}
+            WHERE ${schema.notifications.recipientType} = 'employer' AND ${schema.notifications.recipientId} = ${session.uid} AND ${schema.notifications.isRead} = false) AS unread,
+          -- Distinct people, not cart lines: one candidate saved to two projects is one. Same set as the Shortlist page and
+          -- its steps strip: saved, legacy "checkout" rows included, and no live proposal yet (QA-124).
+          (SELECT count(DISTINCT ci.intern_id) FROM ${schema.employerCartItems} ci
+            WHERE ci.employer_id = ${session.uid} AND ci.list_type IN ('cart', 'checkout')
+              AND NOT EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.employer_id = ci.employer_id AND p.intern_id = ci.intern_id AND lower(btrim(p.status)) NOT IN ('rejected', 'withdrawn', 'expired'))) AS cart`),
     ),
   ]);
   if (empRes.status === "fulfilled") {
     const [emp] = empRes.value;
     if (emp?.companyName) companyName = emp.companyName;
-    termsVersion = emp?.termsVersion ?? null;
+    termsVersion = emp?.termsAcceptedVersion ?? null;
   }
-  if (unreadRes.status === "fulfilled") unreadAlerts = Number(unreadRes.value[0]?.value ?? 0);
-  if (cartRes.status === "fulfilled") cartCount = Number(cartRes.value[0]?.value ?? 0);
+  if (countsRes.status === "fulfilled") {
+    const row = countsRes.value.rows[0];
+    unreadAlerts = Number(row?.unread ?? 0);
+    cartCount = Number(row?.cart ?? 0);
+  }
   // A failed read leaves its fallback (0 = no badge, never a wrong number) but must not be silent.
-  for (const [what, res] of [["company", empRes], ["alerts", unreadRes], ["shortlist badge", cartRes]] as const) {
+  for (const [what, res] of [["company", empRes], ["alert and shortlist badges", countsRes]] as const) {
     if (res.status === "rejected") console.error(`[employer/layout] ${what} read failed`, res.reason);
   }
 

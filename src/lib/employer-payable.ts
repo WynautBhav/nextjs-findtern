@@ -9,6 +9,7 @@
  * accepted proposal is a commitment, and only the second is worth billing.
  */
 
+import { cache } from "react";
 import { and, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
 
 import { acceptedLineCharge } from "@/lib/accepted-charge";
@@ -21,6 +22,7 @@ import { parseOffer } from "@/lib/offer";
 import { initialsOf, scoreOf } from "@/lib/employer-candidates";
 import { hiredInternIds, hiredProposalSql, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, type Currency } from "@/lib/employer-pricing";
+import { getEmployerRows } from "@/lib/employer-request";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { splitTakenDownProposals, TAKEN_DOWN_PAY_NOTE } from "@/lib/projects/takedown-payable";
 import { orderProposalIds } from "@/lib/order-ids";
@@ -200,15 +202,18 @@ export async function payRequestRefusal(db: Db | Tx, employerId: string, checkou
  * payable.
  */
 export async function openProposalsWithDues(db: Db | Tx, employerId: string) {
-  const open = await db
-    .select()
-    .from(schema.proposals)
-    .where(and(eq(schema.proposals.employerId, employerId), inArray(schema.proposals.status, ["accepted", "processing", "hired"])))
-    .orderBy(desc(schema.proposals.updatedAt));
-  const payments = await db
-    .select({ status: schema.employerPayments.status, raw: schema.employerPayments.raw, paidAt: schema.employerPayments.paidAt })
-    .from(schema.employerPayments)
-    .where(eq(schema.employerPayments.employerId, employerId));
+  // Independent reads: one round trip, not two.
+  const [open, payments] = await Promise.all([
+    db
+      .select()
+      .from(schema.proposals)
+      .where(and(eq(schema.proposals.employerId, employerId), inArray(schema.proposals.status, ["accepted", "processing", "hired"])))
+      .orderBy(desc(schema.proposals.updatedAt)),
+    db
+      .select({ status: schema.employerPayments.status, raw: schema.employerPayments.raw, paidAt: schema.employerPayments.paidAt })
+      .from(schema.employerPayments)
+      .where(eq(schema.employerPayments.employerId, employerId)),
+  ]);
   const all = monthlyDues(open, payments);
   // `dues` is what can be paid now; `upcoming` is post-paid months not yet due (display only, never orderable).
   return {
@@ -223,20 +228,37 @@ export async function payableCheckout(
   opts: { proposalIds?: string[]; mode?: PayMode } = {},
 ): Promise<PayableCheckout> {
   const db = getDb();
+  // Wave 1: every read that depends on nothing else, in one round trip (was ten sequential ones).
   // The hiring fee is decided here, at charge time, from the live setting and each offer's band, so the page and the order route agree.
-  const feeSetting = await getPerHireFeeSetting();
-
-  const [employer] = await db
-    .select({
-      name: schema.employers.name,
-      companyEmail: schema.employers.companyEmail,
-      country: schema.employers.country,
-      countryCode: schema.employers.countryCode,
-      phoneNumber: schema.employers.phoneNumber,
-    })
-    .from(schema.employers)
-    .where(eq(schema.employers.id, employerId))
-    .limit(1);
+  const sweptCutoff = new Date(Date.now() - SWEPT_EXPIRY_VISIBLE_DAYS * 86_400_000).toISOString();
+  const [feeSetting, employerRows, { open, dues }, openOrderIds, swept, hiredRows, adminViewing] = await Promise.all([
+    getPerHireFeeSetting(),
+    getEmployerRows(employerId),
+    openProposalsWithDues(db, employerId),
+    openOrderProposalIds(db, employerId),
+    // Offers the sweeper already expired (status `expired`, reason unpaid_past_start) stay listed for a while, so the page shows the
+    // same "Expired, send a new proposal" row before and after the hourly sweep. Not priced; only on the unfiltered view or when asked for.
+    db
+      .select()
+      .from(schema.proposals)
+      .where(
+        and(
+          eq(schema.proposals.employerId, employerId),
+          eq(schema.proposals.status, "expired"),
+          sql`${schema.proposals.offerDetails}->>'expiredReason' = 'unpaid_past_start'`,
+          sql`(${schema.proposals.offerDetails}->>'expiredAt')::timestamptz >= ${sweptCutoff}::timestamptz`,
+          opts.proposalIds?.length ? inArray(schema.proposals.id, opts.proposalIds) : undefined,
+        ),
+      )
+      .orderBy(desc(schema.proposals.updatedAt))
+      .limit(50),
+    db
+      .select({ internId: schema.proposals.internId })
+      .from(schema.proposals)
+      .where(and(eq(schema.proposals.employerId, employerId), hiredProposalSql())),
+    isAdminViewing(),
+  ]);
+  const employer = employerRows[0];
 
   const region = employerRegion(employer ?? {});
   const defaultCurrency: Currency = region === "IN" ? "INR" : "USD";
@@ -246,20 +268,24 @@ export async function payableCheckout(
     contact: employer ? `${employer.countryCode}${employer.phoneNumber}` : undefined,
   };
 
-
-  const { open, dues } = await openProposalsWithDues(db, employerId);
   const wanted = open.filter(
     (p) =>
       (p.status === "accepted" || p.status === "processing" || dues.has(p.id)) && (!opts.proposalIds?.length || opts.proposalIds.includes(p.id)),
   );
   // A project Findtern took down is view-only for the employer: its offers and due months are listed as blocked, never as payable.
   const wantedProjectIds = [...new Set(wanted.map((p) => p.projectId))];
-  const downRows = wantedProjectIds.length
-    ? await db
-        .select({ id: schema.projects.id, projectName: schema.projects.projectName })
-        .from(schema.projects)
-        .where(and(inArray(schema.projects.id, wantedProjectIds), isNotNull(schema.projects.takenDownAt)))
-    : [];
+  // Wave 2: the taken-down projects and the candidates' onboarding rows (read for every wanted offer, a superset of
+  // the ones that pass the take-down split; the lookups below only ever ask for those) in one round trip.
+  const wantedInternIds = [...new Set(wanted.map((p) => p.internId))];
+  const [downRows, onboardingRows] = await Promise.all([
+    wantedProjectIds.length
+      ? db
+          .select({ id: schema.projects.id, projectName: schema.projects.projectName })
+          .from(schema.projects)
+          .where(and(inArray(schema.projects.id, wantedProjectIds), isNotNull(schema.projects.takenDownAt)))
+      : [],
+    wantedInternIds.length ? db.select().from(schema.internOnboarding).where(inArray(schema.internOnboarding.userId, wantedInternIds)) : [],
+  ]);
   const { payable: notDown, blocked: blockedProposals } = splitTakenDownProposals(wanted, new Set(downRows.map((r) => r.id)));
   const downName = new Map(downRows.map((r) => [r.id, r.projectName]));
   const blocked: BlockedPayable[] = blockedProposals.map((p) => ({ id: p.id, projectId: p.projectId, projectName: downName.get(p.projectId) ?? null, note: TAKEN_DOWN_PAY_NOTE }));
@@ -267,46 +293,48 @@ export async function payableCheckout(
   // The pay gate (pay-gate.ts): an accepted offer whose start date has passed unpaid, or whose candidate's CGPA is still being
   // checked, is held back from `lines` (never priced, never in `totals`) and listed in `expired` / `gated` instead. Processing and
   // hired rows, due months and any offer with an open order are never held. Offers that pass come back as the same array.
-  const gateInternIds = [...new Set(notDown.map((p) => p.internId))];
-  const onboardingRows = gateInternIds.length ? await db.select().from(schema.internOnboarding).where(inArray(schema.internOnboarding.userId, gateInternIds)) : [];
   const onboardingByUser = new Map(onboardingRows.map((row) => [row.userId, row]));
-  const openOrderIds = notDown.length ? await openOrderProposalIds(db, employerId) : new Set<string>();
   const split = splitByPayGate(
     notDown,
     (p) => ({ status: p.status, hiredAt: p.hiredAt, offerDetails: p.offerDetails, extraData: onboardingByUser.get(p.internId)?.extraData, updatedAt: p.updatedAt, hasOpenOrder: openOrderIds.has(p.id) }),
     new Date(),
   );
   const proposals = split.payable;
-  // Offers the sweeper already expired (status `expired`, reason unpaid_past_start) stay listed for a while, so the page shows the
-  // same "Expired, send a new proposal" row before and after the hourly sweep. Not priced; only on the unfiltered view or when asked for.
-  const swept = await db
-    .select()
-    .from(schema.proposals)
-    .where(
-      and(
-        eq(schema.proposals.employerId, employerId),
-        eq(schema.proposals.status, "expired"),
-        sql`${schema.proposals.offerDetails}->>'expiredReason' = 'unpaid_past_start'`,
-        sql`(${schema.proposals.offerDetails}->>'expiredAt')::timestamptz >= ${new Date(Date.now() - SWEPT_EXPIRY_VISIBLE_DAYS * 86_400_000).toISOString()}::timestamptz`,
-        opts.proposalIds?.length ? inArray(schema.proposals.id, opts.proposalIds) : undefined,
-      ),
-    )
-    .orderBy(desc(schema.proposals.updatedAt))
-    .limit(50);
   const held = [...split.expired, ...swept].map((item) => ({ item, reason: "expired" as PayGateReason }));
   held.push(...split.gated);
   const expired: HeldPayable[] = [];
   const gated: HeldPayable[] = [];
+  // Wave 3: names and project titles for the held rows and for the payable lines, one round trip.
+  const lineInternIds = [...new Set(proposals.map((p) => p.internId))];
+  const lineProjectIds = [...new Set(proposals.map((p) => p.projectId))];
+  const [heldUsers, heldProjects, userRows, projectRows] = await Promise.all([
+    held.length
+      ? db
+          .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName })
+          .from(schema.users)
+          .where(inArray(schema.users.id, [...new Set(held.map((h) => h.item.internId))]))
+      : [],
+    held.length
+      ? db
+          .select({ id: schema.projects.id, projectName: schema.projects.projectName })
+          .from(schema.projects)
+          .where(and(eq(schema.projects.employerId, employerId), inArray(schema.projects.id, [...new Set(held.map((h) => h.item.projectId))])))
+      : [],
+    proposals.length
+      ? db
+          .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName })
+          .from(schema.users)
+          .where(inArray(schema.users.id, lineInternIds))
+      : [],
+    proposals.length
+      ? db
+          .select({ id: schema.projects.id, projectName: schema.projects.projectName })
+          .from(schema.projects)
+          .where(and(eq(schema.projects.employerId, employerId), inArray(schema.projects.id, lineProjectIds)))
+      : [],
+  ]);
   if (held.length > 0) {
-    const heldUsers = await db
-      .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName })
-      .from(schema.users)
-      .where(inArray(schema.users.id, [...new Set(held.map((h) => h.item.internId))]));
     const initialsById = new Map(heldUsers.map((u) => [u.id, initialsOf((u.firstName || "").trim(), (u.lastName || "").trim())]));
-    const heldProjects = await db
-      .select({ id: schema.projects.id, projectName: schema.projects.projectName })
-      .from(schema.projects)
-      .where(and(eq(schema.projects.employerId, employerId), inArray(schema.projects.id, [...new Set(held.map((h) => h.item.projectId))])));
     const heldProjectName = new Map(heldProjects.map((r) => [r.id, r.projectName]));
     for (const { item, reason } of held) {
       const offer = parseOffer(item.offerDetails, item.currency);
@@ -326,13 +354,6 @@ export async function payableCheckout(
   let lines: PayableLine[] = [];
 
   if (proposals.length > 0) {
-    const internIds = Array.from(new Set(proposals.map((p) => p.internId)));
-    const projectIds = Array.from(new Set(proposals.map((p) => p.projectId)));
-
-    const userRows = await db
-      .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName })
-      .from(schema.users)
-      .where(inArray(schema.users.id, internIds));
     const namesById = new Map(
       userRows.map((row) => {
         const first = (row.firstName || "").trim();
@@ -349,18 +370,7 @@ export async function payableCheckout(
 
     // Names unmask only on hire. Checkout lines are accepted (pre-payment),
     // so almost every line here renders initials.
-    const hiredRows = await db
-      .select({ internId: schema.proposals.internId })
-      .from(schema.proposals)
-      .where(and(eq(schema.proposals.employerId, employerId), hiredProposalSql()));
-    const hiredIds = (await isAdminViewing())
-      ? await hiredInternIds(db, employerId)
-      : new Set(hiredRows.map((row) => row.internId));
-
-    const projectRows = await db
-      .select({ id: schema.projects.id, projectName: schema.projects.projectName })
-      .from(schema.projects)
-      .where(and(eq(schema.projects.employerId, employerId), inArray(schema.projects.id, projectIds)));
+    const hiredIds = adminViewing ? await hiredInternIds(db, employerId) : new Set(hiredRows.map((row) => row.internId));
     const projectsById = new Map(projectRows.map((row) => [row.id, row.projectName]));
 
     lines = proposals.map((proposal) => {
@@ -425,3 +435,10 @@ export async function payableCheckout(
 
   return { lines, expired, gated, blocked, totals, region, defaultCurrency, prefill };
 }
+
+/**
+ * `payableCheckout(employerId)` for one page render: the layout strip, the page body and the hire-flow counts all ask for
+ * the same figure, and `cache` makes that one set of reads per request. Request-scoped, never shared between requests.
+ * Pages only: the order and promo routes call `payableCheckout` directly so they always read fresh.
+ */
+export const payableCheckoutForRequest = cache((employerId: string) => payableCheckout(employerId));

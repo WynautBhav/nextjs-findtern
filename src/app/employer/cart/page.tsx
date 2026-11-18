@@ -13,9 +13,9 @@ import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
 import { pendingMeetingAtFor } from "@/lib/proposal-guard";
 import { isBlockingInterview, isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
-import { hireFlowCounts } from "@/lib/employer-flow";
+import { cartInternIdsForRequest, hireFlowCounts, loadFlowProposals } from "@/lib/employer-flow";
 import { normalizeStatus } from "@/components/employer/proposal-bucket";
-import { payableCheckout } from "@/lib/employer-payable";
+import { payableCheckoutForRequest } from "@/lib/employer-payable";
 import { timezoneForLocation } from "@/lib/timezones";
 import { PageHead } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
@@ -261,7 +261,9 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
   );
 
   // Same figure the checkout shows: accepted offers plus months now due.
-  const toPay = (await payableCheckout(uid)).lines.length;
+  // The strip's other reads (proposals, saved rows) start with it, so counting them is not a second round trip.
+  const [payable] = await Promise.all([payableCheckoutForRequest(uid), loadFlowProposals(uid), cartInternIdsForRequest(uid)]);
+  const toPay = payable.lines.length;
   const counts = await hireFlowCounts(uid, toPay);
   // The strip counts what this page lists: people saved and not yet proposed to, who are still in the pool.
   // hireFlowCounts counts raw saved rows, which includes people who have since left the pool.

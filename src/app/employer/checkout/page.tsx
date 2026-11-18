@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
-import { payableCheckout, type PayableCheckout } from "@/lib/employer-payable";
+import { payableCheckoutForRequest, type PayableCheckout } from "@/lib/employer-payable";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { displayNameOf } from "@/lib/employer-candidates";
 import { heldIds, hireFlowCounts, loadFlowProposals, type FlowProposal } from "@/lib/employer-flow";
@@ -51,11 +51,11 @@ export default async function EmployerCheckout({
   let proposals: FlowProposal[] = [];
   try {
     await expireStaleEmployerOrders(uid).catch(() => 0);
-    result = await payableCheckout(uid);
+    // The payable figures and the proposal states are independent reads: one round trip, not two.
+    [result, proposals] = await Promise.all([payableCheckoutForRequest(uid), loadFlowProposals(uid)]);
     // The same state the Proposals tabs read: an accepted offer is payable only when its CGPA check is clear and its
     // start day has not begun. (payableCheckout drops expired ones itself once the expiry rules land there; this
     // page never relies on that.)
-    proposals = await loadFlowProposals(uid);
     const held = heldIds(proposals);
     counts = await hireFlowCounts(uid, result.lines.filter((l) => !held.has(l.id)).length, proposals);
   } catch (err) {

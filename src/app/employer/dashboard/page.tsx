@@ -16,11 +16,12 @@ import { requireEmployerSetup } from "@/lib/employer-setup";
 import { kickProposalExpiry } from "@/lib/proposal-expiry-kick";
 import { gated } from "@/lib/request-gate";
 import { isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
-import { payableCheckout } from "@/lib/employer-payable";
+import { payableCheckoutForRequest } from "@/lib/employer-payable";
+import { getEmployerRows } from "@/lib/employer-request";
 import { isProjectOpen } from "@/lib/project-locations";
 import { counterRow, type OfferState } from "@/components/employer/proposal-state";
 import { proposalCounts } from "@/components/employer/proposal-bucket";
-import { heldIds, internExtraData, openOrderProposalIds, stateForRow } from "@/lib/employer-flow";
+import { heldIds, internExtraForRequest, openOrdersForRequest, stateForRow } from "@/lib/employer-flow";
 import { projectZone, timezoneForLocation } from "@/lib/timezones";
 import { formatSlotTime } from "@/lib/format";
 import { buildActivity, buildFunnel, buildProjectStats, untilLabel, type Activity as ActivityData, type DashProposal, type Funnel as FunnelData } from "@/lib/employer-dashboard";
@@ -345,11 +346,7 @@ function slotDate(iv: InterviewRow): Date | null {
 async function load(employerId: string): Promise<Loaded> {
   const db = getDb();
   const [employerRow, projectRows, proposalRows, sheetRows, interviewRows, cartRows, metRows, payable, pool] = await Promise.all([
-    gated(() => db
-      .select({ companyName: schema.employers.companyName, country: schema.employers.country, state: schema.employers.state, city: schema.employers.city })
-      .from(schema.employers)
-      .where(eq(schema.employers.id, employerId))
-      .limit(1)),
+    getEmployerRows(employerId),
     gated(() => db.select().from(schema.projects).where(eq(schema.projects.employerId, employerId)).orderBy(desc(schema.projects.createdAt))),
     gated(() => db
       .select({
@@ -381,7 +378,7 @@ async function load(employerId: string): Promise<Loaded> {
       .select({ internId: schema.interviews.internId })
       .from(schema.interviews)
       .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.status, ["scheduled", "completed"])))),
-    gated(() => payableCheckout(employerId)),
+    gated(() => payableCheckoutForRequest(employerId)),
     // Candidates who match the skills this employer is hiring for, best score first; the top of the pool when
     // no open project lists skills. Same pool rule as the candidate browser. Independent of the other reads.
     gated(() => db
@@ -395,10 +392,8 @@ async function load(employerId: string): Promise<Loaded> {
 
   const employer = employerRow[0];
   // The CGPA gate and the open-order freeze, once for every proposal below (two small reads).
-  const ctx = {
-    openOrders: await gated(() => openOrderProposalIds(db, employerId)),
-    extraByIntern: await gated(() => internExtraData(db, proposalRows.map((p) => p.internId))),
-  };
+  const [openOrders, extraByIntern] = await Promise.all([openOrdersForRequest(employerId), internExtraForRequest(proposalRows.map((p) => p.internId))]);
+  const ctx = { openOrders, extraByIntern };
   const states = proposalRows.map((p) => stateForRow(p, ctx).state);
   const held = heldIds(proposalRows.map((p, i) => ({ id: p.id, state: states[i] })));
   // Top matches leave out anyone already proposed to.

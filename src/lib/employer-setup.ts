@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "./db";
 import { setupStepFrom } from "./employer-setup-step";
 import { isAdminViewing } from "./employer-visibility";
+import { getEmployerRows } from "./employer-request";
 import { gated } from "./request-gate";
 
 /**
@@ -17,7 +18,7 @@ export async function employerSetupStep(employerId: string): Promise<"company" |
   // Independent reads, started together (the project one is simply unused when the company step is unfinished).
   // allSettled, not all: a failed projects read must not hide an unfinished company profile (see setupStepFrom).
   const [employerRes, projectRes] = await Promise.allSettled([
-    gated(() => db.select().from(schema.employers).where(eq(schema.employers.id, employerId)).limit(1)),
+    getEmployerRows(employerId),
     gated(() => db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.employerId, employerId)).limit(1)),
   ]);
   return setupStepFrom(employerRes, projectRes);

@@ -1,8 +1,9 @@
+import { cache } from "react";
 import { and, eq, gte, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { proposalCgpaGate, type CgpaGate } from "@/lib/cgpa-verification";
-import { payableCheckout } from "@/lib/employer-payable";
+import { payableCheckoutForRequest } from "@/lib/employer-payable";
 import { parseOffer, type Offer } from "@/lib/offer";
 import { orderProposalIds } from "@/lib/order-ids";
 import { OPEN_ORDER_MINUTES } from "@/lib/payments";
@@ -37,6 +38,30 @@ export async function internExtraData(db: Db, internIds: string[]): Promise<Map<
   return new Map(rows.map((r) => [r.userId, r.extraData]));
 }
 
+/**
+ * Request-scoped copies of the three reads that the dashboard, the Proposals page and the hire-flow strip all make for
+ * the same employer on one page load. `cache` keys on the arguments (strings), so a second caller gets the first one's
+ * promise. Page renders only: writes and the expiry sweep keep calling the plain functions above.
+ */
+export const openOrdersForRequest = cache((employerId: string) => openOrderProposalIds(getDb(), employerId));
+const extraForRequest = cache((idsKey: string) => internExtraData(getDb(), idsKey ? idsKey.split(",") : []));
+export function internExtraForRequest(internIds: string[]): Promise<Map<string, unknown>> {
+  return extraForRequest([...new Set(internIds)].sort().join(","));
+}
+export const cartInternIdsForRequest = cache(async (employerId: string): Promise<string[]> => {
+  const rows = await getDb()
+    .select({ internId: schema.employerCartItems.internId })
+    .from(schema.employerCartItems)
+    .where(
+      and(
+        eq(schema.employerCartItems.employerId, employerId),
+        // Legacy staged some rows as "checkout"; they are still shortlisted (EMB-17).
+        inArray(schema.employerCartItems.listType, ["cart", "checkout"]),
+      ),
+    );
+  return rows.map((r) => r.internId);
+});
+
 type StateRow = { id: string; internId: string; status: string; hiredAt: Date | string | null; updatedAt?: Date | string | null; offerDetails: unknown; currency?: string | null };
 
 /** What `offerState` needs besides the row: whether an order is open for it and where the intern's CGPA check stands. */
@@ -65,7 +90,7 @@ export type FlowProposal = {
 };
 
 /** Every proposal of this employer, classified. */
-export async function loadFlowProposals(employerId: string, now: Date = new Date()): Promise<FlowProposal[]> {
+async function loadFlowProposalsFresh(employerId: string, now: Date = new Date()): Promise<FlowProposal[]> {
   const db = getDb();
   const rows = await db
     .select({
@@ -86,12 +111,17 @@ export async function loadFlowProposals(employerId: string, now: Date = new Date
     .leftJoin(schema.projects, eq(schema.projects.id, schema.proposals.projectId))
     .leftJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
     .where(eq(schema.proposals.employerId, employerId));
-  const ctx: StateContext = { openOrders: await openOrderProposalIds(db, employerId), extraByIntern: await internExtraData(db, rows.map((r) => r.internId)) };
+  // The two context reads are independent: one round trip.
+  const [openOrders, extraByIntern] = await Promise.all([openOrdersForRequest(employerId), internExtraForRequest(rows.map((r) => r.internId))]);
+  const ctx: StateContext = { openOrders, extraByIntern };
   return rows.map((r) => {
     const { offer, state } = stateForRow(r, ctx, now);
     return { id: r.id, internId: r.internId, projectId: r.projectId, projectName: r.projectName ?? null, status: r.status, offer, state, firstName: r.firstName, lastName: r.lastName, viewOnly: Boolean(r.downAt) };
   });
 }
+
+/** Every proposal of this employer, classified; one read per request (the strip and the page body share it). Pass `now` only to bypass the sharing. */
+export const loadFlowProposals = cache((employerId: string): Promise<FlowProposal[]> => loadFlowProposalsFresh(employerId));
 
 /** Accepted offers that cannot be paid now: CGPA being confirmed, or expired. Checkout drops their lines (WP3's payableCheckout does the same server-side). */
 export function heldIds(rows: { id: string; state: OfferState }[]): Set<string> {
@@ -104,23 +134,10 @@ export function heldIds(rows: { id: string; state: OfferState }[]): Set<string> 
  * strip and the page below it can never disagree.
  */
 export async function hireFlowCounts(employerId: string, toPay: number, loaded?: FlowProposal[]): Promise<HireFlowCounts> {
-  const db = getDb();
-  const [cart, proposals] = await Promise.all([
-    db
-      .select({ internId: schema.employerCartItems.internId })
-      .from(schema.employerCartItems)
-      .where(
-        and(
-          eq(schema.employerCartItems.employerId, employerId),
-          // Legacy staged some rows as "checkout"; they are still shortlisted (EMB-17).
-          inArray(schema.employerCartItems.listType, ["cart", "checkout"]),
-        ),
-      ),
-    loaded ? Promise.resolve(loaded) : loadFlowProposals(employerId),
-  ]);
+  const [cart, proposals] = await Promise.all([cartInternIdsForRequest(employerId), loaded ? Promise.resolve(loaded) : loadFlowProposals(employerId)]);
   // Same rule as the Proposals tabs and the dashboard: one counter (proposal-bucket.ts), fed by the same offerState.
   return hireFlowFrom({
-    cartInternIds: cart.map((c) => c.internId),
+    cartInternIds: cart,
     proposals: proposals.map((p) => ({ internId: p.internId, ...counterRow(p.status, p.state, p.viewOnly) })),
     toPay,
   });
@@ -134,7 +151,7 @@ export async function hireFlowCounts(employerId: string, toPay: number, loaded?:
  */
 export async function hireFlowCountsFor(employerId: string): Promise<HireFlowCounts | null> {
   try {
-    const [payable, proposals] = await Promise.all([payableCheckout(employerId), loadFlowProposals(employerId)]);
+    const [payable, proposals] = await Promise.all([payableCheckoutForRequest(employerId), loadFlowProposals(employerId), cartInternIdsForRequest(employerId)]);
     const held = heldIds(proposals);
     return await hireFlowCounts(employerId, payable.lines.filter((l) => !held.has(l.id)).length, proposals);
   } catch (err) {
