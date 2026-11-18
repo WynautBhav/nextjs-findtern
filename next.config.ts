@@ -150,6 +150,13 @@ const nextConfig: NextConfig = {
         ],
       },
       {
+        // Hero videos, logos and marketing images in /public/media are not content-hashed, so not immutable:
+        // a day in the browser and CDN, and a week of stale-while-revalidate. Next serves /public files with
+        // max-age=0 otherwise, so every visit revalidated a 1 MB video.
+        source: "/media/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=86400, stale-while-revalidate=604800" }],
+      },
+      {
         // Findy's clips (not content-hashed): the closed chat pill and the header logo fetch each one on first
         // need and replay it all session, so the browser keeps it a day instead of revalidating on every act.
         source: "/media/mascot/:path*",
