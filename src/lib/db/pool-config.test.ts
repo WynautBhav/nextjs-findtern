@@ -1,15 +1,50 @@
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { test } from "node:test";
 
-// createDb() builds its pool lazily from DATABASE_URL and is not exported, so the settings are checked in the source.
-const src = readFileSync(join(process.cwd(), "src", "lib", "db", "index.ts"), "utf8");
+import {
+  SCHEDULER_JITTER_MS,
+  SCHEDULER_MIN_DELAY_MS,
+  isPoolerUrl,
+  poolIsBusy,
+  poolMax,
+  schedulerStartDelayMs,
+} from "./pool-config.ts";
+import { gateLimit } from "../request-gate.ts";
 
-test("the pool gives a busy request 8 s for a connection, not forever and not 5 s", () => {
-  assert.match(src, /connectionTimeoutMillis: 8_000/);
+test("scheduler start is 45-90 s after boot, never immediate", () => {
+  assert.equal(schedulerStartDelayMs(() => 0), 45_000);
+  assert.equal(schedulerStartDelayMs(() => 1), 89_999);
+  for (let i = 0; i < 200; i++) {
+    const d = schedulerStartDelayMs();
+    assert.ok(d >= SCHEDULER_MIN_DELAY_MS && d < SCHEDULER_MIN_DELAY_MS + SCHEDULER_JITTER_MS, String(d));
+  }
+  assert.equal(schedulerStartDelayMs(() => -5), 45_000, "out-of-range random is clamped");
+  assert.equal(schedulerStartDelayMs(() => NaN) >= 45_000, true);
 });
 
-test("the pool has an error listener, so a dropped idle client cannot crash the process", () => {
-  assert.match(src, /pool\.on\("error"/);
+test("pool is busy when someone waits or every connection is checked out", () => {
+  assert.equal(poolIsBusy({ totalCount: 2, idleCount: 2, waitingCount: 0, max: 5 }), false);
+  assert.equal(poolIsBusy({ totalCount: 5, idleCount: 1, waitingCount: 0, max: 5 }), false);
+  assert.equal(poolIsBusy({ totalCount: 5, idleCount: 0, waitingCount: 0, max: 5 }), true);
+  assert.equal(poolIsBusy({ totalCount: 3, idleCount: 0, waitingCount: 1, max: 5 }), true);
+  assert.equal(poolIsBusy({ totalCount: 3, idleCount: 0, waitingCount: 0, max: 5 }), false, "room to open another connection");
+});
+
+test("pool size: small on Vercel and behind a pooler, 10 on a long-running server, env override clamped", () => {
+  const local = "postgresql://u:p@db.internal:5432/x";
+  const pooler = "postgresql://u.ref:p@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres";
+  assert.equal(poolMax({}, local), 10);
+  assert.equal(poolMax({ VERCEL: "1" }, local), 5);
+  assert.equal(poolMax({}, pooler), 5);
+  assert.equal(poolMax({ DATABASE_POOL_MAX: "3", VERCEL: "1" }, pooler), 3);
+  assert.equal(poolMax({ DATABASE_POOL_MAX: "500" }, local), 20);
+  assert.equal(poolMax({ DATABASE_POOL_MAX: "0" }, local), 10, "invalid override ignored");
+  assert.equal(isPoolerUrl(local), false);
+  assert.equal(isPoolerUrl(pooler), true);
+});
+
+test("per-request read gate always leaves two pool connections for other requests' session checks", () => {
+  assert.equal(gateLimit({ DATABASE_URL: "postgresql://u:p@db.internal:5432/x" }), 8);
+  assert.equal(gateLimit({ VERCEL: "1", DATABASE_URL: "postgresql://u:p@h:5432/x" }), 3);
+  assert.equal(gateLimit({ DATABASE_POOL_MAX: "1" }), 2);
 });

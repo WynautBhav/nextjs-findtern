@@ -2,6 +2,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 
 import * as schema from "./schema.ts";
+import { poolIsBusy, poolMax, type PoolStats } from "./pool-config.ts";
 
 /**
  * Database client.
@@ -11,6 +12,7 @@ import * as schema from "./schema.ts";
  * Runtime requests without DATABASE_URL fail fast with a clear error.
  */
 let _db: ReturnType<typeof createDb> | null = null;
+let _pool: pg.Pool | null = null;
 
 const TIMESTAMP = pg.types.builtins.TIMESTAMP;
 const parseTimestamptz = pg.types.getTypeParser(pg.types.builtins.TIMESTAMPTZ, "text") as (v: string) => Date;
@@ -85,21 +87,34 @@ function createDb() {
   // slow or unreachable; fail after a few seconds instead. 8 s, not less: a session check that cannot get a
   // connection signs the request out (fail closed), so a short wait would log users out during a brief burst;
   // it stays under a serverless function's 10 s limit so the error surfaces instead of a platform timeout. Idle connections
-  // are kept 30 s (pg's default is 10 s) so a visit a few seconds after the
+  // are kept 15 s (pg's default is 10 s) so a visit a few seconds after the
   // last one reuses a connection rather than paying TCP + TLS + auth again.
+  const max = poolMax(process.env, connectionString);
   const pool = new pg.Pool({
     connectionString,
     ssl,
-    max: 10,
+    max,
     connectionTimeoutMillis: 8_000,
-    idleTimeoutMillis: 30_000,
+    // Short on serverless: an instance frozen between requests leaves idle sockets the pooler closes, and the
+    // next query on one fails with "Connection terminated unexpectedly". 15 s still covers a visit's burst.
+    idleTimeoutMillis: 15_000,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10_000,
     options: "-c TimeZone=UTC",
     types: utcTypes,
   });
   // An idle client the server dropped (a frozen serverless instance, a pooler restart) emits "error" on the
   // pool; with no listener that is an uncaught exception. The pool discards the client, so log and carry on.
   pool.on("error", (err) => console.error("[db] idle client error:", err.message));
+  _pool = pool;
   return drizzle(pool, { schema });
+}
+
+/** True when the pool has queued waiters or no free connection. False before the pool exists (nothing is using it). */
+export function dbPoolBusy(): boolean {
+  if (!_pool) return false;
+  const stats: PoolStats = { totalCount: _pool.totalCount, idleCount: _pool.idleCount, waitingCount: _pool.waitingCount, max: _pool.options.max ?? 10 };
+  return poolIsBusy(stats);
 }
 
 /**

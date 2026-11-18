@@ -1,5 +1,7 @@
 import { cache } from "react";
 
+import { poolMax } from "./db/pool-config.ts";
+
 /**
  * Caps how many database reads one page request has in flight. The pool holds 10 connections for every request
  * on the instance, and a page that starts 15+ independent reads at once (employer dashboard: layout 3, setup 2,
@@ -12,6 +14,11 @@ import { cache } from "react";
  * Do not call a gated function from inside another gated one: that holds a slot while waiting for a second.
  */
 export const REQUEST_DB_CONCURRENCY = 8;
+
+/** Always leave two pool connections free: 8 of 10 on the KVM, 3 of 5 on Vercel (see db/pool-config.ts). */
+export function gateLimit(env: Record<string, string | undefined> = process.env): number {
+  return Math.max(2, Math.min(REQUEST_DB_CONCURRENCY, poolMax(env, env.DATABASE_URL ?? "") - 2));
+}
 
 export type Gate = <T>(work: () => PromiseLike<T>) => Promise<T>;
 
@@ -34,7 +41,7 @@ export function makeGate(limit: number): Gate {
 }
 
 /** One gate per request: React's per-request cache gives the layout and the page the same one. */
-const gateForRequest = cache(() => makeGate(REQUEST_DB_CONCURRENCY));
+const gateForRequest = cache(() => makeGate(gateLimit()));
 
 export function gated<T>(work: () => PromiseLike<T>): Promise<T> {
   return gateForRequest()(work);

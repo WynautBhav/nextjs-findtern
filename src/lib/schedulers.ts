@@ -1,6 +1,7 @@
 import { and, eq, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
 
-import { getDb, schema } from "@/lib/db";
+import { dbPoolBusy, getDb, schema } from "@/lib/db";
+import { SCHEDULER_BUSY_RETRIES, SCHEDULER_BUSY_RETRY_MS, schedulerStartDelayMs } from "@/lib/db/pool-config";
 import { readSkills, scoreOf } from "@/lib/employer-candidates";
 import { activeProject } from "@/lib/admin/scope";
 import { notify } from "@/lib/notify";
@@ -19,12 +20,28 @@ let started = false;
 export function startSchedulers() {
   if (started) return;
   started = true;
-  const run = (name: string, fn: () => Promise<void>) => () =>
-    fn().catch((e) => console.error(`[scheduler] ${name} failed`, e));
+  // A cold serverless instance boots because a request arrived. Starting the jobs now would fire their first
+  // queries in parallel with that request and with every other cold start, so the first run is 45-90 s away.
+  setTimeout(begin, schedulerStartDelayMs()).unref?.();
+}
+
+function begin() {
+  // A job that finds the pool busy waits and retries a few times rather than queueing behind user requests.
+  const run = (name: string, fn: () => Promise<void>, retries = SCHEDULER_BUSY_RETRIES) => {
+    const attempt = (left: number) => {
+      if (dbPoolBusy() && left > 0) {
+        setTimeout(() => attempt(left - 1), SCHEDULER_BUSY_RETRY_MS).unref?.();
+        return;
+      }
+      fn().catch((e) => console.error(`[scheduler] ${name} failed`, e));
+    };
+    return () => attempt(retries);
+  };
 
   const reminders = run("interview reminders", interviewReminders);
   const daily = run("notification jobs", notificationJobs);
   const expiry = run("offer expiry", async () => void (await import("@/lib/proposal-expiry-db").then((m) => m.sweepProposalExpiry())));
+  const outbox = run("email outbox", async () => void (await import("@/lib/outbox/run").then((m) => m.runOutboxTick())), 0); // every 30 s: skip a busy tick, the next one is close
   reminders();
   daily();
   expiry();
@@ -32,7 +49,7 @@ export function startSchedulers() {
   setInterval(daily, 6 * 60 * 60 * 1000);
   // Hourly: an accepted offer is not payable once its start day begins (00:00 IST); this makes that state permanent. The daily Vercel cron is the backstop.
   setInterval(expiry, 60 * 60 * 1000);
-  setInterval(() => void import("@/lib/outbox/run").then((m) => m.runOutboxTick()).catch((e) => console.error("[scheduler] email outbox failed", e)), 30_000);
+  setInterval(outbox, 30_000);
   console.log("[scheduler] started");
 }
 

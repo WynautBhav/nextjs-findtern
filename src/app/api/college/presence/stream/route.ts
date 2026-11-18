@@ -6,6 +6,12 @@ import { driveDataOpen } from "@/lib/college/serialize";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * Vercel kills a function at maxDuration and logs "Task timed out", one error per stream. End the stream
+ * ourselves a little earlier: EventSource reconnects after `retry:` and the client sees no gap.
+ */
+export const maxDuration = 300;
+const STREAM_MAX_MS = 270_000;
 const TICK_MS = 5_000;
 const KEEPALIVE_MS = 20_000;
 
@@ -47,7 +53,12 @@ export async function GET(req: Request) {
           stop();
         }
       };
+      let busy = false;
       const tick = async () => {
+        // A slow database must not stack ticks (each holds a pool connection while it runs); the connection is
+        // released between ticks, nothing is held for the life of the stream.
+        if (busy) return;
+        busy = true;
         try {
           const snap = await presenceSnapshot(ctx.college.id, scope);
           const key = `${snap.online}/${snap.total}/${snap.offline.map((o) => o.userId).join(",")}`;
@@ -59,6 +70,8 @@ export async function GET(req: Request) {
           }
         } catch (err) {
           console.error("[presence-stream]", err);
+        } finally {
+          busy = false;
         }
       };
       const stop = () => {
@@ -72,6 +85,7 @@ export async function GET(req: Request) {
       send(`retry: 3000\n\n`);
       await tick();
       timer = setInterval(tick, TICK_MS);
+      setTimeout(stop, STREAM_MAX_MS).unref?.();
     },
     cancel() {
       if (timer) clearInterval(timer);
