@@ -1,5 +1,6 @@
 "use client";
 
+import { FILTER_SELECT } from "@/components/admin/filter-controls";
 import { useCallback, useEffect, useState } from "react";
 
 import { Pill, Surface, type Tone } from "@/components/app/primitives";
@@ -71,7 +72,7 @@ export function CampaignPanel({ orderIds, canWrite }: { orderIds: string[]; canW
         </div>
         <div className="flex items-center gap-2">
           {orderIds.length > 1 && (
-            <select aria-label="Drive order" className="h-9 rounded-md border border-ink-200 bg-surface px-2 text-sm" value={orderId} onChange={(e) => setOrderId(e.target.value)}>
+            <select aria-label="Drive order" className={FILTER_SELECT} value={orderId} onChange={(e) => setOrderId(e.target.value)}>
               {orderIds.map((id) => <option key={id} value={id}>Order {id.slice(0, 8)}</option>)}
             </select>
           )}

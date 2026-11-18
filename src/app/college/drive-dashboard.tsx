@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 
 import { EmptyScene, Pill, Surface, type Tone } from "@/components/app/primitives";
+import { APP_FILTER_BAR, APP_FILTER_CONTROL, APP_FILTER_SELECT } from "@/components/app/filter-controls";
+import { cn } from "@/lib/utils";
 import { DRIVE_STATUSES, DRIVE_STATUS_LABEL, type DriveStatus } from "@/lib/college/drive-dashboard";
 
 type Metrics = {
@@ -103,7 +105,7 @@ export function DriveDashboard() {
         </p>
       </Surface>
       <Surface className="p-4">
-        <div className="flex flex-wrap gap-2">
+        <div className={APP_FILTER_BAR}>
           <label htmlFor="drive-search" className="sr-only">Search students by name or email</label>
           <input
             id="drive-search"
@@ -112,7 +114,7 @@ export function DriveDashboard() {
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search name or email"
                         maxLength={80}
-            className="h-11 min-w-0 flex-1 rounded-md border px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2"
+            className={cn(APP_FILTER_CONTROL, "min-w-0 flex-1")}
           />
           <label htmlFor="drive-status" className="sr-only">Filter by status</label>
           <select
@@ -122,7 +124,7 @@ export function DriveDashboard() {
               setStatus(e.target.value);
               setPage(1);
             }}
-            className="h-11 rounded-md border px-2 text-sm"
+            className={APP_FILTER_SELECT}
           >
             <option value="">All statuses</option>
             {DRIVE_STATUSES.map((s) => (

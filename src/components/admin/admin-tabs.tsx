@@ -73,7 +73,7 @@ function Count({ value, selected }: { value: number | string; selected: boolean 
 }
 
 const ROW =
-  "flex gap-4 overflow-x-auto pe-4 shadow-[inset_0_-1px_0_var(--admin-rule)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-6";
+  "flex gap-4 overflow-x-auto pe-4 shadow-[inset_0_-1px_0_var(--admin-rule)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden max-sm:[mask-image:linear-gradient(to_right,#000_calc(100%-2.5rem),transparent)] sm:gap-6";
 
 export function AdminTabs({ items, active, onSelect, label, className }: AdminTabsProps) {
   const refs = useRef<(HTMLElement | null)[]>([]);

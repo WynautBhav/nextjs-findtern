@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef, useState } from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Download, Search, SlidersHorizontal, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { FILTER_BUTTON, FILTER_CONTROL, FILTER_SELECT, FilterBar, FilterField } from "./filter-controls.tsx";
+import { PageSizeSelect } from "./page-size-select.tsx";
 import { SortSelect, type SortOption } from "./sort-select.tsx";
 import { useUrlTableState } from "./use-url-table-state.ts";
 
@@ -39,6 +41,7 @@ export function TableToolbar({
   searchKey = "q",
   pageKey = "page",
   sortOptions,
+  pageSize,
 }: {
   searchPlaceholder?: string;
   filters?: ToolbarFilter[];
@@ -51,11 +54,14 @@ export function TableToolbar({
   pageKey?: string;
   /** Sortable columns, offered as a select below `lg` where the header row is hidden. */
   sortOptions?: SortOption[];
+  /** Renders the rows-per-page select at the end of the same bar, with these query keys. */
+  pageSize?: { perKey: string; pageKey: string };
 }) {
   const { searchParams, set: setParam, clear, keys } = useUrlTableState({ searchKey, pageKey });
 
   const [term, setTerm] = useState(searchParams.get(searchKey) ?? "");
   const filtersId = useId();
+  const searchId = useId();
   const foldable = filters.length > 3;
   const shown = foldable ? filters.slice(0, 3) : filters;
   const folded = foldable ? filters.slice(3) : [];
@@ -111,22 +117,14 @@ export function TableToolbar({
     const value = searchParams.get(filter.key) ?? "";
     const id = `filter-${filter.key}`;
     return (
-      <div key={filter.key} className="flex min-w-0 items-center gap-1.5 max-sm:w-full">
-        <label
-          htmlFor={id}
-          className="sr-only"
-        >
-          {filter.label}
-        </label>
+      <FilterField key={filter.key} label={filter.label} htmlFor={id} className="max-sm:w-full">
         <select
           id={id}
           value={value}
           onChange={(e) => setParam(filter.key, e.target.value || null)}
           className={cn(
-            "apple-spring h-10 max-w-56 cursor-pointer truncate rounded-full pr-9 pl-4 text-base sm:text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 max-sm:w-full max-sm:max-w-full",
-            value
-              ? "bg-[color:var(--admin-bar-tint)] font-medium text-foreground"
-              : "bg-[color:var(--admin-panel-2)] text-foreground",
+            FILTER_SELECT,
+            value ? "bg-[color:var(--admin-bar-tint)] font-medium" : null,
           )}
         >
           <option value="">{filter.allLabel ?? `All ${lowerFirst(filter.label)}`}</option>
@@ -136,50 +134,52 @@ export function TableToolbar({
             </option>
           ))}
         </select>
-      </div>
+      </FilterField>
     );
   };
 
   return (
     <>
-      <div className="flex flex-wrap items-center gap-2.5">
+      <FilterBar name="table">
         {/* Search -------------------------------------------------------- */}
         {/* `min-w-[12rem]` keeps the box a real search field when the row is
             tight; it wraps to its own line instead of collapsing to the icon. */}
-        <div className="relative w-full min-w-[12rem] flex-1 sm:w-auto sm:max-w-md">
-          <Search
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-text-subtle"
-          />
-          <input
-            ref={inputRef}
-            type="search"
-            value={term}
-            onChange={(e) => setTerm(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Escape" && term) {
-                e.preventDefault();
-                setTerm("");
-              }
-            }}
-            placeholder={searchPlaceholder}
-            aria-label={searchPlaceholder}
-            className="h-10 w-full rounded-full bg-[color:var(--admin-panel-2)] pr-11 pl-10 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 [&::-webkit-search-cancel-button]:hidden"
-          />
-          {term ? (
-            <button
-              type="button"
-              onClick={() => {
-                setTerm("");
-                inputRef.current?.focus();
+        <FilterField label="Search" htmlFor={searchId} className="w-full min-w-[12rem] flex-1 sm:w-auto sm:max-w-md">
+          <div className="relative">
+            <Search
+              aria-hidden
+              className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-text-subtle"
+            />
+            <input
+              id={searchId}
+              ref={inputRef}
+              type="search"
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Escape" && term) {
+                  e.preventDefault();
+                  setTerm("");
+                }
               }}
-              aria-label="Clear search"
-              className="apple-spring absolute top-1/2 right-1 flex size-9 -translate-y-1/2 items-center justify-center rounded-full p-1 text-text-subtle hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring touch:size-11"
-            >
-              <X className="size-3.5" />
-            </button>
-          ) : null}
-        </div>
+              placeholder={searchPlaceholder}
+              className={cn(FILTER_CONTROL, "w-full pr-11 pl-10 [&::-webkit-search-cancel-button]:hidden")}
+            />
+            {term ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setTerm("");
+                  inputRef.current?.focus();
+                }}
+                aria-label="Clear search"
+                className="apple-spring absolute top-1/2 right-1 flex size-9 -translate-y-1/2 items-center justify-center rounded-full p-1 text-text-subtle hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring touch:size-11"
+              >
+                <X className="size-3.5" />
+              </button>
+            ) : null}
+          </div>
+        </FilterField>
 
         {/* Facet filters ------------------------------------------------ */}
         {/* Three filters show; the rest fold behind "More filters" at every
@@ -187,35 +187,39 @@ export function TableToolbar({
         {shown.map(renderFilter)}
         {sortOptions?.length ? <SortSelect options={sortOptions} keys={keys} /> : null}
         {foldable ? (
-          <button
-            type="button"
-            onClick={() => setFiltersOpen((o) => !o)}
-            aria-expanded={filtersOpen}
-            aria-controls={filtersId}
-            className="apple-spring inline-flex h-10 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
-          >
-            <SlidersHorizontal className="size-4" aria-hidden />
-            {filtersOpen ? "Fewer filters" : "More filters"}
-            {foldedActive ? <span className="nums rounded-full bg-[color:var(--admin-bar-tint)] px-1.5 text-xs text-foreground">{foldedActive}</span> : null}
-          </button>
+          <FilterField>
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((o) => !o)}
+              aria-expanded={filtersOpen}
+              aria-controls={filtersId}
+              className={FILTER_BUTTON}
+            >
+              <SlidersHorizontal className="size-4" aria-hidden />
+              {filtersOpen ? "Fewer filters" : "More filters"}
+              {foldedActive ? <span className="nums rounded-full bg-[color:var(--admin-bar-tint)] px-1.5 text-xs text-foreground">{foldedActive}</span> : null}
+            </button>
+          </FilterField>
         ) : null}
         {foldable && filtersOpen ? (
-          <div id={filtersId} className="flex w-full flex-wrap items-center gap-2.5">
+          <div id={filtersId} className="flex w-full flex-wrap items-end gap-x-2.5 gap-y-3">
             {folded.map(renderFilter)}
           </div>
         ) : null}
 
         {extra}
 
+        {/* The export and the page size close the same row, one gap from the rest. */}
         {exportHref ? (
-          <a
-            href={exportHref}
-            className="apple-spring apple-pressable ml-auto inline-flex h-10 items-center gap-1.5 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-sm font-medium text-foreground hover:bg-[color:var(--admin-bar-tint)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
-          >
-            CSV
-          </a>
+          <FilterField>
+            <a href={exportHref} className={FILTER_BUTTON}>
+              <Download className="size-4" aria-hidden />
+              CSV
+            </a>
+          </FilterField>
         ) : null}
-      </div>
+        {pageSize ? <PageSizeSelect perKey={pageSize.perKey} pageKey={pageSize.pageKey} /> : null}
+      </FilterBar>
 
       {/* Active filter chips ------------------------------------------- */}
       {hasFilters ? (

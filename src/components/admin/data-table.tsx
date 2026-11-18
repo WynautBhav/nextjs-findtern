@@ -14,7 +14,6 @@ import {
 import { AdminAvatar } from "./avatar.tsx";
 import { AdminEmpty } from "./panel.tsx";
 import { DataTableKeys } from "./data-table-keys.tsx";
-import { PageSizeSelect } from "./page-size-select.tsx";
 import { Pager } from "./pagination.tsx";
 import { SortSelect } from "./sort-select.tsx";
 import { hasActiveFilters } from "./table-state.ts";
@@ -288,20 +287,18 @@ export function DataTable<T>({
       )}
     >
       {hasToolbar ? (
-        <div className="flex flex-wrap items-end justify-between gap-3 px-[var(--admin-pad-panel)] pt-[var(--admin-pad-panel)] pb-3">
-          {/* On a phone the filters take the full row and Rows drops below
-              them, so a long select never runs into the label (QA-141). */}
-          <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5 max-sm:basis-full">
-            <TableToolbar
-              searchPlaceholder={searchPlaceholder}
-              filters={filters}
-              exportHref={exportHref}
-              extra={extraControls}
-              pageKey={pageKey ?? "page"}
-              sortOptions={sortOptions}
-            />
-          </div>
-          <PageSizeSelect perKey={perKey ?? "per"} pageKey={pageKey ?? "page"} />
+        <div className="px-[var(--admin-pad-panel)] pt-[var(--admin-pad-panel)] pb-3">
+          {/* One bar: search, filters, dates, export and Rows share a row, a top and a gap.
+              On a phone the filters take the full row and Rows drops below (QA-141). */}
+          <TableToolbar
+            searchPlaceholder={searchPlaceholder}
+            filters={filters}
+            exportHref={exportHref}
+            extra={extraControls}
+            pageKey={pageKey ?? "page"}
+            sortOptions={sortOptions}
+            pageSize={{ perKey: perKey ?? "per", pageKey: pageKey ?? "page" }}
+          />
         </div>
       ) : sortOptions.length ? (
         <div className="px-[var(--admin-pad-panel)] pt-[var(--admin-pad-panel)] pb-3 lg:hidden">

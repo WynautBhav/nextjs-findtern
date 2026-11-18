@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 
+import { FILTER_SELECT, FilterField } from "./filter-controls.tsx";
 import { parseSortSelectValue, sortSelectValue, type TableKeys } from "./table-state.ts";
 import { useUrlTableState } from "./use-url-table-state.ts";
 
@@ -32,10 +33,7 @@ export function SortSelect({
   );
 
   return (
-    <div className={className ?? "flex items-center gap-1.5 lg:hidden"}>
-      <label htmlFor={id} className="sr-only">
-        Sort by
-      </label>
+    <FilterField label="Sort by" htmlFor={id} className={className ?? "lg:hidden max-sm:w-full"}>
       <select
         id={id}
         value={value}
@@ -44,7 +42,7 @@ export function SortSelect({
           if (parsed) setSort(parsed.sort, parsed.dir);
           else setSort(null);
         }}
-        className="apple-spring h-10 max-w-56 cursor-pointer truncate rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring sm:text-sm touch:min-h-11 max-sm:w-full max-sm:max-w-full"
+        className={FILTER_SELECT}
       >
         <option value="">Default order</option>
         {options.map((option) => (
@@ -54,6 +52,6 @@ export function SortSelect({
           </optgroup>
         ))}
       </select>
-    </div>
+    </FilterField>
   );
 }

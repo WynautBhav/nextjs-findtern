@@ -197,7 +197,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                 setShown(PAGE);
               }}
               placeholder="Search by role, project or initials"
-              className={cn(fieldClass, "rounded-xl pl-10")}
+              className={cn(fieldClass, "pl-10")}
             />
           </label>
           {projectOptions.length > 1 ? (
@@ -207,7 +207,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                 setProjectFilter(e.target.value);
                 setShown(PAGE);
               }}
-              className={cn(fieldClass, "w-36 shrink-0 truncate rounded-xl sm:w-56")}
+              className={cn(fieldClass, "w-36 shrink-0 truncate sm:w-56")}
               aria-label="Project"
             >
               <option value="all">All projects</option>
@@ -231,7 +231,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
               key={t.key}
               type="button"
               aria-pressed={on}
-              aria-label={`${TAB_LABEL[t.key].label}, ${t.count}`}
+              aria-label={`${TAB_LABEL[t.key].label} ${t.count}`}
               onClick={() => {
                 setStatusFilter(t.key);
                 setShown(PAGE);

@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
+import { CalendarDays } from "lucide-react";
 
 import { AutoSubmitForm } from "@/components/app/auto-submit-form";
 import { cn } from "@/lib/utils";
+import { FILTER_CONTROL, FilterField } from "./filter-controls.tsx";
 
 /**
  * A from-to date filter in DD/MM/YYYY, the format the whole product shows.
@@ -30,8 +32,7 @@ function toDmy(iso: string | undefined): string {
   return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
 }
 
-const field =
-  "h-10 w-36 rounded-full bg-[color:var(--admin-panel-2)] px-4 text-base sm:text-sm tabular-nums text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11";
+const field = cn(FILTER_CONTROL, "w-40 pr-10 tabular-nums max-sm:w-full");
 
 export function DateRangeForm({
   params,
@@ -54,9 +55,11 @@ export function DateRangeForm({
   const [from, setFrom] = useState(params[fromKey] ?? "");
   const [to, setTo] = useState(params[toKey] ?? "");
   const skip = new Set([fromKey, toKey, "page", ...drop]);
+  const fromId = useId();
+  const toId = useId();
 
   return (
-    <AutoSubmitForm className={cn("flex flex-wrap items-end gap-2", className)}>
+    <AutoSubmitForm className={cn("flex flex-wrap items-end gap-x-2.5 gap-y-3 max-sm:w-full", className)}>
       {Object.entries(params)
         .filter(([k, v]) => !skip.has(k) && v)
         .map(([k, v]) => (
@@ -66,26 +69,29 @@ export function DateRangeForm({
       {to ? <input type="hidden" name={toKey} value={to} /> : null}
       {(
         [
-          [fromLabel, params[fromKey], setFrom],
-          [toLabel, params[toKey], setTo],
+          [fromLabel, params[fromKey], setFrom, fromId],
+          [toLabel, params[toKey], setTo, toId],
         ] as const
-      ).map(([label, initial, set]) => (
-        <label key={label} className="flex flex-col gap-1 text-xs font-medium text-text-subtle">
-          {label}
-          {/* Uncontrolled on purpose: AutoSubmitForm compares the value with
-              its defaultValue to tell an edit from a plain focus-and-leave. */}
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="DD/MM/YYYY"
-            defaultValue={toDmy(initial)}
-            data-complete={DMY}
-            data-date="dmy"
-            onChange={(e) => set(toIso(e.target.value))}
-            className={field}
-          />
-        </label>
+      ).map(([label, initial, set, id]) => (
+        <FilterField key={label} label={label} htmlFor={id} className="max-sm:flex-1">
+          <div className="relative">
+            {/* Uncontrolled on purpose: AutoSubmitForm compares the value with
+                its defaultValue to tell an edit from a plain focus-and-leave. */}
+            <input
+              id={id}
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="DD/MM/YYYY"
+              defaultValue={toDmy(initial)}
+              data-complete={DMY}
+              data-date="dmy"
+              onChange={(e) => set(toIso(e.target.value))}
+              className={field}
+            />
+            <CalendarDays aria-hidden className="pointer-events-none absolute top-1/2 right-4 size-4 -translate-y-1/2 text-text-subtle" />
+          </div>
+        </FilterField>
       ))}
       {/* Enter applies with two fields too; implicit submission needs a button. */}
       <button type="submit" className="sr-only">

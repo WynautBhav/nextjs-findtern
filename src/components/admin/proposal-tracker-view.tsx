@@ -351,7 +351,7 @@ function ProposalsTab({ params, search, pickers, rows }: Pick<TabProps, "params"
         <TableToolbar
           searchPlaceholder="Search candidate, company, project, role…"
           filters={filters}
-          extra={<SortSelect options={sortOptions} className="flex items-center gap-1.5 max-sm:w-full" />}
+          extra={<SortSelect options={sortOptions} className="max-sm:w-full" />}
         />
       </div>
       {cards.length === 0 ? (

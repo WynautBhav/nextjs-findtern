@@ -34,7 +34,8 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { RowMenu } from "@/components/app/row-menu";
 import { useConfirm } from "@/components/app/use-confirm";
-import { ADMIN_PILL_PRIMARY, ADMIN_SURFACE } from "@/components/admin/surface";
+import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY, ADMIN_SURFACE } from "@/components/admin/surface";
+import { FILTER_CONTROL, FILTER_SELECT, FilterBar, FilterField } from "@/components/admin/filter-controls";
 import { COLLEGE_CODE_LOCKED, type PromoAppliesTo } from "@/lib/promo-rules";
 import { FullWaiverDialog } from "@/components/admin/full-waiver-dialog";
 import { isFullWaiver } from "@/lib/full-waiver";
@@ -401,81 +402,96 @@ export function PromoCodesManager({
   return (
     <div className="apple-admin space-y-4">
       {/* Toolbar */}
-      <div className={cn(ADMIN_SURFACE, "flex flex-col gap-3 p-[var(--admin-pad-panel)] lg:flex-row lg:items-center")}>
-        <div className="relative min-w-0 flex-1 lg:max-w-sm">
-          <Search
-            aria-hidden
-            className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-text-subtle"
-          />
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-            placeholder="Search codes…"
-            aria-label="Search promo codes"
-            className="h-10 w-full rounded-full bg-[color:var(--admin-panel-2)] pr-11 pl-10 text-base sm:text-sm text-foreground placeholder:text-text-subtle focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11 [&::-webkit-search-cancel-button]:hidden"
-          />
-          {search ? (
-            <button
-              type="button"
-              onClick={() => { setSearch(""); setPage(1); }}
-              aria-label="Clear search"
-              className="absolute top-1/2 right-0 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-full text-text-subtle hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+      <div className={cn(ADMIN_SURFACE, "p-[var(--admin-pad-panel)]")}>
+        <FilterBar name="promo-codes">
+          <FilterField label="Search" htmlFor="promo-search" className="w-full min-w-[12rem] flex-1 sm:w-auto sm:max-w-sm">
+            <div className="relative">
+              <Search
+                aria-hidden
+                className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-text-subtle"
+              />
+              <input
+                id="promo-search"
+                type="search"
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                placeholder="Search codes…"
+                className={cn(FILTER_CONTROL, "w-full pr-11 pl-10 [&::-webkit-search-cancel-button]:hidden")}
+              />
+              {search ? (
+                <button
+                  type="button"
+                  onClick={() => { setSearch(""); setPage(1); }}
+                  aria-label="Clear search"
+                  className="absolute top-1/2 right-0 flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-full text-text-subtle hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+                >
+                  <X className="size-4" />
+                </button>
+              ) : null}
+            </div>
+          </FilterField>
+
+          <FilterField label="Status" htmlFor="promo-status" className="max-sm:w-full">
+            <select
+              id="promo-status"
+              value={statusFilter}
+              onChange={(e) => { setStatusFilter(e.target.value as "all" | "active" | "inactive"); setPage(1); }}
+              className={FILTER_SELECT}
             >
-              <X className="size-4" />
-            </button>
+              <option value="all">All statuses</option>
+              <option value="active">Active only</option>
+              <option value="inactive">Inactive only</option>
+            </select>
+          </FilterField>
+          <FilterField label="Discount type" htmlFor="promo-type" className="max-sm:w-full">
+            <select
+              id="promo-type"
+              value={typeFilter}
+              onChange={(e) => { setTypeFilter(e.target.value as "all" | "percentage" | "fixed" | "full_waiver"); setPage(1); }}
+              className={FILTER_SELECT}
+            >
+              <option value="all">All types</option>
+              <option value="percentage">Percentage</option>
+              <option value="fixed">Fixed amount</option>
+              <option value="full_waiver">Full waiver</option>
+            </select>
+          </FilterField>
+          <FilterField label="Sort by" htmlFor="promo-sort" className="max-sm:w-full">
+            <select
+              id="promo-sort"
+              value={sort}
+              onChange={(e) => { setSort(e.target.value as PromoSort); setPage(1); }}
+              className={FILTER_SELECT}
+            >
+              {(Object.keys(SORT_LABELS) as PromoSort[]).map((k) => <option key={k} value={k}>{SORT_LABELS[k]}</option>)}
+            </select>
+          </FilterField>
+
+          {canWrite && canMintWaiver ? (
+            <FilterField>
+              <button
+                type="button"
+                onClick={() => setWaiverOpen(true)}
+                className={buttonClass({ variant: "outline", size: "md", className: cn(ADMIN_PILL_SECONDARY, "h-10 touch:min-h-11") })}
+              >
+                <ShieldAlert className="size-4" aria-hidden />
+                New full-waiver code
+              </button>
+            </FilterField>
           ) : null}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value as "all" | "active" | "inactive"); setPage(1); }}
-            aria-label="Filter by status"
-            className="h-10 cursor-pointer rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
-          >
-            <option value="all">All statuses</option>
-            <option value="active">Active only</option>
-            <option value="inactive">Inactive only</option>
-          </select>
-          <select
-            value={typeFilter}
-            onChange={(e) => { setTypeFilter(e.target.value as "all" | "percentage" | "fixed" | "full_waiver"); setPage(1); }}
-            aria-label="Filter by discount type"
-            className="h-10 cursor-pointer rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
-          >
-            <option value="all">All types</option>
-            <option value="percentage">Percentage</option>
-            <option value="fixed">Fixed amount</option>
-            <option value="full_waiver">Full waiver</option>
-          </select>
-        </div>
-
-        <select
-          value={sort}
-          onChange={(e) => { setSort(e.target.value as PromoSort); setPage(1); }}
-          aria-label="Sort promo codes"
-          className="h-10 cursor-pointer rounded-full bg-[color:var(--admin-panel-2)] pr-9 pl-4 text-base sm:text-sm text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring touch:min-h-11"
-        >
-          {(Object.keys(SORT_LABELS) as PromoSort[]).map((k) => <option key={k} value={k}>{SORT_LABELS[k]}</option>)}
-        </select>
-
-        {canWrite && canMintWaiver ? <button
-          type="button"
-          onClick={() => setWaiverOpen(true)}
-          className={buttonClass({ variant: "outline", size: "md", className: "lg:ml-auto" })}
-        >
-          <ShieldAlert className="size-4" aria-hidden />
-          New full-waiver code
-        </button> : null}
-        {canWrite ? <button
-          type="button"
-          onClick={openCreateModal}
-          className={buttonClass({ variant: "primary", size: "md", className: cn(ADMIN_PILL_PRIMARY, !(canWrite && canMintWaiver) && "lg:ml-auto") })}
-        >
-          <Plus className="size-4" />
-          New code
-        </button> : null}
+          {canWrite ? (
+            <FilterField>
+              <button
+                type="button"
+                onClick={openCreateModal}
+                className={buttonClass({ variant: "primary", size: "md", className: cn(ADMIN_PILL_PRIMARY, "h-10 touch:min-h-11") })}
+              >
+                <Plus className="size-4" />
+                New code
+              </button>
+            </FilterField>
+          ) : null}
+        </FilterBar>
       </div>
 
       {/* Ticket grid */}

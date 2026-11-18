@@ -245,7 +245,7 @@ export function CartManager({
             <select
               value={selectedProject}
               onChange={(e) => setSelectedProject(e.target.value)}
-              className={cn(fieldClass, "h-11 w-auto min-w-0 max-w-52 rounded-xl pl-3.5 [field-sizing:content] sm:h-9 sm:max-w-72 sm:touch:h-11")}
+              className={cn(fieldClass, "h-11 w-auto min-w-0 max-w-52 pl-3.5 [field-sizing:content] sm:max-w-72")}
             >
               <option value="all">All projects</option>
               {projectOptions.map(([id, name]) => (
