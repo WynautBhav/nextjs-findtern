@@ -9,6 +9,7 @@ import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { cn } from "@/lib/utils";
 import { newTabAttrs } from "@/components/ui/new-tab";
 import { NewTabHint } from "@/components/ui/new-tab-link";
+import { filePickerOpen, FORM_ROUTE, isTypingTarget, mayAutoShow, watchFilePicker } from "./chat-auto-show";
 import { Mascot, MASCOT_STAGE_BG } from "./mascot";
 import { PillMascot } from "./pill-owl";
 import { busyState, replyState, SLEEPY_AFTER_MS, TYPING_AFTER_MS, type MascotState } from "./mascot-state";
@@ -22,9 +23,6 @@ const QUICK_PROMPTS = [
 ];
 
 const TEASER_KEY = "findtern:chat-teaser-seen";
-/** Auth and onboarding forms (see the placement note in ChatWidget). */
-const FORM_ROUTE =
-  /^\/(?:login|signup|forgot-password|reset-password|verify-email|(?:intern|employer)\/onboarding)(?:\/|$)/;
 /** The nudge goes away by itself; it used to sit over the page until dismissed (QA-102). */
 const TEASER_MS = 12_000;
 
@@ -201,6 +199,12 @@ export function ChatWidget() {
   // A field outside the chat has focus (the phone keyboard is up): the
   // launcher steps aside so it never covers what is being typed (QA-136).
   const [typing, setTyping] = useState(false);
+  const typingRef = useRef(false);
+  const pathRef = useRef(pathname);
+  useEffect(() => {
+    typingRef.current = typing;
+    pathRef.current = pathname;
+  });
   const reduceMotion = useReducedMotion();
   // What the owl is doing: waves when the panel opens, thinks (or searches) while a reply is pending.
   const [mood, setMood] = useState<MascotState>("idle");
@@ -230,7 +234,11 @@ export function ChatWidget() {
     } catch {
       // ignore
     }
-    const t = window.setTimeout(() => setTeaser(true), 2500);
+    watchFilePicker();
+    // Checked when it is due, not at mount: by then a field may have focus or a file picker may be open.
+    const t = window.setTimeout(() => {
+      if (mayAutoShow({ pathname: pathRef.current, typing: typingRef.current, uploading: filePickerOpen() })) setTeaser(true);
+    }, 2500);
     return () => window.clearTimeout(t);
     // Once per mount; the widget lives in the root layout.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -252,11 +260,7 @@ export function ChatWidget() {
   }, [teaser]);
 
   useEffect(() => {
-    const isField = (t: EventTarget | null) =>
-      t instanceof HTMLElement &&
-      t.matches("input:not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]), textarea, select, [contenteditable=true]") &&
-      !t.closest("[data-chat-root]");
-    const onIn = (e: FocusEvent) => setTyping(isField(e.target));
+    const onIn = (e: FocusEvent) => setTyping(isTypingTarget(e.target));
     const onOut = () => setTyping(false);
     document.addEventListener("focusin", onIn);
     document.addEventListener("focusout", onOut);
@@ -525,7 +529,7 @@ export function ChatWidget() {
 
       {/* ── Teaser (once per session) ─────────────────────── */}
       {/* Never on a form: at lg the bubble sat over the signup's helper text. */}
-      {teaser && !open && !isForm ? (
+      {teaser && !open && !isForm && !typing ? (
         <motion.div
           role="status"
           initial={reduceMotion ? false : { opacity: 0, y: 8 }}

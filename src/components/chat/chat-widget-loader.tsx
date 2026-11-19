@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ComponentType } from "react";
 import { usePathname } from "next/navigation";
 
 import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
+import { filePickerOpen, isTypingTarget, mayAutoShow, watchFilePicker } from "./chat-auto-show";
 
 /**
  * Loads the chat widget (and the `motion` library it pulls in, ~44 KB gz) after
@@ -40,6 +41,7 @@ export function ChatWidgetLoader() {
       load();
     };
     window.addEventListener(OPEN_CHAT_EVENT, onOpen);
+    watchFilePicker();
     // requestIdleCallback is missing in Safari < 18.
     const hasIdle = typeof window.requestIdleCallback === "function";
     const handle = hasIdle ? window.requestIdleCallback(load, { timeout: IDLE_TIMEOUT_MS }) : window.setTimeout(load, 2000);
@@ -54,7 +56,9 @@ export function ChatWidgetLoader() {
   useEffect(() => {
     if (Widget && wantsOpen.current) {
       wantsOpen.current = false;
-      window.dispatchEvent(new Event(OPEN_CHAT_EVENT));
+      // The load took a moment; if the visitor has since started typing or picked a file, the queued open is stale.
+      // (The route is not checked: the click came from "Ask Findy", which the visitor chose.)
+      if (mayAutoShow({ pathname: null, typing: isTypingTarget(document.activeElement), uploading: filePickerOpen() })) window.dispatchEvent(new Event(OPEN_CHAT_EVENT));
     }
   }, [Widget]);
 
