@@ -62,6 +62,23 @@ export function zeroValueInvoiceEligible(raw: Record<string, unknown> | null | u
   return paymentPromo(raw).code !== null;
 }
 
+/**
+ * The `raw` the intern activation route stores for a promo order. A college code carries `collegePromo` (as the college redeem
+ * route writes it) so the invoice rule never has to guess from the code text.
+ */
+export function activationRaw(promo: { code: string; collegeId?: string | null } | null, discountMinor: number): Record<string, unknown> {
+  if (!promo) return {};
+  return { promoCode: promo.code, discountMinor, ...(promo.collegeId ? { declaredAdult: true, collegePromo: true } : {}) };
+}
+
+/**
+ * Settlement's serial decision. `collegeId` is the redeemed promo row's college: it wins over `raw`, so a row stored without the
+ * `collegePromo` flag still takes no serial. A paid order always does.
+ */
+export function internInvoiceNumbered(amountMinor: number, raw: Record<string, unknown> | null | undefined, collegeId: string | null | undefined): boolean {
+  return amountMinor > 0 || (!collegeId && zeroValueInvoiceEligible(raw));
+}
+
 /** What an intern may see: their own, paid, with a number. A ₹0 row shows only when a code made it free (B-54); number-less ₹0 rows stay hidden. */
 export const isOwnInvoice = (r: InternPaymentRecord, uid: string) =>
   r.internId === uid && r.status === "paid" && !!r.invoiceNumber && (r.amountMinor > 0 || zeroValueInvoiceEligible(r.raw));

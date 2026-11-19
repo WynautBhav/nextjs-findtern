@@ -13,7 +13,7 @@ import { SEATS_USED_UP } from "@/lib/promo-rules";
 import { PROMO_CONSENT_VERSION } from "@/lib/college/promo-consent";
 import { consentProblem, membershipFromPromo, promoConsentHash } from "@/lib/college/promo-membership";
 import { assignInvoiceNumber } from "@/lib/invoice-number";
-import { zeroValueInvoiceEligible } from "@/lib/intern-invoice";
+import { internInvoiceNumbered } from "@/lib/intern-invoice";
 import { invoiceBuyerPatch } from "@/lib/invoice-buyer";
 import { monthMismatches } from "@/lib/billing-plan";
 import { orderProposalIds } from "@/lib/order-ids";
@@ -425,8 +425,9 @@ export async function settleInternOrder(input: {
       await flagPayment(tx, "intern", payment.id, "payment.duplicate_flagged", (row) => planDuplicatePayment(row, input.paymentId, input.paid ?? {}, new Date()), { orderId: input.orderId, paymentId: input.paymentId, amountMinor: payment.amountMinor, currency: payment.currency });
       return false;
     }
-    // A ₹0 activation made free by a promo or waiver is still a numbered invoice (the shared GST serial); test mode and college codes are not.
-    if (payment.amountMinor > 0 || zeroValueInvoiceEligible(payment.raw)) await assignInvoiceNumber("intern", payment.id, new Date(), tx);
+    // A ₹0 activation made free by a promo or waiver is still a numbered invoice (the shared GST serial); test mode and college codes
+    // are not. The serial is taken after the promo use below, because the promo row is what says whether the code is a college's.
+    let collegeId: string | null = null;
     const promo = promoOf(payment.raw);
     if (waived) {
       await redeemWaiverInTx(tx, { kind: "intern", paymentRowId: payment.id, orderId: input.orderId, accountId: payment.internId, currency: payment.currency, raw: payment.raw });
@@ -434,11 +435,13 @@ export async function settleInternOrder(input: {
       const use = await recordPromoUse({ code: promo.code, subjectId: payment.internId, orderId: input.orderId, discountMinor: promo.discountMinor, enforceCap: payment.amountMinor === 0 }, tx);
       // Throwing rolls back the claim above too, so the seat and the order stay unspent.
       if (use.capped) throw new SettleRefused(use.refused);
+      collegeId = use.collegeId ?? null;
       if (use.collegeId) {
         if (consentProblem((payment.raw as { declaredAdult?: unknown } | null)?.declaredAdult)) throw new SettleRefused(consentProblem(false)!);
         await verifyByCollegeCode(tx, payment.internId, use.collegeId);
       }
     }
+    if (internInvoiceNumbered(payment.amountMinor, payment.raw, collegeId)) await assignInvoiceNumber("intern", payment.id, new Date(), tx);
     return true;
   }).catch((e) => (e instanceof SettleRefused || e instanceof WaiverRefused ? e : Promise.reject(e)));
   if (claimed instanceof SettleRefused || claimed instanceof WaiverRefused) return { ok: false, status: 409, error: claimed.message };

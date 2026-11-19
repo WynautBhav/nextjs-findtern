@@ -10,6 +10,7 @@ import { collegeAccountPayBlock } from "@/lib/college/account-state";
 import { openOrder } from "@/lib/intern-order-open";
 import { getInternActivationFeeMinor } from "@/lib/platform-settings";
 import { consentProblem } from "@/lib/college/promo-membership";
+import { activationRaw } from "@/lib/intern-invoice";
 import { isFullWaiver, WAIVER_GATEWAY, waiverPromoRaw } from "@/lib/full-waiver";
 import { promoRefusal, quotePromoGuarded } from "@/lib/promo";
 import { isInternPaid, settleInternOrder } from "@/lib/payments";
@@ -98,7 +99,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     amountMinor = quote.payableMinor;
     if (isFullWaiver(quote.promo)) waiver = waiverPromoRaw({ code: quote.promo.code, promoCodeId: quote.promo.id, waivedMinor: quote.discountMinor });
   }
-  const raw = promo ? { promoCode: promo.code, discountMinor, ...(promo.collegeId ? { declaredAdult: true } : {}) } : {};
+  const raw = activationRaw(promo, discountMinor);
 
   // Full waiver: no Razorpay order at all. The order is marked as a waiver (code id, list value waived); settlement locks the code,
   // consumes its use once and audits it. The order id carries no code text.
