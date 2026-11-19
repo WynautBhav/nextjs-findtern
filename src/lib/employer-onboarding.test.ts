@@ -20,7 +20,7 @@ test("employers can register with a company or college-style domain", () => {
 const FULL = Object.fromEntries([...REQUIRED_COMPANY_FIELDS, ...ESCALATION_FIELDS].map(([k]) => [k, "x"]));
 
 test("escalation contact is required on the profile but not part of the setup gate (B-57)", () => {
-  const legacy = { ...FULL, escalationContactName: "", escalationContactRole: null, escalationContactEmail: " ", escalationContactPhone: undefined };
+  const legacy: Record<string, string | null | undefined> = { ...FULL, escalationContactName: "", escalationContactRole: null, escalationContactEmail: " ", escalationContactPhone: undefined };
   assert.deepEqual(missingCompanyFields(legacy), []);
   assert.deepEqual(
     missingProfileFields(legacy),
