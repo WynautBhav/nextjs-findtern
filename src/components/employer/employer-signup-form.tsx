@@ -7,6 +7,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-r
 
 import { COUNTRY_CODE_OPTIONS, isPersonalEmail } from "@/lib/employer-onboarding";
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
+import { employerSignupErrors } from "@/lib/signup-field-errors";
 import { PASSWORD_RULES } from "@/lib/password-policy";
 import { fieldClass } from "@/components/employer/ui-tokens";
 import { cn } from "@/lib/utils";
@@ -64,18 +65,14 @@ export function EmployerSignupForm({
 
   const trimmedEmail = companyEmail.trim().toLowerCase();
   const personal = trimmedEmail.length > 0 && isPersonalEmail(trimmedEmail);
-  const passwordOk = PASSWORD_RULES.every((rule) => rule.test(password));
   const phoneMaxLength = countryCode === "+91" ? 10 : 15;
 
-  const detailsOk =
-    name.trim().length >= 2 &&
-    companyName.trim().length >= 2 &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail) &&
-    !personal &&
-    isValidPhone(countryCode, phoneNumber) &&
-    !phoneTaken &&
-    passwordOk &&
-    agreedToTerms;
+  // Messages show once a field is left or a submit is tried; the button stays enabled (B-20).
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const fieldErrors = employerSignupErrors({ name, companyName, email: trimmedEmail, countryCode, phoneNumber, password, agreedToTerms });
+  const shown = (key: keyof typeof fieldErrors) => (touched[key] || submitted ? fieldErrors[key] : undefined);
+  const touch = (key: string) => setTouched((t) => (t[key] ? t : { ...t, [key]: true }));
 
   // Same 400ms duplicate check as the intern form. Without it a number that
   // is already on an intern account is only refused after the email code.
@@ -196,17 +193,11 @@ export function EmployerSignupForm({
     if (loading) return;
 
     if (stage === "details") {
-      const problems = validate({
-        name,
-        companyName,
-        email: trimmedEmail,
-        countryCode,
-        phoneNumber,
-        password,
-        agreedToTerms,
-      });
-      if (Object.keys(problems).length > 0) {
-        setError(Object.values(problems)[0]);
+      if (Object.keys(fieldErrors).length > 0 || phoneTaken) {
+        setSubmitted(true);
+        setError(null);
+        const first = (["name", "companyName", "email", "phoneNumber", "password", "agreedToTerms"] as const).find((k) => fieldErrors[k]);
+        document.getElementById(first === "email" ? "companyEmail" : (first ?? "phoneNumber"))?.focus();
         return;
       }
       if (verified) await createAccount();
@@ -312,6 +303,8 @@ export function EmployerSignupForm({
         label="Your name"
         value={name}
         onChange={setName}
+        onBlur={() => touch("name")}
+        error={shown("name")}
         autoComplete="name"
         placeholder="John Doe"
       />
@@ -321,6 +314,8 @@ export function EmployerSignupForm({
         label="Company name"
         value={companyName}
         onChange={setCompanyName}
+        onBlur={() => touch("companyName")}
+        error={shown("companyName")}
         autoComplete="organization"
         placeholder="Acme Labs"
       />
@@ -344,20 +339,21 @@ export function EmployerSignupForm({
             if (e.target.value.trim().toLowerCase() !== trimmedEmail) setVerified(false);
             if (error) setError(null);
           }}
+          onBlur={() => touch("email")}
           placeholder="hiring@acme.com"
-          aria-invalid={personal ? true : undefined}
+          aria-invalid={personal || shown("email") ? true : undefined}
           aria-describedby="companyEmail-note"
-          className={controlClass(personal, cn("mt-2", google && "bg-ink-50 text-ink-700"))}
+          className={controlClass(personal || Boolean(shown("email")), cn("mt-2", google && "bg-ink-50 text-ink-700"))}
         />
         <p
           id="companyEmail-note"
-          className={`mt-1.5 text-xs ${personal ? "text-danger" : "text-text-subtle"}`}
+          className={`mt-1.5 text-xs ${personal || shown("email") ? "text-danger" : "text-text-subtle"}`}
         >
           {google
             ? "Verified by Google."
             : personal
             ? "That is a personal mailbox. Employers need an address at the company domain - the server rejects Gmail, Yahoo, Outlook and the rest."
-            : "Must be at your company domain. Personal mailboxes are rejected."}
+            : shown("email") ?? "Must be at your company domain. Personal mailboxes are rejected."}
         </p>
       </div>
 
@@ -386,7 +382,9 @@ export function EmployerSignupForm({
             inputMode="numeric"
             maxLength={phoneMaxLength}
             value={phoneNumber}
-            aria-invalid={phoneTaken || undefined}
+            aria-invalid={phoneTaken || shown("phoneNumber") ? true : undefined}
+            aria-describedby="phoneNumber-note"
+            onBlur={() => touch("phoneNumber")}
             onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
             autoComplete="tel-national"
             placeholder={countryCode === "+91" ? "9876543210" : "2015550123"}
@@ -394,15 +392,18 @@ export function EmployerSignupForm({
           />
         </div>
         {phoneTaken ? (
-          <p className="mt-1.5 text-xs text-danger">
+          <p id="phoneNumber-note" className="mt-1.5 text-xs text-danger">
             That number is already registered, on an intern or a company account. One number
             can&apos;t be used for both. Use another, or sign in instead.
           </p>
         ) : (
-          <p className="mt-1.5 text-xs text-text-subtle">
+          <p
+            id="phoneNumber-note"
+            className={`mt-1.5 text-xs ${(phoneNumber && !isValidPhone(countryCode, phoneNumber)) || shown("phoneNumber") ? "text-danger" : "text-text-subtle"}`}
+          >
             {phoneNumber && !isValidPhone(countryCode, phoneNumber)
               ? phoneError(countryCode, phoneNumber)
-              : phoneHint(countryCode)}
+              : shown("phoneNumber") ?? phoneHint(countryCode)}
           </p>
         )}
       </div>
@@ -416,11 +417,16 @@ export function EmployerSignupForm({
           name="password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          onBlur={() => touch("password")}
           autoComplete="new-password"
           placeholder="••••••••"
-          aria-describedby="password-rules"
-          className={controlClass(false, "mt-2")}
+          aria-invalid={shown("password") ? true : undefined}
+          aria-describedby="password-error password-rules"
+          className={controlClass(Boolean(shown("password")), "mt-2")}
         />
+        {shown("password") ? (
+          <p id="password-error" className="mt-1.5 text-xs text-danger">{shown("password")}</p>
+        ) : null}
         <ul id="password-rules" className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
           {PASSWORD_RULES.map((rule) => {
             const met = rule.test(password);
@@ -435,9 +441,12 @@ export function EmployerSignupForm({
 
       <label className="flex items-start gap-2.5 text-sm text-ink-700">
         <input
+          id="agreedToTerms"
           type="checkbox"
           checked={agreedToTerms}
           onChange={(e) => setAgreedToTerms(e.target.checked)}
+          aria-invalid={shown("agreedToTerms") ? true : undefined}
+          aria-describedby={shown("agreedToTerms") ? "agreedToTerms-error" : undefined}
           className="mt-0.5 size-4 shrink-0 rounded border-ink-300 accent-brand-700"
         />
         <span>
@@ -455,10 +464,13 @@ export function EmployerSignupForm({
           .
         </span>
       </label>
+      {shown("agreedToTerms") ? (
+        <p id="agreedToTerms-error" className="-mt-3 text-xs text-danger">{shown("agreedToTerms")}</p>
+      ) : null}
 
       <button
         type="submit"
-        disabled={!detailsOk || loading}
+        disabled={loading}
         className="apple-spring apple-pressable group flex min-h-11 w-full items-center justify-center gap-2 rounded-apple-sm bg-brand-700 px-4 text-sm font-semibold text-white hover:bg-brand-600 disabled:pointer-events-none disabled:opacity-60"
       >
         {loading ? (
@@ -494,6 +506,8 @@ function TextInput({
   onChange,
   placeholder,
   autoComplete,
+  onBlur,
+  error,
 }: {
   id: string;
   label: string;
@@ -501,6 +515,8 @@ function TextInput({
   onChange: (value: string) => void;
   placeholder?: string;
   autoComplete?: string;
+  onBlur?: () => void;
+  error?: string;
 }) {
   return (
     <div>
@@ -515,50 +531,16 @@ function TextInput({
         placeholder={placeholder}
         autoComplete={autoComplete}
         onChange={(e) => onChange(e.target.value)}
-        className={controlClass(false, "mt-2")}
+        onBlur={onBlur}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className={controlClass(Boolean(error), "mt-2")}
       />
+      {error ? (
+        <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
-}
-
-/**
- * Mirrors `insertEmployerSchema` in `schema.ts`.
- *
- * Deliberately not imported: that schema also enforces the company's
- * uniqueness on `company_email` and a uniqueness index on country code +
- * phone, which only the database can decide. Everything checkable in the
- * browser is checked here so a round trip is not spent finding out.
- */
-function validate(draft: {
-  name: string;
-  companyName: string;
-  email: string;
-  countryCode: string;
-  phoneNumber: string;
-  password: string;
-  agreedToTerms: boolean;
-}): Record<string, string> {
-  const errors: Record<string, string> = {};
-
-  if (draft.name.trim().length < 2) errors.name = "Your name is required.";
-  if (draft.companyName.trim().length < 2) errors.companyName = "Company name is required.";
-
-  if (!draft.email) {
-    errors.email = "A company email address is required.";
-  } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(draft.email)) {
-    errors.email = "Enter a valid email address.";
-  } else if (isPersonalEmail(draft.email)) {
-    errors.email = "Use your company domain - personal mailboxes cannot register a company.";
-  }
-
-  const phoneProblem = phoneError(draft.countryCode, draft.phoneNumber);
-  if (phoneProblem) errors.phoneNumber = phoneProblem;
-  if (!PASSWORD_RULES.every((rule) => rule.test(draft.password))) {
-    errors.password = "The password does not meet every rule listed above.";
-  }
-  if (!draft.agreedToTerms) {
-    errors.agreedToTerms = "You have to accept the employer terms to register.";
-  }
-
-  return errors;
 }

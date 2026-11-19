@@ -7,6 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { emails, renderEmail } from "@/lib/emails";
 import { sendSmtpMail } from "@/lib/mailer";
 import { bucketKey, generateOtp, hashOtp, limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
+import { accountExistsEmail } from "@/lib/account-exists-email";
 import { phoneInUseAnywhere } from "@/lib/phone-owner";
 import { isPersonalEmail } from "@/lib/employer-onboarding";
 import { INTERN_EMAIL_MESSAGE, internEmailAllowed, SIGNUP_OTP_SUBJECTS } from "@/lib/signup-otp";
@@ -84,41 +85,19 @@ export async function POST(req: Request) {
     if (!account || account.verified) return NextResponse.json({ ok: true });
   }
 
+  // B-55: an address that already has an account (either role) gets the same answer as a new one, so this
+  // form cannot be used to find out who is registered. The owner is mailed instead of a code. The signup POSTs
+  // are only reachable with a verified code for the address, so their "already registered" 409s reveal
+  // nothing to a stranger.
+  let accountExists = false;
   if (purpose === "signup") {
-    // Signup already 409s on a taken address, so saying so here exposes
-    // nothing new - it just saves the user a pointless code.
-    const [existing] =
-      subjectType === "intern"
-        ? await db.select({ id: schema.users.id }).from(schema.users).where(sql`lower(${schema.users.email}) = ${email}`).limit(1)
-        : await db
-            .select({ id: schema.employers.id })
-            .from(schema.employers)
-            .where(sql`lower(${schema.employers.companyEmail}) = ${email}`)
-            .limit(1);
-    if (existing) {
-      return NextResponse.json({ error: "An account with this email already exists. Sign in instead." }, { status: 400 });
-    }
-    // One person, one role: the signup routes refuse an address held by the
-    // other side, so refuse it before mailing a code that cannot be used.
-    const [otherSide] =
-      subjectType === "intern"
-        ? await db
-            .select({ id: schema.employers.id })
-            .from(schema.employers)
-            .where(sql`lower(${schema.employers.companyEmail}) = ${email}`)
-            .limit(1)
-        : await db.select({ id: schema.users.id }).from(schema.users).where(sql`lower(${schema.users.email}) = ${email}`).limit(1);
-    if (otherSide) {
-      return NextResponse.json(
-        {
-          error:
-            subjectType === "intern"
-              ? "This email is registered to a company account. One email can't be used for both an intern and a company account."
-              : "This email is registered to an intern account. One email can't be used for both an intern and a company account.",
-        },
-        { status: 400 },
-      );
-    }
+    const [intern] = await db.select({ id: schema.users.id }).from(schema.users).where(sql`lower(${schema.users.email}) = ${email}`).limit(1);
+    const [employer] = await db
+      .select({ id: schema.employers.id })
+      .from(schema.employers)
+      .where(sql`lower(${schema.employers.companyEmail}) = ${email}`)
+      .limit(1);
+    accountExists = Boolean(intern || employer);
   }
 
   const [last] = await db
@@ -137,16 +116,20 @@ export async function POST(req: Request) {
   }
 
   const otp = generateOtp();
+  // For an existing account the row is already expired and its hash matches no code: it only starts the
+  // same resend cooldown a real code would, so the 429 timing is no tell and the owner is not mail-bombed.
   await db.insert(schema.emailOtps).values({
     subjectType,
     subjectId: email,
     otpHash: hashOtp(otp, email),
-    expiresAt: new Date(Date.now() + OTP_TTL_MINUTES * 60_000),
+    expiresAt: accountExists ? new Date(0) : new Date(Date.now() + OTP_TTL_MINUTES * 60_000),
   });
 
   const sent = await sendSmtpMail({
     to: email,
-    ...renderEmail(emails.otp({ otp, ttlMinutes: OTP_TTL_MINUTES, forEmployer: subjectType === "employer" })),
+    ...renderEmail(
+      accountExists ? accountExistsEmail() : emails.otp({ otp, ttlMinutes: OTP_TTL_MINUTES, forEmployer: subjectType === "employer" }),
+    ),
   });
 
   // Never let signup fail silently (bug sheet 7, NC r17/r35): a staging

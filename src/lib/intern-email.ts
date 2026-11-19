@@ -30,10 +30,10 @@ export function isAcademicEmail(email: string): boolean {
 /**
  * Interns register with a personal mailbox or a college one (so the college
  * can be verified later from the address). Work addresses stay refused.
- * googlemail.com is Gmail, which the Google sign-in accepts too.
+ * The shared free-mail list also covers googlemail.com and regional aliases.
  */
 export function isInternEmail(email: string): boolean {
-  return isPersonalEmail(email) || email.trim().toLowerCase().endsWith("@googlemail.com") || isAcademicEmail(email);
+  return isPersonalEmail(email) || isAcademicEmail(email);
 }
 
 export const INTERN_EMAIL_MESSAGE =

@@ -8,7 +8,15 @@ import { announceAccountDisabled, announceTermsRequired, readCsrfCookie } from "
 import { UnreadableImageError, shrinkImage } from "@/lib/image-shrink";
 import { cn } from "@/lib/utils";
 
-import { PROGRESS_DELAY_MS, nextPercent } from "./upload-progress";
+import {
+  IMAGE_LIMIT_BYTES,
+  PROGRESS_DELAY_MS,
+  TRANSPORT_TARGET_BYTES,
+  imageTooLargeMessage,
+  needsTransportShrink,
+  nextPercent,
+  tooLargeStatusMessage,
+} from "./upload-progress";
 
 export type UploadResult = { key: string; url: string; contentType: string; bytes: number; name: string };
 
@@ -45,7 +53,7 @@ function typeOf(file: File): string {
   return BY_EXTENSION[ext] ?? "";
 }
 
-type PostResult = { ok: boolean; data: Partial<UploadResult> & { error?: string } };
+type PostResult = { ok: boolean; status: number; data: Partial<UploadResult> & { error?: string } };
 
 /**
  * POST the raw file to /api/uploads. XMLHttpRequest rather than fetch(), because fetch cannot report
@@ -86,7 +94,7 @@ function postFile(
         announceTermsRequired(data);
         announceAccountDisabled(data);
       }
-      resolve({ ok: xhr.status >= 200 && xhr.status < 300, data });
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, data });
     };
     xhr.send(file);
   });
@@ -121,7 +129,7 @@ export function FileUpload({
   className?: string;
   /** Word used in the button ("Upload {noun}"); defaults to the label in lowercase. */
   noun?: string;
-  /** Checked before uploading so a too-large file fails at once, not after the upload. */
+  /** Checked on the file that will be sent (after any shrink), so a too-large file fails at once. Images are also held to 5 MB as picked. */
   maxBytes?: number;
   /** Show the uploaded video from the local file, so the candidate can check it. */
   preview?: "video";
@@ -159,14 +167,23 @@ export function FileUpload({
       if (input.current) input.current.value = "";
       return;
     }
-    if (shrink && type.startsWith("image/")) {
+    const isImage = type.startsWith("image/");
+    // The limit is on the file as picked, so a 12 MB photo is told so rather than quietly shrunk.
+    if (isImage && file.size > IMAGE_LIMIT_BYTES) {
+      setState("error");
+      setError(imageTooLargeMessage(file.size));
+      if (input.current) input.current.value = "";
+      return;
+    }
+    // `shrink` aims for ~500 KB; any other image over 4 MB is still brought under Vercel's 4.5 MB body limit.
+    if (isImage && (shrink || needsTransportShrink(file.size))) {
       setState("busy");
       setError(null);
       setPercent(0);
       setSent(false);
       setShowBar(false);
       try {
-        file = (await shrinkImage(file)).file;
+        file = (await shrinkImage(file, shrink ? undefined : TRANSPORT_TARGET_BYTES)).file;
         type = file.type || type;
       } catch (e) {
         setState("error");
@@ -188,7 +205,7 @@ export function FileUpload({
     setShowBar(false);
     const barTimer = setTimeout(() => setShowBar(true), PROGRESS_DELAY_MS);
     try {
-      const { ok, data } = await postFile(
+      const { ok, status, data } = await postFile(
         file,
         type,
         kind,
@@ -198,7 +215,7 @@ export function FileUpload({
           setSent(true);
         },
       );
-      if (!ok || !data.key) throw new Error(data.error ?? "Upload failed. Try again.");
+      if (!ok || !data.key) throw new Error(data.error ?? (status === 413 ? tooLargeStatusMessage(isImage) : "Upload failed. Try again."));
       setName(file.name);
       setState("done");
       if (preview) setPreviewUrl(URL.createObjectURL(file));

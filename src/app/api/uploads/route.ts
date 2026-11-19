@@ -8,7 +8,7 @@ import { bucketKey, clientIp, limiters } from "@/lib/security/rate-limit";
 import type { SessionData } from "@/lib/security/session";
 import { signedUrl } from "@/lib/security/sign";
 import { put, type StoredFile } from "@/lib/security/store";
-import { KINDS, MB, checkType, prepareUpload, readBodyCapped } from "@/lib/security/upload-rules";
+import { KINDS, MB, checkType, maxFor, prepareUpload, readBodyCapped } from "@/lib/security/upload-rules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,21 +42,20 @@ export async function POST(req: Request): Promise<Response> {
   const type = req.headers.get("content-type")?.split(";")[0].trim() ?? "";
   const badType = checkType(kind, type, session.role);
   if (badType) return NextResponse.json({ error: badType.error }, { status: badType.status });
-  const limitMb = Math.round(kind.max / MB);
-  if (Number(req.headers.get("content-length") ?? "0") > kind.max) {
-    return NextResponse.json({ error: `The file must be under ${limitMb} MB` }, { status: 413 });
-  }
+  const max = maxFor(kind, type);
+  const tooBig = { error: `That file is too large. The limit is ${Math.round(max / MB)} MB.` };
+  if (Number(req.headers.get("content-length") ?? "0") > max) return NextResponse.json(tooBig, { status: 413 });
 
   let bytes: Buffer;
   try {
-    const read = await readBodyCapped(req, kind.max);
-    if (!read) return NextResponse.json({ error: `The file must be under ${limitMb} MB` }, { status: 413 });
+    const read = await readBodyCapped(req, max);
+    if (!read) return NextResponse.json(tooBig, { status: 413 });
     bytes = read;
   } catch {
     return NextResponse.json({ error: "Could not read upload" }, { status: 400 });
   }
   if (bytes.length === 0) return NextResponse.json({ error: "Empty file" }, { status: 400 });
-  if (bytes.length > kind.max) return NextResponse.json({ error: `The file must be under ${limitMb} MB` }, { status: 413 });
+  if (bytes.length > max) return NextResponse.json(tooBig, { status: 413 });
   // The onboarding save refuses more than this, so a ninth file would block every later save.
   if (kindName === "marksheet" && (await marksheetCount(session.uid)) >= MAX_MARKSHEETS) {
     return NextResponse.json({ error: `You can keep at most ${MAX_MARKSHEETS} marksheets. Remove one and save your draft, then upload again.` }, { status: 409 });

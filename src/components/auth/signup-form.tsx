@@ -8,6 +8,7 @@ import { AlertCircle, ArrowLeft, ArrowRight, Loader2, MailCheck } from "lucide-r
 import { isValidPhone, phoneError, phoneHint } from "@/lib/phone";
 import { DIAL_CODES } from "@/lib/data/dial-codes";
 import { isInternEmail } from "@/lib/intern-email";
+import { internSignupErrors } from "@/lib/signup-field-errors";
 import { PASSWORD_RULES } from "@/lib/password-policy";
 import { PasswordInput } from "@/components/auth/password-input";
 
@@ -77,19 +78,25 @@ export function SignupForm({
    *  as invalid merely for being unverified yet. */
   const [otpRejected, setOtpRejected] = useState(false);
 
-  const passwordOk = PASSWORD_RULES.every((rule) => rule.test(password));
+  // Messages show once a field is left or a submit is tried; the button stays enabled (B-20).
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
+  const [submitted, setSubmitted] = useState(false);
+  const fieldErrors = internSignupErrors({ firstName, lastName, email, countryCode, phoneNumber, password, agreedToTerms });
+  const shown = (key: keyof typeof fieldErrors) => (touched[key] || submitted ? fieldErrors[key] : undefined);
+  const touch = (key: string) => setTouched((t) => (t[key] ? t : { ...t, [key]: true }));
   const emailShapeOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   // Interns sign up with a personal or a college address. A college with its own domain is only known
   // to the server, so this just warns; send-otp has the last word and its message is shown on refusal.
   const emailUnrecognised = !isInternEmail(email);
-  const detailsOk =
-    firstName.trim().length >= 2 &&
-    lastName.trim().length >= 2 &&
-    emailShapeOk &&
-    isValidPhone(countryCode, phoneNumber) &&
-    !phoneTaken &&
-    passwordOk &&
-    agreedToTerms;
+
+  /** True when the details are fine; otherwise reveals every message and moves focus to the first bad field. */
+  function detailsReady(): boolean {
+    if (Object.keys(fieldErrors).length === 0 && !phoneTaken) return true;
+    setSubmitted(true);
+    const first = (["firstName", "lastName", "email", "phoneNumber", "password", "agreedToTerms"] as const).find((k) => fieldErrors[k]) ?? "phoneNumber";
+    document.getElementById(first)?.focus();
+    return false;
+  }
 
   async function readError(res: Response, fallback: string): Promise<string> {
     const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
@@ -202,7 +209,9 @@ export function SignupForm({
       noValidate
       onSubmit={(e) => {
         e.preventDefault();
-        if (stage === "details") void (google || verified ? createAccount() : sendOtp());
+        if (stage === "details") {
+          if (detailsReady()) void (google || verified ? createAccount() : sendOtp());
+        }
         else if (stage === "otp") void (verified ? createAccount() : verifyOtp());
       }}
     >
@@ -224,6 +233,8 @@ export function SignupForm({
               label="First name"
               value={firstName}
               onChange={setFirstName}
+              onBlur={() => touch("firstName")}
+              error={shown("firstName")}
               autoComplete="given-name"
               maxLength={NAME_MAX}
             />
@@ -232,6 +243,8 @@ export function SignupForm({
               label="Last name"
               value={lastName}
               onChange={setLastName}
+              onBlur={() => touch("lastName")}
+              error={shown("lastName")}
               autoComplete="family-name"
               maxLength={NAME_MAX}
             />
@@ -266,6 +279,8 @@ export function SignupForm({
                 // A different address needs its own code (same as the employer form).
                 if (v.trim().toLowerCase() !== email.trim().toLowerCase()) setVerified(false);
               }}
+              onBlur={() => touch("email")}
+              error={shown("email")}
               autoComplete="email"
               placeholder="you@gmail.com"
             />
@@ -329,19 +344,23 @@ export function SignupForm({
                 }}
                 autoComplete="tel-national"
                 placeholder="9876543210"
-                aria-invalid={phoneTaken || undefined}
+                onBlur={() => touch("phoneNumber")}
+                aria-invalid={phoneTaken || shown("phoneNumber") ? true : undefined}
+                aria-describedby="phoneNumber-note"
                 className="h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-500 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 aria-invalid:border-danger"
               />
             </div>
             {phoneTaken ? (
-              <p className="mt-1.5 text-xs text-danger">
+              <p id="phoneNumber-note" className="mt-1.5 text-xs text-danger">
                 That number is already registered, on an intern or a company account. One number
                 can&apos;t be used for both. Use another, or sign in instead.
               </p>
-            ) : phoneNumber && !isValidPhone(countryCode, phoneNumber) ? (
-              <p className="mt-1.5 text-xs text-danger">{phoneError(countryCode, phoneNumber)}</p>
+            ) : (phoneNumber && !isValidPhone(countryCode, phoneNumber)) || shown("phoneNumber") ? (
+              <p id="phoneNumber-note" className="mt-1.5 text-xs text-danger">
+                {phoneNumber ? phoneError(countryCode, phoneNumber) : shown("phoneNumber")}
+              </p>
             ) : (
-              <p className="mt-1.5 text-xs text-text-subtle">{phoneHint(countryCode)}</p>
+              <p id="phoneNumber-note" className="mt-1.5 text-xs text-text-subtle">{phoneHint(countryCode)}</p>
             )}
           </div>
 
@@ -353,11 +372,16 @@ export function SignupForm({
               id="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onBlur={() => touch("password")}
               autoComplete="new-password"
               placeholder="••••••••"
-              aria-describedby="password-rules"
+              aria-invalid={shown("password") ? true : undefined}
+              aria-describedby="password-error password-rules"
               className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-500 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
             />
+            {shown("password") ? (
+              <p id="password-error" className="mt-1.5 text-xs text-danger">{shown("password")}</p>
+            ) : null}
             <ul id="password-rules" className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
               {PASSWORD_RULES.map((rule) => {
                 const met = rule.test(password);
@@ -375,9 +399,12 @@ export function SignupForm({
 
           <label className="flex items-start gap-2.5 text-sm text-ink-700">
             <input
+              id="agreedToTerms"
               type="checkbox"
               checked={agreedToTerms}
               onChange={(e) => setAgreedToTerms(e.target.checked)}
+              aria-invalid={shown("agreedToTerms") ? true : undefined}
+              aria-describedby={shown("agreedToTerms") ? "agreedToTerms-error" : undefined}
               className="mt-0.5 size-4 shrink-0 rounded border-ink-300 text-brand-700 accent-brand-700"
             />
             <span>
@@ -398,17 +425,20 @@ export function SignupForm({
               .
             </span>
           </label>
+          {shown("agreedToTerms") ? (
+            <p id="agreedToTerms-error" className="-mt-3 text-xs text-danger">{shown("agreedToTerms")}</p>
+          ) : null}
 
           {google ? (
             <Submit
-              disabled={!detailsOk || stage === "creating"}
+              disabled={stage === "creating"}
               loading={stage === "creating"}
               pendingLabel="Creating account…"
             >
               Create account
             </Submit>
           ) : (
-            <Submit disabled={!detailsOk || loading} loading={loading}>
+            <Submit disabled={loading} loading={loading}>
               Send verification code
             </Submit>
           )}
@@ -521,6 +551,8 @@ function TextInput({
   placeholder,
   autoComplete,
   maxLength,
+  onBlur,
+  error,
 }: {
   id: string;
   label: string;
@@ -530,6 +562,8 @@ function TextInput({
   placeholder?: string;
   autoComplete?: string;
   maxLength?: number;
+  onBlur?: () => void;
+  error?: string;
 }) {
   return (
     <div>
@@ -545,8 +579,16 @@ function TextInput({
         autoComplete={autoComplete}
         maxLength={maxLength}
         onChange={(e) => onChange(e.target.value)}
-        className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-500 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
+        onBlur={onBlur}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={error ? `${id}-error` : undefined}
+        className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-500 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 aria-invalid:border-danger"
       />
+      {error ? (
+        <p id={`${id}-error`} className="mt-1.5 text-xs text-danger">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

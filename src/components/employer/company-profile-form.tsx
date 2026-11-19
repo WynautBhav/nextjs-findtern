@@ -205,7 +205,7 @@ export function CompanyProfileForm({
           accept="image/jpeg,image/png,image/webp"
           label="Logo (optional)"
           noun="logo"
-          hint="PNG, JPG or WebP up to 2 MB."
+          hint="PNG, JPG or WebP up to 5 MB."
           current={hasLogo ? "Logo on file" : null}
           onUploaded={() => router.refresh()}
         />

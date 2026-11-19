@@ -72,7 +72,7 @@ export function CompanyStage({
           accept="image/jpeg,image/png,image/webp"
           label="Logo (optional)"
           noun="logo"
-          hint="PNG, JPG or WebP up to 2 MB. Shown next to your project on a candidate's offer."
+          hint="PNG, JPG or WebP up to 5 MB. Shown next to your project on a candidate's offer."
           current={values.logoUrl ? "Logo on file" : null}
           onUploaded={(r) => setCompany({ logoUrl: r.url })}
         />

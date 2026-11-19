@@ -50,3 +50,10 @@ test("isAcademicEmail matches whole trailing labels only", () => {
     assert.equal(isAcademicEmail(e), false, e);
   }
 });
+
+test("interns keep personal, regional-alias and college domains; employer-style addresses stay out", () => {
+  for (const e of ["x.y@iitb.ac.in", "a@gmail.com", "a@googlemail.com", "a@protonmail.ch", "a@outlook.de", "a@mail.yahoo.co.in", "a@pm.me"]) {
+    assert.equal(isInternEmail(e), true, e);
+  }
+  for (const e of ["a@acme.in", "a@acme.ac.com"]) assert.equal(isInternEmail(e), false, e);
+});

@@ -208,6 +208,72 @@ test("readBodyCapped stops reading a chunked body that passes the cap and return
 
 test("the upload route reads the body through the capped reader, never req.arrayBuffer()", () => {
   const src = readFileSync(join(import.meta.dirname, "../../app/api/uploads/route.ts"), "utf8");
-  assert.match(src, /readBodyCapped\(req, kind\.max\)/);
+  assert.match(src, /readBodyCapped\(req, max\)/);
   assert.doesNotMatch(src, /req\.arrayBuffer\(\)/);
+});
+
+import { IMAGE_MAX, KEEP_ORIGINAL_ON_FAILURE, MB, maxFor } from "./upload-rules.ts";
+
+test("every JPG/PNG upload is capped at 5 MB, whatever the kind; PDFs and videos keep the kind's own limit (B-21)", () => {
+  for (const [name, kind] of Object.entries(KINDS)) {
+    for (const t of ["image/jpeg", "image/png"]) {
+      if (kind.types.includes(t)) assert.equal(maxFor(kind, t), 5 * MB, `${name} ${t}`);
+    }
+  }
+  assert.equal(IMAGE_MAX, 5 * MB);
+  assert.equal(maxFor(KINDS.offer_letter, "application/pdf"), 10 * MB);
+  assert.equal(maxFor(KINDS.support, "video/mp4"), 10 * MB);
+  assert.equal(maxFor(KINDS.support, "image/png"), 5 * MB);
+});
+
+test("logos, CMS images and shared-kind images become WebP too", async () => {
+  for (const [name, type, input] of [
+    ["employer_logo", "image/png", await png()],
+    ["cms_image", "image/jpeg", await jpeg()],
+    ["support", "image/png", await png()],
+    ["offer_letter", "image/jpeg", await jpeg()],
+  ] as const) {
+    const r = await prepareUpload(name, KINDS[name], type, input, "pic.png");
+    assert.ok(r.ok, name);
+    assert.ok(isWebp(r.bytes), name);
+    assert.equal(r.contentType, "image/webp");
+    assert.match(r.fileName, /\.webp$/);
+  }
+});
+
+test("a 4.9 MB PNG is accepted by the rules and stored as WebP (B-21)", async () => {
+  // Noise does not compress, so the PNG really is several MB.
+  const w = 1280;
+  const noise = Buffer.alloc(w * w * 3);
+  for (let i = 0; i < noise.length; i++) noise[i] = (i * 2654435761) >>> 24;
+  const big = await sharp(noise, { raw: { width: w, height: w, channels: 3 } }).png({ compressionLevel: 0 }).toBuffer();
+  assert.ok(big.length > 4 * MB && big.length <= IMAGE_MAX, `fixture is ${big.length}`);
+  const r = await prepareUpload("employer_logo", KINDS.employer_logo, "image/png", big, "logo.png");
+  assert.ok(r.ok);
+  assert.ok(isWebp(r.bytes));
+  assert.match(r.fileName, /\.webp$/);
+});
+
+const garbagePng = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(64, 1)]);
+
+test("a logo that fails conversion is kept as sent; every other image kind, ID documents included, fails the upload", async () => {
+  assert.deepEqual([...KEEP_ORIGINAL_ON_FAILURE], ["employer_logo"]);
+  const kept = await prepareUpload("employer_logo", KINDS.employer_logo, "image/png", garbagePng, "logo.png");
+  assert.ok(kept.ok);
+  assert.deepEqual(kept.bytes, garbagePng);
+  assert.equal(kept.contentType, "image/png");
+  assert.equal(kept.fileName, "logo.png");
+  for (const name of ["aadhaar", "pan", "profile_photo", "marksheet", "certificate", "cms_image", "support", "offer_letter"]) {
+    const r = await prepareUpload(name, KINDS[name], "image/png", garbagePng, "x.png");
+    assert.equal(r.ok, false, name);
+    assert.ok(!r.ok);
+    assert.equal(r.status, 415);
+  }
+});
+
+test("the upload route names the limit in its 413 and uses maxFor for every size check", () => {
+  const src = readFileSync(join(import.meta.dirname, "../../app/api/uploads/route.ts"), "utf8");
+  assert.match(src, /The limit is \$\{Math\.round\(max \/ MB\)\} MB/);
+  assert.doesNotMatch(src, /> kind\.max/);
+  assert.match(src, /const max = maxFor\(kind, type\)/);
 });

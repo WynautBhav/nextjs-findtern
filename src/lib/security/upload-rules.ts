@@ -8,6 +8,11 @@ import type { SessionData } from "./session.ts";
  */
 
 export const MB = 1024 * 1024;
+/**
+ * Largest JPG/PNG/WebP any upload kind takes (B-21). The browser checks it before sending and then shrinks the
+ * file under TRANSPORT_BYTES, because Vercel refuses a request body over 4.5 MB before our code runs.
+ */
+export const IMAGE_MAX = 5 * MB;
 export const IMAGES = ["image/jpeg", "image/png", "image/webp"];
 export const DOCS = [...IMAGES, "application/pdf"];
 /** Intern marksheets and certificates: JPG or PNG only, so they can be resized to KB. No PDF, no WebP. */
@@ -17,6 +22,7 @@ export const VIDEO = ["video/mp4", "video/webm", "video/quicktime"];
 export type UploadKind = {
   roles: SessionData["role"][];
   types: string[];
+  /** Limit for the kind's non-image files (PDF, video). Images are capped by IMAGE_MAX as well; see maxFor. */
   max: number;
   isPublic?: boolean;
   /** Replaces `types` for the intern role only (a kind shared with employers). */
@@ -28,28 +34,34 @@ export type UploadKind = {
  * allowed, whether it's public, and which record it attaches to.
  */
 export const KINDS: Record<string, UploadKind> = {
-  profile_photo: { roles: ["intern"], types: IMAGES, max: 5 * MB },
+  profile_photo: { roles: ["intern"], types: IMAGES, max: IMAGE_MAX },
   // Identity cards: images only (never PDF). Always re-encoded to WebP below.
-  aadhaar: { roles: ["intern"], types: IMAGES, max: 10 * MB },
-  pan: { roles: ["intern"], types: IMAGES, max: 10 * MB },
+  aadhaar: { roles: ["intern"], types: IMAGES, max: IMAGE_MAX },
+  pan: { roles: ["intern"], types: IMAGES, max: IMAGE_MAX },
   // Intern scans: JPG/PNG only (PDF removed). Files already stored as PDF still open: the read routes don't use these rules.
-  marksheet: { roles: ["intern"], types: INTERN_SCANS, max: 25 * MB },
+  marksheet: { roles: ["intern"], types: INTERN_SCANS, max: IMAGE_MAX },
   // Professional course / certification files. Stored only: the onboarding
   // save puts the key on its row (extra.academics …certificateUploads).
-  certificate: { roles: ["intern"], types: INTERN_SCANS, max: 10 * MB },
-  employer_logo: { roles: ["employer"], types: IMAGES, max: 2 * MB, isPublic: true },
+  certificate: { roles: ["intern"], types: INTERN_SCANS, max: IMAGE_MAX },
+  employer_logo: { roles: ["employer"], types: IMAGES, max: IMAGE_MAX, isPublic: true },
   // PDF, PNG or JPG, as legacy accepted (employer-orders full-time dialog).
   offer_letter: { roles: ["employer"], types: ["application/pdf", "image/png", "image/jpeg"], max: 10 * MB },
-  cms_image: { roles: ["admin"], types: IMAGES, max: 5 * MB, isPublic: true },
+  cms_image: { roles: ["admin"], types: IMAGES, max: IMAGE_MAX, isPublic: true },
   // Shared: employers may still attach a PDF; interns may not.
   support: { roles: ["intern", "employer"], types: [...DOCS, ...VIDEO], internTypes: [...IMAGES, ...VIDEO], max: 10 * MB },
 };
 
+/** The size limit for one upload: images are held to IMAGE_MAX whatever the kind's own max, PDFs and videos to the kind's. */
+export function maxFor(kind: UploadKind, type: string): number {
+  return IMAGES.includes(type) ? Math.min(kind.max, IMAGE_MAX) : kind.max;
+}
+
 /**
- * Photos and scanned documents are re-encoded to WebP before anything is
- * stored: auto-rotated from EXIF, EXIF/GPS stripped, capped in size. Only the
- * WebP is ever written - the original upload never touches disk or the
- * bucket. PDFs, videos, offer letters, logos and CMS images are kept as sent.
+ * Every JPG/PNG/WebP is re-encoded to WebP before anything is stored: auto-rotated
+ * from EXIF, EXIF/GPS stripped, capped in size. The original upload never
+ * touches disk or the bucket (the one exception is KEEP_ORIGINAL_ON_FAILURE).
+ * The rule is by kind, so it holds for the S3 bucket and the VPS disk alike,
+ * because both are written through store.ts. PDFs and videos are kept as sent.
  * Documents keep more pixels than the face photo so ID numbers stay legible.
  */
 export const WEBP: Record<string, { maxPx: number; quality: number }> = {
@@ -58,7 +70,19 @@ export const WEBP: Record<string, { maxPx: number; quality: number }> = {
   pan: { maxPx: 2000, quality: 85 },
   marksheet: { maxPx: 2000, quality: 85 },
   certificate: { maxPx: 2000, quality: 85 },
+  employer_logo: { maxPx: 1200, quality: 85 },
+  cms_image: { maxPx: 2400, quality: 82 },
+  // Shared kinds: only their image files are converted; a PDF or video skips this (see prepareUpload).
+  offer_letter: { maxPx: 2000, quality: 85 },
+  support: { maxPx: 2000, quality: 80 },
 };
+
+/**
+ * Public kinds whose image is stored as sent when the conversion fails, because a logo that sharp cannot parse
+ * is still a valid picture for a browser. Everything else (ID documents above all) fails the upload instead:
+ * an unconverted file would keep its EXIF/GPS and its full size.
+ */
+export const KEEP_ORIGINAL_ON_FAILURE = new Set(["employer_logo"]);
 
 /** True when the kind accepts nothing but JPG/PNG/WebP images. */
 export function isImagesOnly(kind: Pick<UploadKind, "types">): boolean {
@@ -98,7 +122,7 @@ export function checkType(kind: UploadKind, type: string, role?: SessionData["ro
 /**
  * Body check and re-encode. Verifies the bytes are what the header claims,
  * then converts to WebP when the kind requires it. A conversion failure is a
- * rejection: the unconverted original is never returned for an images-only kind.
+ * rejection, except for the kinds in KEEP_ORIGINAL_ON_FAILURE (logos).
  */
 export async function prepareUpload(
   kindName: string,
@@ -124,14 +148,16 @@ export async function prepareUpload(
   if (webp && IMAGES.includes(type)) {
     try {
       out = await toWebp(bytes, webp);
+      contentType = "image/webp";
+      name = fileName ? `${fileName.replace(/\.[A-Za-z0-9]{1,5}$/, "")}.webp` : fileName;
     } catch {
-      return { ok: false, status: 415, error: "That image could not be read. Try a JPG, PNG or WebP." };
+      if (!KEEP_ORIGINAL_ON_FAILURE.has(kindName)) {
+        return { ok: false, status: 415, error: "That image could not be read. Try a JPG, PNG or WebP." };
+      }
     }
-    contentType = "image/webp";
-    name = fileName ? `${fileName.replace(/\.[A-Za-z0-9]{1,5}$/, "")}.webp` : fileName;
   }
-  // Belt and braces: an images-only kind with a WebP rule must never leave here unconverted.
-  if (webp && imagesOnly && contentType !== "image/webp") {
+  // Belt and braces: an images-only kind with a WebP rule must never leave here unconverted (but for the logo fallback).
+  if (webp && imagesOnly && contentType !== "image/webp" && !KEEP_ORIGINAL_ON_FAILURE.has(kindName)) {
     return { ok: false, status: 415, error: "That image could not be read. Try a JPG, PNG or WebP." };
   }
   return { ok: true, bytes: out, contentType, fileName: name };
