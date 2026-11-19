@@ -10,6 +10,7 @@ import { emails, renderEmail } from "@/lib/emails";
 import { cgpaEmails } from "@/lib/emails/cgpa";
 import { readCgpaVerification } from "@/lib/cgpa-verification";
 import { withAcceptedAt } from "@/lib/cgpa-verification-flow";
+import { profileCompleteForHire, profileIncompleteBody } from "@/lib/hire-gate";
 import { sendSmtpMail } from "@/lib/mailer";
 import { SITE } from "@/lib/content/site";
 import { initialsOf } from "@/lib/employer-candidates";
@@ -175,6 +176,11 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
   if (recordTerms && offer.fullTime && !parsed.data.agreedToFullTimeTerms) {
     return NextResponse.json({ error: "Agree to the full-time acceptance terms to accept." }, { status: 400 });
+  }
+  // An incomplete profile cannot be hired: refused here, before the offer leaves "sent" and long before any money moves (B-62).
+  if (recordTerms) {
+    const hire = await profileCompleteForHire(db, proposal.internId);
+    if (!hire.ok) return NextResponse.json(profileIncompleteBody("intern", hire.missing), { status: 409 });
   }
 
   // Declines: the first FREE_DECLINES are free; the next one is allowed but

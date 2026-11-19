@@ -7,6 +7,7 @@ import { z } from "zod";
 import { withLock, type Tx } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { paymentIndexMismatch } from "@/lib/dues";
+import { profileCompleteForHire, profileIncompleteBody } from "@/lib/hire-gate";
 import { requireMutation } from "@/lib/guards-mutation";
 import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { openProposalsWithDues, payableCheckout, payGateRefusalFor, payRequestRefusal, type PayableLine, type PayGateRefusal } from "@/lib/employer-payable";
@@ -176,6 +177,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // Never re-price a repeat submit as the next month: refuse when the month asked for is not the one due.
   if (paymentIndexMismatch(paying, parsed.data.paymentIndex)) {
     return NextResponse.json({ error: "This month is already paid. Refresh the page to see it under Orders." }, { status: 409 });
+  }
+  // An incomplete profile cannot be hired, so no order opens for it: before any gateway call, and before the waiver branch below
+  // settles one with no payment at all. Only new-hire lines (a due month or an accepted full-time fee is a hire that already happened).
+  // Settlement is deliberately not gated: by then money has been taken.
+  for (const line of paying.filter((l) => takedownCheckedLineIds([l]).length > 0)) {
+    const hire = await profileCompleteForHire(getDb(), line.internId);
+    if (!hire.ok) return NextResponse.json(profileIncompleteBody("employer", hire.missing), { status: 409 });
   }
   // Pay-at-start monthly gone, postpaid for a score under 6 or full-time, promo with monthly payment (order-mode.ts).
   // A full-waiver code works on every pay plan; any other code only on upfront (the rule is unchanged for them).
