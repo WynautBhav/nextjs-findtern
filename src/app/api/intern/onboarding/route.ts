@@ -240,8 +240,8 @@ export async function POST(req: Request) {
     const tooLong = parsed.error.issues.find((i) => i.code === "too_big" && i.path[0] === "experiences" && i.path[2] === "description");
     if (tooLong) {
       const row = (raw as { experiences?: { id?: unknown }[] } | null)?.experiences?.[Number(tooLong.path[1])];
-      const e = descriptionLimitError(row?.id);
-      if (e) return NextResponse.json({ error: e.message, step: 2, fields: { [e.field]: e.message } }, { status: 400 });
+      const limit = descriptionLimitError(row?.id);
+      if (limit) return NextResponse.json({ error: limit.message, step: 2, fields: { [limit.field]: limit.message } }, { status: 400 });
     }
     return NextResponse.json({ error: friendlyIssue(parsed.error.issues[0]) }, { status: 400 });
   }
