@@ -21,6 +21,7 @@ import { requireRole } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { HoursPills } from "@/components/intern/home/hours-pills";
 import { MilestoneNote } from "@/components/intern/home/milestone-note";
+import { engagementDayLabel } from "@/components/intern/home/engagement-day";
 import { NextUpTile } from "@/components/intern/home/next-up-tile";
 import { pickNextUp } from "@/components/intern/home/next-up";
 import { parseOffer } from "@/lib/offer";
@@ -262,11 +263,9 @@ export default async function InternHome() {
 
   // Who this person works for, and for how long: the line the references
   // spend on a subtitle, from rows we already have.
+  const dayLabel = hired && sheetOffer ? engagementDayLabel(sheetOffer.startDate, data.engagement?.hiredAt, now) : null;
   const role = working && data.engagement
-    ? `${roleOf(data.engagement.offerDetails)} at ${companyIn(data.names[data.engagement.employerId])}` +
-      (hired && data.engagement.hiredAt && data.engagement.hiredAt <= now
-        ? `, day ${Math.floor((now.getTime() - data.engagement.hiredAt.getTime()) / 86_400_000) + 1}`
-        : "")
+    ? `${roleOf(data.engagement.offerDetails)} at ${companyIn(data.names[data.engagement.employerId])}` + (dayLabel ? `, ${dayLabel}` : "")
     : null;
 
   const interviewCompany = upcomingInterviewItem
