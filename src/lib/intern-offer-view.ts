@@ -263,7 +263,7 @@ export function internOfferOverlay(
     return {
       ...NO_OVERLAY,
       kind: "correction",
-      label: "Verifying your CGPA",
+      label: "CGPA updated: waiting for the company",
       tone: "waiting",
       detail:
         gate.correctedFrom && gate.correctedTo
