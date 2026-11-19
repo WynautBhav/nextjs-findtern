@@ -1,13 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 import { AdminLoadError, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
 import { ProposalOfferSummary } from "@/components/admin/proposal-offer-summary";
 import { StatusBadge } from "@/components/admin/status-badge";
+import { CgpaSlaClock } from "@/components/app/cgpa-sla-clock";
 import { DetailRow } from "@/components/app/primitives";
 import { proposalTimeline } from "@/lib/admin/proposal-timeline";
+import { cgpaBlocksPayment, proposalCgpaGate } from "@/lib/cgpa-verification";
 import { getDb, schema } from "@/lib/db";
 import { formatIstStamp } from "@/lib/format";
 import { parseOffer } from "@/lib/offer";
@@ -41,7 +43,13 @@ async function load(id: string) {
   const [interview] = row.p.interviewId
     ? await db.select().from(schema.interviews).where(eq(schema.interviews.id, row.p.interviewId)).limit(1)
     : [];
-  return { ...row, interview: interview ?? null };
+  const [onboarding] = await db
+    .select({ extraData: schema.internOnboarding.extraData })
+    .from(schema.internOnboarding)
+    .where(eq(schema.internOnboarding.userId, row.p.internId))
+    .orderBy(desc(schema.internOnboarding.createdAt))
+    .limit(1);
+  return { ...row, interview: interview ?? null, internExtra: onboarding?.extraData ?? null };
 }
 
 export default async function AdminProposalPage({ params }: { params: Promise<{ id: string }> }) {
@@ -61,6 +69,10 @@ export default async function AdminProposalPage({ params }: { params: Promise<{ 
   const { p, interview } = data;
   const offer = parseOffer(p.offerDetails, p.currency);
   const expiry = expiryOf({ status: p.status, hiredAt: p.hiredAt, offerDetails: p.offerDetails, currency: p.currency });
+  // The same hold the pipeline marks: shown on the offer's true status, and never on a full-time acceptance (the hire itself).
+  const trueStatus = expiry.expired ? "expired" : p.status;
+  const cgpaGate = trueStatus === "accepted" && !p.hiredAt && !offer.fullTime ? proposalCgpaGate({ status: trueStatus, extraData: data.internExtra, offerDetails: p.offerDetails, updatedAt: p.updatedAt }) : null;
+  const cgpaHold = cgpaGate && cgpaBlocksPayment(cgpaGate) ? cgpaGate : null;
   const candidate = `${data.internFirst ?? ""} ${data.internLast ?? ""}`.trim() || "Candidate";
   const steps = proposalTimeline({ status: p.status, createdAt: p.createdAt, updatedAt: p.updatedAt, hiredAt: p.hiredAt, offerDetails: p.offerDetails, interviewAt: interview?.createdAt ?? null });
 
@@ -80,6 +92,12 @@ export default async function AdminProposalPage({ params }: { params: Promise<{ 
         <PanelBody>
           <div className="flex flex-wrap items-center gap-3">
             <StatusBadge value={p.status} />
+            {cgpaHold ? (
+              <>
+                <StatusBadge tone="warning" label={cgpaHold.state === "incorrect_unacked" ? "CGPA corrected: company to confirm" : "CGPA verifying"} />
+                {cgpaHold.state === "incorrect_unacked" ? null : <CgpaSlaClock acceptedAt={cgpaHold.acceptedAt} />}
+              </>
+            ) : null}
             {expiry.expired && expiry.reason ? <span className="text-sm text-text-subtle">{EXPIRY_LABEL[expiry.reason]}</span> : null}
           </div>
           <dl className="mt-3 divide-y divide-[color:var(--admin-rule)]">

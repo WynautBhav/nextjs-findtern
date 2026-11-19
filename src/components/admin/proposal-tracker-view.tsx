@@ -17,6 +17,7 @@ import { EXPIRY_LABEL, type ExpiryReason } from "@/lib/proposal-expiry";
 import { formatDate, formatDayLabel, formatIstStamp, formatMoney, formatNumber, formatSlotTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
+import type { CgpaGate } from "@/lib/cgpa-verification";
 import { parseOffer } from "@/lib/offer";
 import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
 
@@ -50,6 +51,8 @@ type ProposalItem = {
   projectId: string;
   projectName: string | null;
   projectTimezone: string | null;
+  /** Set only while the intern's CGPA check holds this accepted offer's payment (derived on the page, from the true status). */
+  cgpaGate?: CgpaGate | null;
 };
 
 type InterviewItem = {
@@ -289,6 +292,7 @@ function ProposalsTab({ params, search, pickers, rows }: Pick<TabProps, "params"
       project: p.projectName ?? "Project",
       flow,
       fullTimeHired: p.status === "hired" && Boolean(o.fullTime),
+      cgpaVerifying: p.cgpaGate ? { acceptedAt: p.cgpaGate.acceptedAt, correction: p.cgpaGate.state === "incorrect_unacked" } : null,
       amount: o.fullTime
         ? `${o.fullTime.annualCtcMinor != null ? formatMoney(o.fullTime.annualCtcMinor, o.currency) : "-"} CTC`
         : o.monthlyMinor != null
