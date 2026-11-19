@@ -150,7 +150,7 @@ export function AdminInvoicesView({
         <StatCard
           fit
           featured
-          label="Collected"
+          label={kind === "employer" ? "Collected from employer orders (this filter)" : "Collected (this filter)"}
           value={formatMoney(totals.collectedMinor, "INR", { zeroLabel: "₹0" })}
           hint={`${formatNumber(totals.collectedCount)} paid ${k.noun} · gross, before refunds · USD at ₹100/$${totals.markedPaidCount ? ` · ${formatNumber(totals.markedPaidCount)} marked paid elsewhere, not counted` : ""}`}
           tone="neutral"

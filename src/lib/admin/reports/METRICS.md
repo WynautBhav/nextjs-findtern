@@ -18,7 +18,7 @@ Not excludable: test interns (no flag on `users`; see report open items). Banned
 | Employers who paid | distinct real employers with a settled order > 0 (paid / refunded / partially refunded) | employer_payments |
 | Today / week / month | always these three, whatever the range | same |
 | Growth % | `(cur - prev) / prev`; zero baseline = "New"; no baseline (all time) = none; to zero = −100% | `growth.ts` |
-| Intern cohort | of interns who signed up in the window: profile complete, applied, hired, paid (`feePaidSql`); each on its own | intern_onboarding, proposals, payments |
+| Intern cohort | of interns who signed up in the window: profile complete, applied, hired, paid (fee received: a `paid` fee > 0, not `college_drive`, the same test as "Interns who paid"), each on its own. "Activated free" is shown next to it: activated (`feePaidSql`: any paid row incl. ₹0, or the legacy flag) but not paid | intern_onboarding, proposals, payments |
 | Employer cohort | of employers who joined in the window: setup done, posted a project, sent a (non-draft) proposal, paid an order | employers, projects, proposals |
 | Where interns come from | college membership, promo code used, account type. No UTM / referrer column exists. | college_memberships, promo_code_usages, intern_onboarding.extra_data |
 

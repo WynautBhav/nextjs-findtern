@@ -106,7 +106,7 @@ test("a student in another college can't redeem this college's code", () => {
 });
 
 // ---- Admin audit (package S) -------------------------------------------------------------------------------------
-import { promoDeleteProblem, promoHoldProblem, promoMaxUsagesProblem, promoRenameProblem } from "./promo-rules.ts";
+import { INVALID_PROMO, promoExpiryProblem, promoState, promoDeleteProblem, promoHoldProblem, promoMaxUsagesProblem, promoRenameProblem } from "./promo-rules.ts";
 
 test("max uses can't be set below the uses already made; clearing it (unlimited) is always fine", () => {
   assert.equal(promoMaxUsagesProblem(null, 40), null);
@@ -139,4 +139,43 @@ test("a code that has been used, or is on an open payment, can't be renamed: ord
   assert.match(promoRenameProblem({ usedCount: 2, usageRows: 2, openOrders: 0 }) ?? "", /used can't be renamed/);
   assert.match(promoRenameProblem({ usedCount: 0, usageRows: 1, openOrders: 0 }) ?? "", /can't be renamed/);
   assert.match(promoRenameProblem({ usedCount: 0, usageRows: 0, openOrders: 1 }) ?? "", /open payment/);
+});
+
+test("B-53: a refused code is 422 with the same message, never 404", () => {
+  assert.equal(INVALID_PROMO.status, 422);
+  assert.equal(INVALID_PROMO.error, "Invalid promo code");
+  assert.equal(INVALID_PROMO.ok, false);
+});
+
+test("B-53: quotePromo returns the shared refusal and no longer answers 404", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("./promo.ts", import.meta.url), "utf8");
+  assert.doesNotMatch(src, /status: 404/);
+  assert.equal(src.match(/\bINVALID_PROMO\b/g)?.length, 4, "import + null byte, unknown or off, waiver that discounts nothing");
+  assert.match(src, /deadWaiver\) return \{ ok: false, error: deadWaiver, status: 422 \}/);
+});
+
+test("B-28: promoState is off, expired, used up or active, in that order of precedence", () => {
+  const now = new Date("2026-11-19T00:00:00Z");
+  const row = { isActive: true, validUntil: null as Date | null, maxUsages: 5 as number | null, usedCount: 2 };
+  assert.equal(promoState(row, now), "active");
+  assert.equal(promoState({ ...row, maxUsages: null }, now), "active", "unlimited is never used up");
+  assert.equal(promoState({ ...row, usedCount: 5 }, now), "used up");
+  assert.equal(promoState({ ...row, usedCount: 9 }, now), "used up");
+  assert.equal(promoState({ ...row, validUntil: new Date("2026-11-18T00:00:00Z") }, now), "expired");
+  assert.equal(promoState({ ...row, validUntil: new Date("2026-11-20T00:00:00Z") }, now), "active");
+  assert.equal(promoState({ ...row, usedCount: 5, validUntil: new Date("2026-11-18T00:00:00Z") }, now), "expired");
+  assert.equal(promoState({ ...row, isActive: false, usedCount: 5 }, now), "off");
+});
+
+test("B-27: a past expiry is refused; today-onward and no expiry pass; an unchanged date on edit passes", () => {
+  const now = new Date("2026-11-19T10:00:00Z");
+  assert.match(promoExpiryProblem(new Date("2020-01-01T00:00:00Z"), null, now) ?? "", /in the past/);
+  assert.equal(promoExpiryProblem(new Date("2026-11-19T10:00:00Z"), null, now), null, "exactly now is not past");
+  assert.equal(promoExpiryProblem(new Date("2026-12-01T00:00:00Z"), null, now), null);
+  assert.equal(promoExpiryProblem(null, null, now), null);
+  assert.equal(promoExpiryProblem(undefined, null, now), null);
+  const old = new Date("2026-11-01T12:00:00Z");
+  assert.equal(promoExpiryProblem(new Date(old.getTime() + 20_000), old, now), null, "same minute as the stored value is not a change");
+  assert.match(promoExpiryProblem(new Date("2026-10-01T00:00:00Z"), old, now) ?? "", /in the past/, "moving to another past date is refused");
 });

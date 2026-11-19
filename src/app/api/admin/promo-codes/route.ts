@@ -7,7 +7,7 @@ import { promoCodeProblem, promoDiscountProblem } from "@/lib/admin/promo-edit-r
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
-import { PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
+import { PROMO_APPLIES_TO, promoExpiryProblem, promoWindowProblem } from "@/lib/promo-rules";
 
 const bodySchema = z.object({
   code: z.string().trim().min(2, "Code must be at least 2 characters"),
@@ -48,6 +48,8 @@ export async function POST(req: Request) {
     parsed.data.validUntil ? new Date(parsed.data.validUntil) : null,
   );
   if (window) return NextResponse.json({ error: window }, { status: 400 });
+  const expired = promoExpiryProblem(parsed.data.validUntil ? new Date(parsed.data.validUntil) : null);
+  if (expired) return NextResponse.json({ error: expired }, { status: 400 });
 
   const db = getDb();
   const code = parsed.data.code.trim().toUpperCase();

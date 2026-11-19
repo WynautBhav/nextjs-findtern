@@ -13,6 +13,7 @@ import { SEATS_USED_UP } from "@/lib/promo-rules";
 import { PROMO_CONSENT_VERSION } from "@/lib/college/promo-consent";
 import { consentProblem, membershipFromPromo, promoConsentHash } from "@/lib/college/promo-membership";
 import { assignInvoiceNumber } from "@/lib/invoice-number";
+import { zeroValueInvoiceEligible } from "@/lib/intern-invoice";
 import { invoiceBuyerPatch } from "@/lib/invoice-buyer";
 import { monthMismatches } from "@/lib/billing-plan";
 import { orderProposalIds } from "@/lib/order-ids";
@@ -419,7 +420,8 @@ export async function settleInternOrder(input: {
       await flagPayment(tx, "intern", payment.id, "payment.duplicate_flagged", (row) => planDuplicatePayment(row, input.paymentId, input.paid ?? {}, new Date()), { orderId: input.orderId, paymentId: input.paymentId, amountMinor: payment.amountMinor, currency: payment.currency });
       return false;
     }
-    if (payment.amountMinor > 0) await assignInvoiceNumber("intern", payment.id, new Date(), tx);
+    // A ₹0 activation made free by a promo or waiver is still a numbered invoice (the shared GST serial); test mode and college codes are not.
+    if (payment.amountMinor > 0 || zeroValueInvoiceEligible(payment.raw)) await assignInvoiceNumber("intern", payment.id, new Date(), tx);
     const promo = promoOf(payment.raw);
     if (waived) {
       await redeemWaiverInTx(tx, { kind: "intern", paymentRowId: payment.id, orderId: input.orderId, accountId: payment.internId, currency: payment.currency, raw: payment.raw });

@@ -36,7 +36,7 @@ import { RowMenu } from "@/components/app/row-menu";
 import { useConfirm } from "@/components/app/use-confirm";
 import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY, ADMIN_SURFACE } from "@/components/admin/surface";
 import { FILTER_CONTROL, FILTER_SELECT, FilterBar, FilterField } from "@/components/admin/filter-controls";
-import { COLLEGE_CODE_LOCKED, type PromoAppliesTo } from "@/lib/promo-rules";
+import { COLLEGE_CODE_LOCKED, promoExpiryProblem, promoState, type PromoAppliesTo, type PromoState } from "@/lib/promo-rules";
 import { FullWaiverDialog } from "@/components/admin/full-waiver-dialog";
 import { isFullWaiver } from "@/lib/full-waiver";
 import { isoToIstInput, istInputToIso } from "@/lib/admin/promo-form-time";
@@ -66,12 +66,12 @@ function benefitLabel(promo: PromoCode): string {
     : `${formatMoney(Number(promo.discountValue), "INR", { zeroLabel: false })} off`;
 }
 
+const STATE_LABEL: Record<PromoState, string> = { active: "Active", "used up": "Used up", expired: "Expired", off: "Disabled" };
+
 /** "Active, 1 of 1 uses left, expires 24 Nov" for a waiver row; the first word is the state an admin scans for. */
 function waiverState(p: PromoCode): string {
   const until = p.validUntil ? new Date(p.validUntil) : null;
-  const left = p.maxUsages === null ? 0 : Math.max(0, p.maxUsages - p.usedCount);
-  const state = !p.isActive ? "Disabled" : until && until.getTime() < Date.now() ? "Expired" : left === 0 ? "Used up" : "Active";
-  return `${state} · expires ${until ? formatDate(until.toISOString()) : "never (invalid)"}`;
+  return `${STATE_LABEL[promoState(p)]} · expires ${until ? formatDate(until.toISOString()) : "never (invalid)"}`;
 }
 
 export function PromoCodesManager({
@@ -378,6 +378,10 @@ export function PromoCodesManager({
     setTimeout(() => setCopiedCode(null), 2000);
   }
 
+  // Warn before saving: a code that ends in the past is refused by the server too. An unchanged date on an edit is allowed.
+  const untilIso = istInputToIso(validUntil);
+  const pastUntil = untilIso ? promoExpiryProblem(new Date(untilIso), editingPromo?.validUntil ? new Date(editingPromo.validUntil) : null) : null;
+
   // Filtered rows
   const filteredAll = promos.filter((promo) => {
     const q = search.trim().toLowerCase();
@@ -388,8 +392,8 @@ export function PromoCodesManager({
 
     const matchesStatus =
       statusFilter === "all" ||
-      (statusFilter === "active" && promo.isActive) ||
-      (statusFilter === "inactive" && !promo.isActive);
+      (statusFilter === "active" && promoState(promo) === "active") ||
+      (statusFilter === "inactive" && promoState(promo) !== "active");
 
     const matchesType =
       typeFilter === "all" || promo.discountType === typeFilter;
@@ -526,6 +530,7 @@ export function PromoCodesManager({
             const used = promo.usedCount;
             const pct = max ? Math.min(100, Math.round((used / max) * 100)) : 0;
             const isCopied = copiedCode === promo.code;
+            const state = promoState(promo);
             return (
               <li key={promo.id} className={cn(PROMO_GRID, "grid items-center gap-x-6 gap-y-2 px-[var(--admin-pad-panel)] py-4")}>
                 <div className="min-w-0">
@@ -544,6 +549,7 @@ export function PromoCodesManager({
                     </button>
                   </p>
                   {promo.description ? <p className="text-sm text-ink-600">{promo.description}</p> : null}
+                  {state === "used up" || state === "expired" ? <p className="mt-1 text-xs font-semibold text-danger">{STATE_LABEL[state]}</p> : null}
                   {isFullWaiver(promo) ? (
                     <p className="mt-1 flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2 py-0.5 text-[0.6875rem] font-bold tracking-wide text-danger">
@@ -551,7 +557,7 @@ export function PromoCodesManager({
                         FULL WAIVER
                       </span>
                       <span className="text-xs text-ink-600">{waiverState(promo)}</span>
-                      {canWrite && promo.isActive ? (
+                      {canWrite && state === "active" ? (
                         <button
                           type="button"
                           onClick={() => void handleToggleActive(promo)}
@@ -598,8 +604,8 @@ export function PromoCodesManager({
                 </div>
                 <div className="max-lg:col-start-2 max-lg:row-start-1 max-lg:justify-self-end">
                   <Switch
-                    checked={promo.isActive}
-                    disabled={!canWrite}
+                    checked={state === "active"}
+                    disabled={!canWrite || state === "used up" || state === "expired"}
                     onCheckedChange={() => handleToggleActive(promo)}
                     aria-label={`${promo.code} active`}
                   />
@@ -828,8 +834,10 @@ export function PromoCodesManager({
                   disabled={collegeLocked}
                   onChange={(e) => setMaxUsages(e.target.value)}
                   placeholder="50"
+                  aria-describedby="promo-max-help"
                   className={`${inputClass} tabular-nums`}
                 />
+                <p id="promo-max-help" className="mt-1 text-xs text-ink-600">Each account can use a code once. This is the total across all accounts.</p>
               </div>
               <div>
                 <label htmlFor="promo-min" className="block text-sm font-semibold text-ink-800">
@@ -875,6 +883,7 @@ export function PromoCodesManager({
                   className={inputClass}
                 />
                 <p id="promo-until-help" className="mt-1 text-xs text-ink-600">Ends at this time, IST.</p>
+                {pastUntil ? <p role="alert" className="mt-1 text-xs font-semibold text-danger">{pastUntil}</p> : null}
               </div>
             </div>
 

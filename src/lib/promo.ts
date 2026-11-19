@@ -4,7 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import { isFullWaiver, waiverRowProblem } from "@/lib/full-waiver";
 import { chargePromoMiss, chargeWaiverRedeem, promoBlockedMessage, promoGuessBlock, waiverBlockedMessage, waiverRedeemBlock } from "@/lib/promo-throttle";
 import { clientIp } from "@/lib/security/rate-limit";
-import { collegeCodeMemberProblem, collegeCodeProblem, employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoHoldProblem, PROMO_HOLD_MINUTES, promoProblem, seatFreeWhere, type PromoAudience } from "@/lib/promo-rules";
+import { INVALID_PROMO, collegeCodeMemberProblem, collegeCodeProblem, employerPromoTooLarge, promoAudienceProblem, promoDiscount, promoHoldProblem, PROMO_HOLD_MINUTES, promoProblem, seatFreeWhere, type PromoAudience } from "@/lib/promo-rules";
 
 /**
  * Promo codes against a real order: shared by the intern activation payment
@@ -33,14 +33,14 @@ export async function quotePromo(input: {
   undiscountableMinor?: number;
 }): Promise<PromoQuote> {
   // Postgres refuses a NUL byte in text, which was an empty 500 instead of "Invalid promo code".
-  if (input.code.includes("\u0000")) return { ok: false, error: "Invalid promo code", status: 404 };
+  if (input.code.includes("\u0000")) return INVALID_PROMO;
   const db = getDb();
   const [row] = await db
     .select()
     .from(schema.promoCodes)
     .where(sql`upper(${schema.promoCodes.code}) = ${input.code.trim().toUpperCase()}`)
     .limit(1);
-  if (!row || !row.isActive) return { ok: false, error: "Invalid promo code", status: 404 };
+  if (!row || !row.isActive) return INVALID_PROMO;
 
   const audience = input.audience ?? (await audienceOf(input.subjectId));
   const scopeProblem = promoAudienceProblem(row.appliesTo, audience);
@@ -49,10 +49,10 @@ export async function quotePromo(input: {
   // A full waiver is the one code that takes the hiring fee too: the whole order is discountable.
   const waiver = isFullWaiver(row);
   const discountableMinor = waiver ? input.orderMinor : input.orderMinor - (input.undiscountableMinor ?? 0);
-  if (discountableMinor <= 0) return { ok: false, error: waiver ? "Invalid promo code" : "Promo codes don't apply to the hiring fee", status: waiver ? 404 : 400 };
+  if (discountableMinor <= 0) return waiver ? INVALID_PROMO : { ok: false, error: "Promo codes don't apply to the hiring fee", status: 400 };
   // A waiver row with no cap or no expiry (made by hand in SQL) is dead.
   const deadWaiver = waiverRowProblem(row);
-  if (deadWaiver) return { ok: false, error: deadWaiver, status: 404 };
+  if (deadWaiver) return { ok: false, error: deadWaiver, status: 422 };
 
   if (row.collegeId) {
     const [college] = await db.select({ isActive: schema.colleges.isActive, isPartner: schema.colleges.isPartner }).from(schema.colleges).where(eq(schema.colleges.id, row.collegeId)).limit(1);
