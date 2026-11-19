@@ -128,6 +128,26 @@ export function toPage<T>(
   return { rows, total, page: Math.min(requestedPage, pages), perPage, pages };
 }
 
+/**
+ * Where to send a request whose `page` is beyond the last page, or null when it is in range.
+ *
+ * `offset` is computed from the requested page before the total is known, so `?page=99` queries
+ * past the end and returns no rows; `toPage` clamping the label does not bring the rows back.
+ * Pages call this after the count and `redirect()` to the returned href (the last page, keeping
+ * every other param). Redirecting beats re-querying: the URL then matches what is shown.
+ */
+export function pastLastPageHref(
+  basePath: string,
+  params: Record<string, string>,
+  requestedPage: number,
+  total: number,
+  perPage: number,
+): string | null {
+  const pages = Math.max(1, Math.ceil(total / perPage));
+  if (requestedPage <= pages) return null;
+  return `${basePath}${toQueryString({ ...params, page: pages > 1 ? String(pages) : "" })}`;
+}
+
 /** "1-25 of 438" - the footer line above the pager. */
 export function rangeLabel(page: Page<unknown>): string {
   if (page.total === 0) return "0 results";
