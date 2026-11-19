@@ -39,3 +39,10 @@ test("E-B10: only a zone the runtime knows counts as a timezone", async () => {
   assert.equal(isKnownTimezone(""), false);
   assert.equal(isKnownTimezone("not a zone"), false);
 });
+
+test("a made-up zone is unknown, and every zone the pickers list is known (B-43)", async () => {
+  const { isKnownTimezone, TIMEZONES } = await import("./timezones.ts");
+  assert.equal(isKnownTimezone("Mars/Phobos"), false);
+  assert.equal(isKnownTimezone(""), false);
+  for (const tz of TIMEZONES.filter((t) => !t.group)) assert.equal(isKnownTimezone(tz.id), true, tz.id);
+});

@@ -8,7 +8,7 @@ import { emails } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
 import { assertProjectActionable } from "@/lib/projects/takedown-guard-server";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
-import { projectZone, timezoneForLocation, wallTimeToUtc } from "@/lib/timezones";
+import { isKnownTimezone, projectZone, timezoneForLocation, wallTimeToUtc } from "@/lib/timezones";
 import { canEmployerSeeIntern } from "@/lib/employer-pool";
 import { hiredProposalSql } from "@/lib/employer-visibility";
 import { hasDuplicateSlots, hasSlotTooFarAhead, isBlockingInterview, isQuarterHourWall } from "@/lib/employer-interview-rules";
@@ -37,6 +37,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Offer three time slots." }, { status: 400 });
+  // A made-up zone is refused even when the project's own zone would override it (B-43).
+  if (parsed.data.timezone !== undefined && !isKnownTimezone(parsed.data.timezone)) {
+    return NextResponse.json({ error: "Unknown timezone. Use a region such as Asia/Kolkata." }, { status: 400 });
+  }
   if (parsed.data.projectId) {
     const td = await assertProjectActionable(parsed.data.projectId, id);
     if (!td.ok) return td.response;
