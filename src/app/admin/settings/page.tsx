@@ -142,7 +142,7 @@ export default async function AdminSettingsPage() {
           leads here too; once connected it sits at the end. */}
       {calendarConnected === false ? calendar : null}
       {pricing && !mayEdit ? (
-        <p className="text-sm text-text-subtle">Editing prices needs the Edit website content permission.</p>
+        <p className="text-sm text-text-subtle">Editing prices needs the Accounts permission (transactions:write).</p>
       ) : pricing ? (
         <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} perHireFee={pricing.perHireFee} stipendBands={pricing.stipendBands} subscription={pricing.subscription} mayEditSubscription={mayEditSubscription} />
       ) : (

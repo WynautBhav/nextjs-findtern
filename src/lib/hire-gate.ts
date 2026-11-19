@@ -14,14 +14,27 @@ export const PROFILE_INCOMPLETE_CODE = "PROFILE_INCOMPLETE";
 
 export const PROFILE_INCOMPLETE_MESSAGE = {
   intern: "Complete your profile before you accept an offer. Open Profile, fill in every required step and submit it.",
-  employer: "This candidate's profile is incomplete, so they can't be hired yet. Findtern has asked them to finish it. Try again once they have.",
+  employer: "This candidate's profile is incomplete, so they can't be hired yet. Nothing has been charged. Try again once they have completed it.",
 } as const;
+
+/** The company-side wording naming the blocking candidate (initials only: names stay hidden until the hire), for a cart of several. */
+export function employerIncompleteMessage(candidate?: string | null): string {
+  const who = candidate?.trim();
+  return who
+    ? `${who}'s profile is incomplete, so they can't be hired yet. Nothing has been charged. Try again once they have completed it, or remove them from this order.`
+    : PROFILE_INCOMPLETE_MESSAGE.employer;
+}
+
+/** Which payable lines the gate covers: every NEW hire, internship or full-time. A due month is a hire that already happened. */
+export function hireGateLines<T extends { due?: unknown }>(lines: T[]): T[] {
+  return lines.filter((l) => !l.due);
+}
 
 export type HireGateDecision = { ok: true } | { ok: false; missing: string[] };
 
 /** The 409 body a route answers with. `missing` (field ids, never values) is for the candidate's own screen only. */
-export function profileIncompleteBody(who: keyof typeof PROFILE_INCOMPLETE_MESSAGE, missing: string[]): { error: string; code: typeof PROFILE_INCOMPLETE_CODE; missing?: string[] } {
-  return { error: PROFILE_INCOMPLETE_MESSAGE[who], code: PROFILE_INCOMPLETE_CODE, ...(who === "intern" ? { missing } : {}) };
+export function profileIncompleteBody(who: keyof typeof PROFILE_INCOMPLETE_MESSAGE, missing: string[], candidate?: string | null): { error: string; code: typeof PROFILE_INCOMPLETE_CODE; missing?: string[] } {
+  return { error: who === "employer" ? employerIncompleteMessage(candidate) : PROFILE_INCOMPLETE_MESSAGE[who], code: PROFILE_INCOMPLETE_CODE, ...(who === "intern" ? { missing } : {}) };
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);

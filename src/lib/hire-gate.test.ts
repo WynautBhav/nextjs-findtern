@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { hireGateDecision, profileIncompleteBody, PROFILE_INCOMPLETE_CODE, PROFILE_INCOMPLETE_MESSAGE } from "./hire-gate.ts";
+import { employerIncompleteMessage, hireGateLines, hireGateDecision, profileIncompleteBody, PROFILE_INCOMPLETE_CODE, PROFILE_INCOMPLETE_MESSAGE } from "./hire-gate.ts";
 
 const docs = { hasPhoto: true, hasPanImage: true, hasAadhaarImage: false };
 const row = (extra: Record<string, unknown> = {}, over: Record<string, unknown> = {}) => ({
@@ -68,4 +68,17 @@ test("the 409 body: the candidate sees what to fix, the company sees only that t
   assert.equal(employer.code, "PROFILE_INCOMPLETE");
   assert.equal(employer.error, PROFILE_INCOMPLETE_MESSAGE.employer);
   assert.equal("missing" in employer, false);
+});
+
+test("the company message promises nothing Findtern does not do, and names the blocking candidate of a cart", () => {
+  assert.doesNotMatch(PROFILE_INCOMPLETE_MESSAGE.employer, /asked them|notif|remind/i);
+  assert.match(employerIncompleteMessage("AB"), /^AB's profile is incomplete/);
+  assert.equal(profileIncompleteBody("employer", [], "AB").error, employerIncompleteMessage("AB"));
+  assert.equal(profileIncompleteBody("employer", []).error, PROFILE_INCOMPLETE_MESSAGE.employer);
+  assert.equal(employerIncompleteMessage("  "), PROFILE_INCOMPLETE_MESSAGE.employer);
+});
+
+test("B-62 covers full-time lines at order creation; only a due month is exempt", () => {
+  const lines = [{ id: "new" }, { id: "ft", fullTime: true }, { id: "due", due: { monthsPaid: 1 } }];
+  assert.deepEqual(hireGateLines(lines).map((l) => l.id), ["new", "ft"]);
 });
