@@ -5,6 +5,7 @@ import { getDb, schema, withoutPassword } from "@/lib/db";
 import { getSession } from "@/lib/auth";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { StaffRolesManager } from "@/components/admin/staff-roles-manager";
+import { canonicalRoleKey } from "@/lib/admin/permissions";
 import { ensureAdminRoles } from "@/lib/admin/roles-seed";
 
 export const metadata: Metadata = { title: "Roles and access" };
@@ -19,7 +20,13 @@ async function load() {
   ]);
   // Super admin first, then the rest in the order they were made.
   roles.sort((a, b) => (a.key === "super_admin" ? -1 : b.key === "super_admin" ? 1 : 0));
-  return { staff, roles };
+  // The matrix counts people by exact role key, and sign-in reads super_admin case-insensitively: match the stored value to
+  // its role row so a stray "Super_Admin" is counted under Super admin, and name that role by its key, not an editable label.
+  const keys = roles.map((r) => r.key);
+  return {
+    staff: staff.map((s) => ({ ...s, role: canonicalRoleKey(s.role, keys) })),
+    roles: roles.map((r) => (r.key === "super_admin" ? { ...r, name: "Super admin" } : r)),
+  };
 }
 
 export default async function AdminRolesPage() {
