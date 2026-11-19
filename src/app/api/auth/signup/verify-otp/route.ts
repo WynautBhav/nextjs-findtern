@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
-import { verifyOtp, limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
+import { otpVerdict } from "@/lib/otp-check";
+import { limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
 import { SIGNUP_OTP_SUBJECTS, attachOtpProof } from "@/lib/signup-otp";
 
 const bodySchema = z.object({
@@ -37,14 +38,15 @@ export async function POST(req: Request) {
     .orderBy(desc(schema.emailOtps.createdAt))
     .limit(1);
 
-  if (!row || row.expiresAt < new Date()) {
-    return NextResponse.json({ error: "Invalid or expired code" }, { status: 400 });
+  // Expired rows (and the stand-in for a registered address) go through the same wrong-guess limit as live ones, so the
+  // answers are identical whether or not the address has an account.
+  if (!row) return NextResponse.json({ error: "Invalid or expired code" }, { status: 400 });
+  const verdict = otpVerdict(row, otp, email, (id) => limiters.otpGuess.take(id));
+  if (verdict === "locked") {
+    await db.update(schema.emailOtps).set({ usedAt: new Date() }).where(eq(schema.emailOtps.id, row.id));
+    return NextResponse.json({ error: "Too many wrong codes. Request a new one." }, { status: 429 });
   }
-  if (!verifyOtp(otp, email, row.otpHash)) {
-    if (!limiters.otpGuess.take(row.id)) {
-      await db.update(schema.emailOtps).set({ usedAt: new Date() }).where(eq(schema.emailOtps.id, row.id));
-      return NextResponse.json({ error: "Too many wrong codes. Request a new one." }, { status: 429 });
-    }
+  if (verdict === "invalid") {
     return NextResponse.json({ error: "Invalid or expired code" }, { status: 400 });
   }
 
