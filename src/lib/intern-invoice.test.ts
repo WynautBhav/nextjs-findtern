@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { adminInvoiceInput } from "./admin/invoice-print.ts";
-import { internInvoiceRow, isOwnInvoice, ownInternInvoices, type InternPaymentRecord } from "./intern-invoice.ts";
+import { internInvoiceRow, isOwnInvoice, ownInternInvoices, zeroValueInvoiceEligible, type InternPaymentRecord } from "./intern-invoice.ts";
 import { taxInvoiceHtml, type InvoiceSeller } from "./invoice.ts";
 
 const seller: InvoiceSeller = { name: "Findtern", gstin: "29ABCDE1234F1Z5", address: "Bengaluru", email: "a@b.c" };
@@ -24,7 +24,35 @@ test("another intern's invoice is unreachable", () => {
   assert.equal(isOwnInvoice(rec({ internId: "u2" }), "u1"), false);
 });
 
-test("₹0, unpaid and number-less rows are absent", () => {
-  const rows = [rec({ amountMinor: 0 }), rec({ status: "created" }), rec({ invoiceNumber: null }), rec({ id: "keep" })];
+test("unpaid and number-less rows are absent; a ₹0 row with no code is absent", () => {
+  const rows = [rec({ amountMinor: 0, raw: {} }), rec({ status: "created" }), rec({ invoiceNumber: null }), rec({ id: "keep" })];
   assert.deepEqual(ownInternInvoices(rows, "u1", seller).map((i) => i.id), ["keep"]);
+});
+
+test("B-54: a ₹0 activation made free by a promo code is listed with its number and discount", () => {
+  const free = rec({ id: "free", amountMinor: 0, gateway: "free", raw: { promoCode: "QA-FREE", discountMinor: 249900 } });
+  const [inv] = ownInternInvoices([free], "u1", seller);
+  assert.equal(inv.id, "free");
+  assert.equal(inv.amountMinor, 0);
+  assert.match(inv.html, /QA-FREE/);
+  assert.match(inv.html, /021126-124/);
+});
+
+test("B-54: a full-waiver ₹0 order is listed; test mode and college codes are not", () => {
+  assert.equal(zeroValueInvoiceEligible({ promoCode: "FREE-AAAA-BBBB-CCCC", discountMinor: 249900 }), true);
+  assert.equal(zeroValueInvoiceEligible({ promo: { promoCode: "X", discountMinor: 100 } }), true);
+  assert.equal(zeroValueInvoiceEligible({ testMode: true }), false);
+  assert.equal(zeroValueInvoiceEligible({ testMode: true, promoCode: "X", discountMinor: 100 }), false);
+  assert.equal(zeroValueInvoiceEligible({ promoCode: "TPO", discountMinor: 100, collegePromo: true }), false);
+  assert.equal(zeroValueInvoiceEligible({ method: "manual", reference: "r1" }), false, "an admin mark-paid with no code is not a promo");
+  assert.equal(zeroValueInvoiceEligible(null), false);
+  assert.equal(isOwnInvoice(rec({ amountMinor: 0, raw: { testMode: true } }), "u1"), false);
+  assert.equal(isOwnInvoice(rec({ amountMinor: 0, raw: { promoCode: "X", discountMinor: 5 } }), "u2"), false, "still only the owner's");
+});
+
+
+test("B-54: settlement numbers a ₹0 intern row only through the same eligibility rule the list uses", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync(new URL("./payments.ts", import.meta.url), "utf8");
+  assert.match(src, /payment\.amountMinor > 0 \|\| zeroValueInvoiceEligible\(payment\.raw\)\) await assignInvoiceNumber\("intern"/);
 });

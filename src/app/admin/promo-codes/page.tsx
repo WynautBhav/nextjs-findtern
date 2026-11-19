@@ -9,6 +9,7 @@ import { getSession } from "@/lib/auth";
 import { canWrite } from "@/lib/admin/permissions";
 import { discountGivenByCode } from "@/lib/admin/promo-redemptions-load";
 import { formatMoney, formatNumber } from "@/lib/format";
+import { promoState } from "@/lib/promo-rules";
 
 export const metadata = {
   title: "Promo Codes · Admin",
@@ -48,7 +49,7 @@ export default async function AdminPromoCodesPage() {
 
   const session = await getSession();
   const permissions = session?.permissions;
-  const activeCount = rows.filter((r) => r.isActive).length;
+  const activeCount = rows.filter((r) => promoState(r) === "active").length;
   const totalRedemptions = rows.reduce((s, r) => s + (r.usedCount ?? 0), 0);
   const totalCodes = rows.length;
   const totalGiven = [...given.values()].reduce((a, b) => a + b, 0);

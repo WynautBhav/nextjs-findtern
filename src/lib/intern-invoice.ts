@@ -52,9 +52,19 @@ export function internInvoiceRow(inv: InternPaymentRecord): AdminInvoiceRow {
   };
 }
 
-/** What an intern may see: their own, paid, with money and a number. ₹0 activations get no invoice (#2). */
+/**
+ * Does a ₹0 activation get a GST invoice number? Yes when a promo or full-waiver code made it free (the invoice shows the
+ * discount line). No for test mode (`raw.testMode`, free-payments mode) and for a college code: the college is invoiced
+ * through its seat batch, so a second invoice (and a serial) for the same seat would double-count it.
+ */
+export function zeroValueInvoiceEligible(raw: Record<string, unknown> | null | undefined): boolean {
+  if (!raw || raw.testMode === true || raw.collegePromo === true) return false;
+  return paymentPromo(raw).code !== null;
+}
+
+/** What an intern may see: their own, paid, with a number. A ₹0 row shows only when a code made it free (B-54); number-less ₹0 rows stay hidden. */
 export const isOwnInvoice = (r: InternPaymentRecord, uid: string) =>
-  r.internId === uid && r.status === "paid" && r.amountMinor > 0 && !!r.invoiceNumber;
+  r.internId === uid && r.status === "paid" && !!r.invoiceNumber && (r.amountMinor > 0 || zeroValueInvoiceEligible(r.raw));
 
 export type InternInvoice = { id: string; number: string; orderId: string; paidAt: string | null; amountMinor: number; currency: string; html: string };
 

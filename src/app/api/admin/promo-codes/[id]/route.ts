@@ -8,7 +8,7 @@ import { getDb, schema } from "@/lib/db";
 import { isFullWaiver, waiverCodeTail, waiverEditProblem } from "@/lib/full-waiver";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation, openPromoOrders } from "@/lib/promo";
-import { collegeCodeDeleteProblem, collegeCodeEditProblem, promoDeleteProblem, promoMaxUsagesProblem, promoRenameProblem, PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
+import { collegeCodeDeleteProblem, collegeCodeEditProblem, promoDeleteProblem, promoExpiryProblem, promoMaxUsagesProblem, promoRenameProblem, PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
 
 // Omitted = leave as is; null = clear.
 const bodySchema = z.object({
@@ -110,6 +110,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     nextUntil === undefined ? existing.validUntil : nextUntil,
   );
   if (window) return NextResponse.json({ error: window }, { status: 400 });
+  // A new expiry in the past is refused; the date the row already holds is left alone.
+  const expired = promoExpiryProblem(nextUntil, existing.validUntil);
+  if (expired) return NextResponse.json({ error: expired }, { status: 400 });
   const next = {
     ...parsed.data,
     code,

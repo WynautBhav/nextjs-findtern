@@ -36,7 +36,7 @@ export default async function Conversion({ window: w }: TabProps) {
     { label: "Profile complete", count: co.interns.profileComplete },
     { label: "Applied / has a proposal", count: co.interns.applied },
     { label: "Hired", count: co.interns.hired },
-    { label: "Paid the activation fee", count: co.interns.paid },
+    { label: "Paid the activation fee (money received)", count: co.interns.paid },
   ]);
   const e = conversionRows([
     { label: "Signed up", count: co.employers.signups },
@@ -58,6 +58,11 @@ export default async function Conversion({ window: w }: TabProps) {
           />
           <PanelBody>
             {co.interns.signups === 0 ? <p className="py-8 text-center text-sm text-text-subtle">Nobody signed up in this period.</p> : <Bars rows={i} label="New interns by what they did" />}
+            {co.interns.signups === 0 ? null : (
+              <p className="nums mt-4 text-sm text-text-subtle">
+                Activated free (a promo or waiver code, a college, or marked paid by an admin, no money received): <b className="font-semibold text-foreground">{formatNumber(co.interns.activatedFree)}</b>
+              </p>
+            )}
           </PanelBody>
         </Panel>
         <Panel>

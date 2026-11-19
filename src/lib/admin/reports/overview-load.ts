@@ -1,7 +1,6 @@
 import { sql, type SQL } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { feePaidSql } from "@/lib/fee-paid-sql";
 import { SETTLED_STATUSES } from "@/lib/refund-accounting";
 import { realEmployerId, realEmployers } from "@/lib/admin/scope";
 
@@ -61,8 +60,15 @@ export async function loadOverviewCounts(w: ReportWindow, now: Date): Promise<Ov
   return { internSignups: toPeriods(i), employerSignups: toPeriods(e), internPayers: toPeriods(ip), employerPayers: toPeriods(ep), totalInterns: n(i?.total), totalEmployers: n(e?.total) };
 }
 
+/**
+ * "Paid" for an intern means fee received: a settled activation row of more than 0 that is not a college-drive waiver. It is the
+ * same test as the growth counters above (B-13), so Overview and the funnel cannot disagree. Activated without paying is its own figure.
+ */
+const paidFeeSql = (userId: SQL) =>
+  sql`EXISTS (SELECT 1 FROM ${IP} ip WHERE ip.intern_id = ${userId} AND ip.status = 'paid' AND ip.amount_minor > 0 AND ip.gateway <> 'college_drive')`;
+
 export type Cohorts = {
-  interns: { signups: number; profileComplete: number; applied: number; hired: number; paid: number };
+  interns: { signups: number; profileComplete: number; applied: number; hired: number; paid: number; activatedFree: number };
   employers: { signups: number; setupDone: number; posted: number; proposed: number; paid: number };
 };
 
@@ -74,7 +80,8 @@ export async function loadCohorts(w: ReportWindow): Promise<Cohorts> {
     timed("overview", "intern-cohort", () =>
       db
         .execute(sql`WITH ${baseCte()} SELECT count(*)::int AS signups, count(*) FILTER (WHERE complete)::int AS complete, count(*) FILTER (WHERE applied)::int AS applied,
-            count(*) FILTER (WHERE hired)::int AS hired, count(*) FILTER (WHERE paid)::int AS paid
+            count(*) FILTER (WHERE hired)::int AS hired, count(*) FILTER (WHERE ${paidFeeSql(sql`id`)})::int AS paid,
+            count(*) FILTER (WHERE paid AND NOT ${paidFeeSql(sql`id`)})::int AS free
           FROM base WHERE ${rangeSql(sql`created_at`, w.since, w.until)}`)
         .then((r) => r.rows[0] as Record<string, unknown>),
     ),
@@ -90,7 +97,7 @@ export async function loadCohorts(w: ReportWindow): Promise<Cohorts> {
     ),
   ]);
   return {
-    interns: { signups: n(i?.signups), profileComplete: n(i?.complete), applied: n(i?.applied), hired: n(i?.hired), paid: n(i?.paid) },
+    interns: { signups: n(i?.signups), profileComplete: n(i?.complete), applied: n(i?.applied), hired: n(i?.hired), paid: n(i?.paid), activatedFree: n(i?.free) },
     employers: { signups: n(e?.signups), setupDone: n(e?.setup), posted: n(e?.posted), proposed: n(e?.proposed), paid: n(e?.paid) },
   };
 }
@@ -150,7 +157,7 @@ export async function loadAcquisition(w: ReportWindow): Promise<Acquisition> {
     ),
     timed("overview", "acq-total", () =>
       db
-        .execute(sql`SELECT count(*)::int AS signups, count(*) FILTER (WHERE ${feePaidSql(sql`${U.id}`, sql`${schema.internOnboarding.extraData}`)})::int AS paid
+        .execute(sql`SELECT count(*)::int AS signups, count(*) FILTER (WHERE ${paidFeeSql(sql`${U.id}`)})::int AS paid
           FROM ${U} LEFT JOIN ${schema.internOnboarding} ON ${schema.internOnboarding.userId} = ${U.id} WHERE ${cohort}`)
         .then((r) => r.rows[0] as { signups: number; paid: number }),
     ),

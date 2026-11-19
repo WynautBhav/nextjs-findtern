@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { NewTabLink } from "@/components/ui/new-tab-link";
 import { redirect } from "next/navigation";
-import { and, desc, eq, gt, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { ArrowRight } from "lucide-react";
 
 import { DetailRow, PageHead, SectionHead, Surface } from "@/components/app/primitives";
@@ -84,7 +84,7 @@ export default async function InternSettings({ searchParams }: { searchParams: P
       .from(schema.notificationPrefs)
       .where(eq(schema.notificationPrefs.userId, uid))
       .limit(1),
-    // Ownership is the session's uid, never a URL id; paid, ₹0 and number-less rows are dropped (also re-checked in ownInternInvoices).
+    // Ownership is the session's uid, never a URL id; paid and number-less rows are dropped (a ₹0 row only has a number when a code made it free) (also re-checked in ownInternInvoices).
     db
       .select({
         id: schema.internPayments.id,
@@ -113,7 +113,6 @@ export default async function InternSettings({ searchParams }: { searchParams: P
         and(
           eq(schema.internPayments.internId, uid),
           eq(schema.internPayments.status, "paid"),
-          gt(schema.internPayments.amountMinor, 0),
           isNotNull(schema.internPayments.invoiceNumber),
         ),
       )

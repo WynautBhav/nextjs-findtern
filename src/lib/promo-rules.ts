@@ -69,6 +69,32 @@ export const COLLEGE_CODE_UNDELETABLE = "This is a college's code. College codes
 /** A college's code is never deleted on its own; it is managed on the Colleges screen. */
 export const collegeCodeDeleteProblem = (collegeId: string | null | undefined): string | null => (collegeId ? COLLEGE_CODE_UNDELETABLE : null);
 
+/**
+ * An unknown, switched-off or dead code is a refused input, not a missing page: 422, never 404 (B-53). The clients show
+ * `error` for any non-OK status, so the message and what the customer sees are unchanged.
+ */
+export const INVALID_PROMO = Object.freeze({ ok: false as const, error: "Invalid promo code", status: 422 });
+
+/** What a code is right now, for the admin header and toggle. Switched off wins, then expired, then used up (B-28). */
+export type PromoState = "active" | "used up" | "expired" | "off";
+export function promoState(row: Pick<PromoRow, "isActive" | "validUntil" | "maxUsages" | "usedCount">, now: Date = new Date()): PromoState {
+  if (!row.isActive) return "off";
+  if (row.validUntil && new Date(row.validUntil) < now) return "expired";
+  if (row.maxUsages !== null && row.usedCount >= row.maxUsages) return "used up";
+  return "active";
+}
+
+/**
+ * Admin create/edit: an expiry in the past makes a dead code (B-27). On edit the same value as the row already holds is
+ * not a change (an expired code can still be renamed or described), compared to the minute because the form is minute-precise.
+ */
+export function promoExpiryProblem(next: Date | null | undefined, existing: Date | null = null, now: Date = new Date()): string | null {
+  if (!next || next >= now) return null;
+  const minute = (d: Date) => Math.floor(d.getTime() / 60_000);
+  if (existing && minute(existing) === minute(next)) return null;
+  return "The expiry date is in the past. Pick a date and time that hasn't passed yet.";
+}
+
 /** Admin input: the window must not end before it starts. */
 export function promoWindowProblem(validFrom: Date | null, validUntil: Date | null): string | null {
   if (validFrom && validUntil && validUntil < validFrom) return "The end date must be on or after the start date";

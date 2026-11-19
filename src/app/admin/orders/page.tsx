@@ -126,7 +126,7 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
     <div>
       <AdminPageHeader
         title="Orders"
-        subtitle="Every employer checkout, paid or not. Test employers are listed but never counted as revenue."
+        subtitle="Every employer checkout, paid or not. The totals cover employer orders only (not intern fees or college seats; see Transactions for all money in). Test employers are listed but never counted as revenue."
         action={
           <ButtonLink href="/admin/transactions" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
             Transactions

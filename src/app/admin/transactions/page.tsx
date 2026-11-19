@@ -103,7 +103,7 @@ export default async function AdminTransactionsPage({ searchParams }: { searchPa
         title="Transactions"
         subtitle={
           metrics
-            ? `${formatMoney(metrics.inflowMinor, "INR", { zeroLabel: "₹0" })} received, ${formatMoney(metrics.outflowMinor, "INR", { zeroLabel: "₹0" })} paid out to interns and colleges, ${formatNumber(metrics.pendingPayouts)} ${metrics.pendingPayouts === 1 ? "payout" : "payouts"} waiting for a bank reference.`
+            ? `${formatMoney(metrics.inflowMinor, "INR", { zeroLabel: "₹0" })} received (employer orders, intern fees and college seats), ${formatMoney(metrics.outflowMinor, "INR", { zeroLabel: "₹0" })} paid out to interns and colleges, ${formatNumber(metrics.pendingPayouts)} ${metrics.pendingPayouts === 1 ? "payout" : "payouts"} waiting for a bank reference.`
             : "Money in from employers, interns and colleges, and money out to interns and colleges."
         }
         action={
