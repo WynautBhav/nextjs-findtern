@@ -35,6 +35,8 @@ test("a correction the company has not confirmed reads with both scores", () => 
   const extra = { cgpaVerification: { ...PENDING.cgpaVerification, status: "incorrect", correctedScore: "7.4", decidedAt: ago(1) } };
   const o = internOfferOverlay(row("accepted", {}, { acceptedAt: ago(30) }), extra, NOW);
   assert.equal(o.kind, "correction");
+  // B-45: the badge no longer says "Verifying your CGPA" once Findtern has finished and the ball is with the company.
+  assert.equal(o.label, "CGPA updated: waiting for the company");
   assert.match(o.detail, /from 8\.1 to 7\.4\. The company needs to confirm before they can pay\./);
   // Confirmed since: a normal accepted offer again.
   assert.equal(internOfferOverlay(row("accepted", {}, { acceptedAt: ago(30), cgpaAckAt: ago(0.5) }), extra, NOW).kind, null);

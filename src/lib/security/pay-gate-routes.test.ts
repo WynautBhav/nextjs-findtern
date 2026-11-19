@@ -43,7 +43,7 @@ test("settlement is not changed by this feature: payments.ts knows nothing of ex
   assert.doesNotMatch(pay, /pay-gate|proposal-expiry|expiryOf|acceptedUnpaidExpired/);
 });
 
-test("cgpa-ack: CSRF/role guard, ownership, takedown guard, then a row-locked write; no admin audit", () => {
+test("cgpa-ack: CSRF/role guard, ownership, takedown guard, then a row-locked write and a strict audit row in the same transaction", () => {
   const at = (s: string) => ack.indexOf(s);
   assert.ok(at("requireMutation({ req, roles: [\"employer\"] })") > 0);
   assert.ok(at("requireMutation(") < at("req.json") || !ack.includes("req.json"), "no body is read before the guard");
@@ -52,7 +52,10 @@ test("cgpa-ack: CSRF/role guard, ownership, takedown guard, then a row-locked wr
   assert.ok(at(".for(\"update\")") > at("assertProposalActionable("));
   assert.ok(at(".update(schema.proposals)") > at(".for(\"update\")"));
   assert.match(ack, /cgpaAckAt/);
-  assert.doesNotMatch(ack, /recordAdminAudit/);
+  // B-48: the employer's confirmation is audited, written with the stamp in one transaction (strict: a failed audit rolls the stamp back).
+  assert.match(ack, /recordAdminAudit\(tx, /);
+  assert.match(ack, /\{ strict: true \}/);
+  assert.ok(at("recordAdminAudit(tx") > at(".update(schema.proposals)"));
 });
 
 test("sweeper: per-employer lock shared with the order route, bounded, never lapsedAt, strict audit in the same transaction", () => {

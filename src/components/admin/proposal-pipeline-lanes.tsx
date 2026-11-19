@@ -2,6 +2,7 @@ import Link from "next/link";
 import { CalendarX2 } from "lucide-react";
 
 import { AdminAvatar } from "@/components/admin/avatar";
+import { CgpaSlaClock } from "@/components/app/cgpa-sla-clock";
 import { ProposalDetailsButton } from "@/components/admin/proposal-tracker-dialogs";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ADMIN_SURFACE } from "@/components/admin/surface";
@@ -34,6 +35,8 @@ export type PipelineCard = {
   /** "Interview first" | "Direct offer". */
   flow: string;
   fullTimeHired: boolean;
+  /** The CGPA check is holding this accepted offer's payment; `correction` = Findtern corrected the score and the company has not confirmed. Null otherwise. */
+  cgpaVerifying: { acceptedAt: string | null; correction: boolean } | null;
   /** "₹30,000/mo" or "₹6,00,000 CTC"; "-" when the offer has no figure. */
   amount: string;
   /** "6 mo internship" | "Full-time". */
@@ -171,6 +174,12 @@ export function ProposalPipelineLanes({
                       <div className="flex min-w-0 flex-col items-start gap-1">
                         {c.fullTimeHired ? <StatusBadge tone="success" label="Full-time hired" /> : <StatusBadge value={c.status} icon={c.status === "expired" ? <CalendarX2 /> : undefined} />}
                         <span className="text-xs text-text-subtle">{c.flow}</span>
+                        {c.cgpaVerifying ? (
+                          <>
+                            <StatusBadge tone="warning" label={c.cgpaVerifying.correction ? "CGPA corrected: company to confirm" : "CGPA verifying"} />
+                            {c.cgpaVerifying.correction ? null : <CgpaSlaClock acceptedAt={c.cgpaVerifying.acceptedAt} />}
+                          </>
+                        ) : null}
                       </div>
                       <ProposalDetailsButton proposal={c.details} />
                     </div>

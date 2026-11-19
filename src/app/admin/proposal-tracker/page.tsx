@@ -6,7 +6,9 @@ import { flattenParams, parsePageRequest, toQueryString } from "@/lib/admin/para
 import { isTestEmployer } from "@/lib/admin/scope";
 import { expiredCounts, expiredProposals, filterExpired, filterInterviews, filterProposals, headlineCount, ineligibleInterns, parseExpiredFilters, parseIstDay, proposalTimezone, upcomingInterviewCount, withTrueInterviewStatus, withTrueProposalStatus, type TrackerFilters } from "@/lib/admin/tracker";
 import { loadExpiredSources } from "@/lib/admin/expired-load";
+import { cgpaBlocksPayment, proposalCgpaGate } from "@/lib/cgpa-verification";
 import { kickProposalExpiry } from "@/lib/proposal-expiry-kick";
+import { parseOffer } from "@/lib/offer";
 import { acceptanceRate, proposalOutcome } from "@/lib/proposals";
 import { formatNumber } from "@/lib/format";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
@@ -25,7 +27,7 @@ import { ButtonAnchor } from "@/components/ui/button";
 
 async function load() {
   const db = getDb();
-  const [employers, proposals, interviews, onboarding, expiredSources] = await Promise.all([
+  const [employers, proposals, interviews, onboarding, cgpaRows, expiredSources] = await Promise.all([
     db
       .select({
         id: schema.employers.id,
@@ -45,6 +47,7 @@ async function load() {
         currency: schema.proposals.currency,
         offerDetails: schema.proposals.offerDetails,
         createdAt: schema.proposals.createdAt,
+        updatedAt: schema.proposals.updatedAt,
         hiredAt: schema.proposals.hiredAt,
         internId: schema.proposals.internId,
         internFirstName: schema.users.firstName,
@@ -93,11 +96,19 @@ async function load() {
       .select({ userId: schema.internOnboarding.userId, endedAt: sql<string | null>`${schema.internOnboarding.extraData}->>'guaranteeEndedAt'` })
       .from(schema.internOnboarding)
       .where(sql`${schema.internOnboarding.extraData} ? 'guaranteeEndedAt'`),
+    // Only the checks that can hold a payment (pending, or corrected and not yet confirmed): the pipeline marks those offers.
+    db
+      .select({ userId: schema.internOnboarding.userId, cgpa: sql<unknown>`${schema.internOnboarding.extraData}->'cgpaVerification'` })
+      .from(schema.internOnboarding)
+      .where(sql`${schema.internOnboarding.extraData}->'cgpaVerification'->>'status' in ('pending', 'incorrect')`)
+      .orderBy(desc(schema.internOnboarding.createdAt)),
     loadExpiredSources(),
   ]);
+  const cgpaByIntern = new Map<string, unknown>();
+  for (const r of cgpaRows) if (!cgpaByIntern.has(r.userId)) cgpaByIntern.set(r.userId, { cgpaVerification: r.cgpa }); // latest row wins
   // From every proposal, not the filtered page rows: same inputs as the intern's own offer page.
   const noGuarantee = ineligibleInterns(proposals, new Map(onboarding.map((o) => [o.userId, { guaranteeEndedAt: o.endedAt }])));
-  return { noGuarantee, expiredSources, employers, proposals, interviews: interviews.map(({ companyEmail, ...i }) => ({ ...i, isAi: isAiInterview(i.employerId, companyEmail) })) };
+  return { noGuarantee, cgpaByIntern, expiredSources, employers, proposals, interviews: interviews.map(({ companyEmail, ...i }) => ({ ...i, isAi: isAiInterview(i.employerId, companyEmail) })) };
 }
 
 type TrackerData = Awaited<ReturnType<typeof load>>;
@@ -162,7 +173,17 @@ export default async function AdminProposalTrackerPage({
   // Every row carries its TRUE status (the shared proposal and interview rules), so nothing past its time reads Sent or
   // Scheduled before the sweep has run; the stored status rides along as `storedStatus` for the actions.
   const nowDate = new Date();
-  const realProposals = withTrueProposalStatus(data.proposals, nowDate, data.expiredSources.openOrderIds).filter((p) => !testIds.has(p.employerId));
+  // The CGPA gate is read off the true status, so an offer that already expired never carries a "verifying" marker. A full-time
+  // acceptance is the hire itself and has no CGPA hold (the intern's own offer view skips it the same way).
+  const realProposals = withTrueProposalStatus(data.proposals, nowDate, data.expiredSources.openOrderIds)
+    .filter((p) => !testIds.has(p.employerId))
+    .map((p) => {
+      const gate =
+        p.status === "accepted" && !p.hiredAt && !parseOffer(p.offerDetails, p.currency).fullTime
+          ? proposalCgpaGate({ status: p.status, extraData: data.cgpaByIntern.get(p.internId), offerDetails: p.offerDetails, updatedAt: p.updatedAt }, nowDate)
+          : null;
+      return { ...p, cgpaGate: gate && cgpaBlocksPayment(gate) ? gate : null };
+    });
   const realInterviews = withTrueInterviewStatus(data.interviews, nowDate.getTime()).filter((i) => !testIds.has(i.employerId));
 
   const proposals = filterProposals(realProposals, filters);

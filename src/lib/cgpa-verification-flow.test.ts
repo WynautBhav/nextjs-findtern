@@ -4,9 +4,12 @@ import { test } from "node:test";
 import { proposalCgpaGate, readCgpaVerification } from "./cgpa-verification.ts";
 import {
   applyCgpaDecision,
+  cgpaClock,
   cgpaSla,
   decisionProblem,
   effectiveScore,
+  employerCgpaConfirmEntry,
+  formatClock,
   nextCgpaVerification,
   readCgpaHistory,
   withAcceptedAt,
@@ -189,4 +192,54 @@ test("withCgpaCorrection clears the employer's earlier confirmation so the gate 
   assert.equal(stamped.startDate, "2026-12-01");
   const gate = proposalCgpaGate({ status: "accepted", extraData: { cgpaVerification: res.verification }, offerDetails: stamped }, NOW);
   assert.equal(gate.state, "incorrect_unacked");
+});
+
+test("B-47: a bad score is a 400 on a check that is already decided, not a 200 no-op", () => {
+  const incorrect = applyCgpaDecision(pendingExtra(), { decision: "incorrect", correctedScore: "7.9", note: "n", by: "a", now: NOW });
+  assert.ok(incorrect.ok);
+  if (!incorrect.ok) return;
+  const decided = { cgpaVerification: incorrect.verification };
+  for (const correctedScore of ["11", "", "   ", "abc"]) {
+    const res = applyCgpaDecision(decided, { decision: "incorrect", correctedScore, note: "n", by: "a", now: NOW });
+    assert.equal(res.ok, false, `"${correctedScore}"`);
+    if (!res.ok) assert.equal(res.status, 400, `"${correctedScore}"`);
+  }
+  // Same score as the claim, and a missing note, are refused too.
+  const sameAsClaim = applyCgpaDecision(decided, { decision: "incorrect", correctedScore: "8.4", note: "n", by: "a", now: NOW });
+  assert.equal(sameAsClaim.ok === false && sameAsClaim.status, 400);
+  const noNote = applyCgpaDecision(decided, { decision: "incorrect", correctedScore: "7.9", by: "a", now: NOW });
+  assert.equal(noNote.ok === false && noNote.status, 400);
+  // A valid repeat is still the quiet no-op, and "verified" on a decided check is untouched by the score rules.
+  const again = applyCgpaDecision(decided, { decision: "incorrect", correctedScore: "7.9", note: "n", by: "a", now: NOW });
+  assert.ok(again.ok && again.noop);
+  const flip = applyCgpaDecision(decided, { decision: "verified", by: "a", now: NOW });
+  assert.equal(flip.ok === false && flip.status, 409);
+});
+
+test("formatClock: hours are not capped at 24, and never negative", () => {
+  assert.equal(formatClock(0), "00:00:00");
+  assert.equal(formatClock(-5000), "00:00:00");
+  assert.equal(formatClock(61_000), "00:01:01");
+  assert.equal(formatClock(((36 * 60 + 56) * 60 + 40) * 1000), "36:56:40");
+});
+
+test("cgpaClock: the colour is cgpaSla's, the text counts down to 48 h and then up past it", () => {
+  const accepted = "2026-11-18T00:00:00.000Z";
+  const at = (h: number, min = 0) => new Date(Date.parse(accepted) + (h * 60 + min) * 60_000);
+  assert.deepEqual(cgpaClock(accepted, at(2)), { tone: "ok", text: "46:00:00 left" });
+  assert.deepEqual(cgpaClock(accepted, at(24)), { tone: "soon", text: "24:00:00 left" });
+  assert.deepEqual(cgpaClock(accepted, at(47, 59)), { tone: "soon", text: "00:01:00 left" });
+  assert.deepEqual(cgpaClock(accepted, at(48)), { tone: "overdue", text: "Overdue by 00:00:00" });
+  assert.deepEqual(cgpaClock(accepted, at(51, 30)), { tone: "overdue", text: "Overdue by 03:30:00" });
+  for (const tone of ["ok", "soon", "overdue"] as const) assert.equal(cgpaClock(accepted, at(tone === "ok" ? 1 : tone === "soon" ? 30 : 60)).tone, cgpaSla(accepted, at(tone === "ok" ? 1 : tone === "soon" ? 30 : 60)).tone);
+  assert.deepEqual(cgpaClock(null, at(1)), { tone: "none", text: "" });
+});
+
+test("B-48: the employer's confirmation audit entry names the employer, the offer and the correction", () => {
+  const e = employerCgpaConfirmEntry({ employerId: "emp-1", proposalId: "p-1", internId: "i-1", gate: { correctedFrom: "8.4", correctedTo: "7.9" }, at: "2026-11-19T10:00:00.000Z" });
+  assert.equal(e.action, "cgpa.employer_confirmed");
+  assert.equal(e.adminId, "emp-1");
+  assert.equal(e.targetType, "proposal");
+  assert.equal(e.targetId, "p-1");
+  assert.deepEqual(e.meta, { actorRole: "employer", internId: "i-1", from: "8.4", to: "7.9", confirmedAt: "2026-11-19T10:00:00.000Z" });
 });
