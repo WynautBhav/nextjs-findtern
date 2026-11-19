@@ -20,6 +20,7 @@ import { parseOffer } from "@/lib/offer";
 import { counterRow, EXPIRED_CARD_NOTE, offerState } from "@/components/employer/proposal-state";
 import { closedBreakdown, proposalCounts } from "@/components/employer/proposal-bucket";
 import { closedSummary, inTab, TAB_EMPTY, TAB_EXPLAINER, TAB_LABEL, tabFromParam, type TabKey } from "@/components/employer/proposal-tabs";
+import { CgpaSlaClock } from "@/components/app/cgpa-sla-clock";
 import { CgpaAckButton } from "@/components/employer/proposal-actions";
 import { cn } from "@/lib/utils";
 import { TakedownBadge } from "@/components/employer/takedown-badge";
@@ -380,8 +381,11 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                       <p className="min-w-0 text-pretty">
                         {note.sendNew && state.expiredReason && EXPIRED_CARD_NOTE[state.expiredReason] ? EXPIRED_CARD_NOTE[state.expiredReason] : state.next}
                         {note.gate && note.gate.state !== "incorrect_unacked" && note.gate.dueBy ? (
-                          <span className="nums mt-0.5 block font-medium text-ink-900">
-                            {note.gate.state === "overdue" ? "Was due by" : "Due by"} {formatIst(note.gate.dueBy)}
+                          <span className="nums mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-medium text-ink-900">
+                            <span>
+                              {note.gate.state === "overdue" ? "Was due by" : "Due by"} {formatIst(note.gate.dueBy)}
+                            </span>
+                            <CgpaSlaClock acceptedAt={note.gate.acceptedAt} />
                           </span>
                         ) : null}
                       </p>

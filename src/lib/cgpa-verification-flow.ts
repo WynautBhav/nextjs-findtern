@@ -132,14 +132,15 @@ export function applyCgpaDecision(
   const prev = readCgpaVerification(extraData);
   const history = readCgpaHistory(extraData);
   if (prev.status === "not_required") return { ok: false, status: 409, error: "This candidate has no CGPA check to decide." };
+  // Validated before the decided-state branch: a bad score is a 400 even on a check that is already decided (it used to read as a 200 no-op).
+  const problem = decisionProblem(input, prev.claimedScore, prev.scoreType);
+  if (problem) return { ok: false, status: 400, error: problem };
   if (prev.status !== "pending") {
     if (prev.status === input.decision) {
       return { ok: true, noop: true, verification: { ...prev, history }, previous: prev, newScore: null };
     }
     return { ok: false, status: 409, error: `This check was already marked ${prev.status === "verified" ? "correct" : "incorrect"}. The candidate has to change their score before it can be decided again.` };
   }
-  const problem = decisionProblem(input, prev.claimedScore, prev.scoreType);
-  if (problem) return { ok: false, status: 400, error: problem };
 
   const at = now.toISOString();
   const note = (input.note ?? "").trim();
@@ -181,6 +182,25 @@ export function cgpaSla(acceptedAt: string | null, now: Date = new Date()): { to
   return { tone: elapsed >= CGPA_SLA_HOURS.min ? "soon" : "ok", label: `${left} h left`, hoursElapsed: elapsed };
 }
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** 133_000_000 ms -> "36:56:40": the ticking clock's face (hours are not capped at 24). */
+export function formatClock(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  return `${pad2(Math.floor(total / 3600))}:${pad2(Math.floor((total % 3600) / 60))}:${pad2(total % 60)}`;
+}
+
+/**
+ * What the ticking CGPA clock shows: the colour from `cgpaSla` (the rule the admin queue uses), and the time left to the
+ * 48 h deadline or past it. Computed from the acceptance time and `now`, so the server and the browser agree.
+ */
+export function cgpaClock(acceptedAt: string | null, now: Date = new Date()): { tone: CgpaSlaTone; text: string } {
+  const sla = cgpaSla(acceptedAt, now);
+  if (sla.hoursElapsed === null || !acceptedAt) return { tone: "none", text: "" };
+  const left = Date.parse(acceptedAt) + CGPA_SLA_HOURS.max * HOUR_MS - now.getTime(); // from the instants, not hoursElapsed: a float round-trip loses a second
+  return { tone: sla.tone, text: left > 0 ? `${formatClock(left)} left` : `Overdue by ${formatClock(-left)}` };
+}
+
 /**
  * The offer details after the intern accepts: `acceptedAt` is stamped the first time only (the SLA clock and the
  * expiry rules read it), and a later call never moves it.
@@ -200,6 +220,24 @@ export function withCgpaCorrection(offerDetails: unknown, c: { from: string; to:
   const { cgpaAckAt: _ack, ...rest } = isRecord(offerDetails) ? offerDetails : ({} as Record<string, unknown>);
   void _ack;
   return { ...rest, cgpaCorrection: { from: c.from, to: c.to, scoreType: c.scoreType, at: c.at } };
+}
+
+/**
+ * The audit row for an employer pressing "Confirm and continue" on a corrected CGPA. The action key lives in
+ * the audit catalogue (AUDIT_ACTIONS); it is held here as one constant so the route writes it without a literal
+ * `action: "..."` and the catalogue test can only be satisfied by the catalogue itself. `adminId` carries the employer's id:
+ * the log has no separate actor column, and `meta.actorRole` says whose id it is.
+ */
+export const CGPA_EMPLOYER_CONFIRMED_ACTION = "cgpa.employer_confirmed";
+
+export function employerCgpaConfirmEntry(o: { employerId: string; proposalId: string; internId: string; gate: { correctedFrom?: string; correctedTo?: string }; at: string }) {
+  return {
+    adminId: o.employerId,
+    action: CGPA_EMPLOYER_CONFIRMED_ACTION,
+    targetType: "proposal",
+    targetId: o.proposalId,
+    meta: { actorRole: "employer", internId: o.internId, from: o.gate.correctedFrom ?? null, to: o.gate.correctedTo ?? null, confirmedAt: o.at },
+  };
 }
 
 export const ADMIN_EDIT_NOTE = "edited by admin";
