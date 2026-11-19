@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { allows, canWrite, BANK_EXPORT_PERMISSIONS, EXPORT_PERMISSIONS, requiredPermissions } from "./permissions.ts";
+import { allows, canonicalRoleKey, canWrite, BANK_EXPORT_PERMISSIONS, EXPORT_PERMISSIONS, requiredPermissions } from "./permissions.ts";
 
 test("reports:read alone opens all 7 CSV exports; the data's own read permission still does too", () => {
   assert.equal(Object.keys(EXPORT_PERMISSIONS).length, 7);
@@ -57,7 +57,7 @@ test("every page that gates controls with canWrite keeps the right answer", () =
     ["/admin/colleges", "companies:read", "companies:write"],
     ["/admin/promo-codes", "transactions:read", "transactions:write"],
     ["/api/admin/cms", "cms:read", "cms:write"],
-    ["/api/admin/pricing", "cms:read", "cms:write"],
+    ["/api/admin/pricing", "cms:read", "transactions:write"],
     ["/api/admin/ai-reports", "interns:read", "interns:write"],
   ];
   for (const [path, read, write] of callers) {
@@ -168,4 +168,17 @@ test("editing a candidate's education needs interns:write (the proxy and require
   assert.equal(allows(["*"], requiredPermissions(path, "PUT")), true);
   assert.equal(allows(["interns:read"], requiredPermissions(path, "PUT")), false);
   assert.equal(allows(["transactions:read", "reports:read"], requiredPermissions(path, "PUT")), false);
+});
+
+test("the CGPA CSV route is covered by the CGPA rule: reading needs interns:read", () => {
+  assert.deepEqual(requiredPermissions("/api/admin/cgpa-verifications/export", "GET"), ["interns:read"]);
+  assert.equal(allows(["companies:read"], requiredPermissions("/api/admin/cgpa-verifications/export", "GET")), false);
+});
+
+test("canonicalRoleKey matches a stored role to its role row ignoring case and spacing", () => {
+  const keys = ["super_admin", "admin", "exec_sales"];
+  assert.equal(canonicalRoleKey("super_admin", keys), "super_admin");
+  assert.equal(canonicalRoleKey(" Super_Admin ", keys), "super_admin");
+  assert.equal(canonicalRoleKey("ghost", keys), "ghost");
+  assert.equal(canonicalRoleKey(null, keys), "");
 });

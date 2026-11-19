@@ -115,6 +115,14 @@ export const AUDIT_ACTIONS = {
   "college_promo.attempt": "A college-account candidate tried a promo code that was not accepted",
   "college_promo.redeemed": "A college-account candidate's fee was settled by their college's promo code",
   "account_type.switch": "A candidate switched between an individual and a college account",
+  "auth.admin_login": "Signed in to the admin",
+  "auth.admin_logout": "Signed out of the admin",
+  "export.companies": "Exported companies",
+  "export.projects": "Exported internship postings",
+  "export.proposals": "Exported offers (proposal tracker)",
+  "export.cgpa": "Exported the CGPA checks",
+  "cgpa.employer_confirmed": "An employer confirmed a candidate's corrected CGPA",
+  "proposal.hired": "An offer became a hire",
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

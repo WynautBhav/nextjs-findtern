@@ -13,10 +13,10 @@ export const PERMISSIONS = [
   { key: "companies:read", label: "See employer accounts and projects" },
   { key: "companies:write", label: "Edit or deactivate employers" },
   { key: "transactions:read", label: "See orders, invoices and payouts" },
-  { key: "transactions:write", label: "Record payouts, promo codes and offline payments" },
+  { key: "transactions:write", label: "Record payouts, promo codes, offline payments and change pricing" },
   { key: "reports:read", label: "See reports and export data" },
   { key: "cms:read", label: "See website content, terms and pricing" },
-  { key: "cms:write", label: "Edit website content, terms and pricing" },
+  { key: "cms:write", label: "Edit website content and terms" },
   { key: "contact:intern:read", label: "Read messages from candidates" },
   { key: "contact:intern:write", label: "Handle messages from candidates" },
   { key: "contact:employer:read", label: "Read messages from employers" },
@@ -132,7 +132,8 @@ const RULES: Rule[] = [
   ["/api/admin/cms", ["cms:read"], ["cms:write"]],
   ["/api/admin/website", ["cms:read"], ["cms:write"]],
   ["/api/admin/ndc-clauses", INTERN_LEGAL_R, INTERN_LEGAL_W],
-  ["/api/admin/pricing", ["cms:read"], ["cms:write"]],
+  // Every price, fee and stipend is money: Accounts (transactions:write) only, not the content permission (cms:write). Super admin keeps it via "*".
+  ["/api/admin/pricing", ["cms:read"], ["transactions:write"]],
   ["/api/admin/google", ["cms:write"]],
   ["/api/admin/account", [], []],
   ["/admin/account", [], []],
@@ -223,6 +224,13 @@ export const EXPORT_PERMISSIONS: Record<string, Permission[]> = {
 
 /** Full bank account numbers in the Candidates export: only for those who record payouts. */
 export const BANK_EXPORT_PERMISSIONS: Permission[] = ["transactions:write"];
+
+/** The role row a staff member's stored role refers to (case and spacing ignored, as sign-in does for super_admin); the raw value when none matches. */
+export function canonicalRoleKey(stored: string | null | undefined, roleKeys: readonly string[]): string {
+  const raw = String(stored ?? "");
+  const wanted = raw.trim().toLowerCase();
+  return roleKeys.find((k) => k.toLowerCase() === wanted) ?? raw;
+}
 
 /** Where staff land, in order of preference: the first page their role opens. */
 const LANDING_PAGES = [

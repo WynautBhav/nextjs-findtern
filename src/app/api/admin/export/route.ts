@@ -69,19 +69,30 @@ export async function GET(req: Request) {
     case "interns":
       return exportInterns(req2.search, params, session);
     case "companies":
-      return exportCompanies(req2.search, params);
+      return exportCompanies(req2.search, params, session.uid);
     case "projects":
-      return exportProjects(req2.search, params);
+      return exportProjects(req2.search, params, session.uid);
     case "proposals":
-      return exportProposals(req2.search, params);
+      return exportProposals(req2.search, params, session.uid);
     case "payments":
       return exportPayments(req2.search, params, session.uid);
     case "payouts":
-      return exportPayouts(req2.search, params);
+      return exportPayouts(req2.search, params, session.uid);
     case "intern-payments":
       return exportInternPayments(req2.search, params);
     default:
       return NextResponse.json({ error: `Unknown export type "${type}"` }, { status: 400 });
+  }
+}
+
+/** Fail closed, like the candidate export: no audit row, no file. Null when the row was written. */
+async function auditExport(adminId: string, action: "export.companies" | "export.projects" | "export.proposals" | "export.payouts", targetType: string, rows: number, filters: Record<string, string>) {
+  try {
+    await recordAdminAudit(getDb(), { adminId, action, targetType, targetId: null, meta: { rows, filters } }, { strict: true });
+    return null;
+  } catch (err) {
+    console.error("[admin/export] audit insert failed", err);
+    return NextResponse.json({ error: "Could not record the export" }, { status: 500 });
   }
 }
 
@@ -133,7 +144,7 @@ async function exportInterns(search: string, params: Record<string, string>, ses
   });
 }
 
-async function exportCompanies(search: string, params: Record<string, string>) {
+async function exportCompanies(search: string, params: Record<string, string>, adminId: string) {
   const db = getDb();
 
   const conditions: (SQL | undefined)[] = [
@@ -201,10 +212,12 @@ async function exportCompanies(search: string, params: Record<string, string>) {
     { header: "Joined (IST)", value: (r) => formatIstStamp(r.createdAt) },
   ];
 
+  const refused = await auditExport(adminId, "export.companies", "employer", rows.length, params);
+  if (refused) return refused;
   return csvResponse(toCsv(rows, columns), csvFilename("companies"));
 }
 
-async function exportProjects(search: string, params: Record<string, string>) {
+async function exportProjects(search: string, params: Record<string, string>, adminId: string) {
   const db = getDb();
 
   const conditions: (SQL | undefined)[] = [
@@ -252,6 +265,8 @@ async function exportProjects(search: string, params: Record<string, string>) {
     { header: "Posted (IST)", value: (r) => formatIstStamp(r.createdAt) },
   ];
 
+  const refused = await auditExport(adminId, "export.projects", "project", rows.length, params);
+  if (refused) return refused;
   return csvResponse(toCsv(rows, columns), csvFilename("projects"));
 }
 
@@ -261,7 +276,7 @@ async function exportProjects(search: string, params: Record<string, string>) {
  * and the word search. Filtered in memory after one bounded query, exactly as
  * the tracker page does, so the file and the screen hold the same rows.
  */
-async function exportProposals(search: string, params: Record<string, string>) {
+async function exportProposals(search: string, params: Record<string, string>, adminId: string) {
   const db = getDb();
   const rows = await db
     .select({
@@ -323,6 +338,8 @@ async function exportProposals(search: string, params: Record<string, string>) {
     { header: "Hired", value: (r) => (r.hiredAt ? r.hiredAt.toISOString() : "") },
   ];
 
+  const refused = await auditExport(adminId, "export.proposals", "proposal", kept.length, params);
+  if (refused) return refused;
   return csvResponse(toCsv(kept, columns), csvFilename("proposals"));
 }
 
@@ -476,7 +493,7 @@ function gstOf(r: GstRow) {
 }
 
 /** Payouts to interns (stipends and completion bonuses; the Kind column tells them apart), honouring the payouts page filters. */
-async function exportPayouts(search: string, params: Record<string, string>) {
+async function exportPayouts(search: string, params: Record<string, string>, adminId: string) {
   const db = getDb();
   const since = periodStart(params.period);
   // Company name too, as the payouts list searches it (ADP-27).
@@ -537,6 +554,8 @@ async function exportPayouts(search: string, params: Record<string, string>) {
     { header: "Paid at (IST)", value: (r) => formatIstStamp(r.paidAt) },
     { header: "Created at (IST)", value: (r) => formatIstStamp(r.createdAt) },
   ];
+  const refused = await auditExport(adminId, "export.payouts", "intern_payouts", rows.length, params);
+  if (refused) return refused;
   return csvResponse(toCsv(rows, columns), csvFilename("payouts"));
 }
 

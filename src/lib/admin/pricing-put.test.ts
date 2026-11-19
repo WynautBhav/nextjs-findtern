@@ -60,18 +60,21 @@ test("one audit meta per save carries {from,to} for each changed field", () => {
   assert.deepEqual(activationFeeAuditMeta(249900, 300000).value, { from: 249900, to: 300000 });
 });
 
-test("a pricing write needs an admin with cms:write: a reader or a user without it is refused", () => {
+test("every pricing write needs Accounts (transactions:write): a content role (cms:write) or a reader is refused, super admin passes", () => {
   // requireMutation refuses (403 "Your role doesn't allow this") when allows(...) is false for the route's rule.
   for (const method of ["PUT", "PATCH", "POST"]) {
     const needed = requiredPermissions("/api/admin/pricing", method);
-    assert.deepEqual(needed, ["cms:write"], method);
-    assert.equal(allows(["cms:write"], needed), true, `${method} writer`);
+    assert.deepEqual(needed, ["transactions:write"], method);
+    assert.equal(allows(["transactions:write"], needed), true, `${method} Accounts`);
     assert.equal(allows(["*"], needed), true, `${method} super admin`);
-    assert.equal(allows(["cms:read"], needed), false, `${method} reader gets 403`);
-    assert.equal(allows(["interns:write", "transactions:write"], needed), false, `${method} other staff get 403`);
+    assert.equal(allows(["cms:read", "cms:write"], needed), false, `${method} content role gets 403`);
+    assert.equal(allows(["cms:read", "transactions:read"], needed), false, `${method} reader gets 403`);
+    assert.equal(allows(["interns:write"], needed), false, `${method} other staff get 403`);
     assert.equal(allows(undefined, needed), false, `${method} no permissions`);
   }
-  assert.equal(canWrite(["cms:read"], "/api/admin/pricing"), false);
+  assert.equal(canWrite(["cms:write"], "/api/admin/pricing"), false);
+  // Reading the rate card stays a content permission.
+  assert.equal(allows(["cms:read"], requiredPermissions("/api/admin/pricing", "GET")), true);
 });
 
 test("the route runs the guard first, keeps the admin role, and every write purges the pricing pages", () => {
