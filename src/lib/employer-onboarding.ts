@@ -6,6 +6,7 @@ import {
   type projects,
 } from "./db/schema.ts";
 import { DIAL_CODES } from "./data/dial-codes.ts";
+import { isFreeEmailDomain } from "./free-email-domains.ts";
 
 /**
  * Employer onboarding shape.
@@ -77,40 +78,26 @@ export const LOCATION_TYPES = [
 ] as const;
 
 /**
- * Personal-mail domains.
+ * Personal-mail rule.
  *
  * A Findtern employer account has to be reachable at a work address - the
  * legacy rule is the mirror image of the intern rule (`insertUserSchema`
  * *requires* a personal domain; `insertEmployerSchema` requires a non-personal
- * one). Same list, inverted, kept in sync by hand with `schema.ts`.
+ * one). The domain list is vendored in `free-email-domains.ts` and matches
+ * subdomains and regional variants (mail.yahoo.co.in, outlook.de).
  */
-export const PERSONAL_EMAIL_DOMAINS = new Set([
-  "gmail.com",
-  "yahoo.com",
-  "yahoo.in",
-  "outlook.com",
-  "hotmail.com",
-  "icloud.com",
-  "aol.com",
-  "proton.me",
-  "protonmail.com",
-  "zoho.com",
-  "yandex.com",
-  "gmx.com",
-  "live.com",
-  "rediffmail.com",
-]);
 
 /** True when the address is a personal mailbox and so cannot register a company. */
 export function isPersonalEmail(email: string): boolean {
-  const domain = email.trim().toLowerCase().split("@").pop() ?? "";
-  return PERSONAL_EMAIL_DOMAINS.has(domain);
+  const at = email.trim().lastIndexOf("@");
+  return at >= 0 && isFreeEmailDomain(email.trim().slice(at + 1));
 }
 
 /**
- * Company fields every employer must fill in. Logo, GST number and the
- * escalation contact are the optional ones (and say so on the form); the
- * billing PIN is required only for an Indian address - see `needsBillingPincode`.
+ * Company fields every employer must fill in. Logo and GST number are the
+ * optional ones (and say so on the form); the escalation contact is required
+ * on save too (see `ESCALATION_FIELDS`); the billing PIN is required only for
+ * an Indian address - see `needsBillingPincode`.
  * One list so the onboarding form, the account form, `PATCH /api/employer/:id`
  * and the dashboard gate cannot disagree about what "complete" means.
  */
