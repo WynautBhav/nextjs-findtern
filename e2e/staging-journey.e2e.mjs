@@ -1666,10 +1666,10 @@ step("US employer composes the offer in the form: calendar, no flexible hours, N
 
   // A start date in the past is moved to the earliest allowed day, and the form says so.
   await page.locator("#startDate").fill("01/01/2020"); // not typeInto: the form moves the date, so the field rightly does not keep it
-  await page.getByText(/is too soon, so the start date moved to/i).first().waitFor({ timeout: 10_000 });
+  await page.getByText(/Moved to .*the earliest start is/i).first().waitFor({ timeout: 10_000 });
   // So is a weekend.
   await page.locator("#startDate").fill(dmy(weekendStartDate(14)));
-  await page.getByText(/is a weekend, so the start date moved to/i).first().waitFor({ timeout: 10_000 });
+  await page.getByText(/Moved to .*is a weekend/i).first().waitFor({ timeout: 10_000 });
 
   const start = businessStartDate(10);
   state.usStart = start;
