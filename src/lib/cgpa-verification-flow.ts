@@ -228,7 +228,7 @@ export function withCgpaCorrection(offerDetails: unknown, c: { from: string; to:
  * `action: "..."` and the catalogue test can only be satisfied by the catalogue itself. `adminId` carries the employer's id:
  * the log has no separate actor column, and `meta.actorRole` says whose id it is.
  */
-export const CGPA_EMPLOYER_CONFIRMED_ACTION = "cgpa.employer_confirmed";
+export const CGPA_EMPLOYER_CONFIRMED_ACTION = "cgpa.employer_confirmed" as const;
 
 export function employerCgpaConfirmEntry(o: { employerId: string; proposalId: string; internId: string; gate: { correctedFrom?: string; correctedTo?: string }; at: string }) {
   return {

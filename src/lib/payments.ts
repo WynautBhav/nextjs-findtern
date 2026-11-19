@@ -18,6 +18,7 @@ import { invoiceBuyerPatch } from "@/lib/invoice-buyer";
 import { monthMismatches } from "@/lib/billing-plan";
 import { orderProposalIds } from "@/lib/order-ids";
 import { recordAdminAudit } from "@/lib/admin/audit";
+import { hireAuditEntry } from "@/lib/hire-audit";
 import { isSubscriptionOrderRaw } from "@/lib/employer-subscription";
 import { notifySubscriptionStarted } from "@/lib/subscription/notify";
 import { paidAmountProblem, planAmountMismatch, planDuplicatePayment, type AmountProblem, type GatewayPaid } from "@/lib/payment-flags";
@@ -221,6 +222,10 @@ export async function settleEmployerOrder(input: {
         ),
       )
       .returning({ id: schema.proposals.id, internId: schema.proposals.internId });
+    // Same transaction as the status change: a hire without its audit row rolls the settlement back.
+    for (const h of hired) {
+      await recordAdminAudit(tx, hireAuditEntry({ employerId: order.employerId, orderId: input.orderId, paymentRowId: order.id }, h), { strict: true });
+    }
     // A month paid out of turn (the hire's paid months are not the due month - 1, e.g. two
     // checkouts for the same month) is still recorded as paid; accounts review it.
     const others = dueIds.size === 0

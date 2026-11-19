@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
-import { recordAdminAudit, type AuditAction } from "@/lib/admin/audit";
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { proposalCgpaGate, readCgpaVerification } from "@/lib/cgpa-verification";
 import { employerCgpaConfirmEntry } from "@/lib/cgpa-verification-flow";
 import { getDb, schema } from "@/lib/db";
@@ -77,8 +77,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .set({ offerDetails: sql`coalesce(${schema.proposals.offerDetails}, '{}'::jsonb) || ${JSON.stringify({ cgpaAckAt: stamp })}::jsonb` })
       .where(eq(schema.proposals.id, id));
     const entry = employerCgpaConfirmEntry({ employerId: session.uid, proposalId: id, internId: p.internId, gate, at: stamp });
-    // The entry builder sits in a pure module and types the key as a string; the audit log reads it as a catalogue key.
-    await recordAdminAudit(tx, { ...entry, action: entry.action as AuditAction }, { strict: true });
+    await recordAdminAudit(tx, entry, { strict: true });
     return { status: 200 as const, body: { ok: true, alreadyConfirmed: false, cgpaAckAt: stamp } };
   });
   return NextResponse.json(result.body, { status: result.status });

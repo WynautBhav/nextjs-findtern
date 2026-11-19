@@ -11,9 +11,8 @@ const CLASS = cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11 roun
 
 /**
  * Downloads the CSV from the server (which audits it) for the filter and search in the page's URL.
- * `now` is accepted only because the page still passes it; the server stamps its own clock.
  */
-export function CgpaExport({ rows }: { rows: CgpaQueueRow[]; now?: string }) {
+export function CgpaExport({ rows }: { rows: CgpaQueueRow[] }) {
   const params = useSearchParams();
   const query = new URLSearchParams();
   const filter = params.get("filter");

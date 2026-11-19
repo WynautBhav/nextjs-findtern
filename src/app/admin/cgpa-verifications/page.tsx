@@ -60,7 +60,7 @@ export default async function CgpaVerificationsPage({ searchParams }: { searchPa
             : `${counts.pending} candidate${counts.pending === 1 ? "" : "s"} waiting${counts.overdue ? `, ${counts.overdue} overdue` : ""}.`
         }
       />
-      <TableToolbar searchPlaceholder="Name, college, company, phone or email" extra={<CgpaExport rows={rows} now={now.toISOString()} />} />
+      <TableToolbar searchPlaceholder="Name, college, company, phone or email" extra={<CgpaExport rows={rows} />} />
       <nav aria-label="Filter" className="mb-4 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
         {CGPA_FILTERS.map((f) => (
           <Link

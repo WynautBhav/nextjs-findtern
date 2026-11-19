@@ -185,7 +185,7 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "export.proposals": { rows: 14, filters: { type: "proposals", status: "hired" } },
   "export.cgpa": { rows: 3, filters: { filter: "pending", q: "" } },
   "cgpa.employer_confirmed": { internId: "i-1", proposalId: "pr-1", employerId: "e-1", correctedScore: "7.9" },
-  "proposal.hired": { proposalId: "pr-1", employerId: "e-1", internId: "i-1" },
+  "proposal.hired": { proposalId: "pr-1", employerId: "e-1", internId: "i-1", orderId: "ord-1", paymentRowId: "pay-1" },
 };
 
 test("every call site's meta passes the redaction check: nothing sensitive leaks, nothing readable is lost", () => {

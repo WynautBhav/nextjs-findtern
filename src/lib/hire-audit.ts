@@ -2,8 +2,6 @@
  * The audit row for a hire completed by a settled payment (B-48), pure so it can be tested without a DB.
  * Written in the settling transaction, one per proposal that actually became "hired", with `strict: true`.
  * The actor is the paying employer: the payment (or its webhook) is what hired the candidate, not an admin.
- *
- * Needs the catalogue key `proposal.hired` from P5 (src/lib/admin/audit.ts). Until that merges the key is not an AuditAction.
  */
 export type HireAuditOrder = { employerId: string; orderId: string; paymentRowId: string };
 
