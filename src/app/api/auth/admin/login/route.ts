@@ -2,6 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { verifyPasswordOrDummy, needsRehash, hashPassword } from "@/lib/security/password";
@@ -74,6 +75,9 @@ export async function POST(req: Request) {
       .limit(1);
     permissions = Array.isArray(roleRow?.permissions) ? roleRow.permissions : [];
   }
+
+  // Only after the password checked out; a failed write is logged, never a locked-out admin.
+  await recordAdminAudit(db, { adminId: admin.id, action: "auth.admin_login", targetType: "admin", targetId: admin.id, meta: { ip } });
 
   const res = NextResponse.json({
     admin: {

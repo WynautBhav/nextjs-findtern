@@ -1,40 +1,39 @@
 "use client";
 
 import { Download } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 import { buttonClass } from "@/components/ui/button";
-import { downloadCsv, type CsvColumn } from "@/lib/admin/csv";
-import { firstAcceptedAt, rowSla, type CgpaQueueRow } from "@/lib/admin/cgpa-queue";
+import type { CgpaQueueRow } from "@/lib/admin/cgpa-queue";
 import { cn } from "@/lib/utils";
 
-/** CSV of the rows on screen (same filter and search), through the shared admin CSV writer. */
-export function CgpaExport({ rows, now }: { rows: CgpaQueueRow[]; now: string }) {
-  const at = new Date(now);
-  const columns: CsvColumn<CgpaQueueRow>[] = [
-    { header: "Candidate", value: (r) => r.name },
-    { header: "Email", value: (r) => r.email },
-    { header: "Phone", value: (r) => r.phone },
-    { header: "College", value: (r) => r.college },
-    { header: "Course", value: (r) => r.course },
-    { header: "Semester", value: (r) => r.semester },
-    { header: "Claimed score", value: (r) => r.claimedScore },
-    { header: "Score type", value: (r) => r.scoreType },
-    { header: "Corrected score", value: (r) => r.correctedScore },
-    { header: "Status", value: (r) => r.status },
-    { header: "Offer accepted at", value: (r) => firstAcceptedAt(r.proposals) },
-    { header: "SLA", value: (r) => rowSla(r, at).label },
-    { header: "Accepted offers", value: (r) => r.proposals.map((p) => `${p.company} - ${p.project} (starts ${p.startDate ?? "n/a"})`).join("; ") },
-    { header: "Decided at", value: (r) => r.decidedAt },
-  ];
+const CLASS = cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11 rounded-full px-4");
+
+/**
+ * Downloads the CSV from the server (which audits it) for the filter and search in the page's URL.
+ * `now` is accepted only because the page still passes it; the server stamps its own clock.
+ */
+export function CgpaExport({ rows }: { rows: CgpaQueueRow[]; now?: string }) {
+  const params = useSearchParams();
+  const query = new URLSearchParams();
+  const filter = params.get("filter");
+  const q = params.get("q");
+  if (filter) query.set("filter", filter);
+  if (q) query.set("q", q);
+  const href = `/api/admin/cgpa-verifications/export${query.size ? `?${query}` : ""}`;
+
+  if (rows.length === 0) {
+    return (
+      <button type="button" disabled className={cn(CLASS, "opacity-50")}>
+        <Download className="size-4" aria-hidden />
+        Download CSV
+      </button>
+    );
+  }
   return (
-    <button
-      type="button"
-      disabled={rows.length === 0}
-      onClick={() => downloadCsv("cgpa-verifications", rows, columns)}
-      className={cn(buttonClass({ variant: "outline", size: "sm" }), "min-h-11 rounded-full px-4 disabled:opacity-50")}
-    >
+    <a href={href} download className={CLASS}>
       <Download className="size-4" aria-hidden />
       Download CSV
-    </button>
+    </a>
   );
 }

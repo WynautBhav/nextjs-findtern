@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
 import { clearAdminStash } from "@/lib/admin/impersonation";
+import { recordAdminAudit } from "@/lib/admin/audit";
 import { revokeSession } from "@/lib/account-status";
+import { getDb } from "@/lib/db";
 import { withLogout } from "@/lib/auth";
 import { readCookie, readSession, sameOriginOrCsrf } from "@/lib/security/session";
 
@@ -18,6 +20,10 @@ export async function POST(req: Request) {
     } catch (e) {
       console.error("logout: could not record the revoked session", e);
     }
+  }
+  // The route is shared by every role; only an admin's sign-out belongs in the admin audit log.
+  if (session?.role === "admin") {
+    await recordAdminAudit(getDb(), { adminId: session.uid, action: "auth.admin_logout", targetType: "admin", targetId: session.uid });
   }
   const res = NextResponse.json({ ok: true });
   await clearAdminStash(res);
