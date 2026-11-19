@@ -23,6 +23,6 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   const extra = (row.extraData as Record<string, unknown>) ?? {};
   await db.update(schema.internOnboarding).set({ extraData: { ...extra, approvalStatus: parsed.data.approvalStatus } }).where(eq(schema.internOnboarding.id, row.id));
-  await recordAdminAudit(db, { adminId: guard.session.uid, action: "intern.approval_update", targetType: "intern", targetId: id, meta: { approvalStatus: { from: extra.approvalStatus ?? null, to: parsed.data.approvalStatus } } });
+  await recordAdminAudit(db, { adminId: guard.session.uid, action: "intern.approval_update", targetType: "intern", targetId: id, meta: { approvalStatus: { from: extra.approvalStatus ?? "Pending", to: parsed.data.approvalStatus } } });
   return NextResponse.json({ ok: true });
 }

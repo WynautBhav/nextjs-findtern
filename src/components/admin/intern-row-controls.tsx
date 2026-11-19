@@ -1,4 +1,5 @@
-import { InlineEditor, InlineSelect, InlineToggle } from "@/components/admin/inline-control";
+import { InlineEditor, InlineToggle } from "@/components/admin/inline-control";
+import { InternApprovalSelect } from "@/components/admin/intern-approval-select";
 import type { InlineField } from "@/lib/admin/inline-request";
 import { toneForStatus, type StatusTone } from "@/lib/admin/status-tone";
 
@@ -20,12 +21,11 @@ const APPROVAL_TONES: Record<string, StatusTone> = Object.fromEntries(APPROVAL.m
 /** `pill` draws the select as a pastel pill tinted by the review state (lists); it stays a labelled `<select>`. */
 export function InternApprovalCell({ internId, value, pill = false }: { internId: string; value: string; pill?: boolean }) {
   return (
-    <InlineSelect
-      label="Review status"
-      tones={pill ? APPROVAL_TONES : undefined}
-      value={APPROVAL.some((o) => o.value === value) ? value : "Pending"}
+    <InternApprovalSelect
+      internId={internId}
       options={APPROVAL}
-      request={{ url: `/api/admin/interns/${encodeURIComponent(internId)}/approval`, method: "PUT", valueKey: "approvalStatus" }}
+      value={APPROVAL.some((o) => o.value === value) ? value : "Pending"}
+      tones={pill ? APPROVAL_TONES : undefined}
     />
   );
 }
