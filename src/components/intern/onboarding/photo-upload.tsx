@@ -8,10 +8,11 @@ import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { shrinkImage, UnreadableImageError } from "@/lib/image-shrink";
 import { cn } from "@/lib/utils";
+import { IMAGE_LIMIT_BYTES, imageTooLargeMessage } from "@/components/app/upload-progress";
 
 const MB = 1024 * 1024;
 /**
- * JPG or PNG of any size: the pick is shrunk in the browser first (≤2000px,
+ * JPG or PNG up to 5 MB (IMAGE_LIMIT_BYTES): the pick is shrunk in the browser first (≤2000px,
  * ~500 KB), then cropped and saved as a 600×600 square. This cap is only a
  * sanity check on the shrunk file; a normal photo never gets near it.
  */
@@ -24,7 +25,7 @@ type Loaded = { url: string; img: HTMLImageElement; name: string };
 
 /**
  * Profile photo with a square crop (INT-21), as the legacy form had: pick a
- * JPG or PNG of any size, drag to position it, zoom and rotate, and the square
+ * JPG or PNG up to 5 MB, drag to position it, zoom and rotate, and the square
  * is saved at 600×600. A big camera photo is shrunk first instead of refused.
  * The crop runs on a canvas in the browser, so there is no extra dependency
  * and the original never leaves the device.
@@ -63,6 +64,7 @@ export function PhotoUpload({
     const mine = ++latest.current;
     setProblem(null);
     if (!TYPES.includes(file.type)) return setProblem("Use a JPG or PNG photo.");
+    if (file.size > IMAGE_LIMIT_BYTES) return setProblem(imageTooLargeMessage(file.size));
     setPreparing(true);
     let ready: File;
     try {
@@ -106,7 +108,7 @@ export function PhotoUpload({
       <div className="min-w-0">
         <p className="text-sm font-medium text-ink-800">Profile photo</p>
         <p className="mt-1 max-w-sm text-sm leading-relaxed text-ink-600">
-          A clear, front-facing photo, like a passport one. JPG or PNG. Big photos are shrunk for you. You can crop it next.
+          A clear, front-facing photo, like a passport one. JPG or PNG, up to 5 MB. Big photos are shrunk for you. You can crop it next.
         </p>
         <label
           htmlFor={inputId}
@@ -220,7 +222,7 @@ function Cropper({ source, onCancel, onDone }: { source: Loaded; onCancel: () =>
         body: blob,
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
-      if (!res.ok) throw new Error(data.error ?? "Upload failed. Try again.");
+      if (!res.ok) throw new Error(data.error ?? (res.status === 413 ? "That photo is too large. The limit is 5 MB." : "Upload failed. Try again."));
       onDone();
     } catch (e) {
       setProblem(e instanceof Error && e.message !== "no canvas" && e.message !== "no blob" ? e.message : "The photo could not be saved. Try again.");

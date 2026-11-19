@@ -23,3 +23,36 @@ test("nextPercent never goes backwards and ignores events without a total", () =
 test("the bar waits about a second", () => {
   assert.equal(PROGRESS_DELAY_MS, 1000);
 });
+
+import {
+  IMAGE_LIMIT_BYTES,
+  TRANSPORT_LIMIT_BYTES,
+  TRANSPORT_TARGET_BYTES,
+  imageTooLargeMessage,
+  needsTransportShrink,
+  tooLargeStatusMessage,
+} from "./upload-progress.ts";
+
+test("image size messages name the 5 MB limit and the real size", () => {
+  assert.equal(imageTooLargeMessage(12 * 1024 * 1024), "This image is 12.0 MB. The limit is 5 MB.");
+  assert.match(tooLargeStatusMessage(true), /5 MB/);
+  assert.match(tooLargeStatusMessage(false), /4 MB/);
+});
+
+test("the transport shrink starts below Vercel's 4.5 MB body limit and aims lower still", () => {
+  assert.ok(TRANSPORT_LIMIT_BYTES < 4.5 * 1024 * 1024);
+  assert.ok(TRANSPORT_TARGET_BYTES < TRANSPORT_LIMIT_BYTES && TRANSPORT_LIMIT_BYTES < IMAGE_LIMIT_BYTES);
+  assert.equal(needsTransportShrink(4 * 1024 * 1024), false);
+  assert.equal(needsTransportShrink(4.9 * 1024 * 1024), true);
+});
+
+import { readFileSync } from "node:fs";
+
+test("file-upload checks the picked image against 5 MB, then shrinks for transport, then names the limit on a bare 413", () => {
+  const src = readFileSync(new URL("./file-upload.tsx", import.meta.url), "utf8");
+  const limit = src.indexOf("imageTooLargeMessage(file.size)");
+  const shrink = src.indexOf("needsTransportShrink(file.size)");
+  const send = src.indexOf("await postFile(");
+  assert.ok(limit > 0 && shrink > limit && send > shrink, "order: limit, shrink, send");
+  assert.match(src, /status === 413 \? tooLargeStatusMessage\(isImage\)/);
+});

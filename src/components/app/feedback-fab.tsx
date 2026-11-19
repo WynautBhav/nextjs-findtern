@@ -214,7 +214,7 @@ export function FeedbackFab({
                   accept={intern ? "image/jpeg,image/png,image/webp" : "image/jpeg,image/png,image/webp,application/pdf"}
                   shrink={intern}
                   label="Screenshot"
-                  hint={`Optional. Up to 5 ${intern ? "images" : "images or PDFs"}, 10 MB each${attachments.length ? ` (${5 - attachments.length} left)` : ""}.`}
+                  hint={`Optional. Up to 5 ${intern ? "images" : "images or PDFs"}. Images up to 5 MB${intern ? "" : ", PDFs up to 4 MB"}${attachments.length ? ` (${5 - attachments.length} left)` : ""}.`}
                   onUploaded={(r) => setAttachments((list) => [...list, { key: r.key, name: r.name }].slice(0, 5))}
                 />
               ) : null}
@@ -223,7 +223,7 @@ export function FeedbackFab({
                 accept="video/mp4,video/webm,video/quicktime"
                 label="Screen recording"
                 noun="video"
-                hint="Optional. One short video, up to 10 MB."
+                hint="Optional. One short video, up to 4 MB."
                 onUploaded={(r) => setVideo(r.key)}
               />
 
