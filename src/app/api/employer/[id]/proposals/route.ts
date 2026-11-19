@@ -4,6 +4,7 @@ import { after, NextResponse } from "next/server";
 import { isHiredProposal } from "@/lib/hire-status";
 import { z } from "zod";
 
+import { startDateFormat } from "@/components/employer/start-date-model";
 import { learnField } from "@/lib/proposal-copy";
 import { projectZone } from "@/lib/timezones";
 import { withLock } from "@/lib/advisory-lock";
@@ -58,7 +59,7 @@ const bodySchema = z
   state: z.string().trim().max(80).default(""),
   officeDays: z.number().int().min(1).max(6).optional(),
   homeDays: z.number().int().min(1).max(6).optional(),
-  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  startDate: startDateFormat,
   duration: z.enum(["1m", "2m", "3m", "6m"], "Pick a duration of 1, 2, 3 or 6 months."),
   /** Ignored: hours follow the schedule and paid leave (scheduledMonthlyHours). */
   monthlyHours: z.number().optional(),
