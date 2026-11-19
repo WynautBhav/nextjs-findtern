@@ -14,6 +14,7 @@ import { formatRate } from "@/lib/format";
 import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
 import { isQuarterHourWall, meetingEndsAt, meetingTime, suggestedSlots } from "@/lib/employer-interview-rules";
 import { MeetingSlots, TimezoneSelect, type Slots } from "@/components/employer/meeting-slots";
+import { hasSlotProblem } from "@/components/employer/meeting-slots-model";
 import { SendProposalHold } from "@/components/employer/send-proposal-hold";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { fieldClass, labelClass } from "@/components/employer/ui-tokens";
@@ -400,7 +401,7 @@ export function CartManager({
                 </button>
                 <button
                   type="submit"
-                  disabled={busyId === "booking-meeting"}
+                  disabled={busyId === "booking-meeting" || hasSlotProblem(slots, timezone)}
                   className={buttonClass({ variant: "primary", size: "sm", className: "min-h-11" })}
                 >
                   {busyId === "booking-meeting" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}

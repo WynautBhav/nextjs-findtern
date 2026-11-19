@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
+import { agreementWait, confirmButtonLabel } from "@/components/app/countdown-agreement-model";
 
 import {
   Dialog,
@@ -87,6 +88,7 @@ function AgreementBody({
   }, [seconds]);
 
   const ready = left === 0 && agreed && !busy;
+  const wait = agreementWait(left, agreed, busy);
 
   return (
     <>
@@ -131,7 +133,9 @@ function AgreementBody({
         )}
       </div>
 
-      <DialogFooter className="border-t border-ink-200/80 px-6 py-4">
+      <DialogFooter className="items-center border-t border-ink-200/80 px-6 py-4">
+        {/* Outside the scrolling terms, so the wait is on screen for as long as the button is locked. */}
+        {wait ? <p className="text-xs text-ink-600 sm:mr-auto">{wait}</p> : null}
         <button
           type="button"
           onClick={() => onOpenChange(false)}
@@ -147,7 +151,7 @@ function AgreementBody({
           className={buttonClass({ variant: "primary", size: "md", className: "text-sm font-semibold" })}
         >
           {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-          {left > 0 ? `${confirmLabel} (${left}s)` : confirmLabel}
+          {confirmButtonLabel(confirmLabel, left)}
         </button>
       </DialogFooter>
     </>

@@ -70,7 +70,7 @@ export const TIMEZONES: TimezoneOption[] = [
   { id: "Europe/Moscow", label: "Europe/Moscow" },
   { id: "Europe/Lisbon", label: "Europe/Lisbon" },
   { id: "Europe/Dublin", label: "Europe/Dublin" },
-  { id: "Europe/Reykjavik", label: "Europe/Reykjavik" },
+  { id: "Atlantic/Reykjavik", label: "Atlantic/Reykjavik" },
   { id: "group-america", label: "America", group: true },
   { id: "America/New_York", label: "America/New_York" },
   { id: "America/Chicago", label: "America/Chicago" },

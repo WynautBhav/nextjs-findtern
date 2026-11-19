@@ -10,8 +10,11 @@
  * converts them.
  */
 
+import { useId } from "react";
+
 import { TIMEZONES } from "@/lib/timezones";
-import { SLOT_MINUTES, wallNow } from "@/lib/employer-interview-rules";
+import { SLOT_MINUTES } from "@/lib/employer-interview-rules";
+import { slotProblems, slotWindow } from "@/components/employer/meeting-slots-model";
 import { DmyDateInput } from "@/components/app/dmy-date-input";
 import { fieldClass } from "@/components/employer/ui-tokens";
 import { cn } from "@/lib/utils";
@@ -51,9 +54,11 @@ export function MeetingSlots({
   describedBy?: string;
 }) {
   // "Now" in the meeting's timezone, so today's past times are not offered.
-  const now = wallNow(timezone);
-  const today = now.slice(0, 10);
-  const maxDate = new Date(Date.parse(`${today}T00:00:00Z`) + 14 * 86_400_000).toISOString().slice(0, 10);
+  const errId = useId();
+  const { now, today } = slotWindow(timezone);
+  // A wrong slot is said in the page, under its own row, not by the browser's min/max tooltip (B-42); the form
+  // button is disabled on the same rule (hasSlotProblem).
+  const problems = slotProblems(slots, timezone);
 
   function set(idx: number, value: string) {
     const next = [...slots] as Slots;
@@ -74,21 +79,19 @@ export function MeetingSlots({
               <DmyDateInput
                 required
                 value={date}
-                min={today}
-                max={maxDate}
                 onChange={(iso) => set(idx, iso ? `${iso}T${time || "09:00"}` : "")}
                 aria-label={`Slot ${idx + 1} date`}
-                aria-invalid={invalid || undefined}
-                aria-describedby={invalid ? describedBy : undefined}
-                className={FIELD}
+                aria-invalid={invalid || problems[idx] ? true : undefined}
+                aria-describedby={cn(problems[idx] && `${errId}-${idx}`, invalid && describedBy) || undefined}
+                className={cn(FIELD, problems[idx] && "border-danger hover:border-danger focus-visible:border-danger focus-visible:ring-danger/20")}
               />
               <select
                 required
                 value={time}
                 onChange={(e) => set(idx, `${date || today}T${e.target.value}`)}
                 aria-label={`Slot ${idx + 1} time`}
-                aria-invalid={invalid || undefined}
-                aria-describedby={invalid ? describedBy : undefined}
+                aria-invalid={invalid || problems[idx]?.includes("time") ? true : undefined}
+                aria-describedby={cn(problems[idx] && `${errId}-${idx}`, invalid && describedBy) || undefined}
                 className={FIELD}
               >
                 <option value="" disabled>
@@ -101,6 +104,11 @@ export function MeetingSlots({
                 ))}
               </select>
             </div>
+            {problems[idx] ? (
+              <p id={`${errId}-${idx}`} role="alert" className="mt-1.5 text-xs text-danger">
+                {problems[idx]}
+              </p>
+            ) : null}
           </fieldset>
         );
       })}

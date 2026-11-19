@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { fixStartDate, startDateHint, startDateIssue, startDayDisabled } from "./start-date-model.ts";
+import { fixStartDate, startDateHint, startDateIssue, startDayDisabled, startDateFormat } from "./start-date-model.ts";
 
 /** A moment given as an India wall-clock time. */
 const ist = (day: string, hhmm: string) => new Date(`${day}T${hhmm}:00+05:30`);
@@ -51,15 +51,15 @@ test("fixStartDate leaves a valid date, an empty one and a half-typed one alone"
 
 test("fixStartDate moves a weekend to the next Monday and says so", () => {
   const now = ist("2026-11-16", "10:00");
-  assert.deepEqual(fixStartDate("2026-11-28", now), { value: "2026-11-30", notice: "Sat 28 Nov is a weekend, so the start date moved to Mon 30 Nov." });
-  assert.deepEqual(fixStartDate("2026-11-29", now), { value: "2026-11-30", notice: "Sun 29 Nov is a weekend, so the start date moved to Mon 30 Nov." });
+  assert.deepEqual(fixStartDate("2026-11-28", now), { value: "2026-11-30", notice: "Moved to Mon 30 Nov: Sat 28 Nov is a weekend and start dates are weekdays only." });
+  assert.deepEqual(fixStartDate("2026-11-29", now), { value: "2026-11-30", notice: "Moved to Mon 30 Nov: Sun 29 Nov is a weekend and start dates are weekdays only." });
 });
 
 test("fixStartDate moves a too-early date to the earliest one and says so", () => {
   const now = ist("2026-11-19", "10:00"); // Thursday: Saturday is two days out, so Monday
   assert.deepEqual(fixStartDate("2026-11-20", now), {
     value: "2026-11-23",
-    notice: "Fri 20 Nov is too soon, so the start date moved to Mon 23 Nov (2 days after sending, weekdays only).",
+    notice: "Moved to Mon 23 Nov: the earliest start is 2 days after sending, weekdays only.",
   });
   // Yesterday and last year too.
   assert.equal(fixStartDate("2026-11-18", now).value, "2026-11-23");
@@ -84,4 +84,17 @@ test("startDateIssue: the sentence the form shows, matching the server", () => {
   // An edit's unchanged date is not judged; a changed one is.
   assert.equal(startDateIssue("2026-11-20", now, "2026-11-20"), null);
   assert.equal(startDateIssue("2026-11-21", now, "2026-11-20"), "The earliest start date is Mon 23 Nov (2 days after sending, weekdays only).");
+});
+
+test("the API's date-format error is a sentence, never the regex (B-39)", () => {
+  assert.equal(startDateFormat.safeParse("2026-11-24").success, true);
+  for (const bad of ["24/11/2026", "tomorrow", "2026-1-5", "", "2026-11-24T10:00"]) {
+    const r = startDateFormat.safeParse(bad);
+    assert.equal(r.success, false, bad);
+    if (!r.success) {
+      const message = r.error.issues[0]?.message ?? "";
+      assert.equal(message, "Use a date like 2026-11-24.");
+      assert.ok(!message.includes("/^") && !message.includes("\\d"), message);
+    }
+  }
 });

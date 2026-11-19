@@ -30,6 +30,7 @@ import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { isQuarterHourWall, suggestedSlots, type InterviewStage } from "@/lib/employer-interview-rules";
 import { MeetingSlots, type Slots } from "@/components/employer/meeting-slots";
+import { hasSlotProblem } from "@/components/employer/meeting-slots-model";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import type { JoinInput } from "@/lib/interview-join";
 import { RowMenu } from "@/components/app/row-menu";
@@ -278,7 +279,7 @@ export function InterviewActions({
             <MeetingSlots slots={slots} onChange={setSlots} timezone={timezone} invalid={errorField === "slots"} describedBy={errId} />
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={reschedule} disabled={busy !== null} className={buttonClass({ size: "sm" })}>
+            <button type="button" onClick={reschedule} disabled={busy !== null || hasSlotProblem(slots, timezone)} className={buttonClass({ size: "sm" })}>
               {busy === "reschedule" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
               Offer these times
             </button>

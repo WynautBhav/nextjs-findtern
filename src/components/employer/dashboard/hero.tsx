@@ -66,10 +66,13 @@ export function Hero({ companyName, dateLabel, total, queue, waitingOnCandidates
       <div className="grid gap-x-8 gap-y-5 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-y-4">
         <Arrive index={0} className="lg:col-start-1 lg:row-start-1 lg:self-center">
           <p className="text-sm font-medium text-on-dark">
-            <span className="text-white">{companyName}</span>
-            <span aria-hidden> · </span>
-            <span className="sr-only">, </span>
-            {dateLabel}
+            {/* One separator, and none when a side is empty (a bare "·" and a stray comma read as junk, B-36). */}
+            {[companyName, dateLabel].filter((part) => part?.trim()).map((part, i) => (
+              <span key={part} className={i === 0 ? "text-white" : undefined}>
+                {i > 0 ? <span aria-hidden> · </span> : null}
+                {part}
+              </span>
+            ))}
           </p>
         </Arrive>
 

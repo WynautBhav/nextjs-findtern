@@ -4,6 +4,7 @@ import { CheckCircle2, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { MeetingSlots, TimezoneSelect, type Slots } from "@/components/employer/meeting-slots";
+import { hasSlotProblem } from "@/components/employer/meeting-slots-model";
 import { labelClass } from "@/components/employer/ui-tokens";
 import { suggestedSlots } from "@/lib/employer-interview-rules";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -104,7 +105,7 @@ export function MeetingDialog({
                 </button>
                 <button
                   type="submit"
-                  disabled={booking}
+                  disabled={booking || hasSlotProblem(slots, timezone)}
                   className={buttonClass({ variant: "primary", size: "sm", className: "min-h-11" })}
                 >
                   {booking ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}

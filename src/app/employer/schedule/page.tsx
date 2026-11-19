@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, count, desc, eq, inArray } from "drizzle-orm";
 import { CalendarDays, CalendarX2, Search } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
@@ -31,6 +31,7 @@ import { ProposalTabs } from "@/components/employer/section-tabs";
 import { InterviewActions } from "@/components/employer/interview-actions";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { serializeJoinInput } from "@/lib/interview-join";
+import { emptyScheduleCopy } from "@/components/employer/schedule-empty";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
 
@@ -96,6 +97,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
   const projectNames = new Map<string, string>();
   const projectZones = new Map<string, string | null>();
   const downProjects = new Map<string, string>(); // taken down by Findtern: view only
+  let shortlisted = 0;
   try {
     const db = getDb();
     rows = await db
@@ -103,6 +105,14 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
       .from(schema.interviews)
       .where(eq(schema.interviews.employerId, uid))
       .orderBy(desc(schema.interviews.createdAt));
+    // Only the empty state needs it: whether anyone is on the shortlist (a candidate already proposed to still is).
+    if (rows.length === 0) {
+      const [row] = await db
+        .select({ n: count() })
+        .from(schema.employerCartItems)
+        .where(and(eq(schema.employerCartItems.employerId, uid), inArray(schema.employerCartItems.listType, ["cart", "checkout"])));
+      shortlisted = Number(row?.n ?? 0);
+    }
 
     const internIds = Array.from(new Set(rows.map((r) => r.internId)));
     const projectIds = Array.from(new Set(rows.map((r) => r.projectId).filter(Boolean))) as string[];
@@ -250,9 +260,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
         <EmptyScene
           art
           title="No interviews yet"
-          body="Shortlist a candidate, then book a meeting from your shortlist: you offer three times and they pick one."
-          next={{ label: "Browse candidates", href: "/employer/candidates" }}
-          who="You - shortlist someone first"
+          {...emptyScheduleCopy(shortlisted)}
         />
       ) : (
         <>
