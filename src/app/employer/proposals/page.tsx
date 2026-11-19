@@ -20,6 +20,7 @@ import { ProposalTabs } from "@/components/employer/section-tabs";
 import { hireFlowCountsFor, internExtraForRequest, openOrdersForRequest, stateForRow } from "@/lib/employer-flow";
 import { tabFromParam } from "@/components/employer/proposal-tabs";
 import { ProposalsManager, type ProposalItem } from "@/components/employer/proposals-manager";
+import { perfScope } from "@/lib/perf/timing";
 
 export const metadata: Metadata = {
   title: "Proposals",
@@ -100,7 +101,7 @@ async function loadList(employerId: string): Promise<{ proposals: ProposalItem[]
   }
 }
 
-export default async function EmployerProposalsPage({ searchParams }: { searchParams: Promise<{ status?: string | string[] }> }) {
+async function EmployerProposalsPageImpl({ searchParams }: { searchParams: Promise<{ status?: string | string[] }> }) {
   // The dashboard's figures and the hire strip open a tab here (?status=open|draft|verifying|accepted|viewonly|hired|closed).
   const initialStatus = tabFromParam((await searchParams).status);
   const session = await requireRole("employer");
@@ -141,4 +142,8 @@ export default async function EmployerProposalsPage({ searchParams }: { searchPa
       )}
     </div>
   );
+}
+
+export default function EmployerProposalsPage(props: Parameters<typeof EmployerProposalsPageImpl>[0]) {
+  return perfScope("employer/proposals", () => EmployerProposalsPageImpl(props));
 }

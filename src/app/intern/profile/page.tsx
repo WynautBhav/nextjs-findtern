@@ -16,6 +16,7 @@ import { isInternPaidGiven } from "@/lib/payments";
 import { readCgpaVerification } from "@/lib/cgpa-verification";
 import { CgpaVerificationCard } from "@/components/intern/profile/cgpa-card";
 import { guardPrecomplete } from "@/lib/intern-precomplete";
+import { perfScope } from "@/lib/perf/timing";
 
 export const metadata: Metadata = {
   title: "Your profile",
@@ -38,7 +39,7 @@ const RATING_LABELS: [key: string, label: string][] = [
  * candidate sees: name, completeness and the next step; the private contact
  * details and documents are the last two cards.
  */
-export default async function InternProfile() {
+async function InternProfileImpl() {
   const session = await requireRole("intern");
   // Every read starts together (the old chain was seven round trips). The guard redirects by throwing, so nothing renders
   // for a closed page; the rest are wasted only in that case. loadInternData is cache()d: the layout's call is shared.
@@ -159,4 +160,8 @@ export default async function InternProfile() {
       />
     </div>
   );
+}
+
+export default function InternProfile() {
+  return perfScope("intern/profile", () => InternProfileImpl());
 }

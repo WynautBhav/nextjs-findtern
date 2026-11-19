@@ -30,18 +30,19 @@ import { DAY_MS } from "@/lib/admin/dashboard-queues-pure";
 export async function loadActivityAndCounts(now: Date) {
   const db = getDb();
   const weekAgo = new Date(now.getTime() - 7 * DAY_MS);
-  const [[signups], [incompleteProfiles], recentUsers, recentProjects, recentAccepted, recentPayments] = await Promise.all([
-    db
-      .select({ value: count(), fresh: sql<number>`count(*) filter (where ${schema.users.createdAt} >= ${weekAgo})` })
-      .from(schema.users)
-      .where(eq(schema.users.role, "intern")),
+  const [[signups, incompleteProfiles], recentUsers, recentProjects, recentAccepted, recentPayments] = await Promise.all([
+    // One read of the intern ids feeds both figures (it used to be a separate count query beside this one).
     // Incomplete = not (submitted and every required onboarding field filled); see lib/admin/profile-state.
     Promise.all([
       db.select({ id: schema.users.id, createdAt: schema.users.createdAt }).from(schema.users).where(eq(schema.users.role, "intern")),
       loadCompleteProfileIds(),
     ]).then(([users, complete]) => {
+      const isFresh = (u: { createdAt: Date | null }) => Boolean(u.createdAt && u.createdAt >= weekAgo);
       const incomplete = users.filter((u) => !complete.has(u.id));
-      return [{ value: incomplete.length, fresh: incomplete.filter((u) => u.createdAt && u.createdAt >= weekAgo).length }];
+      return [
+        { value: users.length, fresh: users.filter(isFresh).length },
+        { value: incomplete.length, fresh: incomplete.filter(isFresh).length },
+      ] as const;
     }),
     db
       .select({
