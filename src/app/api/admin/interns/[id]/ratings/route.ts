@@ -7,6 +7,7 @@ import { getDb, schema } from "@/lib/db";
 import { applyRatings } from "@/lib/admin/ratings";
 import { afterRatingsSaved } from "@/lib/admin/score-live";
 import { isInternPaid } from "@/lib/payments";
+import { ratingsErrorSummary, ratingsFieldErrors } from "@/lib/admin/ratings-errors";
 import { requireMutation } from "@/lib/guards-mutation";
 import { isSafeLink } from "@/lib/safe-url";
 
@@ -45,7 +46,10 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   if (!guard.ok) return guard.response;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Invalid input" }, { status: 400 });
+  if (!parsed.success) {
+    const fields = ratingsFieldErrors(parsed.error.issues);
+    return NextResponse.json({ error: ratingsErrorSummary(fields), fields }, { status: 400 });
+  }
 
   const db = getDb();
   const { communication, coding, aptitude, interview } = parsed.data;
@@ -79,5 +83,5 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const { prevExtra, updatedExtra } = outcome;
   await recordAdminAudit(db, { adminId: guard.session.uid, action: "intern.ratings_update", targetType: "intern", targetId: id, meta: { communication, coding, aptitude, interview, findternScore: { from: prevExtra.findternScore ?? null, to: updatedExtra.findternScore ?? null } } });
   await afterRatingsSaved(id, prevExtra, updatedExtra);
-  return NextResponse.json({ ok: true, findternScore: updatedExtra.findternScore });
+  return NextResponse.json({ ok: true, findternScore: updatedExtra.findternScore, ratings: updatedExtra.ratings ?? {} });
 }

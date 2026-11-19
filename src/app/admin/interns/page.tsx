@@ -1,6 +1,7 @@
 import { Download } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { RatingsImport } from "@/components/admin/ratings-import";
 import { formatDate, formatIstStamp, formatMoney } from "@/lib/format";
@@ -20,7 +21,7 @@ import {
   type InternColKey,
 } from "@/lib/admin/intern-columns";
 import { InternColumnsMenu } from "@/components/admin/intern-columns-menu";
-import { flattenParams, parsePageRequest, toPage, toQueryString } from "@/lib/admin/params";
+import { flattenParams, parsePageRequest, pastLastPageHref, toPage, toQueryString } from "@/lib/admin/params";
 import { INTERN_SORTS as SORTS, loadInterns, type InternRow as Row } from "@/lib/admin/intern-query";
 import { matchesDue, todayIstIso } from "@/lib/admin/intern-list";
 import { AdminLoadError, AdminPageHeader } from "@/components/admin/panel";
@@ -245,6 +246,8 @@ export default async function AdminInterns({
   }
 
   const { rows, total, signups, incomplete } = data;
+  const pastLast = pastLastPageHref("/admin/interns", params, req.page, total, req.perPage);
+  if (pastLast) redirect(pastLast);
   const page = toPage(rows, total, req.page, req.perPage);
   const today = todayIstIso();
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { AlertCircle, Check, Send } from "lucide-react";
 
 import type { ContactType } from "@/lib/contact-types";
@@ -77,6 +77,15 @@ export function ContactForm({ initialType = "general" }: { initialType?: Contact
   const [error, setError] = useState<string | null>(null);
   const [attempted, setAttempted] = useState(false);
   const uid = useId();
+  const messageRef = useRef<HTMLTextAreaElement>(null);
+
+  // No field-sizing (Safari, Firefox): size to the content by hand. The CSS min/max-height still clamp it.
+  useEffect(() => {
+    const el = messageRef.current;
+    if (!el || (typeof CSS !== "undefined" && CSS.supports("field-sizing", "content"))) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight + (el.offsetHeight - el.clientHeight)}px`;
+  }, [v.message]);
 
   // Required, and it must be a real number for its country: exactly 10
   // digits starting 6-9 for India, 6-15 digits elsewhere. "Required" shows
@@ -296,12 +305,15 @@ export function ContactForm({ initialType = "general" }: { initialType?: Contact
         <Field id={`${uid}-me`} label="Message" required className="sm:col-span-2">
           <textarea
             id={`${uid}-me`}
+            ref={messageRef}
             rows={6}
             value={v.message}
             onChange={set("message")}
             required
             placeholder={PLACEHOLDER[v.queryType]}
-            className={cn(inputCls, "resize-y py-3")}
+            // Grows a line at a time from 6 rows up to 16rem, then scrolls. field-sizing does it natively;
+            // the effect above does the same where it is unsupported (Safari, Firefox).
+            className={cn(inputCls, "h-auto min-h-[10.5rem] max-h-[16rem] resize-none overflow-y-auto py-3 [field-sizing:content]")}
           />
         </Field>
       </div>

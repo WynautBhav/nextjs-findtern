@@ -28,12 +28,15 @@ export function RatingsEditor({
   score,
   initialFeedbackLink,
   initialRecordingLink,
+  onSaved,
 }: {
   internId: string;
   ratings: Partial<Record<Axis, number>>;
   score: number | null;
   initialFeedbackLink?: string | null;
   initialRecordingLink?: string | null;
+  /** The saved score and ratings, so the page's header tile updates before the refreshed record arrives (B-38). */
+  onSaved?: (result: { score: number | null; ratings: Record<string, number> }) => void;
 }) {
   const router = useRouter();
   const { ask, dialog } = useConfirm();
@@ -47,11 +50,14 @@ export function RatingsEditor({
   const [recordingLink, setRecordingLink] = useState(initialRecordingLink ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Server-side, per-field messages (a bad link says which link), shown under that field (B-37).
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState<number | null>(null);
 
   async function send(payload: Record<string, unknown>): Promise<boolean> {
     setBusy(true);
     setError(null);
+    setFieldErrors({});
     try {
       const res = await csrfFetch(`/api/admin/interns/${encodeURIComponent(internId)}/ratings`, {
         method: "PUT",
@@ -59,8 +65,15 @@ export function RatingsEditor({
         body: JSON.stringify(payload),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error ?? "Could not save the ratings.");
+      if (!res.ok) {
+        if (data.fields && typeof data.fields === "object") setFieldErrors(data.fields as Record<string, string>);
+        throw new Error(data.error ?? "Could not save the ratings.");
+      }
       setSaved(typeof data.findternScore === "number" ? data.findternScore : null);
+      onSaved?.({
+        score: typeof data.findternScore === "number" ? data.findternScore : null,
+        ratings: data.ratings && typeof data.ratings === "object" ? (data.ratings as Record<string, number>) : {},
+      });
       router.refresh();
       return true;
     } catch (e) {
@@ -149,11 +162,19 @@ export function RatingsEditor({
             onChange={(e) => {
               setFeedbackLink(e.target.value);
               setError(null);
+              setFieldErrors((f) => ({ ...f, aiFeedbackLink: "" }));
               setSaved(null);
             }}
             placeholder="https://incruiter.com/reports/... or PDF URL"
+            aria-invalid={fieldErrors.aiFeedbackLink ? true : undefined}
+            aria-describedby={fieldErrors.aiFeedbackLink ? "ai-feedback-link-err" : undefined}
             className="mt-1 h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus-visible:border-brand-600"
           />
+          {fieldErrors.aiFeedbackLink ? (
+            <p id="ai-feedback-link-err" role="alert" className="mt-1 text-xs font-medium text-danger">
+              {fieldErrors.aiFeedbackLink}
+            </p>
+          ) : null}
         </div>
         <div>
           <label htmlFor="ai-recording-link" className="block text-sm font-medium text-ink-700">
@@ -165,11 +186,19 @@ export function RatingsEditor({
             onChange={(e) => {
               setRecordingLink(e.target.value);
               setError(null);
+              setFieldErrors((f) => ({ ...f, aiRecordingLink: "" }));
               setSaved(null);
             }}
             placeholder="https://incruiter.com/recording/..."
+            aria-invalid={fieldErrors.aiRecordingLink ? true : undefined}
+            aria-describedby={fieldErrors.aiRecordingLink ? "ai-recording-link-err" : undefined}
             className="mt-1 h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus-visible:border-brand-600"
           />
+          {fieldErrors.aiRecordingLink ? (
+            <p id="ai-recording-link-err" role="alert" className="mt-1 text-xs font-medium text-danger">
+              {fieldErrors.aiRecordingLink}
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -185,7 +214,7 @@ export function RatingsEditor({
         ) : null}
       </div>
 
-      {error ? <p role="alert" className="mt-2 text-sm text-danger">{error}</p> : null}
+      {error && !Object.values(fieldErrors).some(Boolean) ? <p role="alert" className="mt-2 text-sm text-danger">{error}</p> : null}
       {saved !== null ? (
         <p role="status" className="mt-2 text-sm text-brand-700">
           Saved. Employers filtering by score and viewing dossier will see the updated report.

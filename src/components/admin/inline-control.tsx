@@ -85,6 +85,7 @@ export function InlineSelect({
   refresh = false,
   tones,
   className,
+  onSaved,
 }: {
   /** Accessible name (the column header is not attached to the control). */
   label: string;
@@ -99,6 +100,8 @@ export function InlineSelect({
    */
   tones?: Record<string, StatusTone>;
   className?: string;
+  /** Called with the picked value once the server has accepted it (for a toast). */
+  onSaved?: (value: string) => void;
 }) {
   const router = useRouter();
   const errorId = useId();
@@ -126,6 +129,7 @@ export function InlineSelect({
       setError(result.error);
       return;
     }
+    onSaved?.(next);
     if (refresh) router.refresh();
   }
 

@@ -33,6 +33,7 @@ import { ChevronDown, ChevronsLeft, ChevronsRight, LogOut, Menu, MessageSquare, 
 import { AdminAvatar } from "@/components/admin/avatar";
 import { ADMIN_DUR, ADMIN_EASE, Count, seconds } from "@/components/admin/motion";
 import { FeedbackFab } from "@/components/app/feedback-fab";
+import { ToastProvider } from "@/components/app/toast";
 import { Logo, LogoMark } from "@/components/brand/logo";
 import {
   DropdownMenu,
@@ -231,15 +232,17 @@ export function AdminShell({
         className={cn("apple-admin min-h-[100dvh] bg-[var(--admin-canvas)] text-foreground lg:p-3", theme === "dark" && "dark")}
         style={{ colorScheme: theme }}
       >
+        <ToastProvider>
         <div className="relative min-h-[100dvh] overflow-x-clip bg-[var(--admin-frame)] lg:flex lg:min-h-[calc(100dvh-1.5rem)] lg:overflow-clip lg:rounded-[var(--radius-admin-frame)]">
           {/* ── Desktop rail ───────────────────────────────────────────── */}
           <aside
             aria-label="Sidebar"
             className={cn(
-              "sticky top-3 hidden h-[calc(100dvh-1.5rem)] shrink-0 flex-col px-5 py-5 transition-[width] duration-[var(--duration-admin-slow)] ease-[var(--ease-out-soft)] motion-reduce:transition-none lg:flex",
+              "sticky top-3 z-40 hidden h-[calc(100dvh-1.5rem)] shrink-0 flex-col px-5 py-5 transition-[width] duration-[var(--duration-admin-slow)] ease-[var(--ease-out-soft)] motion-reduce:transition-none lg:flex",
               collapsed ? "w-[5.75rem]" : "w-72",
             )}
           >
+            {/* z-40 on the aside: the collapse button below overhangs into the content column, whose sticky header (z-30) otherwise clips its top edge (S-3). */}
             <div className={cn("flex min-h-10 items-center", collapsed ? "justify-center" : "gap-2 px-2")}>
               <Link href={homeHref} aria-label="Findtern home" className="flex min-w-0 items-center">
                 {collapsed ? <LogoMark variant={logoVariant} alt="" className="size-8" /> : <Logo variant={logoVariant} priority className="h-8" />}
@@ -334,6 +337,7 @@ export function AdminShell({
             </main>
           </div>
         </div>
+        </ToastProvider>
       </div>
     </MotionConfig>
   );

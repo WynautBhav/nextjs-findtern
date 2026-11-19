@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, count, desc, eq, not, sql, type SQL } from "drizzle-orm";
+import { and, asc, count, desc, eq, isNull, not, sql, type SQL } from "drizzle-orm";
 import { Download } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
@@ -23,6 +23,9 @@ import { TakedownAction } from "./takedown-action";
 
 const SORTS = ["name", "company", "proposals", "posted"] as const;
 
+/** Open to candidates: a live posting that has not been taken down (a taken-down project keeps its old status). */
+const openProject = (): SQL => sql`(${activeProject()} AND ${isNull(schema.projects.takenDownAt)})`;
+
 const proposalCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.project_id = ${q(schema.projects, schema.projects.id)})`;
 
 export default async function AdminProjectsPage({
@@ -37,7 +40,7 @@ export default async function AdminProjectsPage({
   const conditions: (SQL | undefined)[] = [
     searchAny([sql`${schema.projects.projectName}`, sql`${schema.employers.companyName}`, sql`${schema.projects.skills}::text`], req.search),
     realEmployerId(schema.projects.employerId),
-    params.status === "active" ? activeProject() : params.status === "closed" ? not(activeProject()) : undefined,
+    params.status === "active" ? openProject() : params.status === "closed" ? not(openProject()) : undefined,
     params.type === "full_time" ? eq(schema.projects.fullTimeOffer, true) : undefined,
     params.type === "internship" ? sql`coalesce(${schema.projects.fullTimeOffer}, false) = false` : undefined,
   ];
@@ -70,7 +73,7 @@ export default async function AdminProjectsPage({
           takenDownAt: schema.projects.takenDownAt,
           takenDownReason: schema.projects.takenDownReason,
           proposalCount,
-          isActive: sql<boolean>`${activeProject()}`,
+          isActive: sql<boolean>`${openProject()}`,
         })
         .from(schema.projects)
         .innerJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
@@ -84,7 +87,7 @@ export default async function AdminProjectsPage({
         .innerJoin(schema.employers, eq(schema.employers.id, schema.projects.employerId))
         .where(where),
       db.select({ c: count() }).from(schema.projects).where(realEmployerId(schema.projects.employerId)),
-      db.select({ c: count() }).from(schema.projects).where(and(activeProject(), realEmployerId(schema.projects.employerId))),
+      db.select({ c: count() }).from(schema.projects).where(and(openProject(), realEmployerId(schema.projects.employerId))),
       db.select({ c: count() }).from(schema.projects).where(and(eq(schema.projects.fullTimeOffer, true), realEmployerId(schema.projects.employerId))),
       db.select({ c: count() }).from(schema.proposals).where(realEmployerId(schema.proposals.employerId)),
     ]);
