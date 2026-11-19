@@ -9,6 +9,7 @@ import { ADMIN_PILL_PRIMARY } from "@/components/admin/surface";
 import { ButtonLink } from "@/components/ui/button";
 import { flattenParams, parsePageRequest, searchAny, toPage } from "@/lib/admin/params";
 import { AUTO_NOTIFICATION_TYPES } from "@/lib/admin/notification-types";
+import { perfScope } from "@/lib/perf/timing";
 
 export const metadata: Metadata = { title: "Notification history" };
 
@@ -46,7 +47,7 @@ function when(d: Date | null): string {
  * legacy), with its recipient and whether they have read it. Filters and
  * search run on the server so the pager counts are true.
  */
-export default async function AdminNotificationHistoryPage({
+async function AdminNotificationHistoryPageImpl({
   searchParams,
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -177,6 +178,10 @@ export default async function AdminNotificationHistoryPage({
       />
     </div>
   );
+}
+
+export default function AdminNotificationHistoryPage(props: Parameters<typeof AdminNotificationHistoryPageImpl>[0]) {
+  return perfScope("admin/notification-history", () => AdminNotificationHistoryPageImpl(props));
 }
 
 async function load(params: Record<string, string>, req: ReturnType<typeof parsePageRequest>) {

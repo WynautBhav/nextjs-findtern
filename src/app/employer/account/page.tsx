@@ -14,6 +14,7 @@ import { missingProfileFields } from "@/lib/employer-onboarding";
 import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { formatDate } from "@/lib/format";
 import { timezoneForLocation } from "@/lib/timezones";
+import { perfScope } from "@/lib/perf/timing";
 
 export const metadata: Metadata = {
   title: "Company profile",
@@ -26,19 +27,22 @@ export const metadata: Metadata = {
  * The profile form on the left, the account's facts and the password on the
  * right. The sidebar's "Change password" lands on `#security`.
  */
-export default async function EmployerAccount() {
+async function EmployerAccountImpl() {
   const session = await requireRole("employer");
   const uid = session.uid;
 
   let employer: typeof schema.employers.$inferSelect | undefined;
   let prefs: { emailMessages: boolean; pushMessages: boolean } | undefined;
   try {
-    [employer] = await getDb().select().from(schema.employers).where(eq(schema.employers.id, uid)).limit(1);
-    [prefs] = await getDb()
-      .select({ emailMessages: schema.notificationPrefs.emailMessages, pushMessages: schema.notificationPrefs.pushMessages })
-      .from(schema.notificationPrefs)
-      .where(eq(schema.notificationPrefs.userId, uid))
-      .limit(1);
+    // Independent reads, started together: one round trip instead of two.
+    [[employer], [prefs]] = await Promise.all([
+      getDb().select().from(schema.employers).where(eq(schema.employers.id, uid)).limit(1),
+      getDb()
+        .select({ emailMessages: schema.notificationPrefs.emailMessages, pushMessages: schema.notificationPrefs.pushMessages })
+        .from(schema.notificationPrefs)
+        .where(eq(schema.notificationPrefs.userId, uid))
+        .limit(1),
+    ]);
   } catch (err) {
     console.error("Failed to load employer account:", err);
     return (
@@ -133,4 +137,8 @@ export default async function EmployerAccount() {
       </div>
     </div>
   );
+}
+
+export default function EmployerAccount() {
+  return perfScope("employer/account", () => EmployerAccountImpl());
 }

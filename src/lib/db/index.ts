@@ -3,6 +3,7 @@ import pg from "pg";
 
 import * as schema from "./schema.ts";
 import { poolIsBusy, poolMax, type PoolStats } from "./pool-config.ts";
+import { instrumentPool } from "../perf/timing.ts";
 import { CONNECT_TIMEOUT_MS, QUERY_TIMEOUT_MS, holdUntilIdle, idleTimeoutMs, withRetry, type RetryablePool } from "./pool-lifecycle.ts";
 
 /**
@@ -110,6 +111,7 @@ function createDb() {
   _pool = pool;
   withRetry(pool as unknown as RetryablePool);
   holdUntilIdle(pool, idleTimeoutMs(process.env));
+  instrumentPool(pool as unknown as Parameters<typeof instrumentPool>[0]); // last, so retries count; a no-op unless PERF_LOG=1
   return drizzle(pool, { schema });
 }
 

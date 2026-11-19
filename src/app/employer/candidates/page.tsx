@@ -28,13 +28,14 @@ import {
   withFilters,
   type SearchParams,
 } from "./_query";
+import { perfScope } from "@/lib/perf/timing";
 
 export const metadata: Metadata = {
   title: "Candidates",
   robots: { index: false, follow: false },
 };
 
-export default async function CandidatesPage({
+async function CandidatesPageImpl({
   searchParams,
 }: {
   searchParams: Promise<SearchParams>;
@@ -221,4 +222,8 @@ export default async function CandidatesPage({
       </FilterCollapse>
     </div>
   );
+}
+
+export default function CandidatesPage(props: Parameters<typeof CandidatesPageImpl>[0]) {
+  return perfScope("employer/candidates", () => CandidatesPageImpl(props));
 }

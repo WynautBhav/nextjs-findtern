@@ -11,13 +11,14 @@ import { ButtonLink } from "@/components/ui/button";
 import { proposalOutcome } from "@/lib/proposals";
 import { ProjectList, type ListProject } from "./project-list";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
+import { perfScope } from "@/lib/perf/timing";
 
 export const metadata: Metadata = {
   title: "Projects",
   robots: { index: false, follow: false },
 };
 
-export default async function EmployerProjectsPage() {
+async function EmployerProjectsPageImpl() {
   const session = await requireRole("employer");
 
   let rows: ListProject[];
@@ -82,4 +83,8 @@ export default async function EmployerProjectsPage() {
       <ProjectList projects={rows} />
     </div>
   );
+}
+
+export default function EmployerProjectsPage() {
+  return perfScope("employer/projects", () => EmployerProjectsPageImpl());
 }

@@ -64,7 +64,8 @@ export async function loadInterns(
   // Same sources as the Payouts page: placement dues plus the payouts ledger.
   // The set is small (hires), and loading it whole is what lets the payout-date
   // filters and the money sorts run across all pages, not just this one.
-  const [dues, ledger] = await Promise.all([loadPlacementDues(), loadLedgerByIntern()]);
+  // The completeness read is independent of both, so it starts with them (it used to follow as a third round trip).
+  const [dues, ledger, completeIds] = await Promise.all([loadPlacementDues(), loadLedgerByIntern(), loadCompleteProfileIds()]);
   const duesByIntern = new Map<string, PlacementDueRow[]>();
   for (const d of dues) duesByIntern.set(d.internId, [...(duesByIntern.get(d.internId) ?? []), d]);
   const money = new Map<string, InternMoney>();
@@ -84,7 +85,6 @@ export async function loadInterns(
   }
 
   // "Complete" = submitted and every required onboarding field filled (lib/admin/profile-state), decided in JS.
-  const completeIds = await loadCompleteProfileIds();
   const completeList = [...completeIds];
   const profileComplete: SQL = completeList.length ? inArray(u.id, completeList) : sql`false`;
   const profileIncomplete: SQL = completeList.length ? notInArray(u.id, completeList) : sql`true`;

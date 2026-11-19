@@ -17,6 +17,7 @@ import { allows } from "@/lib/admin/permissions";
 import { listCandidateDocuments } from "@/lib/admin/candidate-documents-list";
 import { loadInternActivity, type ActivityEntry } from "@/lib/admin/record-activity";
 import { getDb, schema, withoutPassword } from "@/lib/db";
+import { perfScope } from "@/lib/perf/timing";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -32,7 +33,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   }
 }
 
-export default async function AdminInternDetail({
+async function AdminInternDetailImpl({
   params,
   searchParams,
 }: {
@@ -45,6 +46,9 @@ export default async function AdminInternDetail({
 
   let data: Awaited<ReturnType<typeof load>>;
   let activities: ActivityEntry[] | null;
+  // Started with the record: the permission lookup does not depend on it.
+  const viewAsP = canViewAs(session?.uid, session?.permissions);
+  viewAsP.catch(() => undefined); // awaited below; a failure there must not become an unhandled rejection if the load fails first
   try {
     // The timeline loads beside the record; if it throws, the page still renders without it.
     [data, activities] = await Promise.all([
@@ -68,7 +72,7 @@ export default async function AdminInternDetail({
   if (!data) notFound();
 
   const { user, onboarding, documents, ...rest } = data;
-  const viewAs = await canViewAs(session?.uid, session?.permissions);
+  const viewAs = await viewAsP;
   const canWrite = allows(session?.permissions, ["interns:write"]);
   const extra = (onboarding?.extraData ?? {}) as Record<string, unknown>;
 
@@ -115,12 +119,15 @@ export default async function AdminInternDetail({
   );
 }
 
+export default function AdminInternDetail(props: Parameters<typeof AdminInternDetailImpl>[0]) {
+  return perfScope("admin/interns/[id]", () => AdminInternDetailImpl(props));
+}
+
 async function load(id: string) {
   const db = getDb();
-  const [user] = await db.select(withoutPassword(getTableColumns(schema.users))).from(schema.users).where(eq(schema.users.id, id)).limit(1);
-  if (!user) return null;
-
-  const [[onboarding], [documents], interviews, proposals, timesheets, payouts, [paidFee]] = await Promise.all([
+  // One wave: the user lookup no longer gates the rest (an unknown id wastes six cheap indexed reads and 404s).
+  const [[user], [onboarding], [documents], interviews, proposals, timesheets, payouts, [paidFee]] = await Promise.all([
+    db.select(withoutPassword(getTableColumns(schema.users))).from(schema.users).where(eq(schema.users.id, id)).limit(1),
     db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).limit(1),
     db.select().from(schema.internDocuments).where(eq(schema.internDocuments.userId, id)).orderBy(desc(schema.internDocuments.createdAt)).limit(1),
     db.select().from(schema.interviews).where(eq(schema.interviews.internId, id)).orderBy(desc(schema.interviews.createdAt)),
@@ -133,6 +140,7 @@ async function load(id: string) {
       .where(and(eq(schema.internPayments.internId, id), eq(schema.internPayments.status, "paid")))
       .limit(1),
   ]);
+  if (!user) return null;
 
   const employerIds = [...new Set([...proposals.map((p) => p.employerId), ...interviews.map((i) => i.employerId), ...timesheets.map((t) => t.employerId)].filter(Boolean))];
   const projectIds = [...new Set([...proposals.map((p) => p.projectId), ...interviews.map((i) => i.projectId)].filter((v): v is string => Boolean(v)))];
