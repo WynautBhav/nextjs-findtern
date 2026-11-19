@@ -45,8 +45,10 @@ export function PeriodBar({
   };
   const custom = current === "custom";
 
+  // relative z-20 on the root: the page animates its blocks into stacking contexts, which paint over the open
+  // Custom range panel otherwise (S-2). It stays under the sticky header (z-30).
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2" data-rp="period">
+    <div className="relative z-20 flex flex-wrap items-center gap-x-3 gap-y-2" data-rp="period">
       <nav
         aria-label="Period"
         className="flex max-w-full gap-1 overflow-x-auto rounded-full bg-[color:var(--admin-panel)] p-1 shadow-[var(--admin-shadow)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
