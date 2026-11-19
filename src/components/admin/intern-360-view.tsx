@@ -115,8 +115,17 @@ export function Intern360View({
   const [proposalFilter, setProposalFilter] = useState("all");
 
   const extra = (onboarding?.extraData ?? {}) as Record<string, unknown>;
-  const score = typeof extra.findternScore === "number" ? Math.min(10, Math.max(0, extra.findternScore)) : null; // never shown above 10
-  const ratings = (extra.ratings ?? {}) as Record<string, number>;
+  // What the ratings editor just saved. The header tile shows it at once instead of waiting for the
+  // refreshed record (B-38); a new server record replaces it.
+  const [saved, setSaved] = useState<{ score: number | null; ratings: Record<string, number> } | null>(null);
+  const [seenExtra, setSeenExtra] = useState(onboarding?.extraData);
+  if (seenExtra !== onboarding?.extraData) {
+    setSeenExtra(onboarding?.extraData);
+    setSaved(null);
+  }
+  const rawScore = saved ? saved.score : extra.findternScore;
+  const score = typeof rawScore === "number" ? Math.min(10, Math.max(0, rawScore)) : null; // never shown above 10
+  const ratings = saved ? saved.ratings : ((extra.ratings ?? {}) as Record<string, number>);
   const draft = onboarding ? draftFromRecord(onboarding) : null;
   const skills = draft?.skills ?? [];
   const openToWork = extra.openToWork !== false;
@@ -270,7 +279,7 @@ export function Intern360View({
 
         <div role="tabpanel" id={`panel-${tab}`} aria-label={tabs.find((t) => t.key === tab)?.label} className="min-w-0">
           {tab === "profile" ? (
-            <ProfileTab canWrite={canWrite} internId={user.id} onboarding={onboarding} draft={draft} extra={extra} ratings={ratings} score={score} skills={skills} />
+            <ProfileTab canWrite={canWrite} onRatingsSaved={setSaved} internId={user.id} onboarding={onboarding} draft={draft} extra={extra} ratings={ratings} score={score} skills={skills} />
           ) : null}
 
           {tab === "documents" ? <DocumentsTab internId={user.id} documents={documents} /> : null}
@@ -457,8 +466,10 @@ function ProfileTab({
   score,
   skills,
   canWrite,
+  onRatingsSaved,
 }: {
   canWrite: boolean;
+  onRatingsSaved: (result: { score: number | null; ratings: Record<string, number> }) => void;
   internId: string;
   onboarding: InternOnboarding | null;
   draft: ReturnType<typeof draftFromRecord> | null;
@@ -503,6 +514,7 @@ function ProfileTab({
               internId={internId}
               ratings={ratings}
               score={score}
+              onSaved={onRatingsSaved}
               initialFeedbackLink={(extra.aiFeedbackLink as string) || null}
               initialRecordingLink={(extra.aiRecordingLink as string) || null}
             />
