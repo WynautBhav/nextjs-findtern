@@ -622,8 +622,8 @@ it("9 one money layer: Dashboard, Transactions, Reports, Reports/Money, Orders a
   close("Transactions Received (all time)", await read("/admin/transactions", "Received"), want.total, 50);
   close("Reports Revenue collected (all time)", await read("/admin/reports", "Revenue collected"), want.total, 1);
   close("Reports/Money Received (period=all)", await read("/admin/reports/money?period=all", "Received"), want.total, 1);
-  const orders = await read("/admin/orders", "Collected");
-  const invoices = await read("/admin/intern-invoices", "Collected");
+  const orders = await read("/admin/orders", "Collected from employer orders (this filter)");
+  const invoices = await read("/admin/intern-invoices", "Collected (this filter)");
   close("Orders Collected (employer orders)", orders, want.employer, 1);
   close("Intern invoices Collected", invoices, want.intern, 1);
   // Transactions Received is the whole ledger: employer orders + intern invoices + college seat batches.

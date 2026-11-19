@@ -120,6 +120,7 @@ export async function cleanup() {
     [`DELETE FROM projects WHERE employer_id = ANY($1)`, [ids]],
     [`DELETE FROM notifications WHERE recipient_id = ANY($1)`, [ids]],
     [`DELETE FROM intern_onboarding WHERE user_id = ANY($1)`, [ids]],
+    [`DELETE FROM intern_document WHERE user_id = ANY($1)`, [ids]],
     [`DELETE FROM users WHERE id = ANY($1)`, [ids]],
     [`DELETE FROM employers WHERE id = ANY($1)`, [ids]],
   ];

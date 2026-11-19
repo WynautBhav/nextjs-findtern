@@ -18,6 +18,7 @@ import { chromium } from "playwright";
 
 import { api, pngBase64, upload, url } from "./lib/browser.mjs";
 import { closeDb, one, rows } from "./lib/db.mjs";
+import { completeProfile } from "./lib/profile-complete.mjs";
 import { cleanup, mkEmployer, mkIntern, mkProject, mkProposal, signedIn } from "./lib/fixtures2.mjs";
 
 const SLOTS = (n) => [...Array.from({ length: n - 1 }, (_, i) => `marksheet-${i + 1}`), "college-id"];
@@ -175,6 +176,7 @@ test("accepting stamps offerDetails.acceptedAt once, tells the intern, and leave
   const flagged = await intern("acc");
   const files = await proofs("acc", 2);
   assert.equal((await save("acc", academics({ currentSemester: 2, semesterProofUploads: files }))).status, 200);
+  await completeProfile(rows, flagged.id); // the B-62 hire gate: an intern accepts only with a submitted, complete profile
   const offer = await mkProposal(E.id, flagged.id, pid);
   const r = await api(P.acc.page, "PATCH", `/api/proposals/${offer}/status`, { status: "accepted", agreedToTerms: true });
   assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -192,6 +194,7 @@ test("accepting stamps offerDetails.acceptedAt once, tells the intern, and leave
   assert.equal((await one(`SELECT offer_details->>'acceptedAt' AS a FROM proposals WHERE id = $1`, [offer])).a, row.d.acceptedAt);
 
   const plain = await intern("accplain");
+  await completeProfile(rows, plain.id);
   const offer2 = await mkProposal(E.id, plain.id, pid);
   const r2 = await api(P.accplain.page, "PATCH", `/api/proposals/${offer2}/status`, { status: "accepted", agreedToTerms: true });
   assert.equal(r2.status, 200, JSON.stringify(r2.body));
@@ -259,6 +262,7 @@ test("mark incorrect: the corrected score replaces the profile score, the claim 
   const files = await proofs("inc", 2);
   assert.equal((await save("inc", academics({ currentSemester: 2, semesterProofUploads: files }))).status, 200);
   const pid = await mkProject(E.id, "CGPA correction project");
+  await completeProfile(rows, who.id);
   const offer = await mkProposal(E.id, who.id, pid);
   assert.equal((await api(P.inc.page, "PATCH", `/api/proposals/${offer}/status`, { status: "accepted", agreedToTerms: true })).status, 200);
   // The employer had already confirmed something earlier: the correction must clear that.

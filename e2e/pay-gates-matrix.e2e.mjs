@@ -13,12 +13,14 @@ import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import pg from "pg";
 import { testDatabaseUrl } from "./lib/env.mjs";
+import { completeProfile } from "./lib/profile-complete.mjs";
 
 const BASE = process.env.E2E_BASE ?? "http://localhost:3260";
 const DB = testDatabaseUrl(process.env.E2E_DATABASE_URL);
 const PASSWORD = "Findtern@2026";
 const TAG = "e2eGatesMatrix";
 
+let undoProfiles = [];
 let pool, emp, ids, employerId, downProjectId, projectId;
 const q = async (sql, params) => (await pool.query(sql, params)).rows;
 const ip = () => `10.${1 + Math.floor(Math.random() * 250)}.${Math.floor(Math.random() * 256)}.${1 + Math.floor(Math.random() * 250)}`;
@@ -85,6 +87,9 @@ before(async () => {
   downProjectId = (await q("select gen_random_uuid()::text id"))[0].id;
   await q("insert into projects select (jsonb_populate_record(null::projects, to_jsonb(p) || jsonb_build_object('id', $2::text, 'project_name', 'Gates matrix takedown', 'taken_down_at', now() at time zone 'utc'))).* from projects p where p.id = $1", [projectId, downProjectId]);
   ids = { template: tpl.id, interns };
+  // The B-62 hire gate: the order route refuses an intern whose profile is incomplete, and seeded demo interns are. Complete them
+  // for the run (the gate itself is untouched) and put each profile back afterwards.
+  for (const u of interns) undoProfiles.push(await completeProfile(q, u));
   for (const [i, c] of cells.entries()) {
     await clearCgpa(interns[i]);
     await seedOffer(c.key, { status: "accepted", startOffset: START[c.start], intern: interns[i], project: c.down ? downProjectId : projectId });
@@ -95,6 +100,7 @@ before(async () => {
 after(async () => {
   if (!process.env.E2E_KEEP) {
     await clean();
+    for (const undo of undoProfiles.reverse()) await undo(); // before clearCgpa: the snapshot holds the cell's CGPA state
     for (const u of ids?.interns ?? []) await clearCgpa(u);
   }
   await pool.end();
