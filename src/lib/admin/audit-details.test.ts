@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { diffFields } from "./audit.ts";
-import { auditActionLabel, describeAudit, describeTarget, emptyNames } from "./audit-details.ts";
+import { actorLabel, auditActionLabel, describeAudit, describeTarget, emptyNames } from "./audit-details.ts";
 
 const names = emptyNames();
 names.intern.set("i1", "Sana Kapoor");
@@ -97,4 +97,36 @@ test("a manual activation payment reads 'Manual payment' with its reference, not
   const out = describeAudit("intern.activation_marked_paid", { orderId: "manual_8c175aaf-e1b7-4c1d-9a0b-123456789abc_1a2b3c4d", amountMinor: 249900, reference: "UTR123" });
   assert.equal(out, "Manual payment · Amount: ₹2,499 · Reference: UTR123");
   assert.ok(!out.includes("manual_"));
+});
+
+test("a row written by a job or webhook is attributed to the system, not to deleted staff", () => {
+  assert.equal(actorLabel("system"), "Automatic (system)");
+  assert.equal(actorLabel("system:refund-webhook"), "Automatic (system)");
+  assert.equal(actorLabel("3f1c2b9e-0000-4000-8000-000000000000"), null);
+  assert.equal(actorLabel("systemic"), null);
+});
+
+test("a waiver or refund amount is shown in the currency the row recorded, INR when it recorded none", () => {
+  assert.equal(describeAudit("promo.full_waiver_redeemed", { amountWaivedMinor: 10000, currency: "USD" }), "Amount waived: $100 · Currency: USD");
+  assert.equal(describeAudit("promo.full_waiver_redeemed", { amountWaivedMinor: 10000, currency: "INR" }), "Amount waived: ₹100 · Currency: INR");
+  assert.equal(describeAudit("promo.full_waiver_redeemed", { amountWaivedMinor: 10000 }), "Amount waived: ₹100");
+  // Each amount can name its own currency (expectedMinor → expectedCurrency).
+  const out = describeAudit("payment.amount_mismatch", { expectedMinor: 10000, expectedCurrency: "USD", paidMinor: 10000, paidCurrency: "INR" });
+  assert.ok(out.includes("Expected: $100") && out.includes("Paid: ₹100"), out);
+});
+
+test("the new export actions read as 'Exported N rows of <type>' and point at their list", () => {
+  assert.equal(describeAudit("export.companies", { rows: 8, filters: { type: "companies" } }), "Exported 8 rows of companies");
+  assert.equal(describeAudit("export.projects", { rows: 1 }), "Exported 1 row of internship postings");
+  assert.equal(describeAudit("export.proposals", { rows: 14 }), "Exported 14 rows of offers");
+  assert.equal(describeAudit("export.cgpa", { rows: 3, filters: { filter: "pending" } }), "Exported 3 rows of CGPA checks");
+  assert.equal(describeAudit("export.payments", { rows: 2, filters: { type: "payments" } }), "Exported 2 rows of employer payments");
+  assert.deepEqual(describeTarget("export.cgpa", "intern", null, {}, names), { name: "CGPA checks", href: "/admin/cgpa-verifications" });
+  assert.deepEqual(describeTarget("export.companies", "employer", null, {}, names), { name: "Companies", href: "/admin/companies" });
+});
+
+test("admin sign-in and sign-out rows are labelled and link to the staff member", () => {
+  assert.equal(auditActionLabel("auth.admin_login", {}), "Signed in to the admin");
+  assert.equal(auditActionLabel("auth.admin_logout", {}), "Signed out of the admin");
+  assert.equal(describeAudit("auth.admin_login", { ip: "203.0.113.9" }), "IP address: 203.0.113.9");
 });

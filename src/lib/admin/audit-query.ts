@@ -3,7 +3,7 @@ import { and, count, desc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { searchAny } from "@/lib/admin/params";
 import { parseDateRange } from "@/lib/admin/date-range";
-import { auditActionLabel, describeAudit, describeTarget, emptyNames, type AuditNames } from "@/lib/admin/audit-details";
+import { actorLabel, auditActionLabel, describeAudit, describeTarget, emptyNames, type AuditNames } from "@/lib/admin/audit-details";
 
 const L = schema.adminAuditLog;
 const IST_MS = 330 * 60_000;
@@ -97,12 +97,11 @@ export async function loadAudit(params: Record<string, string>, search: string, 
     officerIds.length ? db.select({ id: schema.collegeAdmins.id, a: schema.collegeAdmins.name, b: schema.collegeAdmins.email }).from(schema.collegeAdmins).where(inArray(schema.collegeAdmins.id, officerIds)) : [],
   ]);
   // An action an employer tripped (automatic completion on final approval) has no staff row: name the company instead.
-  const actorIds = [...new Set(raw.filter((r) => r.staffName == null && r.staffEmail == null).map((r) => r.adminId))];
+  const actorIds = [...new Set(raw.filter((r) => r.staffName == null && r.staffEmail == null && !actorLabel(r.adminId)).map((r) => r.adminId))];
   const actors = new Map<string, string>();
   if (actorIds.length) {
     for (const e of await db.select({ id: schema.employers.id, a: schema.employers.companyName }).from(schema.employers).where(inArray(schema.employers.id, actorIds))) actors.set(e.id, `Employer: ${e.a}`);
   }
-  for (const id of actorIds) if (id.startsWith("system:")) actors.set(id, "Automatic job");
   const names: AuditNames = emptyNames();
   for (const u of users) names.intern.set(u.id, [u.a, u.b].filter(Boolean).join(" ") || "Candidate");
   for (const e of employers) names.company.set(e.id, e.a);
@@ -120,7 +119,7 @@ export async function loadAudit(params: Record<string, string>, search: string, 
     return {
       id: r.id,
       when: r.when,
-      staffName: r.staffName ?? actors.get(r.adminId) ?? null,
+      staffName: r.staffName ?? actorLabel(r.adminId) ?? actors.get(r.adminId) ?? null,
       staffEmail: r.staffEmail,
       action: r.action,
       actionLabel: auditActionLabel(r.action, r.meta),

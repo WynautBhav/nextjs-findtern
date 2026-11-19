@@ -52,6 +52,7 @@ const LABELS: Record<string, string> = {
   findternScore: "Findtern score",
   featureList: "Feature list",
   value: "Value",
+  ip: "IP address",
 };
 
 function sentence(key: string): string {
@@ -76,15 +77,22 @@ function discountType(m: Record<string, unknown>): string | null {
   return null;
 }
 
-function money(n: number): string {
-  return formatMoney(n, "INR", { zeroLabel: false });
+/** The currency a *Minor amount was in: its own "<name>Currency" (expectedMinor → expectedCurrency), else meta.currency, else INR (older rows carry none). */
+function currencyOf(key: string, meta: Record<string, unknown>): string {
+  const own = meta[`${key.replace(/Minor$/, "")}Currency`];
+  const shared = meta.currency;
+  return typeof own === "string" && own ? own : typeof shared === "string" && shared ? shared : "INR";
+}
+
+function money(n: number, currency = "INR"): string {
+  return formatMoney(n, currency, { zeroLabel: false });
 }
 
 function fmt(key: string, v: unknown, ctx: Ctx): string {
   if (v == null) return "none";
   if (typeof v === "boolean") return v ? "yes" : "no";
   if (typeof v === "number") {
-    if (/Minor$/.test(key)) return money(v);
+    if (/Minor$/.test(key)) return money(v, currencyOf(key, ctx.meta));
     if (key === "value" && ctx.action === "settings.update") return money(v);
     if (key === "discountValue") {
       const t = discountType(ctx.meta);
@@ -136,6 +144,11 @@ export function exportNoun(action: string, meta: Record<string, unknown>): strin
   if (action === "export.hired") return "hired candidates";
   if (action === "export.users") return "registered users";
   if (action === "export.audit_log") return "audit log entries";
+  if (action === "export.companies") return "companies";
+  if (action === "export.projects") return "internship postings";
+  if (action === "export.proposals") return "offers";
+  if (action === "export.cgpa") return "CGPA checks";
+  if (action === "export.payments") return "employer payments";
   // Older payout exports went through the candidates export and were logged as such; the type in the filters says which.
   const f = isRecord(meta.filters) ? meta.filters : {};
   const asked = [f.type, f.entity, f.kind].find((v): v is string => typeof v === "string" && v in FILTER_NOUNS);
@@ -149,6 +162,14 @@ export function auditActionLabel(action: string, rawMeta: unknown): string {
     if (noun !== "candidates") return `Exported ${noun}`;
   }
   return actionLabel(action);
+}
+
+/**
+ * Who a row is attributed to when it has no staff row. Jobs and webhooks write "system" or
+ * "system:<job>" as the actor; null means an ordinary id the caller should still try to resolve.
+ */
+export function actorLabel(adminId: string): string | null {
+  return adminId === "system" || adminId.startsWith("system:") ? "Automatic (system)" : null;
 }
 
 export function describeAudit(action: string, rawMeta: unknown, names: AuditNames = emptyNames()): string {
@@ -200,6 +221,11 @@ export function describeTarget(
     if (action === "export.payouts") return { name: "Payouts", href: "/admin/payouts" };
     if (action === "export.audit_log") return { name: "Audit log", href: "/admin/audit-log" };
     if (action === "export.hired") return { name: "Hired candidates", href: null };
+    if (action === "export.companies") return { name: "Companies", href: "/admin/companies" };
+    if (action === "export.projects") return { name: "Internship postings", href: "/admin/projects" };
+    if (action === "export.proposals") return { name: "Offers", href: "/admin/proposal-tracker" };
+    if (action === "export.cgpa") return { name: "CGPA checks", href: "/admin/cgpa-verifications" };
+    if (action === "export.payments") return { name: "Employer payments", href: "/admin/orders" };
   }
   if (type === "payout") {
     const internId = str("internId");
