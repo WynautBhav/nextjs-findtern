@@ -1,3 +1,5 @@
+import { validateStep, VALIDATED_STEPS, type OnboardingDraft, type ValidationContext } from "../../../lib/onboarding.ts";
+
 /** What the form may know about an identity number already on file: a masked form, never the number. */
 export type IdOnFile = { aadhaar: string | null; pan: string | null };
 
@@ -49,4 +51,16 @@ export function clearOnFileErrors(errors: Record<string, string>, values: { aadh
   if (onFile.aadhaar && !values.aadhaarNumber) delete out.aadhaarNumber;
   if (onFile.pan && !values.panNumber) delete out.panNumber;
   return out;
+}
+
+/**
+ * The first step whose rules fail, an untouched on-file number not counting as missing. The form's per-step
+ * checks and its final-save check both go through here, so a masked number on file never blocks another step.
+ */
+export function profileProblems(values: OnboardingDraft, ctx: ValidationContext, onFile: IdOnFile): { step: number; errors: Record<string, string> } | null {
+  for (const step of VALIDATED_STEPS) {
+    const errors = clearOnFileErrors(validateStep(values, step, ctx), values, onFile);
+    if (Object.keys(errors).length > 0) return { step, errors };
+  }
+  return null;
 }

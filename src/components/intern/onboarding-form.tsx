@@ -1,6 +1,6 @@
 "use client";
 
-import { clearOnFileErrors, NO_ID_ON_FILE, saveBody, type IdOnFile } from "./onboarding/id-mask";
+import { clearOnFileErrors, NO_ID_ON_FILE, profileProblems, saveBody, type IdOnFile } from "./onboarding/id-mask";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import dynamic from "next/dynamic";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
@@ -14,7 +14,6 @@ import { isCodeVerifiedMembership } from "@/lib/intern-account";
 import {
   experienceType,
   toDay,
-  validateProfile,
   validateStep,
   type OnboardingDraft,
   type StoredDocument,
@@ -251,7 +250,7 @@ export function OnboardingForm({
 
   /** The full rules, client side; sends the candidate to the first step that fails. */
   function checkAll(): boolean {
-    const failed = validateProfile(values, ctx);
+    const failed = profileProblems(values, ctx, idOnFile);
     if (!failed) return true;
     showStep(failed.step, failed.errors);
     setNotice({ text: `Some details on "${STEPS[failed.step].title}" need attention.`, ok: false });
