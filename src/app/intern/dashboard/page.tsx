@@ -484,9 +484,10 @@ export default async function InternHome() {
 
       <div className="space-y-4">
         {openToWork ? null : <HiddenProfileBanner />}
-        <PresenceNotice userId={session.uid} on={presenceOn} />
+        {/* Only once the profile is visible: before that, "employers can see you" contradicts "Not visible yet". */}
+        <PresenceNotice userId={session.uid} on={presenceOn && profileStatus.tone === "live"} />
         {/* Hides a dismissed notice before first paint on a hard load (the notice is server-rendered). */}
-        {presenceOn ? <DismissedGuard store="local" storageKey={presenceNoticeKey(session.uid)} name="presence" /> : null}
+        {presenceOn && profileStatus.tone === "live" ? <DismissedGuard store="local" storageKey={presenceNoticeKey(session.uid)} name="presence" /> : null}
         <MilestoneNote data={data} userId={session.uid} now={now} />
         {gettingStarted ? (
           <GettingStarted
