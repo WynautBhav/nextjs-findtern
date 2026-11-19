@@ -63,6 +63,7 @@ export function EmployerOnboardingForm({
   const router = useProgressRouter();
   const [stage, setStage] = useState<StageIndex>(initialStage);
   const [busy, setBusy] = useState(false);
+  const [createdId, setCreatedId] = useState<string | null>(null);
   const [edits, setEdits] = useState<{ company?: CompanyDraft; project?: ProjectDraft }>({});
   const [dirty, setDirty] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -218,24 +219,42 @@ export function EmployerOnboardingForm({
     const p = values.project;
     const remote = p.locationType === "remote";
     try {
-      const res = await csrfFetch(
-        hasExistingProject ? `/api/employer/projects/${existingProjectId}` : `/api/employer/${employerId}/projects`,
-        {
-          method: hasExistingProject ? "PUT" : "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            ...p,
-            projectName: p.projectName.trim(),
-            city: remote ? null : p.city.trim() || null,
-            state: remote ? null : p.state.trim() || null,
-            preferredLocations: remote ? [] : p.preferredLocations,
-          }),
-        },
-      );
-      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      // Editing: an existing project, or the one a first try created but could not publish (never a second one).
+      const editId = existingProjectId ?? createdId;
+      const res = await csrfFetch(editId ? `/api/employer/projects/${editId}` : `/api/employer/${employerId}/projects`, {
+        method: editId ? "PUT" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...p,
+          projectName: p.projectName.trim(),
+          city: remote ? null : p.city.trim() || null,
+          state: remote ? null : p.state.trim() || null,
+          preferredLocations: remote ? [] : p.preferredLocations,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string; project?: { id?: string } };
       if (!res.ok) {
         setNotice({ tone: "error", text: data.error ?? "Couldn't save the project. Try again." });
         return;
+      }
+      const newId = hasExistingProject ? null : (data.project?.id ?? createdId);
+      if (newId) setCreatedId(newId);
+      // A new project starts as a draft, and a first project that never goes live leaves "Send proposal" with nothing
+      // to send to (B-08): finishing onboarding publishes it.
+      if (newId) {
+        const t = await csrfFetch(`/api/employer/projects/${newId}/transition`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to: "published" }),
+        });
+        const tb = (await t.json().catch(() => ({}))) as { error?: string };
+        if (!t.ok) {
+          setNotice({
+            tone: "error",
+            text: `Your project is saved as a draft but is not live yet. ${tb.error ?? "Try again."} Press the button again, or finish it later under Projects.`,
+          });
+          return;
+        }
       }
       try {
         window.localStorage.removeItem(draftKey);
@@ -315,7 +334,7 @@ export function EmployerOnboardingForm({
             </button>
           ) : (
             <button type="button" onClick={saveProject} disabled={busy} className={buttonClass({ variant: "primary", size: "md" })}>
-              {busy ? "Saving…" : hasExistingProject ? "Save project" : "Create project and finish"}
+              {busy ? "Saving…" : hasExistingProject ? "Save project" : "Create and publish project"}
               <ArrowRight className="size-4" aria-hidden />
             </button>
           )}
