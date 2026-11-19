@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { PageHero } from "@/components/marketing/page-hero";
 import { OpportunityRow } from "@/components/intern/opportunity-row";
+import { SignedInSwap } from "@/components/marketing/signed-in-swap";
 import { ButtonLink } from "@/components/ui/button";
 import { openProjects } from "@/lib/intern-data";
 import { JsonLd } from "@/components/seo/json-ld";
@@ -57,9 +58,18 @@ export default async function PublicOpportunities() {
               ones that appear next week.
             </p>
             <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <ButtonLink href="/signup" variant="primary" size="lg">
-                Create a free profile
-              </ButtonLink>
+              <SignedInSwap
+                guest={
+                  <ButtonLink href="/signup" variant="primary" size="lg">
+                    Create a free profile
+                  </ButtonLink>
+                }
+                member={
+                  <ButtonLink href="/intern/dashboard" variant="primary" size="lg">
+                    Go to your dashboard
+                  </ButtonLink>
+                }
+              />
               <ButtonLink href="/interns" variant="outline" size="lg">
                 How it works
               </ButtonLink>
@@ -92,9 +102,18 @@ export default async function PublicOpportunities() {
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-3 sm:justify-end">
-                  <ButtonLink href="/signup" variant="primary" size="lg">
-                    Create a free profile
-                  </ButtonLink>
+                  <SignedInSwap
+                    guest={
+                      <ButtonLink href="/signup" variant="primary" size="lg">
+                        Create a free profile
+                      </ButtonLink>
+                    }
+                    member={
+                      <ButtonLink href="/intern/dashboard" variant="primary" size="lg">
+                        Go to your dashboard
+                      </ButtonLink>
+                    }
+                  />
                   <ButtonLink href="/interns" variant="outline" size="lg">
                     How hiring works
                   </ButtonLink>
