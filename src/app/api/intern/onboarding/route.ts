@@ -23,6 +23,7 @@ import {
   type OnboardingDraft,
   workModes,
 } from "@/lib/onboarding";
+import { descriptionLimitError, MAX_EXPERIENCE_DESCRIPTION } from "@/components/intern/onboarding/description-limit";
 import { readCgpaVerification } from "@/lib/cgpa-verification";
 import { nextCgpaVerification } from "@/lib/cgpa-verification-flow";
 import { hasCodeVerifiedMembership } from "@/lib/college/membership";
@@ -106,7 +107,7 @@ const bodySchema = z.object({
         from: z.string().max(10).default(""),
         to: z.string().max(10).default(""),
         current: z.boolean().default(false),
-        description: z.string().max(4000).default(""),
+        description: z.string().max(MAX_EXPERIENCE_DESCRIPTION).default(""),
       }),
     )
     .max(MAX_EXPERIENCES)
@@ -200,7 +201,7 @@ const FIELD_LABELS: Record<string, string> = {
   skills: "Some skills could not be saved - each skill is at most 80 characters.",
   skillsWithRatings: "Some skills could not be saved - each skill is at most 80 characters.",
   academics: "Some academic details are in the wrong format - check the Academics step.",
-  experiences: "Some experience details are too long - company and role are at most 160 characters, the description 4000.",
+  experiences: "Some experience details are too long - company and role are at most 160 characters.",
   languages: "Some language details are in the wrong format - check the Languages step.",
   extracurriculars: "Some activity details are too long - the activity is at most 160 characters, what you achieved 500.",
 };
@@ -232,8 +233,16 @@ export async function POST(req: Request) {
   if (!guard.ok) return guard.response;
   const session = guard.session;
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
+  const raw: unknown = await req.json().catch(() => null);
+  const parsed = bodySchema.safeParse(raw);
   if (!parsed.success) {
+    // An over-long description is named under its own field, with the limit.
+    const tooLong = parsed.error.issues.find((i) => i.code === "too_big" && i.path[0] === "experiences" && i.path[2] === "description");
+    if (tooLong) {
+      const row = (raw as { experiences?: { id?: unknown }[] } | null)?.experiences?.[Number(tooLong.path[1])];
+      const e = descriptionLimitError(row?.id);
+      if (e) return NextResponse.json({ error: e.message, step: 2, fields: { [e.field]: e.message } }, { status: 400 });
+    }
     return NextResponse.json({ error: friendlyIssue(parsed.error.issues[0]) }, { status: 400 });
   }
   const body = parsed.data;
