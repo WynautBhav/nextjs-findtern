@@ -3,6 +3,7 @@
 import { EXPERIENCE_TYPES, MAX_EXPERIENCES, type ExperienceEntry } from "@/lib/onboarding";
 
 import { DateField, localToday } from "../date-input";
+import { MAX_EXPERIENCE_DESCRIPTION } from "./description-limit";
 import { AddButton, Check, EmptyEntries, EntryCard, Field, FieldNote, Grid, Label, SelectField, TextArea, controlClass } from "./fields";
 import type { StepProps } from "./types";
 
@@ -111,7 +112,8 @@ export function ExperienceStep({ values, update, errors }: StepProps) {
               id={`${k}.description`}
               label={project ? "What you built" : "What you did"}
               rows={4}
-              maxLength={2000}
+              maxLength={MAX_EXPERIENCE_DESCRIPTION}
+              hint={`${exp.description.length} / ${MAX_EXPERIENCE_DESCRIPTION}`}
               placeholder={project ? "What you built, your part in it, the tools you used." : "Your work, the tools you used, and a result if you have one."}
               value={exp.description}
               error={errors[`${k}.description`]}

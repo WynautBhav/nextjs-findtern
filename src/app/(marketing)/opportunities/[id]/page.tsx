@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Check, MapPin } from "lucide-react";
 
 import { Pill } from "@/components/app/primitives";
+import { SignedInSwap } from "@/components/marketing/signed-in-swap";
 import { ButtonLink } from "@/components/ui/button";
 import { projectById } from "@/lib/intern-data";
 import { formatDayLabel } from "@/lib/format";
@@ -171,12 +172,23 @@ export default async function PublicRoleDetail({ params }: { params: Promise<{ i
                 them.
               </p>
               <div className="mt-4 flex flex-col gap-2">
-                <ButtonLink href="/signup" variant="primary" block>
-                  Create a free profile
-                </ButtonLink>
-                <ButtonLink href="/login" variant="outline" block>
-                  I already have an account
-                </ButtonLink>
+                <SignedInSwap
+                  guest={
+                    <>
+                      <ButtonLink href="/signup" variant="primary" block>
+                        Create a free profile
+                      </ButtonLink>
+                      <ButtonLink href="/login" variant="outline" block>
+                        I already have an account
+                      </ButtonLink>
+                    </>
+                  }
+                  member={
+                    <ButtonLink href="/intern/dashboard" variant="primary" block>
+                      Go to your dashboard
+                    </ButtonLink>
+                  }
+                />
               </div>
             </div>
 
