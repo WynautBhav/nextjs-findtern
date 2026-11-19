@@ -14,7 +14,7 @@
  * Join button behind the meeting rules gate (INW-10).
  */
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 
@@ -49,6 +49,8 @@ export function SlotPicker({
   const router = useRouter();
   // Two steps: select a time, then confirm it. Booking is final (the API
   // refuses a second pick), so one stray tap must not book.
+  // scroll-mb on the slots and the Book row clears the fixed tab bar (4rem plus the home-indicator inset) below lg.
+  const bookRef = useRef<HTMLDivElement>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [booked, setBooked] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
@@ -148,10 +150,14 @@ export function SlotPicker({
               <button
                 type="button"
                 aria-pressed={on}
-                onClick={() => setSelected(slot.index)}
+                onClick={() => {
+                  setSelected(slot.index);
+                  // The Book button follows the pick; keep it above the phone tab bar rather than under it.
+                  window.requestAnimationFrame(() => bookRef.current?.scrollIntoView({ block: "nearest" }));
+                }}
                 disabled={Boolean(slot.passed) || sending || pending}
                 className={cn(
-                  "flex min-h-11 w-full items-center justify-between gap-3 rounded-apple-sm border px-4 py-3 text-left transition-colors duration-150 sm:flex-col sm:items-start sm:gap-1",
+                  "scroll-mb-28 flex min-h-11 w-full items-center justify-between lg:scroll-mb-6 gap-3 rounded-apple-sm border px-4 py-3 text-left transition-colors duration-150 sm:flex-col sm:items-start sm:gap-1",
                   "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600",
                   on ? "border-brand-700 bg-brand-50 ring-1 ring-inset ring-brand-700" : "border-ink-200/80 bg-surface-raised hover:border-brand-400",
                   "disabled:cursor-not-allowed disabled:hover:border-ink-200/80",
@@ -171,7 +177,7 @@ export function SlotPicker({
       {choosable.length === 0 ? (
         <p className="mt-3 text-sm text-text-subtle">Every offered time has passed. The company can send new ones.</p>
       ) : (
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <div ref={bookRef} className="mt-4 flex scroll-mb-[calc(5.5rem+env(safe-area-inset-bottom))] flex-wrap items-center gap-x-4 gap-y-2 lg:scroll-mb-6">
           <button
             type="button"
             onClick={() => pick && book(pick.index)}
