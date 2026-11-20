@@ -8,8 +8,8 @@ import type { MonthHours, ThreadKind, ThreadNode, ThreadTone } from "@/lib/journ
 import { cn } from "@/lib/utils";
 
 /* ── Dashboard tiles (SPECS §2 dashboard exception) ──────────────────────
- * White, borderless, one soft shadow; the brand gradient on one key-number
- * tile only. Every tile's action is the round arrow in its top-right corner. */
+ * White, hairline border, no shadow (the same card as `Surface` on the intern
+ * console); the brand gradient on one key-number tile only. Every tile's action is the round arrow in its top-right corner. */
 
 const TILE =
   "min-w-0 rounded-apple-xl border border-ink-200/70 bg-white";

@@ -282,7 +282,7 @@
     0 32px 64px -12px rgb(7 47 36 / 0.16);
   --shadow-glow: 0 0 0 1px rgb(14 96 73 / 0.06), 0 12px 40px -8px rgb(14 96 73 / 0.22);
   --shadow-inset-hairline: inset 0 0 0 1px rgb(255 255 255 / 0.06);
-  /* Dashboard tiles on the light console canvas: borderless, one soft shadow. */
+  /* Lifted cards (employer console, data-cards="lifted"): borderless, one soft shadow. Intern cards are bordered with no shadow. */
   --shadow-tile: 0 1px 2px rgb(7 47 36 / 0.04), 0 8px 24px -12px rgb(7 47 36 / 0.1);
   --shadow-tile-brand: 0 12px 32px -12px rgb(7 47 36 / 0.45);
 

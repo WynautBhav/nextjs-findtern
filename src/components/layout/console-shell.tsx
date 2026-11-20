@@ -114,6 +114,7 @@ export function ConsoleShell({
   rootCrumb,
   width = "wide",
   tone = "dark",
+  cards = "lifted",
   flush = false,
   banner,
   children,
@@ -142,6 +143,8 @@ export function ConsoleShell({
   width?: "reading" | "wide";
   /** `light` is the intern frame; everyone else keeps the dark rail. */
   tone?: "dark" | "light";
+  /** With `tone="light"`: how `Surface` cards look. `flat` (intern): hairline border, no shadow. `lifted` (employer): borderless, one soft shadow. */
+  cards?: "flat" | "lifted";
   /** With `tone="light"`: a full-height mint column instead of a floating card, and header and page share one grid line. */
   flush?: boolean;
   banner?: React.ReactNode;
@@ -272,7 +275,7 @@ export function ConsoleShell({
 
   return (
     <MotionConfig reducedMotion="user">
-    <div data-tone={tone} className={cn(
+    <div data-tone={tone} data-cards={light ? cards : undefined} className={cn(
         "apple-admin min-h-[100dvh] overflow-x-clip lg:flex",
         column ? "bg-canvas" : light ? "bg-canvas lg:gap-3 lg:p-3" : "bg-canvas",
         // Rail width for fixed bars that centre on the content column (employer Compare pill).

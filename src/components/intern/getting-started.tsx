@@ -12,6 +12,9 @@ import type { CompletionItem } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 import { completionWhy } from "./completion-why";
 
+/** Fact tiles in the page column: two across when there is room, each its own height, a lone last one across both. */
+const FACTS = "grid min-w-0 content-start items-start gap-4 @xl:grid-cols-2 @xl:[&>:last-child:nth-child(odd)]:col-span-2";
+
 type Completion = { items: CompletionItem[]; done: number; total: number; complete: boolean };
 type StopState = "done" | "current" | "todo";
 
@@ -98,9 +101,16 @@ export function GettingStarted({
 
   const missing = completion.items.filter((i) => !i.done);
   const continueHref = missing[0]?.href ?? "/intern/onboarding";
+  const paidBy = collegeAccount?.state === "paid" && stage >= 1 ? collegeAccount.name : null;
+  // The fee card is what earns a column beside the stage. Small fact tiles alone go in a row below it: a college
+  // line stretched down the side of a tall checklist is an empty card, and left short it is an empty column.
+  const hasFacts = Boolean(paidBy) || Boolean(aside);
+  const stageCell = feeVisible ? "" : "@4xl:col-span-2";
 
   return (
-    <div className="grid gap-4 xl:grid-cols-3">
+    // The split follows the page column's width (the sidebar eats 256px of the window), not the window's.
+    <div className="@container">
+    <div className="grid gap-4 @4xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
       {collegeName && !collegeAccount && stage === 1 && !activated ? <CollegeCodeNotice collegeName={collegeName} /> : null}
       {/* ── The current stage, opened. ── */}
       {stage === 0 ? (
@@ -112,7 +122,7 @@ export function GettingStarted({
               {completion.done} of {completion.total}
             </p>
           }
-          className="xl:col-span-2"
+          className={stageCell}
         >
           <Meter done={completion.done} total={completion.total} />
           <Checklist items={completion.items} className="mt-6" />
@@ -125,7 +135,7 @@ export function GettingStarted({
         </Tile>
       ) : stage === 1 ? (
         // The anchor "Go to activation" lands on; the wrapper keeps the tile's grid slot and height.
-        <div id="activation" className="scroll-mt-24 xl:col-span-2 [&>section]:h-full">
+        <div id="activation" className={cn("scroll-mt-24 [&>section]:h-full", stageCell)}>
           <Tile
             title={collegeAccount ? "Your college has paid" : "Activate your profile"}
             description={collegeAccount ? undefined : "Your profile is complete. Activation is the only payment you make on Findtern."}
@@ -134,7 +144,7 @@ export function GettingStarted({
           </Tile>
         </div>
       ) : (
-        <Tile title="Take the AI interview" description="It produces your Findtern Score, the number employers shortlist on." className="xl:col-span-2">
+        <Tile title="Take the AI interview" description="It produces your Findtern Score, the number employers shortlist on." className={stageCell}>
           <AiInterviewAction internId={internId} initialPhase={aiPhase} initialLink={aiLink} />
           {missing.length > 0 ? (
             <div className="mt-6 border-t border-ink-100 pt-5">
@@ -149,13 +159,20 @@ export function GettingStarted({
         </Tile>
       )}
 
-      <div className="grid min-w-0 content-start gap-4 md:grid-cols-2 md:[&>:last-child:nth-child(odd)]:col-span-2 xl:grid-cols-1 xl:[&>:last-child:nth-child(odd)]:col-span-1">
-        {feeVisible ? <FeeTile fee={fee} activated={activated} /> : null}
-        {collegeAccount?.state === "paid" && stage >= 1 ? <CollegePaidTile name={collegeAccount.name} /> : null}
-        {aside}
-      </div>
+      {feeVisible ? (
+        // Beside the stage: the fee card takes the leftover height, the facts under it keep their own.
+        <div className="flex min-w-0 flex-col gap-4">
+          <FeeTile fee={fee} activated={activated} className="grow" />
+          {hasFacts ? <div className={FACTS}>{paidBy ? <CollegePaidTile name={paidBy} /> : null}{aside}</div> : null}
+        </div>
+      ) : hasFacts ? (
+        <div className={cn(FACTS, "@4xl:col-span-2")}>
+          {paidBy ? <CollegePaidTile name={paidBy} /> : null}
+          {aside}
+        </div>
+      ) : null}
       {/* ── The journey: the screen's one brand tile. ── */}
-      <Surface as="section" aria-labelledby="journey-title" className="p-5 lg:p-6 xl:col-span-3">
+      <Surface as="section" aria-labelledby="journey-title" className="p-5 lg:p-6 @4xl:col-span-2">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h2 id="journey-title" className="text-base font-semibold text-ink-900">
             Before employers can find you
@@ -203,7 +220,7 @@ export function GettingStarted({
           })}
         </ol>
       </Surface>
-
+    </div>
     </div>
   );
 }
@@ -276,11 +293,12 @@ function Checklist({ items, className }: { items: CompletionItem[]; className?: 
 }
 
 /** The fee, what it covers and the guarantee, in one place (PRODUCT.md commercial spine). */
-function FeeTile({ fee, activated }: { fee: string; activated: boolean }) {
+function FeeTile({ fee, activated, className }: { fee: string; activated: boolean; className?: string }) {
   return (
     <Tile
       title="Activation"
       aside={activated ? <Pill tone="live">Paid</Pill> : null}
+      className={className}
     >
       <p className="nums text-3xl font-medium leading-none tracking-[-0.03em] text-ink-900">
         {fee}
@@ -332,7 +350,7 @@ function CollegeCodeNotice({ collegeName }: { collegeName: string }) {
   return (
     <section
       aria-label="College code"
-      className="flex flex-col gap-3 rounded-apple-sm border border-brand-200 bg-brand-50 px-4 py-3.5 text-sm text-brand-950 sm:flex-row sm:items-center sm:justify-between sm:gap-4 xl:col-span-3"
+      className="flex flex-col gap-3 rounded-apple-sm border border-brand-200 bg-brand-50 px-4 py-3.5 text-sm text-brand-950 sm:flex-row sm:items-center sm:justify-between sm:gap-4 @4xl:col-span-2"
     >
       <div className="min-w-0">
         <p className="font-semibold">{collegeName} is on Findtern</p>

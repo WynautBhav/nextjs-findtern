@@ -129,14 +129,15 @@ export function SectionHead({
 
 /* ── Surface ───────────────────────────────────────────────────────────
  * One border, one radius, no shadow (shadows are for things that float), except
- * inside the light intern console, where it takes the dashboard tile look. The old screens used
+ * inside a console that opts into lifted cards (`data-cards="lifted"`, the employer's), where it
+ * is borderless with the soft `shadow-tile`. The intern console is plain bordered cards. The old screens used
  * `rounded-xl border border-ink-100 bg-white` in nine places and
  * `rounded-xl ... shadow-xs` in one, which is how a radius difference of four
  * pixels shipped unnoticed. */
 
-/** On the light console's grey canvas a card is a dashboard tile: no border, one soft shadow. */
+/** Only where the console says `data-cards="lifted"` (employer): no border, one soft shadow. Intern cards stay bordered, flat. */
 export const LIGHT_TILE =
-  "in-data-[tone=light]:border-transparent in-data-[tone=light]:shadow-tile";
+  "in-data-[cards=lifted]:border-transparent in-data-[cards=lifted]:shadow-tile";
 
 /** The card look as a class string, for blocks that are not a `Surface` element (Panel, DataTable, a toolbar). */
 export const SURFACE_CLASS = `rounded-apple-xl border border-ink-200/80 bg-white ${LIGHT_TILE}`;

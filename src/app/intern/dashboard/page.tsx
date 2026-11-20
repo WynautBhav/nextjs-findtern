@@ -22,6 +22,8 @@ import { cn } from "@/lib/utils";
 import { HoursPills } from "@/components/intern/home/hours-pills";
 import { MilestoneNote } from "@/components/intern/home/milestone-note";
 import { engagementDayLabel } from "@/components/intern/home/engagement-day";
+import { HomeLower, HomeTop } from "@/components/intern/home/home-grids";
+import { homeTopLayout } from "@/components/intern/home/home-layout";
 import { NextUpTile } from "@/components/intern/home/next-up-tile";
 import { pickNextUp } from "@/components/intern/home/next-up";
 import { parseOffer } from "@/lib/offer";
@@ -268,35 +270,6 @@ export default async function InternHome() {
     ? `${roleOf(data.engagement.offerDetails)} at ${companyIn(data.names[data.engagement.employerId])}` + (dayLabel ? `, ${dayLabel}` : "")
     : null;
 
-  const interviewCompany = upcomingInterviewItem
-    ? data.names[upcomingInterviewItem.interview.employerId] ?? "the company"
-    : "";
-  const nextUp = canOpen && !preComplete && next ? (
-    next.kind === "interview" && upcomingInterviewItem ? (
-      <NextUpTile next={next} today={today} heading={`Interview with ${interviewCompany}`} href="/intern/interviews" hrefLabel="Interviews">
-        <InterviewJoin interview={serializeJoinInput(upcomingInterviewItem.interview)} serverNow={now.toISOString()} block />
-      </NextUpTile>
-    ) : next.kind === "payout" ? (
-      <NextUpTile
-        next={next}
-        today={today}
-        heading="Stipend payout due"
-        detail={`${formatMoney(data.money.incomingMinor, data.money.currency, { zeroLabel: false })} on its way`}
-        href="/intern/earnings"
-        hrefLabel="Stipend"
-      />
-    ) : (
-      <NextUpTile
-        next={next}
-        today={today}
-        heading="Your next timesheet opens"
-        detail={next.end ? `Covers ${formatPeriodDays(next.day, next.end)}` : undefined}
-        href="/intern/timesheets"
-        hrefLabel="Timesheets"
-      />
-    )
-  ) : null;
-
   // What needs this person next, in one fixed order: an offer waiting,
   // the AI interview, the college's cover, the profile. Each line has one action.
   const nextSteps: { key: string; title: string; detail?: string; href?: string; label?: string; joinLink?: string }[] = [];
@@ -338,6 +311,39 @@ export default async function InternHome() {
     });
   }
 
+  const interviewCompany = upcomingInterviewItem
+    ? data.names[upcomingInterviewItem.interview.employerId] ?? "the company"
+    : "";
+  // Which of the top band's cards exist decides its grid (home-layout.ts), so it is decided once the steps are known.
+  const topLayout = homeTopLayout({ waiting: nextSteps.length > 0, nextUp: canOpen && !preComplete && Boolean(next), chart: Boolean(allMonths) });
+  const nextUp = canOpen && !preComplete && next ? (
+    next.kind === "interview" && upcomingInterviewItem ? (
+      <NextUpTile strip={topLayout?.nextUpStrip} next={next} today={today} heading={`Interview with ${interviewCompany}`} href="/intern/interviews" hrefLabel="Interviews">
+        <InterviewJoin interview={serializeJoinInput(upcomingInterviewItem.interview)} serverNow={now.toISOString()} block />
+      </NextUpTile>
+    ) : next.kind === "payout" ? (
+      <NextUpTile
+        strip={topLayout?.nextUpStrip}
+        next={next}
+        today={today}
+        heading="Stipend payout due"
+        detail={`${formatMoney(data.money.incomingMinor, data.money.currency, { zeroLabel: false })} on its way`}
+        href="/intern/earnings"
+        hrefLabel="Stipend"
+      />
+    ) : (
+      <NextUpTile
+        strip={topLayout?.nextUpStrip}
+        next={next}
+        today={today}
+        heading="Your next timesheet opens"
+        detail={next.end ? `Covers ${formatPeriodDays(next.day, next.end)}` : undefined}
+        href="/intern/timesheets"
+        hrefLabel="Timesheets"
+      />
+    )
+  ) : null;
+
   // No status line while anything is pending (an offer, a profile step): the "What next" card says it,
   // and "Nothing is waiting" above it would contradict it.
   const pending = nextSteps.length > 0;
@@ -369,9 +375,9 @@ export default async function InternHome() {
               <p className={cn("text-pretty font-medium leading-snug text-ink-900", i === 0 ? "text-lg" : "text-base")}>{step.title}</p>
               {step.detail ? <p className="mt-1 text-sm text-text-subtle">{step.detail}</p> : null}
               {step.joinLink ? (
-                <JoinGate link={step.joinLink} label={step.label} variant={i === 0 ? "primary" : "outline"} className="mt-3 w-full" />
+                <JoinGate link={step.joinLink} label={step.label} variant={i === 0 ? "primary" : "outline"} className={cn("mt-3 w-full", topLayout?.wide && "@xl:w-fit")} />
               ) : step.href ? (
-                <Link href={step.href} className={buttonClass({ variant: i === 0 ? "primary" : "outline", className: "mt-3 w-full" })}>
+                <Link href={step.href} className={buttonClass({ variant: i === 0 ? "primary" : "outline", className: cn("mt-3 w-full", topLayout?.wide && "@xl:w-fit") })}>
                   {step.label}
                   <ArrowRight className="size-4" aria-hidden />
                 </Link>
@@ -407,6 +413,8 @@ export default async function InternHome() {
     </Tile>
   );
 
+  // Whether any fact tile besides Profile status (which Getting started leaves to Your profile) will render.
+  const hasFacts = Boolean((canOpen && upcomingInterviewItem && next?.kind !== "interview") || (ratings && !preComplete) || college);
   // The glanceable facts: the narrow column on every state of Home.
   const asideTiles = (
     <>
@@ -501,7 +509,7 @@ export default async function InternHome() {
             hidden={!openToWork}
             collegeName={collegePaid && college ? college.name : null}
             collegeAccount={collegeHome}
-            aside={asideTiles}
+            aside={hasFacts ? asideTiles : null}
             payment={
               collegeUnpaid ? (
                 <CollegePromoCard collegeName={college?.name ?? "your college"} feeLabel={formatMoney(activationFeeMinor, "INR")} />
@@ -526,25 +534,13 @@ export default async function InternHome() {
         {/* DOM order is reading order at every width: what needs you and what's
             next lead (first on a phone, left on a desktop), the chart beside them,
             and only then the key numbers. */}
-        {waiting || nextUp || allMonths ? (
-          <div className="grid gap-4 xl:grid-cols-3">
-            {waiting || nextUp ? (
-              <div className={cn("grid min-w-0 gap-4", waiting && nextUp && "md:max-xl:grid-cols-2", !allMonths && "xl:col-span-3 xl:grid-cols-2")}>
-                {waiting}
-                {nextUp}
-              </div>
-            ) : null}
-            {allMonths ? (
-              <Tile
-                title="Hours by month"
-                action={{ href: "/intern/timesheets", label: "Timesheets" }}
-                // Its own height, not the tallest neighbour's: no empty slab under the chart.
-                className={cn("self-start", waiting || nextUp ? "xl:col-span-2" : "xl:col-span-3")}
-              >
-                <HoursPills months={allMonths} now={now} />
-              </Tile>
-            ) : null}
-          </div>
+        {topLayout ? (
+          <HomeTop
+            layout={topLayout}
+            waiting={waiting}
+            nextUp={nextUp}
+            chart={allMonths ? <HoursPills months={allMonths} now={now} /> : null}
+          />
         ) : null}
 
         {/* The key numbers follow what needs you: the action is the reason to open Home. */}
@@ -561,16 +557,7 @@ export default async function InternHome() {
         {gettingStarted ? (
           history.length > 0 && !preComplete ? <div className="grid gap-4">{activity}</div> : null
         ) : (
-          <div className="grid gap-4 xl:grid-cols-3">
-            <div className="grid min-w-0 content-start gap-4 xl:col-span-2">
-              {activity}
-            </div>
-
-            {/* ── Narrow column: glanceable facts. ── */}
-            <aside className="grid min-w-0 content-start gap-4 md:grid-cols-2 md:[&>:last-child:nth-child(odd)]:col-span-2 xl:grid-cols-1 xl:[&>:last-child:nth-child(odd)]:col-span-1">
-              {asideTiles}
-            </aside>
-          </div>
+          <HomeLower activity={activity} aside={asideTiles} />
         )}
       </div>
     </div>

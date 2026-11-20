@@ -1,5 +1,6 @@
 import { SURFACE_CLASS } from "@/components/app/primitives";
 import { STAT_ROW } from "@/components/app/tiles";
+import { homeTopLayout } from "@/components/intern/home/home-layout";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** A tile as the dashboard draws it: same padding, a title row, then body lines. */
@@ -18,9 +19,13 @@ function TileSkeleton({ className, lines = 3 }: { className?: string; lines?: nu
   );
 }
 
+// The grids are the page's own (home-layout.ts), so the skeleton and the loaded page break at the same widths.
+const top = homeTopLayout({ waiting: true, nextUp: true, chart: true })!;
+
 /**
  * The intern Home in its own shape, so nothing jumps when the data lands: greeting, the needs-you
- * and hours tiles, the key numbers, then activity beside the narrow facts. Same grids and gaps as the page.
+ * and hours tiles, the key numbers, then activity beside the narrow facts. Same grids and gaps as the page, with no
+ * hard-coded card heights: a new intern (Getting started) or one without hours changes less than a fixed slab would.
  */
 export default function InternDashboardLoading() {
   return (
@@ -32,16 +37,22 @@ export default function InternDashboardLoading() {
       </div>
 
       <div className="space-y-4">
-        <div className="grid gap-4 xl:grid-cols-3">
-          <div className="grid min-w-0 gap-4 md:max-xl:grid-cols-2">
-            <TileSkeleton lines={4} className="min-h-[27rem]" />
-            <TileSkeleton lines={3} className="min-h-[20.5rem]" />
-          </div>
-          <div className={`${SURFACE_CLASS} min-w-0 self-start p-5 lg:p-6 xl:col-span-2`}>
-            <div className="mb-4 flex min-h-9 items-center">
-              <Skeleton className="h-5 w-40 rounded-apple-sm" />
+        <div className="@container">
+          <div className={top.root}>
+            <div className={`flex min-w-0 flex-col [&>div]:flex-1 ${top.waiting}`}>
+              <TileSkeleton lines={4} />
             </div>
-            <Skeleton className="h-60 w-full rounded-apple-md" />
+            <div className={`flex min-w-0 flex-col [&>div]:flex-1 ${top.nextUp}`}>
+              <TileSkeleton lines={3} />
+            </div>
+            <div className={`flex min-w-0 flex-col [&>div]:flex-1 ${top.chart}`}>
+              <div className={`${SURFACE_CLASS} min-w-0 p-5 lg:p-6`}>
+                <div className="mb-4 flex min-h-9 items-center">
+                  <Skeleton className="h-5 w-40 rounded-apple-sm" />
+                </div>
+                <Skeleton className="h-52 w-full rounded-apple-md" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -55,11 +66,13 @@ export default function InternDashboardLoading() {
           ))}
         </div>
 
-        <div className="grid gap-4 xl:grid-cols-3">
-          <TileSkeleton lines={6} className="min-h-[28.5rem] xl:col-span-2 xl:min-h-[34.5rem]" />
-          <div className="grid min-w-0 content-start gap-4 md:grid-cols-2 xl:grid-cols-1">
-            <TileSkeleton lines={3} className="min-h-[16.75rem]" />
-            <TileSkeleton lines={3} className="min-h-[16.75rem]" />
+        <div className="@container">
+          <div className="grid gap-4 @4xl:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+            <TileSkeleton lines={5} />
+            <div className="grid min-w-0 content-start items-start gap-4 @xl:grid-cols-2 @4xl:grid-cols-1">
+              <TileSkeleton lines={3} />
+              <TileSkeleton lines={3} />
+            </div>
           </div>
         </div>
       </div>

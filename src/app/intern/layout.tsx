@@ -194,6 +194,7 @@ export default async function InternLayout({ children }: { children: React.React
       crumbParents={{}}
       width="reading"
       tone="light"
+      cards="flat"
       banner={session.impersonator ? <ViewAsBanner viewing={name} admin={session.impersonator.email} /> : null}
     >
       {/* Presence, drive banner and call alerts only exist for partner colleges. */}
