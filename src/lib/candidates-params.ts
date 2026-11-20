@@ -315,9 +315,8 @@ export function activeChips(filters: Filters): FilterChip[] {
   const chips: FilterChip[] = [];
   if (filters.q) chips.push({ key: "q", label: `Keyword: ${filters.q}`, href: drop({ q: "" }) });
   if (filters.city) chips.push({ key: "city", label: `City: ${filters.city}`, href: drop({ city: "" }) });
-  if (filters.remote !== null) {
-    chips.push({ key: "remote", label: filters.remote ? "Remote candidates included" : "Remote candidates left out", href: drop({ remote: null }) });
-  }
+  // Only "included" is worth a chip: leaving remote candidates out is the plain default, not something to undo.
+  if (filters.remote === true) chips.push({ key: "remote", label: "Remote candidates included", href: drop({ remote: false }) });
   if (filters.laptop === "yes") chips.push({ key: "laptop", label: "Has a laptop", href: drop({ laptop: "" }) });
   for (const want of filters.langs) {
     chips.push({ key: `lang:${want.language}`, label: languageChipLabel(want.language, want.level), href: drop({ langs: filters.langs.filter((w) => w !== want) }) });
