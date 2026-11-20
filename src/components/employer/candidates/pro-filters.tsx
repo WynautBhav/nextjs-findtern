@@ -1,8 +1,5 @@
 import { Lock } from "lucide-react";
 
-import type { Currency } from "@/lib/format";
-import type { SubscriptionCharge } from "@/lib/employer-subscription";
-import { chargeLine } from "@/lib/subscription/view";
 import { cn } from "@/lib/utils";
 import { ButtonLink } from "@/components/ui/button";
 import { RatingSlider } from "@/components/employer/candidate-filters";
@@ -22,19 +19,12 @@ export function ProBadge({ className }: { className?: string }) {
   );
 }
 
-/** "per year" for a 365-day purchase, "per month" for 30, else "for 90 days". */
-export function periodLabel(days: number | null): string {
-  if (days === 365) return "per year";
-  if (days === 30) return "per month";
-  return days ? `for ${days} days` : "";
-}
-
 /**
  * The CGPA and college filters for an employer WITHOUT Findtern Pro: the controls are on show but disabled, in
- * one card that says what they are, what they cost and where to unlock them. Disabled inputs leave the
+ * one card that says what they are and where to explore Pro; the price lives on the Pro page, not here. Disabled inputs leave the
  * form (nothing is sent), and the way out, the link, stays a normal tab stop. Locked is never a dead end.
  */
-export function ProLockedCard({ offered, charge, periodDays, currency }: { offered: boolean; charge: SubscriptionCharge | null; periodDays: number | null; currency: Currency }) {
+export function ProLockedCard({ offered }: { offered: boolean }) {
   const why = "pro-locked-why";
   return (
     <section aria-labelledby="pro-locked-title" className="mt-4 rounded-xl bg-brand-50/60 p-3.5 ring-1 ring-inset ring-brand-200/70">
@@ -70,13 +60,8 @@ export function ProLockedCard({ offered, charge, periodDays, currency }: { offer
 
       {offered ? (
         <div className="mt-2.5">
-          {charge ? (
-            <p className="mb-2 text-sm text-ink-800">
-              <span className="nums font-semibold text-ink-900">{chargeLine(charge, currency === "INR" ? "INR" : "USD")}</span> {periodLabel(periodDays)}
-            </p>
-          ) : null}
           <ButtonLink href={SUBSCRIPTION_HREF} variant="primary" size="md" block className="h-auto min-h-11 whitespace-normal rounded-xl px-3 py-2 text-center text-sm leading-snug">
-            Unlock with Findtern Pro
+            Explore Findtern Pro
           </ButtonLink>
         </div>
       ) : null}

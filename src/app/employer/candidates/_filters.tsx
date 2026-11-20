@@ -191,7 +191,7 @@ export function FilterColumn({
               options={pro.colleges}
             />
           ) : (
-            <ProLockedCard offered={pro.offered} charge={pro.charge} periodDays={pro.periodDays} currency={currency} />
+            <ProLockedCard offered={pro.offered} />
           )}
 
           {/* Filters apply as they change (QA-125): no Apply. On a phone "Show results" closes the sheet. */}
