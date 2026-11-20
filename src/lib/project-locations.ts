@@ -44,15 +44,6 @@ export function projectDefaultCity(project: { city?: string | null; locationType
   return cities.length === 1 && cities[0].toLowerCase() === (project.city ?? "").trim().toLowerCase() ? cities[0] : "";
 }
 
-/**
- * "Other cities" only exist while a project has no main city: once a city is
- * picked the field is hidden and nothing is saved there (an old project's
- * list is dropped the next time it is saved).
- */
-export function otherCities(city: string | null | undefined, list: readonly string[]): string[] {
-  return (city ?? "").trim() ? [] : [...list];
-}
-
 /** Error message for this list, or null when it may be saved. */
 export function projectLocationsError(next: readonly string[], stored: readonly string[] = []): string | null {
   if (next.length <= MAX_PROJECT_LOCATIONS) return null;

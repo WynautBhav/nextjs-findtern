@@ -12,14 +12,14 @@
  *   labels "Up to 60/90/180 days" (S1 r81), stored under legacy keys (DB-09).
  * - On-site and hybrid need a state and a city, from the Indian lists, and
  *   start on the company's own city when it is in India (EMH-14, EMH-48).
- * - At most three other cities, asked only until a main city is picked (client
- *   QA; legacy five, older lists keep theirs until the project is saved).
+ * - A project has one city; there is no "other cities" field. The forms save
+ *   `preferredLocations: []`, so an older project's list is dropped on save.
  */
 
 import { Info } from "lucide-react";
 
 import { ChoiceGroup, FieldHint, FieldLabel, NativeSelect, TextField } from "@/components/employer/company-fields";
-import { CityField, StateField, districtOptions } from "@/components/employer/location-fields";
+import { CityField, StateField } from "@/components/employer/location-fields";
 import { ChipInput } from "@/components/employer/project-chip-input";
 import { scopeOfWorkOptions, scopeValue } from "@/lib/db/schema";
 import { STATES } from "@/lib/data/districts";
@@ -27,11 +27,8 @@ import { suggestSkills } from "@/lib/data/skills";
 import type { ProjectDraft } from "@/lib/employer-onboarding";
 import {
   INDIA_ONLY_NOTE,
-  MAX_PROJECT_LOCATIONS,
   MAX_PROJECT_SKILLS,
   MIN_PROJECT_SKILLS,
-  otherCities,
-  projectLocationsError,
   projectPlaceError,
   projectSkillsError,
 } from "@/lib/project-locations";
@@ -48,7 +45,6 @@ export const WORK_MODES = [
 export type ProjectBaseline = {
   projectName: string;
   skills: readonly string[];
-  preferredLocations: readonly string[];
   scopeOfWork: string;
   city: string;
   state: string;
@@ -89,8 +85,6 @@ export function projectFormErrors(
   if (p.pincode && p.locationType && p.locationType !== "remote" && !/^[1-9]\d{5}$/.test(p.pincode)) {
     errors.pincode = "A PIN code is 6 digits.";
   }
-  const places = projectLocationsError(otherCities(p.city, p.preferredLocations), before?.preferredLocations ?? []);
-  if (places) errors.preferredLocations = places;
   return errors;
 }
 
@@ -124,19 +118,12 @@ export function ProjectFields({
   const id = (name: string) => `${idPrefix}-${name}`;
   const onsite = Boolean(values.locationType) && values.locationType !== "remote";
 
-  // Picking a city hides "Other cities", so the list is emptied with it.
-  const setPlace = (patch: Partial<ProjectDraft>) =>
-    set(patch.city?.trim() ? { ...patch, preferredLocations: [] } : patch);
-
   function pickMode(mode: string) {
     const patch: Partial<ProjectDraft> = { locationType: mode };
-    if (mode === "remote") {
-      // A remote role carries no place.
-      patch.preferredLocations = [];
-    } else if (!values.city && !values.state && companyPlace) {
+    if (mode !== "remote" && !values.city && !values.state && companyPlace) {
       Object.assign(patch, companyPlaceDefault(companyPlace));
     }
-    setPlace(patch);
+    set(patch);
   }
 
   return (
@@ -229,7 +216,7 @@ export function ProjectFields({
               india
               value={values.state}
               error={errors.state}
-              onChange={(v) => setPlace({ state: v, city: v === values.state ? values.city : "" })}
+              onChange={(v) => set({ state: v, city: v === values.state ? values.city : "" })}
             />
             <CityField
               id={id("city")}
@@ -237,10 +224,10 @@ export function ProjectFields({
               required
               india
               state={values.state}
-              onStateChange={(v) => setPlace({ state: v })}
+              onStateChange={(v) => set({ state: v })}
               value={values.city}
               error={errors.city}
-              onChange={(v) => setPlace({ city: v })}
+              onChange={(v) => set({ city: v })}
             />
             {showPincode ? (
               <TextField
@@ -255,20 +242,6 @@ export function ProjectFields({
               />
             ) : null}
           </div>
-          {values.city.trim() ? null : (
-          <ChipInput
-            id={id("places")}
-            label="Other cities you'd consider"
-            hint={`Optional. Up to ${MAX_PROJECT_LOCATIONS}, for candidates who would relocate.`}
-            placeholder="Search a city"
-            suggest={(q) => districtOptions(q).map((d) => d.district)}
-            entries={values.preferredLocations}
-            max={MAX_PROJECT_LOCATIONS}
-            onAdd={(place) => set({ preferredLocations: [...values.preferredLocations, place] })}
-            onRemove={(place) => set({ preferredLocations: values.preferredLocations.filter((p) => p !== place) })}
-            error={errors.preferredLocations}
-          />
-          )}
         </div>
       ) : null}
 

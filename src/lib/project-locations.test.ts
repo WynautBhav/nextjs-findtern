@@ -5,7 +5,6 @@ import {
   MAX_PROJECT_LOCATIONS,
   projectCities,
   projectDefaultCity,
-  otherCities,
   isListingLive,
   isProjectClosedForGood,
   isProjectOpen,
@@ -89,13 +88,6 @@ test("an on-site project filters candidates by its main city and every preferred
   );
   // A hybrid project with no main city still uses its preferred ones.
   assert.deepEqual(projectCities({ locationType: "hybrid", city: null, preferredLocations: ["Indore"] }), ["Indore"]);
-});
-
-test("other cities are kept only while the project has no main city", () => {
-  assert.deepEqual(otherCities("", ["Pune", "Delhi"]), ["Pune", "Delhi"]);
-  assert.deepEqual(otherCities("  ", ["Pune"]), ["Pune"]);
-  assert.deepEqual(otherCities(null, []), []);
-  assert.deepEqual(otherCities("Jaipur", ["Pune", "Delhi"]), []);
 });
 
 test("a remote project looks in no city", () => {
