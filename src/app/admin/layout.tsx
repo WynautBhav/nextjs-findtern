@@ -16,6 +16,7 @@ import {
   History,
   LayoutDashboard,
   MessageSquare,
+  Mic,
   Receipt,
   ScrollText,
   Send,
@@ -39,6 +40,7 @@ import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { badgeFor, settleCount } from "@/lib/admin/queue-badge";
 import { pendingCgpaCount } from "@/lib/cgpa-verification-db";
+import { pendingMeetingReviewsCount } from "@/lib/meetings/review-load";
 import { loadQueueCounts } from "@/lib/admin/queue-counts";
 import { adminFullName } from "@/lib/admin/admin-name";
 
@@ -74,6 +76,7 @@ const NAV: AdminNavGroup[] = [
     items: [
       { href: "/admin/interns", label: "Candidates", icon: <Users /> },
       { href: "/admin/cgpa-verifications", label: "CGPA checks", icon: <ClipboardCheck /> },
+      { href: "/admin/meeting-reviews", label: "Meeting reviews", icon: <Mic /> },
       { href: "/admin/users", label: "Users", icon: <UserCheck /> },
       { href: "/admin/companies", label: "Companies", icon: <Building2 /> },
       { href: "/admin/colleges", label: "Colleges", icon: <GraduationCap /> },
@@ -147,7 +150,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const hasItem = (href: string) => groups.some((g) => g.items.some((i) => i.href === href));
 
   // Every figure is read independently: a failed one is `null` and shows nothing, never 0.
-  const [unreadMessages, adminName, queue, cgpaPending] = await Promise.all([
+  const [unreadMessages, adminName, queue, cgpaPending, meetingReviewsPending] = await Promise.all([
     hasItem("/admin/messages") && db
       ? settleCount(async () => {
           const [unread] = await db.select({ value: count() }).from(schema.contactMessages).where(eq(schema.contactMessages.isRead, false));
@@ -164,6 +167,8 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     }),
     // Interns waiting for Findtern to check their CGPA; a failed read is 0 inside, so no badge rather than a broken rail.
     hasItem("/admin/cgpa-verifications") ? settleCount(pendingCgpaCount) : null,
+    // Recorded meetings waiting for an admin to read the flags; unavailable is no badge, never 0.
+    hasItem("/admin/meeting-reviews") ? settleCount(pendingMeetingReviewsCount) : null,
   ]);
 
   // The rail is the live queue: the badge on each item is the number the dashboard's "Needs you" list
@@ -175,6 +180,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     "/admin/proposal-tracker": { count: queue.pipeline, note: "need action" },
     "/admin/colleges": { count: queue.collegePayouts, note: "withdrawals to pay" },
     "/admin/cgpa-verifications": { count: cgpaPending, note: "to verify" },
+    "/admin/meeting-reviews": { count: meetingReviewsPending, note: "to review" },
   };
   const withBadges = groups.map((g) => ({
     ...g,

@@ -54,6 +54,8 @@ const RULES: Rule[] = [
   ["/admin/proposal-tracker", ["interns:read"], ["interns:write"]],
   ["/admin/ai-interviews", ["interns:read"], ["interns:write"]],
   ["/admin/cgpa-verifications", ["interns:read"], ["interns:write"]],
+  // Meeting reviews: either side may be warned, so either read/write permission opens it; the route then needs the write of the PARTY chosen.
+  ["/admin/meeting-reviews", ["interns:read", "companies:read"], ["interns:write", "companies:write"]],
   ["/admin/subscriptions", ["transactions:read"], ["transactions:write"]],
   ["/admin/notification-history", ["notifications:read"]],
   // Someone who may send must be able to open the composer (legacy quirk fixed).
@@ -95,6 +97,7 @@ const RULES: Rule[] = [
   ["/api/admin/interviews", ["interns:read"], ["interns:write"]],
   ["/api/admin/ai-reports", ["interns:read"], ["interns:write"]],
   ["/api/admin/cgpa-verifications", ["interns:read"], ["interns:write"]],
+  ["/api/admin/meeting-reviews", ["interns:read", "companies:read"], ["interns:write", "companies:write"]],
   // Employer subscriptions are money: grant, revoke and the price are Accounts (transactions:write).
   ["/api/admin/subscriptions", ["transactions:read"], ["transactions:write"]],
   // The expired-offers and expired-AI-interviews CSV (tracker and AI interviews tabs).
