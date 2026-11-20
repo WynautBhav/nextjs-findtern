@@ -16,6 +16,23 @@ export function mayAutoShow({ pathname, typing, uploading }: { pathname: string 
   return !FORM_ROUTE.test(path) && !EDIT_ROUTE.test(path);
 }
 
+/**
+ * Where the floating launcher sits for a route. The intern onboarding page is a form, but it renders inside the intern
+ * console, whose top bar already carries "Ask Findy"; treating it as a plain form left a second, floating launcher on
+ * desktop. So it counts as console here (launcher off, panel opens from the top bar), not as a form.
+ */
+export function launcherPlacement(pathname: string | null | undefined) {
+  const path = pathname ?? "";
+  const isForm = FORM_ROUTE.test(path) && !/^\/intern\/onboarding(?:\/|$)/.test(path);
+  return {
+    isForm,
+    inApp: !isForm && /^\/(intern|employer|college)(\/|$)/.test(path),
+    hasBottomNav: !isForm && /^\/(intern|college)(\/|$)/.test(path),
+    /** The intern and employer consoles have "Ask Findy" in the top bar at every width: no floating launcher. */
+    headerOnly: !isForm && /^\/(intern|employer)(\/|$)/.test(path),
+  };
+}
+
 /** A text-like control outside the chat itself has focus. */
 export function isTypingTarget(t: EventTarget | null): boolean {
   return (

@@ -502,7 +502,7 @@ function RailLink({ item, active, compact, light, column = false, onNavigate }: 
       </span>
       <span className={cn("min-w-0 flex-1 truncate", compact && "sr-only")}>
         {item.label}
-        {locked ? `, locked. ${item.lockedNote ?? LOCKED_TEXT}` : ""}
+        {locked ? <span className="sr-only">, locked. {item.lockedNote ?? LOCKED_TEXT}</span> : null}
         {compact && item.attention ? ", needs you" : ""}
         {compact && item.badge ? `, ${item.badge} ${item.badgeLabel ?? "unread"}` : ""}
       </span>
@@ -517,6 +517,21 @@ function RailLink({ item, active, compact, light, column = false, onNavigate }: 
       ) : null}
     </>
   );
+  // A locked entry is not a link at all: no href to click, middle-click or Enter on, and not in the Tab order. It keeps
+  // aria-disabled and the screen-reader reason; the page behind it is closed on the server (proxy, layout, page).
+  if (locked) {
+    return (
+      <span
+        role="link"
+        aria-disabled="true"
+        tabIndex={-1}
+        title={`${item.label}: ${item.lockedNote ?? LOCKED_TEXT}`}
+        className={cn(className, "cursor-not-allowed opacity-60 hover:bg-transparent", light ? "hover:text-ink-600" : "hover:text-on-dark-subtle")}
+      >
+        {body}
+      </span>
+    );
+  }
   return external ? (
     <a href={item.href} title={compact ? item.label : item.href.slice(7)} className={className}>
       {body}
@@ -527,8 +542,7 @@ function RailLink({ item, active, compact, light, column = false, onNavigate }: 
       prefetch={item.prefetch}
       onClick={onNavigate}
       aria-current={active ? "page" : undefined}
-      aria-disabled={locked ? true : undefined}
-      title={locked ? `${item.label}: ${item.lockedNote ?? LOCKED_TEXT}` : compact ? item.label : undefined}
+      title={compact ? item.label : undefined}
       className={className}
       {...newTabAttrs(item.newTab)}
     >
@@ -587,6 +601,46 @@ function AccountMenu({
   );
 }
 
+function TabLink({ item, active }: { item: ConsoleNavItem; active: boolean }) {
+  const tabClass = cn(
+    "apple-spring relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-[0.6875rem] font-medium [&_svg]:size-5",
+    active ? "text-brand-700" : "text-ink-600 hover:text-ink-800",
+  );
+  const tabBody = (
+    <>
+      <span className="relative">
+        {item.icon}
+        {item.locked ? <LockGlyph className="absolute -right-2 -top-1 !size-3.5 rounded-full bg-white p-px text-ink-700" /> : null}
+        {item.attention ? (
+          <span className="absolute -right-1.5 -top-0.5 size-2 rounded-full bg-accent-500 ring-2 ring-white">
+            <span className="sr-only">, needs you</span>
+          </span>
+        ) : null}
+      </span>
+      <span className="max-w-full truncate">{item.label}</span>
+      {item.locked ? <span className="sr-only">, locked. {item.lockedNote ?? LOCKED_TEXT}</span> : null}
+      {active ? (
+        <motion.span
+          layoutId="tab-indicator"
+          transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+          className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-brand-700"
+          aria-hidden
+        />
+      ) : null}
+    </>
+  );
+  // Locked: not a link (see RailLink).
+  return item.locked ? (
+    <span role="link" aria-disabled="true" tabIndex={-1} title={`${item.label}: ${item.lockedNote ?? LOCKED_TEXT}`} className={cn(tabClass, "cursor-not-allowed opacity-60 hover:text-ink-600")}>
+      {tabBody}
+    </span>
+  ) : (
+    <Link href={item.href} aria-current={active ? "page" : undefined} className={tabClass}>
+      {tabBody}
+    </Link>
+  );
+}
+
 function TabBar({ tabs, pathname }: { tabs: ConsoleNavItem[]; pathname: string }) {
   return (
     <nav aria-label="Primary" className="fixed inset-x-0 bottom-0 z-40 border-t border-ink-100 bg-white/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden">
@@ -595,36 +649,7 @@ function TabBar({ tabs, pathname }: { tabs: ConsoleNavItem[]; pathname: string }
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           return (
             <li key={item.href}>
-              <Link
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                aria-disabled={item.locked ? true : undefined}
-                title={item.locked ? `${item.label}: ${item.lockedNote ?? LOCKED_TEXT}` : undefined}
-                className={cn(
-                  "apple-spring relative flex min-h-16 flex-col items-center justify-center gap-1 px-1 py-2 text-[0.6875rem] font-medium [&_svg]:size-5",
-                  active ? "text-brand-700" : "text-ink-600 hover:text-ink-800",
-                )}
-              >
-                <span className="relative">
-                  {item.icon}
-                  {item.locked ? <LockGlyph className="absolute -right-2 -top-1 !size-3.5 rounded-full bg-white p-px text-ink-700" /> : null}
-                  {item.attention ? (
-                    <span className="absolute -right-1.5 -top-0.5 size-2 rounded-full bg-accent-500 ring-2 ring-white">
-                      <span className="sr-only">, needs you</span>
-                    </span>
-                  ) : null}
-                </span>
-                <span className="max-w-full truncate">{item.label}</span>
-                {item.locked ? <span className="sr-only">, locked. {item.lockedNote ?? LOCKED_TEXT}</span> : null}
-                {active ? (
-                  <motion.span
-                    layoutId="tab-indicator"
-                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                    className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-brand-700"
-                    aria-hidden
-                  />
-                ) : null}
-              </Link>
+              <TabLink item={item} active={active} />
             </li>
           );
         })}

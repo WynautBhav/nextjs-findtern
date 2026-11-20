@@ -9,7 +9,7 @@ import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { cn } from "@/lib/utils";
 import { newTabAttrs } from "@/components/ui/new-tab";
 import { NewTabHint } from "@/components/ui/new-tab-link";
-import { filePickerOpen, FORM_ROUTE, isTypingTarget, mayAutoShow, watchFilePicker } from "./chat-auto-show";
+import { filePickerOpen, isTypingTarget, launcherPlacement, mayAutoShow, watchFilePicker } from "./chat-auto-show";
 import { Mascot, MASCOT_STAGE_BG } from "./mascot";
 import { PillMascot } from "./pill-owl";
 import { busyState, replyState, SLEEPY_AFTER_MS, TYPING_AFTER_MS, type MascotState } from "./mascot-state";
@@ -371,12 +371,10 @@ export function ChatWidget() {
   // there sat over the password field and the "sign in" link (QA-102), and
   // they carry their own help links, so below lg it stays out of the way.
   // They are not console pages either, so the top-bar placement never applies.
-  const isForm = FORM_ROUTE.test(pathname ?? "");
-  const inApp = !isForm && /^\/(intern|employer|college)(\/|$)/.test(pathname ?? "");
-  const hasBottomNav = !isForm && /^\/(intern|college)(\/|$)/.test(pathname ?? "");
+  const { isForm, inApp, hasBottomNav, headerOnly } = launcherPlacement(pathname);
   // The intern and employer consoles have "Ask me" in their top bar on every
-  // width, so no launcher floats over their cards on a phone; the panel opens from there.
-  const headerOnly = !isForm && /^\/(intern|employer)(\/|$)/.test(pathname ?? "");
+  // width, so no launcher floats over their cards on a phone; the panel opens from there
+  // (intern onboarding included: see launcherPlacement).
 
   return (
     <div
