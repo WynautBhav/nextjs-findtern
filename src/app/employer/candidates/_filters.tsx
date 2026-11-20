@@ -137,8 +137,8 @@ export function FilterColumn({
             ))}
           </FilterSection>
 
-          <FilterSection title="Language" count={filters.lang ? 1 : 0}>
-            <LanguageFilterField language={filters.lang} level={filters.langLevel} />
+          <FilterSection title="Languages" count={filters.langs.length}>
+            <LanguageFilterField initial={filters.langs} />
           </FilterSection>
 
           <FilterSection title="Hourly price" count={count.price}>

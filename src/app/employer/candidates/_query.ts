@@ -316,18 +316,18 @@ export async function loadCandidates(
       clauses.push(eq(schema.internOnboarding.hasLaptop, false));
     }
 
-    if (filters.lang) {
-      // One of the intern's languages (profile step 5, `extra.languages`) is this one, at the level wanted or above.
+    // Each language wanted (profile step 5, `extra.languages`) must be one of the intern's, at its level or above.
+    for (const want of filters.langs) {
       const langs = sql`(${schema.internOnboarding.extraData}->'languages')`;
       // Any level: the language alone (an entry with no level still counts).
-      const level = filters.langLevel
+      const level = want.level
         ? sql` AND lower(btrim(COALESCE(v->>'level', ''))) IN (${sql.join(
-            levelsAtLeast(filters.langLevel).map((l) => sql`${l}`),
+            levelsAtLeast(want.level).map((l) => sql`${l}`),
             sql`, `,
           )})`
         : sql``;
       clauses.push(sql`EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(${langs}) = 'array' THEN ${langs} ELSE '[]'::jsonb END) AS l(v)
-          WHERE lower(btrim(v->>'language')) = ${filters.lang.toLowerCase()}${level})`);
+          WHERE lower(btrim(v->>'language')) = ${want.language.toLowerCase()}${level})`);
     }
 
     if (filters.minScore > 0) {

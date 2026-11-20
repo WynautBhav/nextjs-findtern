@@ -34,6 +34,34 @@ export function levelsAtLeast(level: LanguageLevelFilter): string[] {
   return ["native", "professional", "basic", "conversational"];
 }
 
+/** One language wanted, and the least level ("" = any). */
+export type LanguageWant = { language: string; level: LanguageLevelFilter };
+
+/** How many languages one search can ask for. */
+export const MAX_LANGUAGES = 5;
+
+/**
+ * The URL form: `lang=French:professional,German` (a level after the colon is optional). Unknown names and repeats
+ * are dropped, at most MAX_LANGUAGES kept. An older link's single `lang=French&ll=native` still reads: `ll` is the
+ * level of a lone language that has none of its own.
+ */
+export function parseLanguages(raw: string | undefined, legacyLevel?: string): LanguageWant[] {
+  const out: LanguageWant[] = [];
+  for (const part of (raw ?? "").split(",")) {
+    const [name, lvl] = part.split(":");
+    const language = parseLanguage(name);
+    if (!language || out.some((w) => w.language === language)) continue;
+    out.push({ language, level: parseLanguageLevel(lvl) });
+    if (out.length >= MAX_LANGUAGES) break;
+  }
+  if (out.length === 1 && !out[0].level && legacyLevel) out[0] = { ...out[0], level: parseLanguageLevel(legacyLevel) };
+  return out;
+}
+
+export function serializeLanguages(list: LanguageWant[]): string {
+  return list.map((w) => (w.level ? `${w.language}:${w.level}` : w.language)).join(",");
+}
+
 /** "French", or "French · Professional" with a level. */
 export function languageChipLabel(language: string, level: LanguageLevelFilter): string {
   const label = LANGUAGE_FILTER_LEVELS.find((l) => l.value === level)?.label;

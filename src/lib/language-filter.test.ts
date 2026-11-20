@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { FILTER_LANGUAGES, LANGUAGE_FILTER_LEVELS, languageChipLabel, levelsAtLeast, parseLanguage, parseLanguageLevel } from "./language-filter.ts";
+import { FILTER_LANGUAGES, LANGUAGE_FILTER_LEVELS, MAX_LANGUAGES, languageChipLabel, levelsAtLeast, parseLanguage, parseLanguageLevel, parseLanguages, serializeLanguages } from "./language-filter.ts";
 import { activeChips, queryOf, readFilters } from "./candidates-params.ts";
 
 test("the three levels are named exactly Native, Professional and Basic", () => {
@@ -27,13 +27,21 @@ test("URL values are checked against the lists", () => {
   assert.equal(languageChipLabel("French", ""), "French");
 });
 
-test("lang and ll round-trip through the URL; a level without a language is dropped; the chip removes both", () => {
-  const f = readFilters({ lang: "french", ll: "professional" });
-  assert.equal(f.lang, "French");
-  assert.equal(f.langLevel, "professional");
-  assert.match(queryOf(f), /lang=French&ll=professional/);
-  assert.equal(readFilters({ ll: "native" }).langLevel, "");
-  const chip = activeChips(f).find((c) => c.key === "lang");
-  assert.equal(chip?.label, "Language: French · Professional");
-  assert.doesNotMatch(chip?.href ?? "", /lang=|ll=/);
+test("several languages, each with its own level, round-trip through the URL; each chip drops only its own", () => {
+  const f = readFilters({ lang: "french:professional,German,klingon,French" });
+  assert.deepEqual(f.langs, [
+    { language: "French", level: "professional" },
+    { language: "German", level: "" },
+  ]);
+  assert.match(queryOf(f), /lang=French%3Aprofessional%2CGerman/);
+  const chips = activeChips(f).filter((c) => c.key.startsWith("lang:"));
+  assert.deepEqual(chips.map((c) => c.label), ["French · Professional", "German"]);
+  assert.match(chips[0].href, /lang=German(&|$)/);
+});
+
+test("an older single-language link with ll still reads; at most five languages", () => {
+  assert.deepEqual(readFilters({ lang: "english", ll: "native" }).langs, [{ language: "English", level: "native" }]);
+  assert.deepEqual(readFilters({ ll: "native" }).langs, []);
+  assert.equal(parseLanguages("Hindi,English,French,German,Spanish,Tamil").length, MAX_LANGUAGES);
+  assert.equal(serializeLanguages([{ language: "Hindi", level: "native" }, { language: "Tamil", level: "" }]), "Hindi:native,Tamil");
 });
