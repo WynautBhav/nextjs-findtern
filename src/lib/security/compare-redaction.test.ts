@@ -10,9 +10,12 @@ const page = readFileSync(join(process.cwd(), "src/app/employer/compare/page.tsx
 
 test("compare/page.tsx: candidates are the redacted profiles", () => {
   assert.match(page, /import \{[^}]*\bredactForEmployer\b[^}]*\} from "@\/lib\/employer-candidates"/);
-  assert.match(page, /candidates = profiles\.map\(\(p\) => redactForEmployer\(p, nameUnlocked\.has\(p\.id\)\)\)/);
+  // Redacted first (photos are attached to that list while the offer relations load); `candidates` is only ever a filter of it.
+  assert.match(page, /const redacted = profiles\.map\(\(p\) => redactForEmployer\(p, nameUnlocked\.has\(p\.id\)\)\)/);
+  assert.match(page, /candidates = redacted\.filter\(/);
   assert.equal((page.match(/\bcandidates = /g) ?? []).length, 1, "one assignment of candidates");
-  // The raw profiles stay inside the block that builds them (declared, mapped to updated-at, mapped to redacted); only the updated-at map escapes.
+  assert.equal((page.match(/\bredacted\b/g) ?? []).length >= 3, true);
+  // The raw profiles stay inside the block that builds them (declared, mapped to redacted, filtered to updated-at); only the updated-at map escapes.
   assert.equal((page.match(/\bprofiles\b/g) ?? []).length, 3, "profiles is not used outside the redacting block");
 });
 

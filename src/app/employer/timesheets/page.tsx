@@ -52,8 +52,11 @@ export default async function EmployerTimesheets({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const session = await requireRole("employer");
-  await requireEmployerSetup(session.uid);
   const uid = session.uid;
+  // The setup check runs beside the page's reads, not ahead of them (one round trip less); its redirect still wins,
+  // before anything renders (awaited below, and ahead of the load-error state).
+  const setup = requireEmployerSetup(uid);
+  setup.catch(() => undefined);
   // "Timesheets" on a hire's row links here with ?intern=<id>. The employer scope below still applies,
   // so an id that isn't one of their interns simply matches nothing.
   const internParam = (await searchParams).intern;
@@ -62,6 +65,10 @@ export default async function EmployerTimesheets({
   let rows: Row[] = [];
   try {
     const db = getDb();
+    // The hired set does not depend on the sheets: it starts with them. The no-op catch only keeps a read nobody
+    // reaches (the sheets read failed first) from becoming an unhandled rejection.
+    const hiredP = Promise.resolve(hiredInternIds(db, uid));
+    hiredP.catch(() => undefined);
     const sheets = await db
       .select({ sheet: schema.timesheets, project: schema.projects.projectName })
       .from(schema.timesheets)
@@ -74,7 +81,7 @@ export default async function EmployerTimesheets({
     if (sheets.length > 0) {
       const internIds = Array.from(new Set(sheets.map((t) => t.sheet.internId)));
       const [unlocked, users] = await Promise.all([
-        hiredInternIds(db, uid),
+        hiredP,
         db
           .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName })
           .from(schema.users)
@@ -106,6 +113,8 @@ export default async function EmployerTimesheets({
       });
     }
   } catch (err) {
+    // A redirect from the setup check wins over the error state.
+    await setup;
     console.error("[employer/timesheets] load failed", err);
     return (
       <div>
@@ -115,6 +124,7 @@ export default async function EmployerTimesheets({
     );
   }
 
+  await setup;
   const queue = rows
     .filter((r) => r.status === "submitted")
     .sort((a, b) => (a.submittedAt?.getTime() ?? 0) - (b.submittedAt?.getTime() ?? 0));

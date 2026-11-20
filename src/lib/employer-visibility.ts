@@ -148,22 +148,25 @@ export async function candidateRelations(
   const out = new Map<string, CandidateRelation>();
   const ids = [...new Set(internIds.filter(Boolean))];
   if (ids.length === 0) return out;
-  const rows = await db
-    .select({
-      id: proposals.id,
-      internId: proposals.internId,
-      status: proposals.status,
-      hiredAt: proposals.hiredAt,
-      offerDetails: proposals.offerDetails,
-      currency: proposals.currency,
-    })
-    .from(proposals)
-    .where(and(eq(proposals.employerId, employerId), inArray(proposals.internId, ids)))
-    .orderBy(desc(proposals.createdAt));
-  const meetings = await db
-    .select()
-    .from(interviews)
-    .where(and(eq(interviews.employerId, employerId), inArray(interviews.internId, ids), inArray(interviews.status, ["pending", "scheduled"])));
+  // Independent reads: one round trip, not two.
+  const [rows, meetings] = await Promise.all([
+    db
+      .select({
+        id: proposals.id,
+        internId: proposals.internId,
+        status: proposals.status,
+        hiredAt: proposals.hiredAt,
+        offerDetails: proposals.offerDetails,
+        currency: proposals.currency,
+      })
+      .from(proposals)
+      .where(and(eq(proposals.employerId, employerId), inArray(proposals.internId, ids)))
+      .orderBy(desc(proposals.createdAt)),
+    db
+      .select()
+      .from(interviews)
+      .where(and(eq(interviews.employerId, employerId), inArray(interviews.internId, ids), inArray(interviews.status, ["pending", "scheduled"]))),
+  ]);
 
   for (const id of ids) {
     const mine = rows.filter((r) => r.internId === id);

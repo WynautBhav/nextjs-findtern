@@ -111,11 +111,13 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       .orderBy(desc(schema.projects.createdAt)),
   );
   const visibleP = ids.length > 0 ? early(visibleInternIds(db0, session.uid, ids)) : null;
+  // Which of the picked candidates sit on which project's shortlist: the page's own shortlist marker (for the project in use,
+  // known only once the projects are read) is taken from the same rows, so it is not a second read.
   const shortlistedForP =
     ids.length > 0
       ? early(
           db0
-            .select({ internId: schema.employerCartItems.internId, projectName: schema.projects.projectName })
+            .select({ internId: schema.employerCartItems.internId, projectId: schema.employerCartItems.projectId, projectName: schema.projects.projectName })
             .from(schema.employerCartItems)
             .innerJoin(schema.projects, eq(schema.projects.id, schema.employerCartItems.projectId))
             .where(
@@ -129,6 +131,23 @@ export default async function CompareCandidates({ searchParams }: { searchParams
       : null;
   const plansP = ids.length > 0 ? early(db0.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true))) : null;
   const employerP = ids.length > 0 ? early(getEmployerRows(session.uid)) : null;
+  const feeP = ids.length > 0 ? early(getPerHireFeeSetting()) : null;
+  // The picked candidates' rows start with everything else (keyed on the picked ids, not on the visibility check); anyone the
+  // check drops, or who is not an active intern, is left out below.
+  const internFilter = ids.length > 0 ? and(inArray(schema.users.id, ids), eq(schema.users.isActive, true), eq(schema.users.role, "intern")) : undefined;
+  const usersP = ids.length > 0 ? early(db0.select().from(schema.users).where(internFilter)) : null;
+  const onboardingP =
+    ids.length > 0
+      ? early(
+          db0
+            .select({ o: schema.internOnboarding })
+            .from(schema.internOnboarding)
+            .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
+            .where(internFilter)
+            .orderBy(desc(schema.internOnboarding.updatedAt))
+            .then((r) => r.map((x) => x.o)),
+        )
+      : null;
   // The tab row's Shortlist figure: the same count the Shortlist page's strip shows.
   const flowP = early(hireFlowCounts(session.uid, 0).catch(() => null));
 
@@ -145,60 +164,38 @@ export default async function CompareCandidates({ searchParams }: { searchParams
     ).filter((p) => isOpenProject(p.status, p.takenDownAt));
     activeProject = (projectParam && projects.find((p) => p.id === projectParam)) || projects[0] || null;
 
-    // The project is now known: its shortlist and the offer relations (which depend on it) read together.
-    const [cartRows, rel] = await Promise.all([
-      activeProject
-        ? db
-            .select({ internId: schema.employerCartItems.internId })
-            .from(schema.employerCartItems)
-            .where(
-              and(
-                eq(schema.employerCartItems.employerId, session.uid),
-                eq(schema.employerCartItems.projectId, activeProject.id),
-                eq(schema.employerCartItems.listType, "cart"),
-              ),
-            )
-        : Promise.resolve([] as { internId: string }[]),
-      ids.length > 0 ? candidateRelations(db, session.uid, ids, activeProject?.id ?? null) : Promise.resolve(new Map<string, CandidateRelation>()),
-    ]);
-    shortlisted = new Set(cartRows.map((r) => r.internId));
+    // The project is now known: the offer relations (which depend on it) start while the other reads finish.
+    const relP = ids.length > 0 ? early(candidateRelations(db, session.uid, ids, activeProject?.id ?? null)) : null;
 
     if (ids.length > 0) {
       // Only candidates this employer may open, minus anyone they already
       // hired - legacy dropped both from compare (employer-compare.tsx:550).
       const visible = await visibleP!;
-      relations = rel;
+      const shortlistRows = await shortlistedForP!;
+      shortlisted = new Set(shortlistRows.filter((r) => activeProject && r.projectId === activeProject.id).map((r) => r.internId));
       // Compare is shared across projects but a shortlist is per project, so say where each one already sits.
-      shortlistedFor = shortlistProjectsByIntern(await shortlistedForP!);
-      const comparable = ids.filter((id) => visible.has(id) && !rel.get(id)?.hired);
-      // Users and their onboarding rows in one wave: the onboarding read selects through the same user filter.
-      const internFilter = and(inArray(schema.users.id, comparable), eq(schema.users.isActive, true), eq(schema.users.role, "intern"));
-      const [rows, onboardingRows] = comparable.length
-        ? await Promise.all([
-            db.select().from(schema.users).where(internFilter),
-            db
-              .select({ o: schema.internOnboarding })
-              .from(schema.internOnboarding)
-              .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
-              .where(internFilter)
-              .orderBy(desc(schema.internOnboarding.updatedAt))
-              .then((r) => r.map((x) => x.o)),
-          ])
-        : [[], []];
+      shortlistedFor = shortlistProjectsByIntern(shortlistRows);
+      const rows = await usersP!;
+      const onboardingRows = await onboardingP!;
       // Newest onboarding row per intern (the table has no unique user index).
       const onboardingByUser = new Map<string, (typeof onboardingRows)[number]>();
       for (const row of onboardingRows) if (!onboardingByUser.has(row.userId)) onboardingByUser.set(row.userId, row);
       const byId = new Map(rows.map((row) => [row.id, row]));
       const profiles = ids
+        .filter((id) => visible.has(id))
         .map((id) => byId.get(id))
         .filter((row): row is NonNullable<typeof row> => Boolean(row))
         .map((row) => toCandidateProfile(row, onboardingByUser.get(row.id)));
       // Only the redacted profile leaves this block (no email, LinkedIn, recording; name only once hired), so
-      // no child, server or client, can ever be handed the unredacted one. The "Profile updated" row is the one
-      // thing redaction drops that compare has always shown, so it is carried on its own.
-      profileUpdated = new Map(profiles.map((p) => [p.id, p.updatedAt]));
-      candidates = profiles.map((p) => redactForEmployer(p, nameUnlocked.has(p.id)));
-      await attachPhotos(db, candidates);
+      // no child, server or client, can ever be handed the unredacted one.
+      const redacted = profiles.map((p) => redactForEmployer(p, nameUnlocked.has(p.id)));
+      // Photos and the offer relations read together; a candidate already hired is dropped once the relations are in.
+      const [rel] = await Promise.all([relP!, attachPhotos(db, redacted)]);
+      relations = rel;
+      const comparable = new Set(ids.filter((id) => !rel.get(id)?.hired));
+      candidates = redacted.filter((c) => comparable.has(c.id));
+      // The "Profile updated" row is the one thing redaction drops that compare has always shown, so it is carried on its own.
+      profileUpdated = new Map(profiles.filter((p) => comparable.has(p.id)).map((p) => [p.id, p.updatedAt]));
 
       plans = await plansP!;
       const [employer] = await employerP!;
@@ -260,7 +257,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
     return `/employer/compare?${search.toString()}`;
   }
 
-  const feeSetting = await getPerHireFeeSetting();
+  const feeSetting = await feeP!;
   const pricing = new Map(candidates.map((c) => [c.id, resolvePricing(c.score, plans, currency, region, feeSetting)]));
   const skillGrid = skillAlignment(requiredSkills, candidates);
   const nameOf = (skill: string) => skill.split(" · ")[0].trim();

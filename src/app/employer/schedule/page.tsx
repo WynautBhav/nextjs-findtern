@@ -42,8 +42,11 @@ const STATUS_FILTERS: StatusFilter[] = [
  */
 export default async function EmployerSchedule({ searchParams }: { searchParams: Promise<Params> }) {
   const session = await requireRole("employer");
-  await requireEmployerSetup(session.uid);
   const uid = session.uid;
+  // The setup check runs beside the page's reads, not ahead of them (one round trip less); its redirect still wins,
+  // before anything renders (awaited below, and ahead of the load-error state).
+  const setup = requireEmployerSetup(uid);
+  setup.catch(() => undefined);
   const sp = await searchParams;
   const q = (sp.q ?? "").trim().toLowerCase();
   // Typed as DD/MM/YYYY (bug sheet 7); older links carried YYYY-MM-DD.
@@ -64,24 +67,22 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
   let shortlisted = 0;
   try {
     const db = getDb();
+    // Wave 1: the interviews and the hired set read together (neither needs the other). The no-op catch only keeps
+    // a read nobody reaches (the interviews read failed first) from becoming an unhandled rejection.
+    const hiredP = Promise.resolve(hiredInternIds(db, uid));
+    hiredP.catch(() => undefined);
     rows = await db
       .select()
       .from(schema.interviews)
       .where(eq(schema.interviews.employerId, uid))
       .orderBy(desc(schema.interviews.createdAt));
-    // Only the empty state needs it: whether anyone is on the shortlist (a candidate already proposed to still is).
-    if (rows.length === 0) {
-      const [row] = await db
-        .select({ n: count() })
-        .from(schema.employerCartItems)
-        .where(and(eq(schema.employerCartItems.employerId, uid), inArray(schema.employerCartItems.listType, ["cart", "checkout"])));
-      shortlisted = Number(row?.n ?? 0);
-    }
 
     const internIds = Array.from(new Set(rows.map((r) => r.internId)));
     const projectIds = Array.from(new Set(rows.map((r) => r.projectId).filter(Boolean))) as string[];
-    const [unlocked, users, projects] = await Promise.all([
-      hiredInternIds(db, uid),
+    // Wave 2: what depends on the interviews. The shortlist count is only for the empty state: whether anyone is on the
+    // shortlist (a candidate already proposed to still is).
+    const [unlocked, users, projects, shortlistRows] = await Promise.all([
+      hiredP,
       internIds.length
         ? db
             .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName })
@@ -94,7 +95,14 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
             .from(schema.projects)
             .where(inArray(schema.projects.id, projectIds))
         : Promise.resolve([]),
+      rows.length === 0
+        ? db
+            .select({ n: count() })
+            .from(schema.employerCartItems)
+            .where(and(eq(schema.employerCartItems.employerId, uid), inArray(schema.employerCartItems.listType, ["cart", "checkout"])))
+        : Promise.resolve([] as { n: number }[]),
     ]);
+    if (rows.length === 0) shortlisted = Number(shortlistRows[0]?.n ?? 0);
     for (const u of users) {
       const first = (u.firstName || "").trim();
       const last = (u.lastName || "").trim();
@@ -108,6 +116,8 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
       if (p.takenDownAt) downProjects.set(p.id, p.projectName);
     }
   } catch (err) {
+    // A redirect from the setup check wins over the error state.
+    await setup;
     console.error("[employer/schedule] load failed", err);
     const retryQs = new URLSearchParams(Object.entries(sp).filter((e): e is [string, string] => typeof e[1] === "string" && e[1] !== ""));
     const retryHref = `/employer/schedule${retryQs.size ? `?${retryQs}` : ""}`;
@@ -119,6 +129,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
     );
   }
 
+  await setup;
   const now = requestTime();
   const all = rows.map((iv) => {
     const stage = interviewStage(iv, now);

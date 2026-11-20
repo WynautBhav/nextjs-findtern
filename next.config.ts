@@ -103,7 +103,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   devIndicators: false,
   // Import only the icons / primitives a page uses, not the whole barrel (lucide-react, the radix-ui meta-package).
-  experimental: { optimizePackageImports: ["lucide-react", "radix-ui"] },
+  // staleTimes.dynamic: the browser keeps a visited dynamic page's data for 5 seconds, so Back / Forward and a quick revisit are instant
+  // (Next's default is 0). Kept short: a payment or proposal status is at most 5 s old on a link-follow. Server actions and
+  // router.refresh() drop the cache at once.
+  experimental: { optimizePackageImports: ["lucide-react", "radix-ui"], staleTimes: { dynamic: 5 } },
   async redirects() {
     return [
       // The legacy admin "reconnect Meet calendar" links (SYS-12). Both start
