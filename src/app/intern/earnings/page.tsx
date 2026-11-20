@@ -1,17 +1,10 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { AlertCircle, ChevronDown, Landmark } from "lucide-react";
-
-import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
-import { Tile } from "@/components/app/tiles";
+import { EmptyScene, PageHead } from "@/components/app/primitives";
 import { bonusTotals, completionBonusesByHire, totalWithBonusLine } from "@/components/intern/stipend/bonus";
-import { Engagement } from "@/components/intern/stipend/engagement-row";
+import { EarningsView } from "@/components/intern/stipend/earnings-view";
 import { orderEngagements, stipendPlan, stipendTotalsLine, totalsByCurrency } from "@/components/intern/stipend/months";
-import { PaymentLedger } from "@/components/intern/stipend/payment-ledger";
-import { buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
 import { bankPrompt, earningsEngagements, earningsView } from "@/lib/earnings-view";
-import { formatMoney } from "@/lib/format";
 import { isHiredProposal } from "@/lib/hire-status";
 import { loadInternData } from "@/lib/intern-data";
 import { isAcceptedStatus, payoutState, type PayoutRow } from "@/lib/journey";
@@ -21,10 +14,6 @@ export const metadata: Metadata = {
   title: "Stipend",
   robots: { index: false, follow: false },
 };
-
-const BANK_HREF = "/intern/settings#bank";
-/** Internships shown before "Show all N": the running and next ones, not sixteen identical rows. */
-const SHOWN = 6;
 
 /**
  * Stipend (legacy earnings.tsx).
@@ -99,124 +88,25 @@ export default async function InternEarnings() {
   const rows = orderEngagements(cards.map((card, i) => ({ card, plan: plans[i], startDate: card.startDate, months: card.months })));
 
   return (
-    <div>
-      <PageHead
-        title="Your stipend"
-        lede={
-          last4 ? (
-            <>
-              Paid into your {bankName || "bank"} account ending <span className="nums font-medium text-ink-700">{last4}</span>.
-            </>
-          ) : (
-            prompt.text
-          )
-        }
-        action={
-          <Link href={BANK_HREF} className={buttonClass({ variant: "outline" })}>
-            <Landmark className="size-4" aria-hidden />
-            {prompt.button}
-          </Link>
-        }
-      />
-
-      <div className="space-y-6 lg:space-y-8">
-        {failed.length > 0 ? (
-          <Surface role="alert" className="flex flex-col gap-4 border-danger/25 bg-danger-soft/50 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex gap-3">
-              <AlertCircle className="mt-1 size-5 shrink-0 text-danger" aria-hidden />
-              <div>
-                <p className="text-base font-medium text-ink-900">
-                  <span className="nums">{failed.map((f) => formatMoney(f.minor, f.currency, { zeroLabel: false })).join(" and ")}</span> did not go
-                  through
-                </p>
-                <p className="mt-1 text-pretty text-sm text-ink-700">
-                  A transfer to your bank failed. It is not counted as paid or scheduled. Check your bank details; Findtern&apos;s team follows up on
-                  every failed transfer.
-                </p>
-              </div>
-            </div>
-            <Link href={BANK_HREF} className={buttonClass({ variant: "outline", size: "md", className: "shrink-0" })}>
-              Check your bank details
-            </Link>
-          </Surface>
-        ) : null}
-
-        {cards.length === 0 ? (
-          <Tile title="Your internships">
-            <EmptyScene
-              title="No paid internship right now"
-              body="Payments from an earlier internship are listed here. A new stipend appears once a company hires you and completes the payment."
-              next={{ label: "See your offers", href: "/intern/proposals" }}
-              className="border-0 bg-transparent px-0 py-6"
-            />
-          </Tile>
+    <EarningsView
+      lede={
+        last4 ? (
+          <>
+            Paid into your {bankName || "bank"} account ending <span className="nums font-medium text-ink-700">{last4}</span>.
+          </>
         ) : (
-          <section data-first-content aria-label="Your internships">
-            <SectionHead
-              title={cards.length === 1 ? "Your internship" : `Your internships (${cards.length})`}
-              hint={stipendTotalsLine(plans)}
-              className="mb-0 border-b border-ink-200/70 pb-3"
-            />
-            {withBonus ? <p className="nums border-b border-ink-200/70 py-2.5 text-sm font-medium text-ink-900">{withBonus}</p> : null}
-            {/* Thin dividers, one row per internship: the employer candidate list's language. */}
-            <ul className="divide-y divide-ink-200/70 border-b border-ink-200/70">
-              {rows.slice(0, SHOWN).map(({ card, plan }) => (
-                <Engagement key={card.proposalId} card={card} plan={plan} bonus={bonuses.get(card.proposalId)} />
-              ))}
-            </ul>
-            {rows.length > SHOWN ? (
-              <details className="group">
-                <summary className="inline-flex min-h-11 cursor-pointer list-none items-center gap-1.5 rounded-md text-sm font-medium text-primary outline-none hover:underline focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
-                  <span className="group-open:hidden">Show all {rows.length}</span>
-                  <span className="hidden group-open:inline">Show fewer</span>
-                  <ChevronDown className="size-4 transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
-                </summary>
-                <ul className="divide-y divide-ink-200/70 border-t border-ink-200/70">
-                  {rows.slice(SHOWN).map(({ card, plan }) => (
-                    <Engagement key={card.proposalId} card={card} plan={plan} bonus={bonuses.get(card.proposalId)} />
-                  ))}
-                </ul>
-              </details>
-            ) : null}
-          </section>
-        )}
-
-        {waitingOnPayment.length > 0 && cards.length > 0 ? (
-          <p className="text-pretty px-1 text-sm text-text-subtle">
-            {waitingOnPayment.length === 1 ? "One accepted offer is" : `${waitingOnPayment.length} accepted offers are`} waiting on the
-            company&apos;s payment. Its stipend appears here once they pay.
-          </p>
-        ) : null}
-
-        {data.payouts.length === 0 ? (
-          <Tile title="How payment works">
-            <ol className="space-y-3">
-              {[
-                "You mark your days on Timesheets and send each month to your manager.",
-                "Each month's stipend (score 6 and above) is paid after that month ends. Once the month is approved, Findtern schedules the payment. Its date shows here as soon as it is set.",
-                "Each payment carries a bank reference so you can match it against your statement.",
-                "It goes to the bank account in your settings, so keep those details right.",
-              ].map((line, i) => (
-                <li key={i} className="flex gap-3">
-                  <span className="nums grid size-6 shrink-0 place-items-center rounded-full bg-brand-50 text-xs font-semibold text-brand-800">{i + 1}</span>
-                  <span className="text-pretty text-sm text-ink-700">{line}</span>
-                </li>
-              ))}
-            </ol>
-          </Tile>
-        ) : (
-          <section aria-labelledby="ledger-head">
-            <h2 id="ledger-head" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
-              Every payment
-            </h2>
-            <p className="mt-1 text-sm text-text-subtle">Newest first, in the currency it was paid in.</p>
-            <div className="mt-3 border-t border-ink-200/70">
-              <PaymentLedger payouts={data.payouts} />
-            </div>
-          </section>
-        )}
-      </div>
-    </div>
+          prompt.text
+        )
+      }
+      bankButton={prompt.button}
+      failed={failed}
+      rows={rows}
+      bonuses={bonuses}
+      totalsLine={stipendTotalsLine(plans)}
+      withBonus={withBonus}
+      waitingOnPayment={waitingOnPayment.length}
+      payouts={data.payouts}
+    />
   );
 }
 

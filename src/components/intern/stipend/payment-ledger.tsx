@@ -1,9 +1,12 @@
 import { Pill } from "@/components/app/primitives";
 import { formatMoney, shortDate } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { payoutState, readScheduledForDate, type PayoutRow } from "@/lib/journey";
 
 import { STIPEND_CURRENCY, totalsByCurrency } from "./months";
 
+/** A failed transfer reads as a problem, in the same red as the alert above the list. */
+const FAILED = "bg-danger-soft text-danger ring-danger/25";
 const date = (d: Date) => shortDate(d, { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
 
 const STATE = {
@@ -55,13 +58,13 @@ export function PaymentLedger({ payouts }: { payouts: PayoutRow[] }) {
                 </td>
                 <td className="nums hidden break-all px-3 py-3 text-ink-700 sm:table-cell">{ref}</td>
                 <td className="hidden px-3 py-3 sm:table-cell">
-                  <Pill tone={s.tone}>{s.label}</Pill>
+                  <Pill tone={s.tone} className={state === "failed" ? FAILED : undefined}>{s.label}</Pill>
                 </td>
                 <td className="py-3 pl-3 text-right">
                   <p className="nums whitespace-nowrap font-semibold text-ink-900">
                     {formatMoney(p.amountMinor ?? 0, p.currency ?? STIPEND_CURRENCY, { zeroLabel: false })}
                   </p>
-                  <Pill tone={s.tone} className="mt-1 sm:hidden">
+                  <Pill tone={s.tone} className={cn("mt-1 sm:hidden", state === "failed" && FAILED)}>
                     {s.label}
                   </Pill>
                 </td>

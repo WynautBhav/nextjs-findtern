@@ -44,7 +44,7 @@ export function Engagement({ card, plan, bonus }: { card: EngagementEarnings; pl
     <div className="min-w-0">
       <Link
         href={`/intern/proposals/${encodeURIComponent(card.proposalId)}`}
-        className="inline-flex min-h-11 items-center text-[15px] font-semibold text-ink-900 underline-offset-4 hover:text-brand-800 hover:underline sm:min-h-0"
+        className="inline-flex min-h-11 items-center text-[15px] font-semibold text-ink-900 underline-offset-4 hover:text-brand-800 hover:underline sm:min-h-0 touch:min-h-11"
       >
         {card.roleTitle}
         <span className="sr-only">: open the offer</span>

@@ -107,7 +107,7 @@ export function HoursHeatmap({ days, today }: { days: HeatDay[]; today: string }
                           className={cn(
                             "nums grid aspect-square place-items-center rounded-apple-sm text-xs font-medium",
                             tone(cell.day, today, k >= 5),
-                            cell.day.date === today && "ring-2 ring-ink-900 ring-offset-2 ring-offset-surface-raised",
+                            cell.day.date === today && "ring-2 ring-ink-900 ring-offset-2 ring-offset-white",
                           )}
                         >
                           {Number(cell.day.date.slice(8, 10))}
