@@ -296,15 +296,14 @@ test("sectionCounts: each active chip counts in its own filter-column section", 
   assert.deepEqual(sectionCounts(["q"], false), { location: 0, scores: 0, price: 0, sorting: 0 });
 });
 
-test("the Candidates page says each fact once: the status line names the project only while it drives the list, the shortlist tab is labelled by scope, laptop sits under Location", () => {
+test("the Candidates page says each fact once: the status line is the count only (the picker names the project), the shortlist tab is labelled by scope, laptop sits under Location", () => {
   const dir = join(import.meta.dirname, "../../app/employer/candidates");
   const toolbar = readFileSync(join(dir, "_toolbar.tsx"), "utf8");
   const results = readFileSync(join(dir, "_results.tsx"), "utf8");
   const filters = readFileSync(join(dir, "_filters.tsx"), "utf8");
   assert.doesNotMatch(toolbar, /not matched to a project/);
-  // "3 candidates · Web Development": no long sentence; with matching off the panel switch says so, not the status line.
-  assert.match(toolbar, /const showName = Boolean\(name\) && \(saved \|\| match === "matched" \|\| match === "edited"\);/);
-  assert.doesNotMatch(toolbar, /matching off|Required skills/);
+  // "3 candidates": the project picker beside the search already names the project.
+  assert.doesNotMatch(toolbar, /projectNameOf|matching off|Required skills/);
   assert.doesNotMatch(toolbar, /fixed order/);
   assert.doesNotMatch(results, /All\{saved/); // the tab row repeats no count the toolbar and the steps strip already show
   assert.match(results, /This project&rsquo;s shortlist <span/);

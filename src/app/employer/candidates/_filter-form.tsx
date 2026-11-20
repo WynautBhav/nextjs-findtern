@@ -31,7 +31,7 @@ function subscribe(onChange: () => void) {
 }
 
 /** lg and up. Server and first client paint assume desktop. */
-export function useDesktop(): boolean {
+function useDesktop(): boolean {
   return useSyncExternalStore(
     subscribe,
     () => window.matchMedia(DESKTOP).matches,

@@ -6,12 +6,9 @@ import { buttonClass } from "@/components/ui/button";
 import { showClearAll } from "@/components/employer/candidate-view";
 import { Segmented, SegmentLink } from "@/components/employer/candidates/toolbar-parts";
 import { activeSortDir, pickSortPatch, sortChoiceOf, sortDirPatch, type SortChoice, type SortDir } from "@/lib/candidate-sort";
-import type { ProjectMatchState } from "@/lib/project-match";
 import { SortSelect } from "./_sort-select";
 import { SORT_OPTIONS, activeChips, resetHref, withFilters, withoutCity, type CandidatesData, type Filters } from "@/lib/candidates-params";
 
-export { matchStateOf, projectNameOf } from "@/lib/candidates-match-state";
-import { projectNameOf } from "@/lib/candidates-match-state";
 
 /**
  * Sort options: best match, each score field, and the college (Findtern Pro). Which way each runs is
@@ -167,26 +164,17 @@ export function ViewToggle({ filters, compact }: { filters: Filters; compact: bo
 }
 
 /**
- * One short status line: "3 candidates · Web Development". The count is the page's own total (hired candidates
- * already left out). The project is named only while it drives the list (matched or edited). One live region, so a
+ * One short status line: "3 candidates" (or "3 shortlisted"). The project is not repeated: the picker beside the
+ * search names it. The count is the page's own total (hired candidates already left out). One live region, so a
  * change after the list reloads is announced once.
  */
-export function ContextLine({ data, filters, match, className }: { data: CandidatesData; filters: Filters; match: ProjectMatchState; className?: string }) {
+export function ContextLine({ data, filters, className }: { data: CandidatesData; filters: Filters; className?: string }) {
   const { total, loadFailed } = data;
   if (loadFailed) return null;
   const saved = filters.saved && Boolean(data.activeProjectId);
-  const name = projectNameOf(data);
-  const showName = Boolean(name) && (saved || match === "matched" || match === "edited");
   return (
     <p role="status" className={cn("min-w-0 text-sm leading-6 text-ink-600", className)}>
       <strong className="nums font-semibold text-ink-900">{total}</strong> {saved ? "shortlisted" : `candidate${total === 1 ? "" : "s"}`}
-      {showName ? (
-        <>
-          <span aria-hidden className="mx-1.5 text-ink-400">·</span>
-          <span className="sr-only">for </span>
-          <span className="font-medium text-ink-900">{name}</span>
-        </>
-      ) : null}
     </p>
   );
 }

@@ -1,5 +1,5 @@
 import Link from "@/app/employer/candidates/_link";
-import { ChevronDown, RotateCcw, SlidersHorizontal } from "lucide-react";
+import { RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import { RATING_META } from "@/lib/employer-candidates";
 import { DEFAULT_PAGE_SIZE, cityField, sectionCounts } from "@/components/employer/candidate-view";
@@ -16,7 +16,7 @@ import { fieldClass } from "@/components/employer/ui-tokens";
 import { FilterSection } from "@/components/employer/candidates/filter-parts";
 import { ProFilterSections, ProLockedCard } from "@/components/employer/candidates/pro-filters";
 import { collegeSortToken } from "@/lib/candidate-sort";
-import { FilterPanel, useDesktop } from "./_filter-form";
+import { FilterPanel } from "./_filter-form";
 import { activeChips, activeFilterCount, resetHref, type Filters, type ProData } from "@/lib/candidates-params";
 
 const SELECT = cn(fieldClass, "mt-2");
@@ -38,7 +38,6 @@ export function FilterColumn({
   effectiveSkills,
   projectCity = "",
   cityDefault = "",
-  projectToggle = null,
   sortControl = null,
   pro,
   panelEpoch = 0,
@@ -59,22 +58,15 @@ export function FilterColumn({
   panelEpoch?: number;
   /** The selected project's own city: pre-fills "Preferred work city" unless the URL sets `city`. Read-only. */
   cityDefault?: string;
-  /** The "Match to project" switch: first in the panel. */
-  projectToggle?: React.ReactNode;
-  /** Sort and its direction (null on the shortlist tab): first on a phone, second from lg up. */
+  /** Sort and its direction (null on the shortlist tab): last, just above Findtern Pro. */
   sortControl?: React.ReactNode;
   /** Findtern Pro: who has the CGPA and college filters, and what they list. */
   pro: ProData;
 }) {
-  const desktop = useDesktop();
   const city = cityField({ city: filters.city, citySet: filters.citySet, defaultCity: cityDefault });
   const count = sectionCounts(activeChips(filters).map((c) => c.key), Boolean(projectCity));
-  const moreActive = RATING_META.filter((m) => filters.minRatings[m.key] > 0).length + (filters.plan ? 1 : 0);
   const sort = sortControl ? (
-    <section aria-labelledby="filter-sort-heading" className="max-lg:mt-1">
-      <h3 id="filter-sort-heading" className="mb-2 text-sm font-semibold text-ink-900">
-        Sort
-      </h3>
+    <FilterSection title="Sort">
       {sortControl}
       <label className="mt-1 flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm text-ink-800">
         Most skills matched first
@@ -86,7 +78,7 @@ export function FilterColumn({
           className="relative h-6 w-10 shrink-0 rounded-full bg-ink-300 transition-colors after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:shadow-xs after:transition-transform peer-checked:bg-brand-700 peer-checked:after:translate-x-4 peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-600 motion-reduce:transition-none motion-reduce:after:transition-none"
         />
       </label>
-    </section>
+    </FilterSection>
   ) : null;
   return (
     <aside
@@ -108,7 +100,7 @@ export function FilterColumn({
         {filters.dir === "asc" ? <input type="hidden" name="dir" value="asc" /> : null}
 
         {/* lg: the card's own header. Phones get "Filters" from the sheet title. */}
-        <div className="flex items-center justify-between border-b border-ink-100 pb-3 mb-4 max-lg:hidden">
+        <div className="flex items-center justify-between max-lg:hidden">
           <h2 className="flex items-center gap-2 text-sm font-bold text-ink-900">
             <SlidersHorizontal className="size-[18px] text-ink-600" aria-hidden />
             Filters
@@ -118,11 +110,6 @@ export function FilterColumn({
           </Link>
         </div>
         <div>
-          {/* Phones: Sort leads the sheet. lg: the project switch leads, then Sort. */}
-          {desktop ? null : sort}
-          {projectToggle ? <div className={desktop ? "" : "mt-3"}>{projectToggle}</div> : null}
-          {desktop ? <div className={projectToggle ? "mt-4" : ""}>{sort}</div> : null}
-
           <FilterSection title="Location" count={count.location}>
             <CityFilter defaultValue={city.value} label="City" autoApply />
             {city.prefilled ? <p className="mt-1.5 text-xs text-text-subtle">From your project</p> : null}
@@ -142,38 +129,29 @@ export function FilterColumn({
             <RatingSlider name="min" label="At least" defaultValue={filters.minScore} />
           </FilterSection>
 
-          {/* Interview scores and price: folded, and open by themselves when one of them is set. */}
-          <details open={moreActive > 0} className="group/more mt-4 border-t border-ink-100 pt-2">
-            <summary className="-mx-1 flex min-h-11 cursor-pointer list-none items-center justify-between rounded-lg px-1 text-sm font-semibold text-ink-900 outline-none focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
-              <span className="flex items-center gap-2">
-                More filters
-                {moreActive > 0 ? (
-                  <span className="nums inline-grid h-5 min-w-5 place-items-center rounded-full bg-ink-900 px-1.5 text-[11px] font-semibold leading-none text-white">
-                    <span aria-hidden>{moreActive}</span>
-                    <span className="sr-only">{moreActive} active</span>
-                  </span>
-                ) : null}
-              </span>
-              <ChevronDown className="size-4 text-ink-500 transition-transform group-open/more:rotate-180 motion-reduce:transition-none" aria-hidden />
-            </summary>
-            <div className="pb-1 pt-1">
-              <p className="mb-1 text-xs text-text-subtle">AI interview scores, each out of 10.</p>
-              {RATING_META.map((meta) => (
-                <RatingSlider key={meta.key} name={`r_${meta.key}`} label={meta.label} defaultValue={filters.minRatings[meta.key]} />
+          <FilterSection title="Interview scores" count={RATING_META.filter((m) => filters.minRatings[m.key] > 0).length}>
+            <p className="mb-1 text-xs text-text-subtle">AI interview scores, each out of 10.</p>
+            {RATING_META.map((meta) => (
+              <RatingSlider key={meta.key} name={`r_${meta.key}`} label={meta.label} defaultValue={filters.minRatings[meta.key]} />
+            ))}
+          </FilterSection>
+
+          <FilterSection title="Hourly price" count={count.price}>
+            <label htmlFor="filter-plan" className="sr-only">
+              Hourly price
+            </label>
+            <select id="filter-plan" name="plan" defaultValue={filters.plan} className={SELECT}>
+              <option value="">Any price</option>
+              {BANDS.map((band) => (
+                <option key={band.id} value={band.id}>
+                  {formatRate(resolvePricing(band.min, plans, currency, region, PER_HIRE_FEE_DEFAULT).hourlyRateMinor, currency)} · {PLAN_NAME[band.id]}
+                </option>
               ))}
-              <label htmlFor="filter-plan" className="mt-3 block text-xs font-semibold text-ink-700">
-                Hourly price
-              </label>
-              <select id="filter-plan" name="plan" defaultValue={filters.plan} className={SELECT}>
-                <option value="">Any price</option>
-                {BANDS.map((band) => (
-                  <option key={band.id} value={band.id}>
-                    {formatRate(resolvePricing(band.min, plans, currency, region, PER_HIRE_FEE_DEFAULT).hourlyRateMinor, currency)} · {PLAN_NAME[band.id]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </details>
+            </select>
+          </FilterSection>
+
+          {/* Sort sits last, just above Findtern Pro. */}
+          {sort}
 
           {pro.active ? (
             <ProFilterSections

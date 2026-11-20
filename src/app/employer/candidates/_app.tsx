@@ -15,9 +15,8 @@ import { HireFlow } from "@/components/employer/hire-flow";
 import { cn } from "@/lib/utils";
 import { FilterColumn } from "./_filters";
 import { Results } from "./_results";
-import { ActiveFilters, ContextLine, ProjectPicker, SlimCount, SortControl, matchStateOf, projectNameOf } from "./_toolbar";
+import { ActiveFilters, ContextLine, ProjectPicker, SlimCount, SortControl } from "./_toolbar";
 import { CandidateSearch } from "@/components/employer/candidates/candidate-search";
-import { ProjectMatchControl } from "@/components/employer/candidates/project-match-control";
 import { StickyBar } from "@/components/employer/candidates/sticky-bar";
 import { compareHref, queryOf, rememberQueryOf, withFilters } from "@/lib/candidates-params";
 import { fromWire, type ChromeWire, type ResultsWire } from "@/lib/candidates-wire";
@@ -103,8 +102,6 @@ export function CandidatesApp({
   const { total, activeProjectId, projectApplied } = data;
   const compareFull = compareIds.length >= MAX_COMPARE;
   const pickedHere = data.candidates.filter((c) => compareIds.includes(c.id));
-  const match = matchStateOf(data, view);
-  const projectToggle = <ProjectMatchControl state={match} projectName={projectNameOf(data)} hasPro={data.pro.active} />;
   const searchBase = queryOf({ ...view, q: "", page: 1, saved: false }).slice(1);
   const searchProps = { q: filters.q, base: searchBase, required: data.effectiveSkills, hasPro: data.pro.active };
 
@@ -145,7 +142,7 @@ export function CandidatesApp({
             <ProjectPicker data={data} className="max-sm:w-full" />
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <ContextLine data={data} filters={view} match={match} className="shrink-0" />
+            <ContextLine data={data} filters={view} className="shrink-0" />
             <SkillFilter
               compact
               className="min-w-0"
@@ -174,7 +171,6 @@ export function CandidatesApp({
               effectiveSkills={data.effectiveSkills}
               projectCity={projectApplied?.city ?? ""}
               cityDefault={data.cityDefault}
-              projectToggle={projectToggle}
               sortControl={<SortControl data={data} filters={view} />}
               pro={data.pro}
             />
