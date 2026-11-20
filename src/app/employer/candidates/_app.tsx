@@ -163,14 +163,12 @@ export function CandidatesApp({
 
         <FilterCollapse
           initialHidden={filtersHidden}
-          className="lg:grid lg:grid-cols-[2rem_17.5rem_minmax(0,1fr)] lg:items-start lg:data-[filters=hidden]:grid-cols-[2rem_minmax(0,1fr)]"
+          className="lg:grid lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start"
         >
-          <div className="max-lg:hidden lg:sticky lg:top-36 lg:self-start">
+          {/* lg: the tab and the panel are one sticky unit below the slim bar, so the tab never runs past the panel. */}
+          <div className="lg:sticky lg:top-36 lg:flex lg:items-start lg:self-start">
             <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(view, data.effectiveSkills, projectApplied?.city ?? "")} />
-          </div>
-
-          {/* The column sticks below the slim bar (4rem header + the bar), not just the header. */}
-          <div id="candidate-filter-column" className="lg:[&>aside]:top-36 lg:[&>aside]:max-h-[calc(100dvh-10rem)] lg:group-data-[filters=hidden]/fl:hidden">
+            <div id="candidate-filter-column" className="lg:w-[17.5rem] lg:[&>aside]:static lg:[&>aside]:max-h-[calc(100dvh-10rem)] lg:group-data-[filters=hidden]/fl:hidden">
             <FilterColumn
               panelEpoch={epoch}
               filters={view}
@@ -188,6 +186,7 @@ export function CandidatesApp({
               sortControl={<SortControl data={data} filters={view} />}
               pro={data.pro}
             />
+            </div>
           </div>
 
           {/* Phones: the compare tray sits over the bottom nav, so the last row needs room to scroll clear of it. */}

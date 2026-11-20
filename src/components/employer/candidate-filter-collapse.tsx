@@ -53,7 +53,7 @@ export function FiltersToggle({ controls, count, className }: { controls: string
       aria-label={state.hidden ? "Show filters" : "Hide filters"}
       title={state.hidden ? "Show filters" : "Hide filters"}
       className={cn(
-        "group sticky top-36 flex w-8 flex-col items-center gap-2 rounded-l-xl border border-r-0 border-ink-200 bg-white py-3 text-ink-700 shadow-xs outline-none transition-colors hover:bg-ink-50 hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 max-lg:hidden",
+        "group flex w-8 shrink-0 flex-col items-center gap-2 rounded-l-xl border border-r-0 border-ink-200 bg-white py-3 text-ink-700 shadow-xs outline-none transition-colors hover:bg-ink-50 hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 max-lg:hidden",
         state.hidden && "rounded-xl border-r",
         className,
       )}
