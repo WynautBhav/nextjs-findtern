@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, not } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { FIRST_PAYMENT_EXPLAINER } from "@/lib/first-payment-copy";
@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { requireRole } from "@/lib/auth";
 import { toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
+import { heldElsewhereSql } from "@/lib/employer-visibility";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { rowSkills, skillBaseName } from "@/components/employer/candidate-view";
 import { requireEmployerSetup } from "@/lib/employer-setup";
@@ -389,7 +390,7 @@ async function load(employerId: string): Promise<Loaded> {
       .select({ user: schema.users, onboarding: schema.internOnboarding })
       .from(schema.users)
       .innerJoin(schema.internOnboarding, eq(schema.users.id, schema.internOnboarding.userId))
-      .where(and(...candidatePoolClauses()))
+      .where(and(...candidatePoolClauses(), not(heldElsewhereSql(employerId))))
       .orderBy(desc(scoreExpr()), desc(schema.internOnboarding.updatedAt))
       .limit(60)),
   ]);

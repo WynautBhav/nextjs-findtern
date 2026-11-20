@@ -4,7 +4,7 @@ import { getSession } from "./auth";
 import { getDb } from "./db";
 import { interviews, proposals, users } from "./db/schema";
 import { isHiredProposal } from "./hire-status";
-import { parseOffer } from "./offer";
+import { parseOffer, todayIst } from "./offer";
 import { LIVE_STATUSES } from "./employer-offer-status";
 import { EXPIRY_LABEL, expiryOf, type ExpiryReason } from "./proposal-expiry";
 import { pendingMeetingAtFor } from "./proposal-guard";
@@ -61,6 +61,28 @@ export async function hiredInternIds(
  */
 export function notHiredByEmployerSql(employerId: string): SQL {
   return sql`NOT EXISTS (SELECT 1 FROM ${proposals} WHERE ${proposals.employerId} = ${employerId} AND ${proposals.internId} = ${users.id} AND (${hiredProposalSql()}))`;
+}
+
+/**
+ * SQL twin of lib/candidate-hold.ts (read its header for the rule): the intern is held by ANOTHER employer's accepted-unpaid
+ * or processing offer, or by that employer's running/upcoming hire. For a query on `users`; the employer's own offers and
+ * hires are left to the existing per-employer rules. Every cast sits behind a regex CASE, so a stray value never fails the
+ * whole query. `now` is only for tests.
+ */
+export function heldElsewhereSql(employerId: string, now: Date = new Date()): SQL {
+  const today = todayIst(now);
+  const sd = sql.raw("btrim(hp.offer_details->>'startDate')");
+  const realDay = sql`(left(${sd}, 10) ~ '^[1-9][0-9]{3}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$')`;
+  // coalesce: a missing start day is NULL, and NOT NULL would drop the row instead of holding the intern.
+  const looseDay = sql`coalesce(left(${sd}, 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$', false)`;
+  const months = sql`least(greatest(coalesce(substring(btrim(hp.offer_details->>'duration') from '^([0-9]{1,3})[[:space:]]*[mM]')::int, 1), 1), 999)`;
+  const startDay = sql`make_date(left(${sd}, 4)::int, substr(${sd}, 6, 2)::int, 1) + (substr(${sd}, 9, 2)::int - 1)`;
+  // Running: full-time, or no real start day, or today is before start + months. Nested CASEs: AND does not order evaluation, and the casts must not run on a bad value.
+  const running = sql`(jsonb_typeof(hp.offer_details->'fullTimeOffer') = 'object' OR CASE WHEN ${realDay} THEN (CASE WHEN date_trunc('month', ${startDay}) = make_date(left(${sd}, 4)::int, substr(${sd}, 6, 2)::int, 1) THEN (${startDay} + ${months} * interval '1 month')::date > ${today}::date ELSE true END) ELSE true END)`;
+  return sql`EXISTS (SELECT 1 FROM proposals hp WHERE hp.intern_id = ${users.id} AND hp.employer_id <> ${employerId} AND (
+    (hp.hired_at IS NULL AND hp.status = 'processing')
+    OR (hp.hired_at IS NULL AND hp.status = 'accepted' AND NOT (${looseDay} AND left(${sd}, 10) <= ${today}))
+    OR ((hp.status = 'hired' OR hp.hired_at IS NOT NULL) AND hp.ended_at IS NULL AND ${running})))`;
 }
 
 /** Of `internIds`, the ones this employer has really hired (same rule as `notHiredByEmployerSql`). */

@@ -10,7 +10,7 @@
  */
 
 import { cache } from "react";
-import { and, desc, eq, gte, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, isNotNull, ne, sql } from "drizzle-orm";
 
 import { acceptedLineCharge } from "@/lib/accepted-charge";
 import { hireFeeMinor, lineCharge, type LineCharge, type PayMode } from "@/lib/checkout";
@@ -18,6 +18,7 @@ import { feeDisplay, type FeeDisplay } from "@/lib/fee-display";
 import { getDb, schema } from "@/lib/db";
 import { istDay, postpaidAnchor, postpaidDueOn } from "@/lib/billing-plan";
 import { monthlyDues } from "@/lib/dues";
+import { hireIsRunning } from "@/lib/candidate-hold";
 import { parseOffer } from "@/lib/offer";
 import { initialsOf, scoreOf } from "@/lib/employer-candidates";
 import { hiredInternIds, hiredProposalSql, isAdminViewing } from "@/lib/employer-visibility";
@@ -192,6 +193,20 @@ export async function payRequestRefusal(db: Db | Tx, employerId: string, checkou
     .from(schema.proposals)
     .where(and(eq(schema.proposals.employerId, employerId), inArray(schema.proposals.id, missing)));
   return rows.some((r) => expiryOf(r).reason === "unpaid_past_start") ? { error: PAY_GATE_MESSAGE.expired, code: PAY_GATE_CODE.expired } : null;
+}
+
+/**
+ * Of the new-hire `lines` (never a due month), the first whose intern is hired and still running with a DIFFERENT company
+ * (candidate-hold.ts). Such an offer was accepted before that hire existed (or in the unguarded past) and must not become a
+ * second paid placement. Another offer of the same company never counts: its own full-time conversion is legitimate.
+ */
+export async function lineHeldByOtherHire(db: Db | Tx, employerId: string, lines: { id: string; internId: string }[]): Promise<boolean> {
+  if (lines.length === 0) return false;
+  const rows = await db
+    .select({ employerId: schema.proposals.employerId, status: schema.proposals.status, hiredAt: schema.proposals.hiredAt, endedAt: schema.proposals.endedAt, offerDetails: schema.proposals.offerDetails, currency: schema.proposals.currency })
+    .from(schema.proposals)
+    .where(and(inArray(schema.proposals.internId, lines.map((l) => l.internId)), ne(schema.proposals.employerId, employerId), hiredProposalSql()));
+  return rows.some((r) => hireIsRunning(r));
 }
 
 /**

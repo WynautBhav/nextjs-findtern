@@ -30,7 +30,8 @@ import {
   type WeeklySchedule,
 } from "@/lib/offer";
 import { employerRegion } from "@/lib/employer-pricing";
-import { canEmployerSeeIntern } from "@/lib/employer-pool";
+import { canEmployerSeeIntern, heldElsewhereIds } from "@/lib/employer-pool";
+import { CANDIDATE_UNAVAILABLE } from "@/lib/candidate-hold";
 import { isProjectOpen } from "@/lib/project-locations";
 import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
 import { isBlockingInterview } from "@/lib/employer-interview-rules";
@@ -156,6 +157,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "This project is not open for offers (it is closed, paused or a draft). Publish it again or pick an open project." }, { status: 409 });
   }
 
+  // One offer at a time: held by another company's accepted offer or running hire. Neutral on purpose (no company, dates or pay).
+  if ((await heldElsewhereIds(db, id, [b.internId])).has(b.internId)) {
+    return NextResponse.json(CANDIDATE_UNAVAILABLE, { status: 409 });
+  }
   // Only a pool candidate, or one this employer already works with.
   if (!(await canEmployerSeeIntern(db, id, b.internId))) {
     return NextResponse.json({ error: "Unknown candidate" }, { status: 404 });

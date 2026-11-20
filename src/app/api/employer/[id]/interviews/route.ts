@@ -9,7 +9,8 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { assertProjectActionable } from "@/lib/projects/takedown-guard-server";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { isKnownTimezone, projectZone, timezoneForLocation, wallTimeToUtc } from "@/lib/timezones";
-import { canEmployerSeeIntern } from "@/lib/employer-pool";
+import { canEmployerSeeIntern, heldElsewhereIds } from "@/lib/employer-pool";
+import { CANDIDATE_UNAVAILABLE } from "@/lib/candidate-hold";
 import { hiredProposalSql } from "@/lib/employer-visibility";
 import { hasDuplicateSlots, hasSlotTooFarAhead, isBlockingInterview, isQuarterHourWall } from "@/lib/employer-interview-rules";
 import { formatIst } from "@/lib/format";
@@ -89,6 +90,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Offer different times - two slots are the same." }, { status: 400 });
   }
 
+  // One offer at a time: no meeting with a candidate another company holds (neutral answer, nothing about who).
+  if ((await heldElsewhereIds(db, id, [b.internId])).has(b.internId)) {
+    return NextResponse.json(CANDIDATE_UNAVAILABLE, { status: 409 });
+  }
   // Only a pool candidate, or one this employer already works with.
   if (!(await canEmployerSeeIntern(db, id, b.internId))) {
     return NextResponse.json({ error: "Unknown candidate" }, { status: 404 });

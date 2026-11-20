@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, not, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { getEmployerRows } from "@/lib/employer-request";
@@ -8,7 +8,7 @@ import {
   type CandidateProfile,
   type Ratings,
 } from "@/lib/employer-candidates";
-import { candidateRelations, hiredAmong, hiredInternIds, notHiredByEmployerSql, type CandidateRelation } from "@/lib/employer-visibility";
+import { candidateRelations, heldElsewhereSql, hiredAmong, hiredInternIds, notHiredByEmployerSql, type CandidateRelation } from "@/lib/employer-visibility";
 import { attachPhotos, candidatePoolClauses, poolInternIds, scoreExpr } from "@/lib/employer-pool";
 import { projectCities, projectDefaultCity } from "@/lib/project-locations";
 import { likePattern } from "@/lib/admin/palette-search";
@@ -545,7 +545,7 @@ export async function loadCandidates(
           );
         data.shortlisted = new Set(rows.map((r) => r.internId));
         // Hired ones left every shortlist (EMB-26) and are not rows below, so they are not counted.
-        const [inPool, hiredOnList] = await Promise.all([poolInternIds(db, [...data.shortlisted]), hiredAmong(db, uid, [...data.shortlisted])]);
+        const [inPool, hiredOnList] = await Promise.all([poolInternIds(db, [...data.shortlisted], uid), hiredAmong(db, uid, [...data.shortlisted])]);
         data.savedCount = [...inPool].filter((id) => !hiredOnList.has(id)).length;
       })(),
     );
@@ -696,6 +696,7 @@ export async function loadCandidates(
             ? and(...candidatePoolClauses(), data.shortlisted.size > 0 ? inArray(schema.users.id, [...data.shortlisted]) : sql`false`)
             : and(...clauses),
           notHiredByEmployerSql(uid),
+          not(heldElsewhereSql(uid)),
         ),
       )
       // Newest onboarding row first, so the dedupe below keeps it (legacy

@@ -36,7 +36,7 @@ export async function GET(req: Request) {
     targetId !== session.uid &&
     session.role === "employer" &&
     !session.impersonator &&
-    !(await canEmployerSeeIntern(db, session.uid, targetId))
+    !(await canEmployerSeeIntern(db, session.uid, targetId, { keepRelationships: true }))
   ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }

@@ -79,7 +79,7 @@ export async function POST(req: Request) {
       // Only someone in the candidate pool can be shortlisted, and not anyone
       // this employer already hired or has an offer out to - legacy refused
       // both and sent the employer to the existing proposal instead.
-      if (!(await poolInternIds(db, [internId])).has(internId)) {
+      if (!(await poolInternIds(db, [internId], employerId)).has(internId)) {
         return NextResponse.json({ error: "This candidate is not available" }, { status: 404 });
       }
       const [existing] = await db

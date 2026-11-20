@@ -21,6 +21,8 @@ import { hasOpenOrderFor, OPEN_ORDER_MINUTES } from "@/lib/payments";
 import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
 import { internLockResponse } from "@/lib/intern-unlock";
 import { expiredStamp, withdrawRefusal } from "@/lib/proposal-expiry";
+import { isHiredProposal } from "@/lib/hire-status";
+import { ALREADY_LINED_UP, rowHoldsIntern } from "@/lib/candidate-hold";
 
 /**
  * Which role may set which status.
@@ -250,21 +252,22 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
         .limit(1);
       if (takedownBlock(live, "accept")) return "taken_down" as const;
     }
-    // One internship at a time: an offer accepted elsewhere and not yet
-    // closed (awaiting payment) blocks a second acceptance.
+    // One internship at a time (candidate-hold.ts): another offer accepted and not yet paid or lapsed, or a hire still
+    // running or upcoming with ANOTHER company (a company's own earlier hire never blocks its full-time offer), blocks a
+    // second acceptance. The rows are locked above, so this read is stable.
     if (status === "accepted") {
-      const [other] = await tx
-        .select({ id: schema.proposals.id })
+      const others = await tx
+        .select({
+          employerId: schema.proposals.employerId,
+          status: schema.proposals.status,
+          hiredAt: schema.proposals.hiredAt,
+          endedAt: schema.proposals.endedAt,
+          offerDetails: schema.proposals.offerDetails,
+          currency: schema.proposals.currency,
+        })
         .from(schema.proposals)
-        .where(
-          and(
-            eq(schema.proposals.internId, proposal.internId),
-            ne(schema.proposals.id, id),
-            inArray(schema.proposals.status, ["accepted", "processing"]),
-          ),
-        )
-        .limit(1);
-      if (other) return "busy" as const;
+        .where(and(eq(schema.proposals.internId, proposal.internId), ne(schema.proposals.id, id)));
+      if (others.some((o) => (o.employerId !== proposal.employerId || !isHiredProposal(o)) && rowHoldsIntern(o))) return "busy" as const;
     }
     const [row] = await tx
       .update(schema.proposals)
@@ -325,7 +328,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     return NextResponse.json({ error: TAKEDOWN_BLOCKS.accept, code: "listing_taken_down" }, { status: 409 });
   }
   if (updated === "busy") {
-    return NextResponse.json({ error: "You have already accepted another offer. Only one internship at a time." }, { status: 409 });
+    return NextResponse.json({ error: ALREADY_LINED_UP, code: "candidate_unavailable" }, { status: 409 });
   }
   if (!updated) {
     return NextResponse.json({ error: "This offer changed a moment ago. Refresh and try again." }, { status: 409 });

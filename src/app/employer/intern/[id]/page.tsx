@@ -112,7 +112,7 @@ export default async function EmployerInternDetail({
       .limit(1);
 
     const adminViewing = await isAdminViewing();
-    if (user && (adminViewing || (await canEmployerSeeIntern(db, employerId, id)))) {
+    if (user && (adminViewing || (await canEmployerSeeIntern(db, employerId, id, { keepRelationships: true })))) {
       visible = true;
       const remembered = await rememberedSelection(employerId);
       // `?project=` keeps the shortlist on the project the employer was

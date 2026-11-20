@@ -22,7 +22,7 @@ test("a cookie written before this still cannot restore a keyword", () => {
 // The list, its total, the pages and every sort are built from one query, so the hired filter has to sit
 // in that query (both the search and the Shortlist branch), not on the page after it.
 test("the candidates query leaves out interns this employer has hired, in both branches", () => {
-  assert.match(src, /\.where\(\s*and\(\s*savedOnly\s*\?[\s\S]*?:\s*and\(\.\.\.clauses\),\s*notHiredByEmployerSql\(uid\),\s*\),\s*\)/);
+  assert.match(src, /\.where\(\s*and\(\s*savedOnly\s*\?[\s\S]*?:\s*and\(\.\.\.clauses\),\s*notHiredByEmployerSql\(uid\),\s*not\(heldElsewhereSql\(uid\)\),\s*\),\s*\)/);
 });
 
 test("the Shortlist tab count and the compare picks leave hired interns out too", () => {

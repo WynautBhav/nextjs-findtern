@@ -10,7 +10,8 @@ import { paymentIndexMismatch } from "@/lib/dues";
 import { hireGateLines, profileCompleteForHire, profileIncompleteBody } from "@/lib/hire-gate";
 import { requireMutation } from "@/lib/guards-mutation";
 import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
-import { openProposalsWithDues, payableCheckout, payGateRefusalFor, payRequestRefusal, type PayableLine, type PayGateRefusal } from "@/lib/employer-payable";
+import { CANDIDATE_UNAVAILABLE } from "@/lib/candidate-hold";
+import { lineHeldByOtherHire, openProposalsWithDues, payableCheckout, payGateRefusalFor, payRequestRefusal, type PayableLine, type PayGateRefusal } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders, legacyOrderRaw, OPEN_ORDER_MINUTES, orderProposalIds, settleEmployerOrder } from "@/lib/payments";
 import { TAKEDOWN_BLOCKS, takedownCheckedLineIds } from "@/lib/projects/takedown";
 import { isFullWaiver, WAIVER_GATEWAY, waiverPromoRaw } from "@/lib/full-waiver";
@@ -184,6 +185,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   for (const line of hireGateLines(paying)) {
     const hire = await profileCompleteForHire(getDb(), line.internId);
     if (!hire.ok) return NextResponse.json(profileIncompleteBody("employer", hire.missing, paying.length > 1 ? line.internInitials : null), { status: 409 });
+  }
+  // One internship at a time: an offer accepted before the candidate was hired elsewhere must not become a second paid
+  // placement. Only a running hire of a DIFFERENT company refuses; nothing about it is revealed.
+  if (await lineHeldByOtherHire(getDb(), id, hireGateLines(paying))) {
+    return NextResponse.json(CANDIDATE_UNAVAILABLE, { status: 409 });
   }
   // Pay-at-start monthly gone, postpaid for a score under 6 or full-time, promo with monthly payment (order-mode.ts).
   // A full-waiver code works on every pay plan; any other code only on upfront (the rule is unchanged for them).
