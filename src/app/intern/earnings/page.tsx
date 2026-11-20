@@ -4,13 +4,14 @@ import { AlertCircle, ChevronDown, Landmark } from "lucide-react";
 
 import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
 import { Tile } from "@/components/app/tiles";
-import { MonthRail } from "@/components/intern/stipend/month-rail";
-import { STIPEND_CURRENCY, orderEngagements, stipendPlan, stipendTotalsLine, totalsByCurrency, type StipendPlan } from "@/components/intern/stipend/months";
+import { bonusTotals, completionBonusesByHire, totalWithBonusLine } from "@/components/intern/stipend/bonus";
+import { Engagement } from "@/components/intern/stipend/engagement-row";
+import { orderEngagements, stipendPlan, stipendTotalsLine, totalsByCurrency } from "@/components/intern/stipend/months";
 import { PaymentLedger } from "@/components/intern/stipend/payment-ledger";
 import { buttonClass } from "@/components/ui/button";
 import { requireRole } from "@/lib/auth";
-import { bankPrompt, earningsEngagements, earningsView, type EngagementEarnings } from "@/lib/earnings-view";
-import { formatDate, formatMoney } from "@/lib/format";
+import { bankPrompt, earningsEngagements, earningsView } from "@/lib/earnings-view";
+import { formatMoney } from "@/lib/format";
 import { isHiredProposal } from "@/lib/hire-status";
 import { loadInternData } from "@/lib/intern-data";
 import { isAcceptedStatus, payoutState, type PayoutRow } from "@/lib/journey";
@@ -88,6 +89,13 @@ export default async function InternEarnings() {
       : null,
   );
 
+  // Completion bonuses belong to a hire by bonus_proposal_id; all of them come from this intern's own payouts (loadInternData filters by session uid).
+  const bonuses = completionBonusesByHire(data.payouts);
+  const withBonus = totalWithBonusLine(
+    { paidMinor: plans.reduce((n, p) => n + (p?.paidMinor ?? 0), 0), pendingMinor: plans.reduce((n, p) => n + (p?.pendingMinor ?? 0), 0) },
+    bonusTotals(data.payouts),
+  );
+
   const rows = orderEngagements(cards.map((card, i) => ({ card, plan: plans[i], startDate: card.startDate, months: card.months })));
 
   return (
@@ -149,10 +157,11 @@ export default async function InternEarnings() {
               hint={stipendTotalsLine(plans)}
               className="mb-0 border-b border-ink-200/70 pb-3"
             />
+            {withBonus ? <p className="nums border-b border-ink-200/70 py-2.5 text-sm font-medium text-ink-900">{withBonus}</p> : null}
             {/* Thin dividers, one row per internship: the employer candidate list's language. */}
             <ul className="divide-y divide-ink-200/70 border-b border-ink-200/70">
               {rows.slice(0, SHOWN).map(({ card, plan }) => (
-                <Engagement key={card.proposalId} card={card} plan={plan} />
+                <Engagement key={card.proposalId} card={card} plan={plan} bonus={bonuses.get(card.proposalId)} />
               ))}
             </ul>
             {rows.length > SHOWN ? (
@@ -164,7 +173,7 @@ export default async function InternEarnings() {
                 </summary>
                 <ul className="divide-y divide-ink-200/70 border-t border-ink-200/70">
                   {rows.slice(SHOWN).map(({ card, plan }) => (
-                    <Engagement key={card.proposalId} card={card} plan={plan} />
+                    <Engagement key={card.proposalId} card={card} plan={plan} bonus={bonuses.get(card.proposalId)} />
                   ))}
                 </ul>
               </details>
@@ -216,86 +225,4 @@ function belongsTo(p: PayoutRow, proposalId: string, soleId: string | null): boo
   const raw = p.raw && typeof p.raw === "object" ? (p.raw as { proposalId?: unknown; proposal_id?: unknown }) : null;
   const pid = String(raw?.proposalId ?? raw?.proposal_id ?? "").trim();
   return pid ? pid === proposalId : proposalId === soleId;
-}
-
-function Engagement({ card, plan }: { card: EngagementEarnings; plan: StipendPlan | null }) {
-  const description = `${card.company} · ${card.months} month${card.months === 1 ? "" : "s"}${card.joiningDate ? ` from ${formatDate(card.joiningDate)}` : ""}`;
-  const title = (
-    <div className="min-w-0">
-      <Link
-        href={`/intern/proposals/${encodeURIComponent(card.proposalId)}`}
-        className="inline-flex min-h-11 items-center text-[15px] font-semibold text-ink-900 underline-offset-4 hover:text-brand-800 hover:underline sm:min-h-0"
-      >
-        {card.roleTitle}
-        <span className="sr-only">: open the offer</span>
-      </Link>
-      <p className="nums text-sm text-ink-600">{description}</p>
-    </div>
-  );
-
-  if (!plan) {
-    return (
-      <li className="py-5">
-        {title}
-        <p className="mt-2 max-w-prose text-pretty text-sm text-text-subtle">
-          {!card.eligible
-            ? "Candidates with a Findtern Score below 6 are not paid a stipend. A higher score makes later internships paid."
-            : "The monthly stipend is not set on this offer, so there is nothing to track here yet."}
-        </p>
-      </li>
-    );
-  }
-
-  const pct = (n: number) => (plan.totalMinor > 0 ? `${(n / plan.totalMinor) * 100}%` : "0%");
-  const current = plan.months.some((m) => m.current);
-  return (
-    <li className="py-5">
-      <div className="grid gap-x-6 gap-y-3 sm:grid-cols-[minmax(0,1fr)_15rem] sm:items-start">
-        {title}
-        <div className="sm:text-right">
-          {plan.paidMinor > 0 ? (
-            <>
-              <p className="nums text-sm text-ink-600">
-                <span className="text-base font-semibold text-ink-900">{formatMoney(plan.paidMinor, STIPEND_CURRENCY, { zeroLabel: false })}</span> paid of{" "}
-                {formatMoney(plan.totalMinor, STIPEND_CURRENCY, { zeroLabel: false })}
-              </p>
-              {/* Paid solid, scheduled lighter, the rest is the track. Decorative: the figures say it in words. */}
-              <div aria-hidden className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-ink-200">
-                <span className="h-full bg-brand-700" style={{ width: pct(plan.paidMinor) }} />
-                <span className="h-full bg-brand-300" style={{ width: pct(plan.pendingMinor) }} />
-              </div>
-            </>
-          ) : (
-            // Nothing paid yet: an empty bar says nothing, the amount to come does.
-            <>
-              <p className="nums text-base font-semibold text-ink-900">{formatMoney(plan.totalMinor, STIPEND_CURRENCY, { zeroLabel: false })}</p>
-              <p className="text-xs text-ink-600">to come</p>
-            </>
-          )}
-        </div>
-      </div>
-      <details className="group mt-1">
-        <summary className="flex min-h-11 w-fit cursor-pointer list-none items-center gap-1.5 rounded-md py-1 text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand-500 [&::-webkit-details-marker]:hidden">
-          {/* One run of text, so a phone wraps it as a sentence, not as two columns. */}
-          <span>
-            <span className="font-medium text-primary group-hover:underline">Month by month</span>
-            <span className="nums text-ink-600">
-              {" "}
-              · {formatMoney(card.monthlyMinor ?? 0, STIPEND_CURRENCY, { zeroLabel: false })} a month{current ? ", running now" : ""}
-            </span>
-          </span>
-          <ChevronDown className="size-4 shrink-0 text-primary transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden />
-        </summary>
-        <div className="mt-3 grid max-w-2xl gap-3">
-          <MonthRail months={plan.months} monthlyMinor={card.monthlyMinor ?? 0} />
-          <Link
-            href={`/intern/timesheets?proposalId=${encodeURIComponent(card.proposalId)}`}
-            className="inline-flex min-h-11 w-fit items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
-          >
-            Timesheets for this internship
-          </Link>
-        </div>
-      </details>
-    </li>
-  );
 }

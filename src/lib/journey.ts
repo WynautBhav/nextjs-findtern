@@ -91,6 +91,8 @@ export type PayoutRow = {
   notes: string | null;
   /** "stipend" | "completion_bonus"; absent on rows built by hand. */
   kind?: string | null;
+  /** The hire a completion bonus is for (intern_payouts.bonus_proposal_id); its raw carries no proposalId. */
+  bonusProposalId?: string | null;
   paidAt: Date | null;
   createdAt: Date;
 };
