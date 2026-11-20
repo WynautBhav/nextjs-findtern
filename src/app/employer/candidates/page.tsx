@@ -16,6 +16,7 @@ import {
   type SearchParams,
 } from "./_query";
 import { perfScope } from "@/lib/perf/timing";
+import { countRelaxations, relaxFixes } from "./_relax";
 
 export const metadata: Metadata = {
   title: "Candidates",
@@ -62,6 +63,12 @@ async function CandidatesPageImpl({
     hireFlowCountsFor(uid),
   ]);
   if (data.restoreTo) redirect(data.restoreTo);
+
+  // An empty list is the rare path: only then count what each one-click widening would return.
+  if (data.total === 0 && !data.loadFailed && !filters.saved) {
+    const fixes = relaxFixes(data, filters);
+    if (fixes.length > 0) data.relaxCounts = await countRelaxations(uid, fixes, data.activeProjectId);
+  }
 
   return <CandidatesView uid={uid} data={data} filters={filters} flow={flow} filtersHidden={filtersHidden} />;
 }

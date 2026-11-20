@@ -170,42 +170,76 @@ export function showClearAll(chipKeys: string[]): boolean {
   return chipKeys.some((key) => key !== "project-city");
 }
 
-export type RelaxKey = "q" | "skill" | "city" | "remote" | "project" | "pro" | "score";
-export type Relaxation = { key: RelaxKey; label: string; hint: string };
+export type RelaxKey = "q" | "skill" | "city" | "remote" | "project" | "stop" | "pro" | "score" | "laptop";
+/**
+ * One way to widen an empty list. `id` is unique (`skill:React`), `label` is the button, `chip` is the removable chip in the
+ * "Your search" recap (null: it is an action, not a filter the employer set).
+ */
+export type Relaxation = { id: string; key: RelaxKey; label: string; chip: string | null };
+/** Candidates each option would return, by option id, plus `reset` for "Reset all filters". Missing or null: not counted. */
+export type RelaxCounts = Record<string, number | null>;
 
 /**
- * One-click ways to widen an empty list, in the order worth trying: the typed keyword, the last required skill,
- * the city, remote-only candidates, the project's own skills, the Findtern Pro filters, the score floors. Only
- * what is actually narrowing the list is offered; `max` caps how many. The page turns each key into a link.
+ * Every way to widen an empty list, in the order worth trying: the city, remote-only candidates, the project's own skills and
+ * city, the typed keyword, score floors, Findtern Pro filters, the laptop filter, the project's skills, then each skill on its
+ * own. Only what is actually narrowing the list is offered. The page turns each into a link; `rankRelaxations` orders them.
  */
-export function relaxations(
-  o: {
-    q: string;
-    /** The skills the list is filtered by (the employer's or the project's). */
-    skills: string[];
-    cities: string[];
-    /** Candidates who only work remotely are in the list. */
-    includeRemote: boolean;
-    proFilters: boolean;
-    scoreFloors: boolean;
-    /** How the selected project relates to the list: see `projectMatchState`. */
-    match: "matched" | "edited" | "off" | "none";
-    projectName: string;
-    saved: boolean;
-  },
-  max = 4,
-): Relaxation[] {
+export function relaxations(o: {
+  q: string;
+  /** The skills the list is filtered by (the employer's or the project's). */
+  skills: string[];
+  cities: string[];
+  /** Candidates who only work remotely are in the list. */
+  includeRemote: boolean;
+  proFilters: boolean;
+  scoreFloors: boolean;
+  laptop: boolean;
+  /** How the selected project relates to the list: see `projectMatchState`. */
+  match: "matched" | "edited" | "off" | "none";
+  projectName: string;
+  /** The city (or cities) came from the selected project, not from the employer. */
+  cityFromProject: boolean;
+  saved: boolean;
+}): Relaxation[] {
   if (o.saved) return [];
   const out: Relaxation[] = [];
-  if (o.q.trim()) out.push({ key: "q", label: "Clear the search", hint: `Search looks at skills and cities only, so “${o.q.trim()}” may be matching nothing.` });
-  const last = o.skills[o.skills.length - 1];
-  if (last) out.push({ key: "skill", label: `Drop ${skillBaseName(last)}`, hint: o.skills.length === 1 ? "Then any skill counts." : `Keeps the other ${o.skills.length - 1} skill${o.skills.length === 2 ? "" : "s"}.` });
-  if (o.cities.length > 0) out.push({ key: "city", label: "Any city", hint: "Candidates are listed wherever they want to work." });
-  if (!o.includeRemote) out.push({ key: "remote", label: "Include remote-only candidates", hint: "People who only work remotely are left out now." });
-  if (o.match === "edited") out.push({ key: "project", label: "Reset to project skills", hint: `Back to the skills of ${o.projectName || "the project"}.` });
-  if (o.proFilters) out.push({ key: "pro", label: "Clear CGPA and college filters", hint: "Findtern Pro filters narrow the list the most." });
-  if (o.scoreFloors) out.push({ key: "score", label: "Clear score minimums", hint: "Findtern Score and the sub-score floors." });
-  return out.slice(0, max);
+  const cityText = o.cities.map((c) => c.replace(/\b\w/g, (ch) => ch.toUpperCase())).join(", ");
+  if (o.cities.length > 0) out.push({ id: "city", key: "city", label: "Any city", chip: o.cityFromProject ? `City: ${cityText} (from project)` : `City: ${cityText}` });
+  if (!o.includeRemote) out.push({ id: "remote", key: "remote", label: "Include remote-only candidates", chip: null });
+  if (o.match === "matched" || o.match === "edited") out.push({ id: "stop", key: "stop", label: `Stop matching ${o.projectName || "the project"}`, chip: null });
+  if (o.q.trim()) out.push({ id: "q", key: "q", label: `Clear keyword \u201c${o.q.trim()}\u201d`, chip: `Keyword: ${o.q.trim()}` });
+  if (o.scoreFloors) out.push({ id: "score", key: "score", label: "Clear score minimums", chip: "Score minimums" });
+  if (o.proFilters) out.push({ id: "pro", key: "pro", label: "Clear CGPA and college filters", chip: "CGPA or college filter" });
+  if (o.laptop) out.push({ id: "laptop", key: "laptop", label: "Laptop not required", chip: "Has own laptop" });
+  if (o.match === "edited") out.push({ id: "project", key: "project", label: "Reset to project skills", chip: null });
+  for (const skill of o.skills) out.push({ id: `skill:${skill}`, key: "skill", label: `Drop ${skillBaseName(skill)}`, chip: skillBaseName(skill) });
+  return out;
+}
+
+/** Most skills offered as separate "Drop X" fixes, so a long skill list does not crowd out the other ways to widen. */
+const MAX_SKILL_FIXES = 2;
+
+/**
+ * The fixes to show, best first. Counted and returning nobody: hidden. Counted: by how many candidates they return
+ * (the list order breaks ties), the first marked Recommended. Not counted (no counts at all, or past the cap): kept in list
+ * order after the counted ones, without a number and never Recommended. At most `MAX_SKILL_FIXES` "Drop X" fixes, `max` in all.
+ */
+export function rankRelaxations<T extends Relaxation>(options: T[], counts: RelaxCounts | null, max = 4): (T & { count: number | null; recommended: boolean })[] {
+  const countOf = (o: T): number | null => {
+    const n = counts?.[o.id];
+    return typeof n === "number" ? n : null;
+  };
+  // Counted and empty: hidden. The sort is stable, so equal counts keep the order of `relaxations`.
+  const usable = options.filter((o) => countOf(o) !== 0);
+  const counted = usable.filter((o) => countOf(o) !== null).sort((a, b) => (countOf(b) as number) - (countOf(a) as number));
+  const uncounted = usable.filter((o) => countOf(o) === null);
+  let skills = 0;
+  const picked = [...counted, ...uncounted].filter((o) => {
+    if (o.key !== "skill") return true;
+    skills += 1;
+    return skills <= MAX_SKILL_FIXES;
+  });
+  return picked.slice(0, max).map((o, i) => ({ ...o, count: countOf(o), recommended: i === 0 && (countOf(o) ?? 0) > 0 }));
 }
 
 export type FilterSectionKey = "location" | "scores" | "price" | "sorting";

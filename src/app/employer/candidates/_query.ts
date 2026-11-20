@@ -24,7 +24,7 @@ import { PRO_PARAMS, restorableFilters, withoutProParams, withoutSavedCity } fro
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { savedInternIds } from "@/lib/saved-roles";
 import { rankProfiles } from "@/components/employer/candidate-rank";
-import { DEFAULT_PAGE_SIZE, dedupeSkills, filterCount, pageWindow, parsePageSize, parseView, type ListView } from "@/components/employer/candidate-view";
+import { DEFAULT_PAGE_SIZE, dedupeSkills, filterCount, pageWindow, parsePageSize, parseView, type ListView, type RelaxCounts } from "@/components/employer/candidate-view";
 
 export type SortKey = "score" | keyof Ratings;
 
@@ -379,6 +379,8 @@ export type CandidatesData = {
   savedCount: number;
   /** Findtern Pro: who may use the CGPA and college filters, and what they did to this list. */
   pro: ProData;
+  /** An empty list only (see `_relax.ts`): how many candidates each one-click widening would return. Null: not counted or it failed. */
+  relaxCounts: RelaxCounts | null;
 };
 
 export type ProData = {
@@ -409,7 +411,7 @@ const NO_PRO: ProData = { active: false, ignored: false, offered: false, charge:
 export async function loadCandidates(
   uid: string,
   filters: Filters,
-  opts: { hasFilterParams: boolean; fresh: boolean },
+  opts: { hasFilterParams: boolean; fresh: boolean; /** Only `total` is wanted (the zero-results counts): skip the page's photos, offers and presence. */ countOnly?: boolean },
 ): Promise<CandidatesData> {
   const data: CandidatesData = {
     restoreTo: null,
@@ -435,6 +437,7 @@ export async function loadCandidates(
     saved: new Set(),
     savedCount: 0,
     pro: { ...NO_PRO },
+    relaxCounts: null,
   };
 
   // Findtern Pro: the entitlement decides, never the URL. Whatever the link asked for is read once,
@@ -761,6 +764,7 @@ export async function loadCandidates(
     }));
 
     data.total = ranked.length;
+    if (opts.countOnly) return data;
     const paged = pageWindow(data.total, filters.page, filters.pageSize);
     data.pages = paged.pages;
     data.candidates = ranked.slice(paged.start, paged.end);

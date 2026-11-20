@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { AVATAR_TINTS, avatarTint, relaxations, sectionCounts, cityField, cityParam, dedupeSkills, filterCount, showClearAll, headlineOf, DEFAULT_PAGE_SIZE, PAGE_SIZES, pageWindow, parsePageSize, parseView, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
+import { AVATAR_TINTS, avatarTint, relaxations, rankRelaxations, sectionCounts, cityField, cityParam, dedupeSkills, filterCount, showClearAll, headlineOf, DEFAULT_PAGE_SIZE, PAGE_SIZES, pageWindow, parsePageSize, parseView, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
 
 test("skillBaseName drops the level", () => {
   assert.equal(skillBaseName("React · Advanced"), "React");
@@ -232,23 +232,58 @@ test("the city pre-fill is wired through the form, the panel and the restore, an
   assert.doesNotMatch(filters + form, /fetch\(|\/api\//);
 });
 
-const none = { q: "", skills: [] as string[], cities: [] as string[], includeRemote: true, proFilters: false, scoreFloors: false, match: "none" as const, projectName: "", saved: false };
+const none = { q: "", skills: [] as string[], cities: [] as string[], includeRemote: true, proFilters: false, scoreFloors: false, laptop: false, match: "none" as const, projectName: "", cityFromProject: false, saved: false };
 
-test("relaxations: only what narrows the list, keyword, skill, city, remote, project, Pro, score in that order", () => {
+test("relaxations: only what narrows the list, city, remote, project, keyword, scores, Pro, laptop, then each skill", () => {
   assert.deepEqual(relaxations(none), []);
-  const all = relaxations({ ...none, q: "reac", skills: ["React · Advanced", "Node.js"], cities: ["pune"], includeRemote: false, proFilters: true, scoreFloors: true, match: "edited", projectName: "Web" }, 9);
-  assert.deepEqual(all.map((r) => r.key), ["q", "skill", "city", "remote", "project", "pro", "score"]);
-  assert.equal(all[1].label, "Drop Node.js");
+  const all = relaxations({ ...none, q: "reac", skills: ["React · Advanced", "Node.js"], cities: ["pune"], includeRemote: false, proFilters: true, scoreFloors: true, laptop: true, match: "edited", projectName: "Web" });
+  assert.deepEqual(all.map((r) => r.id), ["city", "remote", "stop", "q", "score", "pro", "laptop", "project", "skill:React · Advanced", "skill:Node.js"]);
+  assert.equal(all[9].label, "Drop Node.js");
   assert.equal(relaxations({ ...none, skills: ["React · Advanced"] })[0].label, "Drop React");
 });
 
-test("relaxations: capped, never offered on the shortlist tab, no 'project' unless the skills were edited", () => {
-  const many = { ...none, q: "x", skills: ["A"], cities: ["pune"], includeRemote: false };
-  assert.equal(relaxations(many).length, 4);
-  assert.equal(relaxations(many, 2).length, 2);
-  assert.deepEqual(relaxations({ ...many, saved: true }), []);
-  assert.equal(relaxations({ ...many, match: "matched" }, 9).some((r) => r.key === "project"), false);
-  assert.equal(relaxations({ ...many, match: "off" }, 9).some((r) => r.key === "project"), false);
+test("relaxations: one noun per action, a chip only for what the employer set, never offered on the shortlist tab", () => {
+  const o = relaxations({ ...none, cities: ["rohtak"], cityFromProject: true, projectName: "Web", match: "matched", skills: ["React"], includeRemote: false });
+  assert.equal(o.find((r) => r.id === "city")?.label, "Any city");
+  assert.equal(o.find((r) => r.id === "city")?.chip, "City: Rohtak (from project)");
+  assert.equal(o.find((r) => r.id === "remote")?.label, "Include remote-only candidates");
+  assert.equal(o.find((r) => r.id === "stop")?.chip, null);
+  assert.equal(o.find((r) => r.id === "remote")?.chip, null); // a fact about the list, not a condition the employer set
+  assert.equal(o.find((r) => r.id === "stop")?.label, "Stop matching Web");
+  assert.equal(o.some((r) => r.key === "project"), false);
+  assert.deepEqual(relaxations({ ...none, cities: ["pune"], saved: true }), []);
+  assert.equal(relaxations({ ...none, match: "off", skills: ["A"] }).some((r) => r.key === "stop"), false);
+});
+
+const opt = (id: string, key: "city" | "skill" | "remote" | "q" | "stop" = "city") => ({ id, key, label: id, chip: id });
+
+test("rankRelaxations: best count first, recommended only when it returns someone, zero-result fixes hidden", () => {
+  const ranked = rankRelaxations([opt("city"), opt("remote", "remote"), opt("stop", "stop")], { city: 340, remote: 0, stop: 12 });
+  assert.deepEqual(ranked.map((r) => [r.id, r.count, r.recommended]), [["city", 340, true], ["stop", 12, false]]);
+  assert.deepEqual(rankRelaxations([opt("a"), opt("b", "remote")], { a: 0, b: 0 }), []);
+  assert.equal(rankRelaxations([opt("a"), opt("b", "remote")], { a: 5, b: 9 })[0].id, "b");
+});
+
+test("rankRelaxations: equal counts keep the list order, ties and counts are stable", () => {
+  assert.deepEqual(rankRelaxations([opt("a"), opt("b", "remote"), opt("c", "q")], { a: 4, b: 4, c: 4 }).map((r) => r.id), ["a", "b", "c"]);
+});
+
+test("rankRelaxations: with no counts the fixes keep their order, carry no number and none is recommended", () => {
+  for (const counts of [null, {}, { a: null }] as (Record<string, number | null> | null)[]) {
+    const ranked = rankRelaxations([opt("a"), opt("b", "remote")], counts);
+    assert.deepEqual(ranked.map((r) => [r.id, r.count, r.recommended]), [["a", null, false], ["b", null, false]]);
+  }
+  // counted fixes lead the uncounted ones
+  assert.deepEqual(rankRelaxations([opt("a"), opt("b", "remote")], { b: 3 }).map((r) => r.id), ["b", "a"]);
+});
+
+test("rankRelaxations: at most four, and at most two 'Drop X' skills so one list does not crowd out the rest", () => {
+  const options = [opt("skill:A", "skill"), opt("skill:B", "skill"), opt("skill:C", "skill"), opt("city"), opt("remote", "remote"), opt("q", "q")];
+  const counts = { "skill:A": 90, "skill:B": 80, "skill:C": 70, city: 10, remote: 5, q: 1 };
+  const ranked = rankRelaxations(options, counts);
+  assert.equal(ranked.length, 4);
+  assert.deepEqual(ranked.map((r) => r.id), ["skill:A", "skill:B", "city", "remote"]);
+  assert.equal(rankRelaxations(options, counts, 2).length, 2);
 });
 
 test("sectionCounts: each active chip counts in its own filter-column section", () => {
