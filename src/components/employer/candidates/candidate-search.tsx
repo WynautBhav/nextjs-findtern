@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * The Candidates search box: a combobox over skills and cities. Picking a suggestion runs the search; a skill also
- * offers "+ Require" (adds it to Required skills). The server matches skill names and city only, so that is all
+ * The Candidates search box: a combobox over skills and cities. Choosing a skill (a click anywhere on its row, Enter,
+ * or its "+ Require" tag) adds it to the required skills; choosing a city searches it. The server matches skill names and city only, so that is all
  * the box suggests. `/` focuses it from anywhere on the page (unless typing in a field), Esc closes the list, then
  * clears the box, then leaves it.
  */
@@ -99,6 +99,11 @@ export function CandidateSearch({
     setValue("");
     go(requireSkillHref(pathname, params.toString(), required, skill, hasPro));
   }
+  /** A skill row requires the skill (click, Enter or "+ Require" alike); a city row, or a skill already required, searches. */
+  function pick(s: Suggestion) {
+    if (s.canRequire && !full) require(s.label);
+    else run(s.label);
+  }
   function clear() {
     setValue("");
     setOpen(false);
@@ -126,16 +131,14 @@ export function CandidateSearch({
                 aria-selected={i === highlight}
                 onMouseDown={(e) => {
                   e.preventDefault();
-                  // The "+ Require" tag is part of the row but its own target.
-                  if ((e.target as HTMLElement).closest("[data-require]")) require(s.label);
-                  else run(s.label);
+                  pick(s);
                 }}
                 className={rowClass(i === highlight)}
               >
                 <span className="min-w-0 flex-1 truncate">{s.label}</span>
                 {s.canRequire && !full ? (
                   <span
-                    data-require
+                    aria-hidden
                     className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-ink-200 bg-white px-2.5 text-[13px] font-medium text-ink-800 hover:border-ink-400 touch:h-11"
                   >
                     <Plus className="size-3.5" aria-hidden />
@@ -156,7 +159,11 @@ export function CandidateSearch({
       role="search"
       onSubmit={(e) => {
         e.preventDefault();
-        run(value);
+        // Enter with nothing highlighted: the typed skill (or, failing an exact name, the top skill suggestion) is required.
+        const skills = found.all.filter((s) => s.canRequire);
+        const hit = skills.find((s) => s.label.toLowerCase() === typed.toLowerCase()) ?? (found.all[0]?.canRequire ? found.all[0] : undefined);
+        if (hit && !full) require(hit.label);
+        else run(value);
       }}
       className={cn("relative min-w-0", className)}
     >
@@ -167,7 +174,7 @@ export function CandidateSearch({
         Search skills or cities
       </label>
       <p id={`${listId}-note`} className="sr-only">
-        Searches skill names and cities. Enter runs the search. Shift and Enter requires the highlighted skill. Names and profiles are not searched.
+        Searches skill names and cities. Choosing a skill, by click or Enter, adds it to the required skills; choosing a city searches it. Names and profiles are not searched.
       </p>
       <Search className="pointer-events-none absolute left-4 top-1/2 size-[18px] -translate-y-1/2 text-ink-500" aria-hidden />
       <input
@@ -207,9 +214,7 @@ export function CandidateSearch({
             else input.current?.blur();
           } else if (e.key === "Enter" && highlight >= 0 && items[highlight]) {
             e.preventDefault();
-            const pick = items[highlight];
-            if (e.shiftKey && pick.canRequire && !full) require(pick.label);
-            else run(pick.label);
+            pick(items[highlight]);
           }
         }}
         className={cn(
