@@ -5,13 +5,13 @@
 export function emptyScheduleCopy(shortlisted: number): { body: string; next: { label: string; href: string }; who: string } {
   if (shortlisted > 0) {
     return {
-      body: `You have ${shortlisted} ${shortlisted === 1 ? "candidate" : "candidates"} on your shortlist, including any you have already sent a proposal. Book a meeting from your shortlist: you offer three times and they pick one.`,
+      body: `You have ${shortlisted} ${shortlisted === 1 ? "candidate" : "candidates"} on your shortlist, including any you have already sent a proposal. Book a meeting from your shortlist: you offer up to three times and they pick one.`,
       next: { label: "Open your shortlist", href: "/employer/cart" },
       who: "You - book from your shortlist",
     };
   }
   return {
-    body: "Shortlist a candidate, then book a meeting from your shortlist: you offer three times and they pick one.",
+    body: "Shortlist a candidate, then book a meeting from your shortlist: you offer up to three times and they pick one.",
     next: { label: "Browse candidates", href: "/employer/candidates" },
     who: "You - shortlist someone first",
   };

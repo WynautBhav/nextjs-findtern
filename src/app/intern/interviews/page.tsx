@@ -1,25 +1,21 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { CalendarX2, ChevronDown } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
-import { EmptyScene, PageHead, Pill, SectionHead, Surface, type Tone } from "@/components/app/primitives";
-import { SlotPicker } from "@/components/app/slot-picker";
+import { EmptyScene, PageHead, SectionHead, Surface } from "@/components/app/primitives";
+import { meetingSlots, OpenMeetingRow, PastMeetingRow } from "@/components/meetings/intern-rows";
+import { viewFor } from "@/lib/meetings/slots";
 import { AiInterviewJoinCard } from "@/components/intern/ai-interview-join-card";
 import { isScored } from "@/lib/ai-interview";
 import { interviewLifecycle } from "@/lib/interview-lifecycle";
 import { AiInterviewButton } from "@/components/intern/activation-card";
-import { AgendaRow } from "@/components/intern/interviews/agenda";
 import { splitUpcoming } from "@/components/intern/interviews/order";
 import { ScoreReport } from "@/components/intern/interviews/score-report";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { requireRole } from "@/lib/auth";
-import { SITE } from "@/lib/content/site";
-import { employerNoShow, isMeetingLinkLive, isStaleInterview } from "@/lib/employer-interview-rules";
-import { formatIst } from "@/lib/format";
+import { employerNoShow } from "@/lib/employer-interview-rules";
 import { HIDDEN_COMPANY, loadInternData, projectNames } from "@/lib/intern-data";
-import { feedbackForIntern } from "@/lib/interview-feedback";
-import { serializeJoinInput } from "@/lib/interview-join";
-import { isPast, slotOf, type InterviewRow } from "@/lib/journey";
+import type { InterviewRow } from "@/lib/journey";
 import { isInternPaid } from "@/lib/payments";
 
 /** Rows shown before "Show N more": a long list must not bury the score below it. */
@@ -70,61 +66,14 @@ export default async function InternInterviews() {
   const scored = findternScore > 0 || Object.values(ratings).some((v) => Number(v) > 0);
   // Once the score is on the page, the AI card would only repeat it.
   const showAiCard = Boolean(aiInterview) && !(scored && isScored(extra));
-  const slotsOf = (i: InterviewRow) =>
-    [i.slot1, i.slot2, i.slot3].flatMap((d, n) =>
-      // Keep each slot's column number (1..3): select-slot reads by position,
-      // so an empty slot 1 must not renumber slot 2.
-      d instanceof Date ? [{ index: n + 1, iso: d.toISOString(), passed: isPast(d) }] : [],
-    );
-
-  const row = (i: InterviewRow) => {
-    const slots = slotsOf(i);
-    const booked = Boolean(i.selectedSlot);
-    const when = booked ? slotOf(i) : null;
-    return (
-      <AgendaRow
-        key={i.id}
-        iso={when ? when.toISOString() : null}
-        title={titleOf(i)}
-        company={companyLine(i)}
-        status={booked ? <Pill tone="live">Booked</Pill> : slots.length > 0 ? <Pill tone="waiting">Pick a time</Pill> : <Pill tone="neutral">Times to follow</Pill>}
-      >
-        {slots.length > 0 ? (
-          <SlotPicker interviewId={i.id} slots={slots} timezone={i.timezone} chosen={i.selectedSlot} join={serializeJoinInput(i)} serverNow={serverNow} />
-        ) : (
-          <p className="text-pretty text-sm text-text-subtle">The company has not sent its times yet. They appear here as soon as they are set.</p>
-        )}
-      </AgendaRow>
-    );
-  };
-  const pastRow = (i: InterviewRow) => {
-    const outcome = pastOutcome(i);
-    const feedback = feedbackForIntern(i.notes);
-    const when = i.selectedSlot ? slotOf(i) : null;
-    return (
-      <AgendaRow
-        key={i.id}
-        past
-        iso={when ? when.toISOString() : null}
-        title={titleOf(i)}
-        company={companyLine(i)}
-        status={<Pill tone={outcome.tone} icon={outcome.icon}>{outcome.label}</Pill>}
-      >
-        {when ? <p className="nums text-sm text-ink-700">{formatIst(when, { year: true })}</p> : null}
-        {/* The pill already says "Interview done"; its generic sentence would repeat on every row. */}
-        {outcome.label === "Interview done" ? null : <p className="mt-1 text-pretty text-sm text-text-subtle">{outcome.detail}</p>}
-        {/* A missed round can carry feedback too; the employer is told it is shared. */}
-        {(outcome.label === "Interview done" || outcome.label === "Missed") && feedback ? (
-          <div className="mt-2 rounded-apple-sm bg-brand-50/70 p-4">
-            <p className="text-xs font-medium text-brand-800">Feedback from the company</p>
-            <p className="mt-1 whitespace-pre-line text-pretty text-sm text-ink-800">{feedback}</p>
-          </div>
-        ) : null}
-      </AgendaRow>
-    );
-  };
+  const nowMs = new Date(serverNow).getTime();
+  const row = (i: InterviewRow) => <OpenMeetingRow key={i.id} i={i} title={titleOf(i)} company={companyLine(i)} serverNow={serverNow} />;
+  const pastRow = (i: InterviewRow) => <PastMeetingRow key={i.id} i={i} title={titleOf(i)} company={companyLine(i)} />;
   // Rounds waiting on the intern's pick come first; booked ones follow, soonest first.
-  const { toPick, booked } = splitUpcoming(upcoming);
+  const { toPick: open, booked } = splitUpcoming(upcoming);
+  // Open offers split by whose move it is: the company's wait on the intern, the intern's own wait on the company.
+  const toPick = open.filter((i) => meetingSlots(i).length === 0 || viewFor(i, "intern", nowMs).turn === "yours");
+  const waitingOn = open.filter((i) => !toPick.includes(i));
 
   return (
     <div className="space-y-6 lg:space-y-8">
@@ -187,8 +136,15 @@ export default async function InternInterviews() {
         </section>
       ) : null}
 
-      {booked.length > 0 ? (
+      {waitingOn.length > 0 ? (
         <section data-first-content={toPick.length === 0 ? true : undefined} className="space-y-4">
+          <SectionHead title={`Waiting for the company · ${waitingOn.length}`} hint="You sent times. The company picks one, or sends times back." />
+          <FoldedList rows={waitingOn.map(row)} more="more" />
+        </section>
+      ) : null}
+
+      {booked.length > 0 ? (
+        <section data-first-content={toPick.length === 0 && waitingOn.length === 0 ? true : undefined} className="space-y-4">
           <SectionHead
             title={`Coming up · ${booked.length}`}
             action={
@@ -209,8 +165,8 @@ export default async function InternInterviews() {
         ) : (
           <EmptyScene
             as="h2"
-            title="No company interviews yet"
-            body="When a company wants to talk before sending an offer, it sends up to three times here. You pick one and join from this page."
+            title="No meetings yet"
+            body="When a company invites you to meet, it shows up here."
             who="Companies invite you"
           />
         )
@@ -256,51 +212,3 @@ function toIso(d: Date | string | null | undefined): string | null {
   const date = typeof d === "string" ? new Date(d) : d;
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
-
-/**
- * How a finished company round reads (INW-20): a picked time that has passed
- * is an interview that happened; an invite nobody picked a time for expired.
- */
-function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: React.ReactNode; icon?: React.ReactNode } {
-  const status = (i.status ?? "").toLowerCase();
-  if (status === "missed") {
-    return {
-      label: "Missed",
-      tone: "closed",
-      // INW-22: no off-platform contact; support handles it.
-      detail: (
-        <>
-          This round was marked as missed. If that is wrong, write to{" "}
-          <a href={`mailto:${SITE.email}`} className="font-medium text-brand-700 underline-offset-4 hover:underline">
-            {SITE.email}
-          </a>{" "}
-          and we will look into it.
-        </>
-      ),
-    };
-  }
-  if (status === "cancelled") return { label: "Cancelled", tone: "neutral", detail: "This interview was cancelled." };
-  if (employerNoShow(i)) {
-    return {
-      label: "Employer didn't join",
-      tone: "closed",
-      detail: "The company did not join within 30 minutes of the start, so this round expired. It does not count against you.",
-    };
-  }
-  if (interviewLifecycle(i).expired) {
-    return {
-      label: "Expired",
-      tone: "closed",
-      icon: <CalendarX2 />,
-      detail: i.selectedSlot ? "This interview's time passed and it was not marked complete. The company can schedule it again." : "Every offered time passed before one was picked, so this invite expired.",
-    };
-  }
-  if (status === "completed" || i.selectedSlot) {
-    return { label: "Interview done", tone: "paid", detail: "No written feedback yet. Any offer that follows lands in Offers." };
-  }
-  if (isStaleInterview(i)) {
-    return { label: "Expired", tone: "closed", detail: "Every offered time passed before one was picked, so this invite expired." };
-  }
-  return { label: "Closed", tone: "neutral", detail: "This interview is closed." };
-}
-

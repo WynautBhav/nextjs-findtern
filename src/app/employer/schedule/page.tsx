@@ -12,6 +12,7 @@ import { SITE } from "@/lib/content/site";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { projectZone } from "@/lib/timezones";
+import { viewFor } from "@/lib/meetings/slots";
 import { dayLabel, ScheduleView, type Params, type Row, type StatusFilter } from "./schedule-view";
 
 export const metadata: Metadata = {
@@ -24,10 +25,11 @@ const PAST_PAGE = 5;
 /** Status filter, in legacy's vocabulary (employer-schedule.tsx:331). */
 const STATUS_FILTERS: StatusFilter[] = [
   { value: "scheduled", label: "Scheduled", stages: ["upcoming", "live"] },
-  { value: "sent", label: "Waiting on candidate", stages: ["awaiting_pick"] },
+  { value: "sent", label: "Open offers", stages: ["awaiting_pick"] },
   { value: "expired", label: "Expired", stages: ["expired", "employer_no_show"] },
   { value: "completed", label: "Completed", stages: ["over"] },
   { value: "missed", label: "Missed", stages: ["missed"] },
+  { value: "cancelled", label: "Cancelled", stages: ["closed"] },
 ];
 
 /**
@@ -200,10 +202,14 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
     const label = r.sortAt === null ? "Time to be confirmed" : dayLabel(r.sortAt, r.tz, now);
     days.set(label, [...(days.get(label) ?? []), r]);
   }
-  const waiting = shown.filter((x) => x.stage === "awaiting_pick").sort(bySoonest);
+  // Open offers: the candidate's own proposals wait on this employer, so they lead; the employer's wait on the candidate.
+  const open = shown.filter((x) => x.stage === "awaiting_pick");
+  const yourMove = open.filter((x) => viewFor(x.iv, "employer", now).turn === "yours").sort(bySoonest);
+  const waiting = open.filter((x) => !yourMove.includes(x)).sort(bySoonest);
   const past = shown.filter((x) => x.stage === "over" || x.stage === "missed" || x.stage === "expired" || x.stage === "employer_no_show" || x.stage === "closed").sort((a, b) => (b.sortAt ?? 0) - (a.sortAt ?? 0));
   const pastShown = sp.past === "all" ? past : past.slice(0, PAST_PAGE);
   const sections = [
+    ...(yourMove.length ? [{ title: "Candidate proposed times: your reply", rows: yourMove, more: 0 }] : []),
     ...Array.from(days, ([title, rows]) => ({ title, rows, more: 0 })),
     ...(waiting.length ? [{ title: "Waiting on the candidate to pick", rows: waiting, more: 0 }] : []),
     ...(past.length ? [{ title: "Past", rows: pastShown, past: true, more: past.length - pastShown.length }] : []),
@@ -228,6 +234,7 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
       hrefWith={hrefWith}
       now={now}
       statusFilters={STATUS_FILTERS}
+      employerId={uid}
     />
   );
 }

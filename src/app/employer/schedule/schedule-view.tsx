@@ -8,6 +8,9 @@ import { isMeetingLinkLive, meetingTime, canLeaveFeedback, canMarkCompleted, can
 import { formatSlotDay } from "@/lib/format";
 import { ProposalTabs } from "@/components/employer/section-tabs";
 import { InterviewActions } from "@/components/employer/interview-actions";
+import { BookMeetingButton } from "@/components/meetings/book-meeting-dialog";
+import { OfferReply } from "@/components/meetings/offer-reply";
+import { MAX_ROUNDS, viewFor } from "@/lib/meetings/slots";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { serializeJoinInput } from "@/lib/interview-join";
 import { emptyScheduleCopy } from "@/components/employer/schedule-empty";
@@ -51,7 +54,10 @@ export function ScheduleView({
   hrefWith,
   now,
   statusFilters,
+  employerId,
 }: {
+  /** The signed-in employer, for "Book meeting" on a cancelled row. */
+  employerId: string;
   all: Row[];
   shown: Row[];
   sections: Section[];
@@ -74,7 +80,7 @@ export function ScheduleView({
     <div>
       <PageHead
         title="Schedule"
-        lede={all.length === 0 ? "Interviews you book with candidates land here, with what to do about each one." : "Times show in each meeting's own time zone. The join link works from here."}
+        lede={all.length === 0 ? "Meetings you book with candidates land here, with what to do about each one." : "Times show in each meeting's own time zone. The join link works from here."}
         action={
           <Link href="/employer/cart" className={buttonClass({ variant: "outline", size: "sm" })}>
             <CalendarDays className="size-4" aria-hidden />
@@ -93,7 +99,7 @@ export function ScheduleView({
       {all.length === 0 ? (
         <EmptyScene
           art
-          title="No interviews yet"
+          title="No meetings yet"
           {...emptyScheduleCopy(shortlisted)}
         />
       ) : (
@@ -183,7 +189,7 @@ export function ScheduleView({
                   <h2 className="mb-2 text-base font-semibold text-ink-900">{sec.title}</h2>
                   <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
                     {sec.rows.map((r) => (
-                      <ScheduleRow key={r.iv.id} r={r} now={now} past={sec.past === true} />
+                      <ScheduleRow key={r.iv.id} r={r} now={now} past={sec.past === true} employerId={employerId} />
                     ))}
                   </Surface>
                   {sec.more > 0 ? (
@@ -231,7 +237,7 @@ function clockOf(t: number, tz: string): { time: string; zone: string } {
   return { time, zone };
 }
 
-function ScheduleRow({ r, now, past }: { r: Row; now: number; past: boolean }) {
+function ScheduleRow({ r, now, past, employerId }: { r: Row; now: number; past: boolean; employerId: string }) {
   const { iv, stage } = r;
   const slots = [iv.slot1, iv.slot2, iv.slot3].filter((x): x is NonNullable<typeof x> => Boolean(x));
   const link = iv.meetingLink && isMeetingLinkLive(iv, now) ? iv.meetingLink : null;
@@ -239,6 +245,15 @@ function ScheduleRow({ r, now, past }: { r: Row; now: number; past: boolean }) {
   // Links open days early (isMeetingLinkLive); Join is the filled button only within 15 minutes of the start.
   const soon = picked !== null && now >= picked - SOON_MS && isMeetingLinkLive(iv, now);
   const waiting = stage === "awaiting_pick";
+  const view = viewFor(iv, "employer", now);
+  const theirs = waiting && view.turn === "yours";
+  const cancelled = (iv.status ?? "").toLowerCase() === "cancelled";
+  const pill = cancelled
+    ? { label: "Cancelled", tone: "closed" as Tone, icon: <CalendarX2 /> }
+    : theirs
+      ? { label: "Candidate proposed times", tone: "new" as Tone, icon: undefined }
+      : { label: STAGE[stage].label, tone: STAGE[stage].tone, icon: stage === "expired" ? <CalendarX2 /> : undefined };
+  const lapsedOffer = stage === "expired" && !iv.selectedSlot;
   const clock = r.sortAt === null ? null : clockOf(r.sortAt, r.tz);
   const lead = waiting ? (slots.length ? `${slots.length} time${slots.length === 1 ? "" : "s"}` : "No times") : (clock?.time ?? "To be confirmed");
   const sub = waiting ? clock?.zone : past && r.sortAt !== null ? `${formatSlotDay(new Date(r.sortAt), r.tz)} · ${clock?.zone ?? ""}` : clock?.zone;
@@ -268,17 +283,33 @@ function ScheduleRow({ r, now, past }: { r: Row; now: number; past: boolean }) {
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-ink-600">
             <span>{r.project ?? "No project"}</span>
             <span aria-hidden>·</span>
-            <Pill tone={STAGE[stage].tone} icon={stage === "expired" ? <CalendarX2 /> : undefined}>
-              {STAGE[stage].label}
+            <Pill tone={pill.tone} icon={pill.icon}>
+              {pill.label}
             </Pill>
+            {waiting ? (
+              <>
+                <span aria-hidden>·</span>
+                <span>
+                  {iv.proposedBy === "intern" ? "Candidate proposed" : "You proposed"}
+                  {view.round > 1 ? ` · Round ${view.round} of ${MAX_ROUNDS}` : ""}
+                </span>
+              </>
+            ) : null}
           </p>
-          {waiting && offered.length ? (
+          {lapsedOffer ? <p className="mt-1 text-sm text-ink-600">Nobody picked a time before the offer ran out. Propose new times.</p> : null}
+          {cancelled ? (
+            <p className="mt-1 text-sm text-ink-600">
+              {iv.cancelledBy === "intern" ? "The candidate cancelled this meeting." : iv.cancelledBy === "employer" ? "You cancelled this meeting." : "This meeting was cancelled."}
+              {iv.cancelReason ? <> Reason: <span className="text-ink-800">{iv.cancelReason}</span></> : null}
+            </p>
+          ) : null}
+          {waiting && !theirs && offered.length ? (
             <p className="nums mt-1 text-sm text-ink-600">
               <span className="sr-only">Offered times: </span>
               {offered.join(" · ")}
             </p>
           ) : null}
-          {waiting && offered.length === 0 ? <p className="mt-1 text-sm text-ink-600">The candidate asked to reschedule. Offer three new times.</p> : null}
+          {waiting && !theirs && offered.length === 0 ? <p className="mt-1 text-sm text-ink-600">The candidate asked to reschedule. Offer new times.</p> : null}
           {feedbackShown ? (
             <details className="group mt-1 text-sm text-ink-600">
               <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 sm:min-h-0 [&::-webkit-details-marker]:hidden">
@@ -304,7 +335,35 @@ function ScheduleRow({ r, now, past }: { r: Row; now: number; past: boolean }) {
         takenDown={r.down}
         joinInput={serializeJoinInput(iv)}
         serverNow={new Date(now).toISOString()}
+        bookAgain={
+          cancelled && !r.down ? (
+            <BookMeetingButton
+              employerId={employerId}
+              internId={iv.internId}
+              projectId={iv.projectId}
+              projectName={r.project}
+              candidateLabel={r.name}
+              defaultTimezone={r.tz}
+              lockTimezone={Boolean(iv.projectId)}
+            />
+          ) : null
+        }
+        turn={view.turn}
+        canCancel={view.canCancel && !theirs && !r.down}
       />
+      {theirs && !r.down ? (
+        <div className="min-w-0 sm:col-span-3 sm:pl-[calc(6rem+1.25rem)]">
+          <OfferReply
+            interviewId={iv.id}
+            slots={[iv.slot1, iv.slot2, iv.slot3].flatMap((d, n) => (d ? [{ index: n + 1, iso: new Date(d).toISOString() }] : []))}
+            zone={r.tz}
+            role="employer"
+            canCounter={view.canCounter}
+            round={view.round}
+            serverNow={new Date(now).toISOString()}
+          />
+        </div>
+      ) : null}
     </li>
   );
 }

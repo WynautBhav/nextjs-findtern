@@ -33,6 +33,7 @@ import { hasOpenOrderFor } from "@/lib/payments";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { offerTimeline } from "@/components/employer/proposal-timeline";
 import { ProposalView } from "./proposal-view";
+import { BookMeetingButton } from "@/components/meetings/book-meeting-dialog";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
 
 export const metadata: Metadata = {
@@ -319,6 +320,11 @@ export default async function EmployerProposalDetail({
       ratings={ratings}
       timeline={timeline}
       sendNewHref={sendNewHref}
+      bookMeeting={
+        projectDown ? null : (
+          <BookMeetingButton internId={proposal.internId} projectId={proposal.projectId} projectName={projectName} candidateLabel={internName} meetingOpen={Boolean(interview)} className="max-sm:w-full" />
+        )
+      }
       takedown={projectDown ? <TakedownBanner projects={[{ id: projectDown.id, name: projectName ?? "This project", reason: projectDown.reason }]} /> : null}
       notices={
         <>

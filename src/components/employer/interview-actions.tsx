@@ -7,10 +7,10 @@
  * when they didn't apply. Now the row's stage (`interviewStage`) decides
  * which actions exist at all (DESIGN.md §7.5):
  *
- *   awaiting_pick → Send reminder · Offer new times
- *   expired       → Offer new times
+ *   awaiting_pick → Send reminder · Revise times · Cancel (the candidate's own offer is answered in OfferReply instead)
+ *   expired       → Propose new times
  *   employer_no_show → Offer new times (the employer didn't join within 30 minutes)
- *   upcoming      → Join meeting (Meeting link until 15 minutes before) · Send reminder · Reschedule
+ *   upcoming      → Join meeting (Meeting link until 15 minutes before) · Send reminder · Reschedule · Cancel
  *   live          → Join meeting · Mark completed · Mark missed (after the grace period)
  *   over          → Leave feedback · Mark missed
  *   missed        → Leave feedback
@@ -24,13 +24,13 @@
 
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CalendarCheck, CalendarClock, Check, Loader2, MessageSquare, UserRound, X } from "lucide-react";
+import { Bell, CalendarCheck, CalendarClock, CalendarX2, Check, Loader2, MessageSquare, UserRound, X } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
-import { isQuarterHourWall, suggestedSlots, type InterviewStage } from "@/lib/employer-interview-rules";
-import { MeetingSlots, type Slots } from "@/components/employer/meeting-slots";
-import { hasSlotProblem } from "@/components/employer/meeting-slots-model";
+import type { InterviewStage } from "@/lib/employer-interview-rules";
+import { CancelMeetingDialog } from "@/components/meetings/cancel-meeting-dialog";
+import { ProposeTimes } from "@/components/meetings/propose-times";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import type { JoinInput } from "@/lib/interview-join";
 import { RowMenu } from "@/components/app/row-menu";
@@ -52,7 +52,16 @@ export function InterviewActions({
   takenDown = false,
   joinInput,
   serverNow,
+  turn = "none",
+  canCancel = false,
+  bookAgain = null,
 }: {
+  /** A "Book meeting" for a closed or cancelled meeting (the schedule passes its own button). */
+  bookAgain?: React.ReactNode;
+  /** Whose move an open offer is: "yours" means the candidate's offer waits on this employer (answered in the row's reply, so no reminder or revise here). */
+  turn?: "yours" | "theirs" | "none";
+  /** The meeting is an open offer or a booked time that has not started. */
+  canCancel?: boolean;
   /** The booking as `joinState` reads it: Join is gated to 15 minutes before the start, like the intern's. */
   joinInput?: JoinInput;
   /** ISO time on the server, with `joinInput`. */
@@ -80,19 +89,17 @@ export function InterviewActions({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [slots, setSlots] = useState<Slots>(["", "", ""]);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
   // Which input the error is about, so it can be marked invalid and focused.
-  const [errorField, setErrorField] = useState<"slots" | "feedback" | null>(null);
+  const [errorField, setErrorField] = useState<"feedback" | null>(null);
   const uid = useId();
   const errId = `${uid}-error`;
   const feedbackId = `${uid}-feedback`;
-  const slotsId = `${uid}-slots`;
-  function fail(field: "slots" | "feedback", msg: string) {
+  function fail(field: "feedback", msg: string) {
     setErrorField(field);
     setError(msg);
-    const el = document.getElementById(field === "slots" ? slotsId : feedbackId);
-    (field === "slots" ? el?.querySelector<HTMLElement>("input, select") : el)?.focus();
+    document.getElementById(feedbackId)?.focus();
   }
 
   async function post(path: string, body: unknown, label: string) {
@@ -139,18 +146,6 @@ export function InterviewActions({
     }
   }
 
-  async function reschedule() {
-    if (slots.some((v) => !v)) return fail("slots", "Offer three times.");
-    if (!slots.every(isQuarterHourWall)) return fail("slots", "Slots start on the hour or at :15, :30 or :45.");
-    if (new Set(slots).size !== 3) return fail("slots", "Offer three different times.");
-    // Wall-clock; the server applies the interview's timezone.
-    if (await post("reschedule", { slot1: slots[0], slot2: slots[1], slot3: slots[2] }, "reschedule")) {
-      setNotice("New times offered. The candidate has been told.");
-      setPanel("none");
-      router.refresh();
-    }
-  }
-
   async function sendFeedback() {
     if (!feedback.trim()) return fail("feedback", "Write the feedback first.");
     if (await post("feedback", { feedback: feedback.trim() }, "save the feedback")) {
@@ -164,16 +159,17 @@ export function InterviewActions({
   function toggle(next: Panel) {
     setError(null);
     setErrorField(null);
-    if (next === "reschedule" && panel !== "reschedule") setSlots(suggestedSlots(Date.now(), timezone));
     setPanel(panel === next ? "none" : next);
   }
 
-  const canRemind = stage === "awaiting_pick" || stage === "upcoming";
-  const canReschedule = stage === "awaiting_pick" || stage === "expired" || stage === "employer_no_show" || stage === "upcoming";
+  const timePassed = stage === "expired" || stage === "employer_no_show";
+  const theirOffer = stage === "awaiting_pick" && turn === "yours";
+  const canRemind = (stage === "awaiting_pick" && !theirOffer) || stage === "upcoming";
+  const canReschedule = (stage === "awaiting_pick" && !theirOffer) || stage === "expired" || stage === "employer_no_show" || stage === "upcoming";
+  const rescheduleLabel = stage === "upcoming" ? "Reschedule" : timePassed ? "Propose new times" : "Revise times";
   const missedShown = canMarkMissed && (stage === "live" || stage === "over");
   // Join is offered on every booked row; with no link yet it is disabled and says why (bug sheet 12 Nov, row 12).
   const linkShown = stage === "upcoming" || stage === "live";
-  const timePassed = stage === "expired" || stage === "employer_no_show";
   // An expired interview offers no Join and no reminder: "Schedule again" leads (feedback and "Mark completed" stay in the menu).
   const primary: "join" | "feedback" | "remind" | "reschedule" | null = linkShown
     ? "join"
@@ -250,43 +246,45 @@ export function InterviewActions({
             className={buttonClass({ variant: stage === "expired" || stage === "employer_no_show" ? "primary" : "outline", size: "sm" })}
           >
             <CalendarClock className="size-4" aria-hidden />
-            {stage === "upcoming" ? "Reschedule" : timePassed ? "Schedule again" : "Offer new times"}
+            {rescheduleLabel}
           </button>
         ) : null}
+        {stage === "closed" ? bookAgain : null}
         <RowMenu
           label="More actions for this interview"
           className="ml-auto"
           items={[
             ...(canRemind && primary !== "remind" ? [{ label: "Send reminder", onSelect: () => void remind(), icon: <Bell />, disabled: busy !== null }] : []),
             ...(canReschedule && primary !== "reschedule"
-              ? [{ label: stage === "upcoming" ? "Reschedule" : timePassed ? "Schedule again" : "Offer new times", onSelect: () => toggle("reschedule"), icon: <CalendarClock />, disabled: busy !== null }]
+              ? [{ label: rescheduleLabel, onSelect: () => toggle("reschedule"), icon: <CalendarClock />, disabled: busy !== null }]
               : []),
             ...(canMarkCompleted && stage === "expired" ? [{ label: "Mark completed", onSelect: () => void markCompleted(), icon: <CalendarCheck />, disabled: busy !== null }] : []),
             ...(canFeedback && primary !== "feedback" ? [{ label: "Leave feedback", onSelect: () => toggle("feedback"), icon: <MessageSquare /> }] : []),
             { label: "Open profile", href: internHref, icon: <UserRound /> },
+            ...(canCancel ? [{ label: "Cancel meeting", onSelect: () => setCancelOpen(true), icon: <CalendarX2 />, destructive: true, disabled: busy !== null }] : []),
             ...(missedShown ? [{ label: "Mark missed", onSelect: () => toggle("missed"), icon: <X />, destructive: true, disabled: busy !== null }] : []),
           ]}
         />
       </div>
 
       {panel === "reschedule" ? (
-        <div className="mt-1 rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4 sm:col-span-3">
-          <p className="text-sm font-semibold text-ink-900">Offer three new times</p>
-          <p className="mt-1 text-sm leading-relaxed text-ink-600">
-            Suggested: the next quarter hour, then one and two hours after it. Change any of them. Times are in {timezone}.
-          </p>
-          <div id={slotsId} className="mt-3">
-            <MeetingSlots slots={slots} onChange={setSlots} timezone={timezone} invalid={errorField === "slots"} describedBy={errId} />
-          </div>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button type="button" onClick={reschedule} disabled={busy !== null || hasSlotProblem(slots, timezone)} className={buttonClass({ size: "sm" })}>
-              {busy === "reschedule" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-              Offer these times
-            </button>
-            <button type="button" onClick={() => setPanel("none")} className={buttonClass({ variant: "ghost", size: "sm" })}>
-              Cancel
-            </button>
-          </div>
+        <div className="mt-1 sm:col-span-3">
+          <ProposeTimes
+            endpoint={`/api/interviews/${encodeURIComponent(interviewId)}/reschedule`}
+            timezone={timezone}
+            title={stage === "upcoming" ? "Offer new times" : "Offer times"}
+            hint={
+              stage === "upcoming"
+                ? "The booked time is released and the candidate picks again."
+                : "Offer up to three times. We suggest the next quarter hour and the two hours after it; change or remove any."
+            }
+            submitLabel="Offer these times"
+            onSent={() => {
+              setNotice("New times offered. The candidate has been told.");
+              setPanel("none");
+            }}
+            onClose={() => setPanel("none")}
+          />
         </div>
       ) : null}
 
@@ -343,6 +341,7 @@ export function InterviewActions({
           {error}
         </p>
       ) : null}
+      <CancelMeetingDialog interviewId={interviewId} open={cancelOpen} onOpenChange={setCancelOpen} other="the candidate" />
       {/* Always mounted, so the result is announced when it fills in. */}
       <p role="status" className={notice ? "inline-flex items-center gap-1.5 text-sm text-brand-700 sm:col-span-3" : "sr-only"}>
         {notice ? <Check className="size-4" aria-hidden /> : null}

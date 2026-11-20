@@ -6,6 +6,7 @@ import { CompareToggle } from "@/components/employer/compare-toggle";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { proposalPill } from "@/components/employer/proposal-state";
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
+import { BookMeetingButton } from "@/components/meetings/book-meeting-dialog";
 import { ButtonLink } from "@/components/ui/button";
 import type { CandidateRelation } from "@/lib/employer-visibility";
 import type { resolvePricing } from "@/lib/employer-pricing";
@@ -71,7 +72,8 @@ export function HireRail(props: RailProps) {
   const { employerId, employerFte, employerZone, internId, displayName, scored, plan, pricing, currency, action, sendHref, relation, appliedProjects, comparePicks, compareBlocked, shortlist } = props;
   const main = mainAction(action, relation);
   const showShortlist = Boolean(shortlist && action.kind === "send");
-  const hasLower = Boolean(relation?.fullTimeFrom) || showShortlist || !compareBlocked || appliedProjects.length > 0;
+  // Book meeting is always offered, so the lower block always renders.
+  const hasLower = true;
   return (
     <aside aria-label="Hire" className="min-w-0 xl:col-start-2 xl:row-span-2 xl:row-start-1">
       <div className="rise overflow-hidden rounded-[24px] shadow-tile-brand xl:sticky xl:top-24" style={{ ["--i" as string]: 1 }}>
@@ -103,6 +105,7 @@ export function HireRail(props: RailProps) {
                 <FullTimeOfferButton employerId={employerId} proposalId={relation.fullTimeFrom} candidate={displayName} fteStatus={employerFte} timezone={employerZone} />
               ) : null}
               {showShortlist ? <ShortlistToggle internId={internId} projectId={shortlist!.projectId} shortlisted={shortlist!.on} /> : null}
+              <BookMeetingButton internId={internId} projectId={shortlist?.projectId ?? null} candidateLabel={displayName} />
               {/* EMB-12: hires and full-time offers are not compared (legacy). */}
               {compareBlocked ? null : <CompareToggle employerId={employerId} internId={internId} projectId={shortlist?.projectId ?? null} picked={comparePicks} />}
             </div>

@@ -46,6 +46,8 @@ export type ProposalViewProps = {
   /** Heading and body of the actions card; null when there is nothing to do here. */
   actions: { heading: string; body: React.ReactNode } | null;
   sendNewHref: string | null;
+  /** A "Book meeting" button for this candidate and project (the page builds it; null when the project is down). */
+  bookMeeting?: React.ReactNode;
 };
 
 /**
@@ -94,7 +96,7 @@ export function ProposalView(p: ProposalViewProps) {
               }
             />
           </div>
-          {state.canPay || p.sendNewHref ? (
+          {state.canPay || p.sendNewHref || p.bookMeeting ? (
             <div className="flex w-full flex-col gap-3 @sm:w-auto @sm:flex-row">
               {state.canPay ? (
                 <Link href="/employer/checkout" className={buttonClass({ className: "max-sm:w-full" })}>
@@ -108,6 +110,7 @@ export function ProposalView(p: ProposalViewProps) {
                   Send a new proposal
                 </Link>
               ) : null}
+              {p.bookMeeting}
             </div>
           ) : null}
         </div>

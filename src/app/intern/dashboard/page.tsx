@@ -48,6 +48,7 @@ import { canSwitchBackToCollege } from "@/lib/college/identity-match";
 import { membershipOf } from "@/lib/college/membership";
 import { presenceNoticeKey } from "@/lib/dismissed-keys";
 import { paidSeatTotal } from "@/lib/college/seat-gate";
+import { viewFor } from "@/lib/meetings/slots";
 
 export const metadata: Metadata = {
   title: "Home",
@@ -171,6 +172,11 @@ export default async function InternHome() {
         Boolean(x.when && !["ended", "unavailable"].includes(joinState(now, x.interview).state)),
       )
       .sort((a, b) => a.when.getTime() - b.when.getTime())[0] ?? null;
+
+  // Company offers waiting on this intern's pick (the Interviews page answers them).
+  const meetingsToAnswer = data.interviews.filter(
+    (i) => !isAiInterview(i, data.aiEmployerIds) && Boolean(i.slot1 || i.slot2 || i.slot3) && viewFor(i, "intern", now.getTime()).turn === "yours",
+  ).length;
 
   const aiRow = latestAiInterview(data.interviews, data.aiEmployerIds);
   const aiPhase = aiInterviewPhase(aiRow, isScored(data.onboarding?.extraData));
@@ -497,6 +503,17 @@ export default async function InternHome() {
         {/* Hides a dismissed notice before first paint on a hard load (the notice is server-rendered). */}
         {presenceOn && profileStatus.tone === "live" ? <DismissedGuard store="local" storageKey={presenceNoticeKey(session.uid)} name="presence" /> : null}
         <MilestoneNote data={data} userId={session.uid} now={now} />
+        {meetingsToAnswer > 0 ? (
+          <Link
+            href="/intern/interviews"
+            className="flex min-h-11 items-center justify-between gap-3 rounded-apple-md border border-accent-300/70 bg-accent-100 px-4 py-3 text-sm font-medium text-accent-700 outline-none transition-colors hover:border-accent-400 focus-visible:ring-2 focus-visible:ring-brand-600"
+          >
+            <span className="nums">
+              {meetingsToAnswer} meeting {meetingsToAnswer === 1 ? "time" : "times"} to answer
+            </span>
+            <ArrowRight className="size-4 shrink-0" aria-hidden />
+          </Link>
+        ) : null}
         {gettingStarted ? (
           <GettingStarted
             completion={completion}

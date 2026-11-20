@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CheckCircle2, CreditCard, Loader2, MapPin, Send, Trash2, UserRound, Video } from "lucide-react";
+import { AlertCircle, CreditCard, Loader2, MapPin, Send, Trash2, UserRound, Video } from "lucide-react";
 
 import { EmptyScene, Pill } from "@/components/app/primitives";
 import { RowAvatar, ScoreBadge, SkillChips, headlineOf } from "@/components/employer/candidate-row-parts";
@@ -12,12 +12,11 @@ import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatRate } from "@/lib/format";
 import { displayNameOf, type CandidateProfile } from "@/lib/employer-candidates";
-import { isQuarterHourWall, meetingEndsAt, meetingTime, suggestedSlots } from "@/lib/employer-interview-rules";
-import { MeetingSlots, TimezoneSelect, type Slots } from "@/components/employer/meeting-slots";
-import { hasSlotProblem } from "@/components/employer/meeting-slots-model";
+import { meetingEndsAt, meetingTime } from "@/lib/employer-interview-rules";
+import { BookMeetingDialog } from "@/components/meetings/book-meeting-dialog";
 import { SendProposalHold } from "@/components/employer/send-proposal-hold";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
-import { fieldClass, labelClass } from "@/components/employer/ui-tokens";
+import { fieldClass } from "@/components/employer/ui-tokens";
 import type { Currency } from "@/lib/employer-pricing";
 import { cn } from "@/lib/utils";
 import {
@@ -81,11 +80,6 @@ export function CartManager({
   const [selectedProject, setSelectedProject] = useState<string>("all");
 
   const [meetingCandidate, setMeetingCandidate] = useState<CartLineItem | null>(null);
-  const [slots, setSlots] = useState<Slots>(["", "", ""]);
-  const [slotsTouched, setSlotsTouched] = useState(false);
-  const [timezone, setTimezone] = useState(companyTimezone);
-  const [meetingSuccess, setMeetingSuccess] = useState(false);
-  const [meetingError, setMeetingError] = useState("");
 
   const [removing, setRemoving] = useState<CartLineItem | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -147,56 +141,15 @@ export function CartManager({
     }
   }
 
-  function openMeeting(line: CartLineItem) {
-    // Three suggested slots: the next quarter hour, then +1 h and +2 h
-    // (bug sheet 7 S2 r2). Editable.
-    // The project's zone, else the company's (feedback sheet 2, row 7).
-    const zone = projectZone(line.projectTimezone, companyTimezone);
-    setTimezone(zone);
-    setSlots(suggestedSlots(nowMs(), zone));
-    setSlotsTouched(false);
-    setMeetingCandidate(line);
-    setMeetingError("");
-    setMeetingSuccess(false);
-  }
-
-  async function handleBookMeeting(e: React.FormEvent) {
-    e.preventDefault();
-    if (!meetingCandidate) return;
-    const [slot1, slot2, slot3] = slots;
-    if (!slot1 || !slot2 || !slot3) return setMeetingError("Offer three time slots so the candidate can choose.");
-    if (!slots.every(isQuarterHourWall)) return setMeetingError("Slots start on the hour or at :15, :30 or :45.");
-    if (new Set(slots).size !== 3) return setMeetingError("Offer three different times.");
-
-    setBusyId("booking-meeting");
-    setMeetingError("");
-    try {
-      const res = await csrfFetch(`/api/employer/${employerId}/interviews`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        // Wall-clock times in the chosen zone; the server converts them.
-        body: JSON.stringify({ internId: meetingCandidate.candidate.id, projectId: meetingCandidate.projectId, slot1, slot2, slot3, timezone }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) return setMeetingError(data.error ?? "Couldn't send the meeting request. Try again.");
-      // Hold "Book meeting" and "Send proposal" for this candidate until the meeting is over.
-      const end = data.interview ? meetingEndsAt(data.interview) : null;
-      const internId = meetingCandidate.candidate.id;
-      if (end !== null) {
-        const at = meetingTime(data.interview);
-        setCartLines((prev) =>
-          prev.map((l) =>
-            l.candidate.id === internId ? { ...l, meetingUntil: new Date(end).toISOString(), meetingAt: at === null ? null : new Date(at).toISOString() } : l,
-          ),
-        );
-      }
-      setMeetingSuccess(true);
-      router.refresh();
-    } catch {
-      setMeetingError("Couldn't reach the server. Check your connection and try again.");
-    } finally {
-      setBusyId(null);
-    }
+  /** A meeting was sent for `internId`: hold "Book meeting" and "Send proposal" for them until it is over. */
+  function onMeetingBooked(internId: string, interview: unknown) {
+    const iv = interview as Parameters<typeof meetingEndsAt>[0] | undefined;
+    const end = iv ? meetingEndsAt(iv) : null;
+    if (end === null || !iv) return;
+    const at = meetingTime(iv);
+    setCartLines((prev) =>
+      prev.map((l) => (l.candidate.id === internId ? { ...l, meetingUntil: new Date(end).toISOString(), meetingAt: at === null ? null : new Date(at).toISOString() } : l)),
+    );
   }
 
   if (cartLines.length === 0) {
@@ -267,7 +220,7 @@ export function CartManager({
             name={nameOf(group.primary)}
             currency={currency}
             busy={group.lines.some((l) => l.id === busyId)}
-            onMeeting={() => openMeeting(group.primary)}
+            onMeeting={() => setMeetingCandidate(group.primary)}
             onRemove={setRemoving}
           />
         ))}
@@ -294,7 +247,7 @@ export function CartManager({
                 name={nameOf(group.primary)}
                 currency={currency}
                 busy={group.lines.some((l) => l.id === busyId)}
-                onMeeting={() => openMeeting(group.primary)}
+                onMeeting={() => setMeetingCandidate(group.primary)}
                 onRemove={setRemoving}
               />
             ))}
@@ -329,89 +282,21 @@ export function CartManager({
         </DialogContent>
       </Dialog>
 
-      {/* Book a meeting */}
-      <Dialog open={Boolean(meetingCandidate)} onOpenChange={(open) => !open && setMeetingCandidate(null)}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>{meetingCandidate ? `Book a meeting with ${nameOf(meetingCandidate)}` : "Book a meeting"}</DialogTitle>
-            <DialogDescription>
-              Offer three times on the quarter hour. We suggest the next quarter hour and the two hours after it; change any of
-              them. The candidate picks one.
-            </DialogDescription>
-          </DialogHeader>
-
-          {meetingSuccess ? (
-            <div className="rounded-apple-md border border-brand-200 bg-brand-50 p-6 text-center transition-[opacity,scale] duration-[var(--dur-standard)] ease-[var(--ease-out-quart)] starting:scale-[0.97] starting:opacity-0">
-              <CheckCircle2 className="mx-auto size-8 text-brand-700" aria-hidden />
-              <p id="meeting-sent-title" className="mt-2 text-base font-semibold text-ink-900">Meeting request sent</p>
-              <p id="meeting-sent-body" className="mt-1 text-sm text-ink-600">It is on your Schedule as &ldquo;Waiting on candidate&rdquo; until they pick one of your times.</p>
-              {/* The form that held focus is gone: focus lands here and reads the result with it. */}
-              <button
-                type="button"
-                autoFocus
-                aria-describedby="meeting-sent-title meeting-sent-body"
-                onClick={() => setMeetingCandidate(null)}
-                className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 min-h-11" })}
-              >
-                Done
-              </button>
-            </div>
-          ) : (
-            <form onSubmit={handleBookMeeting} className="space-y-4 pt-1">
-              <MeetingSlots
-                slots={slots}
-                timezone={timezone}
-                onChange={(next) => {
-                  setSlots(next);
-                  setSlotsTouched(true);
-                }}
-              />
-              <div>
-                <label htmlFor="cart-timezone" className={labelClass}>
-                  Timezone
-                </label>
-                <div className="mt-1.5">
-                  {meetingCandidate?.projectTimezone ? (
-                    // The project owns its zone (feedback sheet 2, row 7); the server applies it too.
-                    <p id="cart-timezone" className="nums text-sm font-medium text-ink-900">
-                      {timezone}
-                    </p>
-                  ) : (
-                    <TimezoneSelect
-                      id="cart-timezone"
-                      value={timezone}
-                      onChange={(tz) => {
-                        setTimezone(tz);
-                        // Untouched suggestions move to the new zone's next quarter hour.
-                        if (!slotsTouched) setSlots(suggestedSlots(nowMs(), tz));
-                      }}
-                    />
-                  )}
-                </div>
-                <p className="mt-1.5 text-xs text-text-subtle">{meetingCandidate?.projectTimezone ? "Set by the project." : "Set from your company's location."} The candidate sees the times in this zone.</p>
-              </div>
-              {meetingError ? (
-                <p role="alert" className="text-sm text-danger">
-                  {meetingError}
-                </p>
-              ) : null}
-              <DialogFooter>
-                <button type="button" onClick={() => setMeetingCandidate(null)} className={buttonClass({ variant: "light", size: "sm", className: "min-h-11" })}>
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={busyId === "booking-meeting" || hasSlotProblem(slots, timezone)}
-                  className={buttonClass({ variant: "primary", size: "sm", className: "min-h-11" })}
-                >
-                  {busyId === "booking-meeting" ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-                  Send meeting request
-                </button>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
+      {/* Book a meeting: the shared dialog (one to three times; the project's zone when it has one). */}
+      {meetingCandidate ? (
+        <BookMeetingDialog
+          open
+          onOpenChange={(open) => !open && setMeetingCandidate(null)}
+          employerId={employerId}
+          internId={meetingCandidate.candidate.id}
+          projectId={meetingCandidate.projectId}
+          projectName={meetingCandidate.projectName}
+          candidateLabel={nameOf(meetingCandidate)}
+          defaultTimezone={projectZone(meetingCandidate.projectTimezone, companyTimezone)}
+          lockTimezone={Boolean(meetingCandidate.projectTimezone)}
+          onBooked={(interview) => onMeetingBooked(meetingCandidate.candidate.id, interview)}
+        />
+      ) : null}
     </div>
   );
 }

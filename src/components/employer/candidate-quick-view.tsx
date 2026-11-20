@@ -14,6 +14,7 @@ import { studyOf } from "@/components/employer/candidate-view";
 import { WorkPreferenceList } from "@/components/employer/work-preferences";
 import { workPreferenceRows } from "@/lib/work-preferences";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
+import { BookMeetingButton } from "@/components/meetings/book-meeting-dialog";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +34,13 @@ export function CandidateQuickView({
   wantedSkills = [],
   profileHref,
   className,
+  projectId = null,
+  meetingOpen = false,
 }: {
+  /** The project the list is for, when one is chosen: "Book meeting" books inside it. */
+  projectId?: string | null;
+  /** A meeting with this candidate is already open. */
+  meetingOpen?: boolean;
   candidate: CandidateProfile;
   displayName: string;
   place: string;
@@ -166,6 +173,7 @@ export function CandidateQuickView({
 
         <DialogFooter className="sm:items-center">
           <DialogClose className={buttonClass({ variant: "light", size: "sm", className: "h-11 rounded-xl" })}>Close</DialogClose>
+          <BookMeetingButton internId={candidate.id} projectId={projectId} candidateLabel={displayName} meetingOpen={meetingOpen} className="rounded-xl" />
           <ButtonLink href={profileHref} variant="primary" size="sm" className="h-11 rounded-xl px-4">
             Open full profile
           </ButtonLink>

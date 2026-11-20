@@ -243,6 +243,8 @@ export function CandidateCard({
       pricing={pricing}
       wantedSkills={wantedSkills}
       profileHref={profileHref}
+      projectId={projectId}
+      meetingOpen={Boolean(sendProposalHold(pendingMeetingAt))}
       className={QUICK_VIEW_PILL}
     />
   );
