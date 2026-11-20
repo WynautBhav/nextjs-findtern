@@ -5,14 +5,13 @@ import { useRouter } from "next/navigation";
 import { CalendarPlus, CheckCircle2, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { TimezoneSelect, type Slots } from "@/components/employer/meeting-slots";
-import { cannotSend, offerProblem } from "@/components/employer/meeting-slots-model";
+import { MeetingSlots, TimezoneSelect, type Slots } from "@/components/employer/meeting-slots";
+import { cannotSend, offerProblem, REQUIRED_SLOTS } from "@/components/employer/meeting-slots-model";
 import { labelClass } from "@/components/employer/ui-tokens";
 import { suggestedSlots } from "@/lib/employer-interview-rules";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { meetingContextFor, type MeetingContext } from "./meeting-context";
 import { postMeeting } from "./meeting-api";
-import { SlotsEditor } from "./slots-editor";
 
 export type BookMeetingProps = {
   /** With `defaultTimezone`, nothing is looked up. Without them the dialog asks the server who is signed in and which zone applies. */
@@ -29,7 +28,7 @@ export type BookMeetingProps = {
 };
 
 /**
- * "Book a meeting": the employer offers one to three times, the candidate picks one (or answers with times of its own).
+ * "Book a meeting": the employer offers exactly three times and the candidate chooses one.
  * The form mounts only while the dialog is open, so each opening starts from fresh suggestions.
  */
 export function BookMeetingDialog({
@@ -107,6 +106,9 @@ function BookMeetingForm({
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
 
+  // The whole-offer rule is said as soon as the form has been touched, not only after a send the disabled button would block.
+  const shownError = error || (touched ? offerProblem(slots) : null);
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     const problem = offerProblem(slots);
@@ -118,8 +120,8 @@ function BookMeetingForm({
       internId,
       ...(projectId ? { projectId } : {}),
       slot1: slots[0],
-      ...(slots[1] ? { slot2: slots[1] } : {}),
-      ...(slots[2] ? { slot3: slots[2] } : {}),
+      slot2: slots[1],
+      slot3: slots[2],
       timezone,
     });
     setBusy(false);
@@ -134,17 +136,17 @@ function BookMeetingForm({
       <DialogHeader>
         <DialogTitle>Book a meeting with {candidateLabel}</DialogTitle>
         <DialogDescription>
-          {projectName ? `For ${projectName}. ` : ""}Offer up to three times on the quarter hour. We suggest the next quarter hour and the two hours after it;
-          change or remove any. The candidate picks one, or sends times back.
+          {projectName ? `For ${projectName}. ` : ""}Pick {REQUIRED_SLOTS} times the candidate can choose from, on the quarter hour. We suggest the next quarter hour and the
+          two hours after it; change any. The candidate chooses one of them.
         </DialogDescription>
       </DialogHeader>
 
       {sent ? (
         <div className="rounded-apple-md border border-brand-200 bg-brand-50 p-6 text-center transition-[opacity,scale] duration-[var(--dur-standard)] ease-[var(--ease-out-quart)] starting:scale-[0.97] starting:opacity-0">
           <CheckCircle2 className="mx-auto size-8 text-brand-700" aria-hidden />
-          <p id="meeting-sent-title" className="mt-2 text-base font-semibold text-ink-900">Meeting request sent</p>
+          <p id="meeting-sent-title" className="mt-2 text-base font-semibold text-ink-900">Times offered</p>
           <p id="meeting-sent-body" className="mt-1 text-sm text-ink-600">
-            It is on your Schedule as &ldquo;Waiting on candidate&rdquo; until they pick one of your times.
+            It is on your Schedule as &ldquo;Waiting on candidate&rdquo; until they choose one of your 3 times.
           </p>
           {/* The form that held focus is gone: focus lands here and reads the result with it. */}
           <button
@@ -159,10 +161,10 @@ function BookMeetingForm({
         </div>
       ) : (
         <form onSubmit={submit} className="space-y-4 pt-1">
-          <SlotsEditor
+          <MeetingSlots
             slots={slots}
             timezone={timezone}
-            invalid={Boolean(error)}
+            invalid={Boolean(shownError)}
             describedBy={errId}
             onChange={(next) => {
               setSlots(next);
@@ -195,9 +197,9 @@ function BookMeetingForm({
               {lockTimezone ? "Set by the project." : "Set from your company's location."} The candidate sees the times in IST.
             </p>
           </div>
-          {error ? (
+          {shownError ? (
             <p id={errId} role="alert" className="text-sm text-danger">
-              {error}
+              {shownError}
             </p>
           ) : null}
           <DialogFooter>
@@ -206,7 +208,7 @@ function BookMeetingForm({
             </button>
             <button type="submit" disabled={busy || cannotSend(slots, timezone)} className={buttonClass({ variant: "primary", size: "sm", className: "min-h-11" })}>
               {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-              Send meeting request
+              Offer 3 times
             </button>
           </DialogFooter>
         </form>

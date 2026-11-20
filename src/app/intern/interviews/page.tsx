@@ -72,7 +72,7 @@ export default async function InternInterviews() {
   // Rounds waiting on the intern's pick come first; booked ones follow, soonest first.
   const { toPick: open, booked } = splitUpcoming(upcoming);
   // Open offers split by whose move it is: the company's wait on the intern, the intern's own wait on the company.
-  const toPick = open.filter((i) => meetingSlots(i).length === 0 || viewFor(i, "intern", nowMs).turn === "yours");
+  const toPick = open.filter((i) => meetingSlots(i).length > 0 && viewFor(i, "intern", nowMs).turn === "yours");
   const waitingOn = open.filter((i) => !toPick.includes(i));
 
   return (
@@ -109,7 +109,7 @@ export default async function InternInterviews() {
           <EmptyScene
             as="h2"
             title="Your interviews start with the AI interview"
-            body="It opens once the one-time activation is done and produces your Findtern Score. When a company wants to meet you after that, it sends three times here and you pick one."
+            body="It opens once the one-time activation is done and produces your Findtern Score. When a company wants to meet you after that, it offers three times here and you choose one."
             next={{ label: "Go to activation", href: "/intern/dashboard" }}
           />
         ) : (
@@ -129,8 +129,8 @@ export default async function InternInterviews() {
       {toPick.length > 0 ? (
         <section data-first-content className="space-y-4">
           <SectionHead
-            title={toPick.length === 1 ? "Pick a time for 1 interview" : `Pick a time for ${toPick.length} interviews`}
-            hint="Choose one of the times the company offered, then confirm."
+            title={toPick.length === 1 ? "Choose a time for 1 interview" : `Choose a time for ${toPick.length} interviews`}
+            hint="Choose one of the 3 times the company offered, then confirm. If none work, ask to reschedule."
           />
           <FoldedList rows={toPick.map(row)} more="more" />
         </section>
@@ -138,7 +138,7 @@ export default async function InternInterviews() {
 
       {waitingOn.length > 0 ? (
         <section data-first-content={toPick.length === 0 ? true : undefined} className="space-y-4">
-          <SectionHead title={`Waiting for the company · ${waitingOn.length}`} hint="You sent times. The company picks one, or sends times back." />
+          <SectionHead title={`Waiting for the company · ${waitingOn.length}`} hint="The company is offering times, or has not confirmed one yet." />
           <FoldedList rows={waitingOn.map(row)} more="more" />
         </section>
       ) : null}

@@ -202,16 +202,19 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
     const label = r.sortAt === null ? "Time to be confirmed" : dayLabel(r.sortAt, r.tz, now);
     days.set(label, [...(days.get(label) ?? []), r]);
   }
-  // Open offers: the candidate's own proposals wait on this employer, so they lead; the employer's wait on the candidate.
+  // Open offers: a reschedule the candidate asked for (or an older offer of theirs) waits on this employer, so it leads; the employer's own three times wait on the candidate.
   const open = shown.filter((x) => x.stage === "awaiting_pick");
-  const yourMove = open.filter((x) => viewFor(x.iv, "employer", now).turn === "yours").sort(bySoonest);
+  const yourMove = open.filter((x) => {
+    const v = viewFor(x.iv, "employer", now);
+    return v.turn === "yours" || v.requested;
+  }).sort(bySoonest);
   const waiting = open.filter((x) => !yourMove.includes(x)).sort(bySoonest);
   const past = shown.filter((x) => x.stage === "over" || x.stage === "missed" || x.stage === "expired" || x.stage === "employer_no_show" || x.stage === "closed").sort((a, b) => (b.sortAt ?? 0) - (a.sortAt ?? 0));
   const pastShown = sp.past === "all" ? past : past.slice(0, PAST_PAGE);
   const sections = [
-    ...(yourMove.length ? [{ title: "Candidate proposed times: your reply", rows: yourMove, more: 0 }] : []),
+    ...(yourMove.length ? [{ title: "Needs your reply", rows: yourMove, more: 0 }] : []),
     ...Array.from(days, ([title, rows]) => ({ title, rows, more: 0 })),
-    ...(waiting.length ? [{ title: "Waiting on the candidate to pick", rows: waiting, more: 0 }] : []),
+    ...(waiting.length ? [{ title: "Waiting on the candidate to choose", rows: waiting, more: 0 }] : []),
     ...(past.length ? [{ title: "Past", rows: pastShown, past: true, more: past.length - pastShown.length }] : []),
   ];
   const filtering = Boolean(q || dateFilter || chosen || projectFilter || tzFilter);

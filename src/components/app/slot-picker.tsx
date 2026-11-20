@@ -3,7 +3,7 @@
 /**
  * Interview slot picking, for interns.
  *
- * The company offers up to three times in its own timezone; they are stored
+ * The company offers exactly three times in its own timezone; they are stored
  * as UTC instants (converted with the company's DST on that day) and shown
  * here in India time, labelled IST, whatever zone they were booked in (bug
  * sheet 7, S2 r7; INW-09). Three times side by side, because picking a time is

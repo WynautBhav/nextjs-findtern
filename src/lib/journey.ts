@@ -337,11 +337,11 @@ export function buildThread(src: ProofSource, now: Date = new Date()): ThreadNod
         at: slotOf(i) ?? i.createdAt,
         title: needsChoice ? "Choose your interview time" : "Interview confirmed",
         detail: needsChoice
-          ? `${sentence(withName)} offered you three times. Pick the one that suits you and they will be told.`
+          ? `${sentence(withName)} offered you three times. Choose the one that suits you and they will be told.`
           : `Confirmed for ${withName}. The join link is on the interview page.`,
         with: withName,
         href: "/intern/interviews",
-        action: needsChoice ? "Pick a time" : undefined,
+        action: needsChoice ? "Choose a time" : undefined,
       });
     } else {
       nodes.push({

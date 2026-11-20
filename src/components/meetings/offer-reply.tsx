@@ -6,34 +6,32 @@ import { Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { formatIstClock, formatIstDay, IST_ZONE } from "@/lib/format";
-import { MAX_ROUNDS } from "@/lib/meetings/slots";
 import { cn } from "@/lib/utils";
 import { CancelMeetingDialog } from "./cancel-meeting-dialog";
 import { postMeeting, STALE_CODES } from "./meeting-api";
-import { ProposeTimes } from "./propose-times";
+import { RescheduleRequestPanel } from "./intern-meeting-actions";
 
 export type OfferSlot = { index: number; iso: string };
 
 /**
- * The other side's open offer, answered: pick one of its times, send times of your own, or cancel. Both roles use it;
- * `role` decides the words and where the offered times are read (the intern in IST, the employer in the project's zone,
- * with the candidate's IST beside each).
+ * An open offer, answered: the candidate chooses one of the company's three times, asks to reschedule (no times of their own) or
+ * cancels. The employer sees it only for an offer the candidate made before this rule (pick one, or cancel; new times are offered
+ * from the row's menu). `role` decides the words and where the times are read (intern in IST, employer in the project's zone).
  */
 export function OfferReply({
   interviewId,
   slots,
   zone,
   role,
-  canCounter,
-  round,
+  canRequestReschedule = false,
   serverNow,
 }: {
   interviewId: string;
   slots: OfferSlot[];
   zone: string;
   role: "employer" | "intern";
-  canCounter: boolean;
-  round: number;
+  /** The candidate may ask the company for new times. */
+  canRequestReschedule?: boolean;
   /** ISO time on the server, so a time that has started is not offered on first render. */
   serverNow: string;
 }) {
@@ -42,7 +40,7 @@ export function OfferReply({
   const [selected, setSelected] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [counter, setCounter] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const now = new Date(serverNow).getTime();
   const intern = role === "intern";
@@ -66,7 +64,7 @@ export function OfferReply({
     <div className="space-y-4">
       <fieldset className="min-w-0">
         <legend className="w-full text-pretty text-sm text-ink-700">
-          {intern || inIst ? "Choose one time. Times are in India time (IST)." : `Choose one time. Times are in ${zone}, with the candidate's IST beside each.`}
+          {intern || inIst ? "Choose one of these 3 times. Times are in India time (IST)." : `Choose one of these times. Times are in ${zone}, with the candidate's IST beside each.`}
         </legend>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {slots.map((slot) => {
@@ -106,9 +104,9 @@ export function OfferReply({
           {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
           {intern ? "Confirm this time" : "Pick this time"}
         </button>
-        {canCounter ? (
-          <button type="button" aria-expanded={counter} onClick={() => setCounter((v) => !v)} className={buttonClass({ variant: "outline", size: "sm", className: "h-auto min-h-11 whitespace-normal py-2 text-left leading-snug" })}>
-            None of these work: propose other times
+        {intern && canRequestReschedule ? (
+          <button type="button" aria-expanded={asking} onClick={() => setAsking((v) => !v)} className={buttonClass({ variant: "outline", size: "sm", className: "h-auto min-h-11 whitespace-normal py-2 text-left leading-snug" })}>
+            None of these work: ask to reschedule
           </button>
         ) : null}
         <button type="button" onClick={() => setCancelling(true)} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
@@ -116,28 +114,13 @@ export function OfferReply({
         </button>
       </div>
 
-      {!canCounter ? (
-        <p className="text-sm text-ink-600">This has gone back and forth {MAX_ROUNDS} times. Pick one of the times, or cancel.</p>
-      ) : round > 1 && intern ? (
-        <p className="text-sm text-ink-600">
-          Round {round} of {MAX_ROUNDS}.
-        </p>
-      ) : null}
-
       {error ? (
         <p role="alert" className="text-sm text-danger">
           {error}
         </p>
       ) : null}
 
-      {counter ? (
-        <ProposeTimes
-          endpoint={`/api/interviews/${encodeURIComponent(interviewId)}/counter`}
-          timezone={zone}
-          title="Propose other times"
-          onClose={() => setCounter(false)}
-        />
-      ) : null}
+      {asking ? <RescheduleRequestPanel interviewId={interviewId} booked={false} onClose={() => setAsking(false)} /> : null}
       <CancelMeetingDialog interviewId={interviewId} open={cancelling} onOpenChange={setCancelling} other={intern ? "the company" : "the candidate"} />
     </div>
   );

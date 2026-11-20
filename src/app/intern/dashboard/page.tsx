@@ -509,7 +509,7 @@ export default async function InternHome() {
             className="flex min-h-11 items-center justify-between gap-3 rounded-apple-md border border-accent-300/70 bg-accent-100 px-4 py-3 text-sm font-medium text-accent-700 outline-none transition-colors hover:border-accent-400 focus-visible:ring-2 focus-visible:ring-brand-600"
           >
             <span className="nums">
-              {meetingsToAnswer} meeting {meetingsToAnswer === 1 ? "time" : "times"} to answer
+              Choose a time for {meetingsToAnswer} {meetingsToAnswer === 1 ? "interview" : "interviews"}
             </span>
             <ArrowRight className="size-4 shrink-0" aria-hidden />
           </Link>

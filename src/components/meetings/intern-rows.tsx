@@ -12,13 +12,16 @@ import { feedbackForIntern } from "@/lib/interview-feedback";
 import { interviewLifecycle } from "@/lib/interview-lifecycle";
 import { serializeJoinInput } from "@/lib/interview-join";
 import { slotOf, type InterviewRow } from "@/lib/journey";
-import { MAX_ROUNDS, viewFor } from "@/lib/meetings/slots";
+import { viewFor } from "@/lib/meetings/slots";
 
 /** The offered times, each with its column number (1..3): select-slot reads by position, so an empty slot 1 must not renumber slot 2. */
 export const meetingSlots = (i: InterviewRow) =>
   [i.slot1, i.slot2, i.slot3].flatMap((d, n) => (d instanceof Date ? [{ index: n + 1, iso: d.toISOString() }] : []));
 
-/** An open company meeting on the intern's page: an offer to answer, the intern's own offer waiting, or a booked time. Every time is IST. */
+/**
+ * An open company meeting on the intern's page: the company's three times to choose from, a reschedule the candidate asked for
+ * (waiting on the company's three new times), or a booked time. The candidate never proposes times. Every time is IST.
+ */
 export function OpenMeetingRow({ i, title, company, serverNow }: { i: InterviewRow; title: string; company: string; serverNow: string }) {
   const slots = meetingSlots(i);
   const view = viewFor(i, "intern", new Date(serverNow).getTime());
@@ -27,12 +30,14 @@ export function OpenMeetingRow({ i, title, company, serverNow }: { i: InterviewR
   const mine = i.proposedBy === "intern";
   const status = booked ? (
     <Pill tone="live">Booked</Pill>
+  ) : view.requested ? (
+    <Pill tone="neutral">Reschedule requested</Pill>
   ) : slots.length === 0 ? (
     <Pill tone="neutral">Times to follow</Pill>
   ) : view.turn === "yours" ? (
-    <Pill tone="waiting">Pick a time</Pill>
+    <Pill tone="waiting">Choose a time</Pill>
   ) : (
-    <Pill tone="neutral">Waiting for the company to pick</Pill>
+    <Pill tone="neutral">Waiting for the company</Pill>
   );
   return (
     <AgendaRow iso={when ? when.toISOString() : null} title={title} company={company} status={status}>
@@ -44,37 +49,48 @@ export function OpenMeetingRow({ i, title, company, serverNow }: { i: InterviewR
               <InterviewJoin interview={serializeJoinInput(i)} serverNow={serverNow} />
             </div>
           </div>
-          <InternMeetingActions interviewId={i.id} mode="booked" canCancel={view.canCancel} canReschedule={view.canReschedule} />
+          <InternMeetingActions interviewId={i.id} booked canCancel={view.canCancel} canRequestReschedule={view.canRequestReschedule} />
+        </div>
+      ) : view.requested ? (
+        <div className="space-y-3">
+          <p className="text-pretty text-sm text-ink-700">
+            You asked the company to reschedule. They will offer 3 new times and you choose one.
+            {i.cancelReason ? (
+              <>
+                {" "}
+                Your note: <span className="text-ink-800">{i.cancelReason}</span>
+              </>
+            ) : null}
+          </p>
+          <InternMeetingActions interviewId={i.id} canCancel={view.canCancel} canRequestReschedule={false} />
         </div>
       ) : slots.length === 0 ? (
-        <p className="text-pretty text-sm text-text-subtle">The company has not sent its times yet. They appear here as soon as they are set.</p>
+        <div className="space-y-3">
+          <p className="text-pretty text-sm text-text-subtle">The company has not sent its times yet. They appear here as soon as they are set.</p>
+          <InternMeetingActions interviewId={i.id} canCancel={view.canCancel} canRequestReschedule={false} />
+        </div>
       ) : view.turn === "yours" ? (
-        <OfferReply interviewId={i.id} slots={slots} zone={IST_ZONE} role="intern" canCounter={view.canCounter} round={view.round} serverNow={serverNow} />
+        <OfferReply interviewId={i.id} slots={slots} zone={IST_ZONE} role="intern" canRequestReschedule={view.canRequestReschedule} serverNow={serverNow} />
       ) : (
         <div className="space-y-3">
           <p className="text-pretty text-sm text-ink-700">
-            {mine ? "You sent these times. The company picks one." : "The company has not confirmed a time yet."} Times are in India time (IST).
+            {mine ? "These are times you sent earlier. The company picks one or offers new times." : view.lapsed ? "These times have lapsed. Ask to reschedule, or wait for the company to offer new ones." : "The company has not confirmed a time yet."} Times are in India time (IST).
           </p>
-          <ul className="flex flex-wrap gap-2" aria-label="Times you offered">
+          <ul className="flex flex-wrap gap-2" aria-label="Times offered">
             {slots.map((slot) => (
               <li key={slot.index} className="nums rounded-apple-sm border border-ink-200/80 bg-surface-raised px-3 py-2 text-sm font-medium text-ink-900">
                 {formatIst(slot.iso)}
               </li>
             ))}
           </ul>
-          {view.round > 1 ? (
-            <p className="text-sm text-text-subtle">
-              Round {view.round} of {MAX_ROUNDS}
-            </p>
-          ) : null}
-          {mine ? <InternMeetingActions interviewId={i.id} mode="waiting" canCancel={view.canCancel} canReschedule={view.canReschedule} /> : null}
+          <InternMeetingActions interviewId={i.id} canCancel={view.canCancel} canRequestReschedule={view.canRequestReschedule && !mine} />
         </div>
       )}
     </AgendaRow>
   );
 }
 
-/** A finished company round: the outcome, feedback, and (for an expired or cancelled one) a way to ask for new times. */
+/** A finished company round: the outcome and feedback. */
 export function PastMeetingRow({ i, title, company }: { i: InterviewRow; title: string; company: string }) {
   const outcome = pastOutcome(i);
   const feedback = feedbackForIntern(i.notes);
@@ -94,12 +110,6 @@ export function PastMeetingRow({ i, title, company }: { i: InterviewRow; title: 
       {when ? <p className="nums text-sm text-ink-700">{formatIst(when, { year: true })}</p> : null}
       {/* The pill already says "Interview done"; its generic sentence would repeat on every row. */}
       {outcome.label === "Interview done" ? null : <p className="mt-1 text-pretty text-sm text-text-subtle">{outcome.detail}</p>}
-      {/* An expired or cancelled meeting can be asked for again, inside this same relationship (the route refuses anything else). */}
-      {outcome.label === "Cancelled" || outcome.label === "Expired" ? (
-        <div className="mt-3">
-          <InternMeetingActions interviewId={i.id} mode="request" />
-        </div>
-      ) : null}
       {/* A missed round can carry feedback too; the employer is told it is shared. */}
       {(outcome.label === "Interview done" || outcome.label === "Missed") && feedback ? (
         <div className="mt-2 rounded-apple-sm bg-brand-50/70 p-4">
@@ -164,7 +174,7 @@ function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: Reac
       label: "Expired",
       tone: "closed",
       icon: <CalendarX2 />,
-      detail: i.selectedSlot ? "This interview's time passed and it was not marked complete. The company can schedule it again." : "Nobody picked a time before the offer ran out, so it expired.",
+      detail: i.selectedSlot ? "This interview's time passed and it was not marked complete. The company can offer new times." : "Nobody picked a time before the offer ran out, so it expired.",
     };
   }
   if (status === "completed" || i.selectedSlot) {

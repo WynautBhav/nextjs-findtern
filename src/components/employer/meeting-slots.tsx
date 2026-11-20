@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * One to three meeting slots, each a date plus a quarter-hour time (:00, :15, :30,
+ * Three meeting slots (the employer offers exactly three), each a date plus a quarter-hour time (:00, :15, :30,
  * :45), as the legacy cart dialog had (employer-cart.tsx:3961). A plain
  * datetime-local input ignores `step` in most browsers' pickers, so any
  * minute could be typed; a time list cannot drift off the quarter hour.
@@ -11,7 +11,6 @@
  */
 
 import { useId } from "react";
-import { X } from "lucide-react";
 
 import { TIMEZONES } from "@/lib/timezones";
 import { SLOT_MINUTES } from "@/lib/employer-interview-rules";
@@ -20,7 +19,7 @@ import { DmyDateInput } from "@/components/app/dmy-date-input";
 import { fieldClass } from "@/components/employer/ui-tokens";
 import { cn } from "@/lib/utils";
 
-/** One to three wall-clock times. */
+/** Three wall-clock times. */
 export type Slots = string[];
 
 /** "00:00" … "23:45". */
@@ -46,12 +45,9 @@ export function MeetingSlots({
   disabled,
   invalid,
   describedBy,
-  onRemove,
 }: {
   slots: Slots;
   onChange: (next: Slots) => void;
-  /** Given, each slot gets a Remove control (the caller keeps at least one). */
-  onRemove?: (idx: number) => void;
   timezone: string;
   disabled?: boolean;
   /** A message about the slots is showing: mark the controls and tie them to it. */
@@ -80,20 +76,7 @@ export function MeetingSlots({
         return (
           <fieldset key={idx} disabled={disabled} className="min-w-0">
             <legend className="mb-1.5 w-full text-sm font-medium text-ink-800">
-              <span className="flex items-center justify-between gap-2">
-                Slot {idx + 1}
-                {onRemove ? (
-                  <button
-                    type="button"
-                    onClick={() => onRemove(idx)}
-                    aria-label={`Remove slot ${idx + 1}`}
-                    className="-my-3 inline-flex min-h-11 items-center gap-1 rounded-apple-sm px-2 text-sm font-normal text-ink-600 outline-none transition-colors hover:bg-ink-100 hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-600"
-                  >
-                    <X className="size-4" aria-hidden />
-                    Remove
-                  </button>
-                ) : null}
-              </span>
+              Slot {idx + 1} of {slots.length}
             </legend>
             <div className="grid grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)] gap-2">
               <DmyDateInput

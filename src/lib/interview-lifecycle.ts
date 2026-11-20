@@ -139,7 +139,7 @@ export function interviewExpiryNotices(i: { interviewId: string; booked: boolean
       employer: i.employerTakenDown
         ? null
         : { title: "Meeting offer lapsed", message: `The times for your meeting with ${i.initials} were not answered in time. Offer new times if you still want to meet.`, data: { ...data, link: "/employer/schedule" } },
-      intern: { title: "Meeting offer lapsed", message: "The times for your meeting were not answered in time, so the offer lapsed. Either side can propose new times.", data: { ...data, link: "/intern/interviews" } },
+      intern: { title: "Meeting offer lapsed", message: "The times for your meeting were not answered in time, so the offer lapsed. The company can offer new times.", data: { ...data, link: "/intern/interviews" } },
     };
   }
   return {

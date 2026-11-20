@@ -10,7 +10,7 @@ import { ProposalTabs } from "@/components/employer/section-tabs";
 import { InterviewActions } from "@/components/employer/interview-actions";
 import { BookMeetingButton } from "@/components/meetings/book-meeting-dialog";
 import { OfferReply } from "@/components/meetings/offer-reply";
-import { MAX_ROUNDS, viewFor } from "@/lib/meetings/slots";
+import { viewFor } from "@/lib/meetings/slots";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { serializeJoinInput } from "@/lib/interview-join";
 import { maskMeetingLink } from "@/lib/meetings/gate";
@@ -247,11 +247,15 @@ function ScheduleRow({ r, now, past, employerId }: { r: Row; now: number; past: 
   const soon = picked !== null && now >= picked - SOON_MS && isMeetingLinkLive(iv, now);
   const waiting = stage === "awaiting_pick";
   const view = viewFor(iv, "employer", now);
+  const requested = waiting && view.requested;
+  // A time offer the candidate made before this rule (the employer picks one of its times, or offers three of their own).
   const theirs = waiting && view.turn === "yours";
   const cancelled = (iv.status ?? "").toLowerCase() === "cancelled";
   const pill = cancelled
     ? { label: "Cancelled", tone: "closed" as Tone, icon: <CalendarX2 /> }
-    : theirs
+    : requested
+        ? { label: "Offer 3 new times", tone: "new" as Tone, icon: undefined }
+        : theirs
       ? { label: "Candidate proposed times", tone: "new" as Tone, icon: undefined }
       : { label: STAGE[stage].label, tone: STAGE[stage].tone, icon: stage === "expired" ? <CalendarX2 /> : undefined };
   const lapsedOffer = stage === "expired" && !iv.selectedSlot;
@@ -290,14 +294,11 @@ function ScheduleRow({ r, now, past, employerId }: { r: Row; now: number; past: 
             {waiting ? (
               <>
                 <span aria-hidden>·</span>
-                <span>
-                  {iv.proposedBy === "intern" ? "Candidate proposed" : "You proposed"}
-                  {view.round > 1 ? ` · Round ${view.round} of ${MAX_ROUNDS}` : ""}
-                </span>
+                <span>{requested ? "Candidate asked to reschedule" : iv.proposedBy === "intern" ? "Candidate proposed" : "You offered 3 times"}</span>
               </>
             ) : null}
           </p>
-          {lapsedOffer ? <p className="mt-1 text-sm text-ink-600">Nobody picked a time before the offer ran out. Propose new times.</p> : null}
+          {lapsedOffer ? <p className="mt-1 text-sm text-ink-600">Nobody picked a time before the offer ran out. Offer 3 new times.</p> : null}
           {cancelled ? (
             <p className="mt-1 text-sm text-ink-600">
               {iv.cancelledBy === "intern" ? "The candidate cancelled this meeting." : iv.cancelledBy === "employer" ? "You cancelled this meeting." : "This meeting was cancelled."}
@@ -310,7 +311,17 @@ function ScheduleRow({ r, now, past, employerId }: { r: Row; now: number; past: 
               {offered.join(" · ")}
             </p>
           ) : null}
-          {waiting && !theirs && offered.length === 0 ? <p className="mt-1 text-sm text-ink-600">The candidate asked to reschedule. Offer new times.</p> : null}
+          {requested ? (
+            <p className="mt-1 text-sm text-ink-600">
+              The candidate asked to reschedule: please offer 3 new times.
+              {iv.cancelReason ? (
+                <>
+                  {" "}
+                  Their note: <span className="text-ink-800">{iv.cancelReason}</span>
+                </>
+              ) : null}
+            </p>
+          ) : null}
           {feedbackShown ? (
             <details className="group mt-1 text-sm text-ink-600">
               <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 sm:min-h-0 [&::-webkit-details-marker]:hidden">
@@ -350,6 +361,7 @@ function ScheduleRow({ r, now, past, employerId }: { r: Row; now: number; past: 
           ) : null
         }
         turn={view.turn}
+        requested={requested}
         canCancel={view.canCancel && !theirs && !r.down}
       />
       {theirs && !r.down ? (
@@ -359,8 +371,6 @@ function ScheduleRow({ r, now, past, employerId }: { r: Row; now: number; past: 
             slots={[iv.slot1, iv.slot2, iv.slot3].flatMap((d, n) => (d ? [{ index: n + 1, iso: new Date(d).toISOString() }] : []))}
             zone={r.tz}
             role="employer"
-            canCounter={view.canCounter}
-            round={view.round}
             serverNow={new Date(now).toISOString()}
           />
         </div>

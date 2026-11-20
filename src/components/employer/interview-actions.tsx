@@ -7,10 +7,10 @@
  * when they didn't apply. Now the row's stage (`interviewStage`) decides
  * which actions exist at all (DESIGN.md §7.5):
  *
- *   awaiting_pick → Send reminder · Revise times · Cancel (the candidate's own offer is answered in OfferReply instead)
- *   expired       → Propose new times
- *   employer_no_show → Offer new times (the employer didn't join within 30 minutes)
- *   upcoming      → Join meeting (Meeting link until 15 minutes before) · Send reminder · Reschedule · Cancel
+ *   awaiting_pick → Send reminder · Offer 3 new times · Cancel (a reschedule the candidate asked for leads with Offer 3 times)
+ *   expired       → Offer 3 new times
+ *   employer_no_show → Offer 3 new times (the employer didn't join within 30 minutes)
+ *   upcoming      → Join meeting (Meeting link until 15 minutes before) · Send reminder · Reschedule (offer 3 new times) · Cancel
  *   live          → Join meeting · Mark completed · Mark missed (after the grace period)
  *   over          → Leave feedback · Mark missed
  *   missed        → Leave feedback
@@ -30,7 +30,7 @@ import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import type { InterviewStage } from "@/lib/employer-interview-rules";
 import { CancelMeetingDialog } from "@/components/meetings/cancel-meeting-dialog";
-import { ProposeTimes } from "@/components/meetings/propose-times";
+import { OfferTimes } from "@/components/meetings/offer-times";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import type { JoinInput } from "@/lib/interview-join";
 import { RowMenu } from "@/components/app/row-menu";
@@ -53,6 +53,7 @@ export function InterviewActions({
   joinInput,
   serverNow,
   turn = "none",
+  requested = false,
   canCancel = false,
   bookAgain = null,
 }: {
@@ -60,6 +61,8 @@ export function InterviewActions({
   bookAgain?: React.ReactNode;
   /** Whose move an open offer is: "yours" means the candidate's offer waits on this employer (answered in the row's reply, so no reminder or revise here). */
   turn?: "yours" | "theirs" | "none";
+  /** The candidate asked to reschedule: the employer owes three new times (leads with Offer 3 times). */
+  requested?: boolean;
   /** The meeting is an open offer or a booked time that has not started. */
   canCancel?: boolean;
   /** The booking as `joinState` reads it: Join is gated to 15 minutes before the start, like the intern's. */
@@ -164,9 +167,9 @@ export function InterviewActions({
 
   const timePassed = stage === "expired" || stage === "employer_no_show";
   const theirOffer = stage === "awaiting_pick" && turn === "yours";
-  const canRemind = (stage === "awaiting_pick" && !theirOffer) || stage === "upcoming";
-  const canReschedule = (stage === "awaiting_pick" && !theirOffer) || stage === "expired" || stage === "employer_no_show" || stage === "upcoming";
-  const rescheduleLabel = stage === "upcoming" ? "Reschedule" : timePassed ? "Propose new times" : "Revise times";
+  const canRemind = (stage === "awaiting_pick" && !theirOffer && !requested) || stage === "upcoming";
+  const canReschedule = stage === "awaiting_pick" || stage === "expired" || stage === "employer_no_show" || stage === "upcoming";
+  const rescheduleLabel = stage === "upcoming" ? "Reschedule" : requested ? "Offer 3 times" : "Offer 3 new times";
   const missedShown = canMarkMissed && (stage === "live" || stage === "over");
   // Join is offered on every booked row; with no link yet it is disabled and says why (bug sheet 12 Nov, row 12).
   const linkShown = stage === "upcoming" || stage === "live";
@@ -242,7 +245,7 @@ export function InterviewActions({
             onClick={() => toggle("reschedule")}
             aria-expanded={panel === "reschedule"}
             disabled={busy !== null}
-            className={buttonClass({ variant: stage === "expired" || stage === "employer_no_show" ? "primary" : "outline", size: "sm" })}
+            className={buttonClass({ variant: stage === "expired" || stage === "employer_no_show" || requested ? "primary" : "outline", size: "sm" })}
           >
             <CalendarClock className="size-4" aria-hidden />
             {rescheduleLabel}
@@ -268,18 +271,19 @@ export function InterviewActions({
 
       {panel === "reschedule" ? (
         <div className="mt-1 sm:col-span-3">
-          <ProposeTimes
-            endpoint={`/api/interviews/${encodeURIComponent(interviewId)}/reschedule`}
+          <OfferTimes
+            interviewId={interviewId}
             timezone={timezone}
-            title={stage === "upcoming" ? "Offer new times" : "Offer times"}
+            title={stage === "upcoming" ? "Offer 3 new times" : "Offer 3 times"}
             hint={
               stage === "upcoming"
-                ? "The booked time is released and the candidate picks again."
-                : "Offer up to three times. We suggest the next quarter hour and the two hours after it; change or remove any."
+                ? "The booked time is released and the candidate chooses again. Pick 3 times they can choose from."
+                : requested
+                  ? "The candidate asked to reschedule. Pick 3 times they can choose from."
+                  : undefined
             }
-            submitLabel="Offer these times"
             onSent={() => {
-              setNotice("New times offered. The candidate has been told.");
+              setNotice("3 new times offered. The candidate has been told.");
               setPanel("none");
             }}
             onClose={() => setPanel("none")}

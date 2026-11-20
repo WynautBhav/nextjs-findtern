@@ -7,7 +7,7 @@ import { emails, icsInvite } from "@/lib/emails";
 import { initialsOf } from "@/lib/employer-candidates";
 import { hiredProposalSql } from "@/lib/employer-visibility";
 import { formatIst, formatSlotTime } from "@/lib/format";
-import { employerNames, internFirstName, notify, resolveInterviewNotifications } from "@/lib/notify";
+import { employerNames, notify, resolveInterviewNotifications } from "@/lib/notify";
 import { linkTo } from "@/lib/origin";
 import { interviewZone, loadProjectZones } from "@/lib/project-zones";
 import { wallTimeToUtc } from "@/lib/timezones";
@@ -40,7 +40,8 @@ export async function ensureGateToken(db: Db, interview: Pick<Interview, "id" | 
 
 export type Fail = { ok: false; status: number; error: string; code?: string };
 const fail = (status: number, error: string, code?: string): Fail => ({ ok: false, status, error, code });
-const refused = (r: Refusal): Fail => fail(r.code === "not_found" ? 404 : r.code === "own_offer" ? 403 : ["no_slots", "too_many_slots", "bad_slot", "not_quarter_hour", "slot_past", "slot_far", "slot_duplicate", "reason_required", "slot_not_offered"].includes(r.code) ? 400 : 409, r.error, r.code);
+const BAD_INPUT = ["need_three_slots", "bad_slot", "not_quarter_hour", "slot_past", "slot_far", "slot_duplicate", "reason_required", "reason_too_long", "slot_not_offered"];
+const refused = (r: Refusal): Fail => fail(r.code === "not_found" ? 404 : ["own_offer", "employer_only", "intern_only"].includes(r.code) ? 403 : BAD_INPUT.includes(r.code) ? 400 : 409, r.error, r.code);
 
 /** Wall-clock "YYYY-MM-DDTHH:MM" strings in `zone` to UTC instants; null when a zone or string is unusable. */
 export function wallsToUtc(walls: string[], zone: string): Date[] | null {
@@ -64,17 +65,6 @@ export async function busyStarts(db: Pick<Db, "select">, employerId: string, int
     if (s !== null && s > Date.now() - 2 * MEETING_MS) out.push(s);
   }
   return out;
-}
-
-/** Whether `internId` and `employerId` already have a relationship (shortlist, proposal or interview) an intern may start a meeting inside. */
-export async function hasRelationship(db: Db, employerId: string, internId: string, projectId?: string | null): Promise<boolean> {
-  const proj = (col: unknown) => (projectId ? sql`and ${col} = ${projectId}` : sql``);
-  const q = await db.execute(sql`
-    select 1 as ok from employer_cart_items where employer_id = ${employerId} and intern_id = ${internId} ${proj(sql`project_id`)}
-    union all select 1 from proposals where employer_id = ${employerId} and intern_id = ${internId} ${proj(sql`project_id`)}
-    union all select 1 from interviews where employer_id = ${employerId} and intern_id = ${internId} ${proj(sql`project_id`)}
-    limit 1`);
-  return q.rows.length > 0;
 }
 
 /** Locks both parties for the length of a transaction, so two picks for the same person cannot both pass the conflict check. */
@@ -132,8 +122,8 @@ export async function actorSlots(db: Db, iv: Interview, role: Role, walls: strin
 
 export type ActionInput =
   | { type: "choose"; slot: number }
-  | { type: "counter"; slots: Date[] }
   | { type: "reschedule"; slots: Date[] }
+  | { type: "request_reschedule"; reason?: string }
   | { type: "cancel"; reason: string };
 
 /**
@@ -156,7 +146,9 @@ export async function act(interviewId: string, role: Role, uid: string, input: A
         ? { type: "choose", by: role, slot: input.slot, busy: await busyStarts(tx, cur.employerId, cur.internId, cur.id) }
         : input.type === "cancel"
           ? { type: "cancel", by: role, reason: input.reason }
-          : { type: input.type, by: role, slots: input.slots };
+          : input.type === "request_reschedule"
+            ? { type: "request_reschedule", by: role, reason: input.reason }
+            : { type: "reschedule", by: role, slots: input.slots, busy: await busyStarts(tx, cur.employerId, cur.internId, cur.id) };
     const r = step(cur, action);
     if (!r.ok) return refused(r);
     const f = r.fields;
@@ -226,19 +218,32 @@ async function tellOtherSide(db: Db, role: Role, before: Interview, iv: Intervie
   const to = other === "intern" ? { type: "intern" as const, id: iv.internId } : { type: "employer" as const, id: iv.employerId };
   const toName = other === "intern" ? names.internFirst : names.employerContact;
   const fromLabel = role === "employer" ? names.employer : names.intern;
-  const zoneOf = (r: Role) => (r === "intern" ? INTERN_ZONE : empZone);
-  const zoneLabel = (r: Role) => (r === "intern" ? "IST" : empZone);
 
-  if (input.type === "counter" || input.type === "reschedule") {
-    const counter = input.type === "counter";
+  if (input.type === "request_reschedule") {
+    // The candidate asks, with no times of their own: the company is told to offer three new ones.
     await notify({
       to,
-      type: counter ? "meeting_countered" : "meeting_proposed",
-      title: counter ? "New times proposed" : "Meeting times proposed",
-      message: counter ? `${fromLabel} proposed other times. Pick one that works.` : `${fromLabel} offered new times. Pick one that works.`,
-      data: { interviewId: iv.id, link: other === "intern" ? "/intern/interviews" : "/employer/schedule" },
+      type: "meeting_reschedule_requested",
+      title: "Candidate asked to reschedule",
+      message: `The candidate asked to reschedule: please offer 3 new times.${iv.cancelReason ? ` They wrote: ${iv.cancelReason}` : ""}`,
+      data: { interviewId: iv.id, link: "/employer/schedule" },
+      dedupeKey: `meeting_reschedule_requested:${iv.id}:${iv.round}`,
+      email: emails.meetingRescheduleRequested({ name: toName, candidate: fromLabel, reason: iv.cancelReason, project: project?.n ?? null }),
+    });
+    const was = bookedStart(before);
+    if (before.status === "scheduled" && was !== null) await sendCancelFile(iv, before, was);
+    return;
+  }
+
+  if (input.type === "reschedule") {
+    await notify({
+      to,
+      type: "meeting_proposed",
+      title: "Choose a time",
+      message: `${fromLabel} offered 3 times. Choose one that works.`,
+      data: { interviewId: iv.id, link: "/intern/interviews" },
       dedupeKey: `meeting_offer:${iv.id}:${iv.round}:${iv.updatedAt?.getTime() ?? 0}`,
-      email: emails.meetingProposed({ name: toName, other: fromLabel, times: listTimes(iv, zoneOf(other)), zone: zoneLabel(other), forEmployer: other === "employer", counter, project: project?.n ?? null }),
+      email: emails.meetingProposed({ name: toName, other: fromLabel, times: listTimes(iv, INTERN_ZONE), zone: "IST", revised: true, project: project?.n ?? null }),
     });
     // A booked meeting that moved: withdraw the calendar file the other side already had.
     const was = bookedStart(before);
@@ -312,48 +317,28 @@ async function sendCancelFile(iv: Interview, before: Interview, start: number): 
   }
 }
 
-export type CreateInput = { by: Role; employerId: string; internId: string; projectId: string | null; slots: Date[]; timezone: string };
+export type CreateInput = { employerId: string; internId: string; projectId: string | null; slots: Date[]; timezone: string };
 
-/** A new meeting offer (employer: from a Book meeting button; intern: only inside an existing relationship, checked by the caller). */
+/**
+ * A new meeting offer from the employer (a Book meeting button): exactly three future slots that clash with no confirmed meeting
+ * of either party. One open meeting per pair: a live offer or booking, and also a reschedule request still waiting for the
+ * company's three new times, blocks a second one.
+ */
 export async function createMeeting(db: Db, i: CreateInput): Promise<{ ok: true; interview: Interview } | Fail> {
-  const r = step(undefined, { type: "propose", by: i.by, slots: i.slots });
-  if (!r.ok) return refused(r);
-  const { isBlockingInterview } = await import("@/lib/employer-interview-rules");
+  const { isBlockingInterview, hasNoSlotsToPick } = await import("@/lib/employer-interview-rules");
   const created = await withPartyLocks(db, i.employerId, i.internId, async (tx) => {
+    const r = step(undefined, { type: "propose", by: "employer", slots: i.slots, busy: await busyStarts(tx, i.employerId, i.internId, null) });
+    if (!r.ok) return refused(r);
     const open = await tx
       .select()
       .from(schema.interviews)
       .where(and(eq(schema.interviews.employerId, i.employerId), eq(schema.interviews.internId, i.internId), inArray(schema.interviews.status, ["pending", "scheduled"])));
-    if (open.some((iv) => isBlockingInterview(iv))) return null;
+    if (open.some((iv) => isBlockingInterview(iv) || hasNoSlotsToPick(iv))) return fail(409, "A meeting with this candidate is already open - finish it first.", "open_meeting");
     const [row] = await tx
       .insert(schema.interviews)
       .values({ employerId: i.employerId, internId: i.internId, projectId: i.projectId ?? undefined, timezone: i.timezone, ...rowFields(r.fields), gateToken: newToken() })
       .returning();
-    return row;
+    return { ok: true as const, interview: row };
   });
-  if (!created) return fail(409, "A meeting with this candidate is already open - finish it first.", "open_meeting");
-  return { ok: true, interview: created };
-}
-
-/** The mail and notice for a new offer (employer's first offer keeps its existing invitation email). */
-export async function announceOffer(db: Db, iv: Interview, by: Role): Promise<void> {
-  const names = await namesFor(db, iv);
-  const empZone = interviewZone(iv, await loadProjectZones(db, [iv.projectId]));
-  const [project] = iv.projectId ? await db.select({ n: schema.projects.projectName }).from(schema.projects).where(eq(schema.projects.id, iv.projectId)).limit(1) : [];
-  const toIntern = by === "employer";
-  await notify({
-    to: toIntern ? { type: "intern", id: iv.internId } : { type: "employer", id: iv.employerId },
-    type: toIntern ? "interview_pending" : "meeting_requested",
-    title: toIntern ? "Interview invitation" : "Candidate proposed a meeting",
-    message: toIntern ? "A company invited you to an interview. Pick a slot that works for you." : `${names.intern} proposed times to meet. Pick one that works.`,
-    data: { interviewId: iv.id, link: toIntern ? "/intern/interviews" : "/employer/schedule" },
-    email: emails.meetingProposed({
-      name: toIntern ? names.internFirst || (await internFirstName(iv.internId)) : names.employerContact,
-      other: toIntern ? names.employer : names.intern,
-      times: listTimes(iv, toIntern ? INTERN_ZONE : empZone),
-      zone: toIntern ? "IST" : empZone,
-      forEmployer: !toIntern,
-      project: project?.n ?? null,
-    }),
-  });
+  return created;
 }

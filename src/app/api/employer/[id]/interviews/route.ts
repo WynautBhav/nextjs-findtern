@@ -21,10 +21,10 @@ const bodySchema = z.object({
   internId: z.string().min(1),
   projectId: z.string().optional(),
   /** Wall-clock times in `timezone` ("2026-11-03T15:30"), not browser-converted.
-   *  One to three, on the quarter hour (legacy R:11179, sheet row 66; "up to 3" since meetings v1). */
+   *  Exactly three, distinct, on the quarter hour: the candidate chooses from them (legacy R:11175). */
   slot1: wall,
-  slot2: wall.optional(),
-  slot3: wall.optional(),
+  slot2: wall,
+  slot3: wall,
   /** Missing: the company's own zone, from its location (bug sheet 7, S2 r3). */
   timezone: z.string().min(1).optional(),
 });
@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!guard.ok) return guard.response;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Offer one to three time slots." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Offer exactly three times for the candidate to choose from." }, { status: 400 });
   // A made-up zone is refused even when the project's own zone would override it (B-43).
   if (parsed.data.timezone !== undefined && !isKnownTimezone(parsed.data.timezone)) {
     return NextResponse.json({ error: "Unknown timezone. Use a region such as Asia/Kolkata." }, { status: 400 });
@@ -68,7 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   const timezone = projectTz ? projectZone(projectTz, parsed.data.timezone, companyTz) : (parsed.data.timezone ?? companyTz ?? projectZone(null));
   const b = { ...parsed.data, timezone };
-  const walls = [b.slot1, b.slot2, b.slot3].filter((w): w is string => Boolean(w));
+  const walls = [b.slot1, b.slot2, b.slot3];
   if (!walls.every(isQuarterHourWall)) {
     return NextResponse.json({ error: "Slots start on the hour or at :15, :30 or :45." }, { status: 400 });
   }
@@ -110,15 +110,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // all passed is stale and no longer holds the candidate (legacy R:11370).
   // Checked and inserted under one lock, so two requests at once can't both
   // book (a double click gave three pending interviews).
-  const made = await createMeeting(db, { by: "employer", employerId: id, internId: b.internId, projectId: b.projectId ?? null, slots, timezone: b.timezone });
+  const made = await createMeeting(db, { employerId: id, internId: b.internId, projectId: b.projectId ?? null, slots, timezone: b.timezone });
   if (!made.ok) return NextResponse.json({ error: made.error, code: made.code }, { status: made.status });
   const interview = made.interview;
 
   await notify({
     to: { type: "intern", id: b.internId },
     type: "interview_pending",
-    title: "Interview invitation",
-    message: "A company invited you to an interview. Pick a slot that works for you.",
+    title: "Choose a time",
+    message: "A company offered you 3 times for an interview. Choose one that works for you.",
     data: { interviewId: interview.id },
     email: emails.interviewInvitation({
       internName: await internFirstName(b.internId),

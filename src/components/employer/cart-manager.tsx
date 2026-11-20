@@ -282,7 +282,7 @@ export function CartManager({
         </DialogContent>
       </Dialog>
 
-      {/* Book a meeting: the shared dialog (one to three times; the project's zone when it has one). */}
+      {/* Book a meeting: the shared dialog (three times; the project's zone when it has one). */}
       {meetingCandidate ? (
         <BookMeetingDialog
           open

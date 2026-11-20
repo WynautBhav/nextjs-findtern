@@ -33,11 +33,10 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
   setCalendar(cal);
   const load = (p: string) => import(p) as unknown as Promise<Route>;
   const selectSlot = await load("../../app/api/interviews/[id]/select-slot/route.ts");
-  const counter = await load("../../app/api/interviews/[id]/counter/route.ts");
+  const askReschedule = await load("../../app/api/interviews/[id]/request-reschedule/route.ts");
   const cancel = await load("../../app/api/interviews/[id]/cancel/route.ts");
   const reschedule = await load("../../app/api/interviews/[id]/reschedule/route.ts");
   const create = await load("../../app/api/employer/[id]/interviews/route.ts");
-  const requests = await load("../../app/api/intern/meeting-requests/route.ts");
 
   const db = getDb();
   const tag = `mt${Date.now()}`;
@@ -75,7 +74,7 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
   const relate = async (e: typeof e1, i: typeof i1) => db.insert(schema.employerCartItems).values({ employerId: e.id, projectId: projectOf(e).id, internId: i.id, listType: "cart" } as never);
 
   try {
-    await t.test("employer offers 1-3 times; the row records who offered, the round and respond-by", async () => {
+    await t.test("employer offers exactly 3 times (1, 2, duplicate or past are refused); the row records who offered, the round and respond-by", async () => {
       await relate(e1, i1);
       const r = await offer();
       assert.equal(r.status, 201, JSON.stringify(r.body));
@@ -85,11 +84,25 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       assert.ok(iv.respondBy && iv.gateToken);
       // a second open meeting for the pair is refused
       assert.equal((await offer()).status, 409);
-      // a single slot is fine for another pair
+      // exactly three: one or two (or a repeat, or a past time) is a 400 and creates nothing
       await relate(e1, i2);
       as("employer", e1.id);
-      const one = await create.POST(req({ internId: i2.id, projectId: p1.id, slot1: wall(30), timezone: "Asia/Kolkata" }), { params: Promise.resolve({ id: e1.id }) });
-      assert.equal(one.status, 201, JSON.stringify(one.body));
+      const body = (extra: Record<string, string>) => req({ internId: i2.id, projectId: p1.id, timezone: "Asia/Kolkata", ...extra });
+      const ctx = { params: Promise.resolve({ id: e1.id }) };
+      assert.equal((await create.POST(body({ slot1: wall(30) }), ctx)).status, 400);
+      assert.equal((await create.POST(body({ slot1: wall(30), slot2: wall(31) }), ctx)).status, 400);
+      assert.equal((await create.POST(body({ slot1: wall(30), slot2: wall(30), slot3: wall(32) }), ctx)).status, 400);
+      assert.equal((await create.POST(body({ slot1: wall(-5), slot2: wall(31), slot3: wall(32) }), ctx)).status, 400);
+      assert.equal((await db.select().from(schema.interviews).where(eq(schema.interviews.internId, i2.id))).length, 0);
+      // an intern cannot book a meeting at all
+      as("intern", i2.id);
+      const byIntern = await create.POST(body({ slot1: wall(30), slot2: wall(31), slot3: wall(32) }), ctx);
+      assert.ok([401, 403, 404].includes(byIntern.status), String(byIntern.status));
+      assert.equal((await db.select().from(schema.interviews).where(eq(schema.interviews.internId, i2.id))).length, 0);
+      // three slots work for another pair
+      as("employer", e1.id);
+      const three = await create.POST(body({ slot1: wall(30), slot2: wall(31), slot3: wall(32) }), ctx);
+      assert.equal(three.status, 201, JSON.stringify(three.body));
     });
 
     await t.test("the proposer cannot pick its own offer; the other side books it, Meet is made once, gate token is set", async () => {
@@ -114,48 +127,66 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       assert.ok(!JSON.stringify(notes).includes("meet.google.com"), "raw Meet url leaked into a notification");
     });
 
-    await t.test("conflict: a pick overlapping either side's confirmed meeting is a 409, a different slot works", async () => {
-      // i1 is booked at slot 2 (+54h) with e1. e2 offers i1 a time at the same instant and a later one.
-      const [booked] = await db.select().from(schema.interviews).where(eq(schema.interviews.internId, i1.id));
+    await t.test("conflict: an offer overlapping either side's confirmed meeting is refused (409); a pick that became a clash is a 409, another slot works", async () => {
+      // i1 is booked at slot 2 (+54h) with e1. e2 cannot offer i1 that time (the intern is busy), e1 cannot offer anyone else it (the employer is busy).
       const clash = wall(54);
-      const r = await offer(e2, i1, [clash, wall(100), wall(101)]);
+      assert.equal((await offer(e2, i1, [clash, wall(100), wall(101)])).body.code, "conflict");
+      await relate(e1, i3);
+      assert.equal((await offer(e1, i3, [clash, wall(100), wall(101)])).body.code, "conflict");
+      // a clean offer goes through; then i1 gets booked elsewhere at one of its times before replying
+      const r = await offer(e2, i1, [wall(100), wall(103), wall(106)]);
       assert.equal(r.status, 201, JSON.stringify(r.body));
       const id = (r.body.interview as { id: string }).id;
+      const first = await row(id);
+      const [other] = await db.insert(schema.interviews).values({ employerId: e1.id, internId: i1.id, status: "scheduled", slot1: first.slot1, selectedSlot: 1, proposedBy: "employer", round: 1, timezone: "Asia/Kolkata" } as never).returning();
       as("intern", i1.id);
       const bad = await call(selectSlot, id, { slot: 1 });
       assert.equal(bad.status, 409);
       assert.equal(bad.body.code, "conflict");
       assert.equal((await row(id)).status, "pending");
       assert.equal((await call(selectSlot, id, { slot: 2 })).status, 200);
-      void booked;
+      await db.delete(schema.interviews).where(eq(schema.interviews.id, other.id));
     });
 
-    await t.test("counter-offer: intern proposes own times, employer picks; rounds are capped; an own offer cannot be countered", async () => {
-      await relate(e1, i3);
-      const first = await offer(e1, i3);
+    await t.test("intern cannot offer times; reschedule request -> employer re-proposes exactly 3 -> intern picks", async () => {
+      const first = await offer(e1, i3, [wall(140), wall(141), wall(142)]);
+      assert.equal(first.status, 201, JSON.stringify(first.body));
       const id = (first.body.interview as { id: string }).id;
-      as("employer", e1.id);
-      assert.equal((await call(counter, id, { slots: [wall(40)] })).status, 403, "proposer cannot counter itself");
+      // the intern has no way to put times on a meeting
       as("intern", i3.id);
-      const c1 = await call(counter, id, { slots: [wall(40), wall(41)] });
-      assert.equal(c1.status, 200, JSON.stringify(c1.body));
+      const own = await call(reschedule, id, { slots: [wall(40), wall(41), wall(42)] });
+      assert.ok([401, 403].includes(own.status), `stub guard says 401 for a wrong role, the real one 403: got ${own.status}`);
+      assert.deepEqual([(await row(id)).round, (await row(id)).proposedBy], [1, "employer"]);
+      // asking to reschedule: no times, a note over 300 chars is refused
+      assert.equal((await call(askReschedule, id, { reason: "x".repeat(301) })).status, 400);
+      const ask = await call(askReschedule, id, { reason: "Exam that week", slots: [wall(40)] });
+      assert.equal(ask.status, 200, JSON.stringify(ask.body));
       let cur = await row(id);
+      assert.equal(cur.status, "pending");
       assert.equal(cur.proposedBy, "intern");
       assert.equal(cur.round, 2);
-      assert.equal(cur.slot3, null);
-      assert.equal((await call(selectSlot, id, { slot: 1 })).status, 403, "intern cannot pick its own counter");
+      assert.deepEqual([cur.slot1, cur.slot2, cur.slot3, cur.respondBy], [null, null, null, null], "the intern's times are ignored; none are stored");
+      assert.equal(cur.cancelReason, "Exam that week");
+      // the employer is told, in-app, with the calm copy
+      const [note] = await db.select().from(schema.notifications).where(sql`${schema.notifications.recipientId} = ${e1.id} and ${schema.notifications.data}->>'interviewId' = ${id} and ${schema.notifications.type} = 'meeting_reschedule_requested'`);
+      assert.ok(note, "employer notified");
+      assert.match(note.message, /asked to reschedule: please offer 3 new times/);
+      // a second request, and picking from a request, are refused
+      assert.equal((await call(askReschedule, id, {})).status, 409);
+      assert.equal((await call(selectSlot, id, { slot: 1 })).status, 409);
+      // the employer must offer exactly 3
       as("employer", e1.id);
-      const c2 = await call(counter, id, { slots: [wall(60)] });
-      assert.equal(c2.status, 200);
+      assert.equal((await call(reschedule, id, { slots: [wall(40), wall(41)] })).status, 400);
+      assert.equal((await call(reschedule, id, { slots: [wall(40), wall(41), wall(41)] })).status, 400);
+      const re = await call(reschedule, id, { slots: [wall(40), wall(41), wall(42)] });
+      assert.equal(re.status, 200, JSON.stringify(re.body));
       cur = await row(id);
-      assert.equal(cur.round, 3);
       assert.equal(cur.proposedBy, "employer");
-      // round 3 is the last: the intern may not counter again, only pick (or cancel)
+      assert.equal(cur.round, 3);
+      assert.ok(cur.slot1 && cur.slot2 && cur.slot3 && cur.respondBy);
+      assert.equal(cur.cancelReason, null);
       as("intern", i3.id);
-      const c3 = await call(counter, id, { slots: [wall(70)] });
-      assert.equal(c3.status, 409);
-      assert.equal(c3.body.code, "max_rounds");
-      assert.equal((await call(selectSlot, id, { slot: 1 })).status, 200);
+      assert.equal((await call(selectSlot, id, { slot: 3 })).status, 200);
       assert.equal((await row(id)).status, "scheduled");
     });
 
@@ -175,44 +206,50 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       assert.equal((await call(cancel, iv.id, { reason: "again" })).status, 409);
     });
 
-    await t.test("reschedule by the intern (allowed now) re-opens the meeting for the employer to pick", async () => {
+    await t.test("a booked meeting: the intern's reschedule request releases it and withdraws the Meet event; the employer re-proposes 3", async () => {
       const [iv] = await db.select().from(schema.interviews).where(eq(schema.interviews.internId, i3.id)).limit(1);
+      assert.equal(iv.status, "scheduled");
+      const before = cal.events.size;
       as("intern", i3.id);
-      const r = await call(reschedule, iv.id, { slots: [wall(120), wall(121)] });
+      const r = await call(askReschedule, iv.id, {});
       assert.equal(r.status, 200, JSON.stringify(r.body));
       const cur = await row(iv.id);
       assert.equal(cur.status, "pending");
       assert.equal(cur.proposedBy, "intern");
       assert.equal(cur.selectedSlot, null);
       assert.equal(cur.calendarEventId, null);
+      assert.equal(cur.meetingLink, null);
+      assert.equal(cal.events.size, before - 1);
+      // still one open meeting for the pair: a new offer is refused until the employer answers this request
+      assert.equal((await offer(e1, i3, [wall(150), wall(151), wall(152)])).status, 409);
+      // the candidate can still cancel it
+      assert.equal((await call(cancel, iv.id, { reason: "Not available any more" })).status, 200);
     });
 
-    await t.test("an intern can only ask for a meeting inside a relationship; none, no meeting (404)", async () => {
+    await t.test("a meeting an intern proposed under the old rules still shows, can be picked by the employer, or cancelled", async () => {
+      await relate(e2, i2);
+      const mk = async () =>
+        (await db.insert(schema.interviews).values({ employerId: e2.id, internId: i2.id, projectId: p2.id, status: "pending", proposedBy: "intern", round: 1, slot1: new Date(Date.now() + 90 * 3_600_000), respondBy: new Date(Date.now() + 88 * 3_600_000), timezone: "Asia/Kolkata" } as never).returning())[0];
+      const legacy = await mk();
+      as("employer", e2.id);
+      const pick = await call(selectSlot, legacy.id, { slot: 1 });
+      assert.equal(pick.status, 200, JSON.stringify(pick.body));
+      assert.equal((await row(legacy.id)).status, "scheduled");
       as("intern", i2.id);
-      // i2 has an interview with e1 (relationship) but Fyn (e2) never touched i2
-      const none = await requests.POST(req({ interviewId: "00000000-0000-0000-0000-000000000000", slots: [wall(130)] }), { params: Promise.resolve({}) });
-      assert.equal(none.status, 404);
-      const [mine] = await db.select().from(schema.interviews).where(eq(schema.interviews.internId, i2.id)).limit(1);
-      await db.update(schema.interviews).set({ status: "cancelled" }).where(eq(schema.interviews.id, mine.id));
-      const ok = await requests.POST(req({ interviewId: mine.id, slots: [wall(130), wall(131)] }), { params: Promise.resolve({}) });
-      assert.equal(ok.status, 201, JSON.stringify(ok.body));
-      const made = await row((ok.body.interview as { id: string }).id);
-      assert.equal(made.proposedBy, "intern");
-      assert.equal(made.employerId, e1.id);
-      // another intern cannot hang a request on i2's interview
-      as("intern", i3.id);
-      const steal = await requests.POST(req({ interviewId: mine.id, slots: [wall(140)] }), { params: Promise.resolve({}) });
-      assert.equal(steal.status, 404);
+      assert.equal((await call(cancel, legacy.id, { reason: "Changed my mind" })).status, 200);
+      const second = await mk();
+      assert.equal((await call(cancel, second.id, { reason: "Changed my mind" })).status, 200);
+      assert.equal((await row(second.id)).status, "cancelled");
     });
 
-    await t.test("a lapsed offer (respond_by passed) cannot be picked or countered", async () => {
+    await t.test("a lapsed offer (respond_by passed) cannot be picked", async () => {
       await relate(e2, i3);
       const r = await offer(e2, i3, [wall(200), wall(201), wall(202)]);
       const id = (r.body.interview as { id: string }).id;
       await db.update(schema.interviews).set({ respondBy: new Date(Date.now() - 60_000) }).where(eq(schema.interviews.id, id));
       as("intern", i3.id);
       assert.equal((await call(selectSlot, id, { slot: 1 })).body.code, "lapsed");
-      assert.equal((await call(counter, id, { slots: [wall(100)] })).body.code, "lapsed");
+      assert.equal((await call(askReschedule, id, {})).status, 200, "a lapsed offer can still be turned into a request for new times");
     });
   } finally {
     const ids = [i1, i2, i3].map((u) => u.id);
