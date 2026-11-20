@@ -1,16 +1,14 @@
 import type { Metadata } from "next";
 import { eq, desc, count } from "drizzle-orm";
-import { Plus } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { PageHeader } from "@/components/layout/page-header";
-import { ButtonLink } from "@/components/ui/button";
 import { proposalOutcome } from "@/lib/proposals";
-import { ProjectList, type ListProject } from "./project-list";
-import { TakedownBanner } from "@/components/employer/takedown-banner";
+import type { ListProject } from "./project-list";
+import { ProjectsView } from "./projects-view";
 import { perfScope } from "@/lib/perf/timing";
 
 export const metadata: Metadata = {
@@ -68,21 +66,7 @@ async function EmployerProjectsPageImpl() {
     );
   }
 
-  return (
-    <div className="container-page section-y space-y-6">
-      <PageHeader
-        title="Projects"
-        subtitle="Post a project and it goes live as soon as you submit. Pause or close it any time."
-        action={
-          <ButtonLink href="/employer/projects/new" className="max-sm:hidden">
-            <Plus className="size-4" aria-hidden /> Post a project
-          </ButtonLink>
-        }
-      />
-      <TakedownBanner projects={rows.filter((r) => r.takenDown).map((r) => ({ id: r.id, name: r.projectName, reason: r.takenDownReason }))} />
-      <ProjectList projects={rows} />
-    </div>
-  );
+  return <ProjectsView rows={rows} />;
 }
 
 export default function EmployerProjectsPage() {

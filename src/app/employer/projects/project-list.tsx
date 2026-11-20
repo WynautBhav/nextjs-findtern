@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
-import { Briefcase, MapPin, Pencil, Pause, Play, Plus, Users, XCircle, Wrench, Undo2 } from "lucide-react";
+import { Briefcase, MapPin, Pencil, Pause, Play, Users, XCircle, Wrench, Undo2 } from "lucide-react";
 
-import { EmptyScene, Figure, FilterTabs } from "@/components/app/primitives";
+import { EmptyScene, Surface, SURFACE_CLASS } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 import { FormNotice } from "@/components/employer/company-fields";
 import { buttonClass, ButtonLink } from "@/components/ui/button";
@@ -12,7 +12,9 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { MAX_SKILLS_PER_PROJECT } from "@/lib/projects/lifecycle";
 import { MetaList } from "@/components/app/meta-list";
 import { RowMenu, type RowMenuItem } from "@/components/app/row-menu";
-import { RatioBar } from "@/components/employer/kit/ratio-bar";
+import { ProjectPipeline } from "./project-pipeline";
+import { skillChips, stripTiles, tallyStatuses } from "@/lib/projects/list-summary";
+import { cn } from "@/lib/utils";
 import { StatusPill } from "./status-icon";
 import { ContactAdminButton } from "@/components/employer/contact-admin-button";
 import { TakedownBadge } from "@/components/employer/takedown-badge";
@@ -58,15 +60,9 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const counts = new Map<string, number>();
-  for (const p of projects) {
-    const k = statusMeta(p.status).key ?? "unknown";
-    counts.set(k, (counts.get(k) ?? 0) + 1);
-  }
-  const tabs = [
-    { key: "all", label: "All", count: projects.length },
-    ...STATUS_ORDER.filter((s) => counts.get(s)).map((s) => ({ key: s, label: STATUS_META[s].label, count: counts.get(s) })),
-  ];
+  const counts = tallyStatuses(projects.map((p) => statusMeta(p.status).key));
+  const tiles = stripTiles(counts, projects.length, Object.fromEntries(STATUS_ORDER.map((s) => [s, STATUS_META[s].label])));
+  const activeHint = filter === "all" ? "" : (tiles.find((t) => t.key === filter)?.hint ?? "");
   const shown = projects.filter((p) => filter === "all" || statusMeta(p.status).key === filter);
 
   async function move(p: ListProject, a: Action) {
@@ -121,23 +117,47 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
   return (
     <div className="space-y-4">
       {dialog}
-      <dl className="grid grid-cols-3 gap-4 rounded-apple-xl border border-ink-200/80 bg-white p-4 sm:p-5">
-        <Figure label="Live" value={counts.get("published") ?? 0} empty="None" hint="Candidates can see these" />
-        <Figure label="Drafts" value={counts.get("draft") ?? 0} empty="None" hint="Not yet published" />
-        <Figure label="Paused" value={counts.get("paused") ?? 0} empty="None" hint="Hidden until you resume" />
-      </dl>
-      <FilterTabs tabs={tabs} value={filter} onChange={setFilter} label="Filter projects by status" />
+      <div role="group" aria-label="Filter projects by status" className="@container">
+        <div className="flex flex-wrap gap-2 @xl:grid @xl:grid-cols-[repeat(auto-fit,minmax(8rem,1fr))] @xl:gap-3">
+          {tiles.map((t) => {
+            const on = t.key === filter;
+            const none = t.count === 0 && !on && t.key !== "all";
+            return (
+              <button
+                key={t.key}
+                type="button"
+                aria-pressed={on}
+                disabled={none}
+                onClick={() => setFilter(t.key)}
+                className={cn(
+                  SURFACE_CLASS,
+                  "apple-spring flex min-h-[4.75rem] min-w-0 flex-1 basis-[6.5rem] flex-col items-start gap-1 p-3 text-left @xl:basis-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-default @xl:p-5",
+                  on ? "border-transparent bg-brand-700 text-white" : none ? "" : "hover:bg-ink-50",
+                )}
+              >
+                <span className={cn("text-sm font-medium", on ? "text-white" : "text-ink-700")}>{t.label}</span>
+                <span className={cn("nums order-first text-2xl font-semibold leading-none tracking-tight", on ? "text-white" : none ? "text-ink-500" : "text-ink-900")}>{t.count}</span>
+              </button>
+            );
+          })}
+        </div>
+        <p role="status" className="mt-3 text-sm text-text-subtle">
+          Showing {shown.length} of {projects.length} {projects.length === 1 ? "project" : "projects"}
+          {activeHint ? `. ${activeHint}.` : ""}
+        </p>
+      </div>
       {error && <FormNotice tone="error">{error}</FormNotice>}
-      <ul className="grid gap-3">
+      <ul className="grid gap-4">
         {shown.map((p, idx) => {
           const meta = statusMeta(p.status);
           // Taken down by Findtern: view only. No lifecycle action, no edit, no candidates: View and Contact admin.
           const actions = p.takenDown ? [] : (meta.key && ACTIONS[meta.key]) || [];
           const busy = busyId === p.id;
           const edit = `/employer/projects/${p.id}/edit`;
+          const candidates = `/employer/candidates?project=${encodeURIComponent(p.id)}`;
           const menu: RowMenuItem[] = [];
           if (!p.takenDown && (meta.key === "published" || meta.key === "paused")) menu.push({ label: "Edit", href: edit, icon: <Pencil /> });
-          if (!p.takenDown && meta.key === "published") menu.push({ label: "View candidates", href: `/employer/candidates?project=${encodeURIComponent(p.id)}`, icon: <Users /> });
+          if (!p.takenDown && meta.key === "published") menu.push({ label: "View candidates", href: candidates, icon: <Users /> });
           for (const a of actions) {
             if (a.to === "published") continue; // Resume is the primary action
             menu.push({
@@ -151,108 +171,94 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
           const resume = actions.find((a) => a.to === "published");
           const locations = p.preferredLocations.length ? p.preferredLocations.slice(0, 2).join(", ") + (p.preferredLocations.length > 2 ? ` +${p.preferredLocations.length - 2}` : "") : null;
           const live = meta.key === "published" || meta.key === "paused" || meta.key === "closed";
+          const chips = skillChips(p.skills, 5);
+          const closed = meta.key === "closed" || meta.key === "paused";
+          const hasActions = p.takenDown || meta.key !== null;
           return (
-            <li key={p.id} style={{ "--i": idx } as React.CSSProperties} className="rise tile-lift space-y-3 rounded-apple-xl border border-ink-200/70 bg-white p-4 sm:p-5">
-              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1fr)_14rem_11.5rem_2.75rem]">
-                <div className="min-w-0 space-y-1.5">
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                    <h2 className="break-words text-base font-semibold text-ink-900">{p.projectName}</h2>
-                    {p.takenDown ? <TakedownBadge /> : <StatusPill status={p.status} />}
-                  </div>
-                  <MetaList
-                    items={[
-                      { icon: <Briefcase />, text: p.locationType ? p.locationType.charAt(0).toUpperCase() + p.locationType.slice(1) : "Work mode not set" },
-                      { icon: <MapPin />, text: locations },
-                      { text: `${p.skills.length}/${MAX_SKILLS_PER_PROJECT} skills` },
-                      { text: p.fullTimeOffer ? "Full-time offer" : null },
-                    ]}
-                  />
-                  {p.skills.length > 0 && (
-                    <ul className="flex flex-wrap gap-1.5 pt-1" aria-label="Skills">
-                      {p.skills.slice(0, 6).map((sk) => (
-                        <li key={sk} className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-800 ring-1 ring-inset ring-brand-100">{sk}</li>
-                      ))}
-                      {p.skills.length > 6 && <li className="px-1 py-0.5 text-xs text-text-subtle">+{p.skills.length - 6}</li>}
-                    </ul>
-                  )}
-                </div>
-                <div className="order-last col-span-2 sm:order-none sm:col-span-1">
-                  {live && <RatioBar sent={p.sent} accepted={p.accepted} className="w-full" />}
-                </div>
-                <div className="flex items-center justify-end gap-1 sm:contents">
-                  <div className="flex items-center justify-end max-sm:hidden">
-                    {p.takenDown && (
-                      <div className="flex items-center gap-2">
-                        <ButtonLink href={edit} variant="outline" size="sm" className="min-h-11">View</ButtonLink>
-                        <ContactAdminButton projectId={p.id} projectName={p.projectName} />
-                      </div>
-                    )}
-                    {!p.takenDown && meta.key === "published" && (
-                      <ButtonLink href={`/employer/candidates?project=${encodeURIComponent(p.id)}`} size="sm" className="min-h-11">
-                        <Users className="size-4" aria-hidden /> View candidates
-                      </ButtonLink>
-                    )}
-                    {!p.takenDown && meta.key === "draft" && (
-                      <ButtonLink href={edit} size="sm" className="min-h-11">
-                        <Pencil className="size-4" aria-hidden /> Edit
-                      </ButtonLink>
-                    )}
-                    {resume && (
-                      <button type="button" disabled={busy} onClick={() => void move(p, resume)} className={buttonClass({ size: "sm", className: "min-h-11" })}>
-                        <Play className="size-4" aria-hidden /> {resume.label}
-                      </button>
-                    )}
-                    {!p.takenDown && meta.key === "closed" && (
-                      <ButtonLink href={`/employer/candidates?project=${encodeURIComponent(p.id)}`} variant="outline" size="sm" className="min-h-11">View</ButtonLink>
-                    )}
-                  </div>
-                  {!p.takenDown && <RowMenu label={`More actions for ${p.projectName}`} items={menu} />}
-                </div>
+            <Surface as="li" key={p.id} style={{ "--i": idx } as React.CSSProperties} className="rise @container p-4 sm:p-5">
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+                <h2 className={cn("min-w-0 break-words text-lg font-semibold leading-snug tracking-[-0.01em]", closed ? "text-ink-700" : "text-ink-900")}>{p.projectName}</h2>
+                {p.takenDown ? <TakedownBadge /> : <StatusPill status={p.status} />}
               </div>
+              <MetaList
+                className="mt-1.5"
+                items={[
+                  { icon: <Briefcase />, text: p.locationType ? p.locationType.charAt(0).toUpperCase() + p.locationType.slice(1) : "Work mode not set" },
+                  { icon: <MapPin />, text: locations },
+                  { text: `${p.skills.length}/${MAX_SKILLS_PER_PROJECT} skills` },
+                  { text: p.fullTimeOffer ? "Full-time offer" : null },
+                ]}
+              />
+              {chips.shown.length > 0 && (
+                <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Skills">
+                  {chips.shown.map((sk) => (
+                    <li key={sk} className="max-w-full truncate rounded-full bg-ink-100 px-2.5 py-1 text-xs font-medium text-ink-700">{sk}</li>
+                  ))}
+                  {chips.more > 0 && (
+                    <li className="rounded-full px-2 py-1 text-xs font-medium text-text-subtle ring-1 ring-inset ring-ink-200">
+                      +{chips.more}
+                      <span className="sr-only"> more skills</span>
+                    </li>
+                  )}
+                </ul>
+              )}
               {p.takenDown && (
-                <div role="note" className="rounded-apple-md bg-danger-soft p-3 text-sm text-ink-900">
+                <div role="note" className="mt-4 rounded-apple-md bg-danger-soft p-3 text-sm text-ink-900">
                   <p className="font-semibold">Taken down by Findtern</p>
                   <p className="mt-0.5 break-words">{p.takenDownReason || "No reason was recorded."} It is view only until admin restores it. Use Contact admin to resolve this.</p>
                 </div>
               )}
-              {meta.key === "pending_review" && <p className="text-sm text-text-subtle">Not shown to candidates yet. Publish it now, or move it back to a draft to edit it.</p>}
+              {meta.key === "pending_review" && <p className="mt-3 text-sm text-text-subtle">Not shown to candidates yet. Publish it now, or move it back to a draft to edit it.</p>}
               {meta.key === "rejected" && (
-                <div role="note" className="rounded-apple-md bg-danger-soft p-3 text-sm text-ink-900">
+                <div role="note" className="mt-4 rounded-apple-md bg-danger-soft p-3 text-sm text-ink-900">
                   <p className="font-semibold">Not approved{p.rejectionReason ? "" : ": no reason was recorded"}</p>
                   {p.rejectionReason && <p className="mt-0.5 break-words">{p.rejectionReason}</p>}
                 </div>
               )}
-              {/* Phone: the primary action sits under the facts, full width. */}
-              <div className="sm:hidden">
-                {p.takenDown && (
-                  <div className="flex gap-2">
-                    <ButtonLink href={edit} variant="outline" size="sm" block className="min-h-11 flex-1">View</ButtonLink>
-                    <ContactAdminButton projectId={p.id} projectName={p.projectName} className="flex-1" />
+              {(live || hasActions) && (
+                <div className="mt-4 flex flex-col gap-3 border-t border-ink-100 pt-4 @xl:flex-row @xl:items-center @xl:justify-between @xl:gap-6">
+                  {live && <ProjectPipeline sent={p.sent} accepted={p.accepted} className="w-full @xl:max-w-xs" />}
+                  <div className="flex items-center gap-2 @xl:ml-auto">
+                    {p.takenDown && (
+                      <>
+                        <ButtonLink href={edit} variant="outline" size="sm" className="min-h-11 flex-1 @xl:flex-none">View</ButtonLink>
+                        <ContactAdminButton projectId={p.id} projectName={p.projectName} className="flex-1 @xl:flex-none" />
+                      </>
+                    )}
+                    {!p.takenDown && meta.key === "published" && (
+                      <ButtonLink href={candidates} size="sm" className="min-h-11 flex-1 @xl:flex-none">
+                        <Users className="size-4" aria-hidden /> View candidates
+                      </ButtonLink>
+                    )}
+                    {!p.takenDown && meta.key === "draft" && (
+                      <ButtonLink href={edit} size="sm" className="min-h-11 flex-1 @xl:flex-none">
+                        <Pencil className="size-4" aria-hidden />
+                        <span className="@xl:hidden">Edit and publish</span>
+                        <span className="hidden @xl:inline">Edit</span>
+                      </ButtonLink>
+                    )}
+                    {resume && !p.takenDown && (
+                      <button type="button" disabled={busy} onClick={() => void move(p, resume)} className={buttonClass({ size: "sm", className: "min-h-11 flex-1 @xl:flex-none" })}>
+                        <Play className="size-4" aria-hidden /> {resume.label}
+                      </button>
+                    )}
+                    {!p.takenDown && meta.key === "closed" && (
+                      <ButtonLink href={candidates} variant="outline" size="sm" className="min-h-11 flex-1 @xl:flex-none">View</ButtonLink>
+                    )}
+                    {meta.key === "rejected" && !p.takenDown && (
+                      <button type="button" disabled={busy} onClick={() => void resubmit(p)} className={buttonClass({ size: "sm", className: "min-h-11 flex-1 @xl:flex-none" })}>
+                        <Wrench className="size-4" aria-hidden /> Edit and publish
+                      </button>
+                    )}
+                    {!p.takenDown && <RowMenu label={`More actions for ${p.projectName}`} items={menu} className="ring-1 ring-inset ring-ink-200" />}
                   </div>
-                )}
-                {!p.takenDown && meta.key === "published" && (
-                  <ButtonLink href={`/employer/candidates?project=${encodeURIComponent(p.id)}`} size="sm" block className="min-h-11">View candidates</ButtonLink>
-                )}
-                {!p.takenDown && meta.key === "draft" && (
-                  <ButtonLink href={edit} size="sm" block className="min-h-11">Edit and publish</ButtonLink>
-                )}
-                {resume && !p.takenDown && (
-                  <button type="button" disabled={busy} onClick={() => void move(p, resume)} className={buttonClass({ size: "sm", block: true, className: "min-h-11" })}>{resume.label}</button>
-                )}
-              </div>
-              {meta.key === "rejected" && !p.takenDown && (
-                <button type="button" disabled={busy} onClick={() => void resubmit(p)} className={buttonClass({ size: "sm", className: "min-h-11 max-sm:w-full" })}>
-                  <Wrench className="size-4" aria-hidden /> Edit and publish
-                </button>
+                </div>
               )}
-            </li>
+            </Surface>
           );
         })}
       </ul>
-      {shown.length === 0 && <p className="text-sm text-ink-600">Nothing here under this status. Pick another tab above.</p>}
-      <ButtonLink href="/employer/projects/new" className="sm:hidden" block>
-        <Plus className="size-4" aria-hidden /> Post a project
-      </ButtonLink>
+      {shown.length === 0 && <Surface className="px-4 py-10 text-center text-sm text-ink-600">Nothing here under this status. Pick another status above.</Surface>}
     </div>
   );
 }
