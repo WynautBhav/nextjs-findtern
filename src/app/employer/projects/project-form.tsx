@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
-import { CheckCircle2, Circle } from "lucide-react";
+import { CheckCircle2, Circle, CircleAlert, Info } from "lucide-react";
 
 import { Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
@@ -197,17 +197,24 @@ export function ProjectForm({
           Taken down by Findtern: view only. Nothing here can be saved or published. Use Contact admin above to resolve this.
         </p>
       ) : (
-      <div className="sticky bottom-0 z-20 mt-5 border-t border-ink-200 bg-white/85 backdrop-blur-md">
-        <div className="flex items-center justify-end gap-2 py-3 sm:justify-between">
-          <p className="text-sm text-text-subtle max-sm:hidden">
-            {lockedFields ? "Changes apply right away." : missing.length ? `${missing.length} to finish before you can publish.` : "Ready to publish."}
+      <div className="sticky bottom-[calc(9rem+env(safe-area-inset-bottom))] z-20 mt-5 rounded-apple-xl border border-ink-200/80 bg-white px-4 py-3 shadow-tile sm:px-5 lg:bottom-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <p aria-live="polite" className={`flex min-w-0 items-center gap-2 text-sm ${!lockedFields && !missing.length ? "font-medium text-ink-900" : "text-ink-700"}`}>
+            {lockedFields ? (
+              <Info className="size-4 shrink-0 text-ink-500" aria-hidden />
+            ) : missing.length ? (
+              <CircleAlert className="size-4 shrink-0 text-warning" aria-hidden />
+            ) : (
+              <CheckCircle2 className="size-4 shrink-0 text-brand-700" aria-hidden />
+            )}
+            <span>{lockedFields ? "Changes apply right away." : missing.length ? `${missing.length} to finish before you can publish` : "Ready to publish"}</span>
           </p>
-          <div className="flex w-full gap-2 sm:w-auto">
-            <button type="submit" disabled={busy !== null} className={buttonClass({ variant: "outline", className: "min-h-11 max-sm:flex-1" })}>
+          <div className="flex w-full gap-3 sm:w-auto">
+            <button type="submit" disabled={busy !== null} className={buttonClass({ variant: "outline", className: "min-h-11 max-sm:flex-1 max-sm:px-3" })}>
               {busy === "draft" ? "Saving…" : projectId ? "Save changes" : "Save draft"}
             </button>
             {!lockedFields && (
-              <button type="button" disabled={busy !== null} aria-disabled={missing.length > 0} onClick={() => void save(true)} className={buttonClass({ className: "min-h-11 max-sm:flex-1" })}>
+              <button type="button" disabled={busy !== null} aria-disabled={missing.length > 0} onClick={() => void save(true)} className={buttonClass({ className: `min-h-11 max-sm:flex-1 max-sm:px-3${missing.length > 0 ? " cursor-not-allowed opacity-55 hover:shadow-sm" : ""}` })}>
                 {busy === "submit" ? "Publishing…" : "Submit and publish"}
               </button>
             )}
