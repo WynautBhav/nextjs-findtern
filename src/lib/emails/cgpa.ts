@@ -91,11 +91,35 @@ export const cgpaEmails = {
 /** In-app copy for the employer. Initials only, as everywhere before a hire. */
 export const cgpaEmployerCopy = {
   verified: (candidate: string, role: string) => ({
-    title: "Candidate's CGPA verified",
-    message: `Findtern verified the CGPA of ${candidate} for ${role}. Nothing more to do on this.`,
+    title: `CGPA confirmed: you can now pay for ${candidate}`,
+    message: `Findtern confirmed the CGPA of ${candidate} for ${role}. The offer is now under To pay.`,
   }),
   incorrect: (candidate: string, role: string, from: string, to: string, scoreType: string) => ({
-    title: "Candidate's CGPA was corrected",
+    title: "CGPA corrected: confirm to continue",
     message: `Findtern corrected the CGPA of ${candidate} for ${role} from ${from}${unit(scoreType)} to ${to}${unit(scoreType)}. Review it and confirm to continue.`,
+  }),
+};
+
+/** The same two events by email to the employer. No scores in the mail: the proposal page shows the correction. */
+export const cgpaEmployerEmails = {
+  verified: (o: { candidate: string; role: string }): EmailContent => ({
+    subject: `CGPA confirmed: you can now pay for ${o.candidate} | Findtern`,
+    preheader: `Findtern confirmed the CGPA of ${o.candidate} for ${o.role}.`,
+    heading: "CGPA confirmed, you can pay now",
+    greeting: hi(""),
+    lines: [`Findtern confirmed the CGPA of ${o.candidate} for ${o.role}. Payment is open for this offer.`],
+    status: "Ready to pay",
+    tone: "done",
+    cta: cta("Go to checkout", "/employer/checkout"),
+  }),
+  incorrect: (o: { candidate: string; role: string; proposalId: string }): EmailContent => ({
+    subject: "CGPA corrected: confirm to continue | Findtern",
+    preheader: `Findtern corrected the CGPA of ${o.candidate} for ${o.role}. Confirm to continue to payment.`,
+    heading: "A CGPA was corrected, confirm to continue",
+    greeting: hi(""),
+    lines: [`Findtern checked the CGPA of ${o.candidate} for ${o.role} against the marksheets and corrected it.`, "Review the corrected score and confirm to continue to payment, or withdraw the proposal."],
+    status: "Needs your confirmation",
+    tone: "alert",
+    cta: cta("Review the proposal", `/employer/proposal/${o.proposalId}`),
   }),
 };

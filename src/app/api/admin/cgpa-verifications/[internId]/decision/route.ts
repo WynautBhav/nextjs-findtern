@@ -4,7 +4,8 @@ import { z } from "zod";
 
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { applyCgpaDecision, withCgpaCorrection } from "@/lib/cgpa-verification-flow";
-import { cgpaEmails, cgpaEmployerCopy } from "@/lib/emails/cgpa";
+import { cgpaEmployerNotice } from "@/lib/cgpa-employer-notice";
+import { cgpaEmails } from "@/lib/emails/cgpa";
 import { initialsOf } from "@/lib/employer-candidates";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -129,17 +130,19 @@ async function tell(internId: string, decided: Extract<ReturnType<typeof applyCg
     });
     const candidate = `Candidate ${initialsOf(user?.f ?? "", user?.l ?? "")}`;
     for (const o of offers) {
-      const copy = incorrect
-        ? cgpaEmployerCopy.incorrect(candidate, o.role, decided.previous.claimedScore, v.correctedScore ?? "", v.scoreType)
-        : cgpaEmployerCopy.verified(candidate, o.role);
-      await notify({
-        to: { type: "employer", id: o.employerId },
-        type: incorrect ? "cgpa_incorrect" : "cgpa_verified",
-        title: copy.title,
-        message: copy.message,
-        data: { proposalId: o.id },
-        dedupeKey: `cgpa_decision:${o.id}:${at}`,
-      });
+      await notify(
+        cgpaEmployerNotice({
+          employerId: o.employerId,
+          proposalId: o.id,
+          candidate,
+          role: o.role,
+          decision: incorrect ? "incorrect" : "verified",
+          claimedScore: decided.previous.claimedScore,
+          correctedScore: v.correctedScore ?? "",
+          scoreType: v.scoreType,
+          at,
+        }),
+      ).catch((err) => console.error("[cgpa-decision] employer notice failed", err));
     }
   } catch (err) {
     console.error("[cgpa-decision] notifications failed", err);

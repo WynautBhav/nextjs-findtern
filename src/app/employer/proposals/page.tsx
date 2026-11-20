@@ -18,7 +18,6 @@ import { ButtonLink } from "@/components/ui/button";
 import { HireFlow } from "@/components/employer/hire-flow";
 import { ProposalTabs } from "@/components/employer/section-tabs";
 import { hireFlowCountsFor, internExtraForRequest, openOrdersForRequest, stateForRow } from "@/lib/employer-flow";
-import { tabFromParam } from "@/components/employer/proposal-tabs";
 import { ProposalsManager, type ProposalItem } from "@/components/employer/proposals-manager";
 import { perfScope } from "@/lib/perf/timing";
 
@@ -101,9 +100,9 @@ async function loadList(employerId: string): Promise<{ proposals: ProposalItem[]
   }
 }
 
-async function EmployerProposalsPageImpl({ searchParams }: { searchParams: Promise<{ status?: string | string[] }> }) {
-  // The dashboard's figures and the hire strip open a tab here (?status=open|draft|verifying|accepted|viewonly|hired|closed).
-  const initialStatus = tabFromParam((await searchParams).status);
+async function EmployerProposalsPageImpl() {
+  // The dashboard's figures and the hire strip open a tab here (?status=open|draft|verifying|accepted|viewonly|hired|closed);
+  // the manager reads it from the URL, so a link to another tab on this page switches tab in place.
   const session = await requireRole("employer");
   kickProposalExpiry(); // queued after the response; throttled to one sweep per 10 minutes
   const employerId = session.uid;
@@ -132,18 +131,13 @@ async function EmployerProposalsPageImpl({ searchParams }: { searchParams: Promi
       {loadFailed ? (
         <LoadError what="your proposals" retryHref="/employer/proposals" email={SITE.adminEmail} />
       ) : (
-        // The manager copies its props into state (for optimistic withdraws),
-        // so a changed server list must remount it.
-        <ProposalsManager
-          key={proposals.map((p) => `${p.proposal.id}:${p.proposal.status}:${p.gate?.state ?? ""}`).join("|")}
-          initialProposals={proposals}
-          initialStatus={initialStatus}
-        />
+        // No `key`: the manager takes a changed list from its props itself, so a refresh keeps the tab, search and filters.
+        <ProposalsManager initialProposals={proposals} />
       )}
     </div>
   );
 }
 
-export default function EmployerProposalsPage(props: Parameters<typeof EmployerProposalsPageImpl>[0]) {
-  return perfScope("employer/proposals", () => EmployerProposalsPageImpl(props));
+export default function EmployerProposalsPage() {
+  return perfScope("employer/proposals", () => EmployerProposalsPageImpl());
 }

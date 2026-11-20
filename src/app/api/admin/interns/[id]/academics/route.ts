@@ -5,8 +5,12 @@ import { z } from "zod";
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { EDIT_FIELDS, academicsProblems, firstProblem, mergeAcademics, readAcademicsValues, LEVEL_LABELS, type AcademicsEdit } from "@/lib/admin/academics-edit";
 import { applyAdminScoreEdit, withCgpaCorrection } from "@/lib/cgpa-verification-flow";
+import { cgpaEmployerNotice } from "@/lib/cgpa-employer-notice";
 import { getDb, schema } from "@/lib/db";
+import { initialsOf } from "@/lib/employer-candidates";
 import { requireMutation } from "@/lib/guards-mutation";
+import { notify } from "@/lib/notify";
+import { parseOffer } from "@/lib/offer";
 
 /**
  * Admin: edit an intern's education (level, degree, branch, institution, status, years, score type and score).
@@ -38,8 +42,11 @@ const bodySchema = z
   })
   .strict();
 
+/** An accepted offer whose employer must confirm the corrected score. */
+type Corrected = { id: string; employerId: string; role: string; from: string; to: string; scoreType: string; at: string };
+
 type Outcome =
-  | { ok: true; changed: string[]; offers: number }
+  | { ok: true; changed: string[]; offers: number; corrected?: Corrected[] }
   | { ok: false; status: 400 | 404 | 409; error: string; fields?: Record<string, string> };
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -73,6 +80,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
     const next: Record<string, unknown> = { ...extra, academics: merged.academics };
     let offers = 0;
+    const corrected: Corrected[] = [];
     const scoreChanged = "score" in merged.changes || "scoreType" in merged.changes;
     if (scoreChanged) {
       const now = new Date();
@@ -88,7 +96,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       // A first score (nothing stored before) corrects nothing; a changed one is recorded on every accepted offer.
       if (result.scoreChanged && result.previousScore) {
         const accepted = await tx
-          .select({ id: schema.proposals.id, offer: schema.proposals.offerDetails })
+          .select({ id: schema.proposals.id, employerId: schema.proposals.employerId, offer: schema.proposals.offerDetails, currency: schema.proposals.currency })
           .from(schema.proposals)
           .where(and(eq(schema.proposals.internId, id), eq(schema.proposals.status, "accepted")))
           .for("update");
@@ -97,6 +105,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
             .update(schema.proposals)
             .set({ offerDetails: withCgpaCorrection(o.offer, { from: result.previousScore, to: merged.after.score, scoreType: merged.after.scoreType, at: now.toISOString() }) })
             .where(eq(schema.proposals.id, o.id));
+          corrected.push({ id: o.id, employerId: o.employerId, role: parseOffer(o.offer, o.currency).roleTitle || "the role", from: result.previousScore, to: merged.after.score, scoreType: merged.after.scoreType, at: now.toISOString() });
         }
         offers = accepted.length;
       }
@@ -108,9 +117,24 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       { adminId: guard.session.uid, action: "intern.academics_update", targetType: "intern", targetId: id, meta: { changes: merged.changes, offers } },
       { strict: true },
     );
-    return { ok: true, changed, offers };
+    return { ok: true, changed, offers, corrected };
   });
 
   if (!outcome.ok) return NextResponse.json({ error: outcome.error, ...(outcome.fields ? { fields: outcome.fields } : {}) }, { status: outcome.status });
+  await tellEmployers(id, outcome.corrected ?? []);
   return NextResponse.json({ ok: true, changed: outcome.changed, offers: outcome.offers });
+}
+
+/** After the commit: each employer holding an accepted offer for this candidate must confirm the corrected score. Best effort. */
+async function tellEmployers(internId: string, corrected: Corrected[]) {
+  if (corrected.length === 0) return;
+  try {
+    const [user] = await getDb().select({ f: schema.users.firstName, l: schema.users.lastName }).from(schema.users).where(eq(schema.users.id, internId)).limit(1);
+    const candidate = `Candidate ${initialsOf(user?.f ?? "", user?.l ?? "")}`;
+    for (const c of corrected) {
+      await notify(cgpaEmployerNotice({ employerId: c.employerId, proposalId: c.id, candidate, role: c.role, decision: "incorrect", claimedScore: c.from, correctedScore: c.to, scoreType: c.scoreType, at: c.at })).catch((err) => console.error("[admin academics] employer notice failed", err));
+    }
+  } catch (err) {
+    console.error("[admin academics] employer notices failed", err);
+  }
 }

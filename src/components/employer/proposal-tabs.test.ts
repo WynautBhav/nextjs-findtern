@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { closedBreakdown, proposalBucket, proposalCounts, type ProposalRow } from "./proposal-bucket.ts";
-import { closedSummary, inTab, tabFromParam, TAB_EMPTY, TAB_EXPLAINER, TAB_KEYS, TAB_LABEL, type TabKey } from "./proposal-tabs.ts";
+import { closedSummary, inTab, REFRESH_MIN_GAP_MS, shouldAutoRefresh, tabFromParam, tabQuery, TAB_EMPTY, TAB_EXPLAINER, TAB_KEYS, TAB_LABEL, type TabKey } from "./proposal-tabs.ts";
 
 const row = (status: string, extra: Partial<ProposalRow> = {}): ProposalRow => ({ status, lapsed: false, ...extra });
 
@@ -74,4 +74,32 @@ test("the Closed summary names each reason in plain words", () => {
   const b = closedBreakdown([row("rejected"), row("rejected"), row("withdrawn"), row("accepted", { expiredReason: "unpaid_past_start" }), row("sent", { lapsed: true }), row("expired")]);
   assert.equal(closedSummary(b), "2 declined · 1 withdrawn · 1 expired: not paid before start · 1 expired: no reply before start · 1 closed: accepted another offer");
   assert.equal(closedSummary([]), "");
+});
+
+test("a tab click and the URL name the same tab: tabQuery is the inverse of tabFromParam", () => {
+  for (const key of TAB_KEYS) {
+    const q = tabQuery("", key as TabKey);
+    assert.equal(tabFromParam(new URLSearchParams(q).get("status") ?? undefined), key, key);
+  }
+  assert.equal(tabQuery("", "verifying"), "?status=verifying");
+  assert.equal(tabQuery("?status=open", "verifying"), "?status=verifying");
+  assert.equal(tabQuery("?status=verifying", "all"), "");
+  // Other params survive a tab change, in both directions.
+  assert.equal(tabQuery("?project=p1&status=open", "accepted"), "?project=p1&status=accepted");
+  assert.equal(tabQuery("?project=p1&status=open", "all"), "?project=p1");
+});
+
+test("the Verifying empty state says when it applies", () => {
+  assert.equal(TAB_EMPTY.verifying.title, "No CGPA checks in progress");
+  assert.match(TAB_EMPTY.verifying.body, /still checking/);
+  assert.match(TAB_EMPTY.verifying.body, /straight to To pay/);
+});
+
+test("auto refresh runs only while Findtern is checking a CGPA, in a visible tab, not twice in a row", () => {
+  const ok = { waitingOnFindtern: 1, visible: true, sinceLastMs: 60_000 };
+  assert.equal(shouldAutoRefresh(ok), true);
+  assert.equal(shouldAutoRefresh({ ...ok, waitingOnFindtern: 0 }), false, "nothing verifying: never poll");
+  assert.equal(shouldAutoRefresh({ ...ok, visible: false }), false, "hidden tab");
+  assert.equal(shouldAutoRefresh({ ...ok, sinceLastMs: REFRESH_MIN_GAP_MS - 1 }), false, "focus + visibilitychange fire together");
+  assert.equal(shouldAutoRefresh({ ...ok, sinceLastMs: REFRESH_MIN_GAP_MS }), true);
 });

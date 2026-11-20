@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Clock, CreditCard, Eye, Hourglass, Loader2, Pencil, RotateCcw, Search, Send, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { parseOffer } from "@/lib/offer";
 import { counterRow, EXPIRED_CARD_NOTE, offerState } from "@/components/employer/proposal-state";
 import { closedBreakdown, proposalCounts } from "@/components/employer/proposal-bucket";
-import { closedSummary, inTab, TAB_EMPTY, TAB_EXPLAINER, TAB_LABEL, tabFromParam, type TabKey } from "@/components/employer/proposal-tabs";
+import { closedSummary, inTab, shouldAutoRefresh, TAB_EMPTY, TAB_EXPLAINER, TAB_LABEL, tabFromParam, tabQuery, VERIFYING_REFRESH_MS, type TabKey } from "@/components/employer/proposal-tabs";
 import { CgpaSlaClock } from "@/components/app/cgpa-sla-clock";
 import { CgpaAckButton } from "@/components/employer/proposal-actions";
 import { cn } from "@/lib/utils";
@@ -63,11 +63,24 @@ function formatStart(iso: string | null): string | null {
   return `${Number(d)} ${MONTHS[Number(m) - 1]} ${y}`;
 }
 
-export function ProposalsManager({ initialProposals, initialStatus = "all" }: { initialProposals: ProposalItem[]; initialStatus?: TabKey }) {
+export function ProposalsManager({ initialProposals }: { initialProposals: ProposalItem[] }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [proposals, setProposals] = useState<ProposalItem[]>(initialProposals);
+  // Local copy for optimistic withdraws, but a fresh server list (router.refresh, a strip link) replaces it: this is what
+  // lets a verified CGPA move its offer to To pay in place, without a remount that would drop the search and project filter.
+  const [seen, setSeen] = useState(initialProposals);
+  if (seen !== initialProposals) {
+    setSeen(initialProposals);
+    setProposals(initialProposals);
+  }
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<TabKey>(tabFromParam(initialStatus));
+  // The URL names the tab (`?status=`): a clicked tab, a strip or dashboard link, a shared link and a reload all agree.
+  const statusFilter = tabFromParam(useSearchParams().get("status") ?? undefined);
+  function selectTab(key: TabKey) {
+    // Shallow: Next's history integration updates useSearchParams without a server round trip or a scroll.
+    window.history.replaceState(null, "", `${pathname}${tabQuery(window.location.search, key)}${window.location.hash}`);
+  }
   const [projectFilter, setProjectFilter] = useState("all");
   const [shown, setShown] = useState(PAGE);
   const [withdrawTarget, setWithdrawTarget] = useState<ProposalItem | null>(null);
@@ -96,6 +109,29 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
   // The same counter the hire strip, the dashboard and the page header use.
   const counterRows = rows.map((r) => counterRow(r.item.proposal.status, r.state, r.down));
   const counts = proposalCounts(counterRows);
+
+  // A CGPA check Findtern is still running is decided in the admin's tab, which this page cannot see: re-read the server
+  // on focus and once a minute while one is open (and never otherwise), so the offer moves to To pay without a manual reload.
+  const waitingOnFindtern = rows.filter((r) => !r.down && (r.state.gate?.state === "pending" || r.state.gate?.state === "overdue")).length;
+  const lastRefresh = useRef(0);
+  useEffect(() => {
+    if (waitingOnFindtern === 0) return;
+    lastRefresh.current = Date.now(); // the page was just read
+    const tick = () => {
+      const now = Date.now();
+      if (!shouldAutoRefresh({ waitingOnFindtern, visible: document.visibilityState === "visible", sinceLastMs: now - lastRefresh.current })) return;
+      lastRefresh.current = now;
+      router.refresh();
+    };
+    const timer = window.setInterval(tick, VERIFYING_REFRESH_MS);
+    document.addEventListener("visibilitychange", tick);
+    window.addEventListener("focus", tick);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", tick);
+      window.removeEventListener("focus", tick);
+    };
+  }, [waitingOnFindtern, router]);
 
   const needle = search.trim().toLowerCase();
   const filtered = rows.filter(({ item, offer, state, down }) => {
@@ -234,7 +270,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
               aria-pressed={on}
               aria-label={`${TAB_LABEL[t.key].label} ${t.count}`}
               onClick={() => {
-                setStatusFilter(t.key);
+                selectTab(t.key);
                 setShown(PAGE);
               }}
               className={cn(
@@ -280,7 +316,7 @@ export function ProposalsManager({ initialProposals, initialStatus = "all" }: { 
                 type="button"
                 onClick={() => {
                   setSearch("");
-                  setStatusFilter("all");
+                  selectTab("all");
                   setProjectFilter("all");
                   setShown(PAGE);
                   // The button unmounts with the empty state: keep focus on the toolbar.

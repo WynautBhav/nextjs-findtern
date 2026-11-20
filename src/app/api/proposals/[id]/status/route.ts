@@ -378,6 +378,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     const candidate = `Candidate ${initialsOf(intern?.f ?? "", intern?.l ?? "")}`;
     const { contact } = await employerNames(proposal.employerId);
     const fullTime = Boolean(offer.fullTime);
+    // Accepted while the CGPA check is open: the mail must not say "pay now" for an offer that cannot be paid yet.
+    const cgpaPending = status === "accepted" && (await cgpaPendingFor(proposal.internId));
     await notify({
       to: { type: "employer", id: proposal.employerId },
       type: fullTime ? `full_time_offer_${status}` : `proposal_${status}`,
@@ -390,7 +392,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           : "Offer declined",
       message: `${candidate} ${status === "accepted" ? "accepted" : "declined"} your ${fullTime ? "full-time offer" : "offer"} for ${role}.`,
       data: { proposalId: id },
-      email: emails.proposalDecision({ employerName: contact, candidate, role, accepted: status === "accepted", proposalId: id, fullTime }),
+      email: emails.proposalDecision({ employerName: contact, candidate, role, accepted: status === "accepted", proposalId: id, fullTime, cgpaPending }),
     });
     if (status === "accepted") {
       await requestCgpaCheck({ proposalId: id, internId: proposal.internId, employerId: proposal.employerId, role, startDate: offer.startDate ?? null });
@@ -445,6 +447,15 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   return NextResponse.json({ proposal: { id: updated.id, status: updated.status } });
+}
+
+async function cgpaPendingFor(internId: string): Promise<boolean> {
+  try {
+    const [onboarding] = await getDb().select({ extraData: schema.internOnboarding.extraData }).from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, internId)).limit(1);
+    return readCgpaVerification(onboarding?.extraData).status === "pending";
+  } catch {
+    return false;
+  }
 }
 
 /**

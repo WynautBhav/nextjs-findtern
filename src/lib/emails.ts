@@ -243,12 +243,14 @@ export const emails = {
     cta: ctaTo("View proposal", `/intern/proposals/${o.proposalId}`),
   }),
 
-  proposalDecision: (o: { employerName: string; candidate: string; role: string; accepted: boolean; proposalId: string; fullTime?: boolean }): EmailContent => ({
+  proposalDecision: (o: { employerName: string; candidate: string; role: string; accepted: boolean; proposalId: string; fullTime?: boolean; /** Accepted, but Findtern is still checking the candidate's CGPA: payment opens once it is confirmed. */ cgpaPending?: boolean }): EmailContent => ({
     subject: o.fullTime ? "Full-time offer update | Findtern" : "Candidate decision update | Findtern",
     preheader: o.accepted
-      ? o.fullTime
-        ? `${o.candidate} accepted. Pay the hiring fee to confirm the joining.`
-        : `${o.candidate} accepted. Complete the payment to confirm the hire.`
+      ? o.cgpaPending
+        ? `${o.candidate} accepted. Findtern is confirming their CGPA first; you can pay once it is done.`
+        : o.fullTime
+          ? `${o.candidate} accepted. Pay the hiring fee to confirm the joining.`
+          : `${o.candidate} accepted. Complete the payment to confirm the hire.`
       : `${o.candidate} declined. You can send an offer to another candidate.`,
     heading: o.fullTime
       ? o.accepted
@@ -261,14 +263,16 @@ export const emails = {
     lines: [
       `${o.candidate} has responded to your ${o.fullTime ? "full-time offer" : "proposal"} for ${o.role}.`,
       o.accepted
-        ? o.fullTime
-          ? "Complete the full-time hiring fee (8.33% of the annual CTC) to confirm the joining."
-          : "Complete the payment to confirm the hire. Names and contact details unlock once it’s done."
+        ? o.cgpaPending
+          ? "Findtern is confirming the candidate’s CGPA first (usually 24 to 48 hours). We’ll tell you the moment you can pay."
+          : o.fullTime
+            ? "Complete the full-time hiring fee (8.33% of the annual CTC) to confirm the joining."
+            : "Complete the payment to confirm the hire. Names and contact details unlock once it’s done."
         : "You can send an offer to another candidate from your shortlist.",
     ],
-    status: o.accepted ? "Accepted" : "Declined",
-    tone: o.accepted ? "done" : "neutral",
-    cta: o.accepted
+    status: o.accepted ? (o.cgpaPending ? "Accepted · CGPA being confirmed" : "Accepted") : "Declined",
+    tone: o.accepted ? (o.cgpaPending ? "wait" : "done") : "neutral",
+    cta: o.accepted && !o.cgpaPending
       ? ctaTo("Go to checkout", "/employer/checkout")
       : ctaTo("View proposal", `/employer/proposal/${o.proposalId}`),
   }),

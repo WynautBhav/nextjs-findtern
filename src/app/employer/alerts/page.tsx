@@ -34,6 +34,10 @@ function hrefFor(type: string, data: Record<string, unknown> | null): string | n
     case "full_time_offer_status":
     case "full_time_fee_paid":
       return id("proposalId") ? `/employer/proposal/${id("proposalId")}` : "/employer/proposals";
+    case "cgpa_verified":
+      return "/employer/proposals?status=accepted";
+    case "cgpa_incorrect":
+      return id("proposalId") ? `/employer/proposal/${id("proposalId")}` : "/employer/proposals?status=verifying";
     case "timesheet_submitted":
       return id("timesheetId") ? `/employer/timesheets/${id("timesheetId")}` : "/employer/timesheets";
     case "meeting_scheduled":

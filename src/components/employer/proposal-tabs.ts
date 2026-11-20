@@ -18,6 +18,32 @@ export function tabFromParam(value: string | string[] | undefined): TabKey {
   return typeof v === "string" && TAB_KEYS.has(v) ? (v as TabKey) : "all";
 }
 
+/**
+ * The query string (`?status=verifying&project=x`, or "" for none) that makes `tab` the one the URL names, other params
+ * kept. "All" is the default, so it drops the param. The inverse of `tabFromParam`: a clicked tab, a shared link and a
+ * reload all name the same tab.
+ */
+export function tabQuery(search: string, tab: TabKey): string {
+  const params = new URLSearchParams(search);
+  if (tab === "all") params.delete("status");
+  else params.set("status", tab);
+  const q = params.toString();
+  return q ? `?${q}` : "";
+}
+
+/** How often the page re-reads while a CGPA check is open, and the least gap between two reads (focus fires with visibility). */
+export const VERIFYING_REFRESH_MS = 60_000;
+export const REFRESH_MIN_GAP_MS = 5_000;
+
+/**
+ * Whether the Proposals page should re-read the server now. Only a CGPA check Findtern is still running changes by
+ * itself (the admin decides it, the employer's page cannot know), so nothing else polls; a hidden tab never does.
+ * `waitingOnFindtern` counts offers whose gate is pending or overdue.
+ */
+export function shouldAutoRefresh(o: { waitingOnFindtern: number; visible: boolean; sinceLastMs: number }): boolean {
+  return o.waitingOnFindtern > 0 && o.visible && o.sinceLastMs >= REFRESH_MIN_GAP_MS;
+}
+
 /** Whether a proposal in `bucket` (and `viewOnly`, a taken-down project) shows under `tab`. */
 export function inTab(tab: TabKey, bucket: ProposalBucket | null, viewOnly: boolean): boolean {
   const heldDown = viewOnly && (bucket === "open" || bucket === "accepted" || bucket === "verifying");
@@ -54,7 +80,7 @@ export const TAB_EMPTY: Record<TabKey, { title: string; body: string }> = {
   all: { title: "No proposals yet", body: "Open a candidate, then use Send proposal." },
   open: { title: "Nothing waiting on a candidate", body: "Offers you have sent and not heard back on show here." },
   draft: { title: "No drafts", body: "Offers you saved without sending show here." },
-  verifying: { title: "No CGPA checks in progress", body: "When a candidate accepts and Findtern is confirming their CGPA, the offer shows here until you can pay." },
+  verifying: { title: "No CGPA checks in progress", body: "Only candidates whose CGPA Findtern is still checking show here. Most offers go straight to To pay." },
   accepted: { title: "Nothing to pay right now", body: "When a candidate accepts and their CGPA is confirmed, the offer shows here, ready to pay." },
   viewonly: { title: "No offers on taken-down projects", body: "Offers on projects Findtern took down show here." },
   hired: { title: "No hires yet", body: "Once an accepted offer is paid, the placement shows here." },
