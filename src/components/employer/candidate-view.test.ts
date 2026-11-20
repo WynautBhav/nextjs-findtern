@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { AVATAR_TINTS, avatarTint, relaxations, cityField, cityParam, dedupeSkills, filterCount, showClearAll, headlineOf, DEFAULT_PAGE_SIZE, PAGE_SIZES, pageWindow, parsePageSize, parseView, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
+import { AVATAR_TINTS, avatarTint, relaxations, sectionCounts, cityField, cityParam, dedupeSkills, filterCount, showClearAll, headlineOf, DEFAULT_PAGE_SIZE, PAGE_SIZES, pageWindow, parsePageSize, parseView, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
 
 test("skillBaseName drops the level", () => {
   assert.equal(skillBaseName("React · Advanced"), "React");
@@ -249,4 +249,10 @@ test("relaxations: capped, never offered on the shortlist tab, no 'project' unle
   assert.deepEqual(relaxations({ ...many, saved: true }), []);
   assert.equal(relaxations({ ...many, match: "matched" }, 9).some((r) => r.key === "project"), false);
   assert.equal(relaxations({ ...many, match: "off" }, 9).some((r) => r.key === "project"), false);
+});
+
+test("sectionCounts: each active chip counts in its own filter-column section", () => {
+  assert.deepEqual(sectionCounts(["q", "city", "remote", "min", "r_coding", "r_aptitude", "plan", "laptop", "sm", "cgpaMin"], false), { location: 2, scores: 3, price: 1, availability: 1, sorting: 1 });
+  assert.equal(sectionCounts([], true).location, 1);
+  assert.deepEqual(sectionCounts(["q"], false), { location: 0, scores: 0, price: 0, availability: 0, sorting: 0 });
 });

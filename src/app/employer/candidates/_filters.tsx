@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import { RATING_META } from "@/lib/employer-candidates";
-import { DEFAULT_PAGE_SIZE, cityField } from "@/components/employer/candidate-view";
+import { DEFAULT_PAGE_SIZE, cityField, sectionCounts } from "@/components/employer/candidate-view";
 import { resolvePricing, type Currency } from "@/lib/employer-pricing";
 import { PER_HIRE_FEE_DEFAULT } from "@/lib/per-hire-fee";
 import { BANDS, PLAN_NAME } from "@/lib/score";
@@ -17,7 +17,7 @@ import { FilterSection } from "@/components/employer/candidates/filter-parts";
 import { ProFilterSections, ProLockedCard } from "@/components/employer/candidates/pro-filters";
 import { collegeSortToken } from "@/lib/candidate-sort";
 import { FilterPanel } from "./_filter-form";
-import { activeFilterCount, queryOf, resetHref, type Filters, type ProData } from "./_query";
+import { activeChips, activeFilterCount, queryOf, resetHref, type Filters, type ProData } from "./_query";
 
 const SELECT = cn(fieldClass, "mt-2");
 
@@ -63,6 +63,7 @@ export function FilterColumn({
   pro: ProData;
 }) {
   const city = cityField({ city: filters.city, citySet: filters.citySet, defaultCity: cityDefault });
+  const count = sectionCounts(activeChips(filters).map((c) => c.key), Boolean(projectCity));
   return (
     <aside
       aria-label="Filters"
@@ -118,7 +119,7 @@ export function FilterColumn({
             {projectToggle ? <div className="mt-1">{projectToggle}</div> : null}
           </div>
 
-          <FilterSection title="Location">
+          <FilterSection title="Location" count={count.location}>
             <CityFilter key={city.value} defaultValue={city.value} label="Preferred work city" autoApply />
             {city.prefilled ? <p className="mt-1.5 text-sm text-ink-700">From your project: {city.value}. Change it to narrow or widen the search.</p> : null}
             <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
@@ -135,7 +136,7 @@ export function FilterColumn({
             </label>
           </FilterSection>
 
-          <FilterSection title="Scores">
+          <FilterSection title="Scores" count={count.scores}>
             <RatingSlider name="min" label="Findtern Score" defaultValue={filters.minScore} />
             <p className="mb-1 mt-2 text-xs text-text-subtle">AI interview scores, each out of 10.</p>
             {RATING_META.map((meta) => (
@@ -143,7 +144,7 @@ export function FilterColumn({
             ))}
           </FilterSection>
 
-          <FilterSection title="Hourly price">
+          <FilterSection title="Hourly price" count={count.price}>
             <label htmlFor="filter-plan" className="sr-only">
               Hourly price
             </label>
@@ -157,7 +158,7 @@ export function FilterColumn({
             </select>
           </FilterSection>
 
-          <FilterSection title="Availability">
+          <FilterSection title="Availability" count={count.availability}>
             <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
               <input
                 type="checkbox"
@@ -170,7 +171,7 @@ export function FilterColumn({
             </label>
           </FilterSection>
 
-          <FilterSection title="Sorting">
+          <FilterSection title="Sorting" count={count.sorting}>
             <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm text-ink-800">
               Most skills matched first
               {/* Unchecked sends only the hidden 0; checked adds sm=1 after it. */}

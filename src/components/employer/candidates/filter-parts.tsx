@@ -3,12 +3,18 @@ import { useId } from "react";
 import { cn } from "@/lib/utils";
 
 /** One labelled group of the filter rail. Always open: every filter stays in view, like the mock. */
-export function FilterSection({ title, children }: { title: string; children: React.ReactNode }) {
+export function FilterSection({ title, count = 0, children }: { title: string; /** Active filters in this section; shown beside the title when above zero. */ count?: number; children: React.ReactNode }) {
   const id = useId();
   return (
     <section aria-labelledby={id} className="mt-4 border-t border-ink-100 pt-4">
-      <h3 id={id} className="mb-2 text-xs font-semibold text-ink-900">
+      <h3 id={id} className="mb-2 flex items-center gap-2 text-sm font-semibold text-ink-900">
         {title}
+        {count > 0 ? (
+          <span className="nums inline-grid h-5 min-w-5 place-items-center rounded-full bg-ink-900 px-1.5 text-[11px] font-semibold leading-none text-white">
+            <span aria-hidden>{count}</span>
+            <span className="sr-only">{count} active</span>
+          </span>
+        ) : null}
       </h3>
       {children}
     </section>
