@@ -151,8 +151,9 @@ export function CandidatesApp({
               fromProject={!filters.skillsSet && filters.projectDefaults && data.activeProjectSkills.length > 0}
               hasPro={data.pro.active}
             />
-            <ActiveFilters data={data} filters={view} className="min-w-0 lg:ml-auto" />
           </div>
+          {/* Its own line under the count: what else narrows the list, then Clear all. */}
+          <ActiveFilters data={data} filters={view} className="mt-3 border-t border-ink-100 pt-3" />
         </div>
 
         <div className="lg:grid lg:grid-cols-[17.5rem_minmax(0,1fr)] lg:items-start">

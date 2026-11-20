@@ -80,9 +80,9 @@ export function ActiveFilters({ data, filters, className }: { data: CandidatesDa
       ];
   if (chips.length === 0) return null;
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-1", className)}>
-      <span aria-hidden className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-text-subtle max-lg:hidden">
-        Active filters
+    <div className={cn("flex flex-wrap items-center gap-x-1.5 gap-y-1", className)}>
+      <span aria-hidden className="mr-1 text-[13px] font-medium text-ink-600 max-sm:hidden">
+        Active filters:
       </span>
       <ul aria-label="Active filters" className="contents">
         {chips.map((chip) => (
@@ -97,7 +97,7 @@ export function ActiveFilters({ data, filters, className }: { data: CandidatesDa
         ))}
       </ul>
       {showClearAll(chips.map((chip) => chip.key)) ? (
-        <Link href={resetHref(data.activeProjectId)} className={buttonClass({ variant: "ghost", size: "sm", className: "text-ink-700 hover:bg-ink-100 lg:ml-auto" })}>
+        <Link href={resetHref(data.activeProjectId)} className={buttonClass({ variant: "ghost", size: "sm", className: "text-ink-700 hover:bg-ink-100" })}>
           Clear all
         </Link>
       ) : null}
