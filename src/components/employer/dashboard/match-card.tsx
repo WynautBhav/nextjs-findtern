@@ -39,7 +39,7 @@ export type MatchCardProps = {
  * list still fits. Segments fill left to right once on first paint (transform
  * only, 40ms apart, off under reduced motion).
  */
-function FitSegments({ hit, of }: { hit: number; of: number }) {
+export function FitSegments({ hit, of }: { hit: number; of: number }) {
   const { n, filled, width } = fitSegments(hit, of);
   return (
     <span

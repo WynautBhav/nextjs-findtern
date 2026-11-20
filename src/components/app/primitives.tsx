@@ -110,7 +110,10 @@ export function SectionHead({
   hint,
   action,
   className,
+  id,
 }: {
+  /** On the heading, for `aria-labelledby`. */
+  id?: string;
   title: string;
   hint?: string;
   action?: React.ReactNode;
@@ -119,7 +122,7 @@ export function SectionHead({
   return (
     <div className={cn("mb-4 flex items-baseline justify-between gap-4", className)}>
       <div className="min-w-0">
-        <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
+        <h2 id={id} className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{title}</h2>
         {hint ? <p className="mt-1 text-sm text-text-subtle">{hint}</p> : null}
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
