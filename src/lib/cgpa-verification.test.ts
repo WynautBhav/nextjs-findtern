@@ -3,6 +3,7 @@ import { test } from "node:test";
 
 import {
   CGPA_DISCLAIMER,
+  CGPA_UPLOAD_WARNING,
   CGPA_SLA_HOURS,
   cgpaBlocksPayment,
   proofSlots,
@@ -32,6 +33,11 @@ const accepted = (over: Partial<Parameters<typeof proposalCgpaGate>[0]> = {}) =>
 test("the SLA is 24 to 48 hours and the disclaimer is the agreed sentence", () => {
   assert.deepEqual(CGPA_SLA_HOURS, { min: 24, max: 48 });
   assert.equal(CGPA_DISCLAIMER, "You'll receive a confirmation call or email from Findtern to verify your CGPA once a proposal you accept is confirmed.");
+});
+
+test("the proof-upload warning says wrong or false information can suspend the account", () => {
+  assert.match(CGPA_UPLOAD_WARNING, /incorrect or false/);
+  assert.match(CGPA_UPLOAD_WARNING, /account may be suspended/);
 });
 
 /* ── yearOfStudy ───────────────────────────────────────────────────── */

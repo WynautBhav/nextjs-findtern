@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Info, ShieldCheck } from "lucide-react";
 
 import { FileUpload } from "@/components/app/file-upload";
-import { CGPA_DISCLAIMER, proofSlots, semesterOptions, yearOfStudy } from "@/lib/cgpa-verification";
+import { CGPA_DISCLAIMER, CGPA_UPLOAD_WARNING, proofSlots, semesterOptions, yearOfStudy } from "@/lib/cgpa-verification";
 import type { CertificateUpload, OnboardingDraft } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +28,10 @@ export function CgpaDisclaimer({ compact = false, className }: { compact?: boole
   return (
     <div className={cn("flex items-start gap-3 rounded-apple-sm border border-info/25 bg-info-soft px-4 py-3", className)}>
       <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden />
-      <p className="text-sm leading-relaxed text-ink-900">{CGPA_DISCLAIMER}</p>
+      <div className="space-y-2 text-sm leading-relaxed text-ink-900">
+        <p>{CGPA_DISCLAIMER}</p>
+        <p role="note" className="font-medium">{CGPA_UPLOAD_WARNING}</p>
+      </div>
     </div>
   );
 }

@@ -25,6 +25,9 @@ export const CGPA_SLA_HOURS = { min: 24, max: 48 } as const;
 
 export const CGPA_DISCLAIMER = "You'll receive a confirmation call or email from Findtern to verify your CGPA once a proposal you accept is confirmed.";
 
+/** Shown with the CGPA proof uploads in onboarding. */
+export const CGPA_UPLOAD_WARNING = "Make sure every detail and document you upload is correct and belongs to you. If any information is found to be incorrect or false, your account may be suspended.";
+
 const HOUR_MS = 3_600_000;
 const MAX_SEMESTER = 10;
 const ALL_SEMESTERS = Array.from({ length: MAX_SEMESTER }, (_, i) => i + 1);
