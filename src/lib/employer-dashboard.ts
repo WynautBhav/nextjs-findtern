@@ -259,3 +259,34 @@ export function untilLabel(at: Date, now: Date = new Date()): string {
   }
   return `in ${Math.floor(mins / (24 * 60))} d`;
 }
+
+/* ── Top matches: which project a candidate is matched against ───────── */
+
+export type FitProject = {
+  id: string;
+  projectName: string;
+  skills: readonly string[] | null | undefined;
+  /** `isProjectOpen(status, takenDownAt)`: closed, paused and taken-down projects are never a match target. */
+  open: boolean;
+  createdAt: Date | string | null;
+};
+
+export type ProjectFit = { projectId: string; projectName: string; hit: number; of: number; skills: string[] };
+
+/**
+ * The open project a candidate fits best: most of its skills they have, a tie
+ * going to the newest project. Null when the employer has no open project. The
+ * returned `hit`, `of` and `skills` all belong to the one named project.
+ * `candidateSkills` are plain skill names (levels already stripped).
+ */
+export function bestProjectFit(candidateSkills: readonly string[], projects: readonly FitProject[]): ProjectFit | null {
+  const have = new Set(candidateSkills.map((s) => s.trim().toLowerCase()));
+  const time = (p: FitProject) => (p.createdAt ? new Date(p.createdAt).getTime() || 0 : 0);
+  let best: ProjectFit | null = null;
+  for (const p of projects.filter((x) => x.open).sort((a, b) => time(b) - time(a))) {
+    const skills = (p.skills ?? []).map((s) => s.toLowerCase());
+    const hit = skills.filter((s) => have.has(s)).length;
+    if (!best || hit > best.hit) best = { projectId: p.id, projectName: p.projectName, hit, of: skills.length, skills };
+  }
+  return best;
+}

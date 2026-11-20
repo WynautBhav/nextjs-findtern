@@ -228,3 +228,34 @@ test("funnel: the Accepted bar opens To pay, or Verifying CGPA when nothing is t
   assert.equal(href([prop("a", "accepted", { bucket: "verifying" }), prop("b", "accepted")]), "/employer/proposals?status=accepted");
   assert.equal(href([prop("a", "hired")]), "/employer/proposals?status=accepted");
 });
+
+import { bestProjectFit, type FitProject } from "./employer-dashboard.ts";
+
+const fp = (id: string, skills: string[], extra: Partial<FitProject> = {}): FitProject => ({ id, projectName: id.toUpperCase(), skills, open: true, createdAt: "2026-11-01T00:00:00Z", ...extra });
+
+test("top match fit: the project with the most matched skills wins, and its own count and name travel together", () => {
+  const f = bestProjectFit(["React", "Next.js"], [fp("a", ["react", "css", "sql"]), fp("b", ["react", "next.js", "node", "ts", "go"])]);
+  assert.deepEqual([f?.projectId, f?.projectName, f?.hit, f?.of], ["b", "B", 2, 5]);
+});
+
+test("top match fit: a tie goes to the newest project, whatever order they arrive in", () => {
+  const older = fp("old", ["react"], { createdAt: "2026-10-01T00:00:00Z" });
+  const newer = fp("new", ["react"], { createdAt: "2026-11-01T00:00:00Z" });
+  assert.equal(bestProjectFit(["react"], [older, newer])?.projectId, "new");
+  assert.equal(bestProjectFit(["react"], [newer, older])?.projectId, "new");
+});
+
+test("top match fit: closed, paused and taken-down projects are never named, even when they match best", () => {
+  const f = bestProjectFit(["2d animation", "10-18 monkey"], [fp("interns", ["2d animation", "10-18 monkey", "x"], { open: false }), fp("web", ["next.js", "react"])]);
+  assert.deepEqual([f?.projectId, f?.hit, f?.of], ["web", 0, 2]);
+});
+
+test("top match fit: no projects, or none open, is null", () => {
+  assert.equal(bestProjectFit(["react"], []), null);
+  assert.equal(bestProjectFit(["react"], [fp("a", ["react"], { open: false })]), null);
+});
+
+test("top match fit: a project with no skills listed counts 0 of 0, and unknown dates do not throw", () => {
+  const f = bestProjectFit(["react"], [fp("a", [], { createdAt: null }), fp("b", null as unknown as string[], { createdAt: "garbage" })]);
+  assert.deepEqual([f?.hit, f?.of], [0, 0]);
+});

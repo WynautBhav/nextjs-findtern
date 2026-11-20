@@ -25,7 +25,7 @@ import { proposalCounts } from "@/components/employer/proposal-bucket";
 import { heldIds, internExtraForRequest, openOrdersForRequest, stateForRow } from "@/lib/employer-flow";
 import { projectZone, timezoneForLocation } from "@/lib/timezones";
 import { formatSlotTime } from "@/lib/format";
-import { buildActivity, buildFunnel, buildProjectStats, untilLabel, type Activity as ActivityData, type DashProposal, type Funnel as FunnelData } from "@/lib/employer-dashboard";
+import { buildActivity, buildFunnel, bestProjectFit, buildProjectStats, untilLabel, type Activity as ActivityData, type DashProposal, type Funnel as FunnelData } from "@/lib/employer-dashboard";
 import { Hero, type HeroQueueItem } from "@/components/employer/dashboard/hero";
 import { Funnel } from "@/components/employer/dashboard/funnel";
 import { Activity } from "@/components/employer/dashboard/activity";
@@ -431,20 +431,11 @@ async function load(employerId: string): Promise<Loaded> {
   // Skills may carry a level ("React · Advanced"): match on the name.
   const matching = wanted.length ? profiles.filter((c) => c.skills.some((s) => wanted.includes(skillBaseName(s).toLowerCase()))) : profiles;
   const candidates = (matching.length ? matching : profiles).slice(0, 4);
-  // Each match against the open project it fits best (newest wins a tie): the
-  // heart saves to that project and the row says how well they fit it.
-  const openRows = projectRows.filter((p) => isProjectOpen(p.status));
+  // Each match against the open project it fits best (most skills, newest wins a tie): the heart saves to that
+  // project and the row names it. Same openness as the Projects panel, so a closed or taken-down project is never named.
+  const fitProjects = projectRows.map((p) => ({ id: p.id, projectName: p.projectName, skills: p.skills as string[] | null, open: isProjectOpen(p.status, p.takenDownAt), createdAt: p.createdAt }));
   const fit: Record<string, Fit | null> = {};
-  for (const c of candidates) {
-    const have = new Set(c.skills.map((s) => skillBaseName(s).toLowerCase()));
-    let best: Fit | null = null;
-    for (const p of openRows) {
-      const skills = ((p.skills as string[]) ?? []).map((s) => s.toLowerCase());
-      const hit = skills.filter((s) => have.has(s)).length;
-      if (!best || hit > best.hit) best = { projectId: p.id, projectName: p.projectName, hit, of: skills.length, skills };
-    }
-    fit[c.id] = best;
-  }
+  for (const c of candidates) fit[c.id] = bestProjectFit(c.skills.map(skillBaseName), fitProjects);
 
   // The next meeting's candidate: initials and photo only, as everywhere before a hire.
   const nextIv = upcoming[0]?.iv ?? null;

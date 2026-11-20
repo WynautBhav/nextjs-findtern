@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Check } from "lucide-react";
+import { Check, FolderKanban } from "lucide-react";
 
 import type { PresenceLabel } from "@/lib/presence";
 import { PRESENCE_ONLINE } from "@/lib/presence-logic";
@@ -64,7 +64,7 @@ function FitSegments({ hit, of }: { hit: number; of: number }) {
 /**
  * One top match as a card (an `<li>`: put it in a `<ul>`): face, initials and
  * place, the Findtern Score as a ring, how many of the project's skills they
- * have, their skills and a shortlist star. The initials link stretches over the
+ * have and which project that is, their skills and a shortlist star. The initials link stretches over the
  * whole card; the star sits above it.
  */
 export function MatchCard({ id, href, initials, photoUrl, presence, where, score, fit, chips, more, saved }: MatchCardProps) {
@@ -114,13 +114,21 @@ export function MatchCard({ id, href, initials, photoUrl, presence, where, score
       </div>
 
       {fit?.of ? (
-        <div title={`${fit.hit} of ${fit.of} skills for ${fit.projectName}`}>
+        <div title={`${fit.hit} of ${fit.of} skills matched for ${fit.projectName}`} className="min-w-0">
           <FitSegments hit={fit.hit} of={fit.of} />
-          <p className="mt-1.5 line-clamp-2 text-sm leading-5 text-ink-600">
+          <p className="mt-1.5 text-sm leading-5 text-ink-600">
             <span className="nums font-semibold text-ink-900">
               {fit.hit} of {fit.of}
             </span>{" "}
-            skills for {fit.projectName}
+            skills matched
+          </p>
+          {/* The project the count is against: one line, cut with an ellipsis; the full name is the title. */}
+          <p className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs leading-4 text-text-subtle">
+            <FolderKanban className="size-3.5 shrink-0" aria-hidden />
+            <span className="shrink-0">Match for</span>
+            <span className="min-w-0 truncate font-medium text-ink-800" title={fit.projectName}>
+              {fit.projectName}
+            </span>
           </p>
         </div>
       ) : null}
