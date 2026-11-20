@@ -128,7 +128,7 @@ function Membership({
               <Building2 className="size-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{college.name}</h2>
+              <h3 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{college.name}</h3>
               <p className="mt-0.5 text-sm text-ink-600">
                 {[college.year ? YEARS.find((y) => y.value === college.year)?.label : null, college.branch, college.city]
                   .filter(Boolean)
@@ -208,7 +208,7 @@ function Membership({
       {college.isPartner ? (
       <aside className="space-y-4">
         <Surface className="p-5">
-          <h2 className="text-base font-semibold text-ink-900">Call alerts</h2>
+          <h3 className="text-base font-semibold text-ink-900">Call alerts</h3>
           <p className="mt-1 text-sm leading-relaxed text-ink-700">
             During a drive, employers can ask you to a short video call at a few minutes&apos; notice. Alerts make sure you
             don&apos;t miss one.

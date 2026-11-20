@@ -14,6 +14,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check, CheckCheck } from "lucide-react";
 
+import { SURFACE_CLASS } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
@@ -42,12 +43,18 @@ export function NotificationList({
   mode = "list",
   disabled,
   now,
+  card = false,
 }: {
   rows?: NotificationRow[];
   mode?: "list" | "mark-all";
   disabled?: boolean;
   /** Reference time for "Today" and "Yesterday"; read once on mount when omitted. */
   now?: Date;
+  /**
+   * Draw the rows inside one bordered card, with each day as a tinted band and unread rows
+   * tinted. Off by default, so the employer alerts page (the other consumer) is unchanged.
+   */
+  card?: boolean;
 }) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -117,20 +124,29 @@ export function NotificationList({
         </p>
       ) : null}
 
-      {/* By day, newest first; each row then needs only its time. Day labels are h3 under the list's section. */}
-      <div>
+      {/* By day, newest first; each row then needs only its time. In a card the page has section heads, so day labels are h3 there and h2 otherwise. */}
+      <div className={cn(card && [SURFACE_CLASS, "divide-y divide-ink-200/80 overflow-hidden"])}>
         {byDay(rows ?? [], now ?? mountedAt).map(({ day, items }) => (
           <section key={day} aria-label={day}>
-            <h2 className="nums px-3 pb-2 pt-6 text-xs font-semibold text-ink-600 first:pt-0">{day}</h2>
-            <ul className="divide-y divide-ink-200 border-y border-ink-200">
+            <DayHeading
+              as={card ? "h3" : "h2"}
+              className={cn(
+                "nums text-xs font-semibold text-ink-600",
+                card ? "border-b border-ink-200/80 bg-ink-50 px-4 py-2" : "px-3 pb-2 pt-6 first:pt-0",
+              )}
+            >
+              {day}
+            </DayHeading>
+            <ul className={cn("divide-y", card ? "divide-ink-200/80" : "divide-ink-200 border-y border-ink-200")}>
               {items.map((n) => {
                 const isRead = n.isRead || read.has(n.id);
+                const pad = card ? "py-4 pl-4 pr-14" : "py-4 pl-3 pr-14";
                 const body = (
                   <>
                     <span aria-hidden className={cn("mt-2 size-2 shrink-0 rounded-full", isRead ? "bg-transparent" : "bg-brand-700")} />
                     <span className="min-w-0 flex-1">
                       {/* Title with the time on the right; one quiet line of detail. */}
-                      <span className="flex items-baseline justify-between gap-4">
+                      <span className={cn("flex items-baseline justify-between gap-4", card && "max-sm:flex-col max-sm:gap-0.5")}>
                         <span className={cn("min-w-0 text-pretty text-base", isRead ? "font-medium text-ink-800" : "font-semibold text-ink-900")}>
                           {n.title}
                           {!isRead ? <span className="sr-only"> (unread)</span> : null}
@@ -146,19 +162,23 @@ export function NotificationList({
                   </>
                 );
                 return (
-                  <li key={n.id} className="group/row relative flex items-center">
+                  <li key={n.id} className={cn("group/row relative flex items-center", card && !isRead && "bg-brand-50")}>
                     {n.href ? (
                       <Link
                         href={n.href}
                         onClick={() => {
                           if (!isRead) void markOne(n.id, true);
                         }}
-                        className="flex min-w-0 flex-1 items-start gap-4 py-4 pl-3 pr-14 transition-colors hover:bg-ink-50/80 focus-visible:bg-ink-50/80 focus-visible:-outline-offset-2"
+                        className={cn(
+                          "flex min-w-0 flex-1 items-start gap-4 transition-colors focus-visible:-outline-offset-2",
+                          pad,
+                          card ? "hover:bg-ink-50 focus-visible:bg-ink-50" : "hover:bg-ink-50/80 focus-visible:bg-ink-50/80",
+                        )}
                       >
                         {body}
                       </Link>
                     ) : (
-                      <div className="flex min-w-0 flex-1 items-start gap-4 py-4 pl-3 pr-14">{body}</div>
+                      <div className={cn("flex min-w-0 flex-1 items-start gap-4", pad)}>{body}</div>
                     )}
                     {!isRead ? (
                       // Always there on touch; on a pointer it shows on hover or focus.
@@ -181,6 +201,10 @@ export function NotificationList({
       </div>
     </div>
   );
+}
+
+function DayHeading({ as: As, className, children }: { as: "h2" | "h3"; className?: string; children: React.ReactNode }) {
+  return <As className={className}>{children}</As>;
 }
 
 const DAY: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", timeZone: "Asia/Kolkata" };

@@ -51,10 +51,10 @@ export function InvoiceList({ invoices }: { invoices: InternInvoice[] }) {
               </p>
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={() => view(i)} className={buttonClass({ variant: "outline", size: "sm" })}>
+              <button type="button" onClick={() => view(i)} className={buttonClass({ variant: "outline", size: "md" })}>
                 <Eye className="size-3.5" aria-hidden /> View
               </button>
-              <button type="button" onClick={() => download(i)} className={buttonClass({ variant: "outline", size: "sm" })}>
+              <button type="button" onClick={() => download(i)} className={buttonClass({ variant: "outline", size: "md" })}>
                 <Download className="size-3.5" aria-hidden /> Download
               </button>
             </div>

@@ -1,9 +1,10 @@
+import { SURFACE_CLASS } from "@/components/app/primitives";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /** One notification as the list draws it: unread dot, a title with its time, and the message under it. */
 function NotificationRowSkeleton({ wide }: { wide: boolean }) {
   return (
-    <li className="flex items-start gap-4 py-4 pl-3 pr-14">
+    <li className="flex items-start gap-4 py-4 pl-4 pr-14">
       <Skeleton className="mt-2 size-2 shrink-0 rounded-full" />
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline justify-between gap-4">
@@ -32,9 +33,11 @@ export default function InternNotificationsLoading() {
 
       <div className="space-y-8">
         {[5, 4].map((rows, g) => (
-          <section key={g}>
-            <Skeleton className="mb-2 ml-3 h-4 w-24 rounded-apple-sm" />
-            <ul className="divide-y divide-ink-200 border-y border-ink-200">
+          <section key={g} className={`${SURFACE_CLASS} overflow-hidden`}>
+            <div className="border-b border-ink-200/80 bg-ink-50 px-4 py-2">
+              <Skeleton className="h-4 w-20 rounded-apple-sm" />
+            </div>
+            <ul className="divide-y divide-ink-200/80">
               {Array.from({ length: rows }, (_, i) => (
                 <NotificationRowSkeleton key={i} wide={i % 2 === 0} />
               ))}

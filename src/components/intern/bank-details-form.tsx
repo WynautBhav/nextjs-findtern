@@ -161,7 +161,7 @@ export function BankDetailsForm({ initialBank }: { initialBank?: BankDetails }) 
               setEditing(true);
               window.requestAnimationFrame(() => document.getElementById("bankAccountHolderName")?.focus());
             }}
-            className={buttonClass({ variant: "outline", size: "sm", className: "mt-4 touch:min-h-11" })}
+            className={buttonClass({ variant: "outline", size: "md", className: "mt-4" })}
           >
             Edit bank details
           </button>
@@ -189,7 +189,7 @@ export function BankDetailsForm({ initialBank }: { initialBank?: BankDetails }) 
             {saving ? "Saving…" : "Save bank details"}
           </button>
           {onFile(stored) ? (
-            <button type="button" onClick={close} disabled={saving} className={buttonClass({ variant: "ghost", size: "sm" })}>
+            <button type="button" onClick={close} disabled={saving} className={buttonClass({ variant: "ghost", size: "md" })}>
               Cancel
             </button>
           ) : null}
