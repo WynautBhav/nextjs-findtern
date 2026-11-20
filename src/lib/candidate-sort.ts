@@ -8,9 +8,13 @@ export type SortField = "score" | "communication" | "coding" | "aptitude" | "int
 export const SORT_FIELDS: readonly SortField[] = ["score", "communication", "coding", "aptitude", "interview"];
 export const MAX_SORT_FIELDS = 3;
 
-type Sortable = { score: number; ratings: Record<Exclude<SortField, "score">, number> };
+type Sortable = { score: number; scored?: boolean; ratings: Record<Exclude<SortField, "score">, number> };
 
-/** Distinct valid fields from `sort=a,b` or repeated `sort=a&sort=b`, in order, at most three. */
+export type SortDir = "asc" | "desc";
+
+/**
+ * Distinct valid fields from `sort=a,b` or repeated `sort=a&sort=b`, in order, at most three.
+ */
 export function parseSortFields(raw: string | string[] | undefined): SortField[] {
   const parts = (Array.isArray(raw) ? raw : [raw ?? ""]).flatMap((v) => v.split(","));
   const out: SortField[] = [];
@@ -21,16 +25,65 @@ export function parseSortFields(raw: string | string[] | undefined): SortField[]
   return out.slice(0, MAX_SORT_FIELDS);
 }
 
+/**
+ * `dir=asc|desc` for the chosen score fields: anything else is the default, high to low. With no
+ * field chosen (Best match, or the college order) the direction does not apply, so it stays "desc".
+ */
+export function parseSortDir(raw: string | string[] | undefined, sorts: readonly SortField[]): SortDir {
+  return sorts.length > 0 && (Array.isArray(raw) ? raw[0] : raw) === "asc" ? "asc" : "desc";
+}
+
+/**
+ * A value nobody has is "no value": an unscored intern, or a sub-score of 0 (never rated). It sorts
+ * last whichever way the list runs.
+ */
+const valueOf = (c: Sortable, f: SortField): number | null => {
+  if (f === "score") return c.scored === false ? null : c.score;
+  const v = c.ratings[f] ?? 0;
+  return v > 0 ? v : null;
+};
+
 /** Negative when `a` ranks first. Falls back to the Findtern Score (desc) when no field is chosen. */
-export function compareBySortFields(a: Sortable, b: Sortable, fields: readonly SortField[], dir: "asc" | "desc"): number {
-  const value = (c: Sortable, f: SortField) => (f === "score" ? c.score : (c.ratings[f] ?? 0));
+export function compareBySortFields(a: Sortable, b: Sortable, fields: readonly SortField[], dir: SortDir): number {
   const sign = dir === "asc" ? -1 : 1;
   for (const f of fields.length > 0 ? fields : (["score"] as const)) {
-    const diff = value(b, f) - value(a, f);
+    const x = valueOf(a, f);
+    const y = valueOf(b, f);
+    if (x === null || y === null) {
+      if (x === y) continue;
+      return x === null ? 1 : -1;
+    }
+    const diff = y - x;
     if (diff !== 0) return sign * diff;
   }
   return 0;
 }
+
+/** The one thing the sort control picks: a score field, the Findtern Pro college order, or "" for Best match. */
+export type SortChoice = SortField | "college" | "";
+
+/** Today's implicit direction: scores and ratings high to low, colleges A-Z. */
+export const defaultSortDir = (choice: SortChoice): SortDir => (choice === "college" ? "asc" : "desc");
+
+export const sortChoiceOf = (sorts: readonly SortField[], collegeSort: CollegeSort | null): SortChoice => (collegeSort ? "college" : (sorts[0] ?? ""));
+
+/** The direction shown for the current sort; null for Best match, which has one fixed order. */
+export function activeSortDir(choice: SortChoice, dir: SortDir, collegeSort: CollegeSort | null): SortDir | null {
+  return choice === "" ? null : choice === "college" ? (collegeSort ?? "asc") : dir;
+}
+
+/** The filter changes that pick a sort: its default direction, and no other order. */
+export function pickSortPatch(choice: SortChoice): { sorts: SortField[]; dir: SortDir; collegeSort: CollegeSort | null } {
+  return {
+    sorts: choice === "" || choice === "college" ? [] : [choice],
+    dir: "desc",
+    collegeSort: choice === "college" ? defaultSortDir("college") : null,
+  };
+}
+
+/** The filter change that flips the direction of the current sort (and nothing else). */
+export const sortDirPatch = (choice: SortChoice, dir: SortDir): { dir: SortDir } | { collegeSort: CollegeSort } =>
+  choice === "college" ? { collegeSort: dir } : { dir };
 
 /**
  * College order (a Findtern Pro sort): `sort=college` is A-Z, `sort=college_desc` Z-A. It rides in the same
@@ -46,6 +99,10 @@ export function parseCollegeSort(raw: string | string[] | undefined): CollegeSor
   }
   return null;
 }
+
+/** `sort=college&dir=desc` reads as Z-A too, so `dir` means the same for every sort; `sort=college_desc` already says it. */
+export const collegeSortWithDir = (sort: CollegeSort | null, dirRaw: string | string[] | undefined): CollegeSort | null =>
+  sort === "asc" && (Array.isArray(dirRaw) ? dirRaw[0] : dirRaw) === "desc" ? "desc" : sort;
 
 export const collegeSortToken = (sort: CollegeSort | null): string => (sort === "asc" ? "college" : sort === "desc" ? "college_desc" : "");
 

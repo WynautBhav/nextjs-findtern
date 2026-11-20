@@ -153,16 +153,7 @@ export function FilterColumn({
           </FilterSection>
 
           <FilterSection title="Availability">
-            <label htmlFor="filter-mode" className="text-sm text-ink-700">
-              Work mode
-            </label>
-            <select id="filter-mode" name="mode" defaultValue={filters.mode} className={SELECT}>
-              <option value="">Any</option>
-              <option value="remote">Remote</option>
-              <option value="hybrid">Hybrid</option>
-              <option value="onsite">On-site</option>
-            </select>
-            <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
+            <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
               <input
                 type="checkbox"
                 name="laptop"

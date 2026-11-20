@@ -1,4 +1,4 @@
-import { compareBySortFields, type SortField } from "../../lib/candidate-sort.ts";
+import { compareBySortFields, type SortDir, type SortField } from "../../lib/candidate-sort.ts";
 
 /**
  * The candidates list order, pure so it can be tested.
@@ -13,6 +13,8 @@ export type Rankable = {
   id: string;
   initials: string;
   score: number;
+  /** False for an intern with no Findtern Score: last in a score sort, whichever way it runs. */
+  scored?: boolean;
   ratings: { communication: number; coding: number; aptitude: number; interview: number };
   skills: string[];
   preferredLocations: string[];
@@ -20,7 +22,7 @@ export type Rankable = {
 
 export type RankOptions = {
   sorts: readonly SortField[];
-  dir: "asc" | "desc";
+  dir: SortDir;
   /** The skills the list is filtered by (any case). */
   skillTerms: string[];
   /** "Most skills matched first". */

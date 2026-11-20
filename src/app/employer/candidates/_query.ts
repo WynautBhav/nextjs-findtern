@@ -14,7 +14,7 @@ import { projectCities } from "@/lib/project-locations";
 import { likePattern } from "@/lib/admin/palette-search";
 import { employerRegion, type Currency } from "@/lib/employer-pricing";
 import { BANDS, PLAN_NAME, type BandId } from "@/lib/score";
-import { collegeSortToken, parseSortFields, type CollegeSort } from "@/lib/candidate-sort";
+import { collegeSortToken, collegeSortWithDir, parseSortDir, parseSortFields, type CollegeSort, type SortDir } from "@/lib/candidate-sort";
 import { EMPTY_PRO_REQUEST, enforcePro, hasProRequest, proAccess, proQueryPairs, proRequestOf } from "@/lib/candidate-pro-access";
 import { proChips, proFactsOf, type CollegeOption } from "@/lib/candidate-pro-filters";
 import { getEmployerSubscriptionConfig } from "@/lib/platform-settings";
@@ -37,7 +37,6 @@ export type Filters = {
    */
   skillsSet: boolean;
   city: string;
-  mode: string;
   minScore: number;
   laptop: string;
   /** Plan (price band) - the legacy page's hourly-price filter. */
@@ -46,7 +45,8 @@ export type Filters = {
   minRatings: Ratings;
   /** Sort fields in priority order (legacy multi-field sort); empty = Findtern Score. */
   sorts: SortKey[];
-  dir: "desc" | "asc";
+  /** For the score sort chosen in `sorts`; "desc" (the default) when none is. The college order carries its own in `collegeSort`. */
+  dir: SortDir;
   /**
    * Findtern Pro (subscribers only): a minimum CGPA, only CGPAs a college has verified, the colleges wanted and a
    * college order. As read from the URL; `loadCandidates` empties them in place for an employer without the
@@ -89,7 +89,6 @@ export const FILTER_KEYS = [
   "q",
   "skills",
   "city",
-  "mode",
   "min",
   "laptop",
   "plan",
@@ -109,7 +108,6 @@ export type SearchParams = {
   q?: string | string[];
   skills?: string | string[];
   city?: string | string[];
-  mode?: string | string[];
   min?: string | string[];
   laptop?: string | string[];
   plan?: string | string[];
@@ -147,13 +145,13 @@ export function readFilters(params: SearchParams): Filters {
   const all = (raw: string | string[] | undefined) => (raw === undefined ? [] : Array.isArray(raw) ? raw : [raw]);
   const remoteValues = all(params.remote);
   const pro = proRequestOf(params);
+  const sorts = parseSortFields(params.sort);
 
   return {
     q: (one(params.q) ?? "").trim().slice(0, 60),
     skills: dedupeSkills(one(params.skills) ?? ""),
     skillsSet: params.skills !== undefined,
     city: (one(params.city) ?? "").trim().slice(0, 160),
-    mode: (one(params.mode) ?? "").trim(),
     minScore: Number.isFinite(min) && min > 0 ? min : 0,
     laptop: (one(params.laptop) ?? "").trim().toLowerCase(),
     plan: BANDS.some((b) => b.id === planRaw) ? (planRaw as BandId) : "",
@@ -163,12 +161,12 @@ export function readFilters(params: SearchParams): Filters {
       aptitude: floor(params.r_aptitude),
       interview: floor(params.r_interview),
     },
-    sorts: parseSortFields(params.sort),
-    dir: one(params.dir) === "asc" ? "asc" : "desc",
+    sorts,
+    dir: parseSortDir(params.dir, sorts),
     cgpaMin: pro.cgpaMin,
     cgpaVerified: pro.cgpaVerified,
     colleges: pro.colleges,
-    collegeSort: pro.collegeSort,
+    collegeSort: collegeSortWithDir(pro.collegeSort, params.dir),
     // The form sends remote=0, plus remote=1 when ticked; absent = default.
     remote: remoteValues.some((v) => ["1", "true", "on"].includes(v)) ? true : remoteValues.includes("0") ? false : null,
     // Absent = on (the default); the form sends sm=0, plus sm=1 when ticked.
@@ -250,7 +248,6 @@ function filterParams(merged: Filters, withKeyword = true): URLSearchParams {
   if (withKeyword && merged.q) next.set("q", merged.q);
   if (merged.skillsSet) next.set("skills", merged.skills.join(","));
   if (merged.city) next.set("city", merged.city);
-  if (merged.mode) next.set("mode", merged.mode);
   if (merged.minScore > 0) next.set("min", String(merged.minScore));
   if (merged.laptop) next.set("laptop", merged.laptop);
   if (merged.plan) next.set("plan", merged.plan);
@@ -309,7 +306,6 @@ export function activeChips(filters: Filters): FilterChip[] {
   const chips: FilterChip[] = [];
   if (filters.q) chips.push({ key: "q", label: `Keyword: ${filters.q}`, href: drop({ q: "" }) });
   if (filters.city) chips.push({ key: "city", label: `City: ${filters.city}`, href: drop({ city: "" }) });
-  if (filters.mode) chips.push({ key: "mode", label: `Work mode: ${titleCase(filters.mode)}`, href: drop({ mode: "" }) });
   if (filters.remote !== null) {
     chips.push({ key: "remote", label: filters.remote ? "Remote candidates included" : "Remote candidates left out", href: drop({ remote: null }) });
   }
@@ -606,10 +602,8 @@ export async function loadCandidates(
 
     // Legacy "Include remote candidates" (EMB-15): on by default for a
     // remote project (and when showing everyone), off otherwise. Off means
-    // candidates who only work remotely are left out. Picking the Remote
-    // work mode means remote candidates, so it counts as on.
-    let includeRemote = filters.remote ?? (projectRemote || !filters.projectDefaults || filters.mode === "remote");
-    if (filters.mode === "remote") includeRemote = true;
+    // candidates who only work remotely are left out.
+    const includeRemote = filters.remote ?? (projectRemote || !filters.projectDefaults);
     data.includeRemote = includeRemote;
     if (!includeRemote) {
       clauses.push(
@@ -657,10 +651,6 @@ export async function loadCandidates(
       clauses.push(eq(schema.internOnboarding.hasLaptop, true));
     } else if (filters.laptop === "no") {
       clauses.push(eq(schema.internOnboarding.hasLaptop, false));
-    }
-
-    if (filters.mode) {
-      clauses.push(sql`(${schema.internOnboarding.locationTypes})::text ILIKE ${likePattern(filters.mode)} ESCAPE '\\'`);
     }
 
     if (filters.minScore > 0) {

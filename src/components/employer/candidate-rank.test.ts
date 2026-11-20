@@ -64,3 +64,18 @@ test("a save without any of the project's skills gives no boost (review #17)", (
   const none = rankProfiles([make("hi", 9), make("s", 6)], { ...base, saved: new Set(["s"]), projectSkills: [] });
   assert.deepEqual(ids(none), ["hi", "s"], "a project with no skills boosts nobody");
 });
+
+test("sort direction: asc reverses, an unscored intern stays last, ties fall to initials then id", () => {
+  const list = [make("none", 0, { scored: false }), make("b", 7), make("a", 7), make("hi", 9), make("lo", 3)];
+  assert.deepEqual(ids(rankProfiles(list, { ...base, sorts: ["score"], dir: "desc" })), ["hi", "a", "b", "lo", "none"]);
+  assert.deepEqual(ids(rankProfiles(list, { ...base, sorts: ["score"], dir: "asc" })), ["lo", "a", "b", "hi", "none"]);
+  // Best match is the same list as before the direction control existed: unscored last.
+  assert.deepEqual(ids(rankProfiles(list, base)), ["hi", "a", "b", "lo", "none"]);
+});
+
+test("most skills matched first still leads a sort, in either direction", () => {
+  const list = [make("one", 9, { skills: ["React"] }), make("two", 5, { skills: ["React", "Node"] })];
+  const opts = { ...base, skillTerms: ["react", "node"], sorts: ["score" as const] };
+  assert.deepEqual(ids(rankProfiles(list, { ...opts, dir: "desc" })), ["one", "two"]);
+  assert.deepEqual(ids(rankProfiles(list, { ...opts, dir: "asc" })), ["two", "one"]);
+});

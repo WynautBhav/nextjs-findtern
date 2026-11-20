@@ -50,8 +50,7 @@ test("the filter panel treats cgpaMin 0 as 'any' and refocuses a repeated checkb
 });
 
 test("the results toolbar offers the college sorts, locked for an employer without the subscription", () => {
-  assert.match(results, /College A-Z/);
-  assert.match(results, /College Z-A/);
+  assert.match(results, /College \(Pro\)/);
   assert.match(results, /disabled: !proActive/);
   assert.match(results, /sortOptions\(filters, data\.pro\.active\)/);
 });

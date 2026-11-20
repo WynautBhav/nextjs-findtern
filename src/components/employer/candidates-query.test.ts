@@ -38,3 +38,21 @@ test("the hired rule is the one every other screen uses (status hired, or hired_
   // Never `hiredInternIds`: an admin "View as" would then hide everyone.
   assert.doesNotMatch(not.slice(0, not.indexOf("export async function hiredAmong")), /hiredInternIds/);
 });
+
+// The Work mode filter overlapped "Include remote-only candidates" and was removed; an old link or a
+// remembered query that still carries `mode` must simply be ignored.
+test("a legacy ?mode= is not a filter: not parsed, not a chip, not in SQL, not remembered", async () => {
+  assert.doesNotMatch(src, /params\.mode|filters\.mode|merged\.mode|mode: string/);
+  const keys = [...(/FILTER_KEYS = \[([\s\S]*?)\]/.exec(src)?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+  assert.ok(keys.includes("remote") && keys.includes("dir"), "the list of filter keys was read");
+  assert.ok(!keys.includes("mode"));
+  const { restorableFilters } = await import("../../lib/employer-filter-restore.ts");
+  assert.equal(restorableFilters("mode=remote&min=5", keys), "min=5");
+  assert.equal(restorableFilters("mode=hybrid", keys), "");
+});
+
+test("the sort direction rides every link: it is written by filterParams and read by parseSortDir", () => {
+  assert.match(src, /if \(merged\.dir === "asc"\) next\.set\("dir", "asc"\)/);
+  assert.match(src, /dir: parseSortDir\(params\.dir, sorts\)/);
+  assert.match(src, /collegeSort: collegeSortWithDir\(pro\.collegeSort, params\.dir\)/);
+});

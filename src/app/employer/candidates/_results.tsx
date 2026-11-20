@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronDown, Info, LayoutGrid, List, Rows3, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronDown, Info, LayoutGrid, List, Rows3, Search, X } from "lucide-react";
 
 import { redactForEmployer } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
@@ -16,7 +16,7 @@ import { PAGE_SIZES, pageWindow, showClearAll } from "@/components/employer/cand
 import { Segmented, SegmentLink } from "@/components/employer/candidates/toolbar-parts";
 import { FiltersToggle } from "@/components/employer/candidate-filter-collapse";
 import { SUBSCRIPTION_HREF } from "@/components/employer/candidates/pro-filters";
-import { collegeSortToken } from "@/lib/candidate-sort";
+import { activeSortDir, pickSortPatch, sortChoiceOf, sortDirPatch, type SortChoice, type SortDir } from "@/lib/candidate-sort";
 import { SortSelect } from "./_sort-select";
 import {
   SORT_OPTIONS,
@@ -30,7 +30,6 @@ import {
   withoutCity,
   type CandidatesData,
   type Filters,
-  type SortKey,
 } from "./_query";
 
 /**
@@ -59,20 +58,88 @@ export function CandidateSearch({ filters, className }: { filters: Filters; clas
   );
 }
 
-/** Sort options: best match, each field high to low, and the score low to high. */
+/**
+ * Sort options: best match, each score field, and the college (Findtern Pro). Which way each runs is
+ * the direction control beside the select; picking an option starts it at its natural direction
+ * (scores high to low, colleges A-Z), so the list reads as it always did until the control is used.
+ */
 function sortOptions(filters: Filters, proActive: boolean) {
   // One choice at a time: picking a score sort drops the college order, and the reverse.
-  const to = (sort: SortKey | "", dir: "asc" | "desc") =>
-    withFilters(filters, { sorts: sort ? [sort] : [], dir, collegeSort: null, page: "" });
-  const college = (dir: "asc" | "desc") => withFilters(filters, { sorts: [], dir: "desc", collegeSort: dir, page: "" });
+  const to = (choice: SortChoice) => withFilters(filters, { ...pickSortPatch(choice), page: "" });
   return [
-    { value: "", label: "Best match", href: to("", "desc") },
-    ...SORT_OPTIONS.map((o) => ({ value: o.value, label: o.value === "score" ? "Highest Findtern Score" : `Highest ${o.label}`, href: to(o.value, "desc") })),
-    { value: "score:asc", label: "Lowest Findtern Score", href: to("score", "asc") },
+    { value: "", label: "Best match", href: to("") },
+    ...SORT_OPTIONS.map((o) => ({ value: o.value, label: o.label, href: to(o.value) })),
     // Findtern Pro: shown to everyone, choosable by subscribers (the loader ignores `sort=college` for anyone else).
-    { value: "college", label: proActive ? "College A-Z" : "College A-Z (Pro)", href: college("asc"), disabled: !proActive },
-    { value: "college_desc", label: proActive ? "College Z-A" : "College Z-A (Pro)", href: college("desc"), disabled: !proActive },
+    { value: "college", label: proActive ? "College" : "College (Pro)", href: to("college"), disabled: !proActive },
   ];
+}
+
+/**
+ * Ascending / descending for the sort chosen beside it. A pair of links (the server page builds every
+ * URL, as for the layout toggle): the current one is `aria-current`. Direction applies to every sort but
+ * Best match, which is a ranking with one fixed order: there the pair is shown disabled, with the reason.
+ */
+function SortDirection({ filters, choice, collegeSort }: { filters: Filters; choice: SortChoice; collegeSort: Filters["collegeSort"] }) {
+  const current = activeSortDir(choice, filters.dir, collegeSort);
+  const options: { dir: SortDir; label: string; Icon: typeof ArrowUp }[] = [
+    { dir: "asc", label: "Sort ascending", Icon: ArrowUp },
+    { dir: "desc", label: "Sort descending", Icon: ArrowDown },
+  ];
+  const cell = "grid size-10 place-items-center rounded-[10px] sm:size-8 sm:touch:size-11";
+  if (current === null) {
+    return (
+      <div className="flex shrink-0 items-center gap-2 max-sm:hidden">
+        <div role="group" aria-label="Sort direction" aria-describedby="sort-dir-reason" className="flex items-center gap-0.5 rounded-apple-sm border border-ink-200 bg-white p-0.5 opacity-50">
+          {options.map(({ dir, label, Icon }) => (
+            <span key={dir} role="img" aria-label={`${label} (not available)`} className={cn(cell, "text-ink-500")}>
+              <Icon className="size-4" aria-hidden />
+            </span>
+          ))}
+        </div>
+        <span id="sort-dir-reason" className="text-xs text-text-subtle max-lg:sr-only">
+          Best match has a fixed order
+        </span>
+      </div>
+    );
+  }
+  const [other] = options.filter((o) => o.dir !== current);
+  const Now = current === "asc" ? ArrowUp : ArrowDown;
+  return (
+    <>
+      {/* A phone has no room for two buttons beside Sort and the layout toggle: one button shows the direction and flips it. */}
+      <Link
+        href={withFilters(filters, { ...sortDirPatch(choice, other.dir), page: "" })}
+        scroll={false}
+        aria-label={`${current === "asc" ? "Sort ascending" : "Sort descending"}, switch to ${other.dir === "asc" ? "ascending" : "descending"}`}
+        title={`${current === "asc" ? "Ascending" : "Descending"}: tap for ${other.dir === "asc" ? "ascending" : "descending"}`}
+        className="grid size-11 shrink-0 place-items-center rounded-apple-sm border border-ink-200 bg-white text-ink-900 outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:hidden"
+      >
+        <Now className="size-4" aria-hidden />
+      </Link>
+      <nav aria-label="Sort direction" className="flex shrink-0 items-center gap-0.5 rounded-apple-sm border border-ink-200 bg-white p-0.5 max-sm:hidden">
+        {options.map(({ dir, label, Icon }) => {
+          const active = current === dir;
+          return (
+            <Link
+              key={dir}
+              href={withFilters(filters, { ...sortDirPatch(choice, dir), page: "" })}
+              scroll={false}
+              aria-label={label}
+              aria-current={active ? "true" : undefined}
+              title={label}
+              className={cn(
+                cell,
+                "outline-none transition-colors focus-visible:ring-2 focus-visible:ring-brand-500",
+                active ? "bg-ink-900 text-white" : "text-ink-600 hover:bg-ink-100 hover:text-ink-900",
+              )}
+            >
+              <Icon className="size-4" aria-hidden />
+            </Link>
+          );
+        })}
+      </nav>
+    </>
+  );
 }
 
 /**
@@ -128,11 +195,8 @@ export function ActiveFilters({ data, filters, className }: { data: CandidatesDa
  */
 export function ToolbarSort({ data, filters, className }: { data: CandidatesData; filters: Filters; className?: string }) {
   const saved = filters.saved && Boolean(data.activeProjectId);
-  const sortValue = filters.collegeSort
-    ? collegeSortToken(filters.collegeSort)
-    : filters.sorts[0]
-      ? `${filters.sorts[0]}${filters.dir === "asc" ? ":asc" : ""}`
-      : "";
+  // A college order is only real for a subscriber (the loader empties it for anyone else).
+  const choice = sortChoiceOf(filters.sorts, filters.collegeSort);
   const projectKeep = (id: string) => {
     // No `ids`: each project keeps its own compare picks, so the new project shows its own.
     const next = new URLSearchParams({ project: id });
@@ -151,7 +215,12 @@ export function ToolbarSort({ data, filters, className }: { data: CandidatesData
           className={cn(select, "max-w-[min(28rem,100%)] max-lg:hidden")}
         />
       ) : null}
-      {saved ? null : <SortSelect className={select} value={sortValue} options={sortOptions(filters, data.pro.active)} />}
+      {saved ? null : (
+        <>
+          <SortSelect className={select} value={choice} options={sortOptions(filters, data.pro.active)} />
+          <SortDirection filters={filters} choice={choice} collegeSort={filters.collegeSort} />
+        </>
+      )}
       <ViewToggle filters={filters} />
     </div>
   );
