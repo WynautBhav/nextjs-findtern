@@ -136,7 +136,7 @@ export function FilterColumn({
           </FilterSection>
 
           <FilterSection title="Scores">
-            <RatingSlider name="min" label="Minimum score" defaultValue={filters.minScore} />
+            <RatingSlider name="min" label="Findtern Score" defaultValue={filters.minScore} />
             <p className="mb-1 mt-2 text-xs text-text-subtle">AI interview scores, each out of 10.</p>
             {RATING_META.map((meta) => (
               <RatingSlider key={meta.key} name={`r_${meta.key}`} label={meta.label} defaultValue={filters.minRatings[meta.key]} />
