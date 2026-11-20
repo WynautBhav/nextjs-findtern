@@ -12,8 +12,8 @@
  *   labels "Up to 60/90/180 days" (S1 r81), stored under legacy keys (DB-09).
  * - On-site and hybrid need a state and a city, from the Indian lists, and
  *   start on the company's own city when it is in India (EMH-14, EMH-48).
- * - At most three preferred cities (client QA; legacy five, older lists keep
- *   theirs).
+ * - At most three other cities, asked only until a main city is picked (client
+ *   QA; legacy five, older lists keep theirs until the project is saved).
  */
 
 import { Info } from "lucide-react";
@@ -30,6 +30,7 @@ import {
   MAX_PROJECT_LOCATIONS,
   MAX_PROJECT_SKILLS,
   MIN_PROJECT_SKILLS,
+  otherCities,
   projectLocationsError,
   projectPlaceError,
   projectSkillsError,
@@ -88,7 +89,7 @@ export function projectFormErrors(
   if (p.pincode && p.locationType && p.locationType !== "remote" && !/^[1-9]\d{5}$/.test(p.pincode)) {
     errors.pincode = "A PIN code is 6 digits.";
   }
-  const places = projectLocationsError(p.preferredLocations, before?.preferredLocations ?? []);
+  const places = projectLocationsError(otherCities(p.city, p.preferredLocations), before?.preferredLocations ?? []);
   if (places) errors.preferredLocations = places;
   return errors;
 }
@@ -123,6 +124,10 @@ export function ProjectFields({
   const id = (name: string) => `${idPrefix}-${name}`;
   const onsite = Boolean(values.locationType) && values.locationType !== "remote";
 
+  // Picking a city hides "Other cities", so the list is emptied with it.
+  const setPlace = (patch: Partial<ProjectDraft>) =>
+    set(patch.city?.trim() ? { ...patch, preferredLocations: [] } : patch);
+
   function pickMode(mode: string) {
     const patch: Partial<ProjectDraft> = { locationType: mode };
     if (mode === "remote") {
@@ -131,7 +136,7 @@ export function ProjectFields({
     } else if (!values.city && !values.state && companyPlace) {
       Object.assign(patch, companyPlaceDefault(companyPlace));
     }
-    set(patch);
+    setPlace(patch);
   }
 
   return (
@@ -224,7 +229,7 @@ export function ProjectFields({
               india
               value={values.state}
               error={errors.state}
-              onChange={(v) => set({ state: v, city: v === values.state ? values.city : "" })}
+              onChange={(v) => setPlace({ state: v, city: v === values.state ? values.city : "" })}
             />
             <CityField
               id={id("city")}
@@ -232,10 +237,10 @@ export function ProjectFields({
               required
               india
               state={values.state}
-              onStateChange={(v) => set({ state: v })}
+              onStateChange={(v) => setPlace({ state: v })}
               value={values.city}
               error={errors.city}
-              onChange={(v) => set({ city: v })}
+              onChange={(v) => setPlace({ city: v })}
             />
             {showPincode ? (
               <TextField
@@ -250,6 +255,7 @@ export function ProjectFields({
               />
             ) : null}
           </div>
+          {values.city.trim() ? null : (
           <ChipInput
             id={id("places")}
             label="Other cities you'd consider"
@@ -262,6 +268,7 @@ export function ProjectFields({
             onRemove={(place) => set({ preferredLocations: values.preferredLocations.filter((p) => p !== place) })}
             error={errors.preferredLocations}
           />
+          )}
         </div>
       ) : null}
 

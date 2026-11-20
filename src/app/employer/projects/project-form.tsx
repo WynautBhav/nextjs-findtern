@@ -8,6 +8,7 @@ import { Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { FormNotice } from "@/components/employer/company-fields";
 import { ProjectFields, projectFormErrors, type ProjectBaseline } from "@/components/employer/project-fields";
+import { otherCities } from "@/lib/project-locations";
 import { csrfFetch } from "@/lib/client-fetch";
 import { emptyProject, type ProjectDraft } from "@/lib/employer-onboarding";
 import { MAX_SKILLS_PER_PROJECT, submitReadiness } from "@/lib/projects/lifecycle";
@@ -66,7 +67,7 @@ export function ProjectForm({
       const res = await csrfFetch(projectId ? `/api/employer/projects/${projectId}` : `/api/employer/${employerId}/projects`, {
         method: projectId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, preferredLocations: otherCities(form.city, form.preferredLocations) }),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) return setError(body.error ?? "Could not save. Try again.");

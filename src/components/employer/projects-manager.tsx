@@ -13,7 +13,7 @@ import { ProjectFields, projectFormErrors, type ProjectBaseline } from "@/compon
 import { csrfFetch } from "@/lib/client-fetch";
 import { scopeLabel, scopeValue, type Project } from "@/lib/db/schema";
 import { emptyProject, projectFromRecord, type ProjectDraft } from "@/lib/employer-onboarding";
-import { CLOSED_PROJECT_STATUS, isProjectOpen } from "@/lib/project-locations";
+import { CLOSED_PROJECT_STATUS, isProjectOpen, otherCities } from "@/lib/project-locations";
 import { cn } from "@/lib/utils";
 import { RowMenu } from "@/components/app/row-menu";
 import { useConfirm } from "@/components/app/use-confirm";
@@ -136,7 +136,7 @@ export function ProjectsManager({
       // A remote role has no place; null clears one left over from an edit.
       city: remote ? null : form.city.trim() || null,
       state: remote ? null : form.state.trim() || null,
-      preferredLocations: remote ? [] : form.preferredLocations,
+      preferredLocations: remote ? [] : otherCities(form.city, form.preferredLocations),
       timezone: form.timezone,
       fullTimeOffer: form.fullTimeOffer,
     };

@@ -11,6 +11,7 @@ import { parseDraft, readDraft, subscribeToNothing } from "@/components/employer
 import { Stepper } from "@/components/employer/onboarding/stepper";
 import { companyErrors } from "@/components/employer/onboarding/validation";
 import { ProjectFields, projectFormErrors, type ProjectBaseline } from "@/components/employer/project-fields";
+import { otherCities } from "@/lib/project-locations";
 import { csrfFetch } from "@/lib/client-fetch";
 import { timezoneForLocation } from "@/lib/timezones";
 import {
@@ -229,7 +230,7 @@ export function EmployerOnboardingForm({
           projectName: p.projectName.trim(),
           city: remote ? null : p.city.trim() || null,
           state: remote ? null : p.state.trim() || null,
-          preferredLocations: remote ? [] : p.preferredLocations,
+          preferredLocations: remote ? [] : otherCities(p.city, p.preferredLocations),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string; project?: { id?: string } };

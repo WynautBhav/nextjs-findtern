@@ -33,6 +33,15 @@ export function projectCities(project: { city?: string | null; locationType?: st
   return out;
 }
 
+/**
+ * "Other cities" only exist while a project has no main city: once a city is
+ * picked the field is hidden and nothing is saved there (an old project's
+ * list is dropped the next time it is saved).
+ */
+export function otherCities(city: string | null | undefined, list: readonly string[]): string[] {
+  return (city ?? "").trim() ? [] : [...list];
+}
+
 /** Error message for this list, or null when it may be saved. */
 export function projectLocationsError(next: readonly string[], stored: readonly string[] = []): string | null {
   if (next.length <= MAX_PROJECT_LOCATIONS) return null;
