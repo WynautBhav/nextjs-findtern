@@ -40,8 +40,8 @@ test("stop sets pf=0, keeps the other filters and resets the page", () => {
 });
 
 test("matchedOnText", () => {
-  assert.equal(matchedOnText(5, ["Pune"]), "matched on 5 skills + Pune");
-  assert.equal(matchedOnText(1, []), "matched on 1 skill");
+  assert.equal(matchedOnText(5, ["Pune"]), "matched on 5\u00a0skills + Pune");
+  assert.equal(matchedOnText(1, []), "matched on 1\u00a0skill");
   assert.equal(matchedOnText(0, ["Pune", "Delhi"]), "matched on Pune, Delhi");
   assert.equal(matchedOnText(0, []), "");
 });

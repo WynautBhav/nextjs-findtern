@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { AVATAR_TINTS, avatarTint, cityField, cityParam, dedupeSkills, filterCount, showClearAll, headlineOf, DEFAULT_PAGE_SIZE, PAGE_SIZES, pageWindow, parsePageSize, parseView, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
+import { AVATAR_TINTS, avatarTint, relaxations, cityField, cityParam, dedupeSkills, filterCount, showClearAll, headlineOf, DEFAULT_PAGE_SIZE, PAGE_SIZES, pageWindow, parsePageSize, parseView, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
 
 test("skillBaseName drops the level", () => {
   assert.equal(skillBaseName("React · Advanced"), "React");
@@ -230,4 +230,23 @@ test("the city pre-fill is wired through the form, the panel and the restore, an
   assert.match(filters, /defaultValue=\{city\.value\}/);
   assert.match(query, /withoutSavedCity\(remembered\)/);
   assert.doesNotMatch(filters + form, /fetch\(|\/api\//);
+});
+
+const none = { q: "", skills: [] as string[], cities: [] as string[], includeRemote: true, proFilters: false, scoreFloors: false, match: "none" as const, projectName: "", saved: false };
+
+test("relaxations: only what narrows the list, keyword, skill, city, remote, project, Pro, score in that order", () => {
+  assert.deepEqual(relaxations(none), []);
+  const all = relaxations({ ...none, q: "reac", skills: ["React · Advanced", "Node.js"], cities: ["pune"], includeRemote: false, proFilters: true, scoreFloors: true, match: "edited", projectName: "Web" }, 9);
+  assert.deepEqual(all.map((r) => r.key), ["q", "skill", "city", "remote", "project", "pro", "score"]);
+  assert.equal(all[1].label, "Drop Node.js");
+  assert.equal(relaxations({ ...none, skills: ["React · Advanced"] })[0].label, "Drop React");
+});
+
+test("relaxations: capped, never offered on the shortlist tab, no 'project' unless the skills were edited", () => {
+  const many = { ...none, q: "x", skills: ["A"], cities: ["pune"], includeRemote: false };
+  assert.equal(relaxations(many).length, 4);
+  assert.equal(relaxations(many, 2).length, 2);
+  assert.deepEqual(relaxations({ ...many, saved: true }), []);
+  assert.equal(relaxations({ ...many, match: "matched" }, 9).some((r) => r.key === "project"), false);
+  assert.equal(relaxations({ ...many, match: "off" }, 9).some((r) => r.key === "project"), false);
 });

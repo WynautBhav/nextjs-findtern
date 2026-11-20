@@ -51,6 +51,6 @@ export function projectMatchHref(pathname: string, query: string, action: "match
 
 /** "matched on 5 skills + Pune" for the context line; "" when nothing narrows by skill or city. */
 export function matchedOnText(skillCount: number, cities: string[]): string {
-  const parts = [skillCount > 0 ? `${skillCount} skill${skillCount === 1 ? "" : "s"}` : "", cities.join(", ")].filter(Boolean);
+  const parts = [skillCount > 0 ? `${skillCount}\u00a0skill${skillCount === 1 ? "" : "s"}` : "", cities.join(", ")].filter(Boolean);
   return parts.length > 0 ? `matched on ${parts.join(" + ")}` : "";
 }

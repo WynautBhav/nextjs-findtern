@@ -13,7 +13,8 @@ export default function CandidatesLoading() {
       <span className="sr-only" role="status">
         Loading candidates
       </span>
-      <Skeleton className="mb-3 h-10 w-44 rounded-apple-sm sm:mb-4 lg:mb-5" />
+      <Skeleton className="h-10 w-44 rounded-apple-sm" />
+      <Skeleton className="mb-3 mt-2 h-5 w-full max-w-md rounded-apple-sm sm:mb-4 lg:mb-5 lg:max-w-xl" />
 
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-x-8">
         {/* Toolbar: a card at lg, plain rows below. */}
@@ -26,6 +27,10 @@ export default function CandidatesLoading() {
             <Skeleton className="h-9 w-20 rounded-lg" />
             <Skeleton className="h-9 w-24 rounded-lg" />
             <Skeleton className="h-9 w-28 rounded-md" />
+            <Skeleton className="mt-2 h-14 w-full max-w-xl rounded-apple-sm max-lg:hidden" />
+          </div>
+          <div className="col-span-2 row-start-4 mb-2 flex gap-2 lg:col-span-full lg:row-start-5 lg:mb-0 lg:mt-3 lg:border-t lg:border-ink-100 lg:pt-3 xl:row-start-4">
+            <Skeleton className="h-9 w-36 rounded-lg" />
           </div>
           <div className="col-span-2 row-start-5 flex justify-end gap-2 lg:col-span-2 lg:row-start-2 lg:mt-3 lg:justify-start xl:col-span-1 xl:col-start-2 xl:row-start-1 xl:mt-0 xl:justify-end">
             <Skeleton className="h-11 w-40 rounded-apple-sm" />

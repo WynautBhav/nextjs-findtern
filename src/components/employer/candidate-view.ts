@@ -169,3 +169,41 @@ export function cityParam(value: string, defaultCity: string): string | null {
 export function showClearAll(chipKeys: string[]): boolean {
   return chipKeys.some((key) => key !== "project-city");
 }
+
+export type RelaxKey = "q" | "skill" | "city" | "remote" | "project" | "pro" | "score";
+export type Relaxation = { key: RelaxKey; label: string; hint: string };
+
+/**
+ * One-click ways to widen an empty list, in the order worth trying: the typed keyword, the last required skill,
+ * the city, remote-only candidates, the project's own skills, the Findtern Pro filters, the score floors. Only
+ * what is actually narrowing the list is offered; `max` caps how many. The page turns each key into a link.
+ */
+export function relaxations(
+  o: {
+    q: string;
+    /** The skills the list is filtered by (the employer's or the project's). */
+    skills: string[];
+    cities: string[];
+    /** Candidates who only work remotely are in the list. */
+    includeRemote: boolean;
+    proFilters: boolean;
+    scoreFloors: boolean;
+    /** How the selected project relates to the list: see `projectMatchState`. */
+    match: "matched" | "edited" | "off" | "none";
+    projectName: string;
+    saved: boolean;
+  },
+  max = 4,
+): Relaxation[] {
+  if (o.saved) return [];
+  const out: Relaxation[] = [];
+  if (o.q.trim()) out.push({ key: "q", label: "Clear the search", hint: `Search looks at skills and cities only, so “${o.q.trim()}” may be matching nothing.` });
+  const last = o.skills[o.skills.length - 1];
+  if (last) out.push({ key: "skill", label: `Drop ${skillBaseName(last)}`, hint: o.skills.length === 1 ? "Then any skill counts." : `Keeps the other ${o.skills.length - 1} skill${o.skills.length === 2 ? "" : "s"}.` });
+  if (o.cities.length > 0) out.push({ key: "city", label: "Any city", hint: "Candidates are listed wherever they want to work." });
+  if (!o.includeRemote) out.push({ key: "remote", label: "Include remote-only candidates", hint: "People who only work remotely are left out now." });
+  if (o.match === "edited") out.push({ key: "project", label: "Reset to project skills", hint: `Back to the skills of ${o.projectName || "the project"}.` });
+  if (o.proFilters) out.push({ key: "pro", label: "Clear CGPA and college filters", hint: "Findtern Pro filters narrow the list the most." });
+  if (o.scoreFloors) out.push({ key: "score", label: "Clear score minimums", hint: "Findtern Score and the sub-score floors." });
+  return out.slice(0, max);
+}

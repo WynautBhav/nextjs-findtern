@@ -34,7 +34,7 @@ export function StickyBar({ targetId, label, children }: { targetId: string; lab
 
   useEffect(() => {
     const root = document.documentElement;
-    if (stuck) root.style.scrollPaddingTop = "9rem";
+    if (stuck) root.style.scrollPaddingTop = "8rem";
     return () => {
       root.style.scrollPaddingTop = "";
     };
@@ -48,7 +48,7 @@ export function StickyBar({ targetId, label, children }: { targetId: string; lab
         inert={!stuck}
         aria-hidden={!stuck}
         className={cn(
-          "absolute inset-x-0 top-2 rounded-apple-xl border border-ink-200/80 bg-white/95 px-3 py-2 shadow-md backdrop-blur-md transition-[opacity,transform] duration-150 motion-reduce:transition-none",
+          "absolute inset-x-0 top-0 rounded-b-apple-xl border border-t-0 border-ink-200/80 bg-white/98 px-3 py-2 shadow-md backdrop-blur-md transition-[opacity,transform] duration-150 motion-reduce:transition-none",
           stuck ? "pointer-events-auto visible translate-y-0 opacity-100" : "invisible -translate-y-2 opacity-0",
         )}
       >

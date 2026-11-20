@@ -11,11 +11,11 @@ import { cn } from "@/lib/utils";
 import { CandidateCard } from "@/components/employer/candidate-card";
 import { EmptyScene } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
-import { buttonClass } from "@/components/ui/button";
 import { PAGE_SIZES, pageWindow } from "@/components/employer/candidate-view";
 import { Segmented, SegmentLink } from "@/components/employer/candidates/toolbar-parts";
 import { SUBSCRIPTION_HREF } from "@/components/employer/candidates/pro-filters";
-import { resetHref, titleCase, toggle, withFilters, withoutCity, type CandidatesData, type Filters } from "./_query";
+import { toggle, withFilters, type CandidatesData, type Filters } from "./_query";
+import { ZeroResults } from "./_zero-results";
 
 /** "Per page 12 24 48": how many candidates one page holds. Changing it returns to page 1. */
 function PageSizeControl({ filters, className }: { filters: Filters; className?: string }) {
@@ -100,7 +100,6 @@ export function Results({
   const compareFull = compareIds.length >= MAX_COMPARE;
   const compareLink = (id: string) =>
     compareIds.includes(id) || !compareFull ? withFilters(filters, { ids: toggle(compareIds, id) }) : null;
-  const reset = resetHref(data.activeProjectId);
   const saved = filters.saved && Boolean(data.activeProjectId);
   const paged = pageWindow(total, filters.page, filters.pageSize);
   const firstShown = paged.first;
@@ -138,58 +137,8 @@ export function Results({
             next={{ label: "Browse all candidates", href: withFilters(filters, { saved: false, page: "" }) }}
             who="You - save a candidate"
           />
-        ) : filters.cgpaMin > 0 || filters.cgpaVerified || filters.colleges.length > 0 ? (
-          // Findtern Pro filters are the likeliest cause of nobody matching: name them and offer to drop just those.
-          <EmptyScene
-            art
-            title="No candidates match your CGPA or college filters"
-            body={
-              data.pro.hiddenNoScore > 0
-                ? `${data.pro.hiddenNoScore} candidate${data.pro.hiddenNoScore === 1 ? " was" : "s were"} left out for having no score. Lower the minimum CGPA, turn off verified only or choose more colleges.`
-                : "Lower the minimum CGPA, turn off verified only or choose more colleges."
-            }
-            next={{ label: "Clear CGPA and college filters", href: withFilters(filters, { cgpaMin: 0, cgpaVerified: false, colleges: [], collegeSort: null, page: "" }) }}
-            who="You - widen the filters"
-          />
-        ) : data.cityList.length > 0 ? (
-          // EMB-21: legacy offered "Clear location" and "Include remote
-          // candidates" right on the empty result.
-          <div>
-            <EmptyScene
-              art
-              title={`No candidates for ${data.cityList.map(titleCase).join(", ")}`}
-              body="Nobody in the pool has picked this city as a place to work yet. Clear the location, or include candidates who work remotely."
-              next={{ label: "Clear location", href: withoutCity(filters) }}
-              who="You - widen the search"
-            />
-            {!data.includeRemote ? (
-              <p className="mt-3 text-center">
-                <Link
-                  href={withoutCity(filters, { remote: true })}
-                  className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}
-                >
-                  Include remote candidates
-                </Link>
-              </p>
-            ) : null}
-          </div>
-        ) : filters.q ? (
-          // The typed keyword is the likeliest cause: name it and offer to drop just that.
-          <EmptyScene
-            art
-            title={`No candidates match “${filters.q}”`}
-            body="Search looks at skills and cities, for example React or Pune. Names and profiles are not searched."
-            next={{ label: "Clear the search", href: withFilters(filters, { q: "", page: "" }) }}
-            who="You - try another word"
-          />
         ) : (
-          <EmptyScene
-            art
-            title="No candidates match"
-            body="Lower a score floor, drop a skill or turn on remote candidates. New interns join the pool as soon as their AI interview is scored."
-            next={{ label: "Reset filters", href: reset }}
-            who="You - adjust the filters"
-          />
+          <ZeroResults data={data} filters={filters} />
         )
       ) : (
         <>
