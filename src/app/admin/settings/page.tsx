@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { asc, eq } from "drizzle-orm";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, HardDrive } from "lucide-react";
 
 import { AdminLoadError, AdminPageHeader, Panel, PanelHeader } from "@/components/admin/panel";
 import { StatusBadge } from "@/components/admin/status-badge";
 import { ADMIN_PILL_SECONDARY } from "@/components/admin/surface";
 import { buttonClass } from "@/components/ui/button";
-import { calendarConnected as checkCalendar } from "@/lib/calendar-status";
+import { calendarConnected as checkCalendar, driveConnection as checkDrive, type DriveConnection } from "@/lib/calendar-status";
+import { GoogleDriveResetButton } from "@/components/admin/google-drive-reset-button";
 import { AdminPricingEditor, type EditablePlan } from "@/components/admin/admin-pricing-editor";
 import { getSession } from "@/lib/auth";
 import { canWrite } from "@/lib/admin/permissions";
@@ -97,8 +98,44 @@ function HandEditedTexts() {
   );
 }
 
-export default async function AdminSettingsPage() {
-  const [pricing, calendarConnected] = await Promise.all([loadPricing(), checkCalendar()]);
+/** What the Google connect screens redirect back with (`?google=`). */
+const GOOGLE_NOTICE: Record<string, { text: string; ok: boolean }> = {
+  connected: { text: "Google Calendar is connected.", ok: true },
+  drive_connected: { text: "Google Drive is connected. AI reports will be saved to that account.", ok: true },
+  no_refresh_token: {
+    text: "Google didn't give Findtern a lasting sign-in. Remove Findtern under that Google account's third-party access, then connect again.",
+    ok: false,
+  },
+  failed: { text: "The Google connection didn't finish. Try again.", ok: false },
+};
+
+const DRIVE_COPY: Record<Exclude<DriveConnection, null>, { badge: string; tone: "success" | "warning"; text: string }> = {
+  own: {
+    badge: "Own Drive account",
+    tone: "success",
+    text: "AI report PDFs are saved to a Google account set up only for Drive. The calendar account is not affected.",
+  },
+  calendar: {
+    badge: "Using the calendar account",
+    tone: "success",
+    text: "AI report PDFs are saved to the same Google account as the calendar. Change it any time to keep reports in another account.",
+  },
+  no_drive_access: {
+    badge: "Needs Drive access",
+    tone: "warning",
+    text: "Connected, but Google wasn't allowed to use Drive. Connect again and keep the Drive box ticked.",
+  },
+  none: {
+    badge: "Not connected",
+    tone: "warning",
+    text: "Not connected. AI reports can be checked but not saved until a Google account is connected for Drive.",
+  },
+};
+
+export default async function AdminSettingsPage({ searchParams }: { searchParams: Promise<{ google?: string | string[] }> }) {
+  const [pricing, calendarConnected, drive, params] = await Promise.all([loadPricing(), checkCalendar(), checkDrive(), searchParams]);
+  const googleParam = Array.isArray(params.google) ? params.google[0] : params.google;
+  const notice = googleParam ? GOOGLE_NOTICE[googleParam] : undefined;
   const permissions = (await getSession())?.permissions;
   const mayEdit = canWrite(permissions, "/api/admin/pricing");
   const mayEditSubscription = mayEdit && canWrite(permissions, "/api/admin/subscriptions");
@@ -132,8 +169,36 @@ export default async function AdminSettingsPage() {
       </Panel>
   );
 
+  const driveCopy = drive ? DRIVE_COPY[drive] : null;
+  const driveCard = (
+    <Panel>
+      <PanelHeader
+        title="Google Drive (AI report storage)"
+        icon={HardDrive}
+        description={driveCopy?.text ?? "Couldn't check the connection just now. Reload to try again."}
+        action={
+          <>
+            {driveCopy ? <StatusBadge tone={driveCopy.tone} label={driveCopy.badge} /> : null}
+            <a href="/api/admin/google/connect?slot=drive" className={buttonClass({ variant: "outline", size: "sm", className: ADMIN_PILL_SECONDARY })}>
+              {drive === "none" ? "Connect Drive" : "Change Drive account"}
+            </a>
+            {drive === "own" ? <GoogleDriveResetButton /> : null}
+          </>
+        }
+      />
+    </Panel>
+  );
+
   return (
     <div className="space-y-8">
+      {notice ? (
+        <p
+          role="status"
+          className={`rounded-[var(--radius-admin-card)] border border-[color:var(--admin-rule)] px-4 py-3 text-sm font-medium ${notice.ok ? "text-ink-800" : "text-danger"}`}
+        >
+          {notice.text}
+        </p>
+      ) : null}
       <AdminPageHeader
         title="Pricing and fees"
         subtitle="Prices are in rupees; USD is derived at ₹100 = $1. The Findtern Pro price is entered excluding GST: India pays 18% GST on top, USD buyers pay no GST. Changes save by themselves a moment after you stop typing and go live on the site as soon as they save."
@@ -154,6 +219,7 @@ export default async function AdminSettingsPage() {
       {pricing ? <HandEditedTexts /> : null}
 
       {calendarConnected === false ? null : calendar}
+      {driveCard}
     </div>
   );
 }

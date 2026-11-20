@@ -351,7 +351,7 @@ export function AiReportBatch({ drive }: { drive: DriveState }) {
           {drive === "not_configured"
             ? "Google is not configured on this server, so reports can be matched and checked but not saved to Drive."
             : drive === "reconnect"
-              ? "Google needs to be reconnected (it now also needs Drive). Reports can be matched and checked until then."
+              ? "Google Drive needs to be connected or reconnected. Reports can be matched and checked until then."
               : "Couldn't check the Google connection just now."}{" "}
           <Link
             href="/admin/settings"

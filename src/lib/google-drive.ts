@@ -1,14 +1,13 @@
-import { eq } from "drizzle-orm";
-
-import { getDb, schema } from "@/lib/db";
-import { CALENDAR_TOKEN_OWNER, DRIVE_SCOPE, calendarConfig, refreshAccessToken } from "@/lib/google";
+import { DRIVE_SCOPE, calendarConfig, refreshAccessToken } from "@/lib/google";
+import { loadSlotToken } from "@/lib/google-connections";
 
 /**
  * Findtern's Drive, used only for the redacted AI interview reports.
  *
- * Same Google connection as the Meet calendar (`employer_google_tokens`, owner
- * CALENDAR_TOKEN_OWNER), with the narrow `drive.file` scope: the app can only
- * see files it created itself. Plain fetch, like `google.ts`; no SDK.
+ * Uses the "drive" Google connection slot (google-connections.ts): its own
+ * account once an admin wires one in Settings, else the Meet calendar's. The
+ * narrow `drive.file` scope means the app can only see files it created itself.
+ * Plain fetch, like `google.ts`; no SDK.
  */
 
 const API = "https://www.googleapis.com/drive/v3";
@@ -19,7 +18,7 @@ export const REPORT_SOURCE = "findtern-ai-report";
 
 export class DriveError extends Error {
   status: number;
-  /** "reconnect": ask an admin to reconnect Google; "failed": Google said no. */
+  /** "reconnect": ask an admin to reconnect Google Drive; "failed": Google said no. */
   kind: "reconnect" | "failed";
   constructor(message: string, status = 500, kind: "reconnect" | "failed" = "failed") {
     super(message);
@@ -38,34 +37,26 @@ export function hasDriveScope(scope: string | null | undefined): boolean {
 export async function driveStatus(): Promise<DriveStatus | null> {
   if (!calendarConfig()) return "not_configured";
   try {
-    const [token] = await getDb()
-      .select({ refresh: schema.employerGoogleTokens.refreshToken, scope: schema.employerGoogleTokens.scope })
-      .from(schema.employerGoogleTokens)
-      .where(eq(schema.employerGoogleTokens.employerId, CALENDAR_TOKEN_OWNER))
-      .limit(1);
-    return token?.refresh && hasDriveScope(token.scope) ? "ready" : "reconnect";
+    const token = await loadSlotToken("drive");
+    return token && hasDriveScope(token.scope) ? "ready" : "reconnect";
   } catch (e) {
     console.error("[drive] token check failed", e);
     return null;
   }
 }
 
-/** A fresh access token, or a DriveError telling the admin to (re)connect Google. */
+/** A fresh access token, or a DriveError telling the admin to (re)connect Google Drive. */
 export async function driveAccessToken(): Promise<string> {
   const cfg = calendarConfig();
   if (!cfg) throw new DriveError("Google is not configured on this server.", 503, "reconnect");
-  const [token] = await getDb()
-    .select({ refresh: schema.employerGoogleTokens.refreshToken, scope: schema.employerGoogleTokens.scope })
-    .from(schema.employerGoogleTokens)
-    .where(eq(schema.employerGoogleTokens.employerId, CALENDAR_TOKEN_OWNER))
-    .limit(1);
-  if (!token?.refresh || !hasDriveScope(token.scope)) {
-    throw new DriveError("Reconnect Google in Settings so reports can be saved to Drive.", 409, "reconnect");
+  const token = await loadSlotToken("drive");
+  if (!token || !hasDriveScope(token.scope)) {
+    throw new DriveError("Connect Google Drive in Settings so reports can be saved to Drive.", 409, "reconnect");
   }
   try {
-    return await refreshAccessToken(cfg, token.refresh);
+    return await refreshAccessToken(cfg, token.refreshToken);
   } catch {
-    throw new DriveError("Google sign-in expired. Reconnect Google in Settings.", 409, "reconnect");
+    throw new DriveError("The Google Drive sign-in expired. Reconnect Google Drive in Settings.", 409, "reconnect");
   }
 }
 

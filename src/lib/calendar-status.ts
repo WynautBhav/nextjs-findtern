@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { CALENDAR_TOKEN_OWNER, calendarConfig } from "@/lib/google";
+import { slotStatus } from "@/lib/google-connections";
 
 /** Whether Findtern's own Google calendar is connected. null = couldn't check. */
 export async function calendarConnected(): Promise<boolean | null> {
@@ -27,4 +28,19 @@ export async function calendarConnected(): Promise<boolean | null> {
 export async function calendarMissing(): Promise<boolean> {
   if (!calendarConfig()) return process.env.NODE_ENV === "production";
   return (await calendarConnected()) === false;
+}
+
+/**
+ * The Drive slot for the settings page: "own" = its own Google account, "calendar" = using the calendar
+ * account, "no_drive_access" = connected but the Drive box was unticked, "none" = nothing connected.
+ * null = couldn't check.
+ */
+export type DriveConnection = "own" | "calendar" | "no_drive_access" | "none" | null;
+
+export async function driveConnection(): Promise<DriveConnection> {
+  const s = await slotStatus("drive");
+  if (!s) return null;
+  if (!s.connected) return "none";
+  if (!s.hasDriveScope) return "no_drive_access";
+  return s.own ? "own" : "calendar";
 }

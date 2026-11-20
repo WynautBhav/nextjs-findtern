@@ -1,17 +1,15 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-import { getDb, schema } from "@/lib/db";
-import { CALENDAR_SCOPES, CALENDAR_TOKEN_OWNER, calendarConfig, exchangeCode, NONCE_COOKIE } from "@/lib/google";
+import { calendarConfig, exchangeCode, NONCE_COOKIE } from "@/lib/google";
+import { saveSlotToken } from "@/lib/google-connections";
+import { parseSlotState, slotScopes } from "@/lib/google-connections-core";
 
-/** Stores Findtern's Google refresh token (same row the legacy app uses). */
+/** Stores the refresh token for the slot named in the OAuth state (calendar = the row the legacy app uses). */
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const back = (q: string) => NextResponse.redirect(new URL(`/admin/settings?google=${q}`, req.url));
-  let state: { nonce?: string } = {};
-  try {
-    state = JSON.parse(Buffer.from(url.searchParams.get("state") ?? "", "base64url").toString());
-  } catch {}
+  const state = parseSlotState(url.searchParams.get("state"));
   const nonce = (await cookies()).get(NONCE_COOKIE)?.value;
   const code = url.searchParams.get("code");
   const cfg = calendarConfig();
@@ -20,20 +18,8 @@ export async function GET(req: Request) {
   try {
     const t = await exchangeCode(cfg, code);
     if (!t.refresh_token) return back("no_refresh_token");
-    const values = {
-      accessToken: t.access_token,
-      refreshToken: t.refresh_token,
-      // What Google actually granted: the person can untick Drive on the consent screen.
-      scope: t.scope ?? CALENDAR_SCOPES.join(" "),
-      tokenType: "Bearer",
-      expiryDate: new Date(Date.now() + t.expires_in * 1000),
-      updatedAt: new Date(),
-    };
-    await getDb()
-      .insert(schema.employerGoogleTokens)
-      .values({ employerId: CALENDAR_TOKEN_OWNER, ...values })
-      .onConflictDoUpdate({ target: schema.employerGoogleTokens.employerId, set: values });
-    const res = back("connected");
+    await saveSlotToken(state.slot, { ...t, refresh_token: t.refresh_token }, slotScopes(state.slot).join(" "));
+    const res = back(state.slot === "drive" ? "drive_connected" : "connected");
     res.cookies.delete(NONCE_COOKIE);
     return res;
   } catch {
