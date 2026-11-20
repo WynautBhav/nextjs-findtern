@@ -13,6 +13,7 @@ import { OfferReply } from "@/components/meetings/offer-reply";
 import { MAX_ROUNDS, viewFor } from "@/lib/meetings/slots";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { serializeJoinInput } from "@/lib/interview-join";
+import { maskMeetingLink } from "@/lib/meetings/gate";
 import { emptyScheduleCopy } from "@/components/employer/schedule-empty";
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
@@ -240,7 +241,7 @@ function clockOf(t: number, tz: string): { time: string; zone: string } {
 function ScheduleRow({ r, now, past, employerId }: { r: Row; now: number; past: boolean; employerId: string }) {
   const { iv, stage } = r;
   const slots = [iv.slot1, iv.slot2, iv.slot3].filter((x): x is NonNullable<typeof x> => Boolean(x));
-  const link = iv.meetingLink && isMeetingLinkLive(iv, now) ? iv.meetingLink : null;
+  const link = isMeetingLinkLive(iv, now) ? maskMeetingLink(iv.meetingLink) : null;
   const picked = iv.selectedSlot ? meetingTime(iv) : null;
   // Links open days early (isMeetingLinkLive); Join is the filled button only within 15 minutes of the start.
   const soon = picked !== null && now >= picked - SOON_MS && isMeetingLinkLive(iv, now);

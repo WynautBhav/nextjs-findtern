@@ -84,7 +84,7 @@ export function NextMeeting({ meeting, hired, offersOut }: NextMeetingProps) {
         {/* The page's one amber button is the queue's; the join button is solid white on the dark card. The wrapper restyles the trigger only (the rules dialog is portaled out of it). */}
         {meeting.join.status ? (
           <div className="[&_button]:border-transparent [&_button]:bg-white [&_button]:text-brand-950 [&_button]:shadow-sm [&_button:hover]:bg-brand-50">
-            <JoinMeetingButton link={meeting.joinLink} interviewId={interviewId} size="sm" variant="outline" block interview={meeting.join} serverNow={meeting.serverNow} zone={meeting.zone} />
+            <JoinMeetingButton interviewId={interviewId} size="sm" variant="outline" block interview={meeting.join} serverNow={meeting.serverNow} zone={meeting.zone} />
           </div>
         ) : null}
         <ButtonLink href={scheduleHref} variant="outlineLight" size="sm" block className={FOCUS}>

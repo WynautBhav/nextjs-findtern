@@ -6,10 +6,12 @@ import { getDb, schema } from "@/lib/db";
 import { employerNoShow, isMeetingLinkLive, joinCounts } from "@/lib/employer-interview-rules";
 import { interviewLifecycle } from "@/lib/interview-lifecycle";
 import { safeMeetingHref } from "@/lib/interview-join";
+import { hasAccepted } from "@/lib/meetings/gate-service";
 
 /**
  * /meet/<token> -> the Meet URL, only for a signed-in party of a booked, live meeting. The one place the raw link appears is this
- * redirect. (A pre-join disclaimer goes here in a later phase.) The employer's first counted join is stamped, like the Join button.
+ * redirect, and only after the person accepted the CURRENT disclaimer at the gate (see src/lib/meetings/gate.ts for what that does and does not
+ * guarantee). The employer's first counted join is stamped.
  */
 export async function GET(req: Request, { params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
@@ -23,6 +25,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
   if (iv.status !== "scheduled" || !iv.selectedSlot || interviewLifecycle(iv).expired || employerNoShow(iv)) return back("e=closed");
   const link = isMeetingLinkLive(iv) ? safeMeetingHref(iv.meetingLink) : null;
   if (!link) return back("e=pending");
+  // No acceptance of this disclaimer version yet: back to the gate, which shows the countdown.
+  if (!(await hasAccepted(db, iv.id, { role: session.role, uid: session.uid }))) return NextResponse.redirect(new URL(`/meet/${encodeURIComponent(token)}`, req.url));
   if (session.role === "employer" && joinCounts(iv)) {
     await db.update(schema.interviews).set({ employerJoinedAt: new Date() }).where(and(eq(schema.interviews.id, iv.id), isNull(schema.interviews.employerJoinedAt)));
   }

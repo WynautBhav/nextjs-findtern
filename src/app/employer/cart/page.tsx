@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { serializeJoinInput } from "@/lib/interview-join";
+import { maskMeetingLink } from "@/lib/meetings/gate";
 import { Scale } from "lucide-react";
 import { redirect } from "next/navigation";
 import { and, desc, eq, inArray } from "drizzle-orm";
@@ -225,7 +226,7 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
     // A booked meeting's link, while it is live, so the cart can join it (bug sheet 8).
     const meetingLinks = new Map<string, { id: string; link: string; join: ReturnType<typeof serializeJoinInput> }>();
     for (const iv of meetingRows) {
-      if (iv.status === "scheduled" && iv.selectedSlot && iv.meetingLink && isMeetingLinkLive(iv)) meetingLinks.set(iv.internId, { id: iv.id, link: iv.meetingLink, join: serializeJoinInput(iv) });
+      if (iv.status === "scheduled" && iv.selectedSlot && iv.meetingLink && isMeetingLinkLive(iv)) meetingLinks.set(iv.internId, { id: iv.id, link: maskMeetingLink(iv.meetingLink) ?? "", join: serializeJoinInput(iv) });
       const end = meetingEndsAt(iv);
       if (!isBlockingInterview(iv) || end === null) continue;
       const prev = meetingUntil.get(iv.internId);

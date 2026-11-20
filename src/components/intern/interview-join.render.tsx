@@ -10,6 +10,7 @@ import { InterviewJoin } from "./interview-join";
 const START = Date.parse("2026-11-20T10:00:00Z");
 const at = (m: number) => new Date(START + m * 60_000).toISOString();
 const base = {
+  id: "iv-1",
   status: "scheduled",
   selectedSlot: 1,
   slot1: new Date(START).toISOString(),

@@ -16,6 +16,7 @@
  */
 
 import { employerNoShow } from "./employer-interview-rules.ts";
+import { MASKED_MEET_LINK } from "./meetings/gate-text.ts";
 import { MEETING_MINUTES } from "./interview-lifecycle.ts";
 import { formatIstClock } from "./format.ts";
 
@@ -27,6 +28,8 @@ export const JOIN_CLOSE_AFTER_START_MINUTES = MEETING_MINUTES;
 export type JoinStateName = "too_early" | "open" | "ended" | "no_link" | "unavailable";
 
 export type JoinInput = {
+  /** The interview's id; the Join button goes to /api/interviews/<id>/gate. */
+  id?: string;
   status: string | null;
   selectedSlot?: number | null;
   slot1: Date | string | null;
@@ -124,12 +127,14 @@ export function serializeJoinInput(iv: JoinInput): JoinInput & { slot1: string |
     return t === null ? null : new Date(t).toISOString();
   };
   return {
+    id: iv.id,
     status: iv.status,
     selectedSlot: iv.selectedSlot ?? null,
     slot1: iso(iv.slot1),
     slot2: iso(iv.slot2),
     slot3: iso(iv.slot3),
-    meetingLink: iv.meetingLink ?? null,
+    // A placeholder, never the Meet URL: this object is handed to client components. The link is only behind the gate.
+    meetingLink: iv.meetingLink ? MASKED_MEET_LINK : null,
     employerJoinedAt: iso(iv.employerJoinedAt),
     createdAt: iso(iv.createdAt),
     employerId: iv.employerId ?? null,

@@ -1,4 +1,4 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
@@ -6,14 +6,12 @@ import { requireMutation } from "@/lib/guards-mutation";
 import { assertInterviewActionable } from "@/lib/projects/takedown-guard-server";
 import { interviewLifecycle } from "@/lib/interview-lifecycle";
 import { safeMeetingHref } from "@/lib/interview-join";
-import { employerNoShow, isMeetingLinkLive, joinCounts } from "@/lib/employer-interview-rules";
+import { employerNoShow, isMeetingLinkLive } from "@/lib/employer-interview-rules";
 
 /**
- * The employer pressed "Join meeting". Records the first time it counted
- * (`employer_joined_at`), which is what keeps a booked interview from
- * expiring as an employer no-show (bug sheet 12 Nov, row 13), and returns the
- * link to open. A click well before the start only returns the link, so
- * opening it days early cannot stand in for turning up.
+ * Kept for older clients: it no longer hands out the Meet URL. The employer's Join now goes through the recorded gate at
+ * /meet/<token> (migration 0044), whose redirect also stamps `employer_joined_at`. This answers with the gate address once the
+ * booking is joinable, so a script cannot get the raw link here and skip the disclaimer.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -41,12 +39,5 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const link = isMeetingLinkLive(interview) ? safeMeetingHref(interview.meetingLink) : null;
   if (!link) return NextResponse.json({ error: "The meeting link is not ready. We'll email it." }, { status: 409 });
 
-  if (joinCounts(interview)) {
-    // First join wins; later clicks leave the stamp alone.
-    await db
-      .update(schema.interviews)
-      .set({ employerJoinedAt: new Date() })
-      .where(and(eq(schema.interviews.id, id), isNull(schema.interviews.employerJoinedAt)));
-  }
-  return NextResponse.json({ ok: true, link });
+  return NextResponse.json({ ok: true, gate: `/api/interviews/${encodeURIComponent(id)}/gate` });
 }

@@ -12,7 +12,7 @@ import type { JoinInput } from "@/lib/interview-join";
  * The intern's Join meeting button for one booked interview, driven by
  * `joinState` (the same helper the employer side uses):
  *
- *   open       the button (it still shows the meeting rules before opening the link)
+ *   open       the button (it opens Findtern's meeting page with the rules; the Meet link is behind that)
  *   too_early  disabled, "Join opens at 3:15 PM IST (in 30 min)"
  *   no_link    disabled, "Waiting for the company to share a meeting link"
  *   ended      "This interview has ended", no button
@@ -37,11 +37,11 @@ export function InterviewJoin({
 
   if (join.state === "unavailable") return null;
   if (join.state === "ended") return <p className="text-sm text-text-subtle">{join.label}</p>;
-  if (join.state === "open" && join.href) {
+  if (join.state === "open" && interview.id) {
     return (
       <div className={block ? "grid gap-2" : "grid justify-items-start gap-2"} data-join-state="open">
-        <MeetingJoinButton link={join.href} block={block} size={size} />
-        <p className="text-pretty text-xs text-text-subtle">Join a few minutes early. The meeting rules open when you press Join.</p>
+        <MeetingJoinButton interviewId={interview.id} block={block} size={size} />
+        <p className="text-pretty text-xs text-text-subtle">Join a few minutes early. The meeting rules show first.</p>
       </div>
     );
   }

@@ -12,6 +12,7 @@ import { proposalTimeline } from "@/lib/admin/proposal-timeline";
 import { cgpaBlocksPayment, proposalCgpaGate } from "@/lib/cgpa-verification";
 import { getDb, schema } from "@/lib/db";
 import { formatIstStamp } from "@/lib/format";
+import { listAcceptances } from "@/lib/meetings/gate-service";
 import { parseOffer } from "@/lib/offer";
 import { expiryOf, EXPIRY_LABEL } from "@/lib/proposal-expiry";
 
@@ -49,7 +50,8 @@ async function load(id: string) {
     .where(eq(schema.internOnboarding.userId, row.p.internId))
     .orderBy(desc(schema.internOnboarding.createdAt))
     .limit(1);
-  return { ...row, interview: interview ?? null, internExtra: onboarding?.extraData ?? null };
+  const acceptances = interview ? await listAcceptances(db, interview.id) : [];
+  return { ...row, interview: interview ?? null, acceptances, internExtra: onboarding?.extraData ?? null };
 }
 
 export default async function AdminProposalPage({ params }: { params: Promise<{ id: string }> }) {
@@ -135,6 +137,22 @@ export default async function AdminProposalPage({ params }: { params: Promise<{ 
               <DetailRow label="Status" value={<StatusBadge value={interview.status} />} />
               <DetailRow label="Booked" value={interview.createdAt ? `${formatIstStamp(interview.createdAt)} IST` : "-"} />
               <DetailRow label="Meeting link" value={interview.meetingLink ? <a href={interview.meetingLink} target="_blank" rel="noopener noreferrer" className="text-brand-700 hover:underline">Open link</a> : "No link"} />
+              <DetailRow
+                label="Rules agreed"
+                value={
+                  data.acceptances.length ? (
+                    <ul className="space-y-0.5">
+                      {data.acceptances.map((a) => (
+                        <li key={`${a.userType}-${a.userId}-${a.version}`}>
+                          {a.userType === "intern" ? candidate : (data.companyName ?? "Company")} ({a.userType}) · {formatIstStamp(a.acceptedAt)} IST · version {a.version}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    "Nobody has agreed at the meeting gate yet"
+                  )
+                }
+              />
             </dl>
           ) : (
             <p className="text-sm text-text-subtle">{p.flowType === "interview_first" ? "The interview record is no longer linked." : "This was a direct offer, with no interview."}</p>

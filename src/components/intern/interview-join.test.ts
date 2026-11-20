@@ -11,7 +11,8 @@ const html = JSON.parse(
 
 // Class names carry "disabled:" variants, so look at the attribute, not the word.
 const disabled = (s: string) => /<button[^>]*\sdisabled=""/.test(s);
-const hasJoinButton = (s: string) => /<button[^>]*>(?:<svg[^>]*><\/svg>)?Join meeting<\/button>/.test(s.replace(/<svg.*?<\/svg>/g, "<svg></svg>"));
+// Open: a link to the interview's recorded gate (/api/interviews/<id>/gate -> /meet/<token>), never the Meet URL itself.
+const hasJoinButton = (s: string) => /<a href="\/api\/interviews\/iv-1\/gate"[^>]*>(?:<svg[^>]*><\/svg>)?Join meeting<\/a>/.test(s.replace(/<svg.*?<\/svg>/g, "<svg></svg>"));
 
 test("too early: a disabled Join meeting button and when it opens", () => {
   assert.ok(disabled(html.too_early));
@@ -26,6 +27,7 @@ test("15 minutes before the start and mid-interview: an enabled Join meeting but
     assert.ok(hasJoinButton(html[key]), key);
     assert.ok(!disabled(html[key]), key);
     assert.match(html[key], /data-join-state="open"/);
+    assert.doesNotMatch(html[key], /meet\.google\.com/, "the Meet URL never reaches the page");
   }
 });
 

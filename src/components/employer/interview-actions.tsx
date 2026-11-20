@@ -206,7 +206,6 @@ export function InterviewActions({
         {primary === "join" ? (
           <JoinMeetingButton
             interviewId={interviewId}
-            link={meetingLink}
             ready={Boolean(meetingLink)}
             interview={joinInput}
             serverNow={serverNow}

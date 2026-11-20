@@ -337,7 +337,7 @@ export default async function EmployerProposalDetail({
           ? {
               when: formatSlotTime(new Date(meetingTime(interview) ?? 0), projectZone(projectTimezone, interview.timezone)),
               join: (
-                <JoinMeetingButton interviewId={interview.id} link={interview.meetingLink} ready={Boolean(interview.meetingLink)} variant="outline" interview={serializeJoinInput(interview)} serverNow={new Date().toISOString()} zone={projectZone(projectTimezone, interview.timezone)} />
+                <JoinMeetingButton interviewId={interview.id} ready={Boolean(interview.meetingLink)} variant="outline" interview={serializeJoinInput(interview)} serverNow={new Date().toISOString()} zone={projectZone(projectTimezone, interview.timezone)} />
               ),
             }
           : null

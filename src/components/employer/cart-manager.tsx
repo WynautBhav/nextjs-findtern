@@ -408,7 +408,7 @@ function CartLine({
               Book meeting
             </button>
           ) : null}
-          {line.meetingLink ? <JoinMeetingButton link={line.meetingLink} interviewId={line.meetingInterviewId ?? undefined} variant="outline" interview={line.meetingJoin ?? undefined} serverNow={line.meetingNow ?? undefined} /> : null}
+          {line.meetingLink ? <JoinMeetingButton interviewId={line.meetingInterviewId ?? undefined} variant="outline" interview={line.meetingJoin ?? undefined} serverNow={line.meetingNow ?? undefined} /> : null}
         </div>
 
         {/* Profile and remove stay in the menu (QA-124). */}
