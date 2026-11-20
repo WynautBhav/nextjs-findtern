@@ -20,6 +20,7 @@ import { proChips } from "./candidate-pro-filters.ts";
 import { parseIds } from "./compare-map.ts";
 import { MAX_COMPARE } from "./compare-map.ts";
 import { PRO_PARAMS, firstCity } from "./employer-filter-restore.ts";
+import { languageChipLabel, parseLanguage, parseLanguageLevel, type LanguageLevelFilter } from "./language-filter.ts";
 import { DEFAULT_PAGE_SIZE, dedupeSkills, filterCount, parsePageSize, parseView, type ListView } from "../components/employer/candidate-view.ts";
 
 export type SortKey = "score" | keyof Ratings;
@@ -40,6 +41,9 @@ export type Filters = {
   citySet: boolean;
   minScore: number;
   laptop: string;
+  /** One language the candidate speaks (its listed spelling), "" for any; `langLevel` the least level wanted ("" any). */
+  lang: string;
+  langLevel: LanguageLevelFilter;
   /** Plan (price band) - the legacy page's hourly-price filter. */
   plan: BandId | "";
   /** Per-axis AI interview rating floors, out of 10. */
@@ -92,6 +96,8 @@ export const FILTER_KEYS = [
   "city",
   "min",
   "laptop",
+  "lang",
+  "ll",
   "plan",
   "sort",
   "dir",
@@ -111,6 +117,8 @@ export type SearchParams = {
   city?: string | string[];
   min?: string | string[];
   laptop?: string | string[];
+  lang?: string | string[];
+  ll?: string | string[];
   plan?: string | string[];
   sort?: string | string[];
   dir?: string | string[];
@@ -147,6 +155,7 @@ export function readFilters(params: SearchParams): Filters {
   const remoteValues = all(params.remote);
   const pro = proRequestOf(params);
   const sorts = parseSortFields(params.sort);
+  const lang = parseLanguage(one(params.lang));
 
   return {
     q: (one(params.q) ?? "").trim().slice(0, 60),
@@ -157,6 +166,9 @@ export function readFilters(params: SearchParams): Filters {
     citySet: params.city !== undefined,
     minScore: Number.isFinite(min) && min > 0 ? min : 0,
     laptop: (one(params.laptop) ?? "").trim().toLowerCase(),
+    lang,
+    // A level means nothing without a language.
+    langLevel: lang ? parseLanguageLevel(one(params.ll)) : "",
     plan: BANDS.some((b) => b.id === planRaw) ? (planRaw as BandId) : "",
     minRatings: {
       communication: floor(params.r_communication),
@@ -250,6 +262,10 @@ function filterParams(merged: Filters, withKeyword = true): URLSearchParams {
   if (merged.citySet || merged.city) next.set("city", merged.city);
   if (merged.minScore > 0) next.set("min", String(merged.minScore));
   if (merged.laptop) next.set("laptop", merged.laptop);
+  if (merged.lang) {
+    next.set("lang", merged.lang);
+    if (merged.langLevel) next.set("ll", merged.langLevel);
+  }
   if (merged.plan) next.set("plan", merged.plan);
   for (const meta of RATING_META) {
     const value = merged.minRatings[meta.key];
@@ -310,6 +326,7 @@ export function activeChips(filters: Filters): FilterChip[] {
     chips.push({ key: "remote", label: filters.remote ? "Remote candidates included" : "Remote candidates left out", href: drop({ remote: null }) });
   }
   if (filters.laptop === "yes") chips.push({ key: "laptop", label: "Has a laptop", href: drop({ laptop: "" }) });
+  if (filters.lang) chips.push({ key: "lang", label: `Language: ${languageChipLabel(filters.lang, filters.langLevel)}`, href: drop({ lang: "", langLevel: "" }) });
   const band = BANDS.find((b) => b.id === filters.plan);
   if (band) chips.push({ key: "plan", label: `Band: ${PLAN_NAME[band.id]}`, href: drop({ plan: "" }) });
   if (filters.minScore > 0) chips.push({ key: "min", label: `Findtern Score ${filters.minScore.toFixed(1)}+`, href: drop({ minScore: 0 }) });

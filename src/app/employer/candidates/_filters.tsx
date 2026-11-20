@@ -17,6 +17,7 @@ import { FilterSection } from "@/components/employer/candidates/filter-parts";
 import { ProFilterSections, ProLockedCard } from "@/components/employer/candidates/pro-filters";
 import { collegeSortToken } from "@/lib/candidate-sort";
 import { FilterPanel } from "./_filter-form";
+import { LanguageFilterField } from "@/components/employer/candidates/language-filter-field";
 import { activeChips, activeFilterCount, resetHref, type Filters, type ProData } from "@/lib/candidates-params";
 
 const SELECT = cn(fieldClass, "mt-2");
@@ -134,6 +135,10 @@ export function FilterColumn({
             {RATING_META.map((meta) => (
               <RatingSlider key={meta.key} name={`r_${meta.key}`} label={meta.label} defaultValue={filters.minRatings[meta.key]} />
             ))}
+          </FilterSection>
+
+          <FilterSection title="Language" count={filters.lang ? 1 : 0}>
+            <LanguageFilterField language={filters.lang} level={filters.langLevel} />
           </FilterSection>
 
           <FilterSection title="Hourly price" count={count.price}>

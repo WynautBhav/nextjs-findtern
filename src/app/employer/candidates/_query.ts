@@ -11,6 +11,7 @@ import { employerRegion } from "@/lib/employer-pricing";
 import { BANDS } from "@/lib/score";
 import { EMPTY_PRO_REQUEST, enforcePro, hasProRequest, proAccess } from "@/lib/candidate-pro-access";
 import { proFactsOf } from "@/lib/candidate-pro-filters";
+import { levelsAtLeast } from "@/lib/language-filter";
 import { getEmployerSubscriptionConfig } from "@/lib/platform-settings";
 import { subscriptionChargeMinor } from "@/lib/employer-subscription";
 import { isOpenProject, rememberedFilters } from "@/lib/employer-selection";
@@ -313,6 +314,20 @@ export async function loadCandidates(
       clauses.push(eq(schema.internOnboarding.hasLaptop, true));
     } else if (filters.laptop === "no") {
       clauses.push(eq(schema.internOnboarding.hasLaptop, false));
+    }
+
+    if (filters.lang) {
+      // One of the intern's languages (profile step 5, `extra.languages`) is this one, at the level wanted or above.
+      const langs = sql`(${schema.internOnboarding.extraData}->'languages')`;
+      // Any level: the language alone (an entry with no level still counts).
+      const level = filters.langLevel
+        ? sql` AND lower(btrim(COALESCE(v->>'level', ''))) IN (${sql.join(
+            levelsAtLeast(filters.langLevel).map((l) => sql`${l}`),
+            sql`, `,
+          )})`
+        : sql``;
+      clauses.push(sql`EXISTS (SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(${langs}) = 'array' THEN ${langs} ELSE '[]'::jsonb END) AS l(v)
+          WHERE lower(btrim(v->>'language')) = ${filters.lang.toLowerCase()}${level})`);
     }
 
     if (filters.minScore > 0) {
