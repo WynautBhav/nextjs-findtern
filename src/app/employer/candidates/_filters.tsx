@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Plus, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import { RATING_META } from "@/lib/employer-candidates";
-import { DEFAULT_PAGE_SIZE } from "@/components/employer/candidate-view";
+import { DEFAULT_PAGE_SIZE, cityField } from "@/components/employer/candidate-view";
 import { resolvePricing, type Currency } from "@/lib/employer-pricing";
 import { PER_HIRE_FEE_DEFAULT } from "@/lib/per-hire-fee";
 import { BANDS, PLAN_NAME } from "@/lib/score";
@@ -38,6 +38,7 @@ export function FilterColumn({
   total,
   effectiveSkills,
   projectCity = "",
+  cityDefault = "",
   projectToggle = null,
   pro,
 }: {
@@ -54,11 +55,14 @@ export function FilterColumn({
   effectiveSkills: string[];
   /** A city the selected project brings (not typed by hand): shown as its own chip and counted. */
   projectCity?: string;
+  /** The selected project's own city: pre-fills "Preferred work city" unless the URL sets `city`. Read-only. */
+  cityDefault?: string;
   /** "Ignore project skills" / "Match to project": on a phone it lives in the sheet, not on the page. */
   projectToggle?: React.ReactNode;
   /** Findtern Pro: who has the CGPA and college filters, and what they list. */
   pro: ProData;
 }) {
+  const city = cityField({ city: filters.city, citySet: filters.citySet, defaultCity: cityDefault });
   return (
     <aside
       aria-label="Filters"
@@ -68,7 +72,7 @@ export function FilterColumn({
         "lg:[scrollbar-color:transparent_transparent] lg:[scrollbar-width:thin] lg:hover:[scrollbar-color:var(--color-ink-300)_transparent] lg:focus-within:[scrollbar-color:var(--color-ink-300)_transparent]",
       )}
     >
-      <FilterPanel key={queryOf(filters)} activeCount={activeFilterCount(filters, effectiveSkills, projectCity)} total={total}>
+      <FilterPanel key={queryOf(filters)} cityDefault={cityDefault} activeCount={activeFilterCount(filters, effectiveSkills, projectCity)} total={total}>
         {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
         {filters.view !== "list" ? <input type="hidden" name="view" value={filters.view} /> : null}
         {filters.pageSize !== DEFAULT_PAGE_SIZE ? <input type="hidden" name="pageSize" value={filters.pageSize} /> : null}
@@ -115,7 +119,8 @@ export function FilterColumn({
           </div>
 
           <FilterSection title="Location">
-            <CityFilter key={filters.city} defaultValue={filters.city} label="Preferred work city" autoApply />
+            <CityFilter key={city.value} defaultValue={city.value} label="Preferred work city" autoApply />
+            {city.prefilled ? <p className="mt-1.5 text-sm text-ink-700">From your project: {city.value}. Change it to narrow or widen the search.</p> : null}
             <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
               {/* Unchecked sends only the hidden 0; checked adds remote=1 after it. */}
               <input type="hidden" name="remote" value="0" />

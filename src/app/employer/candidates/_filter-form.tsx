@@ -17,6 +17,7 @@ import { usePathname } from "next/navigation";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { SlidersHorizontal } from "lucide-react";
 
+import { cityParam } from "@/components/employer/candidate-view";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
 /** Range filters at zero mean "any" and are left out of the URL. */
@@ -36,8 +37,11 @@ export function FilterPanel({
   children,
   activeCount,
   total,
+  cityDefault = "",
 }: {
   children: React.ReactNode;
+  /** The selected project's own city (pre-filled in the city field): it applies by default, so it is not sent. */
+  cityDefault?: string;
   /** Shown on the phone button. */
   activeCount: number;
   /** The live result count, for the sheet's "Show" button. */
@@ -86,6 +90,12 @@ export function FilterPanel({
     const next = new URLSearchParams();
     for (const [key, raw] of new FormData(el).entries()) {
       const value = String(raw).trim();
+      if (key === "city") {
+        // Cleared with a project city on offer is the choice "no city" (`city=`); the project's own city is the default.
+        const city = cityParam(value, cityDefault);
+        if (city !== null) next.append(key, city);
+        continue;
+      }
       // An empty `skills` is a choice ("no skills"), not a missing value.
       if (!value && key !== "skills") continue;
       if (ZERO_IS_ANY.test(key) && Number(value) === 0) continue;

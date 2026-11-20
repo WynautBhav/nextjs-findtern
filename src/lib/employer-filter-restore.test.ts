@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { PRO_PARAMS, restorableFilters, withoutProParams } from "./employer-filter-restore.ts";
+import { PRO_PARAMS, restorableFilters, withoutProParams, withoutSavedCity } from "./employer-filter-restore.ts";
 
 const KEYS = ["q", "skills", "city", "mode", "min", "plan", "sort", "dir", "page"];
 
@@ -54,4 +54,11 @@ test("withoutProParams leaves a plain query alone and survives junk", () => {
   assert.equal(withoutProParams("skills=react&skills=sql"), "skills=react&skills=sql");
   assert.equal(withoutProParams(""), "");
   assert.doesNotThrow(() => withoutProParams("%%%"));
+});
+
+test("withoutSavedCity drops a remembered city, even an empty one, and keeps the rest", () => {
+  assert.equal(withoutSavedCity("city=Jaipur&plan=assured"), "plan=assured");
+  assert.equal(withoutSavedCity("skills=react&city=&min=3"), "skills=react&min=3");
+  assert.equal(withoutSavedCity("city=Jaipur"), "");
+  assert.equal(withoutSavedCity("plan=assured"), "plan=assured");
 });

@@ -141,6 +141,27 @@ export function filterCount(o: { chips: number; skills: number; projectCity: boo
 }
 
 /**
+ * What the city field starts with. An explicit `city` in the URL (even empty = "no city") always wins;
+ * otherwise the selected project's city (`defaultCity`, already empty when there is none or defaults are off)
+ * fills it. `prefilled` is true only while the value is that default, which is when the field says so.
+ */
+export function cityField(o: { city: string; citySet: boolean; defaultCity: string }): { value: string; prefilled: boolean } {
+  if (o.citySet || !o.defaultCity) return { value: o.city, prefilled: false };
+  return { value: o.defaultCity, prefilled: true };
+}
+
+/**
+ * What the filter form puts in the URL for `city`, or null for nothing. The project's own city is never sent
+ * (it applies by default). A cleared field is sent empty (`city=`, "no city") only when there is a default to
+ * opt out of; anything else typed is explicit.
+ */
+export function cityParam(value: string, defaultCity: string): string | null {
+  const v = value.trim();
+  if (!v) return defaultCity ? "" : null;
+  return v.toLowerCase() === defaultCity.trim().toLowerCase() ? null : v;
+}
+
+/**
  * "Clear all" resets to the project's own defaults, so the project's city chip
  * would come straight back: offer it only when a chip of the employer's own
  * would go.

@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   MAX_PROJECT_LOCATIONS,
   projectCities,
+  projectDefaultCity,
   otherCities,
   isListingLive,
   isProjectClosedForGood,
@@ -146,4 +147,17 @@ test("a taken-down listing is not open for offers even though its status stays a
   assert.equal(isProjectOpen("active", null), true);
   assert.equal(isProjectOpen("active", undefined), true);
   assert.equal(isProjectOpen("inactive", null), false);
+});
+
+test("projectDefaultCity: the project's city pre-fills the filter when it is all the filter matches on", () => {
+  assert.equal(projectDefaultCity({ city: " Pune ", locationType: "onsite", preferredLocations: [] }), "Pune");
+  assert.equal(projectDefaultCity({ city: "Pune", locationType: "hybrid", preferredLocations: ["Pune, Maharashtra"] }), "Pune");
+});
+
+test("projectDefaultCity: nothing for a remote project, no city, or a legacy list with other places", () => {
+  assert.equal(projectDefaultCity({ city: "Pune", locationType: "remote" }), "");
+  assert.equal(projectDefaultCity({ city: "Pune", locationType: null }), "");
+  assert.equal(projectDefaultCity({ city: "", locationType: "onsite", preferredLocations: ["Pune, Maharashtra"] }), "");
+  assert.equal(projectDefaultCity({ city: null, locationType: "onsite" }), "");
+  assert.equal(projectDefaultCity({ city: "Pune", locationType: "onsite", preferredLocations: ["Mumbai, Maharashtra"] }), "");
 });

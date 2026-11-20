@@ -10,7 +10,7 @@ import {
 } from "@/lib/employer-candidates";
 import { candidateRelations, hiredAmong, hiredInternIds, notHiredByEmployerSql, type CandidateRelation } from "@/lib/employer-visibility";
 import { attachPhotos, candidatePoolClauses, poolInternIds, scoreExpr } from "@/lib/employer-pool";
-import { projectCities } from "@/lib/project-locations";
+import { projectCities, projectDefaultCity } from "@/lib/project-locations";
 import { likePattern } from "@/lib/admin/palette-search";
 import { employerRegion, type Currency } from "@/lib/employer-pricing";
 import { BANDS, PLAN_NAME, type BandId } from "@/lib/score";
@@ -20,7 +20,7 @@ import { proChips, proFactsOf, type CollegeOption } from "@/lib/candidate-pro-fi
 import { getEmployerSubscriptionConfig } from "@/lib/platform-settings";
 import { subscriptionChargeMinor, type SubscriptionCharge } from "@/lib/employer-subscription";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedFilters } from "@/lib/employer-selection";
-import { PRO_PARAMS, restorableFilters, withoutProParams } from "@/lib/employer-filter-restore";
+import { PRO_PARAMS, restorableFilters, withoutProParams, withoutSavedCity } from "@/lib/employer-filter-restore";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { savedInternIds } from "@/lib/saved-roles";
 import { rankProfiles } from "@/components/employer/candidate-rank";
@@ -37,6 +37,11 @@ export type Filters = {
    */
   skillsSet: boolean;
   city: string;
+  /**
+   * `city` is in the URL, even empty: the employer's own choice (empty = "no city"), so the selected
+   * project's city neither pre-fills the field nor filters. Otherwise the project's city applies.
+   */
+  citySet: boolean;
   minScore: number;
   laptop: string;
   /** Plan (price band) - the legacy page's hourly-price filter. */
@@ -152,6 +157,7 @@ export function readFilters(params: SearchParams): Filters {
     skills: dedupeSkills(one(params.skills) ?? ""),
     skillsSet: params.skills !== undefined,
     city: (one(params.city) ?? "").trim().slice(0, 160),
+    citySet: params.city !== undefined,
     minScore: Number.isFinite(min) && min > 0 ? min : 0,
     laptop: (one(params.laptop) ?? "").trim().toLowerCase(),
     plan: BANDS.some((b) => b.id === planRaw) ? (planRaw as BandId) : "",
@@ -214,14 +220,11 @@ export function withFilters(base: Filters, patch: Partial<Omit<Filters, "page">>
 }
 
 /**
- * The same view with no city. A typed city is simply dropped; a city that
- * came from the project's defaults needs "show everyone", so the project's
- * skills are pinned explicitly to keep matching on them.
+ * The same view with no city: an explicit empty `city`, so the project's own city does not come back
+ * (and the project's skills keep matching).
  */
-export function withoutCity(filters: Filters, effectiveSkills: string[], patch: Partial<Omit<Filters, "page">> = {}): string {
-  return filters.city
-    ? withFilters(filters, { ...patch, city: "", page: "" })
-    : withFilters(filters, { ...patch, projectDefaults: false, skills: effectiveSkills, skillsSet: true, page: "" });
+export function withoutCity(filters: Filters, patch: Partial<Omit<Filters, "page">> = {}): string {
+  return withFilters(filters, { ...patch, city: "", citySet: true, page: "" });
 }
 
 /** The query string for a set of filters. */
@@ -247,7 +250,7 @@ function filterParams(merged: Filters, withKeyword = true): URLSearchParams {
   const next = new URLSearchParams();
   if (withKeyword && merged.q) next.set("q", merged.q);
   if (merged.skillsSet) next.set("skills", merged.skills.join(","));
-  if (merged.city) next.set("city", merged.city);
+  if (merged.citySet || merged.city) next.set("city", merged.city);
   if (merged.minScore > 0) next.set("min", String(merged.minScore));
   if (merged.laptop) next.set("laptop", merged.laptop);
   if (merged.plan) next.set("plan", merged.plan);
@@ -363,6 +366,8 @@ export type CandidatesData = {
   projectApplied: { name: string; skills: string[]; city: string } | null;
   includeRemote: boolean;
   cityList: string[];
+  /** The selected project's own city, when it applies: what the city field starts with (see `cityField`). */
+  cityDefault: string;
   nameUnlocked: Set<string>;
   plans: (typeof schema.pricingPlans.$inferSelect)[];
   relations: Map<string, CandidateRelation>;
@@ -422,6 +427,7 @@ export async function loadCandidates(
     projectApplied: null,
     includeRemote: false,
     cityList: [],
+    cityDefault: "",
     nameUnlocked: new Set(),
     plans: [],
     relations: new Map(),
@@ -509,7 +515,9 @@ export async function loadCandidates(
     if (!opts.hasFilterParams && !opts.fresh && activeProjectId) {
       // Only real filters are restored. A cookie holding just the retired `view`
       // used to redirect to itself forever (see lib/employer-filter-restore).
-      const restorable = restorableFilters(await rememberedFilters(uid, activeProjectId), FILTER_KEYS);
+      const remembered = restorableFilters(await rememberedFilters(uid, activeProjectId), FILTER_KEYS);
+      // A project with a city of its own brings it back by default: a remembered city (or "no city") is not restored.
+      const restorable = projectDefaultCity(projectRows.find((p) => p.id === activeProjectId) ?? {}) ? withoutSavedCity(remembered) : remembered;
       // A remembered query from before the subscription ended must not bring the Pro filters back.
       const savedFilters = proActive ? restorable : withoutProParams(restorable);
       if (savedFilters) {
@@ -590,7 +598,9 @@ export async function loadCandidates(
     if (project && filters.projectDefaults) {
       if (!filters.skillsSet) skillTerms = data.activeProjectSkills;
       data.effectiveSkills = skillTerms;
-      if (!cityText) cityText = projectCities(project).join(", ");
+      // An explicit `city` (even empty) is the employer's choice; only an absent one takes the project's.
+      if (!cityText && !filters.citySet) cityText = projectCities(project).join(", ");
+      data.cityDefault = projectDefaultCity(project);
       if (skillTerms !== filters.skills || cityText !== filters.city) {
         data.projectApplied = {
           name: project.projectName,

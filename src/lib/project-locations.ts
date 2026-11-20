@@ -34,6 +34,17 @@ export function projectCities(project: { city?: string | null; locationType?: st
 }
 
 /**
+ * The city the candidates filter pre-fills for this project: its own city, when that is the whole of what
+ * `projectCities` filters on. A legacy project that also lists other preferred places is filtered on all of
+ * them, so pre-filling one would show a field that does not match the results: it gets none (as before).
+ * Read-only: nothing here writes to the project.
+ */
+export function projectDefaultCity(project: { city?: string | null; locationType?: string | null; preferredLocations?: unknown }): string {
+  const cities = projectCities(project);
+  return cities.length === 1 && cities[0].toLowerCase() === (project.city ?? "").trim().toLowerCase() ? cities[0] : "";
+}
+
+/**
  * "Other cities" only exist while a project has no main city: once a city is
  * picked the field is hidden and nothing is saved there (an old project's
  * list is dropped the next time it is saved).

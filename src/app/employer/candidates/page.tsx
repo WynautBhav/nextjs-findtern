@@ -161,6 +161,7 @@ async function CandidatesPageImpl({
             total={total}
             effectiveSkills={data.effectiveSkills}
             projectCity={projectApplied?.city ?? ""}
+            cityDefault={data.cityDefault}
             projectToggle={projectToggle}
             pro={data.pro}
           />

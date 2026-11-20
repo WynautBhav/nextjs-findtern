@@ -54,3 +54,19 @@ export function withoutProParams(query: string): string {
   }
   return kept.toString();
 }
+
+/**
+ * A saved query without its `city`. A project that has its own city pre-fills the city field from it, and that
+ * default has to win when the employer comes back or switches project: a remembered city (or a remembered
+ * "no city") is not restored there. Projects with no city keep restoring theirs.
+ */
+export function withoutSavedCity(query: string): string {
+  let source: URLSearchParams;
+  try {
+    source = new URLSearchParams(query);
+  } catch {
+    return "";
+  }
+  source.delete("city");
+  return source.toString();
+}

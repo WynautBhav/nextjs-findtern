@@ -155,7 +155,7 @@ export function ActiveFilters({ data, filters, className }: { data: CandidatesDa
     : [
         ...activeChips(filters),
         // The project's own city narrows the list too: say so, and let it be dropped like the others.
-        ...(projectCity ? [{ key: "project-city", label: `City: ${projectCity} (from project)`, href: withoutCity(filters, data.effectiveSkills) }] : []),
+        ...(projectCity ? [{ key: "project-city", label: `City: ${projectCity} (from project)`, href: withoutCity(filters) }] : []),
       ];
   if (chips.length === 0) return null;
   return (
@@ -429,13 +429,13 @@ export function Results({
               art
               title={`No candidates for ${data.cityList.map(titleCase).join(", ")}`}
               body="Nobody in the pool has picked this city as a place to work yet. Clear the location, or include candidates who work remotely."
-              next={{ label: "Clear location", href: withoutCity(filters, data.effectiveSkills) }}
+              next={{ label: "Clear location", href: withoutCity(filters) }}
               who="You - widen the search"
             />
             {!data.includeRemote ? (
               <p className="mt-3 text-center">
                 <Link
-                  href={withoutCity(filters, data.effectiveSkills, { remote: true })}
+                  href={withoutCity(filters, { remote: true })}
                   className={buttonClass({ variant: "outline", size: "sm", className: "min-h-11" })}
                 >
                   Include remote candidates

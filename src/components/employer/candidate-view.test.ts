@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { test } from "node:test";
 
-import { AVATAR_TINTS, avatarTint, dedupeSkills, filterCount, showClearAll, headlineOf, DEFAULT_PAGE_SIZE, PAGE_SIZES, pageWindow, parsePageSize, parseView, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
+import { AVATAR_TINTS, avatarTint, cityField, cityParam, dedupeSkills, filterCount, showClearAll, headlineOf, DEFAULT_PAGE_SIZE, PAGE_SIZES, pageWindow, parsePageSize, parseView, rowSkills, skillLead, studyOf, skillBaseName, sortChangeAction, sortCommitValue } from "./candidate-view.ts";
 
 test("skillBaseName drops the level", () => {
   assert.equal(skillBaseName("React · Advanced"), "React");
@@ -110,10 +110,13 @@ test("the active count, the skills parse and the project-city chip go through th
   assert.match(query, /skills: dedupeSkills\(one\(params\.skills\) \?\? ""\)/);
   assert.match(query, /filterCount\(\{ chips: activeChips\(filters\)\.length, skills: effectiveSkills\.length, projectCity: Boolean\(projectCity\), shortlistView: filters\.saved \}\)/);
   // The chip: its label names the project as the source, and its X drops the project's defaults (pf=0) through withoutCity.
-  assert.match(results, /key: "project-city", label: `City: \$\{projectCity\} \(from project\)`, href: withoutCity\(filters, data\.effectiveSkills\)/);
+  assert.match(results, /key: "project-city", label: `City: \$\{projectCity\} \(from project\)`, href: withoutCity\(filters\)/);
   assert.match(results, /showClearAll\(chips\.map\(\(chip\) => chip\.key\)\)/);
-  // Removing a project-supplied city pins the skills and turns the defaults off, so the chip does not come back.
-  assert.match(query, /projectDefaults: false, skills: effectiveSkills, skillsSet: true/);
+  // Removing a project-supplied city is an explicit empty `city`, so the chip (and the pre-fill) does not come back.
+  assert.match(query, /withFilters\(filters, \{ \.\.\.patch, city: "", citySet: true, page: "" \}\)/);
+  // An absent `city` takes the project's; a present one (even empty) is the employer's choice.
+  assert.match(query, /if \(!cityText && !filters\.citySet\) cityText = projectCities\(project\)/);
+  assert.match(query, /citySet: params\.city !== undefined/);
 });
 
 test("parseView: grid and rows are themselves, anything else falls back to the cards", () => {
@@ -185,4 +188,46 @@ test("pageWindow: every candidate lands on exactly one page", () => {
       assert.equal(seen, total);
     }
   }
+});
+
+// "Preferred work city" starts with the selected project's city (read-only: nothing is written to the project).
+test("cityField: no city in the URL pre-fills the project's city", () => {
+  assert.deepEqual(cityField({ city: "", citySet: false, defaultCity: "Pune" }), { value: "Pune", prefilled: true });
+});
+
+test("cityField: an explicit city wins, and an explicit empty city stays empty", () => {
+  assert.deepEqual(cityField({ city: "Mumbai", citySet: true, defaultCity: "Pune" }), { value: "Mumbai", prefilled: false });
+  assert.deepEqual(cityField({ city: "", citySet: true, defaultCity: "Pune" }), { value: "", prefilled: false });
+});
+
+test("cityField: no project, or a project without a city, leaves the field empty", () => {
+  assert.deepEqual(cityField({ city: "", citySet: false, defaultCity: "" }), { value: "", prefilled: false });
+  assert.deepEqual(cityField({ city: "Delhi", citySet: false, defaultCity: "" }), { value: "Delhi", prefilled: false });
+});
+
+test("cityField: switching project or Reset (no city in the URL) shows the new project's city", () => {
+  const url = { city: "", citySet: false };
+  assert.equal(cityField({ ...url, defaultCity: "Pune" }).value, "Pune");
+  assert.equal(cityField({ ...url, defaultCity: "Jaipur" }).value, "Jaipur");
+});
+
+test("cityParam: the project's own city is not sent, a cleared field is sent empty, anything else is explicit", () => {
+  assert.equal(cityParam("Pune", "Pune"), null);
+  assert.equal(cityParam(" pune ", "Pune"), null);
+  assert.equal(cityParam("", "Pune"), "");
+  assert.equal(cityParam("Pune, Mumbai", "Pune"), "Pune, Mumbai");
+  assert.equal(cityParam("Mumbai", "Pune"), "Mumbai");
+  // No default to opt out of: a cleared field sends nothing, as before.
+  assert.equal(cityParam("", ""), null);
+  assert.equal(cityParam("Mumbai", ""), "Mumbai");
+});
+
+test("the city pre-fill is wired through the form, the panel and the restore, and writes nothing", () => {
+  const form = readFileSync(join(import.meta.dirname, "../../app/employer/candidates/_filter-form.tsx"), "utf8");
+  const filters = readFileSync(join(import.meta.dirname, "../../app/employer/candidates/_filters.tsx"), "utf8");
+  assert.match(form, /const city = cityParam\(value, cityDefault\);\s*if \(city !== null\) next\.append\(key, city\);/);
+  assert.match(filters, /From your project: \{city\.value\}\. Change it to narrow or widen the search\./);
+  assert.match(filters, /defaultValue=\{city\.value\}/);
+  assert.match(query, /withoutSavedCity\(remembered\)/);
+  assert.doesNotMatch(filters + form, /fetch\(|\/api\//);
 });
