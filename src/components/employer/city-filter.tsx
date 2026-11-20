@@ -1,154 +1,124 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useRef, useState } from "react";
 import { MapPin, X } from "lucide-react";
 
 import { districtOptions } from "@/components/employer/location-fields";
 import { cn } from "@/lib/utils";
 
-/** One city: the Candidates filter takes a single city (an old multi-city link keeps its first). */
-const MAX = 1;
-
 /**
- * Cities filter on the candidates page (QA Sheet1 r55): chips picked from the
- * district list, the same vocabulary the employer and intern location pickers
- * use. Still a plain GET form field - a hidden `city` input carries the chips
- * comma-separated, which is the format the page already parses - so the other
- * filters submit with it unchanged. Typed text that was not turned into a chip
- * is sent too, so a city outside the list still filters.
+ * City filter on the candidates page: ONE city, in one box. Suggestions come from the district list (the same
+ * vocabulary the employer and intern location pickers use). Picking a suggestion puts it in the box and applies it;
+ * a new pick replaces it; the x clears it. Typed text that matches no suggestion still filters (Enter or leaving
+ * the box). Still a plain GET form field: a hidden `city` input carries the value, so the other filters submit
+ * with it unchanged. An old comma list keeps its first city.
  */
 export function CityFilter({
   defaultValue,
-  label = "Cities",
+  label = "City",
   autoApply = false,
 }: {
   defaultValue: string;
   label?: string;
-  /** Submit the surrounding form when a chip is added or removed. */
+  /** Submit the surrounding form when the city is picked or cleared. */
   autoApply?: boolean;
 }) {
   const hidden = useRef<HTMLInputElement>(null);
   const typing = useRef<HTMLInputElement>(null);
-  const [chips, setChips] = useState<string[]>(() =>
-    Array.from(
-      new Set(
-        defaultValue
-          .split(",")
-          .map((c) => c.trim())
-          .filter(Boolean),
-      ),
-    ).slice(0, MAX),
-  );
-  const [initial] = useState(chips);
-  const [draft, setDraft] = useState("");
-
-  // Chips change through state, which fires no form "change" event.
-  useEffect(() => {
-    if (!autoApply || chips.join("|") === initial.join("|")) return;
-    // A removed chip's button is gone by now: put focus on the box so the form
-    // remount that follows the submit restores it there, not on <body>.
-    document.getElementById("filter-city")?.focus();
-    hidden.current?.form?.requestSubmit();
-  }, [autoApply, chips, initial]);
+  const [first] = useState(() => defaultValue.split(",").map((c) => c.trim()).find(Boolean) ?? "");
+  const [value, setValue] = useState(first);
+  // What the list is filtered on now: the panel is not remounted after its own change, so this moves with each commit.
+  const [applied, setApplied] = useState(first);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const listId = useId();
 
-  const options =
-    open
-      ? districtOptions(draft, undefined, 6).filter(
-          (d) => !chips.some((c) => c.toLowerCase() === d.district.toLowerCase()),
-        )
-      : [];
+  const typed = value.trim();
+  const options = open && typed && typed.toLowerCase() !== applied.toLowerCase() ? districtOptions(typed, undefined, 6) : [];
 
-  function add(raw: string) {
-    const city = raw.trim();
-    if (!city || chips.some((c) => c.toLowerCase() === city.toLowerCase())) return;
-    setChips([...chips, city].slice(-MAX));
-    setDraft("");
-    setActive(-1);
+  function commit(next: string) {
+    const city = next.trim();
+    setValue(city);
     setOpen(false);
+    setActive(-1);
+    if (!autoApply || city.toLowerCase() === applied.toLowerCase()) return;
+    setApplied(city);
+    // The hidden input must hold the new value before the form reads it.
+    if (hidden.current) hidden.current.value = city;
+    hidden.current?.form?.requestSubmit();
   }
-
-  // Typed text not yet turned into a chip is the city being chosen: it replaces the chip.
-  const value = draft.trim() || chips[0] || "";
 
   return (
     <div className="min-w-0">
       <label htmlFor="filter-city" className="block text-xs font-semibold text-ink-700">
         {label}
       </label>
-      <input ref={hidden} type="hidden" name="city" value={value} />
+      <input ref={hidden} type="hidden" name="city" value={typed} />
       <div className="relative mt-2">
-        {/* One field: pin (fixed at the left), the chosen cities, then the typing input, wrapping on narrow widths. */}
-        <div
-          onClick={(e) => {
-            if (!(e.target as HTMLElement).closest("button")) typing.current?.focus();
+        <MapPin className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-ink-600" aria-hidden />
+        <input
+          ref={typing}
+          id="filter-city"
+          type="text"
+          role="combobox"
+          aria-expanded={options.length > 0}
+          aria-controls={options.length > 0 ? listId : undefined}
+          aria-autocomplete="list"
+          aria-activedescendant={active >= 0 && options[active] ? `${listId}-${active}` : undefined}
+          value={value}
+          autoComplete="off"
+          placeholder="e.g. Pune"
+          onChange={(e) => {
+            setValue(e.target.value);
+            setActive(-1);
+            setOpen(true);
           }}
-          className="flex min-h-11 w-full cursor-text flex-wrap items-center gap-x-1.5 gap-y-1 relative rounded-apple-sm border border-ink-200 bg-white py-1 pl-10 pr-3 transition-colors hover:border-ink-300 focus-within:border-brand-800 focus-within:ring-2 focus-within:ring-brand-600 focus-within:ring-offset-2 focus-within:ring-offset-white"
-        >
-          <MapPin className="pointer-events-none absolute left-3.5 top-[0.875rem] size-4 text-ink-600" aria-hidden />
-          {chips.length > 0 ? (
-            <ul className="contents">
-              {chips.map((city) => (
-                <li
-                  key={city}
-                  className="inline-flex min-w-0 max-w-full items-center gap-0.5 rounded-full bg-brand-50 py-0.5 pl-2.5 pr-0.5 text-xs font-medium text-brand-700"
-                >
-                  <span className="min-w-0 truncate">{city}</span>
-                  <button
-                    type="button"
-                    onClick={() => setChips(chips.filter((c) => c !== city))}
-                    aria-label={`Remove ${city}`}
-                    className="apple-spring grid size-7 shrink-0 place-items-center rounded-full hover:bg-brand-100 touch:size-11"
-                  >
-                    <X className="size-3" aria-hidden />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-          <input
-            ref={typing}
-            id="filter-city"
-            type="text"
-            role="combobox"
-            aria-expanded={options.length > 0}
-            aria-controls={options.length > 0 ? listId : undefined}
-            aria-autocomplete="list"
-            aria-activedescendant={active >= 0 && options[active] ? `${listId}-${active}` : undefined}
-            value={draft}
-            autoComplete="off"
-            placeholder={chips.length ? "Change city" : "e.g. Pune"}
-            onChange={(e) => {
-              setDraft(e.target.value);
-              setActive(-1);
+          onFocus={(e) => {
+            setOpen(true);
+            e.currentTarget.select();
+          }}
+          onBlur={() =>
+            window.setTimeout(() => {
+              setOpen(false);
+              // Leaving the box applies what is typed (a city outside the list still filters).
+              if (document.activeElement !== typing.current) commit(typing.current?.value ?? "");
+            }, 120)
+          }
+          onKeyDown={(e) => {
+            if (e.key === "ArrowDown" && !open) {
+              e.preventDefault();
               setOpen(true);
+            } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && options.length > 0) {
+              e.preventDefault();
+              const step = e.key === "ArrowDown" ? 1 : -1;
+              setActive((i) => (i < 0 && step < 0 ? options.length - 1 : (i + step + options.length) % options.length));
+            } else if (e.key === "Escape" && open) {
+              setOpen(false);
+              setActive(-1);
+            } else if (e.key === "Enter") {
+              // Enter takes the highlighted suggestion, else the first, else the typed text; it never submits twice.
+              e.preventDefault();
+              commit(options[active]?.district ?? options[0]?.district ?? value);
+            }
+          }}
+          className={cn(
+            "min-h-11 w-full rounded-apple-sm border border-ink-200 bg-white py-2 pl-10 text-base text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus:border-brand-800 focus:ring-2 focus:ring-brand-600 focus:ring-offset-2 focus:ring-offset-white md:text-sm",
+            value ? "pr-11" : "pr-3",
+          )}
+        />
+        {value ? (
+          <button
+            type="button"
+            onClick={() => {
+              commit("");
+              typing.current?.focus();
             }}
-            onFocus={() => setOpen(true)}
-            onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-            onKeyDown={(e) => {
-              if (e.key === "ArrowDown" && !open) {
-                e.preventDefault();
-                setOpen(true);
-              } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && options.length > 0) {
-                e.preventDefault();
-                const step = e.key === "ArrowDown" ? 1 : -1;
-                setActive((i) => (i < 0 && step < 0 ? options.length - 1 : (i + step + options.length) % options.length));
-              } else if (e.key === "Escape" && open) {
-                setOpen(false);
-                setActive(-1);
-              } else if ((e.key === "Enter" || e.key === ",") && draft.trim()) {
-                // Enter with text turns it into a chip (the highlighted suggestion, else the first); on an empty box it submits.
-                e.preventDefault();
-                add(options[active]?.district ?? options[0]?.district ?? draft);
-              } else if (e.key === "Backspace" && !draft && chips.length > 0) {
-                setChips(chips.slice(0, -1));
-              }
-            }}
-            className="min-h-9 min-w-[6rem] flex-1 bg-transparent py-1 text-base text-ink-900 outline-none placeholder:text-text-subtle md:text-sm"
-          />
-        </div>
+            aria-label={`Clear city (${value})`}
+            className="apple-spring absolute right-1 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-full text-ink-500 outline-none hover:bg-ink-100 hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 touch:size-11"
+          >
+            <X className="size-4" aria-hidden />
+          </button>
+        ) : null}
         {options.length > 0 ? (
           <ul
             id={listId}
@@ -164,7 +134,7 @@ export function CityFilter({
                 aria-selected={i === active}
                 // Keep focus in the box on press; the pick itself is the click, so assistive tech that only clicks works too.
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => add(d.district)}
+                onClick={() => commit(d.district)}
                 className={cn(
                   "apple-spring flex min-h-11 cursor-pointer items-center justify-between gap-3 px-3 py-1.5 text-left text-sm text-ink-800 hover:bg-ink-50",
                   i === active && "bg-brand-50 text-brand-800",
