@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { notificationsDue, runTick, tickResponse, type TickDeps, type TickResult } from "./cron-tick.ts";
 
 const req = (auth?: string) => ({ headers: new Headers(auth ? { authorization: auth } : {}) });
-const ok: TickResult = { reminders: "ok", notifications: "skipped", expiry: "ok", outbox: "ok" };
+const ok: TickResult = { reminders: "ok", notifications: "skipped", expiry: "ok", outbox: "ok", transcripts: "skipped" };
 
 test("tick route: 401 without the secret, 401 for a wrong one, closed when CRON_SECRET is unset", async () => {
   let ran = 0;
@@ -47,10 +47,10 @@ test("notification jobs run on the ticks at UTC 00/06/12/18 only", () => {
 test("tick runs every step it owns, and the same tick twice is just two runs of idempotent steps", async () => {
   const calls: string[] = [];
   const six = new Date("2026-11-18T06:10:00Z");
-  assert.deepEqual(await runTick(deps({ now: six }, calls)), { reminders: "ok", notifications: "ok", expiry: "ok", outbox: "ok" });
+  assert.deepEqual(await runTick(deps({ now: six }, calls)), { reminders: "ok", notifications: "ok", expiry: "ok", outbox: "ok", transcripts: "skipped" });
   assert.deepEqual(calls, ["reminders", "expiry", "notifications", "outbox"]);
   const again = await runTick(deps({ now: six }, calls));
-  assert.deepEqual(again, { reminders: "ok", notifications: "ok", expiry: "ok", outbox: "ok" });
+  assert.deepEqual(again, { reminders: "ok", notifications: "ok", expiry: "ok", outbox: "ok", transcripts: "skipped" });
   const off = await runTick(deps({ outboxOff: true }));
   assert.equal(off.outbox, "skipped");
   assert.equal(off.notifications, "skipped");
@@ -76,4 +76,12 @@ test("tick is bounded: no step starts after the budget is spent", async () => {
   assert.equal(r.reminders, "ok");
   assert.equal(r.expiry, "out-of-budget");
   assert.equal(r.outbox, "out-of-budget");
+});
+
+test("the transcripts step runs when given and a failing one never stops the tick", async () => {
+  const calls: string[] = [];
+  const res = await runTick(deps({ transcripts: async () => { calls.push("transcripts"); throw new Error("fireflies down"); } }, calls));
+  assert.equal(res.transcripts, "failed");
+  assert.equal(res.outbox, "ok");
+  assert.ok(calls.includes("transcripts") && calls.includes("outbox"));
 });

@@ -48,6 +48,8 @@ function begin() {
   const daily = run("notification jobs", notificationJobs);
   const expiry = run("offer expiry", async () => void (await import("@/lib/proposal-expiry-db").then((m) => m.sweepProposalExpiry())));
   const outbox = run("email outbox", async () => void (await import("@/lib/outbox/run").then((m) => m.runOutboxTick())), 0); // every 30 s: skip a busy tick, the next one is close
+  // Every 10 min: fetch queued Fireflies transcripts and purge expired text; once an hour (first run in the hour) also poll for a missed webhook.
+  const transcripts = run("meeting transcripts", async () => void (await import("@/lib/meetings/transcripts-db").then((m) => m.sweepTranscripts({ poll: new Date().getMinutes() < 10 }))), 0);
   reminders();
   daily();
   expiry();
@@ -56,6 +58,7 @@ function begin() {
   // Hourly: an accepted offer is not payable once its start day begins (00:00 IST); this makes that state permanent. The daily Vercel cron is the backstop.
   setInterval(expiry, 60 * 60 * 1000);
   setInterval(outbox, 30_000);
+  setInterval(transcripts, 10 * 60 * 1000);
   console.log("[scheduler] started");
 }
 

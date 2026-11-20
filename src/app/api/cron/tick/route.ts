@@ -14,16 +14,18 @@ export async function GET(req: Request) {
     secret: process.env.CRON_SECRET,
     schedulers: process.env.SCHEDULERS,
     run: async () => {
-      const [{ interviewReminders, notificationJobs }, { sweepProposalExpiry }, { runOutboxDrain }] = await Promise.all([
+      const [{ interviewReminders, notificationJobs }, { sweepProposalExpiry }, { runOutboxDrain }, { sweepTranscripts }] = await Promise.all([
         import("@/lib/schedulers"),
         import("@/lib/proposal-expiry-db"),
         import("@/lib/outbox/run"),
+        import("@/lib/meetings/transcripts-db"),
       ]);
       return runTick({
         reminders: interviewReminders,
         notifications: notificationJobs,
         expiry: () => sweepProposalExpiry(),
         outbox: () => runOutboxDrain({ budgetMs: 15_000 }),
+        transcripts: () => sweepTranscripts({ poll: true }),
         outboxOff: outboxCronOff(),
         now: new Date(),
       });

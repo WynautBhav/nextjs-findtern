@@ -8,18 +8,21 @@ import { cronAuthorized } from "./cron-auth.ts";
  *   notification jobs (8)       6 h        notifications  runs when the UTC hour is a multiple of 6; every job dedupes per day/week/month key
  *   offer expiry sweep          1 h        expiry         same sweep as /api/cron/proposal-expiry
  *   email outbox drain          30 s       outbox         bounded drain (50-row batches, 30 s budget); OUTBOX_CRON=off skips it
+ *   meeting transcripts         10 min     transcripts    fetch queued Fireflies transcripts, hourly poll for missed webhooks, purge expired text/evidence
  *
  * Every step is idempotent (dedupe keys, FOR UPDATE SKIP LOCKED, status-guarded sweeps), so a retried or overlapping tick
  * cannot double-send. A step that throws is reported and the next step still runs. Steps stop starting once the budget is spent.
  */
 export type StepResult = "ok" | "skipped" | "failed" | "out-of-budget";
-export type TickResult = Record<"reminders" | "notifications" | "expiry" | "outbox", StepResult>;
+export type TickResult = Record<"reminders" | "notifications" | "expiry" | "outbox" | "transcripts", StepResult>;
 
 export type TickDeps = {
   reminders: () => Promise<unknown>;
   notifications: (now: Date) => Promise<unknown>;
   expiry: () => Promise<unknown>;
   outbox: () => Promise<unknown>;
+  /** Fireflies: fetch queued transcripts, poll for missed ones, purge expired text (src/lib/meetings/transcripts-db.ts). Optional. */
+  transcripts?: () => Promise<unknown>;
   outboxOff: boolean;
   now: Date;
   clock?: () => number;
@@ -38,7 +41,7 @@ export async function runTick(d: TickDeps): Promise<TickResult> {
   const clock = d.clock ?? Date.now;
   const started = clock();
   const budget = d.budgetMs ?? TICK_BUDGET_MS;
-  const out: TickResult = { reminders: "skipped", notifications: "skipped", expiry: "skipped", outbox: "skipped" };
+  const out: TickResult = { reminders: "skipped", notifications: "skipped", expiry: "skipped", outbox: "skipped", transcripts: "skipped" };
   const step = async (name: keyof TickResult, due: boolean, fn: () => Promise<unknown>) => {
     if (!due) return;
     if (clock() - started >= budget) {
@@ -57,6 +60,7 @@ export async function runTick(d: TickDeps): Promise<TickResult> {
   await step("expiry", true, d.expiry);
   await step("notifications", notificationsDue(d.now), () => d.notifications(d.now));
   await step("outbox", !d.outboxOff, d.outbox);
+  await step("transcripts", Boolean(d.transcripts), d.transcripts ?? (async () => undefined));
   return out;
 }
 

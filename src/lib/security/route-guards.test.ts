@@ -24,6 +24,7 @@ const PUBLIC = new Set([
   "auth/signup/send-otp",
   "auth/signup/verify-otp",
   "auth/verify-email",
+  "webhooks/fireflies",
   "webhooks/incruiter",
   "webhooks/razorpay",
   "website/contact",
