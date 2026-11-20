@@ -6,7 +6,8 @@ import { MapPin, X } from "lucide-react";
 import { districtOptions } from "@/components/employer/location-fields";
 import { cn } from "@/lib/utils";
 
-const MAX = 5;
+/** One city: the Candidates filter takes a single city (an old multi-city link keeps its first). */
+const MAX = 1;
 
 /**
  * Cities filter on the candidates page (QA Sheet1 r55): chips picked from the
@@ -52,10 +53,9 @@ export function CityFilter({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const listId = useId();
-  const full = chips.length >= MAX;
 
   const options =
-    open && !full
+    open
       ? districtOptions(draft, undefined, 6).filter(
           (d) => !chips.some((c) => c.toLowerCase() === d.district.toLowerCase()),
         )
@@ -63,14 +63,15 @@ export function CityFilter({
 
   function add(raw: string) {
     const city = raw.trim();
-    if (!city || full || chips.some((c) => c.toLowerCase() === city.toLowerCase())) return;
-    setChips([...chips, city]);
+    if (!city || chips.some((c) => c.toLowerCase() === city.toLowerCase())) return;
+    setChips([...chips, city].slice(-MAX));
     setDraft("");
     setActive(-1);
     setOpen(false);
   }
 
-  const value = [...chips, draft.trim()].filter(Boolean).join(", ");
+  // Typed text not yet turned into a chip is the city being chosen: it replaces the chip.
+  const value = draft.trim() || chips[0] || "";
 
   return (
     <div className="min-w-0">
@@ -117,10 +118,8 @@ export function CityFilter({
             aria-autocomplete="list"
             aria-activedescendant={active >= 0 && options[active] ? `${listId}-${active}` : undefined}
             value={draft}
-            readOnly={full}
-            aria-disabled={full || undefined}
             autoComplete="off"
-            placeholder={full ? `${MAX} cities max` : chips.length ? "Add another" : "Bengaluru, Pune"}
+            placeholder={chips.length ? "Change city" : "e.g. Pune"}
             onChange={(e) => {
               setDraft(e.target.value);
               setActive(-1);

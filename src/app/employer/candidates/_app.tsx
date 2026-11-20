@@ -13,14 +13,14 @@ import { SURFACE_CLASS } from "@/components/app/primitives";
 import { RememberSelection } from "@/components/employer/remember-selection";
 import { HireFlow } from "@/components/employer/hire-flow";
 import { cn } from "@/lib/utils";
-import { FilterCollapse } from "@/components/employer/candidate-filter-collapse";
+import { FilterCollapse, FiltersToggle } from "@/components/employer/candidate-filter-collapse";
 import { FilterColumn } from "./_filters";
 import { Results } from "./_results";
-import { ActiveFilters, ContextLine, SlimCount, ToolbarEnd, ToolbarSort, matchStateOf, projectNameOf } from "./_toolbar";
+import { ActiveFilters, ContextLine, ProjectPicker, SlimCount, SortControl, matchStateOf, projectNameOf } from "./_toolbar";
 import { CandidateSearch } from "@/components/employer/candidates/candidate-search";
 import { ProjectMatchControl } from "@/components/employer/candidates/project-match-control";
 import { StickyBar } from "@/components/employer/candidates/sticky-bar";
-import { compareHref, queryOf, rememberQueryOf, withFilters } from "@/lib/candidates-params";
+import { activeFilterCount, compareHref, queryOf, rememberQueryOf, withFilters } from "@/lib/candidates-params";
 import { fromWire, type ChromeWire, type ResultsWire } from "@/lib/candidates-wire";
 import { CANDIDATES_RESULTS_ENDPOINT } from "@/lib/candidates-endpoint";
 import { normaliseQuery } from "@/lib/instant-query/cache";
@@ -130,49 +130,50 @@ export function CandidatesApp({
         {flow ? <HireFlow counts={flow} current="candidates" currentCount={loadFailed || (filters.saved && Boolean(activeProjectId)) ? null : total} /> : null}
 
         {/* lg and up: the slim bar that takes over once the toolbar card scrolls out. */}
-        <StickyBar targetId="candidate-toolbar" label="Search and sort">
+        <StickyBar targetId="candidate-toolbar" label="Search">
           <div className="flex items-center gap-3">
             <CandidateSearch id="candidate-search-slim" compact {...searchProps} className="min-w-0 flex-1 xl:max-w-md" />
             <SlimCount data={data} filters={view} />
-            <ToolbarSort data={data} filters={view} compact className="shrink-0 flex-nowrap justify-end" />
           </div>
         </StickyBar>
 
         {/*
-          Phones: search has the top line to itself (so its placeholder is never cut), then the count beside the Filters button, then the skill tokens, the chips, then Sort and view.
-          lg: search and Sort span the top of one card, then the count, skills and chips; the filter column and the results sit side by side under it.
-          DOM order is the tab order: search, skills, chips, sort, view, then project and Filters (row 2 at lg), the filter column, the results.
+          The top bar: search and the project picker in one row, then one line with the count, the skill chips and any
+          other active filters. Sort and every filter live in the panel; the layout switch sits with the per-page control.
+          DOM order is the tab order: search, project, skills, chips, the Filters tab, the panel, the results.
         */}
-        <FilterCollapse
-          initialHidden={filtersHidden}
-          className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 lg:grid-cols-[15.5rem_minmax(0,1fr)] lg:gap-x-8 lg:data-[filters=hidden]:grid-cols-[minmax(0,1fr)]"
-        >
-          <div
-            id="candidate-toolbar"
-            // `contents` on phones: the rows below join the page grid and the card look appears at lg.
-            className={cn(SURFACE_CLASS, "max-lg:contents lg:col-span-full lg:row-start-1 lg:mb-5 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-x-4 lg:p-5")}
-          >
-            <CandidateSearch {...searchProps} className="col-span-2 col-start-1 row-start-1 xl:col-span-1 xl:max-w-[44rem]" />
-            <ContextLine data={data} filters={view} match={match} className="col-start-1 row-start-2 mt-2 self-center lg:col-span-1 lg:row-start-3 lg:mt-3 xl:row-start-2" />
+        <div id="candidate-toolbar" className={cn(SURFACE_CLASS, "mb-4 p-4 lg:mb-5 lg:p-5")}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+            <CandidateSearch {...searchProps} className="min-w-0 flex-1" />
+            <ProjectPicker data={data} className="max-sm:w-full" />
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+            <ContextLine data={data} filters={view} match={match} className="shrink-0" />
             <SkillFilter
-              className="col-span-2 row-start-3 mt-2 mb-3 lg:col-span-full lg:row-start-4 lg:mb-0 lg:mt-4 xl:row-start-3 lg:border-t lg:border-ink-100 lg:pt-4"
+              compact
+              className="min-w-0"
               active={data.effectiveSkills}
               projectSkills={data.activeProjectSkills}
               fromProject={!filters.skillsSet && filters.projectDefaults && data.activeProjectSkills.length > 0}
               hasPro={data.pro.active}
-              projectControl={match === "none" ? undefined : <div className="max-lg:hidden">{projectToggle}</div>}
             />
-            <ActiveFilters data={data} filters={view} className="col-span-2 row-start-4 mb-1 lg:col-span-full lg:row-start-5 lg:mb-0 lg:mt-3 xl:row-start-4 lg:border-t lg:border-ink-100 lg:pt-3" />
-            <ToolbarSort data={data} filters={view} className="col-span-2 col-start-1 row-start-5 justify-self-end max-sm:justify-self-stretch lg:col-span-2 lg:row-start-2 lg:mt-3 lg:justify-self-start xl:col-span-1 xl:col-start-2 xl:row-start-1 xl:mt-0 xl:justify-self-auto" />
-            <ToolbarEnd data={data} filters={view} className="lg:col-start-2 lg:row-start-3 lg:mt-3 lg:justify-self-end xl:row-start-2" />
+            <ActiveFilters data={data} filters={view} className="min-w-0 lg:ml-auto" />
+          </div>
+        </div>
+
+        <FilterCollapse
+          initialHidden={filtersHidden}
+          className="lg:grid lg:grid-cols-[2rem_17.5rem_minmax(0,1fr)] lg:items-start lg:data-[filters=hidden]:grid-cols-[2rem_minmax(0,1fr)]"
+        >
+          <div className="max-lg:hidden lg:sticky lg:top-36 lg:self-start">
+            <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(view, data.effectiveSkills, projectApplied?.city ?? "")} />
           </div>
 
           {/* The column sticks below the slim bar (4rem header + the bar), not just the header. */}
-          <div id="candidate-filter-column" className="lg:[&>aside]:top-36 lg:[&>aside]:max-h-[calc(100dvh-10rem)] col-start-2 row-start-2 mt-2 self-center lg:col-span-1 lg:col-start-1 lg:row-start-2 lg:mt-0 lg:self-auto lg:group-data-[filters=hidden]/fl:hidden">
+          <div id="candidate-filter-column" className="lg:[&>aside]:top-36 lg:[&>aside]:max-h-[calc(100dvh-10rem)] lg:group-data-[filters=hidden]/fl:hidden">
             <FilterColumn
               panelEpoch={epoch}
               filters={view}
-              projects={data.projects}
               activeProjectId={activeProjectId}
               includeRemote={data.includeRemote}
               plans={data.plans}
@@ -184,12 +185,13 @@ export function CandidatesApp({
               projectCity={projectApplied?.city ?? ""}
               cityDefault={data.cityDefault}
               projectToggle={projectToggle}
+              sortControl={<SortControl data={data} filters={view} />}
               pro={data.pro}
             />
           </div>
 
           {/* Phones: the compare tray sits over the bottom nav, so the last row needs room to scroll clear of it. */}
-          <div className={cn("col-span-2 row-start-6 min-w-0 lg:col-span-1 lg:col-start-2 lg:row-start-2 lg:group-data-[filters=hidden]/fl:col-start-1", compareIds.length >= 1 && "pb-24")}>
+          <div className={cn("min-w-0 lg:pl-8 lg:group-data-[filters=hidden]/fl:pl-4", compareIds.length >= 1 ? "pb-40 lg:pb-24" : "max-lg:pb-20")}>
             <RememberSelection employerId={uid} project={activeProjectId} compare={compareIds} filters={loadFailed ? undefined : rememberQueryOf(filters)} />
 
             {compareIds.length >= 1 ? (

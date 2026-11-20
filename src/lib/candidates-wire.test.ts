@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { cardCandidate, fromWire, toChromeWire, toResultsWire } from "./candidates-wire.ts";
-import { readFilters, type CandidatesData } from "./candidates-params.ts";
+import { cityTerms, readFilters, type CandidatesData } from "./candidates-params.ts";
 import type { CandidateProfile } from "./employer-candidates.ts";
 
 const SECRET = {
@@ -167,4 +167,16 @@ test("fromWire rebuilds what the page components read, with the chrome from the 
   assert.equal(back.data.projects[0].projectName, "Web app");
   assert.equal(back.data.pro.offered, true);
   assert.deepEqual(back.filters.skills, ["React"]);
+});
+
+test("one city only: a legacy list in the URL keeps its first city, and the match term is that one", () => {
+  const f = (city?: string) => readFilters(city === undefined ? {} : { city });
+  assert.equal(f("Pune,Mumbai").city, "Pune");
+  assert.equal(f(",Mumbai").city, "Mumbai");
+  assert.equal(f("").city, "");
+  assert.equal(f("").citySet, true);
+  assert.equal(f().citySet, false);
+  assert.deepEqual(cityTerms("Pune, Mumbai"), ["pune"]);
+  assert.deepEqual(cityTerms(",Mumbai"), ["mumbai"]);
+  assert.deepEqual(cityTerms(""), []);
 });

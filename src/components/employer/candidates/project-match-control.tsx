@@ -1,56 +1,49 @@
 "use client";
 
 /**
- * One control for how the selected project fills the list, in place of three underlined links. Every state says,
- * in visible text, what it does; every button builds its link from the current URL, so none is a no-op.
+ * "Match to project" as one switch, first in the filter panel. On: the project fills the skills and city
+ * (turning it on from "edited" drops the employer's own skills). Off: the project fills nothing in. The switch
+ * is a button that goes to the link `projectMatchHref` builds from the current URL, so it is never a no-op.
  */
 
-import Link from "@/app/employer/candidates/_link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { Link2, RotateCcw, Unlink } from "lucide-react";
 
-import { buttonClass } from "@/components/ui/button";
+import { useCandidatesGo } from "@/app/employer/candidates/_nav";
 import { projectMatchHref, type ProjectMatchState } from "@/lib/project-match";
 import { cn } from "@/lib/utils";
 
 export function ProjectMatchControl({ state, projectName, hasPro, className }: { state: ProjectMatchState; projectName: string; hasPro: boolean; className?: string }) {
+  const go = useCandidatesGo();
   const pathname = usePathname();
   const params = useSearchParams().toString();
   if (state === "none") return null;
-  const name = <span className="max-w-[16rem] truncate" title={projectName}>{projectName}</span>;
-  const button = buttonClass({ variant: "outline", size: "sm", className: "min-h-9 gap-1.5" });
-  const help = "min-w-0 text-[13px] leading-5 text-ink-600";
+  const on = state === "matched";
+  const hint = state === "edited" ? "Using your own skills. Turn on to use the project's." : on ? `Skills and city from ${projectName}` : null;
   return (
-    <div className={cn("flex flex-wrap items-center gap-x-3 gap-y-1.5", className)}>
-      {state === "matched" ? (
-        <>
-          <span className="inline-flex h-9 min-w-0 items-center gap-1.5 rounded-lg bg-brand-50 px-3 text-[13px] font-medium text-brand-900 ring-1 ring-inset ring-brand-200 touch:h-11">
-            <Link2 className="size-3.5 shrink-0" aria-hidden />
-            Matched to {name}
+    <div className={cn("flex min-h-11 items-center justify-between gap-3", className)}>
+      <span className="min-w-0">
+        <span id="project-match-label" className="block text-sm font-semibold text-ink-900">
+          Match to project
+        </span>
+        {hint ? (
+          <span id="project-match-hint" className="mt-0.5 block text-xs leading-4 text-text-subtle" title={hint}>
+            {hint}
           </span>
-          <Link href={projectMatchHref(pathname, params, "stop", hasPro)} scroll={false} className={button}>
-            <Unlink className="size-3.5" aria-hidden />
-            Stop matching
-          </Link>
-          <p className={help}>Skills and city come from the project. Stopping clears both and uses the default remote setting.</p>
-        </>
-      ) : state === "edited" ? (
-        <>
-          <Link href={projectMatchHref(pathname, params, "match", hasPro)} scroll={false} className={button}>
-            <RotateCcw className="size-3.5" aria-hidden />
-            Reset to project skills
-          </Link>
-          <p className={help}>You chose your own skills, so {name} does not set them. Resetting brings its skills back.</p>
-        </>
-      ) : (
-        <>
-          <Link href={projectMatchHref(pathname, params, "match", hasPro)} scroll={false} className={button}>
-            <Link2 className="size-3.5" aria-hidden />
-            Match to {name}
-          </Link>
-          <p className={help}>Matching is off. Turning it on fills in the project&rsquo;s skills and city and clears the skills you picked.</p>
-        </>
-      )}
+        ) : null}
+      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={on}
+        aria-labelledby="project-match-label"
+        aria-describedby={hint ? "project-match-hint" : undefined}
+        onClick={() => go(projectMatchHref(pathname, params, on ? "stop" : "match", hasPro))}
+        className={cn(
+          "relative h-6 w-10 shrink-0 rounded-full outline-none transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 motion-reduce:transition-none",
+          "after:absolute after:left-0.5 after:top-0.5 after:size-5 after:rounded-full after:bg-white after:shadow-xs after:transition-transform motion-reduce:after:transition-none",
+          on ? "bg-brand-700 after:translate-x-4" : "bg-ink-300",
+        )}
+      />
     </div>
   );
 }

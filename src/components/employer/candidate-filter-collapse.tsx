@@ -9,7 +9,7 @@
  */
 
 import { createContext, useContext, useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 
 import { FILTER_PANEL_COOKIE } from "@/lib/rail";
 import { cn } from "@/lib/utils";
@@ -36,28 +36,39 @@ export function FilterCollapse({ initialHidden, className, children }: { initial
   );
 }
 
-/** The results-toolbar button, lg and up (a phone has its own Filters sheet button). */
+/**
+ * lg and up: a slim tab on the left edge of the layout that hides and shows the whole filter column. A phone has its
+ * own floating Filters button. The tab sticks under the slim bar, so it stays in reach down the list.
+ */
 export function FiltersToggle({ controls, count, className }: { controls: string; count: number; className?: string }) {
   const state = useContext(Ctx);
   if (!state) return null;
+  const Icon = state.hidden ? ChevronRight : ChevronLeft;
   return (
     <button
       type="button"
       onClick={state.toggle}
       aria-expanded={!state.hidden}
       aria-controls={controls}
-      title={count > 0 ? "Counts each required skill and each filter. Sorting does not." : undefined}
+      aria-label={state.hidden ? "Show filters" : "Hide filters"}
+      title={state.hidden ? "Show filters" : "Hide filters"}
       className={cn(
-        "inline-flex h-9 items-center gap-2 rounded-xl border border-ink-200 px-3.5 text-sm font-medium text-ink-900 outline-none hover:border-ink-300 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 touch:h-11 max-lg:hidden",
-        state.hidden ? "bg-white" : "bg-ink-100",
+        "group sticky top-36 flex w-8 flex-col items-center gap-2 rounded-l-xl border border-r-0 border-ink-200 bg-white py-3 text-ink-700 shadow-xs outline-none transition-colors hover:bg-ink-50 hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 max-lg:hidden",
+        state.hidden && "rounded-xl border-r",
         className,
       )}
     >
       <SlidersHorizontal className="size-4" aria-hidden />
-      Filters
+      <span aria-hidden className="text-[13px] font-semibold [writing-mode:vertical-rl] rotate-180">
+        Filters
+      </span>
       {count > 0 ? (
-        <span className="nums rounded-full bg-ink-900 px-2 text-xs font-semibold leading-5 text-white">{count} active</span>
+        <span className="nums grid size-5 place-items-center rounded-full bg-ink-900 text-[11px] font-semibold text-white">
+          {count}
+          <span className="sr-only"> active</span>
+        </span>
       ) : null}
+      <Icon className="size-4 text-ink-500 group-hover:text-ink-900" aria-hidden />
     </button>
   );
 }

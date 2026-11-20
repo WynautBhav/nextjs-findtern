@@ -38,6 +38,7 @@ export function SkillFilter({
   className,
   hasPro = false,
   projectControl,
+  compact = false,
   children,
 }: {
   /** The skills the list is filtered by right now. */
@@ -54,6 +55,8 @@ export function SkillFilter({
   hasPro?: boolean;
   /** The project-match control; replaces the built-in "Restore project skills" link (the page owns what matching means). */
   projectControl?: React.ReactNode;
+  /** Candidates toolbar: chips and a small "+ Skill" chip only; the heading is for screen readers and there is no count or help line. */
+  compact?: boolean;
   /** Trailing quiet links (e.g. "Show everyone"). */
   children?: React.ReactNode;
 }) {
@@ -99,9 +102,9 @@ export function SkillFilter({
 
   return (
     <section aria-labelledby="skills-heading" className={cn("flex flex-wrap items-center gap-x-1.5 gap-y-0", className)}>
-      <h2 id="skills-heading" className="mr-1.5 text-sm font-semibold text-ink-900">
+      <h2 id="skills-heading" className={compact ? "sr-only" : "mr-1.5 text-sm font-semibold text-ink-900"}>
         {title}
-        <span className="nums ml-1.5 font-normal text-ink-600">
+        <span className={compact ? "sr-only" : "nums ml-1.5 font-normal text-ink-600"}>
           {active.length}/{MAX_SKILLS}
         </span>
       </h2>
@@ -125,7 +128,7 @@ export function SkillFilter({
             </Link>
           </li>
         ))}
-        {active.length === 0 ? (
+        {active.length === 0 && !compact ? (
           <li className="inline-flex min-h-9 items-center text-[13px] text-ink-600 touch:min-h-11">
             {projectSkills.length > 0 || projectControl ? "Any skill. Add one or match a project." : "Any skill. Add one to narrow the list."}
           </li>
@@ -223,6 +226,18 @@ export function SkillFilter({
             </ul>
           ) : null}
         </div>
+      ) : compact ? (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          aria-label="Add a required skill"
+          className="group inline-flex min-h-9 items-center outline-none touch:min-h-11"
+        >
+          <span className="inline-flex h-7 items-center gap-1 rounded-lg border border-dashed border-ink-300 px-2.5 text-[13px] font-medium text-ink-700 transition-colors group-hover:border-ink-400 group-hover:bg-ink-50 group-hover:text-ink-900 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
+            <Plus className="size-3.5" aria-hidden />
+            Skill
+          </span>
+        </button>
       ) : (
         <button type="button" onClick={() => setAdding(true)} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600" })}>
           <Plus className="size-3.5" aria-hidden />
@@ -230,7 +245,7 @@ export function SkillFilter({
         </button>
       )}
 
-      {projectControl ? (
+      {compact ? null : projectControl ? (
         <div className="mt-2 w-full">{projectControl}</div>
       ) : (
         <>

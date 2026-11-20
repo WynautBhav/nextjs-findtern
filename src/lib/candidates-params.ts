@@ -19,7 +19,7 @@ import { proQueryPairs, proRequestOf } from "./candidate-pro-request.ts";
 import { proChips } from "./candidate-pro-filters.ts";
 import { parseIds } from "./compare-map.ts";
 import { MAX_COMPARE } from "./compare-map.ts";
-import { PRO_PARAMS } from "./employer-filter-restore.ts";
+import { PRO_PARAMS, firstCity } from "./employer-filter-restore.ts";
 import { DEFAULT_PAGE_SIZE, dedupeSkills, filterCount, parsePageSize, parseView, type ListView } from "../components/employer/candidate-view.ts";
 
 export type SortKey = "score" | keyof Ratings;
@@ -152,7 +152,8 @@ export function readFilters(params: SearchParams): Filters {
     q: (one(params.q) ?? "").trim().slice(0, 60),
     skills: dedupeSkills(one(params.skills) ?? ""),
     skillsSet: params.skills !== undefined,
-    city: (one(params.city) ?? "").trim().slice(0, 160),
+    // One city only: an old link with `Pune,Mumbai` keeps Pune.
+    city: firstCity(one(params.city) ?? "").slice(0, 160),
     citySet: params.city !== undefined,
     minScore: Number.isFinite(min) && min > 0 ? min : 0,
     laptop: (one(params.laptop) ?? "").trim().toLowerCase(),
@@ -328,18 +329,11 @@ export function activeChips(filters: Filters): FilterChip[] {
   return chips;
 }
 
-/** Up to five lower-cased city names from the comma-separated filter. */
+/** The one lower-cased city of the filter (at most one entry: the first of a legacy comma list). */
 export function cityTerms(raw: string): string[] {
-  return Array.from(
-    new Set(
-      raw
-        .split(",")
-        .map((c) => c.trim().toLowerCase())
-        .filter(Boolean),
-    ),
-  ).slice(0, 5);
+  const city = firstCity(raw).toLowerCase();
+  return city ? [city] : [];
 }
-
 
 export type CandidatesData = {
   /** Set when this visit should restore the project's saved filters (EMB-05). */

@@ -16,12 +16,13 @@ import { Segmented, SegmentLink } from "@/components/employer/candidates/toolbar
 import { SUBSCRIPTION_HREF } from "@/components/employer/candidates/pro-filters";
 import { toggle, withFilters, type CandidatesData, type Filters } from "@/lib/candidates-params";
 import { ZeroResults } from "./_zero-results";
+import { ViewToggle } from "./_toolbar";
 
 /** "Per page 12 24 48": how many candidates one page holds. Changing it returns to page 1. */
 function PageSizeControl({ filters, className }: { filters: Filters; className?: string }) {
   return (
     <div className={cn("flex items-center gap-2 text-sm text-ink-600", className)}>
-      <span>Per page</span>
+      <span className="max-sm:sr-only">Per page</span>
       <Segmented label="Candidates per page">
         {PAGE_SIZES.map((size) => (
           <SegmentLink key={size} href={withFilters(filters, { pageSize: size, page: "" })} active={filters.pageSize === size} label={`${size} per page`}>
@@ -148,7 +149,10 @@ export function Results({
             <p className="nums text-sm text-ink-600">
               Showing <strong className="font-semibold text-ink-900">{firstShown}&ndash;{lastShown}</strong> of <strong className="font-semibold text-ink-900">{total}</strong>
             </p>
-            <PageSizeControl filters={filters} />
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <ViewToggle filters={filters} compact={false} />
+              <PageSizeControl filters={filters} />
+            </div>
           </div>
           <ul
             aria-label="Candidates"

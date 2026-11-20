@@ -70,3 +70,31 @@ export function withoutSavedCity(query: string): string {
   source.delete("city");
   return source.toString();
 }
+
+/**
+ * The first city of a comma-separated list (`Pune, Mumbai` -> `Pune`; empty segments skipped), "" when there is none.
+ * The Candidates page filters on ONE city: an old link, a remembered query or a multi-place project keeps its first.
+ */
+export function firstCity(raw: string): string {
+  for (const part of raw.split(",")) {
+    const city = part.trim();
+    if (city) return city;
+  }
+  return "";
+}
+
+/**
+ * A saved query whose `city` keeps only its first city. An explicit empty `city` ("no city") stays as it is, so a
+ * remembered opt-out still opts out. Everything else is untouched, in order.
+ */
+export function singleCity(query: string): string {
+  let source: URLSearchParams;
+  try {
+    source = new URLSearchParams(query);
+  } catch {
+    return "";
+  }
+  const out = new URLSearchParams();
+  for (const [key, value] of source) out.append(key, key === "city" ? firstCity(value) : value);
+  return out.toString();
+}

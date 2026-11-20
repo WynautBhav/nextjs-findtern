@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { PRO_PARAMS, restorableFilters, withoutProParams, withoutSavedCity } from "./employer-filter-restore.ts";
+import { PRO_PARAMS, firstCity, restorableFilters, singleCity, withoutProParams, withoutSavedCity } from "./employer-filter-restore.ts";
 
 const KEYS = ["q", "skills", "city", "mode", "min", "plan", "sort", "dir", "page"];
 
@@ -61,4 +61,20 @@ test("withoutSavedCity drops a remembered city, even an empty one, and keeps the
   assert.equal(withoutSavedCity("skills=react&city=&min=3"), "skills=react&min=3");
   assert.equal(withoutSavedCity("city=Jaipur"), "");
   assert.equal(withoutSavedCity("plan=assured"), "plan=assured");
+});
+
+test("firstCity keeps the first non-empty city of a legacy list", () => {
+  assert.equal(firstCity("Pune,Mumbai"), "Pune");
+  assert.equal(firstCity(" Pune , Mumbai "), "Pune");
+  assert.equal(firstCity(",Mumbai"), "Mumbai");
+  assert.equal(firstCity(""), "");
+  assert.equal(firstCity(" , "), "");
+});
+
+test("singleCity: a remembered multi-city query keeps its first city, everything else is untouched", () => {
+  assert.equal(singleCity("skills=react&city=Pune%2CMumbai&min=5"), "skills=react&city=Pune&min=5");
+  assert.equal(singleCity("city=Pune&plan=assured"), "city=Pune&plan=assured");
+  // A remembered \"no city\" stays empty.
+  assert.equal(singleCity("city=&skills=react"), "city=&skills=react");
+  assert.equal(singleCity("skills=react"), "skills=react");
 });

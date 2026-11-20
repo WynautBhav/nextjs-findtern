@@ -5,11 +5,10 @@ import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
 import { showClearAll } from "@/components/employer/candidate-view";
 import { Segmented, SegmentLink } from "@/components/employer/candidates/toolbar-parts";
-import { FiltersToggle } from "@/components/employer/candidate-filter-collapse";
 import { activeSortDir, pickSortPatch, sortChoiceOf, sortDirPatch, type SortChoice, type SortDir } from "@/lib/candidate-sort";
-import { matchedOnText, type ProjectMatchState } from "@/lib/project-match";
+import type { ProjectMatchState } from "@/lib/project-match";
 import { SortSelect } from "./_sort-select";
-import { SORT_OPTIONS, activeChips, activeFilterCount, resetHref, titleCase, withFilters, withoutCity, type CandidatesData, type Filters } from "@/lib/candidates-params";
+import { SORT_OPTIONS, activeChips, resetHref, withFilters, withoutCity, type CandidatesData, type Filters } from "@/lib/candidates-params";
 
 export { matchStateOf, projectNameOf } from "@/lib/candidates-match-state";
 import { projectNameOf } from "@/lib/candidates-match-state";
@@ -31,48 +30,19 @@ function sortOptions(filters: Filters, proActive: boolean) {
 }
 
 /**
- * Ascending / descending for the sort chosen beside it. A pair of links (the server page builds every
- * URL, as for the layout toggle): the current one is `aria-current`. Direction applies to every sort but
- * Best match, which is a ranking that always lists the best first: there the pair is shown disabled, with the reason.
+ * Ascending / descending for the sort chosen beside it. A pair of links: the current one is `aria-current`.
  */
-function SortDirection({ filters, choice, collegeSort, compact }: { filters: Filters; choice: SortChoice; collegeSort: Filters["collegeSort"]; compact: boolean }) {
+function SortDirection({ filters, choice, collegeSort }: { filters: Filters; choice: SortChoice; collegeSort: Filters["collegeSort"] }) {
   const current = activeSortDir(choice, filters.dir, collegeSort);
   const options: { dir: SortDir; label: string; Icon: typeof ArrowUp }[] = [
     { dir: "asc", label: "Sort ascending", Icon: ArrowUp },
     { dir: "desc", label: "Sort descending", Icon: ArrowDown },
   ];
-  const cell = "grid size-10 place-items-center rounded-[10px] sm:size-9 sm:touch:size-11";
-  if (current === null) {
-    return (
-      <div className="flex shrink-0 items-center gap-2 max-sm:hidden">
-        <div role="group" aria-label="Sort direction" aria-describedby="sort-dir-reason" title="Best match always lists the best first" className="flex items-center gap-0.5 rounded-apple-sm border border-ink-200 bg-white p-0.5 opacity-50">
-          {options.map(({ dir, label, Icon }) => (
-            <span key={dir} role="img" aria-label={`${label} (not available)`} className={cn(cell, "text-ink-500")}>
-              <Icon className="size-4" aria-hidden />
-            </span>
-          ))}
-        </div>
-        <span id="sort-dir-reason" className={cn("text-xs text-text-subtle", compact ? "sr-only" : "max-xl:sr-only")}>
-          Best match always lists the best first
-        </span>
-      </div>
-    );
-  }
-  const [other] = options.filter((o) => o.dir !== current);
-  const Now = current === "asc" ? ArrowUp : ArrowDown;
+  const cell = "grid size-8 place-items-center rounded-lg touch:size-10";
+  // Best match is a ranking that always lists the best first: it has no direction, so none is shown.
+  if (current === null) return null;
   return (
-    <>
-      {/* A phone has no room for two buttons beside Sort and the layout toggle: one button shows the direction and flips it. */}
-      <Link
-        href={withFilters(filters, { ...sortDirPatch(choice, other.dir), page: "" })}
-        scroll={false}
-        aria-label={`${current === "asc" ? "Sort ascending" : "Sort descending"}, switch to ${other.dir === "asc" ? "ascending" : "descending"}`}
-        title={`${current === "asc" ? "Ascending" : "Descending"}: tap for ${other.dir === "asc" ? "ascending" : "descending"}`}
-        className="grid size-11 shrink-0 place-items-center rounded-apple-sm border border-ink-200 bg-white text-ink-900 outline-none focus-visible:ring-2 focus-visible:ring-brand-500 sm:hidden"
-      >
-        <Now className="size-4" aria-hidden />
-      </Link>
-      <nav aria-label="Sort direction" className="flex shrink-0 items-center gap-0.5 rounded-apple-sm border border-ink-200 bg-white p-0.5 max-sm:hidden">
+      <nav aria-label="Sort direction" className="flex shrink-0 items-center gap-0.5 rounded-apple-sm border border-ink-200 bg-white p-0.5">
         {options.map(({ dir, label, Icon }) => {
           const active = current === dir;
           return (
@@ -94,7 +64,6 @@ function SortDirection({ filters, choice, collegeSort, compact }: { filters: Fil
           );
         })}
       </nav>
-    </>
   );
 }
 
@@ -140,33 +109,22 @@ export function ActiveFilters({ data, filters, className }: { data: CandidatesDa
 }
 
 /**
- * Sort and the layout toggle, in the toolbar card (beside the search at lg; its own row on a phone, where the
- * project lives in the Filters sheet). Sort is hidden on the shortlist tab, as before. `compact` is the slim
- * sticky bar's copy: ids are suffixed so the page keeps unique ids, and the view shows icons only.
+ * Sort and its direction, first in the filter panel. Not a form field: the select and the direction links each go
+ * to their own URL, so its change events are kept from the panel form (which would re-apply the old sort).
+ * Hidden on the shortlist tab, as before.
  */
-export function ToolbarSort({ data, filters, compact = false, className }: { data: CandidatesData; filters: Filters; compact?: boolean; className?: string }) {
-  const saved = filters.saved && Boolean(data.activeProjectId);
-  // A college order is only real for a subscriber (the loader empties it for anyone else).
+export function SortControl({ data, filters, id = "candidate-sort", className }: { data: CandidatesData; filters: Filters; id?: string; className?: string }) {
+  if (filters.saved && Boolean(data.activeProjectId)) return null;
   const choice = sortChoiceOf(filters.sorts, filters.collegeSort);
   return (
-    <div className={cn("flex min-w-0 max-w-full items-center gap-2 sm:flex-wrap", className)}>
-      {saved ? null : (
-        <div role="group" aria-label="Sort" className="flex min-w-0 items-center gap-2 max-sm:flex-1">
-          <SortSelect
-            id={compact ? "candidate-sort-slim" : "candidate-sort"}
-            className="h-11 min-w-0 rounded-apple-sm border-ink-200 bg-white pl-3.5 [field-sizing:content] max-sm:w-full max-sm:flex-1 max-sm:[field-sizing:fixed]"
-            value={choice}
-            options={sortOptions(filters, data.pro.active)}
-          />
-          <SortDirection filters={filters} choice={choice} collegeSort={filters.collegeSort} compact={compact} />
-        </div>
-      )}
-      <ViewToggle filters={filters} compact={compact} />
+    <div role="group" aria-label="Sort" onChange={(e) => e.stopPropagation()} className={cn("flex min-w-0 items-center gap-2", className)}>
+      <SortSelect id={id} prefix="" className="h-11 min-w-0 flex-1 rounded-apple-sm border-ink-200 bg-white pl-3.5" value={choice} options={sortOptions(filters, data.pro.active)} />
+      <SortDirection filters={filters} choice={choice} collegeSort={filters.collegeSort} />
     </div>
   );
 }
 
-/** The project picker (only with more than one project): lg and up, beside the Filters button. A phone has it in the sheet. */
+/** The project picker (only with more than one project), beside the search on every width. */
 export function ProjectPicker({ data, className }: { data: CandidatesData; className?: string }) {
   if (data.projects.length < 2 || !data.activeProjectId) return null;
   return (
@@ -177,7 +135,7 @@ export function ProjectPicker({ data, className }: { data: CandidatesData; class
       value={data.activeProjectId}
       // No `ids`: each project keeps its own compare picks, so the new project shows its own.
       options={data.projects.map((p) => ({ value: p.id, label: p.projectName, href: `/employer/candidates?${new URLSearchParams({ project: p.id }).toString()}` }))}
-      className={cn("h-11 min-w-0 max-w-[11rem] rounded-apple-sm border-ink-200 bg-white pl-3.5 [field-sizing:content] xl:max-w-[16rem]", className)}
+      className={cn("h-11 min-w-0 rounded-apple-sm border-ink-200 bg-white pl-3.5 sm:[field-sizing:content] sm:max-w-[16rem]", className)}
     />
   );
 }
@@ -188,7 +146,7 @@ export function ProjectPicker({ data, className }: { data: CandidatesData; class
  * is the default and needs none), so every link on the page keeps it; it is a display choice, not a filter.
  * Text labels from xl up; below that (and in the slim bar) icons, with the label in the accessible name.
  */
-function ViewToggle({ filters, compact }: { filters: Filters; compact: boolean }) {
+export function ViewToggle({ filters, compact }: { filters: Filters; compact: boolean }) {
   const options = [
     { view: "list" as const, text: "Cards", Icon: Rows3 },
     { view: "grid" as const, text: "Grid", Icon: LayoutGrid },
@@ -209,29 +167,26 @@ function ViewToggle({ filters, compact }: { filters: Filters; compact: boolean }
 }
 
 /**
- * The real count and what it is for: "24 candidates for Web Development · matched on 5 skills + Pune". The
- * count is the page's own total (hired candidates already left out), never a made-up figure. One live region,
- * so a change after the list reloads is announced once.
+ * One short status line: "3 candidates · Web Development". The count is the page's own total (hired candidates
+ * already left out). The project is named only while it drives the list (matched or edited). One live region, so a
+ * change after the list reloads is announced once.
  */
 export function ContextLine({ data, filters, match, className }: { data: CandidatesData; filters: Filters; match: ProjectMatchState; className?: string }) {
   const { total, loadFailed } = data;
   if (loadFailed) return null;
   const saved = filters.saved && Boolean(data.activeProjectId);
   const name = projectNameOf(data);
-  const matchedOn = match === "matched" || match === "edited" ? matchedOnText(data.effectiveSkills.length, data.cityList.map(titleCase)) : "";
-  // The summary never contradicts the project control beside it: it names the project and says what the project is doing to the list.
+  const showName = Boolean(name) && (saved || match === "matched" || match === "edited");
   return (
     <p role="status" className={cn("min-w-0 text-sm leading-6 text-ink-600", className)}>
-      <strong className="nums font-semibold text-ink-900">{total}</strong> {saved ? "shortlisted for this project" : `candidate${total === 1 ? "" : "s"}`}
-      {!saved && name && (match === "matched" || match === "edited") ? (
+      <strong className="nums font-semibold text-ink-900">{total}</strong> {saved ? "shortlisted" : `candidate${total === 1 ? "" : "s"}`}
+      {showName ? (
         <>
-          {" "}
-          for <strong className="font-semibold text-ink-900">{name}</strong>
+          <span aria-hidden className="mx-1.5 text-ink-400">·</span>
+          <span className="sr-only">for </span>
+          <span className="font-medium text-ink-900">{name}</span>
         </>
       ) : null}
-      {!saved && name && match === "off" ? ` · project: ${name}, matching off` : null}
-      {!saved && matchedOn ? ` · ${matchedOn}` : null}
-      {!saved && match === "none" && activeFilterCount(filters, data.effectiveSkills, data.projectApplied?.city ?? "") > 0 ? " matching your filters" : null}
     </p>
   );
 }
@@ -244,15 +199,5 @@ export function SlimCount({ data, filters }: { data: CandidatesData; filters: Fi
     <p className="nums shrink-0 whitespace-nowrap text-sm text-ink-600">
       <strong className="font-semibold text-ink-900">{data.total}</strong> {saved ? "shortlisted" : `candidate${data.total === 1 ? "" : "s"}`}
     </p>
-  );
-}
-
-/** lg and up: project picker and the button that hides the filter column. Last in the DOM, after sort and view. */
-export function ToolbarEnd({ data, filters, className }: { data: CandidatesData; filters: Filters; className?: string }) {
-  return (
-    <div className={cn("flex min-w-0 items-center gap-2 max-lg:hidden", className)}>
-      <ProjectPicker data={data} />
-      <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(filters, data.effectiveSkills, data.projectApplied?.city ?? "")} />
-    </div>
   );
 }

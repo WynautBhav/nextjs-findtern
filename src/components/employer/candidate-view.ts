@@ -156,7 +156,8 @@ export function cityField(o: { city: string; citySet: boolean; defaultCity: stri
  * opt out of; anything else typed is explicit.
  */
 export function cityParam(value: string, defaultCity: string): string | null {
-  const v = value.trim();
+  // One city only: a legacy list keeps its first.
+  const v = (value.split(",").find((c) => c.trim()) ?? "").trim();
   if (!v) return defaultCity ? "" : null;
   return v.toLowerCase() === defaultCity.trim().toLowerCase() ? null : v;
 }

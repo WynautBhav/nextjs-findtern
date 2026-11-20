@@ -34,14 +34,12 @@ export function projectCities(project: { city?: string | null; locationType?: st
 }
 
 /**
- * The city the candidates filter pre-fills for this project: its own city, when that is the whole of what
- * `projectCities` filters on. A legacy project that also lists other preferred places is filtered on all of
- * them, so pre-filling one would show a field that does not match the results: it gets none (as before).
+ * The city the candidates filter pre-fills for this project: the first of `projectCities` (its own city comes first), for every
+ * on-site or hybrid project, even a legacy one that lists several places (the filter takes one city). Remote projects: none.
  * Read-only: nothing here writes to the project.
  */
 export function projectDefaultCity(project: { city?: string | null; locationType?: string | null; preferredLocations?: unknown }): string {
-  const cities = projectCities(project);
-  return cities.length === 1 && cities[0].toLowerCase() === (project.city ?? "").trim().toLowerCase() ? cities[0] : "";
+  return projectCities(project)[0] ?? "";
 }
 
 /** Error message for this list, or null when it may be saved. */

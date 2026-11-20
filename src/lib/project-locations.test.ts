@@ -146,10 +146,11 @@ test("projectDefaultCity: the project's city pre-fills the filter when it is all
   assert.equal(projectDefaultCity({ city: "Pune", locationType: "hybrid", preferredLocations: ["Pune, Maharashtra"] }), "Pune");
 });
 
-test("projectDefaultCity: nothing for a remote project, no city, or a legacy list with other places", () => {
+test("projectDefaultCity: nothing for a remote project or no city; a legacy multi-place list gives its first city", () => {
   assert.equal(projectDefaultCity({ city: "Pune", locationType: "remote" }), "");
   assert.equal(projectDefaultCity({ city: "Pune", locationType: null }), "");
-  assert.equal(projectDefaultCity({ city: "", locationType: "onsite", preferredLocations: ["Pune, Maharashtra"] }), "");
   assert.equal(projectDefaultCity({ city: null, locationType: "onsite" }), "");
-  assert.equal(projectDefaultCity({ city: "Pune", locationType: "onsite", preferredLocations: ["Mumbai, Maharashtra"] }), "");
+  assert.equal(projectDefaultCity({ city: "", locationType: "onsite", preferredLocations: ["Pune, Maharashtra"] }), "Pune");
+  assert.equal(projectDefaultCity({ city: "Pune", locationType: "onsite", preferredLocations: ["Mumbai, Maharashtra"] }), "Pune");
+  assert.equal(projectDefaultCity({ city: "Pune", locationType: "hybrid", preferredLocations: ["Mumbai, Maharashtra", "Delhi"] }), "Pune");
 });

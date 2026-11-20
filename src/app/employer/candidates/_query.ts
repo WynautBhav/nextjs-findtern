@@ -5,7 +5,7 @@ import { getEmployerRows } from "@/lib/employer-request";
 import { RATING_META, toCandidateProfile } from "@/lib/employer-candidates";
 import { candidateRelations, heldElsewhereSql, hiredAmong, hiredInternIds, notHiredByEmployerSql } from "@/lib/employer-visibility";
 import { attachPhotos, candidatePoolClauses, scoreExpr } from "@/lib/employer-pool";
-import { projectCities, projectDefaultCity } from "@/lib/project-locations";
+import { projectDefaultCity } from "@/lib/project-locations";
 import { likePattern } from "@/lib/admin/palette-search";
 import { employerRegion } from "@/lib/employer-pricing";
 import { BANDS } from "@/lib/score";
@@ -14,7 +14,7 @@ import { proFactsOf } from "@/lib/candidate-pro-filters";
 import { getEmployerSubscriptionConfig } from "@/lib/platform-settings";
 import { subscriptionChargeMinor } from "@/lib/employer-subscription";
 import { isOpenProject, rememberedFilters } from "@/lib/employer-selection";
-import { restorableFilters, withoutProParams, withoutSavedCity } from "@/lib/employer-filter-restore";
+import { restorableFilters, singleCity, withoutProParams, withoutSavedCity } from "@/lib/employer-filter-restore";
 import { presenceOf } from "@/lib/presence";
 import { savedInternIds } from "@/lib/saved-roles";
 import { rankProfiles } from "@/components/employer/candidate-rank";
@@ -158,7 +158,8 @@ export async function loadCandidates(
     if (!opts.hasFilterParams && !opts.fresh && activeProjectId) {
       // Only real filters are restored. A cookie holding just the retired `view`
       // used to redirect to itself forever (see lib/employer-filter-restore).
-      const remembered = restorableFilters(await rememberedFilters(uid, activeProjectId), FILTER_KEYS);
+      // One city only: an older remembered query that listed several keeps its first.
+      const remembered = singleCity(restorableFilters(await rememberedFilters(uid, activeProjectId), FILTER_KEYS));
       // A project with a city of its own brings it back by default: a remembered city (or "no city") is not restored.
       const restorable = projectDefaultCity(projectRows.find((p) => p.id === activeProjectId) ?? {}) ? withoutSavedCity(remembered) : remembered;
       // A remembered query from before the subscription ended must not bring the Pro filters back.
@@ -250,7 +251,7 @@ export async function loadCandidates(
       if (!filters.skillsSet) skillTerms = data.activeProjectSkills;
       data.effectiveSkills = skillTerms;
       // An explicit `city` (even empty) is the employer's choice; only an absent one takes the project's.
-      if (!cityText && !filters.citySet) cityText = projectCities(project).join(", ");
+      if (!cityText && !filters.citySet) cityText = projectDefaultCity(project);
       data.cityDefault = projectDefaultCity(project);
       if (skillTerms !== filters.skills || cityText !== filters.city) {
         data.projectApplied = {

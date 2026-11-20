@@ -17,6 +17,7 @@ import { useCandidatesGo } from "./_nav";
 import { SlidersHorizontal } from "lucide-react";
 
 import { cityParam } from "@/components/employer/candidate-view";
+import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 
 /** Range filters at zero mean "any" and are left out of the URL. */
@@ -29,13 +30,25 @@ function subscribe(onChange: () => void) {
   return () => mq.removeEventListener("change", onChange);
 }
 
+/** lg and up. Server and first client paint assume desktop. */
+export function useDesktop(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(DESKTOP).matches,
+    () => true,
+  );
+}
+
 export function FilterPanel({
   children,
   activeCount,
   total,
   cityDefault = "",
+  raised = false,
 }: {
   children: React.ReactNode;
+  /** The compare bar is showing at the bottom: the phone Filters button sits above it. */
+  raised?: boolean;
   /** The selected project's own city (pre-filled in the city field): it applies by default, so it is not sent. */
   cityDefault?: string;
   /** Shown on the phone button. */
@@ -49,11 +62,7 @@ export function FilterPanel({
   const timer = useRef<number | undefined>(undefined);
   const projectChanged = useRef(false);
   // Server and first client paint assume desktop; `max-lg:hidden` hides the column on a phone until hydration.
-  const desktop = useSyncExternalStore(
-    subscribe,
-    () => window.matchMedia(DESKTOP).matches,
-    () => true,
-  );
+  const desktop = useDesktop();
   const [open, setOpen] = useState(false);
   function apply() {
     const el = form.current;
@@ -126,16 +135,22 @@ export function FilterPanel({
 
   return (
     <>
+      {/* Phones: a floating button at the bottom left, in thumb reach wherever the list is scrolled. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        className="inline-flex h-11 items-center gap-2 rounded-xl border border-ink-200 bg-white px-4 text-sm font-medium text-ink-900 outline-none hover:border-ink-300 focus-visible:ring-2 focus-visible:ring-brand-500"
+        data-floating-bar
+        className={cn(
+          "fixed left-4 z-40 inline-flex h-12 items-center gap-2 rounded-full bg-ink-900 px-5 text-sm font-semibold text-white shadow-[0_8px_24px_-6px_rgb(0_0_0/0.35)] outline-none hover:bg-ink-800 focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2",
+          // Above the phone tab bar (and above the compare tray when it shows), like the Ask Findy launcher.
+          raised ? "bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+5rem)]" : "bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+1rem)]",
+        )}
       >
         <SlidersHorizontal className="size-4" aria-hidden />
         Filters
         {activeCount > 0 ? (
-          <span className="nums rounded-full bg-ink-900 px-2 text-xs font-semibold leading-5 text-white">{activeCount} active</span>
+          <span className="nums rounded-full bg-white px-2 text-xs font-semibold leading-5 text-ink-900">{activeCount}<span className="sr-only"> active</span></span>
         ) : null}
       </button>
       <Sheet open={open} onOpenChange={setOpen}>

@@ -118,7 +118,7 @@ test("the active count, the skills parse and the project-city chip go through th
   // Removing a project-supplied city is an explicit empty `city`, so the chip (and the pre-fill) does not come back.
   assert.match(query, /withFilters\(filters, \{ \.\.\.patch, city: "", citySet: true, page: "" \}\)/);
   // An absent `city` takes the project's; a present one (even empty) is the employer's choice.
-  assert.match(query, /if \(!cityText && !filters\.citySet\) cityText = projectCities\(project\)/);
+  assert.match(query, /if \(!cityText && !filters\.citySet\) cityText = projectDefaultCity\(project\)/);
   assert.match(query, /citySet: params\.city !== undefined/);
 });
 
@@ -218,7 +218,8 @@ test("cityParam: the project's own city is not sent, a cleared field is sent emp
   assert.equal(cityParam("Pune", "Pune"), null);
   assert.equal(cityParam(" pune ", "Pune"), null);
   assert.equal(cityParam("", "Pune"), "");
-  assert.equal(cityParam("Pune, Mumbai", "Pune"), "Pune, Mumbai");
+  assert.equal(cityParam("Pune, Mumbai", "Pune"), null); // one city: the first, which is the project's
+  assert.equal(cityParam("Mumbai, Pune", "Pune"), "Mumbai");
   assert.equal(cityParam("Mumbai", "Pune"), "Mumbai");
   // No default to opt out of: a cleared field sends nothing, as before.
   assert.equal(cityParam("", ""), null);
@@ -229,7 +230,7 @@ test("the city pre-fill is wired through the form, the panel and the restore, an
   const form = readFileSync(join(import.meta.dirname, "../../app/employer/candidates/_filter-form.tsx"), "utf8");
   const filters = readFileSync(join(import.meta.dirname, "../../app/employer/candidates/_filters.tsx"), "utf8");
   assert.match(form, /const city = cityParam\(value, cityDefault\);\s*if \(city !== null\) next\.append\(key, city\);/);
-  assert.match(filters, /From your project: \{city\.value\}\. Change it to narrow or widen the search\./);
+  assert.match(filters, /city\.prefilled \? <p[^>]*>From your project<\/p>/);
   assert.match(filters, /defaultValue=\{city\.value\}/);
   assert.match(query, /withoutSavedCity\(remembered\)/);
   assert.doesNotMatch(filters + form, /fetch\(|\/api\//);
@@ -295,16 +296,18 @@ test("sectionCounts: each active chip counts in its own filter-column section", 
   assert.deepEqual(sectionCounts(["q"], false), { location: 0, scores: 0, price: 0, sorting: 0 });
 });
 
-test("the Candidates page says each fact once: summary names the project when matching is off, the shortlist tab is labelled by scope, laptop sits under Location", () => {
+test("the Candidates page says each fact once: the status line names the project only while it drives the list, the shortlist tab is labelled by scope, laptop sits under Location", () => {
   const dir = join(import.meta.dirname, "../../app/employer/candidates");
   const toolbar = readFileSync(join(dir, "_toolbar.tsx"), "utf8");
   const results = readFileSync(join(dir, "_results.tsx"), "utf8");
   const filters = readFileSync(join(dir, "_filters.tsx"), "utf8");
   assert.doesNotMatch(toolbar, /not matched to a project/);
-  assert.match(toolbar, /project: \$\{name\}, matching off/);
+  // "3 candidates · Web Development": no long sentence; with matching off the panel switch says so, not the status line.
+  assert.match(toolbar, /const showName = Boolean\(name\) && \(saved \|\| match === "matched" \|\| match === "edited"\);/);
+  assert.doesNotMatch(toolbar, /matching off|Required skills/);
   assert.doesNotMatch(toolbar, /fixed order/);
   assert.doesNotMatch(results, /All\{saved/); // the tab row repeats no count the toolbar and the steps strip already show
   assert.match(results, /This project&rsquo;s shortlist <span/);
   assert.doesNotMatch(filters, /title="Availability"/);
-  assert.match(filters, /Location & setup[\s\S]*name="laptop"[\s\S]*<FilterSection/);
+  assert.match(filters, /title="Location"[\s\S]*name="laptop"[\s\S]*<FilterSection/);
 });
