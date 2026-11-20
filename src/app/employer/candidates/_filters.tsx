@@ -130,20 +130,13 @@ export function FilterColumn({
             </label>
           </FilterSection>
 
-          <FilterSection title="Findtern Score">
+          <FilterSection title="Scores">
             <RatingSlider name="min" label="Minimum score" defaultValue={filters.minScore} />
+            <p className="mb-1 mt-2 text-xs text-text-subtle">AI interview scores, each out of 10.</p>
+            {RATING_META.map((meta) => (
+              <RatingSlider key={meta.key} name={`r_${meta.key}`} label={meta.label} defaultValue={filters.minRatings[meta.key]} />
+            ))}
           </FilterSection>
-
-          {pro.active ? (
-            <ProFilterSections
-              cgpaMin={filters.cgpaMin}
-              cgpaVerified={filters.cgpaVerified}
-              colleges={filters.colleges}
-              options={pro.colleges}
-            />
-          ) : (
-            <ProLockedCard offered={pro.offered} charge={pro.charge} periodDays={pro.periodDays} currency={currency} />
-          )}
 
           <FilterSection title="Hourly price">
             <label htmlFor="filter-plan" className="sr-only">
@@ -181,12 +174,8 @@ export function FilterColumn({
             </label>
           </FilterSection>
 
-          <FilterSection title="More filters">
-            <p className="mb-1 text-xs text-text-subtle">AI interview scores, each out of 10.</p>
-            {RATING_META.map((meta) => (
-              <RatingSlider key={meta.key} name={`r_${meta.key}`} label={meta.label} defaultValue={filters.minRatings[meta.key]} />
-            ))}
-            <label className="mt-2 flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm text-ink-800">
+          <FilterSection title="Sorting">
+            <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm text-ink-800">
               Most skills matched first
               {/* Unchecked sends only the hidden 0; checked adds sm=1 after it. */}
               <input type="hidden" name="sm" value="0" />
@@ -197,6 +186,17 @@ export function FilterColumn({
               />
             </label>
           </FilterSection>
+
+          {pro.active ? (
+            <ProFilterSections
+              cgpaMin={filters.cgpaMin}
+              cgpaVerified={filters.cgpaVerified}
+              colleges={filters.colleges}
+              options={pro.colleges}
+            />
+          ) : (
+            <ProLockedCard offered={pro.offered} charge={pro.charge} periodDays={pro.periodDays} currency={currency} />
+          )}
 
           {/* Filters apply as they change (QA-125): no Apply. On a phone "Show results" closes the sheet. */}
           <div className="mt-4 flex items-center gap-2 border-t border-ink-100 pt-4 lg:hidden">
