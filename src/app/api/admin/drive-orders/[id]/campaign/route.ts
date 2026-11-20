@@ -5,10 +5,12 @@ import { getDb } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { redactError } from "@/lib/outbox";
 import { queueCodeEmails } from "@/lib/drives/campaign";
+import { drainOutboxAfterQueue } from "@/lib/outbox/drain-after";
 import { maskEmail, planRecipients, shapeCounts } from "@/lib/outbox/run";
 
 type Ctx = { params: Promise<{ id: string }> };
 export const dynamic = "force-dynamic";
+export const maxDuration = 60; // after() keeps running for the outbox drain
 
 /** Queue a drive-code email for every roster entry with an issued code and no queued or sent mail. Safe to repeat. */
 export async function POST(req: Request, ctx: Ctx) {
@@ -19,6 +21,7 @@ export async function POST(req: Request, ctx: Ctx) {
     const out = await queueCodeEmails(orderId, g.session.uid);
     if ("error" in out) return NextResponse.json({ error: out.error }, { status: out.status });
     if (out.queued > 0) await recordAdminAudit(getDb(), { adminId: g.session.uid, action: "campaign.send", targetType: "drive_order", targetId: orderId, meta: { orderId, campaignId: out.campaignId, recipients: out.queued } });
+    drainOutboxAfterQueue(out.queued); // send now, after the response, instead of waiting for the daily cron
     return NextResponse.json({ ok: true, campaignId: out.campaignId, queued: out.queued });
   } catch (e) {
     console.error("[drive-campaign]", redactError(e));

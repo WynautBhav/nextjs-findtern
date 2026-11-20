@@ -5,9 +5,11 @@ import { getDb } from "@/lib/db";
 import { withPgTransaction } from "@/lib/db/pg-tx";
 import { requireMutation } from "@/lib/guards-mutation";
 import { redactError, resend } from "@/lib/outbox";
+import { drainOutboxAfterQueue } from "@/lib/outbox/drain-after";
 import { canResend } from "@/lib/outbox/run";
 
 type Ctx = { params: Promise<{ id: string; outboxId: string }> };
+export const maxDuration = 60; // after() keeps running for the outbox drain
 
 /** Queue another copy of one drive-code email under the next resend number. The original row is untouched. */
 export async function POST(req: Request, ctx: Ctx) {
@@ -31,6 +33,7 @@ export async function POST(req: Request, ctx: Ctx) {
     });
     if ("error" in out) return NextResponse.json({ error: out.error }, { status: out.status });
     await recordAdminAudit(getDb(), { adminId: g.session.uid, action: "campaign.resend", targetType: "drive_order", targetId: orderId, meta: { orderId, outboxId, newOutboxId: out.newId } });
+    drainOutboxAfterQueue(1); // send now, after the response, instead of waiting for the daily cron
     return NextResponse.json({ ok: true, id: out.newId });
   } catch (e) {
     console.error("[drive-resend]", redactError(e));
