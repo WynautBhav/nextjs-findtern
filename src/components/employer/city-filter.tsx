@@ -4,7 +4,6 @@ import { useEffect, useId, useRef, useState } from "react";
 import { MapPin, X } from "lucide-react";
 
 import { districtOptions } from "@/components/employer/location-fields";
-import { fieldClass } from "@/components/employer/ui-tokens";
 import { cn } from "@/lib/utils";
 
 const MAX = 5;
@@ -28,6 +27,7 @@ export function CityFilter({
   autoApply?: boolean;
 }) {
   const hidden = useRef<HTMLInputElement>(null);
+  const typing = useRef<HTMLInputElement>(null);
   const [chips, setChips] = useState<string[]>(() =>
     Array.from(
       new Set(
@@ -79,50 +79,77 @@ export function CityFilter({
       </label>
       <input ref={hidden} type="hidden" name="city" value={value} />
       <div className="relative mt-2">
-        <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-ink-600">
-          <MapPin className="size-4" aria-hidden />
-        </span>
-        <input
-          id="filter-city"
-          type="text"
-          role="combobox"
-          aria-expanded={options.length > 0}
-          aria-controls={options.length > 0 ? listId : undefined}
-          aria-autocomplete="list"
-          aria-activedescendant={active >= 0 && options[active] ? `${listId}-${active}` : undefined}
-          value={draft}
-          readOnly={full}
-          aria-disabled={full || undefined}
-          autoComplete="off"
-          placeholder={full ? `${MAX} cities max` : chips.length ? "Add another" : "Bengaluru, Pune"}
-          onChange={(e) => {
-            setDraft(e.target.value);
-            setActive(-1);
-            setOpen(true);
+        {/* One field: pin (fixed at the left), the chosen cities, then the typing input, wrapping on narrow widths. */}
+        <div
+          onClick={(e) => {
+            if (!(e.target as HTMLElement).closest("button")) typing.current?.focus();
           }}
-          onFocus={() => setOpen(true)}
-          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-          onKeyDown={(e) => {
-            if (e.key === "ArrowDown" && !open) {
-              e.preventDefault();
-              setOpen(true);
-            } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && options.length > 0) {
-              e.preventDefault();
-              const step = e.key === "ArrowDown" ? 1 : -1;
-              setActive((i) => (i < 0 && step < 0 ? options.length - 1 : (i + step + options.length) % options.length));
-            } else if (e.key === "Escape" && open) {
-              setOpen(false);
+          className="flex min-h-11 w-full cursor-text flex-wrap items-center gap-x-1.5 gap-y-1 relative rounded-apple-sm border border-ink-200 bg-white py-1 pl-10 pr-3 transition-colors hover:border-ink-300 focus-within:border-brand-800 focus-within:ring-2 focus-within:ring-brand-600 focus-within:ring-offset-2 focus-within:ring-offset-white"
+        >
+          <MapPin className="pointer-events-none absolute left-3.5 top-[0.875rem] size-4 text-ink-600" aria-hidden />
+          {chips.length > 0 ? (
+            <ul className="contents">
+              {chips.map((city) => (
+                <li
+                  key={city}
+                  className="inline-flex min-w-0 max-w-full items-center gap-0.5 rounded-full bg-brand-50 py-0.5 pl-2.5 pr-0.5 text-xs font-medium text-brand-700"
+                >
+                  <span className="min-w-0 truncate">{city}</span>
+                  <button
+                    type="button"
+                    onClick={() => setChips(chips.filter((c) => c !== city))}
+                    aria-label={`Remove ${city}`}
+                    className="apple-spring grid size-7 shrink-0 place-items-center rounded-full hover:bg-brand-100 touch:size-11"
+                  >
+                    <X className="size-3" aria-hidden />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <input
+            ref={typing}
+            id="filter-city"
+            type="text"
+            role="combobox"
+            aria-expanded={options.length > 0}
+            aria-controls={options.length > 0 ? listId : undefined}
+            aria-autocomplete="list"
+            aria-activedescendant={active >= 0 && options[active] ? `${listId}-${active}` : undefined}
+            value={draft}
+            readOnly={full}
+            aria-disabled={full || undefined}
+            autoComplete="off"
+            placeholder={full ? `${MAX} cities max` : chips.length ? "Add another" : "Bengaluru, Pune"}
+            onChange={(e) => {
+              setDraft(e.target.value);
               setActive(-1);
-            } else if ((e.key === "Enter" || e.key === ",") && draft.trim()) {
-              // Enter with text turns it into a chip (the highlighted suggestion, else the first); on an empty box it submits.
-              e.preventDefault();
-              add(options[active]?.district ?? options[0]?.district ?? draft);
-            } else if (e.key === "Backspace" && !draft && chips.length > 0) {
-              setChips(chips.slice(0, -1));
-            }
-          }}
-          className={cn(fieldClass, "pl-10 pr-3.5")}
-        />
+              setOpen(true);
+            }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown" && !open) {
+                e.preventDefault();
+                setOpen(true);
+              } else if ((e.key === "ArrowDown" || e.key === "ArrowUp") && options.length > 0) {
+                e.preventDefault();
+                const step = e.key === "ArrowDown" ? 1 : -1;
+                setActive((i) => (i < 0 && step < 0 ? options.length - 1 : (i + step + options.length) % options.length));
+              } else if (e.key === "Escape" && open) {
+                setOpen(false);
+                setActive(-1);
+              } else if ((e.key === "Enter" || e.key === ",") && draft.trim()) {
+                // Enter with text turns it into a chip (the highlighted suggestion, else the first); on an empty box it submits.
+                e.preventDefault();
+                add(options[active]?.district ?? options[0]?.district ?? draft);
+              } else if (e.key === "Backspace" && !draft && chips.length > 0) {
+                setChips(chips.slice(0, -1));
+              }
+            }}
+            className="min-h-9 min-w-[6rem] flex-1 bg-transparent py-1 text-base text-ink-900 outline-none placeholder:text-text-subtle md:text-sm"
+          />
+        </div>
         {options.length > 0 ? (
           <ul
             id={listId}
@@ -151,26 +178,6 @@ export function CityFilter({
           </ul>
         ) : null}
       </div>
-      {chips.length > 0 ? (
-        <ul className="mt-2 flex flex-wrap gap-1.5">
-          {chips.map((city) => (
-            <li
-              key={city}
-              className="inline-flex items-center gap-0.5 rounded-full bg-brand-50 py-0.5 pl-2.5 pr-0.5 text-xs font-medium text-brand-700"
-            >
-              {city}
-              <button
-                type="button"
-                onClick={() => setChips(chips.filter((c) => c !== city))}
-                aria-label={`Remove ${city}`}
-                className="apple-spring grid size-7 shrink-0 place-items-center rounded-full hover:bg-brand-100 touch:size-11"
-              >
-                <X className="size-3" aria-hidden />
-              </button>
-            </li>
-          ))}
-        </ul>
-      ) : null}
     </div>
   );
 }
