@@ -4,7 +4,7 @@ import { z } from "zod";
 import { getSession, unauthenticatedResponse } from "@/lib/auth";
 import { maskCode, parseCollegeCode } from "@/lib/college/code";
 import { takeCodeAttempt } from "@/lib/college/code-throttle";
-import { BAD_COLLEGE_CODE, joinCollegeByCode, leaveCollege, membershipOf } from "@/lib/college/membership";
+import { BAD_COLLEGE_CODE, joinCollegeByCode, membershipOf } from "@/lib/college/membership";
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -57,10 +57,15 @@ export async function POST(req: Request) {
   return NextResponse.json({ college: r.college });
 }
 
-/** Leave the college. Takes effect immediately everywhere. */
+/**
+ * Leaving is no longer instant: the college's placement officer decides. The student files a request at
+ * POST /api/intern/college/leave-request; the only thing that ends a membership is an approved request.
+ */
 export async function DELETE(req: Request) {
   const guard = await requireMutation({ req, roles: ["intern"] });
   if (!guard.ok) return guard.response;
-  await leaveCollege(guard.session.uid);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json(
+    { error: "Your placement office has to approve your leave. Send a leave request instead.", code: "leave_needs_approval" },
+    { status: 409 },
+  );
 }

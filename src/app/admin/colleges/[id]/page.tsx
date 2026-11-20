@@ -1,10 +1,11 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, sql } from "drizzle-orm";
 
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { CollegeDetailsForm, CollegeLogins, CollegeSwitches } from "@/components/admin/college-partners-manager";
 import { CopyText } from "@/components/college/copy-text";
+import { CollegeLeavePanel } from "@/components/admin/college-leave-panel";
 import { CollegeSeatBatches } from "@/components/admin/college-seat-batches";
 import { CollegeWalletPanel } from "@/components/admin/college-wallet-panel";
 import { Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
@@ -15,6 +16,7 @@ import { allows, canWrite } from "@/lib/admin/permissions";
 import { maskTail } from "@/lib/admin/identity-mask";
 import { getSession } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
+import { leaveRequestsForCollege } from "@/lib/college/leave-request-read";
 import { seatInvoiceInput } from "@/lib/college/seat-invoice";
 import { formatMoney } from "@/lib/format";
 import { taxInvoiceHtml } from "@/lib/invoice";
@@ -48,7 +50,7 @@ export default async function AdminCollegePage({
   const db = getDb();
   const [college] = await db.select().from(schema.colleges).where(eq(schema.colleges.id, id)).limit(1);
   if (!college) notFound();
-  const [orders, reviews, batches, [promo], summary, ledger, officers] = await Promise.all([
+  const [orders, reviews, batches, [promo], summary, ledger, officers, [{ members }], leaveRows] = await Promise.all([
     listOrders(id),
     listPendingReviews(id),
     db.select().from(schema.collegeSeatBatches).where(eq(schema.collegeSeatBatches.collegeId, id)).orderBy(desc(schema.collegeSeatBatches.createdAt)),
@@ -60,7 +62,10 @@ export default async function AdminCollegePage({
       .from(schema.collegeAdmins)
       .where(and(eq(schema.collegeAdmins.collegeId, id), eq(schema.collegeAdmins.isActive, true)))
       .orderBy(asc(schema.collegeAdmins.name)),
+    db.select({ members: sql<number>`count(*)::int` }).from(schema.collegeMemberships).where(and(eq(schema.collegeMemberships.collegeId, id), sql`${schema.collegeMemberships.leftAt} IS NULL`)),
+    leaveRequestsForCollege(id),
   ]);
+  const pendingLeaves = leaveRows.filter((r) => r.status === "requested").map((r) => ({ id: r.id, name: r.name, email: r.email, reason: r.reason, requestedAt: r.requestedAt }));
   const last4 = maskTail(college.bankAccountNumber).slice(-4);
   const bank = college.bankAccountNumber && college.bankIfsc ? { holder: college.bankAccountName ?? "", bankName: college.bankName ?? "", last4, ifsc: college.bankIfsc } : null;
   const seller = getInvoiceSeller();
@@ -121,6 +126,7 @@ export default async function AdminCollegePage({
               <InfoRow label="Student email domains">{college.emailDomains.length ? college.emailDomains.map((d) => `@${d}`).join(", ") : "-"}</InfoRow>
             </InfoList>
             <CollegeSwitches college={{ id, name: college.name, isPartner: college.isPartner, showOnWebsite: college.showOnWebsite, isActive: college.isActive }} canEdit={canEdit} />
+            <CollegeLeavePanel collegeId={id} canEdit={canEdit} members={members} pending={pendingLeaves} />
           </PanelBody>
         </Panel>
       }

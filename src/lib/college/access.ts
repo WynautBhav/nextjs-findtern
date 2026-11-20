@@ -146,6 +146,7 @@ const COLLEGE_ADMIN_WRITES = new Set([
   "nudge:send",
   "bank:update",
   "payout:request",
+  "leave:decide",
 ]);
 
 export function collegeAdminMay(action: string): boolean {

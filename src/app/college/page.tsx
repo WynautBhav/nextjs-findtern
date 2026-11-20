@@ -12,6 +12,7 @@ import {
   rosterCoverage,
   studentsForCollegeAdmin,
 } from "@/lib/college/scope";
+import { pendingLeaveCount } from "@/lib/college/leave-request-read";
 import { toStudentRow } from "@/lib/college/serialize";
 import { getDb, schema } from "@/lib/db";
 import { AWAITING_FIRST_PAYMENT } from "@/lib/college/seat-paid";
@@ -38,7 +39,7 @@ export default async function CollegeDashboard() {
   const ctx = await requireCollegeContext();
   const now = requestTime();
 
-  const [students, coverage, [liveDrive], [seat], paid, hasDriveOrder] = await Promise.all([
+  const [students, coverage, [liveDrive], [seat], paid, hasDriveOrder, pendingLeaves] = await Promise.all([
     studentsForCollegeAdmin(ctx),
     rosterCoverage(ctx.college.id),
     getDb()
@@ -62,6 +63,7 @@ export default async function CollegeDashboard() {
       .limit(1),
     paidSeatTotal(getDb(), ctx.college.id),
     collegeHasDriveOrder(ctx.college.id),
+    pendingLeaveCount(ctx.college.id),
   ]);
 
   const presence = liveDrive
@@ -107,6 +109,16 @@ export default async function CollegeDashboard() {
           ) : null}
         </section>
       ) : null}
+
+      <div className="max-w-sm">
+        <StatCard
+          label="Leave requests"
+          value={pendingLeaves}
+          hint={pendingLeaves ? `${pendingLeaves} student${pendingLeaves === 1 ? "" : "s"} waiting for your approval` : "Students can only leave once you approve"}
+          tone={pendingLeaves ? "warning" : "neutral"}
+          href="/college/leave-requests"
+        />
+      </div>
 
       <StatGrid cols={4} variant="strip">
         <StatCard

@@ -6,12 +6,15 @@ import { CODE_VERIFIED_BY, isCodeVerifiedMembership } from "@/lib/intern-account
 import { codesEqual, parseCollegeCode } from "./code";
 import { COLLEGE_CODE_CONSENT_NOTICE, COLLEGE_CODE_CONSENT_VERSION } from "./code-consent";
 import { branchProblem } from "./join-input";
+import { latestLeaveRequest, type MyLeaveRequest } from "./leave-request-read";
+import { joinProblem } from "./leave-request";
 
 /**
  * A student joining or leaving a college. Joining takes the college's own code
  * (never a name or an id, and no list of colleges is ever sent to a browser):
  * the code verifies the membership, and the college's officer then sees them.
- * Leaving drops them from every dashboard and drive at once.
+ * Leaving needs the college's placement officer to approve a request (leave-request-db.ts): nothing here ends a
+ * membership, and a code from another college is refused while the student is still a member of one.
  */
 
 export type MyCollege = {
@@ -23,6 +26,8 @@ export type MyCollege = {
   verifiedBy: string | null;
   year: number | null;
   branch: string | null;
+  /** The student's latest leave request (any status), or null. */
+  leaveRequest: MyLeaveRequest | null;
 };
 
 export async function membershipOf(userId: string): Promise<MyCollege | null> {
@@ -33,6 +38,7 @@ export async function membershipOf(userId: string): Promise<MyCollege | null> {
     .where(and(eq(schema.collegeMemberships.userId, userId), isNull(schema.collegeMemberships.leftAt)))
     .limit(1);
   if (!row) return null;
+  const leaveRequest = await latestLeaveRequest(userId);
   return {
     collegeId: row.c.id,
     name: row.c.name,
@@ -42,6 +48,7 @@ export async function membershipOf(userId: string): Promise<MyCollege | null> {
     verifiedBy: row.m.verifiedBy,
     year: row.m.year,
     branch: row.m.branch,
+    leaveRequest,
   };
 }
 
@@ -71,7 +78,7 @@ export async function joinCollegeByCode(input: {
   year: number | null;
   branch: string;
   declaredAdult: boolean;
-}): Promise<{ ok: true; college: MyCollege } | { ok: false; error: string; status: number; reason: "adult" | "branch" | "code" | "account" }> {
+}): Promise<{ ok: true; college: MyCollege } | { ok: false; error: string; status: number; reason: "adult" | "branch" | "code" | "account" | "leave_needs_approval" }> {
   if (!input.declaredAdult) {
     return {
       ok: false,
@@ -94,8 +101,20 @@ export async function joinCollegeByCode(input: {
     .where(and(eq(schema.collegeRoster.collegeId, college.id), eq(schema.collegeRoster.email, user.email.trim().toLowerCase())))
     .limit(1);
 
+  let blocked: { error: string } | null = null;
   await db.transaction(async (tx) => {
-    const [existing] = await tx.select().from(schema.collegeMemberships).where(eq(schema.collegeMemberships.userId, input.userId)).limit(1);
+    // Locked: a leave decision on the same row cannot interleave with this check.
+    const [existing] = await tx.select().from(schema.collegeMemberships).where(eq(schema.collegeMemberships.userId, input.userId)).limit(1).for("update");
+    // The only way out of a college is an approved leave request. Moving to another college's code would be a
+    // second way out, so it is refused while the membership is live (same college is fine).
+    if (existing && existing.leftAt === null && existing.collegeId !== college.id) {
+      const [from] = await tx.select({ name: schema.colleges.name }).from(schema.colleges).where(eq(schema.colleges.id, existing.collegeId)).limit(1);
+      const problem = joinProblem(existing, college.id, from?.name ?? "your college");
+      if (problem) {
+        blocked = { error: problem.error };
+        return;
+      }
+    }
     const [consent] = await tx
       .insert(schema.collegeConsents)
       .values({
@@ -131,6 +150,7 @@ export async function joinCollegeByCode(input: {
       .where(eq(schema.internOnboarding.userId, input.userId));
   });
 
+  if (blocked) return { ok: false, status: 409, reason: "leave_needs_approval", error: (blocked as { error: string }).error };
   const mine = await membershipOf(input.userId);
   return mine ? { ok: true, college: mine } : { ok: false, status: 500, reason: "account", error: "Could not save" };
 }
@@ -143,22 +163,6 @@ export async function hasCodeVerifiedMembership(userId: string): Promise<boolean
     .where(eq(schema.collegeMemberships.userId, userId))
     .limit(1);
   return isCodeVerifiedMembership(m);
-}
-
-export async function leaveCollege(userId: string): Promise<void> {
-  const db = getDb();
-  await db.transaction(async (tx) => {
-    await tx
-      .update(schema.collegeMemberships)
-      .set({ leftAt: sql`now()` })
-      .where(and(eq(schema.collegeMemberships.userId, userId), isNull(schema.collegeMemberships.leftAt)));
-    await tx.delete(schema.collegePresence).where(eq(schema.collegePresence.userId, userId));
-    // A college account with no college is an individual account.
-    await tx
-      .update(schema.internOnboarding)
-      .set({ extraData: sql`${schema.internOnboarding.extraData} || jsonb_build_object('accountType', 'individual')` })
-      .where(and(eq(schema.internOnboarding.userId, userId), sql`${schema.internOnboarding.extraData}->>'accountType' = 'college'`));
-  });
 }
 
 /**

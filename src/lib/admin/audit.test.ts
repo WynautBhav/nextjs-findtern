@@ -111,6 +111,7 @@ const CALL_SITE_META: Record<keyof typeof AUDIT_ACTIONS, Record<string, unknown>
   "college.payout_paid": { payoutId: "po-1", amountMinor: 150000, referenceId: "UTR412345678902" },
   "college.payout_reject": { payoutId: "po-1", amountMinor: 150000, reason: "Bank details do not match" },
   "college.bank_reveal": { collegeId: "c-1" },
+  "college.leave_decide": { requestId: "r-1", studentId: "u-1", outcome: "approved", via: "request", hasNote: false },
   "role.create": { key: "exec_sales", name: "Sales exec", permissions: ["interns:read"] },
   "role.update": { changes: { permissions: { from: ["interns:read"], to: ["interns:read", "roles:write"] } } },
   "role.delete": { name: "Sales exec", key: "exec_sales" },

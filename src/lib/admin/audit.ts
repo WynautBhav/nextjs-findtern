@@ -40,6 +40,7 @@ export const AUDIT_ACTIONS = {
   "college.billing_update": "Edited a college's billing details",
   "college.payout_paid": "Marked a college payout paid",
   "college.payout_reject": "Rejected a college payout request",
+  "college.leave_decide": "Decided a student's request to leave a college (or ended their membership)",
   "college.bank_reveal": "Revealed a college's bank account",
   "role.create": "Created a role",
   "role.update": "Edited a role",

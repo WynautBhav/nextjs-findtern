@@ -5,7 +5,15 @@ import { useCallback, useRef, useState } from "react";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
-type Ask = { title: string; body: string; confirmLabel: string; cancelLabel?: string; destructive?: boolean };
+type Ask = {
+  title: string;
+  body: string;
+  confirmLabel: string;
+  cancelLabel?: string;
+  destructive?: boolean;
+  /** Extra content under the text, e.g. an uncontrolled <textarea ref> the caller reads after "Yes". */
+  extra?: React.ReactNode;
+};
 
 /**
  * An in-page confirm for destructive actions (admin, intern, employer), in place of
@@ -39,6 +47,7 @@ export function useConfirm() {
           <DialogTitle>{current?.title}</DialogTitle>
           <DialogDescription>{current?.body}</DialogDescription>
         </DialogHeader>
+        {current?.extra}
         <DialogFooter>
           {/* Cancel takes the focus: Enter on a focused delete is the one
               keyboard slip that can't be undone. */}

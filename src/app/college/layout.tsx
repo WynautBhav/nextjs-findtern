@@ -1,11 +1,12 @@
 import { AccountGuard } from "@/components/app/account-guard";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { LayoutDashboard, ListChecks, Megaphone, Ticket, Wallet } from "lucide-react";
+import { DoorOpen, LayoutDashboard, ListChecks, Megaphone, Ticket, Wallet } from "lucide-react";
 
 import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
 import { TermsGate } from "@/components/app/terms-gate";
 import { RAIL_COOKIE } from "@/lib/rail";
+import { pendingLeaveCount } from "@/lib/college/leave-request-read";
 import { requireCollegeContext } from "@/lib/college/scope";
 import { SITE } from "@/lib/content/site";
 import { shouldShowTermsPrompt } from "@/lib/terms";
@@ -15,13 +16,14 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const NAV: ConsoleNavGroup[] = [
+const navFor = (pendingLeaves: number): ConsoleNavGroup[] => [
   {
     title: "Placement",
     items: [
       { href: "/college", label: "Students", icon: <LayoutDashboard /> },
       { href: "/college/drives", label: "Drives", icon: <Megaphone /> },
       { href: "/college/roster", label: "Roster", icon: <ListChecks /> },
+      { href: "/college/leave-requests", label: "Leave requests", icon: <DoorOpen />, ...(pendingLeaves > 0 ? { badge: pendingLeaves, badgeLabel: "waiting for approval" } : {}) },
       { href: "/college/seats", label: "Seats", icon: <Ticket /> },
       { href: "/college/earnings", label: "Earnings", icon: <Wallet /> },
     ],
@@ -35,6 +37,7 @@ const NAV: ConsoleNavGroup[] = [
  */
 export default async function CollegeLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireCollegeContext();
+  const NAV = navFor(await pendingLeaveCount(ctx.college.id).catch(() => 0));
   return (
     <ConsoleShell
       roleLabel="College"

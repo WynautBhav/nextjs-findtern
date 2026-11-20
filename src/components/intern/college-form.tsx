@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { BadgeCheck, Building2 } from "lucide-react";
@@ -11,6 +11,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { csrfFetch } from "@/lib/client-fetch";
 import { COLLEGE_CODE_CONSENT_NOTICE } from "@/lib/college/code-consent";
+import { LEAVE_REASON_MAX } from "@/lib/college/leave-request";
 import { isCodeVerifiedMembership } from "@/lib/intern-account";
 import type { MyCollege } from "@/lib/college/membership";
 import { branchProblem } from "@/lib/college/join-input";
@@ -64,27 +65,58 @@ function Membership({
   const { ask, dialog } = useConfirm();
   const verified = college.status === "verified";
 
-  async function leave() {
-    const ok = await ask({
-      title: `Leave ${college.name}?`,
-      body: "You leave this college. Your placement team stops seeing you and you disappear from its drives straight away. Your Findtern profile stays as it is.",
-      confirmLabel: "Yes, leave this college",
-    });
-    if (!ok) return;
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
+  const request = college.leaveRequest;
+  const pending = request?.status === "requested";
+  const rejected = request?.status === "rejected";
+  const day = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+  // Leaving is a request: the college's placement officer decides. Nothing here ends the membership.
+  async function send(method: "POST" | "DELETE", body?: unknown) {
     setLeaving(true);
     setError(null);
     try {
-      const res = await csrfFetch("/api/intern/college", { method: "DELETE" });
+      const res = await csrfFetch("/api/intern/college/leave-request", {
+        method,
+        ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+      });
       if (!res.ok) {
-        setError("Couldn't leave right now. Try again.");
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        setError(data?.error ?? "Couldn't do that right now. Try again.");
         return;
       }
       router.refresh();
     } catch {
-      setError("Couldn't leave. Check your connection and try again.");
+      setError("Couldn't reach Findtern. Check your connection and try again.");
     } finally {
       setLeaving(false);
     }
+  }
+
+  async function requestLeave() {
+    const ok = await ask({
+      title: `Ask to leave ${college.name}?`,
+      body: "Your placement office has to approve this. Until they do, you stay in the college and in its drives. You can cancel the request any time.",
+      confirmLabel: "Send request",
+      destructive: false,
+      extra: (
+        <div className="px-1">
+          <label htmlFor="leave-reason" className="text-sm font-medium text-ink-800">
+            Reason <span className="font-normal text-ink-500">(optional)</span>
+          </label>
+          <textarea
+            id="leave-reason"
+            ref={reasonRef}
+            rows={3}
+            maxLength={LEAVE_REASON_MAX}
+            placeholder="Anything your placement office should know"
+            className={controlClass(undefined, "mt-1 h-auto w-full resize-none py-2.5 leading-relaxed")}
+          />
+        </div>
+      ),
+    });
+    if (!ok) return;
+    await send("POST", { reason: reasonRef.current?.value.trim() || undefined });
   }
 
   return (
@@ -133,18 +165,36 @@ function Membership({
         </Surface>
 
         <section>
+          {pending && request ? (
+            <div className="mt-4 space-y-1">
+              <Pill tone="waiting">Leave requested {day(request.requestedAt)} · waiting for placement office</Pill>
+              <p className="text-sm text-ink-600">You stay in {college.name} until they approve.</p>
+            </div>
+          ) : null}
+          {rejected && request ? (
+            <div className="mt-4 rounded-apple-sm border border-ink-100 bg-ink-50 p-3 text-sm text-ink-700">
+              <p className="font-medium text-ink-900">Your placement office did not approve your last request{request.decidedAt ? ` (${day(request.decidedAt)})` : ""}.</p>
+              {request.decisionNote ? <p className="mt-1 break-words">Their note: {request.decisionNote}</p> : null}
+            </div>
+          ) : null}
           <div className="mt-4 flex flex-wrap gap-3">
             <button type="button" onClick={onChange} className={cn(buttonVariants({ variant: "outline", size: "md" }))}>
               Change college
             </button>
-            <button
-              type="button"
-              onClick={leave}
-              disabled={leaving}
-              className={cn(buttonVariants({ variant: "ghost", size: "md" }), "text-danger hover:bg-danger-soft")}
-            >
-              {leaving ? "Leaving…" : "Leave college"}
-            </button>
+            {pending ? (
+              <button type="button" onClick={() => send("DELETE")} disabled={leaving} className={cn(buttonVariants({ variant: "outline", size: "md" }))}>
+                {leaving ? "Cancelling…" : "Cancel request"}
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={requestLeave}
+                disabled={leaving}
+                className={cn(buttonVariants({ variant: "ghost", size: "md" }), "text-danger hover:bg-danger-soft")}
+              >
+                {leaving ? "Sending…" : rejected ? "Request again" : "Request to leave"}
+              </button>
+            )}
             {dialog}
           </div>
           {/* Mounted empty, then filled, so the message is announced. */}

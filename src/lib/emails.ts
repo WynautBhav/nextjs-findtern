@@ -457,6 +457,19 @@ export const emails = {
     cta: ctaTo("View seats and invoice", "/college/seats"),
   }),
 
+  collegeLeaveRequested: (o: { collegeName: string; studentName: string; reason: string | null }): EmailContent => ({
+    subject: `${o.studentName} asked to leave ${o.collegeName} | Findtern`,
+    preheader: `A student asked to leave ${o.collegeName}. Approve or reject it from your dashboard.`,
+    heading: "A student asked to leave your college",
+    greeting: hi(o.collegeName),
+    lines: [`${o.studentName} has asked to leave ${o.collegeName} on Findtern. They stay in your college until you approve.`],
+    facts: [
+      ["Student", o.studentName],
+      ...(o.reason ? ([["Reason", o.reason]] as [string, string][]) : []),
+    ],
+    cta: ctaTo("Review leave requests", "/college/leave-requests"),
+  }),
+
   collegePayoutRequested: (o: { collegeName: string; amount: string }): EmailContent => ({
     subject: `Payout requested: ${o.collegeName} | Findtern`,
     preheader: `${o.collegeName} asked to withdraw ${o.amount}.`,
