@@ -405,7 +405,8 @@ function RailLink({ item, active, compact, onNavigate }: { item: AdminNavItem; a
         // with a gap between rows and wider spacing between groups.
         "apple-spring group relative flex min-h-11 items-center gap-3.5 rounded-full px-4 text-sm [@media(pointer:fine)]:min-h-10",
         active ? "font-semibold text-brand-700" : "text-ink-600 hover:text-ink-900",
-        compact && "justify-center px-0",
+        // Collapsed: a fixed round pill (square link, rounded-full) centred in the rail, icon centred in it.
+        compact && "mx-auto w-11 justify-center gap-0 px-0 [@media(pointer:fine)]:w-10",
       )}
     >
       {active ? (
@@ -420,7 +421,7 @@ function RailLink({ item, active, compact, onNavigate }: { item: AdminNavItem; a
           <span aria-hidden className="absolute -right-1 -top-1 size-2 rounded-full bg-accent-400 ring-2 ring-[var(--admin-frame)]" />
         ) : null}
       </span>
-      <span className={cn("relative min-w-0 flex-1 truncate", compact && "sr-only")}>{item.label}</span>
+      <span className={cn("min-w-0 truncate", compact ? "sr-only" : "relative flex-1")}>{item.label}</span>
       {compact && item.badge ? (
         <span className="sr-only">
           {typeof item.badge === "number" ? formatBadge(item.badge) : item.badge}
