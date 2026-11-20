@@ -157,8 +157,8 @@ export function CandidatesApp({
         </div>
 
         <div className="lg:grid lg:grid-cols-[17.5rem_minmax(0,1fr)] lg:items-start">
-          {/* The column sticks below the slim bar (4rem header + the bar), not just the header. */}
-          <div id="candidate-filter-column" className="lg:sticky lg:top-36 lg:self-start lg:[&>aside]:static lg:[&>aside]:max-h-[calc(100dvh-10rem)]">
+          {/* Every filter is in view, so the column is taller than the screen: it scrolls with the page. */}
+          <div id="candidate-filter-column" className="lg:self-start">
             <FilterColumn
               panelEpoch={epoch}
               filters={view}

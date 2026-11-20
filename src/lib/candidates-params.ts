@@ -20,7 +20,6 @@ import { proChips } from "./candidate-pro-filters.ts";
 import { parseIds } from "./compare-map.ts";
 import { MAX_COMPARE } from "./compare-map.ts";
 import { PRO_PARAMS, firstCity } from "./employer-filter-restore.ts";
-import { languageChipLabel, parseLanguages, serializeLanguages, type LanguageWant } from "./language-filter.ts";
 import { DEFAULT_PAGE_SIZE, dedupeSkills, filterCount, parsePageSize, parseView, type ListView } from "../components/employer/candidate-view.ts";
 
 export type SortKey = "score" | keyof Ratings;
@@ -41,8 +40,6 @@ export type Filters = {
   citySet: boolean;
   minScore: number;
   laptop: string;
-  /** Languages the candidate must speak, each at its least level ("" any). Every one must match. */
-  langs: LanguageWant[];
   /** Plan (price band) - the legacy page's hourly-price filter. */
   plan: BandId | "";
   /** Per-axis AI interview rating floors, out of 10. */
@@ -95,8 +92,6 @@ export const FILTER_KEYS = [
   "city",
   "min",
   "laptop",
-  "lang",
-  "ll",
   "plan",
   "sort",
   "dir",
@@ -116,8 +111,6 @@ export type SearchParams = {
   city?: string | string[];
   min?: string | string[];
   laptop?: string | string[];
-  lang?: string | string[];
-  ll?: string | string[];
   plan?: string | string[];
   sort?: string | string[];
   dir?: string | string[];
@@ -164,7 +157,6 @@ export function readFilters(params: SearchParams): Filters {
     citySet: params.city !== undefined,
     minScore: Number.isFinite(min) && min > 0 ? min : 0,
     laptop: (one(params.laptop) ?? "").trim().toLowerCase(),
-    langs: parseLanguages(one(params.lang), one(params.ll)),
     plan: BANDS.some((b) => b.id === planRaw) ? (planRaw as BandId) : "",
     minRatings: {
       communication: floor(params.r_communication),
@@ -258,7 +250,6 @@ function filterParams(merged: Filters, withKeyword = true): URLSearchParams {
   if (merged.citySet || merged.city) next.set("city", merged.city);
   if (merged.minScore > 0) next.set("min", String(merged.minScore));
   if (merged.laptop) next.set("laptop", merged.laptop);
-  if (merged.langs.length > 0) next.set("lang", serializeLanguages(merged.langs));
   if (merged.plan) next.set("plan", merged.plan);
   for (const meta of RATING_META) {
     const value = merged.minRatings[meta.key];
@@ -318,9 +309,6 @@ export function activeChips(filters: Filters): FilterChip[] {
   // Only "included" is worth a chip: leaving remote candidates out is the plain default, not something to undo.
   if (filters.remote === true) chips.push({ key: "remote", label: "Remote candidates included", href: drop({ remote: false }) });
   if (filters.laptop === "yes") chips.push({ key: "laptop", label: "Has a laptop", href: drop({ laptop: "" }) });
-  for (const want of filters.langs) {
-    chips.push({ key: `lang:${want.language}`, label: languageChipLabel(want.language, want.level), href: drop({ langs: filters.langs.filter((w) => w !== want) }) });
-  }
   const band = BANDS.find((b) => b.id === filters.plan);
   if (band) chips.push({ key: "plan", label: `Band: ${PLAN_NAME[band.id]}`, href: drop({ plan: "" }) });
   if (filters.minScore > 0) chips.push({ key: "min", label: `Findtern Score ${filters.minScore.toFixed(1)}+`, href: drop({ minScore: 0 }) });

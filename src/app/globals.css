@@ -1889,6 +1889,8 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
 html {
   caret-color: var(--color-primary);
   scrollbar-color: var(--color-ink-300) transparent;
+  /* No rubber-band scroll past the top or bottom of the page (macOS trackpads, iOS). */
+  overscroll-behavior-y: none;
 }
 
 /* Score dial: fill arcs draw in once, CSS only. */

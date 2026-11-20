@@ -34,7 +34,7 @@ export type Ratings = {
 };
 
 export const RATING_META: readonly { key: keyof Ratings; label: string }[] = [
-  { key: "communication", label: "Communication" },
+  { key: "communication", label: "English level" },
   { key: "coding", label: "Coding" },
   { key: "aptitude", label: "Aptitude" },
   { key: "interview", label: "AI interview" },

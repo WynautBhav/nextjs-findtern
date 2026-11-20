@@ -17,7 +17,6 @@ import { FilterSection } from "@/components/employer/candidates/filter-parts";
 import { ProFilterSections, ProLockedCard } from "@/components/employer/candidates/pro-filters";
 import { collegeSortToken } from "@/lib/candidate-sort";
 import { FilterPanel } from "./_filter-form";
-import { LanguageFilterField } from "@/components/employer/candidates/language-filter-field";
 import { activeChips, activeFilterCount, resetHref, type Filters, type ProData } from "@/lib/candidates-params";
 
 const SELECT = cn(fieldClass, "mt-2");
@@ -84,11 +83,8 @@ export function FilterColumn({
   return (
     <aside
       aria-label="Filters"
-      className={cn(
-        "lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-6 lg:shadow-xs",
-        // Still scrollable, but the track only shows on hover or focus, so it does not read as a nested box.
-        "lg:[scrollbar-color:transparent_transparent] lg:[scrollbar-width:thin] lg:hover:[scrollbar-color:var(--color-ink-300)_transparent] lg:focus-within:[scrollbar-color:var(--color-ink-300)_transparent]",
-      )}
+      // Scrolls with the page: no inner scroll area (on a trackpad it kept scrolling after the page had ended).
+      className="lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-6 lg:shadow-xs"
     >
       <FilterPanel key={panelEpoch} cityDefault={cityDefault} raised={compareIds.length > 0} activeCount={activeFilterCount(filters, effectiveSkills, projectCity)} total={total}>
         {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
@@ -135,10 +131,6 @@ export function FilterColumn({
             {RATING_META.map((meta) => (
               <RatingSlider key={meta.key} name={`r_${meta.key}`} label={meta.label} defaultValue={filters.minRatings[meta.key]} />
             ))}
-          </FilterSection>
-
-          <FilterSection title="Languages" count={filters.langs.length}>
-            <LanguageFilterField initial={filters.langs} />
           </FilterSection>
 
           <FilterSection title="Hourly price" count={count.price}>

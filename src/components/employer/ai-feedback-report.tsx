@@ -18,7 +18,7 @@ export interface AiRatings {
 
 /** Labels and order as the legacy profile printed them (ProfileResume ratingEntries). */
 const AXES: { key: keyof AiRatings; label: string; hint: string }[] = [
-  { key: "communication", hint: "How clearly they explain their thinking and answer in conversation.", label: "Communication" },
+  { key: "communication", hint: "How clearly they explain their thinking and answer in conversation.", label: "English level" },
   { key: "coding", hint: "How well they solve and write code in a timed task.", label: "Coding" },
   { key: "aptitude", hint: "Logic and problem solving on structured questions.", label: "Aptitude" },
   { key: "interview", hint: "The AI interviewer's overall rating of the full conversation.", label: "AI interview" },
