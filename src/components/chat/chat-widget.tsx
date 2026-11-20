@@ -9,7 +9,7 @@ import { OPEN_CHAT_EVENT } from "@/lib/chat-events";
 import { cn } from "@/lib/utils";
 import { newTabAttrs } from "@/components/ui/new-tab";
 import { NewTabHint } from "@/components/ui/new-tab-link";
-import { filePickerOpen, isTypingTarget, launcherPlacement, mayAutoShow, watchFilePicker } from "./chat-auto-show";
+import { filePickerOpen, isTypingTarget, launcherLift, launcherPlacement, mayAutoShow, watchFilePicker } from "./chat-auto-show";
 import { Mascot, MASCOT_STAGE_BG } from "./mascot";
 import { PillMascot } from "./pill-owl";
 import { busyState, replyState, SLEEPY_AFTER_MS, TYPING_AFTER_MS, type MascotState } from "./mascot-state";
@@ -354,6 +354,55 @@ export function ChatWidget() {
     }
   }
 
+  const { isForm, inApp, hasBottomNav, headerOnly } = launcherPlacement(pathname);
+
+  // Phones: a page's floating action bar (`[data-floating-bar]`: project publish bar, hire bar, compare tray) never has
+  // the launcher on top of it. The launcher rises to sit just above the bar and shrinks to the owl alone while it does.
+  // The bar's width with the label is assumed while measuring, so shrinking cannot un-overlap it and flip back.
+  const [lift, setLift] = useState(0);
+  const liftRef = useRef(0);
+  useEffect(() => {
+    const set = (n: number) => {
+      if (n === liftRef.current) return;
+      liftRef.current = n;
+      setLift(n);
+    };
+    if (headerOnly || isForm) {
+      set(0);
+      return;
+    }
+    const phone = window.matchMedia("(max-width: 1023.98px)");
+    let raf = 0;
+    const measure = () => {
+      raf = 0;
+      const btn = launcherRef.current;
+      const r = btn?.getBoundingClientRect();
+      if (!phone.matches) return set(0);
+      if (!r || r.width === 0) return; // hidden (panel open, dialog open, keyboard up): keep what we had
+      const bars = Array.from(document.querySelectorAll("[data-floating-bar]")).flatMap((el) => {
+        const b = el.getBoundingClientRect();
+        const shown = b.width > 0 && b.height > 0 && b.bottom > 0 && b.top < window.innerHeight && getComputedStyle(el).visibility !== "hidden";
+        return shown ? [{ left: b.left, right: b.right, top: b.top, bottom: b.bottom }] : [];
+      });
+      const cur = liftRef.current;
+      set(launcherLift({ left: Math.min(r.left, r.right - 136), right: r.right, top: r.top + cur, bottom: r.bottom + cur }, bars));
+    };
+    const queue = () => {
+      if (!raf) raf = window.requestAnimationFrame(measure);
+    };
+    queue();
+    window.addEventListener("scroll", queue, { passive: true });
+    window.addEventListener("resize", queue);
+    const watch = new MutationObserver(queue);
+    watch.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      window.removeEventListener("scroll", queue);
+      window.removeEventListener("resize", queue);
+      watch.disconnect();
+      window.cancelAnimationFrame(raf);
+    };
+  }, [headerOnly, isForm, pathname, open]);
+
   // Do not render marketing/support Findtern chat in the admin workspace
   if (pathname?.startsWith("/admin")) {
     return null;
@@ -371,7 +420,7 @@ export function ChatWidget() {
   // there sat over the password field and the "sign in" link (QA-102), and
   // they carry their own help links, so below lg it stays out of the way.
   // They are not console pages either, so the top-bar placement never applies.
-  const { isForm, inApp, hasBottomNav, headerOnly } = launcherPlacement(pathname);
+
   // The intern and employer consoles have "Ask me" in their top bar on every
   // width, so no launcher floats over their cards on a phone; the panel opens from there
   // (intern onboarding included: see launcherPlacement).
@@ -379,11 +428,13 @@ export function ChatWidget() {
   return (
     <div
       data-chat-root
+      style={lift > 0 ? ({ "--findy-lift": `${lift}px` } as React.CSSProperties) : undefined}
       className={cn(
+        "max-lg:translate-y-[calc(var(--findy-lift,0px)*-1)]",
         "pointer-events-none fixed z-[80] flex flex-col items-end gap-3",
         isForm && "max-lg:hidden",
         typing && !open && "max-lg:hidden",
-        hasBottomNav ? "bottom-20 right-4" : "bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))]",
+        hasBottomNav ? "bottom-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+1rem)] right-4" : "bottom-[max(1.25rem,env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))]",
         inApp ? "lg:bottom-auto lg:right-6 lg:top-[4.5rem]" : "lg:bottom-6 lg:right-6",
       )}
     >
@@ -585,6 +636,7 @@ export function ChatWidget() {
           open && "hidden",
           inApp && "lg:hidden",
           headerOnly && "hidden",
+          lift > 0 && "max-lg:w-12 max-lg:pr-1",
         )}
       >
         <PillMascot
@@ -594,7 +646,7 @@ export function ChatWidget() {
           cue={launcherMood === "bye" ? "bye" : null}
           onCueDone={() => setLauncherMood("idle")}
         />
-        <span className="font-semibold">Ask Findy</span>
+        <span className={cn("font-semibold", lift > 0 && "max-lg:hidden")}>Ask Findy</span>
       </button>
     </div>
   );

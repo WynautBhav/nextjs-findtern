@@ -200,7 +200,7 @@ export function ProjectForm({
           Taken down by Findtern: view only. Nothing here can be saved or published. Use Contact admin above to resolve this.
         </p>
       ) : (
-      <div className="sticky bottom-[calc(9rem+env(safe-area-inset-bottom))] z-20 mt-5 rounded-apple-xl border border-ink-200/80 bg-white px-4 py-3 shadow-tile sm:px-5 lg:bottom-3">
+      <div data-floating-bar className="sticky bottom-[calc(9rem+env(safe-area-inset-bottom))] z-20 mt-5 rounded-apple-xl border border-ink-200/80 bg-white px-4 py-3 shadow-tile sm:px-5 lg:bottom-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p aria-live="polite" className={`flex min-w-0 items-center gap-2 text-sm ${!lockedFields && !missing.length ? "font-medium text-ink-900" : "text-ink-700"}`}>
             {lockedFields ? (

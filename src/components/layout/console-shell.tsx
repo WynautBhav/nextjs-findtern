@@ -409,9 +409,11 @@ export function ConsoleShell({
           className={cn(
             gridLine,
             "flex-1 pt-6 outline-none lg:pt-9",
-            // Clears the floating "Ask me" on phones: it sits above the tab
-            // bar (top edge 136px up) or in the corner (76px) (QA-136).
-            tabs ? "pb-40 lg:pb-24" : "pb-24",
+            // Phones: the last content scrolls clear of the tab bar plus the floating "Ask me" above it (tokens in
+            // globals.css; the launcher sits at tab bar + 1rem), or of a floating action bar (hire bar, compare tray, publish bar) and the launcher lifted above it.
+            tabs
+              ? "pb-[calc(var(--tabbar-h)+env(safe-area-inset-bottom)+var(--findy-clear))] has-[[data-floating-bar]]:max-lg:pb-[calc(var(--floating-bar-clear)+env(safe-area-inset-bottom))] lg:pb-24"
+              : "pb-24",
           )}
         >
           {children}

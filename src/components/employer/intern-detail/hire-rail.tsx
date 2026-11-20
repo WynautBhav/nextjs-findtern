@@ -154,6 +154,7 @@ export function HireBar({ pricing, currency, action, relation, sendHref }: Pick<
     <aside
       aria-label="Hire summary"
       data-hire-bar
+      data-floating-bar
       className="fixed inset-x-4 bottom-[calc(9rem+env(safe-area-inset-bottom))] z-20 mx-auto flex max-w-xl items-center gap-3 rounded-apple-xl border border-ink-200/80 bg-white/95 p-3 shadow-tile backdrop-blur-xl lg:left-[calc(var(--console-rail,0rem)+1rem)] xl:hidden"
     >
       <p className="nums min-w-0 flex-1 text-lg font-semibold leading-tight text-ink-900">

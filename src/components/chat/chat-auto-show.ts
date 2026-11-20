@@ -33,6 +33,26 @@ export function launcherPlacement(pathname: string | null | undefined) {
   };
 }
 
+export type Box = { left: number; right: number; top: number; bottom: number };
+
+/**
+ * How far (px) the launcher must rise from where it rests to sit clear above every floating action bar it would
+ * cover. Bars are the `[data-floating-bar]` elements (a fixed or sticky bar that holds a page's main action).
+ * A bar that overlaps the launcher sideways and is not wholly above it pushes it up to the bar's top edge minus
+ * `gap`; the result is re-checked against the bars above, so a stack of bars is cleared too.
+ */
+export function launcherLift(rest: Box, bars: Box[], gap = 8): number {
+  let lift = 0;
+  for (let pass = 0; pass <= bars.length; pass++) {
+    const top = rest.top - lift;
+    const bottom = rest.bottom - lift;
+    const hit = bars.filter((b) => b.left < rest.right && b.right > rest.left && b.top < bottom + gap && b.bottom > top - gap);
+    if (hit.length === 0) break;
+    lift = Math.max(lift, rest.bottom - Math.min(...hit.map((b) => b.top)) + gap);
+  }
+  return Math.max(0, Math.ceil(lift));
+}
+
 /** A text-like control outside the chat itself has focus. */
 export function isTypingTarget(t: EventTarget | null): boolean {
   return (

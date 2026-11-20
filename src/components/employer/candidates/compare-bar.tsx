@@ -24,6 +24,7 @@ export function CompareBar({
   return (
     <div
       id="compare-bar"
+      data-floating-bar
       role="region"
       aria-label="Compare selection"
       className="rise fixed bottom-24 left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-md -translate-x-1/2 flex-wrap items-center justify-center gap-x-4 gap-y-2 rounded-[28px] bg-ink-900/85 px-5 py-3 text-white shadow-[0_24px_60px_-16px_rgb(4_29_23/0.6)] ring-1 ring-inset ring-white/10 backdrop-blur-xl sm:w-max sm:max-w-[calc(100%-2rem)] sm:rounded-full lg:bottom-6 lg:left-[calc(50%+var(--console-rail,0rem)/2)] lg:max-w-[calc(100%-var(--console-rail,0rem)-4rem)]"

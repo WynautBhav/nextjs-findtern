@@ -125,6 +125,7 @@ export function CandidatesView({
           {compareIds.length >= 1 ? (
             <div
               id="compare-bar"
+              data-floating-bar
               role="region"
               aria-label="Compare selection"
               className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] left-1/2 z-40 flex w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 items-center gap-2 rounded-2xl border border-brand-800 bg-brand-950 py-2 pl-4 pr-2 text-white shadow-[0_12px_32px_-8px_rgb(0_0_0/0.35)] sm:w-max sm:gap-4 sm:py-3 sm:pl-5 sm:pr-3 lg:bottom-6 lg:left-[calc(50%+var(--console-rail,0rem)/2)]"

@@ -1156,6 +1156,15 @@
      never generated at all. Nothing to suppress here. */
 }
 
+/* Phone bottom clearances, shared by the console shells' page padding and the chat launcher so they cannot drift:
+   the tab bar, the launcher (48px pill) and the gaps around it, and how far a page's floating action bar reaches
+   up from the bottom edge (the 9rem offset plus the bar itself) so the last content scrolls clear of either. */
+:root {
+  --tabbar-h: 4.1rem;
+  --findy-clear: 6rem;
+  --floating-bar-clear: 15rem;
+}
+
 /* The chat launcher steps aside while any dialog or sheet is open, so it never
    sits on top of a modal's own buttons (it is z-80, above the overlays). */
 body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-content"][data-state="open"]) [data-chat-root] {
