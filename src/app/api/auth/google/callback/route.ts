@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { ACCOUNT_DISABLED_REASON } from "@/lib/account-disabled";
+import { onHoldHref } from "@/lib/account-hold";
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { exchangeCode, fetchProfile, googleConfig, googleLoginEnabled, NONCE_COOKIE, safeNext } from "@/lib/google";
@@ -13,6 +14,12 @@ import { attachOtpProof, type SignupOtpSubject } from "@/lib/signup-otp";
 function fail(req: Request, path: string, code: string) {
   const to = new URL(path, req.url);
   // A switched-off account is shown the shared "contact admin" banner (login page ?reason=disabled), not an oauth error.
+  // A frozen account goes to the on-hold page (Google proved who they are, so naming the hold leaks nothing).
+  if (code === "on_hold") {
+    const hold = NextResponse.redirect(new URL(onHoldHref(path.includes("as=employer") ? "employer" : "intern"), req.url));
+    hold.cookies.delete({ name: NONCE_COOKIE, path: "/" });
+    return hold;
+  }
   if (code === "inactive") to.searchParams.set("reason", ACCOUNT_DISABLED_REASON);
   else to.searchParams.set("oauthError", code);
   const res = NextResponse.redirect(to);
@@ -93,6 +100,7 @@ export async function GET(req: Request) {
       return res;
     }
     if (!employer.isActive) return fail(req, "/login?as=employer", "inactive");
+    if (employer.frozenAt) return fail(req, "/login?as=employer", "on_hold");
     // Google has verified the address, so a later password login is not stuck
     // on "verify your email".
     if (!employer.emailVerified) {
@@ -133,6 +141,7 @@ export async function GET(req: Request) {
     return res;
   }
   if (!user.isActive) return fail(req, "/login?as=intern", "inactive");
+  if (user.frozenAt) return fail(req, "/login?as=intern", "on_hold");
   // Google has verified the address, so an account stuck on "verify your email" is unblocked.
   if (!user.emailVerified) {
     await db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.id, user.id));

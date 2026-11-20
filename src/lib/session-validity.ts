@@ -18,6 +18,8 @@ export interface SessionChecks {
   isRevoked(sid: string): Promise<boolean>;
   isActive(role: string, uid: string): Promise<boolean>;
   isPasswordCurrent(role: string, uid: string, pv: string | undefined): Promise<boolean>;
+  /** The account is frozen by an admin (on hold). Optional so a caller with no hold concept keeps working. */
+  isHeld?(role: string, uid: string): Promise<boolean>;
   /** An admin's permissions: null = admin removed, undefined = lookup failed (both refuse the session). */
   adminPermissions(uid: string): Promise<string[] | null | undefined>;
 }
@@ -27,7 +29,7 @@ export interface SessionChecks {
  * revoked, password current): its holder has proven who they are, so telling them the account was switched off leaks
  * nothing. Everything else is plain "signed out".
  */
-export type SessionVerdict = { session: SessionData } | { session: null; denied: "signed_out" | "disabled" };
+export type SessionVerdict = { session: SessionData } | { session: null; denied: "signed_out" | "disabled" | "held" };
 
 export async function validateSession(session: SessionData, checks: SessionChecks): Promise<SessionData | null> {
   return (await sessionVerdict(session, checks)).session;
@@ -35,21 +37,25 @@ export async function validateSession(session: SessionData, checks: SessionCheck
 
 export async function sessionVerdict(session: SessionData, checks: SessionChecks): Promise<SessionVerdict> {
   const wantsPermissions = session.role === "admin" && !session.impersonator;
-  let results: [boolean, boolean, boolean, string[] | null | undefined];
+  let results: [boolean, boolean, boolean, string[] | null | undefined, boolean];
   try {
     results = await Promise.all([
       checks.isRevoked(session.sid),
       checks.isActive(session.role, session.uid),
       checks.isPasswordCurrent(session.role, session.uid, session.pv),
       wantsPermissions ? checks.adminPermissions(session.uid) : Promise.resolve(undefined),
+      checks.isHeld ? checks.isHeld(session.role, session.uid) : Promise.resolve(false),
     ]);
   } catch (err) {
     console.error("[session] validity check failed; treating the request as signed out:", err instanceof Error ? err.message : err);
     return { session: null, denied: "signed_out" };
   }
-  const [revoked, active, passwordCurrent, perms] = results;
+  const [revoked, active, passwordCurrent, perms, held] = results;
   if (revoked || !passwordCurrent) return { session: null, denied: "signed_out" };
   if (!active) return { session: null, denied: "disabled" };
+  // Frozen: same proof of identity as "disabled" (signed, not revoked, password current), so telling them leaks nothing.
+  // An admin's "View as" session is exempt so staff can still look at a frozen account while deciding.
+  if (held && !session.impersonator) return { session: null, denied: "held" };
   if (wantsPermissions) {
     if (!perms) return { session: null, denied: "signed_out" }; // admin removed (null) or permission lookup failed (undefined)
     return { session: { ...session, permissions: perms } };

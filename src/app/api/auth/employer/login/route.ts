@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { accountDisabledBody } from "@/lib/account-disabled";
+import { accountOnHoldBody } from "@/lib/account-hold";
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { verifyPasswordOrDummy, needsRehash, hashPassword } from "@/lib/security/password";
@@ -40,6 +41,10 @@ export async function POST(req: Request) {
 
   if (!employer.isActive) {
     return NextResponse.json(accountDisabledBody(), { status: 403 });
+  }
+  // Frozen by an admin: same proof-first order as "disabled" (the password was verified above), no session is issued.
+  if (employer.frozenAt) {
+    return NextResponse.json(accountOnHoldBody(), { status: 403 });
   }
 
   let storedPassword = employer.password;

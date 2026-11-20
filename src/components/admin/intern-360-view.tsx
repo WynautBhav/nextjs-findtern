@@ -67,6 +67,8 @@ export type Intern360Props = {
   profileComplete: boolean;
   /** Pill buttons beside the title (Edit contact). */
   actions?: React.ReactNode;
+  /** The Account standing panel (strikes, freeze); omitted when it could not be loaded. */
+  standing?: React.ReactNode;
   /** The "View as candidate" tile, shown with the card's quick actions. */
   viewAs?: React.ReactNode;
   /** Review, visibility and account controls; each shows read-only when absent. */
@@ -88,6 +90,7 @@ const PROPOSAL_STATUSES = ["sent", "interview_scheduled", "accepted", "hired", "
 
 export function Intern360View({
   actions,
+  standing,
   viewAs,
   controls,
   activities,
@@ -254,6 +257,8 @@ export function Intern360View({
           active={tab}
           onSelect={(key) => setTab(key as TabKey)}
         />
+
+        {standing}
 
         {/* Four figures; two across until the column is wide enough for four. */}
         <div className="grid grid-cols-2 gap-[var(--admin-gap)] @2xl:grid-cols-4 [&_.leading-none]:text-[1.75rem]">

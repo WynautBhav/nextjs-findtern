@@ -26,6 +26,9 @@ export const users = pgTable("users", {
   bannedAt: timestamp("banned_at"),
   banReason: text("ban_reason"),
   bannedBy: varchar("banned_by"),
+  // Account standing (migration 0046): set while an admin has the account on hold. Nothing is deleted; see lib/moderation/strikes.ts.
+  frozenAt: timestamp("frozen_at"),
+  frozenReason: text("frozen_reason"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   usersCountryPhoneUnique: uniqueIndex("users_country_phone_unique").on(t.countryCode, t.phoneNumber),
@@ -105,6 +108,9 @@ export const employers = pgTable("employers", {
   setupCompleted: boolean("setup_completed").notNull().default(false),
   onboardingCompleted: boolean("onboarding_completed").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
+  // Account standing (migration 0046), as on users.
+  frozenAt: timestamp("frozen_at"),
+  frozenReason: text("frozen_reason"),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => ({
   employersCountryPhoneUnique: uniqueIndex("employers_country_phone_unique").on(t.countryCode, t.phoneNumber),
@@ -1288,3 +1294,4 @@ export * from "./schema-messaging.ts";
 export * from "./schema-listings.ts";
 export * from "./schema-roster-imports.ts";
 export * from "./schema-leave-requests.ts";
+export * from "./schema-strikes.ts";

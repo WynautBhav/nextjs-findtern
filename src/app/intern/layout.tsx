@@ -20,6 +20,8 @@ import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
 import { PresenceHeartbeat } from "@/components/app/presence-heartbeat";
 import { TermsGate } from "@/components/app/terms-gate";
+import { WarningGate } from "@/components/app/warning-gate";
+import { pendingWarningFor } from "@/lib/moderation/standing-db";
 import { ToastProvider } from "@/components/app/toast";
 import { CollegeLive } from "@/components/intern/college-live";
 import { DismissedGuard } from "@/components/dismissed-guard";
@@ -109,6 +111,9 @@ const PRECOMPLETE_STAGE_NAV: ConsoleNavItem[] = [
 export default async function InternLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session || session.role !== "intern") redirect(await loginRedirectFor("intern"));
+
+  // A first confirmed violation is a warning the person must acknowledge: a blocking notice until they do. A failed read shows nothing (never traps anyone); an admin viewing as them is not shown it.
+  const pendingWarning = session.impersonator ? false : Boolean(await pendingWarningFor({ type: "intern", id: session.uid }).catch(() => null));
 
   // Independent reads, in parallel. loadInternData is cache()d, so the page's own call reuses this one.
   // The live drive rides along (found from the student's id, not from the membership row), so the layout is one wave.
@@ -209,6 +214,7 @@ export default async function InternLayout({ children }: { children: React.React
       {lockedNav ? null : <PresenceHeartbeat />}
       {session.impersonator ? null : <AccountGuard role="intern" />}
       {children}
+      {pendingWarning ? <WarningGate /> : null}
       <TermsGate role="intern" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>
     </ToastProvider>

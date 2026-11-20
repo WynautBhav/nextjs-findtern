@@ -87,7 +87,13 @@ async function loadStatus(role: string, uid: string, key: string): Promise<Statu
  * Cost: one indexed primary-key read per request, run inside validateSession's Promise.all (no extra round trip),
  * and shared by every getSession() call of that request (see getSessionState).
  */
-export type SessionFacts = { revoked: boolean; active: boolean; pv: string | null };
+export type SessionFacts = {
+  revoked: boolean;
+  active: boolean;
+  pv: string | null;
+  /** An admin has frozen the account (account_strikes policy). Always false for admins and college officers. Read fresh, so a freeze stops existing sessions at their next request. */
+  held: boolean;
+};
 
 export async function loadSessionFacts(role: string, uid: string, sid: string | undefined): Promise<SessionFacts> {
   const revoked = sid
@@ -96,7 +102,7 @@ export async function loadSessionFacts(role: string, uid: string, sid: string | 
   const db = getDb();
   if (role === "admin") {
     const [row] = await db.select({ password: schema.admins.password, revoked }).from(schema.admins).where(eq(schema.admins.id, uid)).limit(1);
-    return { revoked: Boolean(row?.revoked), active: Boolean(row), pv: row ? passwordVersion(row.password) : null };
+    return { revoked: Boolean(row?.revoked), active: Boolean(row), pv: row ? passwordVersion(row.password) : null, held: false };
   }
   if (role === "college") {
     // A placement officer is locked out when either they or their college is switched off.
@@ -106,11 +112,11 @@ export async function loadSessionFacts(role: string, uid: string, sid: string | 
       .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeAdmins.collegeId))
       .where(eq(schema.collegeAdmins.id, uid))
       .limit(1);
-    return { revoked: Boolean(row?.revoked), active: Boolean(row?.admin && row?.college), pv: row ? passwordVersion(row.password) : null };
+    return { revoked: Boolean(row?.revoked), active: Boolean(row?.admin && row?.college), pv: row ? passwordVersion(row.password) : null, held: false };
   }
   const table = role === "intern" ? schema.users : schema.employers;
-  const [row] = await db.select({ isActive: table.isActive, password: table.password, revoked }).from(table).where(eq(table.id, uid)).limit(1);
-  return { revoked: Boolean(row?.revoked), active: Boolean(row?.isActive), pv: row ? passwordVersion(row.password) : null };
+  const [row] = await db.select({ isActive: table.isActive, password: table.password, frozenAt: table.frozenAt, revoked }).from(table).where(eq(table.id, uid)).limit(1);
+  return { revoked: Boolean(row?.revoked), active: Boolean(row?.isActive), pv: row ? passwordVersion(row.password) : null, held: Boolean(row?.frozenAt) };
 }
 
 /**

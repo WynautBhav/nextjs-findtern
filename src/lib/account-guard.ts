@@ -1,4 +1,5 @@
 import { ACCOUNT_DISABLED_CODE } from "./account-disabled.ts";
+import { ACCOUNT_ON_HOLD_CODE } from "./account-hold.ts";
 
 /**
  * Pure rules for the open-tab watcher (components/app/account-guard.tsx): when a tab should ask the server whether its
@@ -23,12 +24,13 @@ export function shouldPoll(o: { now: number; lastClaim: number | null; visible: 
   return o.lastClaim === null || o.now - o.lastClaim >= SHARE_MS || o.lastClaim > o.now;
 }
 
-export type StatusVerdict = "ok" | "disabled" | "unknown";
+export type StatusVerdict = "ok" | "disabled" | "held" | "unknown";
 
-/** 200 = fine; 403 with the machine code = disabled; anything else (401, 5xx, network) = do nothing. */
+/** 200 = fine; 403 with the machine code = disabled (or on hold, an admin froze it); anything else (401, 5xx, network) = do nothing. */
 export function statusVerdict(status: number, body: unknown): StatusVerdict {
   if (status >= 200 && status < 300) return "ok";
   if (status === 403 && typeof body === "object" && body !== null && (body as { code?: unknown }).code === ACCOUNT_DISABLED_CODE) return "disabled";
+  if (status === 403 && typeof body === "object" && body !== null && (body as { code?: unknown }).code === ACCOUNT_ON_HOLD_CODE) return "held";
   return "unknown";
 }
 

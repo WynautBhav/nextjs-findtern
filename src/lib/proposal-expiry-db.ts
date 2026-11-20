@@ -241,6 +241,8 @@ export async function sweepProposalExpiry(now: Date = new Date()): Promise<Expir
     console.error("[interview-expiry] sweep failed", err);
     return { expired: 0, ids: [], notified: 0 } satisfies InterviewSweep;
   });
+  // D3: offers on hold for 14 days lapse. Failure here never fails the sweeps above (they have committed).
+  await import("@/lib/moderation/hold-expiry-db").then((m) => m.expireHeldOffers(now)).catch((err) => console.error("[hold-expiry] sweep failed", err));
   return { ...unpaid, noReply, interviews };
 }
 

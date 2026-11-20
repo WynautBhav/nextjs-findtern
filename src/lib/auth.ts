@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { currentAdminPermissions, loadSessionFacts, passwordVersionCurrent } from "@/lib/account-status";
 import { accountDisabledBody, disabledLoginHref, SESSION_EXPIRED_CODE } from "@/lib/account-disabled";
+import { accountOnHoldBody, onHoldHref } from "@/lib/account-hold";
 import { NextResponse } from "next/server";
 import { sessionVerdict } from "@/lib/session-validity";
 
@@ -17,8 +18,11 @@ import {
   type SessionData,
 } from "@/lib/security/session";
 
-/** The session behind this request's cookie, or why there is none. `disabled`: valid session, account switched off. */
-export type SessionState = { session: SessionData; disabled: false } | { session: null; disabled: boolean };
+/**
+ * The session behind this request's cookie, or why there is none. `disabled`: valid session, account switched off.
+ * `held`: valid session, account frozen by an admin (on hold).
+ */
+export type SessionState = { session: SessionData; disabled: false; held: false } | { session: null; disabled: boolean; held: boolean };
 
 /**
  * One validity check per request, however many layouts, pages and guards ask (React's per-request cache). The check
@@ -29,7 +33,7 @@ export const getSessionState = cache(async (): Promise<SessionState> => readStat
 
 async function readState(raw: string | undefined): Promise<SessionState> {
   const session = readSession(raw);
-  if (!session) return { session: null, disabled: false };
+  if (!session) return { session: null, disabled: false, held: false };
   // One read, shared by the three per-account checks, so they cost one round trip together.
   let facts: ReturnType<typeof loadSessionFacts> | undefined;
   const read = () => (facts ??= loadSessionFacts(session.role, session.uid, session.sid));
@@ -37,9 +41,10 @@ async function readState(raw: string | undefined): Promise<SessionState> {
     isRevoked: async () => (await read()).revoked,
     isActive: async () => (await read()).active,
     isPasswordCurrent: async () => passwordVersionCurrent(session.role, session.pv, (await read()).pv),
+    isHeld: async () => (await read()).held,
     adminPermissions: currentAdminPermissions,
   });
-  return verdict.session ? { session: verdict.session, disabled: false } : { session: null, disabled: verdict.denied === "disabled" };
+  return verdict.session ? { session: verdict.session, disabled: false, held: false } : { session: null, disabled: verdict.denied === "disabled", held: verdict.denied === "held" };
 }
 
 /**
@@ -55,13 +60,17 @@ export async function getSession(): Promise<SessionData | null> {
  * response goes through here so a deactivated account is refused the same way everywhere.
  */
 export async function unauthenticatedResponse(error = "Unauthenticated"): Promise<NextResponse> {
-  if ((await getSessionState()).disabled) return NextResponse.json(accountDisabledBody(), { status: 403 });
+  const state = await getSessionState();
+  if (state.disabled) return NextResponse.json(accountDisabledBody(), { status: 403 });
+  if (state.held) return NextResponse.json(accountOnHoldBody(), { status: 403 });
   return NextResponse.json({ error, code: SESSION_EXPIRED_CODE }, { status: 401 });
 }
 
-/** A role's sign-in page for a signed-out redirect; flagged ?reason=disabled when the account was switched off. */
+/** A role's sign-in page for a signed-out redirect; flagged ?reason=disabled when the account was switched off, and the on-hold page when an admin froze it. */
 export async function loginRedirectFor(role: "intern" | "employer" | "college"): Promise<string> {
-  return (await getSessionState()).disabled ? disabledLoginHref(role) : `/login?as=${role}`;
+  const state = await getSessionState();
+  if (state.held) return onHoldHref(role);
+  return state.disabled ? disabledLoginHref(role) : `/login?as=${role}`;
 }
 
 /**

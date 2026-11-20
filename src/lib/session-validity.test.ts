@@ -111,3 +111,27 @@ test("one shared facts read still means one round trip: the three checks resolve
   assert.equal(reads, 1);
   assert.ok(Date.now() - t0 < 40, "checks must not run one after another");
 });
+
+test("a frozen (on hold) account: the session is rejected at the next request with denied=held, not signed_out", async () => {
+  const frozen = checks({ isHeld: async () => true });
+  assert.equal(await validateSession(session, frozen), null);
+  assert.deepEqual(await sessionVerdict(session, frozen), { session: null, denied: "held" });
+});
+
+test("unfreezing restores the same session (nothing was revoked)", async () => {
+  let held = true;
+  const c = checks({ isHeld: async () => held });
+  assert.equal(await validateSession(session, c), null);
+  held = false;
+  assert.equal(await validateSession(session, c), session);
+});
+
+test("an admin's View-as session on a frozen account is not blocked; a revoked one still is", async () => {
+  const viewAs = { ...session, impersonator: { uid: "a1", email: "admin@findtern.in" } } as typeof session;
+  assert.equal(await validateSession(viewAs, checks({ isHeld: async () => true })), viewAs);
+  assert.equal(await validateSession(viewAs, checks({ isHeld: async () => true, isRevoked: async () => true })), null);
+});
+
+test("held beats nothing: disabled still reports disabled first", async () => {
+  assert.deepEqual(await sessionVerdict(session, checks({ isActive: async () => false, isHeld: async () => true })), { session: null, denied: "disabled" });
+});

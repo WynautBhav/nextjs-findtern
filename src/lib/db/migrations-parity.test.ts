@@ -215,7 +215,15 @@ describe("migration numbering and schema exports", () => {
     assert.deepEqual(dups, [7]);
     assert.equal(counts.get(7), 2);
     const uniq = [...counts.keys()].sort((a, b) => a - b);
-    uniq.forEach((n, i) => assert.equal(n, i, `gap before ${n}`));
+    // 0043-0045 are reserved by in-flight work (meetings, transcripts) that lands in its own order; scripts/migrate.ts applies
+    // drizzle/*.sql by filename and records each name, so a number that is not there yet is not an error. Remove once they land.
+    const RESERVED = new Set([43, 44, 45]);
+    let want = 0;
+    for (const n of uniq) {
+      while (RESERVED.has(want) && want !== n) want++;
+      assert.equal(n, want, `gap before ${n}`);
+      want++;
+    }
   });
 
   it("re-exports every schema-*.ts from schema.ts", () => {

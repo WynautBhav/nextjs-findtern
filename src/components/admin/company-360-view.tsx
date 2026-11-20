@@ -57,6 +57,7 @@ export function Company360View({
   interns,
   ledger,
   actions,
+  standing,
   canWrite,
   viewAs,
   activities,
@@ -72,6 +73,8 @@ export function Company360View({
   ledger: CompanyLedger;
   /** Pill buttons beside the title (Edit contact). */
   actions?: React.ReactNode;
+  /** The Account standing panel (strikes, freeze); omitted when it could not be loaded. */
+  standing?: React.ReactNode;
   /** Without it the account switches and Delete are shown as plain text or left out. */
   canWrite: boolean;
   /** The "View as company" tile, shown with the card's quick actions. */
@@ -191,6 +194,8 @@ export function Company360View({
             href: `${base}${toQueryString({ tab: t.key === "profile" ? "" : t.key })}`,
           }))}
         />
+
+        {standing}
 
         {/* Four figures; two across until the column is wide enough for four. */}
         <div className="grid grid-cols-2 gap-[var(--admin-gap)] @2xl:grid-cols-4 [&_.leading-none]:text-[1.75rem]">

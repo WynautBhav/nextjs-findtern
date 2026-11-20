@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSessionState } from "@/lib/auth";
+import { accountOnHoldBody } from "@/lib/account-hold";
 import { accountDisabledBody, SESSION_EXPIRED_CODE } from "@/lib/account-disabled";
 import { canAccess } from "@/lib/security/guards";
 import { verify, replayGuard, TokenError } from "@/lib/security/sign";
@@ -60,6 +61,7 @@ export async function GET(req: Request, ctx: { params: Promise<{ key: string }> 
   const session = state.session;
   if (!session) {
     if (state.disabled) return NextResponse.json(accountDisabledBody(), { status: 403, headers: noStore });
+    if (state.held) return NextResponse.json(accountOnHoldBody(), { status: 403, headers: noStore });
     return NextResponse.json({ error: "Sign in to view this document", code: SESSION_EXPIRED_CODE }, { status: 401, headers: noStore });
   }
   if (!canAccess(session, payload.s)) {

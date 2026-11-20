@@ -34,6 +34,7 @@ const ALLOWED: Record<string, string> = {
   "notifications/prefs/route.ts": "the user's own notification preferences",
   "notifications/read-all/route.ts": "marks the user's own notifications read",
   "presence/heartbeat/route.ts": "presence ping; not project data",
+  "account/acknowledge-warning/route.ts": "records the user's own warning acknowledgement; not project data",
   "terms/accept/route.ts": "accepts the platform terms; not project data",
   "uploads/route.ts": "file upload session; attaches to nothing until a guarded route references the file",
   "employer/[id]/subscription/order/route.ts": "employer-level, not project-scoped: buys the employer's own subscription (no project, no proposal)",

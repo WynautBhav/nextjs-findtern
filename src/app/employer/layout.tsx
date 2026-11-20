@@ -22,6 +22,8 @@ import { RAIL_COOKIE } from "@/lib/rail";
 import { ViewAsBanner } from "@/components/admin/view-as-banner";
 import { PresenceHeartbeat } from "@/components/app/presence-heartbeat";
 import { TermsGate } from "@/components/app/terms-gate";
+import { WarningGate } from "@/components/app/warning-gate";
+import { pendingWarningFor } from "@/lib/moderation/standing-db";
 import { ToastProvider } from "@/components/app/toast";
 import { getSession, loginRedirectFor } from "@/lib/auth";
 import { AccountGuard } from "@/components/app/account-guard";
@@ -70,6 +72,9 @@ const NAV_GROUPS: ConsoleNavGroup[] = [
 export default async function EmployerLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session || session.role !== "employer") redirect(await loginRedirectFor("employer"));
+
+  // A first confirmed violation is a warning the person must acknowledge: a blocking notice until they do. A failed read shows nothing (never traps anyone); an admin viewing as them is not shown it.
+  const pendingWarning = session.impersonator ? false : Boolean(await pendingWarningFor({ type: "employer", id: session.uid }).catch(() => null));
 
   let companyName = "Company Account";
   let unreadAlerts = 0;
@@ -172,6 +177,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
       <PresenceHeartbeat />
       {session.impersonator ? null : <AccountGuard role="employer" />}
       {children}
+      {pendingWarning ? <WarningGate /> : null}
       <TermsGate role="employer" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>
     </ToastProvider>

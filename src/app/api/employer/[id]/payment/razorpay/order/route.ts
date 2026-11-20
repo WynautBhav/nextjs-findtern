@@ -1,3 +1,4 @@
+import { heldProposalIds, ON_HOLD_REFUSAL } from "@/lib/moderation/hold";
 import { randomUUID } from "node:crypto";
 
 import { and, eq, gte, inArray, isNotNull } from "drizzle-orm";
@@ -175,6 +176,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .limit(1);
     if (down[0]) return NextResponse.json({ error: TAKEDOWN_BLOCKS.pay, code: "listing_taken_down" }, { status: 409 });
   }
+  // A new hire on an offer that is on hold (the intern's account is frozen) waits; a due month of a running hire keeps going.
+  if (hireIds.length > 0 && (await heldProposalIds(getDb(), hireIds)).size > 0) return NextResponse.json(ON_HOLD_REFUSAL, { status: 409 });
   // Never re-price a repeat submit as the next month: refuse when the month asked for is not the one due.
   if (paymentIndexMismatch(paying, parsed.data.paymentIndex)) {
     return NextResponse.json({ error: "This month is already paid. Refresh the page to see it under Orders." }, { status: 409 });

@@ -79,10 +79,11 @@ export function heldElsewhereSql(employerId: string, now: Date = new Date()): SQ
   const startDay = sql`make_date(left(${sd}, 4)::int, substr(${sd}, 6, 2)::int, 1) + (substr(${sd}, 9, 2)::int - 1)`;
   // Running: full-time, or no real start day, or today is before start + months. Nested CASEs: AND does not order evaluation, and the casts must not run on a bad value.
   const running = sql`(jsonb_typeof(hp.offer_details->'fullTimeOffer') = 'object' OR CASE WHEN ${realDay} THEN (CASE WHEN date_trunc('month', ${startDay}) = make_date(left(${sd}, 4)::int, substr(${sd}, 6, 2)::int, 1) THEN (${startDay} + ${months} * interval '1 month')::date > ${today}::date ELSE true END) ELSE true END)`;
-  return sql`EXISTS (SELECT 1 FROM proposals hp WHERE hp.intern_id = ${users.id} AND hp.employer_id <> ${employerId} AND (
+  // A frozen intern (account on hold, lib/moderation) is hidden from every employer through this same shared condition.
+  return sql`(${users.frozenAt} IS NOT NULL OR EXISTS (SELECT 1 FROM proposals hp WHERE hp.intern_id = ${users.id} AND hp.employer_id <> ${employerId} AND (
     (hp.hired_at IS NULL AND hp.status = 'processing')
     OR (hp.hired_at IS NULL AND hp.status = 'accepted' AND NOT (${looseDay} AND left(${sd}, 10) <= ${today}))
-    OR ((hp.status = 'hired' OR hp.hired_at IS NOT NULL) AND hp.ended_at IS NULL AND ${running})))`;
+    OR ((hp.status = 'hired' OR hp.hired_at IS NOT NULL) AND hp.ended_at IS NULL AND ${running}))))`;
 }
 
 /** Of `internIds`, the ones this employer has really hired (same rule as `notHiredByEmployerSql`). */

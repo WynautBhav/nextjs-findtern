@@ -6,6 +6,8 @@ import { ContactEditor } from "@/components/admin/contact-editor";
 import { ViewAsButton } from "@/components/admin/view-as-button";
 import { AdminLoadError, Panel } from "@/components/admin/panel";
 import { Company360View, type Company360Tab } from "@/components/admin/company-360-view";
+import { AccountStandingPanel } from "@/components/admin/account-standing-panel";
+import { loadStanding } from "@/lib/moderation/standing-db";
 import { getSession } from "@/lib/auth";
 import { canWrite } from "@/lib/admin/permissions";
 import { canViewAs } from "@/lib/admin/impersonation";
@@ -105,8 +107,27 @@ export default async function AdminCompanyDetailPage({
   );
   const ledger = companyLedger(data.proposals, data.payments, (internId) => scores.get(internId) ?? 0, await getPerHireFeeSetting());
 
+  const standing = await loadStanding({ type: "employer", id }).catch((error) => {
+    console.error("[admin/companies/[id]] standing failed", error);
+    return null;
+  });
+
   return (
     <Company360View
+      standing={
+        standing ? (
+          <AccountStandingPanel
+            subjectType="employer"
+            subjectId={data.company.id}
+            violations={standing.standing.violations}
+            frozen={standing.standing.frozen}
+            frozenAt={standing.frozenAt?.toISOString() ?? null}
+            pendingWarning={standing.standing.pendingWarning}
+            history={standing.history.map((h) => ({ id: h.id, kind: h.kind, reason: h.reason, evidenceNote: h.evidenceNote, adminName: h.adminName, acknowledgedAt: h.acknowledgedAt?.toISOString() ?? null, createdAt: h.createdAt.toISOString() }))}
+            canWrite={mayWrite}
+          />
+        ) : null
+      }
       tab={tab}
       params={query}
       company={data.company}

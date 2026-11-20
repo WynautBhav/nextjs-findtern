@@ -202,6 +202,7 @@ export async function openProjects(limit = 60, opts: { strict?: boolean } = {}) 
         inArray(schema.projects.status, [...INTERN_VISIBLE_STATUSES]),
         isNull(schema.projects.takenDownAt),
         eq(schema.employers.isActive, true),
+        isNull(schema.employers.frozenAt), // on hold: live projects stop showing to candidates
         realEmployers(),
       ),
     )
@@ -248,7 +249,7 @@ export async function projectById(id: string, opts: { strict?: boolean; anyStatu
     .where(
       opts.anyStatus
         ? eq(schema.projects.id, id)
-        : and(eq(schema.projects.id, id), eq(schema.employers.isActive, true), realEmployers()),
+        : and(eq(schema.projects.id, id), eq(schema.employers.isActive, true), isNull(schema.employers.frozenAt), realEmployers()),
     )
     .limit(1);
     if (!row) return null;

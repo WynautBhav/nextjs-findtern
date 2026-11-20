@@ -23,6 +23,7 @@ import { internLockResponse } from "@/lib/intern-unlock";
 import { expiredStamp, withdrawRefusal } from "@/lib/proposal-expiry";
 import { isHiredProposal } from "@/lib/hire-status";
 import { ALREADY_LINED_UP, rowHoldsIntern } from "@/lib/candidate-hold";
+import { heldProposalIds, ON_HOLD_REFUSAL } from "@/lib/moderation/hold";
 
 /**
  * Which role may set which status.
@@ -109,6 +110,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     (session.role === "employer" && proposal.employerId === session.uid) ||
     (session.role === "intern" && proposal.internId === session.uid);
   if (!ownsIt) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  // On hold (either side's account is frozen): paused, not withdrawn. Neutral; the other side learns nothing more.
+  if (status === "accepted" && (await heldProposalIds(db, [id])).has(id)) {
+    return NextResponse.json(ON_HOLD_REFUSAL, { status: 409 });
+  }
   if (session.role === "employer") {
     const td = await assertProposalActionable(id, session.uid);
     if (!td.ok) return td.response;

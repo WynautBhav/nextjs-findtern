@@ -10,6 +10,8 @@ import { AccountActiveCell, InternApprovalCell, InternVisibilityCell } from "@/c
 import { Intern360View } from "@/components/admin/intern-360-view";
 import { redactIdentity } from "@/lib/admin/identity-mask";
 import { AdminLoadError, AdminPageHeader } from "@/components/admin/panel";
+import { AccountStandingPanel } from "@/components/admin/account-standing-panel";
+import { loadStanding } from "@/lib/moderation/standing-db";
 import { getSession } from "@/lib/auth";
 import { canViewAs } from "@/lib/admin/impersonation";
 import { ADMIN_SURFACE } from "@/components/admin/surface";
@@ -76,8 +78,27 @@ async function AdminInternDetailImpl({
   const canWrite = allows(session?.permissions, ["interns:write"]);
   const extra = (onboarding?.extraData ?? {}) as Record<string, unknown>;
 
+  const standing = await loadStanding({ type: "intern", id }).catch((err) => {
+    console.error("[admin/interns/[id]] standing failed", err);
+    return null;
+  });
+
   return (
     <Intern360View
+      standing={
+        standing ? (
+          <AccountStandingPanel
+            subjectType="intern"
+            subjectId={user.id}
+            violations={standing.standing.violations}
+            frozen={standing.standing.frozen}
+            frozenAt={standing.frozenAt?.toISOString() ?? null}
+            pendingWarning={standing.standing.pendingWarning}
+            history={standing.history.map((h) => ({ id: h.id, kind: h.kind, reason: h.reason, evidenceNote: h.evidenceNote, adminName: h.adminName, acknowledgedAt: h.acknowledgedAt?.toISOString() ?? null, createdAt: h.createdAt.toISOString() }))}
+            canWrite={canWrite}
+          />
+        ) : null
+      }
       user={user}
       // Aadhaar, PAN and the bank account leave the server as their last four (QA-003).
       onboarding={onboarding ? redactIdentity(onboarding) : null}

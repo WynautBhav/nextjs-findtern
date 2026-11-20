@@ -26,6 +26,7 @@ export async function csrfFetch(
     const body = await res.clone().json().catch(() => null);
     announceTermsRequired(body);
     announceAccountDisabled(body);
+    announceAccountOnHold(body);
   }
   return res;
 }
@@ -44,6 +45,13 @@ export function announceTermsRequired(body: unknown): void {
 export function announceAccountDisabled(body: unknown): void {
   if (typeof window !== "undefined" && (body as { code?: string } | null)?.code === "ACCOUNT_DISABLED") {
     window.dispatchEvent(new CustomEvent("findtern:account-disabled"));
+  }
+}
+
+/** A route refused because an admin froze the account: the AccountGuard in the shell sends the tab to the on-hold page. */
+export function announceAccountOnHold(body: unknown): void {
+  if (typeof window !== "undefined" && (body as { code?: string } | null)?.code === "ACCOUNT_ON_HOLD") {
+    window.dispatchEvent(new CustomEvent("findtern:account-on-hold"));
   }
 }
 
