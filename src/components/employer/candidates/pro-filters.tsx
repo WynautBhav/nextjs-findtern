@@ -27,15 +27,15 @@ export function ProBadge({ className }: { className?: string }) {
 export function ProLockedCard({ offered }: { offered: boolean }) {
   const why = "pro-locked-why";
   return (
-    <section aria-labelledby="pro-locked-title" className="mt-4 rounded-xl bg-brand-50/60 p-3.5 ring-1 ring-inset ring-brand-200/70">
+    <section aria-labelledby="pro-locked-title" className="mt-4 rounded-xl bg-brand-50/60 p-3 ring-1 ring-inset ring-brand-200/70">
       <h3 id="pro-locked-title" className="flex items-center gap-2 text-sm font-semibold text-ink-900">
         <Lock className="size-4 shrink-0 text-brand-700" aria-hidden />
-        Findtern Pro filters
+        Findtern Pro<span className="sr-only"> filters, locked</span>
       </h3>
-      <p id={why} className="mt-1.5 text-xs leading-relaxed text-ink-700">
+      <p id={why} className="mt-1 text-xs leading-snug text-ink-700">
         {offered
-          ? "Shortlist by minimum CGPA, verified CGPA only and college, and sort by college. These controls unlock with Findtern Pro."
-          : "Filtering by CGPA and college is part of Findtern Pro, which is not on sale right now."}
+          ? "Unlocks the CGPA and college filters."
+          : "CGPA and college filters: not on sale right now."}
       </p>
 
       {/* Disabled previews: they show what is behind the lock. They never submit and cannot be focused. */}
