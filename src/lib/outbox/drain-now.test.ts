@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { drainNowIfQueued, shouldDrainNow } from "./drain-now.ts";
+import { drainNowIfQueued, rowsToDrain, shouldDrainNow } from "./drain-now.ts";
 
 test("shouldDrainNow: SCHEDULERS=off and OUTBOX_CRON=off skip; default and other values drain", () => {
   assert.equal(shouldDrainNow({}), true);
@@ -53,4 +53,20 @@ test("drainNowIfQueued: a throwing scheduler (outside a request) is caught", () 
   deps.schedule = () => { throw new Error("outside request scope"); };
   assert.equal(drainNowIfQueued(1, deps), false);
   assert.equal(calls.logs.length, 1);
+});
+
+test("send decision: drains when rows are already queued even if nothing new was queued; not when both are 0; kill switches still win", () => {
+  const run = (newly: number, pending: number, env: Record<string, string | undefined> = {}) => {
+    const { calls, deps } = harness(env);
+    return { started: drainNowIfQueued(rowsToDrain(newly, pending), deps), calls };
+  };
+  assert.equal(run(0, 2).started, true);
+  assert.equal(run(0, 2).calls.drained.length, 1);
+  assert.equal(run(3, 3).started, true);
+  assert.equal(run(2, 0).started, true);
+  assert.equal(run(0, 0).started, false);
+  assert.equal(run(0, 0).calls.scheduled, 0);
+  assert.equal(run(0, 2, { SCHEDULERS: "off" }).started, false);
+  assert.equal(run(0, 2, { OUTBOX_CRON: "off" }).started, false);
+  assert.equal(rowsToDrain(0, 0), 0);
 });

@@ -9,6 +9,11 @@ export function shouldDrainNow(env: Record<string, string | undefined> = process
   return env.SCHEDULERS !== "off" && !outboxCronOff(env);
 }
 
+/** Rows worth a drain: newly queued ones, or ones queued earlier and still waiting (queued before drain-now existed, or after a failed drain). */
+export function rowsToDrain(newlyQueued: number, pending: number): number {
+  return Math.max(newlyQueued, pending, 0);
+}
+
 type Deps = { schedule: (fn: () => Promise<void>) => void; env?: Record<string, string | undefined>; drain?: (o: { budgetMs: number }) => Promise<unknown>; log?: (...a: unknown[]) => void };
 
 /**

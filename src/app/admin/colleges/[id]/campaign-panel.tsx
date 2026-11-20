@@ -44,6 +44,7 @@ export function CampaignPanel({ orderIds, canWrite }: { orderIds: string[]; canW
 
   if (orderIds.length === 0) return null;
   const eligible = data?.eligible ?? 0;
+  const queued = data?.counts.queued ?? 0;
 
   async function send() {
     setBusy(true);
@@ -52,7 +53,8 @@ export function CampaignPanel({ orderIds, canWrite }: { orderIds: string[]; canW
     const j = await r?.json().catch(() => null);
     setBusy(false);
     setConfirm(false);
-    setMsg(r?.ok ? `Queued ${j.queued} email${j.queued === 1 ? "" : "s"}.` : (j?.error ?? "Could not send. Try again."));
+    const n = Math.max(Number(j?.queued) || 0, Number(j?.pending) || 0);
+    setMsg(r?.ok ? (n > 0 ? `Sending ${n} email${n === 1 ? "" : "s"} now.` : "Nothing to send.") : (j?.error ?? "Could not send. Try again."));
     void load();
   }
 
@@ -76,7 +78,7 @@ export function CampaignPanel({ orderIds, canWrite }: { orderIds: string[]; canW
               {orderIds.map((id) => <option key={id} value={id}>Order {id.slice(0, 8)}</option>)}
             </select>
           )}
-          {canWrite && <button type="button" className={buttonClass({})} disabled={busy || eligible === 0} onClick={() => setConfirm(true)}>{eligible ? `Send (${eligible})` : "Send"}</button>}
+          {canWrite && <button type="button" className={buttonClass({})} disabled={busy || (eligible === 0 && queued === 0)} onClick={() => setConfirm(true)}>{eligible > 0 ? `Send (${eligible})` : queued > 0 ? `Send queued (${queued})` : "Send"}</button>}
         </div>
       </div>
       {msg && <p role="status" className="text-sm">{msg}</p>}
@@ -117,7 +119,9 @@ export function CampaignPanel({ orderIds, canWrite }: { orderIds: string[]; canW
           <DialogHeader>
             <DialogTitle>Email codes now?</DialogTitle>
             <DialogDescription>
-              This emails a personal code to {eligible} student{eligible === 1 ? "" : "s"}. Students who were already sent a code are skipped.
+              {eligible > 0
+                ? `This emails a personal code to ${eligible} student${eligible === 1 ? "" : "s"}. Students who were already sent a code are skipped.`
+                : `This sends the ${queued} queued email${queued === 1 ? "" : "s"} now.`}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
