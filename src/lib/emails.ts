@@ -325,6 +325,58 @@ export const emails = {
     cta: ctaTo("Open dashboard", `/${o.forEmployer ? "employer/schedule" : "intern/interviews"}`),
   }),
 
+  /** Phase 1 meetings: one side offered times (or countered) and the other picks. Times arrive pre-formatted for the recipient. */
+  meetingProposed: (o: { name: string; other: string; times: string[]; zone: string; forEmployer: boolean; counter?: boolean; project?: string | null }): EmailContent => ({
+    subject: o.counter ? "New times proposed for your meeting | Findtern" : "Meeting times proposed | Findtern",
+    preheader: `${o.other} ${o.counter ? "proposed other times" : "proposed times"}. Pick one that works.`,
+    heading: o.counter ? "New times for your meeting" : "Pick a time for your meeting",
+    greeting: hi(o.name),
+    lines: [
+      `${o.other} ${o.counter ? "can't do the earlier times and proposed these instead" : "proposed to meet"}${o.project ? ` about ${o.project}` : ""}. Pick one (${o.zone}), or propose other times.`,
+    ],
+    bullets: o.times,
+    status: "Awaiting your reply",
+    cta: ctaTo(o.counter ? "Reply to the new times" : "Pick a time", o.forEmployer ? "/employer/schedule" : "/intern/interviews"),
+  }),
+
+  /** A confirmed meeting. `gateUrl` is Findtern's own /meet/<token> page: the raw Meet link never goes in mail. */
+  meetingConfirmed: (o: { name: string; other: string; when: string; gateUrl: string | null; forEmployer: boolean }): EmailContent => ({
+    subject: "Meeting confirmed | Findtern",
+    preheader: `${o.when} with ${o.other}.`,
+    heading: "Your meeting is confirmed",
+    greeting: hi(o.name),
+    lines: [
+      "Your meeting is booked. A calendar file is attached. Join from Findtern at the time; the link is on the meeting page.",
+      ...(o.gateUrl ? [] : ["Findtern is preparing the meeting link and will email you when it is ready."]),
+    ],
+    facts: [[o.forEmployer ? "Candidate" : "Company", o.other], ["When", o.when]],
+    status: "Confirmed",
+    cta: o.gateUrl ? { label: "Open meeting page", url: o.gateUrl } : ctaTo("Open dashboard", o.forEmployer ? "/employer/schedule" : "/intern/interviews"),
+  }),
+
+  meetingCancelled: (o: { name: string; other: string; when?: string | null; reason: string; byWho: string; forEmployer: boolean }): EmailContent => ({
+    subject: "Meeting cancelled | Findtern",
+    preheader: `${o.byWho} cancelled the meeting.`,
+    heading: "A meeting was cancelled",
+    greeting: hi(o.name),
+    lines: [`${o.byWho} cancelled the meeting with you.`],
+    facts: [[o.forEmployer ? "Candidate" : "Company", o.other], ...(o.when ? ([["Was on", o.when]] as [string, string][]) : []), ["Reason", o.reason]],
+    status: "Cancelled",
+    tone: "alert",
+    cta: ctaTo("Open dashboard", o.forEmployer ? "/employer/schedule" : "/intern/interviews"),
+  }),
+
+  meetingExpired: (o: { name: string; other: string; forEmployer: boolean }): EmailContent => ({
+    subject: "Meeting offer lapsed | Findtern",
+    preheader: "Nobody picked a time in time.",
+    heading: "The meeting offer lapsed",
+    greeting: hi(o.name),
+    lines: [`The times for the meeting with ${o.other} were not answered in time, so the offer lapsed. You can propose new times.`],
+    status: "Lapsed",
+    tone: "wait",
+    cta: ctaTo("Propose new times", o.forEmployer ? "/employer/schedule" : "/intern/interviews"),
+  }),
+
   /** The employer's nudge about a pending or scheduled interview (send-reminder route). `text` is the same line as the in-app note. */
   interviewReminder: (o: { name: string; pending: boolean; text: string; link: string | null }): EmailContent => ({
     subject: "Interview reminder | Findtern",
@@ -332,7 +384,7 @@ export const emails = {
     heading: o.pending ? "Pick your interview slot" : "Your interview is coming up",
     greeting: hi(o.name),
     lines: [o.text],
-    facts: o.link ? [["Meet link", o.link]] : undefined,
+    facts: o.link ? [["Meeting page", o.link]] : undefined,
     cta: ctaTo("Open interviews", "/intern/interviews"),
   }),
 

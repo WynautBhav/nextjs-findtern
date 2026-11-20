@@ -88,3 +88,14 @@ test("interviewExpiredNow is the sweep's predicate: only an open status that rea
   assert.equal(interviewExpiredNow(invite([-60]), NOW), true);
   assert.equal(interviewExpiredNow(invite([-60, 60]), NOW), false);
 });
+
+test("an unpicked offer lapses at its respond-by even while a slot is still ahead (meetings v1)", () => {
+  const now = Date.parse("2026-11-20T06:00:00Z");
+  const iv = { status: "pending", slot1: new Date(now + 10 * 3_600_000), slot2: null, slot3: null, respondBy: new Date(now + 8 * 3_600_000) };
+  assert.equal(interviewLifecycle(iv, now + 7 * 3_600_000).expired, false);
+  assert.equal(interviewLifecycle(iv, now + 9 * 3_600_000).expired, true);
+  // rows from before the migration have no respondBy and keep the old rule
+  assert.equal(interviewLifecycle({ ...iv, respondBy: null }, now + 9 * 3_600_000).expired, false);
+  // a booked meeting is not an offer: respondBy never lapses it
+  assert.equal(interviewLifecycle({ ...iv, status: "scheduled", selectedSlot: 1 }, now + 9 * 3_600_000).expired, false);
+});

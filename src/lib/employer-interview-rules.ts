@@ -20,7 +20,15 @@ type SlotLike = {
   employerJoinedAt?: Date | string | null;
   createdAt?: Date | string | null;
   employerId?: string | null;
+  /** Meetings v1: an unpicked offer lapses here. Absent on rows from before migration 0043. */
+  respondBy?: Date | string | null;
 };
+
+/** An unpicked pending offer whose respond-by has passed: nobody can answer it any more. */
+function respondByPassed(iv: SlotLike, now: number): boolean {
+  const by = toTime(iv.respondBy);
+  return by !== null && by <= now && !iv.selectedSlot && ["pending", "waiting"].includes((iv.status ?? "").toLowerCase());
+}
 
 const OPEN_STATUSES = ["pending", "scheduled", "waiting"];
 
@@ -69,6 +77,7 @@ export function meetingTime(iv: SlotLike): number | null {
  */
 export function isStaleInterview(iv: SlotLike, now: number = Date.now()): boolean {
   if (!OPEN_STATUSES.includes(iv.status ?? "")) return false;
+  if (respondByPassed(iv, now)) return true;
   const times = iv.selectedSlot ? [meetingTime(iv)].filter((t): t is number => t !== null) : slotTimes(iv);
   return times.length > 0 && times.every((t) => t < now);
 }
@@ -114,6 +123,7 @@ export function joinCounts(iv: SlotLike, now: number = Date.now()): boolean {
  */
 export function isBlockingInterview(iv: SlotLike, now: number = Date.now()): boolean {
   if (!OPEN_STATUSES.includes(iv.status ?? "")) return false;
+  if (respondByPassed(iv, now)) return false;
   const end = meetingEndsAt(iv);
   return end !== null && now < end;
 }

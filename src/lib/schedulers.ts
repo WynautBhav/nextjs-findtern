@@ -118,7 +118,8 @@ export async function interviewReminders() {
         type: "interview_reminder",
         title: `Interview in ${left}`,
         message: `Reminder: your interview starts in ${left}.`,
-        data: { interviewId: i.id, hours, meetingLink: i.meetingLink, slotAt: start.toISOString() },
+        // Findtern's own /meet/<token> page, never the raw Meet URL.
+        data: { interviewId: i.id, hours, slotAt: start.toISOString(), ...(i.gateToken ? { link: `/meet/${i.gateToken}` } : {}) },
         dedupeKey,
       });
     }

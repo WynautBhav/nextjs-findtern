@@ -1,0 +1,271 @@
+/**
+ * The meeting-proposal state machine, pure (no database, no `@/` alias, so `node --test` runs it).
+ *
+ * Either side offers 1-3 times; the other side picks one, or counters with up to 3 of its own (round + 1, the
+ * proposer flips, max MAX_ROUNDS). An offer lapses at `respondBy` (earliest slot minus 2 h). Either side may cancel
+ * with a reason. A pick is refused when it overlaps another confirmed meeting of either party (+-30 min).
+ *
+ * Rows from before migration 0043 read as round 1, proposed by the employer, with no respondBy: they behave as today.
+ * Routes translate a successful `step` into one status-guarded UPDATE, so a stale or double click is a 409.
+ */
+
+import { hasDuplicateSlots, hasSlotTooFarAhead } from "../employer-interview-rules.ts";
+import { MEETING_MINUTES } from "../interview-lifecycle.ts";
+
+export type Role = "employer" | "intern";
+export const MAX_SLOTS = 3;
+export const MAX_ROUNDS = 3;
+/** An offer must be answered this long before its earliest slot. */
+export const RESPOND_LEAD_MS = 2 * 60 * 60_000;
+export const MEETING_MS = MEETING_MINUTES * 60_000;
+export const REASON_MIN = 3;
+export const REASON_MAX = 300;
+
+type When = Date | string | null | undefined;
+
+export type MeetingState = {
+  status: string | null;
+  proposedBy?: string | null;
+  round?: number | null;
+  respondBy?: When;
+  slot1: When;
+  slot2: When;
+  slot3: When;
+  selectedSlot?: number | null;
+};
+
+export const otherRole = (r: Role): Role => (r === "employer" ? "intern" : "employer");
+
+const ms = (d: When): number | null => {
+  if (!d) return null;
+  const t = new Date(d).getTime();
+  return Number.isNaN(t) ? null : t;
+};
+
+export const slotsOf = (s: MeetingState): (number | null)[] => [ms(s.slot1), ms(s.slot2), ms(s.slot3)];
+const offered = (s: MeetingState): number[] => slotsOf(s).filter((t): t is number => t !== null);
+export const proposerOf = (s: MeetingState): Role => (s.proposedBy === "intern" ? "intern" : "employer");
+export const roundOf = (s: MeetingState): number => Math.max(1, s.round ?? 1);
+
+/** Start of the booked slot, or null. */
+export function bookedStart(s: MeetingState): number | null {
+  if (!s.selectedSlot || s.selectedSlot < 1 || s.selectedSlot > 3) return null;
+  return slotsOf(s)[s.selectedSlot - 1];
+}
+
+/** earliest slot - 2 h; when that is already past, the offer holds until the earliest slot starts. */
+export function respondByFor(slots: Date[], now: number = Date.now()): Date {
+  const earliest = Math.min(...slots.map((d) => d.getTime()));
+  const lead = earliest - RESPOND_LEAD_MS;
+  return new Date(lead > now ? lead : earliest);
+}
+
+export type Refusal = { ok: false; code: string; error: string };
+const refuse = (code: string, error: string): Refusal => ({ ok: false, code, error });
+
+/** What an offer of `slots` (UTC instants) must satisfy. Slots on the quarter hour, future, within a year, distinct, 1-3. */
+export function checkOffer(slots: Date[], now: number = Date.now()): { ok: true; slots: Date[]; respondBy: Date } | Refusal {
+  if (slots.length < 1) return refuse("no_slots", "Offer at least one time.");
+  if (slots.length > MAX_SLOTS) return refuse("too_many_slots", "Offer up to three times.");
+  if (slots.some((d) => Number.isNaN(d.getTime()))) return refuse("bad_slot", "One of the times is not valid.");
+  if (!slots.every((d) => d.getUTCSeconds() === 0 && d.getUTCMinutes() % 15 === 0)) {
+    return refuse("not_quarter_hour", "Slots start on the hour or at :15, :30 or :45.");
+  }
+  if (slots.some((d) => d.getTime() < now)) return refuse("slot_past", "Slots must be in the future");
+  if (hasSlotTooFarAhead(slots, now)) return refuse("slot_far", "Pick slots within the next year.");
+  if (hasDuplicateSlots(slots)) return refuse("slot_duplicate", "Offer different times - two slots are the same.");
+  const sorted = [...slots].sort((a, b) => a.getTime() - b.getTime());
+  return { ok: true, slots: sorted, respondBy: respondByFor(sorted, now) };
+}
+
+/** Whether another confirmed meeting at `otherStart` overlaps a 30-minute meeting at `start` (+-30 min). */
+export const overlaps = (start: number, otherStart: number): boolean => Math.abs(start - otherStart) < MEETING_MS;
+
+/** The first of `busy` (start times of both parties' other confirmed meetings) that clashes with `start`, or null. */
+export const firstConflict = (start: number, busy: number[]): number | null => busy.find((b) => overlaps(start, b)) ?? null;
+
+/** Whether the standing offer can no longer be answered: past respondBy, or every offered time has started. */
+export function isLapsed(s: MeetingState, now: number = Date.now()): boolean {
+  const open = ["pending", "waiting", "proposed"].includes((s.status ?? "").toLowerCase());
+  if (!open || s.selectedSlot) return false;
+  const by = ms(s.respondBy);
+  if (by !== null && by <= now) return true;
+  const times = offered(s);
+  return times.length > 0 && times.every((t) => t <= now);
+}
+
+const isPending = (s: MeetingState) => (s.status ?? "").toLowerCase() === "pending";
+
+/** The side that did not make the standing offer may pick from it. */
+export function canChoose(s: MeetingState, role: Role, now: number = Date.now()): { ok: true } | Refusal {
+  if (!isPending(s)) return refuse("not_pending", `This meeting is already ${(s.status ?? "closed").toLowerCase()}`);
+  if (proposerOf(s) === role) return refuse("own_offer", "You made this offer; the other side picks.");
+  if (isLapsed(s, now)) return refuse("lapsed", "This offer has lapsed. Propose new times.");
+  return { ok: true };
+}
+
+/** The same side may instead answer with times of its own, until the rounds run out. */
+export function canCounter(s: MeetingState, role: Role, now: number = Date.now()): { ok: true } | Refusal {
+  const c = canChoose(s, role, now);
+  if (!c.ok) return c;
+  if (roundOf(s) >= MAX_ROUNDS) return refuse("max_rounds", `This has gone back and forth ${MAX_ROUNDS} times. Pick one of the times, or cancel.`);
+  return { ok: true };
+}
+
+/** Cancel while the meeting is still ahead: an open offer, or a booked one that has not started. */
+export function canCancel(s: MeetingState, now: number = Date.now()): { ok: true } | Refusal {
+  const status = (s.status ?? "").toLowerCase();
+  if (status === "pending") return { ok: true };
+  if (status === "scheduled") {
+    const start = bookedStart(s) ?? offered(s)[0] ?? null;
+    return start !== null && start <= now ? refuse("started", "This meeting has started. Mark it completed or missed instead.") : { ok: true };
+  }
+  return refuse("not_open", `This meeting is already ${status || "closed"}`);
+}
+
+/** Offer new times: the proposer revising an open offer, or either side moving a booked / expired meeting. */
+export function canReschedule(s: MeetingState, role: Role, now: number = Date.now()): { ok: true } | Refusal {
+  const status = (s.status ?? "").toLowerCase();
+  if (status === "scheduled" || status === "expired") return { ok: true };
+  if (status === "pending") {
+    // A lapsed offer reads as expired: either side may start again.
+    if (proposerOf(s) === role || isLapsed(s, now)) return { ok: true };
+    return refuse("use_counter", "Pick one of the offered times, or propose other times.");
+  }
+  return refuse("not_open", `This meeting is already ${status || "closed"}`);
+}
+
+export function reasonProblem(reason: unknown): string | null {
+  const r = typeof reason === "string" ? reason.trim() : "";
+  if (r.length < REASON_MIN) return "Say why you are cancelling (a few words).";
+  if (r.length > REASON_MAX) return `Keep the reason under ${REASON_MAX} characters.`;
+  return null;
+}
+
+export type Action =
+  | { type: "propose"; by: Role; slots: Date[] }
+  | { type: "choose"; by: Role; slot: number; busy?: number[] }
+  | { type: "counter"; by: Role; slots: Date[] }
+  | { type: "reschedule"; by: Role; slots: Date[] }
+  | { type: "cancel"; by: Role; reason: string }
+  | { type: "expire" };
+
+export type Fields = {
+  status: string;
+  proposedBy: Role;
+  round: number;
+  respondBy: Date | null;
+  slot1: Date | null;
+  slot2: Date | null;
+  slot3: Date | null;
+  selectedSlot: number | null;
+  cancelledBy: string | null;
+  cancelReason: string | null;
+};
+
+const fresh = (by: Role, round: number, offer: { slots: Date[]; respondBy: Date }): Fields => ({
+  status: "pending",
+  proposedBy: by,
+  round,
+  respondBy: offer.respondBy,
+  slot1: offer.slots[0] ?? null,
+  slot2: offer.slots[1] ?? null,
+  slot3: offer.slots[2] ?? null,
+  selectedSlot: null,
+  cancelledBy: null,
+  cancelReason: null,
+});
+
+/**
+ * The row's new fields after `action`, or the refusal. `current` is undefined only for "propose" (a new meeting).
+ * Pure: the caller supplies `now` and, for a pick, `busy` (the other confirmed meetings of both parties).
+ */
+export function step(current: MeetingState | undefined, action: Action, now: number = Date.now()): { ok: true; fields: Fields } | Refusal {
+  if (action.type === "propose") {
+    const offer = checkOffer(action.slots, now);
+    return offer.ok ? { ok: true, fields: fresh(action.by, 1, offer) } : offer;
+  }
+  if (!current) return refuse("not_found", "Not found");
+
+  if (action.type === "expire") {
+    if (!isLapsed(current, now)) return refuse("not_lapsed", "Not lapsed");
+    return { ok: true, fields: { ...keep(current), status: "expired" } };
+  }
+
+  if (action.type === "choose") {
+    const c = canChoose(current, action.by, now);
+    if (!c.ok) return c;
+    const start = [current.slot1, current.slot2, current.slot3].map(ms)[action.slot - 1];
+    if (action.slot < 1 || action.slot > 3 || start === null || start === undefined) return refuse("slot_not_offered", "That slot wasn't offered");
+    if (start <= now) return refuse("slot_past", "That slot has passed");
+    if (firstConflict(start, action.busy ?? []) !== null) {
+      return refuse("conflict", "That time clashes with another meeting. Pick a different time.");
+    }
+    return { ok: true, fields: { ...keep(current), status: "scheduled", selectedSlot: action.slot } };
+  }
+
+  if (action.type === "counter") {
+    const c = canCounter(current, action.by, now);
+    if (!c.ok) return c;
+    const offer = checkOffer(action.slots, now);
+    return offer.ok ? { ok: true, fields: fresh(action.by, roundOf(current) + 1, offer) } : offer;
+  }
+
+  if (action.type === "reschedule") {
+    const c = canReschedule(current, action.by, now);
+    if (!c.ok) return c;
+    const offer = checkOffer(action.slots, now);
+    if (!offer.ok) return offer;
+    // Revising your own open offer stays in its round; moving a booked or expired meeting starts over.
+    const round = isPending(current) ? roundOf(current) : 1;
+    return { ok: true, fields: fresh(action.by, round, offer) };
+  }
+
+  const c = canCancel(current, now);
+  if (!c.ok) return c;
+  const problem = reasonProblem(action.reason);
+  if (problem) return refuse("reason_required", problem);
+  return { ok: true, fields: { ...keep(current), status: "cancelled", cancelledBy: action.by, cancelReason: action.reason.trim() } };
+}
+
+function keep(s: MeetingState): Fields {
+  const d = (v: When) => (v ? new Date(v) : null);
+  return {
+    status: (s.status ?? "pending").toLowerCase(),
+    proposedBy: proposerOf(s),
+    round: roundOf(s),
+    respondBy: d(s.respondBy),
+    slot1: d(s.slot1),
+    slot2: d(s.slot2),
+    slot3: d(s.slot3),
+    selectedSlot: s.selectedSlot ?? null,
+    cancelledBy: null,
+    cancelReason: null,
+  };
+}
+
+/** What one side can do with a meeting right now, for the screens (the routes re-check on submit). */
+export type MeetingView = {
+  turn: "yours" | "theirs" | "none";
+  canChoose: boolean;
+  canCounter: boolean;
+  canCancel: boolean;
+  canReschedule: boolean;
+  round: number;
+  lapsed: boolean;
+};
+
+export function viewFor(s: MeetingState, role: Role, now: number = Date.now()): MeetingView {
+  const choose = canChoose(s, role, now).ok;
+  const status = (s.status ?? "").toLowerCase();
+  const lapsed = isLapsed(s, now);
+  return {
+    turn: choose ? "yours" : status === "pending" && !lapsed ? "theirs" : "none",
+    canChoose: choose,
+    canCounter: canCounter(s, role, now).ok,
+    canCancel: canCancel(s, now).ok,
+    canReschedule: canReschedule(s, role, now).ok,
+    round: roundOf(s),
+    lapsed,
+  };
+}

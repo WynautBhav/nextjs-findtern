@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getDb, schema } from "@/lib/db";
 import { hiredProposalSql } from "@/lib/employer-visibility";
 import { emails } from "@/lib/emails";
+import { ensureGateToken, gateUrl } from "@/lib/meetings/service";
 import { formatSlotTime } from "@/lib/format";
 import { interviewZone, loadProjectZones } from "@/lib/project-zones";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -67,7 +68,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .limit(1);
   const company = hire ? (await employerNames(interview.employerId)).company : "a company on Findtern";
   // Typed links without a scheme open as https (legacy, EMB-19).
-  const link = normalizeMeetingLink(interview.meetingLink);
+  // The mail names Findtern's own /meet/<token> page, never the raw Meet URL.
+  const link = interview.meetingLink && normalizeMeetingLink(interview.meetingLink) ? gateUrl(await ensureGateToken(db, interview)) : null;
   const text = interview.status === "pending"
     ? `${company} is waiting for you to pick an interview slot.`
     : `Your interview with ${company} is on ${whenIst}.`;

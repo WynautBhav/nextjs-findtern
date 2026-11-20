@@ -114,7 +114,7 @@ test("proposal status route: only an intern accepting is blocked, before any wri
 test("interview slot booking and new-hire checkout refuse for a taken-down listing; due months do not", () => {
   const slot = read("api/interviews/[id]/select-slot/route.ts");
   assert.match(slot, /takedownBlock\(project, "schedule"\)/);
-  assert.ok(slot.indexOf('takedownBlock(project, "schedule")') < slot.indexOf("createMeetEvent("), "refused before a Meet event is created");
+  assert.ok(slot.indexOf('takedownBlock(project, "schedule")') < slot.indexOf("await act("), "refused before the booking (and its Meet event) is made");
   const order = read("api/employer/[id]/payment/razorpay/order/route.ts");
   // Which lines are checked is behaviour: see takedownCheckedLineIds in projects/takedown.test.ts.
   assert.match(order, /takedownCheckedLineIds\(paying\)/);

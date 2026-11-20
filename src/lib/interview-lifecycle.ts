@@ -34,6 +34,8 @@ export type LifecycleInput = {
   slot2: When;
   slot3: When;
   selectedSlot?: number | null;
+  /** Meetings v1: an unpicked offer lapses here (earliest slot - 2 h). Absent on rows from before migration 0043. */
+  respondBy?: When;
   employerId?: string | null;
   /** The caller already knows this is the AI interview (the AI employer's email, not only the "admin" id). */
   isAi?: boolean;
@@ -106,7 +108,9 @@ export function interviewLifecycle(iv: LifecycleInput, now: number = Date.now())
     if (raw === "scheduled") return now >= picked ? out("live", "Happening now", "scheduled") : out("upcoming", "Scheduled", "scheduled");
     return out("awaiting_pick", "Waiting on candidate");
   }
-  // No usable pick: an invite. Expired once every offered slot has started.
+  // No usable pick: an invite. Expired once its respond-by passed, or every offered slot has started.
+  const by = toTime(iv.respondBy);
+  if (by !== null && by <= now && INVITE_STATUSES.includes(raw)) return expired();
   if (slots.length > 0 && slots.every((t) => t < now)) return expired();
   return raw === "scheduled" ? out("upcoming", "Scheduled", "scheduled") : out("awaiting_pick", "Waiting on candidate");
 }
@@ -128,8 +132,16 @@ export const worthNotice = (endsAt: number | null, now: number): boolean => ends
 export const interviewNoticeDedupeKey = (interviewId: string, side: "employer" | "intern"): string => `interview_time_passed:${interviewId}:${side}`;
 
 /** At most one notice per side per interview; the dedupe key makes a retry a no-op. `employer` is null when it must not be told. */
-export function interviewExpiryNotices(i: { interviewId: string; booked: boolean; initials: string; whenEmployer: string; whenIntern: string; employerTakenDown: boolean }) {
-  const data = { interviewId: i.interviewId, reason: i.booked ? "time_passed_not_completed" : "invite_slots_passed" };
+export function interviewExpiryNotices(i: { interviewId: string; booked: boolean; initials: string; whenEmployer: string; whenIntern: string; employerTakenDown: boolean; lapsed?: boolean }) {
+  const data = { interviewId: i.interviewId, reason: i.booked ? "time_passed_not_completed" : i.lapsed ? "offer_lapsed" : "invite_slots_passed" };
+  if (i.lapsed && !i.booked) {
+    return {
+      employer: i.employerTakenDown
+        ? null
+        : { title: "Meeting offer lapsed", message: `The times for your meeting with ${i.initials} were not answered in time. Offer new times if you still want to meet.`, data: { ...data, link: "/employer/schedule" } },
+      intern: { title: "Meeting offer lapsed", message: "The times for your meeting were not answered in time, so the offer lapsed. Either side can propose new times.", data: { ...data, link: "/intern/interviews" } },
+    };
+  }
   return {
     employer: i.employerTakenDown
       ? null

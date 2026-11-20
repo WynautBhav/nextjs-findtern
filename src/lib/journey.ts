@@ -63,6 +63,12 @@ export type InterviewRow = {
   meetingLink: string | null;
   notes: string | null;
   createdAt: Date;
+  /** Meetings v1 (migration 0043); the row carries them, absent on fixtures. */
+  proposedBy?: string | null;
+  round?: number | null;
+  respondBy?: Date | null;
+  cancelledBy?: string | null;
+  cancelReason?: string | null;
 };
 
 export type TimesheetRow = {

@@ -1,8 +1,7 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
 import { requireMutation } from "@/lib/guards-mutation";
@@ -12,7 +11,8 @@ import { isKnownTimezone, projectZone, timezoneForLocation, wallTimeToUtc } from
 import { canEmployerSeeIntern, heldElsewhereIds } from "@/lib/employer-pool";
 import { CANDIDATE_UNAVAILABLE } from "@/lib/candidate-hold";
 import { hiredProposalSql } from "@/lib/employer-visibility";
-import { hasDuplicateSlots, hasSlotTooFarAhead, isBlockingInterview, isQuarterHourWall } from "@/lib/employer-interview-rules";
+import { isQuarterHourWall } from "@/lib/employer-interview-rules";
+import { createMeeting } from "@/lib/meetings/service";
 import { formatIst } from "@/lib/format";
 import { isProjectOpen } from "@/lib/project-locations";
 
@@ -21,15 +21,13 @@ const bodySchema = z.object({
   internId: z.string().min(1),
   projectId: z.string().optional(),
   /** Wall-clock times in `timezone` ("2026-11-03T15:30"), not browser-converted.
-   *  Exactly three, on the quarter hour (legacy R:11179, sheet row 66). */
+   *  One to three, on the quarter hour (legacy R:11179, sheet row 66; "up to 3" since meetings v1). */
   slot1: wall,
-  slot2: wall,
-  slot3: wall,
+  slot2: wall.optional(),
+  slot3: wall.optional(),
   /** Missing: the company's own zone, from its location (bug sheet 7, S2 r3). */
   timezone: z.string().min(1).optional(),
 });
-
-const OPEN = ["pending", "scheduled"];
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -37,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!guard.ok) return guard.response;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Offer three time slots." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Offer one to three time slots." }, { status: 400 });
   // A made-up zone is refused even when the project's own zone would override it (B-43).
   if (parsed.data.timezone !== undefined && !isKnownTimezone(parsed.data.timezone)) {
     return NextResponse.json({ error: "Unknown timezone. Use a region such as Asia/Kolkata." }, { status: 400 });
@@ -70,24 +68,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   const timezone = projectTz ? projectZone(projectTz, parsed.data.timezone, companyTz) : (parsed.data.timezone ?? companyTz ?? projectZone(null));
   const b = { ...parsed.data, timezone };
-  if (![b.slot1, b.slot2, b.slot3].every(isQuarterHourWall)) {
+  const walls = [b.slot1, b.slot2, b.slot3].filter((w): w is string => Boolean(w));
+  if (!walls.every(isQuarterHourWall)) {
     return NextResponse.json({ error: "Slots start on the hour or at :15, :30 or :45." }, { status: 400 });
   }
 
   let slots: Date[];
   try {
-    slots = [b.slot1, b.slot2, b.slot3].map((s) => wallTimeToUtc(s, b.timezone));
+    slots = walls.map((s) => wallTimeToUtc(s, b.timezone));
   } catch {
     return NextResponse.json({ error: "Unknown timezone" }, { status: 400 });
-  }
-  if (slots.some((s) => s.getTime() < Date.now())) {
-    return NextResponse.json({ error: "Slots must be in the future" }, { status: 400 });
-  }
-  if (hasSlotTooFarAhead(slots)) {
-    return NextResponse.json({ error: "Pick slots within the next year." }, { status: 400 });
-  }
-  if (hasDuplicateSlots(slots)) {
-    return NextResponse.json({ error: "Offer different times - two slots are the same." }, { status: 400 });
   }
 
   // One offer at a time: no meeting with a candidate another company holds (neutral answer, nothing about who).
@@ -120,36 +110,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // all passed is stale and no longer holds the candidate (legacy R:11370).
   // Checked and inserted under one lock, so two requests at once can't both
   // book (a double click gave three pending interviews).
-  const interview = await withLock(`interview:${id}:${b.internId}`, async (tx) => {
-    const openRows = await tx
-      .select()
-      .from(schema.interviews)
-      .where(
-        and(
-          eq(schema.interviews.employerId, id),
-          eq(schema.interviews.internId, b.internId),
-          inArray(schema.interviews.status, OPEN),
-        ),
-      );
-    if (openRows.some((iv) => isBlockingInterview(iv))) return null;
-    const [created] = await tx
-      .insert(schema.interviews)
-      .values({
-        employerId: id,
-        internId: b.internId,
-        projectId: b.projectId,
-        slot1: slots[0],
-        slot2: slots[1],
-        slot3: slots[2],
-        timezone: b.timezone,
-        status: "pending",
-      })
-      .returning();
-    return created;
-  });
-  if (!interview) {
-    return NextResponse.json({ error: "A meeting with this candidate is already open - finish it first." }, { status: 409 });
-  }
+  const made = await createMeeting(db, { by: "employer", employerId: id, internId: b.internId, projectId: b.projectId ?? null, slots, timezone: b.timezone });
+  if (!made.ok) return NextResponse.json({ error: made.error, code: made.code }, { status: made.status });
+  const interview = made.interview;
 
   await notify({
     to: { type: "intern", id: b.internId },

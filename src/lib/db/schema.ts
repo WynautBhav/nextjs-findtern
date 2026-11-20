@@ -619,6 +619,16 @@ export const interviews = pgTable("interviews", {
   notes: text("notes"),
   /** First time the employer pressed Join in the app; null for legacy rows and until then. */
   employerJoinedAt: timestamp("employer_joined_at"),
+  /** Who made the standing offer; the other side picks or counters (migration 0043). Legacy rows are the employer's. */
+  proposedBy: text("proposed_by").notNull().default("employer"),
+  /** 1 = first offer; each counter is +1 (max 3). */
+  round: integer("round").notNull().default(1),
+  /** The standing offer lapses here (earliest slot - 2 h); null on legacy rows. */
+  respondBy: timestamp("respond_by"),
+  cancelledBy: text("cancelled_by"),
+  cancelReason: text("cancel_reason"),
+  /** Opaque id behind /meet/<token>; emails carry it, never the Meet URL. */
+  gateToken: text("gate_token"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (t) => ({

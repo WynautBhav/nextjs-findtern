@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { ensureGateToken, gateUrl } from "@/lib/meetings/service";
 import { emails } from "@/lib/emails";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { recordAdminAudit } from "@/lib/admin/audit";
@@ -125,6 +126,8 @@ export async function PUT(
   if (!isAi) {
     // Only an open interview: a missed/completed/cancelled one gets the link saved but no mail.
     if (linkChanged && nextStatus === "scheduled") {
+      // Mail names Findtern's own /meet/<token> page, never the raw link.
+      const gate = gateUrl(await ensureGateToken(db, updated));
       const data = { interviewId: id, meetingLink: link };
       const dedupeKey = `interview_link:${id}:${link}`;
       try {
@@ -135,7 +138,7 @@ export async function PUT(
           message: "The meeting link for your interview has been added. Open your interviews to join.",
           data,
           dedupeKey,
-          email: emails.interviewLinkReady({ name: await internFirstName(existing.internId), link, forEmployer: false }),
+          email: gate ? emails.interviewLinkReady({ name: await internFirstName(existing.internId), link: gate, forEmployer: false }) : undefined,
         });
         await notify({
           to: { type: "employer", id: existing.employerId },
@@ -144,7 +147,7 @@ export async function PUT(
           message: "The meeting link for your interview has been added. Open your schedule to join.",
           data,
           dedupeKey,
-          email: emails.interviewLinkReady({ name: (await employerNames(existing.employerId)).contact, link, forEmployer: true }),
+          email: gate ? emails.interviewLinkReady({ name: (await employerNames(existing.employerId)).contact, link: gate, forEmployer: true }) : undefined,
         });
       } catch (notifyErr) {
         console.error("Interview link notification failed:", notifyErr);

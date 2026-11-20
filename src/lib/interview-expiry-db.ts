@@ -34,7 +34,8 @@ const timePassed = (t: string, nowIso: string) => {
   const last = sql`greatest(${col("slot1")}, ${col("slot2")}, ${col("slot3")})`;
   return sql`(
     (${chosen} is not null and ${chosen} + make_interval(mins => ${MINS}) <= ${nowIso}::timestamp)
-    or (${chosen} is null and ${last} is not null and ${last} < ${nowIso}::timestamp))`;
+    or (${chosen} is null and ${last} is not null and ${last} < ${nowIso}::timestamp)
+    or (${chosen} is null and ${col("respond_by")} is not null and ${col("respond_by")} <= ${nowIso}::timestamp and ${col("status")} in ('pending', 'waiting', 'proposed')))`;
 };
 
 type Expired = {
@@ -116,6 +117,8 @@ async function notifyExpired(all: Expired[], now: Date): Promise<number> {
         whenEmployer: r.slot ? formatSlotTime(r.slot, r.timezone || "Asia/Kolkata") : "",
         whenIntern: r.slot ? formatSlotTime(r.slot, "Asia/Kolkata") : "",
         employerTakenDown: Boolean(r.projectId && down.has(r.projectId)),
+        // An offer that lapsed at its respond-by while a slot was still ahead.
+        lapsed: !r.booked && Date.parse(r.endsAt) > now.getTime(),
       });
       if (n.employer) {
         if (await notify({ to: { type: "employer", id: r.employerId }, type: "interview_time_passed", title: n.employer.title, message: n.employer.message, data: n.employer.data, dedupeKey: interviewNoticeDedupeKey(r.id, "employer") })) sent++;
