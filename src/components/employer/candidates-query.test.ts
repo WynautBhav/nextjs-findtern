@@ -4,7 +4,9 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 // `_query.ts` imports the DB and `@/` aliases, so node:test can't load it: pin the wiring instead.
-const src = readFileSync(join(import.meta.dirname, "../../app/employer/candidates/_query.ts"), "utf8");
+const src =
+  readFileSync(join(import.meta.dirname, "../../app/employer/candidates/_query.ts"), "utf8") +
+  readFileSync(join(import.meta.dirname, "../../lib/candidates-params.ts"), "utf8");
 
 test("a typed keyword is never remembered, only structured filters", () => {
   assert.match(src, /rememberQueryOf\(filters: Filters\): string \{\s*return filterParams\(filters, false\)/);
@@ -26,7 +28,8 @@ test("the candidates query leaves out interns this employer has hired, in both b
 });
 
 test("the Shortlist tab count and the compare picks leave hired interns out too", () => {
-  assert.match(src, /hiredAmong\(db, uid, \[\.\.\.data\.shortlisted\]\)/);
+  // one statement: this project's shortlist kept to the pool, not held elsewhere and not hired by this employer
+  assert.match(src, /notHiredByEmployerSql\(uid\),\s*\),\s*\);\s*data\.shortlisted = new Set/);
   assert.match(src, /filters\.ids = filters\.ids\.filter\(\(id\) => !hiredPicks\.has\(id\)\)/);
 });
 

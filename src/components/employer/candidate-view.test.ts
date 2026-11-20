@@ -103,7 +103,10 @@ test("showClearAll is off when the only chip is the project's own city (reset wo
 });
 
 // `_query.ts` and `_toolbar.tsx` import the DB and `@/` aliases, so node:test cannot load them: pin the wiring.
-const query = readFileSync(join(import.meta.dirname, "../../app/employer/candidates/_query.ts"), "utf8");
+const query =
+  readFileSync(join(import.meta.dirname, "../../app/employer/candidates/_query.ts"), "utf8") +
+  // the URL contract (readFilters, withFilters, chips) moved to a database-free module the browser region shares
+  readFileSync(join(import.meta.dirname, "../../lib/candidates-params.ts"), "utf8");
 const results = readFileSync(join(import.meta.dirname, "../../app/employer/candidates/_toolbar.tsx"), "utf8");
 
 test("the active count, the skills parse and the project-city chip go through the tested helpers", () => {

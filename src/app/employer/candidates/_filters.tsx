@@ -17,7 +17,7 @@ import { FilterSection } from "@/components/employer/candidates/filter-parts";
 import { ProFilterSections, ProLockedCard } from "@/components/employer/candidates/pro-filters";
 import { collegeSortToken } from "@/lib/candidate-sort";
 import { FilterPanel } from "./_filter-form";
-import { activeChips, activeFilterCount, queryOf, resetHref, type Filters, type ProData } from "./_query";
+import { activeChips, activeFilterCount, queryOf, resetHref, type Filters, type ProData } from "@/lib/candidates-params";
 
 const SELECT = cn(fieldClass, "mt-2");
 

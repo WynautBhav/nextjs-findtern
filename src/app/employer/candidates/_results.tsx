@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { ChevronDown, Info, X } from "lucide-react";
 
-import { redactForEmployer } from "@/lib/employer-candidates";
+import { cardCandidate } from "@/lib/candidates-wire";
 import { resolvePricing } from "@/lib/employer-pricing";
 import { PER_HIRE_FEE_DEFAULT } from "@/lib/per-hire-fee";
-import { MAX_COMPARE } from "@/lib/employer-selection";
+import { MAX_COMPARE } from "@/lib/compare-map";
 import { SITE } from "@/lib/content/site";
 import { BANDS, PLAN_NAME } from "@/lib/score";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ import { LoadError } from "@/components/app/load-error";
 import { PAGE_SIZES, pageWindow } from "@/components/employer/candidate-view";
 import { Segmented, SegmentLink } from "@/components/employer/candidates/toolbar-parts";
 import { SUBSCRIPTION_HREF } from "@/components/employer/candidates/pro-filters";
-import { toggle, withFilters, type CandidatesData, type Filters } from "./_query";
+import { toggle, withFilters, type CandidatesData, type Filters } from "@/lib/candidates-params";
 import { ZeroResults } from "./_zero-results";
 
 /** "Per page 12 24 48": how many candidates one page holds. Changing it returns to page 1. */
@@ -161,8 +161,8 @@ export function Results({
                   key={candidate.id}
                   // The AI interview recording stays hidden until hire; only the
                   // written report is shown before (legacy detail:1578).
-                  // The list never shows contact details, so they stay off the wire even after hire.
-                  candidate={{ ...redactForEmployer(candidate, data.nameUnlocked.has(candidate.id)), email: "", linkedinUrl: "" }}
+                  // The one row mapper the results endpoint uses too (lib/candidates-wire): what leaves the server is decided there.
+                  candidate={cardCandidate(candidate, data.nameUnlocked.has(candidate.id))}
                   currency={data.currency}
                   region={data.region}
                   selected={compareIds.includes(candidate.id)}

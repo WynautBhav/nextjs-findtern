@@ -1,58 +1,14 @@
-import { relaxations, type Relaxation, type RelaxCounts } from "@/components/employer/candidate-view";
-import { projectMatchHref } from "@/lib/project-match";
-import { loadCandidates, queryOf, readFilters, resetHref, withFilters, withoutCity, type CandidatesData, type Filters, type SearchParams } from "./_query";
-import { matchStateOf, projectNameOf } from "./_toolbar";
+import type { RelaxCounts } from "@/components/employer/candidate-view";
+import { type RelaxFix, relaxFixes } from "@/lib/candidates-relax";
+import { loadCandidates } from "./_query";
+import { readFilters, resetHref, type CandidatesData, type Filters, type SearchParams } from "@/lib/candidates-params";
 
-/** A fix the zero-results panel offers: what it is and the link that applies it (the same link that is counted). */
-export type RelaxFix = Relaxation & { href: string };
+export { relaxFixes, type RelaxFix };
 
 /** More options than this are never counted: each count reads the pool once, so this bounds the work of an empty page. */
 const MAX_COUNTED = 7;
 /** Past this the panel shows the fixes without numbers rather than make the employer wait. */
 const COUNT_TIMEOUT_MS = 4000;
-
-/** The fixes that apply to this empty list, each with the link that makes it. Pure of the database. */
-export function relaxFixes(data: CandidatesData, filters: Filters): RelaxFix[] {
-  const scoreFloors = filters.minScore > 0 || Object.values(filters.minRatings).some((v) => v > 0);
-  const proFilters = filters.cgpaMin > 0 || filters.cgpaVerified || filters.colleges.length > 0;
-  const options = relaxations({
-    q: filters.q,
-    skills: data.effectiveSkills,
-    cities: data.cityList,
-    includeRemote: data.includeRemote,
-    proFilters,
-    scoreFloors,
-    laptop: filters.laptop === "yes",
-    match: matchStateOf(data, filters),
-    projectName: projectNameOf(data),
-    cityFromProject: Boolean(data.projectApplied?.city) && !filters.citySet,
-    saved: filters.saved && Boolean(data.activeProjectId),
-  });
-  const without = (skill: string) => data.effectiveSkills.filter((s) => s !== skill);
-  const href = (o: Relaxation): string => {
-    switch (o.key) {
-      case "q":
-        return withFilters(filters, { q: "", page: "" });
-      case "skill":
-        return withFilters(filters, { skills: without(o.id.slice("skill:".length)), skillsSet: true, page: "" });
-      case "city":
-        return withoutCity(filters);
-      case "remote":
-        return withFilters(filters, { remote: true, page: "" });
-      case "stop":
-        return projectMatchHref("/employer/candidates", queryOf({ ...filters, page: 1 }).slice(1), "stop", data.pro.active);
-      case "project":
-        return projectMatchHref("/employer/candidates", queryOf({ ...filters, page: 1 }).slice(1), "match", data.pro.active);
-      case "pro":
-        return withFilters(filters, { cgpaMin: 0, cgpaVerified: false, colleges: [], collegeSort: null, page: "" });
-      case "score":
-        return withFilters(filters, { minScore: 0, minRatings: { communication: 0, coding: 0, aptitude: 0, interview: 0 }, page: "" });
-      case "laptop":
-        return withFilters(filters, { laptop: "", page: "" });
-    }
-  };
-  return options.map((o) => ({ ...o, href: href(o) }));
-}
 
 /** A link's query as the page would read it from the URL. */
 function paramsOf(href: string): SearchParams {
@@ -74,7 +30,7 @@ export async function countRelaxations(uid: string, fixes: RelaxFix[], activePro
   const count = async ({ id, href }: { id: string; href: string }): Promise<[string, number | null]> => {
     try {
       const params = paramsOf(href);
-      const data = await loadCandidates(uid, readFilters(params), { hasFilterParams: true, fresh: true, countOnly: true });
+      const data = await loadCandidates(uid, readFilters(params), { hasFilterParams: true, fresh: true, countOnly: true, lean: true });
       return [id, data.loadFailed || data.restoreTo ? null : data.total];
     } catch (err) {
       console.error("[employer/candidates] relax count", id, err);
@@ -97,4 +53,11 @@ export async function countRelaxations(uid: string, fixes: RelaxFix[], activePro
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** An empty list is the rare path: only then count what each one-click widening would return. Used by the page and the results endpoint alike. */
+export async function withRelaxCounts(uid: string, data: CandidatesData, filters: Filters): Promise<void> {
+  if (data.restoreTo || data.total !== 0 || data.loadFailed || filters.saved) return;
+  const fixes = relaxFixes(data, filters);
+  if (fixes.length > 0) data.relaxCounts = await countRelaxations(uid, fixes, data.activeProjectId);
 }

@@ -44,8 +44,10 @@ class EveryoneUnlocked extends Set<string> {
 export async function hiredInternIds(
   db: ReturnType<typeof getDb>,
   employerId: string,
+  /** A caller that already holds the signed session says so, saving the session read this would start with. */
+  viewingAsAdmin?: boolean,
 ): Promise<Set<string>> {
-  if (await isAdminViewing()) return new EveryoneUnlocked();
+  if (viewingAsAdmin ?? (await isAdminViewing())) return new EveryoneUnlocked();
   const rows = await db
     .select({ internId: proposals.internId })
     .from(proposals)

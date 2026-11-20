@@ -11,7 +11,9 @@ import { collegeSortToken } from "../../../lib/candidate-sort.ts";
  * lib/candidate-pro-access.test.ts (entitlement, enforcement) and here the loader's wiring is pinned, plus the
  * URL round trip through the same helpers the page uses.
  */
-const query = readFileSync(join(import.meta.dirname, "../../../app/employer/candidates/_query.ts"), "utf8");
+const query =
+  readFileSync(join(import.meta.dirname, "../../../app/employer/candidates/_query.ts"), "utf8") +
+  readFileSync(join(import.meta.dirname, "../../../lib/candidates-params.ts"), "utf8");
 const results = readFileSync(join(import.meta.dirname, "../../../app/employer/candidates/_toolbar.tsx"), "utf8");
 const panel = readFileSync(join(import.meta.dirname, "../../../app/employer/candidates/_filter-form.tsx"), "utf8");
 

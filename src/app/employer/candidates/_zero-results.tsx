@@ -5,8 +5,8 @@ import { SURFACE_CLASS } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { rankRelaxations, skillBaseName } from "@/components/employer/candidate-view";
 import { cn } from "@/lib/utils";
-import { resetHref, titleCase, type CandidatesData, type Filters } from "./_query";
-import { relaxFixes } from "./_relax";
+import { resetHref, titleCase, type CandidatesData, type Filters } from "@/lib/candidates-params";
+import { relaxFixes } from "@/lib/candidates-relax";
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 

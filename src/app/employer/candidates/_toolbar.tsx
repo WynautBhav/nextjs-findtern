@@ -7,25 +7,12 @@ import { showClearAll } from "@/components/employer/candidate-view";
 import { Segmented, SegmentLink } from "@/components/employer/candidates/toolbar-parts";
 import { FiltersToggle } from "@/components/employer/candidate-filter-collapse";
 import { activeSortDir, pickSortPatch, sortChoiceOf, sortDirPatch, type SortChoice, type SortDir } from "@/lib/candidate-sort";
-import { matchedOnText, projectMatchState, type ProjectMatchState } from "@/lib/project-match";
+import { matchedOnText, type ProjectMatchState } from "@/lib/project-match";
 import { SortSelect } from "./_sort-select";
-import { SORT_OPTIONS, activeChips, activeFilterCount, resetHref, titleCase, withFilters, withoutCity, type CandidatesData, type Filters } from "./_query";
+import { SORT_OPTIONS, activeChips, activeFilterCount, resetHref, titleCase, withFilters, withoutCity, type CandidatesData, type Filters } from "@/lib/candidates-params";
 
-/** How the selected project relates to this list (see `projectMatchState`), read off the loaded data. */
-export function matchStateOf(data: CandidatesData, filters: Filters): ProjectMatchState {
-  return projectMatchState({
-    hasProject: Boolean(data.activeProjectId),
-    projectDefaults: filters.projectDefaults,
-    skillsSet: filters.skillsSet,
-    skills: filters.skills,
-    projectSkills: data.activeProjectSkills,
-    projectCity: data.cityDefault,
-  });
-}
-
-export function projectNameOf(data: CandidatesData): string {
-  return data.projects.find((p) => p.id === data.activeProjectId)?.projectName ?? "";
-}
+export { matchStateOf, projectNameOf } from "@/lib/candidates-match-state";
+import { projectNameOf } from "@/lib/candidates-match-state";
 
 /**
  * Sort options: best match, each score field, and the college (Findtern Pro). Which way each runs is

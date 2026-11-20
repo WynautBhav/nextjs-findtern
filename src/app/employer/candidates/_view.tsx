@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 
-import { MAX_COMPARE } from "@/lib/employer-selection";
+import { MAX_COMPARE } from "@/lib/compare-map";
 import { SkillFilter } from "@/components/employer/skill-filter";
 import { KeepFocusClear } from "@/components/app/keep-focus-clear";
 import { PageHead, SURFACE_CLASS } from "@/components/app/primitives";
@@ -16,7 +16,7 @@ import { ActiveFilters, ContextLine, SlimCount, ToolbarEnd, ToolbarSort, matchSt
 import { CandidateSearch } from "@/components/employer/candidates/candidate-search";
 import { ProjectMatchControl } from "@/components/employer/candidates/project-match-control";
 import { StickyBar } from "@/components/employer/candidates/sticky-bar";
-import { compareHref, queryOf, rememberQueryOf, withFilters, type CandidatesData, type Filters } from "./_query";
+import { compareHref, queryOf, rememberQueryOf, withFilters, type CandidatesData, type Filters } from "@/lib/candidates-params";
 
 /** The page body, split from `page.tsx` (auth and loading) so it renders from plain data. */
 export function CandidatesView({
