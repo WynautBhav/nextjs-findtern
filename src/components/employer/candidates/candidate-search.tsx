@@ -230,7 +230,7 @@ export function CandidateSearch({
           <X className="size-4" aria-hidden />
         </button>
       ) : (
-        <kbd aria-hidden className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-ink-200 bg-white px-1.5 font-sans text-xs font-medium leading-5 text-ink-500 lg:block">
+        <kbd aria-hidden className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-ink-200 bg-white px-1.5 font-sans text-xs font-medium leading-5 text-ink-500 lg:block touch:hidden">
           /
         </kbd>
       )}

@@ -70,7 +70,7 @@ export function CandidatesView({
       </StickyBar>
 
       {/*
-        Phones: search and the Filters button share the top line, then the count, the skill tokens, the chips, then Sort and view.
+        Phones: search has the top line to itself (so its placeholder is never cut), then the count beside the Filters button, then the skill tokens, the chips, then Sort and view.
         lg: search and Sort span the top of one card, then the count, skills and chips; the filter column and the results sit side by side under it.
         DOM order is the tab order: search, skills, chips, sort, view, then project and Filters (row 2 at lg), the filter column, the results.
       */}
@@ -83,8 +83,8 @@ export function CandidatesView({
           // `contents` on phones: the rows below join the page grid and the card look appears at lg.
           className={cn(SURFACE_CLASS, "max-lg:contents lg:col-span-full lg:row-start-1 lg:mb-5 lg:grid lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center lg:gap-x-4 lg:p-5")}
         >
-          <CandidateSearch {...searchProps} className="col-start-1 row-start-1 lg:col-span-2 xl:col-span-1 xl:max-w-[44rem]" />
-          <ContextLine data={data} filters={filters} match={match} className="col-span-2 row-start-2 mt-2 lg:col-span-1 lg:col-start-1 lg:row-start-3 lg:mt-3 xl:row-start-2" />
+          <CandidateSearch {...searchProps} className="col-span-2 col-start-1 row-start-1 xl:col-span-1 xl:max-w-[44rem]" />
+          <ContextLine data={data} filters={filters} match={match} className="col-start-1 row-start-2 mt-2 self-center lg:col-span-1 lg:row-start-3 lg:mt-3 xl:row-start-2" />
           <SkillFilter
             className="col-span-2 row-start-3 mt-2 mb-3 lg:col-span-full lg:row-start-4 lg:mb-0 lg:mt-4 xl:row-start-3 lg:border-t lg:border-ink-100 lg:pt-4"
             active={data.effectiveSkills}
@@ -99,7 +99,7 @@ export function CandidatesView({
         </div>
 
         {/* The column sticks below the slim bar (4rem header + the bar), not just the header. */}
-        <div id="candidate-filter-column" className="lg:[&>aside]:top-36 lg:[&>aside]:max-h-[calc(100dvh-10rem)] col-start-2 row-start-1 lg:col-span-1 lg:col-start-1 lg:row-start-2 lg:group-data-[filters=hidden]/fl:hidden">
+        <div id="candidate-filter-column" className="lg:[&>aside]:top-36 lg:[&>aside]:max-h-[calc(100dvh-10rem)] col-start-2 row-start-2 mt-2 self-center lg:col-span-1 lg:col-start-1 lg:row-start-2 lg:mt-0 lg:self-auto lg:group-data-[filters=hidden]/fl:hidden">
           <FilterColumn
             filters={filters}
             projects={data.projects}
