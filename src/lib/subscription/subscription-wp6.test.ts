@@ -8,7 +8,7 @@ import { orderProposalIds } from "../order-ids.ts";
 import { applyGrant, applyRevoke, grantBodySchema, grantUntilProblem, istDayEnd, overrideAuditView, revokeBodySchema, revokeProblem } from "./grant.ts";
 import { buildSubscriptionRows, filterCounts, filterSubscriptionRows, parseStatusFilter, subscriptionsCsv, type SubscriptionPaymentInput } from "./admin-list.ts";
 import { isSubscriptionConfigBody, parseSubscriptionConfigPut, subscriptionConfigAuditMeta } from "./config-put.ts";
-import { reusableOpenOrder, subscriptionCurrency, subscriptionLineLabel, subscriptionListMinor, subscriptionNotes, subscriptionRawBase } from "./order.ts";
+import { reusableOpenOrder, subscriptionCurrency, subscriptionLineLabel, subscriptionNotes, subscriptionRawBase } from "./order.ts";
 
 const DAY = 86_400_000;
 const NOW = new Date("2026-11-17T10:00:00.000Z");
@@ -17,10 +17,10 @@ const ahead = (d: number) => new Date(NOW.getTime() + d * DAY);
 
 // ---- price and currency ------------------------------------------------------------------------------------------
 
-test("price: Rs 10,000 GST-inclusive, $100 by the 100 INR = 1 USD rule", () => {
-  assert.equal(subscriptionListMinor(SUBSCRIPTION_DEFAULTS, "INR"), 1_000_000);
-  assert.equal(subscriptionListMinor(SUBSCRIPTION_DEFAULTS, "USD"), 10_000);
-  assert.equal(subscriptionListMinor({ ...SUBSCRIPTION_DEFAULTS, priceInrMinor: 1_250_000 }, "USD"), 12_500);
+test("price: Rs 10,000 excluding GST, $100 by the 100 INR = 1 USD rule", () => {
+  assert.equal(subscriptionPriceMinor(SUBSCRIPTION_DEFAULTS, "INR"), 1_000_000);
+  assert.equal(subscriptionPriceMinor(SUBSCRIPTION_DEFAULTS, "USD"), 10_000);
+  assert.equal(subscriptionPriceMinor({ ...SUBSCRIPTION_DEFAULTS, priceInrMinor: 1_250_000 }, "USD"), 12_500);
   assert.equal(subscriptionPriceMinor({ ...SUBSCRIPTION_DEFAULTS, priceInrMinor: 4_990_000 }, "USD"), 49_900);
 });
 
@@ -49,10 +49,10 @@ test("an order's notes carry no proposal ids, so nothing reads it as a hire", ()
 
 test("an open order is reused for the same code and currency, never for another, an old one or a finished one", () => {
   const sub = (over: Record<string, unknown> = {}) => ({
-    orderId: "order_1", status: "created", createdAt: ago(0.001), amountMinor: 1_000_000, currency: "INR", gateway: null,
+    orderId: "order_1", status: "created", createdAt: ago(0.001), amountMinor: 1_180_000, currency: "INR", gateway: null,
     raw: { kind: "employer_subscription", promo: undefined, ...over },
   });
-  const want = { promoCode: null as string | null, currency: "INR" as const, now: NOW, openMinutes: 30 };
+  const want = { promoCode: null as string | null, currency: "INR" as const, amountMinor: 1_180_000, now: NOW, openMinutes: 30 };
   const fresh = (d: number) => new Date(NOW.getTime() - d * 60_000);
   assert.equal(reusableOpenOrder([{ ...sub(), createdAt: fresh(5) }], want)?.orderId, "order_1");
   assert.equal(reusableOpenOrder([{ ...sub(), createdAt: fresh(31) }], want), null, "older than 30 minutes");
@@ -62,6 +62,9 @@ test("an open order is reused for the same code and currency, never for another,
   assert.equal(reusableOpenOrder([{ ...sub({ promo: { promoCode: "PRO20" } }), createdAt: fresh(5) }], want), null, "an order with a code is not the one without");
   assert.equal(reusableOpenOrder([{ ...sub({ promo: { promoCode: "pro20" } }), createdAt: fresh(5) }], { ...want, promoCode: "PRO20" })?.orderId, "order_1");
   assert.equal(reusableOpenOrder([{ ...sub(), createdAt: fresh(5), gateway: "promo_full_waiver" }], want), null, "a waiver order settles at once and is never reused");
+  // An order opened before the GST change (Rs 10,000 inclusive) must not be reused at the new total (Rs 11,800).
+  assert.equal(reusableOpenOrder([{ ...sub(), createdAt: fresh(5), amountMinor: 1_000_000 }], want), null, "an order at another amount is not reused");
+  assert.equal(reusableOpenOrder([{ ...sub(), createdAt: fresh(5), amountMinor: 1_180_000 }], { ...want, amountMinor: 1_000_000 }), null, "nor the new order at the old amount");
 });
 
 // ---- invoice -----------------------------------------------------------------------------------------------------

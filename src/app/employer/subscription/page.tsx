@@ -14,7 +14,8 @@ import { requireEmployerSetup } from "@/lib/employer-setup";
 import { employerSubscription } from "@/lib/subscription/entitlement-db";
 import { formatDate, formatMoney } from "@/lib/format";
 import { getEmployerSubscriptionConfig } from "@/lib/platform-settings";
-import { subscriptionCurrency, subscriptionListMinor } from "@/lib/subscription/order";
+import { subscriptionChargeMinor } from "@/lib/employer-subscription";
+import { subscriptionCurrency } from "@/lib/subscription/order";
 import { buyLabel, renewalNote, statusLine, statusView, UNLOCKS } from "@/lib/subscription/view";
 
 export const metadata: Metadata = {
@@ -58,7 +59,7 @@ export default async function EmployerSubscriptionPage() {
 
   const [config, state] = await Promise.all([getEmployerSubscriptionConfig(), employerSubscription(employerId)]);
   const currency = subscriptionCurrency(employer);
-  const listMinor = subscriptionListMinor(config, currency);
+  const charge = subscriptionChargeMinor(config, currency);
   const view = statusView(state);
 
   return (
@@ -71,9 +72,9 @@ export default async function EmployerSubscriptionPage() {
             The plan
           </h2>
           <p className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <span className="nums text-3xl font-semibold tracking-tight text-ink-900">{formatMoney(listMinor, currency)}</span>
+            <span className="nums text-3xl font-semibold tracking-tight text-ink-900">{formatMoney(charge.baseMinor, currency)}</span>
             <span className="text-sm text-text-subtle">
-              {currency === "INR" ? "GST included" : "all taxes included"} · {config.durationDays} days of access
+              {charge.gstMinor > 0 ? `+ 18% GST (${formatMoney(charge.totalMinor, currency)} in total)` : "no GST"} · {config.durationDays} days of access
             </span>
           </p>
 
@@ -98,7 +99,7 @@ export default async function EmployerSubscriptionPage() {
               <SubscriptionBuy
                 employerId={employerId}
                 currency={currency}
-                listMinor={listMinor}
+                charge={charge}
                 durationDays={config.durationDays}
                 renewing={state.active}
                 note={renewalNote(state, config.durationDays)}

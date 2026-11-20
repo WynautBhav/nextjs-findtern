@@ -9,10 +9,11 @@ import { getDb, schema } from "@/lib/db";
 import { isFullWaiver, WAIVER_GATEWAY, waiverPromoRaw } from "@/lib/full-waiver";
 import { requireMutation } from "@/lib/guards-mutation";
 import { expireStaleEmployerOrders, legacyOrderRaw, OPEN_ORDER_MINUTES, settleEmployerOrder } from "@/lib/payments";
+import { subscriptionChargeMinor } from "@/lib/employer-subscription";
 import { getEmployerSubscriptionConfig } from "@/lib/platform-settings";
 import { promoHoldRefusal, promoRefusal, quotePromoGuarded } from "@/lib/promo";
 import { createOrder, paymentsAreFree, razorpayKeyId, testPayEnabled } from "@/lib/razorpay";
-import { reusableOpenOrder, subscriptionCurrency, subscriptionListMinor, subscriptionNotes, subscriptionRawBase, type SubscriptionCurrency } from "@/lib/subscription/order";
+import { reusableOpenOrder, subscriptionCurrency, subscriptionNotes, subscriptionRawBase, type SubscriptionCurrency } from "@/lib/subscription/order";
 
 const bodySchema = z.object(
   {
@@ -38,20 +39,20 @@ async function recentOrders(q: Db | Parameters<Parameters<Db["transaction"]>[0]>
     .orderBy(desc(schema.employerPayments.createdAt));
 }
 
-const reuse = (rows: Awaited<ReturnType<typeof recentOrders>>, promoCode: string | null, currency: SubscriptionCurrency): Open | null =>
-  reusableOpenOrder(rows, { promoCode, currency, now: new Date(), openMinutes: OPEN_ORDER_MINUTES });
+const reuse = (rows: Awaited<ReturnType<typeof recentOrders>>, promoCode: string | null, currency: SubscriptionCurrency, amountMinor: number): Open | null =>
+  reusableOpenOrder(rows, { promoCode, currency, amountMinor, now: new Date(), openMinutes: OPEN_ORDER_MINUTES });
 
 /**
  * Check and insert as one step per employer (the same advisory lock the hiring checkout takes), so a double click or a
- * second tab cannot open two orders. An unpaid subscription order for the same code and currency is returned as it is;
+ * second tab cannot open two orders. An unpaid subscription order for the same code, currency and amount is returned as it is;
  * any other unpaid subscription order is closed first, so the employer is never left with two live checkouts. An order that
  * settles in the same request (waiver, test host) never reuses one. A capped code
  * whose last uses sit on other accounts' open payments is refused (consume on paid, hold while open).
  */
-async function openOrder(employerId: string, row: OrderRow, promoCode: string | null, currency: SubscriptionCurrency, canReuse = true): Promise<{ open: Open } | { refused: string } | null> {
+async function openOrder(employerId: string, row: OrderRow, promoCode: string | null, currency: SubscriptionCurrency, amountMinor: number, canReuse = true): Promise<{ open: Open } | { refused: string } | null> {
   return withLock(`employer-pay:${employerId}`, async (tx) => {
     const recent = await recentOrders(tx, employerId);
-    const again = canReuse ? reuse(recent, promoCode, currency) : null;
+    const again = canReuse ? reuse(recent, promoCode, currency, amountMinor) : null;
     if (again) return { open: again };
     if (promoCode) {
       const held = await promoHoldRefusal(tx, promoCode, employerId);
@@ -105,10 +106,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!employer) return NextResponse.json({ error: "Company not found" }, { status: 404 });
 
   const currency = subscriptionCurrency(employer);
-  const listMinor = subscriptionListMinor(config, currency);
+  // The price excluding GST, plus 18% GST for India (INR); USD is export: the base alone. Promo codes below price the total payable.
+  const charge = subscriptionChargeMinor(config, currency);
+  const listMinor = charge.totalMinor;
   const periodDays = config.durationDays;
 
-  // The code is priced on the whole price (nothing in a subscription is undiscountable); only a code scoped "subscription" passes.
+  // The code is priced on the whole payable price, GST included (nothing in a subscription is undiscountable); only a code scoped "subscription" passes.
   let amountMinor = listMinor;
   let promo: { promoCode: string; discountMinor: number } | null = null;
   let waiver: ReturnType<typeof waiverPromoRaw> | null = null;
@@ -120,7 +123,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     amountMinor = quote.payableMinor;
   }
   if (preview) {
-    return NextResponse.json({ currency, listMinor, ...(promo ? { code: promo.promoCode, discountMinor: promo.discountMinor, payableMinor: amountMinor } : {}), ...(waiver ? { fullWaiver: true } : {}) });
+    return NextResponse.json({ currency, listMinor, baseMinor: charge.baseMinor, gstMinor: charge.gstMinor, ...(promo ? { code: promo.promoCode, discountMinor: promo.discountMinor, payableMinor: amountMinor } : {}), ...(waiver ? { fullWaiver: true } : {}) });
   }
   if (amountMinor <= 0 && !waiver) return NextResponse.json({ error: "Nothing payable" }, { status: 400 });
 
@@ -129,13 +132,15 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     employerId: id,
     periodDays,
     listMinor,
+    listBaseMinor: charge.baseMinor,
+    listGstMinor: charge.gstMinor,
     amountMinor,
     discountMinor: promo?.discountMinor ?? 0,
     computedAmountMinor: paymentsAreFree() && !parsed.data.testPay && !waiver ? 0 : amountMinor,
   });
   const base = subscriptionRawBase({ periodDays, currency });
   const settleNow = async (row: OrderRow, orderId: string, extra: Record<string, unknown>) => {
-    const outcome = await openOrder(id, row, promo?.promoCode ?? null, currency, false);
+    const outcome = await openOrder(id, row, promo?.promoCode ?? null, currency, amountMinor, false);
     if (outcome && "refused" in outcome) return NextResponse.json({ error: outcome.refused }, { status: 409 });
     const settled = await settleEmployerOrder({ orderId, paymentId: orderId, employerId: id }).catch(async (e) => {
       await closeOrder(id, orderId);
@@ -173,11 +178,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
   try {
     // A double click, a reload or a second tab gets the order that is already open, with no second gateway call.
-    const early = reuse(await recentOrders(db, id), promo?.promoCode ?? null, currency);
+    const early = reuse(await recentOrders(db, id), promo?.promoCode ?? null, currency, amountMinor);
     if (early) return NextResponse.json({ orderId: early.orderId, amount: early.amountMinor, currency: early.currency, keyId: razorpayKeyId(), reused: true });
     // The gateway call comes first, outside the lock. A request that loses the race leaves a Razorpay order nobody pays, which costs nothing.
     const order = await createOrder({ amountMinor, currency, receipt: `sub_${id.slice(0, 8)}_${Date.now().toString(36)}`, notes });
-    const outcome = await openOrder(id, { employerId: id, orderId: order.id, amountMinor, currency, status: "created", raw: { ...base, notes, order: legacyOrderRaw({ id: order.id, amountMinor, currency, notes }), ...(promo ? { promo } : {}) } }, promo?.promoCode ?? null, currency);
+    const outcome = await openOrder(id, { employerId: id, orderId: order.id, amountMinor, currency, status: "created", raw: { ...base, notes, order: legacyOrderRaw({ id: order.id, amountMinor, currency, notes }), ...(promo ? { promo } : {}) } }, promo?.promoCode ?? null, currency, amountMinor);
     if (outcome && "refused" in outcome) return NextResponse.json({ error: outcome.refused }, { status: 409 });
     if (outcome && "open" in outcome) return NextResponse.json({ orderId: outcome.open.orderId, amount: outcome.open.amountMinor, currency: outcome.open.currency, keyId: razorpayKeyId(), reused: true });
     return NextResponse.json({ orderId: order.id, amount: amountMinor, currency, keyId: razorpayKeyId() });

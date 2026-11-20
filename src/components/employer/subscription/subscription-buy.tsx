@@ -16,11 +16,14 @@ import { buttonClass } from "@/components/ui/button";
 import { loadRazorpay, RAZORPAY_THEME_COLOR } from "@/components/payments/razorpay-client";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
+import type { SubscriptionCharge } from "@/lib/employer-subscription";
+import { chargeLine } from "@/lib/subscription/view";
 
 type Props = {
   employerId: string;
   currency: "INR" | "USD";
-  listMinor: number;
+  /** Price excluding GST, the GST on it (0 outside India) and the total the buyer pays before a code. */
+  charge: SubscriptionCharge;
   durationDays: number;
   /** True when they hold access now: the button says Renew and the note says the days are added. */
   renewing: boolean;
@@ -38,7 +41,7 @@ function errorText(e: unknown, fallback: string): string {
   return e instanceof Error && e.message ? e.message : fallback;
 }
 
-export function SubscriptionBuy({ employerId, currency, listMinor, durationDays, renewing, note, prefill }: Props) {
+export function SubscriptionBuy({ employerId, currency, charge, durationDays, renewing, note, prefill }: Props) {
   const router = useRouter();
   const base = `/api/employer/${encodeURIComponent(employerId)}`;
   const [code, setCode] = useState("");
@@ -49,7 +52,7 @@ export function SubscriptionBuy({ employerId, currency, listMinor, durationDays,
   // A second click in the same tick, before `busy` has re-rendered, must not start a second payment.
   const inFlight = useRef(false);
 
-  const payable = applied ? applied.payableMinor : listMinor;
+  const payable = applied ? applied.payableMinor : charge.totalMinor;
   const waived = Boolean(applied?.fullWaiver);
 
   async function apply() {
@@ -189,18 +192,26 @@ export function SubscriptionBuy({ employerId, currency, listMinor, durationDays,
         <dl className="divide-y divide-ink-100 rounded-apple-md border border-ink-200/80 text-sm">
           <div className="flex items-baseline justify-between gap-4 px-4 py-3">
             <dt className="text-ink-700">Findtern Pro, {durationDays} days</dt>
-            <dd className="nums font-medium text-ink-900">{formatMoney(listMinor, currency)}</dd>
+            <dd className="nums font-medium text-ink-900">{formatMoney(charge.baseMinor, currency)}</dd>
           </div>
+          {charge.gstMinor > 0 ? (
+            <div className="flex items-baseline justify-between gap-4 px-4 py-3">
+              <dt className="text-ink-700">GST (18%)</dt>
+              <dd className="nums font-medium text-ink-900">{formatMoney(charge.gstMinor, currency)}</dd>
+            </div>
+          ) : null}
           <div className="flex items-baseline justify-between gap-4 px-4 py-3">
             <dt className="min-w-0 break-words text-ink-700">Code {applied.code}</dt>
             <dd className="nums font-medium text-success">−{formatMoney(applied.discountMinor, currency)}</dd>
           </div>
           <div className="flex items-baseline justify-between gap-4 px-4 py-3">
-            <dt className="font-semibold text-ink-900">{waived ? "To pay (full waiver)" : "To pay, GST included"}</dt>
+            <dt className="font-semibold text-ink-900">{waived ? "To pay (full waiver)" : charge.gstMinor > 0 ? "To pay, GST included" : "To pay (no GST)"}</dt>
             <dd className="nums text-lg font-semibold text-ink-900">{formatMoney(payable, currency, { zeroLabel: false })}</dd>
           </div>
         </dl>
       ) : null}
+
+      <p className="nums text-sm font-medium text-ink-900">Price: {chargeLine(charge, currency)}</p>
 
       <button type="button" onClick={() => void pay()} disabled={busy || checking} className={buttonClass({ variant: "primary", block: true, size: "md", className: "nums" })}>
         {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : waived ? <CheckCircle2 className="size-4" aria-hidden /> : <CreditCard className="size-4" aria-hidden />}

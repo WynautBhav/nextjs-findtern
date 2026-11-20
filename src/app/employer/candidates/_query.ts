@@ -18,7 +18,7 @@ import { collegeSortToken, parseSortFields, type CollegeSort } from "@/lib/candi
 import { EMPTY_PRO_REQUEST, enforcePro, hasProRequest, proAccess, proQueryPairs, proRequestOf } from "@/lib/candidate-pro-access";
 import { proChips, proFactsOf, type CollegeOption } from "@/lib/candidate-pro-filters";
 import { getEmployerSubscriptionConfig } from "@/lib/platform-settings";
-import { subscriptionPriceMinor } from "@/lib/employer-subscription";
+import { subscriptionChargeMinor, type SubscriptionCharge } from "@/lib/employer-subscription";
 import { MAX_COMPARE, isOpenProject, parseIds, rememberedFilters } from "@/lib/employer-selection";
 import { PRO_PARAMS, restorableFilters, withoutProParams } from "@/lib/employer-filter-restore";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
@@ -387,8 +387,8 @@ export type ProData = {
   ignored: boolean;
   /** Subscriptions are on sale (admin switch). */
   offered: boolean;
-  /** Price per period in the employer's currency, minor units; null when not offered or unreadable. */
-  priceMinor: number | null;
+  /** Price per period in the employer's currency (excluding GST, the GST, the total); null when not offered or unreadable. */
+  charge: SubscriptionCharge | null;
   /** How long one purchase lasts, in days. */
   periodDays: number | null;
   /** Colleges in the pool (subscribers only). */
@@ -399,7 +399,7 @@ export type ProData = {
   approxKept: number;
 };
 
-const NO_PRO: ProData = { active: false, ignored: false, offered: false, priceMinor: null, periodDays: null, colleges: [], hiddenNoScore: 0, approxKept: 0 };
+const NO_PRO: ProData = { active: false, ignored: false, offered: false, charge: null, periodDays: null, colleges: [], hiddenNoScore: 0, approxKept: 0 };
 
 /**
  * Everything the candidates page reads. `filters.project` is corrected in
@@ -559,7 +559,7 @@ export async function loadCandidates(
     data.region = employerRegion(employer ?? {});
     data.currency = data.region === "IN" ? "INR" : "USD";
     if (proConfig?.enabled) {
-      data.pro.priceMinor = subscriptionPriceMinor(proConfig, data.currency);
+      data.pro.charge = subscriptionChargeMinor(proConfig, data.currency);
       data.pro.periodDays = proConfig.durationDays;
     }
 

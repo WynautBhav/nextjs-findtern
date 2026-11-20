@@ -1,6 +1,8 @@
 import { Lock } from "lucide-react";
 
-import { formatMoney, type Currency } from "@/lib/format";
+import type { Currency } from "@/lib/format";
+import type { SubscriptionCharge } from "@/lib/employer-subscription";
+import { chargeLine } from "@/lib/subscription/view";
 import { cn } from "@/lib/utils";
 import { ButtonLink } from "@/components/ui/button";
 import { RatingSlider } from "@/components/employer/candidate-filters";
@@ -32,7 +34,7 @@ export function periodLabel(days: number | null): string {
  * one card that says what they are, what they cost and where to unlock them. Disabled inputs leave the
  * form (nothing is sent), and the way out, the link, stays a normal tab stop. Locked is never a dead end.
  */
-export function ProLockedCard({ offered, priceMinor, periodDays, currency }: { offered: boolean; priceMinor: number | null; periodDays: number | null; currency: Currency }) {
+export function ProLockedCard({ offered, charge, periodDays, currency }: { offered: boolean; charge: SubscriptionCharge | null; periodDays: number | null; currency: Currency }) {
   const why = "pro-locked-why";
   return (
     <section aria-labelledby="pro-locked-title" className="mt-4 rounded-xl bg-brand-50/60 p-3.5 ring-1 ring-inset ring-brand-200/70">
@@ -68,9 +70,9 @@ export function ProLockedCard({ offered, priceMinor, periodDays, currency }: { o
 
       {offered ? (
         <div className="mt-2.5">
-          {priceMinor ? (
+          {charge ? (
             <p className="mb-2 text-sm text-ink-800">
-              <span className="nums font-semibold text-ink-900">{formatMoney(priceMinor, currency)}</span> {periodLabel(periodDays)}
+              <span className="nums font-semibold text-ink-900">{chargeLine(charge, currency === "INR" ? "INR" : "USD")}</span> {periodLabel(periodDays)}
             </p>
           ) : null}
           <ButtonLink href={SUBSCRIPTION_HREF} variant="primary" size="md" block className="h-auto min-h-11 whitespace-normal rounded-xl px-3 py-2 text-center text-sm leading-snug">

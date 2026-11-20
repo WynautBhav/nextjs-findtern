@@ -1,4 +1,5 @@
 import { inrMinorToUsdMinor } from "./currency.ts";
+import { GST_RATE } from "./gst.ts";
 
 /**
  * Employer subscription ("Findtern Pro"): pure rules. No SQL, no migration. A purchase is an `employer_payments`
@@ -7,9 +8,10 @@ import { inrMinorToUsdMinor } from "./currency.ts";
  * The database read is `subscription/entitlement-db.ts`.
  */
 
+/** `priceInrMinor` is the price EXCLUDING GST (the base); India pays 18% GST on top, see `subscriptionChargeMinor`. */
 export type SubscriptionConfig = { priceInrMinor: number; durationDays: number; enabled: boolean };
 
-/** GST-inclusive Rs 10,000 for 365 days, on. */
+/** Rs 10,000 excluding GST (Rs 11,800 with 18% GST for India) for 365 days, on. */
 export const SUBSCRIPTION_DEFAULTS: SubscriptionConfig = { priceInrMinor: 1_000_000, durationDays: 365, enabled: true };
 
 const MAX_DURATION_DAYS = 3650;
@@ -30,9 +32,24 @@ export function parseSubscriptionConfig(raw: unknown): SubscriptionConfig {
   };
 }
 
-/** The price in `currency` minor units: INR as set, USD through the Rs 100 = $1 rule (Rs 10,000 -> $100). */
+/** The price EXCLUDING GST in `currency` minor units: INR as set, USD through the Rs 100 = $1 rule (Rs 10,000 -> $100). */
 export function subscriptionPriceMinor(c: SubscriptionConfig, currency: "INR" | "USD"): number {
   return currency === "USD" ? inrMinorToUsdMinor(c.priceInrMinor) : c.priceInrMinor;
+}
+
+export type SubscriptionCharge = { baseMinor: number; gstMinor: number; totalMinor: number };
+
+/**
+ * What a buyer pays for one purchase, before any promo code; the one source for the order, the page and the cards.
+ * INR (India): the base plus 18% GST on top, in whole paise (Rs 10,000 -> GST 1,800 -> Rs 11,800). `splitGst` backs the
+ * same base and GST out of that total, so the invoice reads base 10,000 / GST 1,800 / total 11,800.
+ * USD (export, no GST): the base converted at Rs 100 = $1, nothing added ($100).
+ */
+export function subscriptionChargeMinor(c: SubscriptionConfig, currency: "INR" | "USD"): SubscriptionCharge {
+  const baseMinor = subscriptionPriceMinor(c, currency);
+  // Integer maths (rate in whole percent, half rounds up): a float product could land a hair under a .5 tie.
+  const gstMinor = currency === "USD" ? 0 : Math.floor((baseMinor * Math.round(GST_RATE * 100) + 50) / 100);
+  return { baseMinor, gstMinor, totalMinor: baseMinor + gstMinor };
 }
 
 /** Is this `employer_payments.raw` a subscription purchase (as opposed to a hire order)? */

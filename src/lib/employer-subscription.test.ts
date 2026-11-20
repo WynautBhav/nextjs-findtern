@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
+import { splitGst } from "./gst.ts";
+import { chargeLine } from "./subscription/view.ts";
+
 import {
   SUBSCRIPTION_DEFAULTS,
   isSubscriptionOrderRaw,
   parseSubscriptionConfig,
   parseSubscriptionOverrides,
+  subscriptionChargeMinor,
   subscriptionPriceMinor,
   subscriptionState,
 } from "./employer-subscription.ts";
@@ -201,4 +205,37 @@ test("a garbled override is ignored, never throws", () => {
 test("now defaults to the present", () => {
   const s = subscriptionState({ payments: [pay(new Date(Date.now() - DAY))], override: null });
   assert.equal(s.active, true);
+});
+
+test("subscriptionChargeMinor: INR is the base plus 18% GST on top, USD (export) is the converted base with no GST", () => {
+  assert.deepEqual(subscriptionChargeMinor(SUBSCRIPTION_DEFAULTS, "INR"), { baseMinor: 1_000_000, gstMinor: 180_000, totalMinor: 1_180_000 });
+  assert.deepEqual(subscriptionChargeMinor(SUBSCRIPTION_DEFAULTS, "USD"), { baseMinor: 10_000, gstMinor: 0, totalMinor: 10_000 });
+  // Whole paise, half rounds up: 123_457 x 18% = 22_222.26 -> 22_222; 5 x 18% = 0.9 -> 1; 25 x 18% = 4.5 -> 5.
+  assert.deepEqual(subscriptionChargeMinor({ ...SUBSCRIPTION_DEFAULTS, priceInrMinor: 123_457 }, "INR"), { baseMinor: 123_457, gstMinor: 22_222, totalMinor: 145_679 });
+  assert.equal(subscriptionChargeMinor({ ...SUBSCRIPTION_DEFAULTS, priceInrMinor: 5 }, "INR").gstMinor, 1);
+  assert.equal(subscriptionChargeMinor({ ...SUBSCRIPTION_DEFAULTS, priceInrMinor: 25 }, "INR").gstMinor, 5);
+  assert.deepEqual(subscriptionChargeMinor({ ...SUBSCRIPTION_DEFAULTS, priceInrMinor: 4_990_000 }, "USD"), { baseMinor: 49_900, gstMinor: 0, totalMinor: 49_900 });
+});
+
+test("an exclusive-built total splits back through the invoice's inclusive splitGst to exactly the base and the GST charged", () => {
+  const bases = [1_000_000, 123_457, 999_999, 1, 5, 25, 99, 100, 4_990_000, 1_250_050, 100_000_000, 777_777, 1_000_001];
+  for (let b = 1_000; b < 1_000 + 3_000; b += 7) bases.push(b * 13);
+  for (const b of bases) {
+    const c = subscriptionChargeMinor({ ...SUBSCRIPTION_DEFAULTS, priceInrMinor: b }, "INR");
+    for (const place of [{ kind: "india", stateCode: "08", stateName: "Rajasthan" }, { kind: "india", stateCode: "29", stateName: "Karnataka" }] as const) {
+      const s = splitGst(c.totalMinor, place);
+      assert.equal(s.baseMinor, c.baseMinor, `base ${b}`);
+      assert.equal(s.cgstMinor + s.sgstMinor + s.igstMinor, c.gstMinor, `gst ${b}`);
+      assert.equal(s.totalMinor, c.totalMinor);
+    }
+  }
+  const s = splitGst(1_180_000, { kind: "india", stateCode: "08", stateName: "Rajasthan" });
+  assert.deepEqual([s.baseMinor, s.cgstMinor, s.sgstMinor, s.igstMinor, s.mode], [1_000_000, 90_000, 90_000, 0, "intra"]);
+  const i = splitGst(1_180_000, { kind: "india", stateCode: "29", stateName: "Karnataka" });
+  assert.deepEqual([i.baseMinor, i.cgstMinor, i.sgstMinor, i.igstMinor, i.mode], [1_000_000, 0, 0, 180_000, "inter"]);
+});
+
+test("chargeLine says the price plainly: India base + 18% GST (total), USD no GST", () => {
+  assert.equal(chargeLine(subscriptionChargeMinor(SUBSCRIPTION_DEFAULTS, "INR"), "INR"), "₹10,000 + 18% GST (₹11,800)");
+  assert.equal(chargeLine(subscriptionChargeMinor(SUBSCRIPTION_DEFAULTS, "USD"), "USD"), "$100 (no GST)");
 });

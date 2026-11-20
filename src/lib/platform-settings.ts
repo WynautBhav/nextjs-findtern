@@ -19,7 +19,7 @@ export const SETTING_DEFAULTS = {
   [PER_HIRE_FEE_KEY]: PER_HIRE_FEE_DEFAULT,
   /** Fixed monthly intern stipend per score band, INR paise (lib/pricing-config.ts); null for Espresso. */
   [INTERN_STIPEND_KEY]: STIPEND_BANDS_DEFAULT,
-  /** Employer subscription: price (INR paise, GST-inclusive), length in days, on/off (lib/employer-subscription.ts). */
+  /** Employer subscription: price (INR paise, EXCLUDING GST; India pays 18% GST on top), length in days, on/off (lib/employer-subscription.ts). */
   employer_subscription: SUBSCRIPTION_DEFAULTS,
   /** Per-employer admin grants and revokes, keyed by employer id (lib/employer-subscription.ts). */
   employer_subscription_overrides: {} as Record<string, SubscriptionOverride>,

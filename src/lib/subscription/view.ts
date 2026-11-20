@@ -1,5 +1,6 @@
-import type { SubscriptionState } from "../employer-subscription.ts";
-import { formatDate } from "../format.ts";
+import { GST_RATE } from "../gst.ts";
+import type { SubscriptionCharge, SubscriptionState } from "../employer-subscription.ts";
+import { formatDate, formatMoney } from "../format.ts";
 
 /**
  * What the employer's Findtern Pro page says about where they stand, pure. Status words are the ones the brief names:
@@ -55,4 +56,13 @@ export function renewalNote(state: SubscriptionState, durationDays: number): str
     return `Renewing adds ${durationDays} days to your current end date, so none of your remaining days are lost. New end date: ${next}.`;
   }
   return `Access starts as soon as the payment is confirmed and runs for ${durationDays} days from then.`;
+}
+
+/**
+ * The price said plainly, one wording everywhere (page, upsell card, admin editor): India "₹10,000 + 18% GST (₹11,800)",
+ * export "$100 (no GST)". The GST is shown only when the charge carries some, so a zero-GST INR price reads as plain money.
+ */
+export function chargeLine(charge: SubscriptionCharge, currency: "INR" | "USD"): string {
+  if (charge.gstMinor === 0) return currency === "USD" ? `${formatMoney(charge.totalMinor, currency)} (no GST)` : formatMoney(charge.totalMinor, currency);
+  return `${formatMoney(charge.baseMinor, currency)} + ${Math.round(GST_RATE * 100)}% GST (${formatMoney(charge.totalMinor, currency)})`;
 }

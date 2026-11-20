@@ -142,7 +142,7 @@ export function FilterColumn({
               options={pro.colleges}
             />
           ) : (
-            <ProLockedCard offered={pro.offered} priceMinor={pro.priceMinor} periodDays={pro.periodDays} currency={currency} />
+            <ProLockedCard offered={pro.offered} charge={pro.charge} periodDays={pro.periodDays} currency={currency} />
           )}
 
           <FilterSection title="Hourly price">

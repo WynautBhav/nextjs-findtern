@@ -10,7 +10,7 @@ import { AutosaveStatus, useAutosave, type SaveResult } from "@/components/admin
 import { buttonClass } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { createAutosave } from "@/lib/admin/autosave";
-import type { SubscriptionConfig } from "@/lib/employer-subscription";
+import { subscriptionChargeMinor, type SubscriptionConfig } from "@/lib/employer-subscription";
 import { draftFromConfig, subscriptionDraftEq, usdPreviewMinor, validateSubscriptionDraft, type SubscriptionDraft } from "@/lib/subscription/draft";
 import { describeLegacyBand, isLegacyTier, legacyBandChange } from "@/lib/admin/plan-band";
 import {
@@ -418,7 +418,7 @@ function StipendPanel({ initial }: { initial: StipendBands }) {
 }
 
 /**
- * Findtern Pro: the employer subscription's price (rupees, GST-inclusive), length and on/off switch. Autosaves like the other
+ * Findtern Pro: the employer subscription's price (rupees, EXCLUDING GST), length and on/off switch. Autosaves like the other
  * blocks. USD is derived (₹100 = $1), never typed. Switching it off hides the offer and puts every employer back to no access;
  * paid orders and their invoices stay as they are.
  */
@@ -437,6 +437,7 @@ function SubscriptionPanel({ initial, editable }: { initial: SubscriptionConfig;
   const check = validateSubscriptionDraft(draft);
   const bad = auto.status === "invalid" && !check.ok ? check : null;
   const usd = usdPreviewMinor(draft.price);
+  const inr = subscriptionChargeMinor(check.ok ? check.config : initial, "INR");
 
   return (
     <Panel>
@@ -470,10 +471,11 @@ function SubscriptionPanel({ initial, editable }: { initial: SubscriptionConfig;
           </li>
           <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
             <label htmlFor="subscription-price" className="text-sm font-medium text-ink-800">
-              Price
+              Price excluding GST
               <span className="block text-xs font-normal text-text-subtle">
-                Rupees, GST-inclusive.{" "}
-                {usd !== null ? <span className="nums">Charged as {formatMoney(usd, "USD")} to employers outside India.</span> : "Dollars are derived at ₹100 = $1."}
+                Rupees, before GST. India pays 18% GST on top.{" "}
+                {check.ok ? <span className="nums block font-medium text-ink-800">Employers in India pay {formatMoney(inr.totalMinor, "INR")} including GST ({formatMoney(inr.baseMinor, "INR")} + {formatMoney(inr.gstMinor, "INR")} GST).</span> : null}
+                {usd !== null ? <span className="nums block">Employers outside India pay {formatMoney(usd, "USD")}, no GST.</span> : "Dollars are derived at ₹100 = $1."}
               </span>
             </label>
             <div className="flex items-center gap-2">
