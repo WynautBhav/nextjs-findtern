@@ -11,7 +11,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Plus, Search, X } from "lucide-react";
 
-import { useProgressRouter } from "@/components/layout/navigation-progress";
+import { useCandidatesGo } from "@/app/employer/candidates/_nav";
 import { arrowKey } from "@/components/employer/skill-combobox";
 import { suggestSkills } from "@/lib/data/skills";
 import { suggestDistricts } from "@/lib/data/districts";
@@ -48,7 +48,7 @@ export function CandidateSearch({
   compact?: boolean;
   className?: string;
 }) {
-  const router = useProgressRouter();
+  const go = useCandidatesGo();
   const pathname = usePathname();
   const params = useSearchParams();
   const listId = useId();
@@ -91,13 +91,13 @@ export function CandidateSearch({
   function run(word: string) {
     setOpen(false);
     setHighlight(-1);
-    router.push(searchHref(PATH, base, word), { scroll: false });
+    go(searchHref(PATH, base, word));
   }
   function require(skill: string) {
     setOpen(false);
     setHighlight(-1);
     setValue("");
-    router.push(requireSkillHref(pathname, params.toString(), required, skill, hasPro), { scroll: false });
+    go(requireSkillHref(pathname, params.toString(), required, skill, hasPro));
   }
   function clear() {
     setValue("");

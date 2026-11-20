@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Check, Clock, MapPin, Send, Sparkles, Star } from "lucide-react";
@@ -21,7 +21,10 @@ import { sendProposalHold } from "@/lib/proposal-guard";
 import type { PresenceLabel } from "@/lib/presence";
 import { PRESENCE_ONLINE } from "@/lib/presence-logic";
 import { csrfFetch } from "@/lib/client-fetch";
-import { useOptimisticToggle } from "@/hooks/use-optimistic-toggle";
+import { useShortlisted } from "@/hooks/use-candidate-picks";
+import { announceShortlist, setShortlistOverride, togglePick } from "@/lib/candidate-picks-store";
+import { invalidateQueries } from "@/hooks/use-instant-query";
+import { CANDIDATES_RESULTS_ENDPOINT } from "@/lib/candidates-endpoint";
 import { saveFailureMessage } from "@/lib/fetch-error";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -62,33 +65,45 @@ export interface CandidateCardProps {
  */
 export function SaveToggle({ internId, projectId, shortlisted, name }: { internId: string; projectId: string; shortlisted: boolean; name?: string }) {
   const router = useProgressRouter();
-  // Flips the instant it is pressed; back to the true state if the server says no.
-  const { value: on, pending: busy, toggle: flip } = useOptimisticToggle(shortlisted);
+  // The browser's own state flips at once and rolls back if the server says no; the nav badge follows an event. No page re-render.
+  const on = useShortlisted(projectId, internId, shortlisted);
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const label = on ? "Shortlisted" : "Shortlist";
 
-  function toggle() {
+  async function toggle() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
     setError(null);
-    flip(async (next) => {
-      try {
-        const res = await csrfFetch("/api/employer/cart", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ action: next ? "add" : "remove", projectId, internId, listType: "cart" }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (res.status === 409 && typeof data.proposalId === "string") {
-          router.push(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
-          return false;
-        }
-        if (!res.ok) throw new Error(data.error ?? "Couldn't update your saved list. Try again.");
-        router.refresh();
-        return true;
-      } catch (e) {
-        setError(saveFailureMessage(e));
-        return false;
+    const next = !on;
+    const set = (value: boolean | undefined) => {
+      setShortlistOverride(projectId, internId, value);
+      announceShortlist({ projectId, internId, on: value ?? !next });
+    };
+    set(next);
+    try {
+      const res = await csrfFetch("/api/employer/cart", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: next ? "add" : "remove", projectId, internId, listType: "cart" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && typeof data.proposalId === "string") {
+        set(undefined);
+        router.push(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
+        return;
       }
-    });
+      if (!res.ok) throw new Error(data.error ?? "Couldn't update your saved list. Try again.");
+      invalidateQueries(CANDIDATES_RESULTS_ENDPOINT);
+    } catch (e) {
+      set(undefined);
+      setError(saveFailureMessage(e));
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
   }
 
   return (
@@ -125,7 +140,7 @@ const SECONDARY_PILL =
 const QUICK_VIEW_PILL = "gap-2 border border-ink-200 bg-ink-50 text-[13px] font-semibold text-ink-800 hover:bg-ink-100 hover:text-ink-900";
 
 /** A checkbox-style link: the compare picks live in the URL, so it navigates. */
-function CompareToggle({ href, selected, name }: { href: string | null; selected: boolean; name: string }) {
+function CompareToggle({ href, selected, name, internId }: { href: string | null; selected: boolean; name: string; internId: string }) {
   const box = (
     <span
       aria-hidden
@@ -151,6 +166,15 @@ function CompareToggle({ href, selected, name }: { href: string | null; selected
     <Link
       href={href}
       scroll={false}
+      // The click is answered in the browser, so the router never needs this URL's page ahead of time.
+      prefetch={false}
+      // A plain click only ticks the browser's own pick list (no request, no navigation); a new tab or no script still follows the link.
+      data-compare-toggle=""
+      onClick={(e) => {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        togglePick(internId);
+      }}
       // Starts with the visible word (WCAG 2.5.3); the state is in the name, as a link has no aria-checked.
       aria-label={selected ? `Compare ${name}: selected, press to remove` : `Compare ${name}`}
       className={cn(cls, selected ? "border-ink-300 bg-ink-100 text-ink-900" : "border-ink-200 bg-ink-50 text-ink-800 hover:bg-ink-100")}
@@ -304,7 +328,7 @@ export function CandidateCard({
             ) : null}
           </div>
           <div className="relative z-10 flex flex-wrap items-center gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
-            <CompareToggle href={compareHref} selected={selected} name={displayName} />
+            <CompareToggle href={compareHref} selected={selected} name={displayName} internId={candidate.id} />
             {quickView}
             {viewProfile}
             {primary}
@@ -384,7 +408,7 @@ export function CandidateCard({
 
         <div className="mt-auto flex flex-col gap-2 border-t border-ink-300 bg-ink-50 px-4 py-3">
           <div className="flex flex-wrap items-center gap-2 [&>*]:flex-1">
-            <CompareToggle href={compareHref} selected={selected} name={displayName} />
+            <CompareToggle href={compareHref} selected={selected} name={displayName} internId={candidate.id} />
             {quickView}
           </div>
           <div className="flex flex-wrap items-center gap-2 [&>*]:flex-1">
@@ -479,7 +503,7 @@ export function CandidateCard({
       {/* The pair of quiet controls on the left, the profile and the one primary action on the right. */}
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-3 border-t border-ink-100 pt-4">
         <div className="flex flex-wrap items-start gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
-          <CompareToggle href={compareHref} selected={selected} name={displayName} />
+          <CompareToggle href={compareHref} selected={selected} name={displayName} internId={candidate.id} />
           {quickView}
         </div>
         <div className="flex flex-wrap items-start gap-2 max-sm:w-full sm:justify-end [&>*]:max-sm:flex-1">

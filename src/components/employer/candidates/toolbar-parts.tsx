@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/app/employer/candidates/_link";
 
 import { cn } from "@/lib/utils";
 

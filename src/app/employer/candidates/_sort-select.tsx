@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useProgressRouter } from "@/components/layout/navigation-progress";
+import { useCandidatesGo } from "./_nav";
 
 import { cn } from "@/lib/utils";
 import { fieldClass } from "@/components/employer/ui-tokens";
@@ -28,7 +28,7 @@ export function SortSelect({
   /** Shown before each option ("Sort: Best match"). */
   prefix?: string;
 }) {
-  const router = useProgressRouter();
+  const go = useCandidatesGo();
   // A keyboard choice waits here for Enter or blur; the select shows it meanwhile.
   const [held, setHeld] = useState<string | null>(null);
   const keyboard = useRef(false);
@@ -36,7 +36,7 @@ export function SortSelect({
 
   function apply(next: string) {
     const hit = options.find((o) => o.value === next);
-    if (hit) router.push(hit.href, { scroll: false });
+    if (hit) go(hit.href);
   }
   function commit() {
     const next = sortCommitValue(pending.current, value);

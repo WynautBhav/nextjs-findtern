@@ -46,9 +46,10 @@ test("the college order is written into the sort parameter, and every Pro pair c
   assert.match(query, /for \(const \[key, value\] of proQueryPairs\(merged\)\) next\.append\(key, value\)/);
 });
 
-test("the filter panel treats cgpaMin 0 as 'any' and refocuses a repeated checkbox by its value", () => {
+test("the filter panel treats cgpaMin 0 as 'any' and is not remounted by its own change (no focus-restore hack)", () => {
   assert.match(panel, /ZERO_IS_ANY = \/\^\(min\|cgpaMin\|r_\[a-z\]\+\)\$\//);
-  assert.match(panel, /\[value="\$\{CSS\.escape/);
+  assert.doesNotMatch(panel, /CSS\.escape|refocus/);
+  assert.match(panel, /source: "panel"/);
 });
 
 test("the results toolbar offers the college sorts, locked for an employer without the subscription", () => {

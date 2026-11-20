@@ -12,14 +12,17 @@
  * steps back to an outline button (named "Shortlisted", aria-pressed) that removes on press.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Heart } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
-import { useOptimisticToggle } from "@/hooks/use-optimistic-toggle";
+import { useShortlisted } from "@/hooks/use-candidate-picks";
+import { announceShortlist, setShortlistOverride } from "@/lib/candidate-picks-store";
+import { invalidateQueries } from "@/hooks/use-instant-query";
+import { CANDIDATES_RESULTS_ENDPOINT } from "@/lib/candidates-endpoint";
 import { saveFailureMessage } from "@/lib/fetch-error";
 
 export function ShortlistToggle({
@@ -43,39 +46,45 @@ export function ShortlistToggle({
   className?: string;
 }) {
   const router = useProgressRouter();
-  // Flips the instant it is pressed; back to the true state if the server says no.
-  const { value: state, pending: busy, toggle: flip } = useOptimisticToggle(shortlisted);
+  // Same as the card's star: the browser's own state flips at once, the badge follows an event, no page re-render.
+  const state = useShortlisted(projectId, internId, shortlisted);
+  const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [error, setError] = useState<string | null>(null);
 
-  function toggle() {
+  async function toggle() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
     setError(null);
-    flip(async (next) => {
-      try {
-        const res = await csrfFetch("/api/employer/cart", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            action: next ? "add" : "remove",
-            projectId,
-            internId,
-            listType: "cart",
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        // An offer is already out (or they are hired): go to it, as legacy did
-        // from compare (employer-compare.tsx:457).
-        if (res.status === 409 && typeof data.proposalId === "string") {
-          router.push(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
-          return false;
-        }
-        if (!res.ok) throw new Error(data.error ?? "Couldn't update the shortlist. Try again.");
-        router.refresh();
-        return true;
-      } catch (e) {
-        setError(saveFailureMessage(e));
-        return false;
+    const next = !state;
+    const set = (value: boolean | undefined) => {
+      setShortlistOverride(projectId, internId, value);
+      announceShortlist({ projectId, internId, on: value ?? !next });
+    };
+    set(next);
+    try {
+      const res = await csrfFetch("/api/employer/cart", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ action: next ? "add" : "remove", projectId, internId, listType: "cart" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      // An offer is already out (or they are hired): go to it, as legacy did from compare (employer-compare.tsx:457).
+      if (res.status === 409 && typeof data.proposalId === "string") {
+        set(undefined);
+        router.push(`/employer/proposal/${encodeURIComponent(data.proposalId)}`);
+        return;
       }
-    });
+      if (!res.ok) throw new Error(data.error ?? "Couldn't update the shortlist. Try again.");
+      invalidateQueries(CANDIDATES_RESULTS_ENDPOINT);
+    } catch (e) {
+      set(undefined);
+      setError(saveFailureMessage(e));
+    } finally {
+      inFlight.current = false;
+      setBusy(false);
+    }
   }
 
   const variant = state ? "outline" : emphasis === "primary" ? "primary" : "outline";

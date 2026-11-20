@@ -10,11 +10,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { Check, Scale } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 import { saveComparePicks } from "@/components/employer/remember-selection";
+import { getPicks, setPicks } from "@/lib/candidate-picks-store";
 import { cn } from "@/lib/utils";
 
 const MAX = 4;
@@ -35,7 +35,6 @@ export function CompareToggle({
   /** Why this candidate can't be compared (hired, full-time offer), if so. */
   disabledReason?: string | null;
 }) {
-  const router = useRouter();
   const [picked, setPicked] = useState(initial);
   const inCompare = picked.includes(internId);
   const full = !inCompare && picked.length >= MAX;
@@ -43,7 +42,8 @@ export function CompareToggle({
   function save(next: string[]) {
     setPicked(next);
     if (projectId) saveComparePicks(employerId, projectId, next);
-    router.refresh();
+    // Nothing else on this page reads the picks from the server, and a Candidates list kept in the browser's cache follows the store.
+    if (projectId && getPicks().project === projectId) setPicks(next);
   }
 
   if (disabledReason) {

@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 import { getSessionState, unauthenticatedResponse } from "@/lib/auth";
+import { rememberedSelection } from "@/lib/employer-selection";
 import { readSession } from "@/lib/security/session";
 import { loadCandidates } from "@/app/employer/candidates/_query";
 import { withRelaxCounts } from "@/app/employer/candidates/_relax";
@@ -30,6 +31,10 @@ export async function GET(req: Request) {
     params[key] = had === undefined ? value : Array.isArray(had) ? [...had, value] : [had, value];
   }
   const filters = readFilters(params as SearchParams);
+  // The page's own cookie rules (no database): the remembered project when the link names none, and that project's compare picks.
+  const remembered = await rememberedSelection(claimed.uid, filters.project);
+  if (!filters.project && remembered.project) filters.project = remembered.project;
+  if (!filters.idsSet) filters.ids = remembered.compare;
   // A link that carries filters is not a bare visit; the endpoint never restores remembered ones (the page did, on first paint).
   const loading = loadCandidates(claimed.uid, filters, { hasFilterParams: true, fresh: true, lean: true, viewingAsAdmin: Boolean(claimed.impersonator) });
   loading.catch(() => undefined);

@@ -2,19 +2,18 @@
 
 /**
  * The candidates filter panel. Same contract as the legacy sidebar: the
- * filters are a GET form the server reads (every view is a URL), applied on
- * change (debounced) with client-side navigation. From lg up it is the left
+ * filters are a GET form (every view is a URL; with no script it submits as a plain GET), applied on
+ * change (debounced) in place by the results region. From lg up it is the left
  * column; on a phone the one form moves into a sheet (focus trapped, Esc
  * closes, focus returns to the Filters button), so it is never rendered twice.
  *
- * The page re-keys this panel on every applied filter, so the control in use
- * unmounts. Its name is kept here and focus is put back on the new copy, and
- * an open phone sheet reopens, or a keyboard user would be thrown to the top.
+ * The panel is NOT remounted when it applies its own change, so the control in use keeps focus and an open
+ * phone sheet stays open. It is re-keyed only when the filters change from somewhere else (a chip, Back).
  */
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { useProgressRouter } from "@/components/layout/navigation-progress";
+import { useCandidatesGo } from "./_nav";
 import { SlidersHorizontal } from "lucide-react";
 
 import { cityParam } from "@/components/employer/candidate-view";
@@ -23,9 +22,6 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 /** Range filters at zero mean "any" and are left out of the URL. */
 const ZERO_IS_ANY = /^(min|cgpaMin|r_[a-z]+)$/;
 const DESKTOP = "(min-width: 1024px)";
-
-let refocus: { selector: string; at: number; sheet: boolean } | null = null;
-const fresh = (r: typeof refocus) => r !== null && Date.now() - r.at < 5000;
 
 function subscribe(onChange: () => void) {
   const mq = window.matchMedia(DESKTOP);
@@ -47,7 +43,7 @@ export function FilterPanel({
   /** The live result count, for the sheet's "Show" button. */
   total: number;
 }) {
-  const router = useProgressRouter();
+  const go = useCandidatesGo();
   const pathname = usePathname();
   const form = useRef<HTMLFormElement>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -58,35 +54,10 @@ export function FilterPanel({
     () => window.matchMedia(DESKTOP).matches,
     () => true,
   );
-  const [open, setOpen] = useState(() => fresh(refocus) && Boolean(refocus?.sheet));
-  const openRef = useRef(open);
-  useEffect(() => {
-    openRef.current = open;
-  }, [open]);
-
-  useEffect(() => {
-    // Only straight after an apply: a later visit to the page must not grab focus.
-    if (fresh(refocus) && refocus) {
-      const selector = refocus.selector;
-      // The sheet mounts its content a tick later; let it settle first.
-      if (selector) window.setTimeout(() => form.current?.querySelector<HTMLElement>(selector)?.focus(), 60);
-    }
-    refocus = null;
-  }, []);
-
+  const [open, setOpen] = useState(false);
   function apply() {
     const el = form.current;
     if (!el) return;
-    const active = document.activeElement;
-    const inForm = (active instanceof HTMLInputElement || active instanceof HTMLSelectElement) && el.contains(active) && (active.name || active.id);
-    // By name, or by id for a control with no name (the city box: its value travels in a hidden input).
-    // A repeated checkbox (the colleges) is found again by its value, or focus would jump to the first of them.
-    const named = (a: HTMLInputElement) =>
-      a.type === "checkbox" && a.value
-        ? `[name="${CSS.escape(a.name)}"][value="${CSS.escape(a.value)}"]:not([type="hidden"])`
-        : `[name="${CSS.escape(a.name)}"]:not([type="hidden"])`;
-    const selector = inForm && active ? ((active as HTMLInputElement).name ? named(active as HTMLInputElement) : `#${CSS.escape(active.id)}`) : "";
-    refocus = selector || openRef.current ? { selector, at: Date.now(), sheet: openRef.current } : null;
     const next = new URLSearchParams();
     for (const [key, raw] of new FormData(el).entries()) {
       const value = String(raw).trim();
@@ -112,11 +83,11 @@ export function FilterPanel({
         const value = next.get(key);
         if (value) clean.set(key, value);
       }
-      router.push(`${pathname}?${clean.toString()}`, { scroll: false });
+      go(`${pathname}?${clean.toString()}`); // a project switch brings its own skills, city and remembered filters: the panel re-reads them
       return;
     }
     const qs = next.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    go(qs ? `${pathname}?${qs}` : pathname, { source: "panel" });
   }
 
   const formEl = (
@@ -143,8 +114,6 @@ export function FilterPanel({
       onSubmit={(e) => {
         e.preventDefault();
         window.clearTimeout(timer.current);
-        // "Show results" closes the sheet on purpose: the remount must not reopen it.
-        openRef.current = false;
         apply();
         setOpen(false);
       }}

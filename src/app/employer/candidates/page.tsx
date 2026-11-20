@@ -15,6 +15,7 @@ import {
   readFilters,
   type SearchParams,
 } from "./_query";
+import { normaliseQuery } from "@/lib/instant-query/cache";
 import { perfScope } from "@/lib/perf/timing";
 import { withRelaxCounts } from "./_relax";
 
@@ -46,6 +47,13 @@ async function CandidatesPageImpl({
     redirect(`/employer/intern/${encodeURIComponent(ftIntern)}`);
   }
 
+  // The key the first results are cached under: the address bar's query, without the compare picks (those are the browser's).
+  const addressQs = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (key === "ids" || key === "ftInternId" || value === undefined) continue;
+    for (const v of Array.isArray(value) ? value : [value]) addressQs.append(key, v);
+  }
+  const initialQs = normaliseQuery(addressQs);
   const filters = readFilters(params);
   // The project and compare picks carry over from the last visit (cookie)
   // unless the URL names them. Picks belong to a project: this project's own.
@@ -66,7 +74,7 @@ async function CandidatesPageImpl({
 
   await withRelaxCounts(uid, data, filters);
 
-  return <CandidatesView uid={uid} data={data} filters={filters} flow={flow} filtersHidden={filtersHidden} />;
+  return <CandidatesView uid={uid} data={data} filters={filters} flow={flow} filtersHidden={filtersHidden} initialQs={initialQs} />;
 }
 
 export default function CandidatesPage(props: Parameters<typeof CandidatesPageImpl>[0]) {

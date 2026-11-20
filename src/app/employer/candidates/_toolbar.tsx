@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/app/employer/candidates/_link";
 import { ArrowDown, ArrowUp, LayoutGrid, List, Rows3, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";

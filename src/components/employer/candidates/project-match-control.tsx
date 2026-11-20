@@ -5,7 +5,7 @@
  * in visible text, what it does; every button builds its link from the current URL, so none is a no-op.
  */
 
-import Link from "next/link";
+import Link from "@/app/employer/candidates/_link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Link2, RotateCcw, Unlink } from "lucide-react";
 

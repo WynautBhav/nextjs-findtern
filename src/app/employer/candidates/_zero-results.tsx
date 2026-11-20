@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/app/employer/candidates/_link";
 import { ChevronRight, FunnelX, X } from "lucide-react";
 
 import { SURFACE_CLASS } from "@/components/app/primitives";

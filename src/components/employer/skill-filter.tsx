@@ -16,9 +16,9 @@
  */
 
 import { useId, useState } from "react";
-import Link from "next/link";
+import Link from "@/app/employer/candidates/_link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useProgressRouter } from "@/components/layout/navigation-progress";
+import { useCandidatesGo } from "@/app/employer/candidates/_nav";
 import { Check, Plus, X } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
@@ -57,7 +57,7 @@ export function SkillFilter({
   /** Trailing quiet links (e.g. "Show everyone"). */
   children?: React.ReactNode;
 }) {
-  const router = useProgressRouter();
+  const go = useCandidatesGo();
   const pathname = usePathname();
   const params = useSearchParams();
   const [query, setQuery] = useState("");
@@ -88,7 +88,7 @@ export function SkillFilter({
 
   function add(skill: string) {
     if (full || active.some((s) => s.toLowerCase() === skill.toLowerCase())) return;
-    router.push(hrefWith([...active, skill]), { scroll: false });
+    go(hrefWith([...active, skill]));
     setQuery("");
     setOpen(false);
     setHighlight(-1);

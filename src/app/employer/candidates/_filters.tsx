@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/app/employer/candidates/_link";
 import { Plus, RotateCcw, SlidersHorizontal } from "lucide-react";
 
 import { RATING_META } from "@/lib/employer-candidates";
@@ -17,7 +17,7 @@ import { FilterSection } from "@/components/employer/candidates/filter-parts";
 import { ProFilterSections, ProLockedCard } from "@/components/employer/candidates/pro-filters";
 import { collegeSortToken } from "@/lib/candidate-sort";
 import { FilterPanel } from "./_filter-form";
-import { activeChips, activeFilterCount, queryOf, resetHref, type Filters, type ProData } from "@/lib/candidates-params";
+import { activeChips, activeFilterCount, resetHref, type Filters, type ProData } from "@/lib/candidates-params";
 
 const SELECT = cn(fieldClass, "mt-2");
 
@@ -41,6 +41,7 @@ export function FilterColumn({
   cityDefault = "",
   projectToggle = null,
   pro,
+  panelEpoch = 0,
 }: {
   filters: Filters;
   projects: { id: string; projectName: string }[];
@@ -55,6 +56,8 @@ export function FilterColumn({
   effectiveSkills: string[];
   /** A city the selected project brings (not typed by hand): shown as its own chip and counted. */
   projectCity?: string;
+  /** Changes when the filters change from outside the panel (a chip, Back): the panel then re-reads them. Its own changes never bump it. */
+  panelEpoch?: number;
   /** The selected project's own city: pre-fills "Preferred work city" unless the URL sets `city`. Read-only. */
   cityDefault?: string;
   /** "Ignore project skills" / "Match to project": on a phone it lives in the sheet, not on the page. */
@@ -73,7 +76,7 @@ export function FilterColumn({
         "lg:[scrollbar-color:transparent_transparent] lg:[scrollbar-width:thin] lg:hover:[scrollbar-color:var(--color-ink-300)_transparent] lg:focus-within:[scrollbar-color:var(--color-ink-300)_transparent]",
       )}
     >
-      <FilterPanel key={queryOf(filters)} cityDefault={cityDefault} activeCount={activeFilterCount(filters, effectiveSkills, projectCity)} total={total}>
+      <FilterPanel key={panelEpoch} cityDefault={cityDefault} activeCount={activeFilterCount(filters, effectiveSkills, projectCity)} total={total}>
         {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
         {filters.view !== "list" ? <input type="hidden" name="view" value={filters.view} /> : null}
         {filters.pageSize !== DEFAULT_PAGE_SIZE ? <input type="hidden" name="pageSize" value={filters.pageSize} /> : null}
@@ -120,7 +123,7 @@ export function FilterColumn({
           </div>
 
           <FilterSection title="Location & setup" count={count.location}>
-            <CityFilter key={city.value} defaultValue={city.value} label="Preferred work city" autoApply />
+            <CityFilter defaultValue={city.value} label="Preferred work city" autoApply />
             {city.prefilled ? <p className="mt-1.5 text-sm text-ink-700">From your project: {city.value}. Change it to narrow or widen the search.</p> : null}
             <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
               {/* Unchecked sends only the hidden 0; checked adds remote=1 after it. */}

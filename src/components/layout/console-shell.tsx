@@ -23,6 +23,7 @@
 import Link from "next/link";
 
 import { RAIL_COOKIE } from "@/lib/rail";
+import { SHORTLIST_EVENT, adjustedBadge, type ShortlistEventDetail } from "@/lib/candidate-picks-store";
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
@@ -472,7 +473,28 @@ function RailScroller({ light, column, children }: { light: boolean; column: boo
   );
 }
 
-function RailLink({ item, active, compact, light, column = false, onNavigate }: { item: ConsoleNavItem; active: boolean; compact: boolean; light: boolean; column?: boolean; onNavigate?: () => void }) {
+/** The Shortlist badge follows stars pressed on the Candidates page without waiting for a page render (see candidate-picks-store). */
+function useShortlistBadge(item: ConsoleNavItem): ConsoleNavItem {
+  const cart = item.href === "/employer/cart";
+  // The adjustment belongs to the number it was made against: a fresh number from the server starts again from zero.
+  const [adj, setAdj] = useState<{ on: ConsoleNavItem["badge"]; delta: number }>({ on: item.badge, delta: 0 });
+  const delta = adj.on === item.badge ? adj.delta : 0;
+  useEffect(() => {
+    if (!cart) return;
+    const onChange = (e: Event) => {
+      const d = (e as CustomEvent<ShortlistEventDetail>).detail;
+      if (!d) return;
+      setAdj((was) => ({ on: item.badge, delta: (was.on === item.badge ? was.delta : 0) + (d.on ? 1 : -1) }));
+    };
+    window.addEventListener(SHORTLIST_EVENT, onChange);
+    return () => window.removeEventListener(SHORTLIST_EVENT, onChange);
+  }, [cart, item.badge]);
+  if (!cart || delta === 0) return item;
+  return { ...item, badge: adjustedBadge(item.badge, delta), badgeLabel: item.badgeLabel ?? "saved" };
+}
+
+function RailLink({ item: given, active, compact, light, column = false, onNavigate }: { item: ConsoleNavItem; active: boolean; compact: boolean; light: boolean; column?: boolean; onNavigate?: () => void }) {
+  const item = useShortlistBadge(given);
   const external = item.href.startsWith("mailto:");
   const className = cn(
     // 44px on touch; 40px with a mouse. A short window scrolls the rail
