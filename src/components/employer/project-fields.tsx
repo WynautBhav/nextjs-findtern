@@ -16,7 +16,7 @@
  *   `preferredLocations: []`, so an older project's list is dropped on save.
  */
 
-import { Info } from "lucide-react";
+import { Info, Lock } from "lucide-react";
 
 import { ChoiceGroup, FieldHint, FieldLabel, NativeSelect, TextField } from "@/components/employer/company-fields";
 import { CityField, StateField } from "@/components/employer/location-fields";
@@ -32,6 +32,7 @@ import {
   projectPlaceError,
   projectSkillsError,
 } from "@/lib/project-locations";
+import { isLockedWhilePublished } from "@/lib/projects/lifecycle";
 import { projectNameIssue } from "@/lib/project-name";
 import { TIMEZONES } from "@/lib/timezones";
 
@@ -50,6 +51,30 @@ export type ProjectBaseline = {
   state: string;
   locationType: string;
 };
+
+function LockedGroup({ why, children }: { why: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-apple-lg border border-ink-200/80 bg-ink-50/60">
+      <dl className="divide-y divide-ink-200/70">{children}</dl>
+      <p className="flex items-start gap-2 border-t border-ink-200/70 px-4 py-3 text-sm text-ink-700">
+        <Info className="mt-0.5 size-4 shrink-0 text-ink-500" aria-hidden />
+        <span>{why}</span>
+      </p>
+    </div>
+  );
+}
+
+function LockedRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:gap-6">
+      <dt className="flex shrink-0 items-center gap-1.5 text-sm font-medium text-ink-700 sm:w-40">
+        <Lock className="size-3.5 shrink-0 text-ink-500" aria-hidden />
+        {label}
+      </dt>
+      <dd className="min-w-0 break-words text-sm text-ink-900">{children || <span className="text-text-subtle">Not set</span>}</dd>
+    </div>
+  );
+}
 
 /** Field-keyed problems with this project, empty when it may be saved. */
 export function projectFormErrors(
@@ -103,6 +128,7 @@ export function ProjectFields({
   idPrefix = "project",
   showPincode = false,
   part = "all",
+  lockedFields = false,
 }: {
   values: ProjectDraft;
   set: (patch: Partial<ProjectDraft>) => void;
@@ -113,7 +139,10 @@ export function ProjectFields({
   showPincode?: boolean;
   /** Render one section of the form (the post page groups them) or everything (onboarding). */
   part?: "all" | "basics" | "skills" | "location";
+  /** The project is live: fields the server refuses to change show as read-only rows. */
+  lockedFields?: boolean;
 }) {
+  const locked = (field: string) => lockedFields && isLockedWhilePublished(field);
   const show = (p: "basics" | "skills" | "location") => part === "all" || part === p;
   const id = (name: string) => `${idPrefix}-${name}`;
   const onsite = Boolean(values.locationType) && values.locationType !== "remote";
@@ -130,6 +159,11 @@ export function ProjectFields({
     <div className="space-y-6">
       {show("basics") && (
       <>
+      {locked("projectName") ? (
+        <LockedGroup why="Locked while the project is live: candidates see this as the role. Pause the project to change it.">
+          <LockedRow label="Project name">{values.projectName}</LockedRow>
+        </LockedGroup>
+      ) : (
       <TextField
         id={id("name")}
         label="Project name"
@@ -140,6 +174,7 @@ export function ProjectFields({
         hint="Candidates see this as the role. Name the work, not a requisition number or your company."
         onChange={(v) => set({ projectName: v })}
       />
+      )}
 
       <ChoiceGroup
         id={id("scope")}
@@ -167,7 +202,19 @@ export function ProjectFields({
       </>
       )}
 
-      {show("skills") && (
+      {show("skills") && (locked("skills") ? (
+      <LockedGroup why="Locked while the project is live: candidates are matched on these. Pause the project to change them.">
+        <LockedRow label="Skills">
+          {values.skills.length ? (
+            <ul className="flex flex-wrap gap-1.5">
+              {values.skills.map((skill) => (
+                <li key={skill} className="rounded-full bg-white px-3 py-0.5 text-sm font-medium text-ink-800 ring-1 ring-inset ring-ink-200">{skill}</li>
+              ))}
+            </ul>
+          ) : null}
+        </LockedRow>
+      </LockedGroup>
+      ) : (
       <ChipInput
         id={id("skills")}
         label="Skills"
@@ -183,9 +230,16 @@ export function ProjectFields({
         suggest={(q) => suggestSkills(q, 8)}
         listOnly
       />
-      )}
+      ))}
 
-      {show("location") && (
+      {show("location") && (locked("locationType") ? (
+      <LockedGroup why="Locked while the project is live: candidates are matched on where and how it runs. Pause the project to change these.">
+        <LockedRow label="Work mode">{WORK_MODES.find((m) => m.value === values.locationType)?.label ?? values.locationType}</LockedRow>
+        {onsite ? <LockedRow label="State">{values.state}</LockedRow> : null}
+        {onsite ? <LockedRow label="City">{values.city}</LockedRow> : null}
+        <LockedRow label="Timezone">{TIMEZONES.find((t) => t.id === values.timezone && !t.group)?.label ?? values.timezone}</LockedRow>
+      </LockedGroup>
+      ) : (
       <>
 
       <ChoiceGroup
@@ -274,7 +328,7 @@ export function ProjectFields({
         </div>
       </div>
       </>
-      )}
+      ))}
     </div>
   );
 }

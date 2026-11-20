@@ -1,6 +1,7 @@
 // Pure decision flow for project lifecycle routes. No DB, no clock unless passed.
 import {
-  EDITABLE_WHILE_PUBLISHED,
+  isLockedWhilePublished,
+  publishedLockedMessage,
   canTransition,
   isEditableByEmployer,
   normalizeStatus,
@@ -77,15 +78,12 @@ export function isTransitionConflict(affectedRows: number): boolean {
   return affectedRows < 1;
 }
 
-const PUBLISHED_ALLOWED = new Set<string>(EDITABLE_WHILE_PUBLISHED);
-
 /** Why an employer edit is refused for this status, or null. `changed` lists the fields that differ. */
 export function editBlockedReason(status: string | null | undefined, changed: readonly string[]): string | null {
   const s = normalizeStatus(status);
   if (isEditableByEmployer(status)) return null;
   if (s === "published") {
-    const bad = changed.filter((k) => !PUBLISHED_ALLOWED.has(k));
-    return bad.length ? `While published you can only change: ${EDITABLE_WHILE_PUBLISHED.join(", ")}.` : null;
+    return changed.some(isLockedWhilePublished) ? publishedLockedMessage(changed) : null;
   }
   if (s === "pending_review") return "This project is in review. Move it back to draft to edit it.";
   return "A closed project can't be edited.";

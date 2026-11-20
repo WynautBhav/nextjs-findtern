@@ -10,7 +10,7 @@ import { FormNotice } from "@/components/employer/company-fields";
 import { ProjectFields, projectFormErrors, type ProjectBaseline } from "@/components/employer/project-fields";
 import { csrfFetch } from "@/lib/client-fetch";
 import { emptyProject, type ProjectDraft } from "@/lib/employer-onboarding";
-import { MAX_SKILLS_PER_PROJECT, submitReadiness } from "@/lib/projects/lifecycle";
+import { EDITABLE_WHILE_PUBLISHED, MAX_SKILLS_PER_PROJECT, isLockedWhilePublished, submitReadiness } from "@/lib/projects/lifecycle";
 
 // Keys are what submitReadiness reports; labels are what the employer sees on the form.
 const CHECKS: [key: string, label: string][] = [
@@ -38,7 +38,7 @@ export function ProjectForm({
   companyName?: string | null;
   companyPlace?: { city?: string | null; state?: string | null };
   defaultTimezone?: string;
-  /** Published: only scope, preferred locations and the full-time flag may change. */
+  /** Published: only EDITABLE_WHILE_PUBLISHED may change; the rest shows read-only. */
   lockedFields?: boolean;
   /** The project is taken down by Findtern: every field is read-only and there is nothing to save. */
   readOnly?: boolean;
@@ -55,7 +55,9 @@ export function ProjectForm({
 
   async function save(thenSubmit: boolean) {
     setError(null);
-    const found = projectFormErrors(form, baseline, companyName);
+    // A live project saves only what the server accepts, so only those fields are checked and sent.
+    const all = projectFormErrors(form, baseline, companyName);
+    const found = lockedFields ? Object.fromEntries(Object.entries(all).filter(([k]) => !isLockedWhilePublished(k))) : all;
     setErrors(found);
     if (Object.keys(found).length) return;
     if (thenSubmit && missing.length) return setError(`Complete these first: ${missing.map(labelOf).join(", ")}.`);
@@ -64,7 +66,11 @@ export function ProjectForm({
       const res = await csrfFetch(projectId ? `/api/employer/projects/${projectId}` : `/api/employer/${employerId}/projects`, {
         method: projectId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, preferredLocations: [] }),
+        body: JSON.stringify(
+          lockedFields
+            ? Object.fromEntries(EDITABLE_WHILE_PUBLISHED.map((k) => [k, k === "preferredLocations" ? [] : form[k]]))
+            : { ...form, preferredLocations: [] },
+        ),
       });
       const body = await res.json().catch(() => ({}));
       if (!res.ok) return setError(body.error ?? "Could not save. Try again.");
@@ -120,7 +126,7 @@ export function ProjectForm({
       <div className={lockedFields ? "max-w-2xl" : "lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-8"}>
         <div className="min-w-0 space-y-5">
           {lockedFields && !readOnly && (
-            <FormNotice tone="info">This project is live. You can change how long it runs, preferred locations and the full-time offer.</FormNotice>
+            <FormNotice tone="info">This project is live. You can change its scope of work and the full-time option. To change anything else, pause the project first.</FormNotice>
           )}
           <p className="text-sm text-text-subtle">
             Fields marked <span aria-hidden className="text-danger">*</span>
@@ -139,22 +145,22 @@ export function ProjectForm({
           <fieldset disabled={busy !== null} className="min-w-0 space-y-5">
             <Surface className={sectionCls}>
               {head(1, "Basics", "Name the work and how long it runs.")}
-              <ProjectFields part="basics" values={form} set={set} errors={errors} companyPlace={companyPlace} idPrefix="post" />
+              <ProjectFields part="basics" values={form} set={set} errors={errors} companyPlace={companyPlace} idPrefix="post" lockedFields={lockedFields} />
             </Surface>
             <Surface className={sectionCls}>
               {head(
                 2,
                 "Skills",
                 "Candidates are matched on these.",
-                <span aria-live="polite" className={`nums shrink-0 rounded-full px-2.5 py-1 text-sm font-medium ring-1 ring-inset ${overSkills ? "bg-danger-soft text-danger ring-danger/25" : "bg-ink-100 text-ink-700 ring-ink-200"}`}>
+                lockedFields ? undefined : <span aria-live="polite" className={`nums shrink-0 rounded-full px-2.5 py-1 text-sm font-medium ring-1 ring-inset ${overSkills ? "bg-danger-soft text-danger ring-danger/25" : "bg-ink-100 text-ink-700 ring-ink-200"}`}>
                   {form.skills.length}/{MAX_SKILLS_PER_PROJECT}
                 </span>,
               )}
-              <ProjectFields part="skills" values={form} set={set} errors={errors} companyPlace={companyPlace} idPrefix="post" />
+              <ProjectFields part="skills" values={form} set={set} errors={errors} companyPlace={companyPlace} idPrefix="post" lockedFields={lockedFields} />
             </Surface>
             <Surface className={sectionCls}>
               {head(3, "Location", "Where the intern works, and your timezone.")}
-              <ProjectFields part="location" values={form} set={set} errors={errors} companyPlace={companyPlace} idPrefix="post" />
+              <ProjectFields part="location" values={form} set={set} errors={errors} companyPlace={companyPlace} idPrefix="post" lockedFields={lockedFields} />
             </Surface>
           </fieldset>
         </div>

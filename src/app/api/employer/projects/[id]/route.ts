@@ -73,7 +73,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   });
   // A legacy row's status toggle (close or reopen) is not an edit.
   const blocked = legacyRow && d.status ? null : editBlockedReason(project.status, changed);
-  if (blocked) return NextResponse.json({ error: blocked }, { status: 409 });
+  if (blocked) return NextResponse.json({ error: blocked, code: "project_not_editable" }, { status: 409 });
   if (d.skills) {
     if (d.skills.length > MAX_PROJECT_SKILLS) return NextResponse.json({ error: `A project can have at most ${MAX_PROJECT_SKILLS} skills.` }, { status: 400 });
     const skillsProblem = projectSkillsError(d.skills, (project.skills as string[] | null) ?? []);

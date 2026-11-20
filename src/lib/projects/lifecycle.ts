@@ -75,6 +75,36 @@ export function isEditableByEmployer(status: string | null | undefined): boolean
 /** Fields (projects columns) an employer may change while a project is published. */
 export const EDITABLE_WHILE_PUBLISHED = ["scopeOfWork", "preferredLocations", "fullTimeOffer"] as const;
 
+/** True when the server refuses a change to this field while the project is published. */
+export const isLockedWhilePublished = (field: string): boolean =>
+  !(EDITABLE_WHILE_PUBLISHED as readonly string[]).includes(field);
+
+/**
+ * What an employer calls each project field. Fields missing here are never named in a message
+ * (preferredLocations has no input on the form any more).
+ */
+export const PROJECT_FIELD_LABELS: Readonly<Record<string, string>> = {
+  projectName: "title",
+  skills: "skills",
+  scopeOfWork: "scope of work",
+  fullTimeOffer: "full-time option",
+  locationType: "work mode",
+  city: "city",
+  state: "state",
+  pincode: "PIN code",
+  timezone: "timezone",
+};
+
+const joinWords = (xs: readonly string[]) =>
+  xs.length < 2 ? (xs[0] ?? "") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
+
+/** Plain-language 409 for an edit that touches fields a live project keeps locked. `changed` are raw column names. */
+export function publishedLockedMessage(changed: readonly string[]): string {
+  const locked = joinWords([...new Set(changed.filter(isLockedWhilePublished).map((k) => PROJECT_FIELD_LABELS[k]).filter(Boolean))]);
+  const open = joinWords(EDITABLE_WHILE_PUBLISHED.map((k) => PROJECT_FIELD_LABELS[k]).filter(Boolean).map((l) => `the ${l}`));
+  return `This project is live, so its ${locked || "other details"} can't be changed. You can still change ${open}. To change the rest, pause the project first.`;
+}
+
 export interface SubmitReadinessInput {
   projectName?: string | null;
   scopeOfWork?: string | null;
