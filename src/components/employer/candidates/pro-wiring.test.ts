@@ -12,7 +12,7 @@ import { collegeSortToken } from "../../../lib/candidate-sort.ts";
  * URL round trip through the same helpers the page uses.
  */
 const query = readFileSync(join(import.meta.dirname, "../../../app/employer/candidates/_query.ts"), "utf8");
-const results = readFileSync(join(import.meta.dirname, "../../../app/employer/candidates/_results.tsx"), "utf8");
+const results = readFileSync(join(import.meta.dirname, "../../../app/employer/candidates/_toolbar.tsx"), "utf8");
 const panel = readFileSync(join(import.meta.dirname, "../../../app/employer/candidates/_filter-form.tsx"), "utf8");
 
 test("the loader asks for the entitlement before anything is restored or filtered, and empties the Pro filters without it", () => {

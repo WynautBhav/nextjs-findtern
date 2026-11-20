@@ -21,6 +21,8 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
 import { Check, Plus, X } from "lucide-react";
 
+import { buttonClass } from "@/components/ui/button";
+
 import { suggestSkills } from "@/lib/data/skills";
 import { MAX_SKILLS } from "@/lib/onboarding";
 import { skillFilterHref } from "@/lib/skill-filter-href";
@@ -35,6 +37,7 @@ export function SkillFilter({
   note,
   className,
   hasPro = false,
+  projectControl,
   children,
 }: {
   /** The skills the list is filtered by right now. */
@@ -49,6 +52,8 @@ export function SkillFilter({
   className?: string;
   /** Findtern Pro is active: the chip links keep the Pro filters in the URL. Without it they are dropped (default). */
   hasPro?: boolean;
+  /** The project-match control; replaces the built-in "Restore project skills" link (the page owns what matching means). */
+  projectControl?: React.ReactNode;
   /** Trailing quiet links (e.g. "Show everyone"). */
   children?: React.ReactNode;
 }) {
@@ -94,8 +99,11 @@ export function SkillFilter({
 
   return (
     <section aria-labelledby="skills-heading" className={cn("flex flex-wrap items-center gap-x-1.5 gap-y-0", className)}>
-      <h2 id="skills-heading" className="mr-1 text-[13px] font-medium text-ink-600 max-sm:sr-only">
+      <h2 id="skills-heading" className="mr-1.5 text-sm font-semibold text-ink-900">
         {title}
+        <span className="nums ml-1.5 font-normal text-ink-600">
+          {active.length}/{MAX_SKILLS}
+        </span>
       </h2>
       <p id={`${listId}-note`} className="sr-only">
         {fromProject ? "Skills from the selected project. " : ""}
@@ -117,7 +125,11 @@ export function SkillFilter({
             </Link>
           </li>
         ))}
-        {active.length === 0 ? <li className="inline-flex min-h-9 items-center text-[13px] text-text-subtle">None</li> : null}
+        {active.length === 0 ? (
+          <li className="inline-flex min-h-9 items-center text-[13px] text-ink-600 touch:min-h-11">
+            {projectSkills.length > 0 || projectControl ? "Any skill. Add one or match a project." : "Any skill. Add one to narrow the list."}
+          </li>
+        ) : null}
       </ul>
 
       {/* Always mounted so the screen reader hears the note appear; empty it takes no room. */}
@@ -212,28 +224,28 @@ export function SkillFilter({
           ) : null}
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="group inline-flex min-h-9 items-center outline-none touch:min-h-11"
-        >
-          <span className="inline-flex h-7 items-center gap-1 rounded-lg px-2.5 text-[13px] font-medium border border-dashed border-ink-300 text-ink-700 transition-colors group-hover:border-ink-400 group-hover:text-ink-900 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
-            <Plus className="size-3.5" aria-hidden />
-            Add skill
-          </span>
+        <button type="button" onClick={() => setAdding(true)} className={buttonClass({ variant: "outline", size: "sm", className: "gap-1.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600" })}>
+          <Plus className="size-3.5" aria-hidden />
+          Add skill
         </button>
       )}
 
+      {projectControl ? (
+        <div className="mt-2 w-full">{projectControl}</div>
+      ) : (
+        <>
       {active.length === 0 && projectSkills.length > 0 ? (
-        <Link href={hrefWith(null)} scroll={false} className="inline-flex min-h-9 items-center px-1.5 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
-          <Check className="mr-1 size-3.5" aria-hidden />
-          Restore project skills
-        </Link>
-      ) : restore ? (
-        <Link href={hrefWith(null)} scroll={false} className="inline-flex min-h-9 items-center px-1.5 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
-          Restore project skills
-        </Link>
-      ) : null}
+            <Link href={hrefWith(null)} scroll={false} className="inline-flex min-h-9 items-center px-1.5 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
+              <Check className="mr-1 size-3.5" aria-hidden />
+              Restore project skills
+            </Link>
+          ) : restore ? (
+            <Link href={hrefWith(null)} scroll={false} className="inline-flex min-h-9 items-center px-1.5 text-[13px] font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900 touch:min-h-11">
+              Restore project skills
+            </Link>
+          ) : null}
+        </>
+      )}
       {children}
     </section>
   );
