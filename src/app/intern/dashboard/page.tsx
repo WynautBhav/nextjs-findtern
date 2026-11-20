@@ -483,7 +483,7 @@ export default async function InternHome() {
       />
 
       <div className="space-y-4">
-        {openToWork ? null : <HiddenProfileBanner />}
+        <HiddenProfileBanner hidden={!openToWork} />
         {/* Only once the profile is visible: before that, "employers can see you" contradicts "Not visible yet". */}
         <PresenceNotice userId={session.uid} on={presenceOn && profileStatus.tone === "live"} />
         {/* Hides a dismissed notice before first paint on a hard load (the notice is server-rendered). */}

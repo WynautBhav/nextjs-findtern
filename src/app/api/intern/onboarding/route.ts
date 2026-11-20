@@ -501,7 +501,12 @@ export async function POST(req: Request) {
     }
     throw err;
   }
-  return NextResponse.json({ ok: true, onboarded: onboarded || Boolean(body.final) });
+  return NextResponse.json({
+    ok: true,
+    onboarded: onboarded || Boolean(body.final),
+    // What is stored now (a staff-hidden profile ignores "on"), so the switch and banner show the server's value.
+    openToWork: (extraData as Record<string, unknown>).openToWork !== false,
+  });
 }
 
 /** Upload keys the store mints for this intern: `<uid prefix>.<random>.<ext>` (security/sign.ts). */

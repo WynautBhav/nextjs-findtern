@@ -1,10 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 
-import { csrfFetch } from "@/lib/client-fetch";
+import { useOpenToWork } from "@/components/intern/use-open-to-work";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
 
@@ -19,7 +18,8 @@ import { Switch } from "@/components/ui/switch";
  * The switch only ever shows the stored state. A press sends the request and the switch (and the copy under it)
  * keeps the old state, dimmed and busy, until the server answers; then it moves. Both directions wait: off must
  * not say "hidden" before it is, and on must not say "visible" before consent is stored. A failed save leaves the
- * true state in place and shows the error.
+ * true state in place and shows the error. The state is shared with the Home banner (use-open-to-work.ts): a save
+ * from either one moves both.
  */
 export function OpenToWorkToggle({
   initial,
@@ -29,8 +29,7 @@ export function OpenToWorkToggle({
   /** Dashboard: the explainer only while hidden. */
   brief?: boolean;
 }) {
-  const router = useRouter();
-  const [on, setOn] = useState(initial);
+  const { on, save } = useOpenToWork(initial);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const inFlight = useRef(false);
@@ -41,19 +40,9 @@ export function OpenToWorkToggle({
     setSaving(true);
     setError("");
     try {
-      const res = await csrfFetch("/api/intern/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ openToWork: next }),
-      });
-      if (!res.ok) {
-        setError("Could not save. Try again.");
-        return;
-      }
-      setOn(next);
-      router.refresh();
-    } catch {
-      setError("Could not save. Try again.");
+      const stored = await save(next);
+      if (stored === null) setError("Could not save. Try again.");
+      else if (stored !== next) setError("Staff have hidden this profile, so it cannot be switched on here.");
     } finally {
       inFlight.current = false;
       setSaving(false);

@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { EyeOff, Loader2 } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
-import { csrfFetch } from "@/lib/client-fetch";
+import { useOpenToWork } from "@/components/intern/use-open-to-work";
 
 /**
  * Top of Home while Open to work is off: the profile is invisible to employers,
@@ -13,10 +12,11 @@ import { csrfFetch } from "@/lib/client-fetch";
  * dot blinks red (opacity only, .status-blink in globals.css) to draw the eye;
  * the text beside it says the same in words, and a reduced-motion setting gets
  * a still dot. The action flips the same `openToWork` flag the profile
- * switch does.
+ * switch does, and the two share their state: turning it on here flips the switch, and switching off there
+ * brings this banner back.
  */
-export function HiddenProfileBanner() {
-  const router = useRouter();
+export function HiddenProfileBanner({ hidden }: { hidden: boolean }) {
+  const { on, save } = useOpenToWork(!hidden);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -24,23 +24,15 @@ export function HiddenProfileBanner() {
     setBusy(true);
     setError("");
     try {
-      const res = await csrfFetch("/api/intern/onboarding", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ openToWork: true }),
-      });
-      if (!res.ok) {
-        setError("Could not save. Try again.");
-        return;
-      }
-      router.refresh();
-    } catch {
-      setError("Could not save. Try again.");
+      const stored = await save(true);
+      if (stored === null) setError("Could not save. Try again.");
+      else if (!stored) setError("Staff have hidden this profile, so it cannot be switched on here.");
     } finally {
       setBusy(false);
     }
   }
 
+  if (on) return null;
   return (
     <section
       aria-label="Profile hidden"
