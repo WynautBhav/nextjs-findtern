@@ -1295,3 +1295,4 @@ export * from "./schema-listings.ts";
 export * from "./schema-roster-imports.ts";
 export * from "./schema-leave-requests.ts";
 export * from "./schema-strikes.ts";
+export * from "./schema-meeting-transcripts.ts";
