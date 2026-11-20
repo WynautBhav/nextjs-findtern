@@ -11,7 +11,7 @@ import { candidateRelations, isAdminViewing, type CandidateRelation } from "@/li
 import { ShortlistToggle } from "@/components/employer/shortlist-toggle";
 import { PLAN_NAME, bandFor } from "@/lib/score";
 import { formatDate, formatMoney, formatRate } from "@/lib/format";
-import { RATING_META, displayNameOf, isCatalogSkill, preferredCities, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { RATING_META, displayNameOf, isCatalogSkill, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
 import { hideContactText } from "@/lib/contact-scrub";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
@@ -36,6 +36,9 @@ import { SITE } from "@/lib/content/site";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { profileText } from "@/components/employer/profile-text";
 import { PresenceDot } from "@/components/app/presence-dot";
+import { projectCities } from "@/lib/project-locations";
+import { workPreferenceRows } from "@/lib/work-preferences";
+import { WorkPreferenceList } from "@/components/employer/work-preferences";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { PRESENCE_ONLINE } from "@/lib/presence-logic";
 
@@ -100,7 +103,7 @@ export default async function EmployerInternDetail({
   /** "Active now" / "Last seen 2h ago" / "Offline"; null when the candidate hides it. */
   let presence: PresenceLabel | null = null;
   /** The selected project's skills: matching chips are ticked and listed first, as on the candidate list. */
-  let wanted: { project: string; skills: string[] } | null = null;
+  let wanted: { project: string; skills: string[]; cities: string[] } | null = null;
 
   try {
     const db = getDb();
@@ -120,7 +123,7 @@ export default async function EmployerInternDetail({
       // newest open one (EMH-15).
       const projectRows = (
         await db
-          .select({ id: schema.projects.id, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt, projectName: schema.projects.projectName, skills: schema.projects.skills })
+          .select({ id: schema.projects.id, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt, projectName: schema.projects.projectName, skills: schema.projects.skills, city: schema.projects.city, locationType: schema.projects.locationType, preferredLocations: schema.projects.preferredLocations })
           .from(schema.projects)
           .where(eq(schema.projects.employerId, employerId))
           .orderBy(desc(schema.projects.createdAt))
@@ -130,7 +133,7 @@ export default async function EmployerInternDetail({
         projectRows.find((row) => row.id === remembered.project) ??
         projectRows[0];
       if (project) {
-        wanted = { project: project.projectName ?? "your project", skills: (Array.isArray(project.skills) ? project.skills : []).filter(Boolean) };
+        wanted = { project: project.projectName ?? "your project", skills: (Array.isArray(project.skills) ? project.skills : []).filter(Boolean), cities: projectCities(project) };
         const [item] = await db
           .select({ id: schema.employerCartItems.id })
           .from(schema.employerCartItems)
@@ -318,9 +321,7 @@ export default async function EmployerInternDetail({
   const skills = profile.skills;
   const matchCount = skills.filter((s) => wantedSet.has(skillBaseName(s).toLowerCase())).length;
   const headline = studyOf(academics);
-  // "Also works in" lists the other cities only: the home city is already in the line before it.
-  const homeCity = (profile.location ?? "").split(",")[0].trim().toLowerCase();
-  const prefers = preferredCities(profile.preferredLocations).filter((c) => c.trim().toLowerCase() !== homeCity);
+  const workPreferences = workPreferenceRows(profile, wanted?.cities ?? []);
   const axes = RATING_META.map((m) => ({ label: m.label, value: profile.ratings[m.key] > 0 ? Math.min(10, profile.ratings[m.key]) : null }));
   const rated = axes.filter((a): a is { label: string; value: number } => a.value !== null).sort((a, b) => b.value - a.value);
   const linkedin = nameUnlocked ? linkedinHref(profile.linkedinUrl) : null;
@@ -386,7 +387,6 @@ export default async function EmployerInternDetail({
                   <MapPin className="size-4 shrink-0 text-ink-500" aria-hidden />
                   {profile.location || "Location not stated"}
                 </span>
-                {prefers.length > 0 ? <span>Also works in {prefers.join(", ")}</span> : null}
                 {presence ? <PresenceDot label={presence} withText /> : null}
                 {linkedin ? (
                   <a
@@ -534,6 +534,13 @@ export default async function EmployerInternDetail({
               <SkillChips skills={skills} wanted={wanted?.skills ?? []} />
             </section>
           ) : null}
+
+          <section aria-labelledby="work-h" className={SECTION}>
+            <h2 id="work-h" className={`${H2} mb-4`}>
+              Work preferences
+            </h2>
+            <WorkPreferenceList rows={workPreferences} />
+          </section>
 
           <section id="ai-report" aria-labelledby="ai-h" className={`${SECTION} scroll-mt-24`}>
             <h2 id="ai-h" className={H2}>

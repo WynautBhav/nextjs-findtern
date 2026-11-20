@@ -11,6 +11,8 @@ import { CandidateAvatar } from "@/components/employer/candidate-avatar";
 import { SkillChips } from "@/components/employer/candidate-row-parts";
 import { skillMatch } from "@/components/app/skill-match";
 import { studyOf } from "@/components/employer/candidate-view";
+import { WorkPreferenceList } from "@/components/employer/work-preferences";
+import { workPreferenceRows } from "@/lib/work-preferences";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
@@ -140,6 +142,13 @@ export function CandidateQuickView({
             ) : null}
           </div>
           <SkillChips skills={candidate.skills} wanted={wantedSkills} className="mt-2" />
+        </section>
+
+        <section aria-labelledby="qv-cities">
+          <h3 id="qv-cities" className="mb-2 text-sm font-semibold text-ink-900">
+            Where they want to work
+          </h3>
+          <WorkPreferenceList rows={workPreferenceRows(candidate).filter((row) => row.key === "cities")} />
         </section>
 
         {study || academics?.institution ? (
