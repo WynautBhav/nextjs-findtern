@@ -17,7 +17,7 @@ const PUBLIC_GET = new Set([
   "files/public/[key]", "marketing/students", "users/exists/phone/[phone]",
   "cron/proposal-expiry", // bearer secret through runExpiryCron -> cronAuthorized (asserted below)
 ]);
-const AUTH = /\b(getSession|getSessionState|readSession|requireRole|requireMutation|requireCollege\w*|requireAdmin\w*|cronAuthorized|tickResponse|requirePermission)\b/;
+const AUTH = /\b(getSession|getSessionState|getSessionUnfronted|readSession|requireRole|requireMutation|requireCollege\w*|requireAdmin\w*|cronAuthorized|tickResponse|requirePermission)\b/;
 
 test("every GET handler checks a session, a cron secret, or is on the reviewed public list", () => {
   const open: string[] = [];

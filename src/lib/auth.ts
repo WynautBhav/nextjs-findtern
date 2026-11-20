@@ -8,6 +8,8 @@ import { accountDisabledBody, disabledLoginHref, SESSION_EXPIRED_CODE } from "@/
 import { accountOnHoldBody, onHoldHref } from "@/lib/account-hold";
 import { NextResponse } from "next/server";
 import { sessionVerdict } from "@/lib/session-validity";
+import { restrictionVerdict } from "@/lib/account-restriction";
+import { runningHireOf } from "@/lib/moderation/work-exempt-db";
 
 import {
   createSession,
@@ -20,9 +22,22 @@ import {
 
 /**
  * The session behind this request's cookie, or why there is none. `disabled`: valid session, account switched off.
- * `held`: valid session, account frozen by an admin (on hold).
+ * `held`: valid session, account frozen by an admin (on hold): RESTRICTED. Frozen accounts sign in fine, but `session` is null for
+ * every request except the allowlist in lib/account-restriction.ts, so every page, layout and API that asks for a session refuses them
+ * (pages redirect to the on-hold page, APIs answer 403 ACCOUNT_ON_HOLD) with no per-route code. `restricted` is true on the
+ * allowlisted requests where a frozen account's session is handed out (the on-hold page, sign-out and, for an intern an admin let
+ * keep working, the work surface).
  */
-export type SessionState = { session: SessionData; disabled: false; held: false } | { session: null; disabled: boolean; held: boolean };
+export type SessionState = { session: SessionData; disabled: false; held: false; restricted: boolean; workExempt: false } | { session: null; disabled: boolean; held: boolean; restricted: false; /** Held and let keep working: the status watcher keeps them on the work surface. */ workExempt: boolean };
+
+/** The path the proxy stamped on this request (x-ft-path), query stripped; null when absent, which is never allowlisted. */
+async function requestPath(): Promise<string | null> {
+  try {
+    return (await headers()).get("x-ft-path");
+  } catch {
+    return null;
+  }
+}
 
 /**
  * One validity check per request, however many layouts, pages and guards ask (React's per-request cache). The check
@@ -33,7 +48,7 @@ export const getSessionState = cache(async (): Promise<SessionState> => readStat
 
 async function readState(raw: string | undefined): Promise<SessionState> {
   const session = readSession(raw);
-  if (!session) return { session: null, disabled: false, held: false };
+  if (!session) return { session: null, disabled: false, held: false, restricted: false, workExempt: false };
   // One read, shared by the three per-account checks, so they cost one round trip together.
   let facts: ReturnType<typeof loadSessionFacts> | undefined;
   const read = () => (facts ??= loadSessionFacts(session.role, session.uid, session.sid));
@@ -42,9 +57,16 @@ async function readState(raw: string | undefined): Promise<SessionState> {
     isActive: async () => (await read()).active,
     isPasswordCurrent: async () => passwordVersionCurrent(session.role, session.pv, (await read()).pv),
     isHeld: async () => (await read()).held,
+    // Only asked for a frozen account: the grant AND a paid hire still running (a grant lapses by itself when the hire ends).
+    isWorkExempt: async (role, uid) => role === "intern" && (await read()).workExempt && Boolean(await runningHireOf(uid)),
     adminPermissions: currentAdminPermissions,
   });
-  return verdict.session ? { session: verdict.session, disabled: false, held: false } : { session: null, disabled: verdict.denied === "disabled", held: verdict.denied === "held" };
+  if (verdict.session) return { session: verdict.session, disabled: false, held: false, restricted: false, workExempt: false };
+  if (verdict.denied === "held") {
+    const allowed = restrictionVerdict({ role: session.role, frozen: true, workExempt: verdict.workExempt, path: await requestPath() }) === "allow";
+    return allowed ? { session: verdict.restricted, disabled: false, held: false, restricted: true, workExempt: false } : { session: null, disabled: false, held: true, restricted: false, workExempt: verdict.workExempt };
+  }
+  return { session: null, disabled: verdict.denied === "disabled", held: false, restricted: false, workExempt: false };
 }
 
 /**
@@ -52,6 +74,16 @@ async function readState(raw: string | undefined): Promise<SessionState> {
  */
 export async function getSession(): Promise<SessionData | null> {
   return (await getSessionState()).session;
+}
+
+/**
+ * For the few session routes the proxy does not front (/api/auth/me, status, reauth): there `x-ft-path` is client-supplied and cannot be
+ * trusted, so a frozen account's `restricted` session is treated as held. Everything else (pages, /api/*) sits behind the proxy, which
+ * overwrites that header on every request.
+ */
+export async function getSessionUnfronted(): Promise<SessionState> {
+  const state = await getSessionState();
+  return state.restricted ? { session: null, disabled: false, held: true, restricted: false, workExempt: false } : state;
 }
 
 /**

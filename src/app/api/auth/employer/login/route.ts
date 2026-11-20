@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { accountDisabledBody } from "@/lib/account-disabled";
-import { accountOnHoldBody } from "@/lib/account-hold";
+import { landingAfterLogin } from "@/lib/account-restriction";
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { verifyPasswordOrDummy, needsRehash, hashPassword } from "@/lib/security/password";
@@ -42,10 +42,8 @@ export async function POST(req: Request) {
   if (!employer.isActive) {
     return NextResponse.json(accountDisabledBody(), { status: 403 });
   }
-  // Frozen by an admin: same proof-first order as "disabled" (the password was verified above), no session is issued.
-  if (employer.frozenAt) {
-    return NextResponse.json(accountOnHoldBody(), { status: 403 });
-  }
+  // Frozen by an admin: they CAN sign in (the password was verified above) but the session is restricted to the allowlist (lib/account-restriction.ts).
+  const landing = employer.frozenAt ? landingAfterLogin({ role: "employer", frozen: true, workExempt: false }, "") : null;
 
   let storedPassword = employer.password;
   if (needsRehash(employer.password)) {
@@ -58,6 +56,7 @@ export async function POST(req: Request) {
 
   const res = NextResponse.json({
     employer: { id: employer.id, email: employer.companyEmail, companyName: employer.companyName },
+    ...(landing ? { onHold: true, landing } : {}),
   });
   await issueCsrfCookie(res);
   return withSession(res, { uid: employer.id, role: "employer", email: employer.companyEmail, password: storedPassword });

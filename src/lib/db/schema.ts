@@ -29,6 +29,11 @@ export const users = pgTable("users", {
   // Account standing (migration 0046): set while an admin has the account on hold. Nothing is deleted; see lib/moderation/strikes.ts.
   frozenAt: timestamp("frozen_at"),
   frozenReason: text("frozen_reason"),
+  // Migration 0047: a frozen intern with a running hire may be let keep working (lib/account-restriction.ts); all four clear on unfreeze.
+  workExemptAt: timestamp("work_exempt_at"),
+  workExemptBy: varchar("work_exempt_by"),
+  workDecisionAt: timestamp("work_decision_at"),
+  workReviewNotifiedAt: timestamp("work_review_notified_at"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   usersCountryPhoneUnique: uniqueIndex("users_country_phone_unique").on(t.countryCode, t.phoneNumber),

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { getSession, unauthenticatedResponse } from "@/lib/auth";
+import { getSessionUnfronted, unauthenticatedResponse } from "@/lib/auth";
 
 export async function GET() {
-  const session = await getSession();
+  const { session } = await getSessionUnfronted();
   if (!session) {
     return unauthenticatedResponse();
   }

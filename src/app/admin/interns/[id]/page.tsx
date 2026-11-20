@@ -10,8 +10,9 @@ import { AccountActiveCell, InternApprovalCell, InternVisibilityCell } from "@/c
 import { Intern360View } from "@/components/admin/intern-360-view";
 import { redactIdentity } from "@/lib/admin/identity-mask";
 import { AdminLoadError, AdminPageHeader } from "@/components/admin/panel";
-import { AccountStandingPanel } from "@/components/admin/account-standing-panel";
+import { AccountStandingPanel, type WorkState } from "@/components/admin/account-standing-panel";
 import { loadStanding } from "@/lib/moderation/standing-db";
+import { loadWorkPanel } from "@/lib/moderation/work-exempt-db";
 import { getSession } from "@/lib/auth";
 import { canViewAs } from "@/lib/admin/impersonation";
 import { ADMIN_SURFACE } from "@/components/admin/surface";
@@ -83,6 +84,8 @@ async function AdminInternDetailImpl({
     return null;
   });
 
+  const work = standing?.standing.frozen ? await loadWorkPanel(id).catch((err) => { console.error("[admin/interns/[id]] work panel failed", err); return null; }) : null;
+
   return (
     <Intern360View
       standing={
@@ -96,6 +99,7 @@ async function AdminInternDetailImpl({
             pendingWarning={standing.standing.pendingWarning}
             history={standing.history.map((h) => ({ id: h.id, kind: h.kind, reason: h.reason, evidenceNote: h.evidenceNote, adminName: h.adminName, acknowledgedAt: h.acknowledgedAt?.toISOString() ?? null, createdAt: h.createdAt.toISOString() }))}
             canWrite={canWrite}
+            work={work ? ((work.kind === "exempt" ? { ...work, since: work.since.toISOString() } : work) as WorkState) : undefined}
           />
         ) : null
       }

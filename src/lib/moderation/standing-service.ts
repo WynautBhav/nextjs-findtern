@@ -34,7 +34,7 @@ export type StandingInput = {
   expectedViolations: unknown;
 };
 
-export type StandingTxState = { name: string; frozen: boolean; history: StrikeEntry[] };
+export type StandingTxState = { name: string; frozen: boolean; history: StrikeEntry[]; /** The frozen intern had a work exemption; an unfreeze clears it (recorded in the audit row). */ workExempt?: boolean };
 
 export type StandingTx = {
   state: StandingTxState;
@@ -52,6 +52,8 @@ export type StandingDeps = {
   notify(to: { type: StrikeSubject; id: string }, n: Notice, dedupeKey: string, data: Record<string, unknown>): Promise<void>;
   /** After a freeze or an unfreeze: tell the other sides of the open offers and proposals, neutrally (decision D3). */
   afterHoldChange(subject: { type: StrikeSubject; id: string }, change: "held" | "released", strikeId: string): Promise<void>;
+  /** After an INTERN freeze: if a paid hire is still running, alert the admins once to decide (work-exempt.ts). Optional so existing fakes keep working. */
+  afterFreeze?(intern: { id: string; name: string }, strikeId: string): Promise<void>;
   now(): Date;
 };
 
@@ -84,7 +86,7 @@ export async function applyAccountAction(deps: StandingDeps, input: StandingInpu
     const frozen = plan.effect === "freeze" ? true : plan.effect === "unfreeze" ? false : tx.state.frozen;
     await tx.audit({
       action: plan.effect === "warn" ? "account.warn" : plan.effect === "freeze" ? "account.freeze" : "account.unfreeze",
-      meta: { userType: input.subject.type, userId: input.subject.id, strikeId, reason, hasEvidenceNote: true, violationsAfter: standingOf(history, frozen).violations },
+      meta: { userType: input.subject.type, userId: input.subject.id, strikeId, reason, hasEvidenceNote: true, violationsAfter: standingOf(history, frozen).violations, ...(plan.effect === "unfreeze" && tx.state.workExempt ? { clearedWorkExempt: true } : {}) },
     });
     return { plan, standing: standingOf(history, frozen), name: tx.state.name, strikeId };
   });
@@ -103,6 +105,7 @@ export async function applyAccountAction(deps: StandingDeps, input: StandingInpu
       const n = standingNotices.frozen;
       await deps.notify(input.subject, { ...n, type: "account_frozen", email: standingEmails.accountFrozen({ ...who, reason: reason as StrikeReason }) }, `account_frozen:${strikeId}`, { strikeId });
       await deps.afterHoldChange(input.subject, "held", strikeId);
+      if (input.subject.type === "intern") await deps.afterFreeze?.({ id: input.subject.id, name: done.name }, strikeId);
     } else {
       const n = standingNotices.unfrozen;
       await deps.notify(input.subject, { ...n, type: "account_unfrozen", email: standingEmails.accountUnfrozen(who) }, `account_unfrozen:${strikeId}`, { strikeId });

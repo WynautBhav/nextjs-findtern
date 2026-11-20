@@ -4,6 +4,7 @@ import { recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { notify } from "@/lib/notify";
 import { notifyCounterpartiesOfHold } from "./hold-offers";
+import { flagFrozenInternHire } from "./work-exempt-db";
 import { acknowledgeWarning, applyAccountAction, type AcknowledgeDeps, type StandingDeps, type StandingInput, type StandingTx } from "./standing-service";
 import { standingOf, type StrikeEntry, type StrikeSubject } from "./strikes";
 
@@ -81,7 +82,7 @@ export const standingDeps: StandingDeps = {
         .orderBy(asc(schema.accountStrikes.createdAt));
       const adminId = { current: "" };
       const t: StandingTx = {
-        state: { name, frozen: Boolean(row.frozenAt), history },
+        state: { name, frozen: Boolean(row.frozenAt), history, workExempt: Boolean((row as { workExemptAt?: Date | null }).workExemptAt) },
         async insertStrike(r) {
           adminId.current = r.adminId;
           const [ins] = await tx
@@ -92,6 +93,8 @@ export const standingDeps: StandingDeps = {
         },
         async setFrozen(frozenAt, reason) {
           await tx.update(table).set({ frozenAt, frozenReason: reason }).where(eq(table.id, subject.id));
+          // Released: the work exemption, the decision and the one-alert marker all go with the freeze (a new freeze starts clean).
+          if (frozenAt === null && subject.type === "intern") await tx.update(schema.users).set({ workExemptAt: null, workExemptBy: null, workDecisionAt: null, workReviewNotifiedAt: null }).where(eq(schema.users.id, subject.id));
         },
         async audit(entry) {
           await recordAdminAudit(tx, { adminId: adminId.current, action: entry.action, targetType: subject.type === "intern" ? "user" : "employer", targetId: subject.id, meta: entry.meta }, { strict: true });
@@ -105,6 +108,9 @@ export const standingDeps: StandingDeps = {
   },
   async afterHoldChange(subject, change, strikeId) {
     await notifyCounterpartiesOfHold(subject, change, strikeId);
+  },
+  async afterFreeze(intern) {
+    await flagFrozenInternHire(intern);
   },
 };
 

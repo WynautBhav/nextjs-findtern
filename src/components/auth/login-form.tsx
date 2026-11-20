@@ -8,7 +8,6 @@ import { AlertCircle, ArrowRight, Eye, EyeOff, Loader2 } from "lucide-react";
 import { ButtonAnchor, buttonClass } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { LAST_DOOR_COOKIE } from "@/lib/auth-doors";
-import { onHoldHref } from "@/lib/account-hold";
 
 export function LoginForm({
   endpoint,
@@ -79,16 +78,17 @@ export function LoginForm({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        // Frozen account (password was right): the on-hold page, not a form error.
-        if (res.status === 403 && data.code === "ACCOUNT_ON_HOLD") {
-          window.location.assign(onHoldHref(rememberAs === "employer" ? "employer" : "intern"));
-          return;
-        }
         setError(signInError(res.status, data.error, rememberAs));
         setLoading(false);
         return;
       }
       if (rememberAs) document.cookie = `${LAST_DOOR_COOKIE}=${rememberAs}; path=/; max-age=31536000; samesite=lax`;
+      // A frozen account signs in fine; the server says where it lands (the on-hold page, or their timesheets if an admin let them keep working).
+      const ok = await res.json().catch(() => ({}));
+      if (typeof ok.landing === "string" && ok.landing.startsWith("/")) {
+        window.location.assign(ok.landing);
+        return;
+      }
       router.push(redirectTo);
       router.refresh();
     } catch (err) {

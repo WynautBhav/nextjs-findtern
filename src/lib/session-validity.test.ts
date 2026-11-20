@@ -115,7 +115,19 @@ test("one shared facts read still means one round trip: the three checks resolve
 test("a frozen (on hold) account: the session is rejected at the next request with denied=held, not signed_out", async () => {
   const frozen = checks({ isHeld: async () => true });
   assert.equal(await validateSession(session, frozen), null);
-  assert.deepEqual(await sessionVerdict(session, frozen), { session: null, denied: "held" });
+  assert.deepEqual(await sessionVerdict(session, frozen), { session: null, denied: "held", restricted: session, workExempt: false });
+});
+
+test("a frozen intern with the work exemption: the verdict carries workExempt, asked only when held", async () => {
+  let asked = 0;
+  const c = checks({ isHeld: async () => true, isWorkExempt: async () => { asked++; return true; } });
+  assert.deepEqual(await sessionVerdict(session, c), { session: null, denied: "held", restricted: session, workExempt: true });
+  assert.equal(asked, 1);
+  const clean = checks({ isHeld: async () => false, isWorkExempt: async () => { asked++; return true; } });
+  assert.equal((await sessionVerdict(session, clean)).session, session);
+  assert.equal(asked, 1, "a clean account never asks");
+  assert.equal((await sessionVerdict(session, checks({ isHeld: async () => true, isWorkExempt: async () => { throw new Error("db"); } }))).session, null);
+  assert.deepEqual(await sessionVerdict(session, checks({ isHeld: async () => true, isWorkExempt: async () => { throw new Error("db"); } })).then((v) => "workExempt" in v && v.workExempt), false);
 });
 
 test("unfreezing restores the same session (nothing was revoked)", async () => {

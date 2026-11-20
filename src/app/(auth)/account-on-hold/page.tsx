@@ -3,6 +3,7 @@ import { PauseCircle } from "lucide-react";
 
 import { AuthShell } from "@/components/auth/auth-shell";
 import { ACCOUNT_ON_HOLD_CONTACT, ACCOUNT_ON_HOLD_MESSAGE } from "@/lib/account-hold";
+import { HoldSignOut } from "@/components/auth/hold-sign-out";
 import { doorOf } from "@/lib/auth-doors";
 
 export const metadata: Metadata = {
@@ -11,8 +12,9 @@ export const metadata: Metadata = {
 };
 
 /**
- * Where a frozen account lands: signing in, an open tab's next request and a Google sign in all end here. Public on purpose
- * (a held session cannot load anything signed-in) and it reveals nothing: no reason, no history, only what to do next.
+ * Where a frozen account lands: signing in (password or Google), an open tab's next request and every page it is not allowed to open all
+ * end here. A frozen account CAN sign in, but its session is restricted to this page and sign-out (lib/account-restriction.ts), so this is
+ * all it sees. Public on purpose, and it reveals nothing: no reason, no history, only what to do next.
  */
 export default async function AccountOnHoldPage({ searchParams }: { searchParams: Promise<{ as?: string | string[] }> }) {
   const role = doorOf((await searchParams).as, ["intern", "employer"]);
@@ -37,6 +39,7 @@ export default async function AccountOnHoldPage({ searchParams }: { searchParams
         </p>
         <p className="mt-3 text-text-subtle">Your profile, documents and any payments or timesheets already in progress are kept safe.</p>
       </div>
+      <HoldSignOut to={role === "employer" ? "/login?as=employer" : "/login?as=intern"} />
     </AuthShell>
   );
 }

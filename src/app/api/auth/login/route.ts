@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { accountDisabledBody } from "@/lib/account-disabled";
-import { accountOnHoldBody } from "@/lib/account-hold";
+import { landingAfterLogin } from "@/lib/account-restriction";
+import { runningHireOf } from "@/lib/moderation/work-exempt-db";
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { verifyPasswordOrDummy, needsRehash, hashPassword } from "@/lib/security/password";
@@ -42,10 +43,10 @@ export async function POST(req: Request) {
   if (!user.isActive) {
     return NextResponse.json(accountDisabledBody(), { status: 403 });
   }
-  // Frozen by an admin: same proof-first order as "disabled" (the password was verified above), no session is issued.
-  if (user.frozenAt) {
-    return NextResponse.json(accountOnHoldBody(), { status: 403 });
-  }
+  // Frozen by an admin: they CAN sign in (the password was verified above) but the session is restricted: every request outside the
+  // allowlist (lib/account-restriction.ts) is refused by the central guard (lib/auth.ts), so they land on the on-hold page and can do nothing else.
+  const frozen = Boolean(user.frozenAt);
+  const landing = frozen ? landingAfterLogin({ role: "intern", frozen, workExempt: Boolean(user.workExemptAt) && Boolean(await runningHireOf(user.id)) }, "") : null;
 
   let storedPassword = user.password;
   if (needsRehash(user.password)) {
@@ -58,6 +59,7 @@ export async function POST(req: Request) {
 
   const res = NextResponse.json({
     user: { id: user.id, email: user.email, firstName: user.firstName, lastName: user.lastName },
+    ...(landing ? { onHold: true, landing } : {}),
   });
   await issueCsrfCookie(res);
   return withSession(res, { uid: user.id, role: "intern", email: user.email, password: storedPassword });

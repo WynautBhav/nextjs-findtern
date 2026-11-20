@@ -60,7 +60,11 @@ export async function proxy(req: NextRequest) {
     if (blocked) return blocked;
   }
 
-  return withRenewal(req, session, NextResponse.next());
+  // The path rides along for the account guard (lib/auth.ts), which decides what a frozen account may open. Set here, so a
+  // client-sent x-ft-path is overwritten on every matched request.
+  const headers = new Headers(req.headers);
+  headers.set("x-ft-path", `${pathname}${search}`);
+  return withRenewal(req, session, NextResponse.next({ request: { headers } }));
 }
 
 /**

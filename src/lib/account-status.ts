@@ -93,6 +93,8 @@ export type SessionFacts = {
   pv: string | null;
   /** An admin has frozen the account (account_strikes policy). Always false for admins and college officers. Read fresh, so a freeze stops existing sessions at their next request. */
   held: boolean;
+  /** An admin granted this frozen intern the work exemption (the caller still checks that a paid hire runs). Interns only. */
+  workExempt: boolean;
 };
 
 export async function loadSessionFacts(role: string, uid: string, sid: string | undefined): Promise<SessionFacts> {
@@ -102,7 +104,7 @@ export async function loadSessionFacts(role: string, uid: string, sid: string | 
   const db = getDb();
   if (role === "admin") {
     const [row] = await db.select({ password: schema.admins.password, revoked }).from(schema.admins).where(eq(schema.admins.id, uid)).limit(1);
-    return { revoked: Boolean(row?.revoked), active: Boolean(row), pv: row ? passwordVersion(row.password) : null, held: false };
+    return { revoked: Boolean(row?.revoked), active: Boolean(row), pv: row ? passwordVersion(row.password) : null, held: false, workExempt: false };
   }
   if (role === "college") {
     // A placement officer is locked out when either they or their college is switched off.
@@ -112,11 +114,12 @@ export async function loadSessionFacts(role: string, uid: string, sid: string | 
       .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeAdmins.collegeId))
       .where(eq(schema.collegeAdmins.id, uid))
       .limit(1);
-    return { revoked: Boolean(row?.revoked), active: Boolean(row?.admin && row?.college), pv: row ? passwordVersion(row.password) : null, held: false };
+    return { revoked: Boolean(row?.revoked), active: Boolean(row?.admin && row?.college), pv: row ? passwordVersion(row.password) : null, held: false, workExempt: false };
   }
   const table = role === "intern" ? schema.users : schema.employers;
-  const [row] = await db.select({ isActive: table.isActive, password: table.password, frozenAt: table.frozenAt, revoked }).from(table).where(eq(table.id, uid)).limit(1);
-  return { revoked: Boolean(row?.revoked), active: Boolean(row?.isActive), pv: row ? passwordVersion(row.password) : null, held: Boolean(row?.frozenAt) };
+  const workExemptAt = role === "intern" ? schema.users.workExemptAt : sql<Date | null>`null`;
+  const [row] = await db.select({ isActive: table.isActive, password: table.password, frozenAt: table.frozenAt, workExemptAt, revoked }).from(table).where(eq(table.id, uid)).limit(1);
+  return { revoked: Boolean(row?.revoked), active: Boolean(row?.isActive), pv: row ? passwordVersion(row.password) : null, held: Boolean(row?.frozenAt), workExempt: Boolean(row?.frozenAt && row?.workExemptAt) };
 }
 
 /**

@@ -44,12 +44,27 @@ export const standingEmails = {
     greeting: hi(o.name),
     lines: [
       `Findtern reviewed activity on your account and found ${what(o.reason)}, which does not follow our terms of use. ${ACCOUNT_ON_HOLD_MESSAGE}`,
-      `Write to ${ACCOUNT_ON_HOLD_CONTACT} from the email on your account. This is also how you appeal.`,
+      `You can still sign in to see the status, but nothing else is available until access is restored. Write to ${ACCOUNT_ON_HOLD_CONTACT} from the email on your account. This is also how you appeal.`,
       "What stays safe: your profile, documents and records are kept, and nothing has been deleted. Payments and timesheets for work already under way are not cancelled. Offers and proposals in progress are paused, and carry on if access is restored.",
     ],
     status: "On hold",
     tone: "alert",
     cta: { label: "Contact Findtern admin", url: `mailto:${ACCOUNT_ON_HOLD_CONTACT}` },
+  }),
+
+  /** Internal alert to the Findtern team: a frozen intern still has a paid internship running. Names, company and a link only: no reason, no evidence. */
+  adminFrozenHire: (o: { internName: string; internId: string; company: string }): EmailContent => ({
+    subject: "Frozen intern has a running internship: decide",
+    preheader: `${o.internName || "An intern"} is frozen and has a running internship with ${o.company}.`,
+    heading: "A frozen intern has a running internship",
+    greeting: "Hi team,",
+    lines: [
+      `${o.internName || "An intern"} is on hold and has a running internship with ${o.company}. Their hire and payments carry on as they are.`,
+      "Please decide: let them keep working (timesheets, stipend view and notifications only), or keep them fully frozen. Until you decide, they stay fully frozen.",
+    ],
+    status: "Needs a decision",
+    tone: "wait",
+    cta: cta("Open the intern", `/admin/interns/${o.internId}`),
   }),
 
   accountUnfrozen: (o: Omit<Who, "reason">): EmailContent => ({
