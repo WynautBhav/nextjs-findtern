@@ -56,8 +56,8 @@ export interface CandidateCardProps {
 }
 
 /**
- * The heart = this project's shortlist (the existing cart API), as an icon
- * button at every width. Not `disabled` while saving: that drops keyboard
+ * The star = this project's shortlist (the existing cart API): an icon and a
+ * visible "Shortlist" / "Shortlisted" label (only the label hides, below 380px). Not `disabled` while saving: that drops keyboard
  * focus. An offer already out goes to it.
  */
 export function SaveToggle({ internId, projectId, shortlisted, name }: { internId: string; projectId: string; shortlisted: boolean; name?: string }) {
@@ -65,6 +65,7 @@ export function SaveToggle({ internId, projectId, shortlisted, name }: { internI
   // Flips the instant it is pressed; back to the true state if the server says no.
   const { value: on, pending: busy, toggle: flip } = useOptimisticToggle(shortlisted);
   const [error, setError] = useState<string | null>(null);
+  const label = on ? "Shortlisted" : "Shortlist";
 
   function toggle() {
     setError(null);
@@ -98,15 +99,16 @@ export function SaveToggle({ internId, projectId, shortlisted, name }: { internI
         aria-disabled={busy || undefined}
         aria-busy={busy || undefined}
         aria-pressed={on}
-        // An icon alone, named for screen readers, its state in aria-pressed.
-        aria-label={name ? `Shortlist ${name}` : "Shortlist"}
+        // Starts with the visible word (WCAG 2.5.3); the state is also in aria-pressed.
+        aria-label={name ? `${label}: ${name}` : label}
         title={on ? "On this project's shortlist. Press to remove." : "Add to this project's shortlist"}
         className={cn(
-          "grid size-11 shrink-0 place-items-center rounded-xl transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:size-10 sm:touch:size-11",
+          "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 text-[13px] font-semibold transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 sm:min-h-10 sm:min-w-10 sm:touch:min-h-11 sm:touch:min-w-11",
           on ? "text-brand-700 hover:bg-brand-50" : "text-text-subtle hover:bg-ink-100 hover:text-ink-900",
         )}
       >
-        <Star className={cn("size-5", on && "fill-brand-700 text-brand-700")} aria-hidden />
+        <Star className={cn("size-5 shrink-0", on && "fill-brand-700 text-brand-700")} aria-hidden />
+        <span className="max-[380px]:sr-only">{label}</span>
       </button>
       {error ? (
         <span role="alert" className="absolute right-4 top-full z-20 mt-1 max-w-64 rounded-md bg-white px-2 py-1 text-xs text-danger shadow-md ring-1 ring-danger/30">
