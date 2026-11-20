@@ -119,7 +119,7 @@ export function FilterColumn({
             {projectToggle ? <div className="mt-1">{projectToggle}</div> : null}
           </div>
 
-          <FilterSection title="Location" count={count.location}>
+          <FilterSection title="Location & setup" count={count.location}>
             <CityFilter key={city.value} defaultValue={city.value} label="Preferred work city" autoApply />
             {city.prefilled ? <p className="mt-1.5 text-sm text-ink-700">From your project: {city.value}. Change it to narrow or widen the search.</p> : null}
             <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
@@ -133,6 +133,16 @@ export function FilterColumn({
                 className="size-4 rounded-[4px] border-ink-300 accent-ink-900"
               />
               Include remote-only candidates
+            </label>
+            <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
+              <input
+                type="checkbox"
+                name="laptop"
+                value="yes"
+                defaultChecked={filters.laptop === "yes"}
+                className="size-4 rounded-[4px] border-ink-300 accent-ink-900"
+              />
+              Has own laptop
             </label>
           </FilterSection>
 
@@ -156,19 +166,6 @@ export function FilterColumn({
                 </option>
               ))}
             </select>
-          </FilterSection>
-
-          <FilterSection title="Availability" count={count.availability}>
-            <label className="flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
-              <input
-                type="checkbox"
-                name="laptop"
-                value="yes"
-                defaultChecked={filters.laptop === "yes"}
-                className="size-4 rounded-[4px] border-ink-300 accent-ink-900"
-              />
-              Has own laptop
-            </label>
           </FilterSection>
 
           <FilterSection title="Sorting" count={count.sorting}>

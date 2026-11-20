@@ -208,16 +208,15 @@ export function relaxations(
   return out.slice(0, max);
 }
 
-export type FilterSectionKey = "location" | "scores" | "price" | "availability" | "sorting";
+export type FilterSectionKey = "location" | "scores" | "price" | "sorting";
 
 /** How many of the active filter chips (by key) sit in each filter-column section, for the count beside its title. */
 export function sectionCounts(chipKeys: string[], projectCity: boolean): Record<FilterSectionKey, number> {
   const n = (test: (k: string) => boolean) => chipKeys.filter(test).length;
   return {
-    location: n((k) => k === "city" || k === "remote") + (projectCity ? 1 : 0),
+    location: n((k) => k === "city" || k === "remote" || k === "laptop") + (projectCity ? 1 : 0),
     scores: n((k) => k === "min" || k.startsWith("r_")),
     price: n((k) => k === "plan"),
-    availability: n((k) => k === "laptop"),
     sorting: n((k) => k === "sm"),
   };
 }

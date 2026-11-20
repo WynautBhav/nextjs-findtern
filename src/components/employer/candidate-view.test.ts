@@ -252,18 +252,21 @@ test("relaxations: capped, never offered on the shortlist tab, no 'project' unle
 });
 
 test("sectionCounts: each active chip counts in its own filter-column section", () => {
-  assert.deepEqual(sectionCounts(["q", "city", "remote", "min", "r_coding", "r_aptitude", "plan", "laptop", "sm", "cgpaMin"], false), { location: 2, scores: 3, price: 1, availability: 1, sorting: 1 });
+  assert.deepEqual(sectionCounts(["q", "city", "remote", "min", "r_coding", "r_aptitude", "plan", "laptop", "sm", "cgpaMin"], false), { location: 3, scores: 3, price: 1, sorting: 1 });
   assert.equal(sectionCounts([], true).location, 1);
-  assert.deepEqual(sectionCounts(["q"], false), { location: 0, scores: 0, price: 0, availability: 0, sorting: 0 });
+  assert.deepEqual(sectionCounts(["q"], false), { location: 0, scores: 0, price: 0, sorting: 0 });
 });
 
-test("the Candidates page says each fact once: summary names the project when matching is off, the shortlist tab is labelled by scope", () => {
+test("the Candidates page says each fact once: summary names the project when matching is off, the shortlist tab is labelled by scope, laptop sits under Location", () => {
   const dir = join(import.meta.dirname, "../../app/employer/candidates");
   const toolbar = readFileSync(join(dir, "_toolbar.tsx"), "utf8");
   const results = readFileSync(join(dir, "_results.tsx"), "utf8");
+  const filters = readFileSync(join(dir, "_filters.tsx"), "utf8");
   assert.doesNotMatch(toolbar, /not matched to a project/);
   assert.match(toolbar, /project: \$\{name\}, matching off/);
   assert.doesNotMatch(toolbar, /fixed order/);
   assert.doesNotMatch(results, /All\{saved/); // the tab row repeats no count the toolbar and the steps strip already show
   assert.match(results, /This project&rsquo;s shortlist <span/);
+  assert.doesNotMatch(filters, /title="Availability"/);
+  assert.match(filters, /Location & setup[\s\S]*name="laptop"[\s\S]*<FilterSection/);
 });
