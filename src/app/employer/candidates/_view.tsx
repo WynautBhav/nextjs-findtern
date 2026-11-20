@@ -13,14 +13,12 @@ export function CandidatesView({
   data,
   filters,
   flow,
-  filtersHidden,
   initialQs,
 }: {
   uid: string;
   data: CandidatesData;
   filters: Filters;
   flow: Awaited<ReturnType<typeof hireFlowCountsFor>>;
-  filtersHidden: boolean;
   /** The address bar's query (compare picks left out): the key the first results are cached under. */
   initialQs: string;
 }) {
@@ -36,7 +34,7 @@ export function CandidatesView({
         }
         className="mb-3 sm:mb-4 lg:mb-5 [&_h1]:text-[32px] [&_h1]:leading-10"
       />
-      <CandidatesApp uid={uid} chrome={toChromeWire(uid, data)} initial={{ qs: initialQs, wire: toResultsWire(data, filters) }} flow={flow} filtersHidden={filtersHidden} />
+      <CandidatesApp uid={uid} chrome={toChromeWire(uid, data)} initial={{ qs: initialQs, wire: toResultsWire(data, filters) }} flow={flow} />
     </div>
   );
 }

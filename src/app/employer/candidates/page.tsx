@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { rememberedSelection } from "@/lib/employer-selection";
@@ -7,7 +6,6 @@ import { CandidatesView } from "./_view";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { hireFlowCountsFor } from "@/lib/employer-flow";
-import { FILTER_PANEL_COOKIE } from "@/lib/rail";
 import {
   FILTER_KEYS,
   loadCandidates,
@@ -36,8 +34,6 @@ async function CandidatesPageImpl({
   const setup = requireEmployerSetup(uid);
   setup.catch(() => undefined);
   const params = await searchParams;
-  // From lg up the filter column can be hidden; the choice is a cookie, so the server paints it with no flash.
-  const filtersHidden = (await cookies()).get(FILTER_PANEL_COOKIE)?.value === "1";
 
   // Legacy `?ftInternId=` opened the full-time offer for a hire: the offer
   // lives on the candidate's profile now.
@@ -74,7 +70,7 @@ async function CandidatesPageImpl({
 
   await withRelaxCounts(uid, data, filters);
 
-  return <CandidatesView uid={uid} data={data} filters={filters} flow={flow} filtersHidden={filtersHidden} initialQs={initialQs} />;
+  return <CandidatesView uid={uid} data={data} filters={filters} flow={flow} initialQs={initialQs} />;
 }
 
 export default function CandidatesPage(props: Parameters<typeof CandidatesPageImpl>[0]) {

@@ -13,14 +13,13 @@ import { SURFACE_CLASS } from "@/components/app/primitives";
 import { RememberSelection } from "@/components/employer/remember-selection";
 import { HireFlow } from "@/components/employer/hire-flow";
 import { cn } from "@/lib/utils";
-import { FilterCollapse, FiltersToggle } from "@/components/employer/candidate-filter-collapse";
 import { FilterColumn } from "./_filters";
 import { Results } from "./_results";
 import { ActiveFilters, ContextLine, ProjectPicker, SlimCount, SortControl, matchStateOf, projectNameOf } from "./_toolbar";
 import { CandidateSearch } from "@/components/employer/candidates/candidate-search";
 import { ProjectMatchControl } from "@/components/employer/candidates/project-match-control";
 import { StickyBar } from "@/components/employer/candidates/sticky-bar";
-import { activeFilterCount, compareHref, queryOf, rememberQueryOf, withFilters } from "@/lib/candidates-params";
+import { compareHref, queryOf, rememberQueryOf, withFilters } from "@/lib/candidates-params";
 import { fromWire, type ChromeWire, type ResultsWire } from "@/lib/candidates-wire";
 import { CANDIDATES_RESULTS_ENDPOINT } from "@/lib/candidates-endpoint";
 import { normaliseQuery } from "@/lib/instant-query/cache";
@@ -45,13 +44,11 @@ export function CandidatesApp({
   chrome,
   initial,
   flow,
-  filtersHidden,
 }: {
   uid: string;
   chrome: ChromeWire;
   initial: { qs: string; wire: ResultsWire };
   flow: HireFlowCounts | null;
-  filtersHidden: boolean;
 }) {
   const q = useInstantQuery<ResultsWire>({
     endpoint: CANDIDATES_RESULTS_ENDPOINT,
@@ -161,14 +158,9 @@ export function CandidatesApp({
           </div>
         </div>
 
-        <FilterCollapse
-          initialHidden={filtersHidden}
-          className="lg:grid lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start"
-        >
-          {/* lg: the tab and the panel are one sticky unit below the slim bar, so the tab never runs past the panel. */}
-          <div className="lg:sticky lg:top-36 lg:flex lg:items-start lg:self-start">
-            <FiltersToggle controls="candidate-filter-column" count={activeFilterCount(view, data.effectiveSkills, projectApplied?.city ?? "")} />
-            <div id="candidate-filter-column" className="lg:w-[17.5rem] lg:[&>aside]:static lg:[&>aside]:max-h-[calc(100dvh-10rem)] lg:group-data-[filters=hidden]/fl:hidden">
+        <div className="lg:grid lg:grid-cols-[17.5rem_minmax(0,1fr)] lg:items-start">
+          {/* The column sticks below the slim bar (4rem header + the bar), not just the header. */}
+          <div id="candidate-filter-column" className="lg:sticky lg:top-36 lg:self-start lg:[&>aside]:static lg:[&>aside]:max-h-[calc(100dvh-10rem)]">
             <FilterColumn
               panelEpoch={epoch}
               filters={view}
@@ -186,11 +178,10 @@ export function CandidatesApp({
               sortControl={<SortControl data={data} filters={view} />}
               pro={data.pro}
             />
-            </div>
           </div>
 
           {/* Phones: the compare tray sits over the bottom nav, so the last row needs room to scroll clear of it. */}
-          <div className={cn("min-w-0 lg:pl-8 lg:group-data-[filters=hidden]/fl:pl-4", compareIds.length >= 1 ? "pb-40 lg:pb-24" : "max-lg:pb-20")}>
+          <div className={cn("min-w-0 lg:pl-8", compareIds.length >= 1 ? "pb-40 lg:pb-24" : "max-lg:pb-20")}>
             <RememberSelection employerId={uid} project={activeProjectId} compare={compareIds} filters={loadFailed ? undefined : rememberQueryOf(filters)} />
 
             {compareIds.length >= 1 ? (
@@ -251,7 +242,7 @@ export function CandidatesApp({
               <Results data={data} filters={view} compareIds={compareIds} />
             </ResultsRegion>
           </div>
-        </FilterCollapse>
+        </div>
 
       </div>
     </CandidatesNavContext.Provider>
