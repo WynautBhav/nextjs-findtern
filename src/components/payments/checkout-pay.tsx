@@ -117,6 +117,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
       // Test mode: the server already settled the order.
       if (order.free || !Razorpay) {
         setState("paid");
+        router.refresh(); // drop pages cached from before the payment
         router.replace(AFTER_PAYMENT_HREF);
         return;
       }
@@ -158,6 +159,7 @@ export function CheckoutPay({ employerId, currency, amountMinor, prefill, propos
             const body = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(body.error ?? "Payment could not be verified.");
             setState("paid");
+            router.refresh(); // drop pages cached from before the payment
             router.replace(AFTER_PAYMENT_HREF);
           } catch (e) {
             // The gateway may already have debited: no "try again" here, or a second Pay can charge twice.

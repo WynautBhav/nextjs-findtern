@@ -29,6 +29,7 @@ export function DriveEnterButton({ token }: { token: string }) {
         return;
       }
       // replace, so Back doesn't return to a URL carrying the token.
+      router.refresh(); // drop pages cached from before joining
       router.replace(data.redirect);
     } catch {
       setError("You're offline. Check your connection and try again.");

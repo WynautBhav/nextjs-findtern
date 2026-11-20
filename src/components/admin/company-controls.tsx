@@ -74,6 +74,7 @@ export function CompanyDeleteButton({ id }: { id: string }) {
     const result = await sendInline({ url: `/api/admin/companies/${id}`, method: "DELETE" });
     setBusy(false);
     if (!result.ok) return setError(result.error);
+    router.refresh(); // the list must not show the deleted company
     router.push("/admin/companies");
   }
 

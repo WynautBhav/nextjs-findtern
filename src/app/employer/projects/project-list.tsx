@@ -96,6 +96,7 @@ export function ProjectList({ projects }: { projects: ListProject[] }) {
         body: JSON.stringify({ to: "draft" }),
       });
       if (!res.ok) return setError((await res.json().catch(() => ({}))).error ?? "Could not reopen the project.");
+      router.refresh(); // the edit page and the list must not show the pre-change status
       router.push(`/employer/projects/${p.id}/edit`);
     } finally {
       setBusyId(null);
