@@ -29,6 +29,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { rememberedSelection } from "@/lib/employer-selection";
 import { isProjectOpen } from "@/lib/project-locations";
 import { CartManager, type CartLineItem } from "@/components/employer/cart-manager";
+import { getActivePricingPlans } from "@/lib/cached-reads";
 
 export const metadata: Metadata = {
   title: "Shortlist",
@@ -144,7 +145,7 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
         .orderBy(desc(schema.employerCartItems.createdAt)),
     ),
   );
-  const plansP = early(gated(() => db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true))));
+  const plansP = early(gated(() => getActivePricingPlans()));
   const proposalsP = early(
     gated(() =>
       db

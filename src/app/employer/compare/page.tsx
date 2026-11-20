@@ -33,6 +33,7 @@ import { CompareTabs } from "@/components/employer/compare/compare-tabs";
 import { isLevel, leaders } from "@/components/employer/compare/leaders";
 import { ScrollRegion } from "./scroll-region";
 import { skillAlignment } from "@/components/employer/compare/skill-rows";
+import { getActivePricingPlans } from "@/lib/cached-reads";
 
 export const metadata: Metadata = {
   title: "Compare candidates",
@@ -129,7 +130,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
             ),
         )
       : null;
-  const plansP = ids.length > 0 ? early(db0.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true))) : null;
+  const plansP = ids.length > 0 ? early(getActivePricingPlans()) : null;
   const employerP = ids.length > 0 ? early(getEmployerRows(session.uid)) : null;
   const feeP = ids.length > 0 ? early(getPerHireFeeSetting()) : null;
   // The picked candidates' rows start with everything else (keyed on the picked ids, not on the visibility check); anyone the

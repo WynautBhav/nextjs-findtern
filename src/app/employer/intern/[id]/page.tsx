@@ -27,6 +27,7 @@ import { SITE } from "@/lib/content/site";
 import { projectCities } from "@/lib/project-locations";
 import { workPreferenceRows } from "@/lib/work-preferences";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
+import { getActivePricingPlans } from "@/lib/cached-reads";
 
 export const metadata: Metadata = {
   title: "Candidate",
@@ -240,7 +241,7 @@ export default async function EmployerInternDetail({
       presence = (await presenceOf([profile.id]).catch(() => ({} as Record<string, PresenceLabel | null>)))[profile.id] ?? null;
       // Before the hire, profile text stored ahead of the contact check is hidden where it carries contact (OA1).
       if (onboarding) details = nameUnlocked ? draftFromRecord(onboarding) : hideContactText(draftFromRecord(onboarding), isCatalogSkill);
-      plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
+      plans = await getActivePricingPlans();
 
       const [employer] = await db
         .select({

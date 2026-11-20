@@ -5,6 +5,7 @@ import { z } from "zod";
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { withFreshCollegeCode } from "@/lib/college/code";
 import { requireMutation } from "@/lib/guards-mutation";
+import { CACHE_TAGS, purgeServerCache } from "@/lib/server-cache";
 import { getDb, schema } from "@/lib/db";
 import { GSTIN_FORMAT, GSTIN_HINT } from "@/lib/gstin";
 import { gstinStateError } from "@/lib/gst";
@@ -51,6 +52,7 @@ export async function POST(req: Request) {
     .onConflictDoNothing({ target: schema.colleges.aisheCode, where: sql`${schema.colleges.aisheCode} is not null` })
     .returning({ id: schema.colleges.id }));
   if (!row) return NextResponse.json({ error: "A college with that AISHE code already exists" }, { status: 409 });
+  purgeServerCache(CACHE_TAGS.colleges);
   await recordAdminAudit(getDb(), { adminId: guard.session.uid, action: "college.create", targetType: "college", targetId: row.id, meta: { name: d.name, isPartner: d.isPartner } });
   return NextResponse.json({ id: row.id }, { status: 201 });
 }

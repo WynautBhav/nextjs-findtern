@@ -26,6 +26,7 @@ import { timezoneForLocation } from "@/lib/timezones";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
 import { isBlockingInterview } from "@/lib/employer-interview-rules";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
+import { getActivePricingPlans } from "@/lib/cached-reads";
 
 export const metadata: Metadata = {
   title: "Send a proposal",
@@ -202,10 +203,7 @@ export default async function SendProposal({
 
     let plans: (typeof schema.pricingPlans.$inferSelect)[] = [];
     try {
-      plans = await db
-        .select()
-        .from(schema.pricingPlans)
-        .where(eq(schema.pricingPlans.isActive, true));
+      plans = await getActivePricingPlans();
       hasPlans = plans.length > 0;
     } catch {
       // No rate card in this environment. `resolvePricing` falls back to the

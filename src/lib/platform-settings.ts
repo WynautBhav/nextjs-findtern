@@ -2,6 +2,8 @@ import { cache } from "react";
 import { eq } from "drizzle-orm";
 
 import { getDb, hasDb, schema } from "@/lib/db";
+import { getActivePricingPlans } from "@/lib/cached-reads";
+import { CACHE_TAGS, cachedRead } from "@/lib/server-cache";
 import { SUBSCRIPTION_DEFAULTS, parseSubscriptionConfig, parseSubscriptionOverrides, type SubscriptionConfig, type SubscriptionOverride } from "@/lib/employer-subscription";
 import { PER_HIRE_FEE_DEFAULT, PER_HIRE_FEE_KEY, parsePerHireFeeSetting, type PerHireFeeSetting } from "@/lib/per-hire-fee";
 import { INTERN_STIPEND_KEY, PRICING_DEFAULTS, STIPEND_BANDS_DEFAULT, parsePricingConfig, type PricingConfig } from "@/lib/pricing-config";
@@ -46,16 +48,29 @@ export function getSetting<K extends SettingKey>(key: K): Promise<(typeof SETTIN
   return hit as Promise<(typeof SETTING_DEFAULTS)[K]>;
 }
 
+/**
+ * Keys that are never served from the server cache: the per-employer grants and revokes hold employer ids and
+ * decide who has access, so they are always read live. Everything else is global config.
+ */
+const UNCACHED_KEYS: readonly SettingKey[] = ["employer_subscription_overrides"];
+
+async function readSettingRowLive(key: SettingKey): Promise<unknown> {
+  const [row] = await getDb()
+    .select({ value: schema.platformSettings.value })
+    .from(schema.platformSettings)
+    .where(eq(schema.platformSettings.key, key))
+    .limit(1);
+  return row?.value ?? null;
+}
+
+/** The cached row read: one entry per key, 5 min, purged by `purgeServerCache(CACHE_TAGS.settings)` on admin edits. Throws on a failed read so a blip is never cached. */
+const readSettingRow = cachedRead(["platform-setting"], [CACHE_TAGS.settings], readSettingRowLive);
+
 async function readSetting<K extends SettingKey>(key: K): Promise<(typeof SETTING_DEFAULTS)[K]> {
   if (!hasDb()) return SETTING_DEFAULTS[key];
   try {
-    const db = getDb();
-    const [row] = await db
-      .select({ value: schema.platformSettings.value })
-      .from(schema.platformSettings)
-      .where(eq(schema.platformSettings.key, key))
-      .limit(1);
-    return (row?.value ?? SETTING_DEFAULTS[key]) as (typeof SETTING_DEFAULTS)[K];
+    const value = UNCACHED_KEYS.includes(key) ? await readSettingRowLive(key) : await readSettingRow(key);
+    return (value ?? SETTING_DEFAULTS[key]) as (typeof SETTING_DEFAULTS)[K];
   } catch {
     return SETTING_DEFAULTS[key];
   }
@@ -101,11 +116,7 @@ export async function getPricingConfig(): Promise<PricingConfig> {
       getPerHireFeeSetting(),
       getSetting("intern_activation_fee_minor"),
       getSetting(INTERN_STIPEND_KEY),
-      getDb()
-        .select()
-        .from(schema.pricingPlans)
-        .where(eq(schema.pricingPlans.isActive, true))
-        .catch(() => []),
+      getActivePricingPlans().catch(() => []),
     ]);
     return parsePricingConfig({ plans, feeSetting, stipendBands, activationFeeMinor });
   } catch {

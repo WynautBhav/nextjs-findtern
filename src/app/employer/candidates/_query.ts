@@ -25,6 +25,7 @@ import { presenceOf, type PresenceLabel } from "@/lib/presence";
 import { savedInternIds } from "@/lib/saved-roles";
 import { rankProfiles } from "@/components/employer/candidate-rank";
 import { DEFAULT_PAGE_SIZE, dedupeSkills, filterCount, pageWindow, parsePageSize, parseView, type ListView, type RelaxCounts } from "@/components/employer/candidate-view";
+import { getActivePricingPlans } from "@/lib/cached-reads";
 
 export type SortKey = "score" | keyof Ratings;
 
@@ -473,7 +474,7 @@ export async function loadCandidates(
       .orderBy(desc(schema.projects.createdAt)),
   );
   const employerP = early(getEmployerRows(uid));
-  const plansP = early(db0.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true)));
+  const plansP = early(getActivePricingPlans());
   const proP = early(proAccess(uid));
   const configP = early(getEmployerSubscriptionConfig());
   const proActive = await proP;

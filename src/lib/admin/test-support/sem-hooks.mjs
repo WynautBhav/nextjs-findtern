@@ -1,16 +1,19 @@
 // Module-resolution hooks that let `node --test` import the subscription / CGPA / settings readers:
 //  - "@/x" maps to src/x(.ts), and an extensionless relative import tries ".ts";
-//  - the database ("@/lib/db") maps to ./sem-fakes.mjs.
+//  - the database ("@/lib/db") maps to ./sem-fakes.mjs;
+//  - "next/cache" maps to ./sem-next-cache.mjs (no cache, so lib/server-cache.ts loads and every read is live).
 // Test-only. Nothing here is imported by the app.
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { existsSync } from "node:fs";
 import path from "node:path";
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
+const NEXT_CACHE = pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), "sem-next-cache.mjs")).href;
 const FAKES = pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), "sem-fakes.mjs")).href;
 
 export async function resolve(specifier, context, next) {
   if (specifier === "@/lib/db") return { url: FAKES, shortCircuit: true };
+  if (specifier === "next/cache") return { url: NEXT_CACHE, shortCircuit: true };
   if (specifier.startsWith("@/")) {
     const base = path.join(SRC, specifier.slice(2));
     for (const candidate of [`${base}.ts`, path.join(base, "index.ts")]) {

@@ -8,6 +8,7 @@ import { CMS_COLLECTIONS, CMS_TYPES, sanitizeCmsValues, validateCmsValues, type 
 import { CMS_TABLES } from "@/lib/admin/cms-tables";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { CACHE_TAGS, purgeServerCache } from "@/lib/server-cache";
 import { isUniqueViolation } from "@/lib/promo";
 import { revalidateContentFeeds } from "@/lib/projects/revalidate-public";
 
@@ -71,6 +72,7 @@ export async function POST(req: Request) {
     const [item] = await getDb().insert(table).values(values as never).returning();
     revalidatePath("/", "layout");
     revalidateContentFeeds();
+    purgeServerCache(CACHE_TAGS.skills);
     const newId = (item as { id: string }).id;
     await recordAdminAudit(getDb(), { adminId: guard.session.uid, action: "cms.create", targetType: "cms", targetId: newId, meta: { type: b.type, fields: Object.keys(values) } });
     return NextResponse.json({ ok: true, item: { id: newId } }, { status: 201 });
@@ -117,6 +119,7 @@ export async function PATCH(req: Request) {
     if (!updated.length) return NextResponse.json({ error: "This item no longer exists." }, { status: 404 });
     revalidatePath("/", "layout");
     revalidateContentFeeds();
+    purgeServerCache(CACHE_TAGS.skills);
     await recordAdminAudit(db, { adminId: guard.session.uid, action: "cms.update", targetType: "cms", targetId: id, meta: { type: b.type, fields: Object.keys(values) } });
     return NextResponse.json({ ok: true });
   } catch (e) {
@@ -136,6 +139,7 @@ export async function DELETE(req: Request) {
     await db.delete(table).where(eq(table.id, id));
     revalidatePath("/", "layout");
     revalidateContentFeeds();
+    purgeServerCache(CACHE_TAGS.skills);
     await recordAdminAudit(db, { adminId: guard.session.uid, action: "cms.delete", targetType: "cms", targetId: id, meta: { type: b.type } });
     return NextResponse.json({ ok: true });
   } catch (e) {

@@ -17,6 +17,7 @@ import { INTERN_NDA, internTerms } from "./legal-intern";
 import { getDb, schema, hasDb } from "@/lib/db";
 import { eq, desc, asc, sql, and, inArray } from "drizzle-orm";
 import { inrMinorToUsdMinor } from "@/lib/currency";
+import { getActiveFeaturedSkillRows, getActivePricingPlans, getPartnerCollegeRows } from "@/lib/cached-reads";
 import { getPricingConfig } from "@/lib/platform-settings";
 import { PRICING_DEFAULTS, type PricingConfig } from "@/lib/pricing-config";
 import { blogImageRoutes, cmsImageSrc, imageVersion } from "./image-response";
@@ -117,21 +118,13 @@ export async function getPartners() {
 
 /** Partner colleges Findtern staff chose to show, plus the pitch copy. */
 export async function getCollegePartners(): Promise<{ pitch: CmsCollegePitch; partners: CmsCollegePartner[] }> {
-  const partners = await tryDb(async () => {
-    const c = schema.colleges;
-    return getDb()
-      .select({ id: c.id, name: c.name, city: c.city, logoUrl: c.logoUrl })
-      .from(c)
-      .where(sql`${c.isActive} AND ${c.isPartner} AND ${c.showOnWebsite}`)
-      .orderBy(asc(c.sortOrder), asc(c.name));
-  }, [] as CmsCollegePartner[]);
+  const partners = await tryDb(() => getPartnerCollegeRows(), [] as CmsCollegePartner[]);
   return { pitch: COLLEGE_PITCH, partners };
 }
 
 export async function getFeaturedSkills() {
   return tryDb(async () => {
-    const db = getDb();
-    const rows = await db.select().from(schema.websiteFeaturedSkills).where(eq(schema.websiteFeaturedSkills.isActive, true)).orderBy(asc(schema.websiteFeaturedSkills.sortOrder));
+    const rows = await getActiveFeaturedSkillRows();
     if (!rows.length) return emptyOrBuiltIn(schema.websiteFeaturedSkills, "skill", FEATURED_SKILLS);
     // The stored resource_count is a hand-typed number; the card must show the
     // live bench size. If the candidate query fails, keep the stored number.
@@ -189,8 +182,7 @@ export async function getPopularSteps() {
  */
 export async function getPlans(isIndia: boolean): Promise<CmsPlan[]> {
   return tryDb(async () => {
-    const db = getDb();
-    const rows = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true)).orderBy(asc(schema.pricingPlans.sortOrder));
+    const rows = await getActivePricingPlans(true);
     const inr = rows.filter((r) => String(r.currency).toUpperCase() === "INR");
     if (!inr.length) return isIndia ? PRICING_PLANS : PRICING_PLANS_USD;
     const plans = withPlanDefaults(inr.map(rowToPlan));

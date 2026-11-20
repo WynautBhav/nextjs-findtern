@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { diffFields, recordAdminAudit } from "@/lib/admin/audit";
 import { requireMutation } from "@/lib/guards-mutation";
+import { CACHE_TAGS, purgeServerCache } from "@/lib/server-cache";
 import { forgetAccountStatus } from "@/lib/account-status";
 import { sendAccountNotice, shouldNotify, type NoticeResult } from "@/lib/account-notices";
 import { GSTIN_FORMAT, GSTIN_HINT } from "@/lib/gstin";
@@ -68,6 +69,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     throw e;
   }
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  purgeServerCache(CACHE_TAGS.colleges);
   let notice: NoticeResult | null = null;
   if (parsed.data.isActive !== undefined) {
     // The session check reads the college's flag fresh on every request; the entry is only dropped for the terms cache.

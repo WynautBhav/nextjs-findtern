@@ -6,6 +6,7 @@ import { z } from "zod";
 import { diffFields, recordAdminAudit } from "@/lib/admin/audit";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { CACHE_TAGS, purgeServerCache } from "@/lib/server-cache";
 import { PRICING_PLANS } from "@/lib/content/home";
 import { getSetting, setSetting } from "@/lib/platform-settings";
 import { PER_HIRE_FEE_KEY, parsePerHireFeeSetting } from "@/lib/per-hire-fee";
@@ -43,6 +44,7 @@ const planSchema = z.object({
 
 /** Every pricing write ends here: the public pages and /llms.txt print prices, so purge them all. */
 function revalidatePricing() {
+  purgeServerCache(CACHE_TAGS.plans, CACHE_TAGS.settings);
   for (const { path, type } of PRICING_REVALIDATE) {
     if (type) revalidatePath(path, type);
     else revalidatePath(path);
