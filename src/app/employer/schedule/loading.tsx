@@ -1,4 +1,5 @@
 import { SkeletonRow } from "@/components/app/layout-kit";
+import { Surface } from "@/components/app/primitives";
 import { Skeleton } from "@/components/ui/skeleton";
 
 /**
@@ -22,10 +23,10 @@ export default function EmployerScheduleLoading() {
         <Skeleton className="my-3 h-5 w-20 rounded-apple-sm" />
       </div>
 
-      <div className="mb-5 flex flex-col gap-3">
-        <div className="flex flex-wrap gap-x-3 border-b border-ink-100 sm:gap-x-7">
-          {["w-10", "w-20", "w-36", "w-24"].map((w, i) => (
-            <Skeleton key={i} className={`my-3.5 h-5 rounded-apple-sm ${w}`} />
+      <Surface className="mb-5 flex flex-col gap-3 p-3 sm:p-4">
+        <div className="flex flex-wrap gap-1">
+          {["w-14", "w-24", "w-40", "w-28"].map((w, i) => (
+            <Skeleton key={i} className={`h-11 rounded-full lg:h-10 ${w}`} />
           ))}
         </div>
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-[minmax(0,1.4fr)_10rem_minmax(0,1fr)_minmax(0,1fr)_auto]">
@@ -34,14 +35,16 @@ export default function EmployerScheduleLoading() {
           <Skeleton className="h-11 rounded-apple-md" />
           <Skeleton className="h-11 rounded-apple-md" />
         </div>
-      </div>
+      </Surface>
 
-      <Skeleton className="mb-2 h-5 w-24 rounded-apple-sm" />
-      <div className="divide-y divide-ink-100 border-y border-ink-100">
+      <Skeleton className="mb-2 h-6 w-24 rounded-apple-sm" />
+      <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden px-4 sm:px-5">
         {[0, 1, 2].map((i) => (
-          <SkeletonRow key={i} className="py-4" />
+          <li key={i}>
+            <SkeletonRow className="py-4" />
+          </li>
         ))}
-      </div>
+      </Surface>
     </div>
   );
 }

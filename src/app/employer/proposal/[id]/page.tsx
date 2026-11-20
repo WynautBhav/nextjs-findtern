@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, desc, eq, isNotNull } from "drizzle-orm";
-import { ArrowLeft, Check, ChevronDown, Clock, CreditCard, Download, Send, X } from "lucide-react";
+import { Clock } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -16,16 +16,13 @@ import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { fullTimeFeeMinor, hireFeeMinor } from "@/lib/checkout";
 import { feeDisplay } from "@/lib/fee-display";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
-import { laptopLabel, offerScore, parseOffer, WEEKLY_SCHEDULES } from "@/lib/offer";
+import { offerScore, parseOffer } from "@/lib/offer";
 import { projectZone, shiftInIst } from "@/lib/timezones";
 import type { PlaceOfSupply } from "@/lib/gst";
 import { offerBreakdown, offerPlace } from "@/lib/offer-breakdown";
-import { OfferBreakdownList } from "@/components/employer/offer-breakdown-list";
-import { DetailRow, Pill } from "@/components/app/primitives";
 import { ProposalAvatar } from "@/components/employer/proposal-avatar";
 import { avatarUrl } from "@/lib/employer-pool";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
-import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
 import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
@@ -35,7 +32,7 @@ import { proposalCgpaGate } from "@/lib/cgpa-verification";
 import { hasOpenOrderFor } from "@/lib/payments";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { offerTimeline } from "@/components/employer/proposal-timeline";
-import { MeetingRulesList } from "@/components/employer/meeting-rules";
+import { ProposalView } from "./proposal-view";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
 
 export const metadata: Metadata = {
@@ -44,8 +41,6 @@ export const metadata: Metadata = {
 };
 
 type Proposal = typeof schema.proposals.$inferSelect;
-
-const MODE: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "On-site" };
 
 /**
  * One proposal, from the employer's side.
@@ -252,337 +247,97 @@ export default async function EmployerProposalDetail({
   );
   const profileHref = `/employer/intern/${encodeURIComponent(proposal.internId)}`;
 
-  return (
-    <div>
-      <Link
-        href="/employer/proposals"
-        className="apple-spring mb-4 inline-flex min-h-11 items-center gap-1.5 rounded-apple-sm text-sm font-medium text-brand-700 hover:underline"
-      >
-        <ArrowLeft className="size-4" aria-hidden />
-        All proposals
-      </Link>
-
-      {projectDown ? (
-        <div className="mb-6">
-          <TakedownBanner projects={[{ id: projectDown.id, name: projectName ?? "This project", reason: projectDown.reason }]} />
-        </div>
+  const hasActions = state.canWithdraw || state.canEdit || proposal.status === "hired";
+  const actionsBody = (
+    <>
+      {state.canEdit ? (
+        <ProposalOfferForm
+          proposalId={proposal.id}
+          defaultOpen={edit === "1"}
+          accepted={proposal.status === "accepted"}
+          preference={preference}
+          currency={currency}
+          place={place}
+          perHireMinor={shownFeeMinor}
+          fee={fee}
+          projectTimezone={projectTimezone}
+          shortOnly={score > 0 && score < 6}
+          hasLaptop={hasLaptop}
+          initial={{
+            roleTitle: offer.roleTitle,
+            duration: offer.duration,
+            startDate: offer.startDate ?? undefined,
+            weeklySchedule: offer.weeklySchedule,
+            hourlyRateMinor: offer.hourlyRateMinor,
+            paidLeavesPerMonth: offer.paidLeavesPerMonth,
+            message: offer.jd,
+            additionalInfo: offer.additionalInfo,
+            mode: offer.mode,
+            city: offer.city,
+            state: offer.state,
+            officeDays: offer.officeDays ?? undefined,
+            homeDays: offer.homeDays ?? undefined,
+            shiftFrom: offer.shiftFrom,
+            shiftTo: offer.shiftTo,
+            timezone: offer.timezone,
+            laptop: offer.laptop,
+          }}
+        />
       ) : null}
-      {/* ── Header: who, what, status, and the one thing to do ───────── */}
-      <header className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 items-start gap-4">
-          <ProposalAvatar photoUrl={photoUrl} initials={initials} presence={presence} />
-          <div className="min-w-0">
-            <p className="text-sm text-ink-600">
-              <Link
-                href={profileHref}
-                className="inline-flex min-h-11 items-center font-semibold text-ink-900 underline decoration-ink-300 underline-offset-4 outline-none hover:text-brand-700 hover:decoration-brand-500 focus-visible:rounded-sm focus-visible:ring-2 focus-visible:ring-brand-600 sm:min-h-0"
-              >
-                {internName}
-              </Link>
-              {projectName ? <span> · {projectName}</span> : null}
-            </p>
-            <h1 className="text-balance break-words text-2xl font-semibold tracking-[-0.02em] text-ink-900 sm:text-3xl">
-              {offer.roleTitle || projectName || "Proposal"}
-            </h1>
-            <p className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-ink-600">
-              <Pill tone={state.tone}>{state.label}</Pill>
-              <span>{ft ? "Full-time offer" : "Internship offer"}</span>
-              {score > 0 ? (
-                <span className="nums">
-                  <span className="font-semibold text-ink-900">{score.toFixed(1)}</span> Findtern Score
-                </span>
-              ) : null}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start lg:shrink-0">
-          {state.canPay ? (
-            <Link href="/employer/checkout" className={buttonClass({ className: "max-sm:w-full" })}>
-              <CreditCard className="size-4" aria-hidden />
-              {ft ? "Pay the hiring fee" : "Pay to confirm hire"}
-            </Link>
-          ) : null}
-          {sendNewHref ? (
-            <Link href={sendNewHref} className={buttonClass({ className: "max-sm:w-full" })}>
-              <Send className="size-4" aria-hidden />
-              Send a new proposal
-            </Link>
-          ) : null}
-        </div>
-      </header>
+      <ProposalActions
+        proposalId={proposal.id}
+        status={proposal.status}
+        canPay={false}
+        canWithdraw={state.canWithdraw}
+        {...(confirmingCgpa ? { withdrawLabel: "Withdraw proposal", withdrawSecondary: true } : {})}
+      />
+      {proposal.status === "hired" && !ft ? (
+        <Link href="/employer/timesheets" className={buttonClass({ variant: "outline", block: true })}>
+          <Clock className="size-4" aria-hidden />
+          Timesheets
+        </Link>
+      ) : null}
+    </>
+  );
 
-      <CgpaNotice proposalId={proposal.id} state={state} canConfirm={confirmingCgpa} />
-      <ExpiredNotice state={state} />
-
-      {/* ── The four numbers the decision rests on ───────────────────── */}
-      <dl className="mt-8 grid grid-cols-2 border-y border-ink-100 sm:grid-cols-4">
-        {strip.map(([label, value], i) => (
-          <div
-            key={label}
-            className={[
-              "py-5 sm:px-6 sm:first:pl-0",
-              i % 2 === 1 ? "border-l border-ink-100 pl-5" : "",
-              i >= 2 ? "border-t border-ink-100 sm:border-t-0" : "",
-              i === 2 ? "sm:border-l" : "",
-            ].join(" ")}
-          >
-            <dt className="text-sm text-ink-600">{label}</dt>
-            <dd className="nums mt-1 text-xl font-semibold text-ink-900">{value}</dd>
-          </div>
-        ))}
-      </dl>
-
-      <div className="mt-10 grid gap-x-14 gap-y-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
-        <div className="min-w-0 space-y-10">
-          {!ft ? (
-            <section>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Amount</h2>
-              <OfferBreakdownList lines={breakdown.lines} className="mt-4" />
-              <h2 className="mt-10 text-lg font-semibold tracking-[-0.01em] text-ink-900">Terms</h2>
-              <dl className="mt-2 divide-y divide-ink-100 border-b border-ink-100">
-                <DetailRow label="Working week" value={WEEKLY_SCHEDULES[offer.weeklySchedule].label} />
-                <DetailRow label="Paid leave" value={offer.paidLeavesPerMonth ? `${offer.paidLeavesPerMonth} day${offer.paidLeavesPerMonth === 1 ? "" : "s"} a month` : "None"} />
-                <DetailRow
-                  label="Working hours"
-                  value={
-                    flexible ? (
-                      "Flexible, set by the intern"
-                    ) : (
-                      <>
-                        {offer.shiftFrom}–{offer.shiftTo}
-                        {ist ? <span className="block text-xs font-normal text-text-subtle">{ist} for the intern</span> : null}
-                      </>
-                    )
-                  }
-                  mono
-                />
-                <DetailRow label="Timezone" value={offer.timezone || "Asia/Kolkata"} />
-                <DetailRow label="Mode" value={MODE[offer.mode] ?? "-"} />
-                {offer.mode !== "remote" ? (
-                  <DetailRow label="Location" value={[offer.city, offer.state].filter(Boolean).join(", ") || offer.location || "-"} />
-                ) : null}
-                {offer.mode === "hybrid" ? (
-                  <DetailRow label="Hybrid split" value={`${offer.officeDays ?? 0} office · ${offer.homeDays ?? 0} home days a week`} />
-                ) : null}
-                <DetailRow label="Laptop" value={laptopLabel(offer.laptop)} />
-              </dl>
-            </section>
-          ) : (
-            <section>
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Full-time terms</h2>
-                {ft.offerLetterKey || ft.offerLetterUrl ? (
-                  <a
-                    href={`/api/proposals/${encodeURIComponent(proposal.id)}/offer-letter`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className={buttonClass({ variant: "outline", size: "sm" })}
-                  >
-                    <Download className="size-4" aria-hidden />
-                    Offer letter
-                  </a>
-                ) : null}
-              </div>
-              <dl className="mt-2 divide-y divide-ink-100 border-b border-ink-100">
-                <DetailRow label="Job mode" value={MODE[ft.jobMode] ?? (ft.jobMode || "-")} />
-                <DetailRow label="Location" value={ft.jobMode === "remote" ? "Remote" : ft.location || "-"} />
-                <DetailRow label="Timezone" value={ft.timezone || offer.timezone || "-"} />
-                <DetailRow label="Shift" value={ft.shiftFrom && ft.shiftTo ? `${ft.shiftFrom}–${ft.shiftTo}` : "-"} mono />
-                <DetailRow label="Annual CTC" value={ft.annualCtcMinor ? formatMoney(ft.annualCtcMinor, currency) : "-"} mono />
-                <DetailRow
-                  label="Hiring fee"
-                  value={ft.annualCtcMinor ? `${formatMoney(fullTimeFeeMinor(ft.annualCtcMinor), currency)} (8.33% of CTC, separate from it)` : "-"}
-                  mono
-                />
-              </dl>
-            </section>
-          )}
-
-          {offer.jd ? (
-            <section>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Job description</h2>
-              {/* Text: legacy Quill HTML is read back as plain text (EMH-28). */}
-              <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-base leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{offer.jd}</p>
-            </section>
-          ) : null}
-
-          {offer.additionalInfo ? (
-            <section>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">What the intern will learn</h2>
-              <p className="mt-3 max-w-prose whitespace-pre-line text-pretty text-base leading-relaxed text-ink-800 [overflow-wrap:anywhere]">{offer.additionalInfo}</p>
-            </section>
-          ) : null}
-
-          {skills.length > 0 ? (
-            <section>
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Skills</h2>
-              <ul className="mt-3 flex flex-wrap gap-2">
-                {skills.map((skill) => (
-                  <li key={skill} className="rounded-full border border-ink-200 px-3 py-1 text-sm font-medium text-ink-700">
-                    {skill}
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ) : null}
-
-          {/* Phones: the assessment after the terms, not above them. */}
-          {ratings.length > 0 ? (
-            <section className="border-t border-ink-100 pt-8 lg:hidden">
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Assessment at sending</h2>
-              <dl className="mt-1 divide-y divide-ink-100">
-                {ratings.map(([key, value]) => (
-                  <DetailRow
-                    key={key}
-                    label={key === "overall" ? "Findtern Score" : humanizeKey(key)}
-                    value={`${value}/10`}
-                    mono
-                  />
-                ))}
-              </dl>
-            </section>
-          ) : null}
-
-          {interview ? (
-            <section className="border-t border-ink-100 pt-8" aria-labelledby="proposal-interview-h">
-              <h2 id="proposal-interview-h" className="text-lg font-semibold tracking-[-0.01em] text-ink-900">
-                Interview
-              </h2>
-              <p className="nums mt-1 text-sm text-ink-600">{formatSlotTime(new Date(meetingTime(interview) ?? 0), projectZone(projectTimezone, interview.timezone))}</p>
-              <div className="mt-3">
+  return (
+    <ProposalView
+      proposalId={proposal.id}
+      avatar={<ProposalAvatar photoUrl={photoUrl} initials={initials} presence={presence} />}
+      internName={internName}
+      profileHref={profileHref}
+      projectName={projectName}
+      title={offer.roleTitle || projectName || "Proposal"}
+      state={state}
+      offer={offer}
+      score={score}
+      strip={strip}
+      breakdownLines={breakdown.lines}
+      flexible={flexible}
+      ist={ist}
+      skills={skills}
+      ratings={ratings}
+      timeline={timeline}
+      sendNewHref={sendNewHref}
+      takedown={projectDown ? <TakedownBanner projects={[{ id: projectDown.id, name: projectName ?? "This project", reason: projectDown.reason }]} /> : null}
+      notices={
+        <>
+          <CgpaNotice proposalId={proposal.id} state={state} canConfirm={confirmingCgpa} />
+          <ExpiredNotice state={state} />
+        </>
+      }
+      interview={
+        interview
+          ? {
+              when: formatSlotTime(new Date(meetingTime(interview) ?? 0), projectZone(projectTimezone, interview.timezone)),
+              join: (
                 <JoinMeetingButton interviewId={interview.id} link={interview.meetingLink} ready={Boolean(interview.meetingLink)} variant="outline" interview={serializeJoinInput(interview)} serverNow={new Date().toISOString()} zone={projectZone(projectTimezone, interview.timezone)} />
-              </div>
-            </section>
-          ) : null}
-
-          {/* Meeting rules are for interviews; a full-time offer is not one (bug sheet 12 Nov, row 16). */}
-          {!ft ? (
-          <details className="group border-t border-ink-100 pt-2">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-sm text-lg font-semibold tracking-[-0.01em] text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 [&::-webkit-details-marker]:hidden">
-              Meeting rules
-              <ChevronDown className="size-5 shrink-0 text-ink-500 transition-transform group-open:rotate-180" aria-hidden />
-            </summary>
-            <p className="mt-1 text-sm text-text-subtle">By joining any meeting scheduled through Findtern, you agree to this conduct policy.</p>
-            <MeetingRulesList className="mt-4" />
-          </details>
-          ) : null}
-        </div>
-
-        <aside className="order-first space-y-10 lg:order-none lg:sticky lg:top-24 lg:self-start">
-          {/* ── Timeline: what happened, what is next ─────────────────── */}
-          <section>
-            <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Offer timeline</h2>
-            <ol className="mt-4">
-              {timeline.map((step, i) => {
-                const last = i === timeline.length - 1;
-                return (
-                  <li key={step.label} className="relative flex gap-3.5 pb-6 last:pb-0" aria-current={step.state === "current" ? "step" : undefined}>
-                    {!last ? (
-                      <span aria-hidden className={cn("absolute left-[0.6875rem] top-7 bottom-1 w-px", step.state === "done" ? "bg-brand-300" : "bg-ink-200")} />
-                    ) : null}
-                    <span
-                      aria-hidden
-                      className={cn(
-                        "relative mt-0.5 grid size-6 shrink-0 place-items-center rounded-full",
-                        step.state === "done" && "bg-brand-700 text-white",
-                        step.state === "current" && "bg-white ring-2 ring-inset ring-brand-700",
-                        step.state === "todo" && "bg-white ring-1 ring-inset ring-ink-300",
-                        step.state === "closed" && "bg-ink-200 text-ink-700",
-                      )}
-                    >
-                      {step.state === "done" ? <Check className="size-3.5" strokeWidth={3} /> : null}
-                      {step.state === "current" ? <span className="size-2 rounded-full bg-brand-700" /> : null}
-                      {step.state === "closed" ? <X className="size-3.5" strokeWidth={3} /> : null}
-                    </span>
-                    <div className="min-w-0">
-                      <p className={cn("text-sm", step.state === "todo" ? "text-ink-600" : "font-semibold text-ink-900")}>
-                        {step.label}
-                        <span className="sr-only">{step.state === "done" ? " (done)" : step.state === "current" ? " (next)" : ""}</span>
-                      </p>
-                      {step.date ? <p className="nums text-sm text-ink-600">{step.date}</p> : null}
-                      {step.state === "current" || step.state === "closed" ? (
-                        state.next ? <p className="mt-1.5 text-pretty text-sm leading-relaxed text-ink-700">{state.next}</p> : null
-                      ) : null}
-                    </div>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
-
-          {state.canWithdraw || state.canEdit || proposal.status === "hired" ? (
-            <section className="border-t border-ink-100 pt-8">
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">{proposal.status === "hired" ? "Hire" : state.expiredReason ? "Close this offer" : "Change this offer"}</h2>
-              <div className="mt-4 grid gap-2">
-                {state.canEdit ? (
-                  <ProposalOfferForm
-                    proposalId={proposal.id}
-                    defaultOpen={edit === "1"}
-                    accepted={proposal.status === "accepted"}
-                    preference={preference}
-                    currency={currency}
-                    place={place}
-                    perHireMinor={shownFeeMinor}
-                    fee={fee}
-                    projectTimezone={projectTimezone}
-                    shortOnly={score > 0 && score < 6}
-                    hasLaptop={hasLaptop}
-                    initial={{
-                      roleTitle: offer.roleTitle,
-                      duration: offer.duration,
-                      startDate: offer.startDate ?? undefined,
-                      weeklySchedule: offer.weeklySchedule,
-                      hourlyRateMinor: offer.hourlyRateMinor,
-                      paidLeavesPerMonth: offer.paidLeavesPerMonth,
-                      message: offer.jd,
-                      additionalInfo: offer.additionalInfo,
-                      mode: offer.mode,
-                      city: offer.city,
-                      state: offer.state,
-                      officeDays: offer.officeDays ?? undefined,
-                      homeDays: offer.homeDays ?? undefined,
-                      shiftFrom: offer.shiftFrom,
-                      shiftTo: offer.shiftTo,
-                      timezone: offer.timezone,
-                      laptop: offer.laptop,
-                    }}
-                  />
-                ) : null}
-                <ProposalActions
-                  proposalId={proposal.id}
-                  status={proposal.status}
-                  canPay={false}
-                  canWithdraw={state.canWithdraw}
-                  {...(confirmingCgpa ? { withdrawLabel: "Withdraw proposal", withdrawSecondary: true } : {})}
-                />
-                {proposal.status === "hired" && !ft ? (
-                  <Link href="/employer/timesheets" className={buttonClass({ variant: "outline", block: true })}>
-                    <Clock className="size-4" aria-hidden />
-                    Timesheets
-                  </Link>
-                ) : null}
-              </div>
-            </section>
-          ) : null}
-
-          {ratings.length > 0 ? (
-            <section className="border-t border-ink-100 pt-8 max-lg:hidden">
-              <h2 className="text-lg font-semibold tracking-[-0.01em] text-ink-900">Assessment at sending</h2>
-              <dl className="mt-1 divide-y divide-ink-100">
-                {ratings.map(([key, value]) => (
-                  <DetailRow
-                    key={key}
-                    label={key === "overall" ? "Findtern Score" : humanizeKey(key)}
-                    value={`${value}/10`}
-                    mono
-                  />
-                ))}
-              </dl>
-            </section>
-          ) : null}
-        </aside>
-      </div>
-    </div>
+              ),
+            }
+          : null
+      }
+      actions={hasActions ? { heading: proposal.status === "hired" ? "Hire" : state.expiredReason ? "Close this offer" : "Change this offer", body: actionsBody } : null}
+    />
   );
 }
 
@@ -594,8 +349,3 @@ function formatDate(value: Date | string | null): string {
   return formatWords(d);
 }
 
-/** "problemSolving" / "problem_solving" → "Problem solving". */
-function humanizeKey(key: string): string {
-  const words = key.replace(/_/g, " ").replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase().trim();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-}
