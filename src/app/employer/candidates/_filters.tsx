@@ -202,7 +202,7 @@ export function FilterColumn({
               Reset filters
             </Link>
             <button type="submit" className={buttonClass({ variant: "primary", size: "sm", className: "ml-auto min-h-11 lg:hidden" })}>
-              Show {total} result{total === 1 ? "" : "s"}
+              Show {total} candidate{total === 1 ? "" : "s"}
             </button>
           </div>
         </div>

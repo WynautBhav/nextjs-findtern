@@ -46,7 +46,7 @@ function sortOptions(filters: Filters, proActive: boolean) {
 /**
  * Ascending / descending for the sort chosen beside it. A pair of links (the server page builds every
  * URL, as for the layout toggle): the current one is `aria-current`. Direction applies to every sort but
- * Best match, which is a ranking with one fixed order: there the pair is shown disabled, with the reason.
+ * Best match, which is a ranking that always lists the best first: there the pair is shown disabled, with the reason.
  */
 function SortDirection({ filters, choice, collegeSort, compact }: { filters: Filters; choice: SortChoice; collegeSort: Filters["collegeSort"]; compact: boolean }) {
   const current = activeSortDir(choice, filters.dir, collegeSort);
@@ -58,7 +58,7 @@ function SortDirection({ filters, choice, collegeSort, compact }: { filters: Fil
   if (current === null) {
     return (
       <div className="flex shrink-0 items-center gap-2 max-sm:hidden">
-        <div role="group" aria-label="Sort direction" aria-describedby="sort-dir-reason" title="Best match has a fixed order" className="flex items-center gap-0.5 rounded-apple-sm border border-ink-200 bg-white p-0.5 opacity-50">
+        <div role="group" aria-label="Sort direction" aria-describedby="sort-dir-reason" title="Best match always lists the best first" className="flex items-center gap-0.5 rounded-apple-sm border border-ink-200 bg-white p-0.5 opacity-50">
           {options.map(({ dir, label, Icon }) => (
             <span key={dir} role="img" aria-label={`${label} (not available)`} className={cn(cell, "text-ink-500")}>
               <Icon className="size-4" aria-hidden />
@@ -66,7 +66,7 @@ function SortDirection({ filters, choice, collegeSort, compact }: { filters: Fil
           ))}
         </div>
         <span id="sort-dir-reason" className={cn("text-xs text-text-subtle", compact ? "sr-only" : "max-xl:sr-only")}>
-          Best match has a fixed order
+          Best match always lists the best first
         </span>
       </div>
     );
@@ -232,6 +232,7 @@ export function ContextLine({ data, filters, match, className }: { data: Candida
   const saved = filters.saved && Boolean(data.activeProjectId);
   const name = projectNameOf(data);
   const matchedOn = match === "matched" || match === "edited" ? matchedOnText(data.effectiveSkills.length, data.cityList.map(titleCase)) : "";
+  // The summary never contradicts the project control beside it: it names the project and says what the project is doing to the list.
   return (
     <p role="status" className={cn("min-w-0 text-sm leading-6 text-ink-600", className)}>
       <strong className="nums font-semibold text-ink-900">{total}</strong> {saved ? "shortlisted for this project" : `candidate${total === 1 ? "" : "s"}`}
@@ -241,7 +242,7 @@ export function ContextLine({ data, filters, match, className }: { data: Candida
           for <strong className="font-semibold text-ink-900">{name}</strong>
         </>
       ) : null}
-      {!saved && match === "off" ? " · not matched to a project" : null}
+      {!saved && name && match === "off" ? ` · project: ${name}, matching off` : null}
       {!saved && matchedOn ? ` · ${matchedOn}` : null}
       {!saved && match === "none" && activeFilterCount(filters, data.effectiveSkills, data.projectApplied?.city ?? "") > 0 ? " matching your filters" : null}
     </p>

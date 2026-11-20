@@ -58,7 +58,7 @@ export function CandidatesView({
         className="mb-3 sm:mb-4 lg:mb-5 [&_h1]:text-[32px] [&_h1]:leading-10"
       />
       {/* The hiring-steps strip already links Candidates and Shortlist with their counts; Compare opens from the selection bar once two are ticked. */}
-      {flow ? <HireFlow counts={flow} current="candidates" currentCount={loadFailed ? null : total} /> : null}
+      {flow ? <HireFlow counts={flow} current="candidates" currentCount={loadFailed || (filters.saved && Boolean(activeProjectId)) ? null : total} /> : null}
 
       {/* lg and up: the slim bar that takes over once the toolbar card scrolls out. */}
       <StickyBar targetId="candidate-toolbar" label="Search and sort">

@@ -110,15 +110,15 @@ export function Results({
 
   return (
     <>
-      {/* All | Shortlist. The count and Sort sit above the columns now. */}
+      {/* All | this project's shortlist. The count of the list is the toolbar's (and the hiring-steps strip's): one place each, so no number is repeated here. */}
       {data.activeProjectId ? (
         <div className={cn("border-b border-ink-100 pb-3 sm:pb-4 lg:border-b-0 lg:pb-5", saved ? "flex" : "flex max-sm:hidden")}>
           <nav aria-label="Show" className="flex items-center gap-5">
             <TabLink href={withFilters(filters, { saved: false, page: "" })} active={!saved}>
-              All{saved ? null : <span className="nums font-normal text-ink-600"> {total}</span>}
+              All candidates
             </TabLink>
-            <TabLink href={withFilters(filters, { saved: true, page: "" })} active={saved}>
-              Shortlist <span className="nums text-ink-600">({data.savedCount})</span>
+            <TabLink href={withFilters(filters, { saved: true, page: "" })} active={saved} title="Candidates you shortlisted for this project, whatever the filters say. The Shortlist step above counts every project.">
+              This project&rsquo;s shortlist <span className="nums text-ink-600">({data.savedCount})</span>
             </TabLink>
           </nav>
         </div>
@@ -133,7 +133,7 @@ export function Results({
           <EmptyScene
             art
             title="Nobody shortlisted for this project yet"
-            body="Press Save on a candidate to add them to this project's shortlist."
+            body="Press Shortlist on a candidate to add them to this project's shortlist."
             next={{ label: "Browse all candidates", href: withFilters(filters, { saved: false, page: "" }) }}
             who="You - save a candidate"
           />
@@ -228,10 +228,11 @@ export function Results({
   );
 }
 
-function TabLink({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
+function TabLink({ href, active, title, children }: { href: string; active: boolean; title?: string; children: React.ReactNode }) {
   return (
     <Link
       href={href}
+      title={title}
       scroll={false}
       aria-current={active ? "page" : undefined}
       className={cn(

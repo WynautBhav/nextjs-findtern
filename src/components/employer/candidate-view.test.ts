@@ -256,3 +256,14 @@ test("sectionCounts: each active chip counts in its own filter-column section", 
   assert.equal(sectionCounts([], true).location, 1);
   assert.deepEqual(sectionCounts(["q"], false), { location: 0, scores: 0, price: 0, availability: 0, sorting: 0 });
 });
+
+test("the Candidates page says each fact once: summary names the project when matching is off, the shortlist tab is labelled by scope", () => {
+  const dir = join(import.meta.dirname, "../../app/employer/candidates");
+  const toolbar = readFileSync(join(dir, "_toolbar.tsx"), "utf8");
+  const results = readFileSync(join(dir, "_results.tsx"), "utf8");
+  assert.doesNotMatch(toolbar, /not matched to a project/);
+  assert.match(toolbar, /project: \$\{name\}, matching off/);
+  assert.doesNotMatch(toolbar, /fixed order/);
+  assert.doesNotMatch(results, /All\{saved/); // the tab row repeats no count the toolbar and the steps strip already show
+  assert.match(results, /This project&rsquo;s shortlist <span/);
+});
