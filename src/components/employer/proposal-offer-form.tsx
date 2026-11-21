@@ -130,8 +130,8 @@ export function ProposalOfferForm({
   const week = workingDaysPerWeek(schedule);
   const [officeDays, setOfficeDays] = useState(String(Math.min(week - 1, Math.max(1, initial.officeDays ?? 3))));
   const homeDays = Math.max(0, week - (Number(officeDays) || 0));
-  const [shiftFrom, setShiftFrom] = useState(flexibleAtStart ? "09:00" : initial.shiftFrom!);
-  const [shiftTo, setShiftTo] = useState(flexibleAtStart ? "18:00" : initial.shiftTo || "17:00");
+  const [shiftFrom, setShiftFrom] = useState(flexibleAtStart ? "" : initial.shiftFrom ?? "");
+  const [shiftTo, setShiftTo] = useState(flexibleAtStart ? "" : initial.shiftTo ?? "");
   const noLaptop = hasLaptop === false;
   const [laptop, setLaptop] = useState(noLaptop ? "company" : normalizeLaptop(initial.laptop) || "company");
   const [message, setMessage] = useState(initial.message ?? "");

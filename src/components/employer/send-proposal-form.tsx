@@ -77,13 +77,6 @@ const LAPTOP_OPTIONS = [
   { value: "candidate", label: "Candidate's own laptop" },
 ] as const;
 
-/** Quick fills for the working hours; the times stay editable (bug sheet 23 Oct). */
-const SHIFT_PRESETS = [
-  { label: "9am–5pm", from: "09:00", to: "17:00" },
-  { label: "9am–1pm", from: "09:00", to: "13:00" },
-  { label: "5pm–9pm", from: "17:00", to: "21:00" },
-] as const;
-
 export function SendProposalForm({
   candidate,
   projects,
@@ -154,8 +147,8 @@ export function SendProposalForm({
   const [officeDays, setOfficeDays] = useState("3");
   const week = workingDaysPerWeek(schedule);
   const homeDays = String(Math.max(0, week - (Number(officeDays) || 0)));
-  const [shiftFrom, setShiftFrom] = useState("09:00");
-  const [shiftTo, setShiftTo] = useState("17:00");
+  const [shiftFrom, setShiftFrom] = useState("");
+  const [shiftTo, setShiftTo] = useState("");
   // No intern works more than 8 hours: a later start pulls the end in, and an end
   // typed past the limit is flagged where it is typed.
   const shiftLimit = isClockTime(shiftFrom) ? `Up to 8 hours: a start at ${shiftFrom} can end by ${latestShiftEnd(shiftFrom)}.` : "Up to 8 hours.";
@@ -521,26 +514,6 @@ export function SendProposalForm({
               <Field id="shiftTo" label="To" type="time" value={shiftTo} error={errors.shiftTo ?? (shiftTooLong ? `Too long. ${shiftLimit}` : undefined)} onChange={setShiftTo} />
             </div>
             {shiftTooLong ? null : <p className="mt-2 text-sm text-ink-600">{shiftLimit}</p>}
-            <div className="mt-2 flex flex-wrap gap-1.5">
-              {SHIFT_PRESETS.map((p) => (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => {
-                    setShiftFrom(p.from);
-                    setShiftTo(p.to);
-                  }}
-                  className={cn(
-                    "apple-spring nums min-h-11 rounded-apple-sm border px-3 text-sm font-medium",
-                    shiftFrom === p.from && shiftTo === p.to
-                      ? "border-brand-600 bg-brand-50 text-brand-800"
-                      : "border-ink-200 bg-white text-ink-700 hover:bg-ink-50",
-                  )}
-                >
-                  {p.label}
-                </button>
-              ))}
-            </div>
             {istHours ? (
               <p className="nums mt-1 text-sm text-ink-600">
                 The intern sees these as <span className="font-medium text-ink-800">{istHours}</span>.
