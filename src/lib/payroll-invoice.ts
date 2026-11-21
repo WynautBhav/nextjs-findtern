@@ -46,6 +46,9 @@ export function passThroughOf(lines: readonly Pick<PayrollLine, "key" | "amountM
   return lines.filter((l) => l.key === "salary" || l.key === "overtime").reduce((sum, l) => sum + l.amountMinor, 0);
 }
 
+/** Largest total one invoice can hold (amount_minor is a 32-bit integer): $20,000,000.00. */
+export const MAX_INVOICE_TOTAL_MINOR = 2_000_000_000;
+
 export type IssueInput = {
   lines: readonly PayrollLine[];
   currency: string;
@@ -63,6 +66,8 @@ export function validateIssue(i: IssueInput): { ok: true; totalMinor: number } |
   }
   const totalMinor = i.lines.reduce((sum, l) => sum + l.amountMinor, 0);
   if (totalMinor <= 0) return { ok: false, error: "The total must be above zero." };
+  // amount_minor is a 32-bit integer; refuse in words instead of failing the insert.
+  if (totalMinor > MAX_INVOICE_TOTAL_MINOR) return { ok: false, error: "The total is too large for one invoice." };
   const { start, end } = i.period ?? {};
   if (typeof start !== "string" || typeof end !== "string" || !isRealDay(start) || !isRealDay(end) || start > end) {
     return { ok: false, error: "The service period is not valid." };

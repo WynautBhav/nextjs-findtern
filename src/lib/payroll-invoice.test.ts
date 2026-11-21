@@ -70,3 +70,9 @@ test("isManualInvoiceRaw", () => {
   assert.equal(isManualInvoiceRaw(null), false);
   assert.equal(isManualInvoiceRaw("manual_invoice"), false);
 });
+
+test("validateIssue: a total past the 32-bit column is refused in words", () => {
+  const big = { ...good, lines: [{ key: "salary", label: "Salary", amountMinor: 1_000_000_000 }, { key: "extra", label: "Bonus", amountMinor: 1_000_000_001 }] } as typeof good;
+  const r = validateIssue(big);
+  assert.equal(r.ok, false);
+});

@@ -1,3 +1,4 @@
+import { isHiredProposal } from "@/lib/hire-status";
 import type { Metadata } from "next";
 import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
 
@@ -191,7 +192,8 @@ async function loadOrders(employerId: string) {
     if (!isManualInvoiceRaw(p.raw) || !p.invoiceNumber || (p.status !== "created" && p.status !== "paid")) return [];
     const facts = manualInvoiceFacts(p.raw);
     const hire = facts ? hireByProposal.get(facts.proposalId) : undefined;
-    if (!facts || !hire) return [];
+    // Only while the hire stands: the intern's full name is never shown for a placement that is no longer hired.
+    if (!facts || !hire || !isHiredProposal(hire.proposal)) return [];
     const offer = parseOffer(hire.proposal.offerDetails, hire.proposal.currency);
     const role = offer.roleTitle || hire.projectName || "Full-time role";
     const input = payrollInvoiceInputOf(p, { intern: { name: nameOf(hire), role }, seller, liveBuyer: employer });

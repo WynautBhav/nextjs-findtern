@@ -50,7 +50,7 @@ export async function POST(req: Request) {
   const b = parsed.data;
 
   const db = getDb();
-  const result = await db.transaction(async (tx) => {
+  const issue = () => db.transaction(async (tx) => {
     // Locking the placement serialises two admins issuing the same month; the unique index is the backstop.
     const [proposal] = await tx.select().from(schema.proposals).where(eq(schema.proposals.id, b.proposalId)).for("update").limit(1);
     if (!proposal) return { error: "Unknown placement", status: 404 } as const;
@@ -60,6 +60,23 @@ export async function POST(req: Request) {
     }
     const checked = validateIssue({ lines: b.lines, currency: proposal.currency ?? "", period: b.period, dueOn: b.dueOn });
     if (!checked.ok) return { error: checked.error, status: 400 } as const;
+
+    // The period must be exactly one of this placement's approved timesheet months: no overlapping or
+    // made-up range can bill the same days twice, and only hours the company approved are invoiced.
+    const T = schema.timesheets;
+    const [sheet] = await tx
+      .select({ id: T.id })
+      .from(T)
+      .where(
+        and(
+          eq(T.proposalId, proposal.id),
+          eq(T.status, "approved"),
+          sql`to_char(${T.periodStart}, 'YYYY-MM-DD') = ${b.period.start}`,
+          sql`to_char(${T.periodEnd}, 'YYYY-MM-DD') = ${b.period.end}`,
+        ),
+      )
+      .limit(1);
+    if (!sheet) return { error: "Pick a month with an approved timesheet; the period must match it exactly.", status: 409 } as const;
 
     const P = schema.employerPayments;
     const [dupe] = await tx
@@ -118,6 +135,16 @@ export async function POST(req: Request) {
     return { id: row.id, invoiceNumber, totalMinor: checked.totalMinor } as const;
   });
 
+  let result: Awaited<ReturnType<typeof issue>>;
+  try {
+    result = await issue();
+  } catch (err) {
+    // The unique index (drizzle/0049) caught a second invoice for the same month that slipped past the check.
+    if ((err as { code?: string })?.code === "23505" || (err as { cause?: { code?: string } })?.cause?.code === "23505") {
+      return NextResponse.json({ error: "This placement already has an invoice for that month. Void it first to issue another." }, { status: 409 });
+    }
+    throw err;
+  }
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
   return NextResponse.json(result, { status: 201 });
 }

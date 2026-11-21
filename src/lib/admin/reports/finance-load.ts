@@ -49,9 +49,10 @@ function groupSql(kind: "employer" | "intern", range: { since: Date | null; unti
   const real = kind === "employer" ? sql`${realEmployerId(EP.employerId)}` : sql`true`;
   const moment = sql`coalesce(${t.paidAt}, ${t.createdAt})`;
   const raw = sql`${t.raw}`;
+  // Revenue, like "Received" and the trend: a payroll invoice's pass-through salary is the intern's, not Findtern's.
   return sql`SELECT ${kind} AS kind, lower(${t.status}) AS status, upper(${t.currency}) AS currency, lower(${t.gateway}) AS gateway,
       lower(coalesce(${raw}->>'paymentMethod', ${raw}->>'method', '')) AS method, (${t.amountMinor} = 0) AS zero, ${hasPromoSql(raw)} AS promo,
-      count(*)::int AS count, coalesce(sum(${t.amountMinor}), 0)::bigint AS amount_minor, coalesce(sum(${discountSql(raw)}), 0)::bigint AS discount_minor,
+      count(*)::int AS count, coalesce(sum(${revenueAmountSql(t.amountMinor, t.raw)}), 0)::bigint AS amount_minor, coalesce(sum(${discountSql(raw)}), 0)::bigint AS discount_minor,
       coalesce(sum(CASE WHEN upper(${t.currency}) = 'USD' THEN 0 ELSE ${t.amountMinor} - round(${t.amountMinor}::numeric / 1.18) END), 0)::bigint AS gst_minor
     FROM ${t} WHERE ${real} AND ${rangeSql(moment, range.since, range.until)}
     GROUP BY 1, 2, 3, 4, 5, 6, 7`;
