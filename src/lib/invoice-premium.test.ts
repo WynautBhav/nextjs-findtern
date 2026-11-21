@@ -13,7 +13,6 @@ const base = (over: Partial<PayrollInvoiceInput> = {}): PayrollInvoiceInput => (
   currency: "USD",
   lines: [
     { label: "Salary", amountMinor: 400_000 },
-    { label: "Overtime", detail: "12 h × $30.00", amountMinor: 36_000 },
     { label: "Payroll management fee", amountMinor: 5_000 },
   ],
   intern: { name: "Aarav Sharma", role: "Frontend Developer" },
@@ -39,9 +38,8 @@ test("invoice number is the payment reference, in the wire block and the terms",
 
 test("USD total is the sum of the lines, formatted", () => {
   const html = payrollInvoiceHtml(base());
-  assert.match(html, /\$4,410\.00/);
+  assert.match(html, /\$4,050\.00/);
   assert.match(html, /\$4,000\.00/);
-  assert.match(html, /12 h × \$30\.00/);
 });
 
 test("no GST rows, no SAC", () => {

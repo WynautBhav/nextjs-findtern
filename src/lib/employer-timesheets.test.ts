@@ -259,18 +259,3 @@ test("fullTimeMonthsSoFar: months elapsed since joining, plus the one running, a
   const periods = engagementPeriods("2026-01-15", fullTimeMonthsSoFar("2026-01-15", "2026-03-20"));
   assert.deepEqual(periods.at(-1), { start: "2026-03-15", end: "2026-04-14" });
 });
-
-test("overtimeOf: hours above 8 on each Present day are overtime", async () => {
-  const { overtimeOf } = await import("./employer-timesheets.ts");
-  const entries = [
-    { date: "2026-09-01", status: "Present", hours: 10 },
-    { date: "2026-09-02", status: "Present", hours: 8 },
-    { date: "2026-09-03", status: "Present", hours: 0 }, // no hours stored: the legacy 8-hour day
-    { date: "2026-09-04", status: "Present", hours: 6 },
-    { date: "2026-09-05", status: "Absent", hours: 12 }, // only a Present day counts
-    { date: "2026-09-06", status: "Present", hours: 9.5 },
-  ];
-  const r = overtimeOf(entries, new Date("2026-09-01T00:00:00Z"), new Date("2026-09-06T23:59:59.999Z"));
-  assert.deepEqual(r, { regularHours: 8 + 8 + 8 + 6 + 8, overtimeHours: 2 + 1.5 });
-  assert.deepEqual(overtimeOf([], new Date("2026-09-01T00:00:00Z"), new Date("2026-09-02T23:59:59.999Z")), { regularHours: 0, overtimeHours: 0 });
-});

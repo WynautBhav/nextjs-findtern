@@ -73,12 +73,10 @@ export async function loadPayrollPlacements(seller: InvoiceSeller & { wire?: Inv
       role,
       joining: realJoiningDay(offer),
       annualCtcMinor: offer.fullTime?.annualCtcMinor ?? null,
-      overtimeRateMinor: offer.fullTime?.overtimeRateMinor ?? null,
       periods: payrollPeriods({
         sheets: sheets.filter((s) => s.proposalId === r.proposal.id).map((s) => ({ id: s.id, status: s.status, entries: s.entries, periodStart: s.periodStart, periodEnd: s.periodEnd })),
         invoices: mine.map(toRow),
         annualCtcMinor: offer.fullTime?.annualCtcMinor ?? null,
-        overtimeRateMinor: offer.fullTime?.overtimeRateMinor ?? null,
         toDto,
       }),
     };

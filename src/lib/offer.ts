@@ -69,8 +69,6 @@ export type Offer = {
     shiftTo: string;
     /** The joining date the employer set on the offer (a weekday, two days out at least when sent); null when none. */
     startDate: string | null;
-    /** What the employer pays an hour of overtime (USD offers, which Findtern runs payroll for), minor units; null when none. */
-    overtimeRateMinor: number | null;
   } | null;
 };
 
@@ -301,7 +299,6 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
           shiftFrom: str(ft.shiftFrom),
           shiftTo: str(ft.shiftTo),
           startDate: str(ft.startDate) || null,
-          overtimeRateMinor: toMinor(ft.overtimeHourlyRate),
         }
       : null,
   };

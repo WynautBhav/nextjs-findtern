@@ -65,8 +65,8 @@ export const isMoneyReceived = (p: { gateway?: string | null }) => p.gateway !==
 export const isFullWaiverGateway = (p: { gateway?: string | null }) => p.gateway === WAIVER_GATEWAY;
 
 /**
- * PASS-THROUGH. A payroll invoice (`raw.kind = "manual_invoice"`, lib/payroll-invoice.ts) bills the intern's salary and
- * overtime next to Findtern's own fee. `raw.passThroughMinor` is that salary part: Findtern passes it on to the intern,
+ * PASS-THROUGH. A payroll invoice (`raw.kind = "manual_invoice"`, lib/payroll-invoice.ts) bills the intern's salary
+ * next to Findtern's own fee. `raw.passThroughMinor` is that salary part: Findtern passes it on to the intern,
  * so only the rest (the payroll fee and any extra line) is revenue. Every other row is revenue in full.
  */
 export function passThroughMinorOf(raw: unknown): number {
@@ -217,7 +217,7 @@ export type LedgerRow = {
   gateway?: string | null;
   /** The list value a full-waiver code took off, in the row's own currency. */
   waivedMinor?: number | null;
-  /** Salary and overtime a payroll invoice passes on to the intern (see passThroughMinorOf): collected, but not revenue. */
+  /** The salary a payroll invoice passes on to the intern (see passThroughMinorOf): collected, but not revenue. */
   passThroughMinor?: number | null;
 };
 

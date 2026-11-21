@@ -4,7 +4,7 @@
  * takes. Pure, and free of server imports (the dialog is a client component).
  */
 
-export type FormLine = { key: "salary" | "overtime" | "payroll_fee" | "extra"; label: string; detail: string; amount: string };
+export type FormLine = { key: "salary" | "payroll_fee" | "extra"; label: string; detail: string; amount: string };
 
 /** "4,000", "4000.5", "$12.50" -> cents; null when it is not a plain amount of dollars and cents, zero or more. */
 export function dollarsToMinor(input: string): number | null {

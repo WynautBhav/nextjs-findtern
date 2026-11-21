@@ -61,7 +61,6 @@ function Placement({ placement: p, canWrite, today }: { placement: PayrollPlacem
   const facts: [string, string][] = [
     ["Joined", p.joining ? formatDate(p.joining) : "Date not set"],
     ["Salary", p.annualCtcMinor ? `${usd(Math.round(p.annualCtcMinor / 12))} a month` : "CTC not set"],
-    ["Overtime", p.overtimeRateMinor ? `${usd(p.overtimeRateMinor)} an hour` : "Rate not set"],
   ];
   return (
     <Panel aria-labelledby={`pl-${p.proposalId}`}>
@@ -100,8 +99,7 @@ function Placement({ placement: p, canWrite, today }: { placement: PayrollPlacem
                   ["Period", "lg:w-44"],
                   ["Timesheet", "lg:w-36"],
                   ["Days", "text-right lg:w-20"],
-                  ["Regular", "text-right lg:w-24"],
-                  ["Overtime", "text-right lg:w-24"],
+                  ["Hours", "text-right lg:w-24"],
                   ["Invoice", ""],
                   ["", "lg:w-[21rem]"],
                 ].map(([h, c], i) => (
@@ -130,7 +128,6 @@ function Placement({ placement: p, canWrite, today }: { placement: PayrollPlacem
 const CELL = "px-3 py-3 text-sm text-foreground first:pl-[var(--admin-pad-panel)] last:pr-[var(--admin-pad-panel)]";
 
 function PeriodRow({ placement: p, row, canWrite, today }: { placement: PayrollPlacementDto; row: PayrollPeriodDto; canWrite: boolean; today: string }) {
-  const overtime = (row.overtimeHours ?? 0) > 0;
   return (
     <TableRow className="border-[color:var(--admin-rule)] hover:bg-[color:var(--admin-panel-2)]">
       <TableCell data-title="" className={cn(CELL, "nums whitespace-nowrap font-medium")}>
@@ -142,11 +139,8 @@ function PeriodRow({ placement: p, row, canWrite, today }: { placement: PayrollP
       <TableCell data-label="Days" className={cn(CELL, "nums text-right")}>
         {row.presentDays ?? "-"}
       </TableCell>
-      <TableCell data-label="Regular" className={cn(CELL, "nums text-right")}>
-        {hours(row.regularHours)}
-      </TableCell>
-      <TableCell data-label="Overtime" className={cn(CELL, "nums text-right", overtime && "font-semibold")}>
-        {hours(row.overtimeHours)}
+      <TableCell data-label="Hours" className={cn(CELL, "nums text-right")}>
+        {hours(row.hours)}
       </TableCell>
       <TableCell data-label="Invoice" className={CELL}>
         <div className="min-w-0 max-lg:text-right">

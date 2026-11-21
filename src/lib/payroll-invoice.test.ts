@@ -3,50 +3,48 @@ import { test } from "node:test";
 
 import { isManualInvoiceRaw, passThroughOf, payrollDraft, validateIssue, type PayrollLine } from "./payroll-invoice.ts";
 
-test("payrollDraft: salary is CTC / 12, overtime is hours x rate, fee is $50", () => {
-  const lines = payrollDraft({ annualCtcMinor: 60_000_00, overtimeHours: 3.5, overtimeRateMinor: 12_50 });
+test("payrollDraft: salary is CTC / 12 and the fee is $50; there is no overtime line", () => {
+  const lines = payrollDraft({ annualCtcMinor: 60_000_00 });
   assert.deepEqual(
     lines.map((l) => [l.key, l.amountMinor]),
-    [["salary", 5_000_00], ["overtime", 4375], ["payroll_fee", 5000]],
+    [["salary", 5_000_00], ["payroll_fee", 5000]],
   );
-  assert.equal(lines[1].detail, "3.5 h × $12.50");
   assert.equal(lines[0].label, "Salary");
-  assert.equal(lines[2].label, "Payroll management fee");
+  assert.equal(lines[1].label, "Payroll management fee");
+  assert.ok(!lines.some((l) => /overtime/i.test(`${l.label} ${l.detail ?? ""}`)));
 });
 
 test("payrollDraft: the fee line names the month and never mentions Findtern Pro", () => {
-  const lines = payrollDraft({ annualCtcMinor: 60_000_00, overtimeHours: 0, overtimeRateMinor: null, periodEnd: "2026-11-30" });
-  assert.equal(lines[2].detail, "November 2026");
+  const lines = payrollDraft({ annualCtcMinor: 60_000_00, periodEnd: "2026-11-30" });
+  assert.equal(lines[1].detail, "November 2026");
   assert.ok(!lines.some((l) => /pro\b/i.test(`${l.label} ${l.detail ?? ""}`)));
-  assert.equal(payrollDraft({ annualCtcMinor: 1, overtimeHours: 0, overtimeRateMinor: null })[2].detail, undefined);
+  assert.equal(payrollDraft({ annualCtcMinor: 1 })[1].detail, undefined);
 });
 
-test("payrollDraft: CTC that does not divide by 12 rounds to a cent; no overtime keeps a zero line", () => {
-  const lines = payrollDraft({ annualCtcMinor: 100_000, overtimeHours: 0, overtimeRateMinor: null });
+test("payrollDraft: CTC that does not divide by 12 rounds to a cent", () => {
+  const lines = payrollDraft({ annualCtcMinor: 100_000 });
   assert.equal(lines[0].amountMinor, 8333);
-  assert.equal(lines[1].amountMinor, 0);
-  assert.equal(lines.length, 3);
+  assert.equal(lines.length, 2);
 });
 
-test("passThroughOf: salary and overtime are the intern's money, the fee and extras are Findtern's", () => {
+test("passThroughOf: the salary is the intern's money, the fee and extras are Findtern's", () => {
   const lines: PayrollLine[] = [
     { key: "salary", label: "Salary", amountMinor: 5000_00 },
-    { key: "overtime", label: "Overtime", amountMinor: 100_00 },
     { key: "payroll_fee", label: "Payroll management fee", amountMinor: 5000 },
     { key: "extra", label: "Bonus", amountMinor: 200_00 },
   ];
-  assert.equal(passThroughOf(lines), 5100_00);
+  assert.equal(passThroughOf(lines), 5000_00);
 });
 
 const good = {
-  lines: payrollDraft({ annualCtcMinor: 60_000_00, overtimeHours: 2, overtimeRateMinor: 1000 }),
+  lines: payrollDraft({ annualCtcMinor: 60_000_00 }),
   currency: "USD",
   period: { start: "2026-10-01", end: "2026-10-31" },
   dueOn: "2026-11-07",
 };
 
 test("validateIssue: a good draft returns its total", () => {
-  assert.deepEqual(validateIssue(good), { ok: true, totalMinor: 5_000_00 + 2000 + 5000 });
+  assert.deepEqual(validateIssue(good), { ok: true, totalMinor: 5_000_00 + 5000 });
 });
 
 test("validateIssue refuses bad drafts", () => {

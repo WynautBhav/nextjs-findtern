@@ -19,7 +19,7 @@ const label = "block text-sm font-medium text-ink-800";
 
 /**
  * Prepare and issue the monthly payroll invoice of one approved period. The lines start as the draft (salary =
- * CTC / 12, overtime = hours x the offer's rate, the $50 fee) and are all editable; staff may add or drop a line
+ * CTC / 12, the $50 fee) and are all editable; staff may add or drop a line
  * (a bonus, an adjustment). Issuing is final: the server numbers the invoice and no endpoint edits it afterwards,
  * so the dialog says so before the button, and the button names the act.
  */

@@ -1,4 +1,4 @@
-import { dayDetails, overtimeOf } from "../employer-timesheets.ts";
+import { dayDetails, sheetHours } from "../employer-timesheets.ts";
 import { manualInvoiceFacts, manualInvoiceStatus, type ManualInvoiceRow, type ManualInvoiceStatus } from "../payroll-invoice-view.ts";
 import { payrollDraft } from "../payroll-invoice.ts";
 
@@ -8,7 +8,7 @@ import { payrollDraft } from "../payroll-invoice.ts";
  * (payroll-load.ts) supplies the rows and the printable HTML. Everything here is plain data a client component takes.
  */
 
-export type DraftLineDto = { key: "salary" | "overtime" | "payroll_fee" | "extra"; label: string; detail: string; amountMinor: number };
+export type DraftLineDto = { key: "salary" | "payroll_fee" | "extra"; label: string; detail: string; amountMinor: number };
 
 export type PayrollInvoiceDto = {
   id: string;
@@ -35,8 +35,7 @@ export type PayrollPeriodDto = {
   sheetStatus: string | null;
   /** Counted only once approved: until then the hours are not billable. */
   presentDays: number | null;
-  regularHours: number | null;
-  overtimeHours: number | null;
+  hours: number | null;
   /** The invoice that is not void (due or paid). */
   invoice: PayrollInvoiceDto | null;
   /** Earlier invoices for the same period that were voided (their numbers stay). */
@@ -54,7 +53,6 @@ export type PayrollPlacementDto = {
   /** YYYY-MM-DD, or null when the offer has no real joining day. */
   joining: string | null;
   annualCtcMinor: number | null;
-  overtimeRateMinor: number | null;
   periods: PayrollPeriodDto[];
 };
 
@@ -67,14 +65,13 @@ export function payrollPeriods(input: {
   sheets: readonly SheetLike[];
   invoices: readonly ManualInvoiceRow[];
   annualCtcMinor: number | null;
-  overtimeRateMinor: number | null;
   toDto: (row: ManualInvoiceRow) => PayrollInvoiceDto | null;
 }): PayrollPeriodDto[] {
   const byStart = new Map<string, PayrollPeriodDto>();
   const put = (start: string, end: string) => {
     let p = byStart.get(start);
     if (!p) {
-      p = { start, end, sheetId: null, sheetStatus: null, presentDays: null, regularHours: null, overtimeHours: null, invoice: null, voided: [], draft: null };
+      p = { start, end, sheetId: null, sheetStatus: null, presentDays: null, hours: null, invoice: null, voided: [], draft: null };
       byStart.set(start, p);
     }
     return p;
@@ -85,10 +82,8 @@ export function payrollPeriods(input: {
     p.sheetId = s.id;
     p.sheetStatus = s.status;
     if (s.status === "approved") {
-      const { regularHours, overtimeHours } = overtimeOf(s.entries, s.periodStart, s.periodEnd);
       p.presentDays = dayDetails(s.entries, s.periodStart, s.periodEnd).filter((d) => d.status === "Present").length;
-      p.regularHours = regularHours;
-      p.overtimeHours = overtimeHours;
+      p.hours = sheetHours(s.entries, s.periodStart, s.periodEnd);
     }
   }
 
@@ -103,7 +98,7 @@ export function payrollPeriods(input: {
 
   for (const p of byStart.values()) {
     if (p.sheetStatus === "approved" && !p.invoice) {
-      p.draft = payrollDraft({ annualCtcMinor: input.annualCtcMinor ?? 0, overtimeHours: p.overtimeHours ?? 0, overtimeRateMinor: input.overtimeRateMinor, periodEnd: p.end }).map((l) => ({
+      p.draft = payrollDraft({ annualCtcMinor: input.annualCtcMinor ?? 0, periodEnd: p.end }).map((l) => ({
         key: l.key,
         label: l.label,
         detail: l.detail ?? "",

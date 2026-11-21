@@ -382,13 +382,6 @@ test("offerEditTermIssues: the 8-hour cap judges only a shift the edit changes; 
   assert.deepEqual(offerEditTermIssues({ shiftFrom: "09:00", shiftTo: "17:00" }, { shiftFrom: "flexible", shiftTo: "flexible" }), []);
 });
 
-test("full-time offer: the overtime rate is read in minor units, null when absent", () => {
-  const withRate = parseOffer({ fullTimeOffer: { annualCtc: 60000, overtimeHourlyRate: 12.5 } }, "USD");
-  assert.equal(withRate.fullTime?.overtimeRateMinor, 1250);
-  assert.equal(parseOffer({ fullTimeOffer: { annualCtc: 60000 } }, "USD").fullTime?.overtimeRateMinor, null);
-  assert.equal(parseOffer({ fullTimeOffer: { annualCtc: 60000, overtimeHourlyRate: 0 } }, "USD").fullTime?.overtimeRateMinor, null);
-});
-
 test("isPayrollFullTime: only a full-time offer in USD is payroll-managed", () => {
   assert.equal(isPayrollFullTime(parseOffer({ fullTimeOffer: { annualCtc: 60000 } }, "USD")), true);
   assert.equal(isPayrollFullTime(parseOffer({ fullTimeOffer: { annualCtc: 600000 } }, "INR")), false);
