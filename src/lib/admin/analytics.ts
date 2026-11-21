@@ -1,6 +1,7 @@
 import { isSettledStatus } from "../refund-accounting.ts";
 import { parseOffer } from "../offer.ts";
 import { toInrMinor } from "./money.ts";
+import { revenueMinorOf } from "./revenue.ts";
 import { shortDateTime } from "../format.ts";
 
 /**
@@ -37,7 +38,7 @@ export type AnalyticsInput = {
     hiredAt: Date | null;
   }[];
   interviews: { internId: string; employerId: string; status: string; createdAt: Date | null }[];
-  employerPayments: { employerId?: string; amountMinor: number; currency: string; status: string; paidAt: Date | null; createdAt: Date | null }[];
+  employerPayments: { employerId?: string; amountMinor: number; currency: string; status: string; paidAt: Date | null; createdAt: Date | null; /** Lets a payroll invoice leave its pass-through salary out of revenue (revenue.ts). */ raw?: unknown }[];
   internPayments: { amountMinor: number; currency: string; status: string; paidAt: Date | null; createdAt: Date | null }[];
   /** Paid college seat batches count as revenue like employer orders. */
   collegeBatches?: { amountMinor: number; status: string; paidAt: Date | null; createdAt: Date | null }[];
@@ -78,7 +79,7 @@ export function computeAnalytics(input: AnalyticsInput) {
   const fullTimeProposals = proposalsIn.filter(isFullTime).length;
 
   const sumInr = (rows: AnalyticsInput["employerPayments"]) =>
-    rows.filter((r) => r.status === "paid" && inRange(r.paidAt ?? r.createdAt)).reduce((s, r) => s + toInrMinor(r.amountMinor, r.currency), 0);
+    rows.filter((r) => r.status === "paid" && inRange(r.paidAt ?? r.createdAt)).reduce((s, r) => s + toInrMinor(revenueMinorOf(r), r.currency), 0);
   const revenueEmployersMinor = sumInr(input.employerPayments);
   const revenueInternsMinor = sumInr(input.internPayments);
   const revenueCollegesMinor = sumInr((input.collegeBatches ?? []).map((b) => ({ ...b, currency: "INR" })));

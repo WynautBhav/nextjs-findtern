@@ -7,6 +7,7 @@ import { q } from "@/lib/college/sql";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import { companyMoney } from "@/lib/admin/company-money";
 import { flattenParams, parsePageRequest, searchAny, toPage, toQueryString } from "@/lib/admin/params";
+import { revenueAmountSql } from "@/lib/admin/revenue";
 import { activeProject, inrMinorSql, realEmployerId, realEmployers } from "@/lib/admin/scope";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
@@ -32,7 +33,7 @@ const SORTS = ["name", "joined", "country", "projects", "proposals", "hires", "p
 const projectCount = sql<number>`(select count(*)::int from ${schema.projects} p where p.employer_id = ${q(schema.employers, schema.employers.id)})`;
 const proposalCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.employer_id = ${q(schema.employers, schema.employers.id)})`;
 const hireCount = sql<number>`(select count(*)::int from ${schema.proposals} p where p.employer_id = ${q(schema.employers, schema.employers.id)} and p.status = 'hired')`;
-const paidTotal = sql<number>`(select coalesce(sum(${inrMinorSql(sql`ep.amount_minor`, sql`ep.currency`)}), 0)::bigint from ${schema.employerPayments} ep where ep.employer_id = ${q(schema.employers, schema.employers.id)} and ep.status in ('paid','refunded','partially_refunded'))`;
+const paidTotal = sql<number>`(select coalesce(sum(${inrMinorSql(revenueAmountSql(sql`ep.amount_minor`, sql`ep.raw`), sql`ep.currency`)}), 0)::bigint from ${schema.employerPayments} ep where ep.employer_id = ${q(schema.employers, schema.employers.id)} and ep.status in ('paid','refunded','partially_refunded'))`;
 
 export default async function AdminCompaniesPage({
   searchParams,

@@ -26,10 +26,10 @@ import { downloadInvoice, taxInvoiceHtml, type InvoiceSeller } from "@/lib/invoi
 import { adminInvoiceInput } from "@/lib/admin/invoice-print";
 
 /** Tonal pill actions, as the table toolbar's (no outline); 44px on touch. */
-const PILL =
+export const PILL =
   "apple-spring inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-sm font-medium text-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:opacity-60 touch:min-h-11";
-const PILL_TONAL = cn(PILL, "bg-[color:var(--admin-panel-2)] hover:bg-[color:var(--admin-bar-tint)]");
-const PILL_QUIET = cn(PILL, "hover:bg-[color:var(--admin-panel-2)]");
+export const PILL_TONAL = cn(PILL, "bg-[color:var(--admin-panel-2)] hover:bg-[color:var(--admin-bar-tint)]");
+export const PILL_QUIET = cn(PILL, "hover:bg-[color:var(--admin-panel-2)]");
 
 /**
  * Row actions for the two admin ledgers: the tax invoice (paid rows with

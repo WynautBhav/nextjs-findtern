@@ -15,6 +15,7 @@ import { DateRangeForm } from "@/components/admin/report-range";
 import { dateRangeConditions } from "@/lib/admin/date-range";
 import { displayStatus } from "@/lib/admin/invoice-rows";
 import { viewInvoice } from "@/lib/admin/view-invoice";
+import { isManualInvoiceRaw } from "@/lib/payroll-invoice";
 import { orderRefunds } from "@/lib/refund-accounting";
 import { orderReview } from "@/lib/payment-flags";
 import { gatewayLabel } from "@/lib/admin/invoice-rows";
@@ -283,7 +284,11 @@ async function EmployerPaymentsTable({ params }: { params: Record<string, string
             </>
           ),
         },
-        { header: "Invoice", cell: (row) => <ViewInvoiceLink v={viewInvoice({ kind: "employer", ...row })} /> },
+        {
+          header: "Invoice",
+          // A payroll invoice is not on Orders (it has no GST invoice); its viewer is under Invoices.
+          cell: (row) => <ViewInvoiceLink v={isManualInvoiceRaw(row.raw) && row.invoiceNumber ? { href: "/admin/invoices?tab=payroll", reason: null } : viewInvoice({ kind: "employer", ...row })} />,
+        },
         { header: "Gateway", cell: (row) => gatewayLabel(row.gateway) },
         { header: "Order ID", cell: (row) => <span className="nums break-all text-[0.8125rem] text-text-subtle">{row.orderId}</span> },
         {

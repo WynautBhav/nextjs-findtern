@@ -76,6 +76,7 @@ const RULES: Rule[] = [
   ["/admin/projects", ["companies:read"]],
   ["/admin/orders", ["transactions:read"]],
   ["/admin/intern-invoices", ["transactions:read", "reports:read"]],
+  ["/admin/invoices", ["transactions:read"]],
   ["/admin/transactions", ["transactions:read"]],
   ["/admin/payouts", ["transactions:read"]],
   ["/admin/promo-codes", PROMO_R, PROMO_W],
@@ -120,6 +121,8 @@ const RULES: Rule[] = [
   ["/api/admin/audit-log", ["roles:write"]],
   ["/api/admin/staff", ["roles:write"], ["roles:write"]],
   ["/api/admin/orders", ["transactions:read"], ["transactions:write"]],
+  // Issuing, receiving and voiding a payroll invoice is money: Accounts (transactions:write).
+  ["/api/admin/invoices", ["transactions:read"], ["transactions:write"]],
   ["/api/admin/transactions", ["transactions:read"], ["transactions:write"]],
   // The payouts CSV is also a report export (#31); longest prefix wins over /api/admin/payouts.
   ["/api/admin/payouts/export", ["transactions:read", "reports:read"], ["transactions:write"]],

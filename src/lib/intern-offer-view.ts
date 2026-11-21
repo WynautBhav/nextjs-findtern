@@ -1,6 +1,7 @@
 import { CGPA_DISCLAIMER, CGPA_SLA_HOURS, cgpaBlocksPayment, proposalCgpaGate, type CgpaGate } from "./cgpa-verification.ts";
+import { fullTimeMonthsSoFar } from "./employer-timesheets.ts";
 import { isHiredProposal } from "./hire-status.ts";
-import { isClockTime, isRealDay, offerPastStart, parseOffer, type Offer } from "./offer.ts";
+import { isClockTime, isPayrollFullTime, isRealDay, offerPastStart, parseOffer, type Offer } from "./offer.ts";
 import { expiryOf } from "./proposal-expiry.ts";
 import { wallTimeToUtc } from "./timezones.ts";
 
@@ -162,6 +163,20 @@ export function offerJoiningDay(offer: Offer): string | null {
 export function realJoiningDay(offer: Offer): string | null {
   const day = offerJoiningDay(offer);
   return day && isRealDay(day) ? day : null;
+}
+
+/** Timesheets exist for internships and for full-time hires abroad (USD, payroll run by Findtern); an Indian full-time hire has none. */
+export const timesheetsOpenFor = (offer: Offer): boolean => !offer.fullTime || isPayrollFullTime(offer);
+
+/**
+ * What the timesheet periods of a placement run on: the day they start and how many monthly periods there are. An
+ * internship has its contract months from its start date. A full-time hire has no end, so its periods are monthly from
+ * the joining day and grow by one each month (`fullTimeMonthsSoFar`); with no joining date set there is nothing to anchor to.
+ */
+export function timesheetBasis(offer: Offer, todayIso: string): { joining: string | null; months: number } {
+  if (!offer.fullTime) return { joining: offer.startDate, months: offer.months };
+  const joining = realJoiningDay(offer);
+  return { joining, months: joining ? fullTimeMonthsSoFar(joining, todayIso) : 1 };
 }
 
 /**

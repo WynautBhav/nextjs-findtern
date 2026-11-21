@@ -135,3 +135,24 @@ test("a stored no-reply expiry reads like the unswept lapsed offer: the sweeper 
   // Another expiry kind keeps its own key.
   assert.equal(internOfferKey({ status: "expired", offerDetails: internship({ expiredReason: "accepted_elsewhere" }) }, now), "expired");
 });
+
+test("timesheetBasis: an internship runs its own months from its start date", async () => {
+  const { timesheetBasis } = await import("./intern-offer-view.ts");
+  const offer = parseOffer({ startDate: "2026-09-18", duration: "3m", monthlyAmount: 1000 }, "USD");
+  assert.deepEqual(timesheetBasis(offer, "2026-12-01"), { joining: "2026-09-18", months: 3 });
+});
+
+test("timesheetBasis: a USD full-time hire is monthly, open-ended from the joining day", async () => {
+  const { timesheetBasis } = await import("./intern-offer-view.ts");
+  const ft = parseOffer({ fullTimeOffer: { annualCtc: 60000, startDate: "2026-09-15", timezone: "Asia/Kolkata", shiftFrom: "09:00", shiftTo: "18:00" } }, "USD");
+  assert.deepEqual(timesheetBasis(ft, "2026-11-20"), { joining: "2026-09-15", months: 3 });
+  const noDate = parseOffer({ fullTimeOffer: { annualCtc: 60000 } }, "USD");
+  assert.deepEqual(timesheetBasis(noDate, "2026-11-20"), { joining: null, months: 1 });
+});
+
+test("timesheetsOpenFor: internships and USD full-time hires, never an INR full-time hire", async () => {
+  const { timesheetsOpenFor } = await import("./intern-offer-view.ts");
+  assert.equal(timesheetsOpenFor(parseOffer({ monthlyAmount: 1000, duration: "1m" }, "INR")), true);
+  assert.equal(timesheetsOpenFor(parseOffer({ fullTimeOffer: { annualCtc: 60000 } }, "USD")), true);
+  assert.equal(timesheetsOpenFor(parseOffer({ fullTimeOffer: { annualCtc: 600000 } }, "INR")), false);
+});

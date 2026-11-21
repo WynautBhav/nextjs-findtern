@@ -7,7 +7,7 @@ import { SETTLED_STATUSES } from "@/lib/refund-accounting";
 import { computeReceivables } from "@/lib/admin/receivables";
 import { refundedInrMinorWithin } from "@/lib/admin/refund-window";
 import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
-import { istDayKeys, istDayStart, istKeySql, istMonthKeys, istMonthStart, DRIVE_WAIVER_GATEWAY, isMoneyReceived, PAID_STATUS, receivedAtSql, utcSql, type Bucket } from "@/lib/admin/revenue";
+import { istDayKeys, istDayStart, istKeySql, istMonthKeys, istMonthStart, DRIVE_WAIVER_GATEWAY, isMoneyReceived, PAID_STATUS, receivedAtSql, revenueAmountSql, utcSql, type Bucket } from "@/lib/admin/revenue";
 
 export type MoneyFilter = "both" | "company" | "candidate";
 
@@ -135,7 +135,7 @@ function paidReceipts(): SQL {
   const ip = schema.internPayments;
   const csb = schema.collegeSeatBatches;
   return sql`(
-    SELECT 'employer' AS source, ${inrMinorSql(ep.amountMinor, ep.currency)} AS inr_minor, ${receivedAtSql(ep.paidAt, ep.createdAt)} AS received_at
+    SELECT 'employer' AS source, ${inrMinorSql(revenueAmountSql(ep.amountMinor, ep.raw), ep.currency)} AS inr_minor, ${receivedAtSql(ep.paidAt, ep.createdAt)} AS received_at
       FROM ${ep} WHERE ${ep.status} IN (${sql.join(SETTLED_STATUSES.map((x) => sql`${x}`), sql`, `)}) AND ${realEmployerId(ep.employerId)} AND ${ep.gateway} <> ${WAIVER_GATEWAY}
     UNION ALL
     SELECT 'intern', ${inrMinorSql(ip.amountMinor, ip.currency)}, ${receivedAtSql(ip.paidAt, ip.createdAt)}

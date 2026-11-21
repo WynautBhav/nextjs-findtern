@@ -48,6 +48,8 @@ export type AdminInvoiceRow = {
   needsReview?: boolean;
   /** Why accounts must look at it (settle flag, a duplicate payment, a refused amount), in words. */
   reviewReasons?: string[];
+  /** Salary and overtime a payroll invoice passes on to the intern: collected, but not counted as revenue (revenue.ts passThroughMinorOf). */
+  passThroughMinor?: number;
   /** Paid outside this ledger (only the profile's paid flag records it). */
   flagOnly?: boolean;
   /** A full-waiver code completed this order for free: the list value it took off, in the row's currency (the amount charged is 0). */

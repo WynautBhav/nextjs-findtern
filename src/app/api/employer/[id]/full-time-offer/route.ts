@@ -28,6 +28,8 @@ const bodySchema = z.object({
   shiftTo: z.string().min(1),
   ctcCurrency: z.enum(["INR", "USD"]),
   annualCtc: z.number().positive().max(100_000_000),
+  /** USD offers only (Findtern runs their payroll): what an hour above 8 in a day pays, in dollars. */
+  overtimeHourlyRate: z.number().positive("Enter the overtime rate per hour.").max(10_000).optional(),
   /** Key returned by /api/uploads (kind offer_letter). */
   offerLetterKey: z.string().min(10),
   /** Optional joining date. When sent it is held to the hiring start rule (a weekday, two days after sending). Stored inside fullTimeOffer, so it never lapses the offer. */
@@ -49,6 +51,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const b = parsed.data;
   const dateProblem = b.startDate === undefined ? null : startDateProblem(b.startDate, new Date());
   if (dateProblem) return NextResponse.json({ error: dateProblem }, { status: 400 });
+  if (b.ctcCurrency === "USD" && b.overtimeHourlyRate === undefined) {
+    return NextResponse.json({ error: "Enter the overtime rate per hour (USD)." }, { status: 400 });
+  }
   if (b.jobMode !== "remote" && (!b.jobLocationCity || !b.jobLocationState)) {
     return NextResponse.json({ error: "City and state are needed for onsite or hybrid roles." }, { status: 400 });
   }
@@ -129,6 +134,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
             shiftTo: b.shiftTo,
             ctcCurrency: b.ctcCurrency,
             annualCtc: b.annualCtc,
+            ...(b.ctcCurrency === "USD" && b.overtimeHourlyRate !== undefined ? { overtimeHourlyRate: Math.round(b.overtimeHourlyRate * 100) / 100 } : {}),
             offerLetterKey: b.offerLetterKey,
             offerLetterUrl,
             ...(b.startDate ? { startDate: b.startDate } : {}),

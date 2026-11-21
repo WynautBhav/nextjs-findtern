@@ -3,6 +3,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { SETTLED_STATUSES } from "@/lib/refund-accounting";
 import { parseOffer } from "@/lib/offer";
+import { revenueAmountSql } from "@/lib/admin/revenue";
 import { inrMinorSql, realEmployers, toInrMinor } from "@/lib/admin/scope";
 
 import { companyProposalBuckets, COMPANY_PAGE_SIZE, lifecycleCounts, type CompanyFilter, type LifecycleCounts, type ProposalBuckets } from "./employers";
@@ -161,7 +162,7 @@ export async function loadCompanies(f: CompanyFilter, w: ReportWindow, opts: { l
         count(*) FILTER (WHERE hired_at IS NOT NULL AND ${win("hired_at")}) AS hires
       FROM ${schema.proposals} GROUP BY employer_id) pp ON pp.employer_id = employers.id
     LEFT JOIN (SELECT employer_id, count(*) AS n FROM ${schema.interviews} WHERE ${win("created_at")} GROUP BY employer_id) iv ON iv.employer_id = employers.id
-    LEFT JOIN (SELECT employer_id, sum(${inrMinorSql(sql`amount_minor`, sql`currency`)})::bigint AS paid_minor,
+    LEFT JOIN (SELECT employer_id, sum(${inrMinorSql(revenueAmountSql(sql`amount_minor`, sql`raw`), sql`currency`)})::bigint AS paid_minor,
         (array_agg(raw->'notes'->>'paymentMode' ORDER BY coalesce(paid_at, created_at) DESC))[1] AS mode
       FROM ${schema.employerPayments}
       WHERE status IN (${sql.join(SETTLED_STATUSES.map((s) => sql`${s}`), sql`, `)}) AND ${win("coalesce(paid_at, created_at)")}

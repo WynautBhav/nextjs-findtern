@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { Download, Eye, FileText } from "lucide-react";
 
-import { Surface } from "@/components/app/primitives";
+import { Pill, Surface } from "@/components/app/primitives";
 import { buttonClass } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RowMenu } from "@/components/app/row-menu";
@@ -32,7 +32,7 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
   const filtered = useMemo(() => {
     return invoices.filter((i) => {
       if (currency !== "all" && i.currency !== currency) return false;
-      const day = i.paidAt?.slice(0, 10) ?? "";
+      const day = (i.paidAt ?? i.payroll?.issuedAt)?.slice(0, 10) ?? "";
       if (from && (!day || day < from)) return false;
       if (to && (!day || day > to)) return false;
       return matchesQuery(q, [i.number, i.orderId, i.paymentId, i.currency, day, i.paidAt ? formatDate(i.paidAt) : "", ...i.candidates, ...i.projects]);
@@ -110,10 +110,21 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                 <tr key={i.id}>
                   <td data-title className={tdClass}>
                     <div className="min-w-0 [overflow-wrap:anywhere]">
-                      <p className="nums font-medium text-ink-900">{i.number}</p>
-                      <p className="break-all font-mono text-xs text-text-subtle lg:max-w-[14rem] lg:truncate" title={i.orderId}>
-                        {i.orderId}
+                      <p className="nums flex flex-wrap items-center gap-2 font-medium text-ink-900">
+                        {i.number}
+                        {i.payroll ? (
+                          <Pill tone={i.payroll.status === "paid" ? "paid" : "waiting"} icon={<span aria-hidden className="!size-2 rounded-full bg-current" />}>
+                            {i.payroll.status === "paid" ? "Paid" : "Due"}
+                          </Pill>
+                        ) : null}
                       </p>
+                      {i.payroll ? (
+                        <p className="text-xs text-text-subtle">Payroll for {i.payroll.period}</p>
+                      ) : (
+                        <p className="break-all font-mono text-xs text-text-subtle lg:max-w-[14rem] lg:truncate" title={i.orderId}>
+                          {i.orderId}
+                        </p>
+                      )}
                     </div>
                   </td>
                   <td data-label="Candidate" className={cn(tdClass, "[overflow-wrap:anywhere]")}>{i.candidates.join(", ") || "-"}</td>
@@ -126,7 +137,9 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                       </span>
                     ) : null}
                   </td>
-                  <td data-label="Paid on" className={cn(tdClass, "nums whitespace-nowrap")}>{i.paidAt ? formatDate(i.paidAt) : "-"}</td>
+                  <td data-label={i.payroll && !i.paidAt ? "Payment" : "Paid on"} className={cn(tdClass, "nums whitespace-nowrap")}>
+                    {i.paidAt ? formatDate(i.paidAt) : i.payroll ? `Due ${formatDate(i.payroll.dueOn)}` : "-"}
+                  </td>
                   <td className={cn(tdClass, "text-right lg:sticky lg:right-0 lg:bg-white lg:shadow-[-8px_0_8px_-8px_rgb(0_0_0/0.12)]")}>
                     <div className="flex justify-end gap-2">
                       <button
@@ -168,7 +181,7 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
           }}
         >
           <DialogHeader>
-            <DialogTitle>Tax invoice {viewing?.number}</DialogTitle>
+            <DialogTitle>{viewing?.payroll ? "Invoice" : "Tax invoice"} {viewing?.number}</DialogTitle>
             <DialogDescription className="sr-only">The invoice as it prints. Use Download to save it as a PDF.</DialogDescription>
           </DialogHeader>
           {viewing ? (

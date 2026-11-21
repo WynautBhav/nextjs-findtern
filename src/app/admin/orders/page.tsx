@@ -14,9 +14,11 @@ import { loadInvoiceHires } from "@/lib/employer-invoice-hires";
 import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admin-invoices-view";
 import { discountLabel, paymentPromo } from "@/lib/admin/payment-promo";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
+import { passThroughMinorOf } from "@/lib/admin/revenue";
 import { isTestEmployer } from "@/lib/admin/scope";
 import { orderInternsLabel } from "@/lib/admin/order-list";
 import { invoiceBuyerOf } from "@/lib/invoice-buyer";
+import { notManualInvoice } from "@/lib/payroll-invoice";
 import { waiverFlagOf } from "@/lib/full-waiver";
 
 export const metadata: Metadata = {
@@ -51,6 +53,8 @@ async function loadOrders(): Promise<{ rows: AdminInvoiceRow[]; uncounted: Set<s
     })
     .from(schema.employerPayments)
     .leftJoin(schema.employers, eq(schema.employers.id, schema.employerPayments.employerId))
+    // A payroll invoice is not a checkout order and has no GST tax invoice: those live in Invoices.
+    .where(notManualInvoice(schema.employerPayments.raw))
     .orderBy(desc(schema.employerPayments.createdAt));
 
   // Which interns each order paid for (legacy showed them on every order); the loader the employer's page uses.
@@ -82,6 +86,7 @@ async function loadOrders(): Promise<{ rows: AdminInvoiceRow[]; uncounted: Set<s
       gateway: o.gateway,
       waivedMinor: waiverFlagOf(o.raw)?.waivedMinor ?? null,
       amountMinor: o.amountMinor,
+      passThroughMinor: passThroughMinorOf(o.raw),
       refundedMinor: orderRefunds(o).refundedMinor,
       currency: o.currency || "INR",
       status: o.status,
@@ -126,11 +131,16 @@ export default async function AdminOrdersPage({ searchParams }: { searchParams?:
     <div>
       <AdminPageHeader
         title="Orders"
-        subtitle="Every employer checkout, paid or not. The totals cover employer orders only (not intern fees or college seats; see Transactions for all money in). Test employers are listed but never counted as revenue."
+        subtitle="Every employer checkout, paid or not. The totals cover employer orders only (not intern fees or college seats; see Transactions for all money in). Test employers are listed but never counted as revenue. Payroll invoices for full-time hires abroad are under Invoices."
         action={
-          <ButtonLink href="/admin/transactions" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
-            Transactions
-          </ButtonLink>
+          <>
+            <ButtonLink href="/admin/invoices?tab=payroll" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
+              Payroll invoices
+            </ButtonLink>
+            <ButtonLink href="/admin/transactions" variant="outline" size="sm" className={ADMIN_PILL_SECONDARY}>
+              Transactions
+            </ButtonLink>
+          </>
         }
       />
       {rows ? (

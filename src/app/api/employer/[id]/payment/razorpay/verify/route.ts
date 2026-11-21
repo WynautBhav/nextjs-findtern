@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 
 import { requireMutation } from "@/lib/guards-mutation";
 import { settleEmployerOrder } from "@/lib/payments";
+import { notManualInvoice } from "@/lib/payroll-invoice";
 import { fetchGatewayPaid, verifySignature } from "@/lib/razorpay";
 
 const bodySchema = z.object({ orderId: z.string(), paymentId: z.string(), signature: z.string() });
@@ -29,6 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
           eq(schema.employerPayments.orderId, parsed.data.orderId),
           eq(schema.employerPayments.employerId, id),
           eq(schema.employerPayments.status, "created"),
+          notManualInvoice(schema.employerPayments.raw),
         ),
       );
     return NextResponse.json({ error: "Invalid signature" }, { status: 400 });

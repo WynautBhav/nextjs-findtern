@@ -89,6 +89,7 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
         status: schema.employerPayments.status,
         paidAt: schema.employerPayments.paidAt,
         createdAt: schema.employerPayments.createdAt,
+        raw: schema.employerPayments.raw,
       })
       .from(schema.employerPayments)
       .where(inArray(schema.employerPayments.status, SETTLED_STATUSES)),

@@ -16,6 +16,8 @@ const bodySchema = z.object({
   reference: z.string().trim().min(3).max(120),
   amountRupees: z.number().positive("Amount must be more than ₹0").max(1_000_000).optional(),
   reason: z.string().trim().max(300).optional(),
+  /** How the money arrived. Stored as raw.method (the Reports payment-method split reads it); left out it stays "manual". */
+  method: z.enum(["bank", "upi", "cash"]).optional(),
 });
 
 /**
@@ -34,7 +36,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: "Recording a payment needs the Accounts permission (transactions:write)" }, { status: 403 });
   }
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.path[0] === "amountRupees" ? parsed.error.issues[0].message : "Enter a payment reference (3+ characters) and a valid amount" }, { status: 400 });
+  if (!parsed.success) {
+    const field = parsed.error.issues[0]?.path[0];
+    return NextResponse.json({ error: field === "amountRupees" ? parsed.error.issues[0].message : field === "method" ? "Choose how it was paid: bank transfer, UPI or cash" : "Enter a payment reference (3+ characters) and a valid amount" }, { status: 400 });
+  }
 
   const db = getDb();
   const [onboarding] = await db.select({ id: schema.internOnboarding.id }).from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).limit(1);
@@ -42,7 +47,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const [account] = await db.select({ role: schema.users.role }).from(schema.users).where(eq(schema.users.id, id)).limit(1);
   const feeMinor = await getInternActivationFeeMinor();
   const amountMinor = Math.round((parsed.data.amountRupees ?? feeMinor / 100) * 100);
-  const { reference, reason } = parsed.data;
+  const { reference, reason, method } = parsed.data;
   const problem = markPaidProblem({ role: account?.role, amountMinor, feeMinor, reason });
   if (problem) return NextResponse.json({ error: problem }, { status: 400 });
   const orderId = await db.transaction(async (tx) => {
@@ -63,7 +68,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       amountMinor,
       currency: "INR",
       status: "created",
-      raw: { method: "manual", reference, markedBy: guard.session.uid },
+      raw: { method: method ?? "manual", reference, markedBy: guard.session.uid },
     });
     return fresh;
   });
@@ -76,7 +81,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     action: "intern.activation_marked_paid",
     targetType: "intern",
     targetId: id,
-    meta: { orderId, amountMinor, reference, ...(reason ? { reason } : {}) },
+    meta: { orderId, amountMinor, reference, ...(method ? { method } : {}), ...(reason ? { reason } : {}) },
   }, { strict: true });
-  return NextResponse.json({ ok: true });
+  // The number settlement gave the activation invoice, so the admin form can show it.
+  const [paid] = await db.select({ invoiceNumber: schema.internPayments.invoiceNumber }).from(schema.internPayments).where(eq(schema.internPayments.orderId, orderId)).limit(1);
+  return NextResponse.json({ ok: true, invoiceNumber: paid?.invoiceNumber ?? null });
 }

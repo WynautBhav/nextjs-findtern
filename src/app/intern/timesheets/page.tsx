@@ -12,7 +12,7 @@ import { formatDate } from "@/lib/format";
 import { isHiredProposal } from "@/lib/hire-status";
 import { loadInternData } from "@/lib/intern-data";
 import { isAcceptedStatus, toArray, type ProposalRow } from "@/lib/journey";
-import { realJoiningDay } from "@/lib/intern-offer-view";
+import { realJoiningDay, timesheetBasis, timesheetsOpenFor } from "@/lib/intern-offer-view";
 import { parseOffer } from "@/lib/offer";
 import { formatPeriodDays, isoDay, todayIst } from "@/lib/timesheet-days";
 
@@ -27,8 +27,9 @@ export const metadata: Metadata = {
 /**
  * Timesheets (legacy timesheets.tsx, INW-07).
  *
- * The list: every hired internship (the company has paid; full-time offers
- * have no timesheets) with its sheet count, and for the one picked
+ * The list: every hired internship (the company has paid) and every hired
+ * full-time placement abroad (USD, payroll run by Findtern; an Indian
+ * full-time hire has no timesheets) with its sheet count, and for the one picked
  * (`?proposalId`, the legacy deep link) every sheet with Edit / View and,
  * per the legacy rule, Delete for a draft or Withdraw for one waiting on the
  * manager. `?sheet=<id>` opens one sheet: the editor while it is a draft or
@@ -49,7 +50,7 @@ export default async function InternTimesheets({
 
   const data = await loadInternData(session.uid);
   const hires = data.proposals
-    .filter((p) => isHiredProposal(p) && !parseOffer(p.offerDetails, p.currency).fullTime)
+    .filter((p) => isHiredProposal(p) && timesheetsOpenFor(parseOffer(p.offerDetails, p.currency)))
     .sort((a, b) => (b.hiredAt ?? b.createdAt).getTime() - (a.hiredAt ?? a.createdAt).getTime());
   const sheetsOf = (proposalId: string) =>
     data.timesheets
@@ -146,10 +147,11 @@ export default async function InternTimesheets({
   const taken: Period[] = sheets
     .filter((s) => s.periodStart && s.periodEnd)
     .map((s) => ({ start: isoDay(s.periodStart!), end: isoDay(s.periodEnd!) }));
-  const next = timesheetPeriod(null, offer.startDate, offer.months, today, taken);
+  const basis = timesheetBasis(offer, today);
+  const next = timesheetPeriod(null, basis.joining, basis.months, today, taken);
   const upcoming =
-    "error" in next && offer.startDate
-      ? engagementPeriods(offer.startDate, offer.months)
+    "error" in next && basis.joining
+      ? engagementPeriods(basis.joining, basis.months)
           .flatMap((p) => uncoveredParts(p, taken))
           .find((p) => p.start > today) ?? null
       : null;
@@ -164,7 +166,7 @@ export default async function InternTimesheets({
     );
 
   const joiningDay = realJoiningDay(offer);
-  const periods = offer.startDate ? engagementPeriods(offer.startDate, offer.months) : [];
+  const periods = basis.joining ? engagementPeriods(basis.joining, basis.months) : [];
   const nextLine =
     "error" in next
       ? upcoming
@@ -174,7 +176,7 @@ export default async function InternTimesheets({
 
   return (
     <TimesheetsList
-      lede={`${role(selected)} at ${company(selected)}, ${offer.months} month${offer.months === 1 ? "" : "s"}${joiningDay ? ` from ${formatDate(joiningDay)}` : ""}.`}
+      lede={`${role(selected)} at ${company(selected)}${offer.fullTime ? ", full-time" : `, ${offer.months} month${offer.months === 1 ? "" : "s"}`}${joiningDay ? ` from ${formatDate(joiningDay)}` : ""}.`}
       options={hires.map((p) => {
         const o = parseOffer(p.offerDetails, p.currency);
         const from = realJoiningDay(o);

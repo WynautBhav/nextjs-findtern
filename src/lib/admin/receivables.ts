@@ -6,7 +6,7 @@ import type { PerHireFeeSetting } from "../per-hire-fee.ts";
 import { toInrMinor } from "./money.ts";
 import { isSettledStatus, orderRefunds, refundGstMinor, settledOrders } from "../refund-accounting.ts";
 import { WAIVER_GATEWAY, waiverFlagOf } from "../full-waiver.ts";
-import { collegeBatchReceipts, istDayKey } from "./revenue.ts";
+import { collegeBatchReceipts, istDayKey, revenueMinorOf } from "./revenue.ts";
 import { addMonthsIso, proposalOf, stipendDues } from "./stipend-dues.ts";
 
 /**
@@ -191,7 +191,7 @@ export function computeReceivables(input: ReceivablesInput, filter: { receivable
             : "Employer payment",
           companyName: input.employerName(p.employerId),
           candidateName: null,
-          amountMinor: p.amountMinor,
+          amountMinor: revenueMinorOf(p),
           currency: p.currency,
           reference: p.paymentId ?? p.orderId,
         }),

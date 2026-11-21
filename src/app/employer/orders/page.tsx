@@ -25,6 +25,9 @@ import { parseOffer, todayIst } from "@/lib/offer";
 import { payableCheckoutForRequest } from "@/lib/employer-payable";
 import { expireStaleEmployerOrders } from "@/lib/payments";
 import { isPaidRow } from "@/lib/admin/invoice-rows";
+import { formatPeriod, payrollInvoiceHtml } from "@/lib/invoice-premium";
+import { isManualInvoiceRaw } from "@/lib/payroll-invoice";
+import { manualInvoiceFacts, manualInvoiceStatus, payrollInvoiceInputOf } from "@/lib/payroll-invoice-view";
 
 export const metadata: Metadata = {
   title: "Orders",
@@ -146,9 +149,10 @@ async function loadOrders(employerId: string) {
   const seller = getInvoiceSeller();
   // Money received only: a cancelled, failed or abandoned checkout is not an
   // invoice (bug sheet 7 S1 r135), and a ₹0 test order has nothing to bill.
-  const paidPayments = paymentRows.filter((p) => isPaidRow(p) && p.amountMinor > 0);
+  // A payroll invoice (raw.kind manual_invoice) is not a checkout order: it has its own branch below.
+  const paidPayments = paymentRows.filter((p) => isPaidRow(p) && p.amountMinor > 0 && !isManualInvoiceRaw(p.raw));
   const built = employerInvoices({ payments: paidPayments, allPayments: paymentRows, legacyPaid: paidRefs, hires: hiresById });
-  const invoices: InvoiceRow[] = paidPayments
+  const taxInvoices: InvoiceRow[] = paidPayments
     .map((p) => {
       const inv = built.get(p.id)!;
       const { number, lines } = inv;
@@ -179,6 +183,39 @@ async function loadOrders(employerId: string) {
         }),
       };
     });
+
+  // Payroll invoices Findtern issued for this company's own full-time hires: shown once issued (Due) and when paid;
+  // a void one is hidden. The company never sees another company's, because only this employer's payments and hires are read.
+  const hireByProposal = new Map(proposalRows.map((r) => [r.proposal.id, r]));
+  const payrollInvoices: InvoiceRow[] = paymentRows.flatMap((p) => {
+    if (!isManualInvoiceRaw(p.raw) || !p.invoiceNumber || (p.status !== "created" && p.status !== "paid")) return [];
+    const facts = manualInvoiceFacts(p.raw);
+    const hire = facts ? hireByProposal.get(facts.proposalId) : undefined;
+    if (!facts || !hire) return [];
+    const offer = parseOffer(hire.proposal.offerDetails, hire.proposal.currency);
+    const role = offer.roleTitle || hire.projectName || "Full-time role";
+    const input = payrollInvoiceInputOf(p, { intern: { name: nameOf(hire), role }, seller, liveBuyer: employer });
+    if (!input) return [];
+    return [
+      {
+        id: p.id,
+        number: p.invoiceNumber,
+        orderId: p.orderId,
+        paymentId: null,
+        paidAt: manualInvoiceStatus(p.status) === "paid" && p.paidAt ? p.paidAt.toISOString() : null,
+        amountMinor: p.amountMinor,
+        currency: "USD",
+        candidates: [nameOf(hire)],
+        projects: [hire.projectName ?? role],
+        html: payrollInvoiceHtml(input),
+        payroll: { status: manualInvoiceStatus(p.status) === "paid" ? "paid" : "due", dueOn: facts.dueOn, issuedAt: input.issuedOn.toISOString(), period: formatPeriod(facts.period.start, facts.period.end) },
+      } satisfies InvoiceRow,
+    ];
+  });
+  // Newest first by the day each happened (paid, else issued); with none, the tax invoices keep their order untouched.
+  const invoices = payrollInvoices.length
+    ? [...taxInvoices, ...payrollInvoices].sort((a, b) => (b.paidAt ?? b.payroll?.issuedAt ?? "").localeCompare(a.paidAt ?? a.payroll?.issuedAt ?? ""))
+    : taxInvoices;
 
   // A line is due once its day has come (accepted offers have no day); a post-paid month inside its pay window is only open early.
   const today = todayIst();

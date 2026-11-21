@@ -4,6 +4,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { SETTLED_STATUSES } from "@/lib/refund-accounting";
 import { loadCollected, loadRefundedWithin, type Collected } from "@/lib/admin/receivables-load";
+import { revenueAmountSql } from "@/lib/admin/revenue";
 import { inrMinorSql, realEmployerId } from "@/lib/admin/scope";
 
 import { shapeFinance, shapePayouts, type FinanceFigures, type PayGroup, type PayoutFigures, type PayoutGroup } from "./finance";
@@ -128,7 +129,7 @@ export async function loadFinanceTrend(spec: TrendSpec): Promise<TrendRow[]> {
           coalesce(sum(inr_minor), 0)::bigint AS inr_minor,
           count(*) FILTER (WHERE currency = 'INR' AND amount_minor > 0)::int AS inr_n, count(*) FILTER (WHERE currency = 'USD' AND amount_minor > 0)::int AS usd_n
         FROM (
-          SELECT 'employer' AS source, ${inrMinorSql(EP.amountMinor, EP.currency)} AS inr_minor, upper(${EP.currency}) AS currency, ${EP.amountMinor} AS amount_minor, coalesce(${EP.paidAt}, ${EP.createdAt}) AS received_at
+          SELECT 'employer' AS source, ${inrMinorSql(revenueAmountSql(EP.amountMinor, EP.raw), EP.currency)} AS inr_minor, upper(${EP.currency}) AS currency, ${EP.amountMinor} AS amount_minor, coalesce(${EP.paidAt}, ${EP.createdAt}) AS received_at
             FROM ${EP} WHERE ${EP.status} IN (${settled}) AND ${realEmployerId(EP.employerId)}
           UNION ALL
           SELECT 'intern', ${inrMinorSql(IP.amountMinor, IP.currency)}, upper(${IP.currency}), ${IP.amountMinor}, coalesce(${IP.paidAt}, ${IP.createdAt})

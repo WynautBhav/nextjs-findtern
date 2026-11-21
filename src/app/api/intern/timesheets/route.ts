@@ -8,6 +8,7 @@ import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { parseOffer } from "@/lib/offer";
 import { timesheetPeriod } from "@/lib/employer-timesheets";
+import { timesheetBasis, timesheetsOpenFor } from "@/lib/intern-offer-view";
 import { isoDay, periodDays, todayIst } from "@/lib/timesheet-days";
 import { internLockResponse } from "@/lib/intern-unlock";
 
@@ -57,14 +58,15 @@ export async function POST(req: Request) {
   }
 
   // Legacy rules (routes.ts 13605-13678): hired placements only (the
-  // employer has paid - bug sheet 23 Oct), never a full-time offer, one sheet
-  // for a one-month engagement, and the period clamped to the joining date
-  // and contract end.
+  // employer has paid - bug sheet 23 Oct), one sheet for a one-month
+  // engagement, and the period clamped to the joining date and contract end.
+  // A full-time hire has timesheets only when the company is abroad (USD):
+  // Findtern runs that payroll, so it bills hours. Indian full-time has none.
   if (!isHiredProposal(proposal)) {
     return NextResponse.json({ error: "Timesheets open once the company completes the payment for your offer." }, { status: 400 });
   }
   const offer = parseOffer(proposal.offerDetails, proposal.currency);
-  if (offer.fullTime) {
+  if (!timesheetsOpenFor(offer)) {
     return NextResponse.json({ error: "Timesheets are not used for full-time offers." }, { status: 400 });
   }
 
@@ -82,7 +84,8 @@ export async function POST(req: Request) {
     .map((s) => ({ start: isoDay(s.periodStart!), end: isoDay(s.periodEnd!) }));
 
   const todayIso = todayIst();
-  const period = timesheetPeriod(parsed.data.month ?? null, offer.startDate, offer.months, todayIso, taken);
+  const basis = timesheetBasis(offer, todayIso);
+  const period = timesheetPeriod(parsed.data.month ?? null, basis.joining, basis.months, todayIso, taken);
   if ("error" in period) return NextResponse.json({ error: period.error }, { status: 400 });
   const start = new Date(`${period.start}T00:00:00.000Z`);
   const end = new Date(`${period.end}T23:59:59.999Z`);

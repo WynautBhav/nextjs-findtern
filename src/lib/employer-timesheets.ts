@@ -271,6 +271,33 @@ export function engagementPeriods(joiningIso: string, contractMonths: number): P
 }
 
 /**
+ * How many monthly periods a payroll-managed full-time hire has so far: the months already elapsed since
+ * joining plus the one running (min 1). A full-time role has no contract end, so `engagementPeriods(joining,
+ * fullTimeMonthsSoFar(joining, today))` is the list that grows by one on each monthly anniversary.
+ */
+export function fullTimeMonthsSoFar(joiningIso: string, todayIso: string): number {
+  const joining = joiningIso.slice(0, 10);
+  const today = todayIso.slice(0, 10);
+  let months = 1;
+  while (addMonthsIso(joining, months) <= today) months += 1;
+  return months;
+}
+
+/**
+ * Regular and overtime hours of a sheet: on each Present day the first 8 hours are regular and the rest overtime
+ * (`dayHours` decides what a day counts, so a Present day with no hours is the legacy 8-hour day and no overtime).
+ */
+export function overtimeOf(entries: unknown, periodStart: Date | null, periodEnd: Date | null): { regularHours: number; overtimeHours: number } {
+  let regularHours = 0;
+  let overtimeHours = 0;
+  for (const d of dayDetails(entries, periodStart, periodEnd)) {
+    regularHours += Math.min(d.hours, DEFAULT_DAY_HOURS);
+    overtimeHours += Math.max(0, d.hours - DEFAULT_DAY_HOURS);
+  }
+  return { regularHours, overtimeHours };
+}
+
+/**
  * The parts of `period` no sheet in `taken` covers, earliest first.
  *
  * INW-26: legacy opened sheets by calendar month (1 Oct to 31 Oct) while

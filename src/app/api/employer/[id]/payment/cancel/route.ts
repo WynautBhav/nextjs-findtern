@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
+import { notManualInvoice } from "@/lib/payroll-invoice";
 
 const bodySchema = z.object({ orderId: z.string() });
 
@@ -28,6 +29,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         eq(schema.employerPayments.orderId, parsed.data.orderId),
         eq(schema.employerPayments.employerId, id),
         eq(schema.employerPayments.status, "created"),
+        notManualInvoice(schema.employerPayments.raw),
       ),
     )
     .returning({ id: schema.employerPayments.id });

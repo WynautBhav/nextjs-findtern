@@ -12,7 +12,7 @@ import { CityField, StateField } from "@/components/employer/location-fields";
 import { StartDateField } from "@/components/employer/start-date-field";
 import { startDateIssue } from "@/components/employer/start-date-model";
 import { fieldClass, labelClass } from "@/components/employer/ui-tokens";
-import { fullTimeFeeMinor } from "@/lib/checkout";
+import { fullTimeFeeMinor, PAYROLL_FEE_USD_MINOR } from "@/lib/checkout";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
 import { TIMEZONES } from "@/lib/timezones";
@@ -25,7 +25,7 @@ const USD_NOTICE = [
     lines: [
       "If your organization is located outside India, please note that hiring a candidate directly on a full-time basis may require compliance with local employment and work visa regulations.",
       "To simplify this process and eliminate visa-related complexities, Findtern offers a payroll-managed hiring option. Under this arrangement, the employer remits the salary to Findtern, and Findtern manages payroll and salary disbursement to the candidate in compliance with applicable regulations.",
-      "Employers opting for this model will be charged a one-time full-time conversion fee of 8.33% of the total Annual CTC. No recurring hiring fees apply.",
+      `Employers opting for this model pay a one-time full-time conversion fee of 8.33% of the total Annual CTC at hire, then ${formatMoney(PAYROLL_FEE_USD_MINOR, "USD", { zeroLabel: false })} a month for payroll management. Findtern runs payroll: you wire one monthly invoice with the salary, any overtime and the fee. It includes 1 year of Findtern Pro.`,
     ],
   },
 ];
@@ -70,6 +70,8 @@ export function FullTimeOfferButton({
     shiftTo: "18:00",
     ctcCurrency: "INR",
     annualCtc: "",
+    /** USD offers only: dollars an hour of overtime pays. */
+    overtimeHourlyRate: "",
     /** Optional joining date, YYYY-MM-DD; "" when none. */
     startDate: "",
   });
@@ -80,6 +82,7 @@ export function FullTimeOfferButton({
   const set = (k: keyof typeof v) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setV((s) => ({ ...s, [k]: e.target.value }));
   const usdBlocked = v.ctcCurrency === "USD" && fte !== "approved";
   const ctc = Number(v.annualCtc);
+  const usd = v.ctcCurrency === "USD";
   const feeMinor = ctc > 0 ? fullTimeFeeMinor(Math.round(ctc * 100)) : 0;
 
   async function requestFte() {
@@ -114,7 +117,7 @@ export function FullTimeOfferButton({
       const res = await csrfFetch(`/api/employer/${employerId}/full-time-offer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...v, startDate: v.startDate || undefined, proposalId, annualCtc: ctc, offerLetterKey: letter }),
+        body: JSON.stringify({ ...v, overtimeHourlyRate: usd ? Number(v.overtimeHourlyRate) : undefined, startDate: v.startDate || undefined, proposalId, annualCtc: ctc, offerLetterKey: letter }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
@@ -238,6 +241,22 @@ export function FullTimeOfferButton({
                 <input type="number" min={1} required inputMode="numeric" value={v.annualCtc} onChange={set("annualCtc")} className={cn(fieldClass, "nums mt-1.5")} />
               </label>
             </div>
+            {usd ? (
+              <label className={labelClass}>
+                Overtime rate per hour (USD)
+                <input
+                  type="number"
+                  min={0.01}
+                  step="0.01"
+                  required
+                  inputMode="decimal"
+                  value={v.overtimeHourlyRate}
+                  onChange={set("overtimeHourlyRate")}
+                  className={cn(fieldClass, "nums mt-1.5")}
+                />
+                <span className="mt-1.5 block text-xs font-normal text-text-subtle">Paid for each hour above 8 in a day, on approved timesheets.</span>
+              </label>
+            ) : null}
             <div className="rounded-apple-md bg-ink-50 px-4 py-3">
               <p className="flex items-baseline justify-between gap-3 text-sm">
                 <span className="text-ink-600">One-time hiring fee (8.33% of annual CTC)</span>
@@ -246,6 +265,11 @@ export function FullTimeOfferButton({
               <p className="mt-1 text-xs leading-relaxed text-text-subtle">
                 The recruitment fee charged by Findtern is separate from the candidate&apos;s CTC and is not included within the offered compensation package. It is payable independently by the hiring organization.
               </p>
+              {usd ? (
+                <p className="mt-1 text-xs leading-relaxed text-text-subtle">
+                  Then {formatMoney(PAYROLL_FEE_USD_MINOR, "USD", { zeroLabel: false })} a month for payroll management, on your monthly invoice. Includes 1 year of Findtern Pro.
+                </p>
+              ) : null}
             </div>
             {usdBlocked ? (
               <p className="rounded-apple-md bg-warning-soft px-4 py-3 text-sm text-ink-800">

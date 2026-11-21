@@ -113,6 +113,7 @@ const read = (f: string) => readFileSync(f, "utf8");
 const GENERATORS: Record<string, number> = {
   // path under src/ -> how many separate invoice documents it builds (each needs its own LUT_NUMBER reference)
   "lib/invoice.ts": 1, // taxInvoiceHtml: the one HTML/print/PDF template (employer, subscription, college seat, intern, admin ledgers)
+  "lib/invoice-premium.ts": 1, // payrollInvoiceHtml: USD payroll export invoice (full-time hires abroad)
   "lib/admin/invoice-csv.ts": 1, // Orders / Intern invoices ledger CSV
   "app/api/admin/export/route.ts": 3, // payments CSVs: college seats, employer orders, intern fees
 };

@@ -63,6 +63,26 @@ export const DRIVE_WAIVER_GATEWAY = "college_drive";
  */
 export const isMoneyReceived = (p: { gateway?: string | null }) => p.gateway !== DRIVE_WAIVER_GATEWAY && p.gateway !== WAIVER_GATEWAY;
 export const isFullWaiverGateway = (p: { gateway?: string | null }) => p.gateway === WAIVER_GATEWAY;
+
+/**
+ * PASS-THROUGH. A payroll invoice (`raw.kind = "manual_invoice"`, lib/payroll-invoice.ts) bills the intern's salary and
+ * overtime next to Findtern's own fee. `raw.passThroughMinor` is that salary part: Findtern passes it on to the intern,
+ * so only the rest (the payroll fee and any extra line) is revenue. Every other row is revenue in full.
+ */
+export function passThroughMinorOf(raw: unknown): number {
+  if (typeof raw !== "object" || raw === null || (raw as { kind?: unknown }).kind !== "manual_invoice") return 0;
+  const n = (raw as { passThroughMinor?: unknown }).passThroughMinor;
+  return typeof n === "number" && Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/** What of an employer payment is revenue (its own currency, minor units): the amount less any pass-through, never below 0. */
+export const revenueMinorOf = (p: { amountMinor: number; raw?: unknown }) => Math.max(0, p.amountMinor - passThroughMinorOf(p.raw));
+
+/** SQL twin of `revenueMinorOf`, for the receipt queries: the amount column less the row's pass-through. */
+export function revenueAmountSql(amount: SQLWrapper, raw: SQLWrapper): SQL<number> {
+  return sql<number>`greatest(0, ${amount} - (CASE WHEN ${raw}->>'kind' = 'manual_invoice' THEN coalesce((${raw}->>'passThroughMinor')::bigint, 0) ELSE 0 END))`;
+}
+
 const IST_OFFSET_MS = 330 * 60_000;
 const DAY_MS = 86_400_000;
 
@@ -197,6 +217,8 @@ export type LedgerRow = {
   gateway?: string | null;
   /** The list value a full-waiver code took off, in the row's own currency. */
   waivedMinor?: number | null;
+  /** Salary and overtime a payroll invoice passes on to the intern (see passThroughMinorOf): collected, but not revenue. */
+  passThroughMinor?: number | null;
 };
 
 export const isPaid = (r: Pick<LedgerRow, "status">) => r.status === PAID_STATUS;
@@ -232,10 +254,11 @@ export function ledgerTotals(rows: LedgerRow[], uncounted?: ReadonlySet<string>)
     }
     // Received money: paid, and the two refund labels (the order was paid first): the set Transactions counts.
     if (isSettledStatus(r.status)) {
-      collectedMinor += toInrMinor(r.amountMinor, r.currency);
+      const revenue = Math.max(0, r.amountMinor - (r.passThroughMinor ?? 0));
+      collectedMinor += toInrMinor(revenue, r.currency);
       discountMinor += toInrMinor(r.discountMinor ?? 0, r.currency);
       collectedCount += 1;
-      refundedMinor += Math.min(toInrMinor(r.refundedMinor ?? 0, r.currency), toInrMinor(r.amountMinor, r.currency));
+      refundedMinor += Math.min(toInrMinor(r.refundedMinor ?? 0, r.currency), toInrMinor(revenue, r.currency));
     } else {
       notCollectedMinor += toInrMinor(r.amountMinor, r.currency);
       notCollectedCount += 1;

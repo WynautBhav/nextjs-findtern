@@ -36,4 +36,6 @@ export type InvoiceRow = {
   projects: string[];
   /** Finished invoice HTML, rendered on the server. */
   html: string;
+  /** Set on a monthly payroll invoice from Findtern (full-time hire abroad): issued and awaiting the wire ("due") or paid. Absent on a tax invoice. */
+  payroll?: { status: "due" | "paid"; dueOn: string; issuedAt: string; /** "1 – 30 Nov 2026" */ period: string };
 };

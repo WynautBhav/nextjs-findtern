@@ -16,6 +16,8 @@ import {
   istWeekdayLabel,
   ledgerTotals,
   netMinor,
+  passThroughMinorOf,
+  revenueMinorOf,
   type LedgerRow,
 } from "./revenue.ts";
 
@@ -179,4 +181,26 @@ test("ledgerTotals: a legacy row labelled refunded was received money, as Transa
   assert.equal(t.collectedCount, 2);
   assert.equal(t.notCollectedCount, 0);
   assert.equal(t.netCollectedMinor, 14_000 - 6_500);
+});
+
+test("a payroll invoice's pass-through salary is not Findtern revenue", () => {
+  const raw = { kind: "manual_invoice", passThroughMinor: 5_100_00 };
+  assert.equal(passThroughMinorOf(raw), 5_100_00);
+  assert.equal(revenueMinorOf({ amountMinor: 5_105_00, raw }), 5_00);
+  // Any other row keeps its whole amount, even one that carries a stray passThroughMinor.
+  assert.equal(revenueMinorOf({ amountMinor: 1_000, raw: { kind: "employer_subscription", passThroughMinor: 900 } }), 1_000);
+  assert.equal(revenueMinorOf({ amountMinor: 1_000, raw: null }), 1_000);
+  // A bad or oversized figure never makes revenue negative.
+  assert.equal(revenueMinorOf({ amountMinor: 1_000, raw: { kind: "manual_invoice", passThroughMinor: 9_999 } }), 0);
+  assert.equal(passThroughMinorOf({ kind: "manual_invoice", passThroughMinor: "x" }), 0);
+});
+
+test("ledgerTotals collects only the revenue part of a payroll invoice", () => {
+  const rows: LedgerRow[] = [
+    { id: "a", status: "paid", amountMinor: 1_000, currency: "INR" },
+    { id: "b", status: "paid", amountMinor: 5_105_00, currency: "USD", passThroughMinor: 5_100_00 },
+  ];
+  const t = ledgerTotals(rows);
+  assert.equal(t.collectedMinor, 1_000 + 5_00 * 100);
+  assert.equal(t.collectedCount, 2);
 });

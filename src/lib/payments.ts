@@ -20,6 +20,8 @@ import { orderProposalIds } from "@/lib/order-ids";
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { hireAuditEntry } from "@/lib/hire-audit";
 import { isSubscriptionOrderRaw } from "@/lib/employer-subscription";
+import { isManualInvoiceRaw, notManualInvoice } from "@/lib/payroll-invoice";
+import { proGrantOrderId, proGrantRow, proposalsEarningPro } from "@/lib/full-time-pro";
 import { notifySubscriptionStarted } from "@/lib/subscription/notify";
 import { paidAmountProblem, planAmountMismatch, planDuplicatePayment, type AmountProblem, type GatewayPaid } from "@/lib/payment-flags";
 
@@ -76,6 +78,7 @@ export async function expireStaleEmployerOrders(employerId?: string): Promise<nu
         employerId ? eq(schema.employerPayments.employerId, employerId) : undefined,
         eq(schema.employerPayments.status, "created"),
         lt(schema.employerPayments.createdAt, new Date(Date.now() - OPEN_ORDER_MINUTES * 60_000)),
+        notManualInvoice(schema.employerPayments.raw),
       ),
     )
     .returning({ id: schema.employerPayments.id });
@@ -149,6 +152,8 @@ export async function settleEmployerOrder(input: {
     )
     .limit(1);
   if (!order) return { ok: false, status: 404, error: "Unknown order" };
+  // A payroll invoice is paid by wire and recorded by staff (admin invoices route); a gateway event never settles it.
+  if (isManualInvoiceRaw(order.raw)) return { ok: false, status: 409, error: "This invoice is not a checkout order" };
   // A full-waiver mark only belongs on a zero-amount waiver order (no Razorpay money behind it, nothing to be signed): never settle anything else as free.
   const waiverBad = waiverOrderProblem(order);
   if (waiverBad) return { ok: false, status: 409, error: waiverBad };
@@ -219,10 +224,16 @@ export async function settleEmployerOrder(input: {
           inArray(schema.proposals.status, ["accepted", "processing"]),
         ),
       )
-      .returning({ id: schema.proposals.id, internId: schema.proposals.internId });
+      .returning({ id: schema.proposals.id, internId: schema.proposals.internId, offerDetails: schema.proposals.offerDetails, currency: schema.proposals.currency });
     // Same transaction as the status change: a hire without its audit row rolls the settlement back.
     for (const h of hired) {
       await recordAdminAudit(tx, hireAuditEntry({ employerId: order.employerId, orderId: input.orderId, paymentRowId: order.id }, h), { strict: true });
+    }
+    // A USD full-time hire (payroll run by Findtern) includes a year of Findtern Pro: a free paid subscription row,
+    // once per proposal, so it stacks after any Pro the company has. Amount 0, so it takes no invoice number.
+    for (const proposalId of proposalsEarningPro(hired)) {
+      const [have] = await tx.select({ id: schema.employerPayments.id }).from(schema.employerPayments).where(eq(schema.employerPayments.orderId, proGrantOrderId(proposalId))).limit(1);
+      if (!have) await tx.insert(schema.employerPayments).values(proGrantRow(order.employerId, proposalId, new Date()));
     }
     // A month paid out of turn (the hire's paid months are not the due month - 1, e.g. two
     // checkouts for the same month) is still recorded as paid; accounts review it.

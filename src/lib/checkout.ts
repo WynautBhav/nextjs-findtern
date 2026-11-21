@@ -33,6 +33,8 @@ export type PayMode = "upfront" | "monthly" | "postpaid";
  */
 export const LEGACY_PER_HIRE_MINOR = { INR: 500_000, USD: 5_000 } as const;
 export const FULL_TIME_FEE = 0.0833;
+/** The monthly payroll management fee on a USD full-time hire (Findtern runs payroll), $50 in cents. On top of the one-time 8.33%. */
+export const PAYROLL_FEE_USD_MINOR = 5000;
 
 /** 8.33% of the annual CTC, rounded to whole major units (legacy rounding). */
 export function fullTimeFeeMinor(annualCtcMinor: number): number {
