@@ -63,13 +63,15 @@ export function ProjectForm({
     if (thenSubmit && missing.length) return setError(`Complete these first: ${missing.map(labelOf).join(", ")}.`);
     setBusy(thenSubmit ? "submit" : "draft");
     try {
+      // A remote project keeps its one preferred work location; on-site and hybrid have their city instead.
+      const preferredToSave = form.locationType === "remote" ? form.preferredLocations.slice(0, 1) : [];
       const res = await csrfFetch(projectId ? `/api/employer/projects/${projectId}` : `/api/employer/${employerId}/projects`, {
         method: projectId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
           lockedFields
-            ? Object.fromEntries(EDITABLE_WHILE_PUBLISHED.map((k) => [k, k === "preferredLocations" ? [] : form[k]]))
-            : { ...form, preferredLocations: [] },
+            ? Object.fromEntries(EDITABLE_WHILE_PUBLISHED.map((k) => [k, k === "preferredLocations" ? preferredToSave : form[k]]))
+            : { ...form, preferredLocations: preferredToSave },
         ),
       });
       const body = await res.json().catch(() => ({}));
@@ -126,7 +128,7 @@ export function ProjectForm({
       <div className={lockedFields ? "max-w-2xl" : "lg:grid lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start lg:gap-8"}>
         <div className="min-w-0 space-y-5">
           {lockedFields && !readOnly && (
-            <FormNotice tone="info">This project is live. You can change its scope of work and the full-time option. To change anything else, pause the project first.</FormNotice>
+            <FormNotice tone="info">This project is live. You can change its scope of work, skills, city and the full-time option. To change anything else, pause the project first.</FormNotice>
           )}
           <p className="text-sm text-text-subtle">
             Fields marked <span aria-hidden className="text-danger">*</span>

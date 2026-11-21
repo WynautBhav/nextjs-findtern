@@ -27,6 +27,7 @@ import { getPicks, seedPicks, setPicks } from "@/lib/candidate-picks-store";
 import { useComparePicks } from "@/hooks/use-candidate-picks";
 import type { HireFlowCounts } from "@/components/employer/hire-flow";
 import { CandidatesNavContext, type GoOptions } from "./_nav";
+import { ProjectSkillsProvider } from "./_project-skills";
 
 const PATH = "/employer/candidates";
 const noop = () => () => undefined;
@@ -107,11 +108,16 @@ export function CandidatesApp({
 
   return (
     <CandidatesNavContext.Provider value={go}>
+      <ProjectSkillsProvider
+        projectId={filters.projectDefaults ? activeProjectId : null}
+        saved={data.activeProjectSkills}
+        place={data.projects.find((p) => p.id === activeProjectId) ?? null}
+      >
       <div
         onClickCapture={(e) => {
           if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
           const a = (e.target as Element).closest?.("a[href]") as HTMLAnchorElement | null;
-          if (!a || (a.target && a.target !== "_self") || a.hasAttribute("download") || a.hasAttribute("data-compare-toggle")) return;
+          if (!a || (a.target && a.target !== "_self") || a.hasAttribute("download") || a.hasAttribute("data-compare-toggle") || a.hasAttribute("data-skill-chip")) return;
           const url = new URL(a.href, window.location.href);
           if (url.origin !== window.location.origin || url.pathname !== PATH) return;
           e.preventDefault();
@@ -157,8 +163,15 @@ export function CandidatesApp({
         </div>
 
         <div className="lg:grid lg:grid-cols-[17.5rem_minmax(0,1fr)] lg:items-start">
-          {/* Every filter is in view, so the column is taller than the screen: it scrolls with the page. */}
-          <div id="candidate-filter-column" className="lg:self-start">
+          {/*
+            lg: the column stays in view under the header and the slim search bar while the results scroll. It is taller
+            than the screen, so it scrolls on its own; overscroll-contain stops that scroll running on into the page.
+            The 4px gutter keeps focus rings and the card shadow from being clipped by the scroll box.
+          */}
+          <div
+            id="candidate-filter-column"
+            className="lg:sticky lg:top-[8.5rem] lg:-mx-1 lg:max-h-[calc(100dvh-9.5rem)] lg:self-start lg:overflow-y-auto lg:overscroll-contain lg:px-1 lg:pb-1 lg:[scrollbar-width:thin]"
+          >
             <FilterColumn
               panelEpoch={epoch}
               filters={view}
@@ -242,6 +255,7 @@ export function CandidatesApp({
         </div>
 
       </div>
+      </ProjectSkillsProvider>
     </CandidatesNavContext.Provider>
   );
 }

@@ -65,7 +65,7 @@ function data(ids: string[], unlocked: string[] = []): CandidatesData {
     pages: 1,
     currency: "INR",
     region: "IN",
-    projects: [{ id: "p1", projectName: "Web app" }],
+    projects: [{ id: "p1", projectName: "Web app", locationType: "remote", state: null }],
     shortlisted: new Set(ids.slice(0, 1)),
     activeProjectId: "p1",
     activeProjectSkills: ["React"],

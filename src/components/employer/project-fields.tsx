@@ -12,8 +12,9 @@
  *   labels "Up to 60/90/180 days" (S1 r81), stored under legacy keys (DB-09).
  * - On-site and hybrid need a state and a city, from the Indian lists, and
  *   start on the company's own city when it is in India (EMH-14, EMH-48).
- * - A project has one city; there is no "other cities" field. The forms save
- *   `preferredLocations: []`, so an older project's list is dropped on save.
+ * - A project has one city; there is no "other cities" field. On-site and
+ *   hybrid forms save `preferredLocations: []`, so an older project's list is
+ *   dropped on save; a remote project keeps one preferred work location there.
  */
 
 import { Info, Lock } from "lucide-react";
@@ -155,6 +156,68 @@ export function ProjectFields({
     set(patch);
   }
 
+  const placeFields = (
+        <div className="space-y-4 rounded-apple-lg border border-ink-200/80 bg-ink-50/60 p-4 sm:p-5">
+          <p className="flex items-start gap-2 text-sm text-ink-700">
+            <Info className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
+            <span>
+              <span className="font-medium text-ink-900">Where the intern works.</span> {INDIA_ONLY_NOTE}
+            </span>
+          </p>
+          <div className={showPincode ? "grid gap-4 sm:grid-cols-3" : "grid gap-4 sm:grid-cols-2"}>
+            <StateField
+              id={id("state")}
+              label="State"
+              required
+              india
+              value={values.state}
+              error={errors.state}
+              onChange={(v) => set({ state: v, city: v === values.state ? values.city : "" })}
+            />
+            <CityField
+              id={id("city")}
+              label="City"
+              required
+              india
+              state={values.state}
+              onStateChange={(v) => set({ state: v })}
+              value={values.city}
+              error={errors.city}
+              onChange={(v) => set({ city: v })}
+            />
+            {showPincode ? (
+              <TextField
+                id={id("pincode")}
+                label="PIN code"
+                optional
+                inputMode="numeric"
+                maxLength={6}
+                value={values.pincode}
+                error={errors.pincode}
+                onChange={(v) => set({ pincode: v.replace(/\D/g, "") })}
+              />
+            ) : null}
+          </div>
+        </div>
+  );
+
+  // Remote: one optional city interns are preferred from. Picking a city on the Candidates page updates it.
+  const preferredCity = (values.preferredLocations[0] ?? "").split(",")[0].trim();
+  const preferredField = (
+    <div className="max-w-md">
+      <CityField
+        id={id("preferred")}
+        label="Preferred work location"
+        india
+        value={preferredCity}
+        error={errors.preferredLocations}
+        onChange={(v) => set({ preferredLocations: v.trim() ? [v] : [] })}
+        placeholder="e.g. Jaipur"
+      />
+      <FieldHint>Optional. Candidates opens on this city; remote-only candidates are still included.</FieldHint>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {show("basics") && (
@@ -233,12 +296,14 @@ export function ProjectFields({
       ))}
 
       {show("location") && (locked("locationType") ? (
-      <LockedGroup why="Locked while the project is live: candidates are matched on where and how it runs. Pause the project to change these.">
+      <div className="space-y-4">
+      <LockedGroup why="Locked while the project is live: candidates are matched on how it runs. Pause the project to change these.">
         <LockedRow label="Work mode">{WORK_MODES.find((m) => m.value === values.locationType)?.label ?? values.locationType}</LockedRow>
-        {onsite ? <LockedRow label="State">{values.state}</LockedRow> : null}
-        {onsite ? <LockedRow label="City">{values.city}</LockedRow> : null}
         <LockedRow label="Timezone">{TIMEZONES.find((t) => t.id === values.timezone && !t.group)?.label ?? values.timezone}</LockedRow>
       </LockedGroup>
+      {/* Where the work is stays editable on a live project (the Candidates city filter saves it too). */}
+      {onsite ? placeFields : preferredField}
+      </div>
       ) : (
       <>
 
@@ -254,50 +319,7 @@ export function ProjectFields({
         onChange={pickMode}
       />
 
-      {onsite ? (
-        <div className="space-y-4 rounded-apple-lg border border-ink-200/80 bg-ink-50/60 p-4 sm:p-5">
-          <p className="flex items-start gap-2 text-sm text-ink-700">
-            <Info className="mt-0.5 size-4 shrink-0 text-brand-700" aria-hidden />
-            <span>
-              <span className="font-medium text-ink-900">Where the intern works.</span> {INDIA_ONLY_NOTE}
-            </span>
-          </p>
-          <div className={showPincode ? "grid gap-4 sm:grid-cols-3" : "grid gap-4 sm:grid-cols-2"}>
-            <StateField
-              id={id("state")}
-              label="State"
-              required
-              india
-              value={values.state}
-              error={errors.state}
-              onChange={(v) => set({ state: v, city: v === values.state ? values.city : "" })}
-            />
-            <CityField
-              id={id("city")}
-              label="City"
-              required
-              india
-              state={values.state}
-              onStateChange={(v) => set({ state: v })}
-              value={values.city}
-              error={errors.city}
-              onChange={(v) => set({ city: v })}
-            />
-            {showPincode ? (
-              <TextField
-                id={id("pincode")}
-                label="PIN code"
-                optional
-                inputMode="numeric"
-                maxLength={6}
-                value={values.pincode}
-                error={errors.pincode}
-                onChange={(v) => set({ pincode: v.replace(/\D/g, "") })}
-              />
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      {onsite ? placeFields : values.locationType === "remote" ? preferredField : null}
 
       <div className="max-w-md">
         <div>

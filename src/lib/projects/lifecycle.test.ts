@@ -62,7 +62,7 @@ test("submit readiness and skill limit", () => {
 });
 test("locked-while-published list is the single source the form and server share", () => {
   for (const k of EDITABLE_WHILE_PUBLISHED) assert.equal(isLockedWhilePublished(k), false, k);
-  for (const k of ["projectName", "skills", "locationType", "state", "city", "pincode", "timezone"]) {
+  for (const k of ["projectName", "locationType", "pincode", "timezone"]) {
     assert.equal(isLockedWhilePublished(k), true, k);
   }
 });
@@ -70,12 +70,12 @@ test("published-lock message uses plain words, never column names", () => {
   const msg = publishedLockedMessage(["locationType", "state", "city", "timezone", "scopeOfWork"]);
   assert.equal(
     msg,
-    "This project is live, so its work mode, state, city and timezone can't be changed. You can still change the scope of work and the full-time option. To change the rest, pause the project first.",
+    "This project is live, so its work mode and timezone can't be changed. You can still change the scope of work, the full-time option, the skills, the city and the state. To change the rest, pause the project first.",
   );
   for (const raw of ["locationType", "scopeOfWork", "fullTimeOffer", "preferredLocations", "projectName"]) {
     assert.equal(msg.includes(raw), false, raw);
   }
-  assert.match(publishedLockedMessage(["skills"]), /^This project is live, so its skills can't be changed\./);
+  assert.match(publishedLockedMessage(["projectName"]), /^This project is live, so its title can't be changed\./);
   assert.match(publishedLockedMessage(["somethingNew"]), /so its other details can't be changed/);
   for (const k of EDITABLE_WHILE_PUBLISHED) {
     if (k !== "preferredLocations") assert.ok(PROJECT_FIELD_LABELS[k], k);

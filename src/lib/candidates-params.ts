@@ -343,7 +343,7 @@ export type CandidatesData = {
   pages: number;
   currency: Currency;
   region: "IN" | null;
-  projects: { id: string; projectName: string }[];
+  projects: { id: string; projectName: string; locationType: string | null; state: string | null }[];
   shortlisted: Set<string>;
   activeProjectId: string | null;
   activeProjectSkills: string[];

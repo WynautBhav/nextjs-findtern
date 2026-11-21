@@ -10,6 +10,7 @@ import { formatRate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { schema } from "@/lib/db";
 import { CityFilter } from "@/components/employer/city-filter";
+import { useProjectSkills } from "./_project-skills";
 import { RatingSlider } from "@/components/employer/candidate-filters";
 import { buttonClass } from "@/components/ui/button";
 import { fieldClass } from "@/components/employer/ui-tokens";
@@ -63,6 +64,7 @@ export function FilterColumn({
   /** Findtern Pro: who has the CGPA and college filters, and what they list. */
   pro: ProData;
 }) {
+  const projectPlace = useProjectSkills();
   const city = cityField({ city: filters.city, citySet: filters.citySet, defaultCity: cityDefault });
   const count = sectionCounts(activeChips(filters).map((c) => c.key), Boolean(projectCity));
   const sort = sortControl ? (
@@ -83,7 +85,7 @@ export function FilterColumn({
   return (
     <aside
       aria-label="Filters"
-      // Scrolls with the page: no inner scroll area (on a trackpad it kept scrolling after the page had ended).
+      // lg: sticky in a scroll box of its own (the column in _app.tsx), with overscroll-contain so a trackpad flick ends there.
       className="lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-6 lg:shadow-xs"
     >
       <FilterPanel key={panelEpoch} cityDefault={cityDefault} raised={compareIds.length > 0} activeCount={activeFilterCount(filters, effectiveSkills, projectCity)} total={total}>
@@ -108,7 +110,11 @@ export function FilterColumn({
         </div>
         <div>
           <FilterSection title="Location" count={count.location}>
-            <CityFilter defaultValue={city.value} label="City" autoApply />
+            <CityFilter defaultValue={city.value} label="City" autoApply onApply={projectPlace.saveCity} />
+            {/* Always mounted so a screen reader hears the save result; empty it takes no room. */}
+            <p aria-live="polite" className={projectPlace.cityNotice ? "mt-1.5 text-xs text-ink-700" : "sr-only"}>
+              {projectPlace.cityNotice}
+            </p>
             {city.prefilled ? <p className="mt-1.5 text-xs text-text-subtle">From your project</p> : null}
             <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2.5 text-sm text-ink-800">
               {/* Unchecked sends only the hidden 0; checked adds remote=1 after it. */}

@@ -1,5 +1,7 @@
 import Link from "@/app/employer/candidates/_link";
-import { ArrowDown, ArrowUp, LayoutGrid, List, Rows3, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, FolderKanban, LayoutGrid, List, Rows3, X } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { useCandidatesGo } from "./_nav";
 
 import { cn } from "@/lib/utils";
 import { buttonClass } from "@/components/ui/button";
@@ -121,19 +123,52 @@ export function SortControl({ data, filters, id = "candidate-sort", className }:
   );
 }
 
-/** The project picker (only with more than one project), beside the search on every width. */
+/**
+ * The project picker (only with more than one project), beside the search on every width. A menu rather than a native
+ * select so the open list matches the page (the platform list cannot be styled). Radix gives it the keyboard (arrows,
+ * type-ahead, Esc), focus return and the menu roles; choosing a project goes to that project's link.
+ */
 export function ProjectPicker({ data, className }: { data: CandidatesData; className?: string }) {
+  const go = useCandidatesGo();
   if (data.projects.length < 2 || !data.activeProjectId) return null;
+  const current = data.projects.find((p) => p.id === data.activeProjectId);
   return (
-    <SortSelect
-      id="results-project"
-      label="Project"
-      prefix="Project: "
-      value={data.activeProjectId}
-      // No `ids`: each project keeps its own compare picks, so the new project shows its own.
-      options={data.projects.map((p) => ({ value: p.id, label: p.projectName, href: `/employer/candidates?${new URLSearchParams({ project: p.id }).toString()}` }))}
-      className={cn("h-11 min-w-0 rounded-apple-sm border-ink-200 bg-white pl-3.5 sm:[field-sizing:content] sm:max-w-[16rem]", className)}
-    />
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        aria-label={`Project: ${current?.projectName ?? ""}. Change project`}
+        title={current?.projectName}
+        className={cn(
+          // Dressed like the search box beside it: same height, fill, radius and focus ring.
+          "group inline-flex h-11 min-w-0 items-center gap-2.5 rounded-apple-sm border border-ink-200 bg-ink-50 pl-3.5 pr-3 text-left outline-none transition-colors hover:border-ink-300 hover:bg-white focus-visible:border-brand-600 focus-visible:bg-white focus-visible:ring-[3px] focus-visible:ring-brand-600/20 data-[state=open]:border-brand-600 data-[state=open]:bg-white sm:w-auto sm:max-w-[20rem] lg:h-12",
+          className,
+        )}
+      >
+        <FolderKanban className="size-4 shrink-0 text-ink-500" aria-hidden />
+        <span className="shrink-0 text-[13px] text-ink-600">Project</span>
+        <span className="min-w-0 flex-1 truncate text-sm font-medium text-ink-900">{current?.projectName}</span>
+        <ChevronDown className="size-4 shrink-0 text-ink-500 transition-transform group-data-[state=open]:rotate-180 motion-reduce:transition-none" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-[var(--radix-dropdown-menu-trigger-width)] min-w-64 max-w-[22rem]">
+        <DropdownMenuLabel>Switch project</DropdownMenuLabel>
+        {data.projects.map((p) => {
+          const on = p.id === data.activeProjectId;
+          return (
+            <DropdownMenuItem
+              key={p.id}
+              aria-current={on ? "true" : undefined}
+              // No `ids`: each project keeps its own compare picks, so the new project shows its own.
+              onSelect={() => {
+                if (!on) go(`/employer/candidates?${new URLSearchParams({ project: p.id }).toString()}`);
+              }}
+              className={cn("min-h-11 text-ink-800", on && "text-brand-800")}
+            >
+              <span className="min-w-0 flex-1 truncate">{p.projectName}</span>
+              {on ? <Check className="size-4 shrink-0 text-brand-700" aria-hidden /> : null}
+            </DropdownMenuItem>
+          );
+        })}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

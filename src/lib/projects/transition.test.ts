@@ -81,7 +81,10 @@ test("discovery shows only published and legacy active", () => {
 test("edit rules by status", () => {
   assert.equal(editBlockedReason("draft", ["projectName"]), null);
   assert.equal(editBlockedReason("active", ["scopeOfWork", "fullTimeOffer"]), null);
-  assert.match(editBlockedReason("published", ["skills", "city"])!, /^This project is live, so its skills and city can't be changed/);
+  assert.match(editBlockedReason("published", ["skills", "locationType"])!, /^This project is live, so its work mode can't be changed/);
+  assert.equal(editBlockedReason("published", ["city", "state"]), null);
+  // Skills save from the Candidates page, so a live project accepts them.
+  assert.equal(editBlockedReason("published", ["skills"]), null);
   assert.equal(editBlockedReason("published", ["preferredLocations"]), null);
   assert.ok(editBlockedReason("pending_review", ["scopeOfWork"]));
   assert.ok(editBlockedReason("closed", []));

@@ -69,7 +69,7 @@ export type ResultsWire = {
 /** What does not change with the filters: sent once with the page. */
 export type ChromeWire = {
   uid: string;
-  projects: { id: string; projectName: string }[];
+  projects: { id: string; projectName: string; locationType: string | null; state: string | null }[];
   plans: (typeof schema.pricingPlans.$inferSelect)[];
   currency: Currency;
   region: "IN" | null;

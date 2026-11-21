@@ -39,6 +39,11 @@ export function projectCities(project: { city?: string | null; locationType?: st
  * Read-only: nothing here writes to the project.
  */
 export function projectDefaultCity(project: { city?: string | null; locationType?: string | null; preferredLocations?: unknown }): string {
+  // A remote project has no city, but may name a preferred work location (the form, or the Candidates city filter).
+  if (project.locationType === "remote") {
+    const first = Array.isArray(project.preferredLocations) ? String(project.preferredLocations[0] ?? "") : "";
+    return first.split(",")[0].trim();
+  }
   return projectCities(project)[0] ?? "";
 }
 

@@ -73,7 +73,9 @@ export function isEditableByEmployer(status: string | null | undefined): boolean
 }
 
 /** Fields (projects columns) an employer may change while a project is published. */
-export const EDITABLE_WHILE_PUBLISHED = ["scopeOfWork", "preferredLocations", "fullTimeOffer"] as const;
+// Skills, city and state too: the Candidates page saves its skill and city filters to the selected project, which is
+// usually live. The work mode stays locked (remote, hybrid, on-site changes who the role is for).
+export const EDITABLE_WHILE_PUBLISHED = ["scopeOfWork", "preferredLocations", "fullTimeOffer", "skills", "city", "state"] as const;
 
 /** True when the server refuses a change to this field while the project is published. */
 export const isLockedWhilePublished = (field: string): boolean =>

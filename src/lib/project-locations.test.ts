@@ -148,6 +148,8 @@ test("projectDefaultCity: the project's city pre-fills the filter when it is all
 
 test("projectDefaultCity: nothing for a remote project or no city; a legacy multi-place list gives its first city", () => {
   assert.equal(projectDefaultCity({ city: "Pune", locationType: "remote" }), "");
+  // A remote project's preferred work location (set on the form or from the Candidates city filter) pre-fills it.
+  assert.equal(projectDefaultCity({ city: null, locationType: "remote", preferredLocations: ["Jaipur"] }), "Jaipur");
   assert.equal(projectDefaultCity({ city: "Pune", locationType: null }), "");
   assert.equal(projectDefaultCity({ city: null, locationType: "onsite" }), "");
   assert.equal(projectDefaultCity({ city: "", locationType: "onsite", preferredLocations: ["Pune, Maharashtra"] }), "Pune");

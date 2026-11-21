@@ -19,6 +19,7 @@ import { rankSuggestions, searchHref, type Suggestion } from "@/lib/candidate-su
 import { MAX_SKILLS } from "@/lib/onboarding";
 import { requireSkillHref } from "@/lib/skill-filter-href";
 import { cn } from "@/lib/utils";
+import { useProjectSkills } from "@/app/employer/candidates/_project-skills";
 
 const PATH = "/employer/candidates";
 
@@ -73,6 +74,7 @@ export function CandidateSearch({
     : { skills: [], cities: [], all: [] as Suggestion[] };
   const items = open ? found.all : [];
   const full = required.length >= MAX_SKILLS;
+  const projectSkills = useProjectSkills();
 
   // `/` focuses the box that is on screen: the slim sticky bar's while it shows, else the toolbar's.
   useEffect(() => {
@@ -97,7 +99,10 @@ export function CandidateSearch({
     setOpen(false);
     setHighlight(-1);
     setValue("");
-    go(requireSkillHref(pathname, params.toString(), required, skill, hasPro));
+    const href = requireSkillHref(pathname, params.toString(), required, skill, hasPro);
+    // With a project selected the new skill saves to it first (an addition is never blocked).
+    const next = [...required.filter((s) => s.toLowerCase() !== skill.toLowerCase()), skill];
+    void projectSkills.save(required, next).then((ok) => ok && go(href));
   }
   /** A skill row requires the skill (click, Enter or "+ Require" alike); a city row, or a skill already required, searches. */
   function pick(s: Suggestion) {
@@ -218,7 +223,7 @@ export function CandidateSearch({
           }
         }}
         className={cn(
-          "w-full rounded-apple-sm border border-ink-200 bg-ink-50 pl-11 pr-12 text-base text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:bg-white focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm",
+          "w-full rounded-apple-sm border border-ink-200 bg-ink-50 pl-11 pr-11 text-base text-ink-900 outline-none transition-colors placeholder:text-text-subtle hover:border-ink-300 focus-visible:border-brand-600 focus-visible:bg-white focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm",
           compact ? "h-10 touch:h-11" : "h-11 lg:h-12",
         )}
       />
@@ -234,11 +239,7 @@ export function CandidateSearch({
         >
           <X className="size-4" aria-hidden />
         </button>
-      ) : (
-        <kbd aria-hidden className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-ink-200 bg-white px-1.5 font-sans text-xs font-medium leading-5 text-ink-500 lg:block touch:hidden">
-          /
-        </kbd>
-      )}
+      ) : null}
       <p aria-live="polite" className="sr-only">
         {open && typed ? `${found.all.length} suggestion${found.all.length === 1 ? "" : "s"}` : ""}
       </p>

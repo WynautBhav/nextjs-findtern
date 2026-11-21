@@ -17,11 +17,14 @@ export function CityFilter({
   defaultValue,
   label = "City",
   autoApply = false,
+  onApply,
 }: {
   defaultValue: string;
   label?: string;
   /** Submit the surrounding form when the city is picked or cleared. */
   autoApply?: boolean;
+  /** Told the city each time it is applied (the Candidates page saves it to the selected project). */
+  onApply?: (city: string) => void;
 }) {
   const hidden = useRef<HTMLInputElement>(null);
   const typing = useRef<HTMLInputElement>(null);
@@ -43,6 +46,7 @@ export function CityFilter({
     setActive(-1);
     if (!autoApply || city.toLowerCase() === applied.toLowerCase()) return;
     setApplied(city);
+    onApply?.(city);
     // The hidden input must hold the new value before the form reads it.
     if (hidden.current) hidden.current.value = city;
     hidden.current?.form?.requestSubmit();

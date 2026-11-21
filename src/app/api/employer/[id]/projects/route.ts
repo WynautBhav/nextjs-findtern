@@ -93,7 +93,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // A remote role has no place (legacy stored none).
       city: remote ? null : d.city?.trim() || null,
       state: remote ? null : d.state?.trim() || null,
-      preferredLocations: remote ? [] : (d.preferredLocations ?? []),
+      // Remote: at most the one preferred work location the form sends.
+      preferredLocations: remote ? (d.preferredLocations ?? []).slice(0, 1) : (d.preferredLocations ?? []),
       // Self-service posting starts as a draft; the employer publishes it with Submit (no admin review).
       status: "draft",
     })

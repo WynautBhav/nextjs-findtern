@@ -101,6 +101,7 @@ export async function loadCandidates(
         projectName: schema.projects.projectName,
         skills: schema.projects.skills,
         city: schema.projects.city,
+        state: schema.projects.state,
         preferredLocations: schema.projects.preferredLocations,
         locationType: schema.projects.locationType,
         status: schema.projects.status,
@@ -146,7 +147,8 @@ export async function loadCandidates(
     const projectRows = (
       await projectsP
     ).filter((p) => isOpenProject(p.status, p.takenDownAt));
-    data.projects = projectRows.map((p) => ({ id: p.id, projectName: p.projectName }));
+    // Work mode and state ride along so the location filter can save a picked city to the project (lib/project-skill-sync).
+    data.projects = projectRows.map((p) => ({ id: p.id, projectName: p.projectName, locationType: p.locationType ?? null, state: p.state ?? null }));
     const activeProjectId =
       (filters.project && data.projects.find((p) => p.id === filters.project)?.id) || data.projects[0]?.id || null;
     data.activeProjectId = activeProjectId;

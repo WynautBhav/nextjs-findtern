@@ -135,8 +135,8 @@ export function ProjectsManager({
       // A remote role has no place; null clears one left over from an edit.
       city: remote ? null : form.city.trim() || null,
       state: remote ? null : form.state.trim() || null,
-      // One city per project: the old "other cities" list is cleared on save.
-      preferredLocations: [],
+      // One city per project: the old "other cities" list is cleared on save. A remote project keeps its one preferred work location.
+      preferredLocations: remote ? form.preferredLocations.slice(0, 1) : [],
       timezone: form.timezone,
       fullTimeOffer: form.fullTimeOffer,
     };

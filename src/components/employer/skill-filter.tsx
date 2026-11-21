@@ -28,6 +28,7 @@ import { MAX_SKILLS } from "@/lib/onboarding";
 import { skillFilterHref } from "@/lib/skill-filter-href";
 import { arrowKey, limitNote } from "@/components/employer/skill-combobox";
 import { cn } from "@/lib/utils";
+import { useProjectSkills } from "@/app/employer/candidates/_project-skills";
 
 export function SkillFilter({
   active,
@@ -70,6 +71,8 @@ export function SkillFilter({
   // "Add skill" opens the inline box; it closes again when left empty.
   const [adding, setAdding] = useState(false);
   const full = active.length >= MAX_SKILLS;
+  // Candidates with a project selected: the change saves to the project first (and may be refused below its minimum).
+  const projectSkills$ = useProjectSkills();
 
   const typed = query.trim();
   const options = typed ? suggestSkills(typed, 8).filter((s) => !active.includes(s)) : [];
@@ -89,9 +92,13 @@ export function SkillFilter({
     return skillFilterHref(pathname, params.toString(), skills, hasPro); // A new filter starts at page one.
   }
 
+  async function change(next: string[]) {
+    if (await projectSkills$.save(active, next)) go(hrefWith(next));
+  }
+
   function add(skill: string) {
     if (full || active.some((s) => s.toLowerCase() === skill.toLowerCase())) return;
-    go(hrefWith([...active, skill]));
+    void change([...active, skill]);
     setQuery("");
     setOpen(false);
     setHighlight(-1);
@@ -118,6 +125,13 @@ export function SkillFilter({
             <Link
               href={hrefWith(active.filter((s) => s !== skill))}
               scroll={false}
+              // The Candidates region leaves this link to its own click handler (the save comes first).
+              data-skill-chip
+              onClick={(e) => {
+                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return;
+                e.preventDefault();
+                void change(active.filter((s) => s !== skill));
+              }}
               className="group inline-flex min-h-9 items-center outline-none touch:min-h-11"
             >
               <span className="inline-flex h-7 items-center gap-1 rounded-lg bg-brand-100 pl-2.5 pr-1.5 text-[13px] font-medium text-brand-900 transition-colors group-hover:bg-brand-200 group-focus-visible:ring-2 group-focus-visible:ring-brand-500">
@@ -136,8 +150,8 @@ export function SkillFilter({
       </ul>
 
       {/* Always mounted so the screen reader hears the note appear; empty it takes no room. */}
-      <p aria-live="polite" className={limit ? "inline-flex min-h-9 items-center text-[13px] text-ink-700 touch:min-h-11" : "sr-only"}>
-        {limit}
+      <p aria-live="polite" className={projectSkills$.notice || limit ? "inline-flex min-h-9 items-center text-[13px] text-ink-700 touch:min-h-11" : "sr-only"}>
+        {projectSkills$.notice || limit}
       </p>
 
       {full ? null : showAdd ? (
