@@ -425,7 +425,7 @@ export async function loadCandidates(
       attachPhotos(db, data.candidates),
       plansP ?? Promise.resolve([] as typeof data.plans),
       candidateRelations(db, uid, pageIds, activeProjectId),
-      // Labels like "Active now" / "Last seen 2h ago"; hidden candidates get null (lib/presence.ts). Optional, like the saved roles.
+      // Labels like "Online" / "Last seen 2h ago"; hidden candidates get null (lib/presence.ts). Optional, like the saved roles.
       presenceOf(pageIds).catch((err) => {
         console.error("[employer/candidates] presence", err);
         return {};

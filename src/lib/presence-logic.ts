@@ -18,7 +18,7 @@ export type PresenceView =
 export type PresenceRow = { showActivity: boolean; lastSeenAt: Date | string | null };
 
 /** The one label shown for a live heartbeat. */
-export const PRESENCE_ONLINE = "Active now";
+export const PRESENCE_ONLINE = "Online";
 /** Past this, "Last seen 40d ago" stops being useful and says nothing about when: just "Offline". */
 export const OFFLINE_AFTER_MS = 30 * 24 * 3_600_000;
 

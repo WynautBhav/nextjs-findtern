@@ -2,7 +2,7 @@ import { PRESENCE_ONLINE } from "@/lib/presence-logic";
 import { cn } from "@/lib/utils";
 
 /**
- * Intern presence for employers: a green dot when active now, grey for "Last
+ * Intern presence for employers: a green dot when online, grey for "Last
  * seen 2h ago" / "Offline", nothing when the candidate hides it. The label is
  * always in the accessible name, so colour is never the only signal. The
  * server decides the label (lib/presence.ts); this only draws it. Server-safe

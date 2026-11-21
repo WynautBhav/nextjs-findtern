@@ -134,6 +134,8 @@ export default async function EmployerLayout({ children }: { children: React.Rea
 
   return (
     <ToastProvider>
+    {/* `data-console` scopes console-wide CSS (globals.css: native selects draw the same on macOS as elsewhere). `contents` adds no box. */}
+    <div data-console="employer" className="contents">
     <ConsoleShell
       roleLabel="Employer"
       tone="light"
@@ -180,6 +182,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
       {pendingWarning ? <WarningGate /> : null}
       <TermsGate role="employer" initialOpen={termsVersion !== undefined && shouldShowTermsPrompt({ acceptedVersion: termsVersion, impersonating: !!session.impersonator })} />
     </ConsoleShell>
+    </div>
     </ToastProvider>
   );
 }

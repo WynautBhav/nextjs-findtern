@@ -179,16 +179,14 @@ export async function settleEmployerOrder(input: {
       return null;
     }
     // A free (test-mode) order is not a sale, so it takes no invoice number.
-    if (order.amountMinor > 0) {
-      await assignInvoiceNumber("employer", order.id, new Date(), tx);
-      // Freeze the buyer block (state and GSTIN decide the tax split) so a later
-      // profile edit can't change an invoice that is already out.
-      const [buyer] = await tx.select().from(schema.employers).where(eq(schema.employers.id, order.employerId)).limit(1);
-      await tx
-        .update(schema.employerPayments)
-        .set({ raw: sql`coalesce(${schema.employerPayments.raw}, '{}'::jsonb) || ${JSON.stringify(invoiceBuyerPatch(buyer))}::jsonb` })
-        .where(eq(schema.employerPayments.id, order.id));
-    }
+    if (order.amountMinor > 0) await assignInvoiceNumber("employer", order.id, new Date(), tx);
+    // Freeze the buyer block (country, state and GSTIN decide GST) on every paid order, once: a later
+    // profile edit, even India <-> abroad, can never change an invoice that is already out.
+    const [buyer] = await tx.select().from(schema.employers).where(eq(schema.employers.id, order.employerId)).limit(1);
+    await tx
+      .update(schema.employerPayments)
+      .set({ raw: sql`coalesce(${schema.employerPayments.raw}, '{}'::jsonb) || ${JSON.stringify(invoiceBuyerPatch(buyer))}::jsonb` })
+      .where(and(eq(schema.employerPayments.id, order.id), sql`not (coalesce(${schema.employerPayments.raw}, '{}'::jsonb) ? 'invoiceBuyer')`));
 
     const promo = promoOf(order.raw);
     if (waived) {

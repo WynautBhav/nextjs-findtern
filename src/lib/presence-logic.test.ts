@@ -47,7 +47,7 @@ describe("presenceView: expiry", () => {
 });
 
 describe("labels", () => {
-  it("online reads Active now", () => assert.equal(presenceText({ state: "online" }, NOW), PRESENCE_ONLINE));
+  it("online reads Online", () => assert.equal(presenceText({ state: "online" }, NOW), PRESENCE_ONLINE));
   it("is coarse: minutes in fives, then hours, then days", () => {
     assert.equal(lastSeenLabel(ago(2 * MIN), NOW), "Last seen a few minutes ago");
     assert.equal(lastSeenLabel(ago(7 * MIN), NOW), "Last seen 5m ago");

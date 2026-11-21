@@ -81,7 +81,7 @@ export default async function EmployerInternDetail({
   let comparePicks: string[] = [];
   let employerFte = "none";
   let employerZone = "Asia/Kolkata";
-  /** "Active now" / "Last seen 2h ago" / "Offline"; null when the candidate hides it. */
+  /** "Online" / "Last seen 2h ago" / "Offline"; null when the candidate hides it. */
   let presence: PresenceLabel | null = null;
   /** The selected project's skills: matching chips are ticked and listed first, as on the candidate list. */
   let wanted: { project: string; skills: string[]; cities: string[] } | null = null;

@@ -16,6 +16,7 @@ import { activeProject, realEmployerId, realEmployers } from "@/lib/admin/scope"
 import { LUT_NUMBER, placeOfSupply, sellerStateCode, splitGst } from "@/lib/gst";
 import { formatIstStamp } from "@/lib/format";
 import { placeLabel } from "@/lib/invoice";
+import { invoiceBuyerOf } from "@/lib/invoice-buyer";
 import { dateRangeConditions } from "@/lib/admin/date-range";
 import { orderRefunds } from "@/lib/refund-accounting";
 import { orderReview } from "@/lib/payment-flags";
@@ -421,7 +422,7 @@ async function exportPayments(search: string, params: Record<string, string>, ad
   ].filter(Boolean) as SQL[];
   const combined = parts.length ? sql`${parts.reduce((acc, c) => sql`${acc} and ${c}`)}` : undefined;
 
-  const rows = await db
+  const liveRows = await db
     .select({
       invoiceNumber: schema.employerPayments.invoiceNumber,
       raw: schema.employerPayments.raw,
@@ -445,6 +446,12 @@ async function exportPayments(search: string, params: Record<string, string>, ad
     .where(combined)
     .orderBy(desc(schema.employerPayments.createdAt))
     .limit(MAX_ROWS);
+  // GST and the buyer columns come from the buyer frozen on the order at payment, as the invoice prints them;
+  // a company that later edits its country, state or GSTIN must not change an issued invoice's tax.
+  const rows = liveRows.map((r) => {
+    const b = invoiceBuyerOf(r.raw, { companyName: r.companyName, country: r.country, gstNumber: r.gstin, billingPincode: r.pincode, state: r.state });
+    return { ...r, country: b.country ?? null, gstin: b.gstin ?? null, pincode: b.pincode ?? null, state: b.state ?? null };
+  });
 
   const columns: CsvColumn<(typeof rows)[number]>[] = [
     { header: "Invoice number", value: (r) => r.invoiceNumber ?? "" },

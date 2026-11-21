@@ -36,3 +36,14 @@ test("P1-1: no snapshot falls back to the live profile; null raw is safe", () =>
   assert.equal(invoiceBuyerOf(null, rajasthan).state, "Rajasthan");
   assert.equal(invoiceBuyerOf({ other: 1 }, null).name, "Customer");
 });
+
+test("an invoice frozen in India keeps its GST when the company later moves abroad, and the reverse", () => {
+  const usa = { ...rajasthan, country: "United States", state: "New York", gstNumber: null, billingPincode: "10001" };
+  const frozenIndia = invoiceBuyerPatch(rajasthan);
+  assert.equal(placeOfSupply({ ...invoiceBuyerOf(frozenIndia, usa), currency: "INR" }).kind, "india");
+  assert.match(render(invoiceBuyerOf(frozenIndia, usa)), /GST/);
+
+  const frozenUsa = invoiceBuyerPatch(usa);
+  assert.equal(placeOfSupply({ ...invoiceBuyerOf(frozenUsa, rajasthan), currency: "USD" }).kind, "export");
+  assert.equal(invoiceBuyerOf(frozenUsa, rajasthan).country, "United States");
+});

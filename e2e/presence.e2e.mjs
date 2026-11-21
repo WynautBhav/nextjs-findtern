@@ -59,7 +59,7 @@ const text = async (path, vp) => {
 };
 /** The employer pages that can carry the candidate's presence (labels may be sr-only, which innerText still returns). */
 const EMPLOYER_PAGES = () => ["/employer/dashboard", "/employer/proposals", `/employer/proposal/${proposalId}`, `/employer/intern/${I.id}`, "/employer/candidates"];
-const PRESENCE_RE = /Active now|Last seen|Offline|Online/;
+const PRESENCE_RE = /Online|Last seen|Offline/;
 const shot = async (page, name) => {
   if (!SHOTS) return;
   mkdirSync(SHOTS, { recursive: true });
@@ -115,26 +115,26 @@ test("toggle API: auth, role, CSRF, validation", async () => {
   await anon.close();
 });
 
-test("default: the employer sees the candidate as active now (pages)", async () => {
+test("default: the employer sees the candidate as online (pages)", async () => {
   const hb = await heartbeat(P.I.page);
   assert.equal(hb.status, 200);
   await setSeen("2 seconds");
 
   for (const [name, vp] of VIEWS) {
     const cands = await text("/employer/candidates", vp);
-    assert.match(cands.body, /Active now/, "candidate card shows the presence label");
+    assert.match(cands.body, /Online/, "candidate card shows the presence label");
     await shot(cands.page, `employer-candidates-online-${name}`);
     await cands.page.close();
 
     const prof = await text(`/employer/intern/${I.id}`, vp);
-    assert.match(prof.body, /Active now/, "profile header shows the presence label");
+    assert.match(prof.body, /Online/, "profile header shows the presence label");
     await shot(prof.page, `employer-profile-online-${name}`);
     await prof.page.close();
   }
   // Positive control for the hidden-state sweep below: these pages do render the label while it is visible.
   for (const path of ["/employer/proposals", `/employer/proposal/${proposalId}`]) {
     const pg = await text(path);
-    assert.match(pg.body, /Active now/, `${path} shows the label while visible`);
+    assert.match(pg.body, /Online/, `${path} shows the label while visible`);
     await pg.page.close();
   }
 });
@@ -143,7 +143,7 @@ test("stale heartbeat reads as offline, never online", async () => {
   await setSeen("3 hours 10 minutes");
   const cands = await text("/employer/candidates");
   assert.match(cands.body, /Last seen 3h ago/);
-  assert.doesNotMatch(cands.body, /Active now/);
+  assert.doesNotMatch(cands.body, /Online/);
   await shot(cands.page, "employer-candidates-lastseen-1280");
   await cands.page.close();
 
@@ -225,12 +225,12 @@ test("hidden: the employer sees nothing, anywhere, and no timestamp leaks", asyn
   assert.equal(beat.fresh, true, "the heartbeat did record (so the hide is applied on read, not by not recording)");
   for (const [name, vp] of VIEWS) {
     const cands = await text("/employer/candidates", vp);
-    assert.doesNotMatch(cands.body, /Active now|Last seen|Offline/);
+    assert.doesNotMatch(cands.body, /Online|Last seen|Offline/);
     await shot(cands.page, `employer-candidates-hidden-${name}`);
     await cands.page.close();
 
     const prof = await text(`/employer/intern/${I.id}`, vp);
-    assert.doesNotMatch(prof.body, /Active now|Last seen|Offline/);
+    assert.doesNotMatch(prof.body, /Online|Last seen|Offline/);
     await shot(prof.page, `employer-profile-hidden-${name}`);
     await prof.page.close();
   }
@@ -245,12 +245,12 @@ test("hidden: the employer sees nothing, anywhere, and no timestamp leaks", asyn
     for (const headers of [{}, { RSC: "1" }]) {
       const res = await P.E.ctx.request.get(url(path), { headers });
       assert.equal(res.status(), 200, `${path} ${JSON.stringify(headers)}`);
-      assert.doesNotMatch(await res.text(), /Last seen|Active now|last_seen|lastSeen/, `${path} ${JSON.stringify(headers)} leaks presence`);
+      assert.doesNotMatch(await res.text(), /Last seen|Online|last_seen|lastSeen/, `${path} ${JSON.stringify(headers)} leaks presence`);
     }
   }
   // The raw HTML of an employer page carries no presence for the hidden candidate either.
   const html = await (await P.E.ctx.request.get(url("/employer/candidates"))).text();
-  assert.doesNotMatch(html, /Last seen|Active now|last_seen|lastSeen/);
+  assert.doesNotMatch(html, /Last seen|Online|last_seen|lastSeen/);
 });
 
 test("turning it back on restores the labels", async () => {
@@ -259,7 +259,7 @@ test("turning it back on restores the labels", async () => {
   assert.deepEqual(on.body, { showActivity: true });
   await setSeen("3 seconds");
   const cands = await text("/employer/candidates");
-  assert.match(cands.body, /Active now/);
+  assert.match(cands.body, /Online/);
   await cands.page.close();
   const beat = await rows(`SELECT show_activity FROM user_presence WHERE user_id = $1`, [I.id]);
   assert.equal(beat.length, 1);

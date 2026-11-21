@@ -1,5 +1,5 @@
 /**
- * Candidate presence for employers: "Active now", "Last seen 2h ago", "Offline", or nothing.
+ * Candidate presence for employers: "Online", "Last seen 2h ago", "Offline", or nothing.
  *
  * Employers see it by default; a student hides it with `user_presence.show_activity` (settings). The hide is
  * enforced here, on the server: the query never selects `last_seen_at` for a hidden user, and the labels carry no

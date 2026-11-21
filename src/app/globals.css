@@ -1778,6 +1778,23 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
   padding-inline-end: 2.25rem;
 }
 
+/* Employer console: the same plain native select, drawn by us. macOS draws its own select, which ignores
+   the control's padding and puts its chevron on the text; this one keeps each select's own padding, border,
+   radius and colour, and only adds the chevron and room for it. A `data-slot` or `appearance-none` select
+   (company-fields.tsx draws its own icon) is left alone. */
+[data-console="employer"] select:not([data-slot]):not([class*="appearance-none"]) {
+  padding-inline-end: 2.25rem;
+}
+@layer components {
+  [data-console="employer"] select:not([data-slot]):not([class*="appearance-none"]) {
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23566660' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.875rem center;
+  }
+}
+
 /* ── Admin: native selects and checkboxes ──
    Brand-green check, rounded box, a chevron on the select; no layout change. Admin console only, and
    only the plain native control: a component with its own `data-slot` or `appearance-none` is left alone.

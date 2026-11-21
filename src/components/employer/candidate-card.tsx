@@ -48,7 +48,7 @@ export interface CandidateCardProps {
   expired?: ExpiredProposal | null;
   /** Skills the list is filtered by: matching chips are filled and listed first. */
   wantedSkills?: string[];
-  /** "Active now" / "Last seen 2h ago" / "Offline"; null when the candidate hides it. */
+  /** "Online" / "Last seen 2h ago" / "Offline"; null when the candidate hides it. */
   presence?: PresenceLabel | null;
   /** The intern saved this employer's role for the selected project. */
   interested?: boolean;

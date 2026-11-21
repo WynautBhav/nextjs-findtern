@@ -77,7 +77,7 @@ function data(ids: string[], unlocked: string[] = []): CandidatesData {
     nameUnlocked: new Set(unlocked),
     plans: [],
     relations: new Map(),
-    presence: Object.fromEntries(ids.map((id) => [id, "Active now"])),
+    presence: Object.fromEntries(ids.map((id) => [id, "Online"])),
     saved: new Set(),
     savedCount: 1,
     pro: { active: false, ignored: false, offered: true, charge: null, periodDays: 30, colleges: [], hiddenNoScore: 0, approxKept: 0 },
@@ -163,7 +163,7 @@ test("fromWire rebuilds what the page components read, with the chrome from the 
   assert.equal(back.data.candidates.length, 2);
   assert.equal(back.data.shortlisted.has("a1"), true);
   assert.equal(back.data.shortlisted.has("a2"), false);
-  assert.equal(back.data.presence["a1"], "Active now");
+  assert.equal(back.data.presence["a1"], "Online");
   assert.equal(back.data.projects[0].projectName, "Web app");
   assert.equal(back.data.pro.offered, true);
   assert.deepEqual(back.filters.skills, ["React"]);
