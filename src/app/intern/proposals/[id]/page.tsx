@@ -332,7 +332,8 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
             )}
           </Surface>
 
-          {/* ── Roles & responsibilities ─────────────────────────── */}
+          {/* ── Roles & responsibilities (internships only: a full-time offer carries its terms in the offer letter) ── */}
+          {!fullTime ? (
           <Surface className="p-5 lg:p-6">
             <SectionHead title="Roles and responsibilities" />
             {!project.ok && !jd ? (
@@ -348,6 +349,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
               <p className="text-sm leading-relaxed text-ink-600">The company did not add a description to this offer.</p>
             )}
           </Surface>
+          ) : null}
 
           {offer.additionalInfo ? (
             <Surface className="p-5 lg:p-6">
