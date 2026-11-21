@@ -1,4 +1,5 @@
 import { billingPlanOf, engagementEndOn, istDay, orderNotes, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, postpaidNext, recordedFeeOf } from "./billing-plan.ts";
+import { recordedUpfrontDiscountOf } from "./upfront-discount.ts";
 import { acceptedLineCharge } from "./accepted-charge.ts";
 import { monthsOf, parseOffer } from "./offer.ts";
 import { settledOrders } from "./refund-accounting.ts";
@@ -118,7 +119,9 @@ export function placementLedger(hire: HireLike, allPayments: readonly PaidOrderL
   // A hire's figures never move with the admin setting: the fee is the one its paid order recorded
   // (orders from before the per-band setting recorded none, and were charged the offer's fee).
   const feeMinor = recordedFeeOf(hire.id, payments);
-  const upfront = acceptedLineCharge(offer, "upfront", { feeMinor });
+  // The upfront discount its paid order recorded (lib/upfront-discount.ts): an upfront-paid hire costs what it was charged, never the live rule.
+  const upfrontDiscountRecordedMinor = payments.filter((p) => p.status === "paid").reduce((sum, p) => sum + recordedUpfrontDiscountOf(p.raw, hire.id), 0);
+  const upfront = acceptedLineCharge(offer, "upfront", { feeMinor, upfrontDiscountRecordedMinor });
   const monthly = acceptedLineCharge(offer, "monthly", { firstPayment: false, feeMinor });
   let upfrontPaid = false;
   let monthsPaid = 0;

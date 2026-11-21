@@ -13,7 +13,8 @@ import { getSession } from "@/lib/auth";
 import { canWrite } from "@/lib/admin/permissions";
 import { getDb, schema } from "@/lib/db";
 import Link from "next/link";
-import { getEmployerSubscriptionConfig, getInternActivationFeeMinor, getPerHireFeeSetting, getSetting } from "@/lib/platform-settings";
+import { getEmployerSubscriptionConfig, getInternActivationFeeMinor, getPerHireFeeSetting, getSetting, getUpfrontDiscount } from "@/lib/platform-settings";
+import type { UpfrontDiscount } from "@/lib/upfront-discount";
 import type { SubscriptionConfig } from "@/lib/employer-subscription";
 import type { PerHireFeeSetting } from "@/lib/per-hire-fee";
 import { singleFeatured } from "@/lib/pricing-featured";
@@ -24,9 +25,9 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMinor: number; perHireFee: PerHireFeeSetting; stipendBands: StipendBands; subscription: SubscriptionConfig } | null> {
+async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMinor: number; perHireFee: PerHireFeeSetting; stipendBands: StipendBands; subscription: SubscriptionConfig; upfrontDiscount: UpfrontDiscount } | null> {
   try {
-    const [rows, activationFeeMinor, perHireFee, stipendRaw, subscription] = await Promise.all([
+    const [rows, activationFeeMinor, perHireFee, stipendRaw, subscription, upfrontDiscount] = await Promise.all([
       getDb()
         .select()
         .from(schema.pricingPlans)
@@ -36,8 +37,10 @@ async function loadPricing(): Promise<{ plans: EditablePlan[]; activationFeeMino
       getPerHireFeeSetting(),
       getSetting(INTERN_STIPEND_KEY),
       getEmployerSubscriptionConfig(),
+      getUpfrontDiscount(),
     ]);
     return {
+      upfrontDiscount,
       activationFeeMinor,
       perHireFee,
       subscription,
@@ -209,7 +212,7 @@ export default async function AdminSettingsPage({ searchParams }: { searchParams
       {pricing && !mayEdit ? (
         <p className="text-sm text-text-subtle">Editing prices needs the Accounts permission (transactions:write).</p>
       ) : pricing ? (
-        <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} perHireFee={pricing.perHireFee} stipendBands={pricing.stipendBands} subscription={pricing.subscription} mayEditSubscription={mayEditSubscription} />
+        <AdminPricingEditor plans={pricing.plans} activationFeeMinor={pricing.activationFeeMinor} perHireFee={pricing.perHireFee} stipendBands={pricing.stipendBands} subscription={pricing.subscription} mayEditSubscription={mayEditSubscription} upfrontDiscount={pricing.upfrontDiscount} />
       ) : (
         <Panel>
           <AdminLoadError what="the rate card" retryHref="/admin/settings" />

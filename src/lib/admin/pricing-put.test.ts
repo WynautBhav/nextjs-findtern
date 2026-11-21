@@ -87,11 +87,11 @@ test("the route runs the guard first, keeps the admin role, and every write purg
     assert.ok(h.indexOf("requireMutation(") < h.indexOf("req.json()") || !h.includes("req.json()"), `${name}: guard before body`);
     assert.ok(h.includes("revalidatePricing()"), `${name}: purges the pricing pages`);
   }
-  // PUT has four writers (Findtern Pro subscription, per-hire, stipend, activation fee), each followed by its own purge.
+  // PUT has five writers (Findtern Pro subscription, per-hire, upfront discount, stipend, activation fee), each followed by its own purge.
   const put = handlers[1];
-  assert.equal(put.match(/revalidatePricing\(\)/g)?.length, 4);
-  assert.equal(put.match(/setSetting\(/g)?.length, 4);
-  assert.equal(put.match(/recordAdminAudit\(/g)?.length, 4, "one audit row per save");
+  assert.equal(put.match(/revalidatePricing\(\)/g)?.length, 5);
+  assert.equal(put.match(/setSetting\(/g)?.length, 5);
+  assert.equal(put.match(/recordAdminAudit\(/g)?.length, 5, "one audit row per save");
   // The subscription price is money: it also needs the Accounts permission, checked before anything is written.
   assert.ok(put.indexOf('allows(guard.session.permissions, ["transactions:write"])') < put.indexOf('setSetting("employer_subscription"'));
   // The purge covers the layout and /llms.txt.

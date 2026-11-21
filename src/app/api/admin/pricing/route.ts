@@ -13,6 +13,7 @@ import { PER_HIRE_FEE_KEY, parsePerHireFeeSetting } from "@/lib/per-hire-fee";
 import { perHireFeeAuditMeta } from "@/lib/admin/per-hire-fee-setting";
 import { PRICING_REVALIDATE, activationFeeAuditMeta, parsePricingPut, stipendSaveAuditMeta } from "@/lib/admin/pricing-put";
 import { INTERN_STIPEND_KEY, parseStipendBands } from "@/lib/pricing-config";
+import { UPFRONT_DISCOUNT_KEY, parseUpfrontDiscount } from "@/lib/upfront-discount";
 import { allows } from "@/lib/admin/permissions";
 import { subscriptionConfigAuditMeta } from "@/lib/subscription/config-put";
 import { writePlan, type PlanStore } from "@/lib/admin/pricing-plan-write";
@@ -161,6 +162,23 @@ export async function PUT(req: Request) {
     revalidatePricing();
     revalidatePath("/employer", "layout");
     return NextResponse.json({ ok: true, perHireFeeBands: to });
+  }
+
+  // The upfront discount on 3+ month internships paid in full (lib/upfront-discount.ts): read by checkout and the order route.
+  if (put.kind === "upfrontDiscount") {
+    const from = parseUpfrontDiscount(await getSetting(UPFRONT_DISCOUNT_KEY));
+    const to = put.rule;
+    await setSetting(UPFRONT_DISCOUNT_KEY, to, guard.session.uid);
+    await recordAdminAudit(getDb(), {
+      adminId: guard.session.uid,
+      action: "settings.update",
+      targetType: "platform_setting",
+      targetId: UPFRONT_DISCOUNT_KEY,
+      meta: { value: { from, to } },
+    }, { strict: true });
+    revalidatePricing();
+    revalidatePath("/employer", "layout");
+    return NextResponse.json({ ok: true, upfrontDiscount: to });
   }
 
   // Fixed monthly intern stipend per band (lib/pricing-config.ts): Espresso null, Cappuccino and Latte paise.

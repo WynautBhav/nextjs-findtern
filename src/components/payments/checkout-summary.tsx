@@ -30,6 +30,12 @@ export type SummaryLine = {
   feeWaivedListMinor: number;
   /** The whole engagement paid now (or the full-time fee). */
   upfrontMinor: number;
+  /** The monthly charges for the whole internship, before the upfront discount and without the hiring fee; 0 on a due month or full-time. */
+  engagementMinor: number;
+  /** What paying the whole internship now takes off the monthly charges (0 when it does not qualify). */
+  upfrontDiscountMinor: number;
+  /** That discount as a percent, for the wording (0 when none). */
+  upfrontDiscountPercent: number;
   /** A running placement's due month (no fee); null on a new hire. */
   monthlyMinor: number | null;
   /** The hiring charge + Month 1 charge, paid now; months 2+ are due 2 days before the intern's pay day; null when not offered (score below 6, full-time). */
@@ -227,7 +233,13 @@ export function CheckoutSummary({
                   />
                   <span className="min-w-0 flex-1">
                     Pay the whole internship now
-                    <span className="block text-xs text-text-subtle">Paid once, now</span>
+                    <span className="block text-xs text-text-subtle">
+                      {line.upfrontDiscountMinor > 0 ? (
+                        <span className="nums font-medium text-success">Save {m(line.upfrontDiscountMinor, line.currency)} ({line.upfrontDiscountPercent}% off the monthly charges)</span>
+                      ) : (
+                        "Paid once, now"
+                      )}
+                    </span>
                   </span>
                   <span className="nums shrink-0 text-ink-700">{m(line.upfrontMinor, line.currency)}</span>
                 </label>
@@ -247,9 +259,23 @@ export function CheckoutSummary({
                   </>
                 ) : (
                   <>
-                    <Row label={line.due ? line.durationLabel : "Monthly charges, whole internship"}>
-                      {m(amountMinor - (line.due ? 0 : line.feeMinor), line.currency)}
+                    <Row
+                      label={
+                        line.due
+                          ? line.durationLabel
+                          : line.monthlyRateMinor != null && line.engagementMinor > 0
+                            ? `Monthly charges (${m(line.monthlyRateMinor, line.currency)} × ${line.months} month${line.months === 1 ? "" : "s"})`
+                            : "Monthly charges, whole internship"
+                      }
+                    >
+                      {m(line.due ? amountMinor : line.engagementMinor > 0 ? line.engagementMinor : amountMinor - line.feeMinor, line.currency)}
                     </Row>
+                    {!line.due && line.upfrontDiscountMinor > 0 ? (
+                      <div className="flex items-baseline justify-between gap-3">
+                        <dt className="text-ink-600">Upfront discount ({line.upfrontDiscountPercent}%)</dt>
+                        <dd className="nums font-medium text-success">−{m(line.upfrontDiscountMinor, line.currency)}</dd>
+                      </div>
+                    ) : null}
                     {!line.due ? fee : null}
                   </>
                 )}
@@ -266,6 +292,23 @@ export function CheckoutSummary({
               <dd className="nums text-4xl font-light tracking-[-0.04em] text-ink-900">{m(totalMinor, line.currency)}</dd>
             </div>
           </dl>
+
+          {/* What paying it all now is worth: the same internship month by month, and the difference. */}
+          {!line.due && line.fullTimeCtcMinor == null && line.upfrontDiscountMinor > 0 ? (
+            <p className="nums mt-4 rounded-apple-sm bg-success-soft px-3 py-2 text-sm text-ink-800">
+              {mode === "upfront" ? (
+                <>
+                  Paid month by month, this internship costs {m(line.engagementMinor + line.feeMinor, line.currency)} in total. Paying it all now costs{" "}
+                  {m(line.upfrontMinor, line.currency)}, so you save <span className="font-semibold text-success">{m(line.upfrontDiscountMinor, line.currency)}</span>. The hiring charge is never discounted.
+                </>
+              ) : (
+                <>
+                  Pay the whole internship now and save <span className="font-semibold text-success">{m(line.upfrontDiscountMinor, line.currency)}</span>: {m(line.upfrontMinor, line.currency)} instead of{" "}
+                  {m(line.engagementMinor + line.feeMinor, line.currency)} month by month.
+                </>
+              )}
+            </p>
+          ) : null}
 
           {mode === "postpaid" && line.schedule.length > 0 ? (
             <div className="mt-4 border-t border-ink-100 pt-4 text-sm">

@@ -24,7 +24,7 @@ import { initialsOf, scoreOf } from "@/lib/employer-candidates";
 import { hiredInternIds, hiredProposalSql, isAdminViewing } from "@/lib/employer-visibility";
 import { employerRegion, type Currency } from "@/lib/employer-pricing";
 import { getEmployerRows } from "@/lib/employer-request";
-import { getPerHireFeeSetting } from "@/lib/platform-settings";
+import { getPerHireFeeSetting, getUpfrontDiscount } from "@/lib/platform-settings";
 import { splitTakenDownProposals, TAKEN_DOWN_PAY_NOTE } from "@/lib/projects/takedown-payable";
 import { orderProposalIds } from "@/lib/order-ids";
 import { expiryOf } from "@/lib/proposal-expiry";
@@ -72,6 +72,10 @@ export type PayableLine = {
   dueOn: string | null;
   /** The first payment of a post-paid hire (score 6+ internship): hiring fee + Month 1 charge, whatever mode was asked for. */
   feeCharge: LineCharge;
+  /** The whole internship paid now (upfront discount applied when it qualifies); null on a due month. */
+  upfrontCharge: LineCharge | null;
+  /** The upfront discount % applied in `upfrontCharge` (0 when none), for the checkout's wording. */
+  upfrontDiscountPercent: number;
   /** YYYY-MM-DD each month after the first falls due on a post-paid hire, month 2 first (month 1 is paid with the hiring charge); empty when not offered, one month long, or no start date. */
   schedule: string[];
   /** Offer start date (YYYY-MM-DD) or null. */
@@ -247,7 +251,7 @@ export async function payableCheckout(
   // Wave 1: every read that depends on nothing else, in one round trip (was ten sequential ones).
   // The hiring fee is decided here, at charge time, from the live setting and each offer's band, so the page and the order route agree.
   const sweptCutoff = new Date(Date.now() - SWEPT_EXPIRY_VISIBLE_DAYS * 86_400_000).toISOString();
-  const [feeSetting, employerRows, { open, dues }, openOrderIds, swept, hiredRows, adminViewing] = await Promise.all([
+  const [feeSetting, employerRows, { open, dues }, openOrderIds, swept, hiredRows, adminViewing, upfrontDiscount] = await Promise.all([
     getPerHireFeeSetting(),
     getEmployerRows(employerId),
     openProposalsWithDues(db, employerId),
@@ -273,6 +277,7 @@ export async function payableCheckout(
       .from(schema.proposals)
       .where(and(eq(schema.proposals.employerId, employerId), hiredProposalSql())),
     isAdminViewing(),
+    getUpfrontDiscount(),
   ]);
   const employer = employerRows[0];
 
@@ -396,7 +401,9 @@ export async function payableCheckout(
       // A due month is a later instalment: the hiring fee was in the first.
       const charge = isDue
         ? acceptedLineCharge(offer, "monthly", { firstPayment: false })
-        : lineCharge(offer, score, opts.mode, { feeSetting, bandScore: score });
+        : lineCharge(offer, score, opts.mode, { feeSetting, bandScore: score, upfrontDiscount });
+      // Paying the whole internship now, whatever mode was asked for: the checkout's breakdown and the "save" line read it.
+      const upfrontCharge = isDue ? null : lineCharge(offer, score, "upfront", { feeSetting, bandScore: score, upfrontDiscount });
       const feeCharge = acceptedLineCharge(offer, "postpaid", { feeSetting, bandScore: score });
       return {
         id: proposal.id,
@@ -434,6 +441,8 @@ export async function payableCheckout(
         due: dues.get(proposal.id) ?? null,
         dueOn: dues.has(proposal.id) ? (dues.get(proposal.id)!.dueOn ?? addMonthsDay(offer.startDate, dues.get(proposal.id)!.monthsPaid)) : null,
         feeCharge,
+        upfrontCharge,
+        upfrontDiscountPercent: upfrontCharge && upfrontCharge.discountMinor > 0 ? upfrontDiscount.percent : 0,
         schedule: dues.has(proposal.id) || offer.fullTime
           ? []
           : Array.from({ length: Math.max(0, offer.months - 1) }, (_, i) => postpaidDueOn(postpaidAnchor(offer.startDate, null) ?? istDay(new Date()), offer.months, i + 2) ?? "").filter(Boolean),

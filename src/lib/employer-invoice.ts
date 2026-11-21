@@ -1,4 +1,5 @@
 import { displayInvoiceNumber, LEGACY_INVOICE_CUTOFF, legacyInvoiceNumbers, type InvoiceLine } from "./invoice.ts";
+import { recordedUpfrontDiscountOf } from "./upfront-discount.ts";
 import { billingPlanOf, orderNotes, postpaidMonthsPaid, recordedFeeOf } from "./billing-plan.ts";
 import { hireInvoiceLines } from "./invoice-lines.ts";
 import { formatMoney } from "./format.ts";
@@ -139,6 +140,7 @@ function build(
       paymentIndex,
       chargedMinor: rows.length === 1 ? p.amountMinor : null,
       feeMinor,
+      upfrontDiscountMinor: monthly ? 0 : recordedUpfrontDiscountOf(p.raw, r.proposalId),
     });
   });
 

@@ -33,6 +33,7 @@ import type { StipendBands } from "@/lib/pricing-config";
 import { formatMoney } from "@/lib/format";
 import type { CmsPlanFeature } from "@/lib/content/types";
 import { cn } from "@/lib/utils";
+import { MAX_UPFRONT_MIN_MONTHS, MAX_UPFRONT_PERCENT, upfrontDraftEq, upfrontDraftOf, validateUpfrontDraft, type UpfrontDiscount, type UpfrontDiscountDraft } from "@/lib/upfront-discount";
 
 /**
  * Rate card editor. Admins type rupees; the API stores paise. USD is never
@@ -72,6 +73,7 @@ const hireFeeMachine = createAutosave<PerHireFeeSetting>((a, b) => FEE_BANDS.eve
 const stipendMachine = createAutosave<StipendDraft>((a, b) => wholeRupeesEq(a.skilled, b.skilled) && wholeRupeesEq(a.assured, b.assured));
 const featuredMachine = createAutosave<string | null>((a, b) => a === b);
 const subscriptionMachine = createAutosave<SubscriptionDraft>(subscriptionDraftEq);
+const upfrontMachine = createAutosave<UpfrontDiscountDraft>(upfrontDraftEq);
 
 /** One request to the pricing API; the server's message when it refuses. */
 async function send(method: "PATCH" | "PUT", body: unknown): Promise<SaveResult> {
@@ -98,6 +100,7 @@ export function AdminPricingEditor({
   stipendBands,
   subscription,
   mayEditSubscription = false,
+  upfrontDiscount,
 }: {
   plans: EditablePlan[];
   activationFeeMinor: number;
@@ -107,6 +110,8 @@ export function AdminPricingEditor({
   subscription?: SubscriptionConfig;
   /** Saving it needs the Accounts permission on top of this page's; without it the block is read-only. */
   mayEditSubscription?: boolean;
+  /** The upfront discount rule as saved; the block is hidden when absent. */
+  upfrontDiscount?: UpfrontDiscount;
 }) {
   const router = useRouter();
   const [seeding, setSeeding] = useState(false);
@@ -145,6 +150,7 @@ export function AdminPricingEditor({
         <RateCardSummary plans={plans} />
       </div>
       <PerHireFeePanel initial={perHireFee} />
+      {upfrontDiscount ? <UpfrontDiscountPanel initial={upfrontDiscount} /> : null}
       <StipendPanel initial={stipendBands} />
       {subscription ? <SubscriptionPanel initial={subscription} editable={mayEditSubscription} /> : null}
 
@@ -325,6 +331,109 @@ function PerHireFeePanel({ initial }: { initial: PerHireFeeSetting }) {
         </ul>
         <AutosaveStatus auto={auto} />
       </div>
+    </Panel>
+  );
+}
+
+/**
+ * The upfront discount: an internship of N months or more paid in full now gets X% off its monthly charges. The
+ * hiring fee is never discounted. Saves by itself like the other blocks; new checkouts use it at once, paid orders never change.
+ */
+function UpfrontDiscountPanel({ initial }: { initial: UpfrontDiscount }) {
+  const router = useRouter();
+  const auto = useAutosave(
+    upfrontMachine,
+    upfrontDraftOf(initial),
+    async (d) => {
+      const r = validateUpfrontDraft(d);
+      return r.ok ? send("PUT", { upfrontDiscount: r.rule }) : { ok: false, error: r.message };
+    },
+    () => router.refresh(),
+  );
+  const draft = auto.state.draft;
+  const check = validateUpfrontDraft(draft);
+  const bad = auto.status === "invalid" && !check.ok ? check : null;
+  const field = (key: "percent" | "minMonths", v: string) => {
+    const next = { ...draft, [key]: v.replace(/\D/g, "") };
+    const c = validateUpfrontDraft(next);
+    auto.edit(next, c.ok ? null : c.message);
+  };
+
+  return (
+    <Panel>
+      <PanelHeader
+        title="Upfront payment discount"
+        description="Internships paid in full upfront get a discount on the monthly charges. The one-time hiring fee is always paid in full. INR and USD."
+        icon={IndianRupee}
+      />
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          auto.flush();
+        }}
+        noValidate
+        className="space-y-4 px-5 py-4"
+      >
+        <ul className="divide-y divide-[color:var(--admin-rule)]">
+          <li className="flex items-center justify-between gap-4 py-3">
+            <label htmlFor="upfront-enabled" className="text-sm font-medium text-ink-800">
+              Discount on
+              <span className="block text-xs font-normal text-text-subtle">
+                {draft.enabled ? "Applied at checkout when the employer pays the whole internship now" : "Off: upfront and month-by-month cost the same"}
+              </span>
+            </label>
+            <Switch id="upfront-enabled" checked={draft.enabled} onCheckedChange={(next) => auto.edit({ ...draft, enabled: next }, null, true)} />
+          </li>
+          <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+            <label htmlFor="upfront-percent" className="text-sm font-medium text-ink-800">
+              Discount
+              <span className="block text-xs font-normal text-text-subtle">Off the monthly charges only, 1 to {MAX_UPFRONT_PERCENT}%.</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="upfront-percent"
+                inputMode="numeric"
+                value={draft.percent}
+                onChange={(e) => field("percent", e.target.value)}
+                aria-invalid={bad?.field === "percent" ? true : undefined}
+                aria-describedby={bad?.field === "percent" ? "upfront-error" : undefined}
+                className={cn(inputClass, "mt-0 w-24")}
+              />
+              <span className="text-sm text-ink-600" aria-hidden>%</span>
+            </div>
+          </li>
+          <li className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 py-3">
+            <label htmlFor="upfront-months" className="text-sm font-medium text-ink-800">
+              Minimum internship length
+              <span className="block text-xs font-normal text-text-subtle">Internships this long or longer qualify (1 to {MAX_UPFRONT_MIN_MONTHS}).</span>
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                id="upfront-months"
+                inputMode="numeric"
+                value={draft.minMonths}
+                onChange={(e) => field("minMonths", e.target.value)}
+                aria-invalid={bad?.field === "minMonths" ? true : undefined}
+                aria-describedby={bad?.field === "minMonths" ? "upfront-error" : undefined}
+                className={cn(inputClass, "mt-0 w-24")}
+              />
+              <span className="text-sm text-ink-600" aria-hidden>months</span>
+            </div>
+          </li>
+        </ul>
+        {check.ok && check.rule.enabled ? (
+          <p className="nums text-sm text-ink-700">
+            Example: a {check.rule.minMonths}-month internship at {formatMoney(1_600_000, "INR")}/month paid upfront pays{" "}
+            {formatMoney(1_600_000 * check.rule.minMonths - Math.round((1_600_000 * check.rule.minMonths * check.rule.percent) / 100), "INR")} for the months instead of{" "}
+            {formatMoney(1_600_000 * check.rule.minMonths, "INR")}, plus the hiring fee in full.
+          </p>
+        ) : null}
+        <div className="flex flex-wrap items-center justify-end gap-3 border-t border-[color:var(--admin-rule)] pt-4">
+          <SaveNowButton enabled={auto.state.sending === null && auto.status === "pending"} />
+        </div>
+        {bad ? <p id="upfront-error" role="alert" className="text-sm text-danger">{bad.message}</p> : null}
+        <AutosaveStatus auto={auto} live="Live: new checkouts use this now" />
+      </form>
     </Panel>
   );
 }

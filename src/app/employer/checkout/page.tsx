@@ -207,6 +207,10 @@ export default async function EmployerCheckout({
             feeWaivedListMinor: line.fee.kind === "free" ? line.fee.listMinor : 0,
             // A running monthly placement is already priced as its due month.
             upfrontMinor: line.charge.totalMinor,
+            // The whole internship paid now, for the breakdown: the monthly charges, then what the upfront discount takes off.
+            engagementMinor: line.upfrontCharge ? line.upfrontCharge.baseMinor - line.upfrontCharge.perHireMinor : 0,
+            upfrontDiscountMinor: line.upfrontCharge?.discountMinor ?? 0,
+            upfrontDiscountPercent: line.upfrontDiscountPercent,
             monthlyMinor: line.due ? line.monthlyCharge.totalMinor : null,
             postpaidMinor: !line.due && !line.charge.monthlyBlocked ? line.feeCharge.totalMinor : null,
             schedule: line.schedule,

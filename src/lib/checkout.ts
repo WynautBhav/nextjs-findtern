@@ -1,5 +1,6 @@
 import type { Offer } from "./offer.ts";
 import { perHireChargedForScore, type PerHireFeeSetting } from "./per-hire-fee.ts";
+import { upfrontDiscountMinor, type UpfrontDiscount } from "./upfront-discount.ts";
 
 /**
  * What an employer pays for one accepted proposal. Same base rules as the
@@ -11,9 +12,9 @@ import { perHireChargedForScore, type PerHireFeeSetting } from "./per-hire-fee.t
  *   charged is decided here, at charge time, from the live setting and the
  *   offer's band, so an admin switch also reprices offers not yet paid.
  * - Score below 6: no stipend-plan discount and no monthly plan.
- * - Paying the whole engagement upfront carries no discount (bug sheet
- *   26 Oct removed the 10% upfront discount); upfront and monthly differ only
- *   in when the money is paid.
+ * - Paying the whole engagement upfront: an internship of 3+ months gets 10% off its monthly charges (admin rule,
+ *   lib/upfront-discount.ts; passed in as `upfrontDiscount` by money still to be collected). The hiring fee is never
+ *   discounted. Monthly and post-paid carry no discount.
  * - Full-time offer: 8.33% of annual CTC, upfront only, no separate fee.
  *
  * All amounts are minor units of the offer currency.
@@ -55,6 +56,10 @@ export type FeeOptions = {
   bandScore?: number | null;
   /** The fee a paid order recorded for this hire; wins over `feeSetting`. */
   feeMinor?: number | null;
+  /** The upfront discount rule (lib/upfront-discount.ts), for money still to be collected. Absent: no discount. */
+  upfrontDiscount?: UpfrontDiscount | null;
+  /** The upfront discount a paid order recorded for this hire; wins over `upfrontDiscount`. */
+  upfrontDiscountRecordedMinor?: number | null;
 };
 
 /** The hiring fee on one line (before `firstPayment`): what the offer would charge, then the setting or a recorded fee applied. */
@@ -125,5 +130,10 @@ export function lineCharge(
       ? Math.max(0, offer.totalMinor - (offer.perHireMinor ?? 0))
       : (offer.monthlyMinor ?? 0) * offer.months;
   const base = engagement + perHireMinor;
-  return { baseMinor: base, discountMinor: 0, totalMinor: base, perHireMinor, monthlyBlocked };
+  // Off the monthly charges only: the hiring fee is always paid in full.
+  const discount = Math.min(
+    engagement,
+    opts.upfrontDiscountRecordedMinor != null ? Math.max(0, Math.round(opts.upfrontDiscountRecordedMinor)) : upfrontDiscountMinor(engagement, offer.months, opts.upfrontDiscount),
+  );
+  return { baseMinor: base, discountMinor: discount, totalMinor: base - discount, perHireMinor, monthlyBlocked };
 }

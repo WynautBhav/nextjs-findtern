@@ -35,6 +35,8 @@ export function hireInvoiceLines(input: {
   withMonth1?: boolean;
   /** The hiring fee this hire's paid order recorded (billing-plan `recordedFeeOf`); null/absent on orders from before the per-band setting, which were charged the offer's fee. Never the live setting: a paid invoice does not change. */
   feeMinor?: number | null;
+  /** The upfront discount the order recorded for this hire (lib/upfront-discount.ts); named on the internship line when > 0. */
+  upfrontDiscountMinor?: number | null;
 }): InvoiceLine[] {
   const { roleTitle, projectName, offer, monthly, paymentIndex } = input;
   // A nameless or deleted candidate still reads "Candidate — Designer", never "— Designer".
@@ -98,7 +100,7 @@ export function hireInvoiceLines(input: {
     {
       label: `${who} — ${roleTitle || projectName}`,
       // "2m" first, as on the reference invoice: how long the internship runs.
-      detail: `${offer.months}m · ${projectName} · Internship charge, ${period}`,
+      detail: `${offer.months}m · ${projectName} · Internship charge, ${period}${!monthly && (input.upfrontDiscountMinor ?? 0) > 0 ? `, after an upfront discount of ${formatMoney(input.upfrontDiscountMinor!, offer.currency, { zeroLabel: false })}` : ""}`,
       amountMinor: stipendMinor, // 0 prints as ₹0.00, never "Included"
     },
   ];

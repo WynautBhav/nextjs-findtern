@@ -6,6 +6,7 @@ import { getActivePricingPlans } from "@/lib/cached-reads";
 import { CACHE_TAGS, cachedRead } from "@/lib/server-cache";
 import { SUBSCRIPTION_DEFAULTS, parseSubscriptionConfig, parseSubscriptionOverrides, type SubscriptionConfig, type SubscriptionOverride } from "@/lib/employer-subscription";
 import { PER_HIRE_FEE_DEFAULT, PER_HIRE_FEE_KEY, parsePerHireFeeSetting, type PerHireFeeSetting } from "@/lib/per-hire-fee";
+import { UPFRONT_DISCOUNT_DEFAULT, UPFRONT_DISCOUNT_KEY, parseUpfrontDiscount, type UpfrontDiscount } from "@/lib/upfront-discount";
 import { INTERN_STIPEND_KEY, PRICING_DEFAULTS, STIPEND_BANDS_DEFAULT, parsePricingConfig, type PricingConfig } from "@/lib/pricing-config";
 
 /**
@@ -21,6 +22,8 @@ export const SETTING_DEFAULTS = {
   [PER_HIRE_FEE_KEY]: PER_HIRE_FEE_DEFAULT,
   /** Fixed monthly intern stipend per score band, INR paise (lib/pricing-config.ts); null for Espresso. */
   [INTERN_STIPEND_KEY]: STIPEND_BANDS_DEFAULT,
+  /** Upfront discount on 3+ month internships paid in full (lib/upfront-discount.ts). */
+  [UPFRONT_DISCOUNT_KEY]: UPFRONT_DISCOUNT_DEFAULT as UpfrontDiscount,
   /** Employer subscription: price (INR paise, EXCLUDING GST; India pays 18% GST on top), length in days, on/off (lib/employer-subscription.ts). */
   employer_subscription: SUBSCRIPTION_DEFAULTS,
   /** Per-employer admin grants and revokes, keyed by employer id (lib/employer-subscription.ts). */
@@ -99,6 +102,11 @@ export function getInternActivationFeeMinor(): Promise<number> {
  */
 export async function getPerHireFeeSetting(): Promise<PerHireFeeSetting> {
   return parsePerHireFeeSetting(await getSetting(PER_HIRE_FEE_KEY));
+}
+
+/** The live upfront discount rule. Never throws: no DB, no row or a garbled value gives the default (10% at 3+ months). */
+export async function getUpfrontDiscount(): Promise<UpfrontDiscount> {
+  return parseUpfrontDiscount(await getSetting(UPFRONT_DISCOUNT_KEY));
 }
 
 /**

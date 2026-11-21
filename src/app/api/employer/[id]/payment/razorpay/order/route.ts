@@ -241,6 +241,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     dueProposalIds: paying.filter((l) => l.due).map((l) => l.id),
     // The one-time hiring fee charged on each line (0 when its band is free). Invoices and ledgers read this, so a later admin switch never alters a paid order.
     perHireFeeMinor: Object.fromEntries(paying.filter((l) => !l.due).map((l) => [l.id, l.charge.perHireMinor])),
+    // The upfront discount taken off each line's monthly charges (lib/upfront-discount.ts). The ledger and invoices read this, so a later rule change never alters a paid order.
+    ...(mode === "upfront" && paying.some((l) => l.charge.discountMinor > 0)
+      ? { upfrontDiscountMinor: Object.fromEntries(paying.filter((l) => !l.due && l.charge.discountMinor > 0).map((l) => [l.id, l.charge.discountMinor])) }
+      : {}),
     // A post-paid first payment also covers Month 1. A separate list, never dueProposalIds: settlement hires only ids that are not due (payments.ts).
     firstMonthProposalIds: mode === "postpaid" ? paying.filter((l) => !l.due).map((l) => l.id) : [],
     // The month each due line was priced for; settlement flags the order when the hire has moved on since.

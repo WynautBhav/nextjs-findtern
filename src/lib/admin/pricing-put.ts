@@ -6,6 +6,7 @@ import { isStipendBody, pricingConfigAuditMeta, stipendAuditMeta, stipendBodySch
 import type { PerHireFeeSetting } from "../per-hire-fee.ts";
 import { isSubscriptionConfigBody, parseSubscriptionConfigPut } from "../subscription/config-put.ts";
 import type { SubscriptionConfig } from "../employer-subscription.ts";
+import { isUpfrontDiscountBody, upfrontDiscountBodySchema, type UpfrontDiscount } from "../upfront-discount.ts";
 
 /**
  * The pure half of `PUT /api/admin/pricing`: which of the three settings a
@@ -28,6 +29,7 @@ export type PricingPut =
   | { kind: "perHireFee"; bands: PerHireFeeSetting }
   | { kind: "activationFee"; feeMinor: number }
   | { kind: "subscription"; config: SubscriptionConfig }
+  | { kind: "upfrontDiscount"; rule: UpfrontDiscount }
   | { kind: "invalid"; error: string };
 
 /** Picks the schema by the body's shape (stipend, then per-hire switches, then the activation fee) and validates it. */
@@ -35,6 +37,10 @@ export function parsePricingPut(body: unknown): PricingPut {
   if (isSubscriptionConfigBody(body)) {
     const r = parseSubscriptionConfigPut(body);
     return r.ok ? { kind: "subscription", config: r.config } : { kind: "invalid", error: r.error };
+  }
+  if (isUpfrontDiscountBody(body)) {
+    const r = upfrontDiscountBodySchema.safeParse(body);
+    return r.success ? { kind: "upfrontDiscount", rule: r.data.upfrontDiscount } : { kind: "invalid", error: r.error.issues[0]?.message ?? "Invalid input" };
   }
   if (isStipendBody(body)) {
     const r = stipendBodySchema.safeParse(body);
