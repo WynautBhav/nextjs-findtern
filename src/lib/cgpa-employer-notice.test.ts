@@ -9,7 +9,7 @@ test("verified: tells the employer they can pay, links nothing private, one key 
   const n = cgpaEmployerNotice({ ...base, decision: "verified" });
   assert.deepEqual(n.to, { type: "employer", id: "emp1" });
   assert.equal(n.type, "cgpa_verified");
-  assert.equal(n.title, "CGPA confirmed: you can now pay for Candidate AB");
+  assert.equal(n.title, "Ready to pay: Candidate AB");
   assert.deepEqual(n.data, { proposalId: "prop1" });
   assert.equal(n.dedupeKey, "cgpa_decision:prop1:2026-11-20T10:00:00.000Z");
   const text = `${n.title} ${n.message} ${JSON.stringify(n.email)}`;

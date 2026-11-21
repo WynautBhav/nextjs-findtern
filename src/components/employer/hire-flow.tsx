@@ -13,7 +13,6 @@ const STEPS: Step[] = [
   { key: "candidates", label: "Candidates", hint: "find and compare", href: "/employer/candidates" },
   { key: "shortlisted", label: "Shortlist", hint: "meet, then propose", href: "/employer/cart" },
   { key: "awaitingReply", label: "Waiting", hint: "proposals waiting on the candidate", href: "/employer/proposals?status=open" },
-  { key: "verifying", label: "Verifying", hint: "accepted, Findtern is confirming the candidate's CGPA", href: "/employer/proposals?status=verifying" },
   { key: "toPay", label: "To pay", hint: "accepted and ready for your payment", href: "/employer/checkout" },
   { key: "hired", label: "Hired", hint: "placement running", href: "/employer/orders" },
 ];
@@ -30,14 +29,14 @@ export function HireFlow({ counts, current, currentCount = null }: { counts: Hir
   // links each stage, without competing with the page's own content.
   return (
     <nav aria-label="Hiring steps" className="relative mb-4 rounded-xl border border-brand-200 bg-brand-100/60 p-1 sm:mb-5">
-      {/* Phones: three steps, then three, each row filling the width. Nothing scrolls, so no step is ever cut off at the edge. */}
+      {/* Phones: three steps, then two, each row filling the width. Nothing scrolls, so no step is ever cut off at the edge. */}
       <ol className="grid grid-cols-6 items-stretch gap-1 text-[13px] sm:flex sm:text-sm">
         {STEPS.map((s) => {
           const active = s.key === currentKey;
           // Finding candidates is the start of the path, not a queue: no count.
           const n = s.key === "candidates" ? (active ? currentCount : null) : counts[s.key];
           return (
-            <li key={s.key} className="col-span-2 flex min-w-0 sm:flex-1">
+            <li key={s.key} className="col-span-2 flex min-w-0 sm:flex-1 [&:nth-child(n+4)]:col-span-3">
               <Link
                 href={s.href}
                 aria-current={active ? "step" : undefined}

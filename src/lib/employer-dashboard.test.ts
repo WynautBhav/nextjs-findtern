@@ -185,14 +185,14 @@ test("funnel: a verifying offer is accepted by the candidate (nesting holds) and
   });
   assert.deepEqual(counts(f), [4, 4, 2, 0]);
   assert.equal(f.stages[1].sub, "1 awaiting a reply");
-  assert.equal(f.stages[2].sub, "1 to pay \u00b7 1 verifying CGPA");
+  assert.equal(f.stages[2].sub, "1 to pay \u00b7 1 not payable yet");
   // The expired-unpaid offer (bucket closed) is a lost offer, not an accepted one.
   assert.equal(f.stages[1].lost, 1);
 });
 
-test("funnel: only verifying offers read '1 verifying CGPA', no 'to pay'", () => {
+test("funnel: only held offers read '1 not payable yet', no 'to pay'", () => {
   const f = buildFunnel({ proposals: [prop("a", "accepted", { bucket: "verifying" })], shortlistInternIds: [], metInternIds: [] });
-  assert.equal(f.stages[2].sub, "1 verifying CGPA");
+  assert.equal(f.stages[2].sub, "1 not payable yet");
 });
 
 test("project stats: verifying is in play but not to pay; expired-unpaid is closed", () => {
@@ -217,14 +217,14 @@ test("funnel: a taken-down project's offers are View only, so they are not await
     metInternIds: [],
   });
   assert.equal(f.stages[1].sub, "1 awaiting a reply");
-  assert.equal(f.stages[2].sub, "1 verifying CGPA");
+  assert.equal(f.stages[2].sub, "1 not payable yet");
   // They are still offered and accepted: only the waiting labels move.
   assert.deepEqual(counts(f), [5, 5, 3, 0]);
 });
 
-test("funnel: the Accepted bar opens To pay, or Verifying CGPA when nothing is to pay", () => {
+test("funnel: the Accepted bar always opens To pay (held offers are listed there too)", () => {
   const href = (proposals: DashProposal[]) => buildFunnel({ proposals, shortlistInternIds: [], metInternIds: [] }).stages[2].href;
-  assert.equal(href([prop("a", "accepted", { bucket: "verifying" })]), "/employer/proposals?status=verifying");
+  assert.equal(href([prop("a", "accepted", { bucket: "verifying" })]), "/employer/proposals?status=accepted");
   assert.equal(href([prop("a", "accepted", { bucket: "verifying" }), prop("b", "accepted")]), "/employer/proposals?status=accepted");
   assert.equal(href([prop("a", "hired")]), "/employer/proposals?status=accepted");
 });

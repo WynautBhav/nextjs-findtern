@@ -37,7 +37,7 @@ function hrefFor(type: string, data: Record<string, unknown> | null): string | n
     case "cgpa_verified":
       return "/employer/proposals?status=accepted";
     case "cgpa_incorrect":
-      return id("proposalId") ? `/employer/proposal/${id("proposalId")}` : "/employer/proposals?status=verifying";
+      return id("proposalId") ? `/employer/proposal/${id("proposalId")}` : "/employer/proposals?status=accepted";
     case "timesheet_submitted":
       return id("timesheetId") ? `/employer/timesheets/${id("timesheetId")}` : "/employer/timesheets";
     case "meeting_scheduled":

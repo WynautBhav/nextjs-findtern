@@ -20,20 +20,21 @@ test("a plain accepted offer is To pay, exactly as before", () => {
   assert.deepEqual([s.label, s.bucket, s.canPay, s.canEdit, s.canWithdraw, s.verifying, s.expiredReason, s.closedReason, s.canSendNew], ["Accepted · payment due", "accepted", true, true, true, false, null, null, false]);
 });
 
-test("pending CGPA: Verifying, never payable, still editable and withdrawable", () => {
+test("pending CGPA: not payable yet (the check is not named), still editable and withdrawable", () => {
   const gate = gateFor(pending, { acceptedAt: hoursAgo(2) });
   const s = offerState({ status: "accepted", hiredAt: null, gate }, AHEAD, NOW);
-  assert.deepEqual([s.label, s.tone, s.bucket, s.canPay, s.canWithdraw, s.verifying], ["Verifying CGPA", "waiting", "verifying", false, true, true]);
-  assert.match(s.next, /Findtern is confirming the candidate's CGPA \(usually 24-48 h\)\. You can pay once it is confirmed\./);
+  assert.deepEqual([s.label, s.tone, s.bucket, s.canPay, s.canWithdraw, s.verifying], ["Accepted · not payable yet", "waiting", "verifying", false, true, true]);
+  assert.match(s.next, /Payment opens once Findtern's final checks are done \(usually 24-48 h\)/);
+  assert.doesNotMatch(`${s.label} ${s.next}`, /CGPA|verif/i);
   assert.equal(s.gate?.state, "pending");
 });
 
-test("overdue CGPA (49 h) is still Verifying, with honest wording, never payable", () => {
+test("overdue CGPA (49 h) is still not payable, with the same neutral wording", () => {
   const gate = gateFor(pending, { acceptedAt: hoursAgo(49) });
   const s = offerState({ status: "accepted", hiredAt: null, gate }, AHEAD, NOW);
   assert.equal(s.gate?.state, "overdue");
-  assert.deepEqual([s.bucket, s.canPay, s.label], ["verifying", false, "Verifying CGPA"]);
-  assert.match(s.next, /taking longer than the usual 24-48 h/);
+  assert.deepEqual([s.bucket, s.canPay, s.label], ["verifying", false, "Accepted · not payable yet"]);
+  assert.doesNotMatch(`${s.label} ${s.next}`, /CGPA|verif/i);
 });
 
 test("incorrect and unconfirmed: a correction notice with the two scores, no pay, withdraw open", () => {

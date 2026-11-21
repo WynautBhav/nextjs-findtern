@@ -137,9 +137,9 @@ export function buildFunnel({ proposals, shortlistInternIds, metInternIds }: Fun
         href: "/employer/proposals?status=open",
       }),
       stage("accepted", "Accepted", accepted, offered, "offered", {
-        sub: [toPay ? `${toPay} to pay` : "", verifying ? `${verifying} verifying CGPA` : ""].filter(Boolean).join(" · ") || null,
-        // Opens the tab that needs attention: To pay first, then Verifying CGPA.
-        href: toPay || !verifying ? "/employer/proposals?status=accepted" : "/employer/proposals?status=verifying",
+        sub: [toPay ? `${toPay} to pay` : "", verifying ? `${verifying} not payable yet` : ""].filter(Boolean).join(" · ") || null,
+        // To pay holds both: offers ready to pay and those not payable yet.
+        href: "/employer/proposals?status=accepted",
       }),
       stage("hired", "Hired", hired, accepted, "accepted", {
         href: "/employer/proposals?status=hired",

@@ -4,22 +4,24 @@ import type { ClosedReason, ProposalBucket } from "./proposal-bucket.ts";
  * The Proposals page's tabs: which one a proposal is under, what each says about itself, and what an empty one says.
  * Pure (the node tests run it). The count behind each tab is `proposalCounts` (proposal-bucket.ts): there is no second counter.
  *
- * Every proposal is under exactly one of the state tabs (waiting, verifying, to pay, hired, closed; plus drafts and
+ * Every proposal is under exactly one of the state tabs (waiting, to pay, hired, closed; plus drafts and
  * view only when there are some). "All" is the sum. A tab that reads 0 while "All" reads 2 only means the two are in
  * another tab, and the line under the tab bar says what each tab holds.
  */
-export type TabKey = "all" | "open" | "draft" | "verifying" | "accepted" | "viewonly" | "hired" | "closed";
+export type TabKey = "all" | "open" | "draft" | "accepted" | "viewonly" | "hired" | "closed";
 
-export const TAB_KEYS: ReadonlySet<string> = new Set<TabKey>(["all", "open", "draft", "verifying", "accepted", "viewonly", "hired", "closed"]);
+export const TAB_KEYS: ReadonlySet<string> = new Set<TabKey>(["all", "open", "draft", "accepted", "viewonly", "hired", "closed"]);
 
 /** `?status=` as the dashboard and the strip link it. Unknown values show All. */
 export function tabFromParam(value: string | string[] | undefined): TabKey {
   const v = Array.isArray(value) ? value[0] : value;
+  // Held offers live under To pay now; an old ?status=verifying link (alerts, bookmarks) lands there too.
+  if (v === "verifying") return "accepted";
   return typeof v === "string" && TAB_KEYS.has(v) ? (v as TabKey) : "all";
 }
 
 /**
- * The query string (`?status=verifying&project=x`, or "" for none) that makes `tab` the one the URL names, other params
+ * The query string (`?status=accepted&project=x`, or "" for none) that makes `tab` the one the URL names, other params
  * kept. "All" is the default, so it drops the param. The inverse of `tabFromParam`: a clicked tab, a shared link and a
  * reload all name the same tab.
  */
@@ -49,6 +51,8 @@ export function inTab(tab: TabKey, bucket: ProposalBucket | null, viewOnly: bool
   const heldDown = viewOnly && (bucket === "open" || bucket === "accepted" || bucket === "verifying");
   if (tab === "all") return true;
   if (tab === "viewonly") return heldDown;
+  // An accepted offer still in Findtern's final checks shows under To pay, marked not payable yet.
+  if (tab === "accepted") return (bucket === "accepted" || bucket === "verifying") && !heldDown;
   return bucket === tab && !heldDown;
 }
 
@@ -56,7 +60,6 @@ export const TAB_LABEL: Record<TabKey, { label: string; short: string }> = {
   all: { label: "All", short: "All" },
   open: { label: "Waiting for candidate", short: "Waiting" },
   draft: { label: "Drafts · not sent", short: "Drafts" },
-  verifying: { label: "Verifying CGPA", short: "Verifying" },
   accepted: { label: "To pay", short: "To pay" },
   viewonly: { label: "View only · taken down", short: "View only" },
   hired: { label: "Hired", short: "Hired" },
@@ -68,8 +71,7 @@ export const TAB_EXPLAINER: Record<TabKey, string> = {
   all: "Every proposal, closed ones included. Each sits in exactly one tab, so the tab counts add up to the All count.",
   open: "These candidates have not replied yet. They can accept until the start date.",
   draft: "Saved but never sent. The candidate sees nothing until you send it.",
-  verifying: "These candidates accepted. Findtern is confirming their CGPA (usually 24-48 h) before you can pay.",
-  accepted: "These candidates accepted and are waiting for payment. Pay to confirm the hire.",
+  accepted: "These candidates accepted and are waiting for payment. Pay to confirm the hire. An offer marked not payable yet opens for payment shortly.",
   viewonly: "Findtern took these projects down. You can view the offers, but there is nothing to reply to or pay while a project is down.",
   hired: "Paid and placed. You can see the candidate's name and contact details.",
   closed: "Offers that ended: declined by the candidate, withdrawn by you, or expired.",
@@ -80,8 +82,7 @@ export const TAB_EMPTY: Record<TabKey, { title: string; body: string }> = {
   all: { title: "No proposals yet", body: "Open a candidate, then use Send proposal." },
   open: { title: "Nothing waiting on a candidate", body: "Offers you have sent and not heard back on show here." },
   draft: { title: "No drafts", body: "Offers you saved without sending show here." },
-  verifying: { title: "No CGPA checks in progress", body: "Only candidates whose CGPA Findtern is still checking show here. Most offers go straight to To pay." },
-  accepted: { title: "Nothing to pay right now", body: "When a candidate accepts and their CGPA is confirmed, the offer shows here, ready to pay." },
+  accepted: { title: "Nothing to pay right now", body: "When a candidate accepts, the offer shows here, ready to pay." },
   viewonly: { title: "No offers on taken-down projects", body: "Offers on projects Findtern took down show here." },
   hired: { title: "No hires yet", body: "Once an accepted offer is paid, the placement shows here." },
   closed: { title: "No closed proposals", body: "Declined, withdrawn and expired offers show here." },

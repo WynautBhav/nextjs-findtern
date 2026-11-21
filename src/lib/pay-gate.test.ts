@@ -91,7 +91,7 @@ test("an unreadable or missing start date does not expire an offer", () => {
 
 test("codes and messages are the contract the routes and the UI share", () => {
   assert.deepEqual(PAY_GATE_CODE, { expired: "offer_expired", cgpa_pending: "cgpa_verification_pending", cgpa_incorrect_unacked: "cgpa_incorrect_unacked" });
-  assert.equal(PAY_GATE_MESSAGE.cgpa_pending, "Findtern is still confirming the candidate's CGPA (usually 24-48 h). You can pay once it is confirmed.");
+  assert.equal(PAY_GATE_MESSAGE.cgpa_pending, "Payment opens once Findtern's final checks are done (usually 24-48 h). We'll let you know when you can pay.");
   assert.match(PAY_GATE_MESSAGE.expired, /expired/);
   assert.match(PAY_GATE_MESSAGE.expired, /new proposal/);
   assert.match(PAY_GATE_MESSAGE.cgpa_incorrect_unacked, /Confirm and continue/);

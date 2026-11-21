@@ -44,7 +44,7 @@ export type PayGateCode = (typeof PAY_GATE_CODE)[PayGateReason];
 /** Employer-facing copy. No candidate identity and no pay figures: this is shown on the employer side. */
 export const PAY_GATE_MESSAGE: Record<PayGateReason, string> = {
   expired: "This offer expired because it was not paid before its start date. Send the candidate a new proposal.",
-  cgpa_pending: "Findtern is still confirming the candidate's CGPA (usually 24-48 h). You can pay once it is confirmed.",
+  cgpa_pending: "Payment opens once Findtern's final checks are done (usually 24-48 h). We'll let you know when you can pay.",
   cgpa_incorrect_unacked: "Findtern corrected the candidate's CGPA. Review the correction and press Confirm and continue before you pay.",
 };
 

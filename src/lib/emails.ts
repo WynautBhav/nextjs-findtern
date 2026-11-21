@@ -247,7 +247,7 @@ export const emails = {
     subject: o.fullTime ? "Full-time offer update | Findtern" : "Candidate decision update | Findtern",
     preheader: o.accepted
       ? o.cgpaPending
-        ? `${o.candidate} accepted. Findtern is confirming their CGPA first; you can pay once it is done.`
+        ? `${o.candidate} accepted. Payment opens once Findtern's final checks are done; we'll let you know.`
         : o.fullTime
           ? `${o.candidate} accepted. Pay the hiring fee to confirm the joining.`
           : `${o.candidate} accepted. Complete the payment to confirm the hire.`
@@ -264,13 +264,13 @@ export const emails = {
       `${o.candidate} has responded to your ${o.fullTime ? "full-time offer" : "proposal"} for ${o.role}.`,
       o.accepted
         ? o.cgpaPending
-          ? "Findtern is confirming the candidate’s CGPA first (usually 24 to 48 hours). We’ll tell you the moment you can pay."
+          ? "Payment opens once Findtern’s final checks are done (usually 24 to 48 hours). We’ll tell you the moment you can pay."
           : o.fullTime
             ? "Complete the full-time hiring fee (8.33% of the annual CTC) to confirm the joining."
             : "Complete the payment to confirm the hire. Names and contact details unlock once it’s done."
         : "You can send an offer to another candidate from your shortlist.",
     ],
-    status: o.accepted ? (o.cgpaPending ? "Accepted · CGPA being confirmed" : "Accepted") : "Declined",
+    status: o.accepted ? (o.cgpaPending ? "Accepted · not payable yet" : "Accepted") : "Declined",
     tone: o.accepted ? (o.cgpaPending ? "wait" : "done") : "neutral",
     cta: o.accepted && !o.cgpaPending
       ? ctaTo("Go to checkout", "/employer/checkout")

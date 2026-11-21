@@ -243,8 +243,8 @@ export default async function EmployerProposalDetail({
 
   // An expired offer ends the timeline at its closed step, like an unanswered one.
   const timeline = offerTimeline(proposal, { startDate: offer.startDate, fullTime: Boolean(ft) }, { label: state.label, lapsed: state.lapsed || state.expiredReason === "unpaid_past_start" }, formatDate).map((step) =>
-    // While Findtern confirms the CGPA the next step is not yours yet.
-    state.verifying && /^You pay/.test(step.label) ? { ...step, label: state.gate?.state === "incorrect_unacked" ? "You confirm the CGPA, then pay" : "Findtern confirms the CGPA, then you pay" } : step,
+    // While Findtern's final checks run the next step is not yours yet (the employer is not shown what is checked).
+    state.verifying && /^You pay/.test(step.label) ? { ...step, label: state.gate?.state === "incorrect_unacked" ? "You confirm the CGPA, then pay" : "Payment opens shortly, then you pay" } : step,
   );
   const profileHref = `/employer/intern/${encodeURIComponent(proposal.internId)}`;
 

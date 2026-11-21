@@ -70,10 +70,10 @@ export function VerifyingHeld({ count, needsConfirm }: { count: number; needsCon
     <p className="mb-5 flex items-start gap-3 rounded-2xl bg-accent-100/60 px-5 py-4 text-sm leading-relaxed text-ink-800">
       <Hourglass className="mt-0.5 size-4 shrink-0 text-accent-700" aria-hidden />
       <span>
-        <span className="nums font-semibold text-ink-900">{count}</span> accepted {count === 1 ? "offer is" : "offers are"} not payable yet: Findtern is confirming the candidate&apos;s CGPA (usually 24-48 h).
+        <span className="nums font-semibold text-ink-900">{count}</span> accepted {count === 1 ? "offer is" : "offers are"} not payable yet: payment opens once Findtern&apos;s final checks are done (usually 24-48 h).
         {needsConfirm > 0 ? ` ${needsConfirm} ${needsConfirm === 1 ? "needs" : "need"} you to confirm a corrected CGPA.` : ""}{" "}
-        <Link href="/employer/proposals?status=verifying" className="font-medium text-brand-700 underline underline-offset-4">
-          See them under Verifying CGPA
+        <Link href="/employer/proposals?status=accepted" className="font-medium text-brand-700 underline underline-offset-4">
+          See them under To pay
         </Link>
       </span>
     </p>

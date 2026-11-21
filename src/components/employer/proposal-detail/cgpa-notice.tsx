@@ -1,9 +1,7 @@
 import { Hourglass, Info, TimerOff } from "lucide-react";
 
-import { CgpaSlaClock } from "@/components/app/cgpa-sla-clock";
 import { CgpaAckButton } from "@/components/employer/proposal-actions";
 import type { OfferState } from "@/components/employer/proposal-state";
-import { formatIst } from "@/lib/format";
 
 /**
  * What the employer reads on a proposal whose candidate has accepted but whose CGPA is not confirmed yet.
@@ -34,23 +32,14 @@ export function CgpaNotice({ proposalId, state, canConfirm }: { proposalId: stri
     );
   }
 
-  const overdue = gate.state === "overdue";
   return (
     <section aria-labelledby="cgpa-notice-h" className="mb-6 flex items-start gap-3 rounded-2xl bg-accent-100/60 px-5 py-4">
       <Hourglass className="mt-0.5 size-5 shrink-0 text-accent-700" aria-hidden />
       <div className="min-w-0">
         <h2 id="cgpa-notice-h" className="text-base font-semibold text-ink-900">
-          Verifying CGPA
+          Not payable yet
         </h2>
         <p className="mt-1 max-w-prose text-pretty text-sm leading-relaxed text-ink-800">{state.next}</p>
-        {gate.dueBy ? (
-          <p className="nums mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm font-medium text-ink-900">
-            <span>
-              {overdue ? "Was due by" : "Due by"} {formatIst(gate.dueBy)}
-            </span>
-            <CgpaSlaClock acceptedAt={gate.acceptedAt} />
-          </p>
-        ) : null}
       </div>
     </section>
   );

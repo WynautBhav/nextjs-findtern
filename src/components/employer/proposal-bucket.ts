@@ -146,7 +146,7 @@ export type HireFlowCounts = {
   shortlisted: number;
   /** Proposals waiting on the candidate (= the Proposals "Waiting" tab). */
   awaitingReply: number;
-  /** Accepted, CGPA being confirmed (= the Proposals "Verifying CGPA" tab). */
+  /** Accepted, CGPA being confirmed (listed under the Proposals "To pay" tab as not payable yet). */
   verifying: number;
   toPay: number;
   hired: number;

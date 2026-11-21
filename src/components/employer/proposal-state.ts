@@ -115,16 +115,14 @@ export function offerState(p: OfferStateInput, offer: Pick<Offer, "startDate" | 
     const corrected = gate.state === "incorrect_unacked";
     return {
       ...base,
-      label: corrected ? "CGPA corrected · confirm" : "Verifying CGPA",
+      label: corrected ? "CGPA corrected · confirm" : "Accepted · not payable yet",
       tone: corrected ? "new" : "waiting",
       next:
         gate.state === "incorrect_unacked"
           ? gate.correctedFrom && gate.correctedTo
             ? `Findtern corrected the candidate's CGPA from ${gate.correctedFrom} to ${gate.correctedTo}. Confirm to continue to payment, or withdraw the proposal.`
             : "Findtern corrected the candidate's CGPA. Confirm to continue to payment, or withdraw the proposal."
-          : gate.state === "overdue"
-            ? "Accepted. Findtern is still confirming the candidate's CGPA, which is taking longer than the usual 24-48 h. You can pay once it is confirmed."
-            : "Accepted. Findtern is confirming the candidate's CGPA (usually 24-48 h). You can pay once it is confirmed.",
+          : "Accepted. Payment opens once Findtern's final checks are done (usually 24-48 h). We'll let you know when you can pay.",
       canEdit: !fullTime && unpaid,
       canWithdraw: unpaid,
     };

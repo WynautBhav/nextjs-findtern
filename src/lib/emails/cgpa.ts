@@ -91,8 +91,8 @@ export const cgpaEmails = {
 /** In-app copy for the employer. Initials only, as everywhere before a hire. */
 export const cgpaEmployerCopy = {
   verified: (candidate: string, role: string) => ({
-    title: `CGPA confirmed: you can now pay for ${candidate}`,
-    message: `Findtern confirmed the CGPA of ${candidate} for ${role}. The offer is now under To pay.`,
+    title: `Ready to pay: ${candidate}`,
+    message: `The offer to ${candidate} for ${role} is ready for payment. It is under To pay.`,
   }),
   incorrect: (candidate: string, role: string, from: string, to: string, scoreType: string) => ({
     title: "CGPA corrected: confirm to continue",
@@ -103,11 +103,11 @@ export const cgpaEmployerCopy = {
 /** The same two events by email to the employer. No scores in the mail: the proposal page shows the correction. */
 export const cgpaEmployerEmails = {
   verified: (o: { candidate: string; role: string }): EmailContent => ({
-    subject: `CGPA confirmed: you can now pay for ${o.candidate} | Findtern`,
-    preheader: `Findtern confirmed the CGPA of ${o.candidate} for ${o.role}.`,
-    heading: "CGPA confirmed, you can pay now",
+    subject: `Ready to pay: ${o.candidate} | Findtern`,
+    preheader: `The offer to ${o.candidate} for ${o.role} is ready for payment.`,
+    heading: "You can pay now",
     greeting: hi(""),
-    lines: [`Findtern confirmed the CGPA of ${o.candidate} for ${o.role}. Payment is open for this offer.`],
+    lines: [`The offer to ${o.candidate} for ${o.role} is ready for payment. Pay to confirm the hire.`],
     status: "Ready to pay",
     tone: "done",
     cta: cta("Go to checkout", "/employer/checkout"),

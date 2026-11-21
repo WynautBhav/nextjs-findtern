@@ -25,14 +25,14 @@ const ROWS: ProposalRow[] = [
 ];
 
 test("each proposal is under exactly one state tab; the tab lengths equal the counter's numbers", () => {
-  const STATE_TABS: TabKey[] = ["open", "draft", "verifying", "accepted", "viewonly", "hired", "closed"];
+  const STATE_TABS: TabKey[] = ["open", "draft", "accepted", "viewonly", "hired", "closed"];
   const c = proposalCounts(ROWS);
   const len = (tab: TabKey) => ROWS.filter((r) => inTab(tab, proposalBucket(r.status, r.lapsed, r), Boolean(r.viewOnly))).length;
   const perTab = Object.fromEntries(STATE_TABS.map((t) => [t, len(t)]));
   assert.equal(perTab.open, c.awaiting);
   assert.equal(perTab.draft, c.drafts);
-  assert.equal(perTab.verifying, c.verifying);
-  assert.equal(perTab.accepted, c.accepted);
+  // Offers still in Findtern's final checks are listed under To pay, marked not payable yet.
+  assert.equal(perTab.accepted, c.accepted + (c.verifying ?? 0));
   assert.equal(perTab.viewonly, c.viewOnly);
   assert.equal(perTab.hired, c.hired);
   assert.equal(perTab.closed, c.closed);
@@ -45,10 +45,10 @@ test("each proposal is under exactly one state tab; the tab lengths equal the co
   }
 });
 
-test("the owner's case: 2 accepted, none waiting; the two are under Verifying and To pay, never lost", () => {
+test("the owner's case: 2 accepted, none waiting; both are under To pay (one not payable yet), never lost", () => {
   const rows = [row("accepted", { verifying: true }), row("accepted")];
   const tab = (t: TabKey) => rows.filter((r) => inTab(t, proposalBucket(r.status, r.lapsed, r), false)).length;
-  assert.deepEqual([tab("all"), tab("open"), tab("verifying"), tab("accepted")], [2, 0, 1, 1]);
+  assert.deepEqual([tab("all"), tab("open"), tab("accepted")], [2, 0, 2]);
 });
 
 test("every tab has a label, a one-line explanation and an empty state", () => {
@@ -58,12 +58,13 @@ test("every tab has a label, a one-line explanation and an empty state", () => {
     assert.ok(TAB_EMPTY[key as TabKey].title && TAB_EMPTY[key as TabKey].body, key);
   }
   assert.equal(TAB_LABEL.open.label, "Waiting for candidate");
-  assert.equal(TAB_LABEL.verifying.label, "Verifying CGPA");
+  assert.ok(!TAB_KEYS.has("verifying"), "employers never see a Verifying CGPA tab");
   assert.equal(TAB_LABEL.accepted.label, "To pay");
 });
 
 test("?status= picks a tab; anything unknown is All", () => {
-  assert.equal(tabFromParam("verifying"), "verifying");
+  // An old ?status=verifying link (alerts, bookmarks) opens To pay.
+  assert.equal(tabFromParam("verifying"), "accepted");
   assert.equal(tabFromParam(["accepted", "x"]), "accepted");
   assert.equal(tabFromParam("nope"), "all");
   assert.equal(tabFromParam(undefined), "all");
@@ -81,18 +82,19 @@ test("a tab click and the URL name the same tab: tabQuery is the inverse of tabF
     const q = tabQuery("", key as TabKey);
     assert.equal(tabFromParam(new URLSearchParams(q).get("status") ?? undefined), key, key);
   }
-  assert.equal(tabQuery("", "verifying"), "?status=verifying");
-  assert.equal(tabQuery("?status=open", "verifying"), "?status=verifying");
-  assert.equal(tabQuery("?status=verifying", "all"), "");
+  assert.equal(tabQuery("", "accepted"), "?status=accepted");
+  assert.equal(tabQuery("?status=open", "accepted"), "?status=accepted");
+  assert.equal(tabQuery("?status=accepted", "all"), "");
   // Other params survive a tab change, in both directions.
   assert.equal(tabQuery("?project=p1&status=open", "accepted"), "?project=p1&status=accepted");
   assert.equal(tabQuery("?project=p1&status=open", "all"), "?project=p1");
 });
 
-test("the Verifying empty state says when it applies", () => {
-  assert.equal(TAB_EMPTY.verifying.title, "No CGPA checks in progress");
-  assert.match(TAB_EMPTY.verifying.body, /still checking/);
-  assert.match(TAB_EMPTY.verifying.body, /straight to To pay/);
+test("no employer tab copy mentions the CGPA check", () => {
+  for (const key of TAB_KEYS) {
+    const k = key as TabKey;
+    assert.doesNotMatch(`${TAB_LABEL[k].label} ${TAB_EXPLAINER[k]} ${TAB_EMPTY[k].title} ${TAB_EMPTY[k].body}`, /CGPA|verif/i, k);
+  }
 });
 
 test("auto refresh runs only while Findtern is checking a CGPA, in a visible tab, not twice in a row", () => {

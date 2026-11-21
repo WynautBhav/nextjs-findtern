@@ -140,10 +140,10 @@ export default async function EmployerCheckout({
             body={
               heldTarget.state.gate?.state === "incorrect_unacked"
                 ? "Findtern corrected the candidate's CGPA. Confirm the correction on the proposal to continue to payment."
-                : "The candidate accepted. Findtern is confirming their CGPA (usually 24-48 h), and you can pay once it is confirmed."
+                : "The candidate accepted. Payment opens once Findtern's final checks are done (usually 24-48 h). We'll let you know when you can pay."
             }
             next={{ label: "Open the proposal", href: `/employer/proposal/${encodeURIComponent(heldTarget.id)}` }}
-            who="Findtern - confirms the CGPA"
+            who={heldTarget.state.gate?.state === "incorrect_unacked" ? "You - confirm the correction" : "Findtern - final checks"}
             secondary={payable.length > 0 ? { label: `See what is due (${payable.length})`, href: "/employer/checkout" } : { label: "Back to proposals", href: "/employer/proposals" }}
           />
         ) : (

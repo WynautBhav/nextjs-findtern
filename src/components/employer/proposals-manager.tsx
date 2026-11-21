@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Clock, CreditCard, Eye, Hourglass, Loader2, Pencil, RotateCcw, Search, Send, X } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
-import { formatIst, formatMoney } from "@/lib/format";
+import { formatMoney } from "@/lib/format";
 import type { CgpaGate } from "@/lib/cgpa-verification";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { EmptyScene, Pill } from "@/components/app/primitives";
@@ -20,7 +20,6 @@ import { parseOffer } from "@/lib/offer";
 import { counterRow, EXPIRED_CARD_NOTE, offerState } from "@/components/employer/proposal-state";
 import { closedBreakdown, proposalCounts } from "@/components/employer/proposal-bucket";
 import { closedSummary, inTab, shouldAutoRefresh, TAB_EMPTY, TAB_EXPLAINER, TAB_LABEL, tabFromParam, tabQuery, VERIFYING_REFRESH_MS, type TabKey } from "@/components/employer/proposal-tabs";
-import { CgpaSlaClock } from "@/components/app/cgpa-sla-clock";
 import { CgpaAckButton } from "@/components/employer/proposal-actions";
 import { cn } from "@/lib/utils";
 import { TakedownBadge } from "@/components/employer/takedown-badge";
@@ -195,16 +194,15 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
     );
   }
 
-  // One counter feeds every number here (proposalCounts). Waiting, Verifying, To pay, Hired and Closed are always
+  // One counter feeds every number here (proposalCounts). Waiting, To pay (held offers included), Hired and Closed are always
   // listed, even at 0, so every state has a visible name; drafts and view only appear when there are some.
   const tabs: { key: TabKey; count: number }[] = [
     { key: "all", count: counts.all },
     { key: "open", count: counts.awaiting },
     ...(counts.drafts > 0 ? [{ key: "draft" as const, count: counts.drafts }] : []),
-    { key: "verifying", count: counts.verifying ?? 0 },
     // Accepted offers only; running placements' monthly dues are on Orders,
     // so this is not called "payment due" beside the dashboard's count (QA-123).
-    { key: "accepted", count: counts.accepted },
+    { key: "accepted", count: counts.accepted + (counts.verifying ?? 0) },
     ...(counts.viewOnly ? [{ key: "viewonly" as const, count: counts.viewOnly }] : []),
     { key: "hired", count: counts.hired },
     { key: "closed", count: counts.closed },
@@ -416,14 +414,6 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                       {note.gate && note.gate.state !== "incorrect_unacked" ? <Hourglass className="mt-0.5 size-4 shrink-0 text-accent-700" aria-hidden /> : null}
                       <p className="min-w-0 text-pretty">
                         {note.sendNew && state.expiredReason && EXPIRED_CARD_NOTE[state.expiredReason] ? EXPIRED_CARD_NOTE[state.expiredReason] : state.next}
-                        {note.gate && note.gate.state !== "incorrect_unacked" && note.gate.dueBy ? (
-                          <span className="nums mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 font-medium text-ink-900">
-                            <span>
-                              {note.gate.state === "overdue" ? "Was due by" : "Due by"} {formatIst(note.gate.dueBy)}
-                            </span>
-                            <CgpaSlaClock acceptedAt={note.gate.acceptedAt} />
-                          </span>
-                        ) : null}
                       </p>
                     </div>
                     <div className="flex shrink-0 flex-col gap-2 sm:w-60">
