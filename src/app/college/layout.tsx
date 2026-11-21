@@ -1,11 +1,12 @@
 import { AccountGuard } from "@/components/app/account-guard";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { DoorOpen, LayoutDashboard, ListChecks, Megaphone, Ticket, Wallet } from "lucide-react";
+import { LayoutDashboard, ListChecks, Megaphone, Ticket, UserCheck, Users, Wallet } from "lucide-react";
 
 import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
 import { TermsGate } from "@/components/app/terms-gate";
 import { RAIL_COOKIE } from "@/lib/rail";
+import { pendingApprovalCount } from "@/lib/college/approvals";
 import { pendingLeaveCount } from "@/lib/college/leave-request-read";
 import { requireCollegeContext } from "@/lib/college/scope";
 import { SITE } from "@/lib/content/site";
@@ -16,14 +17,21 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const navFor = (pendingLeaves: number): ConsoleNavGroup[] => [
+/** `waiting` = students to accept plus leave requests: everything that needs the officer's decision. */
+const navFor = (waiting: number): ConsoleNavGroup[] => [
   {
     title: "Placement",
     items: [
-      { href: "/college", label: "Students", icon: <LayoutDashboard /> },
+      { href: "/college", label: "Overview", icon: <LayoutDashboard /> },
+      { href: "/college/students", label: "Students", icon: <Users /> },
+      { href: "/college/approvals", label: "Approvals", icon: <UserCheck />, ...(waiting > 0 ? { badge: waiting, badgeLabel: "waiting for your decision" } : {}) },
+      { href: "/college/roster", label: "Student list", icon: <ListChecks /> },
       { href: "/college/drives", label: "Drives", icon: <Megaphone /> },
-      { href: "/college/roster", label: "Roster", icon: <ListChecks /> },
-      { href: "/college/leave-requests", label: "Leave requests", icon: <DoorOpen />, ...(pendingLeaves > 0 ? { badge: pendingLeaves, badgeLabel: "waiting for approval" } : {}) },
+    ],
+  },
+  {
+    title: "Billing",
+    items: [
       { href: "/college/seats", label: "Seats", icon: <Ticket /> },
       { href: "/college/earnings", label: "Earnings", icon: <Wallet /> },
     ],
@@ -37,7 +45,11 @@ const navFor = (pendingLeaves: number): ConsoleNavGroup[] => [
  */
 export default async function CollegeLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireCollegeContext();
-  const NAV = navFor(await pendingLeaveCount(ctx.college.id).catch(() => 0));
+  const [leaves, approvals] = await Promise.all([
+    pendingLeaveCount(ctx.college.id).catch(() => 0),
+    pendingApprovalCount(ctx.college.id, ctx.college.emailDomains).catch(() => 0),
+  ]);
+  const NAV = navFor(leaves + approvals);
   return (
     <ConsoleShell
       roleLabel="College"
@@ -48,11 +60,10 @@ export default async function CollegeLayout({ children }: { children: React.Reac
       help={{ faqHref: "/faq", contactHref: "/contact?type=college", email: SITE.adminEmail }}
       signOutTo="/login?as=college"
       initialCollapsed={(await cookies()).get(RAIL_COOKIE)?.value === "1"}
-      rootCrumb={{ label: "Students", href: "/college" }}
+      rootCrumb={{ label: "Overview", href: "/college" }}
       // Record pages read "Drives", not "Drives / Details"; no back links needed.
-      // "/college/students" is the Students home itself; pointing it at the
-      // root lets the shell drop it ("Students / Students" before).
-      crumbParents={{ "/college/students": { label: "Students", href: "/college" } }}
+      // Leave requests are decided on the Approvals page; the old address still opens.
+      crumbParents={{ "/college/leave-requests": { label: "Approvals", href: "/college/approvals" } }}
     >
       {children}
       <AccountGuard role="college" />

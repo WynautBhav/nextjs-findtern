@@ -5,6 +5,9 @@ import { and, asc, desc, eq, sql } from "drizzle-orm";
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
 import { CollegeDetailsForm, CollegeLogins, CollegeSwitches } from "@/components/admin/college-partners-manager";
 import { CopyText } from "@/components/college/copy-text";
+import { ApprovalsBoard } from "@/components/college/approvals-board";
+import { approvalsFor } from "@/lib/college/approvals";
+import { getSetting } from "@/lib/platform-settings";
 import { CollegeLeavePanel } from "@/components/admin/college-leave-panel";
 import { CollegeSeatBatches } from "@/components/admin/college-seat-batches";
 import { CollegeWalletPanel } from "@/components/admin/college-wallet-panel";
@@ -30,7 +33,7 @@ import { IdentityReviewQueue } from "./identity-review-queue";
 
 export const dynamic = "force-dynamic";
 
-const TABS = ["seats", "drives", "wallet", "logins", "details"] as const;
+const TABS = ["seats", "students", "drives", "wallet", "logins", "details"] as const;
 type Tab = (typeof TABS)[number];
 
 export default async function AdminCollegePage({
@@ -50,7 +53,9 @@ export default async function AdminCollegePage({
   const db = getDb();
   const [college] = await db.select().from(schema.colleges).where(eq(schema.colleges.id, id)).limit(1);
   if (!college) notFound();
-  const [orders, reviews, batches, [promo], summary, ledger, officers, [{ members }], leaveRows] = await Promise.all([
+  const [approvals, defaultFeeMinor, orders, reviews, batches, [promo], summary, ledger, officers, [{ members }], leaveRows] = await Promise.all([
+    approvalsFor(id, college.emailDomains),
+    getSetting("college_fee_per_student_minor").then(Number),
     listOrders(id),
     listPendingReviews(id),
     db.select().from(schema.collegeSeatBatches).where(eq(schema.collegeSeatBatches.collegeId, id)).orderBy(desc(schema.collegeSeatBatches.createdAt)),
@@ -80,6 +85,7 @@ export default async function AdminCollegePage({
   const tabHref = (t: Tab) => `${base}${toQueryString({ tab: t === "seats" ? "" : t })}`;
   const tabs: AdminTabItem[] = [
     { key: "seats", label: "Seats", href: tabHref("seats") },
+    { key: "students", label: "Students", count: approvals.candidates.length + approvals.reviews.length || undefined, href: tabHref("students") },
     { key: "drives", label: "Drives", count: reviews.length || undefined, href: tabHref("drives") },
     { key: "wallet", label: "Wallet", count: summary.openRequest ? 1 : undefined, href: tabHref("wallet") },
     { key: "logins", label: "Logins", count: loginRows.length, href: tabHref("logins") },
@@ -88,6 +94,7 @@ export default async function AdminCollegePage({
   // Only when something is waiting on staff; each line jumps to the tab where it is handled.
   const waiting: { text: string; href: string; cta: string }[] = [];
   if (summary.openRequest) waiting.push({ text: `Withdrawal of ${formatMoney(summary.openRequest.amountMinor, "INR", { zeroLabel: false })} requested.`, href: tabHref("wallet"), cta: "Open Wallet" });
+  if (approvals.reviews.length) waiting.push({ text: `${approvals.reviews.length} ${approvals.reviews.length === 1 ? "student match needs" : "student matches need"} your check before the college can have them.`, href: tabHref("students"), cta: "Open Students" });
   if (reviews.length) waiting.push({ text: `${reviews.length} ${reviews.length === 1 ? "student match needs" : "student matches need"} your review.`, href: tabHref("drives"), cta: "Open Drives" });
 
   // The Wallet tab shows the withdrawal itself, so a banner pointing at it from there repeats it.
@@ -156,12 +163,23 @@ export default async function AdminCollegePage({
         </Panel>
       ) : null}
 
+      {tab === "students" ? (
+        <Panel>
+          <PanelHeader
+            title="Students waiting to be added"
+            description="Students who already had a Findtern account and match this college's list or email domain. The placement officer accepts or denies these in their console; you can do the same here, and only you can accept the weaker matches listed under Needs your check."
+          />
+          <PanelBody>
+            <ApprovalsBoard candidates={approvals.candidates} removed={approvals.removed} reviews={approvals.reviews} endpoint={`/api/admin/colleges/${id}/students`} readOnly={!canEdit} />
+          </PanelBody>
+        </Panel>
+      ) : null}
       {tab === "drives" ? (
         <>
           <Panel>
             <PanelHeader title="Drive orders" description="One personal code per student. Create an order, record its payment, upload the roster, then confirm to issue the codes." />
             <PanelBody>
-              <DriveOrdersPanel collegeId={id} collegeName={college.name} orders={orders} canMoney={canMoney} canWrite={canDrives} />
+              <DriveOrdersPanel collegeId={id} collegeName={college.name} orders={orders} canMoney={canMoney} canWrite={canDrives} defaultFeeMinor={defaultFeeMinor} />
             </PanelBody>
           </Panel>
           <CampaignPanel orderIds={orders.filter((o) => o.status === "paid").map((o) => o.id)} canWrite={canDrives} />
@@ -196,7 +214,7 @@ export default async function AdminCollegePage({
         <Panel>
           <PanelHeader title="Details" description="How the college is named and billed." />
           <PanelBody>
-            <CollegeDetailsForm college={{ id, name: college.name, city: college.city, state: college.state, gstin: college.gstin, aisheCode: college.aisheCode, isPartner: college.isPartner }} canEdit={canEdit} />
+            <CollegeDetailsForm college={{ id, name: college.name, city: college.city, state: college.state, gstin: college.gstin, aisheCode: college.aisheCode, isPartner: college.isPartner, logoUrl: college.logoUrl, emailDomains: college.emailDomains }} canEdit={canEdit} />
           </PanelBody>
         </Panel>
       ) : null}

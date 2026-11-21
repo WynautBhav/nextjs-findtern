@@ -1,7 +1,8 @@
 import { count, inArray, sql } from "drizzle-orm";
 
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
-import { AddCollegeButton } from "@/components/admin/college-partners-manager";
+import { AddCollegeButton, CollegeFeeSetting } from "@/components/admin/college-partners-manager";
+import { getSetting } from "@/lib/platform-settings";
 import { DataTable, IdentityCell } from "@/components/admin/data-table";
 import { AdminLoadError, AdminPageHeader, Panel } from "@/components/admin/panel";
 import { StatusBadge } from "@/components/admin/status-badge";
@@ -82,6 +83,7 @@ export default async function AdminCollegesPage({
     loaded = null;
   }
 
+  const feeMinor = Number(await getSetting("college_fee_per_student_minor"));
   const header = (subtitle?: string) => (
     <AdminPageHeader title="Colleges" subtitle={subtitle} action={canEdit ? <AddCollegeButton /> : undefined} />
   );
@@ -112,6 +114,11 @@ export default async function AdminCollegesPage({
           ? `${formatNumber(loaded.total)} ${loaded.total === 1 ? "college matches" : "colleges match"} in the whole directory. Open one to make it a partner.`
           : `${formatNumber(loaded.partners)} partner ${loaded.partners === 1 ? "college" : "colleges"}. Search to find any college in the directory.`,
       )}
+      <Panel>
+        <div className="p-5">
+          <CollegeFeeSetting feeMinor={feeMinor} canEdit={canEdit} />
+        </div>
+      </Panel>
       {/* While searching no tab is selected: the search covers every college. */}
       <AdminTabs items={tabs} active={req.search ? "none" : view} label="College views" />
       <DataTable

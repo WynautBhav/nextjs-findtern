@@ -64,6 +64,9 @@ export type CollegeStudent = StudentFacts & {
   driveMeetings: number;
   lastActivityAt: Date | null;
   rollNo: string | null;
+  /** "+91 98765 43210" as registered. The officer sees it for verified students only (serialize.ts). */
+  phone: string | null;
+  linkedin: string | null;
 };
 
 type Row = Record<string, unknown>;
@@ -106,6 +109,8 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
       coalesce(nullif(r.branch, ''), nullif(${m.branch}, ''), ${o.extraData}->'academics'->>'specialization') AS branch,
       r.roll_no AS roll_no,
       ${u.firstName} AS first_name, ${u.lastName} AS last_name, ${u.email} AS email,
+      ${u.countryCode} AS country_code, ${u.phoneNumber} AS phone_number,
+      nullif(${o.linkedinUrl}, '') AS linkedin,
       ${cgpaSql()} AS cgpa,
       ${findternScoreSql()} AS score,
       ${aiInterviewStatus()} AS ai_status,
@@ -139,6 +144,8 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
     firstName: String(r.first_name ?? ""),
     lastName: String(r.last_name ?? ""),
     email: String(r.email ?? ""),
+    phone: r.phone_number ? `${r.country_code ?? ""} ${r.phone_number}`.trim() : null,
+    linkedin: typeof r.linkedin === "string" && /^https?:\/\//i.test(r.linkedin) ? r.linkedin : null,
     cgpa: num(r.cgpa),
     score: num(r.score),
     aiStatus: String(r.ai_status ?? "not_applied"),
@@ -163,18 +170,35 @@ export async function studentForCollegeAdmin(ctx: CollegeContext, userId: string
   return rows.find((s) => s.userId === userId) ?? null;
 }
 
+export type RosterListRow = {
+  email: string;
+  name: string;
+  rollNo: string | null;
+  year: number | null;
+  branch: string | null;
+  phone: string | null;
+  /** joined = a verified student of this college; on_findtern = waiting on the Approvals page for the officer. */
+  state: "joined" | "on_findtern" | "not_joined";
+};
+
 export type RosterCoverage = {
   rosterSize: number;
   joined: number;
-  notJoined: { email: string; name: string; rollNo: string | null; year: number | null; branch: string | null }[];
+  notJoined: RosterListRow[];
+  /** Every row of the list with where the student stands. */
+  rows: RosterListRow[];
   /** Picked this college but not on the roster and not domain-verified. */
   claimed: number;
 };
 
-export async function rosterCoverage(collegeId: string): Promise<RosterCoverage> {
+/**
+ * `acceptable` = emails of students the officer may accept right now (approvals.ts candidates). Only those rows
+ * read "on Findtern": saying so for every email with an account would let an officer test any address they type.
+ */
+export async function rosterCoverage(collegeId: string, acceptable: ReadonlySet<string> = new Set()): Promise<RosterCoverage> {
   const r = schema.collegeRoster;
   const res = await getDb().execute(sql`
-    SELECT ${r.email} AS email, ${r.name} AS name, ${r.rollNo} AS roll_no, ${r.year} AS year, ${r.branch} AS branch,
+    SELECT ${r.email} AS email, ${r.name} AS name, ${r.rollNo} AS roll_no, ${r.year} AS year, ${r.branch} AS branch, ${r.phone} AS phone,
       EXISTS (
         SELECT 1 FROM ${schema.users} u JOIN ${schema.collegeMemberships} m ON m.user_id = u.id
         WHERE lower(u.email) = ${r.email} AND m.college_id = ${collegeId} AND m.left_at IS NULL AND m.status = 'verified'
@@ -193,18 +217,20 @@ export async function rosterCoverage(collegeId: string): Promise<RosterCoverage>
         isNull(schema.collegeMemberships.leftAt),
       ),
     );
+  const list: RosterListRow[] = rows.map((x) => ({
+    email: String(x.email),
+    name: String(x.name ?? ""),
+    rollNo: (x.roll_no as string | null) ?? null,
+    year: num(x.year),
+    branch: (x.branch as string | null) ?? null,
+    phone: (x.phone as string | null) ?? null,
+    state: x.joined ? "joined" : acceptable.has(String(x.email)) ? "on_findtern" : "not_joined",
+  }));
   return {
-    rosterSize: rows.length,
-    joined: rows.filter((x) => x.joined).length,
-    notJoined: rows
-      .filter((x) => !x.joined)
-      .map((x) => ({
-        email: String(x.email),
-        name: String(x.name ?? ""),
-        rollNo: (x.roll_no as string | null) ?? null,
-        year: num(x.year),
-        branch: (x.branch as string | null) ?? null,
-      })),
+    rosterSize: list.length,
+    joined: list.filter((x) => x.state === "joined").length,
+    notJoined: list.filter((x) => x.state !== "joined"),
+    rows: list,
     claimed: claimed?.n ?? 0,
   };
 }

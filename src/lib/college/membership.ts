@@ -52,6 +52,8 @@ export async function membershipOf(userId: string): Promise<MyCollege | null> {
   };
 }
 
+export const DENIED_BY_COLLEGE = "Your placement office removed you from this college on Findtern. Ask them to add you back.";
+
 /** One answer for every code that does not open a college: wrong, malformed, switched off, not a partner. */
 export const BAD_COLLEGE_CODE = "That code doesn't match a college. Check it with your college's placement office.";
 
@@ -114,6 +116,16 @@ export async function joinCollegeByCode(input: {
         blocked = { error: problem.error };
         return;
       }
+    }
+    // The placement office removed this student (approvals.ts): the code is no way back in, only a restore is.
+    const [denied] = await tx
+      .select({ id: schema.collegeDenials.id })
+      .from(schema.collegeDenials)
+      .where(and(eq(schema.collegeDenials.collegeId, college.id), eq(schema.collegeDenials.userId, input.userId)))
+      .limit(1);
+    if (denied) {
+      blocked = { error: DENIED_BY_COLLEGE };
+      return;
     }
     const [consent] = await tx
       .insert(schema.collegeConsents)

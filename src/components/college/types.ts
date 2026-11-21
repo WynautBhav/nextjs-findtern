@@ -4,6 +4,8 @@ export type StudentRow = {
   name: string;
   email: string;
   rollNo: string | null;
+  phone: string | null;
+  linkedin: string | null;
   status: "claimed" | "verified";
   year: number | null;
   branch: string | null;

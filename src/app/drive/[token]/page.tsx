@@ -73,13 +73,14 @@ export default async function DriveLandingPage({ params }: { params: Promise<{ t
     <div className="min-h-[100dvh] bg-ink-50">
       <header className="border-b border-ink-200/80 bg-white">
         <div className="container-page flex h-16 items-center justify-between gap-4">
+          {/* Findtern stays where it always is; the college sits opposite it. */}
+          <Logo className="h-6 shrink-0" alt="Findtern" priority />
           <div className="flex min-w-0 items-center gap-3">
-            <CollegeMark name={college.name} logoUrl={college.logoUrl} className="size-9 rounded-lg text-xs" />
-            <span className="truncate text-sm font-semibold text-ink-900">{college.name}</span>
-          </div>
-          <div className="flex shrink-0 items-center gap-2 text-xs text-text-subtle">
-            <span className="hidden sm:inline">Placement drive on</span>
-            <Logo className="h-5" alt="Findtern" priority />
+            <div className="min-w-0 text-right leading-tight">
+              <p className="text-xs text-text-subtle">In association with</p>
+              <p className="truncate text-sm font-semibold text-ink-900">{college.name}</p>
+            </div>
+            <CollegeMark name={college.name} logoUrl={college.logoUrl} className="size-10 rounded-lg text-xs" />
           </div>
         </div>
       </header>

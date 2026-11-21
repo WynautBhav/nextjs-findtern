@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Search } from "lucide-react";
 
+import { LinkedinIcon } from "@/components/ui/social-icons";
+
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { COHORTS, aiStatusLabel, ago, yearLabel } from "@/lib/college/labels";
 import { cn } from "@/lib/utils";
@@ -11,23 +13,23 @@ import { EmptyScene, Pill, SURFACE_CLASS, pillTabClass } from "@/components/app/
 import { NudgeButton } from "./nudge-button";
 import type { StudentRow } from "./types";
 
-type Filter = "all" | "no_interview" | "offers" | "unverified" | "offline";
+export type StudentFilter = "all" | "no_interview" | "offers" | "offline";
+type Filter = StudentFilter;
 
 const FILTERS: { id: Filter; label: string }[] = [
   { id: "all", label: "Everyone" },
   { id: "no_interview", label: "Interview not done" },
   { id: "offers", label: "Offer waiting on reply" },
   { id: "offline", label: "Inactive 7+ days" },
-  { id: "unverified", label: "Not on roster" },
 ];
 
 const WEEK = 7 * 86400_000;
 /** Rows rendered before "Show all": a 500-student college was a 1 MB page. */
 const PAGE = 50;
 
-export function StudentTable({ students, now }: { students: StudentRow[]; now: number }) {
+export function StudentTable({ students, now, initialFilter = "all" }: { students: StudentRow[]; now: number; initialFilter?: StudentFilter }) {
   const [cohort, setCohort] = useState<number | "all">("all");
-  const [filter, setFilter] = useState<Filter>("all");
+  const [filter, setFilter] = useState<Filter>(initialFilter);
   const [q, setQ] = useState("");
   const [showAll, setShowAll] = useState(false);
 
@@ -43,9 +45,8 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
       if (cohort !== "all" && s.year !== cohort) return false;
       if (filter === "no_interview" && aiStatusLabel(s.aiStatus).done) return false;
       if (filter === "offers" && s.offersPending === 0) return false;
-      if (filter === "unverified" && s.status === "verified") return false;
       if (filter === "offline" && s.lastActivityAt && now - new Date(s.lastActivityAt).getTime() < WEEK) return false;
-      if (term && !`${s.name} ${s.rollNo ?? ""} ${s.branch ?? ""} ${s.email}`.toLowerCase().includes(term)) return false;
+      if (term && !`${s.name} ${s.rollNo ?? ""} ${s.branch ?? ""} ${s.email} ${s.phone ?? ""}`.toLowerCase().includes(term)) return false;
       return true;
     });
   }, [students, cohort, filter, q, now]);
@@ -61,10 +62,10 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 id="students-heading" className="text-lg font-semibold tracking-[-0.02em] text-ink-900">
-              Students
+              <span className="nums">{students.length}</span> verified {students.length === 1 ? "student" : "students"}
             </h2>
             <p className="mt-0.5 text-sm text-text-subtle">
-              Everyone who picked your college and agreed to share their progress.
+              Open a student for the full profile, AI interview report and recording.
             </p>
           </div>
           <label className="relative w-full sm:w-72">
@@ -74,7 +75,7 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
               type="search"
               value={q}
               onChange={(e) => setQ(e.target.value)}
-              placeholder="Name, roll number, branch"
+              placeholder="Name, roll number, phone, email"
               className="h-11 w-full rounded-apple-sm border border-ink-200 bg-white pl-9 pr-3 text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
             />
           </label>
@@ -132,9 +133,9 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
         students.length === 0 ? (
           <EmptyScene
             compact
-            title="No students have joined"
-            body="Students show up here once they sign up and pick your college. The invite message is on the Roster page."
-            next={{ label: "Open the roster", href: "/college/roster" }}
+            title="No verified students yet"
+            body="Students appear here once they join with your college code, or once you accept them on the Approvals page."
+            next={{ label: "Add your student list", href: "/college/roster" }}
           />
         ) : (
           <EmptyScene
@@ -152,6 +153,7 @@ export function StudentTable({ students, now }: { students: StudentRow[]; now: n
               <thead className="border-b border-ink-100 bg-ink-50/60 text-sm font-semibold text-ink-700">
                 <tr>
                   <th scope="col" className="px-5 py-2.5">Student</th>
+                  <th scope="col" className="px-3 py-2.5">Contact</th>
                   <th scope="col" className="px-3 py-2.5">AI interview</th>
                   <th scope="col" className="px-3 py-2.5 text-right">CGPA</th>
                   <th scope="col" className="px-3 py-2.5">Last active</th>
@@ -217,6 +219,25 @@ function Ai({ s }: { s: StudentRow }) {
   return <span className="text-ink-600">{st.label}</span>;
 }
 
+/** Phone, email and LinkedIn. Links sit above the row's stretched link so they can be pressed on their own. */
+function Contact({ s }: { s: StudentRow }) {
+  return (
+    <div className="relative z-10 min-w-0 text-sm">
+      {s.phone ? (
+        <a href={`tel:${s.phone.replace(/\s/g, "")}`} className="nums block font-medium text-ink-800 hover:text-brand-700 hover:underline">{s.phone}</a>
+      ) : null}
+      <span className="flex items-center gap-2">
+        <a href={`mailto:${s.email}`} className="block max-w-[15rem] truncate text-xs text-ink-600 hover:text-brand-700 hover:underline" title={s.email}>{s.email}</a>
+        {s.linkedin ? (
+          <a href={s.linkedin} target="_blank" rel="noopener noreferrer" aria-label={`${s.name || "Student"} on LinkedIn (opens in a new tab)`} className="shrink-0 text-ink-500 hover:text-brand-700">
+            <LinkedinIcon className="size-3.5" />
+          </a>
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
 function Row({ s, now }: { s: StudentRow; now: number }) {
   return (
     // The row opens the student: the name's link is stretched over it.
@@ -230,8 +251,10 @@ function Row({ s, now }: { s: StudentRow; now: number }) {
         </Link>
         <p className="mt-0.5 text-xs text-text-subtle">
           {[s.rollNo, yearLabel(s.year), s.branch].filter(Boolean).join(" · ")}
-          {s.status !== "verified" ? <span className="ml-1.5 font-medium text-accent-700">· Claimed, not verified</span> : <span className="ml-1.5 font-medium text-success">· Verified</span>}
         </p>
+      </td>
+      <td className="px-3 py-3">
+        <Contact s={s} />
       </td>
       <td className="px-3 py-3">
         <Ai s={s} />
@@ -272,6 +295,9 @@ function MobileRow({ s, now }: { s: StudentRow; now: number }) {
         <p className="mt-0.5 truncate text-xs text-text-subtle">
           {[s.rollNo, yearLabel(s.year), s.branch].filter(Boolean).join(" · ")}
         </p>
+        <div className="mt-1.5">
+          <Contact s={s} />
+        </div>
         <p className="mt-1.5 text-sm">
           <Online at={s.lastSeenAt ?? s.lastActivityAt} now={now} />
         </p>

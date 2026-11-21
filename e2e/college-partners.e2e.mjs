@@ -76,19 +76,21 @@ test("officer: signs in and sees the console", async () => {
   await tpo.waitForURL(`${BASE}/college`);
   await tpo.getByRole("heading", { name: "JK Lakshmipat University" }).waitFor();
   const main = await tpo.locator("main").innerText();
-  assert.match(main, /Joined Findtern/);
-  assert.match(main, /61\/73/, "61 of 73 roster students joined in the seed");
-  // Cohort tabs filter the table; the footer's total is every member of the college who has not left
+  // The Overview opens with the batch funnel: the list, then who is verified on Findtern.
+  assert.match(main, /On your list\s+73\b/, "the seed's roster has 73 students");
+  assert.match(main, /Verified on Findtern/);
+  // The register is its own page now. Cohort tabs filter the table; the footer's total is every verified member of the college who has not left
   // (studentsForCollegeAdmin: memberships joined to users, so rows orphaned by a TRUNCATE of users do not count). It is not the 61 "joined" above: that counts roster rows that joined, and
   // the QA situations seed adds one verified member (Ritika) with no roster row, so ask the DB.
   const db = new pg.Client({ connectionString: DB });
   await db.connect();
   const { rows } = await db.query(
-    "SELECT count(*)::int AS n FROM college_memberships m JOIN colleges c ON c.id = m.college_id JOIN users u ON u.id = m.user_id WHERE c.slug = 'jklu' AND m.left_at IS NULL",
+    "SELECT count(*)::int AS n FROM college_memberships m JOIN colleges c ON c.id = m.college_id JOIN users u ON u.id = m.user_id WHERE c.slug = 'jklu' AND m.left_at IS NULL AND m.status = 'verified'",
   );
   await db.end();
   const members = rows[0].n;
   assert.ok(members >= 61, `the seed gives JKLU at least 61 members, found ${members}`);
+  await tpo.goto(`${BASE}/college/students`);
   await tpo.getByRole("button", { name: /4th year/ }).click();
   assert.match(await tpo.locator("main").innerText(), new RegExp(`Showing \\d+ of ${members}\\b`));
 });
@@ -98,6 +100,7 @@ test("officer: builds a live drive that shows only Sana", async () => {
   await tpo.getByLabel("Name").fill("E2E campus drive");
   await fillIst(tpo, "Opens (IST)", -5);
   await fillIst(tpo, "Closes (IST)", 120);
+  await tpo.getByRole("button", { name: "Choose who is shown" }).click(); // a new drive shows everyone until the officer narrows it
   await tpo.getByLabel("Minimum Findtern score").fill("10"); // nobody scores a perfect 10, so nobody qualifies by rule…
   await tpo.getByRole("tab", { name: /^Left out/ }).click();
   await tpo.getByPlaceholder("Search").fill("Sana");

@@ -26,10 +26,10 @@ const money = (n: number) => formatMoney(n, "INR", { zeroLabel: false });
 /** Idempotency key per attempt; a retry of the same attempt reuses it. */
 const newKey = () => crypto.randomUUID();
 
-export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, collegeName }: { collegeId: string; collegeName?: string; orders: OrderDto[]; canMoney: boolean; canWrite: boolean }) {
+export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, collegeName, defaultFeeMinor = 80000 }: { collegeId: string; collegeName?: string; orders: OrderDto[]; canMoney: boolean; canWrite: boolean; /** The admin-set starting fee (Colleges page); each order still stores its own. */ defaultFeeMinor?: number }) {
   const router = useRouter();
   const [slots, setSlots] = useState("300");
-  const [fee, setFee] = useState("800");
+  const [fee, setFee] = useState(() => String(defaultFeeMinor / 100));
   const [credit, setCredit] = useState("");
   const [until, setUntil] = useState("");
   const [today] = useState(() => new Date().toISOString().slice(0, 10));

@@ -1120,6 +1120,8 @@ export const collegeRoster = pgTable("college_roster", {
   /** Year of study, 1–5. */
   year: integer("year"),
   branch: text("branch"),
+  /** Digits only, from the officer's list (drizzle/0050). */
+  phone: text("phone"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   collegeRosterUnique: uniqueIndex("college_roster_college_email_unique").on(t.collegeId, t.email),
@@ -1137,19 +1139,41 @@ export const collegeMemberships = pgTable("college_memberships", {
   userId: varchar("user_id").notNull(),
   collegeId: varchar("college_id").notNull(),
   status: text("status").notNull().default("claimed"), // claimed | verified
-  verifiedBy: text("verified_by"), // roster | email_domain
+  verifiedBy: text("verified_by"), // roster | email_domain | college_code | promo | drive_code | tpo
   year: integer("year"),
   branch: text("branch"),
   consentId: varchar("consent_id"),
   joinedAt: timestamp("joined_at").notNull().defaultNow(),
   /** Set when consent is withdrawn; the row stays for the audit trail. */
   leftAt: timestamp("left_at"),
+  /** The last accept or restore by a placement officer or admin (src/lib/college/approvals.ts; drizzle/0050). */
+  decidedAt: timestamp("decided_at"),
+  decidedByType: text("decided_by_type"), // college_admin | admin
+  decidedById: varchar("decided_by_id"),
 }, (t) => ({
   collegeMembershipsUserUnique: uniqueIndex("college_memberships_user_unique").on(t.userId),
   collegeMembershipsCollegeIdx: index("college_memberships_college_idx").on(t.collegeId),
 }));
 
 export type CollegeMembership = typeof collegeMemberships.$inferSelect;
+
+/**
+ * "This college said no to this student" (drizzle/0050). Its own table because a student has one membership row,
+ * which a later join overwrites; the denial must outlive that. While a row exists, a trigger refuses any live
+ * membership of that college for that student. Deleting the row is the restore.
+ */
+export const collegeDenials = pgTable("college_denials", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  collegeId: varchar("college_id").notNull(),
+  userId: varchar("user_id").notNull(),
+  decidedByType: text("decided_by_type").notNull(), // college_admin | admin
+  decidedById: varchar("decided_by_id").notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  collegeDenialsCollegeUserUnique: uniqueIndex("college_denials_college_user_unique").on(t.collegeId, t.userId),
+  collegeDenialsUserIdx: index("college_denials_user_idx").on(t.userId),
+}));
 
 /**
  * DPDP consent ledger. Append-only: withdrawing sets `withdrawnAt`, a new

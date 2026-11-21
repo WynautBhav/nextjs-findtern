@@ -9,6 +9,9 @@ export function toStudentRow(s: CollegeStudent): StudentRow {
     name: `${s.firstName} ${s.lastName}`.trim(),
     email: s.email,
     rollNo: s.rollNo,
+    // Contact details follow the same rule as the profile below: verified students only.
+    phone: s.status === "verified" ? s.phone : null,
+    linkedin: s.status === "verified" ? s.linkedin : null,
     status: s.status,
     year: s.year,
     branch: s.branch,

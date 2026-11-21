@@ -62,6 +62,8 @@ export function DriveBuilder({
   const [link, setLink] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [view, setView] = useState<"in" | "out">("in");
+  // A new drive shows every student unless the officer asks to narrow it; an existing drive opens with its rules visible.
+  const [limit, setLimit] = useState(Boolean(initial.id) || Boolean(initial.minCgpa || initial.minScore || initial.years.length || initial.branches.length || initial.includeUserIds.length || initial.excludeUserIds.length));
 
   const set = <K extends keyof DriveDraft>(k: K, v: DriveDraft[K]) => setD((x) => ({ ...x, [k]: v }));
 
@@ -197,6 +199,7 @@ export function DriveBuilder({
         </div>
       </section>
 
+      {limit ? (
       <section className={SURFACE_CLASS}>
         {live ? (
           <p role="note" className="border-b border-accent-300/60 bg-accent-100/60 px-5 py-3 text-sm text-accent-700">
@@ -324,6 +327,19 @@ export function DriveBuilder({
           </ul>
         </div>
       </section>
+      ) : (
+        <section className={cn(SURFACE_CLASS, "flex flex-wrap items-center justify-between gap-4 px-5 py-4")}>
+          <p className="min-w-0 text-sm text-ink-700">
+            <span className="block text-[0.9375rem] font-semibold text-ink-900">
+              Employers will see <span className="nums">{split.inside.length}</span> of your <span className="nums">{students.length}</span> students
+            </span>
+            Only your students, and only while the drive is open. You can limit it by CGPA, score, year or branch, or pick students by hand.
+          </p>
+          <button type="button" onClick={() => setLimit(true)} className={buttonClass({ variant: "outline", size: "sm" })}>
+            Choose who is shown
+          </button>
+        </section>
+      )}
 
       <div className="flex flex-wrap items-center gap-3">
         <button

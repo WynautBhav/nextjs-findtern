@@ -8,10 +8,12 @@ import { toView } from "@/lib/college/meetings";
 import { ONLINE_WINDOW_MS, driveForEmployer, eligibleStudents } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
 import { displayNameOf, initialsOf, readSkills } from "@/lib/employer-candidates";
+import { candidatePoolClauses } from "@/lib/employer-pool";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { EmptyScene } from "@/components/app/primitives";
-import { CoBrand, CollegeMark, DriveStatePill, KIND_LABEL, driveTime, timeLeft } from "@/components/employer/drive-parts";
+import { CollegeMark, DriveStatePill, KIND_LABEL, driveTime, timeLeft } from "@/components/employer/drive-parts";
+import { DriveAssociation } from "@/components/employer/drive-association";
 import { DriveWorkspace, type DriveCandidate } from "@/components/employer/drive-workspace";
 
 export const metadata: Metadata = {
@@ -50,7 +52,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
   const left = state === "live" ? timeLeft(drive.endsAt) : null;
   const header = (
     <HeroPanel className="rise mb-6">
-      <CoBrand collegeName={college.name} tone="dark" />
+      <p className="text-xs font-medium text-on-dark-subtle">Campus drive, in association with {college.name}</p>
       <div className="mt-4 flex items-start gap-4">
         <CollegeMark name={college.name} logoUrl={college.logoUrl} className="hidden sm:grid" />
         <div className="min-w-0 flex-1">
@@ -84,7 +86,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
   const db = getDb();
   const students = await eligibleStudents(drive);
   const ids = students.map((s) => s.userId);
-  const [onboarding, shortlist, meetings, hired, hiding] = await Promise.all([
+  const [onboarding, shortlist, meetings, hired, hiding, pool] = await Promise.all([
     ids.length
       ? db
           .select({ userId: schema.internOnboarding.userId, skills: schema.internOnboarding.skills })
@@ -108,7 +110,16 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
           .from(schema.userPresence)
           .where(and(inArray(schema.userPresence.userId, ids), eq(schema.userPresence.showActivity, false)))
       : Promise.resolve([]),
+    // Who is also in Findtern's candidate pool: their profile page opens for this employer, with the usual offer and hire steps.
+    ids.length
+      ? db
+          .select({ userId: schema.users.id })
+          .from(schema.users)
+          .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
+          .where(and(inArray(schema.users.id, ids), ...candidatePoolClauses()))
+      : Promise.resolve([]),
   ]);
+  const poolIds = new Set(pool.map((p) => p.userId));
   const hidingIds = new Set(hiding.map((h) => h.userId));
   const skillsOf = new Map(onboarding.map((o) => [o.userId, readSkills(o.skills).map((s) => s.split(" · ")[0])]));
   const shortlisted = new Set(shortlist.map((s) => s.userId));
@@ -128,12 +139,14 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
       score: s.score,
       skills: skillsOf.get(s.userId) ?? [],
       shortlisted: shortlisted.has(s.userId),
+      hireable: poolIds.has(s.userId) || hired.has(s.userId),
       online: !hidingIds.has(s.userId) && Boolean(s.lastSeenAt && now - s.lastSeenAt.getTime() < ONLINE_WINDOW_MS),
     };
   });
 
   return (
     <div>
+      <DriveAssociation collegeName={college.name} logoUrl={college.logoUrl} />
       {header}
       <DriveWorkspace
         driveId={drive.id}

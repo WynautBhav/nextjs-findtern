@@ -6,6 +6,7 @@ import { FileText, PlayCircle, ShieldCheck } from "lucide-react";
 import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
 import { NudgeButton } from "@/components/college/nudge-button";
 import { EmptyScene, PageHead, Pill } from "@/components/app/primitives";
+import { StudentRemove } from "@/components/college/student-remove";
 import { humanizeStatus } from "@/components/app/status";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { interviewLifecycle } from "@/lib/interview-lifecycle";
@@ -124,7 +125,12 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
             </span>
           </>
         }
-        action={!ai.done ? <NudgeButton kind="interview" userIds={[id]} label="Nudge to take the interview" /> : null}
+        action={
+          <>
+            {!ai.done ? <NudgeButton kind="interview" userIds={[id]} label="Nudge to take the interview" /> : null}
+            <StudentRemove userId={id} name={`${student.firstName} ${student.lastName}`.trim() || student.email} />
+          </>
+        }
       />
 
       <Panel>

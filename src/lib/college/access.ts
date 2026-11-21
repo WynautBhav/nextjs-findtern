@@ -19,7 +19,8 @@ export { isStudentEligible, readEligibility, normBranch, type DriveEligibility, 
  *    the cutoffs. Exclude beats include; include beats cutoffs. Nothing beats
  *    the college boundary.
  *  - A college admin sees every student who joined their own college (joining
- *    is the student's choice; there is no separate consent step). They can
+ *    is the student's choice; there is no separate consent step), and decides
+ *    who is in it: accept, deny, restore (./approvals.ts). They can
  *    never write student data. Their only other writes are their own
  *    college's payout bank details and withdrawal requests.
  */
@@ -147,6 +148,8 @@ const COLLEGE_ADMIN_WRITES = new Set([
   "bank:update",
   "payout:request",
   "leave:decide",
+  // Who is in the college is the officer's call (accept, deny, restore). Still nothing about the student's own data.
+  "student:decide",
 ]);
 
 export function collegeAdminMay(action: string): boolean {

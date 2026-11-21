@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useState } from "react";
 import { Check, ChevronDown, Loader2, Phone, Plus, Video } from "lucide-react";
 
@@ -59,6 +61,11 @@ export function CandidateRow({
             ) : null}
           </p>
           <p className="break-words text-sm text-ink-600">{meta || "Year and branch not given"}</p>
+          {c.hireable ? (
+            <Link href={`/employer/intern/${c.id}`} className="mt-0.5 inline-flex min-h-11 items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline sm:min-h-0">
+              Profile and offer
+            </Link>
+          ) : null}
         </div>
         <button
           type="button"

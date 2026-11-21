@@ -1,7 +1,6 @@
 import { GraduationCap } from "lucide-react";
 
 import { Pill, type Tone } from "@/components/app/primitives";
-import { Logo } from "@/components/brand/logo";
 import type { DriveWindow } from "@/lib/college/access";
 import { formatSlotTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -84,20 +83,5 @@ export function CollegeMark({
     >
       {initials || <GraduationCap className="size-5" />}
     </span>
-  );
-}
-
-export function CoBrand({ collegeName, tone = "light" }: { collegeName: string; tone?: "light" | "dark" }) {
-  const dark = tone === "dark";
-  return (
-    <div className={cn("flex items-center gap-2 text-xs font-medium", dark ? "text-on-dark-subtle" : "text-ink-600")}>
-      <span className="min-w-0 break-words">{collegeName}</span>
-      <span aria-hidden className={dark ? "text-white/50" : "text-ink-300"}>
-        ×
-      </span>
-      <span className={cn(dark && "rounded-md bg-white px-1.5 py-1")}>
-        <Logo className="h-4" alt="Findtern" />
-      </span>
-    </div>
   );
 }

@@ -7,7 +7,7 @@ test("loose headers, BOM, quotes and CRLF", () => {
   const csv = '﻿Roll No,Student Name,Email ID,Department,Year\r\n21CS001,"Sharma, Asha",Asha@JKLU.edu.in,CSE,3rd\r\n21CS002,Ravi,ravi@jklu.edu.in,"ECE",IV\r\n';
   const { rows, errors } = parseRoster(csv);
   assert.deepEqual(errors, []);
-  assert.deepEqual(rows[0], { email: "asha@jklu.edu.in", name: "Sharma, Asha", rollNo: "21CS001", year: 3, branch: "CSE" });
+  assert.deepEqual(rows[0], { email: "asha@jklu.edu.in", name: "Sharma, Asha", rollNo: "21CS001", year: 3, branch: "CSE", phone: null });
   assert.equal(rows[1].year, 4);
 });
 
@@ -57,4 +57,11 @@ test("removalEmails keeps rows the old semicolon bug stored, which are not valid
   assert.deepEqual(removalEmails([" semi;x@qati.edu.in "]), ["semi;x@qati.edu.in"]);
   assert.deepEqual(removalEmails(["Asha@X.in", "", "  "]), ["Asha@X.in", "asha@x.in"]);
   assert.deepEqual(normalizeEmails(["semi;x@qati.edu.in"]), []);
+});
+
+test("parseRoster reads a phone column and keeps the row when the number is bad", () => {
+  const { rows, errors } = parseRoster("Name,Mobile No,Email\nRiya,+91 98765-43210,riya@x.edu\nAman,12345,aman@x.edu\nZoya,,zoya@x.edu");
+  assert.deepEqual(rows.map((r) => r.phone), ["9876543210", null, null]);
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /Row 3/);
 });

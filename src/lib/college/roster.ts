@@ -4,7 +4,7 @@
  * only email is required. Pure, so it is unit tested.
  */
 
-export type RosterInput = { email: string; name: string; rollNo: string | null; year: number | null; branch: string | null };
+export type RosterInput = { email: string; name: string; rollNo: string | null; year: number | null; branch: string | null; phone: string | null };
 
 const HEADERS: Record<keyof RosterInput, RegExp> = {
   email: /e-?mail/i,
@@ -12,7 +12,16 @@ const HEADERS: Record<keyof RosterInput, RegExp> = {
   rollNo: /roll|enrol+ment|reg(istration)?\.?\s*(no|number|id)|^usn$|^prn$/i,
   year: /^(current\s*)?year(\s*of\s*study)?$|^semester$|^sem$/i,
   branch: /branch|department|dept|specialisation|specialization|stream|program(me)?/i,
+  phone: /phone|mobile|contact\s*(no|number)|whats\s*app|^cell$/i,
 };
+
+/** The last 10 digits of an Indian mobile number, or null when the cell is not one. */
+export function readPhone(raw: string): string | null {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length < 10 || digits.length > 13) return null;
+  const ten = digits.slice(-10);
+  return /^[6-9]/.test(ten) ? ten : null;
+}
 
 /** ";" when the header line has more semicolons than commas and tabs (European-locale Excel exports). */
 export function detectSemicolon(text: string): boolean {
@@ -110,7 +119,9 @@ export function parseRoster(text: string): { rows: RosterInput[]; errors: string
       rollNo: cell("rollNo").slice(0, 60) || null,
       year: readYear(cell("year"), semester),
       branch: cell("branch").slice(0, 120) || null,
+      phone: readPhone(cell("phone")),
     });
+    if (cell("phone") && !rows[rows.length - 1].phone) errors.push(`Row ${line}: "${cell("phone").slice(0, 20)}" is not a 10-digit mobile number; saved without a phone.`);
   });
   return { rows, errors };
 }

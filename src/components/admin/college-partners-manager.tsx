@@ -273,7 +273,7 @@ export function CollegeLogins({ collegeId, officers, hasPaidBatch, canEdit }: { 
  * change name, city and AISHE code (the directory import owns the rest), so those three are
  * read-only for a non-partner and only state and GSTIN are sent.
  */
-export function CollegeDetailsForm({ college, canEdit }: { college: { id: string; name: string; city: string | null; state: string | null; gstin: string | null; aisheCode: string | null; isPartner: boolean }; canEdit: boolean }) {
+export function CollegeDetailsForm({ college, canEdit }: { college: { id: string; name: string; city: string | null; state: string | null; gstin: string | null; aisheCode: string | null; isPartner: boolean; logoUrl: string | null; emailDomains: string[] }; canEdit: boolean }) {
   const router = useRouter();
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -292,7 +292,11 @@ export function CollegeDetailsForm({ college, canEdit }: { college: { id: string
         setMsg(null);
         const body = locked
           ? { state: state || null, gstin: gstin || null }
-          : { name: f.get("name"), city: f.get("city"), state: state || null, gstin: gstin || null, aisheCode: String(f.get("aishe") ?? "").trim() || null };
+          : {
+              name: f.get("name"), city: f.get("city"), state: state || null, gstin: gstin || null, aisheCode: String(f.get("aishe") ?? "").trim() || null,
+              logoUrl: String(f.get("logo") ?? "").trim() || null,
+              emailDomains: String(f.get("domains") ?? "").split(/[\s,;]+/).map((d) => d.trim().toLowerCase().replace(/^@/, "")).filter(Boolean),
+            };
         const r = await send(`/api/admin/colleges/${college.id}`, "PATCH", body);
         setBusy(false);
         if (!r.ok) return setMsg({ ok: false, text: String(r.json.error ?? "Couldn't save") });
@@ -321,6 +325,16 @@ export function CollegeDetailsForm({ college, canEdit }: { college: { id: string
           <span className="text-sm font-medium text-foreground">GSTIN</span>
           <input name="gstin" defaultValue={college.gstin ?? ""} maxLength={15} disabled={!canEdit} className={cn(input, "mt-1 uppercase")} />
         </label>
+        <label className="md:col-span-2">
+          <span className="text-sm font-medium text-foreground">Logo link</span>
+          <input name="logo" type="url" inputMode="url" placeholder="https://college.edu.in/logo.png" defaultValue={college.logoUrl ?? ""} disabled={!canEdit || locked} className={cn(input, "mt-1")} />
+          <span className="mt-1 block text-sm text-text-subtle">Shown to employers inside this college&apos;s campus drives as &quot;In association with&quot;. Without it they see the college&apos;s initials.</span>
+        </label>
+        <label className="md:col-span-2">
+          <span className="text-sm font-medium text-foreground">Student email domains</span>
+          <input name="domains" placeholder="college.edu.in, students.college.edu.in" defaultValue={college.emailDomains.join(", ")} disabled={!canEdit || locked} className={cn(input, "mt-1")} />
+          <span className="mt-1 block text-sm text-text-subtle">Students who already have a Findtern account on one of these domains are offered to the placement officer to accept.</span>
+        </label>
       </div>
       <p className="text-sm text-text-subtle">
         State and GSTIN print on the seat invoice and decide CGST + SGST or IGST.
@@ -332,6 +346,49 @@ export function CollegeDetailsForm({ college, canEdit }: { college: { id: string
           <p role="status" className={cn("text-sm", msg?.ok ? "text-foreground" : "text-danger")}>{msg?.text}</p>
         </div>
       ) : null}
+    </form>
+  );
+}
+
+/**
+ * The campus drive fee per student that a new drive order starts from. One number for every college; an order
+ * can still be given its own fee when it is created, and orders already made keep theirs.
+ */
+export function CollegeFeeSetting({ feeMinor, canEdit }: { feeMinor: number; canEdit: boolean }) {
+  const router = useRouter();
+  const [value, setValue] = useState(() => String(feeMinor / 100));
+  const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const rupees = Number(value);
+  const valid = /^\d+(\.\d{1,2})?$/.test(value.trim()) && rupees >= 1 && rupees <= 100000;
+  return (
+    <form
+      className="flex flex-wrap items-end gap-x-3 gap-y-2"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        if (!valid) return setMsg({ ok: false, text: "Enter the fee in rupees, from ₹1 to ₹1,00,000." });
+        setBusy(true);
+        setMsg(null);
+        const r = await send("/api/admin/colleges/settings", "PUT", { feePerStudentMinor: Math.round(rupees * 100) });
+        setBusy(false);
+        if (!r.ok) return setMsg({ ok: false, text: String(r.json.error ?? "Couldn't save") });
+        setMsg({ ok: true, text: "Saved. New drive orders start from this fee." });
+        router.refresh();
+      }}
+    >
+      <label className="block">
+        <span className="text-sm font-medium text-foreground">Campus drive fee per student (₹)</span>
+        <input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} disabled={!canEdit} aria-describedby="college-fee-hint" className={cn(input, "mt-1 w-40")} />
+      </label>
+      {canEdit ? (
+        <button disabled={busy || Math.round(rupees * 100) === feeMinor} className={buttonClass({ className: cn(ADMIN_PILL_PRIMARY, "disabled:opacity-60") })}>
+          {busy ? "Saving…" : "Save fee"}
+        </button>
+      ) : null}
+      <p id="college-fee-hint" className="basis-full text-sm text-text-subtle">
+        What a college pays for each student in a drive. New drive orders start from this; orders already created keep their own fee.
+      </p>
+      <p role="status" className={cn("basis-full text-sm", msg?.ok ? "text-foreground" : "text-danger")}>{msg?.text}</p>
     </form>
   );
 }

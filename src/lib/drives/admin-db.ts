@@ -253,8 +253,9 @@ export type ConfirmResult = { linked: number; reviews: number; codesIssued: numb
 
 async function verifyMembership(c: PgClient, internId: string, collegeId: string) {
   // Never moves a student between colleges and never touches users: only an own-college membership is created or upgraded.
+  // A student the placement office denied is skipped (college_denials, approvals.ts); only a restore brings them back.
   await c.query(
-    "INSERT INTO college_memberships (user_id, college_id, status, verified_by) VALUES ($1,$2,'verified','roster') ON CONFLICT (user_id) DO UPDATE SET status = 'verified', verified_by = 'roster', left_at = NULL WHERE college_memberships.college_id = EXCLUDED.college_id",
+    "INSERT INTO college_memberships (user_id, college_id, status, verified_by) SELECT $1,$2,'verified','roster' WHERE NOT EXISTS (SELECT 1 FROM college_denials d WHERE d.college_id = $2 AND d.user_id = $1) ON CONFLICT (user_id) DO UPDATE SET status = 'verified', verified_by = 'roster', left_at = NULL WHERE college_memberships.college_id = EXCLUDED.college_id",
     [internId, collegeId],
   );
 }

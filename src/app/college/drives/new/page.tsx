@@ -7,17 +7,18 @@ export const dynamic = "force-dynamic";
 
 export default async function NewDrivePage() {
   const ctx = await requireCollegeContext();
-  const students = (await studentsForCollegeAdmin(ctx)).map(toStudentRow);
+  // Only verified students are ever shown to employers (eligibility.ts), so only they are counted and offered here.
+  const students = (await studentsForCollegeAdmin(ctx)).filter((s) => s.status === "verified").map(toStudentRow);
   const branches = [...new Set(students.map((s) => s.branch).filter((b): b is string => Boolean(b)))].sort();
   const start = new Date();
+  // The top of the current hour: the link works the moment it is created, unless the officer picks a later opening.
   start.setMinutes(0, 0, 0);
-  start.setHours(start.getHours() + 1);
   const end = new Date(start.getTime() + 7 * 24 * 3600_000);
 
   return (
     <div className="space-y-6">
       <DriveBuilder
-        heading={{ title: "New drive", lede: "Takes two minutes. You can change dates and eligibility later without a new link." }}
+        heading={{ title: "New campus drive", lede: "Name it, set when it is open, and you get one link to send to the employers you invite. They see your students only. It opens straight away unless you choose a later time." }}
         collegeId={ctx.college.id}
         collegeName={ctx.college.name}
         students={students}

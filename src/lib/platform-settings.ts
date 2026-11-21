@@ -30,6 +30,8 @@ export const SETTING_DEFAULTS = {
   employer_subscription_overrides: {} as Record<string, SubscriptionOverride>,
   /** Days after an AI-interview link is sent before an uncompleted interview reads as expired. */
   ai_link_expiry_days: 7,
+  /** Campus drive fee per student that a new drive order starts from, INR paise. Each order keeps its own fee. */
+  college_fee_per_student_minor: 80000,
 } as const;
 
 export type SettingKey = keyof typeof SETTING_DEFAULTS;

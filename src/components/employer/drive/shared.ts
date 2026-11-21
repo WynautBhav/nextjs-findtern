@@ -14,6 +14,8 @@ export type DriveCandidate = {
   shortlisted: boolean;
   /** Findtern open in the last ~75 s, so a "call now" will be seen. */
   online: boolean;
+  /** In Findtern's candidate pool today, so the usual profile page opens and an offer can be sent from it. */
+  hireable: boolean;
 };
 
 export const CALL_STATUS: Record<string, { tone: Tone; label: string }> = {

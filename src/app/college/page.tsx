@@ -1,32 +1,23 @@
 import Link from "next/link";
 import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
+import { ArrowRight } from "lucide-react";
 
-import { StatCard, StatGrid } from "@/components/college/stat-card";
 import { PresenceLive } from "@/components/college/presence-live";
-import { StudentTable } from "@/components/college/student-table";
+import { CopyText } from "@/components/college/copy-text";
 import { aiStatusLabel } from "@/lib/college/labels";
-import {
-  eligibleStudents,
-  presenceSnapshot,
-  requireCollegeContext,
-  rosterCoverage,
-  studentsForCollegeAdmin,
-} from "@/lib/college/scope";
+import { pendingApprovalCount } from "@/lib/college/approvals";
+import { eligibleStudents, presenceSnapshot, requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { pendingLeaveCount } from "@/lib/college/leave-request-read";
-import { toStudentRow } from "@/lib/college/serialize";
 import { getDb, schema } from "@/lib/db";
 import { AWAITING_FIRST_PAYMENT } from "@/lib/college/seat-paid";
 import { paidSeatTotal } from "@/lib/college/seat-gate";
-import { PageHead } from "@/components/app/primitives";
+import { Surface } from "@/components/app/primitives";
+import { HeroPanel } from "@/components/employer/kit/hero-panel";
+import { ButtonLink } from "@/components/ui/button";
 import { collegeHasDriveOrder } from "@/lib/drives/dashboard-db";
 import { DriveDashboard } from "./drive-dashboard";
 
 export const dynamic = "force-dynamic";
-
-/** Request time, for "online"/"x min ago" labels. Dynamic page, so this is per request. */
-function requestTime(): number {
-  return Date.now();
-}
 
 function median(xs: number[]): number | null {
   if (!xs.length) return null;
@@ -35,11 +26,15 @@ function median(xs: number[]): number | null {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 }
 
-export default async function CollegeDashboard() {
+/**
+ * The placement office's first screen answers one question: what needs me today? Decisions first (students to
+ * accept, leave requests), then the live drive, then how the batch is doing. The student register itself lives
+ * on /college/students.
+ */
+export default async function CollegeOverview() {
   const ctx = await requireCollegeContext();
-  const now = requestTime();
 
-  const [students, coverage, [liveDrive], [seat], paid, hasDriveOrder, pendingLeaves] = await Promise.all([
+  const [all, coverage, [liveDrive], [seat], paid, hasDriveOrder, pendingLeaves, toAccept] = await Promise.all([
     studentsForCollegeAdmin(ctx),
     rosterCoverage(ctx.college.id),
     getDb()
@@ -64,8 +59,10 @@ export default async function CollegeDashboard() {
     paidSeatTotal(getDb(), ctx.college.id),
     collegeHasDriveOrder(ctx.college.id),
     pendingLeaveCount(ctx.college.id),
+    pendingApprovalCount(ctx.college.id, ctx.college.emailDomains),
   ]);
 
+  const students = all.filter((s) => s.status === "verified");
   const presence = liveDrive
     ? await presenceSnapshot(ctx.college.id, (await eligibleStudents(liveDrive)).map((s) => s.userId))
     : null;
@@ -74,25 +71,141 @@ export default async function CollegeDashboard() {
   const scores = interviewed.map((s) => s.score).filter((v): v is number => v !== null);
   const med = median(scores);
   const waiting = students.filter((s) => s.offersPending > 0);
-  const joinedPct = coverage.rosterSize ? Math.round((coverage.joined / coverage.rosterSize) * 100) : null;
+  const notJoined = coverage.rows.filter((r) => r.state === "not_joined").length;
+
+  const decisions = [
+    toAccept > 0
+      ? { href: "/college/approvals", count: toAccept, title: `${toAccept === 1 ? "student is" : "students are"} waiting to be added`, body: "They already have a Findtern account. Accept the ones who are yours." }
+      : null,
+    pendingLeaves > 0
+      ? { href: "/college/approvals#leave", count: pendingLeaves, title: `${pendingLeaves === 1 ? "student has" : "students have"} asked to leave`, body: "They stay in your college until you decide." }
+      : null,
+    waiting.length > 0
+      ? { href: "/college/students?show=offers", count: waiting.length, title: `${waiting.length === 1 ? "student is" : "students are"} sitting on an offer`, body: "A reminder from you usually gets a reply the same day." }
+      : null,
+  ].filter((d): d is NonNullable<typeof d> => d !== null);
+
+  const withOffers = students.filter((s) => s.proposals > 0).length;
+  const listed = Math.max(coverage.rosterSize, students.length);
+  const funnel = [
+    { label: coverage.rosterSize ? "On your list" : "Students", value: listed, hint: coverage.rosterSize ? (notJoined ? `${notJoined} not joined yet` : "Everyone has joined") : "Add your list to track who is missing", href: "/college/roster" },
+    { label: "Verified on Findtern", value: students.length, hint: toAccept ? `${toAccept} more waiting for you` : "Visible in your drives", href: "/college/students" },
+    { label: "AI interview done", value: interviewed.length, hint: med === null ? "Scores appear after the first interview" : `Median score ${med.toFixed(1)} of 10`, href: "/college/students?show=no_interview" },
+    { label: "Got an offer", value: withOffers, hint: waiting.length ? `${waiting.length} still to reply` : "From employers on Findtern", href: "/college/students?show=offers" },
+  ];
+  const funnelTop = funnel[0].value;
+
+  const firstRun = students.length === 0 && coverage.rosterSize === 0;
 
   return (
     <div className="space-y-6">
-      <PageHead
-        title={ctx.college.name}
-        lede={`Placement console${ctx.college.city ? ` · ${ctx.college.city}` : ""}.${ctx.college.code ? ` Your college code is ${ctx.college.code}. Give it only to your own students: it is the only way they join your college.` : ""}`}
-      />
+      <HeroPanel className="rise">
+        <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-5">
+          <div className="min-w-0">
+            <h1 className="text-balance text-[clamp(1.75rem,3.4vw,2.5rem)] font-light leading-tight tracking-[-0.03em]">{ctx.college.name}</h1>
+            <p className="mt-1.5 text-sm text-on-dark-subtle">Placement office{ctx.college.city ? `, ${ctx.college.city}` : ""}</p>
+          </div>
+          <div className="flex w-full flex-wrap gap-2.5 sm:w-auto">
+            <ButtonLink href="/college/drives/new" variant="white">New campus drive link</ButtonLink>
+            <ButtonLink href="/college/roster" variant="outlineLight">Add students</ButtonLink>
+          </div>
+        </div>
+        {/* The batch as a funnel: each step is drawn against the first, so the drop between steps is the thing you read. */}
+        <ol className="mt-8 grid grid-cols-2 gap-x-6 gap-y-6 lg:grid-cols-4" aria-label="Your batch, step by step">
+          {funnel.map((f) => (
+            <li key={f.label} className="relative min-w-0">
+              <Link href={f.href} className="block rounded-lg outline-none after:absolute after:-inset-2 after:rounded-xl after:content-[''] hover:after:bg-white/5 focus-visible:after:ring-2 focus-visible:after:ring-white/70">
+                <span className="block text-[13px] font-medium text-on-dark-subtle">{f.label}</span>
+                <span className="nums mt-1.5 block text-[clamp(2rem,4vw,2.75rem)] font-light leading-none tracking-[-0.04em]">{f.value.toLocaleString("en-IN")}</span>
+                <span aria-hidden className="mt-3 block h-1 overflow-hidden rounded-full bg-white/15">
+                  <span className="block h-full rounded-full bg-accent-400" style={{ width: `${funnelTop ? Math.max(f.value ? 3 : 0, Math.round((f.value / funnelTop) * 100)) : 0}%` }} />
+                </span>
+                <span className="mt-2 block text-xs text-on-dark-subtle">{f.hint}</span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </HeroPanel>
 
-      {liveDrive && presence ? (
-        <PresenceLive
-          driveId={liveDrive.id}
-          driveTitle={liveDrive.title}
-          endsAt={liveDrive.endsAt.toISOString()}
-          initial={{ ...presence }}
-        />
+      {firstRun ? (
+        <Surface className="p-5 sm:p-6">
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Three steps to your first campus drive</h2>
+          <ol className="mt-4 grid gap-5 sm:grid-cols-3">
+            {[
+              { n: 1, title: "Add your students", body: "Paste or upload your list: name, phone and email. Students who are already on Findtern show up for you to accept.", href: "/college/roster", cta: "Add student list" },
+              { n: 2, title: "Students join", body: ctx.college.code ? `New students sign up and enter your college code ${ctx.college.code}. Each takes the AI interview once.` : "New students sign up with the code Findtern gives you. Each takes the AI interview once.", href: "/college/students", cta: "See students" },
+              { n: 3, title: "Invite employers", body: "Create a campus drive link and send it to the companies you invite. They see only your verified students.", href: "/college/drives/new", cta: "Create a link" },
+            ].map((step) => (
+              <li key={step.n} className="border-t border-ink-200 pt-4">
+                <p className="nums text-sm font-medium text-text-subtle">Step {step.n}</p>
+                <h3 className="mt-1 text-[0.9375rem] font-semibold text-ink-900">{step.title}</h3>
+                <p className="mt-1 text-sm leading-relaxed text-ink-600">{step.body}</p>
+                <Link href={step.href} className="mt-2 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-brand-700 hover:underline">
+                  {step.cta} <ArrowRight className="size-4" aria-hidden />
+                </Link>
+              </li>
+            ))}
+          </ol>
+        </Surface>
       ) : null}
 
-      <DriveDashboard />
+      {decisions.length > 0 ? (
+        <section aria-labelledby="needs-you">
+          <h2 id="needs-you" className="mb-2 text-sm font-semibold text-ink-900">Needs your decision</h2>
+          <Surface>
+            <ul className="divide-y divide-ink-100">
+              {decisions.map((d) => (
+                <li key={d.href} className="relative flex items-center gap-4 px-5 py-4 hover:bg-ink-50/60">
+                  <span className="nums w-10 shrink-0 text-right text-2xl font-semibold tracking-[-0.02em] text-ink-900">{d.count}</span>
+                  <div className="min-w-0 flex-1">
+                    <Link href={d.href} className="font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500">
+                      {d.title}
+                    </Link>
+                    <p className="text-sm text-text-subtle">{d.body}</p>
+                  </div>
+                  <ArrowRight className="size-4 shrink-0 text-ink-500" aria-hidden />
+                </li>
+              ))}
+            </ul>
+          </Surface>
+        </section>
+      ) : null}
+
+      {liveDrive && presence ? (
+        <PresenceLive driveId={liveDrive.id} driveTitle={liveDrive.title} endsAt={liveDrive.endsAt.toISOString()} initial={{ ...presence }} />
+      ) : null}
+
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Surface className="p-5">
+          <h2 className="text-[0.9375rem] font-semibold text-ink-900">Your college code</h2>
+          {ctx.college.code ? (
+            <>
+              <p className="mt-1 text-sm text-text-subtle">Students type this when they sign up. Give it only to your own students: whoever has it joins as verified.</p>
+              <p className="mt-3 flex flex-wrap items-center gap-3">
+                <code className="select-all font-mono text-2xl font-semibold tracking-[0.12em] text-ink-900">{ctx.college.code}</code>
+                <CopyText text={ctx.college.code} label="Copy code" />
+              </p>
+            </>
+          ) : (
+            <p className="mt-1 text-sm text-text-subtle">Findtern has not issued your code yet. Write to us and we will set it up.</p>
+          )}
+        </Surface>
+        <Surface className="p-5">
+          <h2 className="text-[0.9375rem] font-semibold text-ink-900">Campus drive link</h2>
+          <p className="mt-1 text-sm text-text-subtle">
+            {liveDrive
+              ? `"${liveDrive.title}" is open. Employers who open its link see your verified students only.`
+              : "No drive is open right now. Create a link, send it to the employers you invite, and they see your verified students only."}
+          </p>
+          <p className="mt-3">
+            <ButtonLink href={liveDrive ? `/college/drives/${liveDrive.id}` : "/college/drives/new"} variant="outline">
+              {liveDrive ? "Open the drive" : "Create a link"}
+            </ButtonLink>
+          </p>
+        </Surface>
+      </div>
+
+      {hasDriveOrder ? <DriveDashboard /> : null}
 
       {seat && !hasDriveOrder ? (
         <section className="rounded-apple-md border border-ink-200 bg-surface p-4" aria-label="Legacy code (read-only)">
@@ -109,59 +222,6 @@ export default async function CollegeDashboard() {
           ) : null}
         </section>
       ) : null}
-
-      <div className="max-w-sm">
-        <StatCard
-          label="Leave requests"
-          value={pendingLeaves}
-          hint={pendingLeaves ? `${pendingLeaves} student${pendingLeaves === 1 ? "" : "s"} waiting for your approval` : "Students can only leave once you approve"}
-          tone={pendingLeaves ? "warning" : "neutral"}
-          href="/college/leave-requests"
-        />
-      </div>
-
-      <StatGrid cols={4} variant="strip">
-        <StatCard
-          label="Joined Findtern"
-          value={coverage.rosterSize ? `${coverage.joined}/${coverage.rosterSize}` : students.length}
-          hint={
-            coverage.rosterSize
-              ? `${joinedPct}% of your roster${coverage.notJoined.length ? `; ${coverage.notJoined.length} still to join` : ""}`
-              : "Upload your roster to track who's missing"
-          }
-          href="/college/roster"
-        />
-        <StatCard
-          label="AI interview done"
-          value={`${interviewed.length}/${students.length}`}
-          hint={students.length ? `${students.length - interviewed.length} still to take it` : "No students yet"}
-          tone="neutral"
-        />
-        <StatCard
-          label="Median Findtern score"
-          value={med === null ? "—" : med.toFixed(1)}
-          hint={scores.length ? `out of 10, across ${scores.length} interviewed` : "Appears after the first interview"}
-          tone="neutral"
-        />
-        <StatCard
-          label="Offers waiting on reply"
-          value={waiting.reduce((n, s) => n + s.offersPending, 0)}
-          hint={waiting.length ? `${waiting.length} student${waiting.length === 1 ? "" : "s"} to chase` : "Nobody is sitting on an offer"}
-          tone={waiting.length ? "warning" : "neutral"}
-        />
-      </StatGrid>
-
-      {!liveDrive ? (
-        <p className="text-sm text-text-subtle">
-          No drive is live right now.{" "}
-          <Link href="/college/drives/new" className="font-medium text-brand-700 hover:underline">
-            Set one up
-          </Link>{" "}
-          and share the link with the employers you invite.
-        </p>
-      ) : null}
-
-      <StudentTable students={students.map(toStudentRow)} now={now} />
     </div>
   );
 }

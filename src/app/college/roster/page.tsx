@@ -1,142 +1,148 @@
 import Link from "next/link";
 
-import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
-import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, PageHead, Pill, Surface, pillTabClass, type Tone } from "@/components/app/primitives";
 import { RosterRemove } from "@/components/college/roster-remove";
 import { RosterImport } from "@/components/college/roster-import";
 import { CopyText } from "@/components/college/copy-text";
+import { approvalsFor } from "@/lib/college/approvals";
 import { yearLabel } from "@/lib/college/labels";
-import { requireCollegeContext, rosterCoverage } from "@/lib/college/scope";
+import { requireCollegeContext, rosterCoverage, type RosterListRow } from "@/lib/college/scope";
 import { requirePublicOrigin } from "@/lib/origin";
 
-/** Name · roll · year · branch · email (stacks on a phone). */
 const PAGE_SIZE = 50;
-const ROSTER_GRID = "grid-cols-[minmax(0,1fr)_auto] sm:grid-cols-[minmax(0,1.3fr)_6rem_5.5rem_minmax(0,0.8fr)_minmax(0,1.5fr)_5.5rem]";
+/** Name · phone · email · year, branch · status · remove (stacks on a phone). */
+const GRID = "grid-cols-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.2fr)_7.5rem_minmax(0,1.5fr)_minmax(0,0.9fr)_8.5rem_5.5rem]";
+
+type Show = "all" | RosterListRow["state"];
+const TABS: { key: Show; label: string }[] = [
+  { key: "all", label: "Everyone" },
+  { key: "not_joined", label: "Not joined yet" },
+  { key: "on_findtern", label: "Waiting for you" },
+  { key: "joined", label: "Joined" },
+];
+const STATE: Record<RosterListRow["state"], { label: string; tone: Tone }> = {
+  joined: { label: "Joined", tone: "paid" },
+  on_findtern: { label: "Waiting for you", tone: "waiting" },
+  not_joined: { label: "Not joined", tone: "closed" },
+};
 
 export const dynamic = "force-dynamic";
 
-export default async function RosterPage({ searchParams }: { searchParams?: Promise<{ page?: string }> }) {
+/**
+ * The college's own student list (name, phone, email) and where each student stands: joined, on Findtern but not
+ * yet accepted, or not signed up. This is the list the placement office used to send to Findtern; they keep it here.
+ */
+export default async function RosterPage({ searchParams }: { searchParams?: Promise<{ page?: string; show?: string }> }) {
   const ctx = await requireCollegeContext();
-  const coverage = await rosterCoverage(ctx.college.id);
-  const pages = Math.max(1, Math.ceil(coverage.notJoined.length / PAGE_SIZE));
-  const page = Math.min(pages, Math.max(1, Number.parseInt((await searchParams)?.page ?? "1", 10) || 1));
-  const shown = coverage.notJoined.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const sp = await searchParams;
+  const { candidates } = await approvalsFor(ctx.college.id, ctx.college.emailDomains);
+  const coverage = await rosterCoverage(ctx.college.id, new Set(candidates.map((c) => c.email.toLowerCase())));
+  const show: Show = TABS.find((t) => t.key === sp?.show)?.key ?? "all";
+  const count = (k: Show) => (k === "all" ? coverage.rows.length : coverage.rows.filter((r) => r.state === k).length);
+  const list = show === "all" ? coverage.rows : coverage.rows.filter((r) => r.state === show);
+  const pages = Math.max(1, Math.ceil(list.length / PAGE_SIZE));
+  const page = Math.min(pages, Math.max(1, Number.parseInt(sp?.page ?? "1", 10) || 1));
+  const shown = list.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const href = (p: number, s: Show = show) => `?${new URLSearchParams({ ...(s !== "all" ? { show: s } : {}), ...(p > 1 ? { page: String(p) } : {}) })}`;
+
   const origin = requirePublicOrigin();
   const invite = [
     `Hi,`,
     ``,
-    `${ctx.college.name} has partnered with Findtern for placements. Create your free account, take the AI interview, and you'll be visible to employers in our virtual placement drives.`,
+    `${ctx.college.name} has partnered with Findtern for placements. Create your free account, take the AI interview, and you'll be visible to employers in our virtual campus drives.`,
     ``,
-    `1. Sign up at ${origin}/signup${ctx.college.emailDomains.length ? ` with your college email (@${ctx.college.emailDomains[0]})` : ""}.`,
-    `2. Under College, choose "${ctx.college.name}" and agree to share your progress with the placement cell.`,
+    `1. Sign up at ${origin}/signup.`,
+    ctx.college.code ? `2. Choose "College account" and enter our college code: ${ctx.college.code}` : `2. Choose "College account" and enter the college code from the placement office.`,
     `3. Take the AI interview from your dashboard.`,
     ``,
     `Training & Placement Cell`,
   ].join("\n");
+  const notJoined = coverage.rows.filter((r) => r.state === "not_joined");
+  const waiting = count("on_findtern");
 
   return (
     <div className="space-y-6">
       <PageHead
-        title="Roster"
+        title="Student list"
         lede={
           coverage.rosterSize
-            ? `${coverage.joined} of ${coverage.rosterSize} students on your roster have joined Findtern.`
-            : "Upload your student list to see who hasn't joined yet."
+            ? `${coverage.joined} of ${coverage.rosterSize} students on your list have joined Findtern.`
+            : "Add your students once. Findtern shows you who has joined, who already had an account, and who still needs a reminder."
         }
       />
 
       {coverage.rosterSize > 0 ? (
-        // Once there is a list the page is about who hasn't joined: upload and
-        // the invite fold into one row instead of two half-empty cards.
-        <Surface className="space-y-4 p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm font-semibold text-ink-900">Keep the list current</p>
-            <CopyText text={invite} label="Copy invite message" />
-          </div>
-          <details className="group">
-            <summary className="cursor-pointer text-sm font-medium text-brand-700">See the invite message</summary>
-            <div className="mt-3"><pre tabIndex={0} aria-label="Invite message" className="max-h-64 overflow-auto whitespace-pre-wrap rounded-apple-sm border border-ink-200 bg-ink-50 p-3 font-sans text-sm leading-relaxed text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600">{invite}</pre></div>
-          </details>
-          <details className="group">
-            <summary className="cursor-pointer text-sm font-medium text-brand-700">Upload a new list</summary>
-            <div className="mt-3">
-              <RosterImport />
-            </div>
-          </details>
-            {coverage.claimed > 0 ? (
-              <p className="text-sm text-text-subtle">
-                {coverage.claimed} student{coverage.claimed === 1 ? " has" : "s have"} picked your college but {coverage.claimed === 1 ? "isn't" : "aren't"} on this list or using a college email. Share your student code with them to verify them.
-              </p>
-            ) : null}
-        </Surface>
-      ) : (
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Panel>
-          <PanelHeader title="Upload student list" description="Students on the list get their year and branch filled in when they join." />
-          <PanelBody>
+        <details className="group rounded-apple-xl border border-ink-200/80 bg-white">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-5 text-sm font-semibold text-ink-900 hover:bg-ink-50">
+            Add or update students
+            <span aria-hidden className="font-medium text-brand-700 group-open:hidden">Open</span>
+          </summary>
+          <div className="border-t border-ink-100 p-5">
             <RosterImport />
-          </PanelBody>
-        </Panel>
-        <Panel>
-          <PanelHeader title="Invite message" description="Send it on your class groups or by email." />
-          <PanelBody className="space-y-3">
-            <pre tabIndex={0} aria-label="Invite message" className="max-h-64 overflow-auto whitespace-pre-wrap rounded-apple-sm border border-ink-200 bg-ink-50 p-3 font-sans text-sm leading-relaxed text-ink-800 focus-visible:outline-2 focus-visible:outline-brand-600">{invite}</pre>
-            <CopyText text={invite} label="Copy message" />
-            {coverage.claimed > 0 ? (
-              <p className="text-sm text-text-subtle">
-                {coverage.claimed} student{coverage.claimed === 1 ? " has" : "s have"} picked your college but {coverage.claimed === 1 ? "isn't" : "aren't"} on this list or using a college email. Share your student code with them to verify them.
-              </p>
-            ) : null}
-          </PanelBody>
-        </Panel>
-      </div>
+          </div>
+        </details>
+      ) : (
+        <Surface className="p-5">
+          <RosterImport />
+        </Surface>
       )}
 
-      <Panel>
-        <PanelHeader
-          title={`Not joined yet (${coverage.notJoined.length})`}
-          description="On your roster, no Findtern account with that email."
-          action={coverage.notJoined.length ? <CopyText text={coverage.notJoined.map((s) => s.email).join(", ")} label="Copy emails" /> : undefined}
-        />
-        {coverage.notJoined.length === 0 ? (
-          <PanelBody>
-            {coverage.rosterSize ? (
-              <p className="text-sm text-text-subtle">Everyone on your roster has joined.</p>
-            ) : (
-              <EmptyScene
-                compact
-                title="No student list yet"
-                body="Once you upload your list, the students who have not joined Findtern appear here so you can remind them."
-                who="You - upload the list in the panel above"
-              />
-            )}
-          </PanelBody>
+      {waiting > 0 ? (
+        <p className="rounded-apple-sm border border-accent-300/70 bg-accent-100/60 px-4 py-3 text-sm text-ink-800">
+          <span className="nums font-semibold">{waiting}</span> {waiting === 1 ? "student on your list already has" : "students on your list already have"} a Findtern account and can be added now.{" "}
+          <Link href="/college/approvals" className="font-semibold text-brand-800 underline underline-offset-2">Review and accept them</Link>
+        </p>
+      ) : null}
+
+      <Surface className="overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-ink-100 px-5 py-3">
+          <nav aria-label="Filter the list" className="flex flex-wrap gap-1">
+            {TABS.map((t) => (
+              <Link key={t.key} href={href(1, t.key)} aria-current={show === t.key ? "page" : undefined} className={pillTabClass(show === t.key)}>
+                {t.label}
+                <span className={`nums text-xs ${show === t.key ? "text-white/75" : "text-text-subtle"}`}>{count(t.key)}</span>
+              </Link>
+            ))}
+          </nav>
+          {notJoined.length > 0 ? (
+            <span className="flex flex-wrap gap-2">
+              <CopyText text={invite} label="Copy invite message" />
+              <CopyText text={notJoined.map((s) => s.email).join(", ")} label={`Copy ${notJoined.length} emails`} />
+            </span>
+          ) : null}
+        </div>
+
+        {shown.length === 0 ? (
+          coverage.rosterSize === 0 ? (
+            <EmptyScene compact title="No student list yet" body="Once you add your list, every student shows here with where they stand, so you know exactly who to remind." who="You - add the list above" />
+          ) : (
+            <EmptyScene compact title="Nobody in this group" body="No student on your list is in this group right now. Choose Everyone to see the whole list." />
+          )
         ) : (
-          // A table of who to chase: name, roll, year, branch, email in aligned
-          // columns (rows were 72px with the email pushed to the far right).
-          // On a phone, two lines: name and roll, then year, branch and email
-          // (five stacked lines made each student 150px tall, QA-160).
           <div>
-            <div aria-hidden className={`${ROSTER_GRID} hidden gap-x-4 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle sm:grid`}>
+            <div aria-hidden className={`${GRID} hidden gap-x-4 border-b border-ink-100 px-5 py-2.5 text-xs font-medium text-text-subtle md:grid`}>
               <span>Name</span>
-              <span>Roll no.</span>
-              <span>Year</span>
-              <span>Branch</span>
+              <span>Phone</span>
               <span>Email</span>
+              <span>Year, branch</span>
+              <span>Status</span>
               <span className="sr-only">Actions</span>
             </div>
             <ul className="divide-y divide-ink-100">
               {shown.map((s) => (
-                <li key={s.email} className={`${ROSTER_GRID} grid items-baseline gap-x-4 gap-y-0.5 px-5 py-2.5 text-sm`}>
-                  <span className="font-medium text-ink-900">{s.name || "—"}</span>
-                  <span className="nums text-ink-700">{s.rollNo || "—"}</span>
-                  <span className="text-ink-700 max-sm:hidden">{s.year ? yearLabel(s.year) : "—"}</span>
-                  <span className="text-ink-700 max-sm:hidden">{s.branch || "—"}</span>
-                  <span className="break-all text-ink-600 max-sm:col-span-2">
-                    <span className="sm:hidden">{[s.year ? yearLabel(s.year) : null, s.branch].filter(Boolean).map((t) => `${t} · `).join("")}</span>
-                    {s.email}
+                <li key={s.email} className={`${GRID} grid items-center gap-x-4 gap-y-0.5 px-5 py-2 text-sm`}>
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium text-ink-900">{s.name || "—"}</span>
+                    {s.rollNo ? <span className="nums block text-xs text-text-subtle">{s.rollNo}</span> : null}
                   </span>
-                  <span className="max-sm:col-span-2 sm:justify-self-end">
+                  <span className="nums text-ink-700 max-md:hidden">{s.phone ?? "—"}</span>
+                  <span className="break-all text-ink-600 max-md:order-3 max-md:col-span-2">
+                    {s.email}
+                    {s.phone ? <span className="nums md:hidden"> · {s.phone}</span> : null}
+                  </span>
+                  <span className="text-ink-700 max-md:hidden">{[s.year ? yearLabel(s.year) : null, s.branch].filter(Boolean).join(", ") || "—"}</span>
+                  <span className="max-md:justify-self-end"><Pill tone={STATE[s.state].tone}>{STATE[s.state].label}</Pill></span>
+                  <span className="max-md:order-4 max-md:col-span-2 md:justify-self-end">
                     <RosterRemove email={s.email} name={s.name} />
                   </span>
                 </li>
@@ -144,16 +150,16 @@ export default async function RosterPage({ searchParams }: { searchParams?: Prom
             </ul>
             {pages > 1 ? (
               <nav aria-label="Pagination" className="flex items-center justify-between gap-3 border-t border-ink-100 px-5 py-3 text-sm">
-                <span className="nums text-text-subtle">Page {page} of {pages} · {coverage.notJoined.length.toLocaleString("en-IN")} not joined</span>
+                <span className="nums text-text-subtle">Page {page} of {pages} · {list.length.toLocaleString("en-IN")} students</span>
                 <span className="flex gap-4 font-medium text-brand-700">
-                  {page > 1 ? <Link href={`?page=${page - 1}`} className="inline-flex min-h-11 items-center rounded-full px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Previous</Link> : null}
-                  {page < pages ? <Link href={`?page=${page + 1}`} className="inline-flex min-h-11 items-center rounded-full px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Next</Link> : null}
+                  {page > 1 ? <Link href={href(page - 1)} className="inline-flex min-h-11 items-center rounded-full px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Previous</Link> : null}
+                  {page < pages ? <Link href={href(page + 1)} className="inline-flex min-h-11 items-center rounded-full px-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">Next</Link> : null}
                 </span>
               </nav>
             ) : null}
           </div>
         )}
-      </Panel>
+      </Surface>
     </div>
   );
 }

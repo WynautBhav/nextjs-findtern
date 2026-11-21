@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 
+import { pendingApprovalCount } from "@/lib/college/approvals";
 import { requireCollegeMutation } from "@/lib/college/guard";
 import { verifyFromRoster } from "@/lib/college/membership";
 import { parseRoster, removalEmails } from "@/lib/college/roster";
@@ -34,11 +35,15 @@ export async function POST(req: Request) {
           rollNo: sql`excluded.roll_no`,
           year: sql`excluded.year`,
           branch: sql`excluded.branch`,
+          // A list without a phone column never wipes numbers saved earlier.
+          phone: sql`coalesce(excluded.phone, ${schema.collegeRoster.phone})`,
         },
       });
   }
   const verified = await verifyFromRoster(g.ctx.college.id);
-  return NextResponse.json({ imported: rows.length, verified, errors: errors.slice(0, 20) });
+  // How many students with a Findtern account are now waiting for the officer (a count only; the list is on /college/approvals).
+  const waiting = await pendingApprovalCount(g.ctx.college.id, g.ctx.college.emailDomains).catch(() => 0);
+  return NextResponse.json({ imported: rows.length, verified, waiting, errors: errors.slice(0, 20) });
 }
 
 const removeSchema = z.object({ emails: z.array(z.string().max(320)).min(1).max(500) });

@@ -365,6 +365,9 @@ export function ConsoleShell({
             </nav> : null}
 
             <div className="ml-auto flex shrink-0 items-center gap-1.5 sm:gap-2">
+              {/* A page may show whose event this is here, opposite the Findtern logo (a college's campus drive:
+                  components/employer/drive-association.tsx). Empty, and so invisible, everywhere else. */}
+              <div id="shell-association" className="flex min-w-0 items-center empty:hidden" />
               {/* Customer consoles (the ones with `help`) open the chat from
                   here on desktop rather than from a floating button that
                   covers tables and rails; phones keep the floating one. */}
