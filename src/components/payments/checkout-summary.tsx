@@ -14,6 +14,8 @@ import { CheckoutPay } from "./checkout-pay";
 export type SummaryLine = {
   id: string;
   internId: string;
+  /** The candidate's profile (photo and initials before hire, as everywhere else). */
+  profileHref: string;
   /** Initials before hire, the name after. */
   who: string;
   roleTitle: string;
@@ -142,6 +144,12 @@ export function CheckoutSummary({
                         {l.roleTitle}
                         {l.projectName && l.projectName !== l.roleTitle ? ` · ${l.projectName}` : ""}
                       </span>
+                      <Link
+                        href={l.profileHref}
+                        className="mt-1 inline-flex min-h-6 items-center text-sm font-medium text-brand-700 underline-offset-4 hover:underline touch:min-h-11"
+                      >
+                        View profile<span className="sr-only"> of {l.who}</span>
+                      </Link>
                       <span className="nums mt-1.5 block text-sm text-ink-600">
                         {l.fullTimeCtcMinor != null
                           ? `Annual CTC ${m(l.fullTimeCtcMinor, l.currency)}`

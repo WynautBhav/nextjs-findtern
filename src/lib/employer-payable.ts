@@ -53,6 +53,7 @@ export type PayableLine = {
   /** True only once the intern is hired; checkout is pre-payment, so usually false. */
   nameUnlocked: boolean;
   internId: string;
+  projectId: string;
   projectName: string | null;
   roleTitle: string;
   durationLabel: string;
@@ -403,6 +404,7 @@ export async function payableCheckout(
         internInitials: namesById.get(proposal.internId)?.initials ?? "?",
         nameUnlocked: hiredIds.has(proposal.internId),
         internId: proposal.internId,
+        projectId: proposal.projectId,
         projectName: projectsById.get(proposal.projectId) ?? null,
         roleTitle: offer.roleTitle || projectsById.get(proposal.projectId) || "Internship",
         // EMH-23: a full-time offer has no duration; it is a one-time fee.

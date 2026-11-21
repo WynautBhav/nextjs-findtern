@@ -196,6 +196,7 @@ export default async function EmployerCheckout({
           lines={lines.map((line) => ({
             id: line.id,
             internId: line.internId,
+            profileHref: `/employer/intern/${encodeURIComponent(line.internId)}?project=${encodeURIComponent(line.projectId)}`,
             who: displayNameOf({ id: line.internId, fullName: line.internName, initials: line.internInitials }, line.nameUnlocked),
             roleTitle: line.roleTitle,
             projectName: line.projectName,
