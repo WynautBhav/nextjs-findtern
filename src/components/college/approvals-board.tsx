@@ -2,13 +2,16 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X } from "lucide-react";
+import { AtSign, Check, ListChecks, MousePointerClick, X } from "lucide-react";
+
+import { Initials } from "@/components/college/kit";
 
 import { EmptyScene, Pill, Surface, type Tone } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 import { buttonClass } from "@/components/ui/button";
 import { yearLabel } from "@/lib/college/labels";
 import { csrfFetch } from "@/lib/client-fetch";
+import { cn } from "@/lib/utils";
 import { formatDate } from "@/lib/format";
 
 export type ApprovalCandidate = {
@@ -27,10 +30,11 @@ export type RemovedRow = { userId: string; name: string; email: string; decidedA
 
 const MAX_BATCH = 100;
 
-const SOURCE: Record<ApprovalCandidate["source"], { label: string; tone: Tone }> = {
-  list: { label: "On the student list", tone: "live" },
-  college_email: { label: "College email", tone: "new" },
-  requested: { label: "Picked this college", tone: "waiting" },
+/** Why this account is offered: the proof, in words, so the officer never accepts on a guess. */
+const SOURCE: Record<ApprovalCandidate["source"], { label: string; why: string; tone: Tone; icon: React.ReactNode }> = {
+  list: { label: "On the student list", why: "Same name and email as a row on the student list", tone: "live", icon: <ListChecks aria-hidden /> },
+  college_email: { label: "College email", why: "Signed up with a verified college email address", tone: "new", icon: <AtSign aria-hidden /> },
+  requested: { label: "Picked this college", why: "Chose this college on Findtern, without a code", tone: "waiting", icon: <MousePointerClick aria-hidden /> },
 };
 
 /**
@@ -124,34 +128,36 @@ export function ApprovalsBoard({ candidates, removed, reviews = [], endpoint = "
                 {busy === "bulk" ? "Adding…" : chosen.length ? `Accept ${chosen.length}` : "Accept selected"}
               </button>
             </div>
-            <ul className="divide-y divide-ink-100">
-              {candidates.map((c) => (
-                <li key={c.userId} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center">
-                  <label className="flex min-w-0 flex-1 cursor-pointer items-start gap-3">
-                    <input type="checkbox" className="mt-1 size-4 shrink-0 accent-brand-700" checked={picked.has(c.userId)} onChange={() => toggle(c.userId)} aria-label={`Select ${c.name || c.email}`} />
-                    <span className="min-w-0">
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="font-medium text-ink-900">{c.name || c.email}</span>
-                        <Pill tone={SOURCE[c.source].tone}>{SOURCE[c.source].label}</Pill>
+            <ul className="grid gap-px bg-ink-100 md:grid-cols-2 md:[&>li:last-child:nth-child(odd)]:col-span-2">
+              {candidates.map((c, i) => {
+                const on = picked.has(c.userId);
+                return (
+                  <li key={c.userId} className={cn("rise flex flex-col gap-4 bg-white p-5 transition-colors", on && "bg-brand-50/60")} style={{ "--i": i } as React.CSSProperties}>
+                    <label className="flex min-w-0 cursor-pointer items-start gap-3">
+                      <input type="checkbox" className="mt-3 size-4 shrink-0 accent-brand-700" checked={on} onChange={() => toggle(c.userId)} aria-label={`Select ${c.name || c.email}`} />
+                      <Initials seed={c.userId} name={c.name || c.email} className="size-11 text-sm" />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-[0.9375rem] font-semibold text-ink-900">{c.name || c.email}</span>
+                        <span className="block break-all text-sm text-ink-600">{c.email}</span>
+                        <span className="mt-0.5 block text-xs text-text-subtle">
+                          {[c.rollNo, c.year ? yearLabel(c.year) : null, c.branch, c.accountSince ? `On Findtern since ${formatDate(c.accountSince)}` : null].filter(Boolean).join(" · ")}
+                        </span>
                       </span>
-                      <span className="mt-0.5 block break-all text-sm text-ink-600">
-                        {c.email}
+                    </label>
+                    <div className="flex flex-wrap items-center justify-between gap-3 pl-7">
+                      <Pill tone={SOURCE[c.source].tone} icon={SOURCE[c.source].icon}>{SOURCE[c.source].why}</Pill>
+                      <span className="flex shrink-0 gap-2">
+                        <button type="button" className={buttonClass({ size: "sm" })} disabled={busy !== null || readOnly} onClick={() => send([c.userId], "accept", c.userId)} aria-label={`Accept ${c.name || c.email}`}>
+                          <Check aria-hidden /> {busy === c.userId ? "Saving…" : "Accept"}
+                        </button>
+                        <button type="button" className={buttonClass({ size: "sm", variant: "outline" })} disabled={busy !== null || readOnly} onClick={() => deny(c)} aria-label={`Deny ${c.name || c.email}`}>
+                          <X aria-hidden /> Deny
+                        </button>
                       </span>
-                      <span className="mt-0.5 block text-xs text-text-subtle">
-                        {[c.rollNo, c.year ? yearLabel(c.year) : null, c.branch, c.accountSince ? `On Findtern since ${formatDate(c.accountSince)}` : null].filter(Boolean).join(" · ")}
-                      </span>
-                    </span>
-                  </label>
-                  <span className="flex shrink-0 gap-2 pl-7 sm:pl-0">
-                    <button type="button" className={buttonClass({ size: "sm" })} disabled={busy !== null || readOnly} onClick={() => send([c.userId], "accept", c.userId)} aria-label={`Accept ${c.name || c.email}`}>
-                      <Check aria-hidden /> {busy === c.userId ? "Saving…" : "Accept"}
-                    </button>
-                    <button type="button" className={buttonClass({ size: "sm", variant: "outline" })} disabled={busy !== null || readOnly} onClick={() => deny(c)} aria-label={`Deny ${c.name || c.email}`}>
-                      <X aria-hidden /> Deny
-                    </button>
-                  </span>
-                </li>
-              ))}
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </>
         )}

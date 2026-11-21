@@ -1,6 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 
-import { EmptyScene, PageHead, Surface } from "@/components/app/primitives";
+import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
+import { ArcGauge, CollegeHero, HeroStat, HeroStats } from "@/components/college/kit";
 import { InvoiceDownload } from "@/components/college/invoice-download";
 import { seatInvoiceInput } from "@/lib/college/seat-invoice";
 import { requireCollegeContext } from "@/lib/college/scope";
@@ -29,46 +30,74 @@ export default async function SeatsPage() {
   const money = (m: number) => formatMoney(m, "INR", { zeroLabel: false });
   const visible = batches.filter((b) => b.status !== "void");
 
+  const paid = visible.filter((b) => b.status === "paid");
+  const pending = visible.filter((b) => b.status === "pending");
+  const seatsPaid = paid.reduce((n, b) => n + b.seats, 0);
+  const showCode = Boolean(seat && !hasDriveOrder);
   return (
     <div className="space-y-6">
-      <PageHead title="Seats" lede="Each seat waives one student's AI interview fee." />
-      {seat && !hasDriveOrder ? (
-        <Surface className="p-5">
-          <p className="text-sm text-text-subtle">Legacy code (read-only). Existing students keep using it.</p>
-          <code className="select-all font-mono text-xl font-semibold tracking-widest">{seat.code}</code>
-          <p className="nums mt-1 text-sm text-text-subtle">
-            {seat.used} used · {seat.cap ?? "unlimited"} total · {seat.cap === null ? "unlimited" : Math.max(0, seat.cap - seat.used)} left
+      <CollegeHero title="Seats" lede="Each seat waives one student's AI interview fee.">
+        <div className="mt-8 grid gap-x-12 gap-y-8 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-end">
+          {showCode && seat && seat.cap !== null ? <ArcGauge used={seat.used} total={seat.cap} label="seats used" /> : null}
+          <HeroStats cols={3} className="mt-0">
+            <HeroStat lead={!showCode} label="Seats paid for" value={seatsPaid.toLocaleString("en-IN")} hint={`${paid.length} paid ${paid.length === 1 ? "batch" : "batches"}`} />
+            <HeroStat label="Paid to Findtern" value={money(paid.reduce((n, b) => n + b.amountMinor, 0))} hint="GST included" />
+            <HeroStat label="Awaiting payment" value={pending.length ? money(pending.reduce((n, b) => n + b.amountMinor, 0)) : "—"} hint={pending.length ? `${pending.reduce((n, b) => n + b.seats, 0)} seats on hold` : "Nothing due"} />
+          </HeroStats>
+        </div>
+      </CollegeHero>
+
+      {showCode && seat ? (
+        <Surface className="flex flex-wrap items-center justify-between gap-4 p-5">
+          <div className="min-w-0">
+            <p className="text-sm text-text-subtle">Legacy code (read-only). Existing students keep using it.</p>
+            <code className="mt-1 block select-all font-mono text-2xl font-semibold tracking-[0.14em] text-ink-900">{seat.code}</code>
+          </div>
+          <p className="nums text-sm text-ink-700">
+            <span className="font-semibold text-ink-900">{seat.used}</span> used · <span className="font-semibold text-ink-900">{seat.cap ?? "unlimited"}</span> total ·{" "}
+            <span className="font-semibold text-ink-900">{seat.cap === null ? "unlimited" : Math.max(0, seat.cap - seat.used)}</span> left
           </p>
         </Surface>
       ) : null}
-      <Surface className="divide-y divide-ink-200/80">
-        {visible.length === 0 ? (
+
+      {visible.length === 0 ? (
+        <Surface>
           <EmptyScene
             compact
             title="No seat batches"
             body="A batch appears here when your college buys seats, with its invoice once it is paid."
             who="Findtern - adds a batch when your college buys seats"
           />
-        ) : (
-          visible.map((b) => (
-            <div key={b.id} className="flex flex-wrap items-start justify-between gap-3 p-4">
-              <div className="min-w-0">
-                <p className="font-medium">{b.seats} seats · {money(b.amountMinor)}</p>
-                <p className="text-sm text-text-subtle">{formatDate(b.paidAt ?? b.createdAt)} · {b.status === "paid" ? `Paid · Invoice ${b.invoiceNumber}` : "Awaiting payment"}</p>
-                {b.status === "pending" && seller.bank ? (
-                  <p className="mt-1 text-sm">Pay {money(b.amountMinor)} to Findtern: {seller.bank.bankName}, a/c {seller.bank.accountNumber}, IFSC {seller.bank.ifsc}</p>
-                ) : null}
+        </Surface>
+      ) : (
+        <ul className="grid gap-4 lg:grid-cols-2">
+          {visible.map((b, i) => (
+            <li key={b.id} className="rise flex flex-col rounded-apple-xl border border-ink-200/80 bg-white" style={{ "--i": i } as React.CSSProperties}>
+              <div className="flex items-start justify-between gap-4 p-5 sm:p-6">
+                <div className="min-w-0">
+                  <p className="nums text-[2rem] font-semibold leading-none tracking-[-0.03em] text-ink-900">{b.seats.toLocaleString("en-IN")}</p>
+                  <p className="mt-1 text-sm text-text-subtle">seats</p>
+                </div>
+                <div className="text-right">
+                  <Pill tone={b.status === "paid" ? "paid" : "waiting"}>{b.status === "paid" ? "Paid" : "Awaiting payment"}</Pill>
+                  <p className="nums mt-2 text-lg font-semibold text-ink-900">{money(b.amountMinor)}</p>
+                </div>
               </div>
-              {b.status === "paid" ? (
-                <InvoiceDownload
-                  html={taxInvoiceHtml(seatInvoiceInput(b, ctx.college, seller))}
-                  fileName={`Invoice-${b.invoiceNumber}.pdf`}
-                />
-              ) : null}
-            </div>
-          ))
-        )}
-      </Surface>
+              {/* The tear line of a receipt: what was bought above, the paperwork below. */}
+              <div aria-hidden className="mx-5 border-t border-dashed border-ink-200 sm:mx-6" />
+              <div className="flex flex-1 flex-wrap items-center justify-between gap-3 p-5 sm:p-6">
+                <div className="min-w-0 text-sm text-ink-700">
+                  <p className="nums">{formatDate(b.paidAt ?? b.createdAt)}{b.status === "paid" ? ` · Invoice ${b.invoiceNumber}` : ""}</p>
+                  {b.status === "pending" && seller.bank ? (
+                    <p className="mt-1">Pay {money(b.amountMinor)} to Findtern: {seller.bank.bankName}, a/c {seller.bank.accountNumber}, IFSC {seller.bank.ifsc}</p>
+                  ) : null}
+                </div>
+                {b.status === "paid" ? <InvoiceDownload html={taxInvoiceHtml(seatInvoiceInput(b, ctx.college, seller))} fileName={`Invoice-${b.invoiceNumber}.pdf`} /> : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

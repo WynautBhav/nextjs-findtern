@@ -1,6 +1,7 @@
 import Link from "next/link";
 
-import { EmptyScene, PageHead, Pill, Surface, pillTabClass, type Tone } from "@/components/app/primitives";
+import { EmptyScene, Pill, Surface, pillTabClass, type Tone } from "@/components/app/primitives";
+import { CollegeHero, HeroStat, HeroStats, Initials, SplitBar } from "@/components/college/kit";
 import { RosterRemove } from "@/components/college/roster-remove";
 import { RosterImport } from "@/components/college/roster-import";
 import { CopyText } from "@/components/college/copy-text";
@@ -62,14 +63,32 @@ export default async function RosterPage({ searchParams }: { searchParams?: Prom
 
   return (
     <div className="space-y-6">
-      <PageHead
+      <CollegeHero
         title="Student list"
         lede={
           coverage.rosterSize
-            ? `${coverage.joined} of ${coverage.rosterSize} students on your list have joined Findtern.`
+            ? "Your own list of students, and where each one stands on Findtern."
             : "Add your students once. Findtern shows you who has joined, who already had an account, and who still needs a reminder."
         }
-      />
+        actions={notJoined.length > 0 ? <CopyText onDark text={invite} label="Copy invite message" /> : undefined}
+      >
+        {coverage.rosterSize > 0 ? (
+          <div className="mt-8 grid gap-x-10 gap-y-8 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-end">
+            <HeroStats cols={3} className="mt-0 grid-cols-2 lg:grid-cols-2">
+              <HeroStat lead label="On your list" value={coverage.rosterSize.toLocaleString("en-IN")} />
+              <HeroStat lead label="Joined" value={`${Math.round((coverage.joined / coverage.rosterSize) * 100)}%`} hint={`${coverage.joined} of ${coverage.rosterSize} students`} />
+            </HeroStats>
+            <SplitBar
+              label="Your list"
+              segments={[
+                { label: "joined", value: coverage.joined, className: "bg-accent-400" },
+                { label: "waiting for you", value: waiting, className: "bg-white/85" },
+                { label: "not joined yet", value: notJoined.length, className: "bg-white/25" },
+              ]}
+            />
+          </div>
+        ) : null}
+      </CollegeHero>
 
       {coverage.rosterSize > 0 ? (
         <details className="group rounded-apple-xl border border-ink-200/80 bg-white">
@@ -104,12 +123,7 @@ export default async function RosterPage({ searchParams }: { searchParams?: Prom
               </Link>
             ))}
           </nav>
-          {notJoined.length > 0 ? (
-            <span className="flex flex-wrap gap-2">
-              <CopyText text={invite} label="Copy invite message" />
-              <CopyText text={notJoined.map((s) => s.email).join(", ")} label={`Copy ${notJoined.length} emails`} />
-            </span>
-          ) : null}
+          {notJoined.length > 0 ? <CopyText text={notJoined.map((s) => s.email).join(", ")} label={`Copy ${notJoined.length} emails to remind`} /> : null}
         </div>
 
         {shown.length === 0 ? (
@@ -131,9 +145,12 @@ export default async function RosterPage({ searchParams }: { searchParams?: Prom
             <ul className="divide-y divide-ink-100">
               {shown.map((s) => (
                 <li key={s.email} className={`${GRID} grid items-center gap-x-4 gap-y-0.5 px-5 py-2 text-sm`}>
-                  <span className="min-w-0">
-                    <span className="block truncate font-medium text-ink-900">{s.name || "—"}</span>
-                    {s.rollNo ? <span className="nums block text-xs text-text-subtle">{s.rollNo}</span> : null}
+                  <span className="flex min-w-0 items-center gap-3">
+                    <Initials seed={s.email} name={s.name || s.email} className="size-8" />
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium text-ink-900">{s.name || "—"}</span>
+                      {s.rollNo ? <span className="nums block text-xs text-text-subtle">{s.rollNo}</span> : null}
+                    </span>
                   </span>
                   <span className="nums text-ink-700 max-md:hidden">{s.phone ?? "—"}</span>
                   <span className="break-all text-ink-600 max-md:order-3 max-md:col-span-2">

@@ -10,6 +10,7 @@ import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { COHORTS, aiStatusLabel, ago, yearLabel } from "@/lib/college/labels";
 import { cn } from "@/lib/utils";
 import { EmptyScene, Pill, SURFACE_CLASS, pillTabClass } from "@/components/app/primitives";
+import { Initials } from "./kit";
 import { NudgeButton } from "./nudge-button";
 import type { StudentRow } from "./types";
 
@@ -150,7 +151,7 @@ export function StudentTable({ students, now, initialFilter = "all" }: { student
           <div className="hidden overflow-x-auto md:block">
             <table className="w-full text-left text-sm">
               <caption className="sr-only">Students, {rows.length} shown</caption>
-              <thead className="border-b border-ink-100 bg-ink-50/60 text-sm font-semibold text-ink-700">
+              <thead className="border-b border-ink-100 text-xs font-medium text-text-subtle">
                 <tr>
                   <th scope="col" className="px-5 py-2.5">Student</th>
                   <th scope="col" className="px-3 py-2.5">Contact</th>
@@ -209,10 +210,16 @@ function Online({ at, now }: { at: string | null; now: number }) {
 function Ai({ s }: { s: StudentRow }) {
   const st = aiStatusLabel(s.aiStatus);
   if (st.done && s.score !== null) {
+    const tone = s.score >= 8 ? "bg-accent-500" : s.score >= 6 ? "bg-brand-600" : "bg-ink-400";
     return (
-      <span className="inline-flex items-baseline gap-1.5">
-        <span className="nums text-[0.9375rem] font-semibold text-ink-900">{s.score.toFixed(1)}</span>
-        <span className="text-xs text-text-subtle">/ 10</span>
+      <span className="inline-block w-24 align-middle">
+        <span className="flex items-baseline gap-1.5">
+          <span className="nums text-[0.9375rem] font-semibold text-ink-900">{s.score.toFixed(1)}</span>
+          <span className="text-xs text-text-subtle">/ 10</span>
+        </span>
+        <span aria-hidden className="mt-1 block h-1 overflow-hidden rounded-full bg-ink-100">
+          <span className={cn("block h-full rounded-full", tone)} style={{ width: `${s.score * 10}%` }} />
+        </span>
       </span>
     );
   }
@@ -241,17 +248,20 @@ function Contact({ s }: { s: StudentRow }) {
 function Row({ s, now }: { s: StudentRow; now: number }) {
   return (
     // The row opens the student: the name's link is stretched over it.
-    <tr className="relative hover:bg-ink-50/60">
+    <tr className="group relative transition-colors hover:bg-brand-50/50">
       <td className="px-5 py-3">
-        <Link
-          href={`/college/students/${s.userId}`}
-          className="font-medium text-ink-900 outline-none touch:inline-flex touch:min-h-11 touch:items-center after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
-        >
-          {s.name || s.email}
-        </Link>
-        <p className="mt-0.5 text-xs text-text-subtle">
-          {[s.rollNo, yearLabel(s.year), s.branch].filter(Boolean).join(" · ")}
-        </p>
+        <span className="flex items-center gap-3">
+          <Initials seed={s.userId} name={s.name || s.email} />
+          <span className="min-w-0">
+            <Link
+              href={`/college/students/${s.userId}`}
+              className="font-medium text-ink-900 outline-none touch:inline-flex touch:min-h-11 touch:items-center after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500"
+            >
+              {s.name || s.email}
+            </Link>
+            <span className="mt-0.5 block text-xs text-text-subtle">{[s.rollNo, yearLabel(s.year), s.branch].filter(Boolean).join(" · ")}</span>
+          </span>
+        </span>
       </td>
       <td className="px-3 py-3">
         <Contact s={s} />

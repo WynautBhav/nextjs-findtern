@@ -2013,3 +2013,19 @@ html {
     from { transform: scaleX(0); }
   }
 }
+
+/* ---- College console kit (components/college/kit.tsx) ---- */
+@media (prefers-reduced-motion: no-preference) {
+  .dot-pop {
+    animation: dot-pop 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes dot-pop {
+    from { transform: scale(0); opacity: 0; }
+  }
+  .arc-draw {
+    animation: arc-draw 900ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+  }
+  @keyframes arc-draw {
+    from { stroke-dasharray: 0 var(--arc-len, 252); }
+  }
+}

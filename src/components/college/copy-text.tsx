@@ -10,7 +10,7 @@ import { buttonClass } from "@/components/ui/button";
  * fails (no clipboard permission, an http page) says so instead of doing
  * nothing; the text is on screen to select by hand.
  */
-export function CopyText({ text, label, primary = false }: { text: string; label: string; primary?: boolean }) {
+export function CopyText({ text, label, primary = false, onDark = false }: { text: string; label: string; primary?: boolean; /** Sits on the dark hero: a white button. */ onDark?: boolean }) {
   const [state, setState] = useState<"idle" | "done" | "failed">("idle");
   return (
     <button
@@ -24,7 +24,7 @@ export function CopyText({ text, label, primary = false }: { text: string; label
         }
         setTimeout(() => setState("idle"), 2500);
       }}
-      className={buttonClass({ variant: primary && state === "idle" ? "primary" : "outline", size: "sm" })}
+      className={buttonClass({ variant: onDark ? "white" : primary && state === "idle" ? "primary" : "outline", size: onDark ? "md" : "sm" })}
     >
       {state === "done" ? <Check className="size-4 text-brand-700" aria-hidden /> : <Copy className="size-4" aria-hidden />}
       <span aria-live="polite">{state === "done" ? "Copied" : state === "failed" ? "Couldn't copy: select it instead" : label}</span>
