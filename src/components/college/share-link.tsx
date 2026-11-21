@@ -1,6 +1,7 @@
 "use client";
 
 import { shortDateTime } from "@/lib/format";
+import { buttonClass } from "@/components/ui/button";
 import { CopyText } from "./copy-text";
 
 
@@ -55,6 +56,15 @@ export function ShareLink({
           className="h-11 min-w-0 flex-1 rounded-apple-sm border border-ink-200 bg-white px-3 font-mono text-sm text-ink-800"
         />
         <CopyText primary text={url} label="Copy link" />
+      </div>
+      {/* Where placement cells actually send invitations: WhatsApp and email, with the message already written. */}
+      <div className="flex flex-wrap gap-2">
+        <a href={`https://wa.me/?text=${encodeURIComponent(message)}`} target="_blank" rel="noopener noreferrer" className={buttonClass({ variant: "outline", size: "sm" })}>
+          Send on WhatsApp<span className="sr-only"> (opens in a new tab)</span>
+        </a>
+        <a href={`mailto:?subject=${encodeURIComponent(`${collegeName}: virtual placement drive on Findtern`)}&body=${encodeURIComponent(message)}`} className={buttonClass({ variant: "outline", size: "sm" })}>
+          Send by email
+        </a>
       </div>
       <details className="group">
         <summary className="cursor-pointer text-sm font-medium text-brand-800">Invitation message for employers</summary>

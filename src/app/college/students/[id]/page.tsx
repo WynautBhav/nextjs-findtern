@@ -21,6 +21,16 @@ import { buttonClass } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
+/** How the student became one of the college's, in the officer's words. */
+const VERIFIED_BY: Record<string, string> = {
+  promo: "Verified by your student code",
+  roster: "On your roster",
+  email_domain: "College email verified",
+  college_code: "Joined with your college code",
+  drive_code: "Joined with a drive code",
+  tpo: "Accepted by your office",
+};
+
 const AXES = [
   ["communication", "Communication"],
   ["coding", "Coding"],
@@ -116,7 +126,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
               {student.status === "verified" ? (
                 <Pill tone="live">
                   <ShieldCheck className="size-3.5" aria-hidden />
-                  {student.verifiedBy === "promo" ? "Verified by your student code" : student.verifiedBy === "roster" ? "On your roster" : "College email verified"}
+                  {VERIFIED_BY[student.verifiedBy ?? ""] ?? "Verified"}
                 </Pill>
               ) : (
                 <Pill tone="waiting">{membershipLabel({ status: student.status, onRoster })}</Pill>
