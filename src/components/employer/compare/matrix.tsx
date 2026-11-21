@@ -51,9 +51,14 @@ export function MatrixRow({
           !last && "border-b",
         )}
       >
+        {/* Hint and "All level" sit beside the title, wrapping with it in the narrow column. */}
         <span className="[overflow-wrap:normal] hyphens-none">{label}</span>
-        {hint ? <span className="mt-0.5 block break-words text-xs font-normal leading-4 text-text-subtle">{hint}</span> : null}
-        {level ? <span className="mt-0.5 block text-xs font-normal leading-4 text-text-subtle">All level</span> : null}
+        {[hint, level ? "All level" : null].filter(Boolean).map((note) => (
+          <span key={note} className="break-words text-xs font-normal text-text-subtle">
+            {" · "}
+            {note}
+          </span>
+        ))}
       </th>
       {children}
     </tr>
