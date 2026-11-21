@@ -33,7 +33,8 @@ import { IdentityReviewQueue } from "./identity-review-queue";
 
 export const dynamic = "force-dynamic";
 
-const TABS = ["seats", "students", "drives", "wallet", "logins", "details"] as const;
+// "seats" is gone: a college is charged through orders only (the Orders tab). Old links to ?tab=seats land there.
+const TABS = ["drives", "students", "wallet", "logins", "details"] as const;
 type Tab = (typeof TABS)[number];
 
 export default async function AdminCollegePage({
@@ -45,7 +46,7 @@ export default async function AdminCollegePage({
 }) {
   const { id } = await params;
   const query = flattenParams(await searchParams);
-  const tab: Tab = (TABS as readonly string[]).includes(query.tab ?? "") ? (query.tab as Tab) : "seats";
+  const tab: Tab = (TABS as readonly string[]).includes(query.tab ?? "") ? (query.tab as Tab) : "drives";
   const perms = (await getSession())?.permissions;
   const canEdit = canWrite(perms, "/admin/colleges");
   const canMoney = allows(perms, ["transactions:write"]);
@@ -53,9 +54,10 @@ export default async function AdminCollegePage({
   const db = getDb();
   const [college] = await db.select().from(schema.colleges).where(eq(schema.colleges.id, id)).limit(1);
   if (!college) notFound();
-  const [approvals, defaultFeeMinor, orders, reviews, batches, [promo], summary, ledger, officers, [{ members }], leaveRows] = await Promise.all([
+  const [approvals, defaultFeeMinor, [{ rosterCount }], orders, reviews, batches, [promo], summary, ledger, officers, [{ members }], leaveRows] = await Promise.all([
     approvalsFor(id, college.emailDomains),
     getSetting("college_fee_per_student_minor").then(Number),
+    db.select({ rosterCount: sql<number>`count(*)::int` }).from(schema.collegeRoster).where(eq(schema.collegeRoster.collegeId, id)),
     listOrders(id),
     listPendingReviews(id),
     db.select().from(schema.collegeSeatBatches).where(eq(schema.collegeSeatBatches.collegeId, id)).orderBy(desc(schema.collegeSeatBatches.createdAt)),
@@ -79,14 +81,16 @@ export default async function AdminCollegePage({
     id: b.id, seats: b.seats, amountMinor: b.amountMinor, status: b.status, method: b.method, referenceId: b.referenceId, invoiceNumber: b.invoiceNumber, paidAt: b.paidAt?.toISOString() ?? null, createdAt: b.createdAt.toISOString(),
   }));
   const hasPaid = batches.some((b) => b.status === "paid");
+  // Seat batches bought the old way. A batch that backs an order is that order's invoice record and shows with the order, not here.
+  const legacyIds = new Set(batches.filter((b) => !b.driveOrderId).map((b) => b.id));
+  const legacyRows = rows.filter((r) => legacyIds.has(r.id));
   const loginRows = officers.map((o) => ({ id: o.id, name: o.name, email: o.email, lastLoginAt: o.lastLoginAt?.toISOString() ?? null }));
 
   const base = `/admin/colleges/${id}`;
-  const tabHref = (t: Tab) => `${base}${toQueryString({ tab: t === "seats" ? "" : t })}`;
+  const tabHref = (t: Tab) => `${base}${toQueryString({ tab: t === "drives" ? "" : t })}`;
   const tabs: AdminTabItem[] = [
-    { key: "seats", label: "Seats", href: tabHref("seats") },
+    { key: "drives", label: "Orders and codes", count: reviews.length || undefined, href: tabHref("drives") },
     { key: "students", label: "Students", count: approvals.candidates.length + approvals.reviews.length || undefined, href: tabHref("students") },
-    { key: "drives", label: "Drives", count: reviews.length || undefined, href: tabHref("drives") },
     { key: "wallet", label: "Wallet", count: summary.openRequest ? 1 : undefined, href: tabHref("wallet") },
     { key: "logins", label: "Logins", count: loginRows.length, href: tabHref("logins") },
     { key: "details", label: "Details", href: tabHref("details") },
@@ -95,7 +99,7 @@ export default async function AdminCollegePage({
   const waiting: { text: string; href: string; cta: string }[] = [];
   if (summary.openRequest) waiting.push({ text: `Withdrawal of ${formatMoney(summary.openRequest.amountMinor, "INR", { zeroLabel: false })} requested.`, href: tabHref("wallet"), cta: "Open Wallet" });
   if (approvals.reviews.length) waiting.push({ text: `${approvals.reviews.length} ${approvals.reviews.length === 1 ? "student match needs" : "student matches need"} your check before the college can have them.`, href: tabHref("students"), cta: "Open Students" });
-  if (reviews.length) waiting.push({ text: `${reviews.length} ${reviews.length === 1 ? "student match needs" : "student matches need"} your review.`, href: tabHref("drives"), cta: "Open Drives" });
+  if (reviews.length) waiting.push({ text: `${reviews.length} ${reviews.length === 1 ? "student match needs" : "student matches need"} your review.`, href: tabHref("drives"), cta: "Open Orders and codes" });
 
   // The Wallet tab shows the withdrawal itself, so a banner pointing at it from there repeats it.
   const waitingElsewhere = waiting.filter((w) => w.href !== tabHref(tab));
@@ -151,18 +155,6 @@ export default async function AdminCollegePage({
 
       <AdminTabs items={tabs} active={tab} label="College sections" />
 
-      {tab === "seats" ? (
-        <Panel>
-          <PanelHeader
-            title="Seats"
-            description={hasPaid ? "One shared code for the whole college. Each paid batch adds seats to it." : "One shared code for the whole college. It is issued, with the placement officer login, once the first batch is paid."}
-          />
-          <PanelBody>
-            <CollegeSeatBatches collegeId={id} batches={rows} seat={promo ? { code: promo.code, cap: promo.maxUsages, used: promo.usedCount } : null} canMoney={canMoney} />
-          </PanelBody>
-        </Panel>
-      ) : null}
-
       {tab === "students" ? (
         <Panel>
           <PanelHeader
@@ -177,9 +169,9 @@ export default async function AdminCollegePage({
       {tab === "drives" ? (
         <>
           <Panel>
-            <PanelHeader title="Drive orders" description="One personal code per student. Create an order, record its payment, upload the roster, then confirm to issue the codes." />
+            <PanelHeader title="Orders and codes" description="The one way a college pays: create an order for a number of students, record the payment once, then add the students. Each student is emailed a personal code." />
             <PanelBody>
-              <DriveOrdersPanel collegeId={id} collegeName={college.name} orders={orders} canMoney={canMoney} canWrite={canDrives} defaultFeeMinor={defaultFeeMinor} />
+              <DriveOrdersPanel collegeId={id} collegeName={college.name} orders={orders} canMoney={canMoney} canWrite={canDrives} defaultFeeMinor={defaultFeeMinor} rosterCount={rosterCount} />
             </PanelBody>
           </Panel>
           <CampaignPanel orderIds={orders.filter((o) => o.status === "paid").map((o) => o.id)} canWrite={canDrives} />
@@ -189,6 +181,16 @@ export default async function AdminCollegePage({
               <IdentityReviewQueue reviews={reviews} canWrite={canWrite(perms, "/api/admin/identity-reviews")} />
             </PanelBody>
           </Panel>
+          {legacyRows.length > 0 ? (
+            <details className="rounded-[var(--radius-admin-card)] bg-surface">
+              <summary className="cursor-pointer px-5 py-4 text-sm font-semibold text-foreground">
+                Earlier seat purchases <span className="font-normal text-text-subtle">({legacyRows.length}, the old shared-code way; no new ones can be added)</span>
+              </summary>
+              <div className="px-5 pb-5">
+                <CollegeSeatBatches collegeId={id} batches={legacyRows} seat={promo ? { code: promo.code, cap: promo.maxUsages, used: promo.usedCount } : null} canMoney={canMoney} allowNew={false} />
+              </div>
+            </details>
+          ) : null}
         </>
       ) : null}
 

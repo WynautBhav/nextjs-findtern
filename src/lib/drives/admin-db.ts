@@ -196,6 +196,27 @@ export type PreviewResult =
   | { needsMapping: false; headers: string[]; suggestedMapping: Mapping; view: ImportView };
 
 /** Reads the bytes, then stores (or returns) the preview. The server derives every row itself; nothing the client edits is trusted. */
+/** One CSV cell: quoted, quotes doubled, and a leading = + - @ neutralised so the row is never read as a formula downstream. */
+function csvCell(v: unknown): string {
+  const t = String(v ?? "").replace(/[\r\n]+/g, " ").trim();
+  return `"${(/^[=+\-@]/.test(t) ? `'${t}` : t).replace(/"/g, '""')}"`;
+}
+
+/**
+ * The college's own student list (college_roster, kept by the placement officer) as CSV bytes for `createImportPreview`:
+ * Name, Email, Phone, ordered so the same list always gives the same bytes (and so the same import). Null when the
+ * order does not exist or its college has no list.
+ */
+export async function collegeListCsv(orderId: string): Promise<Uint8Array | null> {
+  const res = await getDb().$client.query(
+    "SELECT r.name, r.email, r.phone FROM college_roster r JOIN college_drive_orders o ON o.college_id = r.college_id WHERE o.id = $1 ORDER BY r.email",
+    [orderId],
+  );
+  if (res.rows.length === 0) return null;
+  const lines = ["Name,Email,Phone", ...res.rows.map((r: Record<string, unknown>) => [r.name, r.email, r.phone].map(csvCell).join(","))];
+  return new TextEncoder().encode(lines.join("\n"));
+}
+
 export async function createImportPreview(input: { orderId: string; bytes: Uint8Array; fileName: string; mappingRaw: unknown | null; adminId: string }): Promise<PreviewResult> {
   let all: string[][];
   try { all = readRosterRows(input.bytes); } catch { throw new HttpError(400, "That file could not be read as CSV or Excel"); }
@@ -255,7 +276,7 @@ async function verifyMembership(c: PgClient, internId: string, collegeId: string
   // Never moves a student between colleges and never touches users: only an own-college membership is created or upgraded.
   // A student the placement office denied is skipped (college_denials, approvals.ts); only a restore brings them back.
   await c.query(
-    "INSERT INTO college_memberships (user_id, college_id, status, verified_by) SELECT $1,$2,'verified','roster' WHERE NOT EXISTS (SELECT 1 FROM college_denials d WHERE d.college_id = $2 AND d.user_id = $1) ON CONFLICT (user_id) DO UPDATE SET status = 'verified', verified_by = 'roster', left_at = NULL WHERE college_memberships.college_id = EXCLUDED.college_id",
+    "INSERT INTO college_memberships (user_id, college_id, status, verified_by) SELECT $1::varchar,$2::varchar,'verified','roster' WHERE NOT EXISTS (SELECT 1 FROM college_denials d WHERE d.college_id = $2::varchar AND d.user_id = $1::varchar) ON CONFLICT (user_id) DO UPDATE SET status = 'verified', verified_by = 'roster', left_at = NULL WHERE college_memberships.college_id = EXCLUDED.college_id",
     [internId, collegeId],
   );
 }

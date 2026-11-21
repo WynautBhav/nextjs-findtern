@@ -37,7 +37,7 @@ export type CollegeSeatBatchesProps = {
 
 const field = "h-9 rounded-md border border-ink-200 bg-surface px-2 text-sm touch:min-h-11";
 
-export function CollegeSeatBatches({ collegeId, batches, seat, canMoney }: CollegeSeatBatchesProps) {
+export function CollegeSeatBatches({ collegeId, batches, seat, canMoney, allowNew = true }: CollegeSeatBatchesProps & { /** False once orders are the only way to charge a college: old batches can still be settled, none can be added. */ allowNew?: boolean }) {
   const router = useRouter();
   const { ask, dialog } = useConfirm();
   const [seats, setSeats] = useState("300");
@@ -83,7 +83,7 @@ export function CollegeSeatBatches({ collegeId, batches, seat, canMoney }: Colle
       <p className="text-sm text-ink-600">
         {seat ? `Student code ${seat.code}: ${seat.used} of ${seat.cap ?? "unlimited"} seats used.` : "No code yet. It is created when the first batch is marked paid."}
       </p>
-      {canMoney ? (
+      {canMoney && allowNew ? (
         <form
           className="flex flex-wrap items-end gap-3"
           onSubmit={async (e) => {

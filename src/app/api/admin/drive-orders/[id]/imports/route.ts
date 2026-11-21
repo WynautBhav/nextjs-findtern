@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getSession } from "@/lib/auth";
 import { requireMutation } from "@/lib/guards-mutation";
-import { createImportPreview, errorResponse, listImports, readDenied } from "@/lib/drives/admin-db";
+import { collegeListCsv, createImportPreview, errorResponse, listImports, readDenied } from "@/lib/drives/admin-db";
 import { MAX_UPLOAD_BYTES, sniffRosterFile } from "@/lib/drives/admin-rules";
 
 type Ctx = { params: Promise<{ id: string }> };
@@ -23,6 +23,23 @@ export async function GET(req: Request, ctx: Ctx) {
 export async function POST(req: Request, ctx: Ctx) {
   const g = await requireMutation({ req, roles: ["admin"] });
   if (!g.ok) return g.response;
+  // The college keeps its own student list in its console (name, phone, email). Using it here is the normal path:
+  // the same rows go through the same checks as an uploaded file, so nothing about the import rules changes.
+  if ((req.headers.get("content-type") ?? "").includes("application/json")) {
+    const body = (await req.json().catch(() => null)) as { source?: unknown } | null;
+    if (body?.source !== "college_list") return NextResponse.json({ error: "Choose a CSV or Excel file." }, { status: 400 });
+    try {
+      const orderId = (await ctx.params).id;
+      const bytes = await collegeListCsv(orderId);
+      if (!bytes) return NextResponse.json({ error: "This college has not added its student list yet. Ask the placement officer to add it in their console, or upload a file here." }, { status: 409 });
+      const out = await createImportPreview({ orderId, bytes, fileName: "College student list", mappingRaw: { name: 0, email: 1, phone: 2 }, adminId: g.session.uid });
+      if (out.needsMapping) return NextResponse.json({ error: "The college's list could not be read." }, { status: 500 });
+      const v = out.view;
+      return NextResponse.json({ ok: true, needsMapping: false, importId: v.importId, status: v.status, replayed: v.replayed, headers: out.headers, suggestedMapping: out.suggestedMapping, mapping: v.mapping, rows: v.rows, truncated: v.truncated, counts: v.counts });
+    } catch (e) {
+      return errorResponse(e);
+    }
+  }
   const len = Number(req.headers.get("content-length") ?? 0);
   if (len > MAX_UPLOAD_BYTES + 64 * 1024) return NextResponse.json({ error: "The file is larger than 5 MB." }, { status: 413 });
   const form = await req.formData().catch(() => null);

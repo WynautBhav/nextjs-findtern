@@ -70,3 +70,9 @@
 - **Default fee per student** is the admin setting `college_fee_per_student_minor` (₹800), edited on the admin Colleges page. A drive order still stores its own fee.
 - **Employers inside a drive** see "In association with <college>" and its logo in the top bar, opposite the Findtern logo (admin sets the logo link in the college's Details tab). Names stay initials until a paid hire, as everywhere else. A student who is also in Findtern's candidate pool gets a "Profile and offer" link to the usual profile page.
 - **A new drive opens straight away** and shows every verified student unless the officer narrows it.
+
+## Changed 21 Nov 2026 (owner decision: one way to charge a college)
+- **Orders are the only way a college is charged.** The admin college page had two money flows doing the same job: Seats (a batch of seats, one shared code) and Drives (an order, one personal code per student). The owner chose the order with personal codes. The Seats tab is gone; the "Orders and codes" tab is one flow in three steps per order: payment received, students added, codes sent.
+- **Students come from the college's own list.** Step 2 offers "Use the college's student list" (the list the placement officer keeps in their console) and falls back to a file upload. The same rows go through the same import checks either way.
+- **Old seat batches are history.** They show folded under "Earlier seat purchases"; a pending one can still be marked paid or voided, none can be added from the screen. The seat-batch API is unchanged.
+- **Defaults on a new order:** fee from the admin setting, codes valid for 90 days; credit and the validity date are under "More options".

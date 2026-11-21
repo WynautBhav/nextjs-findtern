@@ -562,7 +562,7 @@ const noHorizontalScroll = (page) => page.evaluate(() => document.documentElemen
 test("12 mobile 390x844: admin drive panel has no horizontal scroll and its headings", async () => {
   const page = await login("/api/auth/admin/login", ADMIN, MOBILE);
   await page.goto(`${BASE}/admin/colleges/${college.id}?tab=drives`, { waitUntil: "domcontentloaded" });
-  await page.getByText("Drive orders", { exact: true }).first().waitFor({ timeout: 20_000 });
+  await page.getByText("Orders and codes", { exact: true }).first().waitFor({ timeout: 20_000 });
   await page.getByText("Identity review", { exact: true }).first().waitFor();
   assert.ok(await noHorizontalScroll(page), "page scrolls sideways at 390px");
   await page.context().close();

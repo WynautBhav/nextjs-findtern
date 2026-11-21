@@ -31,7 +31,7 @@ const REASON: Record<string, string> = {
 const field = "h-9 w-full rounded-md border border-ink-200 bg-surface px-2 text-sm touch:min-h-11";
 
 /** Upload a roster, map its columns, read the preview and confirm. The server re-derives every row on confirm. */
-export function DriveImportPanel({ order }: { order: OrderDto }) {
+export function DriveImportPanel({ order, rosterCount = 0 }: { order: OrderDto; /** Students on the college's own list (its console). */ rosterCount?: number }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [mapping, setMapping] = useState<Mapping>({});
@@ -40,6 +40,7 @@ export function DriveImportPanel({ order }: { order: OrderDto }) {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [attempt] = useState(() => crypto.randomUUID());
+  const [fromCollege, setFromCollege] = useState(false);
 
   async function upload(f: File, m: Mapping | null) {
     setBusy(true);
@@ -62,7 +63,27 @@ export function DriveImportPanel({ order }: { order: OrderDto }) {
     }
   }
 
+  /** The normal path: take the students from the list the college keeps in its own console. No file, no column mapping. */
+  async function takeCollegeList() {
+    setBusy(true);
+    setError(null);
+    setDone(null);
+    setFile(null);
+    try {
+      const res = await csrfFetch(`/api/admin/drive-orders/${order.id}/imports`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ source: "college_list" }) });
+      const data = (await res.json().catch(() => null)) as (Partial<Preview> & { error?: string }) | null;
+      if (!res.ok || !data) return setError(data?.error ?? "That did not work. Try again.");
+      setFromCollege(true);
+      setMapping(data.mapping ?? {});
+      setPreview({ importId: data.importId ?? null, needsMapping: false, headers: data.headers ?? [], mapping: data.mapping ?? {}, rows: data.rows ?? [], counts: data.counts ?? null, status: data.status ?? "preview", truncated: !!data.truncated });
+    } catch {
+      setError("Could not reach the server. Check your connection and try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
   function pick(f: File | null) {
+    setFromCollege(false);
     setFile(f);
     setPreview(null);
     setError(null);
@@ -97,21 +118,30 @@ export function DriveImportPanel({ order }: { order: OrderDto }) {
 
   return (
     <div className="space-y-4" aria-busy={busy}>
-      <ol className="flex flex-wrap gap-x-4 gap-y-1 text-xs" aria-label="Import steps">
-        {["Upload", "Map columns", "Preview", "Confirm"].map((s, i) => {
-          const cur = preview?.status === "confirmed" ? 3 : !preview ? 0 : !counts || preview.needsMapping ? 1 : canConfirm ? 3 : 2;
-          return <li key={s} aria-current={i === cur ? "step" : undefined} className={i === cur ? "font-semibold text-ink-900" : "text-ink-500"}>{i + 1}. {s}{i < cur ? " (done)" : ""}</li>;
-        })}
-      </ol>
-      <label className="block text-sm">Roster file (CSV or Excel, up to 5 MB)
-        <input type="file" accept=".csv,.xlsx,text/csv" className={field} onChange={(e) => pick(e.target.files?.[0] ?? null)} />
-      </label>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className={`rounded-lg border p-3.5 ${rosterCount ? "border-brand-300 bg-brand-50/60" : "border-ink-200"}`}>
+          <p className="text-sm font-semibold text-ink-900">Use the college&apos;s student list</p>
+          <p className="mt-0.5 text-sm text-ink-600">
+            {rosterCount ? <><span className="nums font-medium text-ink-900">{rosterCount}</span> students the placement officer added in their console (name, phone, email).</> : "The placement officer has not added a student list in their console yet."}
+          </p>
+          <button type="button" disabled={busy || rosterCount === 0} className={`${buttonClass({ variant: "primary", size: "sm" })} mt-3`} onClick={takeCollegeList}>
+            {busy && fromCollege ? "Reading…" : "Use this list"}
+          </button>
+        </div>
+        <div className="rounded-lg border border-ink-200 p-3.5">
+          <label className="block text-sm font-semibold text-ink-900">Or upload a file
+            <span className="mt-0.5 block font-normal text-ink-600">CSV or Excel with name, email and phone, up to 5 MB.</span>
+            <input type="file" accept=".csv,.xlsx,text/csv" className={`${field} mt-3`} onChange={(e) => pick(e.target.files?.[0] ?? null)} />
+          </label>
+        </div>
+      </div>
       {busy && !preview ? <p className="text-sm text-ink-500" role="status">Reading the file…</p> : null}
       {error ? <p role="alert" className="text-sm text-danger">{error}</p> : null}
-      {order.status !== "paid" ? <p className="text-sm text-ink-500">You can preview a roster now. Codes can be issued once the order is paid.</p> : null}
+      {order.status !== "paid" ? <p className="text-sm text-ink-500">You can check the list now. Codes are sent once the payment is recorded.</p> : null}
 
       {preview ? (
         <>
+          {fromCollege ? null : (
           <fieldset className="grid gap-3 sm:grid-cols-3" disabled={busy || preview.status === "confirmed"}>
             <legend className="mb-1 text-sm font-medium">Which column is which?</legend>
             {(["name", "email", "phone"] as const).map((k) => (
@@ -126,6 +156,7 @@ export function DriveImportPanel({ order }: { order: OrderDto }) {
               <button type="button" disabled={!file || !mapOk || busy} className={buttonClass({ variant: "outline", size: "sm" })} onClick={() => file && upload(file, mapping)}>Apply columns</button>
             </div>
           </fieldset>
+          )}
 
           {preview.needsMapping ? <p className="text-sm text-ink-500">We could not tell which columns hold name and email. Choose them, then apply.</p> : null}
 
@@ -153,9 +184,9 @@ export function DriveImportPanel({ order }: { order: OrderDto }) {
               </div>
               {preview.truncated ? <p className="text-xs text-ink-500">Showing the first 1,000 rows. Counts cover the whole file.</p> : null}
               <div className="flex flex-wrap items-center gap-3">
-                <button type="button" disabled={!canConfirm} className={buttonClass({ variant: "primary", size: "sm" })} onClick={confirm}>{busy ? "Working…" : "Confirm and issue codes"}</button>
+                <button type="button" disabled={!canConfirm} className={buttonClass({ variant: "primary", size: "sm" })} onClick={confirm}>{busy ? "Working…" : counts ? `Send codes to ${counts.valid} ${counts.valid === 1 ? "student" : "students"}` : "Send codes"}</button>
                 {preview.status === "confirmed" ? <Pill tone="paid">Confirmed</Pill> : null}
-                {!canConfirm && preview.status === "preview" ? <p className="text-xs text-ink-500" role="status">{blockers.length ? "Fix the problems above and upload the file again to confirm." : order.status !== "paid" ? "Confirm unlocks once the order is marked paid." : busy ? "Working…" : "Nothing to confirm yet."}</p> : null}
+                {!canConfirm && preview.status === "preview" ? <p className="text-xs text-ink-500" role="status">{blockers.length ? fromCollege ? "Ask the placement officer to fix these rows in their student list, then use the list again." : "Fix the problems above and upload the file again to confirm." : order.status !== "paid" ? "Confirm unlocks once the order is marked paid." : busy ? "Working…" : "Nothing to confirm yet."}</p> : null}
               </div>
             </div>
           ) : null}
