@@ -1990,3 +1990,26 @@ html {
 }
 .range-brand:focus-visible::-webkit-slider-thumb { outline: 3px solid rgb(22 107 84 / 0.35); outline-offset: 2px; }
 .range-brand:focus-visible::-moz-range-thumb { outline: 3px solid rgb(22 107 84 / 0.35); outline-offset: 2px; }
+
+/* ---- College Overview drawings (components/college/overview-charts.tsx): transform and clip-path only ---- */
+@media (prefers-reduced-motion: no-preference) {
+  .ribbon-reveal {
+    animation: ribbon-reveal 900ms cubic-bezier(0.22, 1, 0.36, 1) 120ms both;
+  }
+  @keyframes ribbon-reveal {
+    from { clip-path: inset(0 100% 0 0); }
+    to { clip-path: inset(0 0 0 0); }
+  }
+  .bar-rise {
+    animation: bar-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes bar-rise {
+    from { transform: scaleY(0); }
+  }
+  .bar-slide {
+    animation: bar-slide 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes bar-slide {
+    from { transform: scaleX(0); }
+  }
+}

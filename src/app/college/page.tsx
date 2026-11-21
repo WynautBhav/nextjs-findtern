@@ -4,7 +4,9 @@ import { ArrowRight } from "lucide-react";
 
 import { PresenceLive } from "@/components/college/presence-live";
 import { CopyText } from "@/components/college/copy-text";
-import { aiStatusLabel } from "@/lib/college/labels";
+import { aiStatusLabel, yearLabel } from "@/lib/college/labels";
+import { BatchRibbon, BranchBoard, ScoreCurve, TopOfBatch } from "@/components/college/overview-charts";
+import { CollegeMark } from "@/components/employer/drive-parts";
 import { pendingApprovalCount } from "@/lib/college/approvals";
 import { eligibleStudents, presenceSnapshot, requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { pendingLeaveCount } from "@/lib/college/leave-request-read";
@@ -93,7 +95,27 @@ export default async function CollegeOverview() {
     { label: "AI interview done", value: interviewed.length, hint: med === null ? "Scores appear after the first interview" : `Median score ${med.toFixed(1)} of 10`, href: "/college/students?show=no_interview" },
     { label: "Got an offer", value: withOffers, hint: waiting.length ? `${waiting.length} still to reply` : "From employers on Findtern", href: "/college/students?show=offers" },
   ];
-  const funnelTop = funnel[0].value;
+
+  const topStudents = interviewed
+    .filter((s) => s.score !== null)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .slice(0, 5)
+    .map((s) => ({ userId: s.userId, name: `${s.firstName} ${s.lastName}`.trim() || s.email, meta: [s.year ? yearLabel(s.year) : null, s.branch].filter(Boolean).join(" · "), score: s.score ?? 0 }));
+  const byBranch = new Map<string, { students: number; interviewed: number; sum: number; scored: number }>();
+  for (const s of students) {
+    const b = byBranch.get(s.branch ?? "Branch not set") ?? { students: 0, interviewed: 0, sum: 0, scored: 0 };
+    b.students++;
+    if (aiStatusLabel(s.aiStatus).done) b.interviewed++;
+    if (s.score !== null) {
+      b.sum += s.score;
+      b.scored++;
+    }
+    byBranch.set(s.branch ?? "Branch not set", b);
+  }
+  const branchRows = [...byBranch.entries()]
+    .map(([branch, b]) => ({ branch, students: b.students, interviewed: b.interviewed, avg: b.scored ? b.sum / b.scored : null }))
+    .sort((a, b) => b.students - a.students)
+    .slice(0, 8);
 
   const firstRun = students.length === 0 && coverage.rosterSize === 0;
 
@@ -101,30 +123,19 @@ export default async function CollegeOverview() {
     <div className="space-y-6">
       <HeroPanel className="rise">
         <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-5">
-          <div className="min-w-0">
-            <h1 className="text-balance text-[clamp(1.75rem,3.4vw,2.5rem)] font-light leading-tight tracking-[-0.03em]">{ctx.college.name}</h1>
-            <p className="mt-1.5 text-sm text-on-dark-subtle">Placement office{ctx.college.city ? `, ${ctx.college.city}` : ""}</p>
+          <div className="flex min-w-0 items-center gap-4">
+            <CollegeMark name={ctx.college.name} logoUrl={ctx.college.logoUrl} className="size-14 rounded-2xl bg-white/10 text-base ring-1 ring-white/20" />
+            <div className="min-w-0">
+              <h1 className="text-balance text-[clamp(1.75rem,3.4vw,2.5rem)] font-light leading-tight tracking-[-0.03em]">{ctx.college.name}</h1>
+              <p className="mt-1 text-sm text-on-dark-subtle">Placement office{ctx.college.city ? `, ${ctx.college.city}` : ""}</p>
+            </div>
           </div>
           <div className="flex w-full flex-wrap gap-2.5 sm:w-auto">
             <ButtonLink href="/college/drives/new" variant="white">New campus drive link</ButtonLink>
             <ButtonLink href="/college/roster" variant="outlineLight">Add students</ButtonLink>
           </div>
         </div>
-        {/* The batch as a funnel: each step is drawn against the first, so the drop between steps is the thing you read. */}
-        <ol className="mt-8 grid grid-cols-2 gap-x-6 gap-y-6 lg:grid-cols-4" aria-label="Your batch, step by step">
-          {funnel.map((f) => (
-            <li key={f.label} className="relative min-w-0">
-              <Link href={f.href} className="block rounded-lg outline-none after:absolute after:-inset-2 after:rounded-xl after:content-[''] hover:after:bg-white/5 focus-visible:after:ring-2 focus-visible:after:ring-white/70">
-                <span className="block text-[13px] font-medium text-on-dark-subtle">{f.label}</span>
-                <span className="nums mt-1.5 block text-[clamp(2rem,4vw,2.75rem)] font-light leading-none tracking-[-0.04em]">{f.value.toLocaleString("en-IN")}</span>
-                <span aria-hidden className="mt-3 block h-1 overflow-hidden rounded-full bg-white/15">
-                  <span className="block h-full rounded-full bg-accent-400" style={{ width: `${funnelTop ? Math.max(f.value ? 3 : 0, Math.round((f.value / funnelTop) * 100)) : 0}%` }} />
-                </span>
-                <span className="mt-2 block text-xs text-on-dark-subtle">{f.hint}</span>
-              </Link>
-            </li>
-          ))}
-        </ol>
+        <BatchRibbon stages={funnel} />
       </HeroPanel>
 
       {firstRun ? (
@@ -173,6 +184,37 @@ export default async function CollegeOverview() {
 
       {liveDrive && presence ? (
         <PresenceLive driveId={liveDrive.id} driveTitle={liveDrive.title} endsAt={liveDrive.endsAt.toISOString()} initial={{ ...presence }} />
+      ) : null}
+
+      {scores.length > 0 ? (
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+          <Surface className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">How your batch scores</h2>
+              <p className="text-sm text-text-subtle"><span className="nums">{scores.length}</span> interviewed, out of 10</p>
+            </div>
+            <ScoreCurve scores={scores} median={med} />
+          </Surface>
+          <Surface className="p-5 sm:p-6">
+            <div className="flex items-baseline justify-between gap-2">
+              <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Top of the batch</h2>
+              <Link href="/college/students" className="text-sm font-medium text-brand-700 hover:underline">All students</Link>
+            </div>
+            <TopOfBatch students={topStudents} />
+          </Surface>
+        </div>
+      ) : null}
+
+      {branchRows.length > 1 ? (
+        <Surface className="p-5 sm:p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Branch by branch</h2>
+            <p className="text-sm text-text-subtle">Filled part: students who have taken the AI interview</p>
+          </div>
+          <div className="mt-5 lg:columns-2 lg:gap-x-10 [&_li]:break-inside-avoid">
+            <BranchBoard rows={branchRows} />
+          </div>
+        </Surface>
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">
