@@ -136,7 +136,7 @@ function BookMeetingForm({
       <DialogHeader>
         <DialogTitle>Book a meeting with {candidateLabel}</DialogTitle>
         <DialogDescription>
-          {projectName ? `For ${projectName}. ` : ""}Pick {REQUIRED_SLOTS} times the candidate can choose from, on the quarter hour. We suggest the next quarter hour and the
+          {projectName ? `For ${projectName}. ` : ""}Pick {REQUIRED_SLOTS} time slots the candidate can choose from, on the quarter hour. We suggest the next quarter hour and the
           two hours after it; change any. The candidate chooses one of them.
         </DialogDescription>
       </DialogHeader>
@@ -146,7 +146,7 @@ function BookMeetingForm({
           <CheckCircle2 className="mx-auto size-8 text-brand-700" aria-hidden />
           <p id="meeting-sent-title" className="mt-2 text-base font-semibold text-ink-900">Times offered</p>
           <p id="meeting-sent-body" className="mt-1 text-sm text-ink-600">
-            It is on your Schedule as &ldquo;Waiting on candidate&rdquo; until they choose one of your 3 times.
+            It is on your Schedule as &ldquo;Waiting on candidate&rdquo; until they choose one of your 3 time slots.
           </p>
           {/* The form that held focus is gone: focus lands here and reads the result with it. */}
           <button
@@ -194,7 +194,7 @@ function BookMeetingForm({
               )}
             </div>
             <p className="mt-1.5 text-xs text-text-subtle">
-              {lockTimezone ? "Set by the project." : "Set from your company's location."} The candidate sees the times in IST.
+              {lockTimezone ? "Set by the project." : "Set from your company's location."} The candidate sees the time slots in IST.
             </p>
           </div>
           {shownError ? (
@@ -208,7 +208,7 @@ function BookMeetingForm({
             </button>
             <button type="submit" disabled={busy || cannotSend(slots, timezone)} className={buttonClass({ variant: "primary", size: "sm", className: "min-h-11" })}>
               {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
-              Offer 3 times
+              Offer 3 time slots
             </button>
           </DialogFooter>
         </form>

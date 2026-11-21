@@ -70,14 +70,14 @@ const refuse = (code: string, error: string): Refusal => ({ ok: false, code, err
 
 /** What an offer of `slots` (UTC instants) must satisfy. Exactly three, on the quarter hour, future, within a year, distinct. */
 export function checkOffer(slots: Date[], now: number = Date.now()): { ok: true; slots: Date[]; respondBy: Date } | Refusal {
-  if (slots.length !== REQUIRED_SLOTS) return refuse("need_three_slots", "Offer exactly three times for the candidate to choose from.");
-  if (slots.some((d) => Number.isNaN(d.getTime()))) return refuse("bad_slot", "One of the times is not valid.");
+  if (slots.length !== REQUIRED_SLOTS) return refuse("need_three_slots", "Offer exactly three time slots for the candidate to choose from.");
+  if (slots.some((d) => Number.isNaN(d.getTime()))) return refuse("bad_slot", "One of the time slots is not valid.");
   if (!slots.every((d) => d.getUTCSeconds() === 0 && d.getUTCMinutes() % 15 === 0)) {
     return refuse("not_quarter_hour", "Slots start on the hour or at :15, :30 or :45.");
   }
   if (slots.some((d) => d.getTime() < now)) return refuse("slot_past", "Slots must be in the future");
   if (hasSlotTooFarAhead(slots, now)) return refuse("slot_far", "Pick slots within the next year.");
-  if (hasDuplicateSlots(slots)) return refuse("slot_duplicate", "Offer different times - two slots are the same.");
+  if (hasDuplicateSlots(slots)) return refuse("slot_duplicate", "Offer different time slots - two slots are the same.");
   const sorted = [...slots].sort((a, b) => a.getTime() - b.getTime());
   return { ok: true, slots: sorted, respondBy: respondByFor(sorted, now) };
 }
@@ -106,9 +106,9 @@ export const isRescheduleRequest = (s: MeetingState): boolean => isPending(s) &&
 /** The side that did not make the standing offer may pick from it (the intern from the employer's three; the employer only from a pre-change intern offer). */
 export function canChoose(s: MeetingState, role: Role, now: number = Date.now()): { ok: true } | Refusal {
   if (!isPending(s)) return refuse("not_pending", `This meeting is already ${(s.status ?? "closed").toLowerCase()}`);
-  if (isRescheduleRequest(s)) return refuse("awaiting_times", "Waiting for the company to offer new times.");
+  if (isRescheduleRequest(s)) return refuse("awaiting_times", "Waiting for the company to offer new time slots.");
   if (proposerOf(s) === role) return refuse("own_offer", "You made this offer; the other side picks.");
-  if (isLapsed(s, now)) return refuse("lapsed", "This offer has lapsed. The company can offer new times.");
+  if (isLapsed(s, now)) return refuse("lapsed", "This offer has lapsed. The company can offer new time slots.");
   return { ok: true };
 }
 
@@ -125,7 +125,7 @@ export function canCancel(s: MeetingState, now: number = Date.now()): { ok: true
 
 /** The employer offers three new times: for a booked, expired, requested or still-open meeting. Interns never offer times. */
 export function canReschedule(s: MeetingState, role: Role): { ok: true } | Refusal {
-  if (role !== "employer") return refuse("employer_only", "Only the company offers times. Ask to reschedule instead.");
+  if (role !== "employer") return refuse("employer_only", "Only the company offers time slots. Ask to reschedule instead.");
   const status = (s.status ?? "").toLowerCase();
   if (status === "scheduled" || status === "expired" || status === "pending") return { ok: true };
   return refuse("not_open", `This meeting is already ${status || "closed"}`);
@@ -133,7 +133,7 @@ export function canReschedule(s: MeetingState, role: Role): { ok: true } | Refus
 
 /** The intern asks the company for new times (no times of their own): an open offer or a booked time that has not started. */
 export function canRequestReschedule(s: MeetingState, now: number = Date.now()): { ok: true } | Refusal {
-  if (isRescheduleRequest(s)) return refuse("already_requested", "You already asked to reschedule. The company will offer new times.");
+  if (isRescheduleRequest(s)) return refuse("already_requested", "You already asked to reschedule. The company will offer new time slots.");
   const status = (s.status ?? "").toLowerCase();
   if (status === "pending") return { ok: true };
   if (status === "scheduled") {
@@ -191,7 +191,7 @@ const fresh = (round: number, offer: { slots: Date[]; respondBy: Date }): Fields
   cancelReason: null,
 });
 
-const CLASH_OFFER = "One of these times clashes with another meeting. Pick different times.";
+const CLASH_OFFER = "One of these time slots clashes with another meeting. Pick different time slots.";
 
 /** Checks an employer offer (three future distinct quarter-hour times that clash with no confirmed meeting of either party). */
 function employerOffer(slots: Date[], busy: number[] | undefined, now: number) {
@@ -207,7 +207,7 @@ function employerOffer(slots: Date[], busy: number[] | undefined, now: number) {
  */
 export function step(current: MeetingState | undefined, action: Action, now: number = Date.now()): { ok: true; fields: Fields } | Refusal {
   if (action.type === "propose") {
-    if (action.by !== "employer") return refuse("employer_only", "Only the company offers times.");
+    if (action.by !== "employer") return refuse("employer_only", "Only the company offers time slots.");
     const offer = employerOffer(action.slots, action.busy, now);
     return offer.ok ? { ok: true, fields: fresh(1, offer) } : offer;
   }

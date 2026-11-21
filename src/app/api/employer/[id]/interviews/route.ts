@@ -35,7 +35,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!guard.ok) return guard.response;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Offer exactly three times for the candidate to choose from." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Offer exactly three time slots for the candidate to choose from." }, { status: 400 });
   // A made-up zone is refused even when the project's own zone would override it (B-43).
   if (parsed.data.timezone !== undefined && !isKnownTimezone(parsed.data.timezone)) {
     return NextResponse.json({ error: "Unknown timezone. Use a region such as Asia/Kolkata." }, { status: 400 });
@@ -118,7 +118,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     to: { type: "intern", id: b.internId },
     type: "interview_pending",
     title: "Choose a time",
-    message: "A company offered you 3 times for an interview. Choose one that works for you.",
+    message: "A company offered you 3 time slots for an interview. Choose one that works for you.",
     data: { interviewId: interview.id },
     email: emails.interviewInvitation({
       internName: await internFirstName(b.internId),

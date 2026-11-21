@@ -769,7 +769,7 @@ step("intern 1: opens the invitation and books a time on /intern/interviews [UI]
   const confirm = page.getByRole("button", { name: /^Book (?!this time)/ });
   await page.waitForLoadState("load");
   for (let attempt = 0; attempt < 6 && !(await confirm.isVisible()); attempt++) {
-    await page.getByRole("list", { name: "Offered times" }).getByRole("button").first().click();
+    await page.getByRole("list", { name: "Offered time slots" }).getByRole("button").first().click();
     await confirm.waitFor({ state: "visible", timeout: 2500 }).catch(() => {});
   }
   const res = await clickFor(page, confirm, { path, method: "POST" });
@@ -1561,12 +1561,12 @@ step("US employer: shortlists both, books intern 3 in the cart form (default tim
   const body = await ip.locator("body").innerText();
   assert.match(body, /converted from the company's New York time/i, "the intern is told the times are converted from New York");
   assert.ok(!body.includes(EMPLOYER2.companyName), "the company is hidden before the hire");
-  const offered = await ip.getByRole("list", { name: "Offered times" }).innerText();
+  const offered = await ip.getByRole("list", { name: "Offered time slots" }).innerText();
   assert.ok(offered.toLowerCase().includes(clockIst(iv.slot1).toLowerCase()), `the first offered time reads ${clockIst(iv.slot1)} in India (got ${offered.replace(/\s+/g, " ")})`);
   await shot("us-intern3-converted-times");
   const confirm = ip.getByRole("button", { name: /^Book (?!this time)/ });
   for (let attempt = 0; attempt < 6 && !(await confirm.isVisible()); attempt++) {
-    await ip.getByRole("list", { name: "Offered times" }).getByRole("button").first().click();
+    await ip.getByRole("list", { name: "Offered time slots" }).getByRole("button").first().click();
     await confirm.waitFor({ state: "visible", timeout: 2500 }).catch(() => {});
   }
   expectOk("select-slot (intern 3)", await clickFor(ip, confirm, { path: `/api/interviews/${state.interview3Id}/select-slot`, method: "POST" }));

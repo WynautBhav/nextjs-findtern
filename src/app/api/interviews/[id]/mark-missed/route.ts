@@ -19,7 +19,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!td.ok) return td.response;
 
   // The employer is the one who did not show; the candidate cannot be marked missed for it.
-  if (employerNoShow(interview)) return NextResponse.json({ error: "This interview expired: the employer did not join within 30 minutes of the start. Offer new times instead." }, { status: 409 });
+  if (employerNoShow(interview)) return NextResponse.json({ error: "This interview expired: the employer did not join within 30 minutes of the start. Offer new time slots instead." }, { status: 409 });
   // Only a scheduled interview, and only once its start plus a 15-minute
   // grace period has passed (legacy R:11851).
   if (!["scheduled", "expired"].includes(interview.status) || !interview.selectedSlot || !canMarkMissed(interview)) {

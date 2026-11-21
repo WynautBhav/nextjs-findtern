@@ -30,7 +30,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
   if (employerNoShow(interview)) {
     return NextResponse.json(
-      { error: "This interview expired: the employer did not join within 30 minutes of the start. Offer new times instead." },
+      { error: "This interview expired: the employer did not join within 30 minutes of the start. Offer new time slots instead." },
       { status: 409 },
     );
   }

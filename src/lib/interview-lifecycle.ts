@@ -138,8 +138,8 @@ export function interviewExpiryNotices(i: { interviewId: string; booked: boolean
     return {
       employer: i.employerTakenDown
         ? null
-        : { title: "Meeting offer lapsed", message: `The times for your meeting with ${i.initials} were not answered in time. Offer new times if you still want to meet.`, data: { ...data, link: "/employer/schedule" } },
-      intern: { title: "Meeting offer lapsed", message: "The times for your meeting were not answered in time, so the offer lapsed. The company can offer new times.", data: { ...data, link: "/intern/interviews" } },
+        : { title: "Meeting offer lapsed", message: `The time slots for your meeting with ${i.initials} were not answered in time. Offer new time slots if you still want to meet.`, data: { ...data, link: "/employer/schedule" } },
+      intern: { title: "Meeting offer lapsed", message: "The time slots for your meeting were not answered in time, so the offer lapsed. The company can offer new time slots.", data: { ...data, link: "/intern/interviews" } },
     };
   }
   return {
@@ -149,14 +149,14 @@ export function interviewExpiryNotices(i: { interviewId: string; booked: boolean
           title: "Interview time passed",
           message: i.booked
             ? `Your interview with ${i.initials} on ${i.whenEmployer} has passed and was not marked complete. Schedule again if you still want to meet.`
-            : `${i.initials} did not pick any of the times you offered, and they have all passed. Schedule again with new times.`,
+            : `${i.initials} did not pick any of the time slots you offered, and they have all passed. Schedule again with new time slots.`,
           data: { ...data, link: "/employer/schedule" },
         },
     intern: {
       title: "Interview time passed",
       message: i.booked
         ? `Your interview on ${i.whenIntern} has passed. If it did not happen, the company can schedule it again.`
-        : "The times offered for your interview have passed. The company can offer new ones.",
+        : "The time slots offered for your interview have passed. The company can offer new ones.",
       data: { ...data, link: "/intern/interviews" },
     },
   };

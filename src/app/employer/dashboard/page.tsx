@@ -168,7 +168,7 @@ export default async function EmployerDashboard() {
       {
         count: data.pendingInterviews,
         label: data.pendingInterviews === 1 ? "meeting waiting on the candidate" : "meetings waiting on candidates",
-        detail: "They pick one of the three times you offered. Send a reminder from your schedule if it's been a while.",
+        detail: "They pick one of the three time slots you offered. Send a reminder from your schedule if it's been a while.",
         href: "/employer/schedule",
         cta: "Open schedule",
         yours: false,

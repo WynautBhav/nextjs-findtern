@@ -64,7 +64,7 @@ export function OfferReply({
     <div className="space-y-4">
       <fieldset className="min-w-0">
         <legend className="w-full text-pretty text-sm text-ink-700">
-          {intern || inIst ? "Choose one of these 3 times. Times are in India time (IST)." : `Choose one of these times. Times are in ${zone}, with the candidate's IST beside each.`}
+          {intern || inIst ? "Choose one of these 3 time slots. Times are in India time (IST)." : `Choose one of these time slots. Times are in ${zone}, with the candidate's IST beside each.`}
         </legend>
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
           {slots.map((slot) => {

@@ -45,16 +45,16 @@ const THREE = ["2026-11-20T10:00", "2026-11-20T11:00", "2026-11-20T12:00"];
 
 test("an offer carries exactly three times: one, two or four is refused with a count", () => {
   assert.equal(offerProblem(THREE), null);
-  assert.match(offerProblem([THREE[0]]) ?? "", /Pick 3 times for the candidate to choose from \(1 of 3 set\)/);
+  assert.match(offerProblem([THREE[0]]) ?? "", /Pick 3 time slots for the candidate to choose from \(1 of 3 set\)/);
   assert.match(offerProblem(THREE.slice(0, 2)) ?? "", /\(2 of 3 set\)/);
   assert.match(offerProblem([]) ?? "", /\(0 of 3 set\)/);
-  assert.match(offerProblem([...THREE, "2026-11-20T13:00"]) ?? "", /Pick 3 times/);
+  assert.match(offerProblem([...THREE, "2026-11-20T13:00"]) ?? "", /Pick 3 time slots/);
 });
 
 test("a blank, off-quarter or repeated slot stops the send", () => {
   assert.match(offerProblem([THREE[0], THREE[1], ""]) ?? "", /2 of 3 set/);
   assert.match(offerProblem(["2026-11-20T10:10", THREE[1], THREE[2]]) ?? "", /quarter|:15/);
-  assert.match(offerProblem([THREE[0], THREE[0], THREE[2]]) ?? "", /3 different times/);
+  assert.match(offerProblem([THREE[0], THREE[0], THREE[2]]) ?? "", /3 different time slots/);
 });
 
 test("cannotSend joins the whole-offer rule with the per-slot ones", () => {

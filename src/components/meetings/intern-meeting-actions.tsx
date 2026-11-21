@@ -40,7 +40,7 @@ export function RescheduleRequestPanel({ interviewId, booked, onClose }: { inter
     <div className="rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4">
       <p className="text-sm font-semibold text-ink-900">Ask the company to reschedule</p>
       <p className="mt-1 text-sm leading-relaxed text-ink-600">
-        The company offers 3 new times and you choose one.{booked ? " Your booked time is released." : ""} You don&apos;t pick the times yourself.
+        The company offers 3 new time slots and you choose one.{booked ? " Your booked time is released." : ""} You don&apos;t pick the time slots yourself.
       </p>
       <label htmlFor={`${id}-note`} className={cn(labelClass, "mt-3 block")}>
         Reason (optional)

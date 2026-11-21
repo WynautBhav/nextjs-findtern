@@ -30,18 +30,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const td = await assertInterviewActionable(id, guard.session.uid);
   if (!td.ok) return td.response;
   if (interview.status === "expired") {
-    return NextResponse.json({ error: "This interview's time has passed. Offer new times instead." }, { status: 409 });
+    return NextResponse.json({ error: "This interview's time has passed. Offer new time slots instead." }, { status: 409 });
   }
   if (interview.status !== "scheduled" && interview.status !== "pending") {
     return NextResponse.json({ error: `This interview is already ${interview.status}` }, { status: 409 });
   }
 
-  if (employerNoShow(interview)) return NextResponse.json({ error: "This interview expired: the employer did not join within 30 minutes of the start. Offer new times instead." }, { status: 409 });
-  if (hasNoSlotsToPick(interview)) return NextResponse.json({ error: "There are no times left to pick. Offer new times first." }, { status: 409 });
+  if (employerNoShow(interview)) return NextResponse.json({ error: "This interview expired: the employer did not join within 30 minutes of the start. Offer new time slots instead." }, { status: 409 });
+  if (hasNoSlotsToPick(interview)) return NextResponse.json({ error: "There are no time slots left to pick. Offer new time slots first." }, { status: 409 });
 
   // A meeting that is running now can still be nudged; one that is over, or an invite whose slots all passed, cannot.
   if (interview.status === "pending" ? isStaleInterview(interview) : isMeetingOver(interview)) {
-    return NextResponse.json({ error: "This interview's time has passed. Offer new times instead." }, { status: 409 });
+    return NextResponse.json({ error: "This interview's time has passed. Offer new time slots instead." }, { status: 409 });
   }
 
   // One nudge per interview per 10 minutes, so it can't be used to spam the candidate.

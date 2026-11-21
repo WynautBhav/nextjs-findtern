@@ -54,7 +54,7 @@ export function OpenMeetingRow({ i, title, company, serverNow }: { i: InterviewR
       ) : view.requested ? (
         <div className="space-y-3">
           <p className="text-pretty text-sm text-ink-700">
-            You asked the company to reschedule. They will offer 3 new times and you choose one.
+            You asked the company to reschedule. They will offer 3 new time slots and you choose one.
             {i.cancelReason ? (
               <>
                 {" "}
@@ -66,7 +66,7 @@ export function OpenMeetingRow({ i, title, company, serverNow }: { i: InterviewR
         </div>
       ) : slots.length === 0 ? (
         <div className="space-y-3">
-          <p className="text-pretty text-sm text-text-subtle">The company has not sent its times yet. They appear here as soon as they are set.</p>
+          <p className="text-pretty text-sm text-text-subtle">The company has not sent its time slots yet. They appear here as soon as they are set.</p>
           <InternMeetingActions interviewId={i.id} canCancel={view.canCancel} canRequestReschedule={false} />
         </div>
       ) : view.turn === "yours" ? (
@@ -74,9 +74,9 @@ export function OpenMeetingRow({ i, title, company, serverNow }: { i: InterviewR
       ) : (
         <div className="space-y-3">
           <p className="text-pretty text-sm text-ink-700">
-            {mine ? "These are times you sent earlier. The company picks one or offers new times." : view.lapsed ? "These times have lapsed. Ask to reschedule, or wait for the company to offer new ones." : "The company has not confirmed a time yet."} Times are in India time (IST).
+            {mine ? "These are time slots you sent earlier. The company picks one or offers new time slots." : view.lapsed ? "These time slots have lapsed. Ask to reschedule, or wait for the company to offer new ones." : "The company has not confirmed a time yet."} Times are in India time (IST).
           </p>
-          <ul className="flex flex-wrap gap-2" aria-label="Times offered">
+          <ul className="flex flex-wrap gap-2" aria-label="Time slots offered">
             {slots.map((slot) => (
               <li key={slot.index} className="nums rounded-apple-sm border border-ink-200/80 bg-surface-raised px-3 py-2 text-sm font-medium text-ink-900">
                 {formatIst(slot.iso)}
@@ -174,7 +174,7 @@ function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: Reac
       label: "Expired",
       tone: "closed",
       icon: <CalendarX2 />,
-      detail: i.selectedSlot ? "This interview's time passed and it was not marked complete. The company can offer new times." : "Nobody picked a time before the offer ran out, so it expired.",
+      detail: i.selectedSlot ? "This interview's time passed and it was not marked complete. The company can offer new time slots." : "Nobody picked a time before the offer ran out, so it expired.",
     };
   }
   if (status === "completed" || i.selectedSlot) {

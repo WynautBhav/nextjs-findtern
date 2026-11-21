@@ -304,8 +304,8 @@ export const emails = {
     lines: [
       `You’ve received a meeting invitation from ${o.companyName}${o.project ? ` for ${o.project}` : ""}.`,
       o.slots?.length
-        ? `Choose one of these times${o.timezone ? ` (${o.timezone})` : ""}:`
-        : "They’ve offered you three times to choose from.",
+        ? `Choose one of these time slots${o.timezone ? ` (${o.timezone})` : ""}:`
+        : "They’ve offered you three time slots to choose from.",
     ],
     bullets: o.slots?.length ? o.slots : ["View the available slots", "Select the time that works best for you", "Confirm the meeting"],
     status: "Awaiting your choice",
@@ -327,11 +327,11 @@ export const emails = {
 
   /** The company offered exactly three times and the candidate chooses one (`revised`: new times after a reschedule). Times arrive pre-formatted in IST. */
   meetingProposed: (o: { name: string; other: string; times: string[]; zone: string; revised?: boolean; project?: string | null }): EmailContent => ({
-    subject: o.revised ? "New times for your meeting | Findtern" : "Choose a time for your meeting | Findtern",
+    subject: o.revised ? "New time slots for your meeting | Findtern" : "Choose a time for your meeting | Findtern",
     preheader: `${o.other} offered ${o.times.length} times. Choose the one that works.`,
-    heading: o.revised ? "New times for your meeting" : "Choose a time for your meeting",
+    heading: o.revised ? "New time slots for your meeting" : "Choose a time for your meeting",
     greeting: hi(o.name),
-    lines: [`${o.other} ${o.revised ? "offered new times to meet" : "offered times to meet"}${o.project ? ` about ${o.project}` : ""}. Choose one (${o.zone}). If none work, ask to reschedule and they will offer new times.`],
+    lines: [`${o.other} ${o.revised ? "offered new time slots to meet" : "offered time slots to meet"}${o.project ? ` about ${o.project}` : ""}. Choose one (${o.zone}). If none work, ask to reschedule and they will offer new time slots.`],
     bullets: o.times,
     status: "Awaiting your choice",
     cta: ctaTo("Choose a time", "/intern/interviews"),
@@ -340,13 +340,13 @@ export const emails = {
   /** The candidate asked to reschedule without proposing times: the company is asked for three new ones. */
   meetingRescheduleRequested: (o: { name: string; candidate: string; reason?: string | null; project?: string | null }): EmailContent => ({
     subject: "Candidate asked to reschedule | Findtern",
-    preheader: "Please offer 3 new times.",
+    preheader: "Please offer 3 new time slots.",
     heading: "A candidate asked to reschedule",
     greeting: hi(o.name),
-    lines: [`The candidate asked to reschedule${o.project ? ` the meeting about ${o.project}` : ""}: please offer 3 new times.`],
+    lines: [`The candidate asked to reschedule${o.project ? ` the meeting about ${o.project}` : ""}: please offer 3 new time slots.`],
     facts: [["Candidate", o.candidate], ...(o.reason ? ([["Their note", o.reason]] as [string, string][]) : [])],
-    status: "Offer 3 new times",
-    cta: ctaTo("Offer 3 times", "/employer/schedule"),
+    status: "Offer 3 new time slots",
+    cta: ctaTo("Offer 3 time slots", "/employer/schedule"),
   }),
 
   /** A confirmed meeting. `gateUrl` is Findtern's own /meet/<token> page: the raw Meet link never goes in mail. */
@@ -381,10 +381,10 @@ export const emails = {
     preheader: "Nobody picked a time in time.",
     heading: "The meeting offer lapsed",
     greeting: hi(o.name),
-    lines: [`The times for the meeting with ${o.other} were not answered in time, so the offer lapsed. ${o.forEmployer ? "You can offer 3 new times." : "The company can offer new times."}`],
+    lines: [`The time slots for the meeting with ${o.other} were not answered in time, so the offer lapsed. ${o.forEmployer ? "You can offer 3 new time slots." : "The company can offer new time slots."}`],
     status: "Lapsed",
     tone: "wait",
-    cta: ctaTo(o.forEmployer ? "Offer 3 new times" : "Open dashboard", o.forEmployer ? "/employer/schedule" : "/intern/interviews"),
+    cta: ctaTo(o.forEmployer ? "Offer 3 new time slots" : "Open dashboard", o.forEmployer ? "/employer/schedule" : "/intern/interviews"),
   }),
 
   /** The employer's nudge about a pending or scheduled interview (send-reminder route). `text` is the same line as the in-app note. */

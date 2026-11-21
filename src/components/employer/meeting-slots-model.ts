@@ -49,10 +49,10 @@ const WALL = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 export function offerProblem(slots: readonly string[]): string | null {
   const filled = slots.filter((s) => WALL.test(s)).length;
   if (slots.length !== REQUIRED_SLOTS || filled < REQUIRED_SLOTS) {
-    return `Pick ${REQUIRED_SLOTS} times for the candidate to choose from (${filled} of ${REQUIRED_SLOTS} set). Set a date and time for every slot.`;
+    return `Pick ${REQUIRED_SLOTS} time slots for the candidate to choose from (${filled} of ${REQUIRED_SLOTS} set). Set a date and time for every slot.`;
   }
   if (!slots.every(isQuarterHourWall)) return "Slots start on the hour or at :15, :30 or :45.";
-  if (new Set(slots).size !== slots.length) return "Offer 3 different times: two slots are the same.";
+  if (new Set(slots).size !== slots.length) return "Offer 3 different time slots: two slots are the same.";
   return null;
 }
 

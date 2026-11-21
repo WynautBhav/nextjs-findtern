@@ -485,7 +485,7 @@ step("intern: picks a slot on /intern/interviews [UI]", ["interviewId"], async (
       const body = await page.locator("body").innerText();
       assert.ok(!body.includes(EMPLOYER.companyName), "interviews page hides the company before hire");
       // Two steps: select one of the offered times, then the Book button names it.
-      await page.getByRole("list", { name: "Offered times" }).getByRole("button").first().click();
+      await page.getByRole("list", { name: "Offered time slots" }).getByRole("button").first().click();
       const res = await clickFor(page, page.getByRole("button", { name: /^Book (?!this time)/ }), { path, method: "POST" });
       expectOk(`POST ${path}`, res);
     },

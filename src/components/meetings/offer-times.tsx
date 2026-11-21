@@ -19,7 +19,7 @@ export function OfferTimes({
   timezone,
   title,
   hint,
-  submitLabel = "Offer these 3 times",
+  submitLabel = "Offer these 3 time slots",
   onClose,
   onSent,
 }: {
@@ -63,7 +63,7 @@ export function OfferTimes({
     <div className="rounded-apple-lg border border-ink-200/80 bg-ink-50/70 p-4">
       <p className="text-sm font-semibold text-ink-900">{title}</p>
       <p className="mt-1 text-sm leading-relaxed text-ink-600">
-        {hint ?? `Pick ${REQUIRED_SLOTS} times the candidate can choose from. We suggest the next quarter hour and the two hours after it; change any.`} Times are in{" "}
+        {hint ?? `Pick ${REQUIRED_SLOTS} time slots the candidate can choose from. We suggest the next quarter hour and the two hours after it; change any.`} Times are in{" "}
         {timezone === "Asia/Kolkata" ? "India time (IST)" : timezone}.
       </p>
       <div className="mt-3">

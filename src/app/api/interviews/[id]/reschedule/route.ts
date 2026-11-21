@@ -17,7 +17,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const guard = await requireMutation({ req, roles: ["employer"] });
   if (!guard.ok) return guard.response;
   const parsed = slotsBody.safeParse(await req.json().catch(() => ({})));
-  if (!parsed.success) return NextResponse.json({ error: "Offer exactly three times." }, { status: 400 });
+  if (!parsed.success) return NextResponse.json({ error: "Offer exactly three time slots." }, { status: 400 });
   const db = getDb();
   const [iv] = await db.select().from(schema.interviews).where(eq(schema.interviews.id, id)).limit(1);
   if (!iv) return NextResponse.json({ error: "Not found" }, { status: 404 });

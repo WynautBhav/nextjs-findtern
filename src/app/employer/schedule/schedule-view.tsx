@@ -81,7 +81,7 @@ export function ScheduleView({
     <div>
       <PageHead
         title="Schedule"
-        lede={all.length === 0 ? "Meetings you book with candidates land here, with what to do about each one." : "Times show in each meeting's own time zone. The join link works from here."}
+        lede={all.length === 0 ? "Meetings you book with candidates land here, with what to do about each one." : "Time slots show in each meeting's own time zone. The join link works from here."}
         action={
           <Link href="/employer/cart" className={buttonClass({ variant: "outline", size: "sm" })}>
             <CalendarDays className="size-4" aria-hidden />
@@ -254,13 +254,13 @@ function ScheduleRow({ r, now, past, employerId }: { r: Row; now: number; past: 
   const pill = cancelled
     ? { label: "Cancelled", tone: "closed" as Tone, icon: <CalendarX2 /> }
     : requested
-        ? { label: "Offer 3 new times", tone: "new" as Tone, icon: undefined }
+        ? { label: "Offer 3 new time slots", tone: "new" as Tone, icon: undefined }
         : theirs
-      ? { label: "Candidate proposed times", tone: "new" as Tone, icon: undefined }
+      ? { label: "Candidate proposed time slots", tone: "new" as Tone, icon: undefined }
       : { label: STAGE[stage].label, tone: STAGE[stage].tone, icon: stage === "expired" ? <CalendarX2 /> : undefined };
   const lapsedOffer = stage === "expired" && !iv.selectedSlot;
   const clock = r.sortAt === null ? null : clockOf(r.sortAt, r.tz);
-  const lead = waiting ? (slots.length ? `${slots.length} time${slots.length === 1 ? "" : "s"}` : "No times") : (clock?.time ?? "To be confirmed");
+  const lead = waiting ? (slots.length ? `${slots.length} time slot${slots.length === 1 ? "" : "s"}` : "No time slots") : (clock?.time ?? "To be confirmed");
   const sub = waiting ? clock?.zone : past && r.sortAt !== null ? `${formatSlotDay(new Date(r.sortAt), r.tz)} · ${clock?.zone ?? ""}` : clock?.zone;
   const offered = slots.map((s) => {
     const c = clockOf(new Date(s).getTime(), r.tz);
@@ -294,11 +294,11 @@ function ScheduleRow({ r, now, past, employerId }: { r: Row; now: number; past: 
             {waiting ? (
               <>
                 <span aria-hidden>·</span>
-                <span>{requested ? "Candidate asked to reschedule" : iv.proposedBy === "intern" ? "Candidate proposed" : "You offered 3 times"}</span>
+                <span>{requested ? "Candidate asked to reschedule" : iv.proposedBy === "intern" ? "Candidate proposed" : "You offered 3 time slots"}</span>
               </>
             ) : null}
           </p>
-          {lapsedOffer ? <p className="mt-1 text-sm text-ink-600">Nobody picked a time before the offer ran out. Offer 3 new times.</p> : null}
+          {lapsedOffer ? <p className="mt-1 text-sm text-ink-600">Nobody picked a time before the offer ran out. Offer 3 new time slots.</p> : null}
           {cancelled ? (
             <p className="mt-1 text-sm text-ink-600">
               {iv.cancelledBy === "intern" ? "The candidate cancelled this meeting." : iv.cancelledBy === "employer" ? "You cancelled this meeting." : "This meeting was cancelled."}
@@ -307,13 +307,13 @@ function ScheduleRow({ r, now, past, employerId }: { r: Row; now: number; past: 
           ) : null}
           {waiting && !theirs && offered.length ? (
             <p className="nums mt-1 text-sm text-ink-600">
-              <span className="sr-only">Offered times: </span>
+              <span className="sr-only">Offered time slots: </span>
               {offered.join(" · ")}
             </p>
           ) : null}
           {requested ? (
             <p className="mt-1 text-sm text-ink-600">
-              The candidate asked to reschedule: please offer 3 new times.
+              The candidate asked to reschedule: please offer 3 new time slots.
               {iv.cancelReason ? (
                 <>
                   {" "}

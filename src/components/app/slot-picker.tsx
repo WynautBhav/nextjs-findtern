@@ -99,7 +99,7 @@ export function SlotPicker({
     return (
       <div>
         <Booked iso={bookedSlot.iso} join={join} serverNow={serverNow} justBooked={Boolean(booked && !chosen)} />
-        <ul className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="The three offered times">
+        <ul className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="The three offered time slots">
           {slots.map((slot) => {
             const mine = slot.index === bookedSlot.index;
             return (
@@ -142,7 +142,7 @@ export function SlotPicker({
         {otherZone ? `, converted from the company's ${otherZone} time` : ""}.
       </p>
 
-      <ul className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="Offered times">
+      <ul className="mt-4 grid gap-2 sm:grid-cols-3" aria-label="Offered time slots">
         {slots.map((slot) => {
           const on = selected === slot.index;
           return (

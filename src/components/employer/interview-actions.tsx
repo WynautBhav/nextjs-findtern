@@ -169,7 +169,7 @@ export function InterviewActions({
   const theirOffer = stage === "awaiting_pick" && turn === "yours";
   const canRemind = (stage === "awaiting_pick" && !theirOffer && !requested) || stage === "upcoming";
   const canReschedule = stage === "awaiting_pick" || stage === "expired" || stage === "employer_no_show" || stage === "upcoming";
-  const rescheduleLabel = stage === "upcoming" ? "Reschedule" : requested ? "Offer 3 times" : "Offer 3 new times";
+  const rescheduleLabel = stage === "upcoming" ? "Reschedule" : requested ? "Offer 3 time slots" : "Offer 3 new time slots";
   const missedShown = canMarkMissed && (stage === "live" || stage === "over");
   // Join is offered on every booked row; with no link yet it is disabled and says why (bug sheet 12 Nov, row 12).
   const linkShown = stage === "upcoming" || stage === "live";
@@ -274,16 +274,16 @@ export function InterviewActions({
           <OfferTimes
             interviewId={interviewId}
             timezone={timezone}
-            title={stage === "upcoming" ? "Offer 3 new times" : "Offer 3 times"}
+            title={stage === "upcoming" ? "Offer 3 new time slots" : "Offer 3 time slots"}
             hint={
               stage === "upcoming"
-                ? "The booked time is released and the candidate chooses again. Pick 3 times they can choose from."
+                ? "The booked time is released and the candidate chooses again. Pick 3 time slots they can choose from."
                 : requested
-                  ? "The candidate asked to reschedule. Pick 3 times they can choose from."
+                  ? "The candidate asked to reschedule. Pick 3 time slots they can choose from."
                   : undefined
             }
             onSent={() => {
-              setNotice("3 new times offered. The candidate has been told.");
+              setNotice("3 new time slots offered. The candidate has been told.");
               setPanel("none");
             }}
             onClose={() => setPanel("none")}
