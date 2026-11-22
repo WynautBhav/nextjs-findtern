@@ -287,7 +287,7 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName }:
       const a = document.createElement("a");
       const name = ((viewId === "all" && downloadName) || allViews.find((v) => v.id === viewId)?.name || "master data").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
       a.href = url;
-      a.download = `${name}-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.download = `${name}-${new Date().toLocaleDateString("en-CA")}.csv`;
       document.body.appendChild(a);
       a.click();
       a.remove();
