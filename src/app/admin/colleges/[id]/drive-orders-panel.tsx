@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatDate, formatMoney } from "@/lib/format";
 import { rupeesToMinor } from "@/lib/drives/admin-rules";
+import { withGst } from "@/lib/college/drive-order";
 import type { OrderDto } from "@/lib/drives/admin-db";
 import { DriveImportPanel } from "./drive-import-panel";
 
@@ -41,7 +42,7 @@ const STEPS = ["Payment received", "Students added", "Codes sent"] as const;
  * The one way a college is charged: an order (students x fee), one payment, then the students, who are each emailed
  * a personal code. Every order shows which of those three steps it is on and offers only the next action.
  */
-export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, collegeName, defaultFeeMinor = 80000, rosterCount = 0 }: { collegeId: string; collegeName?: string; orders: OrderDto[]; canMoney: boolean; canWrite: boolean; /** The admin-set starting fee (Colleges page); each order still stores its own. */ defaultFeeMinor?: number; /** Students on the college's own list, offered as the source for step 2. */ rosterCount?: number }) {
+export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, collegeName, defaultFeeMinor = 80000, rosterCount = 0 }: { collegeId: string; collegeName?: string; orders: OrderDto[]; canMoney: boolean; canWrite: boolean; /** The admin-set starting fee before GST (Colleges page); each order stores its own fee with GST. */ defaultFeeMinor?: number; /** Students on the college's own list, offered as the source for step 2. */ rosterCount?: number }) {
   const router = useRouter();
   const [slots, setSlots] = useState("300");
   const [fee, setFee] = useState(() => String(defaultFeeMinor / 100));
@@ -79,15 +80,17 @@ export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, colleg
     }
   }
 
-  const feeMinor = rupeesToMinor(fee);
+  // The admin types the fee before GST; the order stores and charges it with 18% GST (₹800 -> ₹944).
+  const baseMinor = rupeesToMinor(fee);
+  const feeMinor = baseMinor === null ? null : withGst(baseMinor);
   const creditMinor = credit.trim() === "" ? 0 : rupeesToMinor(credit);
   const slotsN = Number(slots);
   const untilDate = until ? new Date(`${until}T23:59:59`) : null;
   const formProblem =
     !Number.isInteger(slotsN) || slotsN < 1 ? "Slots must be a whole number of 1 or more."
-    : feeMinor === null || feeMinor < 1 ? "Enter the fee per student in rupees."
+    : baseMinor === null || baseMinor < 1 ? "Enter the fee per student in rupees, before GST."
     : creditMinor === null ? "Enter the carried-over credit in rupees, or leave it empty."
-    : creditMinor > slotsN * feeMinor ? "Credit cannot be more than the order total."
+    : feeMinor === null || creditMinor > slotsN * feeMinor ? "Credit cannot be more than the order total."
     : !untilDate || until <= today ? "Choose a code validity date in the future."
     : null;
 
@@ -121,7 +124,7 @@ export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, colleg
             <label className="text-sm">Students
               <input className={field} inputMode="numeric" value={slots} onChange={(e) => setSlots(e.target.value)} />
             </label>
-            <label className="text-sm">Fee per student (₹)
+            <label className="text-sm">Fee per student, before GST (₹)
               <input className={field} inputMode="decimal" value={fee} onChange={(e) => setFee(e.target.value)} />
             </label>
             <button type="submit" disabled={busy} className={buttonClass({ variant: "primary", size: "sm" })}>{busy ? "Saving…" : "Create order"}</button>
@@ -129,7 +132,7 @@ export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, colleg
           <p className={`mt-2 text-sm ${formProblem && tried ? "text-danger" : "text-ink-600"}`} role="status">
             {formProblem ?? (
               <>
-                The college pays <strong className="nums text-ink-900">{money(slotsN * (feeMinor ?? 0) - (creditMinor ?? 0))}</strong>
+                {money(baseMinor ?? 0)} + 18% GST = <span className="nums text-ink-900">{money(feeMinor ?? 0)}</span> per student. The college pays <strong className="nums text-ink-900">{money(slotsN * (feeMinor ?? 0) - (creditMinor ?? 0))}</strong>
                 {creditMinor ? ` (${money(slotsN * (feeMinor ?? 0))} less ${money(creditMinor)} credit)` : ""}. Codes work until {formatDate(`${until}T00:00:00`)}.
               </>
             )}
@@ -166,7 +169,7 @@ export function DriveOrdersPanel({ collegeId, orders, canMoney, canWrite, colleg
               <Surface as="li" key={o.id} className="p-4 sm:p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-base font-semibold text-ink-900"><span className="nums">{o.slots}</span> {o.slots === 1 ? "student" : "students"} at <span className="nums">{money(o.feePerStudentMinor)}</span></p>
+                    <p className="text-base font-semibold text-ink-900"><span className="nums">{o.slots}</span> {o.slots === 1 ? "student" : "students"} at <span className="nums">{money(o.feePerStudentMinor)}</span> <span className="text-sm font-normal text-ink-600">incl. GST</span></p>
                     <p className="nums mt-0.5 text-sm text-ink-600">
                       Payable {money(o.payableMinor)}{o.creditMinor ? ` (${money(o.slots * o.feePerStudentMinor)} less ${money(o.creditMinor)} credit)` : ""}
                       {o.paidAt ? ` · paid ${formatDate(o.paidAt)}${o.gatewayRef ? `, ref ${o.gatewayRef}` : ""}` : ""} · codes valid until {formatDate(o.codeValidUntil)}

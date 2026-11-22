@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
+  SEAT_BASE_MINOR,
   SEAT_PRICE_MINOR,
   availableMinor,
   capAfterPaid,
@@ -10,11 +11,15 @@ import {
   seatBatchProblem,
   withdrawalProblem,
 } from "./money.ts";
+import { splitGst } from "../gst.ts";
 
-test("a seat is a fixed ₹800, GST included", () => {
-  assert.equal(SEAT_PRICE_MINOR, 80000);
-  assert.equal(seatBatchAmount(300), 24_000_000);
-  assert.equal(seatBatchAmount(1), 80000);
+test("a seat is ₹800 plus 18% GST: ₹944 charged, and the invoice backs out exactly ₹800 + ₹144", () => {
+  assert.equal(SEAT_BASE_MINOR, 80000);
+  assert.equal(SEAT_PRICE_MINOR, 94400);
+  assert.equal(seatBatchAmount(1), 94400);
+  assert.equal(seatBatchAmount(300), 28_320_000);
+  const split = splitGst(seatBatchAmount(300), { kind: "india", stateCode: "27", stateName: "Maharashtra" });
+  assert.deepEqual([split.baseMinor, split.igstMinor], [24_000_000, 4_320_000]);
 });
 
 test("seat count: whole numbers from 1 to 5000", () => {

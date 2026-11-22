@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { validateOrderInput, computeAmounts, markPaidTransition, activationBlocker, remainingSlots, canIssue } from "./drive-order.ts";
+import { validateOrderInput, computeAmounts, markPaidTransition, activationBlocker, remainingSlots, canIssue, withGst } from "./drive-order.ts";
 
 const now = new Date("2026-11-07T00:00:00Z");
 const later = new Date("2027-01-01T00:00:00Z");
@@ -43,4 +43,10 @@ test("slots and issuing", () => {
 test("no hard-coded default fee in logic", () => {
   const src = readFileSync(new URL("./drive-order.ts", import.meta.url), "utf8");
   assert.ok(!/80000|capAfterPaid/.test(src));
+});
+
+test("a drive fee is entered before GST; the college pays it plus 18% (₹800 -> ₹944), whole paise", () => {
+  assert.equal(withGst(80000), 94400);
+  assert.equal(withGst(249900), 294882);
+  assert.equal(withGst(1), 1);
 });

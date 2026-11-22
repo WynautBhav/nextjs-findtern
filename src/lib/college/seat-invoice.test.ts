@@ -9,8 +9,11 @@ const seller = { name: "Findtern", address: "Jaipur", gstin: "08AAACF0000A1Z5", 
 const batch = { id: "b1", seats: 300, amountMinor: seatBatchAmount(300), invoiceNumber: "061126-1", paidAt: new Date("2026-11-06T05:00:00Z"), createdAt: new Date("2026-11-01") };
 const college = (state: string | null, gstin: string | null = null) => ({ name: "IIT X", gstin, city: "Pune", state });
 
-test("total is seats x 800 rupees", () => {
-  assert.equal(seatInvoiceInput(batch, college("Rajasthan"), seller).amountMinor, 300 * 80000);
+test("total is seats x (800 + 18% GST); the taxable value is exactly seats x 800 rupees", () => {
+  const inv = seatInvoiceInput(batch, college("Rajasthan"), seller);
+  assert.equal(inv.amountMinor, 300 * 94400);
+  const split = splitGst(inv.amountMinor, inv.buyer.place);
+  assert.deepEqual([split.baseMinor, split.cgstMinor, split.sgstMinor], [300 * 80000, 300 * 7200, 300 * 7200]);
 });
 
 test("same state splits CGST+SGST, another state IGST", () => {

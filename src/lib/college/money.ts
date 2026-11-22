@@ -1,12 +1,15 @@
 import { bankProblem } from "../onboarding.ts";
+import { withGst } from "./drive-order.ts";
 
 /**
  * College money rules, pure so the routes, the pages and the tests share one
  * answer. Amounts are paise (minor units), like every other money column.
  */
 
-/** Fixed price of one seat: ₹800, GST-inclusive (owner answer Q4). Admin chooses only the seat count. */
-export const SEAT_PRICE_MINOR = 80000;
+/** One seat is ₹800 plus 18% GST (owner, 23 Nov 2026; was ₹800 GST-inclusive). Admin chooses only the seat count. */
+export const SEAT_BASE_MINOR = 80000;
+/** What one seat costs, GST included: ₹944. Batches store this total; the invoice backs out ₹800 + ₹144. */
+export const SEAT_PRICE_MINOR = withGst(SEAT_BASE_MINOR);
 
 export const MAX_SEATS_PER_BATCH = 5000;
 

@@ -1,5 +1,16 @@
 /** Drive order rules, pure (no DB). Money is integer paise. The fee is per order; there is no default here. */
 
+import { GST_RATE } from "../gst.ts";
+
+/**
+ * A price quoted before GST plus 18% GST, in whole paise (half rounds up, integer maths as in employer subscriptions):
+ * ₹800 -> ₹944. College prices are quoted "+ GST" (owner, 23 Nov 2026); what is stored and charged is this total, and
+ * the invoice backs the same base and GST out of it (gst.ts splitGst).
+ */
+export function withGst(baseMinor: number): number {
+  return baseMinor + Math.floor((baseMinor * Math.round(GST_RATE * 100) + 50) / 100);
+}
+
 export const DRIVE_ORDER_STATUSES = ["pending", "paid", "failed", "refunded", "partially_refunded"] as const;
 export type DriveOrderStatus = (typeof DRIVE_ORDER_STATUSES)[number];
 

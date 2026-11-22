@@ -12,7 +12,7 @@ type Ctx = { params: Promise<{ id: string }> };
 
 const bodySchema = z.object({ seats: z.number() });
 
-/** Admin raises a pending seat batch (₹800 per seat, GST included). It adds no seats until marked paid. */
+/** Admin raises a pending seat batch (₹800 + 18% GST per seat, money.ts). It adds no seats until marked paid. */
 export async function POST(req: Request, ctx: Ctx) {
   const g = await requireMutation({ req, roles: ["admin"] });
   if (!g.ok) return g.response;

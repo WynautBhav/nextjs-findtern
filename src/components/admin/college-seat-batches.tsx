@@ -95,7 +95,7 @@ export function CollegeSeatBatches({ collegeId, batches, seat, canMoney, allowNe
             <span className="block text-ink-600">Seats</span>
             <input className={`${field} w-28`} inputMode="numeric" value={seats} onChange={(e) => setSeats(e.target.value)} aria-invalid={problem ? true : undefined} />
           </label>
-          <p className="nums pb-2 text-sm">{problem ?? `${formatMoney(seatBatchAmount(n), "INR", { zeroLabel: false })} (GST included)`}</p>
+          <p className="nums pb-2 text-sm">{problem ?? `${formatMoney(seatBatchAmount(n), "INR", { zeroLabel: false })} (₹800 + 18% GST a seat)`}</p>
           <button type="submit" disabled={busy || !!problem} className={buttonClass({ variant: "dark", size: "sm" })}>New batch</button>
         </form>
       ) : null}

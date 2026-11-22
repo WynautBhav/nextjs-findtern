@@ -377,7 +377,7 @@ export function CollegeFeeSetting({ feeMinor, canEdit }: { feeMinor: number; can
       }}
     >
       <label className="block">
-        <span className="text-sm font-medium text-foreground">Campus drive fee per student (₹)</span>
+        <span className="text-sm font-medium text-foreground">Campus drive fee per student, before GST (₹)</span>
         <input inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} disabled={!canEdit} aria-describedby="college-fee-hint" className={cn(input, "mt-1 w-40")} />
       </label>
       {canEdit ? (
@@ -386,7 +386,7 @@ export function CollegeFeeSetting({ feeMinor, canEdit }: { feeMinor: number; can
         </button>
       ) : null}
       <p id="college-fee-hint" className="basis-full text-sm text-text-subtle">
-        What a college pays for each student in a drive. New drive orders start from this; orders already created keep their own fee.
+        What a college pays for each student in a drive, plus 18% GST. New drive orders start from this; orders already created keep their own fee.
       </p>
       <p role="status" className={cn("basis-full text-sm", msg?.ok ? "text-foreground" : "text-danger")}>{msg?.text}</p>
     </form>

@@ -11,7 +11,8 @@ import { CACHE_TAGS, purgeServerCache } from "@/lib/server-cache";
 const bodySchema = z.object({ feePerStudentMinor: z.number().int().min(100).max(MAX_FEE_MINOR) }).strict();
 
 /**
- * The campus drive fee per student that a NEW drive order starts from (₹800 until an admin changes it).
+ * The campus drive fee per student, BEFORE GST, that a NEW drive order starts from (₹800 until an admin changes it;
+ * the order adds 18% GST, drive-order.ts withGst).
  * It is a default only: each order still stores its own fee, so changing this never reprices an order already made.
  */
 export async function PUT(req: Request) {
