@@ -6,6 +6,7 @@ import { DetailRow, Pill } from "@/components/app/primitives";
 import { RowAvatar } from "@/components/employer/candidate-row-parts";
 import { initialsOf } from "@/lib/employer-candidates";
 import { dateLabel, widestWorkMode } from "@/lib/onboarding";
+import { semesterLabel } from "@/lib/cgpa-verification";
 import { cn } from "@/lib/utils";
 
 import { NewTabHint } from "@/components/ui/new-tab-link";
@@ -61,7 +62,7 @@ export function PreviewStep({ values, update, errors, documents, onJumpStep }: S
                 value={`${[a.startYear, a.yearOfGraduation].filter(Boolean).join(" – ") || "-"}${a.status ? ` (${a.status.toLowerCase()})` : ""}`}
               />
               {a.cgpa ? <DetailRow label={a.scoreType === "percentage" ? "Percentage" : "CGPA"} mono value={a.scoreType === "percentage" ? `${a.cgpa}%` : `${a.cgpa} / 10`} /> : null}
-              {typeof a.currentSemester === "number" ? <DetailRow label="Current semester" mono value={`Semester ${a.currentSemester}`} /> : null}
+              {typeof a.currentSemester === "number" ? <DetailRow label="Current semester" mono value={semesterLabel(a.currentSemester)} /> : null}
             </dl>
             {a.cgpa && typeof a.currentSemester === "number" ? <CgpaDisclaimer compact className="mt-3" /> : null}
             {qualifications.length > 0 ? (

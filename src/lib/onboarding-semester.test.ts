@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { proofSlots, semesterOptions } from "./cgpa-verification.ts";
+import { proofSlots, readCgpaVerification, SEMESTER_NA, semesterLabel, semesterOptions } from "./cgpa-verification.ts";
 import {
   MAX_MARKSHEETS,
   draftFromRecord,
@@ -95,7 +95,7 @@ test("legacy intern: no semester, or no score, or a level without semesters: not
 });
 
 test("an impossible semester is refused", () => {
-  for (const n of [0, 11, 2.5, -1]) {
+  for (const n of [11, 2.5, -1]) { // 0 is "semester not applicable", tested below
     assert.ok(semesterProofErrors(academics({ currentSemester: n }))["currentSemester"], String(n));
   }
 });
@@ -158,4 +158,30 @@ test("a completed degree or a Ph.D has no semester: a stale one is cleared on sa
   const done = storedFromDraft({ academics: academics({ status: "Completed", currentSemester: 2, semesterProofUploads: proofsFor(2) }) }, stored).extraPatch.academics as Record<string, unknown>;
   assert.equal("currentSemester" in done, false);
   assert.deepEqual(semesterProofErrors(academics({ status: "Completed", currentSemester: 2 })), {});
+});
+
+test("semester not applicable (0): one slot, last year's marksheet, and nothing else", () => {
+  assert.deepEqual(proofSlots(SEMESTER_NA), [{ key: "last-year-marksheet", label: "Last year's marksheet" }]);
+  assert.equal(semesterLabel(SEMESTER_NA), "Semester not applicable");
+  assert.equal(semesterLabel(4), "Semester 4");
+});
+
+test("semester not applicable needs only last year's marksheet once a score is entered", () => {
+  const errors = semesterProofErrors(academics({ currentSemester: SEMESTER_NA }));
+  assert.deepEqual(errors, { "proof-last-year-marksheet": "Upload your last year's marksheet." });
+  assert.deepEqual(semesterProofErrors(academics({ currentSemester: SEMESTER_NA, semesterProofUploads: proofsFor(SEMESTER_NA) })), {});
+});
+
+test("storedFromDraft keeps semester not applicable and its marksheet, and reads them back", () => {
+  const { extraPatch } = storedFromDraft({ academics: academics({ currentSemester: SEMESTER_NA, semesterProofUploads: proofsFor(SEMESTER_NA) }) }, null);
+  const a = extraPatch.academics as Record<string, unknown>;
+  assert.equal(a.currentSemester, SEMESTER_NA);
+  assert.deepEqual(Object.keys(a.semesterProofUploads as object), ["last-year-marksheet"]);
+  const back = draftFromRecord({ extraData: extraPatch });
+  assert.equal(back.academics?.currentSemester, SEMESTER_NA);
+  assert.ok(back.academics?.semesterProofUploads?.["last-year-marksheet"]);
+});
+
+test("a CGPA check stored with semester not applicable reads back as 0, not as unchosen", () => {
+  assert.equal(readCgpaVerification({ cgpaVerification: { status: "pending", claimedScore: "72", scoreType: "percentage", semester: 0 } }).semester, 0);
 });

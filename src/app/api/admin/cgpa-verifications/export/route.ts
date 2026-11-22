@@ -44,7 +44,7 @@ export async function GET(req: Request) {
     { header: "Phone", value: (r) => r.phone },
     { header: "College", value: (r) => r.college },
     { header: "Course", value: (r) => r.course },
-    { header: "Semester", value: (r) => r.semester },
+    { header: "Semester", value: (r) => (r.semester === 0 ? "Not applicable" : r.semester) },
     { header: "Claimed score", value: (r) => r.claimedScore },
     { header: "Score type", value: (r) => r.scoreType },
     { header: "Corrected score", value: (r) => r.correctedScore },

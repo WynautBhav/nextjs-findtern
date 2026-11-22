@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Check, Info, ShieldCheck } from "lucide-react";
 
 import { FileUpload } from "@/components/app/file-upload";
-import { CGPA_DISCLAIMER, CGPA_UPLOAD_WARNING, proofSlots, semesterOptions, yearOfStudy } from "@/lib/cgpa-verification";
+import { CGPA_DISCLAIMER, CGPA_UPLOAD_WARNING, proofSlots, SEMESTER_NA, semesterLabel, semesterOptions, yearOfStudy } from "@/lib/cgpa-verification";
 import type { CertificateUpload, OnboardingDraft } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 
@@ -39,13 +39,16 @@ export function CgpaDisclaimer({ compact = false, className }: { compact?: boole
 /**
  * "Current semester": the two semesters of the student's year (3rd year: 5 and 6); a college member's declared year
  * wins; an unknown year offers 1 to 10. A semester already stored stays selectable even if it is no longer on offer.
+ * "Semester not applicable" (0) is always last, for colleges with yearly exams.
  */
-export function SemesterSelect({ a, collegeYear, error, onChange }: { a: Academics; collegeYear: number | null; error?: string; onChange: (semester: number) => void }) {
+export function SemesterSelect({ a, collegeYear, error, onChange }: { a: Academics; collegeYear: number | null; error?: string; onChange: (semester: number | null) => void }) {
   const year = yearOfStudy({ startYear: a.startYear, status: a.status ?? "" }, collegeYear);
   const options = semesterOptions(year);
   const current = typeof a.currentSemester === "number" ? a.currentSemester : null;
   if (current !== null && !options.includes(current)) options.push(current);
   options.sort((x, y) => x - y);
+  const choices = options.filter((o) => o !== SEMESTER_NA).map((o) => ({ value: String(o), label: semesterLabel(o) }));
+  choices.push({ value: String(SEMESTER_NA), label: semesterLabel(SEMESTER_NA) });
   return (
     <SelectField
       id="currentSemester"
@@ -54,9 +57,15 @@ export function SemesterSelect({ a, collegeYear, error, onChange }: { a: Academi
       placeholder="Choose your semester"
       value={current === null ? "" : String(current)}
       error={error}
-      options={options.map((n) => ({ value: String(n), label: `Semester ${n}` }))}
-      hint={year ? `You are in year ${year}, so this is semester ${2 * year - 1} or ${2 * year}.` : "The semester you are studying in now."}
-      onChange={(v) => onChange(Number(v))}
+      options={choices}
+      hint={
+        current === SEMESTER_NA
+          ? "For colleges without semesters. You upload last year's marksheet instead."
+          : year
+            ? `You are in year ${year}, so this is semester ${2 * year - 1} or ${2 * year}. No semesters at your college? Choose Semester not applicable.`
+            : "The semester you are studying in now. No semesters at your college? Choose Semester not applicable."
+      }
+      onChange={(v) => onChange(v === "" ? null : Number(v))}
     />
   );
 }
@@ -81,7 +90,7 @@ export function SemesterProofs({ a, errors, onChange }: { a: Academics; errors: 
       <CgpaDisclaimer />
       {!haveScore ? (
         <p className="rounded-apple-sm border border-ink-200 bg-ink-50 px-4 py-3 text-sm text-ink-700">
-          Enter your score above and we will ask for the {slots.length} proof photo{slots.length === 1 ? "" : "s"} for semester {semester}.
+          Enter your score above and we will ask for the {slots.length} proof photo{slots.length === 1 ? "" : "s"} {semester === SEMESTER_NA ? "of your last year's marksheet" : `for semester ${semester}`}.
         </p>
       ) : (
         <>

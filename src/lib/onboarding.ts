@@ -1,7 +1,7 @@
 import type { internOnboarding } from "@/lib/db/schema";
 import { phoneError } from "./phone.ts";
 import { getAccountType, type AccountType } from "./intern-account.ts";
-import { proofSlots } from "./cgpa-verification.ts";
+import { proofSlots, SEMESTER_NA } from "./cgpa-verification.ts";
 
 /**
  * Intern onboarding shape across the 8-step wizard.
@@ -757,16 +757,16 @@ function readUploads(raw: unknown): CertificateUpload[] {
 
 const MAX_SEMESTER = 10;
 
-/** A stored `currentSemester` (number, or digits from an older client): 1-10 or undefined. */
+/** A stored `currentSemester` (number, or digits from an older client): 0 (not applicable) to 10, or undefined. */
 function readSemester(raw: unknown): number | null | undefined {
   const n = typeof raw === "string" && /^\d+$/.test(raw.trim()) ? Number(raw) : raw;
-  return typeof n === "number" && Number.isInteger(n) && n >= 1 && n <= MAX_SEMESTER ? n : undefined;
+  return typeof n === "number" && Number.isInteger(n) && n >= SEMESTER_NA && n <= MAX_SEMESTER ? n : undefined;
 }
 
 /** Stored proofs by slot key; only valid slot keys with a file name survive. */
 function readProofs(raw: unknown): Record<string, CertificateUpload> | undefined {
   const rec = obj(raw);
-  const valid = new Set(proofSlots(MAX_SEMESTER).map((s) => s.key));
+  const valid = new Set([...proofSlots(MAX_SEMESTER), ...proofSlots(SEMESTER_NA)].map((s) => s.key));
   const out: Record<string, CertificateUpload> = {};
   for (const [key, value] of Object.entries(rec)) {
     if (!valid.has(key)) continue;
@@ -855,7 +855,7 @@ export function certificateFiles(academics: unknown): (CertificateUpload & { lab
     for (const u of row.uploads ?? []) out.push({ ...u, label: `${row.name || "Certification"} certificate` });
   });
   // The CGPA proofs open from the same places as certificates (documents page, admin file route), under their slot label.
-  const slotLabel = new Map(proofSlots(MAX_SEMESTER).map((s) => [s.key, s.label]));
+  const slotLabel = new Map([...proofSlots(MAX_SEMESTER), ...proofSlots(SEMESTER_NA)].map((s) => [s.key, s.label]));
   for (const [key, u] of Object.entries(readProofs(a.semesterProofUploads) ?? {})) {
     out.push({ ...u, label: slotLabel.get(key) ?? "CGPA proof" });
   }

@@ -5,6 +5,7 @@ import { StatusBadge } from "@/components/admin/status-badge";
 import { CgpaDecision } from "@/components/admin/cgpa/decision";
 import { CopyValue } from "@/components/admin/cgpa/copy-button";
 import { rowSla, startWarning, type CgpaQueueRow } from "@/lib/admin/cgpa-queue";
+import { proofSlots, semesterLabel } from "@/lib/cgpa-verification";
 import { formatDate, shortDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -54,7 +55,7 @@ export function CgpaRows({ rows, now, canWrite }: { rows: CgpaQueueRow[]; now: D
             </div>
 
             <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-4">
-              <Fact label="Semester">{r.semester ? `Semester ${r.semester}` : "Not chosen"}</Fact>
+              <Fact label="Semester">{r.semester != null ? semesterLabel(r.semester) : "Not chosen"}</Fact>
               <Fact label={r.scoreType === "percentage" ? "Claimed percentage" : "Claimed CGPA"}>
                 <span className="nums font-semibold">
                   {r.claimedScore}
@@ -79,7 +80,7 @@ export function CgpaRows({ rows, now, canWrite }: { rows: CgpaQueueRow[]; now: D
             </dl>
 
             <div>
-              <h3 className="text-xs font-medium uppercase tracking-wide text-text-subtle">Proofs ({r.proofs.length}{r.semester ? ` of ${r.semester}` : ""})</h3>
+              <h3 className="text-xs font-medium uppercase tracking-wide text-text-subtle">Proofs ({r.proofs.length}{r.semester != null ? ` of ${proofSlots(r.semester).length}` : ""})</h3>
               {r.proofs.length === 0 ? (
                 <p className="mt-1.5 text-sm text-text-subtle">No proof photos on file. Check the candidate&apos;s documents.</p>
               ) : (

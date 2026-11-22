@@ -30,6 +30,14 @@ export const CGPA_UPLOAD_WARNING = "Make sure every detail and document you uplo
 
 const HOUR_MS = 3_600_000;
 const MAX_SEMESTER = 10;
+
+/** "Semester not applicable": a college without semesters (yearly exams). Stored as 0; its proof is last year's marksheet. */
+export const SEMESTER_NA = 0;
+
+/** "Semester 4", or "Semester not applicable" for 0. */
+export function semesterLabel(semester: number): string {
+  return semester === SEMESTER_NA ? "Semester not applicable" : `Semester ${semester}`;
+}
 const ALL_SEMESTERS = Array.from({ length: MAX_SEMESTER }, (_, i) => i + 1);
 
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
@@ -61,6 +69,7 @@ export function semesterOptions(year: number | null): number[] {
  * card, so semester 1 is the ID card alone. Not a semester (0, 11, 2.5): no slots.
  */
 export function proofSlots(semester: number): { key: string; label: string }[] {
+  if (semester === SEMESTER_NA) return [{ key: "last-year-marksheet", label: "Last year's marksheet" }];
   if (!Number.isInteger(semester) || semester < 1 || semester > MAX_SEMESTER) return [];
   const marksheets = Array.from({ length: semester - 1 }, (_, i) => ({ key: `marksheet-${i + 1}`, label: `Semester ${i + 1} marksheet` }));
   return [...marksheets, { key: "college-id", label: "College ID card" }];
@@ -83,7 +92,7 @@ export function readCgpaVerification(extraData: unknown): CgpaVerification {
     status: typeof raw.status === "string" && STATUSES.has(raw.status) ? (raw.status as CgpaStatus) : "not_required",
     claimedScore: text(raw.claimedScore) ?? "",
     scoreType: raw.scoreType === "cgpa" || raw.scoreType === "percentage" ? raw.scoreType : "",
-    semester: typeof sem === "number" && Number.isInteger(sem) && sem >= 1 && sem <= MAX_SEMESTER ? sem : null,
+    semester: typeof sem === "number" && Number.isInteger(sem) && sem >= SEMESTER_NA && sem <= MAX_SEMESTER ? sem : null,
   };
   const corrected = text(raw.correctedScore);
   if (corrected !== undefined) out.correctedScore = corrected;

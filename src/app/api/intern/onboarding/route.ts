@@ -84,7 +84,7 @@ const bodySchema = z.object({
       cgpa: z.string().max(10).default(""),
       marksheetUploads: z.array(upload).max(MAX_MARKSHEETS).optional(),
       // Current semester (null clears it) and its proofs by slot key; the slots are checked below against the semester.
-      currentSemester: z.number().int().min(1).max(10).nullable().optional(),
+      currentSemester: z.number().int().min(0).max(10).nullable().optional(), // 0 = semester not applicable
       semesterProofUploads: z.record(z.string().max(40), upload).refine((r) => Object.keys(r).length <= MAX_MARKSHEETS).optional(),
       professional: z.array(qualification).max(20).optional(),
       certifications: z.array(qualification).max(20).optional(),

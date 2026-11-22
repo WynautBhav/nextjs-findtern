@@ -22,7 +22,7 @@ import { normaliseEntries, countStatuses, sheetHours } from "@/lib/employer-time
 import { offerScore, parseOffer } from "@/lib/offer";
 import { ProposalOfferSummary } from "@/components/admin/proposal-offer-summary";
 import { draftFromRecord, linkedinHref } from "@/lib/onboarding";
-import { readCgpaVerification } from "@/lib/cgpa-verification";
+import { readCgpaVerification, semesterLabel } from "@/lib/cgpa-verification";
 import { readCgpaHistory } from "@/lib/cgpa-verification-flow";
 import type { RevealField } from "@/lib/admin/identity-mask";
 import type { User as UserType, InternOnboarding, Interview, Proposal, Timesheet, InternPayout } from "@/lib/db/schema";
@@ -1212,7 +1212,7 @@ function CgpaVerificationBlock({ extra }: { extra: Record<string, unknown> }) {
         <StatusBadge tone={v.status === "verified" ? "success" : v.status === "incorrect" ? "danger" : "warning"} label={v.status === "verified" ? "Verified" : v.status === "incorrect" ? "Marked incorrect" : "Pending"} />
       </p>
       <dl className="divide-y divide-ink-100">
-        <DetailRow label="Semester" value={v.semester ? `Semester ${v.semester}` : "-"} />
+        <DetailRow label="Semester" value={v.semester != null ? semesterLabel(v.semester) : "-"} />
         <DetailRow label={v.scoreType === "percentage" ? "Claimed percentage" : "Claimed CGPA"} value={`${v.claimedScore}${unit}`} mono />
         {v.status === "incorrect" ? <DetailRow label="Corrected score" value={`${v.correctedScore ?? "-"}${unit}`} mono /> : null}
         <DetailRow label="Requested" value={at(v.requestedAt)} />
@@ -1228,7 +1228,7 @@ function CgpaVerificationBlock({ extra }: { extra: Record<string, unknown> }) {
                 <span className="nums text-text-subtle">{at(h.at)}</span>
                 <span>
                   {HISTORY_LABEL[h.event] ?? h.event}
-                  {h.semester ? `, semester ${h.semester}` : ""}: {h.claimedScore}
+                  {h.semester != null ? `, ${semesterLabel(h.semester).toLowerCase()}` : ""}: {h.claimedScore}
                   {h.correctedScore ? ` → ${h.correctedScore}` : ""}
                   {h.note ? ` (${h.note})` : ""}
                 </span>
