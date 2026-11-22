@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { PresenceLive } from "@/components/college/presence-live";
 import { CopyText } from "@/components/college/copy-text";
 import { aiStatusLabel, yearLabel } from "@/lib/college/labels";
-import { BatchLedger, BatchRibbon, BatchRings, BatchSeats, BatchSteps, BranchBoard, ScoreCurve, TopOfBatch } from "@/components/college/overview-charts";
+import { BranchBoard, ScoreCurve, TopOfBatch } from "@/components/college/overview-charts";
 import { CollegeMark } from "@/components/employer/drive-parts";
 import { pendingApprovalCount } from "@/lib/college/approvals";
 import { eligibleStudents, presenceSnapshot, requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
@@ -18,7 +18,7 @@ import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { ButtonLink } from "@/components/ui/button";
 import { collegeHasDriveOrder } from "@/lib/drives/dashboard-db";
 import { DriveDashboard } from "./drive-dashboard";
-import { BatchCampusWalk, BatchCaps, BatchDepartures, BatchOrbit, BatchReportCard } from "@/components/college/overview-heroes";
+import { BatchCampusWalk } from "@/components/college/campus-walk";
 
 export const dynamic = "force-dynamic";
 
@@ -39,22 +39,7 @@ function median(xs: number[]): number | null {
  * accept, leave requests), then the live drive, then how the batch is doing. The student register itself lives
  * on /college/students.
  */
-export default async function CollegeOverview({ searchParams }: { searchParams?: Promise<{ hero?: string }> }) {
-  // Hero style preview (/college?hero=rings|seats|steps|ledger). Remove the losers once the owner picks one.
-  const HEROES = [
-    { id: "ribbon", label: "Ribbon" },
-    { id: "rings", label: "Ring" },
-    { id: "seats", label: "Seats" },
-    { id: "steps", label: "Steps" },
-    { id: "ledger", label: "Ledger" },
-    { id: "caps", label: "Caps" },
-    { id: "departures", label: "Departures" },
-    { id: "orbit", label: "Orbit" },
-    { id: "report", label: "Report card" },
-    { id: "walk", label: "Campus walk" },
-  ] as const;
-  const asked = (await searchParams)?.hero;
-  const hero = HEROES.find((h) => h.id === asked)?.id ?? "ribbon";
+export default async function CollegeOverview() {
   const ctx = await requireCollegeContext();
 
   const [all, coverage, [liveDrive], [seat], paid, hasDriveOrder, pendingLeaves, toAccept, [unpaid]] = await Promise.all([
@@ -128,11 +113,6 @@ export default async function CollegeOverview({ searchParams }: { searchParams?:
     { n: students.reduce((t, s) => t + s.offersNew, 0), one: "new offer", many: "new offers" },
     { n: students.reduce((t, s) => t + s.hiredNew, 0), one: "hire", many: "hires" },
   ].filter((x) => x.n > 0);
-  // Ledger's "24 hours" column, one cell per funnel stage. No time is kept for the list or the AI interview: a dash.
-  const joinedNew = students.filter((s) => now - s.joinedAt.getTime() < 86_400_000).length;
-  const offersNew = students.reduce((t, s) => t + s.offersNew, 0);
-  const hiresNew = students.reduce((t, s) => t + s.hiredNew, 0);
-  const ledgerToday = [null, joinedNew ? `+${joinedNew}` : "0", null, offersNew ? `+${offersNew} ${offersNew === 1 ? "offer" : "offers"}` : "0", hiresNew ? `+${hiresNew}` : "0"];
   const listed = Math.max(coverage.rosterSize, students.length);
   const funnel = [
     { label: coverage.rosterSize ? "On your list" : "Students", value: listed, hint: coverage.rosterSize ? (notJoined ? `${notJoined} not joined yet` : "Everyone has joined") : "Add your list to track who is missing", href: "/college/roster" },
@@ -194,42 +174,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams?:
             <ButtonLink href="/college/roster" variant="outlineLight">Add students</ButtonLink>
           </div>
         </div>
-        {/* Preview switch between the hero styles. Remove with the losing versions. */}
-        <nav aria-label="Chart style" className="-mx-1 mt-6 flex overflow-x-auto px-1 py-1">
-          <span className="inline-flex shrink-0 rounded-full bg-white/10 p-1 text-[13px] font-medium">
-            {HEROES.map((h) => ({ href: h.id === "ribbon" ? "/college" : `/college?hero=${h.id}`, label: h.label, on: h.id === hero })).map((o) => (
-              <Link
-                key={o.label}
-                href={o.href}
-                aria-current={o.on ? "page" : undefined}
-                className={`inline-flex min-h-9 shrink-0 items-center rounded-full px-3.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/70 ${o.on ? "bg-white text-ink-900" : "text-on-dark hover:bg-white/10"}`}
-              >
-                {o.label}
-              </Link>
-            ))}
-          </span>
-        </nav>
-        {hero === "rings" ? (
-          <BatchRings stages={funnel} />
-        ) : hero === "seats" ? (
-          <BatchSeats stages={funnel} />
-        ) : hero === "steps" ? (
-          <BatchSteps stages={funnel} />
-        ) : hero === "ledger" ? (
-          <BatchLedger stages={funnel} today={ledgerToday} />
-        ) : hero === "caps" ? (
-          <BatchCaps stages={funnel} />
-        ) : hero === "departures" ? (
-          <BatchDepartures stages={funnel} college={ctx.college.name} />
-        ) : hero === "orbit" ? (
-          <BatchOrbit stages={funnel} />
-        ) : hero === "report" ? (
-          <BatchReportCard stages={funnel} college={ctx.college.name} asOf={new Date(now).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })} />
-        ) : hero === "walk" ? (
-          <BatchCampusWalk stages={funnel} />
-        ) : (
-          <BatchRibbon stages={funnel} />
-        )}
+        <BatchCampusWalk stages={funnel} />
       </HeroPanel>
 
       {firstRun ? (
