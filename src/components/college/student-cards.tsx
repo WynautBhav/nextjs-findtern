@@ -36,6 +36,8 @@ const WEEK = 7 * 86400_000;
 /** Cards rendered before "Show all": a 500-student college was a 1 MB page. */
 const PAGE = 48;
 const GRID = "grid gap-3 p-4 sm:grid-cols-2 sm:p-5 xl:grid-cols-3";
+/** Verified students: one per line, read left to right (who, where they are stuck, contact, figures, the nudge). */
+const ROWS = "grid gap-2 p-4 sm:p-5";
 /** A row of pills: one line that scrolls sideways on a phone, wraps on wider screens. */
 const ROW = "-mx-4 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&>*]:shrink-0";
 
@@ -252,7 +254,7 @@ export function StudentCards({
       {total === 0 ? (
         <EmptyCards group={group} anyAtAll={group === "students" ? students.length > 0 : (group === "on_findtern" ? waiting : notJoined).length > 0} />
       ) : group === "students" ? (
-        <ul className={GRID}>
+        <ul className={ROWS}>
           {rows.slice(0, limit).map((s) => (
             <li key={s.userId} className="min-w-0">
               <StudentCard s={s} now={now} />
@@ -385,7 +387,7 @@ function StuckBar({ counts, total, value, onChange }: { counts: Record<Stuck, nu
 }
 
 /** The six steps as six short segments: reached in ink, the step they are stuck at marked, the rest grey. */
-function Track({ s }: { s: StudentRow }) {
+function Track({ s, className }: { s: StudentRow; className?: string }) {
   const facts = factsOf(s);
   const reached = stepsReached(facts);
   const stuck = stuckAt(facts);
@@ -398,8 +400,8 @@ function Track({ s }: { s: StudentRow }) {
     : `${s.offersPending ? `${s.offersPending} waiting on their reply` : "Offer given"}`;
   const label = stuck === "done" ? "Hired" : STAGES.find((g) => g.id === stuck)!.label;
   return (
-    <div className="px-4 pt-3">
-      <div aria-hidden className="flex gap-1">
+    <div className={className}>
+      <div aria-hidden className="flex max-w-md gap-1">
         {STEPS.map((step, i) => (
           <span
             key={step.id}
@@ -424,9 +426,9 @@ function StudentCard({ s, now }: { s: StudentRow; now: number }) {
   const name = s.name || s.email;
   const scored = ai.done && s.score !== null;
   return (
-    // The whole card opens the student: the name's link is stretched over it.
-    <article className="group relative flex h-full flex-col rounded-lg border border-ink-200/80 bg-white transition-colors hover:border-ink-400 has-[a:focus-visible]:border-brand-500">
-      <div className="flex items-start gap-3 px-4 pt-4">
+    // The whole row opens the student: the name's link is stretched over it. A stacked card on a phone, one line wide.
+    <article className="group relative flex flex-col rounded-lg border border-ink-200/80 bg-white transition-colors hover:border-ink-400 has-[a:focus-visible]:border-brand-500 lg:grid lg:grid-cols-[minmax(0,13rem)_minmax(0,1fr)_minmax(0,14rem)_auto] lg:items-center lg:gap-6 lg:px-4 lg:py-3">
+      <div className="flex items-start gap-3 px-4 pt-4 lg:items-center lg:p-0">
         <Initials seed={s.userId} name={name} className="size-10" />
         <div className="min-w-0 flex-1">
           <Link
@@ -436,16 +438,23 @@ function StudentCard({ s, now }: { s: StudentRow; now: number }) {
             {name}
           </Link>
           <p className="truncate text-xs text-text-subtle">{[s.rollNo, yearLabel(s.year), s.branch].filter((v) => v && v !== "—").join(" · ") || "Year not set"}</p>
+          <span className="mt-0.5 hidden lg:block">
+            <Online at={s.lastSeenAt ?? s.lastActivityAt} now={now} />
+          </span>
         </div>
-        <Online at={s.lastSeenAt ?? s.lastActivityAt} now={now} />
+        <span className="lg:hidden">
+          <Online at={s.lastSeenAt ?? s.lastActivityAt} now={now} />
+        </span>
       </div>
 
-      <Track s={s} />
+      <Track s={s} className="px-4 pt-3 lg:p-0" />
 
-      <ContactLines phone={s.phone} email={s.email} linkedin={s.linkedin} name={name} />
+      <div className="lg:[&>div]:p-0">
+        <ContactLines phone={s.phone} email={s.email} linkedin={s.linkedin} name={name} />
+      </div>
 
       {/* The two numbers employers filter on, as figures; then what is waiting on the student. */}
-      <div className="mt-auto flex items-end gap-5 border-t border-ink-100 px-4 py-3">
+      <div className="mt-auto flex items-end gap-5 border-t border-ink-100 px-4 py-3 lg:mt-0 lg:w-[14rem] lg:gap-4 lg:border-0 lg:p-0">
         <div>
           <p className="whitespace-nowrap text-xs text-text-subtle">Findtern score</p>
           <p className={cn("nums text-lg font-medium leading-tight", scored ? "text-ink-900" : "text-ink-400")}>{scored ? s.score!.toFixed(1) : "—"}</p>
