@@ -170,9 +170,29 @@ export default async function CollegeOverview({ searchParams }: { searchParams?:
               ) : null}
             </div>
           </div>
-          <div className="flex w-full flex-wrap gap-2.5 sm:w-auto">
-            <ButtonLink href="/college/drives/new" variant="white">New campus drive link</ButtonLink>
-            <ButtonLink href="/college/roster" variant="outlineLight">Add students</ButtonLink>
+          <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
+            <div className="flex flex-wrap gap-2.5">
+              <ButtonLink href="/college/drives/new" variant="white">New campus drive link</ButtonLink>
+              <ButtonLink href="/college/roster" variant="outlineLight">Add students</ButtonLink>
+            </div>
+            {/* Preview switch between the two hero charts. Remove with the losing version. */}
+            <nav aria-label="Chart style" className="flex w-full sm:justify-end">
+              <span className="inline-flex rounded-full bg-white/10 p-1 text-[13px] font-medium">
+                {[
+                  { href: "/college", label: "Ribbon", on: !rings },
+                  { href: "/college?hero=rings", label: "Ring", on: rings },
+                ].map((o) => (
+                  <Link
+                    key={o.label}
+                    href={o.href}
+                    aria-current={o.on ? "page" : undefined}
+                    className={`inline-flex min-h-9 items-center rounded-full px-4 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/70 ${o.on ? "bg-white text-ink-900" : "text-on-dark hover:bg-white/10"}`}
+                  >
+                    {o.label}
+                  </Link>
+                ))}
+              </span>
+            </nav>
           </div>
         </div>
         {rings ? <BatchRings stages={funnel} /> : <BatchRibbon stages={funnel} />}
