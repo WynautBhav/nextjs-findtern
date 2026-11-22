@@ -75,6 +75,8 @@ export type CollegeStudent = StudentFacts & {
   /** "+91 98765 43210" as registered. The officer sees it for verified students only (serialize.ts). */
   phone: string | null;
   linkedin: string | null;
+  /** The student's own "open to work" switch. Off = employers cannot find them. */
+  openToWork: boolean;
 };
 
 type Row = Record<string, unknown>;
@@ -119,6 +121,7 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
       ${u.firstName} AS first_name, ${u.lastName} AS last_name, ${u.email} AS email,
       ${u.countryCode} AS country_code, ${u.phoneNumber} AS phone_number,
       nullif(${o.linkedinUrl}, '') AS linkedin,
+      coalesce(${o.extraData}->>'openToWork', 'true') <> 'false' AS open_to_work,
       ${cgpaSql()} AS cgpa,
       ${findternScoreSql()} AS score,
       ${aiInterviewStatus()} AS ai_status,
@@ -173,6 +176,7 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
     interviewsScheduled: Number(r.interviews_scheduled ?? 0),
     driveMeetings: Number(r.drive_meetings ?? 0),
     lastActivityAt: date(r.last_activity_at),
+    openToWork: r.open_to_work !== false,
   }));
 }
 

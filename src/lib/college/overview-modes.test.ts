@@ -12,7 +12,7 @@ const row = (over: Partial<MasterRow>): MasterRow => ({
   professionalStatus: null, professionalLevel: null, certifications: null, experience: null, workMode: null, preferredLocations: [],
   laptop: null, lastSeenAt: null, skills: [], hasReport: false, hasRecording: false, english: null, coding: null, aptitude: null,
   aiInterview: null, score: null, offers: 0, offersAccepted: 0, offersRejected: 0, offersOpen: 0, marks10: null, hired: false, ppo: false,
-  earningsMinor: 0, meetings: { total: 0, done: 0, notAccepted: 0, upcoming: 0, waiting: 0 }, ...over,
+  earningsMinor: 0, meetings: { total: 0, done: 0, notAccepted: 0, upcoming: 0, waiting: 0 }, openToWork: true, ...over,
 });
 
 const rows = [

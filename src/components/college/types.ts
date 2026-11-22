@@ -20,6 +20,7 @@ export type StudentRow = {
   interviewsScheduled: number;
   driveMeetings: number;
   collegeId: string;
+  openToWork: boolean;
   leftAt: null;
   /** Why employers can't find this student, one line; null when they can (student-readiness.ts). */
   hiddenWhy?: string | null;
