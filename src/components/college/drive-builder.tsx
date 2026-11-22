@@ -29,6 +29,8 @@ export type DriveDraft = {
   branches: string[];
   includeUserIds: string[];
   excludeUserIds: string[];
+  /** Companies the officer invited: the drive page shows who came and who to chase. */
+  invitedEmployers?: { company: string; email: string }[];
 };
 
 const field =
@@ -73,7 +75,7 @@ export function DriveBuilder({
     if (d.minScore.trim() !== "" && Number.isFinite(Number(d.minScore))) eligibility.minScore = Number(d.minScore);
     if (d.years.length) eligibility.years = d.years;
     if (d.branches.length) eligibility.branches = d.branches;
-    return { collegeId, eligibility, includeUserIds: d.includeUserIds, excludeUserIds: d.excludeUserIds };
+    return { collegeId, kind: d.kind, eligibility, includeUserIds: d.includeUserIds, excludeUserIds: d.excludeUserIds };
   }, [d, collegeId]);
 
   const split = useMemo(() => {
@@ -109,6 +111,8 @@ export function DriveBuilder({
       eligibility: rules.eligibility,
       includeUserIds: d.includeUserIds,
       excludeUserIds: d.excludeUserIds,
+      // Blank rows are dropped; a half-filled one is sent so the API can say what is missing.
+      invitedEmployers: (d.invitedEmployers ?? []).filter((i) => i.company.trim() || i.email.trim()),
     };
     const res = await csrfFetch(d.id ? `/api/college/drives/${d.id}` : "/api/college/drives", {
       method: d.id ? "PATCH" : "POST",
@@ -163,7 +167,7 @@ export function DriveBuilder({
               {(
                 [
                   ["internship", "Internships", "Findtern's fixed stipend bands apply; score is shown first."],
-                  ["full_time", "Full-time jobs", "Employers also see CGPA up front."],
+                  ["full_time", "Full-time jobs", "Final-year students only: 4th year, or 3rd year in semester 6 and up. Employers also see CGPA."],
                 ] as const
               ).map(([value, label, hint]) => (
                 <label
@@ -198,6 +202,8 @@ export function DriveBuilder({
           </label>
         </div>
       </section>
+
+      <InvitedCompanies value={d.invitedEmployers ?? []} onChange={(v) => set("invitedEmployers", v)} />
 
       {limit ? (
       <section className={SURFACE_CLASS}>
@@ -401,5 +407,42 @@ function IstDateTime({
       </div>
       {hint ? <span className="mt-1 block text-xs text-text-subtle">{hint}</span> : null}
     </fieldset>
+  );
+}
+
+/** The companies the officer is inviting, so the drive page can say who came and who to chase. */
+function InvitedCompanies({ value, onChange }: { value: { company: string; email: string }[]; onChange: (v: { company: string; email: string }[]) => void }) {
+  const rows = value.length ? value : [{ company: "", email: "" }];
+  const put = (i: number, k: "company" | "email", v: string) => onChange(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  return (
+    <section className={SURFACE_CLASS} aria-labelledby="invited-companies">
+      <header className="border-b border-ink-100 px-5 py-4">
+        <h2 id="invited-companies" className="text-lg font-semibold tracking-[-0.02em] text-ink-900">
+          Companies you invited <span className="text-sm font-normal text-text-subtle">(optional)</span>
+        </h2>
+        <p className="mt-0.5 text-sm text-text-subtle">The drive page shows who came in through the link and who you still need to chase.</p>
+      </header>
+      <ul className="space-y-2 px-5 py-4">
+        {rows.map((r, i) => (
+          <li key={i} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
+            <input aria-label={`Company ${i + 1}`} className={field} value={r.company} maxLength={120} onChange={(e) => put(i, "company", e.target.value)} placeholder="Company name" />
+            <input aria-label={`Company ${i + 1} email`} type="email" className={field} value={r.email} maxLength={200} onChange={(e) => put(i, "email", e.target.value)} placeholder="hr@company.com" />
+            <button
+              type="button"
+              onClick={() => onChange(rows.filter((_, j) => j !== i))}
+              aria-label={`Remove company ${i + 1}`}
+              className={buttonClass({ variant: "ghost", size: "sm", className: "h-11 text-ink-600" })}
+            >
+              Remove
+            </button>
+          </li>
+        ))}
+      </ul>
+      <div className="border-t border-ink-100 px-5 py-3">
+        <button type="button" disabled={rows.length >= 50} onClick={() => onChange([...rows, { company: "", email: "" }])} className={buttonClass({ variant: "outline", size: "sm" })}>
+          Add a company
+        </button>
+      </div>
+    </section>
   );
 }

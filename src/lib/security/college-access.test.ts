@@ -373,3 +373,17 @@ test("a claimed (unverified) student shows no score, CGPA, interview or offer pr
   const verified = redactUnverified({ ...base, status: "verified" as const });
   assert.deepEqual(verified, { ...base, status: "verified" });
 });
+
+test("full-time drive: only final-year students (4th year, or 3rd year in semester 6 and up), no override", () => {
+  const ft = { ...driveX, kind: "full_time", eligibility: {} };
+  assert.equal(isStudentEligible(student({ year: 4 }), ft), true);
+  assert.equal(isStudentEligible(student({ year: 3, semester: 6 }), ft), true);
+  assert.equal(isStudentEligible(student({ year: 3, semester: 5 }), ft), false);
+  assert.equal(isStudentEligible(student({ year: 3 }), ft), false);
+  assert.equal(isStudentEligible(student({ year: 2, semester: 8 }), ft), false);
+  assert.equal(isStudentEligible(student({ year: null }), ft), false);
+  // The officer's hand-include does not open a full-time drive to a 2nd year.
+  assert.equal(isStudentEligible(student({ year: 2 }), { ...ft, includeUserIds: ["stu-1"] }), false);
+  // Internship drives are unchanged.
+  assert.equal(isStudentEligible(student({ year: 2 }), { ...driveX, kind: "internship", eligibility: {} }), true);
+});

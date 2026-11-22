@@ -6,7 +6,7 @@ import { BellRing, Check } from "lucide-react";
 import { csrfFetch } from "@/lib/client-fetch";
 import { cn } from "@/lib/utils";
 
-type Kind = "online" | "offer" | "interview";
+type Kind = "online" | "offer" | "interview" | "meeting";
 
 /**
  * Chase one or many students. The server skips anyone nudged for the same

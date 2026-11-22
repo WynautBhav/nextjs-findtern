@@ -16,6 +16,7 @@ export function toStudentRow(s: CollegeStudent): StudentRow {
     year: s.year,
     branch: s.branch,
     cgpa: s.cgpa,
+    semester: s.semester ?? null,
     score: s.score,
     aiStatus: s.aiStatus,
     lastSeenAt: s.lastSeenAt?.toISOString() ?? null,

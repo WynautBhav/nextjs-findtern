@@ -85,7 +85,7 @@ export function LinkActions(props: {
               onClick={() => void call(asking)}
               className={buttonClass({ variant: asking === "DELETE" ? "dark" : "primary", size: "sm" })}
             >
-              {asking === "DELETE" ? "Yes, close the link" : "Yes, issue a new link"}
+              {asking === "DELETE" ? "Yes, turn off the drive" : "Yes, issue a new link"}
             </button>
             {/* Cancel takes the focus: Enter on a focused "close" can't be undone. */}
             <button type="button" autoFocus onClick={cancel} className={buttonClass({ variant: "outline", size: "sm" })}>
@@ -112,7 +112,7 @@ export function LinkActions(props: {
               onClick={() => setAsking("DELETE")}
               className={buttonClass({ variant: "ghost", size: "sm", className: "text-danger hover:bg-danger-soft" })}
             >
-              Close link now
+              Turn off drive
             </button>
           ) : null}
         </div>

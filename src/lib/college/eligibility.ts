@@ -7,6 +7,8 @@
 
 type DriveRules = {
   collegeId: string;
+  /** "full_time" drives take final-year students only (fullTimeReady). */
+  kind?: string;
   eligibility: Record<string, unknown>;
   includeUserIds: string[];
   excludeUserIds: string[];
@@ -51,13 +53,22 @@ export type StudentFacts = {
   branch: string | null;
   cgpa: number | null;
   score: number | null;
+  /** Current semester from the student's academics, when they filled it in. */
+  semester?: number | null;
 };
+
+/** Full-time hiring is for the final year: 4th year, or a 3rd year already in semester 6 or later. */
+export function fullTimeReady(s: Pick<StudentFacts, "year" | "semester">): boolean {
+  return s.year === 4 || (s.year === 3 && (s.semester ?? 0) >= 6);
+}
 
 export function isStudentEligible(s: StudentFacts, drive: DriveRules): boolean {
   // Hard boundaries: no override.
   if (!s.collegeId || s.collegeId !== drive.collegeId) return false;
   if (s.leftAt) return false;
   if (drive.excludeUserIds.includes(s.userId)) return false;
+  // The platform's rule, not the officer's: a hand-include does not open a full-time drive to earlier years.
+  if (drive.kind === "full_time" && !fullTimeReady(s)) return false;
   // The college vouches for hand-included students, cutoffs or not.
   if (drive.includeUserIds.includes(s.userId)) return true;
   if (s.status !== "verified") return false;

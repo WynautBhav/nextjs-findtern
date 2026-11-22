@@ -1,64 +1,101 @@
 import { notFound } from "next/navigation";
 
 import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
-import { PageHead } from "@/components/app/primitives";
+import { CollegeHero, HeroStat, HeroStats } from "@/components/college/kit";
+import { DriveBoardView } from "@/components/college/drive-board-view";
 import { DriveBuilder } from "@/components/college/drive-builder";
-import { toLocalInput } from "@/lib/college/ist";
+import { EmployerAlert } from "@/components/college/employer-alert";
 import { LinkActions } from "@/components/college/link-actions";
 import { PresenceLive } from "@/components/college/presence-live";
+import { ButtonLink } from "@/components/ui/button";
 import { driveWindow, readEligibility } from "@/lib/college/access";
-import { driveEmployers } from "@/lib/college/drives";
+import { loadDriveBoard } from "@/lib/college/drive-board-db";
+import { toLocalInput } from "@/lib/college/ist";
 import { DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
-import {
-  driveForCollegeAdmin,
-  eligibleStudents,
-  presenceSnapshot,
-  requireCollegeContext,
-  studentsForCollegeAdmin,
-} from "@/lib/college/scope";
+import { driveForCollegeAdmin, eligibleStudents, presenceSnapshot, requireCollegeContext, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { driveDataOpen, toStudentRow } from "@/lib/college/serialize";
+import { shortDateTime } from "@/lib/format";
 
 export const dynamic = "force-dynamic";
 
-export default async function DrivePage({ params }: { params: Promise<{ id: string }> }) {
+const fmt = (d: Date) => shortDateTime(d, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString("en-IN")} ${n === 1 ? one : many}`;
+
+/** Request time for "x min ago". Dynamic page, so this is per request. */
+function requestTime(): number {
+  return Date.now();
+}
+
+/**
+ * One campus drive. While it is open: what needs the officer now (calls and offers students haven't answered,
+ * students offline), what it has produced, the employer alert, the link and the edit form. Once it is over: the
+ * same figures as a report, without the student lists (C12).
+ */
+export default async function DrivePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string }> }) {
   const ctx = await requireCollegeContext();
-  const { id } = await params;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
   const drive = await driveForCollegeAdmin(ctx, id);
   if (!drive) notFound();
 
-  const w = driveWindow(drive);
-  // Once over, the TPO keeps counts, not the student lists (C12).
-  const [students, eligible, employers] = await Promise.all([
-    driveDataOpen(drive) ? studentsForCollegeAdmin(ctx) : Promise.resolve([]),
-    eligibleStudents(drive),
-    driveEmployers(drive.id),
-  ]);
+  const now = requestTime();
+  const w = driveWindow(drive, now);
+  const open = driveDataOpen(drive);
+  const [students, eligible] = await Promise.all([open ? studentsForCollegeAdmin(ctx) : Promise.resolve([]), eligibleStudents(drive)]);
   const presence = w === "live" ? await presenceSnapshot(ctx.college.id, eligible.map((s) => s.userId)) : null;
+  const refs = eligible.map((s) => {
+    const r = toStudentRow(s);
+    return { userId: r.userId, name: r.name, rollNo: r.rollNo, year: r.year, branch: r.branch, phone: r.phone };
+  });
+  const { board, came, invited, arrived, missing } = await loadDriveBoard(drive, refs, presence ? presence.offline : null, now);
+
   const rows = students.map(toStudentRow);
   const branches = [...new Set(rows.map((s) => s.branch).filter((b): b is string => Boolean(b)))].sort();
   const e = readEligibility(drive.eligibility);
+  const calls = board.lists.meetingsWaiting.length;
+  const offers = board.lists.offersWaiting.length;
+  const finding = !open
+    ? `${plural(board.offerCount, "offer", "offers")}, ${plural(board.lists.meetings.length, "meeting", "meetings")} and ${plural(board.lists.internships.length + board.lists.fullTime.length, "hire", "hires")} came out of this drive.`
+    : calls || offers || missing.length
+      ? [calls ? `${plural(calls, "student hasn't", "students haven't")} answered a call` : null, offers ? `${plural(offers, "offer is", "offers are")} waiting on a reply` : null, missing.length ? `${plural(missing.length, "invited company hasn't", "invited companies haven't")} come in` : null]
+          .filter(Boolean)
+          .join(" · ")
+      : "Nothing is waiting on you right now.";
 
   return (
     <div className="space-y-6">
-      <PageHead
+      <CollegeHero
         title={drive.title}
-        lede={`${DRIVE_KIND_LABEL[drive.kind] ?? drive.kind} · ${WINDOW_LABEL[w]} · ${eligible.length} ${eligible.length === 1 ? "student" : "students"} visible to employers`}
-      />
+        lede={`${DRIVE_KIND_LABEL[drive.kind] ?? drive.kind} · ${WINDOW_LABEL[w]} · ${fmt(drive.startsAt)} to ${fmt(drive.endsAt)} · ${plural(eligible.length, "student", "students")} in the drive`}
+        actions={open ? <ButtonLink href={`/college/drives/${drive.id}?edit=1#edit`} variant="white">Edit drive</ButtonLink> : null}
+      >
+        <p className="mt-6 max-w-3xl text-pretty text-base text-white">{finding}</p>
+        {!open ? (
+          <HeroStats>
+            <HeroStat label="Offers received" value={board.offerCount} hint={`to ${plural(board.lists.offers.length, "student", "students")}`} />
+            <HeroStat label="Meetings held" value={board.lists.meetings.length} />
+            <HeroStat label="Placed: internship" value={board.lists.internships.length} />
+            <HeroStat label="Placed: full-time" value={board.lists.fullTime.length} />
+          </HeroStats>
+        ) : null}
+      </CollegeHero>
+
+      {open ? <DriveBoardView board={board} live={w === "live"} open={open} /> : null}
+
+      <EmployerAlert invited={invited} arrived={arrived} missing={missing} came={came} over={!open} />
 
       {presence ? (
         <PresenceLive driveId={drive.id} driveTitle={drive.title} showTitle={false} startsAt={drive.startsAt.toISOString()} endsAt={drive.endsAt.toISOString()} initial={presence} />
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Panel>
+      <Panel>
           <PanelHeader
             title="Link"
             description={
               w === "revoked"
-                ? "Closed. No employer can get in."
+                ? "Turned off. No employer can get in."
                 : w === "ended"
-                ? `Ended · ${employers.length} ${employers.length === 1 ? "company" : "companies"} joined.`
-                : `Active · ${employers.length} ${employers.length === 1 ? "company has" : "companies have"} joined. Companies must sign in to Findtern.`
+                  ? "Ended. No employer can get in."
+                  : "Send it to the companies you invite. They must sign in to Findtern. Turn the drive off at any time."
             }
           />
           <PanelBody>
@@ -72,62 +109,41 @@ export default async function DrivePage({ params }: { params: Promise<{ id: stri
               kind={drive.kind}
             />
           </PanelBody>
-        </Panel>
-        <Panel>
-          <PanelHeader title="Employers inside" description="Companies that opened your link while signed in." />
-          {employers.length === 0 ? (
-            <PanelBody>
-              <p className="text-sm text-text-subtle">Nobody yet. Once you share the link, companies appear here as they join.</p>
-            </PanelBody>
-          ) : (
-            <ul className="divide-y divide-ink-100">
-              {employers.map((em) => (
-                <li key={em.employerId} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-                  <span className="font-medium text-ink-900">{em.company ?? "Employer"}</span>
-                  <span className="nums text-sm text-text-subtle">
-                    {em.shortlisted} shortlisted · {em.calls} call{em.calls === 1 ? "" : "s"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
-      </div>
+      </Panel>
 
-      {/* Folded: the page is about the drive running, and editing is the
-          rare case (it was 2,500px open under everything). Gone once the
-          drive is over or its link is closed. */}
-      {w === "ended" || w === "revoked" ? null : (
-      <details className="group rounded-apple-xl border border-ink-200/80 bg-white shadow-xs">
-        <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-5 text-sm font-semibold text-ink-900 hover:bg-ink-50">
-          Edit dates and eligibility
-          <span aria-hidden className="font-medium text-brand-700 group-open:hidden">Open</span>
-        </summary>
-        <div className="border-t border-ink-100 p-5">
-      <DriveBuilder
-        collegeId={ctx.college.id}
-        collegeName={ctx.college.name}
-        students={rows}
-        branches={branches}
-        live={w === "live"}
-        initial={{
-          id: drive.id,
-          title: drive.title,
-          kind: drive.kind === "full_time" ? "full_time" : "internship",
-          description: drive.description ?? "",
-          startsAt: toLocalInput(drive.startsAt),
-          endsAt: toLocalInput(drive.endsAt),
-          minCgpa: e.minCgpa?.toString() ?? "",
-          minScore: e.minScore?.toString() ?? "",
-          years: e.years ?? [],
-          branches: e.branches ?? [],
-          includeUserIds: drive.includeUserIds,
-          excludeUserIds: drive.excludeUserIds,
-        }}
-      />
-        </div>
-      </details>
-      )}
+      {/* Folded unless asked for (Edit drive): the page is about the drive running. Gone once it is over. */}
+      {open ? (
+        <details id="edit" open={sp.edit === "1"} className="group scroll-mt-6 rounded-apple-xl border border-ink-200/80 bg-white shadow-xs">
+          <summary className="flex min-h-14 cursor-pointer list-none items-center justify-between px-5 text-sm font-semibold text-ink-900 hover:bg-ink-50">
+            Edit dates, invited companies and eligibility
+            <span aria-hidden className="font-medium text-brand-700 group-open:hidden">Open</span>
+          </summary>
+          <div className="border-t border-ink-100 p-5">
+            <DriveBuilder
+              collegeId={ctx.college.id}
+              collegeName={ctx.college.name}
+              students={rows}
+              branches={branches}
+              live={w === "live"}
+              initial={{
+                id: drive.id,
+                title: drive.title,
+                kind: drive.kind === "full_time" ? "full_time" : "internship",
+                description: drive.description ?? "",
+                startsAt: toLocalInput(drive.startsAt),
+                endsAt: toLocalInput(drive.endsAt),
+                minCgpa: e.minCgpa?.toString() ?? "",
+                minScore: e.minScore?.toString() ?? "",
+                years: e.years ?? [],
+                branches: e.branches ?? [],
+                includeUserIds: drive.includeUserIds,
+                excludeUserIds: drive.excludeUserIds,
+                invitedEmployers: invited,
+              }}
+            />
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }

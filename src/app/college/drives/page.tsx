@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowUpRight, Plus } from "lucide-react";
 
-import { EmptyScene, Surface } from "@/components/app/primitives";
+import { EmptyScene, FilterTabs, Surface } from "@/components/app/primitives";
 import { CollegeHero, HeroStat, HeroStats, WindowLine } from "@/components/college/kit";
 import { DriveStatePill } from "@/components/employer/drive-parts";
 import { ButtonLink } from "@/components/ui/button";
@@ -35,15 +35,20 @@ function timeNote(state: string, starts: Date, ends: Date, now: number): string 
  * Every campus drive as a card: its window drawn as a line with "now" on it, and what happened inside
  * (employers who entered, students shortlisted, calls answered). Live first, then upcoming, then past.
  */
-export default async function DrivesPage() {
+export default async function DrivesPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const ctx = await requireCollegeContext();
-  const drives = await drivesOverview(ctx.college.id);
+  const [all, sp] = await Promise.all([drivesOverview(ctx.college.id), searchParams]);
   const now = requestTime();
+  // Active = open now or still to open; Past = finished or closed by the officer.
+  const allStates = all.map(({ drive }) => driveWindow(drive, now));
+  const activeCount = allStates.filter((st) => st === "live" || st === "upcoming").length;
+  const view = sp.view === "past" ? "past" : "active";
+  const drives = all.filter((_, i) => (view === "active") === (allStates[i] === "live" || allStates[i] === "upcoming"));
   const states = drives.map(({ drive }) => driveWindow(drive, now));
-  const live = states.filter((s) => s === "live").length;
-  const employers = drives.reduce((n, d) => n + d.employers, 0);
-  const shortlisted = drives.reduce((n, d) => n + d.shortlisted, 0);
-  const answered = drives.reduce((n, d) => n + d.accepted, 0);
+  const live = allStates.filter((s) => s === "live").length;
+  const employers = all.reduce((n, d) => n + d.employers, 0);
+  const shortlisted = all.reduce((n, d) => n + d.shortlisted, 0);
+  const answered = all.reduce((n, d) => n + d.accepted, 0);
   return (
     <div className="space-y-6">
       <CollegeHero
@@ -51,21 +56,37 @@ export default async function DrivesPage() {
         lede="One link per drive. The employers you send it to sign in and see only your verified students, while the drive is open."
         actions={
           <ButtonLink href="/college/drives/new" variant="white">
-            <Plus className="size-4" aria-hidden /> New drive
+            <Plus className="size-4" aria-hidden /> Create new drive
           </ButtonLink>
         }
       >
-        {drives.length > 0 ? (
+        {all.length > 0 ? (
           <HeroStats cols={4}>
             <HeroStat label="Open now" value={live} hint={live ? "Employers can enter" : "No drive is open"} />
-            <HeroStat label="Employers entered" value={employers} hint={`across ${drives.length} ${drives.length === 1 ? "drive" : "drives"}`} />
+            <HeroStat label="Employers entered" value={employers} hint={`across ${all.length} ${all.length === 1 ? "drive" : "drives"}`} />
             <HeroStat label="Students shortlisted" value={shortlisted} />
             <HeroStat label="Calls answered" value={answered} />
           </HeroStats>
         ) : null}
       </CollegeHero>
 
-      {drives.length === 0 ? (
+      {all.length > 0 ? (
+        <FilterTabs
+          label="Show drives"
+          value={view}
+          hrefFor={(k) => (k === "past" ? "/college/drives?view=past" : "/college/drives")}
+          tabs={[
+            { key: "active", label: "Active drives", count: activeCount },
+            { key: "past", label: "Past drives", count: all.length - activeCount },
+          ]}
+        />
+      ) : null}
+
+      {all.length > 0 && drives.length === 0 ? (
+        <Surface className="p-6 text-sm text-text-subtle">
+          {view === "active" ? "No drive is open or coming up. Create one to send employers a new link." : "No past drives yet. A drive moves here once it ends or you turn it off."}
+        </Surface>
+      ) : drives.length === 0 ? (
         <Surface>
           <EmptyScene
             title="No drives yet"

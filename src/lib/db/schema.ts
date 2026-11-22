@@ -1211,6 +1211,8 @@ export const collegeDrives = pgTable("college_drives", {
   eligibility: jsonb("eligibility").$type<Record<string, unknown>>().notNull().default({}),
   includeUserIds: jsonb("include_user_ids").$type<string[]>().notNull().default([]),
   excludeUserIds: jsonb("exclude_user_ids").$type<string[]>().notNull().default([]),
+  /** Companies the officer invited (0051): the drive page counts who came and lists who to chase. */
+  invitedEmployers: jsonb("invited_employers").$type<{ company: string; email: string }[]>().notNull().default([]),
   tokenHash: text("token_hash").notNull(),
   revokedAt: timestamp("revoked_at"),
   /** The paid drive order this drive runs on (drizzle/0018). */

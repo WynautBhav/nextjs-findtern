@@ -11,6 +11,7 @@ export type StudentRow = {
   year: number | null;
   branch: string | null;
   cgpa: number | null;
+  semester?: number | null;
   score: number | null;
   aiStatus: string;
   lastSeenAt: string | null;
