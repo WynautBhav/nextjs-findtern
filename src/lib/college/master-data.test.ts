@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildMasterRow, cellText, csvCell, MASTER_COLUMNS, toCsv, type MasterExtras, type ScopedStudent } from "./master-row.ts";
+import { buildMasterRow, cellText, csvCell, MASTER_COLUMNS, matchesWorkMode, toCsv, type MasterExtras, type ScopedStudent } from "./master-row.ts";
 import { computeInsights, quadrantOf } from "./insights.ts";
 
 const student = (over: Partial<ScopedStudent> = {}): ScopedStudent => ({
@@ -32,8 +32,9 @@ test("a verified student carries every field on the master data list", () => {
   assert.equal(r.professionalStatus, "Pursuing");
   assert.equal(r.certifications, 2);
   assert.equal(r.experience, 1);
-  // Findtern's rule: the widest choice counts, and each choice covers the ones before it (hybrid -> remote + hybrid).
-  assert.deepEqual(r.workModes, ["remote", "hybrid"]);
+  // The student's own pick: the widest mode stored (Findtern's onboarding rule).
+  assert.equal(r.workMode, "hybrid");
+  assert.equal(cellText(r, "workMode"), "Hybrid");
   assert.equal(r.english, 8.8);
   assert.equal(r.emergencyContact, "Sunita Meena (Mother) +91 9800000000");
   assert.equal(r.hasReport, true);
@@ -97,13 +98,21 @@ test("overlooked means a strong Findtern score and no offer yet", () => {
   assert.equal(quadrantOf({ cgpa: null, score: 5.0 }), null);
 });
 
-test("work mode follows Findtern's rule: remote only, hybrid adds remote, onsite adds both", () => {
-  const modes = (picked: string[]) => buildMasterRow(student(), extras({ locationTypes: picked })).workModes;
-  assert.deepEqual(modes(["remote"]), ["remote"]);
-  assert.deepEqual(modes(["Hybrid"]), ["remote", "hybrid"]);
-  assert.deepEqual(modes(["onsite"]), ["remote", "hybrid", "onsite"]);
-  assert.deepEqual(modes(["remote", "onsite"]), ["remote", "hybrid", "onsite"]);
-  assert.deepEqual(modes([]), []);
+test("a student's pick is their widest stored mode", () => {
+  const pick = (stored: string[]) => buildMasterRow(student(), extras({ locationTypes: stored })).workMode;
+  assert.equal(pick(["remote"]), "remote");
+  assert.equal(pick(["remote", "hybrid"]), "hybrid");
+  assert.equal(pick(["remote", "hybrid", "onsite"]), "onsite");
+  assert.equal(pick([]), null);
+});
+
+test("the filter follows Findtern's rule: Remote = remote only, Hybrid = remote + hybrid, Onsite = all three", () => {
+  const shown = (selected: string) => ["remote", "hybrid", "onsite", null].filter((p) => matchesWorkMode(p, selected));
+  assert.deepEqual(shown("remote"), ["remote"]);
+  assert.deepEqual(shown("hybrid"), ["remote", "hybrid"]);
+  assert.deepEqual(shown("onsite"), ["remote", "hybrid", "onsite"]);
+  // No filter shows everyone, including students who never picked.
+  assert.deepEqual(shown(""), ["remote", "hybrid", "onsite", null]);
 });
 
 test("roll number is not part of master data", () => {

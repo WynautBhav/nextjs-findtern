@@ -9,7 +9,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { csrfFetch } from "@/lib/client-fetch";
 import { ago } from "@/lib/college/labels";
 import { HIGH_CGPA, STRONG_SCORE, quadrantOf, type Quadrant } from "@/lib/college/insights";
-import { MASTER_COLUMNS, cellText, type ColumnGroup, type MasterColumn, type MasterRow } from "@/lib/college/master-row";
+import { MASTER_COLUMNS, cellText, matchesWorkMode, type ColumnGroup, type MasterColumn, type MasterRow } from "@/lib/college/master-row";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +41,7 @@ const SCORES: Key[] = ["name", "degree", "branch", "cgpa", "english", "coding", 
 
 const PRESETS: View[] = [
   { id: "all", name: "All students", columns: BASE, filters: NO_FILTERS, sort: { key: "name", dir: "asc" } },
-  { id: "overlooked", name: "Strong score, no offer", columns: [...SCORES, "workModes", "preferredLocations", "phone"], filters: { ...NO_FILTERS, minScore: String(STRONG_SCORE), placement: "none" }, sort: { key: "score", dir: "desc" } },
+  { id: "overlooked", name: "Strong score, no offer", columns: [...SCORES, "workMode", "preferredLocations", "phone"], filters: { ...NO_FILTERS, minScore: String(STRONG_SCORE), placement: "none" }, sort: { key: "score", dir: "desc" } },
   { id: "most-offers", name: "Most offers", columns: ["name", "degree", "branch", "score", "offers", "hired", "ppo", "earningsMinor"], filters: { ...NO_FILTERS, placement: "offer" }, sort: { key: "offers", dir: "desc" } },
   { id: "score-beats-cg", name: "Score beats CGPA", columns: SCORES, filters: { ...NO_FILTERS, quadrant: "scoreBeatsCg" }, sort: { key: "score", dir: "desc" } },
   { id: "cg-beats-score", name: "CGPA beats score", columns: SCORES, filters: { ...NO_FILTERS, quadrant: "cgBeatsScore" }, sort: { key: "cgpa", dir: "desc" } },
@@ -49,12 +49,13 @@ const PRESETS: View[] = [
   { id: "support", name: "Needs support", columns: SCORES, filters: { ...NO_FILTERS, quadrant: "support" }, sort: { key: "score", dir: "asc" } },
   { id: "placed", name: "Placed and PPO", columns: ["name", "degree", "branch", "year", "offers", "hired", "ppo", "earningsMinor"], filters: { ...NO_FILTERS, placement: "hired" }, sort: { key: "earningsMinor", dir: "desc" } },
   { id: "contact", name: "Contact sheet", columns: ["name", "phone", "email", "emergencyContact", "linkedin", "city"], filters: NO_FILTERS, sort: { key: "name", dir: "asc" } },
-  { id: "work-prefs", name: "Work preferences", columns: ["name", "degree", "workModes", "preferredLocations", "laptop", "skills"], filters: NO_FILTERS, sort: { key: "name", dir: "asc" } },
-  { id: "no-laptop", name: "No laptop", columns: ["name", "degree", "branch", "phone", "workModes", "laptop"], filters: { ...NO_FILTERS, laptop: "no" }, sort: { key: "name", dir: "asc" } },
+  { id: "work-prefs", name: "Work preferences", columns: ["name", "degree", "workMode", "preferredLocations", "laptop", "skills"], filters: NO_FILTERS, sort: { key: "name", dir: "asc" } },
+  { id: "no-laptop", name: "No laptop", columns: ["name", "degree", "branch", "phone", "workMode", "laptop"], filters: { ...NO_FILTERS, laptop: "no" }, sort: { key: "name", dir: "asc" } },
 ];
 
 const GROUPS: ColumnGroup[] = ["Student", "Course", "Preferences", "Scores", "Placement"];
-const MODES = [["remote", "Remote"], ["hybrid", "Hybrid"], ["onsite", "Onsite"]] as const;
+/** The filter's options, worded as the rule: each takes in the modes before it. */
+const MODES = [["remote", "Remote only"], ["hybrid", "Remote + Hybrid"], ["onsite", "Remote + Hybrid + Onsite"]] as const;
 const col = (k: Key) => MASTER_COLUMNS.find((c) => c.key === k)!;
 const numeric = (k: Key) => ["number", "score", "money"].includes(col(k).kind);
 
@@ -72,7 +73,7 @@ function sortValue(r: MasterRow, k: Key): string | number | null {
 function matches(r: MasterRow, f: Filters, q: string): boolean {
   if (f.course && (r.degree ?? "Course not set") !== f.course) return false;
   if (f.year && String(r.year ?? "") !== f.year) return false;
-  if (f.mode && !r.workModes.includes(f.mode)) return false;
+  if (!matchesWorkMode(r.workMode, f.mode)) return false;
   if (f.laptop !== "any" && r.laptop !== (f.laptop === "yes")) return false;
   if (f.status === "verified" && !r.verified) return false;
   if (f.status === "unverified" && r.verified) return false;
@@ -112,7 +113,7 @@ function Cell({ r, k, now }: { r: MasterRow; k: Key; now: number }) {
     return (
       <Link href={`/college/students/${r.userId}`} className="font-medium text-brand-700 hover:underline">
         {r.name}
-        {!r.verified ? <span className="ml-1.5 rounded bg-accent-100 px-1.5 py-0.5 text-[11px] font-medium text-accent-700">Not verified</span> : null}
+        {!r.verified ? <span className="ml-1.5 rounded bg-accent-100 px-1.5 py-0.5 text-[11px] font-medium text-accent-700">Waiting for approval</span> : null}
       </Link>
     );
   }
@@ -390,7 +391,7 @@ export function MasterDataTable({ rows, collegeId, now, initial }: { rows: Maste
           </select>
           <select aria-label="Work mode preference" value={filters.mode} onChange={(e) => set("mode", e.target.value)} className={select}>
             <option value="">Work mode preference</option>
-            {MODES.map(([v, l]) => <option key={v} value={v}>Open to {l.toLowerCase()}</option>)}
+            {MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
           <select aria-label="Laptop" value={filters.laptop} onChange={(e) => set("laptop", e.target.value as Filters["laptop"])} className={select}>
             <option value="any">Laptop: any</option>
@@ -399,10 +400,10 @@ export function MasterDataTable({ rows, collegeId, now, initial }: { rows: Maste
           </select>
           <MinimumPicker key={`score-${resetKey}`} label="Findtern score" any="Findtern score" presets={[5, 6, STRONG_SCORE, 8, 9]} value={filters.minScore} onChange={(v) => set("minScore", v)} className={select} />
           <MinimumPicker key={`cgpa-${resetKey}`} label="CGPA" any="Any CGPA" presets={[6, 7, HIGH_CGPA, 8, 9]} value={filters.minCgpa} onChange={(v) => set("minCgpa", v)} className={select} />
-          <select aria-label="Verification" value={filters.status} onChange={(e) => set("status", e.target.value as Filters["status"])} className={select}>
-            <option value="any">Verified and not</option>
-            <option value="verified">Verified only</option>
-            <option value="unverified">Not verified</option>
+          <select aria-label="Approval" value={filters.status} onChange={(e) => set("status", e.target.value as Filters["status"])} className={select}>
+            <option value="any">Accepted and waiting</option>
+            <option value="verified">Accepted by you</option>
+            <option value="unverified">Waiting for your approval</option>
           </select>
           {activeFilters ? (
             <button type="button" onClick={() => { setFilters(NO_FILTERS); setLimit(PAGE); setResetKey((k) => k + 1); }} className="min-h-9 rounded-md px-2 font-medium text-brand-700 hover:underline focus-visible:ring-2 focus-visible:ring-brand-500">
@@ -464,7 +465,7 @@ export function MasterDataTable({ rows, collegeId, now, initial }: { rows: Maste
         ) : null}
       </section>
       <p className="text-xs text-ink-500">
-        Students you have not verified show only their name, email, year and course. Saved views stay in this browser. Every download is recorded.
+        Students waiting for your approval show only their name, email, year and course. Saved views stay in this browser. Every download is recorded.
       </p>
     </div>
   );

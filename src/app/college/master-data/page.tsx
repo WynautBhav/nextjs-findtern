@@ -24,7 +24,7 @@ export default async function MasterDataPage({ searchParams }: { searchParams: P
       <div>
         <h1 className="text-2xl font-semibold tracking-[-0.02em] text-ink-900">Master data</h1>
         <p className="nums mt-1 text-sm text-ink-600">
-          {rows.length.toLocaleString("en-IN")} students, {verified.toLocaleString("en-IN")} verified. Pick a view, change the columns, and download what you see.
+          {rows.length.toLocaleString("en-IN")} students{rows.length - verified ? `, ${(rows.length - verified).toLocaleString("en-IN")} waiting for your approval` : ""}. Pick a view, change the columns, and download what you see.
         </p>
       </div>
       <MasterDataTable rows={rows} collegeId={ctx.college.id} now={requestTime()} initial={{ view: one(sp.view), course: one(sp.course), mode: one(sp.mode) }} />

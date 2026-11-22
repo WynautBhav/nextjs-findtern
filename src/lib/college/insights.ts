@@ -104,7 +104,8 @@ export function computeInsights(all: MasterRow[]): Insights {
   const offerSpread = [0, 0, 0, 0, 0];
   for (const r of rows) if (r.score !== null) offerSpread[Math.min(4, r.offers)]++;
 
-  const workModes = (["remote", "hybrid", "onsite"] as const).map((mode) => ({ mode, students: rows.filter((r) => r.workModes.includes(mode)).length }));
+  // By each student's own pick, so the three add up to the students who picked one.
+  const workModes = (["remote", "hybrid", "onsite"] as const).map((mode) => ({ mode, students: rows.filter((r) => r.workMode === mode).length }));
   const cityCount = new Map<string, number>();
   for (const r of rows) for (const c of new Set(r.preferredLocations)) cityCount.set(c, (cityCount.get(c) ?? 0) + 1);
   const cities = [...cityCount.entries()].map(([city, students]) => ({ city, students })).sort((a, b) => b.students - a.students || a.city.localeCompare(b.city));

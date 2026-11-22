@@ -309,17 +309,17 @@ export function Readiness({ ins }: { ins: Insights }) {
   const { yes, no, unknown } = ins.laptop;
   return (
     <Panel>
-      <PanelHeader title="How and where they want to work" description="From each student's profile. Onsite students are open to hybrid and remote too." />
+      <PanelHeader title="How and where they want to work" description="From each student's profile: the work mode they picked." />
       <PanelBody className="grid gap-8 md:grid-cols-3">
         <div>
-          <h3 className="text-sm font-medium text-ink-900">Open to</h3>
+          <h3 className="text-sm font-medium text-ink-900">Work preference</h3>
           <ul className="mt-3 space-y-3">
             {ins.workModes.map((m) => (
               <li key={m.mode}>
-                <Link href={viewHref("all", `&mode=${m.mode}`)} className="nums block rounded-md outline-none focus-visible:ring-2 focus-visible:ring-brand-500">
+                <div className="nums">
                   <span className="flex justify-between text-sm"><span className="text-ink-700">{MODE[m.mode]}</span><span className="text-ink-900">{n(m.students)} <span className="text-xs text-ink-500">{pct(m.students, total)}%</span></span></span>
                   <span className="mt-1 block h-2 rounded-full bg-brand-50"><span className="block h-2 rounded-full bg-brand-500" style={{ width: `${pct(m.students, total)}%` }} /></span>
-                </Link>
+                </div>
               </li>
             ))}
           </ul>

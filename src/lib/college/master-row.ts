@@ -31,7 +31,8 @@ export type MasterRow = {
   professionalLevel: string | null;
   certifications: number | null;
   experience: number | null;
-  workModes: string[];
+  /** The mode the student picked: their widest stored mode (remote, hybrid or onsite), or null. */
+  workMode: WorkMode | null;
   preferredLocations: string[];
   laptop: boolean | null;
   lastSeenAt: string | null;
@@ -99,13 +100,18 @@ const year4 = (v: unknown): number | null => {
   return n !== null && n >= 1990 && n <= 2100 ? Math.trunc(n) : null;
 };
 
+type WorkMode = (typeof WORK_MODE_ORDER)[number];
+
 /**
- * Findtern's work-mode rule (onboarding.ts): a student's widest choice counts, and it covers every mode before
- * it. Remote is remote only; hybrid is remote and hybrid; onsite is all three.
+ * Findtern's work-mode rule for the filter (the onboarding cascade): selecting a mode takes in every mode before
+ * it. Remote shows students who picked remote; Hybrid, those who picked remote or hybrid; Onsite, all three.
+ * Matched on the student's own pick, never on the text. No selection shows everyone.
  */
-function acceptedModes(raw: unknown): string[] {
-  const widest = widestWorkMode(strs(raw, 3));
-  return widest ? WORK_MODE_ORDER.slice(0, WORK_MODE_ORDER.indexOf(widest) + 1) : [];
+export function matchesWorkMode(pick: string | null, selected: string): boolean {
+  if (!selected) return true;
+  const upTo = WORK_MODE_ORDER.indexOf(selected as WorkMode);
+  if (upTo < 0) return true;
+  return pick !== null && WORK_MODE_ORDER.indexOf(pick as WorkMode) > -1 && WORK_MODE_ORDER.indexOf(pick as WorkMode) <= upTo;
 }
 
 export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): MasterRow {
@@ -134,7 +140,7 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     professionalLevel: null,
     certifications: null,
     experience: null,
-    workModes: [],
+    workMode: null,
     preferredLocations: [],
     laptop: null,
     lastSeenAt: null,
@@ -176,7 +182,7 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     professionalLevel: str(pro.level),
     certifications: arr(a.certifications).length,
     experience: arr(x.experience).length,
-    workModes: acceptedModes(x.locationTypes),
+    workMode: widestWorkMode(strs(x.locationTypes, 3)),
     preferredLocations: strs(x.preferredLocations, 5),
     laptop: x.hasLaptop,
     lastSeenAt: s.lastSeenAt?.toISOString() ?? null,
@@ -227,7 +233,7 @@ export const MASTER_COLUMNS: MasterColumn[] = [
   { key: "professionalLevel", label: "Course level", group: "Course", kind: "text" },
   { key: "certifications", label: "Certifications", group: "Course", kind: "number" },
   { key: "experience", label: "Experience", group: "Course", kind: "number" },
-  { key: "workModes", label: "Work preference", group: "Preferences", kind: "list" },
+  { key: "workMode", label: "Work preference", group: "Preferences", kind: "text" },
   { key: "preferredLocations", label: "Preferred locations", group: "Preferences", kind: "list" },
   { key: "laptop", label: "Laptop", group: "Preferences", kind: "bool" },
   { key: "lastSeenAt", label: "Last seen", group: "Preferences", kind: "date" },
@@ -257,8 +263,8 @@ export function cellText(row: MasterRow, key: MasterColumn["key"], origin = ""):
       return row.hasReport ? `${origin}/api/college/students/${row.userId}/report` : "";
     case "recording":
       return row.hasRecording ? `${origin}/api/college/students/${row.userId}/recording` : "";
-    case "workModes":
-      return row.workModes.map((m) => MODE_LABEL[m] ?? m).join(", ");
+    case "workMode":
+      return row.workMode ? MODE_LABEL[row.workMode] : "";
     case "earningsMinor":
       return row.verified ? (row.earningsMinor / 100).toFixed(2) : "";
     case "hired":
