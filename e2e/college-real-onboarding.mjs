@@ -507,7 +507,7 @@ await check("Officer closes the link; employer is locked out, old link refused",
   await tpo.goto(`${B}/college/drives/${driveId}`);
   await tpo.getByRole("button", { name: "Turn off drive" }).click();
   await tpo.getByRole("button", { name: "Yes, turn off the drive" }).click();
-  await tpo.getByText("Closed. No employer can get in.").waitFor();
+  await tpo.getByText("Turned off. No employer can get in.").waitFor();
   await emp.reload();
   assert(!/Showing \d+ of/.test(await emp.locator("main").innerText()), "employer still sees students");
   const call = await api(emp, "POST", `/api/employer/drives/${driveId}/meetings`, { userId: userId.kunal, inMinutes: 0 });

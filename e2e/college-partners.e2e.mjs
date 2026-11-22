@@ -194,7 +194,7 @@ test("officer: sees Sana online and the employer inside; closes the link", async
   // Confirmed in the page now, not a browser dialog.
   await tpo.getByRole("button", { name: "Turn off drive" }).click();
   await tpo.getByRole("button", { name: "Yes, turn off the drive" }).click();
-  await main.getByText("Closed. No employer can get in.").waitFor();
+  await main.getByText("Turned off. No employer can get in.").waitFor();
 });
 
 test("employer: locked out the moment the link is closed", async () => {

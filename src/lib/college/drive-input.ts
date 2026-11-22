@@ -21,7 +21,8 @@ export const driveInput = z
     invitedEmployers: z
       .array(z.object({ company: z.string().trim().min(1, "Name the company").max(120), email: z.string().trim().toLowerCase().email("Check the company email").max(200) }))
       .max(50, "Invite at most 50 companies per drive")
-      .default([]),
+      // Optional, no default: an edit that leaves it out keeps the saved list (the column defaults to []).
+      .optional(),
   })
   .refine((d) => d.endsAt.getTime() > d.startsAt.getTime(), { message: "The drive must end after it starts", path: ["endsAt"] })
   .refine((d) => d.endsAt.getTime() - d.startsAt.getTime() <= 60 * 24 * 3600_000, {

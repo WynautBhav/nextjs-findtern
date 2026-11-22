@@ -67,3 +67,13 @@ test("invites: arrived by email or company name, the rest are missing", () => {
   assert.deepEqual(r.arrived.map((i) => i.company), ["ACME", "Beta Labs"]);
   assert.deepEqual(r.missing.map((i) => i.company), ["Gamma"]);
 });
+
+test("invites: walk-ins counted once, even when two invites match one company", () => {
+  const came = [
+    { employerId: "e1", company: "Acme", contact: null, email: "hr@acme.in", phone: null, joinedAt: at(5) },
+    { employerId: "e2", company: "Walk-in Co", contact: null, email: "x@walk.in", phone: null, joinedAt: at(4) },
+  ];
+  const r = matchInvites([{ company: "Acme", email: "hr@acme.in" }, { company: "Acme India", email: "hr@acme.in" }], came);
+  assert.equal(r.arrived.length, 2);
+  assert.equal(r.walkIns, 1);
+});

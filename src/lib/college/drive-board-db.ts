@@ -1,7 +1,8 @@
-import { and, eq, gte, inArray, ne, sql, type AnyColumn } from "drizzle-orm";
+import { and, eq, gte, inArray, lte, ne, sql, type AnyColumn } from "drizzle-orm";
 
 import { realEmployerId } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
+import { q } from "./sql";
 import { buildDriveBoard, matchInvites, type CameEmployer, type DriveBoard, type DriveStudentRef, type Invite } from "./drive-board";
 import type { Drive } from "./scope";
 
@@ -15,8 +16,12 @@ const utc = (col: AnyColumn) => sql<Date>`(${col} AT TIME ZONE 'UTC')`.mapWith((
 export async function driveEmployerContacts(driveId: string): Promise<CameEmployer[]> {
   const e = schema.collegeDriveEmployers;
   const em = schema.employers;
+  const employerId = q(e, e.employerId);
   const rows = await getDb()
-    .select({ employerId: e.employerId, joinedAt: utc(e.joinedAt), company: em.companyName, name: em.name, contact: em.primaryContactName, email: em.companyEmail, cc: em.countryCode, phone: em.phoneNumber })
+    .select({
+      shortlisted: sql<number>`(SELECT count(*)::int FROM ${schema.collegeDriveShortlist} s WHERE s.drive_id = ${driveId} AND s.employer_id = ${employerId})`,
+      calls: sql<number>`(SELECT count(*)::int FROM ${schema.collegeDriveMeetings} m WHERE m.drive_id = ${driveId} AND m.employer_id = ${employerId})`,
+      employerId: e.employerId, joinedAt: utc(e.joinedAt), company: em.companyName, name: em.name, contact: em.primaryContactName, email: em.companyEmail, cc: em.countryCode, phone: em.phoneNumber })
     .from(e)
     .leftJoin(em, eq(em.id, e.employerId))
     .where(eq(e.driveId, driveId))
@@ -28,6 +33,8 @@ export async function driveEmployerContacts(driveId: string): Promise<CameEmploy
     email: r.email,
     phone: r.phone ? `${r.cc ?? ""} ${r.phone}`.trim() : null,
     joinedAt: r.joinedAt,
+    shortlisted: Number(r.shortlisted ?? 0),
+    calls: Number(r.calls ?? 0),
   }));
 }
 
@@ -40,7 +47,7 @@ export async function loadDriveBoard(
   students: DriveStudentRef[],
   offline: { userId: string }[] | null,
   now = Date.now(),
-): Promise<{ board: DriveBoard; came: CameEmployer[]; invited: Invite[]; arrived: Invite[]; missing: Invite[] }> {
+): Promise<{ board: DriveBoard; came: CameEmployer[]; invited: Invite[]; arrived: Invite[]; missing: Invite[]; walkIns: number }> {
   const came = await driveEmployerContacts(drive.id);
   const ids = students.map((s) => s.userId);
   const employerIds = came.map((c) => c.employerId);
@@ -63,11 +70,11 @@ export async function loadDriveBoard(
             fullTime: sql<boolean>`jsonb_typeof(${p.offerDetails}->'fullTimeOffer') = 'object'`,
           })
           .from(p)
-          .where(and(inArray(p.internId, ids), inArray(p.employerId, employerIds), gte(p.createdAt, drive.startsAt), ne(p.status, "draft"), realEmployerId(p.employerId)))
+          .where(and(inArray(p.internId, ids), inArray(p.employerId, employerIds), gte(p.createdAt, drive.startsAt), lte(p.createdAt, drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt), ne(p.status, "draft"), realEmployerId(p.employerId)))
       : Promise.resolve([]),
   ]);
   const invited = (drive.invitedEmployers ?? []) as Invite[];
-  const { arrived, missing } = matchInvites(invited, came);
+  const { arrived, missing, walkIns } = matchInvites(invited, came);
   const board = buildDriveBoard({
     students,
     meetings: meetings.map((m) => ({ userId: m.userId, company: companyOf.get(m.employerId) ?? null, status: m.status, createdAt: m.createdAt })),
@@ -77,5 +84,5 @@ export async function loadDriveBoard(
     offline,
     now,
   });
-  return { board, came, invited, arrived, missing };
+  return { board, came, invited, arrived, missing, walkIns };
 }

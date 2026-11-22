@@ -76,7 +76,7 @@ export function buildDriveBoard(input: {
 }
 
 export type Invite = { company: string; email: string };
-export type CameEmployer = { employerId: string; company: string | null; contact: string | null; email: string | null; phone: string | null; joinedAt: Date };
+export type CameEmployer = { employerId: string; company: string | null; contact: string | null; email: string | null; phone: string | null; joinedAt: Date; shortlisted?: number; calls?: number };
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase().replace(/\s+/g, " ").replace(/\b(pvt|private|ltd|limited|llp|inc)\b\.?/g, "").trim();
 
@@ -84,11 +84,12 @@ const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase().re
  * Who the officer invited against who came in through the link. An invite counts as arrived when a company that
  * came has the invited email or the same company name. Companies that came without an invite are listed too.
  */
-export function matchInvites(invited: Invite[], came: CameEmployer[]): { arrived: Invite[]; missing: Invite[] } {
-  const emails = new Set(came.map((c) => (c.email ?? "").trim().toLowerCase()).filter(Boolean));
-  const companies = new Set(came.map((c) => norm(c.company)).filter(Boolean));
+export function matchInvites(invited: Invite[], came: CameEmployer[]): { arrived: Invite[]; missing: Invite[]; walkIns: number } {
+  const matches = (i: Invite, c: CameEmployer) => (c.email ?? "").trim().toLowerCase() === i.email.toLowerCase() || (norm(c.company) !== "" && norm(c.company) === norm(i.company));
   const arrived: Invite[] = [];
   const missing: Invite[] = [];
-  for (const i of invited) (emails.has(i.email.toLowerCase()) || companies.has(norm(i.company)) ? arrived : missing).push(i);
-  return { arrived, missing };
+  for (const i of invited) (came.some((c) => matches(i, c)) ? arrived : missing).push(i);
+  // Companies no invite points to, counted once each however many invites matched the others.
+  const walkIns = came.filter((c) => !invited.some((i) => matches(i, c))).length;
+  return { arrived, missing, walkIns };
 }

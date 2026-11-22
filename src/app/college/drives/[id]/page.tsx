@@ -46,7 +46,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
     const r = toStudentRow(s);
     return { userId: r.userId, name: r.name, rollNo: r.rollNo, year: r.year, branch: r.branch, phone: r.phone };
   });
-  const { board, came, invited, arrived, missing } = await loadDriveBoard(drive, refs, presence ? presence.offline : null, now);
+  const { board, came, invited, arrived, missing, walkIns } = await loadDriveBoard(drive, refs, presence ? presence.offline : null, now);
 
   const rows = students.map(toStudentRow);
   const branches = [...new Set(rows.map((s) => s.branch).filter((b): b is string => Boolean(b)))].sort();
@@ -81,7 +81,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
 
       {open ? <DriveBoardView board={board} live={w === "live"} open={open} /> : null}
 
-      <EmployerAlert invited={invited} arrived={arrived} missing={missing} came={came} over={!open} />
+      <EmployerAlert invited={invited} arrived={arrived} missing={missing} came={came} walkIns={walkIns} over={!open} />
 
       {presence ? (
         <PresenceLive driveId={drive.id} driveTitle={drive.title} showTitle={false} startsAt={drive.startsAt.toISOString()} endsAt={drive.endsAt.toISOString()} initial={presence} />
