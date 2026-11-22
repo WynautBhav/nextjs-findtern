@@ -333,6 +333,8 @@ test("WP8: a verified student shows the agreed fields and never Aadhaar, PAN, ba
   assert.equal(p.education?.institution, "JKLU");
   assert.equal(p.experience[0].company, "Acme");
   assert.equal("bio" in p, false);
+  // Work preferences and extracurriculars are placement facts; the emergency contact is not.
+  assert.deepEqual(Object.keys(p).sort(), ["city", "education", "experience", "extracurriculars", "hasLaptop", "languages", "links", "phone", "preferredCities", "skills", "workModes"]);
   assert.equal(canOpenArtifacts("verified"), true);
   const dump = JSON.stringify(p);
   for (const secret of ["999911112222", "ABCDE1234F", "123456789012", "HDFC0001234", "302001"]) {

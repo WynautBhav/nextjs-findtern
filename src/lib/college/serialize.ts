@@ -82,5 +82,9 @@ export function tpoProfile(status: string, onboarding: OnboardingLike | undefine
     education: a ? { institution: a.institution, degree: a.degree, branch: a.branch, year: a.yearOfGraduation, score: a.cgpa, scoreType: a.scoreType } : null,
     experience: (d.experiences ?? []).map((e) => ({ company: e.company, role: e.role, from: e.from, to: e.current ? "Present" : e.to, description: e.description })),
     links: { linkedin: d.linkedinUrl ?? "" },
+    extracurriculars: (d.extracurriculars ?? []).filter((e) => e.activity).map((e) => (e.level ? `${e.activity} (${e.level})` : e.activity)),
+    workModes: (d.locationTypes ?? []).map((m) => (m === "onsite" ? "On-site" : m === "remote" ? "Remote" : "Hybrid")),
+    preferredCities: d.preferredLocations ?? [],
+    hasLaptop: d.hasLaptop ?? null,
   };
 }

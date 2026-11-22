@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { after } from "next/server";
 import { and, desc, eq, inArray, sql } from "drizzle-orm";
-import { FileText, Mail, Phone, PlayCircle, ShieldCheck } from "lucide-react";
+import { CircleAlert, FileText, Mail, Phone, PlayCircle, ShieldCheck } from "lucide-react";
 
 import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
 import { NudgeButton } from "@/components/college/nudge-button";
@@ -10,6 +10,9 @@ import { Initials } from "@/components/college/kit";
 import { LinkedinIcon } from "@/components/ui/social-icons";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { cn } from "@/lib/utils";
+import { candidatePoolClauses } from "@/lib/employer-pool";
+import { hireGateDecision } from "@/lib/hire-gate";
+import { hasMarksheet, openStepOf, readinessFrom, type Readiness } from "@/lib/college/student-readiness";
 import { StudentRemove } from "@/components/college/student-remove";
 import { humanizeStatus } from "@/components/app/status";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
@@ -42,6 +45,48 @@ const AXES = [
   ["interview", "Interview"],
 ] as const;
 
+/**
+ * Can employers see this student (the employer pool query itself), can they hire them (the hire gate), and is a
+ * marksheet on file. Reads the whole onboarding row here, on the server, and returns only the verdicts
+ * (student-readiness.ts): no field of it reaches the page.
+ */
+async function readinessFor(id: string): Promise<Readiness> {
+  const db = getDb();
+  const [[u], [row], [docs], [pool]] = await Promise.all([
+    db.select({ visibility: schema.users.profileVisibility, isActive: schema.users.isActive, frozenAt: schema.users.frozenAt }).from(schema.users).where(eq(schema.users.id, id)).limit(1),
+    db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).orderBy(desc(schema.internOnboarding.createdAt)).limit(1),
+    db
+      .select({ photo: schema.internDocuments.profilePhotoName, pan: schema.internDocuments.panImageName, aadhaar: schema.internDocuments.aadhaarImageName })
+      .from(schema.internDocuments)
+      .where(eq(schema.internDocuments.userId, id))
+      .orderBy(desc(schema.internDocuments.createdAt))
+      .limit(1),
+    db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
+      .where(and(eq(schema.users.id, id), ...candidatePoolClauses()))
+      .limit(1),
+  ]);
+  const extra = (row?.extraData ?? {}) as Record<string, unknown>;
+  const ratings = (extra.ratings ?? {}) as Record<string, unknown>;
+  const fileDocs = { hasPhoto: Boolean(docs?.photo), hasPanImage: Boolean(docs?.pan), hasAadhaarImage: Boolean(docs?.aadhaar) };
+  const { submitted, openStep } = openStepOf(row, fileDocs);
+  return readinessFrom({
+    inPool: Boolean(pool),
+    profileVisibility: u?.visibility ?? "live",
+    isActive: u?.isActive ?? true,
+    frozen: Boolean(u?.frozenAt),
+    openToWork: extra.openToWork !== false,
+    hiddenByAdmin: extra.hiddenByAdmin === true,
+    interviewed: Number(extra.findternScore) > 0 && Number(ratings.interview) > 0,
+    hireable: hireGateDecision(row, fileDocs).ok,
+    submitted,
+    openStep,
+    marksheet: hasMarksheet(extra),
+  });
+}
+
 /** Request time, for the online dot. Dynamic page, so this is per request. */
 function requestTime(): number {
   return Date.now();
@@ -62,7 +107,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
   const onRoster = Boolean(onRosterRow);
   // A claimed student's offers, interviews and drive calls stay hidden until the officer verifies them.
   const verified = student.status === "verified";
-  const [[onboarding], [user], proposals, interviews, allCalls, views] = await Promise.all([
+  const [[onboarding], [user], proposals, interviews, allCalls, views, readiness] = await Promise.all([
     // Allowlist: no Aadhaar, PAN, PIN, bank or emergency contact ever reaches this render (P-4). Columns are picked one by one,
     // and extra_data keeps only the keys draftFromRecord, the ratings and aiInterviewLinks read.
     db
@@ -72,6 +117,9 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
         linkedinUrl: schema.internOnboarding.linkedinUrl,
         skills: schema.internOnboarding.skills,
         experienceJson: schema.internOnboarding.experienceJson,
+        locationTypes: schema.internOnboarding.locationTypes,
+        preferredLocations: schema.internOnboarding.preferredLocations,
+        hasLaptop: schema.internOnboarding.hasLaptop,
         extraData: sql<Record<string, unknown>>`(SELECT coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb) FROM jsonb_each(coalesce(${schema.internOnboarding.extraData}, '{}'::jsonb)) e WHERE e.key IN ('academics', 'languages', 'experiences', 'extracurricular', 'extracurriculars', 'skillsWithRatings', 'college', 'degree', 'graduationYear', 'ratings', 'aiFeedbackLink', 'aiRecordingLink'))`,
       })
       .from(schema.internOnboarding)
@@ -107,6 +155,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
       .where(and(eq(schema.collegeAuditLog.subjectUserId, id), eq(schema.collegeAuditLog.collegeId, ctx.college.id), inArray(schema.collegeAuditLog.action, ["view_report", "view_recording"])))
       .orderBy(desc(schema.collegeAuditLog.createdAt))
       .limit(5),
+    verified ? readinessFor(id) : Promise.resolve(null),
   ]);
 
   // An ended or revoked drive no longer shows its calls (C12).
@@ -163,7 +212,12 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
               <Pill tone="waiting">{membershipLabel({ status: student.status, onRoster })}</Pill>
             )}
           </div>
-          <p className="mt-2 text-xs text-text-subtle">{online ? "Online now" : `Last active ${ago(seen?.toISOString() ?? null)}`}</p>
+          {readiness ? (
+            <p className={cn("mt-2 text-xs font-medium", readiness.paused || !readiness.seen ? "text-accent-700" : "text-brand-800")}>
+              {readiness.paused ? "Account paused" : !readiness.seen ? "Hidden from employers" : readiness.hireable ? "Visible to employers" : "Visible, can't be hired yet"}
+            </p>
+          ) : null}
+          <p className="mt-1 text-xs text-text-subtle">{online ? "Online now" : `Last active ${ago(seen?.toISOString() ?? null)}`}</p>
 
           <div className="mt-4 flex gap-2">
             {phone ? (
@@ -190,6 +244,11 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
             ["Plan", cohortGoal(student.year)],
             ["Education", education],
             ["Languages", profile?.languages.join(", ") ?? ""],
+            ["Work mode", profile?.workModes.join(", ") ?? ""],
+            ["Prefers", profile?.preferredCities.join(", ") ?? ""],
+            ["Laptop", profile ? (profile.hasLaptop === null ? "" : profile.hasLaptop ? "Has a laptop" : "No laptop") : ""],
+            ["Marksheet", readiness ? (readiness.marksheet ? "Uploaded" : "Not uploaded") : ""],
+            ["Joined", student.joinedAt.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })],
           ] as const).map(([k, v]) =>
             v && v !== "—" ? (
               <div key={k} className="grid grid-cols-[6rem_minmax(0,1fr)] gap-3 px-5 py-2.5">
@@ -220,6 +279,19 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
       </aside>
 
       <div className="min-w-0 space-y-5">
+        {readiness && (!readiness.seen || !readiness.hireable) ? (
+          <p role="status" className="flex items-start gap-2.5 rounded-apple-xl border border-accent-300/70 bg-accent-100 px-4 py-3 text-sm text-ink-900">
+            <CircleAlert className="mt-0.5 size-4 shrink-0 text-accent-700" aria-hidden />
+            <span>
+              <span className="font-medium">
+                {!readiness.seen ? `Employers can't see ${student.firstName || "this student"} yet.` : `Employers can see ${student.firstName || "this student"} but can't hire yet.`}
+              </span>{" "}
+              {!readiness.seen ? readiness.seenWhy : readiness.hireWhy}
+              {!readiness.seen && !readiness.hireable ? ` ${readiness.hireWhy.replace(/^Profile /, "Profile also ")}` : ""}
+            </span>
+          </p>
+        ) : null}
+
         {/* The four numbers an officer asks about first; the score is the one filled tile. */}
         <ul className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="At a glance">
           <Kpi on label="Findtern score" value={ai.done && student.score !== null ? student.score.toFixed(1) : "—"} hint={ai.done ? "out of 10" : ai.label} />
@@ -366,6 +438,19 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                 </li>
               ))}
             </ul>
+          </Panel>
+        ) : null}
+
+        {profile && profile.extracurriculars.length > 0 ? (
+          <Panel>
+            <PanelHeader title="Extracurriculars" />
+            <PanelBody>
+              <ul className="flex flex-wrap gap-1.5">
+                {profile.extracurriculars.map((e) => (
+                  <li key={e} className="rounded-full border border-ink-200 px-2.5 py-0.5 text-sm text-ink-800">{e}</li>
+                ))}
+              </ul>
+            </PanelBody>
           </Panel>
         ) : null}
       </div>
