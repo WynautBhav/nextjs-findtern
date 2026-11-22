@@ -77,7 +77,7 @@ export function PresenceLive({
   const dupes = new Set([...seen].filter(([, n]) => n > 1).map(([name]) => name));
   const fmt = (d: Date) => shortDateTime(d, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
   // A hall of seats: one square per eligible student, online first. Offline squares carry the name on hover.
-  const dot = snap.total > 400 ? "size-1.5 rounded-[2px]" : "size-2.5 rounded-[3px]";
+  const dot = snap.total > 400 ? "size-2 rounded-[2px]" : snap.total > 160 ? "size-3 rounded-[3px]" : "size-4 rounded-[4px]";
 
   return (
     <section aria-labelledby="live-drive" className={`overflow-hidden ${SURFACE_CLASS}`}>

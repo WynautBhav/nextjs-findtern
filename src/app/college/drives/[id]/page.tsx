@@ -1,7 +1,10 @@
 import { notFound } from "next/navigation";
 
 import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
-import { CollegeHero, HeroStat, HeroStats } from "@/components/college/kit";
+import { CollegeHero } from "@/components/college/kit";
+import { DrivePipeline, DriveSpread, EmployerArrivals, type SpreadRow } from "@/components/college/drive-graphics";
+import { Surface } from "@/components/app/primitives";
+import { yearLabel } from "@/lib/college/labels";
 import { DriveBoardView } from "@/components/college/drive-board-view";
 import { DriveBuilder } from "@/components/college/drive-builder";
 import { EmployerAlert } from "@/components/college/employer-alert";
@@ -31,7 +34,7 @@ function requestTime(): number {
  * students offline), what it has produced, the employer alert, the link and the edit form. Once it is over: the
  * same figures as a report, without the student lists (C12).
  */
-export default async function DrivePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string }> }) {
+export default async function DrivePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string; show?: string }> }) {
   const ctx = await requireCollegeContext();
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const drive = await driveForCollegeAdmin(ctx, id);
@@ -51,6 +54,25 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   const rows = students.map(toStudentRow);
   const branches = [...new Set(rows.map((s) => s.branch).filter((b): b is string => Boolean(b)))].sort();
   const e = readEligibility(drive.eligibility);
+  // Offers by branch and year: counts only, so they stay on a past drive too (C12 closes the names, not the totals).
+  const offeredIds = new Set(board.lists.offers.map((s) => s.userId));
+  const hiredIds = new Set(board.lists.hired.map((s) => s.userId));
+  const group = (key: (r: (typeof refs)[number]) => string) => {
+    const m = new Map<string, SpreadRow>();
+    for (const r of refs) {
+      const k = key(r);
+      const row = m.get(k) ?? { label: k, inDrive: 0, offered: 0, hired: 0 };
+      row.inDrive++;
+      if (offeredIds.has(r.userId)) row.offered++;
+      if (hiredIds.has(r.userId)) row.hired++;
+      m.set(k, row);
+    }
+    return [...m.values()];
+  };
+  const spread = {
+    branches: group((r) => r.branch ?? "Branch not set").sort((a, b) => b.offered - a.offered || b.inDrive - a.inDrive).slice(0, 8),
+    years: group((r) => (r.year ? yearLabel(r.year) : "Year not set")).sort((a, b) => a.label.localeCompare(b.label)),
+  };
   const calls = board.lists.meetingsWaiting.length;
   const offers = board.lists.offersWaiting.length;
   const finding = !open
@@ -69,17 +91,42 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
         actions={open ? <ButtonLink href={`/college/drives/${drive.id}?edit=1#edit`} variant="white">Edit drive</ButtonLink> : null}
       >
         <p className="mt-6 max-w-3xl text-pretty text-base text-white">{finding}</p>
-        {!open ? (
-          <HeroStats>
-            <HeroStat label="Offers received" value={board.offerCount} hint={`to ${plural(board.lists.offers.length, "student", "students")}`} />
-            <HeroStat label="Meetings held" value={board.lists.meetings.length} />
-            <HeroStat label="Placed: internship" value={board.lists.internships.length} />
-            <HeroStat label="Placed: full-time" value={board.lists.fullTime.length} />
-          </HeroStats>
-        ) : null}
+        <div className="mt-8">
+          <DrivePipeline
+            driveId={drive.id}
+            open={open}
+            stages={[
+              { key: "all", label: "Students in the drive", value: eligible.length },
+              { key: "called", label: "Called by an employer", value: board.lists.called.length },
+              { key: "offers", label: "Got an offer", value: board.lists.offers.length },
+              { key: "hired", label: "Hired", value: board.lists.hired.length },
+            ]}
+          />
+        </div>
+        <div className="mt-8 border-t border-white/10 pt-6">
+          <EmployerArrivals
+            start={drive.startsAt}
+            end={drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt}
+            now={now}
+            arrivals={came.map((c) => ({ id: c.employerId, company: c.company ?? "Employer", at: c.joinedAt }))}
+            missing={open ? missing.map((m) => m.company) : []}
+          />
+        </div>
       </CollegeHero>
 
-      {open ? <DriveBoardView board={board} live={w === "live"} open={open} /> : null}
+      {open ? <DriveBoardView board={board} live={w === "live"} open={open} initial={sp.show} /> : null}
+
+      {spread.branches.length > 0 ? (
+        <Surface className="p-5 sm:p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-base font-semibold text-ink-900">Offers by branch and year</h2>
+            <p className="nums text-sm text-text-subtle">{plural(board.lists.offers.length, "student", "students")} offered · {board.lists.hired.length} hired</p>
+          </div>
+          <div className="mt-4">
+            <DriveSpread branches={spread.branches} years={spread.years} />
+          </div>
+        </Surface>
+      ) : null}
 
       <EmployerAlert invited={invited} arrived={arrived} missing={missing} came={came} walkIns={walkIns} over={!open} />
 

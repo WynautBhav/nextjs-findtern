@@ -13,7 +13,7 @@ export type MeetingRow = { userId: string; company: string | null; status: strin
 export type OfferRow = { userId: string; company: string | null; status: string; hired: boolean; fullTime: boolean; createdAt: Date };
 export type OfflineRow = { userId: string };
 
-export type BoardKey = "meetingsWaiting" | "offersWaiting" | "offline" | "offers" | "meetings" | "internships" | "fullTime";
+export type BoardKey = "meetingsWaiting" | "offersWaiting" | "offline" | "offers" | "meetings" | "internships" | "fullTime" | "called" | "hired";
 
 export type DriveBoard = {
   lists: Record<BoardKey, BoardItem[]>;
@@ -60,6 +60,7 @@ export function buildDriveBoard(input: {
   const open = input.offers.filter((o) => o.status === "sent");
   const hired = input.offers.filter((o) => o.hired || HIRED.has(o.status));
   const inDrive = input.offers.filter((o) => students.has(o.userId));
+  const hiredItems = perStudent(hired, students, (rs) => `${rs.some((r) => r.fullTime) ? "Full-time" : "Internship"} with ${names(rs)}`);
   return {
     offerCount: inDrive.length,
     offlineKnown: input.offline !== null,
@@ -71,6 +72,9 @@ export function buildDriveBoard(input: {
       meetings: perStudent(held, students, (rs) => `${rs.length === 1 ? "Call" : `${rs.length} calls`} with ${names(rs)}`),
       internships: perStudent(hired.filter((o) => !o.fullTime), students, (rs) => `Internship with ${names(rs)}`),
       fullTime: perStudent(hired.filter((o) => o.fullTime), students, (rs) => `Full-time with ${names(rs)}`),
+      // The pipeline's stages: any call request at all, and any hire (one row per student).
+      called: perStudent(input.meetings, students, (rs) => `${rs.length === 1 ? "1 call request" : `${rs.length} call requests`} · ${names(rs)}`),
+      hired: hiredItems,
     },
   };
 }

@@ -77,3 +77,23 @@ test("invites: walk-ins counted once, even when two invites match one company", 
   assert.equal(r.arrived.length, 2);
   assert.equal(r.walkIns, 1);
 });
+
+test("pipeline stages: called counts any call request, hired counts each student once", () => {
+  const b = buildDriveBoard({
+    students,
+    meetings: [
+      { userId: "a", company: "Acme", status: "declined", createdAt: at(9) },
+      { userId: "a", company: "Beta", status: "requested", createdAt: at(8) },
+      { userId: "b", company: "Acme", status: "accepted", createdAt: at(7) },
+    ],
+    offers: [
+      { userId: "c", company: "Acme", status: "hired", hired: true, fullTime: false, createdAt: at(6) },
+      { userId: "c", company: "Beta", status: "completed", hired: false, fullTime: true, createdAt: at(5) },
+    ],
+    offline: null,
+    now: NOW,
+  });
+  assert.deepEqual(b.lists.called.map((s) => s.userId).sort(), ["a", "b"]);
+  assert.deepEqual(b.lists.hired.map((s) => s.userId), ["c"]);
+  assert.match(b.lists.hired[0].detail, /^Full-time with /);
+});

@@ -25,17 +25,22 @@ const RESULTS: Tile[] = [
   { key: "internships", label: "Placed: internship", hint: (n) => (n ? "Hired for an internship" : "No hire yet") },
   { key: "fullTime", label: "Placed: full-time", hint: (n) => (n ? "Hired for a full-time role" : "No hire yet") },
 ];
-const ALL = [...CRITICAL, ...RESULTS];
+/** Opened from the hero's pipeline; not tiles of their own. */
+const STAGES: Tile[] = [
+  { key: "called", label: "Called by an employer", hint: () => "" },
+  { key: "hired", label: "Hired", hint: () => "" },
+];
+const ALL = [...CRITICAL, ...RESULTS, ...STAGES];
 const PAGE = 40;
 
 /**
  * The drive's dashboard: every figure is a button that opens its students below, where the officer nudges them
  * all at once or one by one. Opens on the most urgent list that has anyone in it.
  */
-export function DriveBoardView({ board, live, open }: { board: DriveBoard; live: boolean; open: boolean }) {
+export function DriveBoardView({ board, live, open, initial }: { board: DriveBoard; live: boolean; open: boolean; initial?: string }) {
   const count = (k: BoardKey) => (k === "offers" ? board.offerCount : board.lists[k].length);
   const first = CRITICAL.find((t) => count(t.key) > 0 && (t.key !== "offline" || board.offlineKnown))?.key ?? "offers";
-  const [sel, setSel] = useState<BoardKey>(first);
+  const [sel, setSel] = useState<BoardKey>(ALL.find((t) => t.key === initial)?.key ?? first);
   const [all, setAll] = useState(false);
   const tile = ALL.find((t) => t.key === sel)!;
   const rows = board.lists[sel];
@@ -77,7 +82,7 @@ export function DriveBoardView({ board, live, open }: { board: DriveBoard; live:
   };
 
   return (
-    <section aria-label="Drive dashboard" className={cn("overflow-hidden", SURFACE_CLASS)}>
+    <section id="board" aria-label="Drive dashboard" className={cn("scroll-mt-6 overflow-hidden", SURFACE_CLASS)}>
       <div className="border-b border-ink-100 px-5 pt-4 pb-1">
         <h2 className="text-base font-semibold text-ink-900">Needs you now</h2>
       </div>
