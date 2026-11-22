@@ -5,7 +5,9 @@ import { ArrowRight } from "lucide-react";
 import { PresenceLive } from "@/components/college/presence-live";
 import { CopyText } from "@/components/college/copy-text";
 import { aiStatusLabel } from "@/lib/college/labels";
-import { BranchBoard, ScoreCurve, ScoreVsCgpa } from "@/components/college/overview-charts";
+import { BranchBoard, ScoreCurve, TopStudents } from "@/components/college/overview-charts";
+import { ScoreVsCgpa } from "@/components/college/score-vs-cgpa";
+import { yearLabel } from "@/lib/college/labels";
 import { CollegeMark } from "@/components/employer/drive-parts";
 import { pendingApprovalCount } from "@/lib/college/approvals";
 import { eligibleStudents, presenceSnapshot, requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
@@ -126,7 +128,13 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
     { label: "Hired", value: hired, hint: hired ? "Working with an employer" : "Hires show here", href: "/college/students?show=hired" },
   ];
 
-  const scorePoints = interviewed.flatMap((s) => (s.score !== null && s.cgpa !== null ? [{ userId: s.userId, score: s.score, cgpa: s.cgpa }] : []));
+  const nameOf = (s: (typeof students)[number]) => `${s.firstName} ${s.lastName}`.trim() || s.email;
+  const scorePoints = interviewed.flatMap((s) => (s.score !== null && s.cgpa !== null ? [{ userId: s.userId, name: nameOf(s), score: s.score, cgpa: s.cgpa }] : []));
+  const topStudents = interviewed
+    .filter((s) => s.score !== null)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.cgpa ?? 0) - (a.cgpa ?? 0))
+    .slice(0, 7)
+    .map((s) => ({ userId: s.userId, name: nameOf(s), meta: [s.year ? yearLabel(s.year) : null, s.branch].filter(Boolean).join(" · "), score: s.score ?? 0, cgpa: s.cgpa }));
   const byBranch = new Map<string, { students: number; interviewed: number; scores: number[] }>();
   for (const s of students) {
     const b = byBranch.get(s.branch ?? "Branch not set") ?? { students: 0, interviewed: 0, scores: [] };
@@ -216,12 +224,22 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
           </Surface>
           <Surface className="p-5 sm:p-6">
             <div className="flex items-baseline justify-between gap-2">
-              <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Findtern score vs CGPA</h2>
-              <p className="text-sm text-text-subtle"><span className="nums">{scorePoints.length}</span> with both</p>
+              <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Top students</h2>
+              <Link href="/college/students" className="text-sm font-medium text-ink-700 underline underline-offset-4 hover:text-ink-900">All students</Link>
             </div>
-            {scorePoints.length > 0 ? <ScoreVsCgpa points={scorePoints} /> : <p className="mt-4 text-sm text-text-subtle">Shows once interviewed students have a CGPA on file.</p>}
+            <TopStudents students={topStudents} />
           </Surface>
         </div>
+      ) : null}
+
+      {scorePoints.length > 0 ? (
+        <Surface className="p-5 sm:p-6">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Findtern score vs CGPA</h2>
+            <p className="text-sm text-text-subtle"><span className="nums">{scorePoints.length}</span> students with both · cut at score 7 and CGPA 7.5</p>
+          </div>
+          <ScoreVsCgpa points={scorePoints} />
+        </Surface>
       ) : null}
 
       {branchRows.length > 1 ? (

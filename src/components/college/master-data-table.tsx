@@ -8,7 +8,7 @@ import { buttonClass } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { csrfFetch } from "@/lib/client-fetch";
 import { ago } from "@/lib/college/labels";
-import { HIGH_CGPA, STRONG_SCORE, quadrantOf, type Quadrant } from "@/lib/college/insights";
+import { HIGH_CGPA, STRONG_SCORE } from "@/lib/college/insights";
 import { COFFEE, MARKS, coffeeOf, marksOf, type CoffeeKey, type MarksKey } from "@/lib/college/overview-modes";
 import { MASTER_COLUMNS, OUTCOMES, cellText, matchesOutcome, matchesWorkMode, type ColumnGroup, type Outcome, type MasterColumn, type MasterRow } from "@/lib/college/master-row";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
@@ -31,7 +31,6 @@ type Filters = {
   status: "any" | "verified" | "unverified";
   minScore: string;
   minCgpa: string;
-  quadrant: Quadrant | "";
   /** Findtern band: "done" is any band (AI interview done), "none" is not interviewed yet. */
   band: CoffeeKey | "done" | "none" | "";
   /** CGPA / % band (marks out of 10). */
@@ -42,7 +41,7 @@ type Filters = {
 type SortState = { key: Key; dir: "asc" | "desc" };
 type View = { id: string; name: string; columns: Key[]; filters: Filters; sort: SortState; own?: boolean };
 
-const NO_FILTERS: Filters = { course: "", year: "", mode: "", laptop: "any", placement: "any", status: "any", minScore: "", minCgpa: "", quadrant: "", band: "", marks: "", outcome: "" };
+const NO_FILTERS: Filters = { course: "", year: "", mode: "", laptop: "any", placement: "any", status: "any", minScore: "", minCgpa: "", band: "", marks: "", outcome: "" };
 const BASE: Key[] = ["name", "degree", "branch", "year", "cgpa", "score", "offers", "hired", "ppo", "lastSeenAt"];
 const SCORES: Key[] = ["name", "degree", "branch", "cgpa", "english", "coding", "aptitude", "aiInterview", "score", "offers"];
 
@@ -50,10 +49,6 @@ const PRESETS: View[] = [
   { id: "all", name: "All students", columns: BASE, filters: NO_FILTERS, sort: { key: "name", dir: "asc" } },
   { id: "overlooked", name: "Strong score, no offer", columns: [...SCORES, "workMode", "preferredLocations", "phone"], filters: { ...NO_FILTERS, minScore: String(STRONG_SCORE), placement: "none" }, sort: { key: "score", dir: "desc" } },
   { id: "most-offers", name: "Most offers", columns: ["name", "degree", "branch", "score", "offers", "hired", "ppo", "earningsMinor"], filters: { ...NO_FILTERS, placement: "offer" }, sort: { key: "offers", dir: "desc" } },
-  { id: "score-beats-cg", name: "Score beats CGPA", columns: SCORES, filters: { ...NO_FILTERS, quadrant: "scoreBeatsCg" }, sort: { key: "score", dir: "desc" } },
-  { id: "cg-beats-score", name: "CGPA beats score", columns: SCORES, filters: { ...NO_FILTERS, quadrant: "cgBeatsScore" }, sort: { key: "cgpa", dir: "desc" } },
-  { id: "stars", name: "Strong on both", columns: SCORES, filters: { ...NO_FILTERS, quadrant: "stars" }, sort: { key: "score", dir: "desc" } },
-  { id: "support", name: "Needs support", columns: SCORES, filters: { ...NO_FILTERS, quadrant: "support" }, sort: { key: "score", dir: "asc" } },
   { id: "placed", name: "Placed and PPO", columns: ["name", "degree", "branch", "year", "offers", "hired", "ppo", "earningsMinor"], filters: { ...NO_FILTERS, placement: "hired" }, sort: { key: "earningsMinor", dir: "desc" } },
   { id: "contact", name: "Contact sheet", columns: ["name", "phone", "email", "emergencyContact", "linkedin", "city"], filters: NO_FILTERS, sort: { key: "name", dir: "asc" } },
   { id: "work-prefs", name: "Work preferences", columns: ["name", "degree", "workMode", "preferredLocations", "laptop", "skills"], filters: NO_FILTERS, sort: { key: "name", dir: "asc" } },
@@ -92,7 +87,6 @@ function matches(r: MasterRow, f: Filters, q: string): boolean {
   if (f.placement === "ppo" && !r.ppo) return false;
   if (f.minScore && (r.score === null || r.score < Number(f.minScore))) return false;
   if (f.minCgpa && (r.cgpa === null || r.cgpa < Number(f.minCgpa))) return false;
-  if (f.quadrant && quadrantOf(r) !== f.quadrant) return false;
   if (f.band === "done" && r.score === null) return false;
   if (f.band === "none" && r.score !== null) return false;
   if (f.band && f.band !== "done" && f.band !== "none" && (r.score === null || coffeeOf(r.score) !== f.band)) return false;
