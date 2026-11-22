@@ -19,6 +19,9 @@ import { ButtonLink } from "@/components/ui/button";
 import { collegeHasDriveOrder } from "@/lib/drives/dashboard-db";
 import { DriveDashboard } from "./drive-dashboard";
 import { BatchCampusWalk } from "@/components/college/campus-walk";
+import { HeroModes, type HeroMode } from "@/components/college/hero-modes/hero-modes";
+import { masterRowsForCollege } from "@/lib/college/master-data";
+import { overviewModes } from "@/lib/college/overview-modes";
 
 export const dynamic = "force-dynamic";
 
@@ -39,10 +42,13 @@ function median(xs: number[]): number | null {
  * accept, leave requests), then the live drive, then how the batch is doing. The student register itself lives
  * on /college/students.
  */
-export default async function CollegeOverview() {
+export default async function CollegeOverview({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const ctx = await requireCollegeContext();
+  const sp = await searchParams;
+  const heroMode: HeroMode = sp.mode === "categories" || sp.mode === "placement" ? sp.mode : "students";
+  const heroDesign = Math.max(0, Math.min(9, (Number(sp.design) || 1) - 1));
 
-  const [all, coverage, [liveDrive], [seat], paid, hasDriveOrder, pendingLeaves, toAccept, [unpaid]] = await Promise.all([
+  const [all, coverage, [liveDrive], [seat], paid, hasDriveOrder, pendingLeaves, toAccept, [unpaid], master] = await Promise.all([
     studentsForCollegeAdmin(ctx),
     rosterCoverage(ctx.college.id),
     getDb()
@@ -72,6 +78,7 @@ export default async function CollegeOverview() {
       .select({ n: sql<number>`count(*)::int` })
       .from(schema.collegeSeatBatches)
       .where(and(eq(schema.collegeSeatBatches.collegeId, ctx.college.id), eq(schema.collegeSeatBatches.status, "pending"))),
+    masterRowsForCollege(ctx),
   ]);
 
   const students = all.filter((s) => s.status === "verified");
@@ -174,7 +181,7 @@ export default async function CollegeOverview() {
             <ButtonLink href="/college/roster" variant="outlineLight">Add students</ButtonLink>
           </div>
         </div>
-        <BatchCampusWalk stages={funnel} />
+        <HeroModes students={<BatchCampusWalk stages={funnel} />} data={overviewModes(master)} initialMode={heroMode} initialDesign={heroDesign} />
       </HeroPanel>
 
       {firstRun ? (

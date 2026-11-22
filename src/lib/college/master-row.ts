@@ -45,6 +45,12 @@ export type MasterRow = {
   aiInterview: number | null;
   score: number | null;
   offers: number;
+  /** Offers by what the student did: accepted (accepted, hired, completed), rejected, or not answered (sent, interview, expired). */
+  offersAccepted: number;
+  offersRejected: number;
+  offersOpen: number;
+  /** Academic score out of 10: CGPA, or a percentage divided by 10 (for bands only; the CGPA column stays CGPA). */
+  marks10: number | null;
   hired: boolean;
   ppo: boolean;
   /** College earnings from this student's hires, in paise. */
@@ -78,6 +84,9 @@ export type MasterExtras = {
   state: string | null;
   experience: unknown;
   offers: number;
+  offersAccepted: number;
+  offersRejected: number;
+  offersOpen: number;
   hired: number;
   ppo: number;
   earningsMinor: number;
@@ -153,6 +162,10 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     aiInterview: null,
     score: null,
     offers: 0,
+    offersAccepted: 0,
+    offersRejected: 0,
+    offersOpen: 0,
+    marks10: null,
     hired: false,
     ppo: false,
     earningsMinor: 0,
@@ -195,6 +208,10 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     aiInterview: score10(ratings.interview ?? ratings.overall),
     score: s.score,
     offers: x.offers,
+    offersAccepted: x.offersAccepted,
+    offersRejected: x.offersRejected,
+    offersOpen: x.offersOpen,
+    marks10: s.cgpa ?? percentOutOf10(a),
     hired: x.hired > 0,
     ppo: x.ppo > 0,
     earningsMinor: x.earningsMinor,
@@ -254,6 +271,13 @@ export const MASTER_COLUMNS: MasterColumn[] = [
 export const COLUMN_KEYS = new Set(MASTER_COLUMNS.map((c) => c.key));
 
 const SCORE_KEYS = new Set<string>(["cgpa", "english", "coding", "aptitude", "aiInterview", "score"]);
+/** A percentage student's marks on the same 0-10 scale as CGPA, for the score bands only. */
+function percentOutOf10(a: Record<string, unknown>): number | null {
+  if (str(a.scoreType) !== "percentage") return null;
+  const p = num(a.score ?? a.cgpa);
+  return p !== null && p >= 0 && p <= 100 ? Math.round(p) / 10 : null;
+}
+
 const MODE_LABEL: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "Onsite" };
 
 /** A cell as plain text, the same in the table's title and in the CSV. Missing is "". */
