@@ -62,6 +62,11 @@ export function fullTimeReady(s: Pick<StudentFacts, "year" | "semester">): boole
   return s.year === 4 || (s.year === 3 && (s.semester ?? 0) >= 6);
 }
 
+/** The first of these live drives (ordered as given, earliest to end) the student may enter, or null: the drive banner's pick. */
+export function firstEligibleDrive<D extends DriveRules>(drives: D[], s: StudentFacts): D | null {
+  return drives.find((d) => isStudentEligible(s, d)) ?? null;
+}
+
 export function isStudentEligible(s: StudentFacts, drive: DriveRules): boolean {
   // Hard boundaries: no override.
   if (!s.collegeId || s.collegeId !== drive.collegeId) return false;

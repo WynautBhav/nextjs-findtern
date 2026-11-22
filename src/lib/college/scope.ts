@@ -104,7 +104,7 @@ function cgpaSql() {
  * The members of one college with everything the dashboard shows. One query;
  * the per-student counts are correlated subqueries on indexed intern ids.
  */
-async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
+async function loadMembers(collegeId: string, onlyUserId?: string): Promise<CollegeStudent[]> {
   // Raw rows: node-postgres reads a plain `timestamp` as *local* time, which
   // made "last seen" 5h30 stale on an IST server. Every timestamp below is
   // converted to timestamptz (AT TIME ZONE 'UTC') so it parses as the instant.
@@ -146,7 +146,7 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
     LEFT JOIN ${o} ON ${o.userId} = ${m.userId}
     LEFT JOIN ${schema.collegePresence} p ON p.user_id = ${m.userId}
     LEFT JOIN ${schema.collegeRoster} r ON r.college_id = ${m.collegeId} AND r.email = lower(${u.email})
-    WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL
+    WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL${onlyUserId ? sql` AND ${m.userId} = ${onlyUserId}` : sql``}
     ORDER BY ${u.firstName}, ${u.lastName}
   `);
   return (res.rows as Row[]).map((r) => ({
@@ -312,6 +312,11 @@ export async function presenceSnapshot(collegeId: string, userIds?: string[]): P
 export type Drive = typeof schema.collegeDrives.$inferSelect;
 
 /** Students an employer in this drive may see. */
+/** One current member of a college, read exactly as the college's lists read them; null if not a member. */
+export async function memberOf(collegeId: string, userId: string): Promise<CollegeStudent | null> {
+  return (await loadMembers(collegeId, userId))[0] ?? null;
+}
+
 export async function eligibleStudents(drive: Drive): Promise<CollegeStudent[]> {
   const rows = await loadMembers(drive.collegeId);
   return rows.filter((s) => isStudentEligible(s, drive));

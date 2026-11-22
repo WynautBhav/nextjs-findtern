@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { requireMutation } from "@/lib/guards-mutation";
-import { liveDriveFor } from "@/lib/college/live-drive";
+import { liveDriveForMember } from "@/lib/college/live-drive";
 import { meetingsForStudent } from "@/lib/college/meetings";
 import { getDb, schema } from "@/lib/db";
 
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     .values({ userId: uid, collegeId: m.collegeId, lastSeenAt: sql`now()` })
     .onConflictDoUpdate({ target: schema.collegePresence.userId, set: { lastSeenAt: sql`now()`, collegeId: m.collegeId } });
 
-  const drive = await liveDriveFor(m.collegeId);
+  const drive = await liveDriveForMember(uid);
 
   return NextResponse.json(
     { college: m.collegeId, drive, meetings: await meetingsForStudent(uid) },

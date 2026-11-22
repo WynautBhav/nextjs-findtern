@@ -102,5 +102,9 @@ export function openStepOf(row: OnboardingLike | null | undefined, docs: Profile
 /** Marksheets uploaded during onboarding (academics.marksheetUploads). */
 export function hasMarksheet(extra: Record<string, unknown> | null | undefined): boolean {
   const a = extra?.academics && typeof extra.academics === "object" ? (extra.academics as Record<string, unknown>) : {};
-  return Array.isArray(a.marksheetUploads) && a.marksheetUploads.some((m) => m && typeof m === "object" && typeof (m as Record<string, unknown>).name === "string");
+  const named = (m: unknown) => Boolean(m && typeof m === "object" && typeof (m as Record<string, unknown>).name === "string" && (m as Record<string, unknown>).name !== "");
+  if (Array.isArray(a.marksheetUploads) && a.marksheetUploads.some(named)) return true;
+  // The profile form's semester photos (cgpa-verification.ts proofSlots): any marksheet slot, never the college ID.
+  const proofs = a.semesterProofUploads && typeof a.semesterProofUploads === "object" ? (a.semesterProofUploads as Record<string, unknown>) : {};
+  return Object.entries(proofs).some(([key, m]) => (key.startsWith("marksheet-") || key === "last-year-marksheet") && named(m));
 }

@@ -44,6 +44,13 @@ test("marksheet flag reads only that a file exists", () => {
   assert.equal(hasMarksheet(null), false);
 });
 
+test("marksheet flag counts the semester marksheet photos from the profile form, not the college ID", () => {
+  assert.equal(hasMarksheet({ academics: { semesterProofUploads: { "marksheet-1": { name: "k/s1.png" }, "college-id": { name: "k/id.png" } } } }), true);
+  assert.equal(hasMarksheet({ academics: { semesterProofUploads: { "last-year-marksheet": { name: "k/ly.png" } } } }), true);
+  assert.equal(hasMarksheet({ academics: { semesterProofUploads: { "college-id": { name: "k/id.png" } } } }), false);
+  assert.equal(hasMarksheet({ academics: { semesterProofUploads: { "marksheet-1": { name: "" } } } }), false);
+});
+
 test("hidden profiles: one reason each, the first that blocks, in the order the officer reads them", () => {
   const out = { ...base, inPool: false };
   const reason = (o: Partial<typeof base>) => readinessFrom({ ...out, ...o }).hidden;
