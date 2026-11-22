@@ -150,6 +150,8 @@ const COLLEGE_ADMIN_WRITES = new Set([
   "leave:decide",
   // Who is in the college is the officer's call (accept, deny, restore). Still nothing about the student's own data.
   "student:decide",
+  // Download master data the officer can already see; audited (export_master_data).
+  "students:export",
 ]);
 
 export function collegeAdminMay(action: string): boolean {

@@ -7,7 +7,7 @@ import { toStudentRow } from "@/lib/college/serialize";
 
 export const dynamic = "force-dynamic";
 
-const FILTERS: readonly StudentFilter[] = ["all", "no_interview", "offers", "offline"];
+const FILTERS: readonly StudentFilter[] = ["all", "no_interview", "offers", "hired", "offline"];
 
 /** Request time, for "online"/"x min ago" labels. Dynamic page, so this is per request. */
 function requestTime(): number {
