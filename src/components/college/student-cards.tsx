@@ -16,6 +16,7 @@ import { Initials } from "./kit";
 import { NudgeButton } from "./nudge-button";
 import { RosterRemove } from "./roster-remove";
 import type { StudentRow } from "./types";
+import { STEPS, stepsReached, stuckAt, type Stuck, type TrackFacts } from "@/lib/college/placement-track";
 
 /** Which students the page shows: your verified students (with their own filters), or names on your list. */
 export type StudentGroup = "students" | "on_findtern" | "not_joined";
@@ -45,6 +46,19 @@ function chipClass(on: boolean) {
     on ? "border-ink-900 bg-ink-900 text-white" : "border-ink-200 bg-white text-ink-700 hover:border-ink-300 hover:text-ink-900",
   );
 }
+
+function factsOf(s: StudentRow): TrackFacts {
+  return { interviewed: aiStatusLabel(s.aiStatus).done, seen: !s.hiddenWhy, offers: s.proposals, hired: s.hired };
+}
+
+/** The stuck groups in the order a student moves through them; "done" (hired) last. */
+const STAGES: { id: Stuck; label: string; tone: string }[] = [
+  { id: "interview", label: "AI interview not done", tone: "bg-ink-300" },
+  { id: "seen", label: "Hidden from employers", tone: "bg-accent-500" },
+  { id: "offer", label: "No offer yet", tone: "bg-ink-400" },
+  { id: "hired", label: "Offer, not hired", tone: "bg-ink-600" },
+  { id: "done", label: "Hired", tone: "bg-brand-600" },
+];
 
 function matches(s: StudentRow, f: Filter, now: number) {
   if (f === "no_interview") return !aiStatusLabel(s.aiStatus).done;
@@ -81,6 +95,7 @@ export function StudentCards({
   const [group, setGroup] = useState<StudentGroup>(initialGroup);
   const [cohort, setCohort] = useState<number | "all">("all");
   const [filter, setFilter] = useState<Filter>(initialFilter);
+  const [stage, setStage] = useState<Stuck | null>(null);
   const [q, setQ] = useState("");
   const [showAll, setShowAll] = useState(false);
 
@@ -96,14 +111,20 @@ export function StudentCards({
 
   const inYear = useMemo(() => students.filter((s) => cohort === "all" || s.year === cohort), [students, cohort]);
   const filterCounts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.id, inYear.filter((s) => matches(s, f.id, now)).length])) as Record<Filter, number>, [inYear, now]);
+  const stageCounts = useMemo(() => {
+    const c = Object.fromEntries(STAGES.map((g) => [g.id, 0])) as Record<Stuck, number>;
+    for (const s of inYear) c[stuckAt(factsOf(s))]++;
+    return c;
+  }, [inYear]);
   const rows = useMemo(
     () =>
       inYear.filter((s) => {
+        if (stage && stuckAt(factsOf(s)) !== stage) return false;
         if (!matches(s, filter, now)) return false;
         if (term && !`${s.name} ${s.rollNo ?? ""} ${s.branch ?? ""} ${s.email} ${s.phone ?? ""}`.toLowerCase().includes(term)) return false;
         return true;
       }),
-    [inYear, filter, term, now],
+    [inYear, stage, filter, term, now],
   );
   const listRows = useMemo(
     () => (group === "on_findtern" ? waiting : notJoined).filter((r) => !term || `${r.name} ${r.rollNo ?? ""} ${r.branch ?? ""} ${r.email} ${r.phone ?? ""}`.toLowerCase().includes(term)),
@@ -112,7 +133,8 @@ export function StudentCards({
 
   const total = group === "students" ? rows.length : listRows.length;
   const limit = showAll ? Infinity : PAGE;
-  const chaseIds = group === "students" && (filter === "no_interview" || filter === "offers") ? rows.map((r) => r.userId) : [];
+  const chase: "interview" | "offer" | null = group !== "students" ? null : filter === "offers" ? "offer" : filter === "no_interview" || stage === "interview" ? "interview" : null;
+  const chaseIds = chase ? rows.map((r) => r.userId) : [];
   const groups: { id: StudentGroup; label: string; n: number }[] = [
     { id: "students", label: "Verified students", n: students.length },
     { id: "on_findtern", label: "Waiting for you", n: waiting.length },
@@ -164,11 +186,11 @@ export function StudentCards({
                   onClick={() => { setGroup(g.id); setShowAll(false); }}
                   className={cn(
                     "inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 pb-1 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600",
-                    on ? "border-brand-700 text-ink-900" : "border-transparent text-ink-500 hover:text-ink-900",
+                    on ? "border-ink-900 text-ink-900" : "border-transparent text-ink-500 hover:text-ink-900",
                   )}
                 >
                   {g.label}
-                  <span className={cn("nums rounded-full px-1.5 text-xs", on ? "bg-brand-50 text-brand-800" : "bg-ink-100 text-ink-600")}>{g.n}</span>
+                  <span className={cn("nums text-xs", on ? "text-ink-700" : "text-text-subtle")}>{g.n}</span>
                 </button>
               );
             })}
@@ -194,11 +216,10 @@ export function StudentCards({
         <div className="flex flex-col gap-3 border-b border-ink-100 px-4 py-3 sm:px-5 min-[1380px]:flex-row min-[1380px]:items-center">
           <div className="min-[1380px]:hidden">{yearTrack}</div>
           <div role="group" aria-label="Show only" className={cn(ROW, "min-w-0 flex-1")}>
-            {FILTERS.map((f) => {
+            {FILTERS.filter((f) => f.id === "offers" || f.id === "hidden" || f.id === "offline" || f.id === filter).map((f) => {
               const on = filter === f.id;
               return (
                 <button key={f.id} type="button" aria-pressed={on} onClick={() => setFilter(on ? "all" : f.id)} className={chipClass(on)}>
-                  {f.id === "hidden" ? <span aria-hidden className={cn("size-1.5 rounded-full", on ? "bg-white" : "bg-accent-500")} /> : null}
                   {f.label}
                   <span className={cn("nums text-xs", on ? "text-white/70" : "text-text-subtle")}>{filterCounts[f.id]}</span>
                 </button>
@@ -207,7 +228,7 @@ export function StudentCards({
           </div>
           {chaseIds.length > 0 ? (
             <span className="shrink-0">
-              <NudgeButton key={`${filter}-${cohort}-${chaseIds.length}`} kind={filter === "offers" ? "offer" : "interview"} userIds={chaseIds} label={`Nudge these ${chaseIds.length}`} />
+              <NudgeButton key={`${filter}-${stage}-${cohort}-${chaseIds.length}`} kind={chase ?? "interview"} userIds={chaseIds} label={`Nudge these ${chaseIds.length}`} />
             </span>
           ) : null}
         </div>
@@ -225,6 +246,8 @@ export function StudentCards({
           <Link href="/college/approvals" className="font-medium text-brand-700 underline underline-offset-2">Accept them on Approvals</Link>
         </p>
       ) : null}
+
+      {group === "students" && inYear.length > 0 ? <StuckBar counts={stageCounts} total={inYear.length} value={stage} onChange={(v) => { setStage(v); setShowAll(false); }} /> : null}
 
       {total === 0 ? (
         <EmptyCards group={group} anyAtAll={group === "students" ? students.length > 0 : (group === "on_findtern" ? waiting : notJoined).length > 0} />
@@ -306,21 +329,109 @@ function ContactLines({ phone, email, linkedin, name }: { phone: string | null; 
   );
 }
 
+/**
+ * Where the batch stands, as one bar: every student sits in exactly one group (the first step they have not reached),
+ * so the groups add up to the list. Each group is a button that narrows the cards to those students; press it again
+ * to see everyone. Hired is the only green on the bar, and the one amber is the group employers cannot see.
+ */
+function StuckBar({ counts, total, value, onChange }: { counts: Record<Stuck, number>; total: number; value: Stuck | null; onChange: (v: Stuck | null) => void }) {
+  return (
+    <div className="border-b border-ink-100 px-4 py-4 sm:px-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-semibold text-ink-900">Where your students are stuck</h3>
+        <p className="nums text-xs text-text-subtle">{total} students</p>
+      </div>
+      <div aria-hidden className="mt-3 flex h-2.5 gap-[2px] overflow-hidden rounded-full">
+        {STAGES.map((g) =>
+          counts[g.id] > 0 ? (
+            <span
+              key={g.id}
+              className={cn("h-full transition-[width,opacity] duration-300 motion-reduce:transition-none", g.tone, value && value !== g.id && "opacity-25")}
+              style={{ width: `${(counts[g.id] / total) * 100}%` }}
+            />
+          ) : null,
+        )}
+      </div>
+      <div role="group" aria-label="Stuck at" className="-mx-4 mt-2 flex overflow-x-auto px-3 [scrollbar-width:none] sm:mx-0 sm:grid sm:grid-cols-5 sm:px-0 sm:-mx-1">
+        {STAGES.map((g) => {
+          const on = value === g.id;
+          const n = counts[g.id];
+          return (
+            <button
+              key={g.id}
+              type="button"
+              aria-pressed={on}
+              disabled={n === 0 && !on}
+              onClick={() => onChange(on ? null : g.id)}
+              className={cn(
+                "group/stage m-1 min-w-36 shrink-0 rounded-lg border px-3 py-2 text-left sm:min-w-0 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 disabled:cursor-default",
+                on ? "border-ink-900 bg-ink-50" : "border-transparent hover:bg-ink-50 disabled:hover:bg-transparent",
+              )}
+            >
+              <span className="flex items-center gap-1.5 text-xs text-ink-600">
+                <span aria-hidden className={cn("size-2 shrink-0 rounded-full", g.tone)} />
+                <span className="truncate">{g.label}</span>
+              </span>
+              <span className="mt-0.5 flex items-baseline gap-1.5">
+                <span className={cn("nums text-xl font-medium tracking-[-0.02em]", n ? "text-ink-900" : "text-ink-400")}>{n}</span>
+                <span className="nums text-xs text-text-subtle">{total ? Math.round((n / total) * 100) : 0}%</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** The six steps as six short segments: reached in ink, the step they are stuck at marked, the rest grey. */
+function Track({ s }: { s: StudentRow }) {
+  const facts = factsOf(s);
+  const reached = stepsReached(facts);
+  const stuck = stuckAt(facts);
+  const ai = aiStatusLabel(s.aiStatus);
+  const why =
+    stuck === "done" ? null
+    : stuck === "interview" ? ai.label
+    : stuck === "seen" ? s.hiddenWhy
+    : stuck === "offer" ? "Employers can see them"
+    : `${s.offersPending ? `${s.offersPending} waiting on their reply` : "Offer given"}`;
+  const label = stuck === "done" ? "Hired" : STAGES.find((g) => g.id === stuck)!.label;
+  return (
+    <div className="px-4 pt-3">
+      <div aria-hidden className="flex gap-1">
+        {STEPS.map((step, i) => (
+          <span
+            key={step.id}
+            title={step.label}
+            className={cn("h-1 flex-1 rounded-full", stuck === "done" ? "bg-brand-600" : i < reached ? "bg-ink-800" : i === reached ? (stuck === "seen" ? "bg-accent-500" : "bg-ink-400") : "bg-ink-100")}
+          />
+        ))}
+      </div>
+      <p className="mt-1.5 line-clamp-2 text-xs leading-4">
+        <span className={cn("font-medium", stuck === "done" ? "text-brand-800" : "text-ink-900")}>{label}</span>
+        {why ? <span className="text-text-subtle"> · {why}</span> : null}
+        {/* The hire gate: an unfinished profile only matters once an employer wants them. */}
+        {stuck !== "done" && s.hireWhy ? <span className="text-text-subtle"> · {s.hireWhy.replace(/^Profile incomplete: (.*) is not finished\.$/, "$1 not finished").replace(/\.$/, "")}</span> : null}
+        <span className="sr-only">, {reached} of {STEPS.length} steps</span>
+      </p>
+    </div>
+  );
+}
+
 function StudentCard({ s, now }: { s: StudentRow; now: number }) {
   const ai = aiStatusLabel(s.aiStatus);
   const name = s.name || s.email;
   const scored = ai.done && s.score !== null;
-  // Hidden outranks "can't be hired": a student employers can't find has the bigger problem.
-  const flag = s.hiddenWhy ? { title: "Hidden from employers", why: s.hiddenWhy } : s.hireWhy ? { title: "Can't be hired yet", why: s.hireWhy } : null;
   return (
     // The whole card opens the student: the name's link is stretched over it.
-    <article className="group relative flex h-full flex-col rounded-apple-md border border-ink-200/80 bg-white transition-colors hover:border-brand-300 has-[a:focus-visible]:border-brand-500">
+    <article className="group relative flex h-full flex-col rounded-lg border border-ink-200/80 bg-white transition-colors hover:border-ink-400 has-[a:focus-visible]:border-brand-500">
       <div className="flex items-start gap-3 px-4 pt-4">
         <Initials seed={s.userId} name={name} className="size-10" />
         <div className="min-w-0 flex-1">
           <Link
             href={`/college/students/${s.userId}`}
-            className="block truncate font-semibold tracking-[-0.01em] text-ink-900 outline-none after:absolute after:inset-0 after:rounded-apple-md after:content-[''] group-hover:text-brand-800 focus-visible:after:ring-2 focus-visible:after:ring-brand-500"
+            className="block truncate font-semibold tracking-[-0.01em] text-ink-900 outline-none after:absolute after:inset-0 after:rounded-lg after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-brand-500"
           >
             {name}
           </Link>
@@ -329,36 +440,26 @@ function StudentCard({ s, now }: { s: StudentRow; now: number }) {
         <Online at={s.lastSeenAt ?? s.lastActivityAt} now={now} />
       </div>
 
+      <Track s={s} />
+
       <ContactLines phone={s.phone} email={s.email} linkedin={s.linkedin} name={name} />
 
-      {/* The two numbers employers filter on, as figures; then what is waiting. */}
-      <div className="mt-auto flex items-end gap-4 px-4 pb-3">
+      {/* The two numbers employers filter on, as figures; then what is waiting on the student. */}
+      <div className="mt-auto flex items-end gap-5 border-t border-ink-100 px-4 py-3">
         <div>
           <p className="whitespace-nowrap text-xs text-text-subtle">Findtern score</p>
-          <p className={cn("nums text-lg font-semibold leading-tight", scored ? "text-ink-900" : "text-ink-400")}>{scored ? s.score!.toFixed(1) : <span className="text-sm font-medium">{ai.label}</span>}</p>
+          <p className={cn("nums text-lg font-medium leading-tight", scored ? "text-ink-900" : "text-ink-400")}>{scored ? s.score!.toFixed(1) : "—"}</p>
         </div>
         <div>
           <p className="text-xs text-text-subtle">CGPA</p>
-          <p className={cn("nums text-lg font-semibold leading-tight", s.cgpa !== null ? "text-ink-900" : "text-ink-400")}>{s.cgpa?.toFixed(1) ?? "—"}</p>
+          <p className={cn("nums text-lg font-medium leading-tight", s.cgpa !== null ? "text-ink-900" : "text-ink-400")}>{s.cgpa?.toFixed(1) ?? "—"}</p>
         </div>
         {s.offersPending > 0 ? (
-          <span className="relative z-10 ml-auto inline-flex items-center gap-1.5">
-            <Pill tone="waiting" className="nums whitespace-nowrap">{s.offersPending} {s.offersPending === 1 ? "offer" : "offers"}</Pill>
-            <NudgeButton kind="offer" userIds={[s.userId]} size="xs" className="min-h-8" />
+          <span className="relative z-10 ml-auto">
+            <NudgeButton kind="offer" userIds={[s.userId]} size="xs" className="min-h-8 whitespace-nowrap" />
           </span>
-        ) : s.hired > 0 ? (
-          <span className="ml-auto"><Pill tone="paid">Hired</Pill></span>
         ) : null}
       </div>
-
-      {flag ? (
-        <p className="flex items-start gap-2 rounded-b-apple-md border-t border-accent-300/60 bg-accent-100/70 px-4 py-2 text-xs leading-4 text-ink-800">
-          <span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-accent-500" />
-          <span className="min-w-0">
-            <span className="font-semibold">{flag.title}.</span> {flag.why}
-          </span>
-        </p>
-      ) : null}
     </article>
   );
 }
