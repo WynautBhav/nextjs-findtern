@@ -43,7 +43,7 @@ export function ScoreCurve({ scores, median }: { scores: number[]; median: numbe
             </div>
           ))}
         </div>
-        {/* Where most employers filter, the same dashed line as Branch by branch. */}
+        {/* Where most employers filter. */}
         <div aria-hidden className="pointer-events-none absolute inset-y-0 border-l border-dashed border-ink-300" style={{ left: "60%" }} />
         {median !== null ? (
           <div aria-hidden className="pointer-events-none absolute inset-y-0" style={{ left: `${(median / 10) * 100}%` }}>
@@ -73,66 +73,6 @@ export function ScoreCurve({ scores, median }: { scores: number[]; median: numbe
           </div>
         ))}
       </dl>
-    </div>
-  );
-}
-
-export type BranchRow = { branch: string; students: number; interviewed: number; scores: number[] };
-
-const medianOf = (xs: number[]) => {
-  if (!xs.length) return null;
-  const v = [...xs].sort((a, b) => a - b);
-  const m = Math.floor(v.length / 2);
-  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
-};
-
-/**
- * Branch by branch, every interviewed student as a tick on one 0-10 line, so a branch's spread shows and not only its
- * average; the ink bar is the branch's median and the dashed line is 6, where most employers filter. Ranked by median.
- */
-export function BranchBoard({ rows }: { rows: BranchRow[] }) {
-  const ranked = rows.map((r) => ({ ...r, median: medianOf(r.scores) })).sort((a, b) => (b.median ?? -1) - (a.median ?? -1));
-  return (
-    <div>
-      <div aria-hidden className="hidden grid-cols-[12rem_minmax(0,1fr)_4.5rem] gap-6 pb-2 text-xs text-text-subtle sm:grid">
-        <span>Branch</span>
-        <span className="nums relative h-4">
-          {[0, 2, 4, 6, 8, 10].map((n) => (
-            <span key={n} className="absolute -translate-x-1/2 first:translate-x-0 last:-translate-x-full" style={{ left: `${n * 10}%` }}>{n}</span>
-          ))}
-        </span>
-        <span className="text-right">Median</span>
-      </div>
-      <ul className="divide-y divide-ink-100 border-t border-ink-100">
-        {ranked.map((r, i) => (
-          <li key={r.branch} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-2 py-3 sm:grid-cols-[12rem_minmax(0,1fr)_4.5rem]">
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-ink-900">{r.branch}</p>
-              <p className="nums text-xs text-text-subtle">{r.interviewed} of {r.students} interviewed</p>
-            </div>
-            <div
-              role="img"
-              aria-label={`${r.branch}: ${r.scores.length} scores${r.median !== null ? `, median ${r.median.toFixed(1)}` : ""}`}
-              className="relative col-span-2 h-7 sm:col-span-1 sm:col-start-2 sm:row-start-1"
-            >
-              <span aria-hidden className="absolute inset-x-0 top-1/2 h-px bg-ink-100" />
-              <span aria-hidden className="absolute inset-y-0 border-l border-dashed border-ink-300" style={{ left: "60%" }} />
-              {r.scores.map((sc, k) => (
-                <span
-                  key={k}
-                  aria-hidden
-                  className="bar-rise absolute top-1/2 h-3.5 w-[2px] -translate-y-1/2 rounded-full bg-brand-600/45"
-                  style={{ left: `${Math.min(99.6, sc * 10)}%`, animationDelay: `${i * 40}ms` }}
-                />
-              ))}
-              {r.median !== null ? <span aria-hidden className="absolute inset-y-0 w-[3px] -translate-x-1/2 rounded-full bg-ink-900" style={{ left: `${r.median * 10}%` }} /> : null}
-            </div>
-            <p className="nums col-start-2 row-start-1 text-right text-lg font-medium text-ink-900 sm:col-start-3">
-              {r.median === null ? <span className="text-sm text-text-subtle">—</span> : r.median.toFixed(1)}
-            </p>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }

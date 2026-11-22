@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { PresenceLive } from "@/components/college/presence-live";
 import { CopyText } from "@/components/college/copy-text";
 import { aiStatusLabel } from "@/lib/college/labels";
-import { BranchBoard, ScoreCurve, TopStudents } from "@/components/college/overview-charts";
+import { ScoreCurve, TopStudents } from "@/components/college/overview-charts";
 import { ScoreVsCgpa } from "@/components/college/score-vs-cgpa";
 import { yearLabel } from "@/lib/college/labels";
 import { CollegeMark } from "@/components/employer/drive-parts";
@@ -141,18 +141,6 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
     .sort((a, b) => (b.score ?? 0) - (a.score ?? 0) || (b.cgpa ?? 0) - (a.cgpa ?? 0))
     .slice(0, 7)
     .map((s) => ({ userId: s.userId, name: nameOf(s), meta: [s.year ? yearLabel(s.year) : null, s.branch].filter(Boolean).join(" · "), score: s.score ?? 0, cgpa: s.cgpa }));
-  const byBranch = new Map<string, { students: number; interviewed: number; scores: number[] }>();
-  for (const s of students) {
-    const b = byBranch.get(s.branch ?? "Branch not set") ?? { students: 0, interviewed: 0, scores: [] };
-    b.students++;
-    if (aiStatusLabel(s.aiStatus).done) b.interviewed++;
-    if (s.score !== null) b.scores.push(s.score);
-    byBranch.set(s.branch ?? "Branch not set", b);
-  }
-  const branchRows = [...byBranch.entries()]
-    .map(([branch, b]) => ({ branch, ...b }))
-    .sort((a, b) => b.students - a.students)
-    .slice(0, 8);
 
   const firstRun = students.length === 0 && coverage.rosterSize === 0;
 
@@ -245,18 +233,6 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
             <p className="text-sm text-text-subtle"><span className="nums">{scorePoints.length}</span> students with both · cut at score 7 and CGPA 7.5</p>
           </div>
           <ScoreVsCgpa points={scorePoints} />
-        </Surface>
-      ) : null}
-
-      {branchRows.length > 1 ? (
-        <Surface className="p-5 sm:p-6">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Branch by branch</h2>
-            <p className="text-sm text-text-subtle">Each tick is a student&apos;s Findtern score · dashed line at 6</p>
-          </div>
-          <div className="mt-5">
-            <BranchBoard rows={branchRows} />
-          </div>
         </Surface>
       ) : null}
 
