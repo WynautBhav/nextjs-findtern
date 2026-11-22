@@ -417,8 +417,8 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
             <option value="hired">Hired</option>
             <option value="ppo">PPO offer</option>
           </select>
-          <select aria-label="Offers and meetings" value={filters.outcome ?? ""} onChange={(e) => set("outcome", e.target.value as Outcome)} className={on(!!(filters.outcome))}>
-            <option value="">Offers and meetings</option>
+          <select aria-label="All offers and meetings" value={filters.outcome ?? ""} onChange={(e) => set("outcome", e.target.value as Outcome)} className={on(!!(filters.outcome))}>
+            <option value="">All offers and meetings</option>
             {OUTCOMES.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
           </select>
           {/* The band filters are not part of the bar: they show only when a Dashboard number opened this list with one
@@ -448,10 +448,10 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
           </select>
           <MinimumPicker key={`score-${resetKey}`} label="Findtern score" any="Findtern score" presets={[5, 6, STRONG_SCORE, 8, 9]} value={filters.minScore} onChange={(v) => set("minScore", v)} className={on(!!filters.minScore)} />
           <MinimumPicker key={`cgpa-${resetKey}`} label="CGPA" any="Any CGPA" presets={[6, 7, HIGH_CGPA, 8, 9]} value={filters.minCgpa} onChange={(v) => set("minCgpa", v)} className={on(!!filters.minCgpa)} />
-          <select aria-label="Approval" value={filters.status} onChange={(e) => set("status", e.target.value as Filters["status"])} className={on(!!(filters.status !== "any"))}>
-            <option value="any">Accepted and waiting</option>
-            <option value="verified">Accepted by you</option>
-            <option value="unverified">Waiting for your approval</option>
+          <select aria-label="Candidate onboarding status" value={filters.status} onChange={(e) => set("status", e.target.value as Filters["status"])} className={on(!!(filters.status !== "any"))}>
+            <option value="any">Candidate onboarding status</option>
+            <option value="verified">Accepted by TPO</option>
+            <option value="unverified">Waiting for TPO approval</option>
           </select>
           {activeFilters ? (
             <button type="button" onClick={() => { setFilters(NO_FILTERS); setLimit(PAGE); setResetKey((k) => k + 1); }} className="min-h-9 shrink-0 whitespace-nowrap rounded-md px-2 font-medium text-brand-700 hover:underline focus-visible:ring-2 focus-visible:ring-brand-500">
