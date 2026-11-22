@@ -95,7 +95,7 @@ export function CgpaDecision({ target }: { target: Target }) {
             <DialogDescription>
               Confirm the proofs show {target.claimedScore}
               {unit}
-              {target.semester ? ` for semester ${target.semester}` : ""}. {target.name.split(" ")[0]} and the companies waiting on this offer are told it is verified.
+              {target.semester ? ` for semester ${target.semester}` : target.semester === 0 ? " (semester not applicable)" : ""}. {target.name.split(" ")[0]} and the companies waiting on this offer are told it is verified.
             </DialogDescription>
           </DialogHeader>
           {error ? (

@@ -27,7 +27,7 @@ export const cgpaEmails = {
       "You’ll get a confirmation call or email from us within 24 to 48 hours. There is nothing else you need to do.",
     ],
     facts: [
-      ...(o.semester ? ([["Semester", String(o.semester)]] as [string, string][]) : []),
+      ...(o.semester != null ? ([["Semester", o.semester === 0 ? "Not applicable" : String(o.semester)]] as [string, string][]) : []),
       ["Score you entered", `${o.score}${unit(o.scoreType)}`],
     ],
     status: "Verification in progress",
@@ -44,7 +44,7 @@ export const cgpaEmails = {
     lines: ["Verify the CGPA against the uploaded proofs within 24 to 48 hours. The queue has the proofs and the phone number."],
     facts: [
       ["Candidate", `${o.internName} (${o.internId})`],
-      ...(o.semester ? ([["Semester", String(o.semester)]] as [string, string][]) : []),
+      ...(o.semester != null ? ([["Semester", o.semester === 0 ? "Not applicable" : String(o.semester)]] as [string, string][]) : []),
       ["Claimed score", `${o.score}${unit(o.scoreType)}`],
       ["Company", o.company],
       ["Role", o.role],

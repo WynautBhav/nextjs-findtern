@@ -1,7 +1,7 @@
 import { CheckCircle2, Clock, Info, TriangleAlert } from "lucide-react";
 
 import { Pill } from "@/components/app/primitives";
-import { CGPA_DISCLAIMER, type CgpaVerification } from "@/lib/cgpa-verification";
+import { CGPA_DISCLAIMER, semesterLabel, type CgpaVerification } from "@/lib/cgpa-verification";
 
 import { ProfileCard } from "./card";
 
@@ -28,7 +28,7 @@ export function CgpaVerificationCard({ v }: { v: CgpaVerification }) {
     <ProfileCard
       id="cgpa"
       title="CGPA verification"
-      hint={v.semester ? `Semester ${v.semester} · ${claimed}` : claimed}
+      hint={v.semester != null ? `${semesterLabel(v.semester)} · ${claimed}` : claimed}
       edit={v.status === "pending" || v.status === "incorrect" ? { href: "/intern/onboarding", label: "semester and score" } : undefined}
     >
       <div className="flex flex-col gap-2">

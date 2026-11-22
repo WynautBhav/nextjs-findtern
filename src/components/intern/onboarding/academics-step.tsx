@@ -22,6 +22,7 @@ import {
 
 import { DateField, localToday } from "../date-input";
 import { AddButton, Choice, EmptyEntries, EntryCard, Field, FieldNote, Grid, Label, RemoveButton, Section, Select, SelectField, controlClass } from "./fields";
+import { SEMESTER_NA } from "@/lib/cgpa-verification";
 import { CgpaDisclaimer, SemesterProofs, SemesterSelect } from "./semester-proofs";
 import type { StepProps } from "./types";
 
@@ -205,7 +206,11 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
       {semesterApplies(level, a.status) && typeof a.currentSemester === "number" ? (
         <Section
           title="Proof of your CGPA"
-          hint={`Semester ${a.currentSemester} needs ${a.currentSemester} photo${a.currentSemester === 1 ? "" : "s"}: a marksheet for each earlier semester and your college ID card. All are required.`}
+          hint={
+            a.currentSemester === SEMESTER_NA
+              ? "Your college has no semesters, so we need one photo: last year's marksheet."
+              : `Semester ${a.currentSemester} needs ${a.currentSemester} photo${a.currentSemester === 1 ? "" : "s"}: a marksheet for each earlier semester and your college ID card. All are required.`
+          }
         >
           <SemesterProofs a={a} errors={errors} onChange={(semesterProofUploads) => set({ semesterProofUploads })} />
         </Section>

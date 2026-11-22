@@ -136,7 +136,7 @@ test("proofSlots: N slots for every semester 1..10, unique keys", () => {
 });
 
 test("proofSlots: no slots for something that is not a semester", () => {
-  for (const bad of [0, -1, 11, 2.5, Number.NaN]) assert.deepEqual(proofSlots(bad), [], String(bad));
+  for (const bad of [-1, 11, 2.5, Number.NaN]) assert.deepEqual(proofSlots(bad), [], String(bad));
 });
 
 /* ── readCgpaVerification ──────────────────────────────────────────── */
@@ -171,7 +171,7 @@ test("readCgpaVerification: garbage fields are normalised, not trusted", () => {
   assert.equal(got.semester, 5);
   assert.equal(got.correctedScore, "7");
   assert.equal("note" in got, false);
-  assert.equal(readCgpaVerification({ cgpaVerification: { status: "pending", semester: 0 } }).semester, null);
+  assert.equal(readCgpaVerification({ cgpaVerification: { status: "pending", semester: -1 } }).semester, null);
   assert.equal(readCgpaVerification({ cgpaVerification: { status: "pending", semester: 11 } }).semester, null);
   assert.equal(readCgpaVerification({ cgpaVerification: { status: "pending", semester: 2.5 } }).semester, null);
   assert.equal(readCgpaVerification({ cgpaVerification: { status: "pending", scoreType: "percentage" } }).scoreType, "percentage");
