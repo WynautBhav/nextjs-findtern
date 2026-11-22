@@ -13,8 +13,9 @@ import type { RibbonStage } from "./overview-charts";
 const INK = "rgb(255 255 255 / 0.78)";
 const GOLD = "var(--color-accent-400)";
 const DETAIL = "rgb(255 255 255 / 0.32)";
-const PLACES = ["Gate", "Admin block", "Exam hall", "Interview room", "Joining desk"];
-const STOPPED = ["not joined yet", "verified only", "interviewed", "have an offer", "hired"];
+
+/** One-word step names for a phone, where five long labels would wrap to three lines. */
+const SHORT = ["List", "Verified", "Interview", "Offer", "Hired"];
 
 const n = (v: number) => v.toLocaleString("en-IN");
 
@@ -150,69 +151,37 @@ export function BatchCampusWalk({ stages }: { stages: RibbonStage[] }) {
     <div className="mt-8">
       <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
         <div>
-          <p className="text-sm text-on-dark-subtle">Students on the walk</p>
+          <p className="text-sm text-on-dark-subtle">Students in your batch</p>
           <p className="nums mt-1 text-[2.5rem] font-light leading-none tracking-[-0.03em] text-white">{n(total)}</p>
         </div>
         {counts[stuck] > 0 ? (
           <p className="max-w-md text-sm text-white sm:text-right">
-            Most are stuck at the {PLACES[stuck]}: <span className="nums font-medium text-accent-300">{n(counts[stuck])}</span> {STOPPED[stuck]}, no further yet.
+            Most are stuck at {stages[stuck].label}: <span className="nums font-medium text-accent-300">{n(counts[stuck])}</span> students, no further yet.
           </p>
         ) : null}
       </div>
 
-      <figure className="mt-4" role="img" aria-label={`${total} students. ${PLACES.map((p, i) => `${p}: ${reached[i]} reached, ${counts[i]} stopped here`).join("; ")}`}>
+      <figure className="mt-4" role="img" aria-label={`${total} students. ${stages.map((st, i) => `${st.label}: ${reached[i]}, ${counts[i]} stopped there`).join("; ")}`}>
         <Scene counts={counts} stuck={stuck} W={1000} cols={7} className="hidden sm:block" />
         <Scene counts={counts} stuck={stuck} W={520} cols={5} className="sm:hidden" />
       </figure>
 
-      {/* Under each building, everything Findtern knows about that stop. */}
-      <ol className="mt-4 hidden grid-cols-5 gap-3 sm:grid" aria-label="Each stop on the walk">
-        {stages.map((s, i) => {
-          const next = reached[i + 1];
-          return (
-            <li key={s.label} className="min-w-0">
-              <Link href={s.href} className="block h-full rounded-xl bg-white/[0.05] px-3 py-3 text-center outline-none hover:bg-white/[0.09] focus-visible:ring-2 focus-visible:ring-white/70">
-                <span className="block text-[13px] text-on-dark-subtle">{PLACES[i]}</span>
-                <span className="nums mt-1 block text-[1.75rem] font-light leading-none text-white">{n(reached[i])}</span>
-                <span className="mt-1 block text-xs text-on-dark-subtle">{s.label}</span>
-                <span className="mt-3 block space-y-1 text-xs">
-                  <span className={cn("nums block", i === stuck ? "font-medium text-accent-300" : "text-white")}>
-                    {i === 4 ? `${n(counts[i])} made it` : `${n(counts[i])} stopped here`}
-                  </span>
-                  <span className="nums block text-on-dark-subtle">{total ? Math.round((reached[i] / total) * 100) : 0}% of your list</span>
-                  {next !== undefined ? (
-                    <span className="nums block text-on-dark-subtle">
-                      {n(next)} went on · {reached[i] ? Math.round((next / reached[i]) * 100) : 0}%
-                    </span>
-                  ) : null}
-                  {i > 0 ? <span className="block text-on-dark-subtle">{s.hint}</span> : null}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ol>
-      <ol className="mt-4 space-y-2 sm:hidden" aria-label="Each stop on the walk">
-        {stages.map((s, i) => {
-          const next = reached[i + 1];
-          return (
-            <li key={s.label}>
-              <Link href={s.href} className="flex items-start justify-between gap-4 rounded-xl bg-white/[0.05] px-4 py-3 outline-none focus-visible:ring-2 focus-visible:ring-white/70">
-                <span className="min-w-0">
-                  <span className="block text-[13px] text-white">{PLACES[i]}</span>
-                  <span className="block text-xs text-on-dark-subtle">{s.hint}</span>
-                </span>
-                <span className="shrink-0 text-right">
-                  <span className="nums block text-xl font-light leading-none text-white">{n(reached[i])}</span>
-                  <span className={cn("nums mt-1 block text-xs", i === stuck ? "text-accent-300" : "text-on-dark-subtle")}>
-                    {i === 4 ? `${n(counts[i])} made it` : `${n(counts[i])} here`}
-                    {next !== undefined && reached[i] ? ` · ${Math.round((next / reached[i]) * 100)}% on` : ""}
-                  </span>
-                </span>
-              </Link>
-            </li>
-          );
-        })}
+      {/* Under each building: the step, how many reached it, how many stopped there. */}
+      <ol className="mt-4 grid grid-cols-5 gap-1 text-center sm:gap-3" aria-label="Each step">
+        {stages.map((s, i) => (
+          <li key={s.label} className="min-w-0">
+            <Link href={s.href} className="block rounded-xl px-1 py-2 outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/70">
+              <span className="block text-[11px] leading-tight text-on-dark-subtle sm:text-[13px]">
+                <span className="sm:hidden">{SHORT[i]}</span>
+                <span className="hidden sm:inline">{s.label}</span>
+              </span>
+              <span className="nums mt-1 block text-[1.375rem] font-light leading-none text-white sm:text-[1.75rem]">{n(reached[i])}</span>
+              <span className={cn("nums mt-1.5 block text-[11px] sm:text-xs", i === stuck ? "font-medium text-accent-300" : "text-on-dark-subtle")}>
+                {i === 4 ? (counts[i] ? <><span className="hidden sm:inline">with an employer</span><span className="sm:hidden">working</span></> : "none yet") : <>{n(counts[i])}<span className="hidden sm:inline"> stopped here</span><span className="sm:hidden"> here</span></>}
+              </span>
+            </Link>
+          </li>
+        ))}
       </ol>
     </div>
   );
