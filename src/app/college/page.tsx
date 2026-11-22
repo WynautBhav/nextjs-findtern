@@ -4,8 +4,8 @@ import { ArrowRight } from "lucide-react";
 
 import { PresenceLive } from "@/components/college/presence-live";
 import { CopyText } from "@/components/college/copy-text";
-import { aiStatusLabel, yearLabel } from "@/lib/college/labels";
-import { BranchBoard, ScoreCurve, TopOfBatch } from "@/components/college/overview-charts";
+import { aiStatusLabel } from "@/lib/college/labels";
+import { BranchBoard, ScoreCurve, ScoreVsCgpa } from "@/components/college/overview-charts";
 import { CollegeMark } from "@/components/employer/drive-parts";
 import { pendingApprovalCount } from "@/lib/college/approvals";
 import { eligibleStudents, presenceSnapshot, requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
@@ -105,7 +105,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
     { key: "calls", label: "Calls not answered", value: callsWaiting.length, href: "/college/drives", hint: "Employers waiting in a drive", clearHint: "No calls waiting" },
     { key: "meetings", label: "Meetings not answered", value: meetingsWaiting, href: "/college/master-data?status=verified&outcome=meet-waiting", hint: "Yet to pick a meeting time", clearHint: "Every invite is answered" },
     { key: "interview", label: "AI interview not done", value: noInterview, href: "/college/students?show=no_interview", hint: "Employers see them after it", clearHint: "Everyone is interviewed" },
-    { key: "joined", label: "Not joined yet", value: notJoined, href: "/college/roster", hint: "On your list, no account yet", clearHint: coverage.rosterSize ? "Everyone has joined" : "Add your list to track this" },
+    { key: "joined", label: "Not joined yet", value: notJoined, href: "/college/students?show=not_joined", hint: "On your list, no account yet", clearHint: coverage.rosterSize ? "Everyone has joined" : "Add your list to track this" },
     { key: "seats", label: "Seats to pay for", value: unpaidBatches, href: "/college/seats", hint: "The invoice is on Seats", clearHint: "Every batch is paid" },
   ];
 
@@ -119,18 +119,14 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
   ].filter((x) => x.n > 0);
   const listed = Math.max(coverage.rosterSize, students.length);
   const funnel = [
-    { label: coverage.rosterSize ? "On your list" : "Students", value: listed, hint: coverage.rosterSize ? (notJoined ? `${notJoined} not joined yet` : "Everyone has joined") : "Add your list to track who is missing", href: "/college/roster" },
+    { label: coverage.rosterSize ? "On your list" : "Students", value: listed, hint: coverage.rosterSize ? (notJoined ? `${notJoined} not joined yet` : "Everyone has joined") : "Add your list to track who is missing", href: coverage.rosterSize ? "/college/students?show=not_joined" : "/college/approvals#add" },
     { label: "Verified on Findtern", value: students.length, hint: toAccept ? `${toAccept} more waiting for you` : "Visible in your drives", href: "/college/students" },
     { label: "AI interview done", value: interviewed.length, hint: med === null ? "Scores appear after the first interview" : `Median score ${med.toFixed(1)} of 10`, href: "/college/students?show=no_interview" },
     { label: "Got an offer", value: withOffers, hint: waiting.length ? `${waiting.length} still to reply` : "From employers on Findtern", href: "/college/students?show=offers" },
     { label: "Hired", value: hired, hint: hired ? "Working with an employer" : "Hires show here", href: "/college/students?show=hired" },
   ];
 
-  const topStudents = interviewed
-    .filter((s) => s.score !== null)
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
-    .slice(0, 5)
-    .map((s) => ({ userId: s.userId, name: `${s.firstName} ${s.lastName}`.trim() || s.email, meta: [s.year ? yearLabel(s.year) : null, s.branch].filter(Boolean).join(" · "), score: s.score ?? 0 }));
+  const scorePoints = interviewed.flatMap((s) => (s.score !== null && s.cgpa !== null ? [{ userId: s.userId, score: s.score, cgpa: s.cgpa }] : []));
   const byBranch = new Map<string, { students: number; interviewed: number; sum: number; scored: number }>();
   for (const s of students) {
     const b = byBranch.get(s.branch ?? "Branch not set") ?? { students: 0, interviewed: 0, sum: 0, scored: 0 };
@@ -175,7 +171,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
           </div>
           <div className="flex w-full flex-wrap gap-2.5 sm:w-auto">
             <ButtonLink href="/college/drives/new" variant="white">New campus drive link</ButtonLink>
-            <ButtonLink href="/college/roster" variant="outlineLight">Add students</ButtonLink>
+            <ButtonLink href="/college/approvals#add" variant="outlineLight">Add students</ButtonLink>
           </div>
         </div>
         <HeroModes students={<BatchCampusWalk stages={funnel} />} data={overviewModes(master)} initialMode={heroMode} initialDesign={heroDesign} rows={master} collegeId={ctx.college.id} now={now} />
@@ -186,7 +182,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Three steps to your first campus drive</h2>
           <ol className="mt-4 grid gap-5 sm:grid-cols-3">
             {[
-              { n: 1, title: "Add your students", body: "Paste or upload your list: name, phone and email. Students who are already on Findtern show up for you to accept.", href: "/college/roster", cta: "Add student list" },
+              { n: 1, title: "Add your students", body: "Paste or upload your list: name, phone and email. Students who are already on Findtern show up for you to accept.", href: "/college/approvals#add", cta: "Add student list" },
               { n: 2, title: "Students join", body: ctx.college.code ? `New students sign up and enter your college code ${ctx.college.code}. Each takes the AI interview once.` : "New students sign up with the code Findtern gives you. Each takes the AI interview once.", href: "/college/students", cta: "See students" },
               { n: 3, title: "Invite employers", body: "Create a campus drive link and send it to the companies you invite. They see only your verified students.", href: "/college/drives/new", cta: "Create a link" },
             ].map((step) => (
@@ -213,7 +209,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
       ) : null}
 
       {scores.length > 0 ? (
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,1.5fr)_minmax(0,1fr)]">
+        <div className="grid gap-6 lg:grid-cols-2">
           <Surface className="p-5 sm:p-6">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">How your batch scores</h2>
@@ -223,10 +219,10 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
           </Surface>
           <Surface className="p-5 sm:p-6">
             <div className="flex items-baseline justify-between gap-2">
-              <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Top of the batch</h2>
-              <Link href="/college/students" className="text-sm font-medium text-brand-700 hover:underline">All students</Link>
+              <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Findtern score vs CGPA</h2>
+              <p className="text-sm text-text-subtle"><span className="nums">{scorePoints.length}</span> with both</p>
             </div>
-            <TopOfBatch students={topStudents} />
+            {scorePoints.length > 0 ? <ScoreVsCgpa points={scorePoints} /> : <p className="mt-4 text-sm text-text-subtle">Shows once interviewed students have a CGPA on file.</p>}
           </Surface>
         </div>
       ) : null}

@@ -114,6 +114,8 @@ const nextConfig: NextConfig = {
       // first.
       { source: "/auth/google/callback/auth", destination: "/api/admin/google/connect", permanent: false },
       { source: "/google/auth", destination: "/api/admin/google/connect", permanent: false },
+      // The college "Student list" page merged into Students (?show= carries over).
+      { source: "/college/roster", destination: "/college/students", permanent: false },
       // `/opportunities` is deliberately absent: it is a real route now (the
       // public browser), and it keeps the one legacy URL that should survive.
       ...LEGACY_REDIRECTS.map((r) => ({

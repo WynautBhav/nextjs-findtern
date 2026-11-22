@@ -1,4 +1,5 @@
-import { SectionHead } from "@/components/app/primitives";
+import { SectionHead, Surface } from "@/components/app/primitives";
+import { RosterImport } from "@/components/college/roster-import";
 import { CollegeHero, HeroStat, HeroStats } from "@/components/college/kit";
 import { ApprovalsBoard } from "@/components/college/approvals-board";
 import { LeaveRequestsTable } from "@/components/college/leave-requests-table";
@@ -10,7 +11,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Every decision that is the placement officer's: who is one of the college's students (accept, deny, add back)
- * and who may leave. A weak match (phone only, or a list email under a different name) is not offered here: Findtern
+ * and who may leave. Adding students (paste or upload the college's list) lives here too, because whoever on that
+ * list already has a Findtern account lands on this page to accept. A weak match (phone only, or a list email under a different name) is not offered here: Findtern
  * confirms those, and the officer sees how many are with Findtern, never whose account it is.
  */
 export default async function ApprovalsPage() {
@@ -46,6 +48,15 @@ export default async function ApprovalsPage() {
           </p>
         ) : null}
       </div>
+      <section id="add" aria-labelledby="add-heading" className="scroll-mt-24">
+        <SectionHead title="Add students" id="add-heading" />
+        <p className="mb-4 max-w-2xl text-sm text-text-subtle">
+          Paste or upload your list: name, phone and email. Students who already have a Findtern account show up above to accept; the rest are on Students, under Not joined yet.
+        </p>
+        <Surface className="p-5">
+          <RosterImport />
+        </Surface>
+      </section>
       <section id="leave" aria-labelledby="leave-heading" className="scroll-mt-24">
         <SectionHead title="Leave requests" id="leave-heading" />
         <p className="mb-4 max-w-2xl text-sm text-text-subtle">

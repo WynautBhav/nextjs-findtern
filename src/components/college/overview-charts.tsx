@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { avatarTint } from "@/components/app/avatar-helpers";
+import { HIGH_CGPA, STRONG_SCORE, quadrantOf, type Quadrant } from "@/lib/college/insights";
 import { cn } from "@/lib/utils";
 
 /**
@@ -103,30 +103,79 @@ export function BranchBoard({ rows }: { rows: BranchRow[] }) {
   );
 }
 
-export type TopStudent = { userId: string; name: string; meta: string; score: number };
+export type ScorePoint = { userId: string; score: number; cgpa: number };
 
-/** The students an employer will reach first: the highest scores in the batch. */
-export function TopOfBatch({ students }: { students: TopStudent[] }) {
+const QUADS: { id: Quadrant; view: string; name: string; hint: string; dot: string; swatch: string }[] = [
+  { id: "scoreBeatsCg", view: "score-beats-cg", name: "Score beats CGPA", hint: "Interview better than marks", dot: "fill-accent-500", swatch: "bg-accent-500" },
+  { id: "stars", view: "stars", name: "Strong on both", hint: "Ready for any drive", dot: "fill-brand-700", swatch: "bg-brand-700" },
+  { id: "support", view: "support", name: "Needs support", hint: "Low on both", dot: "fill-ink-300", swatch: "bg-ink-300" },
+  { id: "cgBeatsScore", view: "cg-beats-score", name: "CGPA beats score", hint: "Marks better than interview", dot: "fill-ink-500", swatch: "bg-ink-500" },
+];
+
+/** A small, stable nudge so students on the same score and CGPA don't sit on one dot. */
+function jitter(id: string, n: number) {
+  let h = n;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
+  return ((h >>> 0) % 1000) / 1000 - 0.5;
+}
+
+/**
+ * Findtern score against CGPA, one dot per interviewed student, cut at the same lines Master data's ready-made views
+ * use. The four groups under it carry the counts and open those views; the dots themselves are a picture, not links,
+ * so a keyboard user tabs through four groups and not three hundred dots.
+ */
+export function ScoreVsCgpa({ points }: { points: ScorePoint[] }) {
+  const W = 400, H = 240, L = 30, R = 8, T = 8, B = 26;
+  const minCg = Math.max(0, Math.min(5, Math.floor(Math.min(...points.map((p) => p.cgpa)))));
+  const x = (cg: number) => L + ((cg - minCg) / (10 - minCg)) * (W - L - R);
+  const y = (sc: number) => T + (1 - sc / 10) * (H - T - B);
+  const counts = Object.fromEntries(QUADS.map((q) => [q.id, 0])) as Record<Quadrant, number>;
+  for (const p of points) counts[quadrantOf(p)!]++;
+  const xTicks = Array.from({ length: 10 - minCg + 1 }, (_, i) => minCg + i).filter((v) => (10 - minCg > 6 ? v % 2 === 0 : true));
+  const dot = (p: ScorePoint) => QUADS.find((q) => q.id === quadrantOf(p))!.dot;
+
   return (
-    <ol className="mt-2 divide-y divide-ink-100">
-      {students.map((s, i) => (
-        <li key={s.userId} className="relative flex items-center gap-3 py-3">
-          <span className="nums w-4 shrink-0 text-sm font-medium text-text-subtle">{i + 1}</span>
-          <span aria-hidden className={cn("grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold", avatarTint(s.userId))}>
-            {s.name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")}
-          </span>
-          <span className="min-w-0 flex-1">
-            <Link href={`/college/students/${s.userId}`} className="block truncate text-sm font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] hover:text-brand-700 focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-brand-500">
-              {s.name}
+    <div className="mt-4">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label={`Findtern score against CGPA for ${points.length} students. ${QUADS.map((q) => `${q.name}: ${counts[q.id]}`).join(", ")}.`}>
+        {[0, 2, 4, 6, 8, 10].map((v) => (
+          <g key={`y${v}`}>
+            <line x1={L} x2={W - R} y1={y(v)} y2={y(v)} className="stroke-ink-100" />
+            <text x={L - 6} y={y(v) + 3.5} textAnchor="end" className="nums fill-ink-500 text-[10px]">{v}</text>
+          </g>
+        ))}
+        {xTicks.map((v) => (
+          <text key={`x${v}`} x={x(v)} y={H - B + 14} textAnchor="middle" className="nums fill-ink-500 text-[10px]">{v}</text>
+        ))}
+        <text x={W - R} y={H - 2} textAnchor="end" className="fill-ink-600 text-[10px]">CGPA →</text>
+        <text x={L + 2} y={T + 10} className="fill-ink-600 text-[10px]">↑ Findtern score</text>
+        {/* The cut lines of the four groups. */}
+        <line x1={x(HIGH_CGPA)} x2={x(HIGH_CGPA)} y1={T} y2={H - B} className="stroke-ink-400" strokeDasharray="3 3" />
+        <line x1={L} x2={W - R} y1={y(STRONG_SCORE)} y2={y(STRONG_SCORE)} className="stroke-ink-400" strokeDasharray="3 3" />
+        <g aria-hidden>
+          {points.map((p) => (
+            <circle key={p.userId} cx={x(p.cgpa + jitter(p.userId, 7) * 0.08)} cy={y(p.score + jitter(p.userId, 13) * 0.08)} r={3.2} className={cn(dot(p), "opacity-80")} />
+          ))}
+        </g>
+      </svg>
+      <ul className="mt-3 grid grid-cols-2 gap-2">
+        {QUADS.map((q) => (
+          <li key={q.id}>
+            <Link
+              href={`/college/master-data?view=${q.view}`}
+              className="flex h-full items-start gap-2.5 rounded-apple-sm border border-ink-200/80 px-3 py-2.5 transition-colors hover:border-ink-300 hover:bg-ink-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+            >
+              <span aria-hidden className={cn("mt-1.5 size-2.5 shrink-0 rounded-full", q.swatch)} />
+              <span className="min-w-0">
+                <span className="flex items-baseline gap-1.5">
+                  <span className="nums text-base font-semibold text-ink-900">{counts[q.id]}</span>
+                  <span className="truncate text-sm font-medium text-ink-800">{q.name}</span>
+                </span>
+                <span className="block truncate text-xs text-text-subtle">{q.hint}</span>
+              </span>
             </Link>
-            <span className="block truncate text-xs text-text-subtle">{s.meta}</span>
-          </span>
-          <span className="nums shrink-0 text-right">
-            <span className="text-lg font-semibold tracking-[-0.02em] text-ink-900">{s.score.toFixed(1)}</span>
-            <span className="text-xs text-text-subtle"> /10</span>
-          </span>
-        </li>
-      ))}
-    </ol>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

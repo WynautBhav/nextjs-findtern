@@ -110,7 +110,7 @@ export function ApprovalsBoard({ candidates, removed, reviews = [], endpoint = "
             compact
             title="Nobody is waiting"
             body="When a student who already has a Findtern account matches your student list or uses a college email, they appear here for you to accept or deny."
-            next={endpoint.startsWith("/api/college/") ? { label: "Add your student list", href: "/college/roster" } : undefined}
+            next={endpoint.startsWith("/api/college/") ? { label: "Add your student list", href: "#add" } : undefined}
           />
         ) : (
           <>
