@@ -1,7 +1,7 @@
 import { AccountGuard } from "@/components/app/account-guard";
 import type { Metadata } from "next";
 import { cookies } from "next/headers";
-import { LayoutDashboard, ListChecks, Megaphone, Ticket, UserCheck, Users, Wallet } from "lucide-react";
+import { ChartColumn, LayoutDashboard, ListChecks, Megaphone, Table2, Ticket, UserCheck, Users, Wallet } from "lucide-react";
 
 import { ConsoleShell, type ConsoleNavGroup } from "@/components/layout/console-shell";
 import { TermsGate } from "@/components/app/terms-gate";
@@ -23,10 +23,12 @@ const navFor = (waiting: number): ConsoleNavGroup[] => [
     title: "Placement",
     items: [
       { href: "/college", label: "Overview", icon: <LayoutDashboard /> },
+      { href: "/college/insights", label: "Insights", icon: <ChartColumn /> },
       { href: "/college/students", label: "Students", icon: <Users /> },
       { href: "/college/approvals", label: "Approvals", icon: <UserCheck />, ...(waiting > 0 ? { badge: waiting, badgeLabel: "waiting for your decision" } : {}) },
       { href: "/college/roster", label: "Student list", icon: <ListChecks /> },
       { href: "/college/drives", label: "Drives", icon: <Megaphone /> },
+      { href: "/college/master-data", label: "Master data", icon: <Table2 /> },
     ],
   },
   {
@@ -55,7 +57,8 @@ export default async function CollegeLayout({ children }: { children: React.Reac
       roleLabel="College"
       homeHref="/college"
       groups={NAV}
-      tabs={NAV[0].items}
+      // The phone tab bar keeps its five; Insights and Master data open from the menu.
+      tabs={NAV[0].items.filter((i) => i.href !== "/college/insights" && i.href !== "/college/master-data")}
       account={{ name: ctx.college.name, email: ctx.admin.email }}
       help={{ faqHref: "/faq", contactHref: "/contact?type=college", email: SITE.adminEmail }}
       signOutTo="/login?as=college"
