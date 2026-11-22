@@ -6,10 +6,11 @@ import { approvalsFor } from "@/lib/college/approvals";
 import { requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { requirePublicOrigin } from "@/lib/origin";
 import { toStudentRow } from "@/lib/college/serialize";
+import { readinessForMany } from "@/lib/college/student-readiness-db";
 
 export const dynamic = "force-dynamic";
 
-const FILTERS: readonly StudentFilter[] = ["all", "no_interview", "offers", "hired", "offline"];
+const FILTERS: readonly StudentFilter[] = ["all", "no_interview", "offers", "hired", "offline", "hidden"];
 const GROUPS: readonly StudentGroup[] = ["students", "on_findtern", "not_joined"];
 
 /** Request time, for "online"/"x min ago" labels. Dynamic page, so this is per request. */
@@ -27,7 +28,10 @@ export default async function StudentsPage({ searchParams }: { searchParams?: Pr
   const show = (await searchParams)?.show;
   const [all, { candidates }] = await Promise.all([studentsForCollegeAdmin(ctx), approvalsFor(ctx.college.id, ctx.college.emailDomains)]);
   const students = all.filter((s) => s.status === "verified");
-  const coverage = await rosterCoverage(ctx.college.id, new Set(candidates.map((c) => c.email.toLowerCase())));
+  const [coverage, readiness] = await Promise.all([
+    rosterCoverage(ctx.college.id, new Set(candidates.map((c) => c.email.toLowerCase()))),
+    readinessForMany(students.map((s) => s.userId)),
+  ]);
   const origin = requirePublicOrigin();
   const invite = [
     `Hi,`,
@@ -64,7 +68,10 @@ export default async function StudentsPage({ searchParams }: { searchParams?: Pr
         </div>
       </CollegeHero>
       <StudentCards
-        students={students.map(toStudentRow)}
+        students={students.map((s) => {
+          const r = readiness.get(s.userId);
+          return { ...toStudentRow(s), hiddenWhy: r && !r.seen ? r.seenWhy : null, hireWhy: r && !r.hireable ? r.hireWhy : null };
+        })}
         roster={coverage.rows.filter((r) => r.state !== "joined")}
         invite={invite}
         now={requestTime()}

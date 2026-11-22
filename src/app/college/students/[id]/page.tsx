@@ -10,9 +10,7 @@ import { Initials } from "@/components/college/kit";
 import { LinkedinIcon } from "@/components/ui/social-icons";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { cn } from "@/lib/utils";
-import { candidatePoolClauses } from "@/lib/employer-pool";
-import { hireGateDecision } from "@/lib/hire-gate";
-import { hasMarksheet, openStepOf, readinessFrom, type Readiness } from "@/lib/college/student-readiness";
+import { readinessForMany } from "@/lib/college/student-readiness-db";
 import { StudentRemove } from "@/components/college/student-remove";
 import { humanizeStatus } from "@/components/app/status";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
@@ -44,48 +42,6 @@ const AXES = [
   ["aptitude", "Aptitude"],
   ["interview", "Interview"],
 ] as const;
-
-/**
- * Can employers see this student (the employer pool query itself), can they hire them (the hire gate), and is a
- * marksheet on file. Reads the whole onboarding row here, on the server, and returns only the verdicts
- * (student-readiness.ts): no field of it reaches the page.
- */
-async function readinessFor(id: string): Promise<Readiness> {
-  const db = getDb();
-  const [[u], [row], [docs], [pool]] = await Promise.all([
-    db.select({ visibility: schema.users.profileVisibility, isActive: schema.users.isActive, frozenAt: schema.users.frozenAt }).from(schema.users).where(eq(schema.users.id, id)).limit(1),
-    db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).orderBy(desc(schema.internOnboarding.createdAt)).limit(1),
-    db
-      .select({ photo: schema.internDocuments.profilePhotoName, pan: schema.internDocuments.panImageName, aadhaar: schema.internDocuments.aadhaarImageName })
-      .from(schema.internDocuments)
-      .where(eq(schema.internDocuments.userId, id))
-      .orderBy(desc(schema.internDocuments.createdAt))
-      .limit(1),
-    db
-      .select({ id: schema.users.id })
-      .from(schema.users)
-      .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-      .where(and(eq(schema.users.id, id), ...candidatePoolClauses()))
-      .limit(1),
-  ]);
-  const extra = (row?.extraData ?? {}) as Record<string, unknown>;
-  const ratings = (extra.ratings ?? {}) as Record<string, unknown>;
-  const fileDocs = { hasPhoto: Boolean(docs?.photo), hasPanImage: Boolean(docs?.pan), hasAadhaarImage: Boolean(docs?.aadhaar) };
-  const { submitted, openStep } = openStepOf(row, fileDocs);
-  return readinessFrom({
-    inPool: Boolean(pool),
-    profileVisibility: u?.visibility ?? "live",
-    isActive: u?.isActive ?? true,
-    frozen: Boolean(u?.frozenAt),
-    openToWork: extra.openToWork !== false,
-    hiddenByAdmin: extra.hiddenByAdmin === true,
-    interviewed: Number(extra.findternScore) > 0 && Number(ratings.interview) > 0,
-    hireable: hireGateDecision(row, fileDocs).ok,
-    submitted,
-    openStep,
-    marksheet: hasMarksheet(extra),
-  });
-}
 
 /** Request time, for the online dot. Dynamic page, so this is per request. */
 function requestTime(): number {
@@ -155,7 +111,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
       .where(and(eq(schema.collegeAuditLog.subjectUserId, id), eq(schema.collegeAuditLog.collegeId, ctx.college.id), inArray(schema.collegeAuditLog.action, ["view_report", "view_recording"])))
       .orderBy(desc(schema.collegeAuditLog.createdAt))
       .limit(5),
-    verified ? readinessFor(id) : Promise.resolve(null),
+    verified ? readinessForMany([id]).then((m) => m.get(id) ?? null) : Promise.resolve(null),
   ]);
 
   // An ended or revoked drive no longer shows its calls (C12).

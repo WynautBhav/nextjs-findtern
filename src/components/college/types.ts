@@ -21,4 +21,8 @@ export type StudentRow = {
   driveMeetings: number;
   collegeId: string;
   leftAt: null;
+  /** Why employers can't find this student, one line; null when they can (student-readiness.ts). */
+  hiddenWhy?: string | null;
+  /** Why they can't be hired yet; null when they can. */
+  hireWhy?: string | null;
 };
