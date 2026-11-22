@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { computeAnalytics, filterCompanies, filterHires, type AnalyticsInput } from "./analytics.ts";
+import { computeAnalytics, filterCompanies, filterHires, isHire, type AnalyticsInput } from "./analytics.ts";
 
 const d = (s: string) => new Date(s);
 
@@ -230,4 +230,35 @@ test("projects per company uses the range on both sides; with every project insi
   };
   assert.equal(computeAnalytics({ ...base, projects: [proj("a", d("2026-02-03")), proj("b", d("2026-02-04")), proj("c", d("2026-02-05"))] }).rates.projectsPerCompany, 1.5);
   assert.equal(computeAnalytics({ ...base, projects: [proj("a", d("2026-02-03")), proj("b", d("2025-11-04")), proj("c", d("2025-12-05"))] }).rates.projectsPerCompany, 0.5);
+});
+
+test("a hire is a hire date or hired/completed, never a bare accepted offer; a lapsed offer is not pending", () => {
+  assert.equal(isHire({ status: "accepted", hiredAt: null }), false);
+  assert.equal(isHire({ status: "hired", hiredAt: null }), true);
+  assert.equal(isHire({ status: "completed", hiredAt: null }), true);
+  assert.equal(isHire({ status: "accepted", hiredAt: d("2026-02-02") }), true);
+
+  const row = (id: string, internId: string, status: string, startDate: string, hiredAt: Date | null = null) => ({
+    id, employerId: "e1", internId, projectId: "p1", status, currency: "INR" as string | null, offerDetails: { monthlyAmount: 100, duration: "1m", startDate }, createdAt: d("2026-02-01"), hiredAt,
+  });
+  const a = computeAnalytics({
+    since: d("2026-01-01"),
+    until: d("2026-04-01"),
+    interns: [],
+    onboarding: [],
+    employers: [{ id: "e1", companyName: "Acme", createdAt: d("2025-01-02") }],
+    projects: [],
+    proposals: [
+      row("a", "i1", "accepted", "2099-01-01"), // unpaid: not a hire
+      row("b", "i2", "completed", "2026-02-01", d("2026-02-10")),
+      row("c", "i3", "sent", "2099-01-01"), // still open: pending
+      row("d", "i4", "sent", "2000-01-01"), // start day passed: lapsed, not pending
+    ],
+    interviews: [],
+    employerPayments: [],
+    internPayments: [],
+  });
+  assert.equal(a.totals.hires, 1);
+  assert.equal(a.totals.pendingProposals, 1);
+  assert.deepEqual(a.topInterns.map((i) => [i.id, i.status]).sort(), [["i1", "applied"], ["i2", "placed"], ["i3", "applied"], ["i4", "applied"]]);
 });

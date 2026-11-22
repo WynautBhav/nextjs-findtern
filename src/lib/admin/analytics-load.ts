@@ -3,6 +3,7 @@ import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { SETTLED_STATUSES } from "@/lib/refund-accounting";
 import { computeAnalytics, type AnalyticsInput } from "@/lib/admin/analytics";
+import { legacyFeeFlag } from "@/lib/admin/fee-flag";
 import { periodStart } from "@/lib/admin/params";
 import { isMoneyReceived, istDateRange, istMonthKeys, istMonthStart } from "@/lib/admin/revenue";
 import { meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
@@ -137,13 +138,12 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
     interns,
     onboarding: onboarding.map((o) => {
       const extra = (o.extraData ?? {}) as Record<string, unknown>;
-      const payment = (extra.payment ?? {}) as Record<string, unknown>;
       const score = Number(extra.findternScore);
       return {
         userId: o.userId,
         createdAt: o.createdAt,
         meaningful: Boolean(o.meaningful),
-        feePaid: payment.isPaid === true || paidInterns.has(o.userId),
+        feePaid: legacyFeeFlag(o.extraData) || paidInterns.has(o.userId),
         score: Number.isFinite(score) ? score : null,
       };
     }),

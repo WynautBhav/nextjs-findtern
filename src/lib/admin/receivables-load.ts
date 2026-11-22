@@ -4,6 +4,7 @@ import { getDb, schema } from "@/lib/db";
 import { WAIVER_GATEWAY } from "@/lib/full-waiver";
 import { getInternActivationFeeMinor, getPerHireFeeSetting } from "@/lib/platform-settings";
 import { SETTLED_STATUSES } from "@/lib/refund-accounting";
+import { legacyFeeFlag } from "@/lib/admin/fee-flag";
 import { computeReceivables } from "@/lib/admin/receivables";
 import { refundedInrMinorWithin } from "@/lib/admin/refund-window";
 import { inrMinorSql, meaningfulProfile, realEmployerId, realEmployers } from "@/lib/admin/scope";
@@ -96,7 +97,7 @@ export async function loadReceivables(
   for (const o of onboarding) {
     const extra = (o.extraData ?? {}) as Record<string, unknown>;
     scores.set(o.userId, Number(extra.findternScore) || 0);
-    const paid = ((extra.payment ?? {}) as Record<string, unknown>).isPaid === true || paidInterns.has(o.userId);
+    const paid = legacyFeeFlag(o.extraData) || paidInterns.has(o.userId);
     // Legacy listed every unpaid onboarding row; only real profiles here.
     if (!paid && o.meaningful) unpaidProfiles.push({ userId: o.userId, createdAt: o.createdAt });
   }

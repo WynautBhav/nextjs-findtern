@@ -1,4 +1,5 @@
 import { isProfileSubmittedComplete } from "@/lib/admin/profile-state";
+import { legacyFeeFlag } from "@/lib/admin/fee-flag";
 import type { Metadata } from "next";
 import { isAiInterview } from "@/lib/admin/interview-notes";
 import { notFound } from "next/navigation";
@@ -178,8 +179,6 @@ async function load(id: string) {
       : Promise.resolve([]),
   ]);
 
-  const extra = (onboarding?.extraData ?? {}) as Record<string, unknown>;
-  const payment = extra.payment && typeof extra.payment === "object" ? (extra.payment as Record<string, unknown>) : {};
 
   return {
     user,
@@ -192,7 +191,7 @@ async function load(id: string) {
     aiInterviewIds: interviews.filter((i) => isAiInterview(i.employerId, employers.find((e) => e.id === i.employerId)?.email)).map((i) => i.id),
     employerNames: Object.fromEntries(employers.map((e) => [e.id, e.name])),
     projectNames: Object.fromEntries(projects.map((p) => [p.id, p.name])),
-    feePaid: Boolean(paidFee) || payment.isPaid === true,
+    feePaid: Boolean(paidFee) || legacyFeeFlag(onboarding?.extraData),
     // Submitted and every required onboarding field filled: the same rule as the candidates list (lib/admin/profile-state).
     profileComplete: isProfileSubmittedComplete(onboarding, {
       hasPhoto: Boolean(documents?.profilePhotoName),

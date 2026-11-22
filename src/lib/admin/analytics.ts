@@ -3,6 +3,8 @@ import { parseOffer } from "../offer.ts";
 import { toInrMinor } from "./money.ts";
 import { revenueMinorOf } from "./revenue.ts";
 import { shortDateTime } from "../format.ts";
+import { isHiredProposal } from "../hire-status.ts";
+import { effectiveProposalStatus } from "../proposal-expiry.ts";
 
 /**
  * Hiring analytics (legacy `GET /api/admin/reports/analytics`,
@@ -49,7 +51,11 @@ export type AnalyticsInput = {
 
 const pct = (n: number, d: number) => (d > 0 ? Number(((n / d) * 100).toFixed(1)) : 0);
 const ratio = (n: number, d: number) => (d > 0 ? Number((n / d).toFixed(1)) : 0);
-const HIRED = new Set(["accepted", "hired"]);
+/**
+ * A hire is a hire date or status hired/completed (college master-data, lib/hire-status), never a bare `accepted`: an accepted
+ * offer is unpaid, the employer still sees the intern masked, and it can expire unpaid.
+ */
+export const isHire = (p: { status: string; hiredAt?: Date | string | null }) => isHiredProposal(p) || p.status.trim().toLowerCase() === "completed";
 
 export function computeAnalytics(input: AnalyticsInput) {
   const { since, until } = input;
@@ -67,14 +73,14 @@ export function computeAnalytics(input: AnalyticsInput) {
   const interviewsIn = input.interviews.filter((i) => inRange(i.createdAt));
   const employersIn = input.employers.filter((e) => inRange(e.createdAt));
   const projectsIn = input.projects.filter((p) => inRange(p.createdAt));
-  const hiresIn = proposals.filter((p) => p.status === "hired" && inRange(p.hiredAt));
+  const hiresIn = proposals.filter((p) => isHire(p) && inRange(p.hiredAt));
   const isFullTime = (p: { offerDetails: unknown; currency: string | null }) => Boolean(parseOffer(p.offerDetails, p.currency).fullTime);
 
   const signups = onboardingIn.length;
   const activeUsers = onboardingIn.filter((o) => o.meaningful).length;
   const applied = new Set(proposalsIn.map((p) => p.internId));
   const interviewed = new Set(interviewsIn.map((i) => i.internId));
-  const placed = new Set(proposalsIn.filter((p) => HIRED.has(p.status)).map((p) => p.internId));
+  const placed = new Set(proposalsIn.filter(isHire).map((p) => p.internId));
   const companies = employersIn.length;
   const fullTimeProposals = proposalsIn.filter(isFullTime).length;
 
@@ -124,7 +130,7 @@ export function computeAnalytics(input: AnalyticsInput) {
     proposals: proposalsIn.length,
     internshipProposals: proposalsIn.length - fullTimeProposals,
     fullTimeProposals,
-    pendingProposals: proposalsIn.filter((p) => ["sent", "draft", "interview_scheduled", "under_review"].includes(p.status)).length,
+    pendingProposals: proposalsIn.filter((p) => ["sent", "draft", "interview_scheduled", "under_review"].includes(effectiveProposalStatus(p))).length,
     hires: hiresIn.length,
     fullTimeHires: hiresIn.filter(isFullTime).length,
     revenueMinor: revenueEmployersMinor + revenueInternsMinor + revenueCollegesMinor,
@@ -162,7 +168,7 @@ export function computeAnalytics(input: AnalyticsInput) {
     stage("Fee paid", onboardingIn.filter((o) => o.feePaid).length),
     stage("AI interview scored", onboardingIn.filter((o) => (o.score ?? 0) > 0).length),
     stage("Received an offer", onboardingIn.filter((o) => applied.has(o.userId)).length),
-    stage("Hired", onboardingIn.filter((o) => proposals.some((p) => p.internId === o.userId && p.status === "hired")).length),
+    stage("Hired", onboardingIn.filter((o) => proposals.some((p) => p.internId === o.userId && isHire(p))).length),
   ];
 
   // Monthly trend over the range (or the last 6 months when open-ended).
@@ -180,7 +186,7 @@ export function computeAnalytics(input: AnalyticsInput) {
     const props = proposals.filter((p) => within(p.createdAt));
     const app = new Set(props.map((p) => p.internId));
     const intv = new Set(input.interviews.filter((i) => within(i.createdAt)).map((i) => i.internId));
-    const hires = proposals.filter((p) => p.status === "hired" && within(p.hiredAt)).length;
+    const hires = proposals.filter((p) => isHire(p) && within(p.hiredAt)).length;
     trend.push({
       month: shortDateTime(m, { month: "short", year: "2-digit", timeZone: "UTC" }),
       proposals: props.length,
@@ -248,7 +254,7 @@ export function computeAnalytics(input: AnalyticsInput) {
   for (const p of proposals) {
     const cur = byIntern.get(p.internId) ?? { applications: 0, offers: 0 };
     cur.applications++;
-    if (HIRED.has(p.status)) cur.offers++;
+    if (isHire(p)) cur.offers++;
     byIntern.set(p.internId, cur);
   }
   const topInterns = [...byIntern.entries()]

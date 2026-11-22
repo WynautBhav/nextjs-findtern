@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, or } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { recordAdminAudit } from "@/lib/admin/audit";
@@ -53,7 +53,8 @@ export async function GET(req: Request) {
     .leftJoin(schema.users, eq(schema.users.id, schema.proposals.internId))
     .leftJoin(schema.employers, eq(schema.employers.id, schema.proposals.employerId))
     .leftJoin(schema.projects, eq(schema.projects.id, schema.proposals.projectId))
-    .where(and(eq(schema.proposals.status, "hired"), realEmployerId(schema.proposals.employerId)))
+    // Same hire rule as the analytics and the college views (lib/hire-status + completed): status hired/completed, or a hire date.
+    .where(and(or(inArray(schema.proposals.status, ["hired", "completed"]), isNotNull(schema.proposals.hiredAt)), realEmployerId(schema.proposals.employerId)))
     .orderBy(desc(schema.proposals.hiredAt), desc(schema.proposals.createdAt))
     .limit(10_000);
 
