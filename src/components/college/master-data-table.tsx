@@ -9,6 +9,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { csrfFetch } from "@/lib/client-fetch";
 import { ago } from "@/lib/college/labels";
 import { HIGH_CGPA, STRONG_SCORE, quadrantOf, type Quadrant } from "@/lib/college/insights";
+import { COFFEE, MARKS, coffeeOf, marksOf, type CoffeeKey, type MarksKey } from "@/lib/college/overview-modes";
 import { MASTER_COLUMNS, cellText, matchesWorkMode, type ColumnGroup, type MasterColumn, type MasterRow } from "@/lib/college/master-row";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { cn } from "@/lib/utils";
@@ -31,11 +32,15 @@ type Filters = {
   minScore: string;
   minCgpa: string;
   quadrant: Quadrant | "";
+  /** Findtern band: "done" is any band (AI interview done), "none" is not interviewed yet. */
+  band: CoffeeKey | "done" | "none" | "";
+  /** CGPA / % band (marks out of 10). */
+  marks: MarksKey | "";
 };
 type SortState = { key: Key; dir: "asc" | "desc" };
 type View = { id: string; name: string; columns: Key[]; filters: Filters; sort: SortState; own?: boolean };
 
-const NO_FILTERS: Filters = { course: "", year: "", mode: "", laptop: "any", placement: "any", status: "any", minScore: "", minCgpa: "", quadrant: "" };
+const NO_FILTERS: Filters = { course: "", year: "", mode: "", laptop: "any", placement: "any", status: "any", minScore: "", minCgpa: "", quadrant: "", band: "", marks: "" };
 const BASE: Key[] = ["name", "degree", "branch", "year", "cgpa", "score", "offers", "hired", "ppo", "lastSeenAt"];
 const SCORES: Key[] = ["name", "degree", "branch", "cgpa", "english", "coding", "aptitude", "aiInterview", "score", "offers"];
 
@@ -84,6 +89,10 @@ function matches(r: MasterRow, f: Filters, q: string): boolean {
   if (f.minScore && (r.score === null || r.score < Number(f.minScore))) return false;
   if (f.minCgpa && (r.cgpa === null || r.cgpa < Number(f.minCgpa))) return false;
   if (f.quadrant && quadrantOf(r) !== f.quadrant) return false;
+  if (f.band === "done" && r.score === null) return false;
+  if (f.band === "none" && r.score !== null) return false;
+  if (f.band && f.band !== "done" && f.band !== "none" && (r.score === null || coffeeOf(r.score) !== f.band)) return false;
+  if (f.marks && (r.marks10 === null || marksOf(r.marks10) !== f.marks)) return false;
   if (q) {
     const hay = [r.name, r.email, r.branch, r.degree, r.city, ...r.skills, ...r.preferredLocations].join(" ").toLowerCase();
     if (!q.split(/\s+/).every((w) => hay.includes(w))) return false;
@@ -187,11 +196,21 @@ function MinimumPicker({ label, any, presets, value, onChange, className }: { la
   );
 }
 
-export function MasterDataTable({ rows, collegeId, now, initial }: { rows: MasterRow[]; collegeId: string; now: number; initial: { view?: string; course?: string; mode?: string } }) {
+export function MasterDataTable({ rows, collegeId, now, initial }: { rows: MasterRow[]; collegeId: string; now: number; initial: { view?: string; course?: string; mode?: string; year?: string; band?: string; marks?: string; status?: string } }) {
   const start = PRESETS.find((p) => p.id === initial.view) ?? PRESETS[0];
   const [viewId, setViewId] = useState(start.id);
   const [columns, setColumns] = useState<Key[]>(start.columns);
-  const [filters, setFilters] = useState<Filters>({ ...start.filters, ...(initial.course ? { course: initial.course } : {}), ...(initial.mode ? { mode: initial.mode } : {}) });
+  // Filters can arrive in the link (from the Overview and Insights): only known values are taken.
+  const [filters, setFilters] = useState<Filters>(() => {
+    const f: Filters = { ...start.filters };
+    if (initial.course) f.course = initial.course;
+    if (initial.mode && MODES.some(([v]) => v === initial.mode)) f.mode = initial.mode;
+    if (initial.year && /^\d{1,2}$/.test(initial.year)) f.year = initial.year;
+    if (initial.band === "done" || initial.band === "none" || COFFEE.some((c) => c.key === initial.band)) f.band = initial.band as Filters["band"];
+    if (MARKS.some((m) => m.key === initial.marks)) f.marks = initial.marks as MarksKey;
+    if (initial.status === "verified" || initial.status === "unverified") f.status = initial.status;
+    return f;
+  });
   const [sort, setSort] = useState<SortState>(start.sort);
   const [q, setQ] = useState("");
   const [limit, setLimit] = useState(PAGE);
@@ -388,6 +407,16 @@ export function MasterDataTable({ rows, collegeId, now, initial }: { rows: Maste
             <option value="none">No offer yet</option>
             <option value="hired">Hired</option>
             <option value="ppo">PPO offer</option>
+          </select>
+          <select aria-label="Findtern band" value={filters.band} onChange={(e) => set("band", e.target.value as Filters["band"])} className={select}>
+            <option value="">Findtern band</option>
+            <option value="done">AI interview done</option>
+            <option value="none">Not interviewed yet</option>
+            {COFFEE.map((c) => <option key={c.key} value={c.key}>{c.name} ({c.range})</option>)}
+          </select>
+          <select aria-label="CGPA / % band" value={filters.marks} onChange={(e) => set("marks", e.target.value as Filters["marks"])} className={select}>
+            <option value="">CGPA / % band</option>
+            {MARKS.map((m) => <option key={m.key} value={m.key}>{m.name} ({m.range})</option>)}
           </select>
           <select aria-label="Work mode preference" value={filters.mode} onChange={(e) => set("mode", e.target.value)} className={select}>
             <option value="">Work mode preference</option>

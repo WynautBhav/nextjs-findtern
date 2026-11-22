@@ -14,7 +14,7 @@ export const COFFEE: { key: CoffeeKey; name: string; range: string }[] = [
   { key: "cappuccino", name: PLAN_NAME.skilled, range: "6 to 8" },
   { key: "latte", name: PLAN_NAME.assured, range: "8 and up" },
 ];
-const coffeeOf = (score: number): CoffeeKey => ({ standard: "espresso", skilled: "cappuccino", assured: "latte" } as const)[bandFor(score).id];
+export const coffeeOf = (score: number): CoffeeKey => ({ standard: "espresso", skilled: "cappuccino", assured: "latte" } as const)[bandFor(score).id];
 
 /** Academic bands on CGPA (or percentage / 10). Named so they never read as the coffee bands. Rename here only. */
 export type MarksKey = "foundation" | "rising" | "strong" | "top";
