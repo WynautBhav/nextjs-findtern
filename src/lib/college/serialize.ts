@@ -29,6 +29,28 @@ export function toStudentRow(s: CollegeStudent): StudentRow {
   };
 }
 
+type Progress = {
+  status: "claimed" | "verified";
+  cgpa: number | null;
+  score: number | null;
+  aiStatus: string;
+  offersPending: number;
+  proposals: number;
+  interviewsScheduled: number;
+  driveMeetings: number;
+  lastActivityAt: Date | null;
+};
+
+/**
+ * Anyone can claim a college at sign-up, so a claimed student's progress (score, CGPA, AI interview,
+ * offers, meetings, activity) stays hidden from that college until the officer verifies them.
+ * Name, email, year and branch stay so the officer can decide.
+ */
+export function redactUnverified<T extends Progress>(s: T): T {
+  if (s.status === "verified") return s;
+  return { ...s, cgpa: null, score: null, aiStatus: "not_applied", offersPending: 0, proposals: 0, interviewsScheduled: 0, driveMeetings: 0, lastActivityAt: null };
+}
+
 /** AI report and recording: verified students only (WP8 / C9). */
 export const canOpenArtifacts = (status: string) => status === "verified";
 

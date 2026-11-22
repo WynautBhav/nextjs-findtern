@@ -12,7 +12,7 @@ const {
   membershipFor,
   driveWindow,
 } = await import("../college/access.ts");
-const { tpoProfile, canOpenArtifacts, driveDataOpen } = await import("../college/serialize.ts");
+const { tpoProfile, canOpenArtifacts, driveDataOpen, redactUnverified } = await import("../college/serialize.ts");
 const { generateDriveToken, hashDriveToken } = await import("../college/tokens.ts");
 const { createSession, readSession } = await import("./session.ts");
 const { canAccess } = await import("./guards.ts");
@@ -345,4 +345,25 @@ test("WP8: an ended or revoked drive hides its student data; upcoming and live k
   assert.equal(driveDataOpen(driveX, NOW - 2 * HOUR), true);
   assert.equal(driveDataOpen(driveX, NOW + 25 * HOUR), false);
   assert.equal(driveDataOpen({ ...driveX, revokedAt: new Date(NOW - 1000) }, NOW), false);
+});
+
+test("a claimed (unverified) student shows no score, CGPA, interview or offer progress to the officer", () => {
+  const base = {
+    userId: "u1", collegeId: "c1", leftAt: null, year: 3, branch: "CSE", cgpa: 8.4, score: 7.9,
+    aiStatus: "completed", offersPending: 1, proposals: 2, interviewsScheduled: 1, driveMeetings: 1,
+    lastActivityAt: new Date(NOW),
+  };
+  const claimed = redactUnverified({ ...base, status: "claimed" as const });
+  assert.equal(claimed.score, null);
+  assert.equal(claimed.cgpa, null);
+  assert.equal(claimed.aiStatus, "not_applied");
+  assert.equal(claimed.offersPending, 0);
+  assert.equal(claimed.proposals, 0);
+  assert.equal(claimed.interviewsScheduled, 0);
+  assert.equal(claimed.driveMeetings, 0);
+  assert.equal(claimed.lastActivityAt, null);
+  assert.equal(claimed.branch, "CSE", "roster facts stay");
+
+  const verified = redactUnverified({ ...base, status: "verified" as const });
+  assert.deepEqual(verified, { ...base, status: "verified" });
 });

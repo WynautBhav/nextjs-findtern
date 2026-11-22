@@ -20,6 +20,7 @@ import {
  */
 
 import { ONLINE_WINDOW_MS } from "./constants";
+import { redactUnverified } from "./serialize";
 export { HEARTBEAT_MS, ONLINE_WINDOW_MS } from "./constants";
 
 export type CollegeContext = {
@@ -161,7 +162,7 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
 /** Students a placement officer may see: everyone who joined their college. */
 export async function studentsForCollegeAdmin(ctx: CollegeContext): Promise<CollegeStudent[]> {
   const rows = await loadMembers(ctx.college.id);
-  return rows.filter((s) => canCollegeAdminSee(ctx.session, ctx.college.id, s));
+  return rows.filter((s) => canCollegeAdminSee(ctx.session, ctx.college.id, s)).map(redactUnverified);
 }
 
 /** One student, or null when outside this officer's scope. */

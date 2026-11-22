@@ -51,6 +51,8 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
     .where(and(eq(schema.collegeRoster.collegeId, ctx.college.id), eq(schema.collegeRoster.email, student.email.trim().toLowerCase())))
     .limit(1);
   const onRoster = Boolean(onRosterRow);
+  // A claimed student's offers, interviews and drive calls stay hidden until the officer verifies them.
+  const verified = student.status === "verified";
   const [[onboarding], [user], proposals, interviews, allCalls, views] = await Promise.all([
     // Allowlist: no Aadhaar, PAN, PIN, bank or emergency contact ever reaches this render (P-4). Columns are picked one by one,
     // and extra_data keeps only the keys draftFromRecord, the ratings and aiInterviewLinks read.
@@ -67,22 +69,28 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
       .where(eq(schema.internOnboarding.userId, id))
       .limit(1),
     db.select({ phone: schema.users.phoneNumber, cc: schema.users.countryCode }).from(schema.users).where(eq(schema.users.id, id)).limit(1),
-    db
-      .select({ p: schema.proposals })
-      .from(schema.proposals)
-      .where(and(eq(schema.proposals.internId, id), realEmployerId(schema.proposals.employerId)))
-      .orderBy(desc(schema.proposals.createdAt)),
-    db
-      .select({ i: schema.interviews })
-      .from(schema.interviews)
-      .where(and(eq(schema.interviews.internId, id), realEmployerId(schema.interviews.employerId), inArray(schema.interviews.status, ["scheduled", "completed", "pending", "expired"])))
-      .orderBy(desc(schema.interviews.createdAt)),
-    db
-      .select({ m: schema.collegeDriveMeetings, drive: schema.collegeDrives.title, d: schema.collegeDrives })
-      .from(schema.collegeDriveMeetings)
-      .innerJoin(schema.collegeDrives, eq(schema.collegeDrives.id, schema.collegeDriveMeetings.driveId))
-      .where(and(eq(schema.collegeDriveMeetings.userId, id), eq(schema.collegeDrives.collegeId, ctx.college.id)))
-      .orderBy(desc(schema.collegeDriveMeetings.createdAt)),
+    !verified
+      ? Promise.resolve([])
+      : db
+        .select({ p: schema.proposals })
+        .from(schema.proposals)
+        .where(and(eq(schema.proposals.internId, id), realEmployerId(schema.proposals.employerId)))
+        .orderBy(desc(schema.proposals.createdAt)),
+    !verified
+      ? Promise.resolve([])
+      : db
+        .select({ i: schema.interviews })
+        .from(schema.interviews)
+        .where(and(eq(schema.interviews.internId, id), realEmployerId(schema.interviews.employerId), inArray(schema.interviews.status, ["scheduled", "completed", "pending", "expired"])))
+        .orderBy(desc(schema.interviews.createdAt)),
+    !verified
+      ? Promise.resolve([])
+      : db
+        .select({ m: schema.collegeDriveMeetings, drive: schema.collegeDrives.title, d: schema.collegeDrives })
+        .from(schema.collegeDriveMeetings)
+        .innerJoin(schema.collegeDrives, eq(schema.collegeDrives.id, schema.collegeDriveMeetings.driveId))
+        .where(and(eq(schema.collegeDriveMeetings.userId, id), eq(schema.collegeDrives.collegeId, ctx.college.id)))
+        .orderBy(desc(schema.collegeDriveMeetings.createdAt)),
     db
       .select({ action: schema.collegeAuditLog.action, at: schema.collegeAuditLog.createdAt, who: schema.collegeAdmins.name })
       .from(schema.collegeAuditLog)
