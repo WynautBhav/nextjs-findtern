@@ -350,7 +350,7 @@ test("WP8: an ended or revoked drive hides its student data; upcoming and live k
 test("a claimed (unverified) student shows no score, CGPA, interview or offer progress to the officer", () => {
   const base = {
     userId: "u1", collegeId: "c1", leftAt: null, year: 3, branch: "CSE", cgpa: 8.4, score: 7.9,
-    aiStatus: "completed", offersPending: 1, proposals: 2, interviewsScheduled: 1, driveMeetings: 1,
+    aiStatus: "completed", offersPending: 1, proposals: 2, hired: 1, offersNew: 1, hiredNew: 1, callsPending: 1, interviewsScheduled: 1, driveMeetings: 1,
     lastActivityAt: new Date(NOW),
   };
   const claimed = redactUnverified({ ...base, status: "claimed" as const });
@@ -359,6 +359,10 @@ test("a claimed (unverified) student shows no score, CGPA, interview or offer pr
   assert.equal(claimed.aiStatus, "not_applied");
   assert.equal(claimed.offersPending, 0);
   assert.equal(claimed.proposals, 0);
+  assert.equal(claimed.hired, 0);
+  assert.equal(claimed.offersNew, 0);
+  assert.equal(claimed.hiredNew, 0);
+  assert.equal(claimed.callsPending, 0);
   assert.equal(claimed.interviewsScheduled, 0);
   assert.equal(claimed.driveMeetings, 0);
   assert.equal(claimed.lastActivityAt, null);

@@ -61,6 +61,13 @@ export type CollegeStudent = StudentFacts & {
   aiStatus: string;
   offersPending: number;
   proposals: number;
+  /** Offers that became a hire. */
+  hired: number;
+  /** Offers sent and hires made in the last 24 hours. */
+  offersNew: number;
+  hiredNew: number;
+  /** Drive calls an employer asked for that the student has not answered, in drives still open. */
+  callsPending: number;
   interviewsScheduled: number;
   driveMeetings: number;
   lastActivityAt: Date | null;
@@ -118,6 +125,12 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
       (p.last_seen_at AT TIME ZONE 'UTC') AS last_seen_at,
       (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND ${realEmployerId(sql`pr.employer_id`)}) AS proposals,
       (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND pr.status = 'sent' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_pending,
+      (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND pr.status = 'hired' AND ${realEmployerId(sql`pr.employer_id`)}) AS hired,
+      (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND pr.created_at > (now() AT TIME ZONE 'UTC') - interval '24 hours' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_new,
+      (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND pr.status = 'hired' AND pr.hired_at > (now() AT TIME ZONE 'UTC') - interval '24 hours' AND ${realEmployerId(sql`pr.employer_id`)}) AS hired_new,
+      (SELECT count(*) FROM ${schema.collegeDriveMeetings} dm JOIN ${schema.collegeDrives} dr ON dr.id = dm.drive_id
+        WHERE dm.user_id = ${m.userId} AND dm.status = 'requested' AND dr.ends_at > (now() AT TIME ZONE 'UTC')
+          AND (dr.revoked_at IS NULL OR dr.revoked_at > (now() AT TIME ZONE 'UTC'))) AS calls_pending,
       (SELECT count(*) FROM ${schema.interviews} iv WHERE iv.intern_id = ${m.userId} AND iv.status = 'scheduled' AND ${realEmployerId(sql`iv.employer_id`)}) AS interviews_scheduled,
       (SELECT count(*) FROM ${schema.collegeDriveMeetings} dm JOIN ${schema.collegeDrives} dr ON dr.id = dm.drive_id
         WHERE dm.user_id = ${m.userId} AND dr.ends_at > (now() AT TIME ZONE 'UTC')
@@ -153,6 +166,10 @@ async function loadMembers(collegeId: string): Promise<CollegeStudent[]> {
     lastSeenAt: date(r.last_seen_at),
     proposals: Number(r.proposals ?? 0),
     offersPending: Number(r.offers_pending ?? 0),
+    hired: Number(r.hired ?? 0),
+    offersNew: Number(r.offers_new ?? 0),
+    hiredNew: Number(r.hired_new ?? 0),
+    callsPending: Number(r.calls_pending ?? 0),
     interviewsScheduled: Number(r.interviews_scheduled ?? 0),
     driveMeetings: Number(r.drive_meetings ?? 0),
     lastActivityAt: date(r.last_activity_at),

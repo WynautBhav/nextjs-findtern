@@ -15,6 +15,7 @@ export type StudentRow = {
   lastSeenAt: string | null;
   lastActivityAt: string | null;
   offersPending: number;
+  hired: number;
   proposals: number;
   interviewsScheduled: number;
   driveMeetings: number;

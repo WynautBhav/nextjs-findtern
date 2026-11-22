@@ -21,6 +21,7 @@ export function toStudentRow(s: CollegeStudent): StudentRow {
     lastSeenAt: s.lastSeenAt?.toISOString() ?? null,
     lastActivityAt: s.lastActivityAt?.toISOString() ?? null,
     offersPending: s.offersPending,
+    hired: s.hired,
     proposals: s.proposals,
     interviewsScheduled: s.interviewsScheduled,
     driveMeetings: s.driveMeetings,
@@ -36,6 +37,10 @@ type Progress = {
   aiStatus: string;
   offersPending: number;
   proposals: number;
+  hired: number;
+  offersNew: number;
+  hiredNew: number;
+  callsPending: number;
   interviewsScheduled: number;
   driveMeetings: number;
   lastActivityAt: Date | null;
@@ -48,7 +53,7 @@ type Progress = {
  */
 export function redactUnverified<T extends Progress>(s: T): T {
   if (s.status === "verified") return s;
-  return { ...s, cgpa: null, score: null, aiStatus: "not_applied", offersPending: 0, proposals: 0, interviewsScheduled: 0, driveMeetings: 0, lastActivityAt: null };
+  return { ...s, cgpa: null, score: null, aiStatus: "not_applied", offersPending: 0, proposals: 0, hired: 0, offersNew: 0, hiredNew: 0, callsPending: 0, interviewsScheduled: 0, driveMeetings: 0, lastActivityAt: null };
 }
 
 /** AI report and recording: verified students only (WP8 / C9). */

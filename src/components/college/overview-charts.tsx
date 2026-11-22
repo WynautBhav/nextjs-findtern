@@ -31,7 +31,7 @@ export function BatchRibbon({ stages }: { stages: RibbonStage[] }) {
   }
   return (
     <div className="mt-8">
-      <ol className="grid grid-cols-2 gap-x-6 gap-y-6 lg:grid-cols-4" aria-label="Your batch, step by step">
+      <ol className={`grid grid-cols-2 gap-x-6 gap-y-6 ${stages.length === 5 ? "sm:grid-cols-3 lg:grid-cols-5" : "lg:grid-cols-4"}`} aria-label="Your batch, step by step">
         {stages.map((s, i) => {
           const share = top ? Math.round((s.value / top) * 100) : 0;
           return (

@@ -21,6 +21,11 @@ import { DriveDashboard } from "./drive-dashboard";
 
 export const dynamic = "force-dynamic";
 
+/** Request time, for the "last 24 hours" line. Dynamic page, so this is per request. */
+function requestTime(): number {
+  return Date.now();
+}
+
 function median(xs: number[]): number | null {
   if (!xs.length) return null;
   const s = [...xs].sort((a, b) => a - b);
@@ -36,7 +41,7 @@ function median(xs: number[]): number | null {
 export default async function CollegeOverview() {
   const ctx = await requireCollegeContext();
 
-  const [all, coverage, [liveDrive], [seat], paid, hasDriveOrder, pendingLeaves, toAccept] = await Promise.all([
+  const [all, coverage, [liveDrive], [seat], paid, hasDriveOrder, pendingLeaves, toAccept, [unpaid]] = await Promise.all([
     studentsForCollegeAdmin(ctx),
     rosterCoverage(ctx.college.id),
     getDb()
@@ -62,6 +67,10 @@ export default async function CollegeOverview() {
     collegeHasDriveOrder(ctx.college.id),
     pendingLeaveCount(ctx.college.id),
     pendingApprovalCount(ctx.college.id, ctx.college.emailDomains),
+    getDb()
+      .select({ n: sql<number>`count(*)::int` })
+      .from(schema.collegeSeatBatches)
+      .where(and(eq(schema.collegeSeatBatches.collegeId, ctx.college.id), eq(schema.collegeSeatBatches.status, "pending"))),
   ]);
 
   const students = all.filter((s) => s.status === "verified");
@@ -74,6 +83,8 @@ export default async function CollegeOverview() {
   const med = median(scores);
   const waiting = students.filter((s) => s.offersPending > 0);
   const notJoined = coverage.rows.filter((r) => r.state === "not_joined").length;
+  const callsWaiting = students.filter((s) => s.callsPending > 0);
+  const unpaidBatches = unpaid?.n ?? 0;
 
   const decisions = [
     toAccept > 0
@@ -85,15 +96,29 @@ export default async function CollegeOverview() {
     waiting.length > 0
       ? { href: "/college/students?show=offers", count: waiting.length, title: `${waiting.length === 1 ? "student is" : "students are"} sitting on an offer`, body: "A reminder from you usually gets a reply the same day." }
       : null,
+    callsWaiting.length > 0
+      ? { href: "/college/drives", count: callsWaiting.length, title: `${callsWaiting.length === 1 ? "student has" : "students have"} not answered an employer's call`, body: "The drive is still open. Ask them to accept or decline." }
+      : null,
+    unpaidBatches > 0
+      ? { href: "/college/seats", count: unpaidBatches, title: `seat ${unpaidBatches === 1 ? "batch is" : "batches are"} waiting for payment`, body: "Bank details and the invoice are on the Seats page." }
+      : null,
   ].filter((d): d is NonNullable<typeof d> => d !== null);
 
   const withOffers = students.filter((s) => s.proposals > 0).length;
+  const hired = students.filter((s) => s.hired > 0).length;
+  const now = requestTime();
+  const today = [
+    { n: students.filter((s) => now - s.joinedAt.getTime() < 86_400_000).length, one: "student joined", many: "students joined" },
+    { n: students.reduce((t, s) => t + s.offersNew, 0), one: "new offer", many: "new offers" },
+    { n: students.reduce((t, s) => t + s.hiredNew, 0), one: "hire", many: "hires" },
+  ].filter((x) => x.n > 0);
   const listed = Math.max(coverage.rosterSize, students.length);
   const funnel = [
     { label: coverage.rosterSize ? "On your list" : "Students", value: listed, hint: coverage.rosterSize ? (notJoined ? `${notJoined} not joined yet` : "Everyone has joined") : "Add your list to track who is missing", href: "/college/roster" },
     { label: "Verified on Findtern", value: students.length, hint: toAccept ? `${toAccept} more waiting for you` : "Visible in your drives", href: "/college/students" },
     { label: "AI interview done", value: interviewed.length, hint: med === null ? "Scores appear after the first interview" : `Median score ${med.toFixed(1)} of 10`, href: "/college/students?show=no_interview" },
     { label: "Got an offer", value: withOffers, hint: waiting.length ? `${waiting.length} still to reply` : "From employers on Findtern", href: "/college/students?show=offers" },
+    { label: "Hired", value: hired, hint: hired ? "Working with an employer" : "Hires show here", href: "/college/students?show=hired" },
   ];
 
   const topStudents = interviewed
@@ -128,6 +153,19 @@ export default async function CollegeOverview() {
             <div className="min-w-0">
               <h1 className="text-balance text-[clamp(1.75rem,3.4vw,2.5rem)] font-light leading-tight tracking-[-0.03em]">{ctx.college.name}</h1>
               <p className="mt-1 text-sm text-on-dark-subtle">Placement office{ctx.college.city ? `, ${ctx.college.city}` : ""}</p>
+              {!firstRun ? (
+                <p className="nums mt-2 text-sm text-on-dark">
+                  <span className="text-on-dark-subtle">Last 24 hours: </span>
+                  {today.length
+                    ? today.map((x, i) => (
+                        <span key={x.one} className="whitespace-nowrap">
+                          {i > 0 ? " · " : ""}
+                          {x.n} {x.n === 1 ? x.one : x.many}
+                        </span>
+                      ))
+                    : "no new joins, offers or hires"}
+                </p>
+              ) : null}
             </div>
           </div>
           <div className="flex w-full flex-wrap gap-2.5 sm:w-auto">
