@@ -2000,6 +2000,12 @@ html {
     from { clip-path: inset(0 100% 0 0); }
     to { clip-path: inset(0 0 0 0); }
   }
+  .ring-draw {
+    animation: ring-draw 1100ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes ring-draw {
+    from { stroke-dasharray: 0 10000; }
+  }
   .bar-rise {
     animation: bar-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }

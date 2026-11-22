@@ -5,7 +5,7 @@ import { ArrowRight } from "lucide-react";
 import { PresenceLive } from "@/components/college/presence-live";
 import { CopyText } from "@/components/college/copy-text";
 import { aiStatusLabel, yearLabel } from "@/lib/college/labels";
-import { BatchRibbon, BranchBoard, ScoreCurve, TopOfBatch } from "@/components/college/overview-charts";
+import { BatchRibbon, BatchRings, BranchBoard, ScoreCurve, TopOfBatch } from "@/components/college/overview-charts";
 import { CollegeMark } from "@/components/employer/drive-parts";
 import { pendingApprovalCount } from "@/lib/college/approvals";
 import { eligibleStudents, presenceSnapshot, requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
@@ -38,7 +38,9 @@ function median(xs: number[]): number | null {
  * accept, leave requests), then the live drive, then how the batch is doing. The student register itself lives
  * on /college/students.
  */
-export default async function CollegeOverview() {
+export default async function CollegeOverview({ searchParams }: { searchParams?: Promise<{ hero?: string }> }) {
+  // Preview of the ring version of the hero: /college?hero=rings. Remove once the owner picks one.
+  const rings = (await searchParams)?.hero === "rings";
   const ctx = await requireCollegeContext();
 
   const [all, coverage, [liveDrive], [seat], paid, hasDriveOrder, pendingLeaves, toAccept, [unpaid]] = await Promise.all([
@@ -173,7 +175,7 @@ export default async function CollegeOverview() {
             <ButtonLink href="/college/roster" variant="outlineLight">Add students</ButtonLink>
           </div>
         </div>
-        <BatchRibbon stages={funnel} />
+        {rings ? <BatchRings stages={funnel} /> : <BatchRibbon stages={funnel} />}
       </HeroPanel>
 
       {firstRun ? (

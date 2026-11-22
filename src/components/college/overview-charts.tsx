@@ -75,6 +75,89 @@ export function BatchRibbon({ stages }: { stages: RibbonStage[] }) {
   );
 }
 
+/** Ring colours, outside in: the list is the base, the batch's progress is mint, the outcomes are gold. */
+const RING_TONE = ["stroke-white/35", "stroke-data-on-dark", "stroke-data-on-dark", "stroke-accent-400", "stroke-accent-300"];
+const DOT_TONE = ["bg-white/35", "bg-data-on-dark", "bg-data-on-dark", "bg-accent-400", "bg-accent-300"];
+
+/**
+ * The batch as concentric rings, one per stage, outside in. Each ring closes as far as that stage's share of the
+ * list, so the gap a ring leaves IS the drop-off. The centre carries the last stage (Hired) as the headline.
+ * The four earlier stages sit two either side on a wide screen and below the rings on a phone.
+ */
+export function BatchRings({ stages }: { stages: RibbonStage[] }) {
+  const top = stages[0]?.value ?? 0;
+  const S = 320;
+  const STROKE = 13;
+  const GAP = 7;
+  const last = stages[stages.length - 1];
+  const share = (v: number) => (top ? Math.round((v / top) * 100) : 0);
+  const side = stages.slice(0, -1);
+  const item = (s: RibbonStage, i: number, end = false) => (
+    <li key={s.label} className="relative min-w-0">
+      <Link
+        href={s.href}
+        className="block rounded-lg outline-none after:absolute after:-inset-2 after:rounded-xl after:content-[''] hover:after:bg-white/5 focus-visible:after:ring-2 focus-visible:after:ring-white/70"
+      >
+        <span className={cn("flex items-center gap-2 text-[13px] font-medium text-on-dark-subtle", end && "lg:flex-row-reverse")}>
+          <span aria-hidden className={cn("size-2 rounded-full", DOT_TONE[i])} />
+          {s.label}
+        </span>
+        <span className={cn("mt-1.5 flex items-baseline gap-2.5", end && "lg:flex-row-reverse")}>
+          <span className="nums text-[clamp(2rem,3.6vw,3rem)] font-light leading-none tracking-[-0.04em]">{s.value.toLocaleString("en-IN")}</span>
+          {i > 0 && top ? <span className="nums rounded-full bg-white/10 px-2 py-0.5 text-xs font-medium text-accent-300">{share(s.value)}%</span> : null}
+        </span>
+        <span className="mt-2 block text-xs text-on-dark-subtle">{s.hint}</span>
+      </Link>
+    </li>
+  );
+  return (
+    <div className="mt-8 grid items-center gap-x-10 gap-y-8 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+      <ol className="order-2 grid grid-cols-2 gap-6 lg:order-1 lg:grid-cols-1 lg:text-right" aria-label="Your batch, step by step">
+        {side.slice(0, 2).map((s, i) => item(s, i, true))}
+      </ol>
+      <figure className="order-1 mx-auto w-full max-w-[13.5rem] lg:order-2 lg:w-[20rem] lg:max-w-none">
+        <div className="relative">
+          <svg viewBox={`0 0 ${S} ${S}`} className="block w-full -rotate-90" role="img" aria-label={stages.map((s) => `${s.label} ${s.value}`).join(", ")}>
+            {stages.map((s, i) => {
+              const r = S / 2 - STROKE / 2 - i * (STROKE + GAP);
+              const c = 2 * Math.PI * r;
+              const f = top ? Math.min(1, s.value / top) : 0;
+              return (
+                <g key={s.label}>
+                  <circle cx={S / 2} cy={S / 2} r={r} fill="none" strokeWidth={STROKE} className="stroke-white/[0.07]" />
+                  {f > 0 ? (
+                    <circle
+                      cx={S / 2}
+                      cy={S / 2}
+                      r={r}
+                      fill="none"
+                      strokeWidth={STROKE}
+                      strokeLinecap="round"
+                      className={cn("ring-draw", RING_TONE[i])}
+                      style={{ strokeDasharray: `${Math.max(f * c, 0.5)} ${c}`, animationDelay: `${120 + i * 90}ms` }}
+                    />
+                  ) : null}
+                </g>
+              );
+            })}
+          </svg>
+          <Link
+            href={last.href}
+            className="absolute inset-0 m-auto flex size-[42%] flex-col items-center justify-center rounded-full text-center outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/70"
+          >
+            <span className="nums text-[clamp(2.5rem,5vw,3.75rem)] font-light leading-none tracking-[-0.04em]">{last.value.toLocaleString("en-IN")}</span>
+            <span className="mt-1 text-[13px] font-medium text-on-dark">{last.label}</span>
+            <span className="nums text-xs text-on-dark-subtle">{share(last.value)}% of your list</span>
+          </Link>
+        </div>
+      </figure>
+      <ol className="order-3 grid grid-cols-2 gap-6 lg:grid-cols-1" aria-label="Your batch, continued">
+        {side.slice(2).map((s, i) => item(s, i + 2))}
+      </ol>
+    </div>
+  );
+}
+
 const BUCKETS = 20; // half a point each, 0 to 10
 
 /**
