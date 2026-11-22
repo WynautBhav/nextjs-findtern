@@ -196,7 +196,7 @@ function MinimumPicker({ label, any, presets, value, onChange, className }: { la
   );
 }
 
-export function MasterDataTable({ rows, collegeId, now, initial, downloadName }: { rows: MasterRow[]; collegeId: string; now: number; initial: { view?: string; course?: string; mode?: string; year?: string; band?: string; marks?: string; status?: string }; /** File name for downloads before a view is picked (the Overview pop-up passes what was clicked). */ downloadName?: string }) {
+export function MasterDataTable({ rows, collegeId, now, initial, downloadName, embedded = false }: { rows: MasterRow[]; collegeId: string; now: number; initial: { view?: string; course?: string; mode?: string; year?: string; band?: string; marks?: string; status?: string }; /** File name for downloads before a view is picked (the Overview pop-up passes what was clicked). */ downloadName?: string; /** Inside the Overview pop-up: no views row, and the table fills the height and scrolls on its own. */ embedded?: boolean }) {
   const start = PRESETS.find((p) => p.id === initial.view) ?? PRESETS[0];
   const [viewId, setViewId] = useState(start.id);
   const [columns, setColumns] = useState<Key[]>(start.columns);
@@ -315,9 +315,9 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName }:
   const shown = visible.slice(0, limit);
 
   return (
-    <div className="space-y-4">
-      {/* Views: ready-made first, then the officer's own. */}
-      <div className="flex gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Views">
+    <div className={embedded ? "flex h-full min-h-0 flex-col gap-3" : "space-y-4"}>
+      {/* Views: ready-made first, then the officer's own. Not in the Overview pop-up, which is already one view. */}
+      <div hidden={embedded} className="flex gap-1.5 overflow-x-auto pb-1" role="tablist" aria-label="Views">
         {allViews.map((v) => (
           <span key={v.id} className="flex shrink-0 items-center">
             <button
@@ -341,7 +341,7 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName }:
         ))}
       </div>
 
-      <section className="apple-admin rounded-apple-xl border border-ink-200/80 bg-card" aria-label="Master data table">
+      <section className={cn("apple-admin rounded-apple-xl border border-ink-200/80 bg-card", embedded && "flex min-h-0 flex-1 flex-col overflow-hidden")} aria-label="Master data table">
         {/* Toolbar: search and filters on the left, columns, save and download on the right. */}
         <div className="flex flex-wrap items-center gap-2 border-b border-ink-100 p-4">
           <label className="relative min-w-[14rem] flex-1 sm:max-w-xs">
@@ -445,7 +445,7 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName }:
         </div>
         {msg ? <p className="border-b border-ink-100 px-4 py-2 text-sm text-ink-700" role="status">{msg}</p> : null}
 
-        <div className="max-h-[70vh] overflow-auto">
+        <div className={embedded ? "min-h-0 flex-1 overflow-auto" : "max-h-[70vh] overflow-auto"}>
           <table className="nums w-full min-w-max border-separate border-spacing-0 text-sm">
             <thead>
               <tr>

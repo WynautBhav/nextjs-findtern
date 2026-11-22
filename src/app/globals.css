@@ -2035,3 +2035,63 @@ html {
     from { stroke-dasharray: 0 var(--arc-len, 252); }
   }
 }
+
+/* Overview drill-down pop-up (components/college/hero-modes/drill.tsx). The dialog's own
+   animate-in classes have no library behind them, so this panel brings its own motion:
+   the panel rises and settles, then the header and the table follow. Transform and opacity
+   only; Tailwind's centring uses `translate`, which composes with `transform` here. */
+@keyframes drill-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.975);
+  }
+}
+@keyframes drill-sink {
+  to {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+}
+@keyframes drill-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes drill-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes drill-step {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.drill-panel[data-state="open"] {
+  animation: drill-rise 320ms var(--ease-out-expo);
+}
+.drill-panel[data-state="closed"] {
+  animation: drill-sink 160ms ease-in forwards;
+}
+[data-slot="dialog-overlay"]:has(+ .drill-panel)[data-state="open"] {
+  animation: drill-fade-in 240ms ease-out;
+}
+[data-slot="dialog-overlay"]:has(+ .drill-panel)[data-state="closed"] {
+  animation: drill-fade-out 160ms ease-in forwards;
+}
+.drill-panel[data-state="open"] .drill-step {
+  animation: drill-step 360ms var(--ease-out-expo) backwards;
+  animation-delay: calc(90ms + var(--i, 0) * 60ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .drill-panel[data-state="open"] {
+    animation: drill-fade-in 150ms ease-out;
+  }
+  .drill-panel[data-state="closed"] {
+    animation: drill-fade-out 120ms ease-out forwards;
+  }
+  .drill-panel[data-state="open"] .drill-step {
+    animation: none;
+  }
+}
