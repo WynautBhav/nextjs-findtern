@@ -75,9 +75,9 @@ export function BatchRibbon({ stages }: { stages: RibbonStage[] }) {
   );
 }
 
-/** Ring colours, outside in: the list is the base, the batch's progress is mint, the outcomes are gold. */
-const RING_TONE = ["stroke-white/35", "stroke-data-on-dark", "stroke-data-on-dark", "stroke-accent-400", "stroke-accent-300"];
-const DOT_TONE = ["bg-white/35", "bg-data-on-dark", "bg-data-on-dark", "bg-accent-400", "bg-accent-300"];
+/** One colour per stage, outside in, each readable on the dark green: list, verified, AI interview, offer, hired. */
+const RING_TONE = ["stroke-slate-300", "stroke-sky-300", "stroke-data-on-dark", "stroke-accent-400", "stroke-rose-300"];
+const DOT_TONE = ["bg-slate-300", "bg-sky-300", "bg-data-on-dark", "bg-accent-400", "bg-rose-300"];
 
 /**
  * The batch as concentric rings, one per stage, outside in. Each ring closes as far as that stage's share of the
@@ -146,7 +146,10 @@ export function BatchRings({ stages }: { stages: RibbonStage[] }) {
             className="absolute inset-0 m-auto flex size-[42%] flex-col items-center justify-center rounded-full text-center outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/70"
           >
             <span className="nums text-[clamp(2.5rem,5vw,3.75rem)] font-light leading-none tracking-[-0.04em]">{last.value.toLocaleString("en-IN")}</span>
-            <span className="mt-1 text-[13px] font-medium text-on-dark">{last.label}</span>
+            <span className="mt-1 flex items-center gap-1.5 text-[13px] font-medium text-on-dark">
+              <span aria-hidden className={cn("size-2 rounded-full", DOT_TONE[stages.length - 1])} />
+              {last.label}
+            </span>
             <span className="nums text-xs text-on-dark-subtle">{share(last.value)}% of your list</span>
           </Link>
         </div>
