@@ -284,14 +284,14 @@ export function TopOfBatch({ students }: { students: TopStudent[] }) {
 }
 
 /** Biggest drop between two neighbouring stages: the finding the newer hero styles lead with. */
-function biggestDrop(stages: RibbonStage[]) {
+export function biggestDrop(stages: RibbonStage[]) {
   let at = 1;
   for (let i = 2; i < stages.length; i++) if (stages[i - 1].value - stages[i].value > stages[at - 1].value - stages[at].value) at = i;
   const lost = Math.max(0, (stages[at - 1]?.value ?? 0) - (stages[at]?.value ?? 0));
   return { at, lost, from: stages[at - 1]?.label ?? "", to: stages[at]?.label ?? "" };
 }
 
-const FILL_TONE = ["bg-white/[0.13]", "bg-sky-300", "bg-data-on-dark", "bg-accent-400", "bg-rose-300"];
+export const FILL_TONE = ["bg-white/[0.13]", "bg-sky-300", "bg-data-on-dark", "bg-accent-400", "bg-rose-300"];
 
 /**
  * Seats: the batch as an exam hall. One seat per student on the list (or per N students for a big college), filled with

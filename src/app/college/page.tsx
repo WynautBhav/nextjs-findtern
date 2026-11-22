@@ -18,6 +18,7 @@ import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { ButtonLink } from "@/components/ui/button";
 import { collegeHasDriveOrder } from "@/lib/drives/dashboard-db";
 import { DriveDashboard } from "./drive-dashboard";
+import { BatchCampusWalk, BatchCaps, BatchDepartures, BatchOrbit, BatchReportCard } from "@/components/college/overview-heroes";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +47,11 @@ export default async function CollegeOverview({ searchParams }: { searchParams?:
     { id: "seats", label: "Seats" },
     { id: "steps", label: "Steps" },
     { id: "ledger", label: "Ledger" },
+    { id: "caps", label: "Caps" },
+    { id: "departures", label: "Departures" },
+    { id: "orbit", label: "Orbit" },
+    { id: "report", label: "Report card" },
+    { id: "walk", label: "Campus walk" },
   ] as const;
   const asked = (await searchParams)?.hero;
   const hero = HEROES.find((h) => h.id === asked)?.id ?? "ribbon";
@@ -183,28 +189,26 @@ export default async function CollegeOverview({ searchParams }: { searchParams?:
               ) : null}
             </div>
           </div>
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:items-end">
-            <div className="flex flex-wrap gap-2.5">
-              <ButtonLink href="/college/drives/new" variant="white">New campus drive link</ButtonLink>
-              <ButtonLink href="/college/roster" variant="outlineLight">Add students</ButtonLink>
-            </div>
-            {/* Preview switch between the two hero charts. Remove with the losing version. */}
-            <nav aria-label="Chart style" className="-mx-1 flex w-[calc(100%+0.5rem)] overflow-x-auto px-1 py-1 sm:justify-end">
-              <span className="inline-flex shrink-0 rounded-full bg-white/10 p-1 text-[13px] font-medium">
-                {HEROES.map((h) => ({ href: h.id === "ribbon" ? "/college" : `/college?hero=${h.id}`, label: h.label, on: h.id === hero })).map((o) => (
-                  <Link
-                    key={o.label}
-                    href={o.href}
-                    aria-current={o.on ? "page" : undefined}
-                    className={`inline-flex min-h-9 shrink-0 items-center rounded-full px-3.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/70 ${o.on ? "bg-white text-ink-900" : "text-on-dark hover:bg-white/10"}`}
-                  >
-                    {o.label}
-                  </Link>
-                ))}
-              </span>
-            </nav>
+          <div className="flex w-full flex-wrap gap-2.5 sm:w-auto">
+            <ButtonLink href="/college/drives/new" variant="white">New campus drive link</ButtonLink>
+            <ButtonLink href="/college/roster" variant="outlineLight">Add students</ButtonLink>
           </div>
         </div>
+        {/* Preview switch between the hero styles. Remove with the losing versions. */}
+        <nav aria-label="Chart style" className="-mx-1 mt-6 flex overflow-x-auto px-1 py-1">
+          <span className="inline-flex shrink-0 rounded-full bg-white/10 p-1 text-[13px] font-medium">
+            {HEROES.map((h) => ({ href: h.id === "ribbon" ? "/college" : `/college?hero=${h.id}`, label: h.label, on: h.id === hero })).map((o) => (
+              <Link
+                key={o.label}
+                href={o.href}
+                aria-current={o.on ? "page" : undefined}
+                className={`inline-flex min-h-9 shrink-0 items-center rounded-full px-3.5 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/70 ${o.on ? "bg-white text-ink-900" : "text-on-dark hover:bg-white/10"}`}
+              >
+                {o.label}
+              </Link>
+            ))}
+          </span>
+        </nav>
         {hero === "rings" ? (
           <BatchRings stages={funnel} />
         ) : hero === "seats" ? (
@@ -213,6 +217,16 @@ export default async function CollegeOverview({ searchParams }: { searchParams?:
           <BatchSteps stages={funnel} />
         ) : hero === "ledger" ? (
           <BatchLedger stages={funnel} today={ledgerToday} />
+        ) : hero === "caps" ? (
+          <BatchCaps stages={funnel} />
+        ) : hero === "departures" ? (
+          <BatchDepartures stages={funnel} college={ctx.college.name} />
+        ) : hero === "orbit" ? (
+          <BatchOrbit stages={funnel} />
+        ) : hero === "report" ? (
+          <BatchReportCard stages={funnel} college={ctx.college.name} asOf={new Date(now).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" })} />
+        ) : hero === "walk" ? (
+          <BatchCampusWalk stages={funnel} />
         ) : (
           <BatchRibbon stages={funnel} />
         )}

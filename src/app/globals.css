@@ -2012,6 +2012,61 @@ html {
   @keyframes bar-rise {
     from { transform: scaleY(0); }
   }
+  /* overview-heroes.tsx */
+  .cap-fly {
+    animation: cap-fly 900ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes cap-fly {
+    from { opacity: 0; transform: translateY(var(--fly, 60px)) rotate(-30deg); }
+  }
+  .flap {
+    display: inline-block;
+    transform-origin: 50% 50%;
+    animation: flap 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes flap {
+    0% { opacity: 0; transform: rotateX(90deg); }
+    60% { opacity: 1; transform: rotateX(-12deg); }
+  }
+  .orbit-spin {
+    transform-box: view-box;
+    animation: orbit-spin linear infinite;
+  }
+  @keyframes orbit-spin {
+    to { transform: rotate(360deg); }
+  }
+  .core-pulse {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: core-pulse 3.2s ease-in-out infinite;
+  }
+  @keyframes core-pulse {
+    50% { transform: scale(1.05); }
+  }
+  .paper-in {
+    animation: paper-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes paper-in {
+    from { opacity: 0; transform: translateY(24px) rotate(2deg); }
+  }
+  .stamp-in {
+    animation: stamp-in 420ms cubic-bezier(0.34, 1.56, 0.64, 1) 650ms both;
+  }
+  @keyframes stamp-in {
+    from { opacity: 0; transform: scale(1.8) rotate(-9deg); }
+  }
+  .walk-march {
+    animation: walk-march 1.6s linear infinite;
+  }
+  @keyframes walk-march {
+    to { stroke-dashoffset: -24; }
+  }
+  .dot-drop {
+    animation: dot-drop 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes dot-drop {
+    from { opacity: 0; transform: translateY(-14px); }
+  }
   .seat-pop {
     animation: seat-pop 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }
