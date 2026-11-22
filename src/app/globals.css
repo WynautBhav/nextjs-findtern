@@ -1999,7 +1999,13 @@ html {
   @keyframes bar-rise {
     from { transform: scaleY(0); }
   }
-  /* batch-flow.tsx */
+  /* campus-walk.tsx */
+  .walk-march {
+    animation: walk-march 1.6s linear infinite;
+  }
+  @keyframes walk-march {
+    to { stroke-dashoffset: -24; }
+  }
   .dot-drop {
     animation: dot-drop 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }

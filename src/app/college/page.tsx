@@ -18,7 +18,7 @@ import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { ButtonLink } from "@/components/ui/button";
 import { collegeHasDriveOrder } from "@/lib/drives/dashboard-db";
 import { DriveDashboard } from "./drive-dashboard";
-import { BatchFlow } from "@/components/college/batch-flow";
+import { BatchCampusWalk } from "@/components/college/campus-walk";
 
 export const dynamic = "force-dynamic";
 
@@ -174,7 +174,7 @@ export default async function CollegeOverview() {
             <ButtonLink href="/college/roster" variant="outlineLight">Add students</ButtonLink>
           </div>
         </div>
-        <BatchFlow stages={funnel} />
+        <BatchCampusWalk stages={funnel} />
       </HeroPanel>
 
       {firstRun ? (
