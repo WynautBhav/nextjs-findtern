@@ -13,6 +13,7 @@ import type { RibbonStage } from "./overview-charts";
 const FILL = ["rgb(255 255 255 / 0.28)", "var(--color-sky-300)", "var(--color-data-on-dark)", "var(--color-accent-400)", "var(--color-rose-300)"];
 const PLACES = ["Gate", "Admin block", "Exam hall", "Interview room", "Joining desk"];
 const STOPPED = ["not joined yet", "verified only", "interviewed", "have an offer", "hired"];
+const REACHED = ["on your list", "verified", "took the AI interview", "got an offer", "hired"];
 
 const n = (v: number) => v.toLocaleString("en-IN");
 
@@ -86,7 +87,7 @@ function Building({ i }: { i: number }) {
  * The scene itself, at one width. The wide screen gets five stops 200 units apart; a phone gets them closer (W 520)
  * with narrower stacks, so the buildings and dots draw about twice as large instead of shrinking to specks.
  */
-function Scene({ counts, W, cols, className }: { counts: number[]; W: number; cols: number; className?: string }) {
+function Scene({ counts, reached, W, cols, compact, className }: { counts: number[]; reached: number[]; W: number; cols: number; compact?: boolean; className?: string }) {
   const xs = [0.1, 0.3, 0.5, 0.7, 0.9].map((f) => f * W);
   const GAP = 12;
   const per = Math.max(1, Math.ceil(Math.max(...counts) / (cols * 9)));
@@ -96,9 +97,13 @@ function Scene({ counts, W, cols, className }: { counts: number[]; W: number; co
   const top = Math.min(...stacks.map((m, i) => -(ROOF[i] + 12 + Math.max(1, Math.ceil(m / cols)) * GAP)));
   const bottom = 40;
   const bend = W / 16;
+  // The step that loses the most students gets the gold tag.
+  let worst = 0;
+  for (let i = 1; i < 4; i++) if (reached[i] - reached[i + 1] > reached[worst] - reached[worst + 1]) worst = i;
   const path = `M8,22 ` + xs.map((x, i) => `${i === 0 ? "L" : "S"}${x - bend},${i % 2 ? 32 : 14} ${x},22`).join(" ") + ` L${W - 8},22`;
   return (
     <div className={className}>
+      <div className="relative">
       <svg viewBox={`0 ${top} ${W} ${bottom - top}`} className="block w-full" aria-hidden>
         <path d={path} fill="none" stroke="var(--color-accent-300)" strokeOpacity="0.45" strokeWidth="2.5" strokeDasharray="2 10" strokeLinecap="round" className="walk-march" />
         {xs.map((x, i) => {
@@ -129,6 +134,36 @@ function Scene({ counts, W, cols, className }: { counts: number[]; W: number; co
           );
         })}
       </svg>
+        {/* On the path between two buildings: how many walked on from the one before, and what share that is. */}
+        {[0, 1, 2, 3].map((i) => {
+          const from = reached[i];
+          const on = reached[i + 1];
+          const rate = from ? Math.round((on / from) * 100) : 0;
+          return (
+            <span
+              key={i}
+              aria-hidden
+              className={cn(
+                "nums absolute -translate-x-1/2 translate-y-1/2 whitespace-nowrap rounded-full bg-black/45 text-center leading-tight",
+                compact ? "px-1.5 py-0.5 text-[10px]" : "px-3 py-1 text-xs",
+                i === worst ? "text-accent-200 ring-1 ring-accent-400/70" : "text-on-dark",
+              )}
+              style={{ left: `${(((xs[i] + xs[i + 1]) / 2) / W) * 100}%`, bottom: `${((bottom - 22) / (bottom - top)) * 100}%` }}
+            >
+              {compact ? (
+                <>
+                  <span className="block font-semibold text-white">{n(on)}</span>
+                  {rate}%
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold text-white">{n(on)}</span> of {n(from)} passed · {rate}%
+                </>
+              )}
+            </span>
+          );
+        })}
+      </div>
       {per > 1 ? <p className="mt-1 text-xs text-on-dark-subtle">One dot, {per} students.</p> : null}
     </div>
   );
@@ -137,6 +172,7 @@ function Scene({ counts, W, cols, className }: { counts: number[]; W: number; co
 export function BatchCampusWalk({ stages }: { stages: RibbonStage[] }) {
   const counts = furthest(stages);
   const total = stages[0]?.value ?? 0;
+  const reached = stages.map((s) => s.value);
   // The station where most students are stuck (the joining desk is the goal, not a place to be stuck).
   let stuck = 0;
   for (let i = 1; i < 4; i++) if (counts[i] > counts[stuck]) stuck = i;
@@ -159,18 +195,25 @@ export function BatchCampusWalk({ stages }: { stages: RibbonStage[] }) {
         ) : null}
       </div>
 
-      <figure className="mt-4" role="img" aria-label={`${total} students. Where each stopped: ${PLACES.map((p, i) => `${p} ${counts[i]}`).join(", ")}`}>
-        <Scene counts={counts} W={1000} cols={7} className="hidden sm:block" />
-        <Scene counts={counts} W={520} cols={5} className="sm:hidden" />
+      <figure className="mt-4" role="img" aria-label={`${total} students. ${PLACES.map((p, i) => `${p}: ${reached[i]} reached, ${counts[i]} stopped here`).join("; ")}`}>
+        <Scene counts={counts} reached={reached} W={1000} cols={7} className="hidden sm:block" />
+        <Scene counts={counts} reached={reached} W={520} cols={5} compact className="sm:hidden" />
       </figure>
 
-      <ol className="mt-3 grid grid-cols-5 gap-1 text-center sm:gap-2" aria-label="Where each student stopped">
+      <ol className="mt-3 grid grid-cols-5 gap-1 text-center sm:gap-2" aria-label="Each stop on the walk">
         {stages.map((s, i) => (
           <li key={s.label} className="min-w-0">
             <Link href={s.href} className="block rounded-lg px-1 py-1.5 outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/70">
               <span className="block text-balance text-[11px] font-medium leading-tight text-on-dark sm:text-[13px]">{PLACES[i]}</span>
-              <span className={cn("nums mt-0.5 block text-xl font-light leading-tight sm:text-3xl", i === stuck ? "text-accent-300" : "text-white")}>{n(counts[i])}</span>
-              <span className="hidden text-[11px] text-on-dark-subtle sm:block">{STOPPED[i]}</span>
+              <span className="nums mt-0.5 block text-xl font-light leading-tight text-white sm:text-3xl">{n(reached[i])}</span>
+              <span className="hidden text-[11px] text-on-dark-subtle sm:block">{REACHED[i]}</span>
+              <span className={cn("nums mt-1 flex items-center justify-center gap-1 whitespace-nowrap text-[10px] sm:mt-1.5 sm:text-xs", i === stuck ? "font-medium text-accent-300" : "text-on-dark")}>
+                <span aria-hidden className="size-1.5 shrink-0 rounded-full sm:size-2" style={{ background: FILL[i] }} />
+                {n(counts[i])}
+                <span className="sm:hidden">{i === 4 ? "made it" : "here"}</span>
+                <span className="hidden sm:inline">{i === 4 ? "made it" : "stopped here"}</span>
+              </span>
+              <span className="nums mt-0.5 hidden text-[11px] text-on-dark-subtle sm:block">{total ? `${Math.round((reached[i] / total) * 100)}% of your list` : "—"}</span>
             </Link>
           </li>
         ))}
