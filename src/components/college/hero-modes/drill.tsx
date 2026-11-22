@@ -6,7 +6,7 @@ import { ExternalLink } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { MasterDataTable } from "@/components/college/master-data-table";
-import type { MasterRow } from "@/lib/college/master-row";
+import type { MasterRow, Outcome } from "@/lib/college/master-row";
 
 /**
  * Drill-down from the Overview hero: a number opens Master data in a pop-up on the same page, filters already set,
@@ -14,7 +14,7 @@ import type { MasterRow } from "@/lib/college/master-row";
  * /college/master-data, so a new-tab click or a browser without script still gets there.
  */
 
-export type DrillFilters = { course?: string; year?: number; band?: string; marks?: string };
+export type DrillFilters = { course?: string; year?: number; band?: string; marks?: string; placement?: "offer" | "none" | "hired" | "ppo"; outcome?: Outcome };
 type Drill = { title: string; filters: DrillFilters };
 
 const DrillContext = createContext<((d: Drill) => void) | null>(null);
@@ -26,6 +26,8 @@ export function drillHref(f: DrillFilters) {
   if (f.year) q.set("year", String(f.year));
   if (f.band) q.set("band", f.band);
   if (f.marks) q.set("marks", f.marks);
+  if (f.placement) q.set("placement", f.placement);
+  if (f.outcome) q.set("outcome", f.outcome);
   return `/college/master-data?${q}`;
 }
 
@@ -66,7 +68,7 @@ export function DrillProvider({ rows, collegeId, now, children }: { rows: Master
                   collegeId={collegeId}
                   now={now}
                   downloadName={drill.title}
-                  initial={{ course: drill.filters.course === "Not set" ? "Course not set" : drill.filters.course, year: drill.filters.year ? String(drill.filters.year) : undefined, band: drill.filters.band, marks: drill.filters.marks, status: "verified" }}
+                  initial={{ course: drill.filters.course === "Not set" ? "Course not set" : drill.filters.course, year: drill.filters.year ? String(drill.filters.year) : undefined, band: drill.filters.band, marks: drill.filters.marks, placement: drill.filters.placement, outcome: drill.filters.outcome, status: "verified" }}
                 />
               </div>
             </>

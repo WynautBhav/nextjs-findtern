@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { CoffeeKey, MarksKey } from "@/lib/college/overview-modes";
+import { DrillLink, type DrillFilters } from "./drill";
 
 /**
  * The shared kit for every Overview hero design. Designs sit on the green hero field, so colour is white at set
@@ -26,16 +27,30 @@ export function Swatch({ fill, className }: { fill: string; className?: string }
 }
 
 /** A legend row under a design: each swatch is the fill its mark uses. */
-export function Legend({ items, className }: { items: { label: string; fill: string; value?: number }[]; className?: string }) {
+/** A legend; an item with `drill` opens Master data for its students (the Overview pop-up). */
+export function Legend({ items, className }: { items: { label: string; fill: string; value?: number; drill?: { title: string; filters: DrillFilters } }[]; className?: string }) {
   return (
     <ul className={cn("flex flex-wrap gap-x-5 gap-y-2 text-xs text-on-dark-subtle", className)}>
-      {items.map((i) => (
-        <li key={i.label} className="flex items-center gap-1.5">
-          <Swatch fill={i.fill} />
-          {i.label}
-          {i.value !== undefined ? <span className="nums text-white">{n(i.value)}</span> : null}
-        </li>
-      ))}
+      {items.map((i) => {
+        const body = (
+          <>
+            <Swatch fill={i.fill} />
+            {i.label}
+            {i.value !== undefined ? <span className="nums text-white">{n(i.value)}</span> : null}
+          </>
+        );
+        return (
+          <li key={i.label}>
+            {i.drill ? (
+              <DrillLink title={i.drill.title} filters={i.drill.filters} aria-label={`${i.label}${i.value !== undefined ? `: ${i.value}` : ""}. Open in Master data`} className="flex min-h-6 items-center gap-1.5 rounded-sm underline-offset-4 outline-none hover:text-white hover:underline focus-visible:ring-2 focus-visible:ring-white/80">
+                {body}
+              </DrillLink>
+            ) : (
+              <span className="flex items-center gap-1.5">{body}</span>
+            )}
+          </li>
+        );
+      })}
     </ul>
   );
 }

@@ -10,7 +10,7 @@ import { csrfFetch } from "@/lib/client-fetch";
 import { ago } from "@/lib/college/labels";
 import { HIGH_CGPA, STRONG_SCORE, quadrantOf, type Quadrant } from "@/lib/college/insights";
 import { COFFEE, MARKS, coffeeOf, marksOf, type CoffeeKey, type MarksKey } from "@/lib/college/overview-modes";
-import { MASTER_COLUMNS, cellText, matchesWorkMode, type ColumnGroup, type MasterColumn, type MasterRow } from "@/lib/college/master-row";
+import { MASTER_COLUMNS, OUTCOMES, cellText, matchesOutcome, matchesWorkMode, type ColumnGroup, type Outcome, type MasterColumn, type MasterRow } from "@/lib/college/master-row";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { cn } from "@/lib/utils";
 
@@ -36,11 +36,13 @@ type Filters = {
   band: CoffeeKey | "done" | "none" | "";
   /** CGPA / % band (marks out of 10). */
   marks: MarksKey | "";
+  /** Offers and meetings: the students behind a Placement analysis block. Missing in views saved before it existed. */
+  outcome?: Outcome;
 };
 type SortState = { key: Key; dir: "asc" | "desc" };
 type View = { id: string; name: string; columns: Key[]; filters: Filters; sort: SortState; own?: boolean };
 
-const NO_FILTERS: Filters = { course: "", year: "", mode: "", laptop: "any", placement: "any", status: "any", minScore: "", minCgpa: "", quadrant: "", band: "", marks: "" };
+const NO_FILTERS: Filters = { course: "", year: "", mode: "", laptop: "any", placement: "any", status: "any", minScore: "", minCgpa: "", quadrant: "", band: "", marks: "", outcome: "" };
 const BASE: Key[] = ["name", "degree", "branch", "year", "cgpa", "score", "offers", "hired", "ppo", "lastSeenAt"];
 const SCORES: Key[] = ["name", "degree", "branch", "cgpa", "english", "coding", "aptitude", "aiInterview", "score", "offers"];
 
@@ -68,11 +70,13 @@ function sortValue(r: MasterRow, k: Key): string | number | null {
   if (k === "report") return r.hasReport ? 1 : 0;
   if (k === "recording") return r.hasRecording ? 1 : 0;
   if (k === "lastSeenAt") return r.lastSeenAt ? Date.parse(r.lastSeenAt) : null;
+  if (k === "meetingsDone") return r.verified ? r.meetings.done : null;
+  if (k === "meetingsNotAccepted") return r.verified ? r.meetings.notAccepted : null;
   const v = r[k as keyof MasterRow];
   if (v === null || v === undefined) return null;
   if (typeof v === "boolean") return v ? 1 : 0;
   if (Array.isArray(v)) return v.length ? v.join(", ").toLowerCase() : null;
-  return typeof v === "string" ? v.toLowerCase() : v;
+  return typeof v === "string" ? v.toLowerCase() : typeof v === "number" ? v : null;
 }
 
 function matches(r: MasterRow, f: Filters, q: string): boolean {
@@ -93,6 +97,7 @@ function matches(r: MasterRow, f: Filters, q: string): boolean {
   if (f.band === "none" && r.score !== null) return false;
   if (f.band && f.band !== "done" && f.band !== "none" && (r.score === null || coffeeOf(r.score) !== f.band)) return false;
   if (f.marks && (r.marks10 === null || marksOf(r.marks10) !== f.marks)) return false;
+  if (f.outcome && !matchesOutcome(r, f.outcome)) return false;
   if (q) {
     const hay = [r.name, r.email, r.branch, r.degree, r.city, ...r.skills, ...r.preferredLocations].join(" ").toLowerCase();
     if (!q.split(/\s+/).every((w) => hay.includes(w))) return false;
@@ -196,10 +201,13 @@ function MinimumPicker({ label, any, presets, value, onChange, className }: { la
   );
 }
 
-export function MasterDataTable({ rows, collegeId, now, initial, downloadName, embedded = false }: { rows: MasterRow[]; collegeId: string; now: number; initial: { view?: string; course?: string; mode?: string; year?: string; band?: string; marks?: string; status?: string }; /** File name for downloads before a view is picked (the Overview pop-up passes what was clicked). */ downloadName?: string; /** Inside the Overview pop-up: no views row, and the table fills the height and scrolls on its own. */ embedded?: boolean }) {
+export function MasterDataTable({ rows, collegeId, now, initial, downloadName, embedded = false }: { rows: MasterRow[]; collegeId: string; now: number; initial: { view?: string; course?: string; mode?: string; year?: string; band?: string; marks?: string; status?: string; placement?: string; outcome?: string }; /** File name for downloads before a view is picked (the Overview pop-up passes what was clicked). */ downloadName?: string; /** Inside the Overview pop-up: no views row, and the table fills the height and scrolls on its own. */ embedded?: boolean }) {
   const start = PRESETS.find((p) => p.id === initial.view) ?? PRESETS[0];
   const [viewId, setViewId] = useState(start.id);
-  const [columns, setColumns] = useState<Key[]>(start.columns);
+  // A meetings drill-down from the Overview shows the meeting counts, so each row says why it is in the list.
+  const [columns, setColumns] = useState<Key[]>(() =>
+    /^(met|meet-|not-accepted)/.test(initial.outcome ?? "") ? ["name", "degree", "branch", "year", "meetingsDone", "meetingsNotAccepted", "score", "offers", "hired", "lastSeenAt"] : start.columns,
+  );
   // Filters can arrive in the link (from the Overview and Insights): only known values are taken.
   const [filters, setFilters] = useState<Filters>(() => {
     const f: Filters = { ...start.filters };
@@ -209,6 +217,8 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
     if (initial.band === "done" || initial.band === "none" || COFFEE.some((c) => c.key === initial.band)) f.band = initial.band as Filters["band"];
     if (MARKS.some((m) => m.key === initial.marks)) f.marks = initial.marks as MarksKey;
     if (initial.status === "verified" || initial.status === "unverified") f.status = initial.status;
+    if (initial.placement === "offer" || initial.placement === "none" || initial.placement === "hired" || initial.placement === "ppo") f.placement = initial.placement;
+    if (OUTCOMES.some((o) => o.key === initial.outcome)) f.outcome = initial.outcome as Outcome;
     return f;
   });
   const [sort, setSort] = useState<SortState>(start.sort);
@@ -312,6 +322,8 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
   }
 
   const select = "h-9 rounded-lg border border-ink-300 bg-card px-2.5 text-sm text-ink-900 outline-none focus-visible:ring-2 focus-visible:ring-brand-500";
+  /** A set filter is tinted, so the officer sees at a glance which of the twelve are narrowing the list. */
+  const on = (active: boolean) => (active ? cn(select, "border-brand-600 bg-brand-50 font-medium text-brand-900") : select);
   const shown = visible.slice(0, limit);
 
   return (
@@ -349,6 +361,9 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-500" aria-hidden />
             <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder="Name, skill or city" className={cn(select, "w-full pl-9")} />
           </label>
+          <p className="nums shrink-0 whitespace-nowrap px-1 text-sm text-ink-600" aria-live="polite">
+            <span className="font-medium text-ink-900">{visible.length.toLocaleString("en-IN")}</span> of {rows.length.toLocaleString("en-IN")} students
+          </p>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <Sheet>
               <SheetTrigger asChild>
@@ -393,43 +408,47 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
         </div>
 
         <div className="flex items-center gap-2 overflow-x-auto border-b border-ink-100 px-4 py-3 text-sm sm:flex-wrap [&>select]:shrink-0">
-          <select aria-label="Course" value={filters.course} onChange={(e) => set("course", e.target.value)} className={select}>
+          <select aria-label="Course" value={filters.course} onChange={(e) => set("course", e.target.value)} className={on(!!(filters.course))}>
             <option value="">All courses</option>
             {courses.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-          <select aria-label="Current year" value={filters.year} onChange={(e) => set("year", e.target.value)} className={select}>
+          <select aria-label="Current year" value={filters.year} onChange={(e) => set("year", e.target.value)} className={on(!!(filters.year))}>
             <option value="">All years</option>
             {years.map((y) => <option key={y} value={String(y)}>Year {y}</option>)}
           </select>
-          <select aria-label="Placement" value={filters.placement} onChange={(e) => set("placement", e.target.value as Placement)} className={select}>
+          <select aria-label="Placement" value={filters.placement} onChange={(e) => set("placement", e.target.value as Placement)} className={on(!!(filters.placement !== "any"))}>
             <option value="any">Any placement</option>
             <option value="offer">Has an offer</option>
             <option value="none">No offer yet</option>
             <option value="hired">Hired</option>
             <option value="ppo">PPO offer</option>
           </select>
-          <select aria-label="Findtern band" value={filters.band} onChange={(e) => set("band", e.target.value as Filters["band"])} className={select}>
+          <select aria-label="Offers and meetings" value={filters.outcome ?? ""} onChange={(e) => set("outcome", e.target.value as Outcome)} className={on(!!(filters.outcome))}>
+            <option value="">Offers and meetings</option>
+            {OUTCOMES.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
+          </select>
+          <select aria-label="Findtern band" value={filters.band} onChange={(e) => set("band", e.target.value as Filters["band"])} className={on(!!(filters.band))}>
             <option value="">Findtern band</option>
             <option value="done">AI interview done</option>
             <option value="none">Not interviewed yet</option>
             {COFFEE.map((c) => <option key={c.key} value={c.key}>{c.name} ({c.range})</option>)}
           </select>
-          <select aria-label="CGPA / % band" value={filters.marks} onChange={(e) => set("marks", e.target.value as Filters["marks"])} className={select}>
+          <select aria-label="CGPA / % band" value={filters.marks} onChange={(e) => set("marks", e.target.value as Filters["marks"])} className={on(!!(filters.marks))}>
             <option value="">CGPA / % band</option>
             {MARKS.map((m) => <option key={m.key} value={m.key}>{m.name} ({m.range})</option>)}
           </select>
-          <select aria-label="Work mode preference" value={filters.mode} onChange={(e) => set("mode", e.target.value)} className={select}>
+          <select aria-label="Work mode preference" value={filters.mode} onChange={(e) => set("mode", e.target.value)} className={on(!!(filters.mode))}>
             <option value="">Work mode preference</option>
             {MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
           </select>
-          <select aria-label="Laptop" value={filters.laptop} onChange={(e) => set("laptop", e.target.value as Filters["laptop"])} className={select}>
+          <select aria-label="Laptop" value={filters.laptop} onChange={(e) => set("laptop", e.target.value as Filters["laptop"])} className={on(!!(filters.laptop !== "any"))}>
             <option value="any">Laptop: any</option>
             <option value="yes">Has a laptop</option>
             <option value="no">No laptop</option>
           </select>
-          <MinimumPicker key={`score-${resetKey}`} label="Findtern score" any="Findtern score" presets={[5, 6, STRONG_SCORE, 8, 9]} value={filters.minScore} onChange={(v) => set("minScore", v)} className={select} />
-          <MinimumPicker key={`cgpa-${resetKey}`} label="CGPA" any="Any CGPA" presets={[6, 7, HIGH_CGPA, 8, 9]} value={filters.minCgpa} onChange={(v) => set("minCgpa", v)} className={select} />
-          <select aria-label="Approval" value={filters.status} onChange={(e) => set("status", e.target.value as Filters["status"])} className={select}>
+          <MinimumPicker key={`score-${resetKey}`} label="Findtern score" any="Findtern score" presets={[5, 6, STRONG_SCORE, 8, 9]} value={filters.minScore} onChange={(v) => set("minScore", v)} className={on(!!filters.minScore)} />
+          <MinimumPicker key={`cgpa-${resetKey}`} label="CGPA" any="Any CGPA" presets={[6, 7, HIGH_CGPA, 8, 9]} value={filters.minCgpa} onChange={(v) => set("minCgpa", v)} className={on(!!filters.minCgpa)} />
+          <select aria-label="Approval" value={filters.status} onChange={(e) => set("status", e.target.value as Filters["status"])} className={on(!!(filters.status !== "any"))}>
             <option value="any">Accepted and waiting</option>
             <option value="verified">Accepted by you</option>
             <option value="unverified">Waiting for your approval</option>
@@ -439,9 +458,6 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
               Clear {activeFilters === 1 ? "filter" : `${activeFilters} filters`}
             </button>
           ) : null}
-          <p className="nums ml-auto shrink-0 whitespace-nowrap text-ink-600" aria-live="polite">
-            <span className="font-medium text-ink-900">{visible.length.toLocaleString("en-IN")}</span> of {rows.length.toLocaleString("en-IN")} students
-          </p>
         </div>
         {msg ? <p className="border-b border-ink-100 px-4 py-2 text-sm text-ink-700" role="status">{msg}</p> : null}
 

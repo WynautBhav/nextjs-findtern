@@ -3,7 +3,13 @@ import { sql } from "drizzle-orm";
 import { realEmployerId } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
 import { studentsForCollegeAdmin, type CollegeContext } from "./scope";
-import { buildMasterRow, type MasterExtras, type MasterRow } from "./master-row";
+import { buildMasterRow, NO_MEETINGS, type MasterExtras, type MasterRow, type Meetings } from "./master-row";
+
+const meetingsOf = (v: unknown): Meetings => {
+  const m = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
+  const n = (k: keyof Meetings) => Number(m[k] ?? 0) || 0;
+  return m.total === undefined ? NO_MEETINGS : { total: n("total"), done: n("done"), notAccepted: n("notAccepted"), upcoming: n("upcoming"), waiting: n("waiting") };
+};
 
 /** Onboarding keys master data may read. An allowlist: Aadhaar, PAN, bank, address and PIN are never selected. */
 const EXTRA_KEYS = ["academics", "ratings", "emergencyName", "emergencyRelation", "emergencyCountryCode", "emergencyPhone", "aiFeedbackLink", "aiRecordingLink", "incruiterReportUrl", "incruiterRecordingUrl"];
@@ -32,7 +38,14 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status NOT IN ('draft', 'withdrawn')
           AND jsonb_typeof(pr.offer_details->'fullTimeOffer') = 'object' AND ${realEmployerId(sql`pr.employer_id`)}) AS ppo,
         (SELECT coalesce(sum(w.amount_minor), 0) FROM ${schema.collegeWalletEntries} w
-          WHERE w.college_id = ${ctx.college.id} AND w.intern_id = ${o.userId} AND w.kind = 'incentive') AS earnings_minor
+          WHERE w.college_id = ${ctx.college.id} AND w.intern_id = ${o.userId} AND w.kind = 'incentive') AS earnings_minor,
+        (SELECT jsonb_build_object(
+            'total', count(*),
+            'done', count(*) FILTER (WHERE iv.status = 'completed'),
+            'notAccepted', count(*) FILTER (WHERE iv.status IN ('expired', 'declined', 'rejected') OR (iv.status = 'cancelled' AND iv.cancelled_by = 'intern')),
+            'upcoming', count(*) FILTER (WHERE iv.status = 'scheduled'),
+            'waiting', count(*) FILTER (WHERE iv.status = 'pending'))
+          FROM ${schema.interviews} iv WHERE iv.intern_id = ${o.userId} AND ${realEmployerId(sql`iv.employer_id`)}) AS meetings
       FROM ${o}
       WHERE ${o.userId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
     `);
@@ -53,6 +66,7 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
         hired: Number(r.hired ?? 0),
         ppo: Number(r.ppo ?? 0),
         earningsMinor: Number(r.earnings_minor ?? 0),
+        meetings: meetingsOf(r.meetings),
       });
     }
   }

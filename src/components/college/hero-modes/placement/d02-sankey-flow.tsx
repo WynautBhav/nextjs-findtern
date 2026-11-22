@@ -1,7 +1,8 @@
 import type { PlacementData } from "@/lib/college/overview-modes";
 import { DesignFrame, GOLD, Legend, n, OUTCOME_FILL, white } from "../kit";
 import { cn } from "@/lib/utils";
-import { BandBar, goldA, onFill, Scores } from "./parts";
+import { Averages, BandBar, goldA, MarksBar, Meetings, onFill } from "./parts";
+import { DrillLink, type DrillFilters } from "../drill";
 
 const W = 1000;
 const H = 230;
@@ -12,6 +13,19 @@ const GAP = 10;
 const per = (total: number, avail: number) => (total ? avail / total : 0);
 
 type Node = { id: string; label: string; short?: string; v: number; x: number; y: number; h: number; fill: string; below?: boolean };
+
+/** What each block opens: the students behind it. Offer blocks count offers; the pop-up lists the students holding one. */
+const DRILL: Record<string, { title: string; filters: DrillFilters }> = {
+  i: { title: "Interviewed students", filters: { band: "done" } },
+  o: { title: "Students who got an offer", filters: { placement: "offer" } },
+  n: { title: "Interviewed, no offer yet", filters: { outcome: "no-offer" } },
+  accepted: { title: "Students who accepted an offer", filters: { outcome: "accepted" } },
+  notAnswered: { title: "Students with an offer not answered", filters: { outcome: "open" } },
+  rejected: { title: "Students who rejected an offer", filters: { outcome: "rejected" } },
+  withdrawn: { title: "Students with an offer withdrawn", filters: { outcome: "withdrawn" } },
+  h: { title: "Students with an internship", filters: { placement: "hired" } },
+  p: { title: "Students with a PPO offer", filters: { placement: "ppo" } },
+};
 
 function ribbon(x0: number, y0: number, h0: number, x1: number, y1: number, h1: number) {
   const m = (x0 + x1) / 2;
@@ -92,28 +106,40 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
           const tight = !nd.below && nd.h < 50;
           const txt = nd.below ? "white" : onFill(nd.fill);
           return (
-            <div key={nd.id} className={nd.below ? "absolute text-center" : cn("absolute grid text-center", tight ? "place-items-center" : "place-content-center")} style={style}>
+            <DrillLink
+              key={nd.id}
+              title={DRILL[nd.id].title}
+              filters={DRILL[nd.id].filters}
+              aria-label={`${nd.label}: ${nd.v}. Open in Master data`}
+              className={cn(nd.below ? "absolute rounded-sm text-center" : cn("absolute grid text-center", tight ? "place-items-center" : "place-content-center"), "outline-none ring-white/0 transition-[box-shadow] hover:ring-2 hover:ring-white/60 focus-visible:ring-2 focus-visible:ring-white", nd.h === 0 && !nd.below && "pointer-events-none")}
+              style={nd.below ? { ...style, top: `${(nd.y / H) * 100}%`, paddingTop: nd.h + 4 } : style}
+            >
               {nd.h === 0 && !nd.below ? null : (
                 <span className={tight ? "flex items-baseline justify-center gap-1.5" : "contents"}>
                   <span className="hidden text-xs sm:block" style={{ color: nd.below ? "var(--color-on-dark-subtle)" : txt }}>{nd.label}</span>
                   <span className="nums text-sm font-medium sm:text-lg" style={{ color: txt }}>{n(nd.v)}</span>
                 </span>
               )}
-            </div>
+            </DrillLink>
           );
         })}
       </div>
       <Legend
         className="mt-4 sm:hidden"
-        items={nodes.map((nd) => ({ label: nd.label, fill: nd.fill, value: nd.v }))}
+        items={nodes.map((nd) => ({ label: nd.label, fill: nd.fill, value: nd.v, drill: DRILL[nd.id] }))}
       />
       <p className="mt-2 text-xs text-on-dark-subtle">Blocks left of the offers count students; from the offers on they count offers. A student can hold several.</p>
-      <div className="mt-4 grid gap-x-12 gap-y-5 lg:grid-cols-[2fr_3fr]">
-        <div>
+      <Meetings data={data} className="mt-6 border-t border-white/15 pt-5" />
+      <div className="mt-5 grid gap-x-10 gap-y-6 border-t border-white/15 pt-5 md:grid-cols-2 xl:grid-cols-[1fr_1fr_auto]">
+        <div className="min-w-0">
           <p className="mb-2 text-[13px] text-on-dark-subtle">Findtern band of the {n(inter)} interviewed</p>
           <BandBar data={data} />
         </div>
-        <Scores data={data} />
+        <div className="min-w-0">
+          <p className="mb-2 text-[13px] text-on-dark-subtle">CGPA / % band of the {n(inter)} interviewed</p>
+          <MarksBar data={data} />
+        </div>
+        <Averages data={data} className="md:col-span-2 xl:col-span-1" />
       </div>
     </DesignFrame>
   );

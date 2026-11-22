@@ -49,6 +49,8 @@ export type PlacementData = {
   withOffer: number;
   internships: number;
   ppo: number;
+  /** Employer meetings; other = missed or called off by the employer. students = students with at least one. */
+  meetings: { total: number; done: number; notAccepted: number; upcoming: number; waiting: number; other: number; students: number };
 };
 
 export type OverviewModes = { categories: CategoriesData; placement: PlacementData };
@@ -93,6 +95,17 @@ export function overviewModes(all: MasterRow[]): OverviewModes {
   }
   // Whatever is left was withdrawn by the employer; never below zero if a status is new.
   offers.withdrawn = Math.max(0, offers.received - offers.accepted - offers.rejected - offers.notAnswered);
+  const meetings = { total: 0, done: 0, notAccepted: 0, upcoming: 0, waiting: 0, other: 0, students: 0 };
+  for (const r of rows) {
+    const m = r.meetings;
+    meetings.total += m.total;
+    meetings.done += m.done;
+    meetings.notAccepted += m.notAccepted;
+    meetings.upcoming += m.upcoming;
+    meetings.waiting += m.waiting;
+    if (m.total > 0) meetings.students++;
+  }
+  meetings.other = Math.max(0, meetings.total - meetings.done - meetings.notAccepted - meetings.upcoming - meetings.waiting);
 
   return {
     categories: {
@@ -114,6 +127,7 @@ export function overviewModes(all: MasterRow[]): OverviewModes {
       withOffer: rows.filter((r) => r.offers > 0).length,
       internships: rows.filter((r) => r.hired).length,
       ppo: rows.filter((r) => r.ppo).length,
+      meetings,
     },
   };
 }

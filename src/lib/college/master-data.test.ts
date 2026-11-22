@@ -19,7 +19,7 @@ const extras = (over: Partial<MasterExtras> = {}): MasterExtras => ({
     aadhaarNumber: "1234 5678 9012", panNumber: "ABCDE1234F", bank: { accountNumber: "000111" },
   },
   skills: ["Excel", "Sales"], locationTypes: ["Hybrid", "remote", "space"], preferredLocations: ["Jaipur", "Delhi"],
-  hasLaptop: true, city: "Jaipur", state: "Rajasthan", experience: [{}], offers: 0, offersAccepted: 0, offersRejected: 0, offersOpen: 0, hired: 0, ppo: 0, earningsMinor: 0, ...over,
+  hasLaptop: true, city: "Jaipur", state: "Rajasthan", experience: [{}], offers: 0, offersAccepted: 0, offersRejected: 0, offersOpen: 0, hired: 0, ppo: 0, earningsMinor: 0, meetings: { total: 0, done: 0, notAccepted: 0, upcoming: 0, waiting: 0 }, ...over,
 });
 
 test("a verified student carries every field on the master data list", () => {
@@ -44,8 +44,9 @@ test("a verified student carries every field on the master data list", () => {
 });
 
 test("an unverified student shows only name, email, year, course and branch", () => {
-  const r = buildMasterRow(student({ status: "claimed", phone: null, linkedin: null, cgpa: null, score: null }), extras({ offers: 3, hired: 1, ppo: 1, earningsMinor: 50000 }));
+  const r = buildMasterRow(student({ status: "claimed", phone: null, linkedin: null, cgpa: null, score: null }), extras({ offers: 3, hired: 1, ppo: 1, earningsMinor: 50000, meetings: { total: 4, done: 2, notAccepted: 1, upcoming: 1, waiting: 0 } }));
   assert.equal(r.verified, false);
+  assert.equal(r.meetings.total, 0);
   for (const k of ["phone", "emergencyContact", "cgpa", "score", "english", "city", "laptop", "lastSeenAt", "professionalCourse"] as const) {
     assert.equal(r[k], null, k);
   }

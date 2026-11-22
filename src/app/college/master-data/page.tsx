@@ -27,7 +27,7 @@ export default async function MasterDataPage({ searchParams }: { searchParams: P
           {rows.length.toLocaleString("en-IN")} students{rows.length - verified ? `, ${(rows.length - verified).toLocaleString("en-IN")} waiting for your approval` : ""}. Pick a view, change the columns, and download what you see.
         </p>
       </div>
-      <MasterDataTable rows={rows} collegeId={ctx.college.id} now={requestTime()} initial={{ view: one(sp.view), course: one(sp.course), mode: one(sp.mode), year: one(sp.year), band: one(sp.band), marks: one(sp.marks), status: one(sp.status) }} />
+      <MasterDataTable rows={rows} collegeId={ctx.college.id} now={requestTime()} initial={{ view: one(sp.view), course: one(sp.course), mode: one(sp.mode), year: one(sp.year), band: one(sp.band), marks: one(sp.marks), status: one(sp.status), placement: one(sp.placement), outcome: one(sp.outcome) }} />
     </div>
   );
 }
