@@ -51,6 +51,7 @@ export async function readinessForMany(ids: string[]): Promise<Map<string, Readi
         frozen: Boolean(u.frozenAt),
         openToWork: extra.openToWork !== false,
         hiddenByAdmin: extra.hiddenByAdmin === true,
+        rejected: extra.approvalStatus === "Rejected",
         interviewed: Number(extra.findternScore) > 0 && Number(ratings.interview) > 0,
         hireable: hireGateDecision(row, files).ok,
         submitted,

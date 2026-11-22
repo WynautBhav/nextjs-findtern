@@ -3,10 +3,10 @@ import assert from "node:assert/strict";
 
 import { hasMarksheet, openStepOf, readinessFrom } from "./student-readiness.ts";
 
-const base = { inPool: true, profileVisibility: "live", isActive: true, frozen: false, openToWork: true, hiddenByAdmin: false, interviewed: true, hireable: true, submitted: true, openStep: null, marksheet: true };
+const base: Parameters<typeof readinessFrom>[0] = { inPool: true, profileVisibility: "live", isActive: true, frozen: false, openToWork: true, hiddenByAdmin: false, rejected: false, interviewed: true, hireable: true, submitted: true, openStep: null, marksheet: true };
 
 test("in the pool and complete: seen and hireable, no lines", () => {
-  assert.deepEqual(readinessFrom(base), { seen: true, seenWhy: "", hireable: true, hireWhy: "", paused: false, marksheet: true });
+  assert.deepEqual(readinessFrom(base), { seen: true, seenWhy: "", hidden: null, hireable: true, hireWhy: "", paused: false, marksheet: true });
 });
 
 test("the pool decides seen; an incomplete profile only blocks the hire, by step name", () => {
@@ -42,4 +42,21 @@ test("marksheet flag reads only that a file exists", () => {
   assert.equal(hasMarksheet({ academics: { marksheetUploads: [{ name: "k/1.pdf" }] } }), true);
   assert.equal(hasMarksheet({ academics: { marksheetUploads: [] } }), false);
   assert.equal(hasMarksheet(null), false);
+});
+
+test("hidden profiles: one reason each, the first that blocks, in the order the officer reads them", () => {
+  const out = { ...base, inPool: false };
+  const reason = (o: Partial<typeof base>) => readinessFrom({ ...out, ...o }).hidden;
+  assert.equal(readinessFrom(base).hidden, null);
+  assert.equal(reason({ frozen: true, rejected: true }), "paused");
+  assert.equal(reason({ rejected: true, openToWork: false }), "rejected");
+  assert.equal(readinessFrom({ ...out, rejected: true }).seenWhy, "Findtern did not approve this profile.");
+  assert.equal(reason({ openToWork: false, submitted: false }), "open_to_work");
+  assert.equal(reason({ submitted: false, interviewed: false }), "interview");
+  assert.equal(reason({ openStep: 2 }), "profile");
+  assert.equal(reason({ submitted: false }), "profile");
+  assert.equal(reason({ interviewed: false }), "interview");
+  assert.equal(reason({}), "checks");
+  // In the pool = not hidden, whatever the flags say (the pool query is the truth).
+  assert.equal(readinessFrom({ ...base, submitted: false }).hidden, null);
 });

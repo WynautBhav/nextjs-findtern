@@ -5,6 +5,18 @@
  * PPO, 4th year a job.
  */
 
+import type { HiddenReason } from "./student-readiness.ts";
+
+/** Why a student is hidden from employers, in the order the dashboard lists them. Paused shows only when someone is. */
+export const HIDDEN_REASONS: { id: HiddenReason; label: string }[] = [
+  { id: "checks", label: "Waiting for Findtern's check" },
+  { id: "rejected", label: "Rejected by Findtern" },
+  { id: "profile", label: "Profile not complete" },
+  { id: "interview", label: "AI interview not done" },
+  { id: "open_to_work", label: "Open to work turned off" },
+  { id: "paused", label: "Paused by Findtern" },
+];
+
 export const COHORTS = [
   { year: 2, label: "2nd year", goal: "Internship" },
   { year: 3, label: "3rd year", goal: "Internship + PPO" },

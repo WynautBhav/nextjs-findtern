@@ -9,11 +9,19 @@ import type { ProfileDocs } from "../admin/profile-state.ts";
 /** The onboarding steps in the student's own words (lib/onboarding.ts, steps 1 to 8). */
 export const STEP_NAMES = ["About me", "Academics", "Experience", "Skills", "Languages", "Extracurriculars", "Work preferences", "Agreement"] as const;
 
+/**
+ * Why employers cannot see a student, as one code: the first that blocks wins, so every hidden student counts once.
+ * "checks" is Findtern's approval and the interview fee read as one: what the student paid is not the officer's to see.
+ */
+export type HiddenReason = "paused" | "rejected" | "open_to_work" | "profile" | "interview" | "checks";
+
 export type Readiness = {
   /** In the employer pool today (lib/employer-pool.ts), the same query employers browse with. */
   seen: boolean;
   /** Why not, in one line; empty when seen. */
   seenWhy: string;
+  /** Why not, as a code; null when seen. */
+  hidden: HiddenReason | null;
   /** The hire gate (lib/hire-gate.ts): a complete profile. Employers can see a student they cannot hire yet. */
   hireable: boolean;
   hireWhy: string;
@@ -23,6 +31,15 @@ export type Readiness = {
   marksheet: boolean;
 };
 
+const HIDDEN_WHY: Record<HiddenReason, (o: { submitted: boolean; openStep: number | null }) => string> = {
+  paused: () => "Paused by Findtern. Contact Findtern for details.",
+  rejected: () => "Findtern did not approve this profile.",
+  open_to_work: () => "The student turned off Open to work.",
+  profile: (o) => (!o.submitted ? "Profile not submitted yet." : `Profile incomplete: ${STEP_NAMES[o.openStep ?? 0] ?? "a step"} is not finished.`),
+  interview: () => "The AI interview is not done yet.",
+  checks: () => "Waiting on Findtern's checks.",
+};
+
 export function readinessFrom(o: {
   inPool: boolean;
   profileVisibility: string;
@@ -30,6 +47,8 @@ export function readinessFrom(o: {
   frozen: boolean;
   openToWork: boolean;
   hiddenByAdmin: boolean;
+  /** Findtern reviewed the profile and rejected it. */
+  rejected: boolean;
   /** An AI interview rating and a Findtern score. */
   interviewed: boolean;
   hireable: boolean;
@@ -42,21 +61,27 @@ export function readinessFrom(o: {
   const paused = o.frozen || !o.isActive;
   // The pool query is the truth; the flags only explain a "no", first reason wins. Approval and the interview fee read
   // as one "Findtern's checks" line: what the student paid is not the officer's to see.
-  const seenWhy = o.inPool
-    ? ""
+  const incomplete = !o.submitted || o.openStep !== null;
+  const hidden: HiddenReason | null = o.inPool
+    ? null
     : paused || o.profileVisibility === "hidden" || o.hiddenByAdmin
-      ? "Paused by Findtern. Contact Findtern for details."
-      : !o.openToWork
-        ? "The student turned off Open to work."
-        : !o.interviewed
-          ? "The AI interview is not done yet."
-          : "Waiting on Findtern's checks.";
+      ? "paused"
+      : o.rejected
+        ? "rejected"
+        : !o.openToWork
+          ? "open_to_work"
+          : !o.interviewed
+            ? "interview"
+            : incomplete
+              ? "profile"
+              : "checks";
+  const seenWhy = hidden === null ? "" : HIDDEN_WHY[hidden](o);
   const hireWhy = o.hireable
     ? ""
     : !o.submitted
       ? "Profile not submitted yet."
       : `Profile incomplete: ${STEP_NAMES[o.openStep ?? 0] ?? "a step"} is not finished.`;
-  return { seen: o.inPool, seenWhy, hireable: o.hireable, hireWhy, paused, marksheet: o.marksheet };
+  return { seen: o.inPool, seenWhy, hidden, hireable: o.hireable, hireWhy, paused, marksheet: o.marksheet };
 }
 
 /**

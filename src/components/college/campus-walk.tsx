@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { HIDDEN_REASONS } from "@/lib/college/labels";
+import type { HiddenReason } from "@/lib/college/student-readiness";
 import { cn } from "@/lib/utils";
 import type { RibbonStage } from "./overview-charts";
 
@@ -139,7 +141,41 @@ function Scene({ counts, stuck, W, cols, className }: { counts: number[]; stuck:
   );
 }
 
-export function BatchCampusWalk({ stages }: { stages: RibbonStage[] }) {
+/**
+ * Verified students employers cannot see, by the first reason that blocks each one, so the rows add up to the total.
+ * Every row opens the Students page showing just those students. Paused is listed only when someone is.
+ */
+function HiddenProfiles({ counts }: { counts: Partial<Record<HiddenReason, number>> }) {
+  const total = Object.values(counts).reduce((a, b) => a + (b ?? 0), 0);
+  const rows = HIDDEN_REASONS.filter((r) => r.id !== "paused" || (counts.paused ?? 0) > 0);
+  return (
+    <nav aria-label="Hidden profiles" className="min-w-0 lg:max-w-[44rem]">
+      <Link href="/college/students?show=hidden" className="flex flex-wrap items-baseline gap-x-2 rounded-lg px-2 py-1 outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/70">
+        <span className="whitespace-nowrap text-sm text-white">Hidden profiles</span>
+        <span className="nums text-sm font-medium text-accent-300">{n(total)}</span>
+        <span className="basis-full text-xs text-on-dark-subtle sm:basis-auto">employers can&apos;t see them yet</span>
+      </Link>
+      <ul className="mt-1 grid grid-cols-3 gap-1 sm:grid-flow-col sm:auto-cols-fr sm:grid-cols-none">
+        {rows.map((r) => {
+          const v = counts[r.id] ?? 0;
+          return (
+            <li key={r.id} className="min-w-0">
+              <Link
+                href={`/college/students?show=hidden&why=${r.id}`}
+                className="flex h-full flex-col justify-between gap-1.5 rounded-xl px-2 py-2 outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/70"
+              >
+                <span className="text-[11px] leading-tight text-on-dark-subtle sm:text-xs">{r.label}</span>
+                <span className={cn("nums text-[1.375rem] font-light leading-none", v ? "text-white" : "text-white/40")}>{n(v)}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </nav>
+  );
+}
+
+export function BatchCampusWalk({ stages, hidden }: { stages: RibbonStage[]; hidden?: Partial<Record<HiddenReason, number>> }) {
   const counts = furthest(stages);
   const total = stages[0]?.value ?? 0;
   const reached = stages.map((s) => s.value);
@@ -149,16 +185,17 @@ export function BatchCampusWalk({ stages }: { stages: RibbonStage[] }) {
 
   return (
     <div className="mt-8">
-      <div className="flex flex-wrap items-end justify-between gap-x-8 gap-y-3">
+      <div className="flex flex-col gap-x-10 gap-y-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-sm text-on-dark-subtle">Students in your batch</p>
           <p className="nums mt-1 text-[2.5rem] font-light leading-none tracking-[-0.03em] text-white">{n(total)}</p>
+          {counts[stuck] > 0 ? (
+            <p className="mt-3 max-w-md text-sm text-white">
+              Most are stuck at {stages[stuck].label}: <span className="nums font-medium text-accent-300">{n(counts[stuck])}</span> students, no further yet.
+            </p>
+          ) : null}
         </div>
-        {counts[stuck] > 0 ? (
-          <p className="max-w-md text-sm text-white sm:text-right">
-            Most are stuck at {stages[stuck].label}: <span className="nums font-medium text-accent-300">{n(counts[stuck])}</span> students, no further yet.
-          </p>
-        ) : null}
+        {hidden ? <HiddenProfiles counts={hidden} /> : null}
       </div>
 
       <figure className="mt-4" role="img" aria-label={`${total} students. ${stages.map((st, i) => `${st.label}: ${reached[i]}, ${counts[i]} stopped there`).join("; ")}`}>

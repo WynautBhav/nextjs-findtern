@@ -23,6 +23,8 @@ import { DriveDashboard } from "./drive-dashboard";
 import { BatchCampusWalk } from "@/components/college/campus-walk";
 import { HeroModes, type HeroMode } from "@/components/college/hero-modes/hero-modes";
 import { masterRowsForCollege } from "@/lib/college/master-data";
+import { readinessForMany } from "@/lib/college/student-readiness-db";
+import type { HiddenReason } from "@/lib/college/student-readiness";
 import { overviewModes } from "@/lib/college/overview-modes";
 import { AttentionTiles, type AttentionTile } from "@/components/college/attention-tiles";
 
@@ -85,9 +87,13 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
   ]);
 
   const students = all.filter((s) => s.status === "verified");
-  const presence = liveDrive
-    ? await presenceSnapshot(ctx.college.id, (await eligibleStudents(liveDrive)).map((s) => s.userId))
-    : null;
+  const [presence, readiness] = await Promise.all([
+    liveDrive ? eligibleStudents(liveDrive).then((e) => presenceSnapshot(ctx.college.id, e.map((s) => s.userId))) : null,
+    readinessForMany(students.map((s) => s.userId)),
+  ]);
+  // Hidden from employers, one reason each (the first that blocks), for the Hidden profiles panel.
+  const hidden: Partial<Record<HiddenReason, number>> = {};
+  for (const r of readiness.values()) if (r.hidden) hidden[r.hidden] = (hidden[r.hidden] ?? 0) + 1;
 
   const interviewed = students.filter((s) => aiStatusLabel(s.aiStatus).done);
   const scores = interviewed.map((s) => s.score).filter((v): v is number => v !== null);
@@ -179,7 +185,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
             <ButtonLink href="/college/approvals#add" variant="outlineLight">Add students</ButtonLink>
           </div>
         </div>
-        <HeroModes students={<BatchCampusWalk stages={funnel} />} data={overviewModes(master)} initialMode={heroMode} initialDesign={heroDesign} rows={master} collegeId={ctx.college.id} now={now} />
+        <HeroModes students={<BatchCampusWalk stages={funnel} hidden={hidden} />} data={overviewModes(master)} initialMode={heroMode} initialDesign={heroDesign} rows={master} collegeId={ctx.college.id} now={now} />
       </HeroPanel>
 
       {firstRun ? (

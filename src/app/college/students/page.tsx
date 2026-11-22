@@ -6,6 +6,7 @@ import { approvalsFor } from "@/lib/college/approvals";
 import { requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { requirePublicOrigin } from "@/lib/origin";
 import { toStudentRow } from "@/lib/college/serialize";
+import { HIDDEN_REASONS } from "@/lib/college/labels";
 import { readinessForMany } from "@/lib/college/student-readiness-db";
 
 export const dynamic = "force-dynamic";
@@ -23,9 +24,9 @@ function requestTime(): number {
  * plus the college's own list (who already has an account and waits for the officer, who has not joined). This page
  * took over the old Student list page; adding students (paste or upload) is on Approvals.
  */
-export default async function StudentsPage({ searchParams }: { searchParams?: Promise<{ show?: string }> }) {
+export default async function StudentsPage({ searchParams }: { searchParams?: Promise<{ show?: string; why?: string }> }) {
   const ctx = await requireCollegeContext();
-  const show = (await searchParams)?.show;
+  const { show, why } = (await searchParams) ?? {};
   const [all, { candidates }] = await Promise.all([studentsForCollegeAdmin(ctx), approvalsFor(ctx.college.id, ctx.college.emailDomains)]);
   const students = all.filter((s) => s.status === "verified");
   const [coverage, readiness] = await Promise.all([
@@ -70,13 +71,14 @@ export default async function StudentsPage({ searchParams }: { searchParams?: Pr
       <StudentCards
         students={students.map((s) => {
           const r = readiness.get(s.userId);
-          return { ...toStudentRow(s), hiddenWhy: r && !r.seen ? r.seenWhy : null, hireWhy: r && !r.hireable ? r.hireWhy : null };
+          return { ...toStudentRow(s), hiddenWhy: r && !r.seen ? r.seenWhy : null, hidden: r?.hidden ?? null, hireWhy: r && !r.hireable ? r.hireWhy : null };
         })}
         roster={coverage.rows.filter((r) => r.state !== "joined")}
         invite={invite}
         now={requestTime()}
         initialGroup={GROUPS.find((g) => g === show) ?? "students"}
         initialFilter={FILTERS.find((f) => f === show) ?? "all"}
+        initialWhy={show === "hidden" ? (HIDDEN_REASONS.find((h) => h.id === why)?.id ?? null) : null}
       />
     </div>
   );

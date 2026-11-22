@@ -7,7 +7,8 @@ import { Mail, Phone, Search } from "lucide-react";
 import { LinkedinIcon } from "@/components/ui/social-icons";
 
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
-import { COHORTS, aiStatusLabel, ago, yearLabel } from "@/lib/college/labels";
+import { COHORTS, HIDDEN_REASONS, aiStatusLabel, ago, yearLabel } from "@/lib/college/labels";
+import type { HiddenReason } from "@/lib/college/student-readiness";
 import type { RosterListRow } from "@/lib/college/scope";
 import { cn } from "@/lib/utils";
 import { EmptyScene, Pill, SURFACE_CLASS } from "@/components/app/primitives";
@@ -86,6 +87,7 @@ export function StudentCards({
   now,
   initialGroup = "students",
   initialFilter = "all",
+  initialWhy = null,
 }: {
   students: StudentRow[];
   /** The college's list, only the names that are not verified students yet. */
@@ -95,10 +97,14 @@ export function StudentCards({
   now: number;
   initialGroup?: StudentGroup;
   initialFilter?: StudentFilter;
+  /** With the "hidden" filter: only students hidden for this reason (the dashboard's Hidden profiles links). */
+  initialWhy?: HiddenReason | null;
 }) {
   const [group, setGroup] = useState<StudentGroup>(initialGroup);
   const [cohort, setCohort] = useState<number | "all">("all");
-  const [filter, setFilter] = useState<Filter>(initialFilter);
+  const [filter, setFilterState] = useState<Filter>(initialFilter);
+  const [why, setWhy] = useState<HiddenReason | null>(initialWhy);
+  const setFilter = (f: Filter) => { setFilterState(f); setWhy(null); };
   const [stage, setStage] = useState<Stuck | null>(null);
   const [q, setQ] = useState("");
   const [showAll, setShowAll] = useState(false);
@@ -125,10 +131,11 @@ export function StudentCards({
       inYear.filter((s) => {
         if (stage && stuckAt(factsOf(s)) !== stage) return false;
         if (!matches(s, filter, now)) return false;
+        if (why && s.hidden !== why) return false;
         if (term && !`${s.name} ${s.rollNo ?? ""} ${s.branch ?? ""} ${s.email} ${s.phone ?? ""}`.toLowerCase().includes(term)) return false;
         return true;
       }),
-    [inYear, stage, filter, term, now],
+    [inYear, stage, filter, why, term, now],
   );
   const listRows = useMemo(
     () => (group === "on_findtern" ? waiting : notJoined).filter((r) => !term || `${r.name} ${r.rollNo ?? ""} ${r.branch ?? ""} ${r.email} ${r.phone ?? ""}`.toLowerCase().includes(term)),
@@ -224,8 +231,8 @@ export function StudentCards({
               const on = filter === f.id;
               return (
                 <button key={f.id} type="button" aria-pressed={on} onClick={() => setFilter(on ? "all" : f.id)} className={chipClass(on)}>
-                  {f.label}
-                  <span className={cn("nums text-xs", on ? "text-white/70" : "text-text-subtle")}>{filterCounts[f.id]}</span>
+                  {on && why && f.id === "hidden" ? HIDDEN_REASONS.find((h) => h.id === why)?.label : f.label}
+                  <span className={cn("nums text-xs", on ? "text-white/70" : "text-text-subtle")}>{on && why && f.id === "hidden" ? inYear.filter((s) => s.hidden === why).length : filterCounts[f.id]}</span>
                 </button>
               );
             })}

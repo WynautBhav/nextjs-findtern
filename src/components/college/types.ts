@@ -1,3 +1,4 @@
+import type { HiddenReason } from "@/lib/college/student-readiness";
 /** Student rows as the placement console's client components receive them. */
 export type StudentRow = {
   userId: string;
@@ -24,6 +25,7 @@ export type StudentRow = {
   leftAt: null;
   /** Why employers can't find this student, one line; null when they can (student-readiness.ts). */
   hiddenWhy?: string | null;
+  hidden?: HiddenReason | null;
   /** Why they can't be hired yet; null when they can. */
   hireWhy?: string | null;
 };
