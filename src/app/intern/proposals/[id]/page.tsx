@@ -73,7 +73,7 @@ export default async function ProposalDetail({ params }: { params: Promise<{ id:
   const facts = offerFacts(proposal, { score, names: data.names });
   const { offer, fullTime } = facts;
   const ft = offer.fullTime;
-  const overlay = internOfferOverlay(proposal, extra);
+  const overlay = internOfferOverlay({ ...proposal, hasOpenOrder: data.openOrderIds.has(proposal.id) }, extra);
   // The CGPA check and an expired offer read differently from the stored status (intern-offer-view.ts).
   const status = overlay.kind ? { label: overlay.label, tone: overlay.tone, detail: overlay.detail } : proposalStatus(facts.key);
   const open = canDecide(facts.key);

@@ -13,8 +13,9 @@ import { wallTimeToUtc } from "./timezones.ts";
  * - unanswered on or after the joining date: "lapsed" (closed as rejected);
  * - "processing" (a legacy checkout that was started): already accepted
  *   (INW-21), so the intern is never asked to answer it again;
- * - a full-time offer that was accepted: the hire itself (INW-13), so it is
- *   never "awaiting payment";
+ * - an accepted full-time offer is accepted, not hired, until the company has
+ *   paid the hiring fee (status hired or `hiredAt`), the same as an internship
+ *   and the same as the company's and the college's screens;
  * - any row with `hiredAt`: hired, whatever the status says.
  */
 export type InternOfferKey =
@@ -44,7 +45,7 @@ export function internOfferKey(p: Row, now: Date = new Date()): InternOfferKey {
   if ((status === "sent" || status === "interview_scheduled") && offerPastStart(offer.startDate, now)) return "lapsed";
   // The sweeper storing a no-reply expiry must not change what the intern reads (it said "Rejected · no response" a minute before).
   if (status === "expired" && expiryOf({ status, hiredAt: p.hiredAt ?? null, offerDetails: p.offerDetails }).reason === "no_reply_past_start") return "lapsed";
-  if (status === "accepted" || status === "processing") return fullTime ? "fulltime_hired" : "accepted";
+  if (status === "accepted" || status === "processing") return "accepted";
   if (["sent", "interview_scheduled", "rejected", "withdrawn", "expired", "draft"].includes(status)) {
     return status as InternOfferKey;
   }
@@ -224,7 +225,9 @@ export function formatIstPlain(value: Date | string | null | undefined): string 
  *   expired_unpaid     accepted, but the company did not pay before the start date
  *   closed_by_admin    Findtern closed the offer
  *
- * Only an accepted internship offer can be verifying; a hired, processing, sent or full-time row never is.
+ * Only an accepted internship offer can be verifying; a hired, processing, sent or full-time row never is. The expiry
+ * kinds apply to a full-time offer too (the company's screen expires it the same way), and `hasOpenOrder` (an unpaid
+ * payment order is open, as the company's screen and the admin tracker read it) freezes the unpaid expiry.
  */
 export type InternOverlayKind = "verifying" | "verifying_overdue" | "correction" | "expired_unpaid" | "closed_by_admin";
 
@@ -246,15 +249,22 @@ export type InternOfferOverlay = {
 const NO_OVERLAY: InternOfferOverlay = { kind: null, label: "", tone: "neutral", detail: "", sla: null, disclaimer: null, dueBy: null, group: null };
 
 export function internOfferOverlay(
-  p: { status: string | null; hiredAt?: Date | string | null; offerDetails: unknown; currency?: string | null; updatedAt?: Date | string | null },
+  p: {
+    status: string | null;
+    hiredAt?: Date | string | null;
+    offerDetails: unknown;
+    currency?: string | null;
+    updatedAt?: Date | string | null;
+    /** An unpaid payment order is open for this offer (intern-data.ts openOrderIds): the company can still pay, so it is not expired. */
+    hasOpenOrder?: boolean;
+  },
   extraData: unknown,
   now: Date = new Date(),
 ): InternOfferOverlay {
   const status = (p.status ?? "").toLowerCase();
   const offer = parseOffer(p.offerDetails, p.currency);
-  if (offer.fullTime) return NO_OVERLAY;
 
-  const expiry = expiryOf({ status, hiredAt: p.hiredAt ?? null, offerDetails: p.offerDetails, currency: p.currency }, now);
+  const expiry = expiryOf({ status, hiredAt: p.hiredAt ?? null, offerDetails: p.offerDetails, currency: p.currency, hasOpenOrder: status === "accepted" && Boolean(p.hasOpenOrder) }, now);
   if (expiry.reason === "unpaid_past_start") {
     return {
       ...NO_OVERLAY,
@@ -268,7 +278,7 @@ export function internOfferOverlay(
   if (status === "expired" && expiry.reason === "admin_closed") {
     return { ...NO_OVERLAY, kind: "closed_by_admin", label: "Closed by Findtern", tone: "closed", detail: "Findtern closed this offer. Nothing more is needed from you.", group: "closed" };
   }
-  if (status !== "accepted" || p.hiredAt) return NO_OVERLAY;
+  if (offer.fullTime || status !== "accepted" || p.hiredAt) return NO_OVERLAY;
 
   const gate: CgpaGate = proposalCgpaGate({ status, extraData, offerDetails: p.offerDetails, updatedAt: p.updatedAt ?? null }, now);
   if (!cgpaBlocksPayment(gate)) return NO_OVERLAY;

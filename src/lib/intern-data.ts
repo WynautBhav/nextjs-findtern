@@ -24,6 +24,7 @@ import {
 import { parseOffer } from "@/lib/offer";
 import { isHiredProposal } from "@/lib/hire-status";
 import { rawScore } from "@/lib/employer-candidates";
+import { openOrderProposalIds } from "@/lib/employer-payable";
 
 /**
  * One read for every intern screen.
@@ -106,6 +107,13 @@ export const loadInternData = cache(async (uid: string) => {
     names.admin = AI_INTERVIEW_NAME;
   }
 
+  // Accepted, unpaid offers whose company has an unpaid payment order open: the company can still pay them, so they are not
+  // expired (the company's screen and the admin tracker read the same order rule: employer-payable.ts openOrderProposalIds).
+  const awaitingPayment = p.filter((x) => x.status === "accepted" && !x.hiredAt);
+  const orderEmployers = [...new Set(awaitingPayment.map((x) => x.employerId))];
+  const openOrders = await Promise.all(orderEmployers.map((e) => openOrderProposalIds(db, e)));
+  const openOrderIds = new Set(openOrders.flatMap((s) => [...s]));
+
   const source = { proposals: p, interviews: i, timesheets: t, payouts: r, names, aiEmployerIds, score: currentScore(onboarding[0]?.extraData) };
 
   return {
@@ -116,6 +124,8 @@ export const loadInternData = cache(async (uid: string) => {
     onboarding: onboarding[0] ?? null,
     document: document[0] ?? null,
     names,
+    /** Ids of this intern's accepted offers that have an unpaid payment order open (frozen against expiry). */
+    openOrderIds,
     /** Employer ids whose interviews are the AI interview, not a company round. */
     aiEmployerIds,
     stage: deriveStage(p),

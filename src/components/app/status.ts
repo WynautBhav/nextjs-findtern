@@ -52,13 +52,13 @@ export function proposalStatus(status: string | null): {
         tone: "paid",
         detail: "The company completed the payment. Log your hours on Timesheets.",
       };
-    // Accepting a full-time offer is the hire itself (INW-13): no payment
-    // step on the intern's side and no timesheets.
+    // A full-time offer is hired once the company has paid (like an internship):
+    // no payment step on the intern's side.
     case "fulltime_hired":
       return {
         label: "Hired · full-time",
         tone: "paid",
-        detail: "You accepted this full-time offer, which makes you hired. Join the company on the joining date.",
+        detail: "The company completed the payment. Join the company on the joining date.",
       };
     case "rejected":
       return { label: "Rejected", tone: "closed", detail: "This offer is closed. Nothing more is needed from you." };

@@ -68,7 +68,7 @@ export default async function InternProposals({ searchParams }: { searchParams: 
     .map((p) => ({
       p,
       facts: offerFacts(p, { score, names: data.names }),
-      overlay: internOfferOverlay(p, extra),
+      overlay: internOfferOverlay({ ...p, hasOpenOrder: data.openOrderIds.has(p.id) }, extra),
       project: p.projectId ? (projects[p.projectId] ?? null) : null,
       takenDown: Boolean(p.projectId && takenDown.has(p.projectId)),
     }));

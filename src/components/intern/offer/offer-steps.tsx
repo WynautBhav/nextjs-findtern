@@ -4,8 +4,9 @@ import type { InternOfferKey } from "@/lib/intern-offer-view";
 import { cn } from "@/lib/utils";
 
 /** Where an offer is on its way: sent, accepted, hired. Closed offers show no track, only their end state. */
-export function OfferSteps({ stateKey, fullTime, className }: { stateKey: InternOfferKey; fullTime: boolean; className?: string }) {
-  const steps = fullTime ? ["Offer sent", "Hired"] : ["Offer sent", "Accepted", "Hired"];
+export function OfferSteps({ stateKey, className }: { stateKey: InternOfferKey; fullTime?: boolean; className?: string }) {
+  // A full-time offer is hired only once the company has paid, so it has the same three steps.
+  const steps = ["Offer sent", "Accepted", "Hired"];
   const at =
     stateKey === "hired" || stateKey === "fulltime_hired"
       ? steps.length - 1

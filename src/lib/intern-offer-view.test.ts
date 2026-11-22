@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { canDecide, hybridSplit, internOfferKey, joiningDayIst, joiningInstant, offerGroup, offerJoiningDay, offerWasEdited, shiftInIst } from "./intern-offer-view.ts";
+import { canDecide, hybridSplit, internOfferKey, internOfferOverlay, joiningDayIst, joiningInstant, offerGroup, offerJoiningDay, offerWasEdited, shiftInIst } from "./intern-offer-view.ts";
 import { parseOffer } from "./offer.ts";
 
 const now = new Date("2026-10-19T06:00:00Z"); // 19 Oct, 11:30 IST
@@ -28,11 +28,37 @@ test("processing reads as accepted (INW-21)", () => {
   assert.ok(!canDecide("accepted"));
 });
 
-test("an accepted full-time offer is the hire (INW-13)", () => {
-  assert.equal(internOfferKey({ status: "accepted", offerDetails: fullTime() }, now), "fulltime_hired");
+test("an accepted full-time offer is accepted, not hired, until the company has paid", () => {
+  assert.equal(internOfferKey({ status: "accepted", offerDetails: fullTime() }, now), "accepted");
+  assert.equal(internOfferKey({ status: "processing", offerDetails: fullTime() }, now), "accepted");
+  assert.equal(offerGroup("accepted"), "accepted");
+  assert.equal(internOfferKey({ status: "hired", offerDetails: fullTime() }, now), "fulltime_hired");
+  assert.equal(internOfferKey({ status: "accepted", hiredAt: new Date(), offerDetails: fullTime() }, now), "fulltime_hired");
   assert.equal(internOfferKey({ status: "accepted", offerDetails: internship() }, now), "accepted");
   assert.equal(internOfferKey({ status: "accepted", hiredAt: new Date(), offerDetails: internship() }, now), "hired");
   assert.equal(internOfferKey({ status: "hired", offerDetails: internship({ startDate: "2026-01-01" }) }, now), "hired");
+});
+
+test("an accepted full-time offer expires unpaid after its start day, like the company's screen says", () => {
+  const past = fullTime({ startDate: "2026-10-10" });
+  const o = internOfferOverlay({ status: "accepted", offerDetails: past }, null, now);
+  assert.deepEqual([o.kind, o.label, o.group], ["expired_unpaid", "Expired", "closed"]);
+  // Before the start day, or once hired, it is not expired and no CGPA overlay applies to a full-time row.
+  assert.equal(internOfferOverlay({ status: "accepted", offerDetails: fullTime() }, null, now).kind, null);
+  assert.equal(internOfferOverlay({ status: "accepted", hiredAt: new Date(), offerDetails: past }, null, now).kind, null);
+  assert.equal(internOfferOverlay({ status: "hired", offerDetails: past }, null, now).kind, null);
+});
+
+test("an open payment order freezes the unpaid expiry for the intern, as it does for the company and the admin tracker", () => {
+  const past = { status: "accepted", offerDetails: internship({ startDate: "2026-10-10" }) };
+  assert.equal(internOfferOverlay(past, null, now).kind, "expired_unpaid");
+  assert.equal(internOfferOverlay({ ...past, hasOpenOrder: false }, null, now).kind, "expired_unpaid");
+  assert.equal(internOfferOverlay({ ...past, hasOpenOrder: true }, null, now).kind, null);
+  const ft = { status: "accepted", offerDetails: fullTime({ startDate: "2026-10-10" }) };
+  assert.equal(internOfferOverlay(ft, null, now).kind, "expired_unpaid");
+  assert.equal(internOfferOverlay({ ...ft, hasOpenOrder: true }, null, now).kind, null);
+  // A stored expiry is not undone by a stray open order.
+  assert.equal(internOfferOverlay({ status: "expired", hasOpenOrder: true, offerDetails: internship({ expiredReason: "unpaid_past_start" }) }, null, now).kind, "expired_unpaid");
 });
 
 test("closed states pass through", () => {
