@@ -1,9 +1,8 @@
-import Link from "next/link";
-
 import type { CategoriesData } from "@/lib/college/overview-modes";
 import { cn } from "@/lib/utils";
 import { COFFEE_FILL, DesignFrame, Legend, MARKS_FILL, n, pct, Swatch, white } from "../kit";
 import { DONE, finding, NOT_YET, notInterviewed } from "./parts";
+import { DrillLink, type DrillFilters } from "../drill";
 
 /**
  * Categories analysis, "Heat matrix" (the chosen design): degrees down, Findtern bands across. Each cell is the band's
@@ -20,35 +19,25 @@ const COLS = [
 ];
 const level = (v: number, max: number) => (v === 0 ? 0 : 0.2 + 0.8 * Math.sqrt(v / Math.max(1, max)));
 
-/** A Master data link with filters set. "Not set" here is "Course not set" there. */
-function md(f: { course?: string; year?: number; band?: string; marks?: string }) {
-  const q = new URLSearchParams({ status: "verified" });
-  if (f.course) q.set("course", f.course === "Not set" ? "Course not set" : f.course);
-  if (f.year) q.set("year", String(f.year));
-  if (f.band) q.set("band", f.band);
-  if (f.marks) q.set("marks", f.marks);
-  return `/college/master-data?${q}`;
-}
-
 const FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-white/80";
 
-function Cell({ value, fill, max, dark, href, label }: { value: number; fill: string; max: number; dark: boolean; href: string; label: string }) {
+function Cell({ value, fill, max, dark, filters, label }: { value: number; fill: string; max: number; dark: boolean; filters: DrillFilters; label: string }) {
   const o = level(value, max);
   return (
-    <Link href={href} aria-label={`${label}: ${value} students. Open in Master data`} className={cn("group relative grid h-11 place-items-center rounded-md transition-transform hover:-translate-y-px sm:h-12", FOCUS)} style={{ background: white(0.05) }}>
+    <DrillLink title={label} filters={filters} aria-label={`${label}: ${value} students. Open in Master data`} className={cn("group relative grid h-11 place-items-center rounded-md transition-transform hover:-translate-y-px sm:h-12", FOCUS)} style={{ background: white(0.05) }}>
       <span className="absolute inset-0 rounded-md" style={{ background: fill, opacity: o }} aria-hidden />
       <span className="absolute inset-0 rounded-md ring-1 ring-white/0 transition-colors group-hover:ring-white/50" aria-hidden />
       <span className={cn("nums relative text-sm", dark && o >= 0.55 ? "font-medium text-brand-950" : "text-white")}>{n(value)}</span>
-    </Link>
+    </DrillLink>
   );
 }
 
 /** A plain number or header that opens Master data; underline on hover so it reads as a link. */
-function NumLink({ href, label, className, children }: { href: string; label: string; className?: string; children: React.ReactNode }) {
+function NumLink({ filters, title, label, className, children }: { filters: DrillFilters; title: string; label: string; className?: string; children: React.ReactNode }) {
   return (
-    <Link href={href} aria-label={`${label}. Open in Master data`} className={cn("rounded-sm underline-offset-4 hover:underline", FOCUS, className)}>
+    <DrillLink title={title} filters={filters} aria-label={`${label}. Open in Master data`} className={cn("rounded-sm underline-offset-4 hover:underline", FOCUS, className)}>
       {children}
-    </Link>
+    </DrillLink>
   );
 }
 
@@ -87,7 +76,7 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
             {COLS.map((c) => {
               const b = data.coffee.find((x) => x.key === c.key)!;
               return (
-                <NumLink key={c.key} href={md({ band: c.key })} label={`${b.name}, all degrees`} className="min-w-0">
+                <NumLink key={c.key} filters={{ band: c.key }} title={`${b.name}, all degrees`} label={`${b.name}, all degrees`} className="min-w-0">
                   <span className="flex items-center gap-1 text-white">
                     <Swatch fill={c.fill} className="size-2 sm:size-2.5" />
                     <span className="hidden truncate sm:inline">{b.name}</span>
@@ -96,7 +85,7 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
                 </NumLink>
               );
             })}
-            <NumLink href={md({ band: "none" })} label="Not interviewed yet, all degrees" className="min-w-0">
+            <NumLink filters={{ band: "none" }} title="Not interviewed yet, all degrees" label="Not interviewed yet, all degrees" className="min-w-0">
               <span className="flex items-center gap-1 text-white">
                 <Swatch fill={NONE} className="size-2 sm:size-2.5" />
                 <span className="hidden truncate sm:inline">Not yet</span>
@@ -108,14 +97,14 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
           <div className="space-y-1.5">
             {data.degrees.map((d) => (
               <div key={d.name} className={grid}>
-                <NumLink href={md({ course: d.name })} label={`${d.name}, all students`} className="truncate text-sm text-white">
+                <NumLink filters={{ course: d.name }} title={`${d.name}, all students`} label={`${d.name}, all students`} className="truncate text-sm text-white">
                   {d.name}
                 </NumLink>
                 {COLS.map((c) => (
-                  <Cell key={c.key} value={d.coffee[c.key]} fill={c.fill} max={max} dark={c.dark} href={md({ course: d.name, band: c.key })} label={`${d.name}, ${bandName(c.key)}`} />
+                  <Cell key={c.key} value={d.coffee[c.key]} fill={c.fill} max={max} dark={c.dark} filters={{ course: d.name, band: c.key }} label={`${d.name}, ${bandName(c.key)}`} />
                 ))}
-                <Cell value={Math.max(0, d.students - d.interviewed)} fill={NONE} max={max} dark={false} href={md({ course: d.name, band: "none" })} label={`${d.name}, not interviewed yet`} />
-                <NumLink href={md({ course: d.name })} label={`${d.name}: ${d.students} students`} className="nums text-right text-sm text-white">
+                <Cell value={Math.max(0, d.students - d.interviewed)} fill={NONE} max={max} dark={false} filters={{ course: d.name, band: "none" }} label={`${d.name}, not interviewed yet`} />
+                <NumLink filters={{ course: d.name }} title={`${d.name}, all students`} label={`${d.name}: ${d.students} students`} className="nums text-right text-sm text-white">
                   {n(d.students)}
                 </NumLink>
               </div>
@@ -125,15 +114,15 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
               {COLS.map((c) => {
                 const v = data.coffee.find((x) => x.key === c.key)?.students ?? 0;
                 return (
-                  <NumLink key={c.key} href={md({ band: c.key })} label={`${bandName(c.key)}: ${v} students`} className={cn("nums text-center text-sm", c.key === "latte" ? "text-accent-300" : "text-white")}>
+                  <NumLink key={c.key} filters={{ band: c.key }} title={`${bandName(c.key)}, all degrees`} label={`${bandName(c.key)}: ${v} students`} className={cn("nums text-center text-sm", c.key === "latte" ? "text-accent-300" : "text-white")}>
                     {n(v)}
                   </NumLink>
                 );
               })}
-              <NumLink href={md({ band: "none" })} label={`Not interviewed yet: ${notInterviewed(data)} students`} className="nums text-center text-sm text-white">
+              <NumLink filters={{ band: "none" }} title="Not interviewed yet, all degrees" label={`Not interviewed yet: ${notInterviewed(data)} students`} className="nums text-center text-sm text-white">
                 {n(notInterviewed(data))}
               </NumLink>
-              <NumLink href={md({})} label={`All ${data.students} students`} className="nums text-right text-sm text-white">
+              <NumLink filters={{}} title="All students" label={`All ${data.students} students`} className="nums text-right text-sm text-white">
                 {n(data.students)}
               </NumLink>
             </div>
@@ -146,7 +135,7 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
 
         <div className="min-w-0 max-lg:order-first">
           <Block title="Done with the AI interview">
-            <NumLink href={md({ band: "done" })} label={`${data.interviewed} students done with the AI interview`} className="flex items-baseline gap-2">
+            <NumLink filters={{ band: "done" }} title="Done with the AI interview" label={`${data.interviewed} students done with the AI interview`} className="flex items-baseline gap-2">
               <span className="nums text-[2.5rem] font-light leading-none tracking-[-0.03em] text-white">{n(data.interviewed)}</span>
               <span className="nums text-sm text-on-dark-subtle">
                 of {n(data.students)} students · {pct(data.interviewed, data.students)}%
@@ -159,7 +148,7 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
                 const o = level(b.students, maxMarks);
                 return (
                   <li key={b.key} className="min-w-0 text-[11px] text-on-dark-subtle sm:text-xs">
-                    <Link href={md({ marks: b.key })} aria-label={`CGPA / % ${b.name} (${b.range}): ${b.students} students. Open in Master data`} className={cn("group block rounded-md", FOCUS)}>
+                    <DrillLink title={`CGPA / % ${b.name} (${b.range})`} filters={{ marks: b.key }} aria-label={`CGPA / % ${b.name} (${b.range}): ${b.students} students. Open in Master data`} className={cn("group block rounded-md", FOCUS)}>
                       <span className="relative grid h-11 place-items-center rounded-md transition-transform group-hover:-translate-y-px sm:h-12" style={{ background: white(0.05) }}>
                         <span className="absolute inset-0 rounded-md" style={{ background: MARKS_FILL[b.key], opacity: o }} aria-hidden />
                         <span className="absolute inset-0 rounded-md ring-1 ring-white/0 transition-colors group-hover:ring-white/50" aria-hidden />
@@ -167,7 +156,7 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
                       </span>
                       <span className="mt-1 block whitespace-nowrap text-white">{b.name}</span>
                       <span className="nums block truncate">{b.range}</span>
-                    </Link>
+                    </DrillLink>
                   </li>
                 );
               })}
@@ -178,13 +167,13 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
             <ul className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Students by year">
               {data.years.map((y) => (
                 <li key={y.year}>
-                  <Link href={md({ year: y.year })} aria-label={`Year ${y.year}: ${y.interviewed} of ${y.students} interviewed. Open in Master data`} className={cn("group flex items-center gap-2 whitespace-nowrap rounded-md pr-1", FOCUS)}>
+                  <DrillLink title={`Year ${y.year}`} filters={{ year: y.year }} aria-label={`Year ${y.year}: ${y.interviewed} of ${y.students} interviewed. Open in Master data`} className={cn("group flex items-center gap-2 whitespace-nowrap rounded-md pr-1", FOCUS)}>
                     <Ring share={pct(y.interviewed, y.students)} />
                     <span className="nums text-xs text-on-dark-subtle">
                       <span className="block text-[13px] text-white group-hover:underline">Year {y.year}</span>
                       <span className="text-white">{n(y.interviewed)}</span>/{n(y.students)}
                     </span>
-                  </Link>
+                  </DrillLink>
                 </li>
               ))}
             </ul>

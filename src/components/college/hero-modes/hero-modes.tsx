@@ -2,7 +2,9 @@
 
 import { useState } from "react";
 
+import type { MasterRow } from "@/lib/college/master-row";
 import type { OverviewModes } from "@/lib/college/overview-modes";
+import { DrillProvider } from "./drill";
 import { cn } from "@/lib/utils";
 import { CATEGORY_DESIGNS } from "./categories";
 import { PLACEMENT_DESIGNS } from "./placement";
@@ -20,7 +22,7 @@ const MODES: { id: HeroMode; label: string }[] = [
   { id: "placement", label: "Placement analysis" },
 ];
 
-export function HeroModes({ students, data, initialMode, initialDesign }: { students: React.ReactNode; data: OverviewModes; initialMode: HeroMode; initialDesign: number }) {
+export function HeroModes({ students, data, initialMode, initialDesign, rows, collegeId, now }: { students: React.ReactNode; data: OverviewModes; initialMode: HeroMode; initialDesign: number; rows: MasterRow[]; collegeId: string; now: number }) {
   const [mode, setMode] = useState<HeroMode>(initialMode);
   const [design, setDesign] = useState<Record<"categories" | "placement", number>>({
     categories: initialMode === "categories" ? initialDesign : 0,
@@ -41,6 +43,7 @@ export function HeroModes({ students, data, initialMode, initialDesign }: { stud
   const current = mode === "students" ? 0 : Math.min(design[mode], list.length - 1);
 
   return (
+    <DrillProvider rows={rows} collegeId={collegeId} now={now}>
     <div className="mt-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div role="tablist" aria-label="Dashboard mode" className="flex flex-wrap gap-1 rounded-full bg-white/10 p-1">
@@ -94,5 +97,6 @@ export function HeroModes({ students, data, initialMode, initialDesign }: { stud
         {mode === "students" ? students : mode === "categories" ? (() => { const C = CATEGORY_DESIGNS[current].Component; return <C data={data.categories} />; })() : (() => { const C = PLACEMENT_DESIGNS[current].Component; return <C data={data.placement} />; })()}
       </div>
     </div>
+    </DrillProvider>
   );
 }

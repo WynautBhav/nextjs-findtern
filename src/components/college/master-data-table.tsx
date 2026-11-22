@@ -196,7 +196,7 @@ function MinimumPicker({ label, any, presets, value, onChange, className }: { la
   );
 }
 
-export function MasterDataTable({ rows, collegeId, now, initial }: { rows: MasterRow[]; collegeId: string; now: number; initial: { view?: string; course?: string; mode?: string; year?: string; band?: string; marks?: string; status?: string } }) {
+export function MasterDataTable({ rows, collegeId, now, initial, downloadName }: { rows: MasterRow[]; collegeId: string; now: number; initial: { view?: string; course?: string; mode?: string; year?: string; band?: string; marks?: string; status?: string }; /** File name for downloads before a view is picked (the Overview pop-up passes what was clicked). */ downloadName?: string }) {
   const start = PRESETS.find((p) => p.id === initial.view) ?? PRESETS[0];
   const [viewId, setViewId] = useState(start.id);
   const [columns, setColumns] = useState<Key[]>(start.columns);
@@ -285,7 +285,7 @@ export function MasterDataTable({ rows, collegeId, now, initial }: { rows: Maste
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
-      const name = (allViews.find((v) => v.id === viewId)?.name ?? "master data").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
+      const name = ((viewId === "all" && downloadName) || allViews.find((v) => v.id === viewId)?.name || "master data").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
       a.href = url;
       a.download = `${name}-${new Date().toISOString().slice(0, 10)}.csv`;
       document.body.appendChild(a);
@@ -435,7 +435,7 @@ export function MasterDataTable({ rows, collegeId, now, initial }: { rows: Maste
             <option value="unverified">Waiting for your approval</option>
           </select>
           {activeFilters ? (
-            <button type="button" onClick={() => { setFilters(NO_FILTERS); setLimit(PAGE); setResetKey((k) => k + 1); }} className="min-h-9 rounded-md px-2 font-medium text-brand-700 hover:underline focus-visible:ring-2 focus-visible:ring-brand-500">
+            <button type="button" onClick={() => { setFilters(NO_FILTERS); setLimit(PAGE); setResetKey((k) => k + 1); }} className="min-h-9 shrink-0 whitespace-nowrap rounded-md px-2 font-medium text-brand-700 hover:underline focus-visible:ring-2 focus-visible:ring-brand-500">
               Clear {activeFilters === 1 ? "filter" : `${activeFilters} filters`}
             </button>
           ) : null}

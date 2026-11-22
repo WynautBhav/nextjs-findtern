@@ -181,7 +181,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
             <ButtonLink href="/college/roster" variant="outlineLight">Add students</ButtonLink>
           </div>
         </div>
-        <HeroModes students={<BatchCampusWalk stages={funnel} />} data={overviewModes(master)} initialMode={heroMode} initialDesign={heroDesign} />
+        <HeroModes students={<BatchCampusWalk stages={funnel} />} data={overviewModes(master)} initialMode={heroMode} initialDesign={heroDesign} rows={master} collegeId={ctx.college.id} now={now} />
       </HeroPanel>
 
       {firstRun ? (
