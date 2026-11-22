@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { buildMasterRow, cellText, csvCell, MASTER_COLUMNS, matchesWorkMode, toCsv, type MasterExtras, type ScopedStudent } from "./master-row.ts";
-import { computeInsights, quadrantOf } from "./insights.ts";
+import { quadrantOf } from "./insights.ts";
 
 const student = (over: Partial<ScopedStudent> = {}): ScopedStudent => ({
   userId: "u1", status: "verified", firstName: "Asha", lastName: "Meena", email: "asha@jklu.edu.in",
@@ -70,30 +70,8 @@ test("CSV cells cannot run as spreadsheet formulas", () => {
   assert.equal(csvCell("Jaipur, Delhi"), '"Jaipur, Delhi"');
 });
 
-test("course totals add up to the batch, and claimed students are left out", () => {
-  const rows = [
-    buildMasterRow(student({ userId: "a" }), extras({ offers: 2, hired: 1, ppo: 1, earningsMinor: 200000 })),
-    buildMasterRow(student({ userId: "b", score: 5.1 }), extras({ offers: 1 })),
-    buildMasterRow(student({ userId: "c", cgpa: 8.9, score: 6.0 }), extras({ extra: { academics: { degree: "B.Tech" } } })),
-    buildMasterRow(student({ userId: "d", status: "claimed" }), extras({ offers: 9 })),
-  ];
-  const ins = computeInsights(rows);
-  assert.equal(ins.verified, 3);
-  assert.equal(ins.courses.reduce((t, c) => t + c.students, 0), ins.totals.students);
-  assert.equal(ins.courses.reduce((t, c) => t + c.offers, 0), 3);
-  assert.equal(ins.courses[0].course, "BBA");
-  assert.equal(ins.totals.earningsMinor, 200000);
-  assert.equal(ins.offerSpread.reduce((a, b) => a + b, 0), ins.totals.interviewed);
-  assert.equal(ins.quadrants.reduce((t, q) => t + q.students, 0), 3);
-});
-
-test("overlooked means a strong Findtern score and no offer yet", () => {
-  const rows = [
-    buildMasterRow(student({ userId: "a", score: 8.5 }), extras({ offers: 0 })),
-    buildMasterRow(student({ userId: "b", score: 8.9 }), extras({ offers: 1 })),
-    buildMasterRow(student({ userId: "c", score: 6.9 }), extras({ offers: 0 })),
-  ];
-  assert.deepEqual(computeInsights(rows).overlooked.map((r) => r.userId), ["a"]);
+test("quadrants split on a strong Findtern score and a high CGPA", () => {
+  assert.equal(quadrantOf({ cgpa: 8.0, score: 8.0 }), "stars");
   assert.equal(quadrantOf({ cgpa: 6.0, score: 8.0 }), "scoreBeatsCg");
   assert.equal(quadrantOf({ cgpa: 9.0, score: 5.0 }), "cgBeatsScore");
   assert.equal(quadrantOf({ cgpa: null, score: 5.0 }), null);

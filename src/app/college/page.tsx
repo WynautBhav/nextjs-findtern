@@ -22,6 +22,7 @@ import { BatchCampusWalk } from "@/components/college/campus-walk";
 import { HeroModes, type HeroMode } from "@/components/college/hero-modes/hero-modes";
 import { masterRowsForCollege } from "@/lib/college/master-data";
 import { overviewModes } from "@/lib/college/overview-modes";
+import { AttentionTiles, type AttentionTile } from "@/components/college/attention-tiles";
 
 export const dynamic = "force-dynamic";
 
@@ -94,23 +95,19 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
   const callsWaiting = students.filter((s) => s.callsPending > 0);
   const unpaidBatches = unpaid?.n ?? 0;
 
-  const decisions = [
-    toAccept > 0
-      ? { href: "/college/approvals", count: toAccept, title: `${toAccept === 1 ? "student is" : "students are"} waiting to be added`, body: "They already have a Findtern account. Accept the ones who are yours." }
-      : null,
-    pendingLeaves > 0
-      ? { href: "/college/approvals#leave", count: pendingLeaves, title: `${pendingLeaves === 1 ? "student has" : "students have"} asked to leave`, body: "They stay in your college until you decide." }
-      : null,
-    waiting.length > 0
-      ? { href: "/college/students?show=offers", count: waiting.length, title: `${waiting.length === 1 ? "student is" : "students are"} sitting on an offer`, body: "A reminder from you usually gets a reply the same day." }
-      : null,
-    callsWaiting.length > 0
-      ? { href: "/college/drives", count: callsWaiting.length, title: `${callsWaiting.length === 1 ? "student has" : "students have"} not answered an employer's call`, body: "The drive is still open. Ask them to accept or decline." }
-      : null,
-    unpaidBatches > 0
-      ? { href: "/college/seats", count: unpaidBatches, title: `seat ${unpaidBatches === 1 ? "batch is" : "batches are"} waiting for payment`, body: "Bank details and the invoice are on the Seats page." }
-      : null,
-  ].filter((d): d is NonNullable<typeof d> => d !== null);
+  const noInterview = students.length - interviewed.length;
+  const meetingsWaiting = master.filter((r) => r.verified && r.meetings.waiting > 0).length;
+  // What needs the officer, most urgent first. Every tile always shows; a zero reads "All clear".
+  const attention: AttentionTile[] = [
+    { key: "approvals", label: "Waiting for approval", value: toAccept, href: "/college/approvals", hint: "Accept the students who are yours", clearHint: "Nobody is waiting" },
+    { key: "leave", label: "Asked to leave", value: pendingLeaves, href: "/college/approvals#leave", hint: "They stay until you decide", clearHint: "No leave requests" },
+    { key: "offers", label: "Sitting on an offer", value: waiting.length, href: "/college/students?show=offers", hint: "A reminder gets a same-day reply", clearHint: "Every offer is answered" },
+    { key: "calls", label: "Calls not answered", value: callsWaiting.length, href: "/college/drives", hint: "Employers waiting in a drive", clearHint: "No calls waiting" },
+    { key: "meetings", label: "Meetings not answered", value: meetingsWaiting, href: "/college/master-data?status=verified&outcome=meet-waiting", hint: "Yet to pick a meeting time", clearHint: "Every invite is answered" },
+    { key: "interview", label: "AI interview not done", value: noInterview, href: "/college/students?show=no_interview", hint: "Employers see them after it", clearHint: "Everyone is interviewed" },
+    { key: "joined", label: "Not joined yet", value: notJoined, href: "/college/roster", hint: "On your list, no account yet", clearHint: coverage.rosterSize ? "Everyone has joined" : "Add your list to track this" },
+    { key: "seats", label: "Seats to pay for", value: unpaidBatches, href: "/college/seats", hint: "The invoice is on Seats", clearHint: "Every batch is paid" },
+  ];
 
   const withOffers = students.filter((s) => s.proposals > 0).length;
   const hired = students.filter((s) => s.hired > 0).length;
@@ -206,27 +203,10 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
         </Surface>
       ) : null}
 
-      {decisions.length > 0 ? (
-        <section aria-labelledby="needs-you">
-          <h2 id="needs-you" className="mb-2 text-sm font-semibold text-ink-900">Needs your decision</h2>
-          <Surface>
-            <ul className="divide-y divide-ink-100">
-              {decisions.map((d) => (
-                <li key={d.href} className="relative flex items-center gap-4 px-5 py-4 hover:bg-ink-50/60">
-                  <span className="nums w-10 shrink-0 text-right text-2xl font-semibold tracking-[-0.02em] text-ink-900">{d.count}</span>
-                  <div className="min-w-0 flex-1">
-                    <Link href={d.href} className="font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-inset focus-visible:after:ring-brand-500">
-                      {d.title}
-                    </Link>
-                    <p className="text-sm text-text-subtle">{d.body}</p>
-                  </div>
-                  <ArrowRight className="size-4 shrink-0 text-ink-500" aria-hidden />
-                </li>
-              ))}
-            </ul>
-          </Surface>
-        </section>
-      ) : null}
+      <section aria-labelledby="needs-you">
+        <h2 id="needs-you" className="mb-3 text-sm font-semibold text-ink-900">Needs your attention</h2>
+        <AttentionTiles tiles={attention} />
+      </section>
 
       {liveDrive && presence ? (
         <PresenceLive driveId={liveDrive.id} driveTitle={liveDrive.title} endsAt={liveDrive.endsAt.toISOString()} initial={{ ...presence }} />

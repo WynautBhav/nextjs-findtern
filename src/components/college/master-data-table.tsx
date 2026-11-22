@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * Master data: every field on the placement office's list, as a table the officer shapes into views (columns,
- * filters, sort) and downloads. Ready-made views answer the questions Insights asks; the officer's own views are
+ * filters, sort) and downloads. Ready-made views answer the common placement questions; the officer's own views are
  * kept in this browser. The download is built on the server from the same rows (api/college/students/export).
  */
 
@@ -208,7 +208,7 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
   const [columns, setColumns] = useState<Key[]>(() =>
     /^(met|meet-|not-accepted)/.test(initial.outcome ?? "") ? ["name", "degree", "branch", "year", "meetingsDone", "meetingsNotAccepted", "score", "offers", "hired", "lastSeenAt"] : start.columns,
   );
-  // Filters can arrive in the link (from the Overview and Insights): only known values are taken.
+  // Filters can arrive in the link (from the Dashboard pop-up and its tiles): only known values are taken.
   const [filters, setFilters] = useState<Filters>(() => {
     const f: Filters = { ...start.filters };
     if (initial.course) f.course = initial.course;
