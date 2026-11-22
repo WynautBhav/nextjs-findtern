@@ -14,7 +14,7 @@ import { Initials } from "./kit";
 import { NudgeButton } from "./nudge-button";
 import type { StudentRow } from "./types";
 
-export type StudentFilter = "all" | "no_interview" | "offers" | "hired" | "offline";
+export type StudentFilter = "all" | "no_interview" | "offers" | "hired" | "offline" | "not_open";
 type Filter = StudentFilter;
 
 const FILTERS: { id: Filter; label: string }[] = [
@@ -23,6 +23,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "offers", label: "Offer waiting on reply" },
   { id: "hired", label: "Hired" },
   { id: "offline", label: "Inactive 7+ days" },
+  { id: "not_open", label: "Not open to work" },
 ];
 
 const WEEK = 7 * 86400_000;
@@ -48,6 +49,7 @@ export function StudentTable({ students, now, initialFilter = "all" }: { student
       if (filter === "no_interview" && aiStatusLabel(s.aiStatus).done) return false;
       if (filter === "offers" && s.offersPending === 0) return false;
       if (filter === "hired" && s.hired === 0) return false;
+      if (filter === "not_open" && s.openToWork) return false;
       if (filter === "offline" && s.lastActivityAt && now - new Date(s.lastActivityAt).getTime() < WEEK) return false;
       if (term && !`${s.name} ${s.rollNo ?? ""} ${s.branch ?? ""} ${s.email} ${s.phone ?? ""}`.toLowerCase().includes(term)) return false;
       return true;

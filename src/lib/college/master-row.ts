@@ -49,6 +49,8 @@ export type MasterRow = {
   ppo: boolean;
   /** College earnings from this student's hires, in paise. */
   earningsMinor: number;
+  /** The student's "open to work" switch; null until the officer accepts them. */
+  openToWork: boolean | null;
 };
 
 /** What scope.ts already gives (already redacted for claimed students). */
@@ -65,6 +67,7 @@ export type ScopedStudent = {
   cgpa: number | null;
   score: number | null;
   lastSeenAt: Date | null;
+  openToWork: boolean;
 };
 
 /** The extra facts master data reads for each student (one SQL row, see master-data.ts). */
@@ -156,6 +159,7 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     hired: false,
     ppo: false,
     earningsMinor: 0,
+    openToWork: null,
   };
   if (!verified || !x) return base;
 
@@ -198,6 +202,7 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     hired: x.hired > 0,
     ppo: x.ppo > 0,
     earningsMinor: x.earningsMinor,
+    openToWork: s.openToWork,
   };
 }
 

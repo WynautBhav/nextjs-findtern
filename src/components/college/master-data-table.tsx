@@ -26,6 +26,7 @@ type Filters = {
   year: string;
   mode: string;
   laptop: "any" | "yes" | "no";
+  openToWork: "any" | "yes" | "no";
   placement: Placement;
   status: "any" | "verified" | "unverified";
   minScore: string;
@@ -35,7 +36,7 @@ type Filters = {
 type SortState = { key: Key; dir: "asc" | "desc" };
 type View = { id: string; name: string; columns: Key[]; filters: Filters; sort: SortState; own?: boolean };
 
-const NO_FILTERS: Filters = { course: "", year: "", mode: "", laptop: "any", placement: "any", status: "any", minScore: "", minCgpa: "", quadrant: "" };
+const NO_FILTERS: Filters = { course: "", year: "", mode: "", laptop: "any", openToWork: "any", placement: "any", status: "any", minScore: "", minCgpa: "", quadrant: "" };
 const BASE: Key[] = ["name", "degree", "branch", "year", "cgpa", "score", "offers", "hired", "ppo", "lastSeenAt"];
 const SCORES: Key[] = ["name", "degree", "branch", "cgpa", "english", "coding", "aptitude", "aiInterview", "score", "offers"];
 
@@ -75,6 +76,7 @@ function matches(r: MasterRow, f: Filters, q: string): boolean {
   if (f.year && String(r.year ?? "") !== f.year) return false;
   if (!matchesWorkMode(r.workMode, f.mode)) return false;
   if (f.laptop !== "any" && r.laptop !== (f.laptop === "yes")) return false;
+  if (f.openToWork !== "any" && r.openToWork !== (f.openToWork === "yes")) return false;
   if (f.status === "verified" && !r.verified) return false;
   if (f.status === "unverified" && r.verified) return false;
   if (f.placement === "offer" && r.offers === 0) return false;
@@ -397,6 +399,11 @@ export function MasterDataTable({ rows, collegeId, now, initial }: { rows: Maste
             <option value="any">Laptop: any</option>
             <option value="yes">Has a laptop</option>
             <option value="no">No laptop</option>
+          </select>
+          <select aria-label="Open to work" value={filters.openToWork} onChange={(e) => set("openToWork", e.target.value as Filters["openToWork"])} className={select}>
+            <option value="any">Open to work: any</option>
+            <option value="yes">Open to work</option>
+            <option value="no">Not open to work</option>
           </select>
           <MinimumPicker key={`score-${resetKey}`} label="Findtern score" any="Findtern score" presets={[5, 6, STRONG_SCORE, 8, 9]} value={filters.minScore} onChange={(v) => set("minScore", v)} className={select} />
           <MinimumPicker key={`cgpa-${resetKey}`} label="CGPA" any="Any CGPA" presets={[6, 7, HIGH_CGPA, 8, 9]} value={filters.minCgpa} onChange={(v) => set("minCgpa", v)} className={select} />

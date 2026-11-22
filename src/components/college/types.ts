@@ -20,5 +20,6 @@ export type StudentRow = {
   interviewsScheduled: number;
   driveMeetings: number;
   collegeId: string;
+  openToWork: boolean;
   leftAt: null;
 };

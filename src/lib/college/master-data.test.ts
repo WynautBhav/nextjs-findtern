@@ -7,7 +7,7 @@ import { computeInsights, quadrantOf } from "./insights.ts";
 const student = (over: Partial<ScopedStudent> = {}): ScopedStudent => ({
   userId: "u1", status: "verified", firstName: "Asha", lastName: "Meena", email: "asha@jklu.edu.in",
   phone: "+91 98290 00000", linkedin: "https://linkedin.com/in/asha", year: 3, branch: "Finance", cgpa: 6.4, score: 8.2,
-  lastSeenAt: new Date("2026-11-22T10:00:00Z"), ...over,
+  lastSeenAt: new Date("2026-11-22T10:00:00Z"), openToWork: true, ...over,
 });
 
 const extras = (over: Partial<MasterExtras> = {}): MasterExtras => ({
@@ -118,4 +118,10 @@ test("the filter follows Findtern's rule: Remote = remote only, Hybrid = remote 
 test("roll number is not part of master data", () => {
   assert.ok(!MASTER_COLUMNS.some((c) => (c.key as string) === "rollNo"));
   assert.ok(!("rollNo" in buildMasterRow(student(), extras())));
+});
+
+test("open to work: the student's own switch, shown only once the officer accepts them", () => {
+  assert.equal(buildMasterRow(student(), extras()).openToWork, true);
+  assert.equal(buildMasterRow(student({ openToWork: false }), extras()).openToWork, false);
+  assert.equal(buildMasterRow(student({ status: "claimed", openToWork: false }), extras()).openToWork, null);
 });
