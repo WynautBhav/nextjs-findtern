@@ -421,16 +421,22 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
             <option value="">Offers and meetings</option>
             {OUTCOMES.map((o) => <option key={o.key} value={o.key}>{o.label}</option>)}
           </select>
+          {/* The band filters are not part of the bar: they show only when a Dashboard number opened this list with one
+              set, so the filter that is on stays visible and can be cleared. */}
+          {filters.band ? (
           <select aria-label="Findtern band" value={filters.band} onChange={(e) => set("band", e.target.value as Filters["band"])} className={on(!!(filters.band))}>
             <option value="">Findtern band</option>
             <option value="done">AI interview done</option>
             <option value="none">Not interviewed yet</option>
             {COFFEE.map((c) => <option key={c.key} value={c.key}>{c.name} ({c.range})</option>)}
           </select>
+          ) : null}
+          {filters.marks ? (
           <select aria-label="CGPA / % band" value={filters.marks} onChange={(e) => set("marks", e.target.value as Filters["marks"])} className={on(!!(filters.marks))}>
             <option value="">CGPA / % band</option>
             {MARKS.map((m) => <option key={m.key} value={m.key}>{m.name} ({m.range})</option>)}
           </select>
+          ) : null}
           <select aria-label="Work mode preference" value={filters.mode} onChange={(e) => set("mode", e.target.value)} className={on(!!(filters.mode))}>
             <option value="">Work mode preference</option>
             {MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
