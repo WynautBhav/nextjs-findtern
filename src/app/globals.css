@@ -2012,6 +2012,19 @@ html {
   @keyframes bar-rise {
     from { transform: scaleY(0); }
   }
+  .seat-pop {
+    animation: seat-pop 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes seat-pop {
+    from { opacity: 0; transform: scale(0.4); }
+  }
+  .step-rise {
+    transform-origin: bottom;
+    animation: step-rise 640ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+  @keyframes step-rise {
+    from { opacity: 0; transform: scaleY(0.6); }
+  }
   .bar-slide {
     animation: bar-slide 520ms cubic-bezier(0.22, 1, 0.36, 1) both;
   }

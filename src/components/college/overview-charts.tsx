@@ -1,3 +1,4 @@
+import type React from "react";
 import Link from "next/link";
 
 import { avatarTint } from "@/components/app/avatar-helpers";
@@ -279,5 +280,178 @@ export function TopOfBatch({ students }: { students: TopStudent[] }) {
         </li>
       ))}
     </ol>
+  );
+}
+
+/** Biggest drop between two neighbouring stages: the finding the newer hero styles lead with. */
+function biggestDrop(stages: RibbonStage[]) {
+  let at = 1;
+  for (let i = 2; i < stages.length; i++) if (stages[i - 1].value - stages[i].value > stages[at - 1].value - stages[at].value) at = i;
+  const lost = Math.max(0, (stages[at - 1]?.value ?? 0) - (stages[at]?.value ?? 0));
+  return { at, lost, from: stages[at - 1]?.label ?? "", to: stages[at]?.label ?? "" };
+}
+
+const FILL_TONE = ["bg-white/[0.13]", "bg-sky-300", "bg-data-on-dark", "bg-accent-400", "bg-rose-300"];
+
+/**
+ * Seats: the batch as an exam hall. One seat per student on the list (or per N students for a big college), filled with
+ * the colour of the furthest stage that student has reached; an unfilled seat is a student who has not joined yet.
+ * The legend under the hall is the stage list, each a link to its students.
+ */
+export function BatchSeats({ stages }: { stages: RibbonStage[] }) {
+  const v = stages.map((s) => s.value);
+  // Furthest stage reached: each stage minus the next, never below zero.
+  const counts = v.map((x, i) => Math.max(0, x - (v[i + 1] ?? 0)));
+  const total = counts.reduce((a, b) => a + b, 0);
+  const per = total > 240 ? Math.ceil(total / 240) : 1;
+  const seats: number[] = [];
+  counts.forEach((c, i) => {
+    for (let k = 0; k < Math.round(c / per); k++) seats.push(i);
+  });
+  seats.reverse(); // hired first, front row
+  // Column count that leaves the back row as full as possible (no lone seat at the end).
+  const fit = (lo: number, hi: number) => {
+    let best = lo;
+    let score = -1;
+    for (let c = lo; c <= hi; c++) {
+      const rem = seats.length % c;
+      const sc = rem === 0 ? 1 : rem / c;
+      if (sc > score) [best, score] = [c, sc];
+    }
+    return best;
+  };
+  const drop = biggestDrop(stages);
+  return (
+    <div className="mt-8 grid gap-x-10 gap-y-6 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="min-w-0">
+        <p className="nums text-[clamp(2.5rem,5vw,4rem)] font-light leading-none tracking-[-0.04em]">{drop.lost.toLocaleString("en-IN")}</p>
+        <p className="mt-2 text-sm text-on-dark-subtle">
+          students lost between <span className="whitespace-nowrap text-white">{drop.from}</span> and <span className="whitespace-nowrap text-white">{drop.to}</span>
+        </p>
+        <p className="mt-1 text-xs text-on-dark-subtle">Your biggest drop. Each seat is {per === 1 ? "one student" : `${per} students`}, front row hired.</p>
+      </div>
+      <div className="min-w-0">
+        <ul
+          aria-hidden
+          style={{ "--cols": fit(9, 12), "--cols-lg": fit(18, 26) } as React.CSSProperties}
+          className="grid grid-cols-[repeat(var(--cols),minmax(0,1fr))] gap-x-1.5 gap-y-2.5 sm:gap-x-2 sm:gap-y-3 lg:grid-cols-[repeat(var(--cols-lg),minmax(0,1fr))]"
+        >
+          {seats.map((stage, i) => (
+            <li key={i} className={cn("seat-pop aspect-[5/6] rounded-t-[0.6rem] rounded-b-[0.2rem]", FILL_TONE[stage])} style={{ animationDelay: `${Math.min(i, 120) * 6}ms` }} />
+          ))}
+        </ul>
+        <ol className="mt-6 flex flex-wrap gap-x-6 gap-y-3" aria-label="Your batch, step by step">
+          {stages.map((s, i) => (
+            <li key={s.label} className="relative">
+              <Link href={s.href} className="flex items-baseline gap-2 rounded-md text-sm outline-none after:absolute after:-inset-1.5 after:rounded-lg after:content-[''] hover:after:bg-white/5 focus-visible:after:ring-2 focus-visible:after:ring-white/70">
+                <span aria-hidden className={cn("size-2.5 self-center rounded-[3px]", FILL_TONE[i])} />
+                <span className="text-on-dark-subtle">{s.label}</span>
+                <span className="nums font-medium text-white">{s.value.toLocaleString("en-IN")}</span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Steps: the batch as a staircase down from the list to a hire. Elevation by lightness alone: each step one tone lighter
+ * than the one before, no borders, no shadows; colour only on the last step (the hire). The riser between two steps
+ * carries the students lost there as a signed figure.
+ */
+export function BatchSteps({ stages }: { stages: RibbonStage[] }) {
+  const top = stages[0]?.value ?? 0;
+  const TONE = ["bg-white/[0.04]", "bg-white/[0.07]", "bg-white/[0.10]", "bg-white/[0.14]", "bg-accent-400 text-ink-900"];
+  const drop = biggestDrop(stages);
+  return (
+    <div className="mt-8">
+      <ol className="grid grid-cols-5 items-end gap-1.5 sm:gap-2" aria-label="Your batch, step by step">
+        {stages.map((s, i) => {
+          const h = top ? Math.max(14, Math.round((s.value / top) * 100)) : 14;
+          const lost = i > 0 ? stages[i - 1].value - s.value : 0;
+          const last = i === stages.length - 1;
+          return (
+            <li key={s.label} className="relative flex min-w-0 flex-col justify-end">
+              {i > 0 ? (
+                <span className={cn("nums mb-1.5 block text-xs", i === drop.at ? "font-semibold text-accent-300" : "text-on-dark-subtle")}>{lost > 0 ? `−${lost.toLocaleString("en-IN")}` : "±0"}</span>
+              ) : (
+                <span className="mb-1.5 block text-xs text-on-dark-subtle">&nbsp;</span>
+              )}
+              <Link
+                href={s.href}
+                style={{ height: `calc(${h} * 0.11rem + 4.5rem)` }}
+                className={cn(
+                  "step-rise flex min-w-0 flex-col justify-between rounded-t-xl p-3 outline-none transition-colors hover:brightness-110 focus-visible:ring-2 focus-visible:ring-white/70 sm:p-4",
+                  TONE[i],
+                  !last && "text-white",
+                )}
+              >
+                <span className={cn("nums text-[clamp(1.5rem,3.4vw,2.75rem)] font-light leading-none tracking-[-0.04em]")}>{s.value.toLocaleString("en-IN")}</span>
+                <span className={cn("text-[11px] font-medium leading-tight sm:text-[13px]", last ? "text-ink-900/80" : "text-on-dark-subtle")}>{s.label}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="mt-3 text-xs text-on-dark-subtle">
+        Gold figure: your biggest drop, <span className="nums text-on-dark">{drop.lost}</span> students between {drop.from} and {drop.to}.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Ledger: the batch read like a market screen. Tabular figures that stack, every change carries its sign in the text,
+ * and the one selection (the biggest drop) is a 1px gold line exactly as wide as its label. The last column is what
+ * moved in the last 24 hours; a dash where Findtern keeps no time for that step.
+ */
+export function BatchLedger({ stages, today }: { stages: RibbonStage[]; today: (string | null)[] }) {
+  const top = stages[0]?.value ?? 0;
+  const drop = biggestDrop(stages);
+  return (
+    <div className="mt-8 overflow-x-auto">
+      <table className="nums w-full text-left text-sm sm:min-w-[34rem]">
+        <caption className="sr-only">Your batch, step by step</caption>
+        <thead>
+          <tr className="text-xs text-on-dark-subtle">
+            <th scope="col" className="pb-3 font-medium">Step</th>
+            <th scope="col" className="pb-3 text-right font-medium">Students</th>
+            <th scope="col" className="hidden pb-3 text-right font-medium sm:table-cell">Of list</th>
+            <th scope="col" className="pb-3 text-right font-medium">Lost here</th>
+            <th scope="col" className="hidden w-[34%] pb-3 pl-6 font-medium sm:table-cell"><span className="sr-only">Share</span></th>
+            <th scope="col" className="pb-3 text-right font-medium">24 hours</th>
+          </tr>
+        </thead>
+        <tbody>
+          {stages.map((s, i) => {
+            const share = top ? (s.value / top) * 100 : 0;
+            const lost = i > 0 ? stages[i - 1].value - s.value : null;
+            const sel = i === drop.at;
+            return (
+              <tr key={s.label} className="group">
+                <th scope="row" className="py-2.5 pr-4 font-normal">
+                  <Link href={s.href} className="relative inline-flex min-h-8 items-center text-on-dark outline-none hover:text-white focus-visible:ring-2 focus-visible:ring-white/70">
+                    {s.label}
+                    {sel ? <span aria-hidden className="absolute inset-x-0 bottom-0.5 h-px bg-accent-400" /> : null}
+                    {sel ? <span className="sr-only"> (biggest drop)</span> : null}
+                  </Link>
+                </th>
+                <td className="py-2.5 text-right text-[1.375rem] font-light tracking-[-0.02em] text-white">{s.value.toLocaleString("en-IN")}</td>
+                <td className="hidden py-2.5 text-right text-on-dark-subtle sm:table-cell">{i === 0 ? "100%" : `${share.toFixed(share < 10 && share > 0 ? 1 : 0)}%`}</td>
+                <td className={cn("py-2.5 text-right", sel ? "text-accent-300" : "text-on-dark-subtle")}>{lost === null ? "—" : lost > 0 ? `−${lost.toLocaleString("en-IN")}` : "±0"}</td>
+                <td className="hidden py-2.5 pl-6 sm:table-cell">
+                  <span aria-hidden className="block h-1.5 overflow-hidden rounded-full bg-white/10">
+                    <span className={cn("bar-slide block h-full origin-left rounded-full", sel ? "bg-accent-400" : "bg-white/55")} style={{ width: `${Math.max(s.value ? 1.5 : 0, share)}%` }} />
+                  </span>
+                </td>
+                <td className={cn("py-2.5 text-right", today[i] ? "text-data-on-dark" : "text-on-dark-subtle")}>{today[i] ?? "—"}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
   );
 }
