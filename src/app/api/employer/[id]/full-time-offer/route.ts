@@ -15,7 +15,9 @@ import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { startDateProblem } from "@/lib/business-days";
 import { DRIVE_FULL_TIME_FEE } from "@/lib/checkout";
 import { driveForEmployer, eligibleStudents } from "@/lib/college/scope";
-import { candidatePoolClauses } from "@/lib/employer-pool";
+import { candidatePoolClauses, heldElsewhereIds } from "@/lib/employer-pool";
+import { CANDIDATE_UNAVAILABLE } from "@/lib/candidate-hold";
+import { ON_HOLD_REFUSAL } from "@/lib/account-hold";
 import { parseOffer } from "@/lib/offer";
 import { isProjectOpen } from "@/lib/project-locations";
 import { requirePublicOrigin } from "@/lib/origin";
@@ -112,6 +114,19 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!isProjectOpen(project.status, project.takenDownAt)) return NextResponse.json({ error: "That project is closed. Pick an open one." }, { status: 409 });
     base = { internId: b.internId!, projectId: project.id, flowType: "direct", skills: [], aiRatings: null };
     from = { driveId: loaded.drive.id, feeRate: DRIVE_FULL_TIME_FEE };
+  }
+  // The candidate rules of the internship proposals route, on both paths: an active intern account, not frozen
+  // (on hold), and not held by another company's accepted offer or running hire. Otherwise the offer goes out but
+  // can only fail when the intern accepts it. Neutral on purpose: nothing about the other company.
+  const [candidate] = await db
+    .select({ role: schema.users.role, isActive: schema.users.isActive, frozenAt: schema.users.frozenAt })
+    .from(schema.users)
+    .where(eq(schema.users.id, base.internId))
+    .limit(1);
+  if (!candidate || candidate.role !== "intern" || !candidate.isActive) return NextResponse.json({ error: "Unknown candidate" }, { status: 404 });
+  if (candidate.frozenAt) return NextResponse.json(ON_HOLD_REFUSAL, { status: 409 });
+  if ((await heldElsewhereIds(db, id, [base.internId])).has(base.internId)) {
+    return NextResponse.json(CANDIDATE_UNAVAILABLE, { status: 409 });
   }
   // A taken-down listing sends no new offers, a full-time one included.
   if (base.projectId) {

@@ -9,6 +9,8 @@ import { notify } from "@/lib/notify";
 import { learnField } from "@/lib/proposal-copy";
 import { projectZone } from "@/lib/timezones";
 import { hasOpenOrderFor } from "@/lib/payments";
+import { withLock, type Tx } from "@/lib/advisory-lock";
+import { openOrderProposalIds } from "@/lib/employer-payable";
 import { takedownBlock } from "@/lib/projects/takedown";
 import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
 import {
@@ -269,13 +271,24 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const monthlyMinor = o.hourlyRateMinor ? Math.round(hours * o.hourlyRateMinor) : (o.monthlyMinor ?? 0);
   next.monthlyAmount = monthlyMinor / 100;
   next.totalPrice = (monthlyMinor * o.months + (before.perHireMinor ?? 0)) / 100;
-  const [updated] = await db
-    .update(schema.proposals)
-    .set({ offerDetails: next, updatedAt: new Date(), ...(reopen ? { status: "sent" } : {}) })
-    // Unchanged since it was read, so an acceptance or a payment in between
-    // is never overwritten.
-    .where(and(eq(schema.proposals.id, id), eq(schema.proposals.status, proposal.status)))
-    .returning({ updatedAt: schema.proposals.updatedAt });
+  // Reopening an accepted offer runs under the order route's lock (`employer-pay:<id>`), with the open-order check re-read
+  // inside it: an order opened in another tab either committed first (seen here, refused) or waits and then finds the
+  // offer back at `sent` (its own re-check refuses). Never an order on an offer that is no longer accepted.
+  const write = async (tx: Tx) => {
+    if (reopen && (await openOrderProposalIds(tx, proposal.employerId)).has(proposal.id)) return "paying" as const;
+    const [row] = await tx
+      .update(schema.proposals)
+      .set({ offerDetails: next, updatedAt: new Date(), ...(reopen ? { status: "sent" } : {}) })
+      // Unchanged since it was read, so an acceptance or a payment in between
+      // is never overwritten.
+      .where(and(eq(schema.proposals.id, id), eq(schema.proposals.status, proposal.status)))
+      .returning({ updatedAt: schema.proposals.updatedAt });
+    return row;
+  };
+  const updated = reopen ? await withLock(`employer-pay:${proposal.employerId}`, write) : await db.transaction(write);
+  if (updated === "paying") {
+    return NextResponse.json({ error: "A payment for this offer is in progress. Try again in a few minutes." }, { status: 409 });
+  }
   if (!updated) {
     return NextResponse.json({ error: "This offer changed a moment ago. Refresh and try again." }, { status: 409 });
   }

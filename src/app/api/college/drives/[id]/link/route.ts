@@ -7,6 +7,7 @@ import { driveShareUrl } from "@/lib/college/drive-input";
 import { driveForCollegeAdmin } from "@/lib/college/scope";
 import { generateDriveToken } from "@/lib/college/tokens";
 import { reissueDriveLink } from "@/lib/college/link";
+import { closeDriveCalls } from "@/lib/college/meetings";
 import { getDb, schema } from "@/lib/db";
 
 /**
@@ -30,9 +31,13 @@ export async function DELETE(req: Request, ctx: { params: Promise<{ id: string }
   if (!g.ok) return g.response;
   const drive = await driveForCollegeAdmin(g.ctx, (await ctx.params).id);
   if (!drive) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  await getDb()
-    .update(schema.collegeDrives)
-    .set({ revokedAt: new Date(), updatedAt: new Date() })
-    .where(eq(schema.collegeDrives.id, drive.id));
+  // One transaction: the drive goes off and its open calls close with it, so no student accepts one afterwards.
+  await getDb().transaction(async (tx) => {
+    await tx
+      .update(schema.collegeDrives)
+      .set({ revokedAt: new Date(), updatedAt: new Date() })
+      .where(eq(schema.collegeDrives.id, drive.id));
+    await closeDriveCalls(tx, drive.id);
+  });
   return NextResponse.json({ ok: true });
 }

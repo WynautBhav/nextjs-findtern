@@ -19,6 +19,8 @@ import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
 import { FREE_DECLINES, offerPastStart, parseOffer, todayIst } from "@/lib/offer";
 import { feeRateLabel, fullTimeRate } from "@/lib/checkout";
 import { hasOpenOrderFor, OPEN_ORDER_MINUTES } from "@/lib/payments";
+import { withLock, type Tx } from "@/lib/advisory-lock";
+import { openOrderProposalIds } from "@/lib/employer-payable";
 import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
 import { internLockResponse } from "@/lib/intern-unlock";
 import { expiredStamp, withdrawRefusal } from "@/lib/proposal-expiry";
@@ -244,7 +246,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // cart cleanup land together. Locking the intern's proposal rows first makes
   // two simultaneous acceptances queue instead of both winning.
   let expired: { id: string; employerId: string }[] = [];
-  const updated = await db.transaction(async (tx) => {
+  // A withdraw runs under the order route's lock (`employer-pay:<employerId>`, taken first, before any row lock, as the
+  // order route and the expiry sweep do), and the open-order check is re-read inside it. An order opened in another tab
+  // either committed first (seen here, refused) or waits and then finds the offer withdrawn (its own re-check refuses).
+  const lockedWithdraw = status === "withdrawn";
+  const run = <T>(fn: (tx: Tx) => Promise<T>) => (lockedWithdraw ? withLock(`employer-pay:${proposal.employerId}`, fn) : db.transaction(fn));
+  const updated = await run(async (tx) => {
+    if (lockedWithdraw && (await openOrderProposalIds(tx, proposal.employerId)).has(proposal.id)) return "paying" as const;
     // In id order, the same order the takedown locks a project's offers in, so the two cannot deadlock.
     await tx.select({ id: schema.proposals.id }).from(schema.proposals).where(eq(schema.proposals.internId, proposal.internId)).orderBy(schema.proposals.id).for("update");
     // Re-check the takedown under a shared row lock: the admin takedown holds FOR UPDATE on the project
@@ -330,6 +338,9 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     }
     return row;
   });
+  if (updated === "paying") {
+    return NextResponse.json({ error: "A payment for this offer is in progress. Try again in a few minutes." }, { status: 409 });
+  }
   if (updated === "taken_down") {
     return NextResponse.json({ error: TAKEDOWN_BLOCKS.accept, code: "listing_taken_down" }, { status: 409 });
   }

@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 
 import { withLock } from "@/lib/advisory-lock";
@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { CALENDAR_TOKEN_OWNER, calendarConfig, createMeetEvent } from "@/lib/google";
 import { notify } from "@/lib/notify";
 import { linkTo } from "@/lib/origin";
+import { studentCallOpen } from "./access";
 import { CALL_GRACE_MS } from "./constants";
 import { pickMeetingLink } from "./meeting-link";
 import { sendPush } from "./push";
@@ -163,27 +164,69 @@ export function toView(m: typeof schema.collegeDriveMeetings.$inferSelect): Meet
   };
 }
 
-/** Requests waiting on this student, plus accepted calls not yet over. */
-export async function meetingsForStudent(userId: string): Promise<MeetingView[]> {
-  const rows = await getDb()
+/**
+ * A student's call rows with what decides whether the call is still open to them (studentCallOpen): the drive's
+ * window and revoke, its college switched on, and the student's membership of that college.
+ */
+function studentCallRows(where: SQL | undefined) {
+  return getDb()
     .select({
       m: schema.collegeDriveMeetings,
       title: schema.collegeDrives.title,
       company: schema.employers.companyName,
+      drive: { startsAt: schema.collegeDrives.startsAt, endsAt: schema.collegeDrives.endsAt, revokedAt: schema.collegeDrives.revokedAt },
+      collegeActive: schema.colleges.isActive,
+      membershipId: schema.collegeMemberships.id,
+      leftAt: schema.collegeMemberships.leftAt,
     })
     .from(schema.collegeDriveMeetings)
     .innerJoin(schema.collegeDrives, eq(schema.collegeDrives.id, schema.collegeDriveMeetings.driveId))
+    .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeDrives.collegeId))
+    .leftJoin(
+      schema.collegeMemberships,
+      and(eq(schema.collegeMemberships.userId, schema.collegeDriveMeetings.userId), eq(schema.collegeMemberships.collegeId, schema.collegeDrives.collegeId)),
+    )
     .leftJoin(schema.employers, eq(schema.employers.id, schema.collegeDriveMeetings.employerId))
-    .where(
-      and(
-        eq(schema.collegeDriveMeetings.userId, userId),
-        // A row still waiting for its Meet link (see requestMeeting) is not a call yet.
-        isNotNull(schema.collegeDriveMeetings.meetingLink),
-        inArray(schema.collegeDriveMeetings.status, ["requested", "accepted"]),
-        sql`${schema.collegeDriveMeetings.startsAt} > now() - interval '40 minutes'`,
-      ),
-    );
+    .where(where);
+}
+
+type StudentCallRow = Awaited<ReturnType<typeof studentCallRows>>[number];
+
+function callRowOpen(r: StudentCallRow, now = Date.now()): boolean {
+  return studentCallOpen({ drive: r.drive, collegeActive: r.collegeActive, membership: r.membershipId ? { leftAt: r.leftAt } : null, now });
+}
+
+/** The student's own call request, and whether its drive still lets them answer it. Null when it is not theirs. */
+export async function studentCall(userId: string, meetingId: string): Promise<{ meeting: typeof schema.collegeDriveMeetings.$inferSelect; open: boolean } | null> {
+  const [r] = await studentCallRows(and(eq(schema.collegeDriveMeetings.id, meetingId), eq(schema.collegeDriveMeetings.userId, userId))).limit(1);
+  return r ? { meeting: r.m, open: callRowOpen(r) } : null;
+}
+
+/**
+ * Turning a drive off closes its open calls too: requests and accepted calls become `cancelled`, so no student
+ * accepts (or joins) a call of a drive the officer shut. Runs on the caller's db/tx.
+ */
+export async function closeDriveCalls(db: Pick<ReturnType<typeof getDb>, "update">, driveId: string): Promise<void> {
+  await db
+    .update(schema.collegeDriveMeetings)
+    .set({ status: "cancelled", respondedAt: new Date() })
+    .where(and(eq(schema.collegeDriveMeetings.driveId, driveId), inArray(schema.collegeDriveMeetings.status, ["requested", "accepted"])));
+}
+
+/** Requests waiting on this student, plus accepted calls not yet over, of drives still open to them. */
+export async function meetingsForStudent(userId: string): Promise<MeetingView[]> {
+  const rows = await studentCallRows(
+    and(
+      eq(schema.collegeDriveMeetings.userId, userId),
+      // A row still waiting for its Meet link (see requestMeeting) is not a call yet.
+      isNotNull(schema.collegeDriveMeetings.meetingLink),
+      inArray(schema.collegeDriveMeetings.status, ["requested", "accepted"]),
+      sql`${schema.collegeDriveMeetings.startsAt} > now() - interval '40 minutes'`,
+    ),
+  );
+  const now = Date.now();
   return rows
+    .filter((r) => callRowOpen(r, now))
     .map((r) => ({ ...toView(r.m), driveTitle: r.title, company: r.company ?? "An employer" }))
     .filter((m) => m.status === "requested" || m.status === "accepted")
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt));

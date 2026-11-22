@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { requireMutation } from "@/lib/guards-mutation";
-import { effectiveStatus, toView } from "@/lib/college/meetings";
+import { effectiveStatus, studentCall, toView } from "@/lib/college/meetings";
 import { getDb, schema } from "@/lib/db";
 
 const bodySchema = z.object({ action: z.enum(["accept", "decline"]) });
@@ -16,13 +16,12 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   if (!parsed.success) return NextResponse.json({ error: "Invalid action" }, { status: 400 });
   const { id } = await ctx.params;
   const db = getDb();
-  const [m] = await db
-    .select()
-    .from(schema.collegeDriveMeetings)
-    .where(and(eq(schema.collegeDriveMeetings.id, id), eq(schema.collegeDriveMeetings.userId, guard.session.uid)))
-    .limit(1);
-  if (!m) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (effectiveStatus(m) !== "requested") {
+  const call = await studentCall(guard.session.uid, id);
+  if (!call) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  const m = call.meeting;
+  // A revoked or ended drive (or a student who left the college) closes its calls: no accept, no Meet link.
+  // Revoking also cancels the open rows (closeDriveCalls), so a revoke racing this answer wins at the status guard below.
+  if (!call.open || effectiveStatus(m) !== "requested") {
     return NextResponse.json({ error: "This request has already closed" }, { status: 409 });
   }
   // Rows made before QA-001 could have no link; accepting one leads nowhere.

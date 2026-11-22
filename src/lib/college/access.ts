@@ -65,6 +65,21 @@ export function compareDrives(a: Pick<DriveLike, "startsAt" | "endsAt" | "revoke
   return b.endsAt.getTime() - a.endsAt.getTime();
 }
 
+/**
+ * A drive call request can still be seen and answered by the student only while the drive is live (not revoked, not
+ * ended), its college is switched on, and the student is still a member of that college. Otherwise the call is closed,
+ * whatever its stored status: the officer turning the drive off must also shut the calls in it.
+ */
+export function studentCallOpen(input: {
+  drive: Pick<DriveLike, "startsAt" | "endsAt" | "revokedAt">;
+  collegeActive: boolean;
+  /** The student's membership of the drive's college; null when they are not (or no longer) in it. */
+  membership: { leftAt: Date | null } | null;
+  now?: number;
+}): boolean {
+  return input.collegeActive && driveWindow(input.drive, input.now ?? Date.now()) === "live" && input.membership !== null && input.membership.leftAt === null;
+}
+
 function windowDenial(drive: DriveLike, now: number): AccessResult | null {
   const w = driveWindow(drive, now);
   if (w === "revoked") return { ok: false, reason: "revoked" };
