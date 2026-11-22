@@ -46,7 +46,7 @@ export default async function DrivePage({ params }: { params: Promise<{ id: stri
       />
 
       {presence ? (
-        <PresenceLive driveId={drive.id} driveTitle={drive.title} showTitle={false} endsAt={drive.endsAt.toISOString()} initial={presence} />
+        <PresenceLive driveId={drive.id} driveTitle={drive.title} showTitle={false} startsAt={drive.startsAt.toISOString()} endsAt={drive.endsAt.toISOString()} initial={presence} />
       ) : null}
 
       <div className="grid gap-6 lg:grid-cols-2">

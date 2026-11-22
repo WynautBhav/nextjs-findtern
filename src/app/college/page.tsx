@@ -127,19 +127,16 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
   ];
 
   const scorePoints = interviewed.flatMap((s) => (s.score !== null && s.cgpa !== null ? [{ userId: s.userId, score: s.score, cgpa: s.cgpa }] : []));
-  const byBranch = new Map<string, { students: number; interviewed: number; sum: number; scored: number }>();
+  const byBranch = new Map<string, { students: number; interviewed: number; scores: number[] }>();
   for (const s of students) {
-    const b = byBranch.get(s.branch ?? "Branch not set") ?? { students: 0, interviewed: 0, sum: 0, scored: 0 };
+    const b = byBranch.get(s.branch ?? "Branch not set") ?? { students: 0, interviewed: 0, scores: [] };
     b.students++;
     if (aiStatusLabel(s.aiStatus).done) b.interviewed++;
-    if (s.score !== null) {
-      b.sum += s.score;
-      b.scored++;
-    }
+    if (s.score !== null) b.scores.push(s.score);
     byBranch.set(s.branch ?? "Branch not set", b);
   }
   const branchRows = [...byBranch.entries()]
-    .map(([branch, b]) => ({ branch, students: b.students, interviewed: b.interviewed, avg: b.scored ? b.sum / b.scored : null }))
+    .map(([branch, b]) => ({ branch, ...b }))
     .sort((a, b) => b.students - a.students)
     .slice(0, 8);
 
@@ -205,7 +202,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
       </section>
 
       {liveDrive && presence ? (
-        <PresenceLive driveId={liveDrive.id} driveTitle={liveDrive.title} endsAt={liveDrive.endsAt.toISOString()} initial={{ ...presence }} />
+        <PresenceLive driveId={liveDrive.id} driveTitle={liveDrive.title} startsAt={liveDrive.startsAt.toISOString()} endsAt={liveDrive.endsAt.toISOString()} initial={{ ...presence }} />
       ) : null}
 
       {scores.length > 0 ? (
@@ -213,7 +210,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
           <Surface className="p-5 sm:p-6">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">How your batch scores</h2>
-              <p className="text-sm text-text-subtle"><span className="nums">{scores.length}</span> interviewed, out of 10</p>
+              <p className="text-sm text-text-subtle"><span className="nums">{scores.length}</span> interviewed · dashed line at 6, where most employers filter</p>
             </div>
             <ScoreCurve scores={scores} median={med} />
           </Surface>
@@ -231,43 +228,41 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
         <Surface className="p-5 sm:p-6">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Branch by branch</h2>
-            <p className="text-sm text-text-subtle">Filled part: students who have taken the AI interview</p>
+            <p className="text-sm text-text-subtle">Each tick is a student&apos;s Findtern score · dashed line at 6</p>
           </div>
-          <div className="mt-5 lg:columns-2 lg:gap-x-10 [&_li]:break-inside-avoid">
+          <div className="mt-5">
             <BranchBoard rows={branchRows} />
           </div>
         </Surface>
       ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Surface className="p-5">
-          <h2 className="text-[0.9375rem] font-semibold text-ink-900">Your college code</h2>
+      {/* What the office hands out: the code to students, the link to employers. One strip, two halves. */}
+      <Surface className="grid overflow-hidden md:grid-cols-2 md:divide-x md:divide-ink-100">
+        <section aria-labelledby="share-code" className="p-5 sm:p-6">
+          <h2 id="share-code" className="text-sm font-semibold text-ink-900">For your students: the college code</h2>
           {ctx.college.code ? (
             <>
-              <p className="mt-1 text-sm text-text-subtle">Students type this when they sign up. Give it only to your own students: whoever has it joins as verified.</p>
               <p className="mt-3 flex flex-wrap items-center gap-3">
-                <code className="select-all font-mono text-2xl font-semibold tracking-[0.12em] text-ink-900">{ctx.college.code}</code>
+                <code className="select-all font-mono text-[1.75rem] font-medium tracking-[0.14em] text-ink-900">{ctx.college.code}</code>
                 <CopyText text={ctx.college.code} label="Copy code" />
               </p>
+              <p className="mt-2 text-sm text-text-subtle">Whoever signs up with it joins as verified. Give it only to your own students.</p>
             </>
           ) : (
-            <p className="mt-1 text-sm text-text-subtle">Findtern has not issued your code yet. Write to us and we will set it up.</p>
+            <p className="mt-2 text-sm text-text-subtle">Findtern has not issued your code yet. Write to us and we will set it up.</p>
           )}
-        </Surface>
-        <Surface className="p-5">
-          <h2 className="text-[0.9375rem] font-semibold text-ink-900">Campus drive link</h2>
-          <p className="mt-1 text-sm text-text-subtle">
-            {liveDrive
-              ? `"${liveDrive.title}" is open. Employers who open its link see your verified students only.`
-              : "No drive is open right now. Create a link, send it to the employers you invite, and they see your verified students only."}
-          </p>
-          <p className="mt-3">
-            <ButtonLink href={liveDrive ? `/college/drives/${liveDrive.id}` : "/college/drives/new"} variant="outline">
+        </section>
+        <section aria-labelledby="share-drive" className="border-t border-ink-100 p-5 sm:p-6 md:border-t-0">
+          <h2 id="share-drive" className="text-sm font-semibold text-ink-900">For employers: the campus drive link</h2>
+          <p className="mt-3 text-[1.75rem] font-medium leading-tight tracking-[-0.02em] text-ink-900">{liveDrive ? liveDrive.title : "No drive open"}</p>
+          <p className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-text-subtle">
+            <span>{liveDrive ? "Employers who open its link see your verified students only." : "Create a link and send it to the employers you invite."}</span>
+            <ButtonLink href={liveDrive ? `/college/drives/${liveDrive.id}` : "/college/drives/new"} variant="outline" size="sm">
               {liveDrive ? "Open the drive" : "Create a link"}
             </ButtonLink>
           </p>
-        </Surface>
-      </div>
+        </section>
+      </Surface>
 
       {hasDriveOrder ? <DriveDashboard /> : null}
 
