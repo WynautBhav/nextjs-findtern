@@ -6,6 +6,7 @@ import { getDb, schema } from "@/lib/db";
 import { CALENDAR_TOKEN_OWNER, calendarConfig, createMeetEvent } from "@/lib/google";
 import { notify } from "@/lib/notify";
 import { linkTo } from "@/lib/origin";
+import { CALL_GRACE_MS } from "./constants";
 import { pickMeetingLink } from "./meeting-link";
 import { sendPush } from "./push";
 
@@ -16,7 +17,7 @@ import { sendPush } from "./push";
  */
 export const MEETING_DELAYS = [0, 5, 10] as const;
 export const MEETING_MINUTES = 20;
-const GRACE_MS = 10 * 60_000;
+const GRACE_MS = CALL_GRACE_MS;
 
 export type MeetingView = {
   id: string;

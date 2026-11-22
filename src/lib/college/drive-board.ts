@@ -1,3 +1,5 @@
+import { CALL_GRACE_MS } from "./constants.ts";
+
 /**
  * One campus drive, as the placement officer runs it: what needs chasing now (critical) and what the drive has
  * produced (results). Pure, so the counts can be tested without a database (drive-board-db.ts loads the rows).
@@ -9,7 +11,14 @@
 export type DriveStudentRef = { userId: string; name: string; rollNo: string | null; year: number | null; branch: string | null; phone: string | null };
 export type BoardItem = DriveStudentRef & { detail: string };
 
-export type MeetingRow = { userId: string; company: string | null; status: string; createdAt: Date };
+export type MeetingRow = {
+  userId: string;
+  company: string | null;
+  status: string;
+  createdAt: Date;
+  /** When the call was set to start; a request lapses CALL_GRACE_MS after it (meetings.ts effectiveStatus). */
+  startsAt?: Date;
+};
 export type OfferRow = { userId: string; company: string | null; status: string; hired: boolean; fullTime: boolean; createdAt: Date };
 export type OfflineRow = { userId: string };
 
@@ -55,7 +64,8 @@ export function buildDriveBoard(input: {
 }): DriveBoard {
   const students = new Map(input.students.map((s) => [s.userId, s]));
   const { now } = input;
-  const waiting = input.meetings.filter((m) => m.status === "requested");
+  // Only requests the student can still accept: a lapsed one is expired for the student and the employer alike.
+  const waiting = input.meetings.filter((m) => m.status === "requested" && (!m.startsAt || m.startsAt.getTime() + CALL_GRACE_MS >= now));
   const held = input.meetings.filter((m) => m.status === "accepted");
   const open = input.offers.filter((o) => o.status === "sent");
   const hired = input.offers.filter((o) => o.hired || HIRED.has(o.status));

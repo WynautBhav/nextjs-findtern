@@ -22,6 +22,7 @@ export function toStudentRow(s: CollegeStudent): StudentRow {
     lastSeenAt: s.lastSeenAt?.toISOString() ?? null,
     lastActivityAt: s.lastActivityAt?.toISOString() ?? null,
     offersPending: s.offersPending,
+    callsPending: s.callsPending,
     hired: s.hired,
     proposals: s.proposals,
     interviewsScheduled: s.interviewsScheduled,

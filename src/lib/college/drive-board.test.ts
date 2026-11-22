@@ -97,3 +97,21 @@ test("pipeline stages: called counts any call request, hired counts each student
   assert.deepEqual(b.lists.hired.map((s) => s.userId), ["c"]);
   assert.match(b.lists.hired[0].detail, /^Full-time with /);
 });
+
+test("a call request past its 10-minute lapse is not waiting on the student any more", () => {
+  const b = buildDriveBoard({
+    students,
+    meetings: [
+      // Starts in 5 minutes: still answerable.
+      { userId: "a", company: "Acme", status: "requested", createdAt: at(2), startsAt: new Date(NOW + 5 * 60_000) },
+      // Started 9 minutes ago: inside the 10-minute grace.
+      { userId: "b", company: "Acme", status: "requested", createdAt: at(15), startsAt: at(9) },
+      // Started 11 minutes ago: lapsed, the student can no longer accept it.
+      { userId: "c", company: "Acme", status: "requested", createdAt: at(40), startsAt: at(11) },
+    ],
+    offers: [],
+    offline: null,
+    now: NOW,
+  });
+  assert.deepEqual(b.lists.meetingsWaiting.map((s) => s.userId).sort(), ["a", "b"]);
+});

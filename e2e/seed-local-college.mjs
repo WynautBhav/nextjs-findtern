@@ -288,7 +288,8 @@ async function main() {
       const submitted = s.stage !== "profile_incomplete";
       const interviewed = s.stage !== "interview_pending";
       const paid = true; // the TPO code activated their account
-      const approval = s.stage === "checks_pending" ? "Pending" : s.stage === "rejected" ? "Rejected" : interviewed && submitted ? "Approved" : undefined;
+      // An unfinished profile cannot be approved: it waits, like a profile in Findtern's check.
+      const approval = s.stage === "checks_pending" || s.stage === "profile_incomplete" ? "Pending" : s.stage === "rejected" ? "Rejected" : interviewed && submitted ? "Approved" : undefined;
       const extra = {
         ...(paid ? { payment: { isPaid: true, paidAt: iso(-30 + (s.n % 20)), gateway: "free", orderId: `free_${tpoCode}_${pad(s.n, 3)}`, paymentId: null, promoCode: tpoCode, finalAmountMinor: 0, discountAmountMinor: FEE_MINOR, originalAmountMinor: FEE_MINOR } } : {}),
         ...(interviewed ? { ratings: s.ratings, findternScore: s.score, aiFeedbackLink: "https://example.org/incruiter/report-demo.pdf", aiRecordingLink: "https://example.org/incruiter/recording-demo.mp4" } : {}),

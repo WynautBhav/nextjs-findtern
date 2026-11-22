@@ -56,7 +56,7 @@ export async function loadDriveBoard(
   const p = schema.proposals;
   const [meetings, offers] = await Promise.all([
     db
-      .select({ userId: schema.collegeDriveMeetings.userId, employerId: schema.collegeDriveMeetings.employerId, status: schema.collegeDriveMeetings.status, createdAt: utc(schema.collegeDriveMeetings.createdAt) })
+      .select({ userId: schema.collegeDriveMeetings.userId, employerId: schema.collegeDriveMeetings.employerId, status: schema.collegeDriveMeetings.status, createdAt: utc(schema.collegeDriveMeetings.createdAt), startsAt: utc(schema.collegeDriveMeetings.startsAt) })
       .from(schema.collegeDriveMeetings)
       .where(eq(schema.collegeDriveMeetings.driveId, drive.id)),
     ids.length && employerIds.length
@@ -77,7 +77,7 @@ export async function loadDriveBoard(
   const { arrived, missing, walkIns } = matchInvites(invited, came);
   const board = buildDriveBoard({
     students,
-    meetings: meetings.map((m) => ({ userId: m.userId, company: companyOf.get(m.employerId) ?? null, status: m.status, createdAt: m.createdAt })),
+    meetings: meetings.map((m) => ({ userId: m.userId, company: companyOf.get(m.employerId) ?? null, status: m.status, createdAt: m.createdAt, startsAt: m.startsAt })),
     offers: offers
       .filter((o) => o.status !== "withdrawn")
       .map((o) => ({ userId: o.userId, company: companyOf.get(o.employerId) ?? null, status: (o.status ?? "").toLowerCase(), hired: o.hiredAt !== null, fullTime: Boolean(o.fullTime), createdAt: o.createdAt ?? drive.startsAt })),

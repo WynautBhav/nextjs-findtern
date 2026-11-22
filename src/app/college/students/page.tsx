@@ -11,7 +11,7 @@ import { readinessForMany } from "@/lib/college/student-readiness-db";
 
 export const dynamic = "force-dynamic";
 
-const FILTERS: readonly StudentFilter[] = ["all", "no_interview", "offers", "hired", "offline", "hidden", "not_open"];
+const FILTERS: readonly StudentFilter[] = ["all", "no_interview", "interviewed", "offered", "offers", "calls", "hired", "offline", "hidden", "not_open"];
 const GROUPS: readonly StudentGroup[] = ["students", "on_findtern", "not_joined"];
 
 /** Request time, for "online"/"x min ago" labels. Dynamic page, so this is per request. */

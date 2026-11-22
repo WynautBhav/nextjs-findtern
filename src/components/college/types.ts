@@ -17,6 +17,8 @@ export type StudentRow = {
   lastSeenAt: string | null;
   lastActivityAt: string | null;
   offersPending: number;
+  /** Drive call requests the student can still accept (not lapsed). */
+  callsPending: number;
   hired: number;
   proposals: number;
   interviewsScheduled: number;

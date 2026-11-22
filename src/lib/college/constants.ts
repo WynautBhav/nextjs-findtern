@@ -8,3 +8,5 @@
 export const HEARTBEAT_MS = 30_000;
 /** A student counts as online when their last heartbeat is this recent. */
 export const ONLINE_WINDOW_MS = 75_000;
+/** A call request lapses this long after its start time: past it the student can no longer accept it (meetings.ts). */
+export const CALL_GRACE_MS = 10 * 60_000;

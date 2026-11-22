@@ -110,7 +110,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
     { key: "approvals", label: "Waiting for approval", value: toAccept, href: "/college/approvals", hint: "Accept the students who are yours", clearHint: "Nobody is waiting" },
     { key: "leave", label: "Asked to leave", value: pendingLeaves, href: "/college/approvals#leave", hint: "They stay until you decide", clearHint: "No leave requests" },
     { key: "offers", label: "Sitting on an offer", value: waiting.length, href: "/college/students?show=offers", hint: "A reminder gets a same-day reply", clearHint: "Every offer is answered" },
-    { key: "calls", label: "Calls not answered", value: callsWaiting.length, href: "/college/drives", hint: "Employers waiting in a drive", clearHint: "No calls waiting" },
+    { key: "calls", label: "Calls not answered", value: callsWaiting.length, href: "/college/students?show=calls", hint: "Employers waiting in a drive", clearHint: "No calls waiting" },
     { key: "meetings", label: "Meetings not answered", value: meetingsWaiting, href: "/college/master-data?status=verified&outcome=meet-waiting", hint: "Yet to pick a meeting time", clearHint: "Every invite is answered" },
     { key: "interview", label: "AI interview not done", value: noInterview, href: "/college/students?show=no_interview", hint: "Employers see them after it", clearHint: "Everyone is interviewed" },
     { key: "joined", label: "Not joined yet", value: notJoined, href: "/college/students?show=not_joined", hint: "On your list, no account yet", clearHint: coverage.rosterSize ? "Everyone has joined" : "Add your list to track this" },
@@ -129,8 +129,8 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
   const funnel = [
     { label: coverage.rosterSize ? "On your list" : "Students", value: listed, hint: coverage.rosterSize ? (notJoined ? `${notJoined} not joined yet` : "Everyone has joined") : "Add your list to track who is missing", href: coverage.rosterSize ? "/college/students?show=not_joined" : "/college/approvals#add" },
     { label: "Verified on Findtern", value: students.length, hint: toAccept ? `${toAccept} more waiting for you` : "Visible in your drives", href: "/college/students" },
-    { label: "AI interview done", value: interviewed.length, hint: med === null ? "Scores appear after the first interview" : `Median score ${med.toFixed(1)} of 10`, href: "/college/students?show=no_interview" },
-    { label: "Got an offer", value: withOffers, hint: waiting.length ? `${waiting.length} still to reply` : "From employers on Findtern", href: "/college/students?show=offers" },
+    { label: "AI interview done", value: interviewed.length, hint: med === null ? "Scores appear after the first interview" : `Median score ${med.toFixed(1)} of 10`, href: "/college/students?show=interviewed" },
+    { label: "Got an offer", value: withOffers, hint: waiting.length ? `${waiting.length} still to reply` : "From employers on Findtern", href: "/college/students?show=offered" },
     { label: "Hired", value: hired, hint: hired ? "Working with an employer" : "Hires show here", href: "/college/students?show=hired" },
   ];
 
