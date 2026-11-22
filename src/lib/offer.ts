@@ -69,6 +69,10 @@ export type Offer = {
     shiftTo: string;
     /** The joining date the employer set on the offer (a weekday, two days out at least when sent); null when none. */
     startDate: string | null;
+    /** The campus drive the offer was sent from; null for a conversion of a hired intern. */
+    driveId: string | null;
+    /** The fee rate the server stamped on the offer (1% from a campus drive); null means the standard rate. */
+    feeRate: number | null;
   } | null;
 };
 
@@ -299,6 +303,9 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
           shiftFrom: str(ft.shiftFrom),
           shiftTo: str(ft.shiftTo),
           startDate: str(ft.startDate) || null,
+          driveId: str(ft.driveId) || null,
+          // Only a lower rate than the standard one is honoured; anything else reads as the standard rate.
+          feeRate: typeof ft.feeRate === "number" && ft.feeRate > 0 && ft.feeRate < 0.0833 ? ft.feeRate : null,
         }
       : null,
   };

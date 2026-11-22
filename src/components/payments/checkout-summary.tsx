@@ -7,6 +7,7 @@ import { ShieldCheck } from "lucide-react";
 import { Pill } from "@/components/app/primitives";
 import { scheduleSummary } from "@/lib/dues-display";
 import { promoTotals } from "@/lib/checkout-selection";
+import { FULL_TIME_FEE, feeRateLabel } from "@/lib/checkout";
 import { formatDate, formatMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CheckoutPay } from "./checkout-pay";
@@ -51,6 +52,8 @@ export type SummaryLine = {
   dueOn: string | null;
   months: number;
   fullTimeCtcMinor: number | null;
+  /** The full-time fee rate on the offer (8.33%, or 1% from a campus drive). */
+  fullTimeFeeRate?: number | null;
 };
 
 type Mode = "upfront" | "monthly" | "postpaid";
@@ -249,7 +252,7 @@ export function CheckoutSummary({
 
           <dl className="mt-4 space-y-2 border-t border-ink-100 pt-4 text-sm">
             {line.fullTimeCtcMinor != null ? (
-              <Row label="Hiring fee (8.33% of annual CTC)">{m(line.upfrontMinor, line.currency)}</Row>
+              <Row label={`Hiring fee (${feeRateLabel(line.fullTimeFeeRate ?? FULL_TIME_FEE)} of annual CTC)`}>{m(line.upfrontMinor, line.currency)}</Row>
             ) : (
               <>
                 {mode === "postpaid" ? (

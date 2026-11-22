@@ -12,28 +12,29 @@ import { CityField, StateField } from "@/components/employer/location-fields";
 import { StartDateField } from "@/components/employer/start-date-field";
 import { startDateIssue } from "@/components/employer/start-date-model";
 import { fieldClass, labelClass } from "@/components/employer/ui-tokens";
-import { fullTimeFeeMinor, PAYROLL_FEE_USD_MINOR } from "@/lib/checkout";
+import { DRIVE_FULL_TIME_FEE, FULL_TIME_FEE, feeRateLabel, fullTimeFeeMinor, PAYROLL_FEE_USD_MINOR } from "@/lib/checkout";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
 import { TIMEZONES } from "@/lib/timezones";
 import { cn } from "@/lib/utils";
 
 /** Legacy "Important notice" before a company outside India offers in USD (EMH-22). */
-const USD_NOTICE = [
+const usdNotice = (rate: string) => [
   {
     title: "Hiring from outside India",
     lines: [
       "If your organization is located outside India, please note that hiring a candidate directly on a full-time basis may require compliance with local employment and work visa regulations.",
       "To simplify this process and eliminate visa-related complexities, Findtern offers a payroll-managed hiring option. Under this arrangement, the employer remits the salary to Findtern, and Findtern manages payroll and salary disbursement to the candidate in compliance with applicable regulations.",
-      `Employers opting for this model pay a one-time full-time conversion fee of 8.33% of the total Annual CTC at hire, then ${formatMoney(PAYROLL_FEE_USD_MINOR, "USD", { zeroLabel: false })} a month for payroll management. Findtern runs payroll: you wire one monthly invoice with the salary and the fee. It includes 1 year of Findtern Pro.`,
+      `Employers opting for this model pay a one-time full-time conversion fee of ${rate} of the total Annual CTC at hire, then ${formatMoney(PAYROLL_FEE_USD_MINOR, "USD", { zeroLabel: false })} a month for payroll management. Findtern runs payroll: you wire one monthly invoice with the salary and the fee. It includes 1 year of Findtern Pro.`,
     ],
   },
 ];
 
-/** Offer a hired intern a full-time role (legacy "Full-time offer"). */
+/** Offer a hired intern (legacy "Full-time offer") or a student in a full-time campus drive a full-time role. */
 export function FullTimeOfferButton({
   employerId,
   proposalId,
+  drive,
   candidate,
   fteStatus: initialFte,
   timezone = "Asia/Kolkata",
@@ -42,7 +43,10 @@ export function FullTimeOfferButton({
   onOpenChange,
 }: {
   employerId: string;
-  proposalId: string;
+  /** The hired intern's placement; or `drive` for a campus drive student. */
+  proposalId?: string;
+  /** A full-time campus drive: the student, and the employer's projects to file the offer under. Fee 1%. */
+  drive?: { driveId: string; internId: string; projects: { id: string; name: string }[] };
   candidate: string;
   fteStatus: string;
   /** The company's timezone, from its location. */
@@ -73,6 +77,7 @@ export function FullTimeOfferButton({
     /** Optional joining date, YYYY-MM-DD; "" when none. */
     startDate: "",
   });
+  const [projectId, setProjectId] = useState(drive?.projects[0]?.id ?? "");
   const [letter, setLetter] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -81,7 +86,11 @@ export function FullTimeOfferButton({
   const usdBlocked = v.ctcCurrency === "USD" && fte !== "approved";
   const ctc = Number(v.annualCtc);
   const usd = v.ctcCurrency === "USD";
-  const feeMinor = ctc > 0 ? fullTimeFeeMinor(Math.round(ctc * 100)) : 0;
+  const rate = drive ? DRIVE_FULL_TIME_FEE : FULL_TIME_FEE;
+  const rateLabel = feeRateLabel(rate);
+  const feeMinor = ctc > 0 ? fullTimeFeeMinor(Math.round(ctc * 100), rate) : 0;
+  const idKey = proposalId ?? drive?.internId ?? "new";
+  const source = drive ? { driveId: drive.driveId, internId: drive.internId, projectId } : { proposalId };
 
   async function requestFte() {
     setError(null);
@@ -101,6 +110,7 @@ export function FullTimeOfferButton({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (drive && !projectId) return setError("Pick the project this role belongs to.");
     if (!letter) return setError("Upload the offer letter (PDF) first.");
     if (v.jobMode !== "remote" && (!v.jobLocationState || !v.jobLocationCity)) return setError("Pick the city and state of the role.");
     const startIssue = v.startDate ? startDateIssue(v.startDate, new Date()) : null;
@@ -115,7 +125,7 @@ export function FullTimeOfferButton({
       const res = await csrfFetch(`/api/employer/${employerId}/full-time-offer`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...v, startDate: v.startDate || undefined, proposalId, annualCtc: ctc, offerLetterKey: letter }),
+        body: JSON.stringify({ ...v, startDate: v.startDate || undefined, ...source, annualCtc: ctc, offerLetterKey: letter }),
       });
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (!res.ok) {
@@ -145,10 +155,31 @@ export function FullTimeOfferButton({
           <DialogHeader>
             <DialogTitle>Full-time offer for {candidate}</DialogTitle>
             <DialogDescription>
-              The hiring fee is 8.33% of the annual CTC, paid at checkout once {candidate} accepts.
+              The hiring fee is {rateLabel} of the annual CTC{drive ? " (campus drive rate)" : ""}, paid at checkout once {candidate} accepts.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={submit} className="space-y-4">
+            {drive ? (
+              drive.projects.length ? (
+                <label className={labelClass}>
+                  Project
+                  <select required value={projectId} onChange={(e) => setProjectId(e.target.value)} className={cn(fieldClass, "mt-1.5")}>
+                    {drive.projects.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ) : (
+                <p className="rounded-apple-md bg-warning-soft px-4 py-3 text-sm text-ink-800">
+                  Add a project first.{" "}
+                  <a href="/employer/projects" className="font-semibold text-brand-700 underline underline-offset-4">
+                    Your projects
+                  </a>
+                </p>
+              )
+            ) : null}
             <label className={labelClass}>
               Job title
               <input required minLength={2} value={v.jobTitle} onChange={set("jobTitle")} className={cn(fieldClass, "mt-1.5")} />
@@ -166,7 +197,7 @@ export function FullTimeOfferButton({
                 {/* EMH-06: legacy offered Indian cities only, state filled from the city. */}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <StateField
-                    id={`ft-state-${proposalId}`}
+                    id={`ft-state-${idKey}`}
                     label="State"
                     india
                     required
@@ -174,7 +205,7 @@ export function FullTimeOfferButton({
                     onChange={(state) => setV((s) => ({ ...s, jobLocationState: state, jobLocationCity: "" }))}
                   />
                   <CityField
-                    id={`ft-city-${proposalId}`}
+                    id={`ft-city-${idKey}`}
                     label="City"
                     india
                     required
@@ -241,7 +272,7 @@ export function FullTimeOfferButton({
             </div>
             <div className="rounded-apple-md bg-ink-50 px-4 py-3">
               <p className="flex items-baseline justify-between gap-3 text-sm">
-                <span className="text-ink-600">One-time hiring fee (8.33% of annual CTC)</span>
+                <span className="text-ink-600">One-time hiring fee ({rateLabel} of annual CTC)</span>
                 <span className="nums font-semibold text-ink-900">{feeMinor > 0 ? formatMoney(feeMinor, v.ctcCurrency, { zeroLabel: false }) : "-"}</span>
               </p>
               <p className="mt-1 text-xs leading-relaxed text-text-subtle">
@@ -271,7 +302,7 @@ export function FullTimeOfferButton({
                 {error}
               </p>
             ) : null}
-            <button type="submit" disabled={busy || usdBlocked} className={buttonClass({ block: true })}>
+            <button type="submit" disabled={busy || usdBlocked || (drive ? !drive.projects.length : false)} className={buttonClass({ block: true })}>
               {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
               {busy ? "Sending…" : "Send full-time offer"}
             </button>
@@ -282,7 +313,7 @@ export function FullTimeOfferButton({
         open={notice}
         onOpenChange={setNotice}
         title="Important notice"
-        sections={USD_NOTICE}
+        sections={usdNotice(rateLabel)}
         agreeLabel="I understand and want to enable this option"
         confirmLabel="Request approval"
         onConfirm={requestFte}

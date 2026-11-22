@@ -220,6 +220,7 @@ export default async function EmployerCheckout({
             dueOn: line.dueOn,
             months: line.months,
             fullTimeCtcMinor: line.fullTime ? line.fullTimeCtcMinor ?? 0 : null,
+            fullTimeFeeRate: line.fullTimeFeeRate,
           }))}
         />
         {othersDue > 0 ? (

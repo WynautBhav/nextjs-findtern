@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import { buildOffer, parseOffer } from "./offer.ts";
-import { fullTimeFeeMinor, lineCharge, LEGACY_PER_HIRE_MINOR } from "./checkout.ts";
+import { DRIVE_FULL_TIME_FEE, feeRateLabel, fullTimeFeeMinor, lineCharge, LEGACY_PER_HIRE_MINOR } from "./checkout.ts";
 
 const newOffer = () =>
   parseOffer(
@@ -112,6 +112,19 @@ test("EMH-39: the full-time fee is 8.33% of CTC in whole rupees, as legacy round
   const c = lineCharge(parseOffer({ fullTimeOffer: { annualCtc: 777777 } }, "INR"), 8);
   assert.equal(c.totalMinor, 6_478_900);
   assert.equal(c.totalMinor % 100, 0);
+});
+
+test("a full-time offer from a campus drive is charged the 1% the server stamped on it", () => {
+  // ₹7,77,777 × 1% = ₹7,777.77 → ₹7,778
+  const drive = lineCharge(parseOffer({ fullTimeOffer: { annualCtc: 777777, driveId: "d1", feeRate: DRIVE_FULL_TIME_FEE } }, "INR"), 8);
+  assert.equal(drive.totalMinor, 777_800);
+  assert.equal(fullTimeFeeMinor(77_777_700, DRIVE_FULL_TIME_FEE), 777_800);
+  assert.equal(feeRateLabel(DRIVE_FULL_TIME_FEE), "1%");
+  assert.equal(feeRateLabel(0.0833), "8.33%");
+  // A drive id alone, or a rate at or above the standard one, or junk, is charged the standard 8.33%.
+  for (const ft of [{ driveId: "d1" }, { feeRate: 0.0833 }, { feeRate: 0.5 }, { feeRate: 0 }, { feeRate: -1 }, { feeRate: "0.01" }]) {
+    assert.equal(lineCharge(parseOffer({ fullTimeOffer: { annualCtc: 777777, ...ft } }, "INR"), 8).totalMinor, 6_478_900, JSON.stringify(ft));
+  }
 });
 
 test("a fixed intern stipend on the offer does not change the employer's charge", () => {

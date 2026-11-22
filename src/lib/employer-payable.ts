@@ -13,7 +13,7 @@ import { cache } from "react";
 import { and, desc, eq, gte, inArray, isNotNull, ne, sql } from "drizzle-orm";
 
 import { acceptedLineCharge } from "@/lib/accepted-charge";
-import { hireFeeMinor, lineCharge, type LineCharge, type PayMode } from "@/lib/checkout";
+import { fullTimeRate, hireFeeMinor, lineCharge, type LineCharge, type PayMode } from "@/lib/checkout";
 import { feeDisplay, type FeeDisplay } from "@/lib/fee-display";
 import { getDb, schema } from "@/lib/db";
 import { istDay, postpaidAnchor, postpaidDueOn } from "@/lib/billing-plan";
@@ -80,8 +80,10 @@ export type PayableLine = {
   schedule: string[];
   /** Offer start date (YYYY-MM-DD) or null. */
   startDate: string | null;
-  /** Set on a full-time offer: the annual CTC the 8.33% fee is on. */
+  /** Set on a full-time offer: the annual CTC the fee is on. */
   fullTimeCtcMinor: number | null;
+  /** Set on a full-time offer: its fee rate (8.33%, or 1% from a campus drive). */
+  fullTimeFeeRate: number | null;
   fullTime: boolean;
   currency: Currency;
 };
@@ -448,6 +450,7 @@ export async function payableCheckout(
           : Array.from({ length: Math.max(0, offer.months - 1) }, (_, i) => postpaidDueOn(postpaidAnchor(offer.startDate, null) ?? istDay(new Date()), offer.months, i + 2) ?? "").filter(Boolean),
         startDate: offer.startDate,
         fullTimeCtcMinor: offer.fullTime?.annualCtcMinor ?? null,
+        fullTimeFeeRate: offer.fullTime ? fullTimeRate(offer.fullTime) : null,
         fullTime: Boolean(offer.fullTime),
         currency: offer.currency,
       };

@@ -8,7 +8,7 @@ import type { OfferState } from "@/components/employer/proposal-state";
 import type { TimelineStep } from "@/components/employer/proposal-timeline";
 import { buttonClass } from "@/components/ui/button";
 import { formatMoney } from "@/lib/format";
-import { fullTimeFeeMinor } from "@/lib/checkout";
+import { feeRateLabel, fullTimeFeeMinor, fullTimeRate } from "@/lib/checkout";
 import { laptopLabel, WEEKLY_SCHEDULES, type Offer } from "@/lib/offer";
 import type { BreakdownLine } from "@/lib/offer-breakdown";
 import { cn } from "@/lib/utils";
@@ -256,7 +256,7 @@ export function ProposalView(p: ProposalViewProps) {
                   <DetailRow label="Annual CTC" value={ft.annualCtcMinor ? formatMoney(ft.annualCtcMinor, currency) : "-"} mono />
                   <DetailRow
                     label="Hiring fee"
-                    value={ft.annualCtcMinor ? `${formatMoney(fullTimeFeeMinor(ft.annualCtcMinor), currency)} (8.33% of CTC, separate from it)` : "-"}
+                    value={ft.annualCtcMinor ? `${formatMoney(fullTimeFeeMinor(ft.annualCtcMinor, fullTimeRate(ft)), currency)} (${feeRateLabel(fullTimeRate(ft))} of CTC${ft.driveId ? ", campus drive rate" : ""}, separate from it)` : "-"}
                     mono
                   />
                 </dl>

@@ -6,6 +6,7 @@ import { useConfirm } from "@/components/app/use-confirm";
 import { CallsPanel } from "@/components/employer/drive/calls-panel";
 import { CandidateRow } from "@/components/employer/drive/candidate-row";
 import { FilterBar } from "@/components/employer/drive/filters";
+import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { YEAR_LABEL, type DriveCandidate } from "@/components/employer/drive/shared";
 import { csrfFetch } from "@/lib/client-fetch";
 import type { MeetingView } from "@/lib/college/meetings";
@@ -19,11 +20,14 @@ export function DriveWorkspace({
   fullTime,
   candidates,
   initialMeetings,
+  offerAs,
 }: {
   driveId: string;
   fullTime: boolean;
   candidates: DriveCandidate[];
   initialMeetings: MeetingView[];
+  /** Full-time drives: the employer sends full-time offers from the card (1% fee). */
+  offerAs?: { employerId: string; fteStatus: string; timezone: string; projects: { id: string; name: string }[] };
 }) {
   const [q, setQ] = useState("");
   const [minScore, setMinScore] = useState(0);
@@ -275,6 +279,18 @@ export function DriveWorkspace({
                 call={callFor.get(c.id)}
                 onShortlist={() => toggleShortlist(c.id)}
                 onCall={(m) => requestCall(c.id, m)}
+                offer={
+                  fullTime && offerAs && c.hireable ? (
+                    <FullTimeOfferButton
+                      employerId={offerAs.employerId}
+                      candidate={c.name}
+                      fteStatus={offerAs.fteStatus}
+                      timezone={offerAs.timezone}
+                      drive={{ driveId, internId: c.id, projects: offerAs.projects }}
+                      className="min-h-0 max-sm:min-h-11"
+                    />
+                  ) : null
+                }
               />
             ))}
           </ul>

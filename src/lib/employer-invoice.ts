@@ -5,6 +5,7 @@ import { hireInvoiceLines } from "./invoice-lines.ts";
 import { formatMoney } from "./format.ts";
 import { isSubscriptionOrderRaw } from "./employer-subscription.ts";
 import { parseOffer } from "./offer.ts";
+import { feeRateLabel, fullTimeRate } from "./checkout.ts";
 import { subscriptionLineLabel } from "./subscription/order.ts";
 import { orderProposalIds } from "./order-ids.ts";
 import { discountLabel, paymentPromo } from "./admin/payment-promo.ts";
@@ -96,7 +97,7 @@ function build(
     if (offer.fullTime) {
       return [
         {
-          label: `${r.who} - Full time consulting fee (8.33% of the total mentioned CTC)`,
+          label: `${r.who} - Full time consulting fee (${feeRateLabel(fullTimeRate(offer.fullTime))} of the total mentioned CTC)`,
           detail: offer.fullTime.annualCtcMinor
             ? `${offer.roleTitle || "Full-time role"} · Annual CTC ${formatMoney(offer.fullTime.annualCtcMinor, offer.currency, { zeroLabel: false })}`
             : offer.roleTitle || null,

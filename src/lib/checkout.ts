@@ -34,12 +34,24 @@ export type PayMode = "upfront" | "monthly" | "postpaid";
  */
 export const LEGACY_PER_HIRE_MINOR = { INR: 500_000, USD: 5_000 } as const;
 export const FULL_TIME_FEE = 0.0833;
+/** The full-time hiring fee when the hire comes from a college's full-time campus drive. Stamped on the offer by the server when it is sent. */
+export const DRIVE_FULL_TIME_FEE = 0.01;
 /** The monthly payroll management fee on a USD full-time hire (Findtern runs payroll), $50 in cents. On top of the one-time 8.33%. */
 export const PAYROLL_FEE_USD_MINOR = 5000;
 
-/** 8.33% of the annual CTC, rounded to whole major units (legacy rounding). */
-export function fullTimeFeeMinor(annualCtcMinor: number): number {
-  return Math.max(0, Math.round((annualCtcMinor * FULL_TIME_FEE) / 100) * 100);
+/** The offer's fee rate (stamped when sent: 1% from a campus drive), else the standard 8.33%. */
+export function fullTimeRate(ft: { feeRate?: number | null } | null | undefined): number {
+  return ft?.feeRate ?? FULL_TIME_FEE;
+}
+
+/** "8.33%" or "1%", for copy next to the fee. */
+export function feeRateLabel(rate: number): string {
+  return `${Number((rate * 100).toFixed(2))}%`;
+}
+
+/** The fee share (8.33% unless the offer carries its own rate) of the annual CTC, rounded to whole major units (legacy rounding). */
+export function fullTimeFeeMinor(annualCtcMinor: number, rate: number = FULL_TIME_FEE): number {
+  return Math.max(0, Math.round((annualCtcMinor * rate) / 100) * 100);
 }
 
 /**
@@ -102,7 +114,7 @@ export function lineCharge(
   if (offer.fullTime) {
     // Whole rupees / dollars, as legacy rounds it (EMH-39): the quote on the
     // offer and the charge must be the same figure, and legacy dues read it.
-    const base = fullTimeFeeMinor(offer.fullTime.annualCtcMinor ?? 0);
+    const base = fullTimeFeeMinor(offer.fullTime.annualCtcMinor ?? 0, fullTimeRate(offer.fullTime));
     return { baseMinor: base, discountMinor: 0, totalMinor: base, perHireMinor: 0, monthlyBlocked };
   }
 

@@ -10,6 +10,8 @@ import { getDb, schema } from "@/lib/db";
 import { displayNameOf, initialsOf, readSkills } from "@/lib/employer-candidates";
 import { candidatePoolClauses } from "@/lib/employer-pool";
 import { hiredInternIds } from "@/lib/employer-visibility";
+import { isProjectOpen } from "@/lib/project-locations";
+import { timezoneForLocation } from "@/lib/timezones";
 import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { EmptyScene } from "@/components/app/primitives";
 import { CollegeMark, DriveStatePill, KIND_LABEL, driveTime, timeLeft } from "@/components/employer/drive-parts";
@@ -119,6 +121,26 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
           .where(and(inArray(schema.users.id, ids), ...candidatePoolClauses()))
       : Promise.resolve([]),
   ]);
+  // Full-time drives: the employer offers a full-time role from the card (1% hiring fee), filed under one of its projects.
+  const offerAs = fullTime
+    ? await Promise.all([
+        db
+          .select({ country: schema.employers.country, state: schema.employers.state, fteStatus: schema.employers.internationalFteStatus })
+          .from(schema.employers)
+          .where(eq(schema.employers.id, session.uid))
+          .limit(1),
+        db
+          .select({ id: schema.projects.id, name: schema.projects.projectName, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt })
+          .from(schema.projects)
+          .where(eq(schema.projects.employerId, session.uid))
+          .orderBy(desc(schema.projects.createdAt)),
+      ]).then(([[employer], projects]) => ({
+        employerId: session.uid,
+        fteStatus: employer?.fteStatus ?? "none",
+        timezone: timezoneForLocation(employer ?? {}),
+        projects: projects.filter((p) => isProjectOpen(p.status, p.takenDownAt)).map((p) => ({ id: p.id, name: p.name })),
+      }))
+    : undefined;
   const poolIds = new Set(pool.map((p) => p.userId));
   const hidingIds = new Set(hiding.map((h) => h.userId));
   const skillsOf = new Map(onboarding.map((o) => [o.userId, readSkills(o.skills).map((s) => s.split(" · ")[0])]));
@@ -153,6 +175,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
         fullTime={fullTime}
         candidates={candidates}
         initialMeetings={meetings.map(toView)}
+        offerAs={offerAs}
       />
     </div>
   );

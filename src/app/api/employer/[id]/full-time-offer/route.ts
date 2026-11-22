@@ -13,12 +13,21 @@ import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
 import { sendSmtpMail } from "@/lib/mailer";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { startDateProblem } from "@/lib/business-days";
+import { DRIVE_FULL_TIME_FEE } from "@/lib/checkout";
+import { driveForEmployer, eligibleStudents } from "@/lib/college/scope";
+import { candidatePoolClauses } from "@/lib/employer-pool";
 import { parseOffer } from "@/lib/offer";
+import { isProjectOpen } from "@/lib/project-locations";
 import { requirePublicOrigin } from "@/lib/origin";
 import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
 
 const bodySchema = z.object({
-  proposalId: z.string().min(1),
+  /** A hired intern's placement: the offer converts it to full time. */
+  proposalId: z.string().min(1).optional(),
+  /** Or a full-time campus drive the employer is in, with the student and one of the employer's projects (the offer's project). */
+  driveId: z.string().min(1).optional(),
+  internId: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
   jobTitle: z.string().trim().min(2).max(120),
   jobMode: z.enum(["remote", "hybrid", "onsite"]),
   jobLocationCity: z.string().trim().max(80).default(""),
@@ -33,12 +42,12 @@ const bodySchema = z.object({
   offerLetterKey: z.string().min(10),
   /** Optional joining date. When sent it is held to the hiring start rule (a weekday, two days after sending). Stored inside fullTimeOffer, so it never lapses the offer. */
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Pick a start date.").optional(),
-});
+}).refine((b) => (b.proposalId ? !b.driveId : Boolean(b.driveId && b.internId && b.projectId)), { message: "Invalid input" });
 
 /**
- * Offer a hired intern a full-time role. Same shape as the legacy route: a new
- * proposal carrying `offerDetails.fullTimeOffer`, which the intern accepts and
- * the employer then pays the hiring fee for at checkout.
+ * Offer a full-time role, to a hired intern or to a student in a full-time campus drive. Same shape as the
+ * legacy route: a new proposal carrying `offerDetails.fullTimeOffer`, which the intern accepts and the employer
+ * then pays the hiring fee for at checkout. A drive offer carries the drive and its 1% fee, stamped here only.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -58,14 +67,52 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   }
 
   const db = getDb();
-  const [[employer], [base]] = await Promise.all([
-    db.select().from(schema.employers).where(eq(schema.employers.id, id)).limit(1),
-    db.select().from(schema.proposals).where(eq(schema.proposals.id, b.proposalId)).limit(1),
-  ]);
-  if (!base || base.employerId !== id) return NextResponse.json({ error: "Unknown placement" }, { status: 404 });
-  const td = await assertProposalActionable(b.proposalId, id);
-  if (!td.ok) return td.response;
-  if (base.status !== "hired") return NextResponse.json({ error: "Full-time offers go to interns you've hired." }, { status: 409 });
+  const [employer] = await db.select().from(schema.employers).where(eq(schema.employers.id, id)).limit(1);
+  let base: Pick<typeof schema.proposals.$inferSelect, "internId" | "projectId" | "flowType" | "skills" | "aiRatings">;
+  let from: { baseProposalId: string } | { driveId: string; feeRate: number };
+  if (b.proposalId) {
+    const [placement] = await db.select().from(schema.proposals).where(eq(schema.proposals.id, b.proposalId)).limit(1);
+    if (!placement || placement.employerId !== id) return NextResponse.json({ error: "Unknown placement" }, { status: 404 });
+    const td = await assertProposalActionable(b.proposalId, id);
+    if (!td.ok) return td.response;
+    if (placement.status !== "hired") return NextResponse.json({ error: "Full-time offers go to interns you've hired." }, { status: 409 });
+    base = placement;
+    from = { baseProposalId: b.proposalId };
+  } else {
+    // A drive offer: the drive must be open to this employer (joined from the link, inside its window), a
+    // full-time drive, the student one of its students and the project the employer's own.
+    const loaded = await driveForEmployer(b.driveId!, guard.session);
+    if (!loaded) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    if (!loaded.access.ok) return NextResponse.json({ error: "No access to this drive", reason: loaded.access.reason }, { status: 403 });
+    if (loaded.drive.kind !== "full_time") return NextResponse.json({ error: "Full-time offers go out from full-time drives." }, { status: 409 });
+    if (!(await eligibleStudents(loaded.drive)).some((s) => s.userId === b.internId)) {
+      return NextResponse.json({ error: "Student not in this drive" }, { status: 404 });
+    }
+    // Only a student in Findtern's candidate pool takes offers (the card shows the button for them alone).
+    const [inPool] = await db
+      .select({ id: schema.users.id })
+      .from(schema.users)
+      .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
+      .where(and(eq(schema.users.id, b.internId!), ...candidatePoolClauses()))
+      .limit(1);
+    if (!inPool) return NextResponse.json({ error: "This student can't take offers yet." }, { status: 409 });
+    // An intern this employer already hired converts through the placement, at the standard rate, never the drive rate.
+    const [held] = await db
+      .select({ id: schema.proposals.id })
+      .from(schema.proposals)
+      .where(and(eq(schema.proposals.employerId, id), eq(schema.proposals.internId, b.internId!), inArray(schema.proposals.status, ["accepted", "processing", "hired"])))
+      .limit(1);
+    if (held) return NextResponse.json({ error: "You've already hired this intern. Make the full-time offer from their placement." }, { status: 409 });
+    const [project] = await db
+      .select({ id: schema.projects.id, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt })
+      .from(schema.projects)
+      .where(and(eq(schema.projects.id, b.projectId!), eq(schema.projects.employerId, id)))
+      .limit(1);
+    if (!project) return NextResponse.json({ error: "Pick one of your projects." }, { status: 404 });
+    if (!isProjectOpen(project.status, project.takenDownAt)) return NextResponse.json({ error: "That project is closed. Pick an open one." }, { status: 409 });
+    base = { internId: b.internId!, projectId: project.id, flowType: "direct", skills: [], aiRatings: null };
+    from = { driveId: loaded.drive.id, feeRate: DRIVE_FULL_TIME_FEE };
+  }
   // A taken-down listing sends no new offers, a full-time one included.
   if (base.projectId) {
     const [project] = await db.select({ takenDownAt: schema.projects.takenDownAt }).from(schema.projects).where(eq(schema.projects.id, base.projectId)).limit(1);
@@ -120,7 +167,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         currency: b.ctcCurrency,
         offerDetails: {
           fullTimeOffer: {
-            baseProposalId: b.proposalId,
+            ...from,
             jobTitle: b.jobTitle,
             jobMode: b.jobMode,
             jobLocationCity: b.jobLocationCity,
@@ -181,6 +228,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     `timezone: ${b.timezone}`,
     `shift: ${b.shiftFrom} - ${b.shiftTo}`,
     `annualCtc: ${b.ctcCurrency} ${b.annualCtc}`,
+    ...("driveId" in from ? [`campusDrive: ${from.driveId} (hiring fee ${from.feeRate * 100}%)`] : []),
     `offerLetter: ${offerLetterUrl}`,
   ].join("\n");
   try {

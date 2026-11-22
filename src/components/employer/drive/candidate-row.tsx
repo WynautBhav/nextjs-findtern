@@ -34,6 +34,7 @@ export function CandidateRow({
   call,
   onShortlist,
   onCall,
+  offer,
 }: {
   c: DriveCandidate;
   fullTime: boolean;
@@ -41,6 +42,8 @@ export function CandidateRow({
   call: MeetingView | undefined;
   onShortlist: () => void;
   onCall: (minutes: number) => Promise<void>;
+  /** A full-time drive's "Full-time offer" button, beside Call. */
+  offer?: React.ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
   const open = isOpen(call);
@@ -131,47 +134,50 @@ export function CandidateRow({
         ) : (
           <span />
         )}
-        {open && call?.status === "accepted" && call.meetingLink ? (
-          <a
-            href={call.meetingLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            // Arrives by poll when the candidate accepts; fade in so it is noticed, not teleported.
-            className={cn(buttonVariants({ size: "sm" }), "starting:scale-[0.97] starting:opacity-0")}
-          >
-            <Video className="size-4" aria-hidden />
-            Join call
-          </a>
-        ) : open ? null : (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button type="button" disabled={busy} className={buttonVariants({ size: "sm", variant: "outline" })}>
-                {busy ? <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden /> : <Phone className="size-4" aria-hidden />}
-                Call
-                <ChevronDown className="size-3.5" aria-hidden />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 p-1.5">
-              <DropdownMenuLabel className="px-2 py-1.5 text-xs font-medium text-ink-600">
-                Video call with {c.name}
-                {!c.online ? <span className="mt-0.5 block font-normal">Not online right now: they get a notification, and may not see it at once.</span> : null}
-              </DropdownMenuLabel>
-              {DELAYS.map((d) => (
-                <DropdownMenuItem
-                  key={d.minutes}
-                  className="min-h-11 cursor-pointer"
-                  onSelect={async () => {
-                    setBusy(true);
-                    await onCall(d.minutes);
-                    setBusy(false);
-                  }}
-                >
-                  {d.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        )}
+        <span className="flex flex-wrap items-center gap-2">
+          {offer}
+          {open && call?.status === "accepted" && call.meetingLink ? (
+            <a
+              href={call.meetingLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              // Arrives by poll when the candidate accepts; fade in so it is noticed, not teleported.
+              className={cn(buttonVariants({ size: "sm" }), "starting:scale-[0.97] starting:opacity-0")}
+            >
+              <Video className="size-4" aria-hidden />
+              Join call
+            </a>
+          ) : open ? null : (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button type="button" disabled={busy} className={buttonVariants({ size: "sm", variant: "outline" })}>
+                  {busy ? <Loader2 className="size-4 motion-safe:animate-spin" aria-hidden /> : <Phone className="size-4" aria-hidden />}
+                  Call
+                  <ChevronDown className="size-3.5" aria-hidden />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 p-1.5">
+                <DropdownMenuLabel className="px-2 py-1.5 text-xs font-medium text-ink-600">
+                  Video call with {c.name}
+                  {!c.online ? <span className="mt-0.5 block font-normal">Not online right now: they get a notification, and may not see it at once.</span> : null}
+                </DropdownMenuLabel>
+                {DELAYS.map((d) => (
+                  <DropdownMenuItem
+                    key={d.minutes}
+                    className="min-h-11 cursor-pointer"
+                    onSelect={async () => {
+                      setBusy(true);
+                      await onCall(d.minutes);
+                      setBusy(false);
+                    }}
+                  >
+                    {d.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
+        </span>
       </div>
     </li>
   );

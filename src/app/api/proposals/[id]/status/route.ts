@@ -17,6 +17,7 @@ import { initialsOf } from "@/lib/employer-candidates";
 import { employerNames, internFirstName, notify, resolveOfferNotifications } from "@/lib/notify";
 import { guaranteeEnded, guaranteeMisses } from "@/lib/guarantee";
 import { FREE_DECLINES, offerPastStart, parseOffer, todayIst } from "@/lib/offer";
+import { feeRateLabel, fullTimeRate } from "@/lib/checkout";
 import { hasOpenOrderFor, OPEN_ORDER_MINUTES } from "@/lib/payments";
 import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
 import { internLockResponse } from "@/lib/intern-unlock";
@@ -400,7 +401,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           : "Offer declined",
       message: `${candidate} ${status === "accepted" ? "accepted" : "declined"} your ${fullTime ? "full-time offer" : "offer"} for ${role}.`,
       data: { proposalId: id },
-      email: emails.proposalDecision({ employerName: contact, candidate, role, accepted: status === "accepted", proposalId: id, fullTime, cgpaPending }),
+      email: emails.proposalDecision({ employerName: contact, candidate, role, accepted: status === "accepted", proposalId: id, fullTime, feeRate: offer.fullTime ? feeRateLabel(fullTimeRate(offer.fullTime)) : undefined, cgpaPending }),
     });
     if (status === "accepted") {
       await requestCgpaCheck({ proposalId: id, internId: proposal.internId, employerId: proposal.employerId, role, startDate: offer.startDate ?? null });

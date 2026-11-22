@@ -13,7 +13,7 @@ import { formatDate as formatWords, formatMoney, formatSlotTime } from "@/lib/fo
 import { interviewStage, meetingTime } from "@/lib/employer-interview-rules";
 import { serializeJoinInput } from "@/lib/interview-join";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
-import { fullTimeFeeMinor, hireFeeMinor } from "@/lib/checkout";
+import { fullTimeFeeMinor, fullTimeRate, hireFeeMinor } from "@/lib/checkout";
 import { feeDisplay } from "@/lib/fee-display";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { offerScore, parseOffer } from "@/lib/offer";
@@ -220,7 +220,7 @@ export default async function EmployerProposalDetail({
   const strip: [string, string][] = ft
     ? [
         ["Annual CTC", ft.annualCtcMinor ? formatMoney(ft.annualCtcMinor, currency) : "-"],
-        ["Hiring fee", ft.annualCtcMinor ? formatMoney(fullTimeFeeMinor(ft.annualCtcMinor), currency) : "-"],
+        ["Hiring fee", ft.annualCtcMinor ? formatMoney(fullTimeFeeMinor(ft.annualCtcMinor, fullTimeRate(ft)), currency) : "-"],
         ["Joining", formatDate(offer.startDate)],
         ["Type", "Full-time"],
       ]

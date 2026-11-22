@@ -243,7 +243,7 @@ export const emails = {
     cta: ctaTo("View proposal", `/intern/proposals/${o.proposalId}`),
   }),
 
-  proposalDecision: (o: { employerName: string; candidate: string; role: string; accepted: boolean; proposalId: string; fullTime?: boolean; /** Accepted, but Findtern is still checking the candidate's CGPA: payment opens once it is confirmed. */ cgpaPending?: boolean }): EmailContent => ({
+  proposalDecision: (o: { employerName: string; candidate: string; role: string; accepted: boolean; proposalId: string; fullTime?: boolean; /** The full-time fee as shown, e.g. "8.33%" (1% from a campus drive). */ feeRate?: string; /** Accepted, but Findtern is still checking the candidate's CGPA: payment opens once it is confirmed. */ cgpaPending?: boolean }): EmailContent => ({
     subject: o.fullTime ? "Full-time offer update | Findtern" : "Candidate decision update | Findtern",
     preheader: o.accepted
       ? o.cgpaPending
@@ -266,7 +266,7 @@ export const emails = {
         ? o.cgpaPending
           ? "Payment opens once Findtern’s final checks are done (usually 24 to 48 hours). We’ll tell you the moment you can pay."
           : o.fullTime
-            ? "Complete the full-time hiring fee (8.33% of the annual CTC) to confirm the joining."
+            ? `Complete the full-time hiring fee (${o.feeRate ?? "8.33%"} of the annual CTC) to confirm the joining.`
             : "Complete the payment to confirm the hire. Names and contact details unlock once it’s done."
         : "You can send an offer to another candidate from your shortlist.",
     ],
