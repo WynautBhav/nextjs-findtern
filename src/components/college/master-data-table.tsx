@@ -48,7 +48,7 @@ const PRESETS: View[] = [
   { id: "stars", name: "Strong on both", columns: SCORES, filters: { ...NO_FILTERS, quadrant: "stars" }, sort: { key: "score", dir: "desc" } },
   { id: "support", name: "Needs support", columns: SCORES, filters: { ...NO_FILTERS, quadrant: "support" }, sort: { key: "score", dir: "asc" } },
   { id: "placed", name: "Placed and PPO", columns: ["name", "degree", "branch", "year", "offers", "hired", "ppo", "earningsMinor"], filters: { ...NO_FILTERS, placement: "hired" }, sort: { key: "earningsMinor", dir: "desc" } },
-  { id: "contact", name: "Contact sheet", columns: ["name", "rollNo", "phone", "email", "emergencyContact", "linkedin", "city"], filters: NO_FILTERS, sort: { key: "name", dir: "asc" } },
+  { id: "contact", name: "Contact sheet", columns: ["name", "phone", "email", "emergencyContact", "linkedin", "city"], filters: NO_FILTERS, sort: { key: "name", dir: "asc" } },
   { id: "work-prefs", name: "Work preferences", columns: ["name", "degree", "workModes", "preferredLocations", "laptop", "skills"], filters: NO_FILTERS, sort: { key: "name", dir: "asc" } },
   { id: "no-laptop", name: "No laptop", columns: ["name", "degree", "branch", "phone", "workModes", "laptop"], filters: { ...NO_FILTERS, laptop: "no" }, sort: { key: "name", dir: "asc" } },
 ];
@@ -84,7 +84,7 @@ function matches(r: MasterRow, f: Filters, q: string): boolean {
   if (f.minCgpa && (r.cgpa === null || r.cgpa < Number(f.minCgpa))) return false;
   if (f.quadrant && quadrantOf(r) !== f.quadrant) return false;
   if (q) {
-    const hay = [r.name, r.email, r.rollNo, r.branch, r.degree, r.city, ...r.skills, ...r.preferredLocations].join(" ").toLowerCase();
+    const hay = [r.name, r.email, r.branch, r.degree, r.city, ...r.skills, ...r.preferredLocations].join(" ").toLowerCase();
     if (!q.split(/\s+/).every((w) => hay.includes(w))) return false;
   }
   return true;
@@ -134,6 +134,58 @@ function Cell({ r, k, now }: { r: MasterRow; k: Key; now: number }) {
   return <span className={numeric(k) ? "text-ink-900" : "text-ink-700"}>{text}</span>;
 }
 
+/**
+ * A minimum out of 10: the usual cut-offs, or "Custom…" for any value the officer types (one decimal, 0 to 10).
+ * The typed value filters as soon as it is a valid number; a blank or invalid entry filters nothing.
+ */
+function MinimumPicker({ label, any, presets, value, onChange, className }: { label: string; any: string; presets: number[]; value: string; onChange: (v: string) => void; className: string }) {
+  const isPreset = value === "" || presets.some((p) => String(p) === value);
+  const [custom, setCustom] = useState(!isPreset);
+  const [draft, setDraft] = useState(isPreset ? "" : value);
+  const commit = (raw: string) => {
+    setDraft(raw);
+    const n = Number(raw);
+    onChange(raw.trim() !== "" && Number.isFinite(n) && n >= 0 && n <= 10 ? String(Math.round(n * 10) / 10) : "");
+  };
+  return (
+    <span className="flex shrink-0 items-center gap-1.5">
+      <select
+        aria-label={`Minimum ${label}`}
+        value={custom ? "custom" : value}
+        onChange={(e) => {
+          if (e.target.value === "custom") {
+            setCustom(true);
+            commit(draft);
+          } else {
+            setCustom(false);
+            onChange(e.target.value);
+          }
+        }}
+        className={className}
+      >
+        <option value="">{any}</option>
+        {presets.map((p) => <option key={p} value={String(p)}>{label} {p}+</option>)}
+        <option value="custom">Custom…</option>
+      </select>
+      {custom ? (
+        <input
+          type="number"
+          inputMode="decimal"
+          min={0}
+          max={10}
+          step={0.1}
+          value={draft}
+          onChange={(e) => commit(e.target.value)}
+          aria-label={`Minimum ${label}, 0 to 10`}
+          placeholder="0-10"
+          autoFocus
+          className={cn(className, "w-20")}
+        />
+      ) : null}
+    </span>
+  );
+}
+
 export function MasterDataTable({ rows, collegeId, now, initial }: { rows: MasterRow[]; collegeId: string; now: number; initial: { view?: string; course?: string; mode?: string } }) {
   const start = PRESETS.find((p) => p.id === initial.view) ?? PRESETS[0];
   const [viewId, setViewId] = useState(start.id);
@@ -146,6 +198,8 @@ export function MasterDataTable({ rows, collegeId, now, initial }: { rows: Maste
   const [viewName, setViewName] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  // Bumped when a view is applied or filters are cleared, so the custom score and CGPA boxes start over.
+  const [resetKey, setResetKey] = useState(0);
 
   // Own views live in this browser only (no student data in them: just columns, filters and sort).
   const raw = useSyncExternalStore(subscribeViews, () => readViews(collegeId), () => "[]");
@@ -187,6 +241,7 @@ export function MasterDataTable({ rows, collegeId, now, initial }: { rows: Maste
     setSort(v.sort);
     setLimit(PAGE);
     setMsg(null);
+    setResetKey((k) => k + 1);
   };
   const set = <K extends keyof Filters>(k: K, v: Filters[K]) => { setFilters((f) => ({ ...f, [k]: v })); setLimit(PAGE); };
   const activeFilters = (Object.keys(NO_FILTERS) as (keyof Filters)[]).filter((k) => filters[k] !== NO_FILTERS[k]).length;
@@ -272,7 +327,7 @@ export function MasterDataTable({ rows, collegeId, now, initial }: { rows: Maste
           <label className="relative min-w-[14rem] flex-1 sm:max-w-xs">
             <span className="sr-only">Search students</span>
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-500" aria-hidden />
-            <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder="Name, roll no., skill or city" className={cn(select, "w-full pl-9")} />
+            <input value={q} onChange={(e) => { setQ(e.target.value); setLimit(PAGE); }} placeholder="Name, skill or city" className={cn(select, "w-full pl-9")} />
           </label>
           <div className="ml-auto flex flex-wrap items-center gap-2">
             <Sheet>
@@ -333,30 +388,24 @@ export function MasterDataTable({ rows, collegeId, now, initial }: { rows: Maste
             <option value="hired">Hired</option>
             <option value="ppo">PPO offer</option>
           </select>
-          <select aria-label="Work preference" value={filters.mode} onChange={(e) => set("mode", e.target.value)} className={select}>
-            <option value="">Any work mode</option>
-            {MODES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+          <select aria-label="Work mode preference" value={filters.mode} onChange={(e) => set("mode", e.target.value)} className={select}>
+            <option value="">Work mode preference</option>
+            {MODES.map(([v, l]) => <option key={v} value={v}>Open to {l.toLowerCase()}</option>)}
           </select>
           <select aria-label="Laptop" value={filters.laptop} onChange={(e) => set("laptop", e.target.value as Filters["laptop"])} className={select}>
             <option value="any">Laptop: any</option>
             <option value="yes">Has a laptop</option>
             <option value="no">No laptop</option>
           </select>
-          <select aria-label="Minimum Findtern score" value={filters.minScore} onChange={(e) => set("minScore", e.target.value)} className={select}>
-            <option value="">Any score</option>
-            {[5, 6, 7, 8, 9].map((v) => <option key={v} value={String(v)}>Score {v}+</option>)}
-          </select>
-          <select aria-label="Minimum CGPA" value={filters.minCgpa} onChange={(e) => set("minCgpa", e.target.value)} className={select}>
-            <option value="">Any CGPA</option>
-            {[6, 7, HIGH_CGPA, 8, 9].map((v) => <option key={v} value={String(v)}>CGPA {v}+</option>)}
-          </select>
+          <MinimumPicker key={`score-${resetKey}`} label="Findtern score" any="Findtern score" presets={[5, 6, STRONG_SCORE, 8, 9]} value={filters.minScore} onChange={(v) => set("minScore", v)} className={select} />
+          <MinimumPicker key={`cgpa-${resetKey}`} label="CGPA" any="Any CGPA" presets={[6, 7, HIGH_CGPA, 8, 9]} value={filters.minCgpa} onChange={(v) => set("minCgpa", v)} className={select} />
           <select aria-label="Verification" value={filters.status} onChange={(e) => set("status", e.target.value as Filters["status"])} className={select}>
             <option value="any">Verified and not</option>
             <option value="verified">Verified only</option>
             <option value="unverified">Not verified</option>
           </select>
           {activeFilters ? (
-            <button type="button" onClick={() => { setFilters(NO_FILTERS); setLimit(PAGE); }} className="min-h-9 rounded-md px-2 font-medium text-brand-700 hover:underline focus-visible:ring-2 focus-visible:ring-brand-500">
+            <button type="button" onClick={() => { setFilters(NO_FILTERS); setLimit(PAGE); setResetKey((k) => k + 1); }} className="min-h-9 rounded-md px-2 font-medium text-brand-700 hover:underline focus-visible:ring-2 focus-visible:ring-brand-500">
               Clear {activeFilters === 1 ? "filter" : `${activeFilters} filters`}
             </button>
           ) : null}
@@ -403,7 +452,7 @@ export function MasterDataTable({ rows, collegeId, now, initial }: { rows: Maste
           {!visible.length ? (
             <div className="px-4 py-10 text-center text-sm text-ink-600">
               No students match.{" "}
-              <button type="button" onClick={() => { setFilters(NO_FILTERS); setQ(""); }} className="font-medium text-brand-700 hover:underline">Clear filters and search</button>
+              <button type="button" onClick={() => { setFilters(NO_FILTERS); setQ(""); setResetKey((k) => k + 1); }} className="font-medium text-brand-700 hover:underline">Clear filters and search</button>
             </div>
           ) : null}
         </div>

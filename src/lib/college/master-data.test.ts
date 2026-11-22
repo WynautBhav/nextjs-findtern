@@ -5,7 +5,7 @@ import { buildMasterRow, cellText, csvCell, MASTER_COLUMNS, toCsv, type MasterEx
 import { computeInsights, quadrantOf } from "./insights.ts";
 
 const student = (over: Partial<ScopedStudent> = {}): ScopedStudent => ({
-  userId: "u1", status: "verified", firstName: "Asha", lastName: "Meena", email: "asha@jklu.edu.in", rollNo: "22JK01",
+  userId: "u1", status: "verified", firstName: "Asha", lastName: "Meena", email: "asha@jklu.edu.in",
   phone: "+91 98290 00000", linkedin: "https://linkedin.com/in/asha", year: 3, branch: "Finance", cgpa: 6.4, score: 8.2,
   lastSeenAt: new Date("2026-11-22T10:00:00Z"), ...over,
 });
@@ -32,7 +32,8 @@ test("a verified student carries every field on the master data list", () => {
   assert.equal(r.professionalStatus, "Pursuing");
   assert.equal(r.certifications, 2);
   assert.equal(r.experience, 1);
-  assert.deepEqual(r.workModes, ["hybrid", "remote"]);
+  // Findtern's rule: the widest choice counts, and each choice covers the ones before it (hybrid -> remote + hybrid).
+  assert.deepEqual(r.workModes, ["remote", "hybrid"]);
   assert.equal(r.english, 8.8);
   assert.equal(r.emergencyContact, "Sunita Meena (Mother) +91 9800000000");
   assert.equal(r.hasReport, true);
@@ -41,7 +42,7 @@ test("a verified student carries every field on the master data list", () => {
   assert.equal(cellText(r, "semester"), "5");
 });
 
-test("an unverified student shows only name, email, roll, year, course and branch", () => {
+test("an unverified student shows only name, email, year, course and branch", () => {
   const r = buildMasterRow(student({ status: "claimed", phone: null, linkedin: null, cgpa: null, score: null }), extras({ offers: 3, hired: 1, ppo: 1, earningsMinor: 50000 }));
   assert.equal(r.verified, false);
   for (const k of ["phone", "emergencyContact", "cgpa", "score", "english", "city", "laptop", "lastSeenAt", "professionalCourse"] as const) {
@@ -94,4 +95,18 @@ test("overlooked means a strong Findtern score and no offer yet", () => {
   assert.equal(quadrantOf({ cgpa: 6.0, score: 8.0 }), "scoreBeatsCg");
   assert.equal(quadrantOf({ cgpa: 9.0, score: 5.0 }), "cgBeatsScore");
   assert.equal(quadrantOf({ cgpa: null, score: 5.0 }), null);
+});
+
+test("work mode follows Findtern's rule: remote only, hybrid adds remote, onsite adds both", () => {
+  const modes = (picked: string[]) => buildMasterRow(student(), extras({ locationTypes: picked })).workModes;
+  assert.deepEqual(modes(["remote"]), ["remote"]);
+  assert.deepEqual(modes(["Hybrid"]), ["remote", "hybrid"]);
+  assert.deepEqual(modes(["onsite"]), ["remote", "hybrid", "onsite"]);
+  assert.deepEqual(modes(["remote", "onsite"]), ["remote", "hybrid", "onsite"]);
+  assert.deepEqual(modes([]), []);
+});
+
+test("roll number is not part of master data", () => {
+  assert.ok(!MASTER_COLUMNS.some((c) => (c.key as string) === "rollNo"));
+  assert.ok(!("rollNo" in buildMasterRow(student(), extras())));
 });

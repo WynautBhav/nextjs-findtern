@@ -8,12 +8,13 @@
  * audited /api/college/students/[id]/[artifact] route, never the raw URL.
  */
 
+import { WORK_MODE_ORDER, widestWorkMode } from "../onboarding.ts";
+
 export type MasterRow = {
   userId: string;
   verified: boolean;
   name: string;
   email: string;
-  rollNo: string | null;
   phone: string | null;
   emergencyContact: string | null;
   degree: string | null;
@@ -56,7 +57,6 @@ export type ScopedStudent = {
   firstName: string;
   lastName: string;
   email: string;
-  rollNo: string | null;
   phone: string | null;
   linkedin: string | null;
   year: number | null;
@@ -99,7 +99,14 @@ const year4 = (v: unknown): number | null => {
   return n !== null && n >= 1990 && n <= 2100 ? Math.trunc(n) : null;
 };
 
-const MODES = new Set(["remote", "hybrid", "onsite"]);
+/**
+ * Findtern's work-mode rule (onboarding.ts): a student's widest choice counts, and it covers every mode before
+ * it. Remote is remote only; hybrid is remote and hybrid; onsite is all three.
+ */
+function acceptedModes(raw: unknown): string[] {
+  const widest = widestWorkMode(strs(raw, 3));
+  return widest ? WORK_MODE_ORDER.slice(0, WORK_MODE_ORDER.indexOf(widest) + 1) : [];
+}
 
 export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): MasterRow {
   const verified = s.status === "verified";
@@ -111,7 +118,6 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     verified,
     name,
     email: s.email,
-    rollNo: s.rollNo,
     phone: null,
     emergencyContact: null,
     degree: str(a.degree),
@@ -170,7 +176,7 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     professionalLevel: str(pro.level),
     certifications: arr(a.certifications).length,
     experience: arr(x.experience).length,
-    workModes: strs(x.locationTypes, 3).map((m) => m.toLowerCase()).filter((m) => MODES.has(m)),
+    workModes: acceptedModes(x.locationTypes),
     preferredLocations: strs(x.preferredLocations, 5),
     laptop: x.hasLaptop,
     lastSeenAt: s.lastSeenAt?.toISOString() ?? null,
@@ -207,13 +213,12 @@ export const MASTER_COLUMNS: MasterColumn[] = [
   { key: "email", label: "Email", group: "Student", kind: "text" },
   { key: "phone", label: "Phone", group: "Student", kind: "text" },
   { key: "emergencyContact", label: "Emergency contact", group: "Student", kind: "text" },
-  { key: "rollNo", label: "Roll no.", group: "Student", kind: "text" },
   { key: "degree", label: "Degree", group: "Course", kind: "text" },
   { key: "branch", label: "Branch", group: "Course", kind: "text" },
   { key: "startYear", label: "Start year", group: "Course", kind: "number" },
   { key: "endYear", label: "End year", group: "Course", kind: "number" },
   { key: "year", label: "Current year", group: "Course", kind: "number" },
-  { key: "semester", label: "Current sem", group: "Course", kind: "number" },
+  { key: "semester", label: "Current semester", group: "Course", kind: "number" },
   { key: "linkedin", label: "LinkedIn", group: "Student", kind: "link" },
   { key: "city", label: "City", group: "Student", kind: "text" },
   { key: "cgpa", label: "CGPA", group: "Course", kind: "score" },

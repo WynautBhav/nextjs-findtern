@@ -309,10 +309,10 @@ export function Readiness({ ins }: { ins: Insights }) {
   const { yes, no, unknown } = ins.laptop;
   return (
     <Panel>
-      <PanelHeader title="How and where they want to work" description="From each student's profile. A student can pick more than one." />
+      <PanelHeader title="How and where they want to work" description="From each student's profile. Onsite students are open to hybrid and remote too." />
       <PanelBody className="grid gap-8 md:grid-cols-3">
         <div>
-          <h3 className="text-sm font-medium text-ink-900">Work preference</h3>
+          <h3 className="text-sm font-medium text-ink-900">Open to</h3>
           <ul className="mt-3 space-y-3">
             {ins.workModes.map((m) => (
               <li key={m.mode}>
