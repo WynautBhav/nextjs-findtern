@@ -73,7 +73,9 @@ test("sweeper: per-employer lock shared with the order route, bounded, never lap
 });
 
 test("sweeper SQL: the start-date test uses [0-9], not \\d (a bare \\d in a template literal is the letter d and matches nothing)", () => {
-  const sql = sweeper.slice(sweeper.indexOf("const startBegun"), sweeper.indexOf("async function expireForEmployer"));
+  // The start-date SQL lives in one shared helper (the college counts read it too); the sweeper must use it.
+  assert.match(sweeper.slice(sweeper.indexOf("const startBegun"), sweeper.indexOf("async function expireForEmployer")), /startBegunSql\(/);
+  const sql = read(LIB, "offer-start-sql.ts").replace(/\/\*[\s\S]*?\*\//g, "");
   assert.match(sql, /\[0-9\]\{4\}-\[0-9\]\{2\}-\[0-9\]\{2\}/);
   assert.doesNotMatch(sql, /\\d/);
 });

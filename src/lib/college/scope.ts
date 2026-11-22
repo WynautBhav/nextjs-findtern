@@ -19,7 +19,9 @@ import {
  * cannot widen what a placement officer or drive employer sees.
  */
 
+import { todayIst } from "@/lib/offer";
 import { CALL_GRACE_MS, ONLINE_WINDOW_MS } from "./constants";
+import { interviewUpcomingSql, offerWaitingSql } from "./count-rules";
 import { redactUnverified } from "./serialize";
 export { HEARTBEAT_MS, ONLINE_WINDOW_MS } from "./constants";
 
@@ -111,6 +113,10 @@ async function loadMembers(collegeId: string, onlyUserId?: string): Promise<Coll
   const m = schema.collegeMemberships;
   const u = schema.users;
   const o = schema.internOnboarding;
+  // Offers lapse on their IST start day and meetings expire after their slot: the same clocks the other roles read.
+  const now = new Date();
+  const today = todayIst(now);
+  const nowIso = now.toISOString();
   const res = await getDb().execute(sql`
     SELECT
       ${m.userId} AS user_id, ${m.collegeId} AS college_id, ${m.status} AS status, ${m.verifiedBy} AS verified_by,
@@ -129,7 +135,7 @@ async function loadMembers(collegeId: string, onlyUserId?: string): Promise<Coll
       (p.last_seen_at AT TIME ZONE 'UTC') AS last_seen_at,
       -- Same rules as master-data.ts: a draft is no offer; a hire is a hire date or a hired/completed status (a finished internship still placed the student).
       (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND pr.status <> 'draft' AND ${realEmployerId(sql`pr.employer_id`)}) AS proposals,
-      (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND pr.status = 'sent' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_pending,
+      (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND ${offerWaitingSql('pr', today)} AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_pending,
       (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND (pr.hired_at IS NOT NULL OR pr.status IN ('hired', 'completed')) AND ${realEmployerId(sql`pr.employer_id`)}) AS hired,
       (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND pr.status <> 'draft' AND pr.created_at > (now() AT TIME ZONE 'UTC') - interval '24 hours' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_new,
       (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId} AND pr.hired_at > (now() AT TIME ZONE 'UTC') - interval '24 hours' AND ${realEmployerId(sql`pr.employer_id`)}) AS hired_new,
@@ -138,7 +144,7 @@ async function loadMembers(collegeId: string, onlyUserId?: string): Promise<Coll
           -- Still answerable: a request lapses CALL_GRACE_MS after its start time (meetings.ts effectiveStatus).
           AND dm.starts_at + make_interval(secs => ${CALL_GRACE_MS / 1000}) >= (now() AT TIME ZONE 'UTC')
           AND (dr.revoked_at IS NULL OR dr.revoked_at > (now() AT TIME ZONE 'UTC'))) AS calls_pending,
-      (SELECT count(*) FROM ${schema.interviews} iv WHERE iv.intern_id = ${m.userId} AND iv.status = 'scheduled' AND ${realEmployerId(sql`iv.employer_id`)}) AS interviews_scheduled,
+      (SELECT count(*) FROM ${schema.interviews} iv WHERE iv.intern_id = ${m.userId} AND ${interviewUpcomingSql('iv', nowIso)} AND ${realEmployerId(sql`iv.employer_id`)}) AS interviews_scheduled,
       (SELECT count(*) FROM ${schema.collegeDriveMeetings} dm JOIN ${schema.collegeDrives} dr ON dr.id = dm.drive_id
         WHERE dm.user_id = ${m.userId} AND dr.ends_at > (now() AT TIME ZONE 'UTC')
           AND (dr.revoked_at IS NULL OR dr.revoked_at > (now() AT TIME ZONE 'UTC'))) AS drive_meetings,

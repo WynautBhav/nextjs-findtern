@@ -107,3 +107,12 @@ export function matchInvites(invited: Invite[], came: CameEmployer[]): { arrived
   const walkIns = came.filter((c) => !invited.some((i) => matches(i, c))).length;
   return { arrived, missing, walkIns };
 }
+
+/**
+ * The report sentence on a closed drive. Students, not offers: the pipeline counts students, and a student with two offers, or an
+ * internship plus a full-time offer, is one student.
+ */
+export function closedDriveFinding(lists: { offers: unknown[]; meetings: unknown[]; hired: unknown[] }): string {
+  const n = (c: number, one: string, many: string) => `${c.toLocaleString("en-IN")} ${c === 1 ? one : many}`;
+  return `${n(lists.offers.length, "student got an offer", "students got an offer")}, ${n(lists.meetings.length, "student had a call", "students had a call")} and ${n(lists.hired.length, "student was hired", "students were hired")} in this drive.`;
+}

@@ -1,0 +1,47 @@
+import { sql, type SQL } from "drizzle-orm";
+
+import { timePassed } from "../interview-time-sql.ts";
+import { startBegunSql } from "../offer-start-sql.ts";
+
+/**
+ * The college portal's offer and meeting counts, written once so every count reads the same rule as the intern, employer and
+ * admin views (and the list it opens). SQL twins of: offerPastStart / internOfferKey (offers), interviewLifecycle (meetings).
+ * All take the table alias the caller's subquery uses. Pure SQL fragments, no database: the node tests render them.
+ */
+
+/** Stored statuses where the student said yes (internOfferKey: `processing` is an accepted offer whose payment is under way). */
+export const ACCEPTED_OFFER_STATUSES = ["accepted", "processing", "hired", "completed"] as const;
+export const acceptedStatusesSql = (): SQL => sql.join(ACCEPTED_OFFER_STATUSES.map((s) => sql`${s}`), sql`, `);
+
+const col = (alias: string, c: string) => sql.raw(`${alias}.${c}`);
+
+/** Unanswered and its start day has begun (IST), or already stored as a no-reply expiry: the intern's "lapsed". */
+export function offerLapsedSql(alias: string, today: string): SQL {
+  return sql`((${col(alias, "status")} IN ('sent', 'interview_scheduled') AND ${startBegunSql(col(alias, "offer_details"), today)})
+    OR (${col(alias, "status")} = 'expired' AND ${col(alias, "offer_details")}->>'expiredReason' = 'no_reply_past_start'))`;
+}
+
+/** Still waiting on the student: sent, and the start day has not begun. */
+export function offerWaitingSql(alias: string, today: string): SQL {
+  return sql`(${col(alias, "status")} = 'sent' AND NOT ${startBegunSql(col(alias, "offer_details"), today)})`;
+}
+
+/** Open (not answered, not closed): sent or interview booked, and the start day has not begun. */
+export function offerOpenSql(alias: string, today: string): SQL {
+  return sql`(${col(alias, "status")} IN ('sent', 'interview_scheduled') AND NOT ${startBegunSql(col(alias, "offer_details"), today)})`;
+}
+
+/** A booked interview still ahead or running (interviewLifecycle "upcoming" / "live"). */
+export function interviewUpcomingSql(alias: string, nowIso: string): SQL {
+  return sql`(${col(alias, "status")} = 'scheduled' AND NOT ${timePassed(alias, nowIso)})`;
+}
+
+/** Times offered, no answer yet, and a slot is still ahead (interviewLifecycle "awaiting_pick"). */
+export function interviewWaitingSql(alias: string, nowIso: string): SQL {
+  return sql`(${col(alias, "status")} = 'pending' AND NOT ${timePassed(alias, nowIso)})`;
+}
+
+/** Stored `expired`, or still open but its time passed (interviewLifecycle "expired"). */
+export function interviewExpiredSql(alias: string, nowIso: string): SQL {
+  return sql`(${col(alias, "status")} = 'expired' OR (${col(alias, "status")} IN ('pending', 'waiting', 'proposed', 'scheduled') AND ${timePassed(alias, nowIso)}))`;
+}

@@ -285,7 +285,12 @@ export async function approvalsFor(collegeId: string, domains: readonly string[]
   }));
 }
 
+/** The students the officer can decide right now (the Approvals list, the dashboard tile and "Waiting for you" on Students). */
+export async function candidatesFor(collegeId: string, domains: readonly string[]) {
+  return withPgTransaction((client) => candidatesIn(client, collegeId, domains));
+}
+
 /** The officer's badge: how many students they can decide right now. */
 export async function pendingApprovalCount(collegeId: string, domains: readonly string[]): Promise<number> {
-  return withPgTransaction(async (client) => (await candidatesIn(client, collegeId, domains)).length);
+  return (await candidatesFor(collegeId, domains)).length;
 }

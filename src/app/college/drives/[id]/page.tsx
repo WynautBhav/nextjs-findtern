@@ -12,6 +12,7 @@ import { LinkActions } from "@/components/college/link-actions";
 import { PresenceLive } from "@/components/college/presence-live";
 import { ButtonLink } from "@/components/ui/button";
 import { driveWindow, readEligibility } from "@/lib/college/access";
+import { closedDriveFinding } from "@/lib/college/drive-board";
 import { loadDriveBoard } from "@/lib/college/drive-board-db";
 import { toLocalInput } from "@/lib/college/ist";
 import { DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
@@ -76,7 +77,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   const calls = board.lists.meetingsWaiting.length;
   const offers = board.lists.offersWaiting.length;
   const finding = !open
-    ? `${plural(board.offerCount, "offer", "offers")}, ${plural(board.lists.meetings.length, "meeting", "meetings")} and ${plural(board.lists.internships.length + board.lists.fullTime.length, "hire", "hires")} came out of this drive.`
+    ? closedDriveFinding(board.lists)
     : calls || offers || missing.length
       ? [calls ? `${plural(calls, "student hasn't", "students haven't")} answered a call` : null, offers ? `${plural(offers, "offer is", "offers are")} waiting on a reply` : null, missing.length ? `${plural(missing.length, "invited company hasn't", "invited companies haven't")} come in` : null]
           .filter(Boolean)

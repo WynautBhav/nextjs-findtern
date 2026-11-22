@@ -45,7 +45,7 @@ export type MasterRow = {
   aiInterview: number | null;
   score: number | null;
   offers: number;
-  /** Offers by what the student did: accepted (accepted, hired, completed), rejected, or not answered (sent, interview, expired). */
+  /** Offers by what the student did: accepted (accepted, processing, hired, completed), rejected (or lapsed unanswered past the start date), or not answered (sent or interview booked, start date ahead). */
   offersAccepted: number;
   offersRejected: number;
   offersOpen: number;

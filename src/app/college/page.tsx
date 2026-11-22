@@ -9,7 +9,7 @@ import { ScoreCurve, TopStudents } from "@/components/college/overview-charts";
 import { ScoreVsCgpa } from "@/components/college/score-vs-cgpa";
 import { yearLabel } from "@/lib/college/labels";
 import { CollegeMark } from "@/components/employer/drive-parts";
-import { pendingApprovalCount } from "@/lib/college/approvals";
+import { candidatesFor } from "@/lib/college/approvals";
 import { eligibleStudents, presenceSnapshot, requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { pendingLeaveCount } from "@/lib/college/leave-request-read";
 import { getDb, schema } from "@/lib/db";
@@ -53,9 +53,11 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
   const heroMode: HeroMode = sp.mode === "categories" || sp.mode === "placement" ? sp.mode : "students";
   const heroDesign = Math.max(0, Math.min(9, (Number(sp.design) || 1) - 1));
 
+  // One read of who the officer can accept: the tile counts it and the roster marks those students "Waiting for you" (as Students does).
+  const candidates = candidatesFor(ctx.college.id, ctx.college.emailDomains);
   const [all, coverage, [liveDrive], [seat], paid, hasDriveOrder, pendingLeaves, toAccept, [unpaid], master] = await Promise.all([
     studentsForCollegeAdmin(ctx),
-    rosterCoverage(ctx.college.id),
+    candidates.then((c) => rosterCoverage(ctx.college.id, new Set(c.map((x) => x.email.toLowerCase())))),
     getDb()
       .select()
       .from(schema.collegeDrives)
@@ -78,7 +80,7 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
     paidSeatTotal(getDb(), ctx.college.id),
     collegeHasDriveOrder(ctx.college.id),
     pendingLeaveCount(ctx.college.id),
-    pendingApprovalCount(ctx.college.id, ctx.college.emailDomains),
+    candidates.then((c) => c.length),
     getDb()
       .select({ n: sql<number>`count(*)::int` })
       .from(schema.collegeSeatBatches)

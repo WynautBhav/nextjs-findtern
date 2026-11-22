@@ -2,6 +2,8 @@ import { sql } from "drizzle-orm";
 
 import { realEmployerId } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
+import { todayIst } from "@/lib/offer";
+import { acceptedStatusesSql, interviewExpiredSql, interviewUpcomingSql, interviewWaitingSql, offerLapsedSql, offerOpenSql } from "./count-rules";
 import { studentsForCollegeAdmin, type CollegeContext } from "./scope";
 import { buildMasterRow, NO_MEETINGS, type MasterExtras, type MasterRow, type Meetings } from "./master-row";
 
@@ -22,6 +24,10 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
   const students = await studentsForCollegeAdmin(ctx);
   const ids = students.filter((s) => s.status === "verified").map((s) => s.userId);
   const extras = new Map<string, MasterExtras>();
+  // The same clocks the other roles read: an offer closes on its IST start day, a meeting expires after its slot.
+  const now = new Date();
+  const today = todayIst(now);
+  const nowIso = now.toISOString();
   if (ids.length) {
     const o = schema.internOnboarding;
     const keys = sql.join(EXTRA_KEYS.map((k) => sql`${k}`), sql`, `);
@@ -31,9 +37,9 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
         ${o.skills} AS skills, ${o.locationTypes} AS location_types, ${o.preferredLocations} AS preferred_locations,
         ${o.hasLaptop} AS has_laptop, ${o.city} AS city, ${o.state} AS state, ${o.experienceJson} AS experience,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status <> 'draft' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers,
-        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status IN ('accepted', 'hired', 'completed') AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_accepted,
-        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status = 'rejected' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_rejected,
-        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status IN ('sent', 'interview_scheduled', 'expired') AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_open,
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status IN (${acceptedStatusesSql()}) AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_accepted,
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND (pr.status = 'rejected' OR ${offerLapsedSql('pr', today)}) AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_rejected,
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND ${offerOpenSql('pr', today)} AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_open,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND (pr.hired_at IS NOT NULL OR pr.status IN ('hired', 'completed')) AND ${realEmployerId(sql`pr.employer_id`)}) AS hired,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status NOT IN ('draft', 'withdrawn')
           AND jsonb_typeof(pr.offer_details->'fullTimeOffer') = 'object' AND ${realEmployerId(sql`pr.employer_id`)}) AS ppo,
@@ -42,9 +48,9 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
         (SELECT jsonb_build_object(
             'total', count(*),
             'done', count(*) FILTER (WHERE iv.status = 'completed'),
-            'notAccepted', count(*) FILTER (WHERE iv.status IN ('expired', 'declined', 'rejected') OR (iv.status = 'cancelled' AND iv.cancelled_by = 'intern')),
-            'upcoming', count(*) FILTER (WHERE iv.status = 'scheduled'),
-            'waiting', count(*) FILTER (WHERE iv.status = 'pending'))
+            'notAccepted', count(*) FILTER (WHERE iv.status IN ('declined', 'rejected') OR (iv.status = 'cancelled' AND iv.cancelled_by = 'intern') OR ${interviewExpiredSql('iv', nowIso)}),
+            'upcoming', count(*) FILTER (WHERE ${interviewUpcomingSql('iv', nowIso)}),
+            'waiting', count(*) FILTER (WHERE ${interviewWaitingSql('iv', nowIso)}))
           FROM ${schema.interviews} iv WHERE iv.intern_id = ${o.userId} AND ${realEmployerId(sql`iv.employer_id`)}) AS meetings
       FROM ${o}
       WHERE ${o.userId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})

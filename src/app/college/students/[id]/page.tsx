@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { after } from "next/server";
-import { and, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { CircleAlert, FileText, Mail, Phone, PlayCircle, ShieldCheck } from "lucide-react";
 
 import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
@@ -12,12 +12,14 @@ import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { cn } from "@/lib/utils";
 import { readinessForMany } from "@/lib/college/student-readiness-db";
 import { StudentRemove } from "@/components/college/student-remove";
-import { humanizeStatus } from "@/components/app/status";
+import { humanizeStatus, proposalStatus } from "@/components/app/status";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { interviewLifecycle } from "@/lib/interview-lifecycle";
+import { effectiveStatus } from "@/lib/college/meetings";
 import { aiStatusLabel, cohortGoal, membershipLabel, yearLabel, ago } from "@/lib/college/labels";
 import { auditCollegeView, requireCollegeContext, studentForCollegeAdmin } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
+import { internOfferKey } from "@/lib/intern-offer-view";
 import { parseOffer } from "@/lib/offer";
 import { realEmployerId } from "@/lib/admin/scope";
 import { shortDateTime } from "@/lib/format";
@@ -87,7 +89,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
       : db
         .select({ p: schema.proposals })
         .from(schema.proposals)
-        .where(and(eq(schema.proposals.internId, id), realEmployerId(schema.proposals.employerId)))
+        .where(and(eq(schema.proposals.internId, id), ne(schema.proposals.status, "draft"), realEmployerId(schema.proposals.employerId)))
         .orderBy(desc(schema.proposals.createdAt)),
     !verified
       ? Promise.resolve([])
@@ -348,14 +350,16 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
             <ul className="divide-y divide-ink-100">
               {proposals.map(({ p }) => {
                 const offer = parseOffer(p.offerDetails, p.currency);
-                const waiting = p.status === "sent";
+                // The intern's own reading: a sent offer past its start day is lapsed, not waiting.
+                const key = internOfferKey(p);
+                const waiting = key === "sent";
                 return (
                   <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
                     <div className="min-w-0">
                       <p className="font-medium text-ink-900">Offer · {offer.roleTitle || "Internship"}</p>
                       <p className="text-sm text-text-subtle">Sent {ago(p.createdAt?.toISOString() ?? null)}</p>
                     </div>
-                    <Pill tone={waiting ? "waiting" : "neutral"}>{waiting ? "Waiting for the student's reply" : humanizeStatus(p.status)}</Pill>
+                    <Pill tone={waiting ? "waiting" : "neutral"}>{waiting ? "Waiting for the student's reply" : key === "lapsed" ? proposalStatus(key).label : humanizeStatus(p.status)}</Pill>
                   </li>
                 );
               })}
@@ -367,7 +371,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                       {shortDateTime(m.startsAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} IST
                     </p>
                   </div>
-                  <Pill tone="neutral">{humanizeStatus(m.status)}</Pill>
+                  <Pill tone="neutral">{humanizeStatus(effectiveStatus(m, requestTime()))}</Pill>
                 </li>
               ))}
               {interviews.map(({ i }) => (

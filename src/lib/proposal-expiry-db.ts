@@ -8,6 +8,7 @@ import { expireInterviewsPastTime, type InterviewSweep } from "@/lib/interview-e
 import { openOrderProposalIds } from "@/lib/employer-payable";
 import { employerNames, notify, resolveOfferNotifications } from "@/lib/notify";
 import { parseOffer, todayIst } from "@/lib/offer";
+import { startBegunSql } from "@/lib/offer-start-sql";
 import { tryPublicOrigin } from "@/lib/origin";
 import { expiryDedupeKey, expiryNotices, noReplyDedupeKey, noReplyNotices, planExpiry } from "@/lib/proposal-expiry-plan";
 import { expiredStamp, noReplyStamp } from "@/lib/proposal-expiry";
@@ -43,8 +44,7 @@ export type ExpirySweep = { expired: number; employers: number; ids: string[]; n
 type Expired = { id: string; employerId: string; internId: string; projectId: string; offerDetails: Record<string, unknown> | null; currency: string };
 
 /** SQL for "the start day has begun": the offer's start date is a real-looking day on or before today in India. */
-const startBegun = (today: string) =>
-  sql`(left(${schema.proposals.offerDetails}->>'startDate', 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' and left(${schema.proposals.offerDetails}->>'startDate', 10) <= ${today})`;
+const startBegun = (today: string) => startBegunSql(schema.proposals.offerDetails, today);
 
 async function expireForEmployer(employerId: string, now: Date, today: string): Promise<Expired[]> {
   return withLock(`employer-pay:${employerId}`, async (tx) => {

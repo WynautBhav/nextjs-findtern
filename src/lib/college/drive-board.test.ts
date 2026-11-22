@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { buildDriveBoard, matchInvites, type DriveStudentRef } from "./drive-board.ts";
+import { buildDriveBoard, closedDriveFinding, matchInvites, type DriveStudentRef } from "./drive-board.ts";
 
 const NOW = Date.parse("2026-11-23T10:00:00Z");
 const at = (minAgo: number) => new Date(NOW - minAgo * 60_000);
@@ -114,4 +114,21 @@ test("a call request past its 10-minute lapse is not waiting on the student any 
     now: NOW,
   });
   assert.deepEqual(b.lists.meetingsWaiting.map((s) => s.userId).sort(), ["a", "b"]);
+});
+
+test("the closed-drive sentence counts students, so it agrees with the pipeline", () => {
+  const b = buildDriveBoard({
+    students,
+    offline: null,
+    // a has an internship and a full-time offer (two rows), b has one: 2 students, not 3 offers.
+    offers: [
+      { userId: "a", company: "Acme", status: "hired", hired: true, fullTime: false, createdAt: at(30) },
+      { userId: "a", company: "Beta", status: "sent", hired: false, fullTime: true, createdAt: at(20) },
+      { userId: "b", company: "Acme", status: "sent", hired: false, fullTime: false, createdAt: at(10) },
+    ],
+    meetings: [],
+    now: NOW,
+  });
+  assert.equal(b.lists.offers.length, 2);
+  assert.equal(closedDriveFinding(b.lists), "2 students got an offer, 0 students had a call and 1 student was hired in this drive.");
 });

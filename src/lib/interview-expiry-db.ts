@@ -5,6 +5,7 @@ import { getDb, schema } from "@/lib/db";
 import { initialsOf } from "@/lib/employer-candidates";
 import { formatSlotTime } from "@/lib/format";
 import { MEETING_MINUTES, SWEEPABLE_STATUSES, interviewExpiryNotices, interviewNoticeDedupeKey, worthNotice } from "@/lib/interview-lifecycle";
+import { timePassed } from "@/lib/interview-time-sql";
 import { notify } from "@/lib/notify";
 
 /**
@@ -26,17 +27,6 @@ const SYSTEM_ACTOR = "system";
 const AI_EMAIL = "ai-interview@findtern.ai";
 const OPEN = sql.join(SWEEPABLE_STATUSES.map((s) => sql`${s}`), sql`, `);
 const MINS = sql.raw(String(MEETING_MINUTES));
-
-/** SQL twin of interviewExpiredNow for table alias `t`: a picked slot ended, or an unpicked invite's every slot has started. */
-const timePassed = (t: string, nowIso: string) => {
-  const col = (c: string) => sql.raw(`${t}.${c}`);
-  const chosen = sql`(case ${col("selected_slot")} when 1 then ${col("slot1")} when 2 then ${col("slot2")} when 3 then ${col("slot3")} end)`;
-  const last = sql`greatest(${col("slot1")}, ${col("slot2")}, ${col("slot3")})`;
-  return sql`(
-    (${chosen} is not null and ${chosen} + make_interval(mins => ${MINS}) <= ${nowIso}::timestamp)
-    or (${chosen} is null and ${last} is not null and ${last} < ${nowIso}::timestamp)
-    or (${chosen} is null and ${col("respond_by")} is not null and ${col("respond_by")} <= ${nowIso}::timestamp and ${col("status")} in ('pending', 'waiting', 'proposed')))`;
-};
 
 type Expired = {
   id: string;
