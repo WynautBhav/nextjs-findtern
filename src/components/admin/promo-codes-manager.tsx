@@ -133,6 +133,7 @@ export function PromoCodesManager({
   const [validFrom, setValidFrom] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [isActive, setIsActive] = useState(true);
+  const [reusable, setReusable] = useState(false);
   const [appliesTo, setAppliesTo] = useState<PromoAppliesTo>("intern");
 
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -153,6 +154,7 @@ export function PromoCodesManager({
     setValidFrom("");
     setValidUntil("");
     setIsActive(true);
+    setReusable(false);
     setAppliesTo("intern");
     setErrorMsg("");
     setErrorField(null);
@@ -185,6 +187,7 @@ export function PromoCodesManager({
     setValidFrom(isoToIstInput(promo.validFrom));
     setValidUntil(isoToIstInput(promo.validUntil));
     setIsActive(promo.isActive);
+    setReusable(promo.reusable);
     setAppliesTo(promo.appliesTo === "intern" || promo.appliesTo === "employer" || promo.appliesTo === "subscription" ? promo.appliesTo : "both");
     setErrorMsg("");
     setErrorField(null);
@@ -260,6 +263,7 @@ export function PromoCodesManager({
         validFrom: istInputToIso(validFrom),
         validUntil: istInputToIso(validUntil),
         isActive,
+        reusable,
         appliesTo,
       };
 
@@ -291,6 +295,7 @@ export function PromoCodesManager({
                   validFrom: istInputToIso(validFrom) ? new Date(istInputToIso(validFrom)!) : null,
                   validUntil: istInputToIso(validUntil) ? new Date(istInputToIso(validUntil)!) : null,
                   isActive,
+                  reusable,
                   appliesTo,
                   updatedAt: new Date(),
                 }
@@ -856,7 +861,7 @@ export function PromoCodesManager({
                   aria-describedby="promo-max-help"
                   className={`${inputClass} tabular-nums`}
                 />
-                <p id="promo-max-help" className="mt-1 text-xs text-ink-600">Each account can use a code once. This is the total across all accounts.</p>
+                <p id="promo-max-help" className="mt-1 text-xs text-ink-600">{reusable ? "An account can use this code again. This is the total across all uses." : "Each account can use a code once. This is the total across all accounts."}</p>
               </div>
               <div>
                 <label htmlFor="promo-min" className="block text-sm font-semibold text-ink-800">
@@ -928,6 +933,14 @@ export function PromoCodesManager({
                   ? "Takes money off the Findtern Pro subscription only. It does not work on hires or intern activation, and hiring codes do not work on the subscription."
                   : "Hiring and activation codes never apply to the Findtern Pro subscription. Choose Employer subscription for a code that does."}
               </p>
+            </div>
+
+<div className="flex items-center justify-between gap-3 rounded-apple-sm bg-ink-50 px-3 py-2">
+              <span>
+                <span id="promo-reusable-label" className="block text-sm font-medium text-ink-800">Same account can use it again</span>
+                <span className="block text-xs text-ink-600">For testing. Max uses still caps the total.</span>
+              </span>
+              <Switch checked={reusable} onCheckedChange={setReusable} disabled={collegeLocked} aria-labelledby="promo-reusable-label" />
             </div>
 
             <div className="flex items-center justify-between rounded-apple-sm bg-ink-50 px-3 py-2">

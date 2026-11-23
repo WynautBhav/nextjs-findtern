@@ -18,6 +18,7 @@ const bodySchema = z.object({
   appliesTo: z.string().optional(),
   maxUsages: z.number().nullish(),
   validUntil: z.string().datetime().nullish(),
+  reusable: z.boolean().optional(),
 });
 
 export async function POST(req: Request) {
@@ -54,6 +55,7 @@ export async function POST(req: Request) {
         maxUsages,
         validUntil,
         isActive: true,
+        reusable: body.reusable ?? false,
         appliesTo: body.appliesTo as string,
       })
       .returning();

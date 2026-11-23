@@ -8,6 +8,7 @@ import { isoToIstInput, istInputToIso } from "@/lib/admin/promo-form-time";
 import { FULL_WAIVER_LIMITS, generateWaiverCode } from "@/lib/full-waiver";
 import type { PromoCode } from "@/lib/db/schema";
 import { buttonClass } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const inputClass =
@@ -43,6 +44,7 @@ export function FullWaiverDialog({
   const [code, setCode] = useState("");
   const [appliesTo, setAppliesTo] = useState<Audience | "">(initialAudience);
   const [maxUsages, setMaxUsages] = useState<number | string>(FULL_WAIVER_LIMITS.maxUsesDefault);
+  const [reusable, setReusable] = useState(false);
   const [validUntil, setValidUntil] = useState(() => isoToIstInput(new Date(Date.now() + FULL_WAIVER_LIMITS.expiryDaysDefault * DAY_MS)));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -56,6 +58,7 @@ export function FullWaiverDialog({
     setCode("");
     setAppliesTo(initialAudience);
     setMaxUsages(FULL_WAIVER_LIMITS.maxUsesDefault);
+    setReusable(false);
     setValidUntil(isoToIstInput(new Date(Date.now() + FULL_WAIVER_LIMITS.expiryDaysDefault * DAY_MS)));
     setError("");
     setCreated(null);
@@ -75,7 +78,7 @@ export function FullWaiverDialog({
       const res = await csrfFetch("/api/admin/promo-codes/full-waiver", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...(code.trim() ? { code: code.trim().toUpperCase() } : {}), appliesTo, maxUsages: uses, validUntil: until }),
+        body: JSON.stringify({ ...(code.trim() ? { code: code.trim().toUpperCase() } : {}), appliesTo, maxUsages: uses, validUntil: until, reusable }),
       });
       const data = (await res.json().catch(() => ({}))) as { promo?: PromoCode; error?: string };
       if (!res.ok || !data.promo) throw new Error(data.error || "Could not create the code.");
@@ -201,7 +204,14 @@ export function FullWaiverDialog({
                   />
                 </div>
               </div>
-              <p className="text-xs text-ink-600">Each account can use a code once.</p>
+              {/* For testing (owner, 23 Nov): one employer pays several hires with the same code. */}
+              <div className="flex items-center justify-between gap-3 rounded-apple-sm bg-ink-50 px-3 py-2">
+                <span>
+                  <span id="waiver-reusable-label" className="block text-sm font-medium text-ink-800">Same account can use it again</span>
+                  <span className="block text-xs text-ink-600">For testing. Max uses still caps the total.</span>
+                </span>
+                <Switch checked={reusable} onCheckedChange={setReusable} aria-labelledby="waiver-reusable-label" />
+              </div>
             </fieldset>
 
             <DialogFooter>

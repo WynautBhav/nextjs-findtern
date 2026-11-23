@@ -35,12 +35,12 @@ export async function redeemWaiverInTx(
     .from(schema.promoCodeUsages)
     .where(and(eq(schema.promoCodeUsages.promoCodeId, row.id), eq(schema.promoCodeUsages.userId, order.accountId)))
     .limit(1);
-  const problem = waiverRedeemProblem(row, { audience, alreadyUsedByAccount: Boolean(prior) });
+  const problem = waiverRedeemProblem(row, { audience, alreadyUsedByAccount: Boolean(prior) && !row.reusable });
   if (problem) throw new WaiverRefused(problem);
 
   const inserted = await tx
     .insert(schema.promoCodeUsages)
-    .values({ promoCodeId: row.id, userId: order.accountId, orderId: order.orderId, discountAppliedMinor: flag.waivedMinor })
+    .values({ promoCodeId: row.id, userId: order.accountId, orderId: order.orderId, discountAppliedMinor: flag.waivedMinor, singleUse: !row.reusable })
     .onConflictDoNothing()
     .returning({ id: schema.promoCodeUsages.id });
   if (inserted.length === 0) throw new WaiverRefused("You have already used this code");

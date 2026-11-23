@@ -53,10 +53,12 @@ type CollegeCodeTerms = { discountType: string; discountValue: number; appliesTo
  */
 export function collegeCodeEditProblem(
   existing: (CollegeCodeTerms & { collegeId: string | null }) | null,
-  next: { discountType?: string; discountValue?: number; appliesTo?: string; maxUsages?: number | null },
+  next: { discountType?: string; discountValue?: number; appliesTo?: string; maxUsages?: number | null; reusable?: boolean },
 ): string | null {
   if (!existing?.collegeId) return null;
   const changed =
+    // A college code's seats are one per student; a reusable one would let a student spend several.
+    next.reusable === true ||
     (next.discountType !== undefined && next.discountType !== existing.discountType) ||
     (next.discountValue !== undefined && next.discountValue !== existing.discountValue) ||
     (next.appliesTo !== undefined && next.appliesTo !== (existing.appliesTo ?? "both")) ||

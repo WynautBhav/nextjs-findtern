@@ -21,6 +21,7 @@ const bodySchema = z.object({
   validFrom: z.string().datetime().nullish(),
   validUntil: z.string().datetime().nullish(),
   isActive: z.boolean().default(true),
+  reusable: z.boolean().default(false),
   appliesTo: z.enum(PROMO_APPLIES_TO).default("intern"),
 })
   .refine((b) => b.discountType !== "percentage" || b.discountValue === undefined || b.discountValue <= 100, {

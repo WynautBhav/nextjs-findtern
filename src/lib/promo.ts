@@ -77,7 +77,7 @@ export async function quotePromo(input: {
     .from(schema.promoCodeUsages)
     .where(and(eq(schema.promoCodeUsages.promoCodeId, row.id), eq(schema.promoCodeUsages.userId, input.subjectId)))
     .limit(1);
-  if (priorUse) return { ok: false, error: "You have already used this code", status: 400 };
+  if (priorUse && !row.reusable) return { ok: false, error: "You have already used this code", status: 400 };
 
   const discountMinor = promoDiscount(row, discountableMinor, input.currency);
   if (audience === "employer" && !waiver && employerPromoTooLarge(discountMinor, discountableMinor)) {
@@ -175,7 +175,7 @@ async function audienceOf(subjectId: string): Promise<PromoAudience> {
   return employer ? "employer" : "intern";
 }
 
-/** Idempotent: a second call for the same code and account is a no-op. */
+/** Idempotent: a second call for the same code and account (or, for a reusable code, the same order) is a no-op. */
 export async function recordPromoUse(input: {
   code: string;
   subjectId: string;
@@ -185,7 +185,7 @@ export async function recordPromoUse(input: {
   enforceCap?: boolean;
 }, db: Db | Tx = getDb()): Promise<{ capped: boolean; collegeId: string | null; refused?: string }> {
   const [promo] = await db
-    .select({ id: schema.promoCodes.id, collegeId: schema.promoCodes.collegeId })
+    .select({ id: schema.promoCodes.id, collegeId: schema.promoCodes.collegeId, reusable: schema.promoCodes.reusable })
     .from(schema.promoCodes)
     .where(eq(schema.promoCodes.code, input.code))
     .limit(1);
@@ -198,6 +198,7 @@ export async function recordPromoUse(input: {
       userId: input.subjectId,
       orderId: input.orderId,
       discountAppliedMinor: input.discountMinor,
+      singleUse: !promo.reusable,
     })
     .onConflictDoNothing()
     .returning({ id: schema.promoCodeUsages.id });

@@ -953,6 +953,8 @@ export const promoCodes = pgTable("promo_codes", {
   isActive: boolean("is_active").notNull().default(true),
   /** Where the code can be redeemed: "intern" | "employer" | "both". */
   appliesTo: text("applies_to").notNull().default("intern"),
+  /** For testing (owner, 23 Nov): the same account may use this code more than once. Max uses still caps the total. */
+  reusable: boolean("reusable").notNull().default(false),
   /**
    * The college this code belongs to (one code per college). Null for ordinary codes.
    * Rotation: a college code is rotated IN PLACE (update `code` on the same row), never deactivate-and-create.
@@ -976,9 +978,13 @@ export const promoCodeUsages = pgTable("promo_code_usages", {
   userId: varchar("user_id").notNull(), // intern or employer id that used the code
   orderId: varchar("order_id"), // payment/order that used this code
   discountAppliedMinor: integer("discount_applied_minor").notNull().default(0),
+  /** False when the code was reusable at the time: only single-use rows are held to one per account. */
+  singleUse: boolean("single_use").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow(),
 }, (t) => ({
-  promoCodeUsagesUnique: uniqueIndex("promo_code_usages_unique").on(t.promoCodeId, t.userId),
+  promoCodeUsagesUnique: uniqueIndex("promo_code_usages_unique").on(t.promoCodeId, t.userId).where(sql`${t.singleUse}`),
+  // A reusable code counts once per order, so a payment settled twice (webhook and verify) is still one use.
+  promoCodeUsagesOrderUnique: uniqueIndex("promo_code_usages_order_unique").on(t.promoCodeId, t.orderId).where(sql`NOT ${t.singleUse}`),
 }));
 
 export type PromoCodeUsage = typeof promoCodeUsages.$inferSelect;

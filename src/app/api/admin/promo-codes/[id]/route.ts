@@ -26,6 +26,7 @@ const bodySchema = z.object({
   validFrom: z.string().datetime().nullish(),
   validUntil: z.string().datetime().nullish(),
   isActive: z.boolean().optional(),
+  reusable: z.boolean().optional(),
   appliesTo: z.enum(PROMO_APPLIES_TO).optional(),
 })
   .refine((b) => b.discountType !== "percentage" || b.discountValue === undefined || b.discountValue <= 100, {
@@ -75,6 +76,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       description: schema.promoCodes.description,
       minOrderAmountMinor: schema.promoCodes.minOrderAmountMinor,
       isActive: schema.promoCodes.isActive,
+      reusable: schema.promoCodes.reusable,
     })
     .from(schema.promoCodes)
     .where(eq(schema.promoCodes.id, id))
