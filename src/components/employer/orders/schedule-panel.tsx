@@ -124,8 +124,24 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                         <Pill tone={s.tone} className={cn("mt-1.5", overdue && "bg-danger-soft text-danger ring-danger/25")}>{s.label}</Pill>
                       </div>
                     </td>
-                    <td data-label="Total" className={cn(tdClass, "nums text-right font-medium text-ink-900")}>{m(h.ledger.totalMinor)}</td>
-                    <td data-label="Paid" data-empty={h.ledger.paidMinor > 0 ? undefined : ""} className={cn(tdClass, "nums text-right")}>{h.ledger.paidMinor > 0 ? m(h.ledger.paidMinor) : "-"}</td>
+                    {/* Total is the price before any promo code; what a code paid counts as paid, so Total - Paid = Left. */}
+                    <td data-label="Total" className={cn(tdClass, "nums text-right")}>
+                      {/* One block, so on a phone the note sits under the amount, not beside it. */}
+                      <div>
+                        <span className="font-medium text-ink-900">{m(h.ledger.listMinor)}</span>
+                        {h.ledger.monthlyMinor > 0 ? <span className="block text-xs text-text-subtle">{m(h.ledger.monthlyMinor)} / month</span> : null}
+                      </div>
+                    </td>
+                    <td data-label="Paid" data-empty={h.ledger.paidMinor + h.ledger.promoMinor > 0 ? undefined : ""} className={cn(tdClass, "nums text-right")}>
+                      <div>
+                        {h.ledger.paidMinor + h.ledger.promoMinor > 0 ? m(h.ledger.paidMinor + h.ledger.promoMinor) : "-"}
+                        {h.ledger.promoMinor > 0 ? (
+                          <span className="block text-xs text-text-subtle [overflow-wrap:anywhere]">
+                            {h.ledger.paidMinor > 0 ? `${m(h.ledger.promoMinor)} by promo code ${h.ledger.promoCode ?? ""}` : `Promo code ${h.ledger.promoCode ?? ""}`}
+                          </span>
+                        ) : null}
+                      </div>
+                    </td>
                     <td data-label="Left" data-empty={h.ledger.dueMinor > 0 ? undefined : ""} className={cn(tdClass, "nums text-right font-semibold", h.ledger.dueMinor > 0 ? "text-ink-900" : "text-text-subtle")}>
                       {h.ledger.dueMinor > 0 ? m(h.ledger.dueMinor) : "-"}
                     </td>

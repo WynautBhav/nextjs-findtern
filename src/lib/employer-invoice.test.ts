@@ -202,3 +202,33 @@ test("an upfront discount with no code: the discount row carries it, so the stip
   const coded = pay({ ...p, id: "up2", orderId: "order_up2", raw: { ...p.raw as object, promo: { promoCode: "ACME10", discountMinor: 100_000 } } });
   assert.match(employerInvoice({ payment: coded, allPayments: [coded], legacyPaid: [], hires }).lines[0].detail ?? "", /after an upfront discount of ₹3,000/);
 });
+
+// Staging 23 Nov: an order a promo code paid in full (₹0 / $0 charged) is still an invoice the company keeps;
+// a ₹0 order with no code (a test order) is not.
+test("an order a promo code paid in full is invoiced; a ₹0 order with no code is not", async () => {
+  const { invoicedPayment } = await import("./employer-invoice.ts");
+  const promoPaid = { amountMinor: 0, raw: { promo: { promoCode: "FREE-7EU4-2BRY-D6TU", fullWaiver: true, discountMinor: 19200 } } };
+  assert.equal(invoicedPayment(promoPaid), true);
+  assert.equal(invoicedPayment({ amountMinor: 0, raw: {} }), false);
+  assert.equal(invoicedPayment({ amountMinor: 0, raw: null }), false);
+  assert.equal(invoicedPayment({ amountMinor: 4800, raw: {} }), true);
+});
+
+test("a promo-paid ₹0 invoice shows the price, the code taking it off, a ₹0 total, and that the code paid it", () => {
+  const html = taxInvoiceHtml({
+    invoiceNo: "231126-01",
+    date: new Date("2026-11-23T12:36:34Z"),
+    orderId: "waiver_d331",
+    paymentId: "waiver_d331",
+    currency: "USD",
+    amountMinor: 0,
+    description: "Hiring: Web Development, month 1",
+    promo: { code: "FREE-7EU4-2BRY-D6TU", discountMinor: 19200 },
+    seller: { name: "Findtern", address: "Jaipur", gstin: "08AAAAA0000A1Z5", state: "Rajasthan", email: "billing@findtern.in" } as unknown as InvoiceSeller,
+    buyer: { name: "Amazon", city: "Melbourne", state: "Melbourne", country: "Australia", email: "x@y.z", gstin: "", place: "Outside India" } as never,
+  });
+  assert.match(html, /Price before discount<\/span><span>\$\s?192\.00/);
+  assert.match(html, /Promo code FREE-7EU4-2BRY-D6TU<\/span><span>-\$\s?192\.00/);
+  assert.match(html, /Total<\/span><span>\$\s?0\.00/);
+  assert.match(html, /Paid with promo code FREE-7EU4-2BRY-D6TU/);
+});

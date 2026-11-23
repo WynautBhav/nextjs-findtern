@@ -252,6 +252,9 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
   // With an amount: its own rows (price before, discount, then the taxes and the total on what is left). Without one: a note.
   const discountMinor = input.promo?.discountMinor && input.promo.discountMinor > 0 ? input.promo.discountMinor : 0;
   const promoNote = input.promo && !discountMinor ? `<p class="note">Promo ${esc(input.promo.code)} applied.</p>` : "";
+  // Nothing charged because a code took the whole price: say how it was paid (owner, 23 Nov).
+  const paidByPromo =
+    input.amountMinor === 0 && input.promo && discountMinor > 0 ? `<p class="note">Paid with ${esc(discountRowLabel(input.promo.code).replace(/^Promo code/, "promo code"))}.</p>` : "";
   const discountRows =
     input.promo && discountMinor
       ? `<div class="row"><span>Price before discount</span><span>${m(input.amountMinor + discountMinor)}</span></div>
@@ -373,8 +376,9 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
       <div class="row final"><span>Total</span><span>${m(split.totalMinor)}</span></div>
     </div>
     ${promoNote}
+    ${paidByPromo}
     ${exportNote}
-    <div class="refs">Order ref: ${esc(input.orderId)} · Payment ID: ${esc(input.paymentId || "Captured")}</div>
+    <div class="refs">Order ref: ${esc(input.orderId)} · ${paidByPromo ? "Payment: promo code" : `Payment ID: ${esc(input.paymentId || "Captured")}`}</div>
   </div>
 
   <div class="foot">

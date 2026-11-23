@@ -22,6 +22,11 @@ function promoDiscountOf(raw: unknown): number {
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
 }
 
+function promoCodeOf(raw: unknown): string | null {
+  const code = ((raw ?? {}) as { promo?: { promoCode?: unknown } }).promo?.promoCode;
+  return typeof code === "string" && code.trim() ? code.trim() : null;
+}
+
 /** The Orders button: "1 payment due · 1 can be paid early"; a part that is zero is left out. */
 export function paymentsBadge(due: number, early: number): string {
   return [due > 0 ? `${due} ${due === 1 ? "payment" : "payments"} due` : "", early > 0 ? `${early} can be paid early` : ""].filter(Boolean).join(" · ");
@@ -86,8 +91,15 @@ export type PlacementLedger = {
   proposalId: string;
   plan: "upfront" | "monthly" | "postpaid" | "full_time" | "unpaid";
   currency: "INR" | "USD";
-  /** Whole engagement incl. the one-time hiring fee (or the full-time fee). Minor units. */
+  /** Whole engagement incl. the one-time hiring fee (or the full-time fee), after any promo code. Minor units. */
   totalMinor: number;
+  /** The same before any promo code: the price the Orders row shows as Total. */
+  listMinor: number;
+  /** One month's payment (0 for full time). */
+  monthlyMinor: number;
+  /** What promo codes paid for this hire, and the code (the latest one) for "paid with promo code X". */
+  promoMinor: number;
+  promoCode: string | null;
   /** The one-time hiring fee inside the total, as this hire was charged (0 when its band was free). */
   feeMinor: number;
   paidMinor: number;
@@ -129,6 +141,7 @@ export function placementLedger(hire: HireLike, allPayments: readonly PaidOrderL
   // only a one-hire order can be pinned to its hire; older multi-hire orders
   // keep the offer's figures (see above).
   let promoMinor = 0;
+  let promoCode: string | null = null;
   const paidOn: string[] = [];
   for (const p of payments) {
     if (p.status !== "paid") continue;
@@ -140,7 +153,10 @@ export function placementLedger(hire: HireLike, allPayments: readonly PaidOrderL
       if (firstMonthIds.includes(hire.id)) monthsPaid += 1;
     } else if (mode === "monthly" || asDue) monthsPaid += 1;
     else upfrontPaid = true;
-    if (ids.length <= 1) promoMinor += promoDiscountOf(p.raw);
+    if (ids.length <= 1) {
+      promoMinor += promoDiscountOf(p.raw);
+      promoCode = promoCodeOf(p.raw) ?? promoCode;
+    }
     const at = p.paidAt ? new Date(p.paidAt) : null;
     if (at && !Number.isNaN(at.getTime())) paidOn.push(at.toISOString());
   }
@@ -173,6 +189,10 @@ export function placementLedger(hire: HireLike, allPayments: readonly PaidOrderL
     plan,
     currency: offer.currency,
     totalMinor,
+    listMinor,
+    monthlyMinor: offer.fullTime ? 0 : monthly.totalMinor,
+    promoMinor: Math.min(promoMinor, listMinor),
+    promoCode: promoMinor > 0 ? promoCode : null,
     feeMinor: offer.fullTime ? 0 : upfront.perHireMinor,
     paidMinor,
     dueMinor,

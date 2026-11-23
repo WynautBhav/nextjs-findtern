@@ -77,3 +77,25 @@ test("paymentIndexRefusal: a later month than the one due says an earlier month 
   assert.match(paymentIndexRefusal([{ due: { monthsPaid: 2 } }], 1) ?? "", /already paid/);
   assert.match(paymentIndexRefusal([{ due: { monthsPaid: 1 } }], 0) ?? "", /already paid/);
 });
+
+// Staging 23 Nov (Amazon, FREE-7EU4-2BRY-D6TU): $192 a month for 6 months, month 1 paid in full by a promo code.
+// Orders must read Total $1,152 · Paid $192 (promo code) · Left $960, and show the $192 monthly payment.
+test("placementLedger: a month a promo code paid shows as paid by that code, with the full price and the monthly amount", () => {
+  const hire = { id: "6fc9", status: "hired", currency: "USD", hiredAt: "2026-11-23T12:36:34Z", offerDetails: { roleTitle: "Web Development", duration: "6m", monthlyAmount: 192, totalPrice: 1152, perHireCharge: 0, startDate: "2026-12-01", currency: "USD" } };
+  const order = {
+    status: "paid",
+    paidAt: "2026-11-23T12:36:34Z",
+    raw: {
+      order: { id: "waiver_d331", amount: 0, currency: "USD", notes: { purpose: "employer_checkout", paymentMode: "hiring_fee", proposalIds: ["6fc9"], firstMonthProposalIds: ["6fc9"], perHireFeeMinor: { "6fc9": 0 }, listAmountMinor: 19200, computedAmountMinor: 0, discountAmountMinor: 19200 } },
+      promo: { promoCode: "FREE-7EU4-2BRY-D6TU", fullWaiver: true, waivedMinor: 19200, discountMinor: 19200 },
+    },
+  };
+  const l = placementLedger(hire, [order]);
+  assert.equal(l.listMinor, 115200, "total before the code");
+  assert.equal(l.monthlyMinor, 19200, "the monthly payment");
+  assert.equal(l.promoMinor, 19200, "what the code paid");
+  assert.equal(l.promoCode, "FREE-7EU4-2BRY-D6TU");
+  assert.equal(l.dueMinor, 96000, "left to pay: five months");
+  assert.equal(l.monthsPaid, 1);
+  assert.equal(l.status, "partially_paid");
+});

@@ -19,7 +19,7 @@ import { orderRefunds } from "@/lib/refund-accounting";
 import { placeOfSupply } from "@/lib/gst";
 import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { LEGACY_INVOICE_CUTOFF, taxInvoiceHtml } from "@/lib/invoice";
-import { employerInvoices } from "@/lib/employer-invoice";
+import { employerInvoices, invoicedPayment } from "@/lib/employer-invoice";
 import { loadInvoiceHires } from "@/lib/employer-invoice-hires";
 import { hasOpenMeeting } from "@/lib/employer-interview-rules";
 import { timezoneForLocation } from "@/lib/timezones";
@@ -159,10 +159,10 @@ async function loadOrders(employerId: string) {
     );
 
   const seller = getInvoiceSeller();
-  // Money received only: a cancelled, failed or abandoned checkout is not an
-  // invoice (bug sheet 7 S1 r135), and a ₹0 test order has nothing to bill.
+  // Paid orders only: a cancelled, failed or abandoned checkout is not an
+  // invoice (bug sheet 7 S1 r135). A ₹0 order a promo code paid is billed (it shows the code); a ₹0 test order is not.
   // A payroll invoice (raw.kind manual_invoice) is not a checkout order: it has its own branch below.
-  const paidPayments = paymentRows.filter((p) => isPaidRow(p) && p.amountMinor > 0 && !isManualInvoiceRaw(p.raw));
+  const paidPayments = paymentRows.filter((p) => isPaidRow(p) && invoicedPayment(p) && !isManualInvoiceRaw(p.raw));
   const built = employerInvoices({ payments: paidPayments, allPayments: paymentRows, legacyPaid: paidRefs, hires: hiresById });
   const taxInvoices: InvoiceRow[] = paidPayments
     .map((p) => {

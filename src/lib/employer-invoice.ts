@@ -195,6 +195,14 @@ export function employerInvoice(input: Input & { payment: InvoicePayment }): Emp
   return prepare(input)(input.payment);
 }
 
+/**
+ * Whether a paid order gets an invoice: money was received, or a promo code paid it (a ₹0 order a code covered is
+ * still billed, showing the code). A ₹0 order with no code (a test order) has nothing to bill.
+ */
+export function invoicedPayment(p: { amountMinor: number; raw: unknown }): boolean {
+  return p.amountMinor > 0 || paymentPromo(p.raw).discountMinor > 0;
+}
+
 /** The invoices of many payments at once, keyed by payment id. Linear in the number of payments. */
 export function employerInvoices(input: Input & { payments: readonly InvoicePayment[] }): Map<string, EmployerInvoice> {
   const make = prepare(input);
