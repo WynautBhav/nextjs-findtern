@@ -56,3 +56,14 @@ export function interviewWaitingSql(alias: string, nowIso: string): SQL {
 export function interviewExpiredSql(alias: string, nowIso: string): SQL {
   return sql`(${col(alias, "status")} = 'expired' OR (${col(alias, "status")} IN ('pending', 'waiting', 'proposed', 'scheduled') AND ${timePassed(alias, nowIso)}))`;
 }
+
+/**
+ * "On your list" on the dashboard funnel: every roster row (leavers already dropped) PLUS each verified student who is not matched
+ * to a roster row (joined by a code, not on the uploaded list). Not max(roster, verified), which is one short for each such student
+ * and so does not add up with the "Not joined yet" tile (FN-04). Emails match case-insensitively, as the roster join does.
+ */
+export function onYourListCount(rosterEmails: readonly string[], verifiedStudentEmails: readonly string[]): number {
+  const onRoster = new Set(rosterEmails.map((e) => e.toLowerCase()));
+  const unmatched = new Set(verifiedStudentEmails.map((e) => e.toLowerCase()).filter((e) => !onRoster.has(e)));
+  return onRoster.size + unmatched.size;
+}

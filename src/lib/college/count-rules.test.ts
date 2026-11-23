@@ -69,3 +69,12 @@ test("an offer with no start date (full-time offers keep theirs inside fullTimeO
   assert.match(text, /^coalesce\(/);
   assert.match(text, /, false\)$/);
 });
+
+test("FN-04: On your list = roster rows + verified students not on the roster, not max(roster, verified)", async () => {
+  const { onYourListCount } = await import("./count-rules.ts");
+  // 3 roster rows (2 joined, 1 not), plus one verified student who joined by code and is not on the roster: 4, where max(3, 3) said 3.
+  assert.equal(onYourListCount(["a@x.in", "b@x.in", "c@x.in"], ["a@x.in", "b@x.in", "ria@x.in"]), 4);
+  assert.equal(onYourListCount(["a@x.in", "b@x.in"], ["A@X.in"]), 2, "case-insensitive match, counted once");
+  assert.equal(onYourListCount([], ["a@x.in", "b@x.in"]), 2, "no roster: the verified students");
+  assert.equal(onYourListCount(["a@x.in"], []), 1);
+});

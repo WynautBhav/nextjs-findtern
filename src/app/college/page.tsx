@@ -11,6 +11,7 @@ import { ScoreVsCgpa } from "@/components/college/score-vs-cgpa";
 import { yearLabel } from "@/lib/college/labels";
 import { CollegeMark } from "@/components/employer/drive-parts";
 import { candidatesFor } from "@/lib/college/approvals";
+import { onYourListCount } from "@/lib/college/count-rules";
 import { eligibleStudents, presenceSnapshot, requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { pendingLeaveCount } from "@/lib/college/leave-request-read";
 import { getDb, schema } from "@/lib/db";
@@ -129,7 +130,8 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
     { n: students.reduce((t, s) => t + s.offersNew, 0), one: "new offer", many: "new offers" },
     { n: students.reduce((t, s) => t + s.hiredNew, 0), one: "hire", many: "hires" },
   ].filter((x) => x.n > 0);
-  const listed = Math.max(coverage.rosterSize, students.length);
+  // Roster rows plus verified students who are not on it (FN-04): the funnel adds up with the "Not joined yet" tile and the lists they open.
+  const listed = onYourListCount(coverage.rows.map((r) => r.email), students.map((s) => s.email));
   const funnel = [
     { label: coverage.rosterSize ? "On your list" : "Students", value: listed, hint: coverage.rosterSize ? (notJoined ? `${notJoined} not joined yet` : "Everyone has joined") : "Add your list to track who is missing", href: coverage.rosterSize ? "/college/students?show=not_joined" : "/college/approvals#add" },
     { label: "Verified on Findtern", value: students.length, hint: toAccept ? `${toAccept} more waiting for you` : "Visible in your drives", href: "/college/students" },
