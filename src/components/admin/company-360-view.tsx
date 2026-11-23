@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { effectiveProposalStatus } from "@/lib/proposal-expiry";
 import { ExternalLink, Globe, Mail, Phone } from "lucide-react";
 
 import { CompanyActiveToggle, CompanyDeleteButton, CompanyFteSelect } from "@/components/admin/company-controls";
@@ -330,7 +331,7 @@ export function Company360View({
               },
             },
             { header: "Start", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(parseOffer(p.offerDetails, p.currency).startDate)}</span> },
-            { header: "Status", cell: (p) => <StatusBadge value={p.status} /> },
+            { header: "Status", cell: (p) => <StatusBadge value={effectiveProposalStatus(p)} /> /* true status: a sent offer past its start date is expired */ },
             { header: "Sent", cell: (p) => <span className="nums whitespace-nowrap">{formatDate(p.createdAt)}</span> },
             { header: "Change", cell: (p) => <ProposalStatusEditor proposalId={p.id} status={p.status} offerDetails={p.offerDetails} /> },
           ]}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { interviewLifecycle } from "@/lib/interview-lifecycle";
 import { desc, eq } from "drizzle-orm";
 
 import { AdminLoadError, AdminPageHeader, Panel, PanelBody, PanelHeader } from "@/components/admin/panel";
@@ -93,7 +94,8 @@ export default async function AdminProposalPage({ params }: { params: Promise<{ 
         <PanelHeader title="Status" />
         <PanelBody>
           <div className="flex flex-wrap items-center gap-3">
-            <StatusBadge value={p.status} />
+            {/* The offer's true status, as the pipeline, the intern and the employer read it (a lapsed "sent" offer is expired). */}
+            <StatusBadge value={trueStatus} />
             {cgpaHold ? (
               <>
                 <StatusBadge tone="warning" label={cgpaHold.state === "incorrect_unacked" ? "CGPA corrected: company to confirm" : "CGPA verifying"} />
@@ -134,7 +136,7 @@ export default async function AdminProposalPage({ params }: { params: Promise<{ 
         <PanelBody>
           {interview ? (
             <dl className="divide-y divide-[color:var(--admin-rule)]">
-              <DetailRow label="Status" value={<StatusBadge value={interview.status} />} />
+              <DetailRow label="Status" value={<StatusBadge value={interviewLifecycle(interview).status} />} />
               <DetailRow label="Booked" value={interview.createdAt ? `${formatIstStamp(interview.createdAt)} IST` : "-"} />
               <DetailRow label="Meeting link" value={interview.meetingLink ? <a href={interview.meetingLink} target="_blank" rel="noopener noreferrer" className="text-brand-700 hover:underline">Open link</a> : "No link"} />
               <DetailRow

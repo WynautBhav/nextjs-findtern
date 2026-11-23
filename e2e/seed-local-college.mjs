@@ -27,7 +27,7 @@ import { hash } from "@node-rs/argon2";
 import pg from "pg";
 
 import { lineCharge } from "../src/lib/checkout.ts";
-import { parseOffer } from "../src/lib/offer.ts";
+import { offerTermIssues, parseOffer } from "../src/lib/offer.ts";
 import { draftFromRecord, emptyDraft, validateProfile } from "../src/lib/onboarding.ts";
 
 const PASSWORD = "Findtern@2026";
@@ -137,7 +137,7 @@ function plan() {
 
 /* ── Offer and timesheet helpers (same shapes as e2e/seed-demo-interns.mjs) ── */
 const internOffer = (title, startOffset, duration = "3m") => ({
-  jd: "<p>Own a small slice of the product. Weekly demos.</p>", mode: "remote", laptop: "candidate", shiftTo: "18:00", currency: "INR",
+  jd: "<p>Own a small slice of the product. Weekly demos.</p>", mode: "remote", laptop: "candidate", shiftTo: "17:00", currency: "INR",
   duration, location: "Remote", timezone: "Asia/Kolkata", roleTitle: title, shiftFrom: "09:00",
   startDate: dateOnly(startOffset), totalPrice: 24000, hourlyRate: 150, monthlyHours: 176,
   monthlyAmount: 26400, weeklySchedule: "mon_fri", workFromHomeDays: 0, paidLeavesPerMonth: 1, workFromOfficeDays: 0,
@@ -363,12 +363,15 @@ async function main() {
       const emp = employers[k++ % employers.length];
       const proj = emp.projects[s.n % 2];
       const aiRatings = JSON.stringify({ coding: s.ratings.coding, overall: s.score, aptitude: s.ratings.aptitude, communication: s.ratings.communication });
-      const insertProposal = (status, offer, created, hiredAt = null, projectId = proj.id, employerId = emp.id) =>
-        one(
+      // The app's own offer rule: a candidate scoring below 6 can be offered up to 2 months (employer proposals route).
+      const insertProposal = (status, offer, created, hiredAt = null, projectId = proj.id, employerId = emp.id) => {
+        if (!offer.fullTimeOffer && s.score < 6 && (offer.duration === "3m" || offer.duration === "6m")) offer.duration = "2m";
+        return one(
           `INSERT INTO proposals (employer_id, intern_id, project_id, flow_type, status, currency, offer_details, ai_ratings, skills, hired_at, created_at, updated_at)
            VALUES ($1,$2,$3,'direct',$4,'INR',$5,$6,$7,$8,$9,$9) RETURNING id`,
           [employerId, u.id, projectId, status, JSON.stringify(offer), aiRatings, JSON.stringify(skills.slice(0, 2)), hiredAt, created],
         );
+      };
       // Inside the live internship drive window (it opened 2 days ago) for drive students; earlier for the rest.
       const recent = (h) => (inLiveIntern ? at(-h * HOUR) : iso(-6 - (s.n % 8)));
       // Paid upfront, the amount checkout charges for this offer (src/lib/checkout.ts), linked by the order notes.
@@ -514,7 +517,15 @@ async function main() {
     )).length;
     console.log("[seed-local] stages:", JSON.stringify(counts));
     console.log("[seed-local] check:", JSON.stringify(check));
-    if (check.students !== TOTAL || check.roster !== TOTAL + 40 || check.distinctEmails !== TOTAL || check.oddCalls || check.unpaidHires || check.orphanProposals || check.offersToHiddenStudents || check.incompleteSubmitted) {
+    // Every internship offer obeys the rules the employer's send route enforces (shift length, hours, the score cap on duration),
+    // so no seeded offer is one the app could never have made.
+    const offerRows = (await q(`SELECT p.offer_details, (o.extra_data->>'findternScore')::float AS score FROM proposals p LEFT JOIN intern_onboarding o ON o.user_id = p.intern_id WHERE NOT (p.offer_details ? 'fullTimeOffer')`)).rows;
+    check.impossibleOffers = offerRows.filter((r) => {
+      const d = r.offer_details;
+      return offerTermIssues({ shiftFrom: d.shiftFrom, shiftTo: d.shiftTo, timezone: d.timezone }).length > 0 || ((r.score ?? 10) < 6 && ["3m", "6m"].includes(d.duration));
+    }).length;
+    console.log(`[seed-local] impossible offers: ${check.impossibleOffers}`);
+    if (check.students !== TOTAL || check.impossibleOffers || check.roster !== TOTAL + 40 || check.distinctEmails !== TOTAL || check.oddCalls || check.unpaidHires || check.orphanProposals || check.offersToHiddenStudents || check.incompleteSubmitted) {
       throw new Error("Self-check failed (see the check line)");
     }
     console.log(`[seed-local] seats used ${paidSeats} of 600 · TPO code ${tpoCode} · college wallet ₹${wallet / 100} · first student login ${students[0].email}`);

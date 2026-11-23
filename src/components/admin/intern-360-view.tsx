@@ -447,6 +447,7 @@ export function Intern360View({
 
       <ProposalDialog
         proposal={selectedProposal}
+        statusShown={selectedProposal ? shown(selectedProposal) : ""}
         onClose={() => setSelectedProposal(null)}
         company={company(selectedProposal?.employerId)}
         project={project(selectedProposal?.projectId)}
@@ -923,11 +924,14 @@ function InterviewDialog({
 
 function ProposalDialog({
   proposal,
+  statusShown,
   onClose,
   company,
   project,
 }: {
   proposal: Proposal | null;
+  /** The same true status the list shows (lapsed offers expired, open payment orders kept). */
+  statusShown: string;
   onClose: () => void;
   company: string | null;
   project: string | null;
@@ -950,7 +954,7 @@ function ProposalDialog({
         {proposal ? (
           <div className="space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <StatusBadge value={proposal.status} />
+              <StatusBadge value={statusShown} />
               <span className="text-sm text-ink-600">
                 {proposal.flowType === "direct" ? "Direct offer" : "Interview first"} · sent {formatDate(proposal.createdAt)}
                 {proposal.hiredAt ? ` · hired ${formatDate(proposal.hiredAt)}` : ""}
