@@ -9,6 +9,7 @@ import {
   proofSlots,
   proposalCgpaGate,
   readCgpaVerification,
+  semesterFromInput,
   semesterOptions,
   yearOfStudy,
   type CgpaGate,
@@ -261,4 +262,18 @@ test("cgpaBlocksPayment: exactly pending, overdue and incorrect_unacked", () => 
   const states: CgpaGate["state"][] = ["none", "pending", "overdue", "incorrect_unacked", "clear"];
   const blocked = states.filter((state) => cgpaBlocksPayment({ state, acceptedAt: null, dueBy: null }));
   assert.deepEqual(blocked, ["pending", "overdue", "incorrect_unacked"]);
+});
+
+/* ── semesterFromInput (the manual semester box) ───────────────────── */
+
+test("semesterFromInput: any whole number is kept as typed, empty or 0 is nothing (0 is only the Not applicable box)", () => {
+  assert.equal(semesterFromInput("3"), 3);
+  assert.equal(semesterFromInput("10"), 10);
+  assert.equal(semesterFromInput("11"), 11); // kept so validation can say "1 to 10"
+  assert.equal(semesterFromInput("07"), 7);
+  assert.equal(semesterFromInput("4.5"), 45); // non-digits are dropped, never a decimal
+  assert.equal(semesterFromInput(""), null);
+  assert.equal(semesterFromInput("0"), null);
+  assert.equal(semesterFromInput("abc"), null);
+  assert.equal(semesterFromInput("123"), 12);
 });

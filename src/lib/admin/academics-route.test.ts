@@ -91,7 +91,7 @@ test("invalid scores are 400 with the field's message, and nothing is written", 
     ["percentage over 100", { scoreType: "percentage", score: "101" }, "score"],
     ["not a number", { scoreType: "cgpa", score: "eight" }, "score"],
     ["score without a type", { qualificationLevel: "Bachelor's", degree: "B.Tech", score: "8" }, "scoreType"],
-    ["score on a Ph.D", { score: "8", scoreType: "cgpa" }, "score"],
+    ["CGPA over 10 on a Ph.D", { qualificationLevel: "Ph.D", score: "11", scoreType: "cgpa" }, "score"],
     ["end year before start", { yearOfGraduation: "2021" }, "yearOfGraduation"],
   ] as const) {
     fakes.reset();

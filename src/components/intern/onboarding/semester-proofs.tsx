@@ -4,11 +4,11 @@ import { useState } from "react";
 import { Check, Info, ShieldCheck } from "lucide-react";
 
 import { FileUpload } from "@/components/app/file-upload";
-import { CGPA_DISCLAIMER, CGPA_UPLOAD_WARNING, proofSlots, SEMESTER_NA, semesterLabel, semesterOptions, yearOfStudy } from "@/lib/cgpa-verification";
+import { CGPA_DISCLAIMER, CGPA_UPLOAD_WARNING, proofSlots, SEMESTER_NA, semesterFromInput } from "@/lib/cgpa-verification";
 import type { CertificateUpload, OnboardingDraft } from "@/lib/onboarding";
 import { cn } from "@/lib/utils";
 
-import { RemoveButton, SelectField } from "./fields";
+import { Check as CheckField, FieldNote, Label, RemoveButton, controlClass, describedBy } from "./fields";
 
 type Academics = OnboardingDraft["academics"];
 
@@ -37,36 +37,40 @@ export function CgpaDisclaimer({ compact = false, className }: { compact?: boole
 }
 
 /**
- * "Current semester": the two semesters of the student's year (3rd year: 5 and 6); a college member's declared year
- * wins; an unknown year offers 1 to 10. A semester already stored stays selectable even if it is no longer on offer.
- * "Semester not applicable" (0) is always last, for colleges with yearly exams.
+ * "Current semester": typed by hand (any semester from 1 to 10, whatever the year of study), with a small "Not
+ * applicable" box beside it for colleges that run on yearly exams (stored as `SEMESTER_NA`, 0). Ticking the box
+ * clears the number and disables it; unticking leaves the semester empty again.
  */
-export function SemesterSelect({ a, collegeYear, error, onChange }: { a: Academics; collegeYear: number | null; error?: string; onChange: (semester: number | null) => void }) {
-  const year = yearOfStudy({ startYear: a.startYear, status: a.status ?? "" }, collegeYear);
-  const options = semesterOptions(year);
+export function SemesterInput({ a, error, onChange }: { a: Academics; error?: string; onChange: (semester: number | null) => void }) {
+  const id = "currentSemester";
   const current = typeof a.currentSemester === "number" ? a.currentSemester : null;
-  if (current !== null && !options.includes(current)) options.push(current);
-  options.sort((x, y) => x - y);
-  const choices = options.filter((o) => o !== SEMESTER_NA).map((o) => ({ value: String(o), label: semesterLabel(o) }));
-  choices.push({ value: String(SEMESTER_NA), label: semesterLabel(SEMESTER_NA) });
+  const na = current === SEMESTER_NA;
+  const hint = na ? "For colleges without semesters. You upload last year's marksheet instead." : "The semester you are studying in now, 1 to 10.";
   return (
-    <SelectField
-      id="currentSemester"
-      label="Current semester"
-      optional
-      placeholder="Choose your semester"
-      value={current === null ? "" : String(current)}
-      error={error}
-      options={choices}
-      hint={
-        current === SEMESTER_NA
-          ? "For colleges without semesters. You upload last year's marksheet instead."
-          : year
-            ? `You are in year ${year}, so this is semester ${2 * year - 1} or ${2 * year}. No semesters at your college? Choose Semester not applicable.`
-            : "The semester you are studying in now. No semesters at your college? Choose Semester not applicable."
-      }
-      onChange={(v) => onChange(v === "" ? null : Number(v))}
-    />
+    <div className="min-w-0">
+      <Label htmlFor={id} optional>
+        Current semester
+      </Label>
+      <div className="mt-2 flex items-center gap-x-4 gap-y-1">
+        <input
+          id={id}
+          name={id}
+          inputMode="numeric"
+          maxLength={2}
+          placeholder="e.g. 5"
+          disabled={na}
+          value={current !== null && !na ? String(current) : ""}
+          onChange={(e) => onChange(semesterFromInput(e.target.value))}
+          aria-invalid={error ? true : undefined}
+          aria-describedby={describedBy(id, error, hint)}
+          className={controlClass(error, "nums min-w-0 flex-1 disabled:cursor-not-allowed disabled:opacity-60")}
+        />
+        <CheckField checked={na} onChange={(checked) => onChange(checked ? SEMESTER_NA : null)} className="shrink-0">
+          Not applicable<span className="sr-only"> (my course has no semesters)</span>
+        </CheckField>
+      </div>
+      <FieldNote id={id} error={error} hint={hint} />
+    </div>
   );
 }
 

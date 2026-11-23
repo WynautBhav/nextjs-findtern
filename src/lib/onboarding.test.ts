@@ -403,14 +403,21 @@ test("academics: level and status are chosen, nothing preselected (INT-30)", () 
   assert.equal(emptyDraft().academics.scoreType, "");
 });
 
-test("INT-17: score needed only once completed, never for a Ph.D", () => {
+test("INT-17: score needed only once completed, for a Ph.D too", () => {
   const base = complete();
   const pursuing = validateStep({ ...base, academics: { ...base.academics, cgpa: "", scoreType: "" } }, 1, ctx);
   assert.equal(pursuing.cgpa, undefined);
   const done = validateStep({ ...base, academics: { ...base.academics, status: "Completed", yearOfGraduation: "2026", cgpa: "" } }, 1, ctx);
   assert.ok(done.cgpa);
   const phd = validateStep({ ...base, academics: { ...base.academics, qualificationLevel: "Ph.D", degree: "Physics", status: "Completed", yearOfGraduation: "2026", cgpa: "" } }, 1, ctx);
-  assert.equal(phd.cgpa, undefined);
+  assert.ok(phd.cgpa, "a completed Ph.D needs a score like every other degree");
+  const phdAt = (patch: Partial<OnboardingDraft["academics"]>) =>
+    validateStep({ ...base, academics: { ...base.academics, qualificationLevel: "Ph.D", degree: "Physics", status: "Completed", yearOfGraduation: "2026", ...patch } }, 1, ctx);
+  assert.deepEqual([phdAt({ scoreType: "cgpa", cgpa: "8.4" }).cgpa, phdAt({ scoreType: "cgpa", cgpa: "8.4" }).scoreType], [undefined, undefined]);
+  assert.equal(phdAt({ scoreType: "percentage", cgpa: "72" }).cgpa, undefined);
+  assert.ok(phdAt({ scoreType: "cgpa", cgpa: "12" }).cgpa);
+  assert.ok(phdAt({ scoreType: "percentage", cgpa: "101" }).cgpa);
+  assert.ok(phdAt({ scoreType: "", cgpa: "8" }).scoreType);
   assert.ok(validateStep({ ...base, academics: { ...base.academics, scoreType: "", cgpa: "8" } }, 1, ctx).scoreType);
 });
 
@@ -677,4 +684,12 @@ test("the stored account type reads back into the draft; unknown values are blan
   assert.equal(draftFromRecord(row({ accountType: "individual" })).accountType, "individual");
   assert.equal(draftFromRecord(row({})).accountType, "");
   assert.equal(draftFromRecord(row({ accountType: "admin" })).accountType, "");
+});
+
+test("a Ph.D score is saved with its type, like any other degree", () => {
+  const { extraPatch } = storedFromDraft({ academics: { ...emptyDraft().academics, qualificationLevel: "Ph.D", degree: "Physics", status: "Completed", scoreType: "cgpa", cgpa: "8.4" } }, null);
+  const a = extraPatch.academics as Record<string, unknown>;
+  assert.equal(a.score, "8.4");
+  assert.equal(a.scoreType, "cgpa");
+  assert.equal(draftFromRecord({ extraData: extraPatch }).academics?.cgpa, "8.4");
 });

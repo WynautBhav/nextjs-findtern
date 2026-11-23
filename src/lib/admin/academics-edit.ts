@@ -14,9 +14,8 @@ import {
  *
  * The rules are the intern onboarding rules, not a copy: `academicsProblems` runs `validateStep` on the Academics
  * step (CGPA 0-10, percentage 0-100, years, completed/pursuing, degree list), so an admin can never store what the
- * intern's own form would refuse. Two differences, both on purpose: a Completed degree may be saved without a
- * score (the admin may be fixing something else, and a legacy record has none), and a Ph.D carries no score, as on
- * the intern's form.
+ * intern's own form would refuse. One difference, on purpose: a Completed degree may be saved without a
+ * score (the admin may be fixing something else, and a legacy record has none).
  *
  * Pure: the route reads and writes the rows.
  */
@@ -94,9 +93,6 @@ export function academicsProblems(current: AcademicsValues, edit: AcademicsEdit,
     delete out.score;
     delete out.scoreType;
   }
-  if (next.qualificationLevel === "Ph.D" && score) {
-    out.score = "Ph.D profiles carry no score. Choose another qualification level to add one.";
-  }
   // Judge only what the admin touched, plus the score when the level, type or status moved under it.
   const touched = new Set<EditField>(Object.keys(edit) as EditField[]);
   if (touched.has("qualificationLevel") || touched.has("scoreType")) touched.add("score");
@@ -124,7 +120,7 @@ export type AcademicsMerge = {
 
 /**
  * `extra_data.academics` after the edit. Keys this editor does not own (certifications, professionalCourses,
- * marksheet uploads, the CGPA proofs) are carried over untouched; a score is dropped for a Ph.D; a course that is
+ * marksheet uploads, the CGPA proofs) are carried over untouched; a course that is
  * Completed, or not a degree, keeps no current semester, exactly as the intern's own save does.
  */
 export function mergeAcademics(extraData: unknown, edit: AcademicsEdit): AcademicsMerge {
@@ -135,11 +131,6 @@ export function mergeAcademics(extraData: unknown, edit: AcademicsEdit): Academi
   for (const f of EDIT_FIELDS) {
     const v = edit[f];
     if (v !== undefined) (next as Record<string, string>)[f] = v.trim();
-  }
-  const phd = next.qualificationLevel === "Ph.D";
-  if (phd) {
-    next.score = "";
-    next.scoreType = "";
   }
   next.degree = canonicalDegree(next.degree, next.qualificationLevel).trim();
 

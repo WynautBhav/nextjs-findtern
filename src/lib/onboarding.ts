@@ -577,8 +577,7 @@ export function storedFromDraft(
     const a = draft.academics;
     const prev = obj(prevExtra.academics);
     const level = a.qualificationLevel ?? LEVELS.find(([k]) => k === text(prev.level))?.[1] ?? text(prev.level);
-    const isPhd = level === "Ph.D";
-    const score = isPhd ? "" : (a.cgpa?.trim() ?? text(prev.score));
+    const score = a.cgpa?.trim() ?? text(prev.score);
     out.extraPatch.academics = {
       ...prev,
       level: LEVELS.find(([, v]) => v === level)?.[0] ?? level ?? "",
@@ -1255,8 +1254,8 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     else if (!completed && Number(end) > thisYear + 6) errors.yearOfGraduation = `The end year can be at most ${thisYear + 6}.`;
     else if (YEAR.test(start) && Number(end) <= Number(start)) errors.yearOfGraduation = "The end year must be after the start year.";
 
-    // Score: required once completed, never for a Ph.D (legacy).
-    if (level !== "Ph.D") {
+    // Score: required once completed, at every level (Ph.D included).
+    {
       const score = a.cgpa.trim();
       if (score && !a.scoreType) errors.scoreType = "Choose CGPA or percentage.";
       else if (score) {
@@ -1427,7 +1426,6 @@ export type CompletionDocs = {
 function academicsFilled(a: OnboardingDraft["academics"] | undefined): boolean {
   if (!a) return false;
   const completed = a.status === "Completed";
-  const needsScore = completed && a.qualificationLevel !== "Ph.D";
   return Boolean(
     a.qualificationLevel &&
       a.status &&
@@ -1435,7 +1433,7 @@ function academicsFilled(a: OnboardingDraft["academics"] | undefined): boolean {
       a.degree &&
       a.startYear &&
       (!completed || a.yearOfGraduation) &&
-      (!needsScore || a.cgpa),
+      (!completed || a.cgpa),
   );
 }
 
