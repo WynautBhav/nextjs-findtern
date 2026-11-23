@@ -45,14 +45,19 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   const w = driveWindow(drive, now);
   const open = driveDataOpen(drive);
   const [students, eligible] = await Promise.all([open ? studentsForCollegeAdmin(ctx) : Promise.resolve([]), eligibleStudents(drive)]);
-  const presence = w === "live" ? await presenceSnapshot(ctx.college.id, eligible.map((s) => s.userId)) : null;
-  const refs = eligible.map((s) => {
+  // P3: a hand-included student the officer has not verified shows name, roll, year and branch and nothing more:
+  // no offers, meets, hires or presence (redactUnverified). So the board and the presence snapshot read verified students only.
+  const verified = eligible.filter((s) => s.status === "verified");
+  const presence = w === "live" ? await presenceSnapshot(ctx.college.id, verified.map((s) => s.userId)) : null;
+  const toRef = (s: (typeof eligible)[number]) => {
     const r = toStudentRow(s);
     return { userId: r.userId, name: r.name, rollNo: r.rollNo, year: r.year, branch: r.branch, phone: r.phone };
-  });
-  const { board, came, invited, arrived, missing, walkIns } = await loadDriveBoard(drive, refs, presence ? presence.offline : null, now);
+  };
+  const refs = eligible.map(toRef);
+  const { board, came, invited, arrived, missing, walkIns } = await loadDriveBoard(drive, verified.map(toRef), presence ? presence.offline : null, now);
 
-  const rows = students.map(toStudentRow);
+  // Last seen is activity: not shown for a student who is not verified yet.
+  const rows = students.map(toStudentRow).map((r) => (r.status === "verified" ? r : { ...r, lastSeenAt: null }));
   const branches = [...new Set(rows.map((s) => s.branch).filter((b): b is string => Boolean(b)))].sort();
   const e = readEligibility(drive.eligibility);
   // Offers by branch and year: counts only, so they stay on a past drive too (C12 closes the names, not the totals).
