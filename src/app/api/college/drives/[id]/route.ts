@@ -3,13 +3,13 @@ import { eq } from "drizzle-orm";
 
 import { requireCollegeMutation } from "@/lib/college/guard";
 import { driveInput } from "@/lib/college/drive-input";
-import { newInvitees } from "@/lib/college/drive-invite";
-import { sendDriveInvites } from "@/lib/college/drive-invite-send";
+import { invitesToSend, withUnsent } from "@/lib/college/drive-invite";
+import { sendAndRecordInvites } from "@/lib/college/drive-invite-send";
 import { driveForCollegeAdmin } from "@/lib/college/scope";
 import { driveDataOpen } from "@/lib/college/serialize";
 import { getDb, schema } from "@/lib/db";
 
-/** Edit dates, eligibility and the include/exclude lists. The link is unchanged. Companies newly added to the invited list are emailed. */
+/** Edit dates, eligibility and the include/exclude lists. The link is unchanged. Companies newly added to the invited list, or never reached by an earlier mail, are emailed. */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const g = await requireCollegeMutation(req, "drive:update");
   if (!g.ok) return g.response;
@@ -24,11 +24,14 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the drive details" }, { status: 400 });
   }
+  // Companies never reached by a mail (new, or held back by the daily cap or a failed send before) are flagged unsent until it goes out.
+  const submitted = parsed.data.invitedEmployers;
+  const toSend = invitesToSend(drive.invitedEmployers, submitted);
   await getDb()
     .update(schema.collegeDrives)
-    .set({ ...parsed.data, updatedAt: new Date() })
+    .set({ ...parsed.data, ...(submitted ? { invitedEmployers: withUnsent(submitted, toSend.map((i) => i.email)) } : {}), updatedAt: new Date() })
     .where(eq(schema.collegeDrives.id, drive.id));
   const { title, kind, startsAt, endsAt } = parsed.data;
-  const invites = await sendDriveInvites({ id: drive.id, title, kind, startsAt, endsAt, tokenHash: drive.tokenHash }, g.ctx.college.id, g.ctx.college.name, newInvitees(drive.invitedEmployers, parsed.data.invitedEmployers));
+  const invites = await sendAndRecordInvites({ id: drive.id, title, kind, startsAt, endsAt, tokenHash: drive.tokenHash }, g.ctx.college.id, g.ctx.college.name, submitted ?? [], toSend);
   return NextResponse.json({ ok: true, invites });
 }

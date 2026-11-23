@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { csrfFetch } from "@/lib/client-fetch";
+import { inviteSentLine } from "@/lib/college/drive-invite-line";
 import { buttonClass } from "@/components/ui/button";
 import { ShareLink } from "./share-link";
 
@@ -21,6 +22,7 @@ export function LinkActions(props: {
   const [url, setUrl] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
   // Asked in the page, not window.confirm (as admin since QA-145): the
   // consequence is spelled out next to the yes/cancel pair.
   const [asking, setAsking] = useState<"POST" | "DELETE" | null>(null);
@@ -42,18 +44,20 @@ export function LinkActions(props: {
     setAsking(null);
     setBusy(true);
     setError(null);
+    setNote(null);
     const res = await csrfFetch(`/api/college/drives/${props.driveId}/link`, { method }).catch(() => null);
-    const body = (await res?.json().catch(() => null)) as { url?: string; error?: string } | null;
+    const body = (await res?.json().catch(() => null)) as { url?: string; error?: string; invites?: { sent: string[]; failed: string[]; limited: string[] } } | null;
     setBusy(false);
     if (!res?.ok) return setError(body?.error ?? "Couldn't update the link.");
     setUrl(method === "POST" && body?.url ? new URL(body.url, window.location.origin).href : null);
+    setNote(method === "POST" && body?.invites ? inviteSentLine(body.invites.sent, body.invites.failed, body.invites.limited) : null);
     router.refresh();
   }
 
   const consequence =
     asking === "DELETE"
       ? "Every employer, including those already inside, loses access immediately."
-      : "The current link stops working, and companies already inside are let out too. Send the new link to the companies you still want; their shortlists are kept.";
+      : "The current link stops working, and companies already inside are let out too. Companies you invited are emailed a fresh invite; send the new link to any others you still want. Shortlists are kept.";
 
   return (
     <div ref={box} className="space-y-4">
@@ -117,8 +121,8 @@ export function LinkActions(props: {
           ) : null}
         </div>
       )}
-      <span role="status" aria-live="polite" className="text-sm text-danger">
-        {error}
+      <span role="status" aria-live="polite" className={error ? "text-sm text-danger" : "text-sm text-ink-600"}>
+        {error ?? note}
       </span>
     </div>
   );

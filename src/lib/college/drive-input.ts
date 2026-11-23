@@ -21,6 +21,8 @@ export const driveInput = z
     invitedEmployers: z
       .array(z.object({ company: z.string().trim().min(1, "Name the company").max(120), email: z.string().trim().toLowerCase().email("Check the company email").max(200) }))
       .max(50, "Invite at most 50 companies per drive")
+      // The same address typed twice (emails are already lowercased above) is one company: keep the first.
+      .transform((list) => list.filter((i, at) => list.findIndex((o) => o.email === i.email) === at))
       // Optional, no default: an edit that leaves it out keeps the saved list (the column defaults to []).
       .optional(),
   })

@@ -12,6 +12,11 @@ export class InviteGate {
   private readonly perCollege = new RateLimiter(INVITES_PER_COLLEGE_PER_DAY, DAY_MS, { bypassable: false });
   private readonly sentAt = new Map<string, number>();
 
+  /** Forget that these addresses were mailed for this drive: a failed send, or a link reissue that voided the old invites. */
+  forget(driveId: string, emails: string[]): void {
+    for (const e of emails) this.sentAt.delete(`${driveId}:${e.trim().toLowerCase()}`);
+  }
+
   /** `send`: mail these. `limited`: held back by the daily cap. Addresses already mailed today are in neither. */
   plan(collegeId: string, driveId: string, invitees: Invitee[], now = Date.now()): { send: Invitee[]; limited: Invitee[] } {
     for (const [k, at] of this.sentAt) if (now - at >= DAY_MS) this.sentAt.delete(k);
