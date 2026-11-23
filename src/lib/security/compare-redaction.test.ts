@@ -11,7 +11,8 @@ const page = readFileSync(join(process.cwd(), "src/app/employer/compare/page.tsx
 test("compare/page.tsx: candidates are the redacted profiles", () => {
   assert.match(page, /import \{[^}]*\bredactForEmployer\b[^}]*\} from "@\/lib\/employer-candidates"/);
   // Redacted first (photos are attached to that list while the offer relations load); `candidates` is only ever a filter of it.
-  assert.match(page, /const redacted = profiles\.map\(\(p\) => redactForEmployer\(p, nameUnlocked\.has\(p\.id\)\)\)/);
+  // Name and contact redaction first, then CGPA/percentage only with Findtern Pro.
+  assert.match(page, /const redacted = profiles\.map\(\(p\) => withoutScoreUnlessPro\(redactForEmployer\(p, nameUnlocked\.has\(p\.id\)\), proActive\)\)/);
   assert.match(page, /candidates = redacted\.filter\(/);
   assert.equal((page.match(/\bcandidates = /g) ?? []).length, 1, "one assignment of candidates");
   assert.equal((page.match(/\bredacted\b/g) ?? []).length >= 3, true);
