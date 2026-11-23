@@ -156,6 +156,9 @@ const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object"
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 const strs = (v: unknown, max: number): string[] => arr(v).map(str).filter((s): s is string => s !== null).slice(0, max);
+/** Skills as the onboarding form saves them are {id, name, rating} objects; older/seeded rows are plain strings. */
+const skillNames = (v: unknown, max: number): string[] =>
+  arr(v).map((s) => (s && typeof s === "object" ? str((s as { name?: unknown }).name) : str(s))).filter((s): s is string => s !== null).slice(0, max);
 const num = (v: unknown): number | null => {
   const n = typeof v === "string" && v.trim() ? Number(v) : v;
   return typeof n === "number" && Number.isFinite(n) ? n : null;
@@ -233,7 +236,9 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     meetings: NO_MEETINGS,
     openToWork: null,
   };
-  if (!verified || !x) return base;
+  if (!verified) return base;
+  // A verified student who has not saved onboarding yet still has the phone and LinkedIn the Students page shows.
+  if (!x) return { ...base, phone: s.phone, linkedin: s.linkedin };
 
   const ratings = obj(extra.ratings);
   const pro = obj(arr(a.professional)[0]);
@@ -262,7 +267,7 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     preferredLocations: strs(x.preferredLocations, 5),
     laptop: x.hasLaptop,
     lastSeenAt: s.lastSeenAt?.toISOString() ?? null,
-    skills: strs(x.skills, 7),
+    skills: skillNames(x.skills, 7),
     hasReport: typeof extra.aiFeedbackLink === "string" || typeof extra.incruiterReportUrl === "string",
     hasRecording: typeof extra.aiRecordingLink === "string" || typeof extra.incruiterRecordingUrl === "string",
     english: score10(ratings.communication),
