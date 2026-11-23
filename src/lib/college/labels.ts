@@ -54,14 +54,18 @@ export const WINDOW_LABEL: Record<string, string> = {
   revoked: "Link closed",
 };
 
-/** "just now", "4 min ago", "3 h ago", "2 days ago". */
+/** The India calendar day (days since 1970) of an instant: "yesterday" means yesterday there, not 24 to 48 hours ago. */
+const istDay = (ms: number) => Math.floor((ms + 330 * 60_000) / 86_400_000);
+
+/** "just now", "4 min ago", "3 h ago", "yesterday", "3 days ago". Units are whole and never rounded up ("59 min", not "60 min"). */
 export function ago(iso: string | null, now = Date.now()): string {
   if (!iso) return "Never";
-  const s = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
+  const at = new Date(iso).getTime();
+  const s = Math.max(0, Math.floor((now - at) / 1000));
   if (s < 60) return "just now";
-  if (s < 3600) return `${Math.round(s / 60)} min ago`;
-  if (s < 86400) return `${Math.round(s / 3600)} h ago`;
-  const d = Math.round(s / 86400);
+  if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`;
+  const d = Math.max(1, istDay(now) - istDay(at));
   return d === 1 ? "yesterday" : `${d} days ago`;
 }
 
@@ -116,4 +120,13 @@ export function coverMessage(c: CollegeCover | null): { tone: "covered" | "unava
   if (c.seatsLeft === null) return null;
   if (c.seatsLeft <= 0) return { tone: "unavailable", text: `${c.collegeName} has no seats left to cover this interview. Ask your placement officer, or pay the fee yourself.` };
   return { tone: "covered", text: "Your college covers this interview. Enter the code from your placement officer." };
+}
+
+const graphemes = typeof Intl !== "undefined" && "Segmenter" in Intl ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
+const firstChar = (w: string) => (graphemes ? (graphemes.segment(w)[Symbol.iterator]().next().value?.segment ?? "") : (Array.from(w)[0] ?? ""));
+
+/** Up to two initials from the first two words: whole characters (emoji, accents, Devanagari signs stay in one piece). */
+export function initialsOf(name: string): string {
+  const letters = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => firstChar(w).toLocaleUpperCase()).join("");
+  return letters || "?";
 }
