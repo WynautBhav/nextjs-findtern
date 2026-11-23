@@ -89,7 +89,7 @@ export function PresenceLive({
           </p>
           {showTitle ? (
             <h2 id="live-drive" className="mt-1 text-xl font-semibold tracking-[-0.02em] text-ink-900">
-              <Link href={`/college/drives/${driveId}`} className="hover:underline hover:underline-offset-4">
+              <Link href={`/college/drives/${driveId}`} className="inline-flex items-center hover:underline hover:underline-offset-4 max-lg:min-h-11">
                 {driveTitle}
               </Link>
             </h2>
@@ -146,9 +146,9 @@ export function PresenceLive({
             <p className="mt-3 text-sm text-ink-700">
               {/* Said plainly; it read "0 more can get a phone alert; 35 only see…". */}
               {snap.alertable === 0
-                ? "None of the offline students has call alerts on, so a nudge reaches them when they next open Findtern."
+                ? "None of the offline students has phone alerts on, so a nudge reaches them when they next open Findtern."
                 : snap.alertable === snap.offline.length
-                  ? "Every offline student has call alerts on: a nudge reaches their phone now."
+                  ? "Every offline student has phone alerts on: a nudge reaches their phone now."
                   : `${snap.alertable} offline students get a nudge on their phone now; the rest when they next open Findtern.`}
             </p>
           ) : null}
@@ -166,11 +166,11 @@ export function PresenceLive({
               </div>
               <div className="mt-1.5 flex justify-between text-xs text-text-subtle">
                 <span>{fmt(starts)}</span>
-                <span>{fmt(ends)}</span>
+                <span>{fmt(ends)} IST</span>
               </div>
             </div>
           ) : (
-            <p className="mt-2 text-xs text-text-subtle">Open until {fmt(ends)}</p>
+            <p className="mt-2 text-xs text-text-subtle">Open until {fmt(ends)} IST</p>
           )}
           {snap.offline.length > 0 ? (
             <div className="mt-auto pt-5">

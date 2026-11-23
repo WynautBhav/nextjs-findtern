@@ -116,7 +116,7 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
             >
               {nd.h === 0 && !nd.below ? null : (
                 <span className={tight ? "flex items-baseline justify-center gap-1.5" : "contents"}>
-                  <span className="hidden text-xs sm:block" style={{ color: nd.below ? "var(--color-on-dark-subtle)" : txt }}>{nd.label}</span>
+                  <span className="hidden text-xs sm:block" style={{ color: nd.below ? "var(--color-on-dark)" : txt }}>{nd.label}</span>
                   <span className="nums text-sm font-medium sm:text-lg" style={{ color: txt }}>{n(nd.v)}</span>
                 </span>
               )}
@@ -128,15 +128,15 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
         className="mt-4 sm:hidden"
         items={nodes.map((nd) => ({ label: nd.label, fill: nd.fill, value: nd.v, drill: DRILL[nd.id] }))}
       />
-      <p className="mt-2 text-xs text-on-dark-subtle">Blocks left of the offers count students; from the offers on they count offers. A student can hold several.</p>
+      <p className="mt-2 text-xs text-on-dark">Blocks left of the offers count students; from the offers on they count offers. A student can hold several.</p>
       <Meetings data={data} className="mt-6 border-t border-white/15 pt-5" />
       <div className="mt-5 grid gap-x-10 gap-y-6 border-t border-white/15 pt-5 md:grid-cols-2 xl:grid-cols-[1fr_1fr_auto]">
         <div className="min-w-0">
-          <p className="mb-2 text-[13px] text-on-dark-subtle">Findtern band of the {n(inter)} interviewed</p>
+          <p className="mb-2 text-[13px] text-on-dark">Findtern band of the {n(inter)} interviewed</p>
           <BandBar data={data} />
         </div>
         <div className="min-w-0">
-          <p className="mb-2 text-[13px] text-on-dark-subtle">CGPA / % band of the {n(inter)} interviewed</p>
+          <p className="mb-2 text-[13px] text-on-dark">CGPA / % band of the {n(inter)} interviewed</p>
           <MarksBar data={data} />
         </div>
         <Averages data={data} className="md:col-span-2 xl:col-span-1" />
