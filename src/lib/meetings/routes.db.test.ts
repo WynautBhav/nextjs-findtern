@@ -240,6 +240,31 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       assert.equal((await call(selectSlot, id, { slot: 1 })).body.code, "lapsed");
       assert.equal((await call(askReschedule, id, {})).status, 403, "a lapsed offer cannot be turned into a request either");
     });
+
+    await t.test("one open meeting per pair: an expired or lapsed meeting cannot be revived while another is open (409 open_meeting); the open one itself can be re-offered", async () => {
+      // e2 + i3 still has the lapsed offer from the test above. A fresh offer is allowed and is now the open one.
+      const lapsed = (await db.select().from(schema.interviews).where(sql`${schema.interviews.employerId} = ${e2.id} and ${schema.interviews.internId} = ${i3.id}`))[0];
+      const fresh = await offer(e2, i3, [wall(300), wall(301), wall(302)]);
+      assert.equal(fresh.status, 201, JSON.stringify(fresh.body));
+      const openId = (fresh.body.interview as { id: string }).id;
+      await db.update(schema.interviews).set({ status: "expired" }).where(eq(schema.interviews.id, lapsed.id));
+      as("employer", e2.id);
+      for (const id of [lapsed.id]) {
+        const r = await call(reschedule, id, { slots: [wall(310), wall(311), wall(312)] });
+        assert.equal(r.status, 409, JSON.stringify(r.body));
+        assert.equal(r.body.code, "open_meeting");
+        assert.equal((await row(id)).status, "expired", "still expired");
+      }
+      // the same pair's lapsed-but-not-yet-swept pending row is refused the same way
+      await db.update(schema.interviews).set({ status: "pending", respondBy: new Date(Date.now() - 60_000) }).where(eq(schema.interviews.id, lapsed.id));
+      assert.equal((await call(reschedule, lapsed.id, { slots: [wall(310), wall(311), wall(312)] })).body.code, "open_meeting");
+      // the open meeting itself is still re-offerable
+      assert.equal((await call(reschedule, openId, { slots: [wall(320), wall(321), wall(322)] })).status, 200);
+      // once the open one is cancelled the lapsed one can be revived
+      assert.equal((await call(cancel, openId, { reason: "no longer needed" })).status, 200);
+      assert.equal((await call(reschedule, lapsed.id, { slots: [wall(330), wall(331), wall(332)] })).status, 200);
+      assert.equal((await row(lapsed.id)).status, "pending");
+    });
   } finally {
     const ids = [i1, i2, i3].map((u) => u.id);
     await db.execute(sql`delete from notifications where recipient_id in (${sql.join([...ids, e1.id, e2.id].map((x) => sql`${x}`), sql`, `)})`);
