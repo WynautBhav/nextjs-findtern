@@ -20,6 +20,8 @@ import { aiStatusLabel, cohortGoal, membershipLabel, yearLabel, ago } from "@/li
 import { auditCollegeView, requireCollegeContext, studentForCollegeAdmin } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
 import { internOfferKey } from "@/lib/intern-offer-view";
+import { openOrderProposalIds } from "@/lib/employer-flow";
+import { expiryOf } from "@/lib/proposal-expiry";
 import { parseOffer } from "@/lib/offer";
 import { realEmployerId } from "@/lib/admin/scope";
 import { shortDateTime } from "@/lib/format";
@@ -96,7 +98,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
       : db
         .select({ i: schema.interviews })
         .from(schema.interviews)
-        .where(and(eq(schema.interviews.internId, id), realEmployerId(schema.interviews.employerId), inArray(schema.interviews.status, ["scheduled", "completed", "pending", "expired"])))
+        .where(and(eq(schema.interviews.internId, id), realEmployerId(schema.interviews.employerId), inArray(schema.interviews.status, ["scheduled", "completed", "pending", "expired", "missed", "cancelled"])))
         .orderBy(desc(schema.interviews.createdAt)),
     !verified
       ? Promise.resolve([])
@@ -115,6 +117,11 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
       .limit(5),
     verified ? readinessForMany([id]).then((m) => m.get(id) ?? null) : Promise.resolve(null),
   ]);
+  // Offers with a payment open right now keep their accepted status (an open order freezes expiry, as for the employer).
+  const openOrders = new Set<string>();
+  for (const employerId of new Set(proposals.filter(({ p }) => p.status === "accepted" && !p.hiredAt).map(({ p }) => p.employerId))) {
+    for (const pid of await openOrderProposalIds(getDb(), employerId)) openOrders.add(pid);
+  }
 
   // An ended or revoked drive no longer shows its calls (C12).
   const calls = allCalls.filter((c) => driveDataOpen(c.d));
@@ -353,13 +360,16 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                 // The intern's own reading: a sent offer past its start day is lapsed, not waiting.
                 const key = internOfferKey(p);
                 const waiting = key === "sent";
+                // Accepted but not paid before the start day (and no payment open): expired, as the intern, the employer and
+                // admin read it, before and after the sweep stores it.
+                const expiry = expiryOf({ status: p.status, hiredAt: p.hiredAt, offerDetails: p.offerDetails, currency: p.currency, hasOpenOrder: openOrders.has(p.id) });
                 return (
                   <li key={p.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
                     <div className="min-w-0">
                       <p className="font-medium text-ink-900">Offer · {offer.roleTitle || "Internship"}</p>
                       <p className="text-sm text-text-subtle">Sent {ago(p.createdAt?.toISOString() ?? null)}</p>
                     </div>
-                    <Pill tone={waiting ? "waiting" : "neutral"}>{waiting ? "Waiting for the student's reply" : key === "lapsed" ? proposalStatus(key).label : humanizeStatus(p.status)}</Pill>
+                    <Pill tone={waiting ? "waiting" : "neutral"}>{waiting ? "Waiting for the student's reply" : key === "lapsed" ? proposalStatus(key).label : humanizeStatus(expiry.expired ? "expired" : p.status)}</Pill>
                   </li>
                 );
               })}

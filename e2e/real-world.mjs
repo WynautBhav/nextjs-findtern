@@ -16,6 +16,8 @@ const DB = process.env.DATABASE_URL;
 const BASE = process.env.BASE ?? "http://localhost:3528";
 const PASSWORD = "Findtern@2026";
 if (!DB || !/@(127\.0\.0\.1|localhost)[:/]/.test(DB)) throw new Error("DATABASE_URL must be a loopback test DB");
+// Every run starts from the same seeded world (e2e/seed-local-college.mjs), so earlier runs never leak in.
+if (process.env.RESEED !== "0") execFileSync("node", ["e2e/seed-local-college.mjs", "--yes"], { env: process.env, stdio: "ignore" });
 pg.types.setTypeParser(1114, (v) => new Date(`${v.replace(" ", "T")}Z`));
 const db = new pg.Client({ connectionString: DB, options: "-c TimeZone=UTC" });
 await db.connect();
@@ -54,13 +56,18 @@ const EMP = { a: await empRow("hiring@northwind.dev"), b: await empRow("talent@m
 const fresh = await q(
   `SELECT u.id, u.email FROM users u JOIN college_memberships m ON m.user_id = u.id AND m.status = 'verified'
      JOIN intern_onboarding o ON o.user_id = u.id
-    WHERE o.extra_data->>'approvalStatus' = 'Approved' AND coalesce((o.extra_data->>'openToWork')::boolean, true)
+    WHERE o.extra_data->>'approvalStatus' = 'Approved' AND o.location_types ? 'remote' AND coalesce((o.extra_data->>'openToWork')::boolean, true)
       AND NOT EXISTS (SELECT 1 FROM proposals p WHERE p.intern_id = u.id) AND NOT EXISTS (SELECT 1 FROM interviews i WHERE i.intern_id = u.id)
       AND NOT EXISTS (SELECT 1 FROM college_drive_meetings d WHERE d.user_id = u.id)
     ORDER BY u.email`,
 );
 let nextStudent = 0;
-const takeStudent = () => fresh[nextStudent++];
+// Only students an employer can actually find (in the pool: open to work, not paused): the app's own rule decides.
+const visible = async (sid) => (await q(`SELECT 1 FROM users u JOIN intern_onboarding o ON o.user_id = u.id
+  WHERE u.id = $1 AND u.is_active AND coalesce((o.extra_data->>'openToWork')::boolean, true) AND coalesce(u.profile_visibility, 'live') = 'live'
+    AND coalesce((o.extra_data->>'findternScore')::float, 0) > 0`, [sid])).length > 0;
+// The next fresh student an employer could find; ones outside the pool are passed over, as an employer would never see them.
+const takeStudent = async () => { for (;;) { const s = fresh[nextStudent++]; if (!s) throw new Error("ran out of fresh students"); if (await visible(s.id)) return s; } };
 
 const tpo = await signIn("/api/auth/college/login", "tpo@jklu.edu.in");
 const admin = await signIn("/api/auth/admin/login", "admin@findtern.dev");
@@ -71,11 +78,13 @@ const weekdayAhead = (n) => { for (let i = n; ; i++) { const d = new Date(`${day
 const sweep = () => execFileSync("npx", ["tsx", "e2e/run-sweeps.mts"], { env: process.env, stdio: "pipe" });
 
 async function sendOffer(e, student) {
+  if (!(await visible(student.id))) throw Object.assign(new Error("not in the pool"), { skip: true });
   const r = await emp[e].call("POST", `/api/employer/${EMP[e].id}/proposals`, {
     internId: student.id, projectId: EMP[e].project, flowType: "direct", agreedToPolicy: true, roleTitle: "Scenario Intern",
     jd: "Real-world scenario.", additionalInfo: "How a real product team ships: code review, testing and weekly demos.", mode: "remote", startDate: weekdayAhead(7), duration: "2m", shiftFrom: "09:00", shiftTo: "17:00",
     timezone: "Asia/Kolkata", laptop: "candidate", monthlyAmount: 20000, currency: "INR",
   });
+  if (r.status === 404 && /Unknown candidate/.test(JSON.stringify(r.body))) throw Object.assign(new Error("not visible"), { skip: true });
   if (!r.ok) throw new Error(`send offer ${r.status} ${JSON.stringify(r.body)}`);
   return r.body.proposal?.id ?? r.body.id ?? (await q(`SELECT id FROM proposals WHERE intern_id = $1 AND employer_id = $2 ORDER BY created_at DESC LIMIT 1`, [student.id, EMP[e].id]))[0].id;
 }
@@ -83,10 +92,10 @@ const startPassed = (id) => q(`UPDATE proposals SET offer_details = jsonb_set(of
 
 // What a screen says, from a fixed list of each role's labels (longest first, so "Rejected · no response" is not "Rejected").
 const VOCAB = {
-  intern: ["Waiting on you", "Interview booked", "Accepted · awaiting payment", "Rejected · no response", "Rejected", "Withdrawn", "Expired", "Closed by Findtern", "Hired · full-time", "Hired"],
+  intern: ["Closed · you took another offer", "Waiting on you", "Interview booked", "Accepted · awaiting payment", "Rejected · no response", "Rejected", "Withdrawn", "Expired", "Closed by Findtern", "Hired · full-time", "Hired"],
   employer: ["Waiting on candidate", "Accepted · payment due", "Accepted · not payable yet", "Declined", "Expired · no reply before start", "Expired · not paid before start", "Withdrawn", "Closed · candidate accepted another offer", "Closed · accepted elsewhere", "Payment in progress", "Hired"],
   admin: ["Sent", "Accepted", "Rejected", "Expired", "Withdrawn", "Hired", "Processing"],
-  college: ["Waiting for the student's reply", "Rejected · no response", "Rejected", "Accepted", "Withdrawn", "Expired", "Hired", "Processing", "Sent"],
+  college: ["Waiting for the student's reply", "Rejected · no response", "Rejected", "Accepted", "Withdrawn", "Expired", "Hired", "Processing"],
 };
 const labelsIn = (text, words) => {
   const found = [];
@@ -130,9 +139,12 @@ function expect(name, views, want) {
 
 /* ── Offers ── */
 async function offerScenario(name, steps, want) {
-  const s = takeStudent();
+  let s, id;
+  for (;;) {
+    s = await takeStudent();
+    try { id = await sendOffer("a", s); break; } catch (err) { if (!err.skip) throw err; }
+  }
   const intern = await signIn("/api/auth/login", s.email);
-  const id = await sendOffer("a", s);
   for (const step of steps) await step({ s, id, intern });
   expect(name, await viewsOfOffer("a", s, id, intern), want);
   await intern.ctx.close();
@@ -156,7 +168,7 @@ await offerScenario("Accepted and paid: hired", [accept, pay("a")], { intern: "H
 
 // Two companies offer one student; the student accepts the first, it is paid; the second offer closes.
 {
-  const s = takeStudent();
+  const s = await takeStudent();
   const intern = await signIn("/api/auth/login", s.email);
   const first = await sendOffer("a", s);
   const second = await sendOffer("b", s);
@@ -177,19 +189,35 @@ await offerScenario("Accepted and paid: hired", [accept, pay("a")], { intern: "H
 }
 
 /* ── Employer meetings ── */
+// Each run books on its own days (30-300 days ahead), so its meetings never clash with an earlier run's.
+let meetingNo = 0;
+const RUN_DAY = 30 + Math.floor(Math.random() * 270);
 async function interviewScenario(name, steps, want) {
-  const s = takeStudent();
+  const k = meetingNo++; // each meeting on its own days: an employer can't hold two at once
+  const s = await takeStudent();
   const intern = await signIn("/api/auth/login", s.email);
   const wall = (d, h) => `${day(d)}T${String(h).padStart(2, "0")}:00`;
-  const r = await emp.a.call("POST", `/api/employer/${EMP.a.id}/interviews`, { internId: s.id, projectId: EMP.a.project, slot1: wall(3, 11), slot2: wall(3, 12), slot3: wall(4, 11), timezone: "Asia/Kolkata" });
+  const r = await emp.a.call("POST", `/api/employer/${EMP.a.id}/interviews`, { internId: s.id, projectId: EMP.a.project, slot1: wall(RUN_DAY + 2 * k, 11), slot2: wall(RUN_DAY + 2 * k, 12), slot3: wall(RUN_DAY + 1 + 2 * k, 11), timezone: "Asia/Kolkata" });
   if (!r.ok) throw new Error(`schedule ${r.status} ${JSON.stringify(r.body)}`);
   const id = (await q(`SELECT id FROM interviews WHERE intern_id = $1 ORDER BY created_at DESC LIMIT 1`, [s.id]))[0].id;
   for (const step of steps) await step({ s, id, intern });
-  const V = { intern: ["Waiting on you", "Upcoming", "Scheduled", "Expired", "Missed", "Completed", "Cancelled", "Employer didn't join"], employer: ["Waiting on candidate", "Upcoming", "Scheduled", "Expired", "Missed", "Completed", "Cancelled"], admin: ["Pending", "Scheduled", "Upcoming", "Expired", "Missed", "Completed", "Cancelled"], college: ["Pending", "Scheduled", "Upcoming", "Expired", "Missed", "Completed", "Cancelled"] };
+  const V = {
+    intern: ["Booked", "Choose a time", "Interview done", "Employer didn't join", "Expired", "Missed", "Cancelled", "Closed"],
+    employer: ["Waiting on candidate", "Expired: employer didn't join", "Expired", "Scheduled", "Happening now", "Completed", "Missed", "Closed", "Cancelled"],
+    admin: ["Pending", "Scheduled", "Expired", "Missed", "Completed", "Cancelled"],
+    college: ["Pending", "Scheduled", "Expired", "Missed", "Completed", "Cancelled"],
+  };
+  // Only this meeting's row on each screen (the pages also carry filter tabs with the same words).
+  await emp.a.read(`/employer/schedule`);
+  const empRow = await emp.a.page.locator(`a[href="/employer/intern/${s.id}"]`).first().locator("xpath=ancestor::*[self::li or self::tr or self::article][1]").innerText().catch(() => "");
+  await admin.read(`/admin/interns/${s.id}`);
+  await admin.page.getByRole("tab", { name: /Interviews/ }).or(admin.page.getByRole("button", { name: /^Interviews/ })).first().click().catch(() => {});
+  await admin.page.waitForTimeout(500);
+  const adminRows = await admin.page.locator("table tbody").last().innerText().catch(() => "");
   expect(name, {
     intern: labelsIn(await intern.read(`/intern/interviews`), V.intern),
-    employer: labelsIn(await emp.a.read(`/employer/schedule`), V.employer).filter(Boolean),
-    admin: labelsIn(await admin.read(`/admin/interns/${s.id}`), V.admin),
+    employer: labelsIn(empRow, V.employer),
+    admin: labelsIn(adminRows, V.admin),
     college: labelsIn(await tpo.read(`/college/students/${s.id}`), V.college),
     master: await masterRow(s, ["meetingsDone", "meetingsNotAccepted", "meetingsMissed"]),
   }, want);
@@ -197,14 +225,33 @@ async function interviewScenario(name, steps, want) {
 }
 const pickSlot = async ({ id, intern }) => { const r = await intern.call("POST", `/api/interviews/${id}/select-slot`, { slot: 1 }); if (!r.ok) throw new Error(`pick ${r.status} ${JSON.stringify(r.body)}`); };
 const slotPassed = async ({ id }) => q(`UPDATE interviews SET slot1 = (now() AT TIME ZONE 'UTC') - interval '3 hours', slot2 = (now() AT TIME ZONE 'UTC') - interval '150 minutes', slot3 = (now() AT TIME ZONE 'UTC') - interval '2 hours' WHERE id = $1`, [id]);
+// The meeting starts (picked slot began 5 minutes ago) and the employer presses Join, as at the real time.
+const meetingStarts = async ({ id }) => q(`UPDATE interviews SET meeting_link = coalesce(meeting_link, 'https://meet.google.com/scn-test-run'), slot1 = (now() AT TIME ZONE 'UTC') - interval '5 minutes', slot2 = (now() AT TIME ZONE 'UTC') + interval '1 day', slot3 = (now() AT TIME ZONE 'UTC') + interval '2 days' WHERE id = $1`, [id]);
+// The employer presses Join: the recorded gate (/meet/<token>), 10 s of rules, "I understand and agree", then the redirect
+// to Meet that stamps employer_joined_at. The hop to Google is blocked: nothing leaves this machine.
+const employerJoins = async ({ id }) => {
+  const r = await emp.a.call("POST", `/api/interviews/${id}/join`, {});
+  if (!r.ok) throw new Error(`join ${r.status} ${JSON.stringify(r.body)}`);
+  const page = emp.a.page;
+  await page.route("**/*", (route) => (route.request().url().startsWith(BASE) ? route.continue() : route.abort()));
+  await page.goto(`${BASE}${r.body.gate}`, { waitUntil: "domcontentloaded" });
+  const agree = page.getByRole("button", { name: /I understand and agree/ });
+  await agree.waitFor({ timeout: 30_000 });
+  await page.waitForFunction(() => [...document.querySelectorAll("button")].some((b) => /I understand and agree/.test(b.textContent ?? "") && !b.disabled), null, { timeout: 30_000 });
+  await agree.click();
+  await page.waitForTimeout(3000);
+  await page.unroute("**/*");
+  const [row] = await q(`SELECT employer_joined_at FROM interviews WHERE id = $1`, [id]);
+  if (!row.employer_joined_at) throw new Error("employer joined through the gate but no join was recorded");
+};
 const markMissed = async ({ id }) => { const r = await emp.a.call("POST", `/api/interviews/${id}/mark-missed`, {}); if (!r.ok) throw new Error(`mark missed ${r.status} ${JSON.stringify(r.body)}`); };
 const markDone = async ({ id }) => { const r = await emp.a.call("POST", `/api/interviews/${id}/mark-completed`, {}); if (!r.ok) throw new Error(`mark done ${r.status} ${JSON.stringify(r.body)}`); };
 const cancelByEmployer = async ({ id }) => { const r = await emp.a.call("POST", `/api/interviews/${id}/cancel`, { reason: "Role filled" }); if (!r.ok) throw new Error(`cancel ${r.status} ${JSON.stringify(r.body)}`); };
 
-await interviewScenario("Meeting booked by the student", [pickSlot], { admin: "Scheduled", master: { meetingsDone: "0", meetingsNotAccepted: "0", meetingsMissed: "0" } });
-await interviewScenario("Booked, time passes, nobody closes it", [pickSlot, slotPassed], { intern: "Expired", employer: "Expired", admin: "Expired", college: "Expired", master: { meetingsNotAccepted: "0", meetingsMissed: "0" } });
-await interviewScenario("Booked, time passes, employer marks student missed", [pickSlot, slotPassed, markMissed], { intern: "Missed", employer: "Missed", admin: "Missed", college: "Missed", master: { meetingsMissed: "1", meetingsNotAccepted: "0" } });
-await interviewScenario("Booked, held, employer marks it done", [pickSlot, slotPassed, markDone], { intern: "Completed", employer: "Completed", admin: "Completed", college: "Completed", master: { meetingsDone: "1" } });
+await interviewScenario("Meeting booked by the student", [pickSlot], { intern: "Booked", employer: "Scheduled", admin: "Scheduled", college: "Scheduled", master: { meetingsDone: "0", meetingsNotAccepted: "0", meetingsMissed: "0" } });
+await interviewScenario("Booked, time passes, employer never joins", [pickSlot, slotPassed], { intern: "Employer didn't join", employer: "Expired: employer didn't join", admin: "Expired", college: "Expired", master: { meetingsNotAccepted: "0", meetingsMissed: "0" } });
+await interviewScenario("Booked, time passes, employer marks student missed", [pickSlot, meetingStarts, employerJoins, slotPassed, markMissed], { intern: "Missed", employer: "Missed", admin: "Missed", college: "Missed", master: { meetingsMissed: "1", meetingsNotAccepted: "0" } });
+await interviewScenario("Booked, held, employer marks it done", [pickSlot, meetingStarts, employerJoins, slotPassed, markDone], { intern: "Interview done", employer: "Completed", admin: "Completed", college: "Completed", master: { meetingsDone: "1" } });
 await interviewScenario("Invite never answered, every slot passes", [slotPassed], { intern: "Expired", employer: "Expired", admin: "Expired", college: "Expired", master: { meetingsNotAccepted: "1" } });
 await interviewScenario("Employer cancels a booked meeting", [pickSlot, cancelByEmployer], { intern: "Cancelled", employer: "Cancelled", admin: "Cancelled", college: "Cancelled", master: { meetingsNotAccepted: "0" } });
 
@@ -213,10 +260,15 @@ const came = new Set((await q(`SELECT employer_id FROM college_drive_employers W
 if (!came.has(EMP.a.id)) failures.push("Northwind has not joined the summer drive; drive meet scenarios skipped");
 else {
   async function meetScenario(name, steps, wantEmployer, wantMaster) {
-    const s = takeStudent();
-    const intern = await signIn("/api/auth/login", s.email);
-    const r = await emp.a.call("POST", `/api/employer/drives/${summer.id}/meetings`, { userId: s.id, inMinutes: 0, manualLink: "https://meet.example.com/scenario" });
+    let s = await takeStudent();
+    let r = await emp.a.call("POST", `/api/employer/drives/${summer.id}/meetings`, { userId: s.id, inMinutes: 0, manualLink: "https://meet.example.com/scenario" });
+    // A student outside the drive (wrong year, below its cutoffs) cannot be called; an employer would not see them there.
+    while (r.status === 404 && /not in this drive/.test(JSON.stringify(r.body))) {
+      s = await takeStudent();
+      r = await emp.a.call("POST", `/api/employer/drives/${summer.id}/meetings`, { userId: s.id, inMinutes: 0, manualLink: "https://meet.example.com/scenario" });
+    }
     if (!r.ok) { failures.push(`${name}: request ${r.status} ${JSON.stringify(r.body)}`); return; }
+    const intern = await signIn("/api/auth/login", s.email);
     const id = (await q(`SELECT id FROM college_drive_meetings WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`, [s.id]))[0].id;
     for (const step of steps) await step({ s, id, intern });
     const list = await emp.a.call("GET", `/api/employer/drives/${summer.id}/meetings`);
@@ -235,7 +287,7 @@ else {
   await meetScenario("Employer cancels the drive meet", [cancelMeet], "cancelled", "");
   // A lapsed request can no longer be accepted.
   {
-    const s = takeStudent();
+    const s = await takeStudent();
     const intern = await signIn("/api/auth/login", s.email);
     await emp.a.call("POST", `/api/employer/drives/${summer.id}/meetings`, { userId: s.id, inMinutes: 0, manualLink: "https://meet.example.com/scenario" });
     const id = (await q(`SELECT id FROM college_drive_meetings WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1`, [s.id]))[0].id;

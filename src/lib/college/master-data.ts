@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { realEmployerId } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
 import { todayIst } from "@/lib/offer";
-import { acceptedStatusesSql, interviewExpiredSql, interviewUpcomingSql, interviewWaitingSql, offerLapsedSql, offerOpenSql } from "./count-rules";
+import { acceptedStatusesSql, offerUnpaidExpiredSql, interviewExpiredSql, interviewUpcomingSql, interviewWaitingSql, offerLapsedSql, offerOpenSql } from "./count-rules";
 import { CALL_GRACE_MS } from "./constants";
 import { studentsForCollegeAdmin, type CollegeContext } from "./scope";
 import { buildMasterRow, NO_MEETINGS, type MasterExtras, type MasterRow, type Meetings } from "./master-row";
@@ -41,7 +41,8 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
         ${o.skills} AS skills, ${o.locationTypes} AS location_types, ${o.preferredLocations} AS preferred_locations,
         ${o.hasLaptop} AS has_laptop, ${o.city} AS city, ${o.state} AS state, ${o.experienceJson} AS experience,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status <> 'draft' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers,
-        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status IN (${acceptedStatusesSql()}) AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_accepted,
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status IN (${acceptedStatusesSql()})
+          AND NOT ${offerUnpaidExpiredSql('pr', today)} AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_accepted,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status = 'rejected' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_rejected,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND ${offerLapsedSql('pr', today)} AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_lapsed,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND ${offerOpenSql('pr', today)} AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_open,

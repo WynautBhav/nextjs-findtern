@@ -28,6 +28,7 @@ import pg from "pg";
 
 import { lineCharge } from "../src/lib/checkout.ts";
 import { offerTermIssues, parseOffer } from "../src/lib/offer.ts";
+import { modeProblem, offerableModes, workPreferenceOf } from "../src/lib/work-preference.ts";
 import { draftFromRecord, emptyDraft, validateProfile } from "../src/lib/onboarding.ts";
 
 const PASSWORD = "Findtern@2026";
@@ -125,6 +126,8 @@ function plan() {
     if (stage === "rejected") score = r1(between(3, 4.4));
     out.push({
       n: i + 1, stage, year, semester, branch, first, last, ratings, score,
+      // Half open to remote work, half on-site or hybrid only: offers respect it (work-preference.ts).
+      locationTypes: (i + 1) % 2 ? ["remote", "hybrid"] : ["onsite", "hybrid"],
       cgpa: r1(between(5.6, 9.8)),
       domain: DOMAINS[i % DOMAINS.length],
       email: `${first.toLowerCase()}.${last.toLowerCase()}${i + 1}@jklu.edu.in`,
@@ -341,7 +344,7 @@ async function main() {
          VALUES ($1,'302026','Rajasthan','Jaipur',$2,$3,$4,'[]',$5,$6,$7,true,$8,$9)`,
         [u.id, submitted ? `8880${pad(s.n, 8)}` : null, submitted ? `JKLUP${pad(s.n, 4)}Z` : null,
          `Year ${s.year} ${s.branch} student at ${college.name}. Builds small ${domain.toLowerCase()} projects in ${skills.slice(0, 3).join(", ")}.`,
-         JSON.stringify(skills), JSON.stringify(s.n % 2 ? ["remote", "hybrid"] : ["onsite", "hybrid"]), JSON.stringify(["Jaipur", "Delhi"]),
+         JSON.stringify(skills), JSON.stringify(s.locationTypes), JSON.stringify(["Jaipur", "Delhi"]),
          `${college.name}, ${s.branch}, year ${s.year}.${interviewed ? ` Score ${s.score.toFixed(1)}/10.` : ""}`, JSON.stringify(extra)],
       );
       if (submitted) {
@@ -366,6 +369,10 @@ async function main() {
       // The app's own offer rule: a candidate scoring below 6 can be offered up to 2 months (employer proposals route).
       const insertProposal = (status, offer, created, hiredAt = null, projectId = proj.id, employerId = emp.id) => {
         if (!offer.fullTimeOffer && s.score < 6 && (offer.duration === "3m" || offer.duration === "6m")) offer.duration = "2m";
+        // And only in a work mode the student is open to (work-preference.ts): hybrid in Jaipur when remote is not.
+        if (!offer.fullTimeOffer && !offerableModes(workPreferenceOf({ locationTypes: s.locationTypes, preferredLocations: ["Jaipur", "Delhi"] }, s.score)).includes(offer.mode)) {
+          Object.assign(offer, { mode: "hybrid", location: "Jaipur, Rajasthan", city: "Jaipur", state: "Rajasthan", workFromOfficeDays: 3, workFromHomeDays: 2 });
+        }
         return one(
           `INSERT INTO proposals (employer_id, intern_id, project_id, flow_type, status, currency, offer_details, ai_ratings, skills, hired_at, created_at, updated_at)
            VALUES ($1,$2,$3,'direct',$4,'INR',$5,$6,$7,$8,$9,$9) RETURNING id`,
@@ -519,10 +526,11 @@ async function main() {
     console.log("[seed-local] check:", JSON.stringify(check));
     // Every internship offer obeys the rules the employer's send route enforces (shift length, hours, the score cap on duration),
     // so no seeded offer is one the app could never have made.
-    const offerRows = (await q(`SELECT p.offer_details, (o.extra_data->>'findternScore')::float AS score FROM proposals p LEFT JOIN intern_onboarding o ON o.user_id = p.intern_id WHERE NOT (p.offer_details ? 'fullTimeOffer')`)).rows;
+    const offerRows = (await q(`SELECT p.offer_details, (o.extra_data->>'findternScore')::float AS score, o.location_types, o.preferred_locations FROM proposals p LEFT JOIN intern_onboarding o ON o.user_id = p.intern_id WHERE NOT (p.offer_details ? 'fullTimeOffer')`)).rows;
     check.impossibleOffers = offerRows.filter((r) => {
       const d = r.offer_details;
-      return offerTermIssues({ shiftFrom: d.shiftFrom, shiftTo: d.shiftTo, timezone: d.timezone }).length > 0 || ((r.score ?? 10) < 6 && ["3m", "6m"].includes(d.duration));
+      return offerTermIssues({ shiftFrom: d.shiftFrom, shiftTo: d.shiftTo, timezone: d.timezone }).length > 0 || ((r.score ?? 10) < 6 && ["3m", "6m"].includes(d.duration))
+        || modeProblem(workPreferenceOf({ locationTypes: r.location_types, preferredLocations: r.preferred_locations }, r.score), d.mode) !== null;
     }).length;
     console.log(`[seed-local] impossible offers: ${check.impossibleOffers}`);
     if (check.students !== TOTAL || check.impossibleOffers || check.roster !== TOTAL + 40 || check.distinctEmails !== TOTAL || check.oddCalls || check.unpaidHires || check.orphanProposals || check.offersToHiddenStudents || check.incompleteSubmitted) {

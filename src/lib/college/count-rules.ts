@@ -15,6 +15,17 @@ export const acceptedStatusesSql = (): SQL => sql.join(ACCEPTED_OFFER_STATUSES.m
 
 const col = (alias: string, c: string) => sql.raw(`${alias}.${c}`);
 
+/**
+ * Accepted, not hired, its start day begun, and no payment order open for it in the last 30 minutes: the employer did not
+ * pay in time, so it expired (proposal-expiry.ts acceptedUnpaidExpired, "Expired · not paid before start" for the employer,
+ * "Expired" for the intern). Until the sweep stores it, its status still reads `accepted`, so counts must exclude it here.
+ */
+export function offerUnpaidExpiredSql(alias: string, today: string): SQL {
+  return sql`(${col(alias, "status")} = 'accepted' AND ${col(alias, "hired_at")} IS NULL AND ${startBegunSql(col(alias, "offer_details"), today)}
+    AND NOT EXISTS (SELECT 1 FROM employer_payments ep WHERE ep.employer_id = ${col(alias, "employer_id")} AND ep.status = 'created'
+      AND ep.created_at >= (now() AT TIME ZONE 'UTC') - interval '30 minutes' AND ep.raw->'notes'->'proposalIds' ? ${col(alias, "id")}))`;
+}
+
 /** Unanswered and its start day has begun (IST), or already stored as a no-reply expiry: the intern's "lapsed". */
 export function offerLapsedSql(alias: string, today: string): SQL {
   return sql`((${col(alias, "status")} IN ('sent', 'interview_scheduled') AND ${col(alias, "hired_at")} IS NULL AND ${startBegunSql(col(alias, "offer_details"), today)})

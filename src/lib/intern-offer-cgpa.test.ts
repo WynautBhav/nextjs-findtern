@@ -63,7 +63,8 @@ test("stored expired: by reason; a legacy row with none keeps the existing 'With
   assert.equal(internOfferOverlay(row("expired", {}, { expiredReason: "unpaid_past_start" }), null, NOW).kind, "expired_unpaid");
   assert.equal(internOfferOverlay(row("expired", {}, { expiredReason: "admin_closed" }), null, NOW).label, "Closed by Findtern");
   assert.equal(internOfferOverlay(row("expired"), null, NOW).kind, null);
-  assert.equal(internOfferOverlay(row("expired", {}, { expiredReason: "accepted_elsewhere" }), null, NOW).kind, null);
+  // Closed because the intern took another offer: said so, as the employer reads it ("Closed · candidate accepted another offer").
+  assert.equal(internOfferOverlay(row("expired", {}, { expiredReason: "accepted_elsewhere" }), null, NOW).label, "Closed · you took another offer");
   assert.equal(internOfferOverlay(row("expired", {}, { expiredReason: "no_reply_past_start" }), null, NOW).kind, null);
 });
 

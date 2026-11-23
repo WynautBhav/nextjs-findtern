@@ -229,7 +229,7 @@ export function formatIstPlain(value: Date | string | null | undefined): string 
  * kinds apply to a full-time offer too (the company's screen expires it the same way), and `hasOpenOrder` (an unpaid
  * payment order is open, as the company's screen and the admin tracker read it) freezes the unpaid expiry.
  */
-export type InternOverlayKind = "verifying" | "verifying_overdue" | "correction" | "expired_unpaid" | "closed_by_admin";
+export type InternOverlayKind = "verifying" | "verifying_overdue" | "correction" | "expired_unpaid" | "closed_by_admin" | "closed_elsewhere";
 
 export type InternOfferOverlay = {
   kind: InternOverlayKind | null;
@@ -277,6 +277,13 @@ export function internOfferOverlay(
   }
   if (status === "expired" && expiry.reason === "admin_closed") {
     return { ...NO_OVERLAY, kind: "closed_by_admin", label: "Closed by Findtern", tone: "closed", detail: "Findtern closed this offer. Nothing more is needed from you.", group: "closed" };
+  }
+  // Closed because the intern took another offer (the employer reads "Closed · candidate accepted another offer"). Not "Withdrawn":
+  // the company did not withdraw it.
+  // Only a stored reason: a legacy expired row with none keeps the legacy "Withdrawn" reading (INW-16).
+  const storedReason = (p.offerDetails && typeof p.offerDetails === "object" ? (p.offerDetails as Record<string, unknown>).expiredReason : undefined);
+  if (status === "expired" && storedReason === "accepted_elsewhere") {
+    return { ...NO_OVERLAY, kind: "closed_elsewhere", label: "Closed · you took another offer", tone: "closed", detail: "This offer closed when you accepted another one. Nothing more is needed from you.", group: "closed" };
   }
   if (offer.fullTime || status !== "accepted" || p.hiredAt) return NO_OVERLAY;
 
