@@ -8,6 +8,7 @@ import { isStudentEligible } from "@/lib/college/eligibility";
 import { fromLocalInput } from "@/lib/college/ist";
 import { COHORTS, yearLabel } from "@/lib/college/labels";
 import { csrfFetch } from "@/lib/client-fetch";
+import { inviteSentLine } from "@/lib/college/drive-invite-line";
 import { cn } from "@/lib/utils";
 import { PageHead, SURFACE_CLASS } from "@/components/app/primitives";
 
@@ -119,13 +120,16 @@ export function DriveBuilder({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }).catch(() => null);
-    const body = (await res?.json().catch(() => null)) as { id?: string; url?: string; error?: string } | null;
+    const body = (await res?.json().catch(() => null)) as { id?: string; url?: string; error?: string; invites?: { sent: string[]; failed: string[] } } | null;
     setSaving(false);
     if (!res?.ok) {
       setError(body?.error ?? "Couldn't save. Check your connection and try again.");
       return;
     }
+    // "Invite sent to hr@acme.com": each newly invited company was emailed (and alerted in its app if it has an account).
+    const invited = body?.invites ? inviteSentLine(body.invites.sent, body.invites.failed) : null;
     if (!d.id && body?.id) {
+      if (invited) setSaved(invited);
       setD((x) => ({ ...x, id: body.id }));
       setLink(body.url ? new URL(body.url, window.location.origin).href : null);
       // Update the address without remounting, so the one-time link stays on screen.
@@ -133,7 +137,7 @@ export function DriveBuilder({
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    setSaved("Saved. Employers see the change on their next refresh.");
+    setSaved(invited ? `Saved. ${invited}` : "Saved. Employers see the change on their next refresh.");
     router.refresh();
   }
 
@@ -420,7 +424,7 @@ function InvitedCompanies({ value, onChange }: { value: { company: string; email
         <h2 id="invited-companies" className="text-lg font-semibold tracking-[-0.02em] text-ink-900">
           Companies you invited <span className="text-sm font-normal text-text-subtle">(optional)</span>
         </h2>
-        <p className="mt-0.5 text-sm text-text-subtle">The drive page shows who came in through the link and who you still need to chase.</p>
+        <p className="mt-0.5 text-sm text-text-subtle">Each new company is emailed a link to join the drive, and gets an alert if it already has a Findtern account. The drive page shows who came in and who you still need to chase.</p>
       </header>
       <ul className="space-y-2 px-5 py-4">
         {rows.map((r, i) => (

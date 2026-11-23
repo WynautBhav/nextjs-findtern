@@ -4,6 +4,8 @@ import { tryPublicOrigin } from "@/lib/origin";
 import { requireCollegeMutation } from "@/lib/college/guard";
 import { driveInput, driveShareUrl } from "@/lib/college/drive-input";
 import { generateDriveToken } from "@/lib/college/tokens";
+import { newInvitees } from "@/lib/college/drive-invite";
+import { sendDriveInvites } from "@/lib/college/drive-invite-send";
 import { getDb, schema } from "@/lib/db";
 
 /** Create a drive. The link's token is returned once and never stored. */
@@ -19,5 +21,8 @@ export async function POST(req: Request) {
     .insert(schema.collegeDrives)
     .values({ ...parsed.data, collegeId: g.ctx.college.id, tokenHash: hash, createdBy: g.ctx.admin.id })
     .returning({ id: schema.collegeDrives.id });
-  return NextResponse.json({ id: drive.id, url: driveShareUrl(tryPublicOrigin(), token) }, { status: 201 });
+  // After the commit: each invited company is emailed (and alerted in its app if it has an account).
+  const { title, kind, startsAt, endsAt } = parsed.data;
+  const invites = await sendDriveInvites({ id: drive.id, title, kind, startsAt, endsAt, tokenHash: hash }, g.ctx.college.name, newInvitees([], parsed.data.invitedEmployers));
+  return NextResponse.json({ id: drive.id, url: driveShareUrl(tryPublicOrigin(), token), invites }, { status: 201 });
 }
