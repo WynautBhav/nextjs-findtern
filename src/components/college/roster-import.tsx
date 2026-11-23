@@ -111,8 +111,8 @@ export function RosterImport() {
               A CSV with <strong>Name</strong>, <strong>Phone</strong> and <strong>Email</strong> columns. Roll number, year and branch are read too if they are there. The column order does not matter.
             </p>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              <input ref={file} id="roster-file" type="file" accept=".csv,text/csv,.tsv,text/tab-separated-values,.txt" className="sr-only" onChange={(e) => { void take(e.target.files?.[0]); e.target.value = ""; }} />
-              <label htmlFor="roster-file" className={cn(buttonClass({ size: "sm" }), "cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600")}>
+              <input ref={file} id="roster-file" type="file" accept=".csv,text/csv,.tsv,text/tab-separated-values,.txt" className="peer sr-only" onChange={(e) => { void take(e.target.files?.[0]); e.target.value = ""; }} />
+              <label htmlFor="roster-file" className={cn(buttonClass({ size: "sm" }), "cursor-pointer peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-600")}>
                 <Upload aria-hidden /> Choose a file
               </label>
               <button type="button" onClick={() => setPasting((v) => !v)} aria-expanded={pasting} className={buttonClass({ size: "sm", variant: "outline" })}>

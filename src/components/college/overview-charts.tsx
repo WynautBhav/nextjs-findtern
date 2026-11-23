@@ -3,6 +3,7 @@ import Link from "next/link";
 import { COFFEE, coffeeOf } from "@/lib/college/overview-modes";
 import { avatarTint } from "@/components/app/avatar-helpers";
 import { initialsOf } from "@/lib/college/labels";
+import { cgpaText } from "@/lib/college/master-row";
 import { cn } from "@/lib/utils";
 
 /**
@@ -105,7 +106,7 @@ export function TopStudents({ students }: { students: TopStudent[] }) {
               <span className="block truncate text-xs text-text-subtle">{s.meta}</span>
             </span>
             <span className="hidden shrink-0 rounded-full border border-ink-200 px-2 py-0.5 text-xs text-ink-700 sm:inline">{band.name}</span>
-            <span className="nums w-14 shrink-0 text-right text-xs text-text-subtle">CGPA <span className="text-ink-800">{s.cgpa?.toFixed(1) ?? "—"}</span></span>
+            <span className="nums w-14 shrink-0 text-right text-xs text-text-subtle">CGPA <span className="text-ink-800">{s.cgpa !== null ? cgpaText(s.cgpa) : "—"}</span></span>
             <span className="nums w-10 shrink-0 text-right text-lg font-medium text-ink-900">{s.score.toFixed(1)}</span>
           </li>
         );

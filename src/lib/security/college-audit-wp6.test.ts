@@ -53,7 +53,7 @@ test("T1 builder input: typed IST wall time round-trips across IST midnight", ()
 
 // Every college date that is formatted in a client component or on a server must name its zone, else the server's and the
 // browser's zone disagree (React #418) or the day is wrong in the evening. Found on the leave requests table; was open
-// as a REQUEST to WP5 (src/components/college/leave-requests-table.tsx:13). Fixed in INT-06 (ist.ts: istDay).
+// as a REQUEST to WP5 (src/components/college/leave-requests-table.tsx:13). Fixed in INT-06 (ist.ts: istDateText).
 import { readFileSync } from "node:fs";
 test("T1 no college screen formats a date without the IST zone (INT-06)", () => {
   const offenders: string[] = [];
@@ -64,9 +64,16 @@ test("T1 no college screen formats a date without the IST zone (INT-06)", () => 
   assert.deepEqual(offenders, []);
 });
 
-import { istDay } from "../college/ist.ts";
-test("INT-06 istDay shows the IST day whatever the host zone is (20:00 UTC on 23 Nov is already 24 Nov in IST)", () => {
-  assert.equal(istDay("2026-11-23T20:00:00Z"), "24 Nov 2026");
-  assert.equal(istDay("2026-11-23T18:29:00Z"), "23 Nov 2026");
-  assert.equal(istDay("2026-11-23T20:00:00Z", "numeric"), "24/11/2026");
+import { istDateText } from "../college/ist.ts";
+test("INT-06 istDateText shows the IST day whatever the host zone is (20:00 UTC on 23 Nov is already 24 Nov in IST)", () => {
+  assert.equal(istDateText("2026-11-23T20:00:00Z"), "24 Nov 2026");
+  assert.equal(istDateText("2026-11-23T18:29:00Z"), "23 Nov 2026");
+  assert.equal(istDateText("2026-11-23T20:00:00Z", "numeric"), "24/11/2026");
+});
+
+test("INT-07 the roster file picker shows a focus ring when its (visually hidden) input is focused by keyboard", () => {
+  const src = readFileSync("src/components/college/roster-import.tsx", "utf8");
+  assert.match(src, /id="roster-file"[^>]*className="peer sr-only"/);
+  assert.match(src, /peer-focus-visible:outline-2/);
+  assert.doesNotMatch(src, /focus-within:outline-2/, "focus-within on a label never fires: the input is a sibling, not a child");
 });

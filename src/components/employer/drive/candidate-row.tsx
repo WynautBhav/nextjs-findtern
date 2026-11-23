@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { MeetingView } from "@/lib/college/meetings";
+import { cgpaText } from "@/lib/college/master-row";
 import { cn } from "@/lib/utils";
 
 function isOpen(call: MeetingView | undefined): boolean {
@@ -96,7 +97,7 @@ export function CandidateRow({
         {fullTime ? (
           <div>
             <p className="text-xs font-medium text-text-subtle">CGPA</p>
-            <p className="nums mt-0.5 text-sm font-semibold text-ink-900">{c.cgpa !== null ? c.cgpa.toFixed(1) : "Not given"}</p>
+            <p className="nums mt-0.5 text-sm font-semibold text-ink-900">{c.cgpa !== null ? cgpaText(c.cgpa) : "Not given"}</p>
           </div>
         ) : null}
       </div>

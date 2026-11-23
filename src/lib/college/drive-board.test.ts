@@ -23,7 +23,7 @@ test("critical lists: unanswered calls, offers waiting on a reply, offline stude
   assert.deepEqual(b.lists.meetingsWaiting.map((s) => s.userId), ["a"]);
   assert.equal(b.lists.meetingsWaiting[0].detail, "Beta, Acme asked for a meet · 3 min ago");
   assert.deepEqual(b.lists.offersWaiting.map((s) => s.userId), ["c"]);
-  assert.match(b.lists.offersWaiting[0].detail, /^Offer from Acme · sent 2 h ago$/);
+  assert.match(b.lists.offersWaiting[0].detail, /^Offer from Acme · sent 1 h ago$/);
   assert.deepEqual(b.lists.offline.map((s) => s.userId), ["b"]);
   assert.equal(b.offlineKnown, true);
   assert.deepEqual(b.lists.meetings.map((s) => s.userId), ["b"]);
@@ -160,4 +160,16 @@ test("a meet request the company cancelled is not 'asked to meet' (like a withdr
     now: NOW,
   });
   assert.deepEqual(b.lists.called.map((s) => s.userId), ["b"]);
+});
+
+test("INT-07: board times read like the rest of the console (shared ago): under a minute is 'just now', a day later is 'yesterday'", () => {
+  const b = buildDriveBoard({
+    students,
+    meetings: [{ userId: "a", company: "Acme", status: "requested", createdAt: new Date(NOW - 30_000) }],
+    offers: [{ userId: "c", company: "Acme", status: "sent", hired: false, fullTime: false, createdAt: new Date(NOW - 27 * 3_600_000) }],
+    offline: [],
+    now: NOW,
+  });
+  assert.equal(b.lists.meetingsWaiting[0].detail, "Acme asked for a meet · just now");
+  assert.match(b.lists.offersWaiting[0].detail, /sent yesterday$/);
 });

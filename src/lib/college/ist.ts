@@ -17,6 +17,6 @@ export function fromLocalInput(value: string): string {
 }
 
 /** A day in IST, the same on the server and in any browser zone (a zone-less format showed the wrong day and caused React #418). */
-export function istDay(value: string | number | Date, style: "short" | "numeric" = "short"): string {
+export function istDateText(value: string | number | Date, style: "short" | "numeric" = "short"): string {
   return new Date(value).toLocaleDateString("en-IN", style === "short" ? { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" } : { timeZone: "Asia/Kolkata" });
 }

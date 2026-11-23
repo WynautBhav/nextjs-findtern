@@ -265,7 +265,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
           <Kpi on label="Findtern score" value={ai.done && student.score !== null ? student.score.toFixed(1) : "—"} hint={!verified ? HIDDEN_HINT : ai.done ? "out of 10" : ai.label} />
           <Kpi label="CGPA" value={student.cgpa !== null ? cgpaText(student.cgpa) : "—"} hint={!verified ? HIDDEN_HINT : student.cgpa !== null ? "out of 10" : "Not entered"} />
           <Kpi label="Offers" value={verified ? String(proposals.length) : "—"} hint={!verified ? HIDDEN_HINT : student.offersPending > 0 ? `${student.offersPending} waiting on reply` : student.hired > 0 ? "Hired" : "None waiting"} />
-          <Kpi label="Meetings" value={verified ? String(meetings) : "—"} hint={!verified ? HIDDEN_HINT : calls.length > 0 ? `${calls.length} from your drives` : "Interviews, calls"} />
+          <Kpi label="Meetings" value={verified ? String(meetings) : "—"} hint={!verified ? HIDDEN_HINT : calls.length > 0 ? `${calls.length} from your drives` : "Interviews, drive meets"} />
         </ul>
 
         <Panel>

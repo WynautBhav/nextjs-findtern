@@ -1,4 +1,5 @@
 import { CALL_GRACE_MS } from "./constants.ts";
+import { ago } from "./labels.ts";
 
 /**
  * One campus drive, as the placement officer runs it: what needs chasing now (critical) and what the drive has
@@ -36,13 +37,6 @@ export type DriveBoard = {
 const HIRED = new Set(["hired", "completed"]);
 const company = (c: string | null) => c?.trim() || "An employer";
 
-function ago(from: Date, now: number): string {
-  const m = Math.max(0, Math.round((now - from.getTime()) / 60_000));
-  if (m < 60) return `${m} min ago`;
-  const h = Math.round(m / 60);
-  return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} days ago`;
-}
-
 /** Group rows per student, newest first, and describe them in one line. */
 function perStudent<T extends { userId: string; createdAt: Date }>(rows: T[], students: Map<string, DriveStudentRef>, line: (rs: T[]) => string): BoardItem[] {
   const by = new Map<string, T[]>();
@@ -78,8 +72,8 @@ export function buildDriveBoard(input: {
     offerCount: inDrive.length,
     offlineKnown: input.offline !== null,
     lists: {
-      meetingsWaiting: perStudent(waiting, students, (rs) => `${names(rs)} asked for a meet · ${ago(rs[0].createdAt, now)}`),
-      offersWaiting: perStudent(open, students, (rs) => `Offer from ${names(rs)} · sent ${ago(rs[0].createdAt, now)}`),
+      meetingsWaiting: perStudent(waiting, students, (rs) => `${names(rs)} asked for a meet · ${ago(rs[0].createdAt.toISOString(), now)}`),
+      offersWaiting: perStudent(open, students, (rs) => `Offer from ${names(rs)} · sent ${ago(rs[0].createdAt.toISOString(), now)}`),
       offline: (input.offline ?? []).filter((o) => students.has(o.userId)).map((o) => ({ ...students.get(o.userId)!, detail: "Not on Findtern right now" })),
       offers: perStudent(inDrive, students, (rs) => `${rs.length === 1 ? "1 offer" : `${rs.length} offers`} · ${names(rs)}`),
       meetings: perStudent(held, students, (rs) => `${rs.length === 1 ? "Meet" : `${rs.length} meets`} with ${names(rs)}`),
