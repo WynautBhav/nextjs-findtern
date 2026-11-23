@@ -442,14 +442,22 @@ async function main() {
     // 7. Inside the live drives: shortlists, call requests (some waiting, some accepted, some declined).
     const pool = students.filter((s) => ["live", "interview_scheduled", "interview_done", "proposal_sent"].includes(s.stage));
     const drivePool = pool.filter((s) => s.year === 2 || s.year === 3);
+    // A call as the app makes one: the employer asks for now, in 5 or in 10 minutes (DELAYS), so the request is made
+    // 0-10 minutes before the start; the student answers within a couple of minutes of the request.
+    const call = (driveId, employerId, userId, status, startsAt, delayMin) => {
+      const created = new Date(Date.parse(startsAt) - delayMin * 60_000).toISOString();
+      const responded = status === "requested" ? null : new Date(Date.parse(created) + 90_000).toISOString();
+      return q(`INSERT INTO college_drive_meetings (drive_id, employer_id, user_id, starts_at, status, meeting_link, responded_at, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [driveId, employerId, userId, startsAt, status, status === "accepted" ? "https://meet.example.com/seed-call" : null, responded, created]);
+    };
     for (const [i, s] of drivePool.slice(0, 60).entries()) {
       const e = employers[i % employers.length];
       await q(`INSERT INTO college_drive_shortlist (drive_id, employer_id, user_id, created_at) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [liveIntern.id, e.id, s.id, at(-(i % 40) * HOUR)]);
       if (i % 3 !== 0) continue;
       const status = ["requested", "accepted", "declined", "requested", "accepted"][i % 5];
-      const startsAt = status === "requested" ? at((5 + (i % 10)) * 60_000) : at(-(1 + (i % 30)) * HOUR);
-      await q(`INSERT INTO college_drive_meetings (drive_id, employer_id, user_id, starts_at, status, meeting_link, responded_at, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-        [liveIntern.id, e.id, s.id, startsAt, status, status === "accepted" ? "https://meet.example.com/seed-call" : null, status === "requested" ? null : startsAt, at(-(1 + (i % 30)) * HOUR - 10 * 60_000)]);
+      // Waiting ones start in 1-9 minutes (asked "in 10 minutes"); answered ones were hours ago.
+      if (status === "requested") await call(liveIntern.id, e.id, s.id, status, at((1 + (i % 9)) * 60_000), 10);
+      else await call(liveIntern.id, e.id, s.id, status, at(-(1 + (i % 30)) * HOUR), [0, 5, 10][i % 3]);
     }
     const finalYears = students.filter((s) => s.year === 4 && ["live", "ft_offer_sent"].includes(s.stage)).slice(0, 15);
     for (const [i, s] of finalYears.entries()) {
@@ -457,8 +465,8 @@ async function main() {
       await q(`INSERT INTO college_drive_shortlist (drive_id, employer_id, user_id, created_at) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [liveFullTime.id, e.id, s.id, at(-(i % 20) * HOUR)]);
       if (i % 2 === 0) {
         const status = i % 4 === 0 ? "requested" : "accepted";
-        await q(`INSERT INTO college_drive_meetings (drive_id, employer_id, user_id, starts_at, status, meeting_link, responded_at, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-          [liveFullTime.id, e.id, s.id, status === "requested" ? at(10 * 60_000) : at(-(2 + i) * HOUR), status, status === "accepted" ? "https://meet.example.com/seed-call" : null, status === "requested" ? null : at(-(2 + i) * HOUR), at(-(3 + i) * HOUR)]);
+        if (status === "requested") await call(liveFullTime.id, e.id, s.id, status, at((4 + (i % 5)) * 60_000), 10);
+        else await call(liveFullTime.id, e.id, s.id, status, at(-(2 + i) * HOUR), 5);
       }
     }
 
@@ -472,6 +480,8 @@ async function main() {
       hired: await n(`SELECT count(*)::int n FROM proposals WHERE status IN ('hired','completed')`),
       fullTimeDriveOffers: await n(`SELECT count(*)::int n FROM proposals WHERE offer_details->'fullTimeOffer'->>'driveId' = $1`, [liveFullTime.id]),
       // Every hire is paid for; every proposal's intern and employer exist.
+      // A call request is made at most 10 minutes before its start (the app's DELAYS), never in the future.
+      oddCalls: await n(`SELECT count(*)::int n FROM college_drive_meetings WHERE created_at > starts_at OR starts_at - created_at > interval '10 minutes' OR created_at > (now() AT TIME ZONE 'UTC')`),
       unpaidHires: await n(`SELECT count(*)::int n FROM proposals p WHERE status IN ('hired','completed') AND NOT EXISTS (SELECT 1 FROM employer_payments e WHERE e.employer_id = p.employer_id AND e.raw->'notes'->'proposalIds' ? p.id)`),
       orphanProposals: await n(`SELECT count(*)::int n FROM proposals p WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.id = p.intern_id) OR NOT EXISTS (SELECT 1 FROM employers e WHERE e.id = p.employer_id)`),
       offersToHiddenStudents: await n(`SELECT count(*)::int n FROM proposals p JOIN intern_onboarding o ON o.user_id = p.intern_id WHERE coalesce(o.extra_data->>'approvalStatus','') <> 'Approved'`),
@@ -484,7 +494,7 @@ async function main() {
     )).length;
     console.log("[seed-local] stages:", JSON.stringify(counts));
     console.log("[seed-local] check:", JSON.stringify(check));
-    if (check.students !== TOTAL || check.roster !== TOTAL + 40 || check.distinctEmails !== TOTAL || check.unpaidHires || check.orphanProposals || check.offersToHiddenStudents || check.incompleteSubmitted) {
+    if (check.students !== TOTAL || check.roster !== TOTAL + 40 || check.distinctEmails !== TOTAL || check.oddCalls || check.unpaidHires || check.orphanProposals || check.offersToHiddenStudents || check.incompleteSubmitted) {
       throw new Error("Self-check failed (see the check line)");
     }
     console.log(`[seed-local] seats used ${paidSeats} of 600 · TPO code ${tpoCode} · college wallet ₹${wallet / 100} · first student login ${students[0].email}`);
