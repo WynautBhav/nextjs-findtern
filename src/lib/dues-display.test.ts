@@ -25,28 +25,25 @@ test("dayMonth: DD MMM, blank for junk", () => {
   assert.equal(dayMonth(null), "");
 });
 
-const ledger = (o: Partial<Parameters<typeof payButtonState>[0]> = {}) => ({ proposalId: "p1", plan: "postpaid" as const, dueMinor: 100, monthsPaid: 1, nextDue: "2026-12-20", ...o });
+const ledger = (o: Partial<Parameters<typeof payButtonState>[0]> = {}) => ({ proposalId: "p1", plan: "postpaid" as const, dueMinor: 100, monthsPaid: 1, ...o });
 
 test("payButtonState: nothing owed shows no button", () => {
-  assert.deepEqual(payButtonState(ledger({ dueMinor: 0, nextDue: null }), ["p1"], "2026-12-10"), { show: false });
+  assert.deepEqual(payButtonState(ledger({ dueMinor: 0 }), ["p1"]), { show: false });
 });
 
-test("payButtonState: a payable row is enabled", () => {
-  assert.deepEqual(payButtonState(ledger(), ["p1"], "2026-12-10"), { show: true, enabled: true, label: "Pay month 2", payableFrom: null });
+test("payButtonState: a payable row is enabled, with no date gate on the button", () => {
+  assert.deepEqual(payButtonState(ledger(), ["p1"]), { show: true, enabled: true, label: "Pay month 2" });
 });
 
-test("payButtonState: outside the 15-day window it is disabled and names due - 15 days", () => {
-  // due 20 Dec, opens 5 Dec
-  assert.deepEqual(payButtonState(ledger(), [], "2026-12-04"), { show: true, enabled: false, label: "Pay month 2", payableFrom: "2026-12-05" });
-  assert.equal(payButtonState(ledger(), [], "2026-12-05").show && (payButtonState(ledger(), [], "2026-12-05") as { payableFrom: string | null }).payableFrom, null);
+test("payButtonState: a row checkout does not list is disabled with no date to wait for", () => {
+  assert.deepEqual(payButtonState(ledger(), []), { show: true, enabled: false, label: "Pay month 2" });
 });
 
-test("payButtonState: the old monthly plan is always enabled; a due month crossing a year end", () => {
-  assert.equal((payButtonState(ledger({ plan: "monthly", nextDue: "2026-12-01" }), [], "2026-11-01") as { enabled: boolean }).enabled, true);
-  assert.equal((payButtonState(ledger({ nextDue: "2027-01-10" }), [], "2026-12-01") as { payableFrom: string | null }).payableFrom, "2026-12-26");
+test("payButtonState: the old monthly plan is always enabled", () => {
+  assert.equal((payButtonState(ledger({ plan: "monthly" }), []) as { enabled: boolean }).enabled, true);
 });
 
-test("payButtonState: a row checkout does not bill stays disabled even if listed; no due day means no date", () => {
-  assert.deepEqual(payButtonState(ledger({ plan: "unpaid", monthsPaid: 0, nextDue: null }), ["p1"], "2026-12-01"), { show: true, enabled: false, label: "Pay", payableFrom: null });
-  assert.deepEqual(payButtonState(ledger({ plan: "unpaid", monthsPaid: 0, nextDue: null }), [], "2026-12-01"), { show: true, enabled: false, label: "Pay", payableFrom: null });
+test("payButtonState: an unpaid offer row stays disabled even if listed", () => {
+  assert.deepEqual(payButtonState(ledger({ plan: "unpaid", monthsPaid: 0 }), ["p1"]), { show: true, enabled: false, label: "Pay" });
+  assert.deepEqual(payButtonState(ledger({ plan: "unpaid", monthsPaid: 0 }), []), { show: true, enabled: false, label: "Pay" });
 });

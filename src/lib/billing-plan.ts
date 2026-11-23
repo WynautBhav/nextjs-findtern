@@ -180,9 +180,9 @@ export function engagementEndOn(anchor: string | null | undefined, months: numbe
 
 export type PostpaidNext = { k: number; dueOn: string; payable: boolean };
 
-/** The next unpaid month of a post-paid hire; null when all are paid or the anchor is unknown. Payable from 15 days before its due day, and any time after. */
-export function postpaidNext(anchor: string | null | undefined, months: number, monthsPaid: number, todayIst: string): PostpaidNext | null {
+/** The next unpaid month of a post-paid hire; null when all are paid or the anchor is unknown. Payable any time: early, on its due day or late. */
+export function postpaidNext(anchor: string | null | undefined, months: number, monthsPaid: number): PostpaidNext | null {
   const k = monthsPaid + 1;
   const d = stipendMonthDates(anchor, months, k);
-  return d ? { k, dueOn: d.employerDueOn, payable: todayIst >= d.payableFrom } : null;
+  return d ? { k, dueOn: d.employerDueOn, payable: true } : null;
 }

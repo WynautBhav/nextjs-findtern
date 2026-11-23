@@ -114,7 +114,7 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                 const overdue = Boolean(h.ledger.nextDue) && (h.ledger.nextDue as string) < today && h.ledger.dueMinor > 0;
                 const s = overdue ? { label: "Overdue", tone: "waiting" as Tone } : STATUS[h.ledger.status];
                 const m = (minor: number) => formatMoney(minor, h.currency, { zeroLabel: false });
-                const pay = payButtonState(h.ledger, payableIds, today);
+                const pay = payButtonState(h.ledger, payableIds);
                 return (
                   <tr key={h.proposalId}>
                     <td data-title className={tdClass}>
@@ -172,7 +172,7 @@ export function SchedulePanel({ hires, payableIds }: { hires: HireRow[]; payable
                               {pay.label}
                             </button>
                             <span id={`pay-hint-${h.proposalId}`} className="text-xs text-text-subtle">
-                              {pay.payableFrom ? `Payable from ${formatDate(pay.payableFrom)}` : "Not payable online yet"}
+                              Not payable online yet
                             </span>
                           </div>
                         )
