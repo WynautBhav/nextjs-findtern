@@ -8,7 +8,7 @@ import { candidateRelations, isAdminViewing, type CandidateRelation } from "@/li
 import { PLAN_NAME, bandFor } from "@/lib/score";
 import { RATING_META, displayNameOf, isCatalogSkill, toCandidateProfile, withoutScoreUnlessPro, type CandidateProfile } from "@/lib/employer-candidates";
 import { proAccess } from "@/lib/candidate-pro-access";
-import { hideContactText } from "@/lib/contact-scrub";
+import { hideContactText, maskInternName } from "@/lib/contact-scrub";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { skillBaseName, studyOf } from "@/components/employer/candidate-view";
@@ -238,11 +238,13 @@ export default async function EmployerInternDetail({
 
       // CGPA and percentage are Findtern Pro only: blanked here, before the profile goes to any component.
       profile = withoutScoreUnlessPro(toCandidateProfile(user, onboarding), await proAccess(employerId));
+      // Before the hire the candidate's own name, typed into free text (institution, degree), is masked too.
+      if (!nameUnlocked) profile = { ...profile, academics: maskInternName(profile.academics, user.firstName, user.lastName), skills: maskInternName(profile.skills, user.firstName, user.lastName) };
       // Photo shows before hire (owner, 6 Nov); the name stays initials until hired.
       await attachPhotos(db, [profile]);
       presence = (await presenceOf([profile.id]).catch(() => ({} as Record<string, PresenceLabel | null>)))[profile.id] ?? null;
       // Before the hire, profile text stored ahead of the contact check is hidden where it carries contact (OA1).
-      if (onboarding) details = nameUnlocked ? draftFromRecord(onboarding) : hideContactText(draftFromRecord(onboarding), isCatalogSkill);
+      if (onboarding) details = nameUnlocked ? draftFromRecord(onboarding) : maskInternName(hideContactText(draftFromRecord(onboarding), isCatalogSkill), user.firstName, user.lastName);
       plans = await getActivePricingPlans();
 
       const [employer] = await db

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import { offerState, proposalPill } from "./proposal-state.ts";
-import { proposalCgpaGate } from "../../lib/cgpa-verification.ts";
+import { proposalCgpaGate, withoutCgpaScores } from "../../lib/cgpa-verification.ts";
 
 // "Now" is Wed 18 Nov 2026 12:00 IST. Offers start on 25 Nov (ahead) or 10 Nov (behind).
 const NOW = new Date("2026-11-18T12:00:00+05:30");
@@ -42,6 +42,14 @@ test("incorrect and unconfirmed: a correction notice with the two scores, no pay
   const s = offerState({ status: "accepted", hiredAt: null, gate }, AHEAD, NOW);
   assert.deepEqual([s.label, s.bucket, s.canPay, s.canWithdraw], ["CGPA corrected · confirm", "verifying", false, true]);
   assert.match(s.next, /corrected the candidate's CGPA from 8\.1 to 7\.4/);
+});
+
+test("incorrect and unconfirmed without Pro: the notice says it was corrected, with no scores", () => {
+  const gate = withoutCgpaScores(gateFor({ ...pending, status: "incorrect", correctedScore: "7.4", decidedAt: hoursAgo(1) }, { acceptedAt: hoursAgo(30) }), false);
+  const s = offerState({ status: "accepted", hiredAt: null, gate }, AHEAD, NOW);
+  assert.deepEqual([s.label, s.bucket, s.canPay, s.canWithdraw], ["CGPA corrected · confirm", "verifying", false, true]);
+  assert.match(s.next, /corrected the candidate's CGPA\. Confirm to continue/);
+  assert.doesNotMatch(JSON.stringify(s), /8\.1|7\.4/);
 });
 
 test("incorrect and confirmed, or verified, or never flagged: payable again", () => {

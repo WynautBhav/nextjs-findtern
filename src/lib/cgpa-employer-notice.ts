@@ -19,9 +19,11 @@ export function cgpaEmployerNotice(o: {
   scoreType: string;
   /** ISO time of the decision. */
   at: string;
+  /** The employer holds Findtern Pro: only then may the alert quote the scores. Absent means no (fail closed). */
+  showScores?: boolean;
 }): NotifyInput {
   const incorrect = o.decision === "incorrect";
-  const copy = incorrect ? cgpaEmployerCopy.incorrect(o.candidate, o.role, o.claimedScore, o.correctedScore, o.scoreType) : cgpaEmployerCopy.verified(o.candidate, o.role);
+  const copy = incorrect ? cgpaEmployerCopy.incorrect(o.candidate, o.role, o.showScores ? { from: o.claimedScore, to: o.correctedScore, scoreType: o.scoreType } : null) : cgpaEmployerCopy.verified(o.candidate, o.role);
   return {
     to: { type: "employer", id: o.employerId },
     type: incorrect ? "cgpa_incorrect" : "cgpa_verified",

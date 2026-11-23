@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { kickProposalExpiry } from "@/lib/proposal-expiry-kick";
 import { hiredInternIds } from "@/lib/employer-visibility";
+import { proAccess } from "@/lib/candidate-pro-access";
 import { avatarUrl } from "@/lib/employer-pool";
 import { initialsOf } from "@/lib/employer-candidates";
 import { presenceOf, type PresenceLabel } from "@/lib/presence";
@@ -81,7 +82,7 @@ async function loadList(employerId: string): Promise<{ proposals: ProposalItem[]
       // presenceOf takes at most 200 ids; the rest simply show no dot.
       internIds.length > 0 ? presenceOf(internIds.slice(0, 200)).catch((): Record<string, PresenceLabel | null> => ({})) : ({} as Record<string, PresenceLabel | null>),
     ]);
-    const ctx = { openOrders, extraByIntern };
+    const ctx = { openOrders, extraByIntern, pro: await proAccess(employerId) };
     const withPhoto = new Set<string>(docs.map((d) => d.userId));
     const proposals = rows.map((row) => ({
       proposal: toEmployerProposal(row.proposal),

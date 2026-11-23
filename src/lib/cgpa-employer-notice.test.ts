@@ -18,7 +18,7 @@ test("verified: tells the employer they can pay, links nothing private, one key 
 });
 
 test("corrected: asks the employer to confirm; the mail carries no scores", () => {
-  const n = cgpaEmployerNotice({ ...base, decision: "incorrect" });
+  const n = cgpaEmployerNotice({ ...base, decision: "incorrect", showScores: true });
   assert.equal(n.type, "cgpa_incorrect");
   assert.equal(n.title, "CGPA corrected: confirm to continue");
   assert.match(n.message, /confirm to continue/);
@@ -30,4 +30,17 @@ test("the key differs per offer and per decision time, so two offers or a later 
   assert.notEqual(key({ decision: "verified" }), key({ decision: "verified", proposalId: "prop2" }));
   assert.notEqual(key({ decision: "verified" }), key({ decision: "verified", at: "2026-11-21T10:00:00.000Z" }));
   assert.equal(key({ decision: "incorrect" }), key({ decision: "incorrect" }));
+});
+
+test("corrected without Findtern Pro: the alert says it was corrected, with no numbers (default fails closed)", () => {
+  for (const n of [cgpaEmployerNotice({ ...base, decision: "incorrect" }), cgpaEmployerNotice({ ...base, decision: "incorrect", showScores: false })]) {
+    assert.doesNotMatch(`${n.title} ${n.message} ${JSON.stringify(n.email)}`, /8\.9|7\.9/);
+    assert.match(n.message, /corrected the CGPA of Candidate AB/);
+    assert.match(n.message, /confirm to continue/i);
+  }
+});
+
+test("corrected with Findtern Pro: the alert names both scores", () => {
+  const n = cgpaEmployerNotice({ ...base, decision: "incorrect", showScores: true });
+  assert.match(n.message, /from 8\.9 \/ 10 to 7\.9 \/ 10/);
 });

@@ -5,6 +5,7 @@ import { z } from "zod";
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { EDIT_FIELDS, academicsProblems, firstProblem, mergeAcademics, readAcademicsValues, LEVEL_LABELS, type AcademicsEdit } from "@/lib/admin/academics-edit";
 import { applyAdminScoreEdit, withCgpaCorrection } from "@/lib/cgpa-verification-flow";
+import { proAccess } from "@/lib/candidate-pro-access";
 import { cgpaEmployerNotice } from "@/lib/cgpa-employer-notice";
 import { getDb, schema } from "@/lib/db";
 import { initialsOf } from "@/lib/employer-candidates";
@@ -132,7 +133,7 @@ async function tellEmployers(internId: string, corrected: Corrected[]) {
     const [user] = await getDb().select({ f: schema.users.firstName, l: schema.users.lastName }).from(schema.users).where(eq(schema.users.id, internId)).limit(1);
     const candidate = `Candidate ${initialsOf(user?.f ?? "", user?.l ?? "")}`;
     for (const c of corrected) {
-      await notify(cgpaEmployerNotice({ employerId: c.employerId, proposalId: c.id, candidate, role: c.role, decision: "incorrect", claimedScore: c.from, correctedScore: c.to, scoreType: c.scoreType, at: c.at })).catch((err) => console.error("[admin academics] employer notice failed", err));
+      await notify(cgpaEmployerNotice({ employerId: c.employerId, proposalId: c.id, candidate, role: c.role, decision: "incorrect", claimedScore: c.from, correctedScore: c.to, scoreType: c.scoreType, at: c.at, showScores: await proAccess(c.employerId) })).catch((err) => console.error("[admin academics] employer notice failed", err));
     }
   } catch (err) {
     console.error("[admin academics] employer notices failed", err);

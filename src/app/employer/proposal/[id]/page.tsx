@@ -28,7 +28,8 @@ import { ProposalActions } from "@/components/employer/proposal-actions";
 import { ProposalOfferForm } from "@/components/employer/proposal-offer-form";
 import { offerState } from "@/components/employer/proposal-state";
 import { CgpaNotice, ExpiredNotice } from "@/components/employer/proposal-detail/cgpa-notice";
-import { proposalCgpaGate } from "@/lib/cgpa-verification";
+import { proposalCgpaGate, withoutCgpaScores } from "@/lib/cgpa-verification";
+import { proAccess } from "@/lib/candidate-pro-access";
 import { hasOpenOrderFor } from "@/lib/payments";
 import { TakedownBanner } from "@/components/employer/takedown-banner";
 import { offerTimeline } from "@/components/employer/proposal-timeline";
@@ -189,7 +190,7 @@ export default async function EmployerProposalDetail({
   // Findtern took the project down: the offer is view only (no pay, edit, withdraw or message).
   // An open payment order freezes expiry; the CGPA check blocks payment until Findtern confirms it (or a correction is confirmed).
   const hasOpenOrder = await hasOpenOrderFor(proposal.employerId, proposal.id).catch(() => false);
-  const gate = proposalCgpaGate({ status: proposal.status, extraData: internExtra, offerDetails: proposal.offerDetails, updatedAt: proposal.updatedAt });
+  const gate = withoutCgpaScores(proposalCgpaGate({ status: proposal.status, extraData: internExtra, offerDetails: proposal.offerDetails, updatedAt: proposal.updatedAt }), await proAccess(proposal.employerId));
   const baseState = offerState({ ...proposal, hasOpenOrder, gate }, offer);
   const state = projectDown ? { ...baseState, canPay: false, canEdit: false, canWithdraw: false, canSendNew: false } : baseState;
   const confirmingCgpa = !projectDown && state.gate?.state === "incorrect_unacked";
