@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { getSession } from "@/lib/auth";
 import { requireMutation } from "@/lib/guards-mutation";
-import { MEETING_DELAYS, requestMeeting, toView } from "@/lib/college/meetings";
+import { MEETING_DELAYS, requestMeeting, toView, viewsForStudentsInDrive } from "@/lib/college/meetings";
 import { manualMeetingLink } from "@/lib/college/meeting-link";
 import { driveForEmployer, eligibleStudents } from "@/lib/college/scope";
 import { ON_HOLD_REFUSAL } from "@/lib/account-hold";
@@ -29,7 +29,8 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     .from(schema.collegeDriveMeetings)
     .where(and(eq(schema.collegeDriveMeetings.driveId, loaded.drive.id), eq(schema.collegeDriveMeetings.employerId, session!.uid), isNotNull(schema.collegeDriveMeetings.meetingLink)))
     .orderBy(desc(schema.collegeDriveMeetings.createdAt));
-  return NextResponse.json({ meetings: rows.map(toView) }, { headers: { "Cache-Control": "no-store" } });
+  const inDrive = new Set((await eligibleStudents(loaded.drive)).map((x) => x.userId));
+  return NextResponse.json({ meetings: viewsForStudentsInDrive(rows, inDrive) }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /** Ask a student for a call now, in 5 or in 10 minutes. */

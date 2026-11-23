@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { requireRole } from "@/lib/auth";
 import { driveWindow } from "@/lib/college/access";
-import { toView } from "@/lib/college/meetings";
+import { viewsForStudentsInDrive } from "@/lib/college/meetings";
 import { ONLINE_WINDOW_MS, driveForEmployer, eligibleStudents } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
 import { displayNameOf, initialsOf, readSkills } from "@/lib/employer-candidates";
@@ -174,7 +174,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
         driveId={drive.id}
         fullTime={fullTime}
         candidates={candidates}
-        initialMeetings={meetings.map(toView)}
+        initialMeetings={viewsForStudentsInDrive(meetings, new Set(ids))}
         offerAs={offerAs}
       />
     </div>
