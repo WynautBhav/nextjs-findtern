@@ -16,6 +16,7 @@ export async function POST(req: Request, ctx: Ctx) {
   if (!parsed.success) return NextResponse.json({ error: "Decision must be link or reject." }, { status: 400 });
   try {
     const out = await decideReview({ reviewId: (await ctx.params).id, decision: parsed.data.decision, internId: parsed.data.internId, adminId: g.session.uid });
+    if (out.inactive) return NextResponse.json({ error: "This account is disabled, so it cannot be linked. The suggestion was closed." }, { status: 409 });
     return NextResponse.json({ ok: true, ...out });
   } catch (e) {
     return errorResponse(e);

@@ -275,7 +275,11 @@ export function internOfferOverlay(
       group: "closed",
     };
   }
-  if (status === "expired" && expiry.reason === "admin_closed") {
+  // An offer Findtern's staff withdrew (stored status "withdrawn" + closedByAdminAt, as a full-time offer is closed) reads like any other
+  // admin-closed offer. A takedown's own withdrawal (closedByTakedownAt) keeps its wording. FN-06.
+  const od = (p.offerDetails && typeof p.offerDetails === "object" ? p.offerDetails : {}) as Record<string, unknown>;
+  const adminWithdrawn = status === "withdrawn" && typeof od.closedByAdminAt === "string" && od.closedByAdminAt !== "" && !od.closedByTakedownAt;
+  if ((status === "expired" && expiry.reason === "admin_closed") || adminWithdrawn) {
     return { ...NO_OVERLAY, kind: "closed_by_admin", label: "Closed by Findtern", tone: "closed", detail: "Findtern closed this offer. Nothing more is needed from you.", group: "closed" };
   }
   // Closed because the intern took another offer (the employer reads "Closed · candidate accepted another offer"). Not "Withdrawn":

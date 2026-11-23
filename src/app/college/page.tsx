@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { and, eq, gt, isNull, lte, sql } from "drizzle-orm";
 import { ArrowRight } from "lucide-react";
@@ -10,6 +11,7 @@ import { ScoreVsCgpa } from "@/components/college/score-vs-cgpa";
 import { yearLabel } from "@/lib/college/labels";
 import { CollegeMark } from "@/components/employer/drive-parts";
 import { candidatesFor } from "@/lib/college/approvals";
+import { onYourListCount } from "@/lib/college/count-rules";
 import { eligibleStudents, presenceSnapshot, requireCollegeContext, rosterCoverage, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { pendingLeaveCount } from "@/lib/college/leave-request-read";
 import { getDb, schema } from "@/lib/db";
@@ -28,6 +30,7 @@ import type { HiddenReason } from "@/lib/college/student-readiness";
 import { overviewModes } from "@/lib/college/overview-modes";
 import { AttentionTiles, type AttentionTile } from "@/components/college/attention-tiles";
 
+export const metadata: Metadata = { title: "Dashboard" };
 export const dynamic = "force-dynamic";
 
 /** Request time, for the "last 24 hours" line. Dynamic page, so this is per request. */
@@ -112,8 +115,8 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
     { key: "approvals", label: "Waiting for approval", value: toAccept, href: "/college/approvals", hint: "Accept the students who are yours", clearHint: "Nobody is waiting" },
     { key: "leave", label: "Asked to leave", value: pendingLeaves, href: "/college/approvals#leave", hint: "They stay until you decide", clearHint: "No leave requests" },
     { key: "offers", label: "Sitting on an offer", value: waiting.length, href: "/college/students?show=offers", hint: "A reminder gets a same-day reply", clearHint: "Every offer is answered" },
-    { key: "calls", label: "Meets not answered", value: callsWaiting.length, href: "/college/students?show=calls", hint: "Employers waiting in a drive", clearHint: "No meets waiting" },
-    { key: "meetings", label: "Meetings not answered", value: meetingsWaiting, href: "/college/master-data?status=verified&outcome=meet-waiting", hint: "Yet to pick a meeting time", clearHint: "Every invite is answered" },
+    { key: "calls", label: "Drive meets not answered", value: callsWaiting.length, href: "/college/students?show=calls", hint: "Employers waiting in a drive", clearHint: "No drive meets waiting" },
+    { key: "meetings", label: "Meetings not answered", value: meetingsWaiting, href: "/college/master-data?status=verified&outcome=meet-waiting", hint: "Interview invites with no reply yet", clearHint: "Every invite is answered" },
     { key: "interview", label: "AI interview not done", value: noInterview, href: "/college/students?show=no_interview", hint: "Employers see them after it", clearHint: "Everyone is interviewed" },
     { key: "joined", label: "Not joined yet", value: notJoined, href: "/college/students?show=not_joined", hint: "On your list, no account yet", clearHint: coverage.rosterSize ? "Everyone has joined" : "Add your list to track this" },
     { key: "seats", label: "Seats to pay for", value: unpaidBatches, href: "/college/seats", hint: "The invoice is on Seats", clearHint: "Every batch is paid" },
@@ -127,7 +130,8 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
     { n: students.reduce((t, s) => t + s.offersNew, 0), one: "new offer", many: "new offers" },
     { n: students.reduce((t, s) => t + s.hiredNew, 0), one: "hire", many: "hires" },
   ].filter((x) => x.n > 0);
-  const listed = Math.max(coverage.rosterSize, students.length);
+  // Roster rows plus verified students who are not on it (FN-04): the funnel adds up with the "Not joined yet" tile and the lists they open.
+  const listed = onYourListCount(coverage.rows.map((r) => r.email), students.map((s) => s.email));
   const funnel = [
     { label: coverage.rosterSize ? "On your list" : "Students", value: listed, hint: coverage.rosterSize ? (notJoined ? `${notJoined} not joined yet` : "Everyone has joined") : "Add your list to track who is missing", href: coverage.rosterSize ? "/college/students?show=not_joined" : "/college/approvals#add" },
     { label: "Verified on Findtern", value: students.length, hint: toAccept ? `${toAccept} more waiting for you` : "Visible in your drives", href: "/college/students" },
@@ -154,10 +158,10 @@ export default async function CollegeOverview({ searchParams }: { searchParams: 
             <CollegeMark name={ctx.college.name} logoUrl={ctx.college.logoUrl} className="size-14 rounded-2xl bg-white/10 text-base ring-1 ring-white/20" />
             <div className="min-w-0">
               <h1 className="text-balance text-[clamp(1.75rem,3.4vw,2.5rem)] font-light leading-tight tracking-[-0.03em]">{ctx.college.name}</h1>
-              <p className="mt-1 text-sm text-on-dark-subtle">Placement office{ctx.college.city ? `, ${ctx.college.city}` : ""}</p>
+              <p className="mt-1 text-sm text-on-dark">Placement office{ctx.college.city ? `, ${ctx.college.city}` : ""}</p>
               {!firstRun ? (
                 <p className="nums mt-2 text-sm text-on-dark">
-                  <span className="text-on-dark-subtle">Last 24 hours: </span>
+                  <span className="text-on-dark">Last 24 hours: </span>
                   {today.length
                     ? today.map((x, i) => (
                         <span key={x.one} className="whitespace-nowrap">

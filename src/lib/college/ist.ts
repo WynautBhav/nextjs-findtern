@@ -15,3 +15,8 @@ export function toLocalInput(d: Date): string {
 export function fromLocalInput(value: string): string {
   return new Date(`${value}:00+05:30`).toISOString();
 }
+
+/** A day in IST, the same on the server and in any browser zone (a zone-less format showed the wrong day and caused React #418). */
+export function istDateText(value: string | number | Date, style: "short" | "numeric" = "short"): string {
+  return new Date(value).toLocaleDateString("en-IN", style === "short" ? { day: "numeric", month: "short", year: "numeric", timeZone: "Asia/Kolkata" } : { timeZone: "Asia/Kolkata" });
+}

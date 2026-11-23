@@ -43,7 +43,7 @@ export default async function EarningsPage() {
               ].map((x) => ({ ...x, hideValue: true }))}
             />
           ) : (
-            <p className="text-sm text-on-dark-subtle">Your first credit arrives when one of your students finishes an internship found through Findtern.</p>
+            <p className="text-sm text-on-dark">Your first credit arrives when one of your students finishes an internship found through Findtern.</p>
           )}
         </div>
       </CollegeHero>

@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /**
- * One consistent local test world for the college portal: 500 JK Lakshmipat University students spread over every
+ * One consistent local test world for the college portal: 500 (or --students=N) JK Lakshmipat University students spread over every
  * stage (profile not started → AI interview → Findtern's check → in the pool → interview → offer → hired → completed),
  * 4 employers, 4 campus drives (live internship, live full-time, upcoming, past), seats and the TPO code.
  * Every screen reads the same rows, so the student, the employer, the admin and the college see the same story.
  *
  *   DATABASE_URL=postgresql://…@127.0.0.1:5435/<db> node e2e/seed-local-college.mjs          # dry run, rolled back
  *   DATABASE_URL=postgresql://…@127.0.0.1:5435/<db> node e2e/seed-local-college.mjs --yes    # wipe and seed
+ *   … node e2e/seed-local-college.mjs --yes --students=2000   # same world at another size (50 to 20000; default 500)
  *   DATABASE_URL=postgresql://…@127.0.0.1:5435/<db> node e2e/seed-local-college.mjs --refresh-meets
  *       # no wipe: the open drive meet requests start again (a request lapses 10 minutes after its start, so the
- *       # "Meets not answered" list empties itself about 20 minutes after seeding; run this before testing it)
+ *       # "Drive meets not answered" list empties itself about 20 minutes after seeding; run this before testing it)
  *
  * LOCAL ONLY: refuses any host that is not 127.0.0.1 / localhost. It empties accounts, activity and payments (rows
  * only; the schema, migration record, colleges, plans, settings, terms and website_* content stay), then seeds. One
@@ -48,7 +49,16 @@ const KEEP_TABLES = [
   "colleges", "pricing_plans", "invoice_counters",
   "employer_terms", "intern_terms", "intern_non_disclosure_clauses",
 ];
-const TOTAL = 500;
+// --students=N sets how many JKLU students are seeded (default 500; the Phase S runs use 100, 500, 2000). Test-only.
+// Every stage count, the seats, the not-yet-joined roster and the drive shortlists scale with it; 500 is the exact
+// original world. All the self-checks below still run for any N.
+const studentsArg = process.argv.find((a) => a.startsWith("--students="));
+const TOTAL = studentsArg ? Number(studentsArg.split("=")[1]) : 500;
+if (!Number.isInteger(TOTAL) || TOTAL < 50 || TOTAL > 20000) { console.error("[seed-local] --students=N needs a whole number from 50 to 20000"); process.exit(1); }
+const SCALE = TOTAL / 500;
+const NOT_JOINED = Math.round(TOTAL * 0.08); // 40 at 500
+const SEATS_PAID = Math.round(TOTAL * 1.2); // 600 at 500
+const SEATS_PENDING = Math.round(TOTAL * 0.2); // 100 at 500
 
 /* ── Deterministic randomness ───────────────────────────────────────────── */
 function mulberry32(a) {
@@ -84,10 +94,10 @@ const EMPLOYERS = [
 ];
 
 /**
- * Stages, with how many of the 500 land in each. Pre-pool stages are the TPO's "hidden profiles" reasons;
+ * Stages, with how many of the 500 (BASE_STAGES) land in each. Pre-pool stages are the TPO's "hidden profiles" reasons;
  * the rest are in the employer pool and somewhere on the hiring path.
  */
-const STAGES = [
+const BASE_STAGES = [
   ["not_started", 30],        // account + membership, no profile yet
   ["profile_incomplete", 30], // took the AI interview, profile left unfinished (no languages, no proofs)
   ["interview_pending", 50],  // submitted and paid, AI interview not taken
@@ -106,6 +116,14 @@ const STAGES = [
   ["ft_offer_sent", 10],      // final-year: full-time offer from the full-time drive (1% fee)
   ["ft_hired", 10],           // final-year: full-time offer accepted and paid
 ];
+// Largest-remainder scaling, so the counts add up to TOTAL exactly (identical to BASE_STAGES at 500).
+const STAGES = (() => {
+  const raw = BASE_STAGES.map(([name, n]) => [name, n * SCALE]);
+  const out = raw.map(([name, v]) => [name, Math.floor(v)]);
+  let short = TOTAL - out.reduce((a, [, n]) => a + n, 0);
+  raw.map(([, v], i) => [i, v - Math.floor(v)]).sort((a, b) => b[1] - a[1] || a[0] - b[0]).slice(0, short).forEach(([i]) => { out[i][1] += 1; });
+  return out;
+})();
 const PRE_POOL = new Set(["not_started", "profile_incomplete", "interview_pending", "checks_pending", "rejected"]);
 const FINAL_YEAR_ONLY = new Set(["ft_offer_sent", "ft_hired"]);
 
@@ -234,18 +252,18 @@ async function main() {
       employers.push({ id: row.id, ...e, projects });
     }
 
-    // 3. Seats and the TPO code: 600 seats paid, 100 more ordered and unpaid.
+    // 3. Seats and the TPO code: SEATS_PAID seats paid (600 at 500 students), SEATS_PENDING more ordered and unpaid.
     const tpoCode = `JKLU${randomBytes(3).toString("hex").toUpperCase()}`;
     const promo = await one(
       `INSERT INTO promo_codes (code, description, discount_type, discount_value, applies_to, college_id, used_count, max_usages, is_active)
-       VALUES ($1,'College TPO code','percentage',100,'intern',$2,0,600,true) RETURNING id`,
-      [tpoCode, college.id],
+       VALUES ($1,'College TPO code','percentage',100,'intern',$2,0,$3,true) RETURNING id`,
+      [tpoCode, college.id, SEATS_PAID],
     );
     const seatPrice = 80000; // ₹800 a seat before GST
     await q(`INSERT INTO college_seat_batches (college_id, seats, unit_price_minor, amount_minor, status, method, reference_id, invoice_number, paid_at, created_by)
-             VALUES ($1,600,$2,$3,'paid','bank','UTR-SEED-001','SEED-001',$4,$5)`, [college.id, seatPrice, Math.round(600 * seatPrice * 1.18), iso(-40), tpo.id]);
-    await q(`INSERT INTO college_seat_batches (college_id, seats, unit_price_minor, amount_minor, status, created_by) VALUES ($1,100,$2,$3,'pending',$4)`,
-      [college.id, seatPrice, Math.round(100 * seatPrice * 1.18), tpo.id]);
+             VALUES ($1,$6,$2,$3,'paid','bank','UTR-SEED-001','SEED-001',$4,$5)`, [college.id, seatPrice, Math.round(SEATS_PAID * seatPrice * 1.18), iso(-40), tpo.id, SEATS_PAID]);
+    await q(`INSERT INTO college_seat_batches (college_id, seats, unit_price_minor, amount_minor, status, created_by) VALUES ($1,$5,$2,$3,'pending',$4)`,
+      [college.id, seatPrice, Math.round(SEATS_PENDING * seatPrice * 1.18), tpo.id, SEATS_PENDING]);
 
     // 4. Drives. Windows: live internship (started 2 days ago), live full-time (started 1 day ago), upcoming, past.
     const token = () => createHash("sha256").update(randomBytes(32)).digest("hex");
@@ -271,9 +289,9 @@ async function main() {
     ];
     for (const [d, e, t] of joins) await q(`INSERT INTO college_drive_employers (drive_id, employer_id, joined_at) VALUES ($1,$2,$3)`, [d, e, t]);
 
-    // 5. Roster: every student, plus 40 who are on the college's list but have not joined Findtern.
+    // 5. Roster: every student, plus NOT_JOINED (40 at 500) who are on the college's list but have not joined Findtern.
     const students = plan();
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < NOT_JOINED; i++) {
       await q(`INSERT INTO college_roster (college_id, email, name, roll_no, year, branch, phone) VALUES ($1,$2,$3,$4,$5,$6,$7)`,
         [college.id, `notjoined${i + 1}@jklu.edu.in`, `${FIRST[(i * 3) % FIRST.length]} ${LAST[(i * 5) % LAST.length]}`, `${2026 - (2 + (i % 3))}JK9${pad(i + 1, 3)}`, 2 + (i % 3), pick(BRANCHES), `98291${pad(i + 1, 5)}`]);
     }
@@ -478,7 +496,7 @@ async function main() {
       return q(`INSERT INTO college_drive_meetings (drive_id, employer_id, user_id, starts_at, status, meeting_link, responded_at, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
         [driveId, employerId, userId, startsAt, status, status === "accepted" ? "https://meet.example.com/seed-call" : null, responded, created]);
     };
-    for (const [i, s] of drivePool.slice(0, 60).entries()) {
+    for (const [i, s] of drivePool.slice(0, Math.round(60 * SCALE)).entries()) {
       const e = employers[i % employers.length];
       await q(`INSERT INTO college_drive_shortlist (drive_id, employer_id, user_id, created_at) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [liveIntern.id, e.id, s.id, at(-(i % 40) * HOUR)]);
       if (i % 3 !== 0) continue;
@@ -489,7 +507,7 @@ async function main() {
       else if (status === "lapsed") await call(liveIntern.id, e.id, s.id, "requested", at(-(1 + (i % 30)) * HOUR), 5);
       else await call(liveIntern.id, e.id, s.id, status, at(-(1 + (i % 30)) * HOUR), [0, 5, 10][i % 3]);
     }
-    const finalYears = students.filter((s) => s.year === 4 && ["live", "ft_offer_sent"].includes(s.stage)).slice(0, 15);
+    const finalYears = students.filter((s) => s.year === 4 && ["live", "ft_offer_sent"].includes(s.stage)).slice(0, Math.round(15 * SCALE));
     for (const [i, s] of finalYears.entries()) {
       const e = employers[i % 2];
       await q(`INSERT INTO college_drive_shortlist (drive_id, employer_id, user_id, created_at) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [liveFullTime.id, e.id, s.id, at(-(i % 20) * HOUR)]);
@@ -533,10 +551,10 @@ async function main() {
         || modeProblem(workPreferenceOf({ locationTypes: r.location_types, preferredLocations: r.preferred_locations }, r.score), d.mode) !== null;
     }).length;
     console.log(`[seed-local] impossible offers: ${check.impossibleOffers}`);
-    if (check.students !== TOTAL || check.impossibleOffers || check.roster !== TOTAL + 40 || check.distinctEmails !== TOTAL || check.oddCalls || check.unpaidHires || check.orphanProposals || check.offersToHiddenStudents || check.incompleteSubmitted) {
+    if (check.students !== TOTAL || check.impossibleOffers || check.roster !== TOTAL + NOT_JOINED || check.distinctEmails !== TOTAL || check.oddCalls || check.unpaidHires || check.orphanProposals || check.offersToHiddenStudents || check.incompleteSubmitted) {
       throw new Error("Self-check failed (see the check line)");
     }
-    console.log(`[seed-local] seats used ${paidSeats} of 600 · TPO code ${tpoCode} · college wallet ₹${wallet / 100} · first student login ${students[0].email}`);
+    console.log(`[seed-local] seats used ${paidSeats} of ${SEATS_PAID} · TPO code ${tpoCode} · college wallet ₹${wallet / 100} · first student login ${students[0].email}`);
 
     if (COMMIT) { await q("COMMIT"); console.log("[seed-local] committed."); }
     else { await q("ROLLBACK"); console.log("[seed-local] dry run: rolled back. Re-run with --yes to keep it."); }

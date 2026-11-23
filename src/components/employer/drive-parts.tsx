@@ -2,6 +2,7 @@ import { GraduationCap } from "lucide-react";
 
 import { Pill, type Tone } from "@/components/app/primitives";
 import type { DriveWindow } from "@/lib/college/access";
+import { timeUntil } from "@/lib/college/time-left";
 import { formatSlotTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -43,15 +44,10 @@ export function driveTime(d: Date): string {
   return formatSlotTime(d, "Asia/Kolkata");
 }
 
-/** "3 days left", "5 hours left", from real dates only. */
+/** "3 days left", "5 hours left", from real dates only. The one rule (floor) is lib/college/time-left.ts, shared with the TPO list. */
 export function timeLeft(endsAt: Date, now = Date.now()): string | null {
-  const ms = endsAt.getTime() - now;
-  if (ms <= 0) return null;
-  const hours = Math.floor(ms / 3600_000);
-  if (hours >= 48) return `${Math.floor(hours / 24)} days left`;
-  if (hours >= 1) return `${hours} hour${hours === 1 ? "" : "s"} left`;
-  const mins = Math.max(1, Math.floor(ms / 60_000));
-  return `${mins} min left`;
+  const t = timeUntil(endsAt.getTime() - now);
+  return t ? `${t} left` : null;
 }
 
 /** College mark next to Findtern's: the college's logo when it has one, else its initials. */

@@ -136,7 +136,7 @@ function Scene({ counts, stuck, W, cols, className }: { counts: number[]; stuck:
         })}
       </svg>
       </div>
-      {per > 1 ? <p className="mt-1 text-xs text-on-dark-subtle">One dot, {per} students.</p> : null}
+      {per > 1 ? <p className="mt-1 text-xs text-on-dark">One dot, {per} students.</p> : null}
     </div>
   );
 }
@@ -153,7 +153,7 @@ function HiddenProfiles({ counts }: { counts: Partial<Record<HiddenReason, numbe
       <Link href="/college/students?show=hidden" className="flex flex-wrap items-baseline gap-x-2 rounded-lg px-2 py-1 outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/70">
         <span className="whitespace-nowrap text-sm text-white">Hidden profiles</span>
         <span className="nums text-sm font-medium text-accent-300">{n(total)}</span>
-        <span className="basis-full text-xs text-on-dark-subtle sm:basis-auto">employers can&apos;t see them yet</span>
+        <span className="basis-full text-xs text-on-dark sm:basis-auto">employers can&apos;t see them yet</span>
       </Link>
       <ul className="mt-1 grid grid-cols-3 gap-1 sm:grid-flow-col sm:auto-cols-fr sm:grid-cols-none">
         {rows.map((r) => {
@@ -164,7 +164,7 @@ function HiddenProfiles({ counts }: { counts: Partial<Record<HiddenReason, numbe
                 href={`/college/students?show=hidden&why=${r.id}`}
                 className="flex h-full flex-col justify-between gap-1.5 rounded-xl px-2 py-2 outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/70"
               >
-                <span className="text-[11px] leading-tight text-on-dark-subtle sm:text-xs">{r.label}</span>
+                <span className="text-[11px] leading-tight text-on-dark sm:text-xs">{r.label}</span>
                 <span className={cn("nums text-[1.375rem] font-light leading-none", v ? "text-white" : "text-white/40")}>{n(v)}</span>
               </Link>
             </li>
@@ -187,7 +187,7 @@ export function BatchCampusWalk({ stages, hidden }: { stages: RibbonStage[]; hid
     <div className="mt-8">
       <div className="flex flex-col gap-x-10 gap-y-5 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <p className="text-sm text-on-dark-subtle">Students in your batch</p>
+          <p className="text-sm text-on-dark">Students in your batch</p>
           <p className="nums mt-1 text-[2.5rem] font-light leading-none tracking-[-0.03em] text-white">{n(total)}</p>
           {counts[stuck] > 0 ? (
             <p className="mt-3 max-w-md text-sm text-white">
@@ -208,12 +208,12 @@ export function BatchCampusWalk({ stages, hidden }: { stages: RibbonStage[]; hid
         {stages.map((s, i) => (
           <li key={s.label} className="min-w-0">
             <Link href={s.href} className="block rounded-xl px-1 py-2 outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/70">
-              <span className="block text-[11px] leading-tight text-on-dark-subtle sm:text-[13px]">
+              <span className="block text-[11px] leading-tight text-on-dark sm:text-[13px]">
                 <span className="sm:hidden">{SHORT[i]}</span>
                 <span className="hidden sm:inline">{s.label}</span>
               </span>
               <span className="nums mt-1 block text-[1.375rem] font-light leading-none text-white sm:text-[1.75rem]">{n(reached[i])}</span>
-              <span className={cn("nums mt-1.5 block text-[11px] sm:text-xs", i === stuck ? "font-medium text-accent-300" : "text-on-dark-subtle")}>
+              <span className={cn("nums mt-1.5 block text-[11px] sm:text-xs", i === stuck ? "font-medium text-accent-300" : "text-on-dark")}>
                 {i === 4 ? (counts[i] ? <><span className="hidden sm:inline">with an employer</span><span className="sm:hidden">working</span></> : "none yet") : <>{n(counts[i])}<span className="hidden sm:inline"> stopped here</span><span className="sm:hidden"> here</span></>}
               </span>
             </Link>

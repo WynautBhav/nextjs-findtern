@@ -8,7 +8,7 @@ import { FileSpreadsheet, Upload } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { yearLabel } from "@/lib/college/labels";
-import { parseRoster } from "@/lib/college/roster";
+import { decodeRosterBytes, parseRoster } from "@/lib/college/roster";
 import { cn } from "@/lib/utils";
 
 const SAMPLE = "Name,Phone,Email,Roll No,Year,Branch\nAsha Sharma,9876543210,asha.sharma@college.edu.in,22CS014,3,CSE\nRavi Meena,9812345678,ravi.meena@college.edu.in,22EC031,3,ECE\n";
@@ -46,7 +46,7 @@ export function RosterImport() {
       setProblem("That file is over 2 MB. Split it into smaller files and upload them one by one.");
       return;
     }
-    setText(await f.text());
+    setText(decodeRosterBytes(new Uint8Array(await f.arrayBuffer())));
     setSource(f.name);
     setPasting(false);
   }
@@ -111,8 +111,8 @@ export function RosterImport() {
               A CSV with <strong>Name</strong>, <strong>Phone</strong> and <strong>Email</strong> columns. Roll number, year and branch are read too if they are there. The column order does not matter.
             </p>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
-              <input ref={file} id="roster-file" type="file" accept=".csv,text/csv,.tsv,text/tab-separated-values,.txt" className="sr-only" onChange={(e) => { void take(e.target.files?.[0]); e.target.value = ""; }} />
-              <label htmlFor="roster-file" className={cn(buttonClass({ size: "sm" }), "cursor-pointer focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-brand-600")}>
+              <input ref={file} id="roster-file" type="file" accept=".csv,text/csv,.tsv,text/tab-separated-values,.txt" className="peer sr-only" onChange={(e) => { void take(e.target.files?.[0]); e.target.value = ""; }} />
+              <label htmlFor="roster-file" className={cn(buttonClass({ size: "sm" }), "cursor-pointer peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-600")}>
                 <Upload aria-hidden /> Choose a file
               </label>
               <button type="button" onClick={() => setPasting((v) => !v)} aria-expanded={pasting} className={buttonClass({ size: "sm", variant: "outline" })}>

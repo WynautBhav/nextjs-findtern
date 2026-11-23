@@ -5,6 +5,7 @@ import { requireCollegeMutation } from "@/lib/college/guard";
 import { masterRowsForCollege } from "@/lib/college/master-data";
 import { COLUMN_KEYS, toCsv, type MasterColumn } from "@/lib/college/master-row";
 import { auditCollegeView } from "@/lib/college/scope";
+import { todayIst } from "@/lib/offer";
 
 const bodySchema = z.object({
   columns: z.array(z.string()).min(1).max(60),
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
     { students: rows.length, columns },
   );
   const origin = new URL(req.url).origin;
-  const day = new Date().toISOString().slice(0, 10);
+  const day = todayIst(); // India date: between 00:00 and 05:30 IST the UTC date is still yesterday
   return new NextResponse(toCsv(rows, columns, origin), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

@@ -6,6 +6,7 @@ import { Search } from "lucide-react";
 
 import { isStudentEligible } from "@/lib/college/eligibility";
 import { fromLocalInput } from "@/lib/college/ist";
+import { cgpaText } from "@/lib/college/master-row";
 import { COHORTS, yearLabel } from "@/lib/college/labels";
 import { csrfFetch } from "@/lib/client-fetch";
 import { inviteSentLine } from "@/lib/college/drive-invite-line";
@@ -317,7 +318,7 @@ export function DriveBuilder({
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink-900">{s.name}</p>
                     <p className="nums text-xs text-text-subtle">
-                      {[s.rollNo, yearLabel(s.year), s.branch, s.cgpa !== null ? `CGPA ${s.cgpa.toFixed(1)}` : "CGPA —", s.score !== null ? `Score ${s.score.toFixed(1)}` : "No score"].filter(Boolean).join(" · ")}
+                      {[s.rollNo, yearLabel(s.year), s.branch, s.cgpa !== null ? `CGPA ${cgpaText(s.cgpa)}` : "CGPA —", s.score !== null ? `Score ${s.score.toFixed(1)}` : "No score"].filter(Boolean).join(" · ")}
                       {included ? <span className="ml-1.5 font-medium text-brand-800">· added by you</span> : null}
                       {excluded ? <span className="ml-1.5 font-medium text-accent-700">· removed by you</span> : null}
                     </p>

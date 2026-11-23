@@ -22,7 +22,9 @@ import {
 import { todayIst } from "@/lib/offer";
 import { CALL_GRACE_MS, ONLINE_WINDOW_MS } from "./constants";
 import { interviewUpcomingSql, offerWaitingSql } from "./count-rules";
+import { cgpaSqlText } from "./cgpa-sql";
 import { redactUnverified } from "./serialize";
+import { rosterRowLeftSql } from "./roster-left";
 export { HEARTBEAT_MS, ONLINE_WINDOW_MS } from "./constants";
 
 export type CollegeContext = {
@@ -96,10 +98,7 @@ const date = (v: unknown): Date | null => (v ? new Date(v as string) : null);
  * cutoff unless the college includes them by hand.
  */
 function cgpaSql() {
-  const a = sql`${schema.internOnboarding.extraData}->'academics'`;
-  return sql`(CASE
-    WHEN coalesce(${a}->>'scoreType', 'cgpa') = 'cgpa' AND (${a}->>'score') ~ '^[0-9]+(\\.[0-9]+)?$'
-      AND (${a}->>'score')::float8 <= 10 THEN (${a}->>'score')::float8 END)`;
+  return sql.raw(cgpaSqlText(`"intern_onboarding"."extra_data"->'academics'`));
 }
 
 /**
@@ -237,6 +236,7 @@ export async function rosterCoverage(collegeId: string, acceptable: ReadonlySet<
         WHERE lower(u.email) = ${r.email} AND m.college_id = ${collegeId} AND m.left_at IS NULL AND m.status = 'verified'
       ) AS joined
     FROM ${r} WHERE ${r.collegeId} = ${collegeId}
+      AND NOT ${rosterRowLeftSql(sql`${r.email}`, collegeId)}
     ORDER BY ${r.name}
   `);
   const rows = res.rows as Row[];
@@ -291,7 +291,9 @@ export async function presenceSnapshot(collegeId: string, userIds?: string[]): P
     LEFT JOIN ${schema.collegeRoster} r ON r.college_id = ${m.collegeId} AND r.email = lower(u.email)
     LEFT JOIN ${schema.collegePresence} p ON p.user_id = ${m.userId}
     -- A placement officer sees verified members only (Q27); a student who merely picked the college stays hidden.
-    WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL AND ${m.status} = 'verified'
+    -- A disabled account is not live and a nudge refuses it (nudge.ts), so it is neither counted nor listed as someone to nudge
+    -- (the students list keeps it in its Paused bucket).
+    WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL AND ${m.status} = 'verified' AND u.is_active
   `);
   let rows = res.rows as Row[];
   if (userIds) {

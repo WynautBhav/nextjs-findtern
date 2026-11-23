@@ -99,7 +99,7 @@ function matches(r: MasterRow, f: Filters, q: string): boolean {
   if (f.minCgpa && (r.cgpa === null || r.cgpa < Number(f.minCgpa))) return false;
   if (f.quadrant && quadrantOf(r) !== f.quadrant) return false;
   if (f.band === "done" && r.score === null) return false;
-  if (f.band === "none" && r.score !== null) return false;
+  if (f.band === "none" && (r.score !== null || !r.verified)) return false; // a claimed student's score is hidden, not absent: never "not interviewed"
   if (f.band && f.band !== "done" && f.band !== "none" && (r.score === null || coffeeOf(r.score) !== f.band)) return false;
   if (f.marks && (r.marks10 === null || marksOf(r.marks10) !== f.marks)) return false;
   if (f.outcome && !matchesOutcome(r, f.outcome)) return false;
@@ -158,14 +158,15 @@ function Cell({ r, k, now }: { r: MasterRow; k: Key; now: number }) {
  * A minimum out of 10: the usual cut-offs, or "Custom…" for any value the officer types (one decimal, 0 to 10).
  * The typed value filters as soon as it is a valid number; a blank or invalid entry filters nothing.
  */
-function MinimumPicker({ label, any, presets, value, onChange, className }: { label: string; any: string; presets: number[]; value: string; onChange: (v: string) => void; className: string }) {
+function MinimumPicker({ label, any, presets, value, onChange, className, decimals = 1 }: { label: string; any: string; presets: number[]; value: string; onChange: (v: string) => void; className: string; /** Digits kept after the point: 1 for the Findtern score, 2 for a CGPA (students enter 8.47). */ decimals?: 1 | 2 }) {
   const isPreset = value === "" || presets.some((p) => String(p) === value);
   const [custom, setCustom] = useState(!isPreset);
   const [draft, setDraft] = useState(isPreset ? "" : value);
   const commit = (raw: string) => {
     setDraft(raw);
     const n = Number(raw);
-    onChange(raw.trim() !== "" && Number.isFinite(n) && n >= 0 && n <= 10 ? String(Math.round(n * 10) / 10) : "");
+    const f = 10 ** decimals;
+    onChange(raw.trim() !== "" && Number.isFinite(n) && n >= 0 && n <= 10 ? String(Math.round(n * f) / f) : "");
   };
   return (
     <span className="flex shrink-0 items-center gap-1.5">
@@ -193,7 +194,7 @@ function MinimumPicker({ label, any, presets, value, onChange, className }: { la
           inputMode="decimal"
           min={0}
           max={10}
-          step={0.1}
+          step={decimals === 2 ? 0.01 : 0.1}
           value={draft}
           onChange={(e) => commit(e.target.value)}
           aria-label={`Minimum ${label}, 0 to 10`}
@@ -252,7 +253,7 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
   };
 
   const courses = useMemo(() => [...new Set(rows.map((r) => r.degree ?? "Course not set"))].sort(), [rows]);
-  const years = useMemo(() => [...new Set(rows.map((r) => r.year).filter((y): y is number => y !== null))].sort(), [rows]);
+  const years = useMemo(() => [...new Set(rows.map((r) => r.year).filter((y): y is number => y !== null))].sort((a, b) => a - b), [rows]);
 
   const visible = useMemo(() => {
     const words = q.trim().toLowerCase();
@@ -302,7 +303,7 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
       const a = document.createElement("a");
       const name = ((viewId === "all" && downloadName) || allViews.find((v) => v.id === viewId)?.name || "master data").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
       a.href = url;
-      a.download = `${name}-${new Date().toLocaleDateString("en-CA")}.csv`;
+      a.download = `${name}-${new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10)}.csv`; // India date, whatever the browser's zone is
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -463,7 +464,7 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
             <option value="no">Not open to work</option>
           </select>
           <MinimumPicker key={`score-${resetKey}`} label="Findtern score" any="Findtern score" presets={[5, 6, STRONG_SCORE, 8, 9]} value={filters.minScore} onChange={(v) => set("minScore", v)} className={on(!!filters.minScore)} />
-          <MinimumPicker key={`cgpa-${resetKey}`} label="CGPA" any="Any CGPA" presets={[6, 7, HIGH_CGPA, 8, 9]} value={filters.minCgpa} onChange={(v) => set("minCgpa", v)} className={on(!!filters.minCgpa)} />
+          <MinimumPicker key={`cgpa-${resetKey}`} label="CGPA" any="Any CGPA" presets={[6, 7, HIGH_CGPA, 8, 9]} value={filters.minCgpa} onChange={(v) => set("minCgpa", v)} className={on(!!filters.minCgpa)} decimals={2} />
           <select aria-label="Candidate onboarding status" value={filters.status} onChange={(e) => set("status", e.target.value as Filters["status"])} className={on(!!(filters.status !== "any"))}>
             <option value="any">Candidate onboarding status</option>
             <option value="verified">Accepted by TPO</option>

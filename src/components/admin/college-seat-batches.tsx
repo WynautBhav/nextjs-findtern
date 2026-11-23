@@ -7,6 +7,7 @@ import { EmptyScene } from "@/components/app/primitives";
 import { useConfirm } from "@/components/app/use-confirm";
 import { buttonClass } from "@/components/ui/button";
 import { seatBatchAmount, seatBatchProblem } from "@/lib/college/money";
+import { seatInvoiceState } from "@/lib/college/seat-invoice";
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatDate, formatMoney } from "@/lib/format";
 import { downloadInvoice } from "@/lib/invoice";
@@ -110,11 +111,11 @@ export function CollegeSeatBatches({ collegeId, batches, seat, canMoney, allowNe
                 <p className="font-medium">{b.seats} seats · {formatMoney(b.amountMinor, "INR", { zeroLabel: false })} · {b.status}</p>
                 <p className="text-xs text-ink-600">
                   {formatDate(b.paidAt ?? b.createdAt)}
-                  {b.status === "paid" ? ` · ${b.method} ${b.referenceId} · Invoice ${b.invoiceNumber ?? "pending"}` : ""}
+                  {b.status === "paid" ? ` · ${b.method} ${b.referenceId} · ${{ none: "", serial: `Invoice ${b.invoiceNumber}`, pending: "Invoice pending", covered: "No invoice (covered by credit)" }[seatInvoiceState(b)]}` : ""}
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                {b.status === "paid" && b.invoiceHtml ? (
+                {seatInvoiceState(b) === "serial" && b.invoiceHtml ? (
                   <button type="button" className={buttonClass({ variant: "outline", size: "sm" })} onClick={() => downloadInvoice(b.invoiceHtml!, `Invoice-${b.invoiceNumber ?? b.id.slice(-8)}.pdf`)}>Invoice</button>
                 ) : null}
                 {canMoney && b.status === "pending" ? (

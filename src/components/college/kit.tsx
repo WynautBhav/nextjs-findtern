@@ -1,5 +1,6 @@
 import { avatarTint } from "@/components/app/avatar-helpers";
 import { HeroPanel } from "@/components/employer/kit/hero-panel";
+import { initialsOf } from "@/lib/college/labels";
 import { cn } from "@/lib/utils";
 
 /**
@@ -27,7 +28,7 @@ export function CollegeHero({
       <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-5">
         <div className="min-w-0 max-w-2xl">
           <h1 className="text-balance text-[clamp(1.75rem,3.4vw,2.5rem)] font-light leading-tight tracking-[-0.03em]">{title}</h1>
-          {lede ? <p className="mt-1.5 text-pretty text-sm leading-relaxed text-on-dark-subtle">{lede}</p> : null}
+          {lede ? <p className="mt-1.5 text-pretty text-sm leading-relaxed text-on-dark">{lede}</p> : null}
         </div>
         {actions ? <div className="flex w-full flex-wrap gap-2.5 sm:w-auto">{actions}</div> : null}
       </div>
@@ -44,10 +45,10 @@ export function HeroStats({ children, cols = 4, className }: { children: React.R
 export function HeroStat({ label, value, hint, lead = false }: { label: string; value: React.ReactNode; hint?: React.ReactNode; lead?: boolean }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[13px] font-medium text-on-dark-subtle">{label}</dt>
+      <dt className="text-[13px] font-medium text-on-dark">{label}</dt>
       <dd>
         <span className={cn("nums mt-1.5 block break-words font-light leading-none tracking-[-0.04em]", lead ? "text-[clamp(2.5rem,5.4vw,4rem)]" : "text-[clamp(2rem,4vw,2.75rem)]")}>{value}</span>
-        {hint ? <span className="mt-2 block text-xs text-on-dark-subtle">{hint}</span> : null}
+        {hint ? <span className="mt-2 block text-xs text-on-dark">{hint}</span> : null}
       </dd>
     </div>
   );
@@ -55,15 +56,10 @@ export function HeroStat({ label, value, hint, lead = false }: { label: string; 
 
 /** A person's initials on their own steady tint (the same student is the same colour on every page). */
 export function Initials({ seed, name, className }: { seed: string; name: string; className?: string }) {
-  const letters = name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? "")
-    .join("");
+  const letters = initialsOf(name);
   return (
     <span aria-hidden className={cn("grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold", avatarTint(seed), className)}>
-      {letters || "?"}
+      {letters}
     </span>
   );
 }
@@ -83,7 +79,7 @@ export function SplitBar({ segments, label, tone = "dark", className }: { segmen
           ) : null,
         )}
       </div>
-      <ul className={cn("mt-3 flex flex-wrap gap-x-6 gap-y-1.5 text-sm", dark ? "text-on-dark-subtle" : "text-ink-600")}>
+      <ul className={cn("mt-3 flex flex-wrap gap-x-6 gap-y-1.5 text-sm", dark ? "text-on-dark" : "text-ink-600")}>
         {segments.map((s) => (
           <li key={s.label} className="flex items-center gap-2">
             <span aria-hidden className={cn("size-2 rounded-full", s.dot ?? s.className)} />
@@ -124,12 +120,12 @@ export function ScoreDots({ scores, className }: { scores: number[]; className?:
           </div>
         ))}
       </div>
-      <div aria-hidden className="nums mt-1.5 flex justify-between text-[11px] text-on-dark-subtle">
+      <div aria-hidden className="nums mt-1.5 flex justify-between text-[11px] text-on-dark">
         {[0, 2, 4, 6, 8, 10].map((n) => (
           <span key={n}>{n}</span>
         ))}
       </div>
-      <p className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-on-dark-subtle">
+      <p className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-xs text-on-dark">
         <span>{per === 1 ? "One dot is one student" : `One dot is ${per} students`}, placed at their Findtern score.</span>
         <span className="flex items-center gap-1.5"><span aria-hidden className="size-2 rounded-full bg-accent-400" /> 8 and above</span>
         <span className="flex items-center gap-1.5"><span aria-hidden className="size-2 rounded-full bg-white/85" /> 6 to 8</span>
@@ -154,7 +150,7 @@ export function ArcGauge({ used, total, label, className }: { used: number; tota
       </svg>
       <div className="absolute inset-x-0 bottom-0 text-center">
         <p className="nums text-[2.5rem] font-light leading-none tracking-[-0.04em]">{used.toLocaleString("en-IN")}</p>
-        <p className="mt-1 text-xs text-on-dark-subtle">of {total.toLocaleString("en-IN")} {label}</p>
+        <p className="mt-1 text-xs text-on-dark">of {total.toLocaleString("en-IN")} {label}</p>
       </div>
     </div>
   );

@@ -8,6 +8,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { driveWindow } from "@/lib/college/access";
 import { drivesOverview } from "@/lib/college/drives";
 import { DRIVE_KIND_LABEL } from "@/lib/college/labels";
+import { timeUntil } from "@/lib/college/time-left";
 import { requireCollegeContext } from "@/lib/college/scope";
 import { shortDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -22,12 +23,9 @@ function requestTime(): number {
 }
 
 function timeNote(state: string, starts: Date, ends: Date, now: number): string {
-  const hours = (ms: number) => {
-    const h = Math.max(1, Math.round(ms / 3600_000));
-    return h >= 48 ? `${Math.round(h / 24)} days` : `${h} ${h === 1 ? "hour" : "hours"}`;
-  };
-  if (state === "live") return `${hours(ends.getTime() - now)} left`;
-  if (state === "upcoming") return `Opens in ${hours(starts.getTime() - now)}`;
+  // The employer's drive page reads the same window through the same rule (lib/college/time-left.ts): whole units, rounded down.
+  if (state === "live") return `${timeUntil(ends.getTime() - now) ?? "Under a minute"} left`;
+  if (state === "upcoming") return `Opens in ${timeUntil(starts.getTime() - now) ?? "a moment"}`;
   return state === "revoked" ? "You closed the link" : "Finished";
 }
 

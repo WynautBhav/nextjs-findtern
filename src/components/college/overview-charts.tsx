@@ -2,6 +2,8 @@ import Link from "next/link";
 
 import { COFFEE, coffeeOf } from "@/lib/college/overview-modes";
 import { avatarTint } from "@/components/app/avatar-helpers";
+import { initialsOf } from "@/lib/college/labels";
+import { cgpaText } from "@/lib/college/master-row";
 import { cn } from "@/lib/utils";
 
 /**
@@ -92,19 +94,19 @@ export function TopStudents({ students }: { students: TopStudent[] }) {
           <li key={s.userId} className="group relative flex items-center gap-3 py-2.5">
             <span className="nums w-5 shrink-0 text-sm text-text-subtle">{i + 1}</span>
             <span aria-hidden className={cn("grid size-9 shrink-0 place-items-center rounded-full text-xs font-semibold", avatarTint(s.userId))}>
-              {s.name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? "").join("")}
+              {initialsOf(s.name)}
             </span>
             <span className="min-w-0 flex-1">
               <Link
                 href={`/college/students/${s.userId}`}
-                className="block truncate text-sm font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] group-hover:underline group-hover:underline-offset-4 focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-brand-500"
+                title={s.name} className="line-clamp-2 break-words text-sm font-medium text-ink-900 outline-none after:absolute after:inset-0 after:content-[''] group-hover:underline group-hover:underline-offset-4 focus-visible:after:rounded-lg focus-visible:after:ring-2 focus-visible:after:ring-brand-500"
               >
                 {s.name}
               </Link>
               <span className="block truncate text-xs text-text-subtle">{s.meta}</span>
             </span>
             <span className="hidden shrink-0 rounded-full border border-ink-200 px-2 py-0.5 text-xs text-ink-700 sm:inline">{band.name}</span>
-            <span className="nums w-14 shrink-0 text-right text-xs text-text-subtle">CGPA <span className="text-ink-800">{s.cgpa?.toFixed(1) ?? "—"}</span></span>
+            <span className="nums w-14 shrink-0 text-right text-xs text-text-subtle">CGPA <span className="text-ink-800">{s.cgpa !== null ? cgpaText(s.cgpa) : "—"}</span></span>
             <span className="nums w-10 shrink-0 text-right text-lg font-medium text-ink-900">{s.score.toFixed(1)}</span>
           </li>
         );

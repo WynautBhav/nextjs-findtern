@@ -67,3 +67,19 @@ test("hidden profiles: one reason each, the first that blocks, in the order the 
   // In the pool = not hidden, whatever the flags say (the pool query is the truth).
   assert.equal(readinessFrom({ ...base, submitted: false }).hidden, null);
 });
+
+// R4-01: the college view asks the hire gate the same question as the real gate (code-backed live membership), via one batched membership list.
+test("R4-01: code-verified, claimed and left students get the gate's verdict", async () => {
+  const { codeVerifiedUserIds } = await import("./student-readiness.ts");
+  const { hireGateDecision } = await import("../hire-gate.ts");
+  const row = { city: "Pune", state: "Maharashtra", pinCode: "411001", skills: ["React", "SQL", "Excel", "Python"], locationTypes: ["remote"], preferredLocations: [], hasLaptop: true, aadhaarNumber: "234567890123", panNumber: "ABCDE1234F", extraData: { accountType: "college", profileSubmittedAt: "2026-10-01T00:00:00.000Z", languages: [{ id: "l1", language: "english", level: "professional", read: true, write: true, speak: true }], emergencyPhone: "9812345678", emergencyName: "Asha Rao", emergencyRelation: "Mother", ndaAcceptedAt: "2026-10-01", academics: { qualificationLevel: "Bachelor", status: "Pursuing", institution: "ABC College", degree: "B.Tech", startYear: "2023" } } };
+  const docs = { hasPhoto: true, hasPanImage: true, hasAadhaarImage: false };
+  const ids = codeVerifiedUserIds([
+    { userId: "code", status: "verified", verifiedBy: "college_code", leftAt: null },
+    { userId: "claimed", status: "claimed", verifiedBy: "email_domain", leftAt: null },
+    { userId: "left", status: "verified", verifiedBy: "college_code", leftAt: new Date() },
+  ]);
+  for (const [id, ok] of [["code", true], ["claimed", false], ["left", false], ["none", false]] as const) {
+    assert.equal(hireGateDecision(row, docs, ids.has(id)).ok, ok, id);
+  }
+});

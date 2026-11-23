@@ -3,8 +3,11 @@
 const EMAIL = /^[^\s@,;<>()"]+@[^\s@,;<>()"]+\.[a-z]{2,}$/;
 const JUNK = new Set(["na", "n/a", "null", "none", "-", "nil", "test"]);
 
+/** Zero-width and other format characters (ZWSP, ZWNJ, BOM, bidi marks): invisible in a sheet, fatal in a match or a mail address. */
+const INVISIBLE = /\p{Cf}/gu;
+
 export function normaliseEmail(raw: unknown): string | null {
-  const e = String(raw ?? "").trim().toLowerCase();
+  const e = String(raw ?? "").replace(INVISIBLE, "").trim().toLowerCase();
   if (!e || JUNK.has(e) || e.length > 254 || e.includes("..")) return null;
   const at = e.indexOf("@");
   if (at < 1 || e.lastIndexOf("@") !== at || e.startsWith(".") || e.slice(0, at).endsWith(".")) return null;
@@ -13,7 +16,7 @@ export function normaliseEmail(raw: unknown): string | null {
 
 /** Indian mobile → "+91XXXXXXXXXX"; anything else null. */
 export function normalisePhoneE164(raw: unknown): string | null {
-  let d = String(raw ?? "").replace(/[\s\-().]/g, "");
+  let d = String(raw ?? "").replace(INVISIBLE, "").replace(/[\s\-().]/g, "");
   if (/[^\d+]/.test(d) || d.indexOf("+") > 0) return null;
   if (d.startsWith("+")) {
     if (!d.startsWith("+91")) return null;
@@ -26,7 +29,7 @@ export function normalisePhoneE164(raw: unknown): string | null {
 
 /** Display name: trimmed, whitespace collapsed. */
 export function normaliseName(raw: unknown): string {
-  return String(raw ?? "").replace(/\s+/g, " ").trim();
+  return String(raw ?? "").replace(INVISIBLE, "").replace(/\s+/g, " ").trim();
 }
 
 /** Comparison key only: diacritics stripped, case-folded. Never store this. */

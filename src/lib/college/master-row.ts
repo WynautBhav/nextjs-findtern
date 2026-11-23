@@ -156,6 +156,9 @@ const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object"
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 const strs = (v: unknown, max: number): string[] => arr(v).map(str).filter((s): s is string => s !== null).slice(0, max);
+/** Skills as the onboarding form saves them are {id, name, rating} objects; older/seeded rows are plain strings. */
+const skillNames = (v: unknown, max: number): string[] =>
+  arr(v).map((s) => (s && typeof s === "object" ? str((s as { name?: unknown }).name) : str(s))).filter((s): s is string => s !== null).slice(0, max);
 const num = (v: unknown): number | null => {
   const n = typeof v === "string" && v.trim() ? Number(v) : v;
   return typeof n === "number" && Number.isFinite(n) ? n : null;
@@ -233,7 +236,9 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     meetings: NO_MEETINGS,
     openToWork: null,
   };
-  if (!verified || !x) return base;
+  if (!verified) return base;
+  // A verified student who has not saved onboarding yet still has the phone and LinkedIn the Students page shows.
+  if (!x) return { ...base, phone: s.phone, linkedin: s.linkedin };
 
   const ratings = obj(extra.ratings);
   const pro = obj(arr(a.professional)[0]);
@@ -262,7 +267,7 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     preferredLocations: strs(x.preferredLocations, 5),
     laptop: x.hasLaptop,
     lastSeenAt: s.lastSeenAt?.toISOString() ?? null,
-    skills: strs(x.skills, 7),
+    skills: skillNames(x.skills, 7),
     hasReport: typeof extra.aiFeedbackLink === "string" || typeof extra.incruiterReportUrl === "string",
     hasRecording: typeof extra.aiRecordingLink === "string" || typeof extra.incruiterRecordingUrl === "string",
     english: score10(ratings.communication),
@@ -376,6 +381,20 @@ export function driveCalls(m: Pick<Meetings, "callsAccepted" | "callsNotTaken" |
     .join(" · ");
 }
 
+/**
+ * A CGPA as the student entered it: one decimal when that says it all (8.5), two when it needs them (8.47). A CGPA of 8.47 read as
+ * "8.5" disagreed with the "8.5+" filter that leaves it out, and the officer could not check an eligibility cut-off from the file.
+ */
+export function cgpaText(v: number): string {
+  return Math.abs(v * 10 - Math.round(v * 10)) < 1e-9 ? v.toFixed(1) : v.toFixed(2);
+}
+
+/** An instant as India time for the file an officer opens in a spreadsheet: "2026-11-23 08:28 IST" (the ISO text read as UTC). */
+export function istStamp(iso: string): string {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? "" : `${new Date(t + 330 * 60_000).toISOString().slice(0, 16).replace("T", " ")} IST`;
+}
+
 /** A cell as plain text, the same in the table's title and in the CSV. Missing is "". */
 export function cellText(row: MasterRow, key: MasterColumn["key"], origin = ""): string {
   switch (key) {
@@ -385,6 +404,8 @@ export function cellText(row: MasterRow, key: MasterColumn["key"], origin = ""):
       return row.hasRecording ? `${origin}/api/college/students/${row.userId}/recording` : "";
     case "workMode":
       return row.workMode ? MODE_LABEL[row.workMode] : "";
+    case "lastSeenAt":
+      return row.lastSeenAt ? istStamp(row.lastSeenAt) : "";
     case "earningsMinor":
       return row.verified ? (row.earningsMinor / 100).toFixed(2) : "";
     case "hired":
@@ -408,18 +429,19 @@ export function cellText(row: MasterRow, key: MasterColumn["key"], origin = ""):
       if (Array.isArray(v)) return v.join(", ");
       if (typeof v === "boolean") return v ? "Yes" : "No";
       // Scores always carry one decimal (6.0, not 6); counts and years never do.
-      if (typeof v === "number") return SCORE_KEYS.has(key) ? v.toFixed(1) : String(Math.round(v));
+      if (typeof v === "number") return key === "cgpa" ? cgpaText(v) : SCORE_KEYS.has(key) ? v.toFixed(1) : String(Math.round(v));
       return String(v);
     }
   }
 }
 
 /**
- * One CSV cell. Quotes always, doubles inner quotes, and prefixes a ' to anything a spreadsheet would run as a
- * formula (=, +, -, @, tab, CR), so a student who types "=HYPERLINK(...)" as a skill cannot attack the officer.
+ * One CSV cell. Quotes always, doubles inner quotes, and prefixes a ' to anything a spreadsheet could run as a
+ * formula: a cell whose first visible character is =, +, - or @ (also behind leading blanks, no-break spaces or a BOM),
+ * or that starts with a tab, CR or LF. A student who types "=HYPERLINK(...)" as a skill cannot attack the officer.
  */
 export function csvCell(v: string): string {
-  const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  const safe = /^[\t\r\n]/.test(v) || /^[\s\u00a0\ufeff]*[=+\-@]/.test(v) ? `'${v}` : v;
   return `"${safe.replace(/"/g, '""')}"`;
 }
 

@@ -112,3 +112,26 @@ test("profileDocsOf: files on file, and collegeVerified only for a live code-ver
   assert.equal(profileDocsOf(undefined, { status: "pending", verifiedBy: null }).collegeVerified, false);
   assert.equal(profileDocsOf(undefined, undefined).collegeVerified, false);
 });
+
+// PM-01: joining by a college code writes accountType "college" onto the profile; the onboarding step then wants the membership proof.
+test("a college-account intern with a code-verified membership may be hired", () => {
+  const r = row({ accountType: "college" });
+  assert.deepEqual(hireGateDecision(r, { ...docs, collegeVerified: true }), { ok: true });
+});
+
+test("a college-account intern whose membership no code backs (claimed, left) is still refused", () => {
+  const r = row({ accountType: "college" });
+  for (const d of [hireGateDecision(r, docs), hireGateDecision(r, { ...docs, collegeVerified: false })]) {
+    assert.equal(d.ok, false);
+    if (!d.ok) assert.deepEqual(d.missing, ["accountType"]);
+  }
+});
+
+test("an individual account is unaffected by the membership", () => {
+  assert.deepEqual(hireGateDecision(row({ accountType: "individual" }), { ...docs, collegeVerified: false }), { ok: true });
+  assert.deepEqual(hireGateDecision(row({ accountType: "individual" }), { ...docs, collegeVerified: true }), { ok: true });
+});
+
+test("a code-backed membership never rescues an otherwise incomplete profile", () => {
+  assert.equal(hireGateDecision(row({ accountType: "college", languages: [] }), { ...docs, collegeVerified: true }).ok, false);
+});

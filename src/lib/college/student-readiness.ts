@@ -5,6 +5,12 @@
  */
 import { draftFromRecord, emptyDraft, validateProfile, type OnboardingLike } from "../onboarding.ts";
 import type { ProfileDocs } from "../admin/profile-state.ts";
+import { isCodeVerifiedMembership } from "../intern-account.ts";
+
+/** Ids of students whose live membership a college code backs: the proof the hire gate wants for accountType "college" (R4-01). */
+export function codeVerifiedUserIds(members: { userId: string; status: string; verifiedBy: string | null; leftAt: Date | null }[]): Set<string> {
+  return new Set(members.filter((m) => isCodeVerifiedMembership(m)).map((m) => m.userId));
+}
 
 /** The onboarding steps in the student's own words (lib/onboarding.ts, steps 1 to 8). */
 export const STEP_NAMES = ["About me", "Academics", "Experience", "Skills", "Languages", "Extracurriculars", "Work preferences", "Agreement"] as const;

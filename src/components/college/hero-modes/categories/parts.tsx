@@ -52,10 +52,10 @@ export function finding(d: CategoriesData, order: "band" | "degree" = "band") {
 export function Lead({ data, className, gold = false }: { data: CategoriesData; className?: string; gold?: boolean }) {
   return (
     <div className={cn("min-w-0", className)}>
-      <p className="text-[13px] text-on-dark-subtle">Done with the AI interview</p>
+      <p className="text-[13px] text-on-dark">Done with the AI interview</p>
       <p className="mt-1 flex items-baseline gap-2">
         <span className={cn("nums text-[2.5rem] font-light leading-none tracking-[-0.03em]", gold ? "text-accent-300" : "text-white")}>{n(data.interviewed)}</span>
-        <span className="nums text-sm text-on-dark-subtle">
+        <span className="nums text-sm text-on-dark">
           of {n(data.students)} students · {pct(data.interviewed, data.students)}%
         </span>
       </p>
@@ -68,14 +68,14 @@ export function MarksBars({ data, className }: { data: CategoriesData; className
   const max = Math.max(1, ...data.marks.map((b) => b.students));
   return (
     <div className={className}>
-      <p className="text-[13px] text-on-dark-subtle">CGPA / % bands</p>
+      <p className="text-[13px] text-on-dark">CGPA / % bands</p>
       <ul className="mt-2 space-y-1.5" aria-label="CGPA and percentage bands">
         {data.marks.map((b) => (
           <li key={b.key} className="grid grid-cols-[8rem_1fr_2rem] items-center gap-2 text-[13px]">
             <span className="flex items-baseline gap-1.5 whitespace-nowrap text-white">
               <Swatch fill={MARKS_FILL[b.key]} className="self-center" />
               {b.name}
-              <span className="nums text-[11px] text-on-dark-subtle">{b.range}</span>
+              <span className="nums text-[11px] text-on-dark">{b.range}</span>
             </span>
             <span className="h-2 rounded-full" style={{ background: white(0.07) }} aria-hidden>
               <span className="block h-full rounded-full" style={{ width: `${(b.students / max) * 100}%`, background: MARKS_FILL[b.key] }} />
@@ -84,7 +84,7 @@ export function MarksBars({ data, className }: { data: CategoriesData; className
           </li>
         ))}
       </ul>
-      {data.marksMissing > 0 ? <p className="nums mt-1.5 text-xs text-on-dark-subtle">{n(data.marksMissing)} with no CGPA or % on file</p> : null}
+      {data.marksMissing > 0 ? <p className="nums mt-1.5 text-xs text-on-dark">{n(data.marksMissing)} with no CGPA or % on file</p> : null}
     </div>
   );
 }
@@ -93,18 +93,18 @@ export function MarksBars({ data, className }: { data: CategoriesData; className
 export function MarksInline({ data, className }: { data: CategoriesData; className?: string }) {
   return (
     <div className={className}>
-      <p className="text-[13px] text-on-dark-subtle">CGPA / % bands</p>
+      <p className="text-[13px] text-on-dark">CGPA / % bands</p>
       <ul className="mt-2 flex flex-wrap gap-x-5 gap-y-1.5" aria-label="CGPA and percentage bands">
         {data.marks.map((b) => (
           <li key={b.key} className="nums flex items-baseline gap-1.5 text-[13px] text-white">
             <Swatch fill={MARKS_FILL[b.key]} className="self-center" />
             {b.name}
-            <span className="text-[11px] text-on-dark-subtle">{b.range}</span>
+            <span className="text-[11px] text-on-dark">{b.range}</span>
             <span className={cn("text-base", b.key === "top" && "text-accent-300")}>{n(b.students)}</span>
           </li>
         ))}
       </ul>
-      {data.marksMissing > 0 ? <p className="nums mt-1.5 text-xs text-on-dark-subtle">{n(data.marksMissing)} with no CGPA or % on file</p> : null}
+      {data.marksMissing > 0 ? <p className="nums mt-1.5 text-xs text-on-dark">{n(data.marksMissing)} with no CGPA or % on file</p> : null}
     </div>
   );
 }
@@ -114,7 +114,7 @@ export function YearBars({ data, className }: { data: CategoriesData; className?
   const max = Math.max(1, ...data.years.map((y) => y.students));
   return (
     <div className={className}>
-      <p className="text-[13px] text-on-dark-subtle">Year of study</p>
+      <p className="text-[13px] text-on-dark">Year of study</p>
       <ul className="mt-2 space-y-1.5" aria-label="Students by year">
         {data.years.map((y) => (
           <li key={y.year} className="grid grid-cols-[3.25rem_1fr_4.5rem] items-center gap-2 text-[13px]">
@@ -122,7 +122,7 @@ export function YearBars({ data, className }: { data: CategoriesData; className?
             <span className="flex h-2 overflow-hidden rounded-full" style={{ width: `${(y.students / max) * 100}%`, background: NOT_YET }} aria-hidden>
               <span style={{ width: `${pct(y.interviewed, y.students)}%`, background: DONE }} />
             </span>
-            <span className="nums text-right text-on-dark-subtle">
+            <span className="nums text-right text-on-dark">
               <span className="text-white">{n(y.interviewed)}</span>/{n(y.students)}
             </span>
           </li>
@@ -143,20 +143,20 @@ export function BandFigures({ data, className, withNotYet = false }: { data: Cat
           if (!b) return null;
           return (
             <li key={k} className="min-w-0">
-              <p className="flex items-center gap-1.5 text-[13px] text-on-dark-subtle">
+              <p className="flex items-center gap-1.5 text-[13px] text-on-dark">
                 <Swatch fill={COFFEE_FILL[k]} />
                 {b.name} <span className="nums text-[11px]">{b.range}</span>
               </p>
               <p className="mt-1 flex items-baseline gap-1.5">
                 <span className={cn("nums text-[1.75rem] font-light leading-none", k === "latte" ? "text-accent-300" : "text-white")}>{n(b.students)}</span>
-                <span className="nums text-xs text-on-dark-subtle">{pct(b.students, data.interviewed)}%</span>
+                <span className="nums text-xs text-on-dark">{pct(b.students, data.interviewed)}%</span>
               </p>
             </li>
           );
         })}
       {withNotYet ? (
         <li className="min-w-0">
-          <p className="flex items-center gap-1.5 text-[13px] text-on-dark-subtle">
+          <p className="flex items-center gap-1.5 text-[13px] text-on-dark">
             <Swatch fill={NOT_YET} />
             Not interviewed
           </p>
@@ -196,13 +196,13 @@ export function segments(d: CategoriesData["degrees"][number]) {
 export function YearInline({ data, className }: { data: CategoriesData; className?: string }) {
   return (
     <div className={className}>
-      <p className="text-[13px] text-on-dark-subtle">Year of study, done / students</p>
+      <p className="text-[13px] text-on-dark">Year of study, done / students</p>
       <ul className="mt-2 flex flex-wrap gap-x-6 gap-y-1.5" aria-label="Students by year">
         {data.years.map((y) => (
           <li key={y.year} className="nums flex items-baseline gap-1.5 whitespace-nowrap text-[13px] text-white">
             Year {y.year}
             <span className="text-base">{n(y.interviewed)}</span>
-            <span className="text-xs text-on-dark-subtle">/ {n(y.students)}</span>
+            <span className="text-xs text-on-dark">/ {n(y.students)}</span>
           </li>
         ))}
       </ul>

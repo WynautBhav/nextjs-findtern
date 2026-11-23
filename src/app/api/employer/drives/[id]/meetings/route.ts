@@ -4,10 +4,17 @@ import { z } from "zod";
 
 import { getSession } from "@/lib/auth";
 import { requireMutation } from "@/lib/guards-mutation";
-import { MEETING_DELAYS, requestMeeting, toView } from "@/lib/college/meetings";
+import { liveDriveStudents, MEETING_DELAYS, requestMeeting, toView, viewsForStudentsInDrive } from "@/lib/college/meetings";
 import { manualMeetingLink } from "@/lib/college/meeting-link";
 import { driveForEmployer, eligibleStudents } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
+import { heldElsewhereIds } from "@/lib/employer-pool";
+
+/**
+ * One answer for every student the employer can no longer call (an inactive account, one on hold, one held by another
+ * company's accepted offer or hire): the same words, so nothing hints at why. The status code is the same too (409), so nothing tells the cases apart.
+ */
+const STUDENT_UNAVAILABLE = { error: "This student is no longer available.", code: "candidate_unavailable" } as const;
 
 const bodySchema = z.object({
   userId: z.string().min(1),
@@ -26,7 +33,9 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
     .from(schema.collegeDriveMeetings)
     .where(and(eq(schema.collegeDriveMeetings.driveId, loaded.drive.id), eq(schema.collegeDriveMeetings.employerId, session!.uid), isNotNull(schema.collegeDriveMeetings.meetingLink)))
     .orderBy(desc(schema.collegeDriveMeetings.createdAt));
-  return NextResponse.json({ meetings: rows.map(toView) }, { headers: { "Cache-Control": "no-store" } });
+  // Cancelled only for a student who left the college, not for one the drive's rules stopped listing (R2-02).
+  const { live, labels } = await liveDriveStudents(loaded.drive.collegeId, rows.map((r) => r.userId));
+  return NextResponse.json({ meetings: viewsForStudentsInDrive(rows, live, labels) }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /** Ask a student for a call now, in 5 or in 10 minutes. */
@@ -47,6 +56,21 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   }
   const eligible = (await eligibleStudents(loaded.drive)).some((s) => s.userId === parsed.data.userId);
   if (!eligible) return NextResponse.json({ error: "Student not in this drive" }, { status: 404 });
+
+  // The candidate rules of the full-time offer route and the proposals route: an active intern account, not frozen
+  // (on hold), and not held by another company's accepted offer or running hire. Neutral wording: nothing about the other company.
+  const db = getDb();
+  const [candidate] = await db
+    .select({ role: schema.users.role, isActive: schema.users.isActive, frozenAt: schema.users.frozenAt })
+    .from(schema.users)
+    .where(eq(schema.users.id, parsed.data.userId))
+    .limit(1);
+  if (!candidate || candidate.role !== "intern") return NextResponse.json(STUDENT_UNAVAILABLE, { status: 404 });
+  // A disabled account answers exactly like one on hold or held elsewhere (same status, same message): the status code must not tell them apart (R4-02).
+  if (!candidate.isActive || candidate.frozenAt) return NextResponse.json(STUDENT_UNAVAILABLE, { status: 409 });
+  if ((await heldElsewhereIds(db, guard.session.uid, [parsed.data.userId])).has(parsed.data.userId)) {
+    return NextResponse.json(STUDENT_UNAVAILABLE, { status: 409 });
+  }
 
   const r = await requestMeeting({
     driveId: loaded.drive.id,

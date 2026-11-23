@@ -111,6 +111,28 @@ export function seatBatchForOrder(order: { id: string; collegeId: string; slots:
   };
 }
 
+export type LinkBlock = "denied" | "other_college" | "left";
+
+/**
+ * Whether confirm may tie a roster row to the matched account (and verify it into the college). Null: yes.
+ * Never for a student the placement office denied (only a restore brings them back), one who belongs to another
+ * college right now, or one who left THIS college (leaving is a decision; an import must not undo it).
+ * Such a row still gets its code; it just is not bound to that account, so nobody is told "accept your fee"
+ * for a seat they cannot take, and the code only works for whoever may actually use it.
+ */
+export function rosterLinkBlock(collegeId: string, a: { membership: { collegeId: string; leftAt: Date | null } | null; denied: boolean }): LinkBlock | null {
+  if (a.denied) return "denied";
+  const m = a.membership;
+  if (!m) return null;
+  if (m.collegeId === collegeId) return m.leftAt ? "left" : null;
+  return m.leftAt ? null : "other_college";
+}
+
+/** A seat batch gets a GST invoice (and a serial) only when money is due: a ₹0 batch (full credit) has nothing to tax. */
+export function invoiceNeeded(batchAmountMinor: number): boolean {
+  return batchAmountMinor > 0;
+}
+
 /** Regression guard for the retired college-code path: a batch that backs a drive order never raises the seat cap. */
 export function shouldRaiseSeatCap(batch: { driveOrderId: string | null | undefined }): boolean {
   return !batch.driveOrderId;
@@ -149,3 +171,31 @@ export function rupeesToMinor(raw: string): number | null {
   if (!/^\d+(\.\d{1,2})?$/.test(t)) return null;
   return Math.round(Number(t) * 100);
 }
+
+/**
+ * Own-college, LIVE membership only: a roster link creates the membership if the student has none, and upgrades a live
+ * one. It never moves a student between colleges and never revives one that ended (approved leave, or a college the
+ * student left); a student the placement office denied is skipped (only a restore brings them back). $1 user, $2 college.
+ */
+export const VERIFY_MEMBERSHIP_SQL =
+  "INSERT INTO college_memberships (user_id, college_id, status, verified_by) SELECT $1::varchar,$2::varchar,'verified','roster' WHERE NOT EXISTS (SELECT 1 FROM college_denials d WHERE d.college_id = $2::varchar AND d.user_id = $1::varchar) ON CONFLICT (user_id) DO UPDATE SET status = 'verified', verified_by = 'roster' WHERE college_memberships.college_id = EXCLUDED.college_id AND college_memberships.left_at IS NULL";
+
+/** Accounts a confirmed sheet may match: interns with a verified email or an exact (+91, phone), and still active (a disabled account is never offered or auto-linked). $1 emails, $2 phones. */
+export const IMPORT_CANDIDATE_USERS_SQL =
+  "SELECT id, email, email_verified, country_code, phone_number, first_name, last_name FROM users WHERE role = 'intern' AND is_active AND ((email = ANY($1::text[]) AND email_verified) OR (country_code = '+91' AND phone_number = ANY($2::text[])))";
+
+/** The identity-review queue: pending reviews whose candidate account is still active. $1 college. */
+export const PENDING_REVIEWS_SQL = `SELECT v.id, v.order_id, v.entry_id, v.candidate_intern_id, e.name AS entry_name, e.college_email_norm, e.phone_e164,
+            u.first_name, u.last_name, u.email AS candidate_email
+       FROM identity_reviews v
+       JOIN college_drive_orders o ON o.id = v.order_id
+       JOIN drive_roster_entries e ON e.id = v.entry_id
+       JOIN users u ON u.id = v.candidate_intern_id AND u.is_active
+      WHERE o.college_id = $1 AND v.status = 'pending' ORDER BY v.created_at LIMIT 200`;
+
+/** Why a review 'link' cannot give the student a membership of this college (409 text). */
+export const LINK_BLOCK_TEXT: Record<LinkBlock, string> = {
+  denied: "The placement office removed this student from the college; only they can add them back. The row was not linked.",
+  other_college: "This student is a member of another college right now. The row was not linked.",
+  left: "This student left the college; leaving is their decision, an import does not undo it. The row was not linked.",
+};

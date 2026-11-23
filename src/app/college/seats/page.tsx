@@ -3,7 +3,7 @@ import { desc, eq } from "drizzle-orm";
 import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
 import { ArcGauge, CollegeHero, HeroStat, HeroStats } from "@/components/college/kit";
 import { InvoiceDownload } from "@/components/college/invoice-download";
-import { seatInvoiceInput } from "@/lib/college/seat-invoice";
+import { seatInvoiceInput, seatInvoiceState } from "@/lib/college/seat-invoice";
 import { requireCollegeContext } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
 import { collegeHasDriveOrder } from "@/lib/drives/dashboard-db";
@@ -87,12 +87,12 @@ export default async function SeatsPage() {
               <div aria-hidden className="mx-5 border-t border-dashed border-ink-200 sm:mx-6" />
               <div className="flex flex-1 flex-wrap items-center justify-between gap-3 p-5 sm:p-6">
                 <div className="min-w-0 text-sm text-ink-700">
-                  <p className="nums">{formatDate(b.paidAt ?? b.createdAt)}{b.status === "paid" ? ` · Invoice ${b.invoiceNumber}` : ""}</p>
+                  <p className="nums">{formatDate(b.paidAt ?? b.createdAt)}{{ none: "", serial: ` · Invoice ${b.invoiceNumber}`, pending: " · Invoice pending", covered: " · Covered by your credit, no invoice" }[seatInvoiceState(b)]}</p>
                   {b.status === "pending" && seller.bank ? (
                     <p className="mt-1">Pay {money(b.amountMinor)} to Findtern: {seller.bank.bankName}, a/c {seller.bank.accountNumber}, IFSC {seller.bank.ifsc}</p>
                   ) : null}
                 </div>
-                {b.status === "paid" ? <InvoiceDownload html={taxInvoiceHtml(seatInvoiceInput(b, ctx.college, seller))} fileName={`Invoice-${b.invoiceNumber}.pdf`} /> : null}
+                {seatInvoiceState(b) === "serial" ? <InvoiceDownload html={taxInvoiceHtml(seatInvoiceInput(b, ctx.college, seller))} fileName={`Invoice-${b.invoiceNumber}.pdf`} /> : null}
               </div>
             </li>
           ))}

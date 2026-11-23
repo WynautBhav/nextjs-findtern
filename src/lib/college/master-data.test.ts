@@ -123,3 +123,17 @@ test("every student in a drive call is reachable by one drive-call filter, and a
   assert.equal(matchesOutcome(m({ total: 1 }), "meet-other"), true);
   assert.equal(matchesOutcome(m({ total: 1 }), "not-accepted"), false);
 });
+
+// SYNC-01 / SYNC-02 (data-sync audit): what the student typed must reach the TPO's list.
+test("skills saved by the onboarding form ({id,name,rating} objects) reach the master data row and CSV", () => {
+  const r = buildMasterRow(student(), extras({ skills: [{ id: "skill-1", name: "SQL", rating: 2 }, { id: "skill-2", name: "Python", rating: 2 }, "Excel"] }));
+  assert.deepEqual(r.skills, ["SQL", "Python", "Excel"]);
+  assert.equal(cellText(r, "skills"), "SQL, Python, Excel");
+});
+
+test("a verified student with no onboarding record still shows the phone and LinkedIn the Students page shows", () => {
+  const r = buildMasterRow(student(), undefined);
+  assert.equal(r.phone, "+91 98290 00000");
+  assert.equal(r.linkedin, "https://linkedin.com/in/asha");
+  assert.equal(buildMasterRow(student({ status: "claimed" }), undefined).phone, null, "an unverified student keeps only name/email/year/course/branch");
+});

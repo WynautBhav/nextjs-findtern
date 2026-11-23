@@ -4,12 +4,13 @@ import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { requireRole } from "@/lib/auth";
 import { driveWindow } from "@/lib/college/access";
-import { toView } from "@/lib/college/meetings";
+import { liveDriveStudents, viewsForStudentsInDrive } from "@/lib/college/meetings";
 import { ONLINE_WINDOW_MS, driveForEmployer, eligibleStudents } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
 import { displayNameOf, initialsOf, readSkills } from "@/lib/employer-candidates";
 import { candidatePoolClauses } from "@/lib/employer-pool";
 import { hiredInternIds } from "@/lib/employer-visibility";
+import { inIdList } from "@/lib/sql-ids";
 import { isProjectOpen } from "@/lib/project-locations";
 import { timezoneForLocation } from "@/lib/timezones";
 import { HeroPanel } from "@/components/employer/kit/hero-panel";
@@ -118,7 +119,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
           .select({ userId: schema.users.id })
           .from(schema.users)
           .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-          .where(and(inArray(schema.users.id, ids), ...candidatePoolClauses()))
+          .where(and(inIdList(schema.users.id, ids), ...candidatePoolClauses()))
       : Promise.resolve([]),
   ]);
   // Full-time drives: the employer offers a full-time role from the card (1% hiring fee), filed under one of its projects.
@@ -166,6 +167,9 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
     };
   });
 
+  // A call reads cancelled only for a student who is no longer a live member of this college, not for one the drive's rules stopped listing.
+  const callStudents = await liveDriveStudents(drive.collegeId, meetings.map((m) => m.userId));
+
   return (
     <div>
       <DriveAssociation collegeName={college.name} logoUrl={college.logoUrl} />
@@ -174,7 +178,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
         driveId={drive.id}
         fullTime={fullTime}
         candidates={candidates}
-        initialMeetings={meetings.map(toView)}
+        initialMeetings={viewsForStudentsInDrive(meetings, callStudents.live, callStudents.labels)}
         offerAs={offerAs}
       />
     </div>
