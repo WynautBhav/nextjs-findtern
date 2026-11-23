@@ -82,3 +82,26 @@ test("B-62 covers full-time lines at order creation; only a due month is exempt"
   const lines = [{ id: "new" }, { id: "ft", fullTime: true }, { id: "due", due: { monthsPaid: 1 } }];
   assert.deepEqual(hireGateLines(lines).map((l) => l.id), ["new", "ft"]);
 });
+
+// PM-01: joining by a college code writes accountType "college" onto the profile; the onboarding step then wants the membership proof.
+test("a college-account intern with a code-verified membership may be hired", () => {
+  const r = row({ accountType: "college" });
+  assert.deepEqual(hireGateDecision(r, docs, true), { ok: true });
+});
+
+test("a college-account intern whose membership no code backs (claimed, left) is still refused", () => {
+  const r = row({ accountType: "college" });
+  for (const d of [hireGateDecision(r, docs), hireGateDecision(r, docs, false)]) {
+    assert.equal(d.ok, false);
+    if (!d.ok) assert.deepEqual(d.missing, ["accountType"]);
+  }
+});
+
+test("an individual account is unaffected by the membership", () => {
+  assert.deepEqual(hireGateDecision(row({ accountType: "individual" }), docs, false), { ok: true });
+  assert.deepEqual(hireGateDecision(row({ accountType: "individual" }), docs, true), { ok: true });
+});
+
+test("a code-backed membership never rescues an otherwise incomplete profile", () => {
+  assert.equal(hireGateDecision(row({ accountType: "college", languages: [] }), docs, true).ok, false);
+});
