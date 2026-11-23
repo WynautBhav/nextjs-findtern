@@ -1,13 +1,20 @@
 import { z } from "zod";
 
+/** Dates outside this window are typos (and years past Postgres' timestamp range answer a 500). */
+const MIN_DATE = Date.UTC(2000, 0, 1);
+const MAX_DATE = Date.UTC(2101, 0, 1);
+const sensibleDate = z.coerce
+  .date()
+  .refine((d) => d.getTime() >= MIN_DATE && d.getTime() < MAX_DATE, { message: "Pick a date between 2000 and 2100" });
+
 /** Drive builder payload, shared by create and update. */
 export const driveInput = z
   .object({
     title: z.string().trim().min(3, "Give the drive a name").max(120),
     kind: z.enum(["internship", "full_time"]),
     description: z.string().trim().max(2000).optional().default(""),
-    startsAt: z.coerce.date(),
-    endsAt: z.coerce.date(),
+    startsAt: sensibleDate,
+    endsAt: sensibleDate,
     eligibility: z
       .object({
         minCgpa: z.number().min(0).max(10).optional(),

@@ -5,6 +5,7 @@ import { currentAdminPermissions } from "@/lib/account-status";
 import { ensureAdminRolesOnce } from "@/lib/admin/roles-seed";
 import { readSession, renewSession, type SessionData } from "@/lib/security/session";
 import { internUnlockState } from "@/lib/intern-unlock";
+import { jsonTextHasNul, urlHasNul } from "@/lib/security/nul-guard";
 import { lockEnabled, lockVerdict, lockedHref, needsLookup } from "@/lib/intern-lock";
 
 /**
@@ -34,6 +35,13 @@ export async function proxy(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
   const session = readSession(req.cookies.get("ft_sid")?.value);
   const isApi = pathname.startsWith("/api/");
+
+  // A NUL byte in a path id, query or JSON string would reach Postgres, which rejects it: refuse it up front (400).
+  if (urlHasNul(req.url)) return nulRefusal(isApi);
+  if (isApi && /^(POST|PUT|PATCH|DELETE)$/.test(req.method) && /json/i.test(req.headers.get("content-type") ?? "")) {
+    const text = await req.clone().text().catch(() => "");
+    if (jsonTextHasNul(text)) return nulRefusal(true);
+  }
 
   if (pathname === "/admin" || pathname.startsWith("/admin/") || pathname.startsWith("/api/admin")) {
     return withRenewal(req, session, await adminGate(req, session, pathname, isApi));
@@ -65,6 +73,12 @@ export async function proxy(req: NextRequest) {
   const headers = new Headers(req.headers);
   headers.set("x-ft-path", `${pathname}${search}`);
   return withRenewal(req, session, NextResponse.next({ request: { headers } }));
+}
+
+function nulRefusal(isApi: boolean): NextResponse {
+  return isApi
+    ? NextResponse.json({ error: "That request has an invalid character." }, { status: 400 })
+    : new NextResponse("Not found", { status: 404 });
 }
 
 /**
