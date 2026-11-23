@@ -147,8 +147,9 @@ export function SendProposalForm({
   const [officeDays, setOfficeDays] = useState("3");
   const week = workingDaysPerWeek(schedule);
   const homeDays = String(Math.max(0, week - (Number(officeDays) || 0)));
-  const [shiftFrom, setShiftFrom] = useState("");
-  const [shiftTo, setShiftTo] = useState("");
+  // Owner, 23 Nov: a fresh offer starts on 9 to 5 (an empty time box opened on the current time); both stay editable.
+  const [shiftFrom, setShiftFrom] = useState("09:00");
+  const [shiftTo, setShiftTo] = useState("17:00");
   // No intern works more than 8 hours: a later start pulls the end in, and an end
   // typed past the limit is flagged where it is typed.
   const shiftLimit = isClockTime(shiftFrom) ? `Up to 8 hours: a start at ${shiftFrom} can end by ${latestShiftEnd(shiftFrom)}.` : "Up to 8 hours.";

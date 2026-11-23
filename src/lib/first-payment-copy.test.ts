@@ -25,3 +25,10 @@ test("the dashboard and the composer use these words", () => {
   assert.match(dash, /detail: FIRST_PAYMENT_EXPLAINER/);
   assert.match(form, /firstPaymentNote\(candidate\.scored \? candidate\.score : null\)/);
 });
+
+test("a new offer's shift starts on 9 to 5, not empty (the time box opened on the current time; owner, 23 Nov)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync("src/components/employer/send-proposal-form.tsx", "utf8");
+  assert.match(src, /useState\("09:00"\)/);
+  assert.match(src, /useState\("17:00"\)/);
+});
