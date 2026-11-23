@@ -42,3 +42,9 @@ test("a malformed legacy number is not locked, so the intern can correct it", ()
   assert.equal(lockedIdField({ aadhaarNumber: "12345" }, { aadhaarNumber: "234567890123" }), null);
   assert.equal(lockedIdField({ panNumber: "BAD" }, { panNumber: "ABCDE1234F" }), null);
 });
+
+test("a legacy Aadhaar starting with 0 or 1 does not lock, so the intern can correct it to a real one", () => {
+  assert.equal(lockedIdField({ aadhaarNumber: "123456789012" }, { aadhaarNumber: "234567890123" }), null);
+  assert.equal(lockedIdField({ aadhaarNumber: "0123 4567 8901" }, { aadhaarNumber: "234567890123" }), null);
+  assert.equal(lockedIdField({ aadhaarNumber: "234567890123" }, { aadhaarNumber: "345678901234" }), "aadhaarNumber");
+});

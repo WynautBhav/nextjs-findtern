@@ -47,7 +47,8 @@ function missingFields(row: OnboardingLike | null | undefined, docs: ProfileDocs
   if (!(typeof extra.profileSubmittedAt === "string" && extra.profileSubmittedAt !== "")) out.push("profileSubmittedAt");
   if (!Array.isArray(extra.languages) || extra.languages.length === 0) out.push("languages");
   const draft = { ...emptyDraft(), ...draftFromRecord(row) };
-  for (const step of VALIDATED_STEPS) out.push(...Object.keys(validateStep(draft, step, docs)));
+  const ctx = { ...docs, storedAadhaar: row.aadhaarNumber ?? "" };
+  for (const step of VALIDATED_STEPS) out.push(...Object.keys(validateStep(draft, step, ctx)));
   return out;
 }
 

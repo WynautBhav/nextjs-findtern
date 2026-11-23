@@ -577,7 +577,7 @@ export function storedFromDraft(
     const a = draft.academics;
     const prev = obj(prevExtra.academics);
     const level = a.qualificationLevel ?? LEVELS.find(([k]) => k === text(prev.level))?.[1] ?? text(prev.level);
-    const score = a.cgpa?.trim() ?? text(prev.score);
+    const score = a.cgpa !== undefined ? bareScore(a.cgpa) : text(prev.score);
     out.extraPatch.academics = {
       ...prev,
       level: LEVELS.find(([, v]) => v === level)?.[0] ?? level ?? "",
@@ -693,7 +693,7 @@ function writeProfessional(q: QualificationEntry, prev: Record<string, unknown>)
     // Legacy clears the date while the course is still being pursued.
     completionDate: status === "Pursuing" ? "" : q.completionDate.trim(),
     scoreType: q.scoreType || text(prev.scoreType) || "percentage",
-    score: (q.score ?? text(prev.score)).trim(),
+    score: bareScore(q.score ?? text(prev.score)),
     certificateUploads: q.uploads ?? arr(prev.certificateUploads),
     credentialUrl: q.credentialUrl.trim(),
   };
@@ -1090,6 +1090,11 @@ export function linkedinHref(raw: string | null | undefined): string | null {
   const v = (raw ?? "").trim();
   if (!LINKEDIN.test(v)) return null;
   return /^https?:\/\//i.test(v) ? v : `https://${v}`;
+}
+
+/** A score is stored as the number only: "7.5%" is accepted when typed (see `scoreProblem`), never kept with the sign. */
+export function bareScore(raw: string): string {
+  return raw.trim().replace(/\s*%$/, "");
 }
 
 export function scoreProblem(type: ScoreType | "", raw: string): string | null {
