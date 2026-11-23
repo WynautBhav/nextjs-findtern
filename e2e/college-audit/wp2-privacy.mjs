@@ -99,6 +99,19 @@ if (/(^|,)"[=+\-@\t\r]/m.test(csv.replace(/^\uFEFF/, ""))) fail("raw CSV has a q
 // Tampered request: foreign / unknown ids and columns.
 const t = await s.post("/api/college/students/export", { columns: ["name", "email", "nonsense", "__proto__"], userIds: ["00000000-0000-0000-0000-000000000000", "x'; drop table users;--"] });
 t.status === 400 ? ok("tampered ids/columns: 400") : fail(`tampered ids: ${t.status}`);
+// A student who belongs to another college, or who left, cannot be added by a tampered id list.
+const other = (await db.query(`select id from colleges where id <> (select college_id from college_admins where email='tpo@jklu.edu.in') limit 1`)).rows[0].id;
+const victims = (await db.query(`select m.user_id, m.college_id, u.email from college_memberships m join users u on u.id=m.user_id where m.status='verified' and m.left_at is null and m.college_id = (select college_id from college_admins where email='tpo@jklu.edu.in') order by u.email desc limit 2`)).rows;
+try {
+  await db.query(`update college_memberships set college_id=$2 where user_id=$1`, [victims[0].user_id, other]);
+  await db.query(`update college_memberships set left_at=now() at time zone 'utc' where user_id=$1`, [victims[1].user_id]);
+  const r = await s.post("/api/college/students/export", { columns: ["name", "email"], userIds: [victims[0].user_id, victims[1].user_id, claimed[0].id] });
+  const rows = parseCsv((await r.text()).replace(/^\uFEFF/, "")).slice(1).map((x) => x[1]);
+  rows.length === 1 && rows[0] === claimed[0].email ? ok("export drops another college's student and a student who left") : fail(`export with foreign/left ids returned ${JSON.stringify(rows)}`);
+} finally {
+  await db.query(`update college_memberships set college_id=$2 where user_id=$1`, [victims[0].user_id, victims[0].college_id]);
+  await db.query(`update college_memberships set left_at=null where user_id=$1`, [victims[1].user_id]);
+}
 await db.end();
 console.log(bad.length ? `\nWP2 privacy: ${bad.length} FAIL` : "\nWP2 privacy: PASS");
 process.exit(bad.length ? 1 : 0);
