@@ -88,9 +88,9 @@ export const OUTCOMES: { key: Exclude<Outcome, "">; label: string }[] = [
   { key: "meet-waiting", label: "Meeting not answered yet" },
   { key: "not-accepted", label: "Didn't accept a meeting" },
   { key: "meet-other", label: "Meeting missed, called off or not closed" },
-  { key: "call-took", label: "Took a drive meet" },
-  { key: "call-waiting", label: "Drive meet not answered yet" },
-  { key: "call-not-taken", label: "Didn't take a drive meet" },
+  { key: "call-took", label: "Drive meets: accepted" },
+  { key: "call-waiting", label: "Drive meets: not answered" },
+  { key: "call-not-taken", label: "Drive meets: declined or lapsed" },
 ];
 const withdrawnOf = (r: MasterRow) => r.offers - r.offersAccepted - r.offersRejected - r.offersLapsed - r.offersOpen;
 const meetOtherOf = (m: Meetings) => m.total - m.done - m.notAccepted - m.upcoming - m.waiting;
@@ -364,11 +364,11 @@ export function offerReplies(r: Pick<MasterRow, "offersAccepted" | "offersReject
     .join(" · ");
 }
 
-/** A student's live drive calls, e.g. "1 accepted · 1 not taken"; "" with none. */
+/** A student's live drive calls, e.g. "1 accepted · 1 declined or lapsed"; "" with none. */
 export function driveCalls(m: Pick<Meetings, "callsAccepted" | "callsNotTaken" | "callsWaiting">): string {
   return [
     [m.callsAccepted, "accepted"],
-    [m.callsNotTaken, "not taken"],
+    [m.callsNotTaken, "declined or lapsed"],
     [m.callsWaiting, "waiting"],
   ]
     .filter(([n]) => (n as number) > 0)

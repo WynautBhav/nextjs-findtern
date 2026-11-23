@@ -7,6 +7,9 @@
  *
  *   DATABASE_URL=postgresql://…@127.0.0.1:5435/<db> node e2e/seed-local-college.mjs          # dry run, rolled back
  *   DATABASE_URL=postgresql://…@127.0.0.1:5435/<db> node e2e/seed-local-college.mjs --yes    # wipe and seed
+ *   DATABASE_URL=postgresql://…@127.0.0.1:5435/<db> node e2e/seed-local-college.mjs --refresh-meets
+ *       # no wipe: the open drive meet requests start again (a request lapses 10 minutes after its start, so the
+ *       # "Meets not answered" list empties itself about 20 minutes after seeding; run this before testing it)
  *
  * LOCAL ONLY: refuses any host that is not 127.0.0.1 / localhost. It empties accounts, activity and payments (rows
  * only; the schema, migration record, colleges, plans, settings, terms and website_* content stay), then seeds. One
@@ -168,6 +171,18 @@ async function main() {
   await client.connect();
   const q = (sql, params = []) => client.query(sql, params);
   const one = async (sql, params) => (await q(sql, params)).rows[0];
+  if (process.argv.includes("--refresh-meets")) {
+    // The seed's open requests are the ones asked "in 10 minutes" (start = request + 10 min); the lapsed and answered
+    // ones use 0 or 5. Each open one is asked again now, starting in 1-9 minutes, as the app would make it.
+    const r = await q(`WITH open AS (SELECT id, row_number() OVER (ORDER BY id) AS k FROM college_drive_meetings
+                         WHERE status = 'requested' AND starts_at - created_at = interval '10 minutes')
+                       UPDATE college_drive_meetings m SET starts_at = (now() AT TIME ZONE 'UTC') + make_interval(mins => (1 + open.k % 9)::int),
+                         created_at = (now() AT TIME ZONE 'UTC') + make_interval(mins => (1 + open.k % 9)::int) - interval '10 minutes'
+                       FROM open WHERE m.id = open.id`);
+    console.log(`[seed-local] ${r.rowCount} open meet requests start again in 1-9 minutes (they lapse 10 minutes after that).`);
+    await client.end();
+    return;
+  }
   console.log(`[seed-local] ${host}/${new URL(url).pathname.slice(1)}  mode: ${COMMIT ? "WRITE (--yes)" : "dry run (rolled back)"}`);
 
   await q("BEGIN");
@@ -457,9 +472,11 @@ async function main() {
       const e = employers[i % employers.length];
       await q(`INSERT INTO college_drive_shortlist (drive_id, employer_id, user_id, created_at) VALUES ($1,$2,$3,$4) ON CONFLICT DO NOTHING`, [liveIntern.id, e.id, s.id, at(-(i % 40) * HOUR)]);
       if (i % 3 !== 0) continue;
-      const status = ["requested", "accepted", "declined", "requested", "accepted"][i % 5];
-      // Waiting ones start in 1-9 minutes (asked "in 10 minutes"); answered ones were hours ago.
+      // Waiting ones start in 1-9 minutes (asked "in 10 minutes"); "lapsed" ones were asked hours ago and never answered
+      // (asked "in 5 minutes", so --refresh-meets leaves them lapsed); answered ones were hours ago.
+      const status = ["lapsed", "accepted", "declined", "requested", "accepted"][i % 5];
       if (status === "requested") await call(liveIntern.id, e.id, s.id, status, at((1 + (i % 9)) * 60_000), 10);
+      else if (status === "lapsed") await call(liveIntern.id, e.id, s.id, "requested", at(-(1 + (i % 30)) * HOUR), 5);
       else await call(liveIntern.id, e.id, s.id, status, at(-(1 + (i % 30)) * HOUR), [0, 5, 10][i % 3]);
     }
     const finalYears = students.filter((s) => s.year === 4 && ["live", "ft_offer_sent"].includes(s.stage)).slice(0, 15);

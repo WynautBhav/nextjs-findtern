@@ -69,7 +69,7 @@ function expected(id) {
     meetingsMissed: String(iv.filter((r) => r.status === "missed").length),
     driveCalls: join([
       [cs.filter((c) => c.status === "accepted").length, "accepted"],
-      [cs.filter((c) => ["declined", "expired"].includes(c.status) || (c.status === "requested" && !waiting(c))).length, "not taken"],
+      [cs.filter((c) => ["declined", "expired"].includes(c.status) || (c.status === "requested" && !waiting(c))).length, "declined or lapsed"],
       [cs.filter(waiting).length, "waiting"],
     ]),
     offerReplies: join([
