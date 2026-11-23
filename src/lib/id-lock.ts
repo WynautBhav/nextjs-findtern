@@ -6,7 +6,8 @@
 
 export const ID_LOCKED_MESSAGE = "Saved and locked. To change it, write to us.";
 
-const WELL_FORMED = { aadhaarNumber: /^\d{12}$/, panNumber: /^[A-Z]{5}\d{4}[A-Z]$/ } as const;
+// Aadhaar never starts with 0 or 1: a legacy number that does is still accepted on submit (INT-30) but does not lock.
+const WELL_FORMED = { aadhaarNumber: /^[2-9]\d{11}$/, panNumber: /^[A-Z]{5}\d{4}[A-Z]$/ } as const;
 
 const squash = (v: unknown) => (typeof v === "string" ? v.replace(/\s/g, "").toUpperCase() : "");
 

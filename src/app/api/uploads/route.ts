@@ -1,15 +1,17 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
 import { ID_LOCKED_MESSAGE, cardImageLocked } from "@/lib/id-lock";
+import { fillFromOlder } from "@/lib/intern-docs-merge";
+import { withInternLock, type InternTx } from "@/lib/intern-save-lock";
 import { requireMutation } from "@/lib/guards-mutation";
 import { MAX_MARKSHEETS } from "@/lib/onboarding";
 import { bucketKey, clientIp, limiters } from "@/lib/security/rate-limit";
 import type { SessionData } from "@/lib/security/session";
 import { signedUrl } from "@/lib/security/sign";
 import { put, type StoredFile } from "@/lib/security/store";
-import { KINDS, MB, checkType, maxFor, prepareUpload, readBodyCapped } from "@/lib/security/upload-rules";
+import { MB, checkType, kindFor, maxFor, prepareUpload, readBodyCapped } from "@/lib/security/upload-rules";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,7 +38,7 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const kindName = req.headers.get("x-document-kind") ?? "";
-  const kind = KINDS[kindName];
+  const kind = kindFor(kindName);
   if (!kind || !kind.roles.includes(session.role)) {
     return NextResponse.json({ error: "You can't upload that here" }, { status: 400 });
   }
@@ -46,6 +48,7 @@ export async function POST(req: Request): Promise<Response> {
       .select({ aadhaarImageName: schema.internDocuments.aadhaarImageName, panImageName: schema.internDocuments.panImageName })
       .from(schema.internDocuments)
       .where(eq(schema.internDocuments.userId, session.uid))
+      .orderBy(desc(schema.internDocuments.createdAt))
       .limit(1);
     if (cardImageLocked(kindName, doc)) return NextResponse.json({ error: ID_LOCKED_MESSAGE, code: "id_locked" }, { status: 409 });
   }
@@ -78,7 +81,11 @@ export async function POST(req: Request): Promise<Response> {
   const { contentType, fileName } = prepared;
 
   const stored = await put(kind.isPublic ? "public" : session.uid, prepared.bytes, contentType, kind.max);
-  await attach(kindName, session, stored, fileName);
+  // Same lock as the onboarding save, so parallel uploads for one intern take turns on one row; the card-image lock is
+  // checked again inside it (the check above can be passed by two requests at once).
+  if ((await withInternLock(session.uid, (tx) => attach(tx, kindName, session, stored, fileName))) === "locked") {
+    return NextResponse.json({ error: ID_LOCKED_MESSAGE, code: "id_locked" }, { status: 409 });
+  }
 
   return NextResponse.json(
     {
@@ -98,6 +105,7 @@ async function marksheetCount(uid: string): Promise<number> {
     .select({ extra: schema.internOnboarding.extraData })
     .from(schema.internOnboarding)
     .where(eq(schema.internOnboarding.userId, uid))
+    .orderBy(desc(schema.internOnboarding.createdAt))
     .limit(1);
   const list = ((row?.extra as { academics?: { marksheetUploads?: unknown } } | undefined)?.academics?.marksheetUploads);
   return Array.isArray(list) ? list.length : 0;
@@ -112,18 +120,16 @@ function decodeFileName(raw: string): string {
   }
 }
 
-/** Link the stored file to its record. */
-async function attach(kind: string, session: SessionData, f: StoredFile, fileName: string) {
-  const db = getDb();
+/** Link the stored file to its record. Runs under `withInternLock`; "locked" means a card image was saved meanwhile. */
+async function attach(db: InternTx, kind: string, session: SessionData, f: StoredFile, fileName: string): Promise<"locked" | undefined> {
   if (kind in DOC_COLUMNS) {
     const [name, type, size] = DOC_COLUMNS[kind as keyof typeof DOC_COLUMNS];
     const values = { [name]: f.key, [type]: f.contentType, [size]: f.bytes, updatedAt: new Date() };
-    const [doc] = await db
-      .select({ id: schema.internDocuments.id })
-      .from(schema.internDocuments)
-      .where(eq(schema.internDocuments.userId, session.uid))
-      .limit(1);
-    if (doc) await db.update(schema.internDocuments).set(values).where(eq(schema.internDocuments.id, doc.id));
+    // Readers use the newest row, so that is the one written (older duplicates are left alone, their files copied in).
+    const rows = await db.select().from(schema.internDocuments).where(eq(schema.internDocuments.userId, session.uid)).orderBy(desc(schema.internDocuments.createdAt));
+    const [doc] = rows;
+    if (cardImageLocked(kind, doc)) return "locked";
+    if (doc) await db.update(schema.internDocuments).set({ ...fillFromOlder(rows), ...values }).where(eq(schema.internDocuments.id, doc.id));
     else await db.insert(schema.internDocuments).values({ userId: session.uid, ...values });
     return;
   }
@@ -133,6 +139,7 @@ async function attach(kind: string, session: SessionData, f: StoredFile, fileNam
       .select({ id: schema.internOnboarding.id, extra: schema.internOnboarding.extraData })
       .from(schema.internOnboarding)
       .where(eq(schema.internOnboarding.userId, session.uid))
+      .orderBy(desc(schema.internOnboarding.createdAt))
       .limit(1);
     const extra = (row?.extra ?? {}) as Record<string, unknown>;
     const academics = (extra.academics ?? {}) as Record<string, unknown>;
@@ -142,7 +149,7 @@ async function attach(kind: string, session: SessionData, f: StoredFile, fileNam
       // `originalName` is the legacy key (INT-23); `label` is what the documents page reads.
       academics: { ...academics, marksheetUploads: [...list, { name: f.key, originalName: fileName, label: fileName, type: f.contentType, size: f.bytes }] },
     };
-    if (row) await db.update(schema.internOnboarding).set({ extraData }).where(eq(schema.internOnboarding.id, row.id));
+    if (row) await db.update(schema.internOnboarding).set({ extraData, updatedAt: new Date() }).where(eq(schema.internOnboarding.id, row.id));
     else await db.insert(schema.internOnboarding).values({ userId: session.uid, extraData });
     return;
   }

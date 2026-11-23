@@ -55,8 +55,8 @@ export const loadInternData = cache(async (uid: string) => {
     db.select().from(schema.interviews).where(eq(schema.interviews.internId, uid)).orderBy(desc(schema.interviews.createdAt)),
     db.select().from(schema.timesheets).where(eq(schema.timesheets.internId, uid)).orderBy(desc(schema.timesheets.createdAt)),
     db.select().from(schema.internPayouts).where(eq(schema.internPayouts.internId, uid)).orderBy(desc(schema.internPayouts.createdAt)),
-    db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, uid)).limit(1),
-    db.select().from(schema.internDocuments).where(eq(schema.internDocuments.userId, uid)).limit(1),
+    db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, uid)).orderBy(desc(schema.internOnboarding.createdAt)).limit(1),
+    db.select().from(schema.internDocuments).where(eq(schema.internDocuments.userId, uid)).orderBy(desc(schema.internDocuments.createdAt)).limit(1),
     // The employers behind this intern's proposals and interviews, in the same round trip (a sub-select, not a second
     // wave keyed on the rows above): the names below are only read for ids in those two lists, so a superset-free exact set.
     db

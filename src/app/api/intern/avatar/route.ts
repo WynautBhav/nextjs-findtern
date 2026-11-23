@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { getSession, unauthenticatedResponse } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
 import { readAny } from "@/lib/security/store";
@@ -48,6 +48,7 @@ export async function GET(req: Request) {
     })
     .from(schema.internDocuments)
     .where(eq(schema.internDocuments.userId, targetId))
+    .orderBy(desc(schema.internDocuments.createdAt))
     .limit(1);
 
   // Only photos uploaded to Findtern are served. This used to redirect to any

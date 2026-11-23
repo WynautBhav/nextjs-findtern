@@ -51,6 +51,11 @@ export const KINDS: Record<string, UploadKind> = {
   support: { roles: ["intern", "employer"], types: [...DOCS, ...VIDEO], internTypes: [...IMAGES, ...VIDEO], max: 10 * MB },
 };
 
+/** The declared kind for a header value; names like "constructor" or "__proto__" are not kinds. */
+export function kindFor(name: string): UploadKind | undefined {
+  return Object.hasOwn(KINDS, name) ? KINDS[name] : undefined;
+}
+
 /** The size limit for one upload: images are held to IMAGE_MAX whatever the kind's own max, PDFs and videos to the kind's. */
 export function maxFor(kind: UploadKind, type: string): number {
   return IMAGES.includes(type) ? Math.min(kind.max, IMAGE_MAX) : kind.max;

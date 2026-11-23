@@ -32,5 +32,6 @@ export function isProfileSubmittedComplete(row: OnboardingLike | null | undefine
   if (!submitted && !scored) return false;
   // The form pre-fills Hindi and English when none are stored, so "passes the form" alone would count an untouched step.
   if (!Array.isArray(extra.languages) || extra.languages.length === 0) return false;
-  return validateProfile({ ...emptyDraft(), ...draftFromRecord(row) }, docs) === null;
+  // The number on file is not re-judged (a legacy Aadhaar starting 0 or 1), exactly as the final submit does (INT-30).
+  return validateProfile({ ...emptyDraft(), ...draftFromRecord(row) }, { ...docs, storedAadhaar: row.aadhaarNumber ?? "" }) === null;
 }

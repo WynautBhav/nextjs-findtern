@@ -135,3 +135,8 @@ test("an individual account is unaffected by the membership", () => {
 test("a code-backed membership never rescues an otherwise incomplete profile", () => {
   assert.equal(hireGateDecision(row({ accountType: "college", languages: [] }), { ...docs, collegeVerified: true }).ok, false);
 });
+
+test("a legacy Aadhaar starting with 1 on file is accepted by the gate, as the final submit accepts it (INT-30)", () => {
+  assert.deepEqual(hireGateDecision(row({}, { aadhaarNumber: "123456789012" }), docs), { ok: true });
+  assert.deepEqual(hireGateDecision(row({}, { aadhaarNumber: "0123 4567 8901" }), docs), { ok: true });
+});

@@ -1,4 +1,5 @@
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
+import { withInternLock } from "@/lib/intern-save-lock";
 import { ID_LOCKED_MESSAGE, lockedIdField } from "@/lib/id-lock";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -271,6 +272,7 @@ export async function POST(req: Request) {
     .select()
     .from(schema.internOnboarding)
     .where(eq(schema.internOnboarding.userId, session.uid))
+    .orderBy(desc(schema.internOnboarding.createdAt))
     .limit(1);
   const saved = existing ? draftFromRecord(existing) : {};
   // A saved Aadhaar or PAN number is locked (23 Nov): a different one is refused; the same one or none is fine.
@@ -349,6 +351,7 @@ export async function POST(req: Request) {
     })
     .from(schema.internDocuments)
     .where(eq(schema.internDocuments.userId, session.uid))
+    .orderBy(desc(schema.internDocuments.createdAt))
     .limit(1);
   const docs = { hasPanImage: Boolean(docRow?.pan), hasAadhaarImage: Boolean(docRow?.aadhaar), hasPhoto: Boolean(docRow?.photo) };
 
@@ -493,10 +496,22 @@ export async function POST(req: Request) {
   };
 
   try {
-    if (existing) {
-      await db.update(schema.internOnboarding).set(values).where(eq(schema.internOnboarding.id, existing.id));
-    } else {
-      await db.insert(schema.internOnboarding).values(values);
+    // Parallel first saves each read "no row yet" above; under the per-intern lock the latest row is read again, so one
+    // row is written, and a save built on an older read (another save or upload landed meanwhile) is refused, not merged blind.
+    const outcome = await withInternLock(session.uid, async (tx) => {
+      const [fresh] = await tx
+        .select()
+        .from(schema.internOnboarding)
+        .where(eq(schema.internOnboarding.userId, session.uid))
+        .orderBy(desc(schema.internOnboarding.createdAt))
+        .limit(1);
+      if (fresh?.id !== existing?.id || fresh?.updatedAt?.getTime() !== existing?.updatedAt?.getTime()) return "changed" as const;
+      if (fresh) await tx.update(schema.internOnboarding).set(values).where(eq(schema.internOnboarding.id, fresh.id));
+      else await tx.insert(schema.internOnboarding).values(values);
+      return "saved" as const;
+    });
+    if (outcome === "changed") {
+      return NextResponse.json({ error: "Your profile was saved from another window just now. Reload the page and try again.", code: "save_conflict" }, { status: 409 });
     }
   } catch (err) {
     // Two accounts saving the same Aadhaar/PAN at once get past the check above.
