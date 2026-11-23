@@ -103,7 +103,7 @@ export function CollegeLeavePanel({ collegeId, canEdit, members, pending }: { co
               <li key={r.id} className="rounded-md border border-ink-100 p-2 text-sm">
                 <p className="break-words font-medium">{r.name}</p>
                 <p className="break-all text-xs text-text-subtle">
-                  {r.email} · asked {formatDate(r.requestedAt)}
+                  {r.email} · <span className="whitespace-nowrap">asked {formatDate(r.requestedAt)}</span>
                 </p>
                 {r.reason ? <p className="mt-1 break-words text-xs">“{r.reason}”</p> : null}
                 {canEdit ? (
