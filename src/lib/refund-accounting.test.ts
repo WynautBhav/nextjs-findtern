@@ -130,10 +130,10 @@ const hireRow = { id: "p1", status: "hired", offerDetails: { monthlyAmount: 5000
 const monthly = (status: string, amount = 1_000_000) => ({ status, paidAt: new Date("2026-10-18T05:00:00Z"), raw: { notes: { proposalIds: ["p1"], paymentMode: "monthly" } }, amountMinor: amount, currency: "INR" });
 
 test("monthlyDues: a refunded month is still a paid month, so the employer is not asked to pay it again", () => {
-  const paid = monthlyDues([hireRow], [monthly("paid")], "2026-11-17");
-  const refunded = monthlyDues([hireRow], [monthly("refunded")], "2026-11-17");
-  const partly = monthlyDues([hireRow], [monthly("partially_refunded")], "2026-11-17");
+  const paid = monthlyDues([hireRow], [monthly("paid")]);
+  const refunded = monthlyDues([hireRow], [monthly("refunded")]);
+  const partly = monthlyDues([hireRow], [monthly("partially_refunded")]);
   assert.deepEqual(refunded, paid);
   assert.deepEqual(partly, paid);
-  assert.notDeepEqual(monthlyDues([hireRow], [monthly("failed")], "2026-11-17"), paid, "a failed order is still unpaid");
+  assert.notDeepEqual(monthlyDues([hireRow], [monthly("failed")]), paid, "a failed order is still unpaid");
 });

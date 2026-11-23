@@ -7,7 +7,7 @@ import { FIRST_PAYMENT_EXPLAINER, firstPaymentNote } from "./first-payment-copy.
 
 test("the dashboard explainer says the first payment is the hiring charge plus Month 1 (master wording)", () => {
   assert.match(FIRST_PAYMENT_EXPLAINER, /first payment is made: the hiring charge, plus the Month 1 charge for scores 6 and above/);
-  assert.match(FIRST_PAYMENT_EXPLAINER, /due 2 days before the month's pay date; you can pay up to 15 days early/);
+  assert.match(FIRST_PAYMENT_EXPLAINER, /due 2 days before the month's pay date; you can pay the next month any time/);
 });
 
 test("composer note: Month 1 with the fee at score 6+, nothing below 6 or unscored", () => {

@@ -2,12 +2,9 @@ import type { PlacementLedger } from "./dues.ts";
 
 /**
  * Display rules for the checkout and Orders screens. Pure: they only decide what
- * to SHOW. Amounts, settlement and the 15-day payable window live in `dues.ts`
- * and `billing-plan.ts` and are not touched here.
+ * to SHOW. Amounts and settlement live in `dues.ts` and `billing-plan.ts` and are
+ * not touched here.
  */
-
-/** How many days before its due day a month can be paid (mirrors PAY_WINDOW_DAYS in billing-plan.ts, shown not enforced). */
-const WINDOW_DAYS = 15;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -40,25 +37,17 @@ export type PayButtonState =
       enabled: boolean;
       /** Button text: "Pay month 2" on a monthly or post-paid hire, else "Pay". */
       label: string;
-      /** YYYY-MM-DD the month opens for payment; set only when the button is disabled because that day is still ahead. */
-      payableFrom: string | null;
     };
-
-function minusDays(day: string, days: number): string {
-  return new Date(Date.parse(`${day}T00:00:00Z`) - days * 86_400_000).toISOString().slice(0, 10);
-}
 
 /**
  * Orders > Payment schedule: a Pay button on every row that still owes money.
  * Enabled exactly where it always was: the old monthly plan, or a post-paid row that is in
- * `payableIds` (the server's list of lines checkout accepts); otherwise it is
- * disabled and, when a next-due day is known, names the day it opens (due - 15 days).
+ * `payableIds` (the server's list of lines checkout accepts, any time before or after the
+ * due day); otherwise it is disabled.
  */
-export function payButtonState(ledger: Pick<PlacementLedger, "proposalId" | "plan" | "dueMinor" | "monthsPaid" | "nextDue">, payableIds: readonly string[], todayIst: string): PayButtonState {
+export function payButtonState(ledger: Pick<PlacementLedger, "proposalId" | "plan" | "dueMinor" | "monthsPaid">, payableIds: readonly string[]): PayButtonState {
   if (!(ledger.dueMinor > 0)) return { show: false };
   const label = ledger.plan === "monthly" || ledger.plan === "postpaid" ? `Pay month ${ledger.monthsPaid + 1}` : "Pay";
   const enabled = ledger.plan === "monthly" || (ledger.plan === "postpaid" && payableIds.includes(ledger.proposalId));
-  if (enabled) return { show: true, enabled: true, label, payableFrom: null };
-  const from = ledger.nextDue ? minusDays(ledger.nextDue, WINDOW_DAYS) : null;
-  return { show: true, enabled: false, label, payableFrom: from && todayIst < from ? from : null };
+  return { show: true, enabled, label };
 }

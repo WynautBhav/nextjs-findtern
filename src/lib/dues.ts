@@ -1,4 +1,4 @@
-import { billingPlanOf, engagementEndOn, istDay, orderNotes, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, postpaidNext, recordedFeeOf } from "./billing-plan.ts";
+import { billingPlanOf, engagementEndOn, orderNotes, postpaidAnchor, postpaidDueOn, postpaidMonthsPaid, postpaidNext, recordedFeeOf } from "./billing-plan.ts";
 import { recordedUpfrontDiscountOf } from "./upfront-discount.ts";
 import { acceptedLineCharge } from "./accepted-charge.ts";
 import { monthsOf, parseOffer } from "./offer.ts";
@@ -34,16 +34,16 @@ export type Due = {
   plan: "monthly_prepaid" | "postpaid";
   /** Post-paid: month `monthsPaid + 1` falls due on this day (YYYY-MM-DD); null for pay-at-start hires. */
   dueOn: string | null;
-  /** Can this month be paid now? Pay-at-start months always; post-paid ones from 15 days before their due day. */
+  /** Can this month be paid now? Always: pay-at-start months and post-paid ones, early or late. */
   payable: boolean;
 };
 
 /**
  * Hired placements with months still to pay. Pay-at-start hires (grandfathered)
  * owe the next month straight away; post-paid hires owe month k 2 days before
- * the intern is paid for it, payable from 15 days before that (`todayIst`, YYYY-MM-DD).
+ * the intern is paid for it, payable any time.
  */
-export function monthlyDues(proposals: ProposalLike[], allPayments: PaymentLike[], todayIst: string = istDay(new Date())!): Due[] {
+export function monthlyDues(proposals: ProposalLike[], allPayments: PaymentLike[]): Due[] {
   // A refunded order is still a paid month: a refund never makes the employer owe (or be charged) it again.
   const payments = settledOrders(allPayments);
   const paid = new Map<string, number>();
@@ -63,7 +63,7 @@ export function monthlyDues(proposals: ProposalLike[], allPayments: PaymentLike[
     if (plan === "postpaid") {
       const monthsPaid = postpaidMonthsPaid(p.id, payments);
       if (monthsPaid >= months) continue;
-      const next = postpaidNext(postpaidAnchor(offer.startDate as string | undefined, p.hiredAt), months, monthsPaid, todayIst);
+      const next = postpaidNext(postpaidAnchor(offer.startDate as string | undefined, p.hiredAt), months, monthsPaid);
       dues.push({ proposalId: p.id, monthsPaid, months, plan, dueOn: next?.dueOn ?? null, payable: Boolean(next?.payable) });
     } else if (paid.has(p.id) && paid.get(p.id)! < months) {
       dues.push({ proposalId: p.id, monthsPaid: paid.get(p.id)!, months, plan: "monthly_prepaid", dueOn: null, payable: true });
@@ -187,7 +187,8 @@ export function placementLedger(hire: HireLike, allPayments: readonly PaidOrderL
         : null,
     // The last period's end (as the instalments and timesheets count it), not start + months, which is a day later.
     endsOn: offer.fullTime ? null : (engagementEndOn(offer.startDate, offer.months) ?? addMonths(offer.startDate, offer.months)),
-    status: dueMinor === 0 && paidMinor > 0 ? "fully_paid" : paidMinor > 0 ? "partially_paid" : "unpaid",
+    // A month a promo waived in full is still a month paid: the row says Month 2 next, so it is not "No instalment paid".
+    status: dueMinor === 0 && paidMinor > 0 ? "fully_paid" : paidMinor > 0 || (covered > 0 && dueMinor > 0) ? "partially_paid" : "unpaid",
   };
 }
 

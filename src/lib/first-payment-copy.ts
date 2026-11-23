@@ -4,7 +4,7 @@
 
 /** Dashboard "payments due" explainer. Verbatim from master 98184314. */
 export const FIRST_PAYMENT_EXPLAINER =
-  "An accepted offer becomes a hire once the first payment is made: the hiring charge, plus the Month 1 charge for scores 6 and above. Each later month's charge is due 2 days before the month's pay date; you can pay up to 15 days early.";
+  "An accepted offer becomes a hire once the first payment is made: the hiring charge, plus the Month 1 charge for scores 6 and above. Each later month's charge is due 2 days before the month's pay date; you can pay the next month any time.";
 
 /** Composer note. Null below 6 (those hires pay the whole engagement up front) or when the candidate is not scored. */
 export function firstPaymentNote(score: number | null | undefined): string | null {

@@ -109,7 +109,7 @@ const employerFaq = (config: PricingConfig) => [
       category: "Payment",
       question: "When do I pay?",
       answer:
-        `${perHireFeeAnswerE3(feeSettingOf(config), hireFeeText(config))} The first month's charge is paid at hire; each later month is billed against the timesheets you approve, due 2 days before the intern's pay day (you can pay up to 15 days early).`,
+        `${perHireFeeAnswerE3(feeSettingOf(config), hireFeeText(config))} The first month's charge is paid at hire; each later month is billed against the timesheets you approve, due 2 days before the intern's pay day (you can pay the next month any time).`,
     },
     {
       id: "e4",

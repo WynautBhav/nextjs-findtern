@@ -46,15 +46,11 @@ test("postpaidDueOn: 2 days before the intern is paid for the month, in IST; cla
   assert.equal(postpaidDueOn("2026-01-31", 2, 1), "2026-02-26"); // intern paid 28 Feb (clamped)
   assert.equal(postpaidDueOn("2026-09-18", 3, 4), null);
   assert.equal(postpaidDueOn(null, 3, 1), null);
-  assert.deepEqual(postpaidNext("2026-09-18", 3, 0, "2026-09-30"), { k: 1, dueOn: "2026-10-16", payable: false });
-  assert.equal(postpaidNext("2026-09-18", 3, 0, "2026-10-01")!.payable, true); // 15 days before the due day
-  assert.equal(postpaidNext("2026-09-18", 3, 0, "2026-10-16")!.payable, true);
-  assert.equal(postpaidNext("2026-09-18", 3, 0, "2026-11-30")!.payable, true); // late is still payable
-  assert.equal(postpaidNext("2026-09-18", 3, 1, "2026-10-31")!.payable, false); // month 2 (due 16 Nov) not before 1 Nov
-  assert.equal(postpaidNext("2026-09-18", 3, 1, "2026-11-01")!.payable, true);
-  assert.equal(postpaidNext("2026-09-18", 3, 3, "2027-01-01"), null);
+  assert.deepEqual(postpaidNext("2026-09-18", 3, 0), { k: 1, dueOn: "2026-10-16", payable: true }); // any time, however early
+  assert.equal(postpaidNext("2026-09-18", 3, 1)!.payable, true); // month 2 (due 16 Nov) too
+  assert.equal(postpaidNext("2026-09-18", 3, 3), null);
   // hired 17 Oct 23:00 UTC = 18 Oct IST, no start date: month 1 paid to the intern 18 Nov, due from the employer 16 Nov
-  const [d] = monthlyDues([{ id: "p1", status: "hired", offerDetails: { duration: "1m" }, hiredAt: "2026-10-17T23:00:00Z" }], [fee], "2026-11-17");
+  const [d] = monthlyDues([{ id: "p1", status: "hired", offerDetails: { duration: "1m" }, hiredAt: "2026-10-17T23:00:00Z" }], [fee]);
   assert.equal(d.dueOn, "2026-11-16");
 });
 
@@ -88,7 +84,7 @@ test("stipendMonthDates: the one source of the intern pay day, employer due day 
 
 test("IST: the anchor of a hire with no start date is its Indian day, so its dates follow India", () => {
   // 18:29 UTC on 22 Nov is 23:59 IST 22 Nov; 18:30 UTC is 00:00 IST 23 Nov
-  const at = (hiredAt: string) => monthlyDues([{ id: "p1", status: "hired", offerDetails: { duration: "1m" }, hiredAt }], [fee], "2026-11-01")[0].dueOn;
+  const at = (hiredAt: string) => monthlyDues([{ id: "p1", status: "hired", offerDetails: { duration: "1m" }, hiredAt }], [fee])[0].dueOn;
   assert.equal(at("2026-11-22T18:29:00Z"), "2026-12-20");
   assert.equal(at("2026-11-22T18:30:00Z"), "2026-12-21");
 });
@@ -108,14 +104,14 @@ test("checkout: post-paid first payment is the fee + Month 1; no double fee on a
   assert.equal(lineCharge(parseOffer({ monthlyAmount: 100, duration: "2m", currency: "USD" }, "USD"), 8, "postpaid").totalMinor, 5_000 + 10_000);
 });
 
-test("monthlyDues (old rule, fee-only order): month 1 is payable from 15 days before its due day (2 days before the intern's pay day), never blocked after", () => {
+test("monthlyDues (old rule, fee-only order): month 1 is payable any time, however early, and never blocked after", () => {
   const hire = [{ id: "p1", status: "hired", offerDetails: OFFER, hiredAt: "2026-09-10T00:00:00Z" }];
-  assert.deepEqual(monthlyDues(hire, [fee], "2026-09-30").map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[0, "2026-10-16", false]]);
-  assert.deepEqual(monthlyDues(hire, [fee], "2026-10-01").map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[0, "2026-10-16", true]]);
-  assert.deepEqual(monthlyDues(hire, [fee], "2026-10-16").map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[0, "2026-10-16", true]]);
-  assert.deepEqual(monthlyDues(hire, [fee, m1], "2026-10-18").map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[1, "2026-11-16", false]]);
-  assert.deepEqual(monthlyDues(hire, [fee, m1], "2026-11-01").map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[1, "2026-11-16", true]]);
-  assert.deepEqual(monthlyDues(hire, [fee, m1, m2, ord("monthly", "2026-12-17", { dueProposalIds: ["p1"] })], "2027-01-01"), []);
+  assert.deepEqual(monthlyDues(hire, [fee]).map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[0, "2026-10-16", true]]);
+  assert.deepEqual(monthlyDues(hire, [fee]).map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[0, "2026-10-16", true]]);
+  assert.deepEqual(monthlyDues(hire, [fee]).map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[0, "2026-10-16", true]]);
+  assert.deepEqual(monthlyDues(hire, [fee, m1]).map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[1, "2026-11-16", true]]);
+  assert.deepEqual(monthlyDues(hire, [fee, m1]).map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[1, "2026-11-16", true]]);
+  assert.deepEqual(monthlyDues(hire, [fee, m1, m2, ord("monthly", "2026-12-17", { dueProposalIds: ["p1"] })]), []);
   // a stale second submit for month 1 once month 2 is payable names a paid month
   assert.equal(paymentIndexMismatch([{ due: { monthsPaid: 1 } }], 0), true);
 });
@@ -123,8 +119,8 @@ test("monthlyDues (old rule, fee-only order): month 1 is payable from 15 days be
 test("grandfathered hires: a monthly (pay-at-start) hire owes its next month now, a fully paid one owes nothing", () => {
   const hire = [{ id: "p1", status: "hired", offerDetails: OFFER, hiredAt: "2026-09-10T00:00:00Z" }];
   const first = ord("monthly", "2026-09-10");
-  assert.deepEqual(monthlyDues(hire, [first], "2026-09-11").map((d) => [d.plan, d.monthsPaid, d.payable]), [["monthly_prepaid", 1, true]]);
-  assert.deepEqual(monthlyDues(hire, [ord("total", "2026-09-10")], "2026-09-11"), []);
+  assert.deepEqual(monthlyDues(hire, [first]).map((d) => [d.plan, d.monthsPaid, d.payable]), [["monthly_prepaid", 1, true]]);
+  assert.deepEqual(monthlyDues(hire, [ord("total", "2026-09-10")]), []);
 });
 
 test("placementLedger (old rule, fee-only order): after the fee only the hire is partly paid, never fully paid; due 2 days before the intern's pay day", () => {
@@ -304,13 +300,13 @@ test("new rule: a fee order that names the hire in firstMonthProposalIds pays mo
 });
 
 test("new rule: monthlyDues and placementLedger start at month 2; a one-month hire is fully paid", () => {
-  assert.deepEqual(monthlyDues([hireP1], [feeM1], "2026-11-01").map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[1, "2026-11-16", true]]);
+  assert.deepEqual(monthlyDues([hireP1], [feeM1]).map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[1, "2026-11-16", true]]);
   const a = placementLedger(hireP1, [feeM1]);
   assert.deepEqual([a.plan, a.status, a.paidMinor, a.dueMinor, a.monthsPaid, a.nextDue], ["postpaid", "partially_paid", 1_500_000, 2_000_000, 1, "2026-11-16"]);
   const one = { ...hireP1, offerDetails: { ...OFFER, duration: "1m" } };
   const b = placementLedger(one, [feeM1]);
   assert.deepEqual([b.status, b.dueMinor, b.paidMinor, b.nextDue], ["fully_paid", 0, 1_500_000, null]);
-  assert.deepEqual(monthlyDues([one], [feeM1], "2026-11-01"), []);
+  assert.deepEqual(monthlyDues([one], [feeM1]), []);
 });
 
 test("new rule: companyLedger counts month 1 on the fee order", () => {

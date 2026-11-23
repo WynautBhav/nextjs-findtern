@@ -316,7 +316,7 @@ export function CheckoutSummary({
           {mode === "postpaid" && line.schedule.length > 0 ? (
             <div className="mt-4 border-t border-ink-100 pt-4 text-sm">
               <p className="font-medium text-ink-800">{scheduleSummary(line.schedule, line.monthlyRateMinor, (n) => m(n, line.currency))}</p>
-              <p className="mt-0.5 text-xs text-text-subtle">Each month is due 2 days before the intern&apos;s pay day. You can pay up to 15 days early.</p>
+              <p className="mt-0.5 text-xs text-text-subtle">Each month is due 2 days before the intern&apos;s pay day. You can pay the next month any time.</p>
             </div>
           ) : null}
 
