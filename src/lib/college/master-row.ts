@@ -415,11 +415,12 @@ export function cellText(row: MasterRow, key: MasterColumn["key"], origin = ""):
 }
 
 /**
- * One CSV cell. Quotes always, doubles inner quotes, and prefixes a ' to anything a spreadsheet would run as a
- * formula (=, +, -, @, tab, CR), so a student who types "=HYPERLINK(...)" as a skill cannot attack the officer.
+ * One CSV cell. Quotes always, doubles inner quotes, and prefixes a ' to anything a spreadsheet could run as a
+ * formula: a cell whose first visible character is =, +, - or @ (also behind leading blanks, no-break spaces or a BOM),
+ * or that starts with a tab, CR or LF. A student who types "=HYPERLINK(...)" as a skill cannot attack the officer.
  */
 export function csvCell(v: string): string {
-  const safe = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  const safe = /^[\t\r\n]/.test(v) || /^[\s\u00a0\ufeff]*[=+\-@]/.test(v) ? `'${v}` : v;
   return `"${safe.replace(/"/g, '""')}"`;
 }
 
