@@ -4,18 +4,18 @@ import { getDb, schema } from "@/lib/db";
 import { candidatePoolClauses } from "@/lib/employer-pool";
 import { hireGateDecision } from "@/lib/hire-gate";
 import { inIdList } from "@/lib/sql-ids";
-import { hasMarksheet, openStepOf, readinessFrom, type Readiness } from "./student-readiness";
+import { codeVerifiedUserIds, hasMarksheet, openStepOf, readinessFrom, type Readiness } from "./student-readiness";
 
 /**
  * Can employers see these students (the employer pool query itself), can they be hired (the hire gate), and is a
  * marksheet on file. Reads whole onboarding rows here, on the server, and returns only the verdicts
- * (student-readiness.ts): no field of them leaves this function. Four queries whatever the number of students.
+ * (student-readiness.ts): no field of them leaves this function. Five queries whatever the number of students.
  */
 export async function readinessForMany(ids: string[]): Promise<Map<string, Readiness>> {
   const out = new Map<string, Readiness>();
   if (ids.length === 0) return out;
   const db = getDb();
-  const [users, rows, docs, pool] = await Promise.all([
+  const [users, rows, docs, pool, members] = await Promise.all([
     db.select({ id: schema.users.id, visibility: schema.users.profileVisibility, isActive: schema.users.isActive, frozenAt: schema.users.frozenAt }).from(schema.users).where(inArray(schema.users.id, ids)),
     db.select().from(schema.internOnboarding).where(inArray(schema.internOnboarding.userId, ids)).orderBy(desc(schema.internOnboarding.createdAt)),
     db
@@ -28,6 +28,11 @@ export async function readinessForMany(ids: string[]): Promise<Map<string, Readi
       .from(schema.users)
       .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
       .where(and(inIdList(schema.users.id, ids), ...candidatePoolClauses())),
+    // The real hire gate (profileCompleteForHire) accepts accountType "college" only with a live code-backed membership; ask the same, in one query (R4-01).
+    db
+      .select({ userId: schema.collegeMemberships.userId, status: schema.collegeMemberships.status, verifiedBy: schema.collegeMemberships.verifiedBy, leftAt: schema.collegeMemberships.leftAt })
+      .from(schema.collegeMemberships)
+      .where(inIdList(schema.collegeMemberships.userId, ids)),
   ]);
   // Latest row wins, as on the admin page and in the hire gate (both lists are newest first).
   const rowOf = new Map<string, (typeof rows)[number]>();
@@ -35,6 +40,7 @@ export async function readinessForMany(ids: string[]): Promise<Map<string, Readi
   const docOf = new Map<string, (typeof docs)[number]>();
   for (const d of docs) if (d.userId && !docOf.has(d.userId)) docOf.set(d.userId, d);
   const inPool = new Set(pool.map((p) => p.id));
+  const codeVerified = codeVerifiedUserIds(members);
 
   for (const u of users) {
     const row = rowOf.get(u.id);
@@ -54,7 +60,7 @@ export async function readinessForMany(ids: string[]): Promise<Map<string, Readi
         hiddenByAdmin: extra.hiddenByAdmin === true,
         rejected: extra.approvalStatus === "Rejected",
         interviewed: Number(extra.findternScore) > 0 && Number(ratings.interview) > 0,
-        hireable: hireGateDecision(row, files).ok,
+        hireable: hireGateDecision(row, files, codeVerified.has(u.id)).ok,
         submitted,
         openStep,
         marksheet: hasMarksheet(extra),
