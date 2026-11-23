@@ -87,12 +87,12 @@ export default async function SeatsPage() {
               <div aria-hidden className="mx-5 border-t border-dashed border-ink-200 sm:mx-6" />
               <div className="flex flex-1 flex-wrap items-center justify-between gap-3 p-5 sm:p-6">
                 <div className="min-w-0 text-sm text-ink-700">
-                  <p className="nums">{formatDate(b.paidAt ?? b.createdAt)}{b.status === "paid" ? ` · Invoice ${b.invoiceNumber}` : ""}</p>
+                  <p className="nums">{formatDate(b.paidAt ?? b.createdAt)}{b.status === "paid" ? (b.amountMinor > 0 ? ` · Invoice ${b.invoiceNumber}` : " · Covered by your credit, no invoice") : ""}</p>
                   {b.status === "pending" && seller.bank ? (
                     <p className="mt-1">Pay {money(b.amountMinor)} to Findtern: {seller.bank.bankName}, a/c {seller.bank.accountNumber}, IFSC {seller.bank.ifsc}</p>
                   ) : null}
                 </div>
-                {b.status === "paid" ? <InvoiceDownload html={taxInvoiceHtml(seatInvoiceInput(b, ctx.college, seller))} fileName={`Invoice-${b.invoiceNumber}.pdf`} /> : null}
+                {b.status === "paid" && b.amountMinor > 0 ? <InvoiceDownload html={taxInvoiceHtml(seatInvoiceInput(b, ctx.college, seller))} fileName={`Invoice-${b.invoiceNumber}.pdf`} /> : null}
               </div>
             </li>
           ))}
