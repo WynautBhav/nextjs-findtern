@@ -1254,14 +1254,14 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     else if (!completed && Number(end) > thisYear + 6) errors.yearOfGraduation = `The end year can be at most ${thisYear + 6}.`;
     else if (YEAR.test(start) && Number(end) <= Number(start)) errors.yearOfGraduation = "The end year must be after the start year.";
 
-    // Score: required once completed, at every level (Ph.D included).
+    // Score: required once completed, except for a Ph.D (shown, optional, judged only when filled).
     {
       const score = a.cgpa.trim();
       if (score && !a.scoreType) errors.scoreType = "Choose CGPA or percentage.";
       else if (score) {
         const bad = scoreProblem(a.scoreType, score);
         if (bad) errors.cgpa = bad;
-      } else if (completed) {
+      } else if (completed && level !== "Ph.D") {
         if (!a.scoreType) errors.scoreType = "Choose CGPA or percentage.";
         errors.cgpa = "Enter your final score.";
       }
@@ -1426,6 +1426,7 @@ export type CompletionDocs = {
 function academicsFilled(a: OnboardingDraft["academics"] | undefined): boolean {
   if (!a) return false;
   const completed = a.status === "Completed";
+  const needsScore = completed && a.qualificationLevel !== "Ph.D";
   return Boolean(
     a.qualificationLevel &&
       a.status &&
@@ -1433,7 +1434,7 @@ function academicsFilled(a: OnboardingDraft["academics"] | undefined): boolean {
       a.degree &&
       a.startYear &&
       (!completed || a.yearOfGraduation) &&
-      (!completed || a.cgpa),
+      (!needsScore || a.cgpa),
   );
 }
 

@@ -180,6 +180,7 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
           <Field
             id="cgpa"
             label={completed ? "Final score" : "Your current aggregated score"}
+            optional={phd && completed}
             inputMode="decimal"
             placeholder={a.scoreType === "percentage" ? "e.g. 84" : "e.g. 8.4"}
             inputClassName="nums"
