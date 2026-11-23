@@ -264,6 +264,9 @@ async function restoreIn(client: PgClient, input: { collegeId: string; userId: s
 export type DecideInput = { collegeId: string; domains: readonly string[]; userId: string; action: ApprovalAction; actor: Actor; note?: unknown; asAdmin?: boolean };
 
 export async function decideStudentIn(client: PgClient, input: DecideInput & { note: string | null }): Promise<ApprovalResult> {
+  // One decision per student at a time. A student with no membership row has nothing for FOR UPDATE to lock, so
+  // a double-click on Accept ran twice (two audit rows, two bells); the second now waits and sees the first's result.
+  await run(client, "SELECT pg_advisory_xact_lock(hashtext($1))", [`college-decide:${input.userId}`]);
   if (input.action === "accept") return acceptIn(client, input);
   if (input.action === "deny") return denyIn(client, input);
   return restoreIn(client, input);
