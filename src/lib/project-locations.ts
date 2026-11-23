@@ -39,12 +39,16 @@ export function projectCities(project: { city?: string | null; locationType?: st
  * Read-only: nothing here writes to the project.
  */
 export function projectDefaultCity(project: { city?: string | null; locationType?: string | null; preferredLocations?: unknown }): string {
-  // A remote project has no city, but may name a preferred work location (the form, or the Candidates city filter).
-  if (project.locationType === "remote") {
-    const first = Array.isArray(project.preferredLocations) ? String(project.preferredLocations[0] ?? "") : "";
-    return first.split(",")[0].trim();
-  }
+  // A remote project has no work location, so a stale preferred city never pre-fills the filter.
   return projectCities(project)[0] ?? "";
+}
+
+/**
+ * The preferred work locations a project saves. A remote project has no work location, so it saves none (a stale
+ * list is cleared); on-site and hybrid keep what the form sends.
+ */
+export function preferredLocationsToSave(locationType: string | null | undefined, preferred: readonly string[] | undefined): string[] {
+  return locationType === "remote" ? [] : [...(preferred ?? [])];
 }
 
 /** Error message for this list, or null when it may be saved. */

@@ -12,9 +12,8 @@
  *   labels "Up to 60/90/180 days" (S1 r81), stored under legacy keys (DB-09).
  * - On-site and hybrid need a state and a city, from the Indian lists, and
  *   start on the company's own city when it is in India (EMH-14, EMH-48).
- * - A project has one city; there is no "other cities" field. On-site and
- *   hybrid forms save `preferredLocations: []`, so an older project's list is
- *   dropped on save; a remote project keeps one preferred work location there.
+ * - A project has one city. On-site and hybrid also ask for an optional preferred
+ *   work location; a remote project has no work location, so it asks for neither.
  */
 
 import { Info, Lock } from "lucide-react";
@@ -201,7 +200,7 @@ export function ProjectFields({
         </div>
   );
 
-  // Remote: one optional city interns are preferred from. Picking a city on the Candidates page updates it.
+  // On-site and hybrid: one optional city interns are preferred from. Never asked for a remote project.
   const preferredCity = (values.preferredLocations[0] ?? "").split(",")[0].trim();
   const preferredField = (
     <div className="max-w-md">
@@ -214,7 +213,7 @@ export function ProjectFields({
         onChange={(v) => set({ preferredLocations: v.trim() ? [v] : [] })}
         placeholder="e.g. Jaipur"
       />
-      <FieldHint>Optional. Candidates opens on this city; remote-only candidates are still included.</FieldHint>
+      <FieldHint>Optional. Interns from this city are preferred.</FieldHint>
     </div>
   );
 
@@ -302,7 +301,7 @@ export function ProjectFields({
         <LockedRow label="Timezone">{TIMEZONES.find((t) => t.id === values.timezone && !t.group)?.label ?? values.timezone}</LockedRow>
       </LockedGroup>
       {/* Where the work is stays editable on a live project (the Candidates city filter saves it too). */}
-      {onsite ? placeFields : preferredField}
+      {onsite ? <>{placeFields}{preferredField}</> : null}
       </div>
       ) : (
       <>
@@ -319,7 +318,7 @@ export function ProjectFields({
         onChange={pickMode}
       />
 
-      {onsite ? placeFields : values.locationType === "remote" ? preferredField : null}
+      {onsite ? <>{placeFields}{preferredField}</> : null}
 
       <div className="max-w-md">
         <div>

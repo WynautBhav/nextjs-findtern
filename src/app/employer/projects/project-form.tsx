@@ -11,6 +11,7 @@ import { ProjectFields, projectFormErrors, type ProjectBaseline } from "@/compon
 import { csrfFetch } from "@/lib/client-fetch";
 import { emptyProject, type ProjectDraft } from "@/lib/employer-onboarding";
 import { EDITABLE_WHILE_PUBLISHED, MAX_SKILLS_PER_PROJECT, isLockedWhilePublished, submitReadiness } from "@/lib/projects/lifecycle";
+import { preferredLocationsToSave } from "@/lib/project-locations";
 
 // Keys are what submitReadiness reports; labels are what the employer sees on the form.
 const CHECKS: [key: string, label: string][] = [
@@ -63,8 +64,8 @@ export function ProjectForm({
     if (thenSubmit && missing.length) return setError(`Complete these first: ${missing.map(labelOf).join(", ")}.`);
     setBusy(thenSubmit ? "submit" : "draft");
     try {
-      // A remote project keeps its one preferred work location; on-site and hybrid have their city instead.
-      const preferredToSave = form.locationType === "remote" ? form.preferredLocations.slice(0, 1) : [];
+      // A remote project has no work location, so it saves no preferred one; on-site and hybrid keep theirs.
+      const preferredToSave = preferredLocationsToSave(form.locationType, form.preferredLocations);
       const res = await csrfFetch(projectId ? `/api/employer/projects/${projectId}` : `/api/employer/${employerId}/projects`, {
         method: projectId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },

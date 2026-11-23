@@ -23,10 +23,10 @@ export function projectSkillPlan(saved: readonly string[], current: readonly str
  * What a city picked in the Candidates location filter saves to the project. On-site or hybrid: the project's city, in
  * the district list's spelling, with its state; a name in two states (Aurangabad, Bilaspur…) keeps the project's own
  * state when it is one of them, otherwise it is not guessed, and clearing never empties a city such a project needs.
- * Remote: the preferred work location (one city), which clearing empties.
+ * Remote: nothing, a remote project has no work location, so the filter applies on screen only.
  */
 export type CityPlan =
-  | { action: "save"; body: { city: string; state: string } | { preferredLocations: string[] }; label: string }
+  | { action: "save"; body: { city: string; state: string }; label: string }
   | { action: "skip"; message: string };
 
 export function projectCityPlan(
@@ -37,9 +37,7 @@ export function projectCityPlan(
   const name = city.trim();
   const hits = districts.filter((d) => d.district.toLowerCase() === name.toLowerCase());
   if (!project.locationType || project.locationType === "remote") {
-    if (!name) return { action: "save", body: { preferredLocations: [] }, label: "" };
-    if (hits.length === 0) return { action: "skip", message: "Not saved to the project: pick a city from the list." };
-    return { action: "save", body: { preferredLocations: [hits[0].district] }, label: hits[0].district };
+    return { action: "skip", message: "A remote project has no work location. The city filter applies here only." };
   }
   if (!name) return { action: "skip", message: "An on-site or hybrid project keeps its city. The filter is cleared here only." };
   if (hits.length === 0) return { action: "skip", message: "Not saved to the project: pick a city from the list." };
