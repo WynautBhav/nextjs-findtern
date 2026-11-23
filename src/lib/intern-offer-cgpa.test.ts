@@ -81,3 +81,13 @@ test("formatIstPlain: plain India time, empty for junk", () => {
   assert.equal(formatIstPlain(null), "");
   assert.equal(formatIstPlain("nope"), "");
 });
+
+test("FN-06: an offer admin withdrew (full-time included) reads 'Closed by Findtern'; an employer's withdrawal and a takedown keep 'Withdrawn'", () => {
+  const stamp = { closedByAdminAt: "2026-11-03T00:00:00Z", closedByAdminStatus: "withdrawn" };
+  for (const fullTime of [true, false]) {
+    const o = internOfferOverlay(row("withdrawn", {}, { ...stamp, fullTime }), null, NOW);
+    assert.deepEqual([o.kind, o.label, o.tone, o.group], ["closed_by_admin", "Closed by Findtern", "closed", "closed"]);
+  }
+  assert.equal(internOfferOverlay(row("withdrawn", {}, { fullTime: true }), null, NOW).kind, null);
+  assert.equal(internOfferOverlay(row("withdrawn", {}, { ...stamp, closedByTakedownAt: "2026-11-03T00:00:00Z" }), null, NOW).kind, null);
+});
