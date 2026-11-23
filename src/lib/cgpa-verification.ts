@@ -59,6 +59,15 @@ export function yearOfStudy(a: { startYear: string; status: string }, collegeYea
   return year <= 5 ? year : null;
 }
 
+/**
+ * The manual semester box: digits only, at most two. Empty and 0 are no semester (0 is "not applicable", set only
+ * by its own checkbox). Values above 10 are kept so validation can say "1 to 10" instead of silently changing them.
+ */
+export function semesterFromInput(raw: string): number | null {
+  const n = Number(raw.replace(/\D/g, "").slice(0, 2));
+  return n >= 1 ? n : null;
+}
+
 /** The two semesters a year covers (3rd year: 5 and 6); an unknown year offers 1-10. */
 export function semesterOptions(year: number | null): number[] {
   return isYear(year) ? [2 * year - 1, 2 * year] : [...ALL_SEMESTERS];

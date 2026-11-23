@@ -23,7 +23,7 @@ import {
 import { DateField, localToday } from "../date-input";
 import { AddButton, Choice, EmptyEntries, EntryCard, Field, FieldNote, Grid, Label, RemoveButton, Section, Select, SelectField, controlClass } from "./fields";
 import { SEMESTER_NA } from "@/lib/cgpa-verification";
-import { CgpaDisclaimer, SemesterProofs, SemesterSelect } from "./semester-proofs";
+import { CgpaDisclaimer, SemesterInput, SemesterProofs } from "./semester-proofs";
 import type { StepProps } from "./types";
 
 const MB = 1024 * 1024;
@@ -73,7 +73,7 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
             onChange={(v) => {
               setTypingOther(false);
               // The degree list depends on the level, so it starts again (legacy).
-              set({ qualificationLevel: v, degree: "", ...(v === "Ph.D" ? { cgpa: "", scoreType: "" } : {}) });
+              set({ qualificationLevel: v, degree: "" });
             }}
           />
           <Choice id="academicStatus" label="Status" value={a.status as "Completed" | "Pursuing" | ""} options={STATUS} error={errors.academicStatus} onChange={(v) => set({ status: v })} />
@@ -168,35 +168,34 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
           />
         </Grid>
 
-        {phd ? null : (
-          <Grid>
-            <Choice
-              id="scoreType"
-              label="Score type"
-                value={a.scoreType}
-              options={SCORE_TYPES}
-              error={errors.scoreType}
-              onChange={(v) => set({ scoreType: v })}
-            />
-            <Field
-              id="cgpa"
-              label={completed ? "Final score" : "Your current aggregated score"}
-                inputMode="decimal"
-              placeholder={a.scoreType === "percentage" ? "e.g. 84" : "e.g. 8.4"}
-              inputClassName="nums"
-              value={a.cgpa}
-              error={errors.cgpa}
-              hint={a.scoreType === "percentage" ? "Out of 100." : a.scoreType === "cgpa" ? "Out of 10." : "Pick CGPA or percentage first."}
-              onChange={(v) => set({ cgpa: v.replace(/[^\d.-]/g, "").replace(/(?!^)-/g, "").slice(0, 6) })}
-            />
-          </Grid>
-        )}
+        <Grid>
+          <Choice
+            id="scoreType"
+            label="Score type"
+            value={a.scoreType}
+            options={SCORE_TYPES}
+            error={errors.scoreType}
+            onChange={(v) => set({ scoreType: v })}
+          />
+          <Field
+            id="cgpa"
+            label={completed ? "Final score" : "Your current aggregated score"}
+            optional={phd && completed}
+            inputMode="decimal"
+            placeholder={a.scoreType === "percentage" ? "e.g. 84" : "e.g. 8.4"}
+            inputClassName="nums"
+            value={a.cgpa}
+            error={errors.cgpa}
+            hint={a.scoreType === "percentage" ? "Out of 100." : a.scoreType === "cgpa" ? "Out of 10." : "Pick CGPA or percentage first."}
+            onChange={(v) => set({ cgpa: v.replace(/[^\d.-]/g, "").replace(/(?!^)-/g, "").slice(0, 6) })}
+          />
+        </Grid>
 
-        {phd ? null : <CgpaDisclaimer compact />}
+        <CgpaDisclaimer compact />
 
-        {semesterApplies(level, a.status) && !phd ? (
+        {semesterApplies(level, a.status) ? (
           <Grid>
-            <SemesterSelect a={a} collegeYear={college?.year ?? null} error={errors.currentSemester} onChange={(currentSemester) => set({ currentSemester })} />
+            <SemesterInput a={a} error={errors.currentSemester} onChange={(currentSemester) => set({ currentSemester })} />
           </Grid>
         ) : null}
 

@@ -82,7 +82,7 @@ export function AcademicsEditor({ internId, initial }: { internId: string; initi
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label htmlFor="acad-level" className={label}>Qualification level</label>
-          <select id="acad-level" value={values.qualificationLevel} onChange={(e) => set({ qualificationLevel: e.target.value, ...(e.target.value === "Ph.D" ? { score: "", scoreType: "" as const } : {}) })} className={input} {...aria("qualificationLevel")}>
+          <select id="acad-level" value={values.qualificationLevel} onChange={(e) => set({ qualificationLevel: e.target.value })} className={input} {...aria("qualificationLevel")}>
             <option value="">Choose</option>
             {levels.map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
@@ -136,7 +136,7 @@ export function AcademicsEditor({ internId, initial }: { internId: string; initi
         </div>
         <div>
           <label htmlFor="acad-score-type" className={label}>Score type</label>
-          <select id="acad-score-type" value={values.scoreType} onChange={(e) => set({ scoreType: e.target.value as AcademicsValues["scoreType"] })} disabled={phd} className={input} {...aria("scoreType")}>
+          <select id="acad-score-type" value={values.scoreType} onChange={(e) => set({ scoreType: e.target.value as AcademicsValues["scoreType"] })} className={input} {...aria("scoreType")}>
             <option value="">None</option>
             <option value="cgpa">CGPA (out of 10)</option>
             <option value="percentage">Percentage</option>
@@ -147,9 +147,8 @@ export function AcademicsEditor({ internId, initial }: { internId: string; initi
           <label htmlFor="acad-score" className={label}>{values.scoreType === "percentage" ? "Percentage" : "CGPA"}</label>
           <input
             id="acad-score"
-            value={phd ? "" : values.score}
+            value={values.score}
             onChange={(e) => set({ score: e.target.value })}
-            disabled={phd}
             inputMode="decimal"
             placeholder={values.scoreType === "percentage" ? "0–100" : "0–10"}
             className={cn(input, "nums")}
@@ -158,7 +157,6 @@ export function AcademicsEditor({ internId, initial }: { internId: string; initi
           {msg("score")}
         </div>
       </div>
-      {phd ? <p className="mt-2 text-xs text-text-subtle">Ph.D profiles carry no score. Choose another qualification level to add one.</p> : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button type="button" onClick={save} disabled={busy || !dirty || firstProblem(problems) !== null} className={buttonClass({ variant: "primary", size: "sm" })}>

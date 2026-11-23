@@ -78,10 +78,11 @@ test("typing only a score on a record with no score type asks for the type (the 
   assert.deepEqual(problems({ score: "8", scoreType: "cgpa" }, noType), {});
 });
 
-test("a Ph.D carries no score, as on the intern's form", () => {
-  assert.match(problems({ qualificationLevel: "Ph.D" }).score ?? "", /Ph\.D profiles carry no score/);
+test("a Ph.D takes a score with the same rules as any degree", () => {
+  assert.deepEqual(problems({ qualificationLevel: "Ph.D" }), {});
   assert.deepEqual(problems({ qualificationLevel: "Ph.D", score: "", scoreType: "" }), {});
-  assert.match(problems({ score: "8" }, { ...bachelors, qualificationLevel: "Ph.D", scoreType: "", score: "" }).score ?? "", /carry no score/);
+  assert.deepEqual(problems({ score: "8", scoreType: "cgpa" }, { ...bachelors, qualificationLevel: "Ph.D", scoreType: "", score: "" }), {});
+  assert.match(problems({ score: "11", scoreType: "cgpa" }, { ...bachelors, qualificationLevel: "Ph.D", scoreType: "", score: "" }).score ?? "", /out of 10/);
 });
 
 test("years follow the onboarding rules: start not in the future, end after start, completed ends by this year", () => {
@@ -131,13 +132,13 @@ test("a save that changes nothing reports no changes (nothing to write or audit)
   assert.deepEqual(mergeAcademics(prodExtra, { score: "" }).changes, {});
 });
 
-test("switching to Ph.D clears the score; Completed or Ph.D drops a stale current semester and proofs", () => {
+test("switching to Ph.D keeps the score; Completed or Ph.D drops a stale current semester and proofs", () => {
   const pursuing = {
     academics: { ...prodExtra.academics, level: "bachelors", degree: "B.Tech", status: "Pursuing", score: "7.2", scoreType: "cgpa", currentSemester: 5, semesterProofUploads: { "college-id": { name: "x.png", type: "image/png", size: 1 } } },
   };
   const phd = mergeAcademics(pursuing, { qualificationLevel: "Ph.D" });
-  assert.equal(phd.academics.score, "");
-  assert.equal(phd.academics.scoreType, "");
+  assert.equal(phd.academics.score, "7.2");
+  assert.equal(phd.academics.scoreType, "cgpa");
   assert.equal("currentSemester" in phd.academics, false);
   const done = mergeAcademics(pursuing, { status: "Completed" });
   assert.equal("currentSemester" in done.academics, false);

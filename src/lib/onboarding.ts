@@ -577,8 +577,7 @@ export function storedFromDraft(
     const a = draft.academics;
     const prev = obj(prevExtra.academics);
     const level = a.qualificationLevel ?? LEVELS.find(([k]) => k === text(prev.level))?.[1] ?? text(prev.level);
-    const isPhd = level === "Ph.D";
-    const score = isPhd ? "" : (a.cgpa?.trim() ?? text(prev.score));
+    const score = a.cgpa?.trim() ?? text(prev.score);
     out.extraPatch.academics = {
       ...prev,
       level: LEVELS.find(([, v]) => v === level)?.[0] ?? level ?? "",
@@ -1255,14 +1254,14 @@ export function validateStep(values: OnboardingDraft, step: number, ctx: Validat
     else if (!completed && Number(end) > thisYear + 6) errors.yearOfGraduation = `The end year can be at most ${thisYear + 6}.`;
     else if (YEAR.test(start) && Number(end) <= Number(start)) errors.yearOfGraduation = "The end year must be after the start year.";
 
-    // Score: required once completed, never for a Ph.D (legacy).
-    if (level !== "Ph.D") {
+    // Score: required once completed, except for a Ph.D (shown, optional, judged only when filled).
+    {
       const score = a.cgpa.trim();
       if (score && !a.scoreType) errors.scoreType = "Choose CGPA or percentage.";
       else if (score) {
         const bad = scoreProblem(a.scoreType, score);
         if (bad) errors.cgpa = bad;
-      } else if (completed) {
+      } else if (completed && level !== "Ph.D") {
         if (!a.scoreType) errors.scoreType = "Choose CGPA or percentage.";
         errors.cgpa = "Enter your final score.";
       }

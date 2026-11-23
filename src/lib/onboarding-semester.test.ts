@@ -185,3 +185,16 @@ test("storedFromDraft keeps semester not applicable and its marksheet, and reads
 test("a CGPA check stored with semester not applicable reads back as 0, not as unchosen", () => {
   assert.equal(readCgpaVerification({ cgpaVerification: { status: "pending", claimedScore: "72", scoreType: "percentage", semester: 0 } }).semester, 0);
 });
+
+test("a typed semester need not match the year of study: a 2023 B.Tech student can be in semester 2 or 8", () => {
+  for (const n of [2, 8]) {
+    assert.deepEqual(semesterProofErrors(academics({ startYear: "2023", currentSemester: n, semesterProofUploads: proofsFor(n) })), {});
+  }
+  assert.ok(semesterProofErrors(academics({ startYear: "2023", currentSemester: 12 })).currentSemester);
+});
+
+test("not applicable is accepted without a number, for a degree and a diploma", () => {
+  for (const level of ["Bachelor's", "Diploma"]) {
+    assert.deepEqual(semesterProofErrors(academics({ qualificationLevel: level, currentSemester: SEMESTER_NA, semesterProofUploads: proofsFor(SEMESTER_NA) })), {});
+  }
+});

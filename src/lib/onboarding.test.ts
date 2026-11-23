@@ -403,14 +403,22 @@ test("academics: level and status are chosen, nothing preselected (INT-30)", () 
   assert.equal(emptyDraft().academics.scoreType, "");
 });
 
-test("INT-17: score needed only once completed, never for a Ph.D", () => {
+test("INT-17: score needed only once completed, optional for a Ph.D (checked if filled)", () => {
   const base = complete();
   const pursuing = validateStep({ ...base, academics: { ...base.academics, cgpa: "", scoreType: "" } }, 1, ctx);
   assert.equal(pursuing.cgpa, undefined);
   const done = validateStep({ ...base, academics: { ...base.academics, status: "Completed", yearOfGraduation: "2026", cgpa: "" } }, 1, ctx);
   assert.ok(done.cgpa);
   const phd = validateStep({ ...base, academics: { ...base.academics, qualificationLevel: "Ph.D", degree: "Physics", status: "Completed", yearOfGraduation: "2026", cgpa: "" } }, 1, ctx);
-  assert.equal(phd.cgpa, undefined);
+  assert.equal(phd.cgpa, undefined, "a completed Ph.D may leave the score empty");
+  assert.equal(phd.scoreType, undefined);
+  const phdAt = (patch: Partial<OnboardingDraft["academics"]>) =>
+    validateStep({ ...base, academics: { ...base.academics, qualificationLevel: "Ph.D", degree: "Physics", status: "Completed", yearOfGraduation: "2026", ...patch } }, 1, ctx);
+  assert.deepEqual([phdAt({ scoreType: "cgpa", cgpa: "8.4" }).cgpa, phdAt({ scoreType: "cgpa", cgpa: "8.4" }).scoreType], [undefined, undefined]);
+  assert.equal(phdAt({ scoreType: "percentage", cgpa: "72" }).cgpa, undefined);
+  assert.ok(phdAt({ scoreType: "cgpa", cgpa: "12" }).cgpa);
+  assert.ok(phdAt({ scoreType: "percentage", cgpa: "101" }).cgpa);
+  assert.ok(phdAt({ scoreType: "", cgpa: "8" }).scoreType);
   assert.ok(validateStep({ ...base, academics: { ...base.academics, scoreType: "", cgpa: "8" } }, 1, ctx).scoreType);
 });
 
@@ -677,4 +685,24 @@ test("the stored account type reads back into the draft; unknown values are blan
   assert.equal(draftFromRecord(row({ accountType: "individual" })).accountType, "individual");
   assert.equal(draftFromRecord(row({})).accountType, "");
   assert.equal(draftFromRecord(row({ accountType: "admin" })).accountType, "");
+});
+
+test("a Ph.D score is saved with its type, like any other degree", () => {
+  const { extraPatch } = storedFromDraft({ academics: { ...emptyDraft().academics, qualificationLevel: "Ph.D", degree: "Physics", status: "Completed", scoreType: "cgpa", cgpa: "8.4" } }, null);
+  const a = extraPatch.academics as Record<string, unknown>;
+  assert.equal(a.score, "8.4");
+  assert.equal(a.scoreType, "cgpa");
+  assert.equal(draftFromRecord({ extraData: extraPatch }).academics?.cgpa, "8.4");
+});
+
+test("a completed Ph.D with no score passes validateProfile and profile completion; a bad score fails", () => {
+  const phd = (patch: Partial<OnboardingDraft["academics"]>): OnboardingDraft => ({
+    ...complete(),
+    academics: { ...complete().academics, qualificationLevel: "Ph.D", degree: "Physics", status: "Completed", startYear: "2022", yearOfGraduation: "2026", scoreType: "", cgpa: "", ...patch },
+  });
+  assert.equal(validateProfile(phd({}), ctx), null);
+  assert.equal(validateProfile(phd({ scoreType: "cgpa", cgpa: "8.4" }), ctx), null);
+  assert.ok(validateProfile(phd({ scoreType: "cgpa", cgpa: "12" }), ctx)?.errors.cgpa);
+  const row = { ...storedComplete, extraData: { ...(storedComplete.extraData as { academics: object }), academics: { level: "phd", degree: "Physics", institution: "X", status: "Completed", startYear: 2022, endYear: 2026, score: "", scoreType: "" } } };
+  assert.equal(profileCompletion(row, allDocs).items.find((i) => i.id === "academics")?.done, true);
 });
