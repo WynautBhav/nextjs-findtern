@@ -4,7 +4,7 @@ import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 
 import { requireRole } from "@/lib/auth";
 import { driveWindow } from "@/lib/college/access";
-import { viewsForStudentsInDrive } from "@/lib/college/meetings";
+import { liveDriveStudents, viewsForStudentsInDrive } from "@/lib/college/meetings";
 import { ONLINE_WINDOW_MS, driveForEmployer, eligibleStudents } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
 import { displayNameOf, initialsOf, readSkills } from "@/lib/employer-candidates";
@@ -166,6 +166,9 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
     };
   });
 
+  // A call reads cancelled only for a student who is no longer a live member of this college, not for one the drive's rules stopped listing.
+  const callStudents = await liveDriveStudents(drive.collegeId, meetings.map((m) => m.userId));
+
   return (
     <div>
       <DriveAssociation collegeName={college.name} logoUrl={college.logoUrl} />
@@ -174,7 +177,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
         driveId={drive.id}
         fullTime={fullTime}
         candidates={candidates}
-        initialMeetings={viewsForStudentsInDrive(meetings, new Set(ids))}
+        initialMeetings={viewsForStudentsInDrive(meetings, callStudents.live, callStudents.labels)}
         offerAs={offerAs}
       />
     </div>

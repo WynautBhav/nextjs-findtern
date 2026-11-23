@@ -1,7 +1,8 @@
 import { desc, eq } from "drizzle-orm";
 
 import { isProfileSubmittedComplete, type ProfileDocs } from "./admin/profile-state.ts";
-import { draftFromRecord, emptyDraft, validateStep, VALIDATED_STEPS, type OnboardingLike } from "./onboarding.ts";
+import { isCodeVerifiedMembership } from "./intern-account.ts";
+import { draftFromRecord, emptyDraft, validateStep, VALIDATED_STEPS, type OnboardingLike, type ValidationContext } from "./onboarding.ts";
 
 /**
  * The hire gate: an intern whose profile is not submitted and complete cannot be hired. It is checked where no money has
@@ -40,7 +41,7 @@ export function profileIncompleteBody(who: keyof typeof PROFILE_INCOMPLETE_MESSA
 const isRecord = (v: unknown): v is Record<string, unknown> => !!v && typeof v === "object" && !Array.isArray(v);
 
 /** Field ids that fail across every step (not only the first failing step), plus the submit and languages markers. */
-function missingFields(row: OnboardingLike | null | undefined, docs: ProfileDocs): string[] {
+function missingFields(row: OnboardingLike | null | undefined, docs: ValidationContext): string[] {
   if (!row) return ["profile"];
   const extra = isRecord(row.extraData) ? row.extraData : {};
   const out: string[] = [];
@@ -54,10 +55,14 @@ function missingFields(row: OnboardingLike | null | undefined, docs: ProfileDocs
 /**
  * Whether the profile may be hired. Pure. Legacy rows that carry a Findtern score or an interview rating count as
  * submitted (inside `isProfileSubmittedComplete`), so a pre-launch hired intern is judged by the same rule as the admin list.
+ * `collegeVerified`: a college code backs the intern's live membership. Joining by a code stamps accountType "college" on
+ * the profile, and the account-type step accepts that only with this proof (as the onboarding route passes it), so without
+ * it a verified student was refused as "missing accountType". A claimed or ended membership gives no proof: still refused.
  */
-export function hireGateDecision(row: OnboardingLike | null | undefined, docs: ProfileDocs): HireGateDecision {
-  if (isProfileSubmittedComplete(row, docs)) return { ok: true };
-  const missing = missingFields(row, docs);
+export function hireGateDecision(row: OnboardingLike | null | undefined, docs: ProfileDocs, collegeVerified = false): HireGateDecision {
+  const ctx: ProfileDocs & ValidationContext = { ...docs, collegeVerified };
+  if (isProfileSubmittedComplete(row, ctx)) return { ok: true };
+  const missing = missingFields(row, ctx);
   return { ok: false, missing: missing.length > 0 ? missing : ["profile"] };
 }
 
@@ -67,7 +72,7 @@ type Db = Pick<ReturnType<typeof import("@/lib/db").getDb>, "select">;
 export async function profileCompleteForHire(db: Db, internId: string): Promise<HireGateDecision> {
   // Imported here so the pure rule above runs under node:test, which has no `@/` alias.
   const { schema } = await import("@/lib/db");
-  const [[row], [doc]] = await Promise.all([
+  const [[row], [doc], [member]] = await Promise.all([
     db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, internId)).orderBy(desc(schema.internOnboarding.createdAt)).limit(1),
     db
       .select({ photo: schema.internDocuments.profilePhotoName, pan: schema.internDocuments.panImageName, aadhaar: schema.internDocuments.aadhaarImageName })
@@ -75,6 +80,11 @@ export async function profileCompleteForHire(db: Db, internId: string): Promise<
       .where(eq(schema.internDocuments.userId, internId))
       .orderBy(desc(schema.internDocuments.createdAt))
       .limit(1),
+    db
+      .select({ status: schema.collegeMemberships.status, verifiedBy: schema.collegeMemberships.verifiedBy, leftAt: schema.collegeMemberships.leftAt })
+      .from(schema.collegeMemberships)
+      .where(eq(schema.collegeMemberships.userId, internId))
+      .limit(1),
   ]);
-  return hireGateDecision(row, { hasPhoto: Boolean(doc?.photo), hasPanImage: Boolean(doc?.pan), hasAadhaarImage: Boolean(doc?.aadhaar) });
+  return hireGateDecision(row, { hasPhoto: Boolean(doc?.photo), hasPanImage: Boolean(doc?.pan), hasAadhaarImage: Boolean(doc?.aadhaar) }, isCodeVerifiedMembership(member));
 }

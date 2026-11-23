@@ -4,7 +4,8 @@ import { Video, X } from "lucide-react";
 
 import { EmptyScene, Pill, type Tone } from "@/components/app/primitives";
 import { CALL_STATUS, clock } from "@/components/employer/drive/shared";
-import type { MeetingView } from "@/lib/college/meetings";
+import type { MeetingView } from "@/lib/college/meeting-views";
+import { NO_LONGER_IN_DRIVE } from "@/lib/college/meeting-views";
 
 export function CallsPanel({
   meetings,
@@ -39,17 +40,20 @@ export function CallsPanel({
         <ul className="max-h-[28rem] divide-y divide-ink-100 overflow-y-auto">
           {meetings.map((m) => {
             const s = CALL_STATUS[m.status] ?? { tone: "neutral" as Tone, label: "Call" };
+            // The student may no longer be in the candidate list (left the college): their initials stay, and the reason is neutral.
+            const who = nameOf.get(m.userId) ?? m.studentLabel ?? "Student";
+            const label = m.status === "cancelled" && m.noLongerInDrive ? NO_LONGER_IN_DRIVE : s.label;
             return (
               <li key={m.id} className="flex items-center gap-3 px-4 py-3">
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-ink-900">{nameOf.get(m.userId) ?? "Student"}</p>
+                  <p className="text-sm font-semibold text-ink-900">{who}</p>
                   <p className="nums text-xs text-ink-600">{clock(m.startsAt)}</p>
                 </div>
                 {m.status === "requested" || m.status === "accepted" ? (
                   <button
                     type="button"
                     onClick={() => onCancel(m.id)}
-                    aria-label={`Cancel call with ${nameOf.get(m.userId) ?? "student"}`}
+                    aria-label={`Cancel call with ${who}`}
                     className="inline-flex min-h-11 items-center rounded-lg px-2 text-sm font-medium text-ink-600 hover:bg-ink-100 hover:text-ink-900"
                   >
                     Cancel
@@ -68,7 +72,7 @@ export function CallsPanel({
                 ) : (
                   <Pill tone={s.tone}>
                     {m.status === "declined" ? <X className="size-3" aria-hidden /> : null}
-                    {s.label}
+                    {label}
                   </Pill>
                 )}
               </li>
