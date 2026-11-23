@@ -88,9 +88,9 @@ export const OUTCOMES: { key: Exclude<Outcome, "">; label: string }[] = [
   { key: "meet-waiting", label: "Meeting not answered yet" },
   { key: "not-accepted", label: "Didn't accept a meeting" },
   { key: "meet-other", label: "Meeting missed, called off or not closed" },
-  { key: "call-took", label: "Took a drive call" },
-  { key: "call-waiting", label: "Drive call not answered yet" },
-  { key: "call-not-taken", label: "Didn't take a drive call" },
+  { key: "call-took", label: "Took a drive meet" },
+  { key: "call-waiting", label: "Drive meet not answered yet" },
+  { key: "call-not-taken", label: "Didn't take a drive meet" },
 ];
 const withdrawnOf = (r: MasterRow) => r.offers - r.offersAccepted - r.offersRejected - r.offersLapsed - r.offersOpen;
 const meetOtherOf = (m: Meetings) => m.total - m.done - m.notAccepted - m.upcoming - m.waiting;
@@ -336,7 +336,7 @@ export const MASTER_COLUMNS: MasterColumn[] = [
   { key: "meetingsNotAccepted", label: "Meetings not accepted", group: "Placement", kind: "number" },
   { key: "meetingsMissed", label: "Meetings missed", group: "Placement", kind: "number" },
   { key: "offerReplies", label: "Offer replies", group: "Placement", kind: "text" },
-  { key: "driveCalls", label: "Drive calls", group: "Placement", kind: "text" },
+  { key: "driveCalls", label: "Drive meets", group: "Placement", kind: "text" },
 ];
 
 export const COLUMN_KEYS = new Set(MASTER_COLUMNS.map((c) => c.key));

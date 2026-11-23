@@ -56,7 +56,7 @@ export function EmployerAlert({ invited, arrived, missing, came, walkIns, over =
             <li key={c.employerId} className="space-y-1 px-5 py-3 text-sm">
               <p className="font-medium text-ink-900">{c.company ?? "Employer"}</p>
               <p className="text-ink-700">{[c.contact, c.employerId.slice(0, 8).toUpperCase()].filter(Boolean).join(" · ")}</p>
-              <p className="text-xs text-text-subtle">{c.shortlisted ?? 0} shortlisted · {c.calls ?? 0} {c.calls === 1 ? "call" : "calls"}</p>
+              <p className="text-xs text-text-subtle">{c.shortlisted ?? 0} shortlisted · {c.calls ?? 0} {c.calls === 1 ? "meet" : "meets"}</p>
               {c.phone ? (
                 <a href={`tel:${c.phone.replace(/\s+/g, "")}`} className="nums inline-flex min-h-9 items-center gap-1.5 text-ink-700 hover:text-brand-700">
                   <Phone className="size-3.5 text-ink-400" aria-hidden />
@@ -98,7 +98,7 @@ export function EmployerAlert({ invited, arrived, missing, came, walkIns, over =
                     )}
                   </td>
                   <td className="px-3 py-3 text-xs tracking-wide text-ink-600">{c.employerId.slice(0, 8).toUpperCase()}</td>
-                  <td className="px-3 py-3 text-ink-700">{c.shortlisted ?? 0} shortlisted · {c.calls ?? 0} {c.calls === 1 ? "call" : "calls"}</td>
+                  <td className="px-3 py-3 text-ink-700">{c.shortlisted ?? 0} shortlisted · {c.calls ?? 0} {c.calls === 1 ? "meet" : "meets"}</td>
                   <td className="px-5 py-3 text-right text-ink-700">{shortDateTime(c.joinedAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</td>
                 </tr>
               ))}

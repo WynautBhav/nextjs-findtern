@@ -342,7 +342,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
               <EmptyScene
                 compact
                 title="No offers or meetings"
-                body="Offers, interview invitations and drive calls from employers appear here once they reach out to this student."
+                body="Offers, interview invitations and drive meets from employers appear here once they reach out to this student."
                 next={{ label: "See your drives", href: "/college/drives" }}
               />
             </PanelBody>
@@ -366,7 +366,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
               {calls.map(({ m, drive }) => (
                 <li key={m.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
                   <div className="min-w-0">
-                    <p className="font-medium text-ink-900">Drive call · {drive}</p>
+                    <p className="font-medium text-ink-900">Drive meet · {drive}</p>
                     <p className="text-sm text-text-subtle">
                       {shortDateTime(m.startsAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} IST
                     </p>

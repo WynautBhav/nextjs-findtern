@@ -14,20 +14,20 @@ type Tile = { key: BoardKey; label: string; hint: (n: number) => string; nudge?:
 
 /** Needs the officer now, most urgent first (his order: calls, offers, offline). */
 const CRITICAL: Tile[] = [
-  { key: "meetingsWaiting", label: "Calls not answered", hint: (n) => (n ? "An employer asked; the student hasn't replied" : "Every call request is answered"), nudge: "meeting", critical: true },
+  { key: "meetingsWaiting", label: "Meets not answered", hint: (n) => (n ? "An employer asked; the student hasn't replied" : "Every meet request is answered"), nudge: "meeting", critical: true },
   { key: "offersWaiting", label: "Offers not answered", hint: (n) => (n ? "Neither accepted nor declined yet" : "Every offer has a reply"), nudge: "offer", critical: true },
   { key: "offline", label: "Offline now", hint: (n) => (n ? "Not on Findtern during the drive" : "Everyone is online"), nudge: "online", critical: true },
 ];
 /** What the drive has produced so far. */
 const RESULTS: Tile[] = [
   { key: "offers", label: "Offers received", hint: () => "" },
-  { key: "meetings", label: "Calls accepted", hint: (n) => (n ? "Live calls students accepted" : "No call accepted yet") },
+  { key: "meetings", label: "Meets accepted", hint: (n) => (n ? "Live meets students accepted" : "No meet accepted yet") },
   { key: "internships", label: "Placed: internship", hint: (n) => (n ? "Hired for an internship" : "No hire yet") },
   { key: "fullTime", label: "Placed: full-time", hint: (n) => (n ? "Hired for a full-time role" : "No hire yet") },
 ];
 /** Opened from the hero's pipeline; not tiles of their own. */
 const STAGES: Tile[] = [
-  { key: "called", label: "Called by an employer", hint: () => "" },
+  { key: "called", label: "Asked to meet", hint: () => "" },
   { key: "hired", label: "Hired", hint: () => "" },
 ];
 const ALL = [...CRITICAL, ...RESULTS, ...STAGES];

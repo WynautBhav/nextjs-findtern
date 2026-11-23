@@ -21,7 +21,7 @@ test("critical lists: unanswered calls, offers waiting on a reply, offline stude
     now: NOW,
   });
   assert.deepEqual(b.lists.meetingsWaiting.map((s) => s.userId), ["a"]);
-  assert.equal(b.lists.meetingsWaiting[0].detail, "Beta, Acme asked for a call · 3 min ago");
+  assert.equal(b.lists.meetingsWaiting[0].detail, "Beta, Acme asked for a meet · 3 min ago");
   assert.deepEqual(b.lists.offersWaiting.map((s) => s.userId), ["c"]);
   assert.match(b.lists.offersWaiting[0].detail, /^Offer from Acme · sent 2 h ago$/);
   assert.deepEqual(b.lists.offline.map((s) => s.userId), ["b"]);
@@ -130,5 +130,5 @@ test("the closed-drive sentence counts students, so it agrees with the pipeline"
     now: NOW,
   });
   assert.equal(b.lists.offers.length, 2);
-  assert.equal(closedDriveFinding(b.lists), "2 students got an offer, 0 students had a call and 1 student was hired in this drive.");
+  assert.equal(closedDriveFinding(b.lists), "2 students got an offer, 0 students had a meet and 1 student was hired in this drive.");
 });

@@ -75,15 +75,15 @@ export function buildDriveBoard(input: {
     offerCount: inDrive.length,
     offlineKnown: input.offline !== null,
     lists: {
-      meetingsWaiting: perStudent(waiting, students, (rs) => `${names(rs)} asked for a call · ${ago(rs[0].createdAt, now)}`),
+      meetingsWaiting: perStudent(waiting, students, (rs) => `${names(rs)} asked for a meet · ${ago(rs[0].createdAt, now)}`),
       offersWaiting: perStudent(open, students, (rs) => `Offer from ${names(rs)} · sent ${ago(rs[0].createdAt, now)}`),
       offline: (input.offline ?? []).filter((o) => students.has(o.userId)).map((o) => ({ ...students.get(o.userId)!, detail: "Not on Findtern right now" })),
       offers: perStudent(inDrive, students, (rs) => `${rs.length === 1 ? "1 offer" : `${rs.length} offers`} · ${names(rs)}`),
-      meetings: perStudent(held, students, (rs) => `${rs.length === 1 ? "Call" : `${rs.length} calls`} with ${names(rs)}`),
+      meetings: perStudent(held, students, (rs) => `${rs.length === 1 ? "Meet" : `${rs.length} meets`} with ${names(rs)}`),
       internships: perStudent(hired.filter((o) => !o.fullTime), students, (rs) => `Internship with ${names(rs)}`),
       fullTime: perStudent(hired.filter((o) => o.fullTime), students, (rs) => `Full-time with ${names(rs)}`),
       // The pipeline's stages: any call request at all, and any hire (one row per student).
-      called: perStudent(input.meetings, students, (rs) => `${rs.length === 1 ? "1 call request" : `${rs.length} call requests`} · ${names(rs)}`),
+      called: perStudent(input.meetings, students, (rs) => `${rs.length === 1 ? "1 meet request" : `${rs.length} meet requests`} · ${names(rs)}`),
       hired: hiredItems,
     },
   };
@@ -114,5 +114,5 @@ export function matchInvites(invited: Invite[], came: CameEmployer[]): { arrived
  */
 export function closedDriveFinding(lists: { offers: unknown[]; meetings: unknown[]; hired: unknown[] }): string {
   const n = (c: number, one: string, many: string) => `${c.toLocaleString("en-IN")} ${c === 1 ? one : many}`;
-  return `${n(lists.offers.length, "student got an offer", "students got an offer")}, ${n(lists.meetings.length, "student had a call", "students had a call")} and ${n(lists.hired.length, "student was hired", "students were hired")} in this drive.`;
+  return `${n(lists.offers.length, "student got an offer", "students got an offer")}, ${n(lists.meetings.length, "student had a meet", "students had a meet")} and ${n(lists.hired.length, "student was hired", "students were hired")} in this drive.`;
 }

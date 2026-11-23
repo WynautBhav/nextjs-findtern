@@ -79,7 +79,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   const finding = !open
     ? closedDriveFinding(board.lists)
     : calls || offers || missing.length
-      ? [calls ? `${plural(calls, "student hasn't", "students haven't")} answered a call` : null, offers ? `${plural(offers, "offer is", "offers are")} waiting on a reply` : null, missing.length ? `${plural(missing.length, "invited company hasn't", "invited companies haven't")} come in` : null]
+      ? [calls ? `${plural(calls, "student hasn't", "students haven't")} answered a meet request` : null, offers ? `${plural(offers, "offer is", "offers are")} waiting on a reply` : null, missing.length ? `${plural(missing.length, "invited company hasn't", "invited companies haven't")} come in` : null]
           .filter(Boolean)
           .join(" · ")
       : "Nothing is waiting on you right now.";
@@ -98,7 +98,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
             open={open}
             stages={[
               { key: "all", label: "Students in the drive", value: eligible.length },
-              { key: "called", label: "Called by an employer", value: board.lists.called.length },
+              { key: "called", label: "Asked to meet", value: board.lists.called.length },
               { key: "offers", label: "Got an offer", value: board.lists.offers.length },
               { key: "hired", label: "Hired", value: board.lists.hired.length },
             ]}

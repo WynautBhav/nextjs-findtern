@@ -65,7 +65,7 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
             <HeroStat label="Open now" value={live} hint={live ? "Employers can enter" : "No drive is open"} />
             <HeroStat label="Employers entered" value={employers} hint={`across ${all.length} ${all.length === 1 ? "drive" : "drives"}`} />
             <HeroStat label="Students shortlisted" value={shortlisted} />
-            <HeroStat label="Calls accepted" value={answered} hint="Live calls in a drive" />
+            <HeroStat label="Meets accepted" value={answered} hint="Live meets in a drive" />
           </HeroStats>
         ) : null}
       </CollegeHero>
@@ -132,7 +132,7 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
                     {[
                       ["Employers", String(e)],
                       ["Shortlisted", String(s)],
-                      ["Calls accepted", calls ? `${accepted} of ${calls}` : "—"],
+                      ["Meets accepted", calls ? `${accepted} of ${calls}` : "—"],
                     ].map(([label, value]) => (
                       <div key={label} className="min-w-0">
                         <dt className="text-xs text-text-subtle">{label}</dt>
