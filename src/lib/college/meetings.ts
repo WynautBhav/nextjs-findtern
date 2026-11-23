@@ -1,14 +1,16 @@
-import { and, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, sql, type SQL } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 
 import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
 import { CALENDAR_TOKEN_OWNER, calendarConfig, createMeetEvent } from "@/lib/google";
+import { initialsOf } from "@/lib/employer-candidates";
 import { notify } from "@/lib/notify";
 import { linkTo } from "@/lib/origin";
 import { studentCallOpen } from "./access";
 import { CALL_GRACE_MS } from "./constants";
 import { pickMeetingLink } from "./meeting-link";
+import { maskMeetingViews, type MeetingView } from "./meeting-views";
 import { sendPush } from "./push";
 
 /**
@@ -20,17 +22,7 @@ export const MEETING_DELAYS = [0, 5, 10] as const;
 export const MEETING_MINUTES = 20;
 const GRACE_MS = CALL_GRACE_MS;
 
-export type MeetingView = {
-  id: string;
-  driveId: string;
-  employerId: string;
-  userId: string;
-  startsAt: string;
-  status: string;
-  meetingLink: string | null;
-  company?: string;
-  driveTitle?: string;
-};
+export type { MeetingView };
 
 export function effectiveStatus(m: { status: string; startsAt: Date }, now = Date.now()): string {
   if (m.status === "requested" && m.startsAt.getTime() + GRACE_MS < now) return "expired";
@@ -203,12 +195,30 @@ export async function studentCall(userId: string, meetingId: string): Promise<{ 
 }
 
 /**
- * A student who left the college (leave approved) is no longer one of the drive's students: their open request or
- * accepted call reads as `cancelled` to the employer, as it does to the student (who can no longer accept it).
- * Applied when the employer's views are built; the stored row is closed by whoever ends the membership.
+ * The employer's views of their calls in a drive (see maskMeetingViews): a call reads `cancelled` only when the student is
+ * no longer a live member of THIS college, never because the drive's eligibility (officer exclusion, a raised CGPA cutoff)
+ * stopped listing them. `liveMemberIds` comes from `liveDriveStudents`.
  */
-export function viewsForStudentsInDrive(rows: (typeof schema.collegeDriveMeetings.$inferSelect)[], studentIds: ReadonlySet<string>): MeetingView[] {
-  return rows.map(toView).map((v) => ((v.status === "requested" || v.status === "accepted") && !studentIds.has(v.userId) ? { ...v, status: "cancelled" as const, meetingLink: null } : v));
+export function viewsForStudentsInDrive(rows: (typeof schema.collegeDriveMeetings.$inferSelect)[], liveMemberIds: ReadonlySet<string>, labelOf?: ReadonlyMap<string, string>): MeetingView[] {
+  return maskMeetingViews(rows.map(toView), liveMemberIds, labelOf);
+}
+
+/** Of these students: who still has a live membership (left_at IS NULL) in this college, and each one's initials (never a name). */
+export async function liveDriveStudents(collegeId: string, userIds: string[]): Promise<{ live: Set<string>; labels: Map<string, string> }> {
+  const ids = [...new Set(userIds)];
+  if (ids.length === 0) return { live: new Set(), labels: new Map() };
+  const rows = await getDb()
+    .select({ id: schema.users.id, firstName: schema.users.firstName, lastName: schema.users.lastName, membershipId: schema.collegeMemberships.id })
+    .from(schema.users)
+    .leftJoin(
+      schema.collegeMemberships,
+      and(eq(schema.collegeMemberships.userId, schema.users.id), eq(schema.collegeMemberships.collegeId, collegeId), isNull(schema.collegeMemberships.leftAt)),
+    )
+    .where(inArray(schema.users.id, ids));
+  return {
+    live: new Set(rows.filter((r) => r.membershipId).map((r) => r.id)),
+    labels: new Map(rows.map((r) => [r.id, initialsOf(r.firstName ?? "", r.lastName ?? "")])),
+  };
 }
 
 /**
