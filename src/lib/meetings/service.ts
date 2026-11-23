@@ -40,8 +40,8 @@ export async function ensureGateToken(db: Db, interview: Pick<Interview, "id" | 
 
 export type Fail = { ok: false; status: number; error: string; code?: string };
 const fail = (status: number, error: string, code?: string): Fail => ({ ok: false, status, error, code });
-const BAD_INPUT = ["need_three_slots", "bad_slot", "not_quarter_hour", "slot_past", "slot_far", "slot_duplicate", "reason_required", "reason_too_long", "slot_not_offered"];
-const refused = (r: Refusal): Fail => fail(r.code === "not_found" ? 404 : ["own_offer", "employer_only", "intern_only"].includes(r.code) ? 403 : BAD_INPUT.includes(r.code) ? 400 : 409, r.error, r.code);
+const BAD_INPUT = ["need_three_slots", "bad_slot", "not_quarter_hour", "slot_past", "slot_far", "slot_duplicate", "reason_required", "slot_not_offered"];
+const refused = (r: Refusal): Fail => fail(r.code === "not_found" ? 404 : ["own_offer", "employer_only", "intern_only", "intern_reschedule_removed"].includes(r.code) ? 403 : BAD_INPUT.includes(r.code) ? 400 : 409, r.error, r.code);
 
 /** Wall-clock "YYYY-MM-DDTHH:MM" strings in `zone` to UTC instants; null when a zone or string is unusable. */
 export function wallsToUtc(walls: string[], zone: string): Date[] | null {
@@ -123,7 +123,8 @@ export async function actorSlots(db: Db, iv: Interview, role: Role, walls: strin
 export type ActionInput =
   | { type: "choose"; slot: number }
   | { type: "reschedule"; slots: Date[] }
-  | { type: "request_reschedule"; reason?: string }
+  /** Always refused by `step` (interns cannot reschedule); kept so the old route answers with an explicit 403. */
+  | { type: "request_reschedule" }
   | { type: "cancel"; reason: string };
 
 /**
@@ -147,7 +148,7 @@ export async function act(interviewId: string, role: Role, uid: string, input: A
         : input.type === "cancel"
           ? { type: "cancel", by: role, reason: input.reason }
           : input.type === "request_reschedule"
-            ? { type: "request_reschedule", by: role, reason: input.reason }
+            ? { type: "request_reschedule", by: role }
             : { type: "reschedule", by: role, slots: input.slots, busy: await busyStarts(tx, cur.employerId, cur.internId, cur.id) };
     const r = step(cur, action);
     if (!r.ok) return refused(r);
@@ -218,22 +219,6 @@ async function tellOtherSide(db: Db, role: Role, before: Interview, iv: Intervie
   const to = other === "intern" ? { type: "intern" as const, id: iv.internId } : { type: "employer" as const, id: iv.employerId };
   const toName = other === "intern" ? names.internFirst : names.employerContact;
   const fromLabel = role === "employer" ? names.employer : names.intern;
-
-  if (input.type === "request_reschedule") {
-    // The candidate asks, with no times of their own: the company is told to offer three new ones.
-    await notify({
-      to,
-      type: "meeting_reschedule_requested",
-      title: "Candidate asked to reschedule",
-      message: `The candidate asked to reschedule: please offer 3 new time slots.${iv.cancelReason ? ` They wrote: ${iv.cancelReason}` : ""}`,
-      data: { interviewId: iv.id, link: "/employer/schedule" },
-      dedupeKey: `meeting_reschedule_requested:${iv.id}:${iv.round}`,
-      email: emails.meetingRescheduleRequested({ name: toName, candidate: fromLabel, reason: iv.cancelReason, project: project?.n ?? null }),
-    });
-    const was = bookedStart(before);
-    if (before.status === "scheduled" && was !== null) await sendCancelFile(iv, before, was);
-    return;
-  }
 
   if (input.type === "reschedule") {
     await notify({

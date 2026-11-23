@@ -1,10 +1,10 @@
 /**
  * The meeting-proposal state machine, pure (no database, no `@/` alias, so `node --test` runs it).
  *
- * Only the EMPLOYER proposes times, and always exactly three. The intern picks one of them, asks to reschedule (no times
- * of their own: the meeting goes back to pending with `proposedBy = "intern"` and no slots, which reads as "the employer
- * must offer three new times"), or cancels. An offer lapses at `respondBy` (earliest slot minus 2 h). A pick or an offer
- * is refused when it overlaps another confirmed meeting of either party (+-30 min).
+ * Only the EMPLOYER proposes times, and always exactly three. The intern picks one of them or cancels; interns can no
+ * longer ask to reschedule (`request_reschedule` is always refused). A request made earlier still reads as pending with
+ * `proposedBy = "intern"` and no slots: "the employer must offer three new times". An offer lapses at `respondBy` (earliest
+ * slot minus 2 h). A pick or an offer is refused when it overlaps another confirmed meeting of either party (+-30 min).
  *
  * `round` counts offers and requests (a revision number, no cap). Rows from before migration 0043 read as round 1, proposed
  * by the employer, with no respondBy. A row an intern proposed under the earlier rules (`proposedBy = "intern"` with times)
@@ -23,8 +23,6 @@ export const RESPOND_LEAD_MS = 2 * 60 * 60_000;
 export const MEETING_MS = MEETING_MINUTES * 60_000;
 export const REASON_MIN = 3;
 export const REASON_MAX = 300;
-/** The intern's optional note on a reschedule request. */
-export const REQUEST_REASON_MAX = 300;
 
 type When = Date | string | null | undefined;
 
@@ -100,7 +98,7 @@ export function isLapsed(s: MeetingState, now: number = Date.now()): boolean {
 
 const isPending = (s: MeetingState) => (s.status ?? "").toLowerCase() === "pending";
 
-/** The intern asked to reschedule and the employer has not offered new times yet: pending, no times, the intern's marker. */
+/** An old intern reschedule request (no longer creatable) the employer has not answered yet: pending, no times, the intern's marker. */
 export const isRescheduleRequest = (s: MeetingState): boolean => isPending(s) && s.proposedBy === "intern" && offered(s).length === 0;
 
 /** The side that did not make the standing offer may pick from it (the intern from the employer's three; the employer only from a pre-change intern offer). */
@@ -125,21 +123,9 @@ export function canCancel(s: MeetingState, now: number = Date.now()): { ok: true
 
 /** The employer offers three new times: for a booked, expired, requested or still-open meeting. Interns never offer times. */
 export function canReschedule(s: MeetingState, role: Role): { ok: true } | Refusal {
-  if (role !== "employer") return refuse("employer_only", "Only the company offers time slots. Ask to reschedule instead.");
+  if (role !== "employer") return refuse("employer_only", "Only the company offers time slots.");
   const status = (s.status ?? "").toLowerCase();
   if (status === "scheduled" || status === "expired" || status === "pending") return { ok: true };
-  return refuse("not_open", `This meeting is already ${status || "closed"}`);
-}
-
-/** The intern asks the company for new times (no times of their own): an open offer or a booked time that has not started. */
-export function canRequestReschedule(s: MeetingState, now: number = Date.now()): { ok: true } | Refusal {
-  if (isRescheduleRequest(s)) return refuse("already_requested", "You already asked to reschedule. The company will offer new time slots.");
-  const status = (s.status ?? "").toLowerCase();
-  if (status === "pending") return { ok: true };
-  if (status === "scheduled") {
-    const start = bookedStart(s);
-    return start !== null && start <= now ? refuse("started", "This meeting has started.") : { ok: true };
-  }
   return refuse("not_open", `This meeting is already ${status || "closed"}`);
 }
 
@@ -150,17 +136,11 @@ export function reasonProblem(reason: unknown): string | null {
   return null;
 }
 
-/** The note on a reschedule request is optional; too long is refused. */
-export function requestReasonProblem(reason: unknown): string | null {
-  if (reason === undefined || reason === null || reason === "") return null;
-  if (typeof reason !== "string") return "Keep the reason short.";
-  return reason.trim().length > REQUEST_REASON_MAX ? `Keep the reason under ${REQUEST_REASON_MAX} characters.` : null;
-}
-
 export type Action =
   | { type: "propose"; by: Role; slots: Date[]; busy?: number[] }
   | { type: "choose"; by: Role; slot: number; busy?: number[] }
   | { type: "reschedule"; by: Role; slots: Date[]; busy?: number[] }
+  /** Always refused: kept so a stale client or a direct API call gets an explicit error. */
   | { type: "request_reschedule"; by: Role; reason?: string }
   | { type: "cancel"; by: Role; reason: string }
   | { type: "expire" };
@@ -237,30 +217,8 @@ export function step(current: MeetingState | undefined, action: Action, now: num
     return offer.ok ? { ok: true, fields: fresh(roundOf(current) + 1, offer) } : offer;
   }
 
-  if (action.type === "request_reschedule") {
-    if (action.by !== "intern") return refuse("intern_only", "Only the candidate can ask to reschedule.");
-    const c = canRequestReschedule(current, now);
-    if (!c.ok) return c;
-    const problem = requestReasonProblem(action.reason);
-    if (problem) return refuse("reason_too_long", problem);
-    const reason = (action.reason ?? "").trim();
-    return {
-      ok: true,
-      fields: {
-        status: "pending",
-        proposedBy: "intern",
-        round: roundOf(current) + 1,
-        respondBy: null,
-        slot1: null,
-        slot2: null,
-        slot3: null,
-        selectedSlot: null,
-        cancelledBy: null,
-        // The note rides in this column until the employer offers new times (which clears it); it is only shown on the request.
-        cancelReason: reason || null,
-      },
-    };
-  }
+  // Interns can no longer ask to reschedule; the employer is the only side that moves a meeting's times.
+  if (action.type === "request_reschedule") return refuse("intern_reschedule_removed", "Rescheduling is not available. Choose one of the offered times, or decline.");
 
   const c = canCancel(current, now);
   if (!c.ok) return c;
@@ -292,9 +250,7 @@ export type MeetingView = {
   canCancel: boolean;
   /** Employer: offer three new times. Always false for the intern. */
   canReschedule: boolean;
-  /** Intern: ask the company for new times. Always false for the employer. */
-  canRequestReschedule: boolean;
-  /** The intern asked to reschedule and the employer owes three new times. */
+  /** An intern request made before interns lost reschedule: the employer still owes three new times. */
   requested: boolean;
   round: number;
   lapsed: boolean;
@@ -309,7 +265,6 @@ export function viewFor(s: MeetingState, role: Role, now: number = Date.now()): 
     canChoose: choose,
     canCancel: canCancel(s, now).ok,
     canReschedule: canReschedule(s, role).ok,
-    canRequestReschedule: role === "intern" && canRequestReschedule(s, now).ok,
     requested: isRescheduleRequest(s),
     round: roundOf(s),
     lapsed,

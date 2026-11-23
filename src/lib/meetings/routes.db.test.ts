@@ -148,7 +148,7 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       await db.delete(schema.interviews).where(eq(schema.interviews.id, other.id));
     });
 
-    await t.test("intern cannot offer times; reschedule request -> employer re-proposes exactly 3 -> intern picks", async () => {
+    await t.test("intern cannot offer times or ask to reschedule (403, nothing changes); the employer re-offers exactly 3 -> intern picks", async () => {
       const first = await offer(e1, i3, [wall(140), wall(141), wall(142)]);
       assert.equal(first.status, 201, JSON.stringify(first.body));
       const id = (first.body.interview as { id: string }).id;
@@ -157,23 +157,17 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       const own = await call(reschedule, id, { slots: [wall(40), wall(41), wall(42)] });
       assert.ok([401, 403].includes(own.status), `stub guard says 401 for a wrong role, the real one 403: got ${own.status}`);
       assert.deepEqual([(await row(id)).round, (await row(id)).proposedBy], [1, "employer"]);
-      // asking to reschedule: no times, a note over 300 chars is refused
-      assert.equal((await call(askReschedule, id, { reason: "x".repeat(301) })).status, 400);
-      const ask = await call(askReschedule, id, { reason: "Exam that week", slots: [wall(40)] });
-      assert.equal(ask.status, 200, JSON.stringify(ask.body));
+      // ...and no way to ask to reschedule: refused explicitly, the meeting is untouched, the employer is not notified
+      for (const body of [{}, { reason: "Exam that week", slots: [wall(40)] }]) {
+        const ask = await call(askReschedule, id, body);
+        assert.equal(ask.status, 403, JSON.stringify(ask.body));
+        assert.equal(ask.body.code, "intern_reschedule_removed");
+      }
       let cur = await row(id);
-      assert.equal(cur.status, "pending");
-      assert.equal(cur.proposedBy, "intern");
-      assert.equal(cur.round, 2);
-      assert.deepEqual([cur.slot1, cur.slot2, cur.slot3, cur.respondBy], [null, null, null, null], "the intern's times are ignored; none are stored");
-      assert.equal(cur.cancelReason, "Exam that week");
-      // the employer is told, in-app, with the calm copy
-      const [note] = await db.select().from(schema.notifications).where(sql`${schema.notifications.recipientId} = ${e1.id} and ${schema.notifications.data}->>'interviewId' = ${id} and ${schema.notifications.type} = 'meeting_reschedule_requested'`);
-      assert.ok(note, "employer notified");
-      assert.match(note.message, /asked to reschedule: please offer 3 new times/);
-      // a second request, and picking from a request, are refused
-      assert.equal((await call(askReschedule, id, {})).status, 409);
-      assert.equal((await call(selectSlot, id, { slot: 1 })).status, 409);
+      assert.deepEqual([cur.status, cur.proposedBy, cur.round], ["pending", "employer", 1]);
+      assert.ok(cur.slot1 && cur.slot2 && cur.slot3, "the company's three times are still there");
+      const notes = await db.select().from(schema.notifications).where(sql`${schema.notifications.recipientId} = ${e1.id} and ${schema.notifications.data}->>'interviewId' = ${id} and ${schema.notifications.type} = 'meeting_reschedule_requested'`);
+      assert.equal(notes.length, 0, "no reschedule notification");
       // the employer must offer exactly 3
       as("employer", e1.id);
       assert.equal((await call(reschedule, id, { slots: [wall(40), wall(41)] })).status, 400);
@@ -182,7 +176,7 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       assert.equal(re.status, 200, JSON.stringify(re.body));
       cur = await row(id);
       assert.equal(cur.proposedBy, "employer");
-      assert.equal(cur.round, 3);
+      assert.equal(cur.round, 2);
       assert.ok(cur.slot1 && cur.slot2 && cur.slot3 && cur.respondBy);
       assert.equal(cur.cancelReason, null);
       as("intern", i3.id);
@@ -206,23 +200,18 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       assert.equal((await call(cancel, iv.id, { reason: "again" })).status, 409);
     });
 
-    await t.test("a booked meeting: the intern's reschedule request releases it and withdraws the Meet event; the employer re-proposes 3", async () => {
+    await t.test("a booked meeting: the intern's reschedule request is refused, it stays booked with its Meet event; the intern can still cancel", async () => {
       const [iv] = await db.select().from(schema.interviews).where(eq(schema.interviews.internId, i3.id)).limit(1);
       assert.equal(iv.status, "scheduled");
       const before = cal.events.size;
       as("intern", i3.id);
       const r = await call(askReschedule, iv.id, {});
-      assert.equal(r.status, 200, JSON.stringify(r.body));
+      assert.equal(r.status, 403, JSON.stringify(r.body));
       const cur = await row(iv.id);
-      assert.equal(cur.status, "pending");
-      assert.equal(cur.proposedBy, "intern");
-      assert.equal(cur.selectedSlot, null);
-      assert.equal(cur.calendarEventId, null);
-      assert.equal(cur.meetingLink, null);
-      assert.equal(cal.events.size, before - 1);
-      // still one open meeting for the pair: a new offer is refused until the employer answers this request
-      assert.equal((await offer(e1, i3, [wall(150), wall(151), wall(152)])).status, 409);
-      // the candidate can still cancel it
+      assert.equal(cur.status, "scheduled");
+      assert.equal(cur.selectedSlot, iv.selectedSlot);
+      assert.equal(cur.calendarEventId, iv.calendarEventId);
+      assert.equal(cal.events.size, before);
       assert.equal((await call(cancel, iv.id, { reason: "Not available any more" })).status, 200);
     });
 
@@ -249,7 +238,7 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       await db.update(schema.interviews).set({ respondBy: new Date(Date.now() - 60_000) }).where(eq(schema.interviews.id, id));
       as("intern", i3.id);
       assert.equal((await call(selectSlot, id, { slot: 1 })).body.code, "lapsed");
-      assert.equal((await call(askReschedule, id, {})).status, 200, "a lapsed offer can still be turned into a request for new times");
+      assert.equal((await call(askReschedule, id, {})).status, 403, "a lapsed offer cannot be turned into a request either");
     });
   } finally {
     const ids = [i1, i2, i3].map((u) => u.id);

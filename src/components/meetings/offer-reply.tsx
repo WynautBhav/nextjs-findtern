@@ -9,29 +9,24 @@ import { formatIstClock, formatIstDay, IST_ZONE } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { CancelMeetingDialog } from "./cancel-meeting-dialog";
 import { postMeeting, STALE_CODES } from "./meeting-api";
-import { RescheduleRequestPanel } from "./intern-meeting-actions";
 
 export type OfferSlot = { index: number; iso: string };
 
 /**
- * An open offer, answered: the candidate chooses one of the company's three times, asks to reschedule (no times of their own) or
- * cancels. The employer sees it only for an offer the candidate made before this rule (pick one, or cancel; new times are offered
- * from the row's menu). `role` decides the words and where the times are read (intern in IST, employer in the project's zone).
+ * An open offer, answered: the candidate chooses one of the company's three times or cancels. The employer sees it only for an
+ * offer the candidate made before this rule (pick one, or cancel; new times are offered from the row's menu). `role` decides the words and where the times are read (intern in IST, employer in the project's zone).
  */
 export function OfferReply({
   interviewId,
   slots,
   zone,
   role,
-  canRequestReschedule = false,
   serverNow,
 }: {
   interviewId: string;
   slots: OfferSlot[];
   zone: string;
   role: "employer" | "intern";
-  /** The candidate may ask the company for new times. */
-  canRequestReschedule?: boolean;
   /** ISO time on the server, so a time that has started is not offered on first render. */
   serverNow: string;
 }) {
@@ -40,7 +35,6 @@ export function OfferReply({
   const [selected, setSelected] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [asking, setAsking] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const now = new Date(serverNow).getTime();
   const intern = role === "intern";
@@ -104,11 +98,6 @@ export function OfferReply({
           {busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden /> : null}
           {intern ? "Confirm this time" : "Pick this time"}
         </button>
-        {intern && canRequestReschedule ? (
-          <button type="button" aria-expanded={asking} onClick={() => setAsking((v) => !v)} className={buttonClass({ variant: "outline", size: "sm", className: "h-auto min-h-11 whitespace-normal py-2 text-left leading-snug" })}>
-            None of these work: ask to reschedule
-          </button>
-        ) : null}
         <button type="button" onClick={() => setCancelling(true)} className={buttonClass({ variant: "ghost", size: "sm", className: "min-h-11" })}>
           Cancel
         </button>
@@ -120,7 +109,6 @@ export function OfferReply({
         </p>
       ) : null}
 
-      {asking ? <RescheduleRequestPanel interviewId={interviewId} booked={false} onClose={() => setAsking(false)} /> : null}
       <CancelMeetingDialog interviewId={interviewId} open={cancelling} onOpenChange={setCancelling} other={intern ? "the company" : "the candidate"} />
     </div>
   );
