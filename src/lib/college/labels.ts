@@ -122,11 +122,11 @@ export function coverMessage(c: CollegeCover | null): { tone: "covered" | "unava
   return { tone: "covered", text: "Your college covers this interview. Enter the code from your placement officer." };
 }
 
-const graphemes = typeof Intl !== "undefined" && "Segmenter" in Intl ? new Intl.Segmenter(undefined, { granularity: "grapheme" }) : null;
+const graphemes = typeof Intl !== "undefined" && "Segmenter" in Intl ? new Intl.Segmenter("en", { granularity: "grapheme" }) : null;
 const firstChar = (w: string) => (graphemes ? (graphemes.segment(w)[Symbol.iterator]().next().value?.segment ?? "") : (Array.from(w)[0] ?? ""));
 
 /** Up to two initials from the first two words: whole characters (emoji, accents, Devanagari signs stay in one piece). */
 export function initialsOf(name: string): string {
-  const letters = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => firstChar(w).toLocaleUpperCase()).join("");
+  const letters = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => firstChar(w).toUpperCase()).join("");
   return letters || "?";
 }

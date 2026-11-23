@@ -82,3 +82,12 @@ test("initialsOf takes whole characters, not UTF-16 halves", () => {
   assert.equal(initialsOf("   "), "?");
   for (const name of ["Zoë 🙂 Ørsted", "🙂🙂 🙂", "𝒜𝓁𝒾𝒸ℯ 𝒷𝑜𝒷"]) assert.ok(!/[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/.test(initialsOf(name)), name);
 });
+
+test("initialsOf does not depend on the reader's locale (R3-07): Turkish i / ı / İ give the same letters everywhere", () => {
+  // A locale-aware upper-case would turn "i" into "İ" in a tr-TR browser and hydrate differently from the server.
+  if ("i".toLocaleUpperCase("tr-TR") === "İ") assert.notEqual("i".toLocaleUpperCase("tr-TR"), "i".toUpperCase(), "the trap is real on this runtime");
+  assert.equal(initialsOf("ismail ince"), "II");
+  assert.equal(initialsOf("ışıl ığdır"), "II");
+  assert.equal(initialsOf("İlker İpek"), "İİ");
+  assert.equal(initialsOf("istanbul"), "I");
+});

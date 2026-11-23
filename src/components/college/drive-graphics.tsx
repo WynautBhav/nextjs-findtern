@@ -23,7 +23,7 @@ export function DrivePipeline({ driveId, stages, open }: { driveId: string; stag
         const last = i === stages.length - 1;
         const body = (
           <>
-            <span className="flex items-center justify-between gap-2 text-[13px] font-medium text-on-dark-subtle">
+            <span className="flex items-center justify-between gap-2 text-[13px] font-medium text-on-dark">
               {s.label}
               {i > 0 ? <span className="nums text-xs font-normal">{share}%</span> : null}
             </span>
@@ -70,7 +70,7 @@ export function EmployerArrivals({ start, end, now, arrivals, missing }: { start
   }
   return (
     <figure aria-label={`${arrivals.length} ${arrivals.length === 1 ? "company" : "companies"} came in${missing.length ? `, ${missing.length} invited not yet` : ""}`}>
-      <figcaption className="flex flex-wrap items-baseline justify-between gap-2 text-[13px] font-medium text-on-dark-subtle">
+      <figcaption className="flex flex-wrap items-baseline justify-between gap-2 text-[13px] font-medium text-on-dark">
         <span>Employers arriving</span>
         <span className="nums text-xs font-normal">
           <span className="text-white">{arrivals.length}</span> came{missing.length ? <> · <span className="text-accent-300">{missing.length}</span> invited not yet</> : null}
@@ -102,7 +102,7 @@ export function EmployerArrivals({ start, end, now, arrivals, missing }: { start
           </span>
         ) : null}
       </div>
-      <p className="nums mt-1 flex justify-between text-[11px] text-on-dark-subtle">
+      <p className="nums mt-1 flex justify-between text-[11px] text-on-dark">
         <span>{time(start)}</span>
         <span>{time(end)}</span>
       </p>
@@ -111,13 +111,13 @@ export function EmployerArrivals({ start, end, now, arrivals, missing }: { start
           {[...arrivals].sort((p, q) => p.at.getTime() - q.at.getTime()).slice(0, 6).map((a) => (
             <li key={a.id} className="flex items-center gap-1.5">
               <span aria-hidden className="size-1.5 rounded-full bg-white" />
-              {a.company} <span className="nums text-on-dark-subtle">{time(a.at)}</span>
+              {a.company} <span className="nums text-on-dark">{time(a.at)}</span>
             </li>
           ))}
-          {arrivals.length > 6 ? <li className="text-on-dark-subtle">+{arrivals.length - 6} more below</li> : null}
+          {arrivals.length > 6 ? <li className="text-on-dark">+{arrivals.length - 6} more below</li> : null}
         </ul>
       ) : (
-        <p className="mt-3 text-xs text-on-dark-subtle">No company has opened the link yet.</p>
+        <p className="mt-3 text-xs text-on-dark">No company has opened the link yet.</p>
       )}
     </figure>
   );
