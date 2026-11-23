@@ -316,8 +316,10 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
           .set({
             status: "expired",
             updatedAt: new Date(),
-            // Durable lapse stamp: a `sent` sibling past its start day still counts as a miss.
-            offerDetails: sql`CASE WHEN ${schema.proposals.status} = 'sent' AND left(${schema.proposals.offerDetails}->>'startDate', 10) <= ${todayIst()} THEN ${schema.proposals.offerDetails} || jsonb_build_object('lapsedAt', now()) ELSE ${schema.proposals.offerDetails} END`,
+            // Durable lapse stamp: a `sent` sibling past its start day still counts as a miss. And the reason it closed, so
+            // every side reads the same thing: the employer "Closed · accepted elsewhere", the intern "Closed · you took another
+            // offer" (without it the intern's legacy reading said "Withdrawn", which the company never did).
+            offerDetails: sql`(CASE WHEN ${schema.proposals.status} = 'sent' AND left(${schema.proposals.offerDetails}->>'startDate', 10) <= ${todayIst()} THEN coalesce(${schema.proposals.offerDetails}, '{}'::jsonb) || jsonb_build_object('lapsedAt', now()) ELSE coalesce(${schema.proposals.offerDetails}, '{}'::jsonb) END) || ${JSON.stringify(expiredStamp("accepted_elsewhere"))}::jsonb`,
           })
           .where(
             and(

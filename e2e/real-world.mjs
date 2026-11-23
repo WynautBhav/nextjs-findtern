@@ -208,12 +208,12 @@ async function interviewScenario(name, steps, want) {
     college: ["Pending", "Scheduled", "Expired", "Missed", "Completed", "Cancelled"],
   };
   // Only this meeting's row on each screen (the pages also carry filter tabs with the same words).
-  await emp.a.read(`/employer/schedule`);
+  await emp.a.read(`/employer/schedule?status=all&past=all`); // past meetings sit behind "Show more past meetings"
   const empRow = await emp.a.page.locator(`a[href="/employer/intern/${s.id}"]`).first().locator("xpath=ancestor::*[self::li or self::tr or self::article][1]").innerText().catch(() => "");
   await admin.read(`/admin/interns/${s.id}`);
   await admin.page.getByRole("tab", { name: /Interviews/ }).or(admin.page.getByRole("button", { name: /^Interviews/ })).first().click().catch(() => {});
   await admin.page.waitForTimeout(500);
-  const adminRows = await admin.page.locator("table tbody").last().innerText().catch(() => "");
+  const adminRows = await admin.page.locator("[role=tabpanel]").last().innerText().catch(() => "");
   expect(name, {
     intern: labelsIn(await intern.read(`/intern/interviews`), V.intern),
     employer: labelsIn(empRow, V.employer),
