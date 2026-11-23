@@ -21,7 +21,7 @@ const CRITICAL: Tile[] = [
 /** What the drive has produced so far. */
 const RESULTS: Tile[] = [
   { key: "offers", label: "Offers received", hint: () => "" },
-  { key: "meetings", label: "Meetings scheduled", hint: (n) => (n ? "Calls students accepted" : "No call accepted yet") },
+  { key: "meetings", label: "Calls accepted", hint: (n) => (n ? "Live calls students accepted" : "No call accepted yet") },
   { key: "internships", label: "Placed: internship", hint: (n) => (n ? "Hired for an internship" : "No hire yet") },
   { key: "fullTime", label: "Placed: full-time", hint: (n) => (n ? "Hired for a full-time role" : "No hire yet") },
 ];
