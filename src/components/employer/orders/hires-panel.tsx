@@ -323,6 +323,7 @@ export function HiresPanel({
                       <FullTimeOfferButton
                         employerId={employerId}
                         proposalId={h.proposalId}
+                        feeRate={h.ppoFeeRate}
                         candidate={h.candidateName}
                         fteStatus={fteStatus}
                         timezone={timezone}

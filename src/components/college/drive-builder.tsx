@@ -168,31 +168,10 @@ export function DriveBuilder({
             <input className={cn(field, "mt-1.5")} value={d.title} onChange={(e) => set("title", e.target.value)} required maxLength={120} placeholder="e.g. Summer internship drive 2027" />
           </label>
 
-          <fieldset className="md:col-span-2">
-            <legend className="text-sm font-medium text-ink-800">Hiring for</legend>
-            <div className="mt-1.5 grid gap-2 sm:grid-cols-2">
-              {(
-                [
-                  ["internship", "Internships", "Findtern's fixed stipend bands apply; score is shown first."],
-                  ["full_time", "Full-time jobs", "Final-year students only: 4th year, or 3rd year in semester 6 and up. Employers also see CGPA."],
-                ] as const
-              ).map(([value, label, hint]) => (
-                <label
-                  key={value}
-                  className={cn(
-                    "flex cursor-pointer items-start gap-3 rounded-apple-sm border p-3.5",
-                    d.kind === value ? "border-brand-600 bg-brand-50/60" : "border-ink-200 hover:border-ink-300",
-                  )}
-                >
-                  <input type="radio" name="kind" value={value} checked={d.kind === value} onChange={() => set("kind", value)} className="mt-1 accent-brand-700" />
-                  <span>
-                    <span className="block text-sm font-semibold text-ink-900">{label}</span>
-                    <span className="block text-sm text-text-subtle">{hint}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          {/* One kind of drive: inside it the employer picks Interns or Full-time (final year only). Owner, 23 Nov. */}
+          <p className="text-sm text-text-subtle md:col-span-2">
+            Employers hire interns and full-time from the same drive. Full-time offers go to final-year students only.
+          </p>
 
           {/* No backdated drives (owner, 23 Nov): past days are greyed; a live drive being edited keeps its own start day. */}
           <IstDateTime label="Opens (IST)" value={d.startsAt} min={initial.startsAt && initial.startsAt.slice(0, 10) < today ? initial.startsAt.slice(0, 10) : today} onChange={(v) => set("startsAt", v)} field={field} />

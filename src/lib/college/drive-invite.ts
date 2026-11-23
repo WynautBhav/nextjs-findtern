@@ -86,7 +86,8 @@ export function driveInviteEmail(o: { company: string; collegeName: string; driv
     ],
     facts: [
       ["College", college],
-      ["Hiring for", o.kind === "full_time" ? "Full-time jobs" : "Internships"],
+      ["Hiring for", o.kind === "full_time" ? "Full-time jobs" : "Interns and full-time"],
+      ["Drive pricing", "15% off internship hires, 1% full-time fee"],
       ["Opens", when(o.startsAt)],
       ["Closes", when(o.endsAt)],
     ],

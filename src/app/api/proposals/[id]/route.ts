@@ -2,6 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
+import { discountedMonthlyMinor } from "@/lib/college/drive-pricing";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
@@ -268,7 +269,17 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const o = parseOffer(next, proposal.currency);
   if (touchesHours) next.monthlyHours = scheduledMonthlyHours(o.weeklySchedule, o.paidLeavesPerMonth);
   const hours = touchesHours ? Number(next.monthlyHours) : o.monthlyHours;
-  const monthlyMinor = o.hourlyRateMinor ? Math.round(hours * o.hourlyRateMinor) : (o.monthlyMinor ?? 0);
+  // A campus drive offer keeps its drive discount (stamped when sent, read from the stored offer, never from the edit).
+  const drivePct = parseOffer(current, proposal.currency).driveDiscountPercent;
+  delete next.driveDiscountPercent;
+  delete next.listMonthlyAmount;
+  const listMonthlyMinor = o.hourlyRateMinor ? Math.round(hours * o.hourlyRateMinor) : null;
+  const monthlyMinor = listMonthlyMinor === null ? (o.monthlyMinor ?? 0) : drivePct > 0 ? discountedMonthlyMinor(listMonthlyMinor, drivePct) : listMonthlyMinor;
+  if (drivePct > 0) {
+    next.driveDiscountPercent = drivePct;
+    if (listMonthlyMinor !== null) next.listMonthlyAmount = listMonthlyMinor / 100;
+    else if (current.listMonthlyAmount !== undefined) next.listMonthlyAmount = current.listMonthlyAmount;
+  }
   next.monthlyAmount = monthlyMinor / 100;
   next.totalPrice = (monthlyMinor * o.months + (before.perHireMinor ?? 0)) / 100;
   // Reopening an accepted offer runs under the order route's lock (`employer-pay:<id>`), with the open-order check re-read

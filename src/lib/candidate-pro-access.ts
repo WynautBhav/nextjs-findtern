@@ -21,8 +21,23 @@ export async function proAccess(employerId: string, lookup: (employerId: string)
   if (!employerId) return false;
   try {
     const state = await lookup(employerId);
-    return state?.active === true;
+    if (state?.active === true) return true;
   } catch {
+    // fall through: no subscription read, so only a live campus drive can grant it
+  }
+  return inCampusDrive(employerId);
+}
+
+/**
+ * Findtern Pro comes with a campus drive: a company inside a live drive (lib/college/campus-lock.ts) gets the Pro
+ * candidate features for as long as the drive runs, with no subscription. Fail closed on any error.
+ */
+async function inCampusDrive(employerId: string): Promise<boolean> {
+  try {
+    const { activeCampusDrives } = await import("@/lib/college/campus-lock");
+    return (await activeCampusDrives(employerId)).length > 0;
+  } catch (err) {
+    console.error("[pro-access] campus drive check failed", err);
     return false;
   }
 }

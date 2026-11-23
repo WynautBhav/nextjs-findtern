@@ -42,7 +42,7 @@ export type CardRow = {
   nameUnlocked: boolean;
 };
 
-export type ProResults = Pick<ProData, "active" | "ignored" | "hiddenNoScore" | "approxKept" | "colleges">;
+export type ProResults = Pick<ProData, "active" | "ignored" | "hiddenNoScore" | "approxKept" | "colleges" | "campusColleges">;
 
 /** Everything that depends on the filters. This is the endpoint's body. */
 export type ResultsWire = {
@@ -103,7 +103,7 @@ export function toResultsWire(data: CandidatesData, filters: Filters): ResultsWi
     cityList: data.cityList,
     cityDefault: data.cityDefault,
     savedCount: data.savedCount,
-    pro: { active: data.pro.active, ignored: data.pro.ignored, hiddenNoScore: data.pro.hiddenNoScore, approxKept: data.pro.approxKept, colleges: data.pro.colleges },
+    pro: { active: data.pro.active, ignored: data.pro.ignored, hiddenNoScore: data.pro.hiddenNoScore, approxKept: data.pro.approxKept, colleges: data.pro.colleges, campusColleges: data.pro.campusColleges },
     relaxCounts: data.relaxCounts,
   };
 }
@@ -128,7 +128,7 @@ export function fromWire(chrome: ChromeWire, results: ResultsWire): { data: Cand
   const nameUnlocked = new Set<string>();
   for (const row of results.rows) {
     const id = row.candidate.id;
-    if (row.relation) relations.set(id, { ...row.relation, hired: false, fullTimeFrom: null });
+    if (row.relation) relations.set(id, { ...row.relation, hired: false, fullTimeFrom: null, fullTimeFeeRate: null });
     presence[id] = row.presence;
     if (row.shortlisted) shortlisted.add(id);
     if (row.interested) saved.add(id);

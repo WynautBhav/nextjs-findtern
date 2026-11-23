@@ -1,3 +1,4 @@
+import { ppoRate } from "@/lib/college/drive-pricing";
 import { isHiredProposal } from "@/lib/hire-status";
 import type { Metadata } from "next";
 import { and, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
@@ -126,6 +127,7 @@ async function loadOrders(employerId: string) {
       const ledger = placementLedger(r.proposal, paymentRows);
       return {
         proposalId: r.proposal.id,
+        ppoFeeRate: ppoRate(r.proposal.ppoFeePercent),
         internId: r.proposal.internId,
         projectId: r.proposal.projectId ?? null,
         meetingOpen: hasOpenMeeting(openMeetings.filter((iv) => iv.internId === r.proposal.internId)),

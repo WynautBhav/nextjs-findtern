@@ -244,6 +244,7 @@ export default async function EmployerProposalDetail({
     monthlyMinor: offer.monthlyMinor,
     fee,
     place,
+    driveDiscountPercent: offer.driveDiscountPercent,
   });
 
   // An expired offer ends the timeline at its closed step, like an unanswered one.
@@ -267,6 +268,7 @@ export default async function EmployerProposalDetail({
           perHireMinor={shownFeeMinor}
           fee={fee}
           projectTimezone={projectTimezone}
+          driveDiscountPercent={offer.driveDiscountPercent}
           shortOnly={score > 0 && score < 6}
           hasLaptop={hasLaptop}
           initial={{

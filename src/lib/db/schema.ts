@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, boolean, integer, timestamp, jsonb, uniqueIndex, index, check } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, boolean, integer, numeric, timestamp, jsonb, uniqueIndex, index, check } from "drizzle-orm/pg-core";
 // --------------------------------------------------
 // User (Intern) Schema
 // --------------------------------------------------
@@ -825,10 +825,20 @@ export const proposals = pgTable("proposals", {
   /** Set when the placement ends early (ban / left mid-way). Read null-safe. */
   endedAt: timestamp("ended_at"),
   endedReason: text("ended_reason"),
+  /**
+   * Campus drive pricing, stamped by the server when the offer is sent (0053; lib/college/drive-pricing.ts), never read from
+   * the request: from a drive, 15% off the monthly charges and a 1% full-time fee; otherwise standard (0, 8.33). A later PPO of
+   * this intern reads `ppoFeePercent` from here, so the drive rate survives the drive.
+   */
+  driveId: varchar("drive_id"),
+  pricingTier: text("pricing_tier").notNull().default("standard"), // standard | virtual_drive
+  discountPercent: integer("discount_percent").notNull().default(0),
+  ppoFeePercent: numeric("ppo_fee_percent", { precision: 5, scale: 2 }).notNull().default("8.33"),
 }, (t) => ({
   proposalsInternIdx: index("proposals_intern_id_idx").on(t.internId),
   proposalsEmployerIdx: index("proposals_employer_id_idx").on(t.employerId),
   proposalsProjectIdx: index("proposals_project_id_idx").on(t.projectId),
+  proposalsDriveIdx: index("proposals_drive_idx").on(t.driveId).where(sql`${t.driveId} IS NOT NULL`),
 }));
 
 export type Proposal = typeof proposals.$inferSelect;
@@ -1239,8 +1249,15 @@ export const collegeDriveEmployers = pgTable("college_drive_employers", {
   driveId: varchar("drive_id").notNull(),
   employerId: varchar("employer_id").notNull(),
   joinedAt: timestamp("joined_at").notNull().defaultNow(),
+  /** joined | exited (left early) | completed (the drive ended while in). The lock itself is read live (lib/college/campus-lock.ts). */
+  status: text("status").notNull().default("joined"),
+  /** link | invite | auto (signed up or in with an invited email). */
+  via: text("via").notNull().default("link"),
+  exitedAt: timestamp("exited_at"),
+  completedAt: timestamp("completed_at"),
 }, (t) => ({
   collegeDriveEmployersUnique: uniqueIndex("college_drive_employers_unique").on(t.driveId, t.employerId),
+  collegeDriveEmployersEmployerIdx: index("college_drive_employers_employer_idx").on(t.employerId, t.status),
 }));
 
 export const collegeDriveShortlist = pgTable("college_drive_shortlist", {
@@ -1305,6 +1322,21 @@ export const collegeAuditLog = pgTable("college_audit_log", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 }, (t) => ({
   collegeAuditLogCollegeIdx: index("college_audit_log_college_idx").on(t.collegeId, t.createdAt),
+}));
+
+/** What each company did inside a campus drive, for the placement officer (0053). */
+export const driveActivityLogs = pgTable("drive_activity_logs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  driveId: varchar("drive_id").notNull(),
+  collegeId: varchar("college_id").notNull(),
+  employerId: varchar("employer_id").notNull(),
+  /** joined_drive | viewed_candidates | shortlisted_candidate | sent_internship_offer | sent_fulltime_offer | exited_drive_early | drive_auto_completed */
+  action: text("action").notNull(),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => ({
+  driveActivityLogsDriveIdx: index("drive_activity_logs_drive_idx").on(t.driveId, t.createdAt),
+  driveActivityLogsEmployerIdx: index("drive_activity_logs_employer_idx").on(t.employerId, t.driveId, t.action),
 }));
 
 /** Web Push subscriptions (students accept instant meetings from their phone). */

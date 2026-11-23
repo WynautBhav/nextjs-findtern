@@ -1,3 +1,5 @@
+import { driveSourceFor } from "@/lib/college/campus-lock";
+import { calculateHireFees } from "@/lib/college/drive-pricing";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { and, desc, eq, inArray } from "drizzle-orm";
@@ -347,6 +349,7 @@ export default async function SendProposal({
         candidateHasLaptop={hasLaptop}
         heldProjectIds={heldProjectIds}
         place={place}
+        driveDiscountPercent={calculateHireFees({ driveId: (await driveSourceFor(uid, internId))?.driveId ?? null }).discountPercent}
       />
     </div>
   );

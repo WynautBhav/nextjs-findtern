@@ -27,7 +27,8 @@ export async function POST(req: Request) {
     .values({ ...parsed.data, invitedEmployers: withUnsent(list, toSend.map((i) => i.email)), collegeId: g.ctx.college.id, tokenHash: hash, createdBy: g.ctx.admin.id })
     .returning({ id: schema.collegeDrives.id });
   // After the commit: each invited company is emailed (and alerted in its app if it has an account).
-  const { title, kind, startsAt, endsAt } = parsed.data;
+  const { title, startsAt, endsAt } = parsed.data;
+  const kind = parsed.data.kind ?? "internship";
   const invites = await sendAndRecordInvites({ id: drive.id, title, kind, startsAt, endsAt, tokenHash: hash }, g.ctx.college.id, g.ctx.college.name, list, toSend);
   return NextResponse.json({ id: drive.id, url: driveShareUrl(tryPublicOrigin(), token), invites }, { status: 201 });
 }

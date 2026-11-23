@@ -55,10 +55,15 @@ async function loadList(employerId: string): Promise<{ proposals: ProposalItem[]
           projectId: schema.projects.id,
           projectName: schema.projects.projectName,
           takenDownAt: schema.projects.takenDownAt,
+          driveTitle: schema.collegeDrives.title,
+          driveCollege: schema.colleges.name,
         })
         .from(schema.proposals)
         .leftJoin(schema.users, eq(schema.proposals.internId, schema.users.id))
         .leftJoin(schema.projects, eq(schema.proposals.projectId, schema.projects.id))
+        // The drive an offer was sent from (0053): its badge outlives the drive and the company's exit.
+        .leftJoin(schema.collegeDrives, eq(schema.collegeDrives.id, schema.proposals.driveId))
+        .leftJoin(schema.colleges, eq(schema.colleges.id, schema.collegeDrives.collegeId))
         .where(eq(schema.proposals.employerId, employerId))
         .orderBy(desc(schema.proposals.createdAt)),
       // Unmask on a hire with this employer on any project, as every other employer screen does.
@@ -93,6 +98,7 @@ async function loadList(employerId: string): Promise<{ proposals: ProposalItem[]
       photoUrl: withPhoto.has(row.proposal.internId) ? avatarUrl(row.proposal.internId) : null,
       presence: presence[row.proposal.internId] ?? null,
       user: userFor(row.firstName, row.lastName, hired.has(row.proposal.internId)),
+      drive: row.driveCollege ? { collegeName: row.driveCollege, title: row.driveTitle ?? "" } : null,
     }));
     return { proposals, loadFailed: false };
   } catch (err) {

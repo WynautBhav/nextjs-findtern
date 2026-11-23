@@ -1,5 +1,6 @@
 import { INR_PER_USD } from "./currency.ts";
 import { PRICING_DEFAULTS, stipendInrMinorFor, type PricingConfig } from "./pricing-config.ts";
+import { discountedMonthlyMinor } from "./college/drive-pricing.ts";
 import { startDateProblem } from "./business-days.ts";
 import { isKnownTimezone } from "./timezones.ts";
 
@@ -49,6 +50,9 @@ export type Offer = {
   hourlyRateMinor: number | null;
   /** Fixed monthly intern stipend (INR paise), set when sent. Null on older offers, which use the 50% rule. */
   internStipendMinor: number | null;
+  /** Campus drive offers: % off the monthly charges (15), and the monthly charge before it. 0 / null otherwise. */
+  driveDiscountPercent: number;
+  listMonthlyMinor: number | null;
   perHireMinor: number | null;
   /**
    * The band's hiring-fee amount at send time (INR/USD minor of the offer), charged or not: a snapshot, so a
@@ -289,6 +293,8 @@ export function parseOffer(raw: unknown, rowCurrency?: string | null): Offer {
     totalMinor: toMinor(o.totalPrice),
     hourlyRateMinor: toMinorKeepZero(o.hourlyRate),
     internStipendMinor: toMinorKeepZero(o.internStipendMonthly),
+    driveDiscountPercent: Math.min(100, Math.max(0, num(o.driveDiscountPercent) ?? 0)),
+    listMonthlyMinor: toMinor(o.listMonthlyAmount),
     perHireMinor: perHireOf(o, monthsOf(duration)),
     perHireListMinor: toMinor(o.perHireListCharge),
     candidateScore: offerScore(o),
@@ -462,13 +468,17 @@ export type OfferInput = {
   pricing?: PricingConfig;
   candidateScore?: number;
   projectSkills?: string[];
+  /** Campus drive offers: % off the monthly charges, decided by the server (lib/college/drive-pricing.ts). Never the hiring fee. */
+  driveDiscountPercent?: number;
 };
 
 /** Legacy `offer_details` (major units), with the money computed here. */
 export function buildOffer(input: OfferInput): Record<string, unknown> {
   const months = monthsOf(input.duration);
   // Always rate × hours: a typed monthly figure could undercut the band rate.
-  const monthlyMinor = Math.round(input.monthlyHours * input.hourlyRateMinor);
+  const listMonthlyMinor = Math.round(input.monthlyHours * input.hourlyRateMinor);
+  const drivePct = input.driveDiscountPercent ?? 0;
+  const monthlyMinor = drivePct > 0 ? discountedMonthlyMinor(listMonthlyMinor, drivePct) : listMonthlyMinor;
   const totalMinor = monthlyMinor * months + input.perHireMinor;
   const major = (minor: number) => Math.round(minor) / 100;
   const fixedStipend = fixedInternStipendInrMinor(input.candidateScore, input.pricing);
@@ -495,6 +505,7 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
     monthlyHours: input.monthlyHours,
     weeklySchedule: input.weeklySchedule ?? "mon_fri",
     monthlyAmount: major(monthlyMinor),
+    ...(drivePct > 0 ? { listMonthlyAmount: major(listMonthlyMinor), driveDiscountPercent: drivePct } : {}),
     totalPrice: major(totalMinor),
     hourlyRate: major(input.hourlyRateMinor),
     // A scored candidate below 6 is stored as 0, not left off: with the key
@@ -514,7 +525,7 @@ export function buildOffer(input: OfferInput): Record<string, unknown> {
 }
 
 /** The money a sent offer carries; an edit of its terms never moves them. */
-const PRICING_SNAPSHOT_KEYS = ["internStipendMonthly", "perHireCharge", "perHireListCharge"] as const;
+const PRICING_SNAPSHOT_KEYS = ["internStipendMonthly", "perHireCharge", "perHireListCharge", "driveDiscountPercent", "listMonthlyAmount"] as const;
 
 /**
  * Carries the figures an offer was sent with onto its edited copy. Only keys the stored offer had are carried,

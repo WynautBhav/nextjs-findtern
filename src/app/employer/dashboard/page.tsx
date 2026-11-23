@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { and, desc, eq, inArray, not } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
+import { campusCohort, cohortClause } from "@/lib/college/campus-lock";
 import { FIRST_PAYMENT_EXPLAINER } from "@/lib/first-payment-copy";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
@@ -387,13 +388,14 @@ async function load(employerId: string): Promise<Loaded> {
     gated(() => payableCheckoutForRequest(employerId)),
     // Candidates who match the skills this employer is hiring for, best score first; the top of the pool when
     // no open project lists skills. Same pool rule as the candidate browser. Independent of the other reads.
-    gated(() => db
+    // Campus-locked: the drive's students only (lib/college/campus-lock.ts).
+    gated(async () => { const lock = cohortClause(await campusCohort(employerId)); return db
       .select({ user: schema.users, onboarding: schema.internOnboarding })
       .from(schema.users)
       .innerJoin(schema.internOnboarding, eq(schema.users.id, schema.internOnboarding.userId))
-      .where(and(...candidatePoolClauses(), not(heldElsewhereSql(employerId))))
+      .where(and(...candidatePoolClauses(), not(heldElsewhereSql(employerId)), lock))
       .orderBy(desc(scoreExpr()), desc(schema.internOnboarding.updatedAt))
-      .limit(60)),
+      .limit(60); }),
   ]);
 
   const employer = employerRow[0];

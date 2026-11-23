@@ -9,6 +9,8 @@ import { learnField } from "@/lib/proposal-copy";
 import { projectZone } from "@/lib/timezones";
 import { withLock } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
+import { driveSourceFor, logDriveActivity } from "@/lib/college/campus-lock";
+import { calculateHireFees } from "@/lib/college/drive-pricing";
 import { scoreOf, toCandidateProfile } from "@/lib/employer-candidates";
 import { resolvePricing } from "@/lib/employer-pricing";
 import { getPricingConfig } from "@/lib/platform-settings";
@@ -262,6 +264,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const plans = await db.select().from(schema.pricingPlans).where(eq(schema.pricingPlans.isActive, true));
   const pricing = await getPricingConfig();
   const rate = resolvePricing(score, plans, currency, null, feeSettingOf(pricing), pricing);
+  // Campus drive pricing: decided here from where the candidate was sourced (a live drive this company is in, the student one
+  // of its students), never from the request. Stays on the offer after the drive (lib/college/drive-pricing.ts).
+  const source = await driveSourceFor(id, b.internId);
+  const fees = calculateHireFees({ driveId: source?.driveId ?? null });
   const offerDetails = buildOffer({
     ...b,
     // The offer runs on the PROJECT's clock (feedback sheet 2, row 7): its zone wins over the one sent.
@@ -278,6 +284,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     pricing,
     candidateScore: score,
     projectSkills: b.skills,
+    driveDiscountPercent: fees.discountPercent,
   });
 
   // The checks above ran before this request held the candidate. Repeated and
@@ -325,6 +332,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         aiRatings: { communication: ratings.communication, coding: ratings.coding, aptitude: ratings.aptitude, overall: score },
         skills: b.skills,
         status: "sent",
+        driveId: fees.driveId,
+        pricingTier: fees.pricingTier,
+        discountPercent: fees.discountPercent,
+        ppoFeePercent: String(fees.ppoFeePercent),
       })
       .returning();
     return row;
@@ -336,6 +347,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     return NextResponse.json({ error: created.held, ...(created.proposalId ? { proposalId: created.proposalId } : {}) }, { status: 409 });
   }
   const proposal = created;
+  // The officer's activity log (never throws; one insert).
+  if (source) await logDriveActivity(db, { driveId: source.driveId, collegeId: source.collegeId, employerId: id, action: "sent_internship_offer", metadata: { proposalId: proposal.id, internId: b.internId } });
   // The company stays hidden from the intern until it hires them. This used
   // to reveal it whenever any offer was merely open.
   const companyName = openOffers.some(isHiredProposal) ? (await employerNames(id)).company : "A company on Findtern";

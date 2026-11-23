@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Clock, CreditCard, Eye, Hourglass, Loader2, Pencil, RotateCcw, Search, Send, X } from "lucide-react";
+import { Clock, CreditCard, Eye, Hourglass, Loader2, Pencil, RotateCcw, Search, Send, X, GraduationCap } from "lucide-react";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { formatMoney } from "@/lib/format";
@@ -41,6 +41,8 @@ export type ProposalItem = {
   gate: CgpaGate | null;
   /** A payment order is open for this offer: it freezes expiry. */
   hasOpenOrder: boolean;
+  /** Sent from a college's campus drive: badged for good, with the drive's pricing. */
+  drive?: { collegeName: string; title: string } | null;
 };
 
 const needsYou = (s: ReturnType<typeof offerState>) => s.canPay || s.gate?.state === "incorrect_unacked";
@@ -384,6 +386,12 @@ export function ProposalsManager({ initialProposals }: { initialProposals: Propo
                   </p>
                   <p className="mt-0.5 break-words text-sm font-medium text-ink-800">{title}</p>
                   {item.project ? <p className="mt-0.5 break-words text-sm text-ink-700">{item.project.projectName}</p> : null}
+                  {item.drive ? (
+                    <p className="mt-1 inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-800 ring-1 ring-brand-200">
+                      <GraduationCap aria-hidden className="size-3.5 shrink-0" />
+                      <span className="truncate">Campus drive · {item.drive.collegeName}</span>
+                    </p>
+                  ) : null}
                   {down ? <p className="mt-1 flex flex-wrap items-center gap-2 text-xs text-ink-700"><TakedownBadge /> <span>{TAKEN_DOWN_SHORT}</span></p> : null}
                 </div>
                 <div className="col-span-2 flex flex-col items-start gap-1 lg:col-span-1">

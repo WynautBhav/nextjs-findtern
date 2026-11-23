@@ -5,6 +5,7 @@ import { getDb } from "./db";
 import { interviews, proposals, users } from "./db/schema";
 import { isHiredProposal } from "./hire-status";
 import { parseOffer, todayIst } from "./offer";
+import { ppoRate } from "./college/drive-pricing";
 import { LIVE_STATUSES } from "./employer-offer-status";
 import { EXPIRY_LABEL, expiryOf, type ExpiryReason } from "./proposal-expiry";
 import { hasOpenMeeting } from "./employer-interview-rules";
@@ -120,6 +121,8 @@ export type CandidateRelation = {
   hired: boolean;
   /** The internship hire a full-time offer would follow from, if offerable (EMH-42). */
   fullTimeFrom: string | null;
+  /** The full-time fee that conversion carries: 1% when the internship came from a campus drive (proposals.ppo_fee_percent). */
+  fullTimeFeeRate: number | null;
   /**
    * When this employer's booked (or offered) meeting with them is, as an ISO
    * string, while it still holds the candidate; null otherwise. A date only:
@@ -167,6 +170,7 @@ export async function candidateRelations(
         hiredAt: proposals.hiredAt,
         offerDetails: proposals.offerDetails,
         currency: proposals.currency,
+        ppoFeePercent: proposals.ppoFeePercent,
       })
       .from(proposals)
       .where(and(eq(proposals.employerId, employerId), inArray(proposals.internId, ids)))
@@ -193,6 +197,7 @@ export async function candidateRelations(
       proposal: shown ? { id: shown.id, status: isHiredProposal(shown) ? "hired" : shown.status, fullTime: shown.fullTime } : null,
       hired: hires.length > 0,
       fullTimeFrom: internship && !fullTimeOut ? internship.id : null,
+      fullTimeFeeRate: internship ? ppoRate(internship.ppoFeePercent) : null,
       expired: lapsedRow && lapsedReason ? { id: lapsedRow.id, reason: lapsedReason, label: EXPIRY_LABEL[lapsedReason] } : null,
       pendingMeetingAt: pendingMeetingAtFor(
         meetings.filter((m) => m.internId === id),

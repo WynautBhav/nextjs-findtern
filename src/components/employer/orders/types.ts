@@ -2,6 +2,8 @@ import type { PlacementLedger } from "@/lib/dues";
 
 export type HireRow = {
   proposalId: string;
+  /** The full-time fee a conversion of this hire carries (1% from a campus drive, else 8.33%). */
+  ppoFeeRate: number;
   internId: string;
   /** The project they were hired on; "Book meeting" books inside it. */
   projectId: string | null;

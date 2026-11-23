@@ -85,8 +85,11 @@ export function ProposalOfferForm({
   perHireMinor = null,
   fee,
   projectTimezone = null,
+  driveDiscountPercent = 0,
 }: {
   proposalId: string;
+  /** A campus drive offer keeps its % off the monthly charge through edits (stamped when sent). */
+  driveDiscountPercent?: number;
   /** The candidate already accepted: saving asks them to accept again. */
   accepted?: boolean;
   /** The candidate said they have no laptop: the company must provide one (EMH-18). */
@@ -121,7 +124,7 @@ export function ProposalOfferForm({
   const [leaves, setLeaves] = useState(String(Math.min(3, Math.round((initial.paidLeavesPerMonth ?? 0) * 2) / 2)));
   const hours = scheduledMonthlyHours(schedule, Number(leaves) || 0);
   const days = billableWorkingDays(schedule);
-  const breakdown = offerBreakdown({ currency, hourlyRateMinor: initial.hourlyRateMinor ?? null, hours, perHireMinor, fee, place });
+  const breakdown = offerBreakdown({ currency, hourlyRateMinor: initial.hourlyRateMinor ?? null, hours, perHireMinor, fee, place, driveDiscountPercent });
   const modes = MODE_OPTIONS.filter((m) => offerableModes(preference).includes(m.value) || m.value === initial.mode);
   const [mode, setMode] = useState(initial.mode || modes[0]?.value || "remote");
   const [timezone, setTimezone] = useState(projectTimezone || initial.timezone || "Asia/Kolkata");

@@ -524,6 +524,27 @@ export const emails = {
     cta: ctaTo("Review leave requests", "/college/leave-requests"),
   }),
 
+  collegeDriveEmployerExited: (o: { collegeName: string; driveTitle: string; company: string; contact: string; exitedAt: Date; summary: Record<string, number> }): EmailContent => {
+    const n = (k: string) => String(o.summary[k] ?? 0);
+    const when = o.exitedAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata", dateStyle: "medium", timeStyle: "short" });
+    return {
+      subject: `${o.company} left your drive ${o.driveTitle} | Findtern`,
+      preheader: `${o.company} exited ${o.driveTitle} early, on ${when}.`,
+      heading: "A company left your campus drive early",
+      greeting: hi(o.collegeName),
+      lines: [`${o.company} exited ${o.driveTitle} before it closed. Offers and hires they made in the drive stay as they are.`],
+      facts: [
+        ["Company", o.company],
+        ...(o.contact ? ([["Contact", o.contact]] as [string, string][]) : []),
+        ["Left on", `${when} IST`],
+        ["Shortlisted", n("shortlisted_candidate")],
+        ["Internship offers", n("sent_internship_offer")],
+        ["Full-time offers", n("sent_fulltime_offer")],
+      ],
+      cta: ctaTo("Open your drives", "/college/drives"),
+    };
+  },
+
   collegePayoutRequested: (o: { collegeName: string; amount: string }): EmailContent => ({
     subject: `Payout requested: ${o.collegeName} | Findtern`,
     preheader: `${o.collegeName} asked to withdraw ${o.amount}.`,

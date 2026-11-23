@@ -35,6 +35,7 @@ export function FullTimeOfferButton({
   employerId,
   proposalId,
   drive,
+  feeRate = null,
   candidate,
   fteStatus: initialFte,
   timezone = "Asia/Kolkata",
@@ -47,6 +48,8 @@ export function FullTimeOfferButton({
   proposalId?: string;
   /** A full-time campus drive: the student, and the employer's projects to file the offer under. Fee 1%. */
   drive?: { driveId: string; internId: string; projects: { id: string; name: string }[] };
+  /** A conversion: the fee rate the placement was hired on (1% for a campus drive hire), as the server will stamp it. */
+  feeRate?: number | null;
   candidate: string;
   fteStatus: string;
   /** The company's timezone, from its location. */
@@ -86,7 +89,7 @@ export function FullTimeOfferButton({
   const usdBlocked = v.ctcCurrency === "USD" && fte !== "approved";
   const ctc = Number(v.annualCtc);
   const usd = v.ctcCurrency === "USD";
-  const rate = drive ? DRIVE_FULL_TIME_FEE : FULL_TIME_FEE;
+  const rate = drive ? DRIVE_FULL_TIME_FEE : (feeRate ?? FULL_TIME_FEE);
   const rateLabel = feeRateLabel(rate);
   const feeMinor = ctc > 0 ? fullTimeFeeMinor(Math.round(ctc * 100), rate) : 0;
   const idKey = proposalId ?? drive?.internId ?? "new";

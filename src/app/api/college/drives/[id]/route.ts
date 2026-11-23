@@ -33,7 +33,8 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     .update(schema.collegeDrives)
     .set({ ...parsed.data, ...(submitted ? { invitedEmployers: withUnsent(submitted, toSend.map((i) => i.email)) } : {}), updatedAt: new Date() })
     .where(eq(schema.collegeDrives.id, drive.id));
-  const { title, kind, startsAt, endsAt } = parsed.data;
+  const { title, startsAt, endsAt } = parsed.data;
+  const kind = parsed.data.kind ?? drive.kind;
   const invites = await sendAndRecordInvites({ id: drive.id, title, kind, startsAt, endsAt, tokenHash: drive.tokenHash }, g.ctx.college.id, g.ctx.college.name, submitted ?? [], toSend);
   return NextResponse.json({ ok: true, invites });
 }

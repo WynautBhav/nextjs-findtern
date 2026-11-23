@@ -24,12 +24,13 @@ test("a cookie written before this still cannot restore a keyword", () => {
 // The list, its total, the pages and every sort are built from one query, so the hired filter has to sit
 // in that query (both the search and the Shortlist branch), not on the page after it.
 test("the candidates query leaves out interns this employer has hired, in both branches", () => {
-  assert.match(src, /\.where\(\s*and\(\s*savedOnly\s*\?[\s\S]*?:\s*and\(\.\.\.clauses\),\s*notHiredByEmployerSql\(uid\),\s*not\(heldElsewhereSql\(uid\)\),\s*\),\s*\)/);
+  // `lock` is the campus-lock clause (lib/college/campus-lock.ts): undefined outside a live drive.
+  assert.match(src, /\.where\(\s*and\(\s*savedOnly\s*\?[\s\S]*?:\s*and\(\.\.\.clauses\),\s*notHiredByEmployerSql\(uid\),\s*not\(heldElsewhereSql\(uid\)\),\s*lock,\s*\),\s*\)/);
 });
 
 test("the Shortlist tab count and the compare picks leave hired interns out too", () => {
   // one statement: this project's shortlist kept to the pool, not held elsewhere and not hired by this employer
-  assert.match(src, /notHiredByEmployerSql\(uid\),\s*\),\s*\);\s*data\.shortlisted = new Set/);
+  assert.match(src, /notHiredByEmployerSql\(uid\),\s*lock,\s*\),\s*\);\s*data\.shortlisted = new Set/);
   assert.match(src, /filters\.ids = filters\.ids\.filter\(\(id\) => !hiredPicks\.has\(id\)\)/);
 });
 

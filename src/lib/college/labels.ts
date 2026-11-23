@@ -45,7 +45,7 @@ export function aiStatusLabel(status: string): { label: string; done: boolean } 
   return AI_STATUS[status] ?? { label: "Not started", done: false };
 }
 
-export const DRIVE_KIND_LABEL: Record<string, string> = { internship: "Internship", full_time: "Full-time" };
+export const DRIVE_KIND_LABEL: Record<string, string> = { internship: "Interns and full-time", full_time: "Full-time" };
 
 export const WINDOW_LABEL: Record<string, string> = {
   upcoming: "Opens soon",
@@ -129,4 +129,13 @@ const firstChar = (w: string) => (graphemes ? (graphemes.segment(w)[Symbol.itera
 export function initialsOf(name: string): string {
   const letters = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => firstChar(w).toUpperCase()).join("");
   return letters || "?";
+}
+
+/**
+ * Another college's name as a campus-locked company sees it: each word's first letter only, the rest masked with a fixed
+ * run so the length of the real name does not show ("Jaipur Knowledge Park" → "J••• K••• P•••"). Done on the server.
+ */
+export function redactCollegeName(name: string): string {
+  const words = name.trim().split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w));
+  return words.map((w) => `${(w.match(/[\p{L}\p{N}]/u) ?? ["?"])[0].toUpperCase()}•••`).join(" ") || "•••";
 }

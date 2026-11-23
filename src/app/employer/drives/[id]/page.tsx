@@ -1,23 +1,21 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
+import { after } from "next/server";
+import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { requireRole } from "@/lib/auth";
 import { driveWindow } from "@/lib/college/access";
-import { liveDriveStudents, viewsForStudentsInDrive } from "@/lib/college/meetings";
-import { ONLINE_WINDOW_MS, driveForEmployer, eligibleStudents } from "@/lib/college/scope";
+import { driveForEmployer, eligibleStudents } from "@/lib/college/scope";
+import { DriveActions, DriveStats } from "@/components/employer/campus/drive-overview";
 import { getDb, schema } from "@/lib/db";
-import { displayNameOf, initialsOf, readSkills } from "@/lib/employer-candidates";
-import { candidatePoolClauses } from "@/lib/employer-pool";
-import { hiredInternIds } from "@/lib/employer-visibility";
-import { inIdList } from "@/lib/sql-ids";
-import { isProjectOpen } from "@/lib/project-locations";
-import { timezoneForLocation } from "@/lib/timezones";
 import { HeroPanel } from "@/components/employer/kit/hero-panel";
 import { EmptyScene } from "@/components/app/primitives";
-import { CollegeMark, DriveStatePill, KIND_LABEL, driveTime, timeLeft } from "@/components/employer/drive-parts";
+import { CollegeMark, DriveStatePill, driveTime, timeLeft } from "@/components/employer/drive-parts";
+import { DriveBenefits } from "@/components/employer/campus/drive-benefits";
+import { driveCountdown } from "@/lib/college/drive-pricing";
+import { fullTimeReady } from "@/lib/college/eligibility";
+import { logDriveViewOncePerDay } from "@/lib/college/campus-lock";
 import { DriveAssociation } from "@/components/employer/drive-association";
-import { DriveWorkspace, type DriveCandidate } from "@/components/employer/drive-workspace";
 
 export const metadata: Metadata = {
   title: "Campus drive",
@@ -26,31 +24,22 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-const DENIED: Record<string, { title: string; body: string }> = {
-  ended: { title: "This drive has ended", body: "The college's drive window is over, so its students are no longer shown here. Candidates you met can still be found on Findtern." },
-  revoked: { title: "The college closed this drive", body: "The placement office has switched off this drive's link. Ask them for a new one if you were expecting to continue." },
-  not_started: { title: "This drive hasn't opened yet", body: "Come back at the opening time. Nothing to do until then." },
-  not_joined: { title: "Open the college's link first", body: "You enter a drive from the link the college shared with you. Open it while signed in and you'll land back here." },
-};
+const NOT_STARTED = { title: "This drive hasn't opened yet", body: "Come back at the opening time. Nothing to do until then." };
 
 /**
- * The drive workspace. Only this college's eligible students, only while the
- * drive is open, only for an employer who entered from the link: all three
- * are re-checked on every load and every action (src/lib/college/access.ts).
+ * The Virtual drive overview: what the drive gives the company (15% off, 1% full-time fee, Findtern Pro), how it is
+ * going (its numbers in this drive) and the next things to do. The students themselves are on the regular Candidates
+ * page, locked to this college while the drive runs (lib/college/campus-lock.ts), and the company hires through the
+ * regular flow. Access is re-checked on every load (src/lib/college/access.ts).
  */
-/** Request time for the "online now" dots (dynamic page: per request). */
-function requestTime(): number {
-  return Date.now();
-}
 
 export default async function EmployerDrivePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole("employer");
   const { id } = await params;
   const loaded = await driveForEmployer(id, session);
   if (!loaded) notFound();
-  const { drive, college, access, joined } = loaded;
+  const { drive, college, access, joined, exited } = loaded;
   const state = driveWindow(drive);
-  const fullTime = drive.kind === "full_time";
 
   const left = state === "live" ? timeLeft(drive.endsAt) : null;
   const header = (
@@ -62,7 +51,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
           <h1 className="text-balance text-[clamp(1.75rem,3.6vw,2.75rem)] font-light leading-tight tracking-[-0.03em]">{drive.title}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-on-dark-subtle">
             <DriveStatePill state={state} />
-            <span>{KIND_LABEL[drive.kind] ?? "Campus drive"}</span>
+            <span>Interns and full-time</span>
             <span aria-hidden>·</span>
             <span className="nums">
               Closes {driveTime(drive.endsAt)}
@@ -71,17 +60,19 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
           </div>
         </div>
       </div>
+      {access.ok && state === "live" ? <DriveBenefits driveId={drive.id} collegeName={college.name} daysRemaining={driveCountdown(drive.endsAt).daysRemaining} /> : null}
     </HeroPanel>
   );
 
   if (!access.ok) {
-    const copy = joined ? (DENIED[access.reason] ?? DENIED.not_joined) : DENIED.not_joined;
+    // Once a drive is over for this company (ended, closed by the college, or left) its page is gone, also by URL
+    // (owner, 23 Nov). The one page left is the wait before a joined drive opens. A company that never joined learns
+    // nothing about the drive either way.
+    if (!joined || exited || access.reason !== "not_started") notFound();
     return (
       <div>
-        {/* An employer who never joined learns nothing about the drive (title,
-            college, dates), whatever its window: only how to get in. */}
-        {joined ? header : null}
-        <EmptyScene title={copy.title} body={copy.body} next={{ label: "All campus drives", href: "/employer/drives" }} />
+        {header}
+        <EmptyScene title={NOT_STARTED.title} body={NOT_STARTED.body} next={{ label: "Browse candidates", href: "/employer/candidates" }} />
       </div>
     );
   }
@@ -89,97 +80,59 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
   const db = getDb();
   const students = await eligibleStudents(drive);
   const ids = students.map((s) => s.userId);
-  const [onboarding, shortlist, meetings, hired, hiding, pool] = await Promise.all([
-    ids.length
-      ? db
-          .select({ userId: schema.internOnboarding.userId, skills: schema.internOnboarding.skills })
-          .from(schema.internOnboarding)
-          .where(inArray(schema.internOnboarding.userId, ids))
-      : Promise.resolve([]),
+  const finalYear = students.filter((s) => fullTimeReady(s)).length;
+  const p = schema.proposals;
+  const [[offers], [shortlisted], [meetings]] = await Promise.all([
+    // This company's offers from this drive (stamped with its id when sent).
     db
-      .select({ userId: schema.collegeDriveShortlist.userId })
-      .from(schema.collegeDriveShortlist)
-      .where(and(eq(schema.collegeDriveShortlist.driveId, drive.id), eq(schema.collegeDriveShortlist.employerId, session.uid))),
-    db
-      .select()
-      .from(schema.collegeDriveMeetings)
-      .where(and(eq(schema.collegeDriveMeetings.driveId, drive.id), eq(schema.collegeDriveMeetings.employerId, session.uid), isNotNull(schema.collegeDriveMeetings.meetingLink)))
-      .orderBy(desc(schema.collegeDriveMeetings.createdAt)),
-    hiredInternIds(db, session.uid),
-    // Students who hid their activity (settings) never show as online here either.
+      .select({
+        sent: sql<number>`count(*) FILTER (WHERE lower(btrim(${p.status})) <> 'draft')::int`,
+        accepted: sql<number>`count(*) FILTER (WHERE lower(btrim(${p.status})) IN ('accepted', 'processing'))::int`,
+        hired: sql<number>`count(*) FILTER (WHERE ${p.hiredAt} IS NOT NULL OR lower(btrim(${p.status})) = 'hired')::int`,
+        fullTime: sql<number>`count(*) FILTER (WHERE jsonb_typeof(${p.offerDetails}->'fullTimeOffer') = 'object')::int`,
+      })
+      .from(p)
+      .where(and(eq(p.employerId, session.uid), eq(p.driveId, drive.id))),
+    // Its regular shortlist, counting this drive's students.
     ids.length
       ? db
-          .select({ userId: schema.userPresence.userId })
-          .from(schema.userPresence)
-          .where(and(inArray(schema.userPresence.userId, ids), eq(schema.userPresence.showActivity, false)))
-      : Promise.resolve([]),
-    // Who is also in Findtern's candidate pool: their profile page opens for this employer, with the usual offer and hire steps.
+          .select({ n: sql<number>`count(DISTINCT ${schema.employerCartItems.internId})::int` })
+          .from(schema.employerCartItems)
+          .where(and(eq(schema.employerCartItems.employerId, session.uid), inArray(schema.employerCartItems.internId, ids)))
+      : Promise.resolve([{ n: 0 }]),
     ids.length
       ? db
-          .select({ userId: schema.users.id })
-          .from(schema.users)
-          .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-          .where(and(inIdList(schema.users.id, ids), ...candidatePoolClauses()))
-      : Promise.resolve([]),
+          .select({ n: sql<number>`count(*)::int` })
+          .from(schema.interviews)
+          .where(and(eq(schema.interviews.employerId, session.uid), inArray(schema.interviews.internId, ids)))
+      : Promise.resolve([{ n: 0 }]),
   ]);
-  // Full-time drives: the employer offers a full-time role from the card (1% hiring fee), filed under one of its projects.
-  const offerAs = fullTime
-    ? await Promise.all([
-        db
-          .select({ country: schema.employers.country, state: schema.employers.state, fteStatus: schema.employers.internationalFteStatus })
-          .from(schema.employers)
-          .where(eq(schema.employers.id, session.uid))
-          .limit(1),
-        db
-          .select({ id: schema.projects.id, name: schema.projects.projectName, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt })
-          .from(schema.projects)
-          .where(eq(schema.projects.employerId, session.uid))
-          .orderBy(desc(schema.projects.createdAt)),
-      ]).then(([[employer], projects]) => ({
-        employerId: session.uid,
-        fteStatus: employer?.fteStatus ?? "none",
-        timezone: timezoneForLocation(employer ?? {}),
-        projects: projects.filter((p) => isProjectOpen(p.status, p.takenDownAt)).map((p) => ({ id: p.id, name: p.name })),
-      }))
-    : undefined;
-  const poolIds = new Set(pool.map((p) => p.userId));
-  const hidingIds = new Set(hiding.map((h) => h.userId));
-  const skillsOf = new Map(onboarding.map((o) => [o.userId, readSkills(o.skills).map((s) => s.split(" · ")[0])]));
-  const shortlisted = new Set(shortlist.map((s) => s.userId));
-
-  // Only what the card shows crosses to the browser: no email, no full name
-  // before hire, no CGPA on internship drives.
-  const now = requestTime();
-  const candidates: DriveCandidate[] = students.map((s) => {
-    const initials = initialsOf(s.firstName, s.lastName);
-    return {
-      id: s.userId,
-      name: displayNameOf({ id: s.userId, fullName: `${s.firstName} ${s.lastName}`.trim(), initials }, hired.has(s.userId)),
-      initials,
-      year: s.year,
-      branch: s.branch,
-      cgpa: fullTime ? s.cgpa : null,
-      score: s.score,
-      skills: skillsOf.get(s.userId) ?? [],
-      shortlisted: shortlisted.has(s.userId),
-      hireable: poolIds.has(s.userId) || hired.has(s.userId),
-      online: !hidingIds.has(s.userId) && Boolean(s.lastSeenAt && now - s.lastSeenAt.getTime() < ONLINE_WINDOW_MS),
-    };
-  });
-
-  // A call reads cancelled only for a student who is no longer a live member of this college, not for one the drive's rules stopped listing.
-  const callStudents = await liveDriveStudents(drive.collegeId, meetings.map((m) => m.userId));
+  // The officer's activity log: the company opened its drive (once a day is enough to read).
+  after(() => logDriveViewOncePerDay(drive.id, drive.collegeId, session.uid));
 
   return (
     <div>
       <DriveAssociation collegeName={college.name} logoUrl={college.logoUrl} />
       {header}
-      <DriveWorkspace
-        driveId={drive.id}
-        fullTime={fullTime}
-        candidates={candidates}
-        initialMeetings={viewsForStudentsInDrive(meetings, callStudents.live, callStudents.labels)}
-        offerAs={offerAs}
+      <DriveStats
+        stats={[
+          { label: "Students in the drive", value: students.length, href: "/employer/candidates" },
+          { label: "Final year, for full-time", value: finalYear, href: "/employer/candidates?track=full_time" },
+          { label: "Shortlisted", value: shortlisted?.n ?? 0, href: "/employer/cart" },
+          { label: "Interviews", value: meetings?.n ?? 0, href: "/employer/schedule" },
+          { label: "Offers sent", value: offers?.sent ?? 0, href: "/employer/proposals" },
+          { label: "Hired", value: offers?.hired ?? 0, href: "/employer/proposals?status=hired" },
+        ]}
+      />
+      <DriveActions
+        collegeName={college.name}
+        actions={[
+          { title: "Browse interns", body: `All ${students.length} students of ${college.name}, scored and ready to hire.`, href: "/employer/candidates", primary: true },
+          { title: "Hire full-time", body: `${finalYear} final-year students. A full-time offer costs 1% of CTC here.`, href: "/employer/candidates?track=full_time" },
+          { title: "Your shortlist", body: "Compare the students you saved and send proposals.", href: "/employer/cart" },
+          { title: "Proposals and hires", body: `${offers?.sent ?? 0} sent, ${offers?.accepted ?? 0} accepted, ${offers?.hired ?? 0} hired from this drive.`, href: "/employer/proposals" },
+          { title: "Interviews", body: "Book and run interviews with the students you like.", href: "/employer/schedule" },
+        ]}
       />
     </div>
   );

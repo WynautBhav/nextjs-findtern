@@ -5,6 +5,7 @@ import type { CandidateProfile } from "./employer-candidates";
 import { LIVE_STATUSES } from "./employer-offer-status";
 import { feePaidSql } from "./fee-paid-sql";
 import { heldElsewhereSql, hiredProposalSql } from "./employer-visibility";
+import { campusCohort, cohortClause } from "./college/campus-lock";
 
 /**
  * Who an employer is allowed to browse.
@@ -76,7 +77,7 @@ export async function visibleInternIds(
 ): Promise<Set<string>> {
   const ids = [...new Set(internIds.filter(Boolean))];
   if (ids.length === 0) return new Set();
-  const [pool, committed] = await Promise.all([
+  const [pool, committed, cohort] = await Promise.all([
     db
       .select({ id: schema.users.id, held: sql<boolean>`${heldElsewhereSql(employerId)}` })
       .from(schema.users)
@@ -92,9 +93,13 @@ export async function visibleInternIds(
           or(inArray(schema.proposals.status, ["accepted", "processing"]), hiredProposalSql()),
         ),
       ),
+    campusCohort(employerId),
   ]);
-  const visible = new Set(pool.filter((r) => !r.held).map((r) => r.id));
-  const heldIds = pool.filter((r) => r.held).map((r) => r.id);
+  // Campus-locked (inside a live drive): only the drive's students are open; the relationship exceptions below still keep
+  // anyone this company already has an offer, shortlist or interview with, and committed interns always stay.
+  const inCohort = (id: string) => !cohort || cohort.ids.has(id);
+  const visible = new Set(pool.filter((r) => !r.held && inCohort(r.id)).map((r) => r.id));
+  const heldIds = pool.filter((r) => r.held || !inCohort(r.id)).map((r) => r.id);
   if (opts.keepRelationships && heldIds.length > 0) {
     const [offers, shortlisted, interviews] = await Promise.all([
       db
@@ -155,11 +160,13 @@ export async function poolInternIds(
 ): Promise<Set<string>> {
   const ids = [...new Set(internIds.filter(Boolean))];
   if (ids.length === 0) return new Set();
+  // A campus-locked company starts something new only with its drive's students.
+  const lock = employerId ? cohortClause(await campusCohort(employerId)) : undefined;
   const rows = await db
     .select({ id: schema.users.id })
     .from(schema.users)
     .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-    .where(and(inArray(schema.users.id, ids), ...candidatePoolClauses(), employerId ? not(heldElsewhereSql(employerId)) : undefined));
+    .where(and(inArray(schema.users.id, ids), ...candidatePoolClauses(), employerId ? not(heldElsewhereSql(employerId)) : undefined, lock));
   return new Set(rows.map((r) => r.id));
 }
 

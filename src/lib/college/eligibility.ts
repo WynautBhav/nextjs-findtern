@@ -57,8 +57,24 @@ export type StudentFacts = {
   semester?: number | null;
 };
 
-/** Full-time hiring is for the final year: 4th year, or a 3rd year already in semester 6 or later. */
-export function fullTimeReady(s: Pick<StudentFacts, "year" | "semester">): boolean {
+/**
+ * How many years the degree in a branch name runs, when the name says so: 4 for B.Tech / B.E., 3 for BCA, BBA, B.Com,
+ * B.Sc, BA and the like. Null when the name doesn't tell (the year and semester rule below then decides).
+ */
+export function degreeYears(branch: string | null | undefined): number | null {
+  const b = ` ${(branch ?? "").toLowerCase().replace(/[.\s]+/g, " ").trim()} `;
+  if (/ (b ?tech|b ?e|be|b ?arch|bs ?ms) /.test(b)) return 4;
+  if (/ (bca|bba|bbm|bms|b ?com|b ?sc|ba|b ?voc|bjmc) /.test(b)) return 3;
+  return null;
+}
+
+/**
+ * Full-time hiring is for the final year: the last year of the degree (B.Tech 4th, BCA 3rd) when the branch names it,
+ * otherwise 4th year, or a 3rd year already in semester 6 or later.
+ */
+export function fullTimeReady(s: Pick<StudentFacts, "year" | "semester"> & { branch?: string | null }): boolean {
+  const years = degreeYears(s.branch);
+  if (years !== null) return s.year !== null && s.year >= years;
   return s.year === 4 || (s.year === 3 && (s.semester ?? 0) >= 6);
 }
 

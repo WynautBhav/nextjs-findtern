@@ -28,6 +28,7 @@ const ALLOWED: Record<string, string> = {
   "employer/drives/[id]/meetings/route.ts": "college-drive meetings; scoped to a drive, not a project",
   "employer/drives/[id]/shortlist/route.ts": "college-drive shortlist; scoped to a drive, not a project",
   "drives/join/route.ts": "joins a college drive by code; not a project",
+  "employer/virtual-drive/exit/route.ts": "leaves a college drive (lifts the campus lock); scoped to a drive, not a project",
   "employer/projects/[id]/contact-admin/route.ts": "THE allowed action on a taken-down project: contact admin",
   "support/feedback/route.ts": "in-app 'Report a problem'; the other way to reach admin",
   "notifications/[id]/read/route.ts": "marks the user's own notification read",

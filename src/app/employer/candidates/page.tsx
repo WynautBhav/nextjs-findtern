@@ -1,3 +1,4 @@
+import { activeCampusDrives } from "@/lib/college/campus-lock";
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
@@ -57,7 +58,7 @@ async function CandidatesPageImpl({
   if (!filters.idsSet) filters.ids = remembered.compare;
   if (!filters.project && remembered.project) filters.project = remembered.project;
 
-  const [, data, flow] = await Promise.all([
+  const [, data, flow, campusDrives] = await Promise.all([
     setup,
     loadCandidates(uid, filters, {
       // A link that names the view is not a bare visit: restoring the remembered filters would drop it.
@@ -65,12 +66,14 @@ async function CandidatesPageImpl({
       fresh: one(params.fresh) === "1",
     }),
     hireFlowCountsFor(uid),
+    activeCampusDrives(uid),
   ]);
+  const campus = campusDrives[0] ? { driveId: campusDrives[0].drive.id, collegeName: campusDrives[0].collegeName } : null;
   if (data.restoreTo) redirect(data.restoreTo);
 
   await withRelaxCounts(uid, data, filters);
 
-  return <CandidatesView uid={uid} data={data} filters={filters} flow={flow} initialQs={initialQs} />;
+  return <CandidatesView uid={uid} data={data} filters={filters} flow={flow} initialQs={initialQs} campus={campus} />;
 }
 
 export default function CandidatesPage(props: Parameters<typeof CandidatesPageImpl>[0]) {

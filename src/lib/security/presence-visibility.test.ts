@@ -34,15 +34,9 @@ describe("hidden candidates never leak last seen", () => {
   });
 
   it("no employer-facing screen or API serializes a raw last-seen timestamp", () => {
-    // The drive page reads college_presence only to compute a boolean, which it blanks for hidden students.
-    const allow = new Set([join("app", "employer", "drives", "[id]", "page.tsx")]);
-    const offenders = ["app/employer", "app/api/employer", "components/employer"]
-      .flatMap(walk)
-      .filter((f) => !allow.has(f) && /last_?seen/i.test(read(f)));
+    // The drive page is an overview now (23 Nov): no student list, so no presence at all; students show on Candidates.
+    const offenders = ["app/employer", "app/api/employer", "components/employer"].flatMap(walk).filter((f) => /last_?seen/i.test(read(f)));
     assert.deepEqual(offenders, []);
-    const drive = read(join("app", "employer", "drives", "[id]", "page.tsx"));
-    assert.match(drive, /showActivity, false/);
-    assert.match(drive, /online: !hidingIds\.has\(s\.userId\)/);
   });
 });
 

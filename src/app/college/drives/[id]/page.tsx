@@ -1,4 +1,8 @@
 import { notFound } from "next/navigation";
+import { and, desc, eq } from "drizzle-orm";
+
+import { getDb, schema } from "@/lib/db";
+import { DriveActivity, type DriveActivityRow } from "@/components/college/drive-activity";
 
 import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
 import { CollegeHero } from "@/components/college/kit";
@@ -55,6 +59,15 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   };
   const refs = eligible.map(toRef);
   const { board, came, invited, arrived, missing, walkIns } = await loadDriveBoard(drive, verified.map(toRef), presence ? presence.offline : null, now);
+  const activity: DriveActivityRow[] = (
+    await getDb()
+      .select({ id: schema.driveActivityLogs.id, action: schema.driveActivityLogs.action, at: schema.driveActivityLogs.createdAt, company: schema.employers.companyName })
+      .from(schema.driveActivityLogs)
+      .leftJoin(schema.employers, eq(schema.employers.id, schema.driveActivityLogs.employerId))
+      .where(and(eq(schema.driveActivityLogs.driveId, drive.id), eq(schema.driveActivityLogs.collegeId, ctx.college.id)))
+      .orderBy(desc(schema.driveActivityLogs.createdAt))
+      .limit(50)
+  ).map((r) => ({ id: r.id, action: r.action, at: r.at.toISOString(), company: r.company ?? "A company" }));
 
   // Last seen is activity: not shown for a student who is not verified yet.
   const rows = students.map(toStudentRow).map((r) => (r.status === "verified" ? r : { ...r, lastSeenAt: null }));
@@ -163,6 +176,8 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
             />
           </PanelBody>
       </Panel>
+
+      <DriveActivity rows={activity} />
 
       {/* Folded unless asked for (Edit drive): the page is about the drive running. Gone once it is over. */}
       {open ? (

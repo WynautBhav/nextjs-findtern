@@ -57,6 +57,8 @@ export type ProfileViewProps = {
   comparePicks: string[];
   compareBlocked: string | null;
   shortlist: { projectId: string; on: boolean } | null;
+  /** Campus drive Full-time track: offer a full-time role at the drive's 1% fee. */
+  driveFullTime?: { driveId: string; projects: { id: string; name: string }[] } | null;
   wanted: { project: string; skills: string[]; cities: string[] } | null;
   matchCount: number;
   workPreferences: ReturnType<typeof workPreferenceRows>;
@@ -139,6 +141,7 @@ export function ProfileView(props: ProfileViewProps) {
           comparePicks={comparePicks}
           compareBlocked={compareBlocked}
           shortlist={shortlist}
+          driveFullTime={props.driveFullTime ?? null}
         />
 
         <div className="min-w-0 space-y-8 xl:col-start-1">

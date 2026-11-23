@@ -11,7 +11,8 @@ const sensibleDate = z.coerce
 export const driveInput = z
   .object({
     title: z.string().trim().min(3, "Give the drive a name").max(120),
-    kind: z.enum(["internship", "full_time"]),
+    // One kind of drive since 23 Nov (employers pick Interns or Full-time inside it); an older client may still send one.
+    kind: z.enum(["internship", "full_time"]).optional(),
     description: z.string().trim().max(2000).optional().default(""),
     startsAt: sensibleDate,
     endsAt: sensibleDate,

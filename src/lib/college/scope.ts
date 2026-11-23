@@ -338,7 +338,7 @@ export async function eligibleStudents(drive: Drive): Promise<CollegeStudent[]> 
 export async function driveForEmployer(
   driveId: string,
   session: SessionData | null,
-): Promise<{ drive: Drive; college: typeof schema.colleges.$inferSelect; joined: boolean; access: AccessResult } | null> {
+): Promise<{ drive: Drive; college: typeof schema.colleges.$inferSelect; joined: boolean; exited: boolean; access: AccessResult } | null> {
   const db = getDb();
   const [row] = await db
     .select({ drive: schema.collegeDrives, college: schema.colleges })
@@ -348,15 +348,18 @@ export async function driveForEmployer(
     .limit(1);
   if (!row) return null;
   let joined = false;
+  let exited = false;
   if (session?.role === "employer") {
     const [j] = await db
-      .select({ id: schema.collegeDriveEmployers.id })
+      .select({ id: schema.collegeDriveEmployers.id, status: schema.collegeDriveEmployers.status })
       .from(schema.collegeDriveEmployers)
       .where(and(eq(schema.collegeDriveEmployers.driveId, driveId), eq(schema.collegeDriveEmployers.employerId, session.uid)))
       .limit(1);
-    joined = Boolean(j);
+    // A company that left the drive (Exit campus drive) is out for good: no drive tools, no drive pricing.
+    exited = j?.status === "exited";
+    joined = Boolean(j) && !exited;
   }
-  return { ...row, joined, access: checkDriveAccess({ drive: row.drive, session, joined, collegeActive: row.college.isActive }) };
+  return { ...row, joined, exited, access: checkDriveAccess({ drive: row.drive, session, joined, collegeActive: row.college.isActive }) };
 }
 
 /** The drive's own college, for a placement officer's write. Null when not theirs. */

@@ -74,6 +74,8 @@ export type Filters = {
   projectDefaults: boolean;
   /** "Saved" tab: only this project's shortlisted candidates, other filters set aside. */
   saved: boolean;
+  /** Inside a campus drive: the Full-time track, final-year students only (lib/college/campus-lock.ts). Ignored outside a drive. */
+  fullTime?: boolean;
   /** Candidates ticked for Compare. Carried on every link so paging keeps them. */
   ids: string[];
   /** `ids` was in the URL (even empty): it wins over the remembered picks. */
@@ -102,6 +104,7 @@ export const FILTER_KEYS = [
   "sm",
   "page",
   "saved",
+  "track",
   ...RATING_META.map((m) => `r_${m.key}`),
 ];
 
@@ -127,6 +130,8 @@ export type SearchParams = {
   remote?: string | string[];
   sm?: string | string[];
   saved?: string | string[];
+  /** "full_time": the campus drive's Full-time track. */
+  track?: string | string[];
   /** "Reset": start clean instead of restoring the remembered filters. */
   fresh?: string | string[];
   /** Legacy deep link that opened the full-time offer for a hire (EMH-42). */
@@ -180,6 +185,7 @@ export function readFilters(params: SearchParams): Filters {
     project: (one(params.project) ?? "").trim(),
     projectDefaults: one(params.pf) !== "0",
     saved: one(params.saved) === "1",
+    fullTime: one(params.track) === "full_time",
     ids: parseIds(params.ids),
     idsSet: params.ids !== undefined,
   };
@@ -236,6 +242,8 @@ export function queryOf(merged: Filters): string {
   if (merged.view !== "list") next.set("view", merged.view);
   // The Saved tab is a view, not a filter: carried on links, never remembered.
   if (merged.saved) next.set("saved", "1");
+  // The campus drive's Full-time track: a view too, carried on links, never remembered.
+  if (merged.fullTime) next.set("track", "full_time");
   if (merged.ids.length > 0 || merged.idsSet) next.set("ids", merged.ids.join(","));
   if (merged.page > 1) next.set("page", String(merged.page));
   const query = next.toString();
@@ -383,6 +391,11 @@ export type ProData = {
   periodDays: number | null;
   /** Colleges in the pool (subscribers only). */
   colleges: CollegeOption[];
+  /**
+   * Inside a live campus drive: the drive's college (the whole pool) and the other colleges on Findtern, redacted to their
+   * initials on the server so no other name reaches the page. Null outside a drive.
+   */
+  campusColleges: { current: CollegeOption; others: string[] } | null;
   /** Left out of a CGPA-filtered list for having no score. */
   hiddenNoScore: number;
   /** Results that rest on a percentage converted to CGPA. */

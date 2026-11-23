@@ -5,6 +5,7 @@ import { z } from "zod";
 import { requireMutation } from "@/lib/guards-mutation";
 import { driveForEmployer, eligibleStudents } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
+import { logDriveActivity } from "@/lib/college/campus-lock";
 
 const bodySchema = z.object({ userId: z.string().min(1), on: z.boolean() });
 
@@ -27,10 +28,14 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     eq(schema.collegeDriveShortlist.userId, parsed.data.userId),
   );
   if (parsed.data.on) {
-    await db
+    const [added] = await db
       .insert(schema.collegeDriveShortlist)
       .values({ driveId: loaded.drive.id, employerId: guard.session.uid, userId: parsed.data.userId })
-      .onConflictDoNothing();
+      .onConflictDoNothing()
+      .returning({ id: schema.collegeDriveShortlist.id });
+    if (added) {
+      await logDriveActivity(db, { driveId: loaded.drive.id, collegeId: loaded.drive.collegeId, employerId: guard.session.uid, action: "shortlisted_candidate", metadata: { internId: parsed.data.userId } });
+    }
   } else {
     await db.delete(schema.collegeDriveShortlist).where(key);
   }

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and, ne } from "drizzle-orm";
 
 import type { getDb } from "../db/index.ts";
 import { collegeDriveEmployers, collegeDrives } from "../db/schema.ts";
@@ -27,6 +27,8 @@ export async function reissueDriveLink(
 ): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.update(collegeDrives).set({ tokenHash, revokedAt: null, updatedAt: now }).where(eq(collegeDrives.id, driveId));
-    await tx.delete(collegeDriveEmployers).where(eq(collegeDriveEmployers.driveId, driveId));
+    // A company that left the drive (Exit campus drive) keeps its row: a new link, a resent invite or an auto-join at
+    // sign-in must not put it back under the lock and the drive pricing.
+    await tx.delete(collegeDriveEmployers).where(and(eq(collegeDriveEmployers.driveId, driveId), ne(collegeDriveEmployers.status, "exited")));
   });
 }

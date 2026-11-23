@@ -2,6 +2,7 @@ import { formatMoney, formatRate, type Currency } from "./format.ts";
 import type { FeeDisplay } from "./fee-display.ts";
 import { buyerFromEmployer, type LiveEmployerBuyer } from "./invoice-buyer.ts";
 import { placeOfSupply, splitGst, type PlaceOfSupply } from "./gst.ts";
+import { discountedMonthlyMinor } from "./college/drive-pricing.ts";
 
 /**
  * The money lines of an offer, worked out once: rate × hours, the monthly
@@ -14,7 +15,7 @@ import { placeOfSupply, splitGst, type PlaceOfSupply } from "./gst.ts";
  */
 
 export type BreakdownLine = {
-  key: "rate" | "monthly" | "gst" | "fee";
+  key: "rate" | "drive" | "monthly" | "gst" | "fee";
   label: string;
   /** Already formatted for display. */
   value: string;
@@ -47,16 +48,22 @@ export function offerBreakdown(input: {
   fee?: FeeDisplay;
   /** Null when the company's tax place is unknown: the GST line is left out rather than guessed. */
   place: PlaceOfSupply | null;
+  /** A campus drive offer: % off the monthly charge (server-decided; lib/college/drive-pricing.ts). */
+  driveDiscountPercent?: number;
 }): OfferBreakdown {
   const { currency } = input;
   const rate = input.hourlyRateMinor && input.hourlyRateMinor > 0 ? input.hourlyRateMinor : 0;
   const hours = input.hours && input.hours > 0 ? input.hours : 0;
+  const drivePct = input.driveDiscountPercent && input.driveDiscountPercent > 0 ? input.driveDiscountPercent : 0;
+  const listMinor = Math.round(rate * hours);
   const monthlyMinor =
     input.monthlyMinor != null
       ? input.monthlyMinor
       : input.hourlyRateMinor == null
         ? null
-        : Math.round(rate * hours);
+        : drivePct
+          ? discountedMonthlyMinor(listMinor, drivePct)
+          : listMinor;
   const fee: FeeDisplay =
     input.fee ??
     (input.perHireMinor && input.perHireMinor > 0 ? { kind: "charged", amountMinor: input.perHireMinor } : { kind: "none" });
@@ -72,6 +79,9 @@ export function offerBreakdown(input: {
   const lines: BreakdownLine[] = [];
   if (rate > 0 && hours > 0) {
     lines.push({ key: "rate", label: "Rate × hours", value: `${formatRate(rate, currency)} × ${+hours.toFixed(2)} h` });
+  }
+  if (drivePct && monthlyMinor != null && listMinor > monthlyMinor) {
+    lines.push({ key: "drive", label: `Campus drive, ${drivePct}% off`, value: `− ${formatMoney(listMinor - monthlyMinor, currency)}`, struck: formatMoney(listMinor, currency) });
   }
   lines.push({
     key: "monthly",

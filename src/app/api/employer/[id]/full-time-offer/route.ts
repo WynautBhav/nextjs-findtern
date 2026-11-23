@@ -14,6 +14,9 @@ import { sendSmtpMail } from "@/lib/mailer";
 import { employerNames, internFirstName, notify } from "@/lib/notify";
 import { startDateProblem } from "@/lib/business-days";
 import { DRIVE_FULL_TIME_FEE } from "@/lib/checkout";
+import { logDriveActivity } from "@/lib/college/campus-lock";
+import { calculateHireFees, ppoRate } from "@/lib/college/drive-pricing";
+import { fullTimeReady } from "@/lib/college/eligibility";
 import { driveForEmployer, eligibleStudents } from "@/lib/college/scope";
 import { candidatePoolClauses, heldElsewhereIds } from "@/lib/employer-pool";
 import { CANDIDATE_UNAVAILABLE } from "@/lib/candidate-hold";
@@ -71,7 +74,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const db = getDb();
   const [employer] = await db.select().from(schema.employers).where(eq(schema.employers.id, id)).limit(1);
   let base: Pick<typeof schema.proposals.$inferSelect, "internId" | "projectId" | "flowType" | "skills" | "aiRatings">;
-  let from: { baseProposalId: string } | { driveId: string; feeRate: number };
+  let from: { baseProposalId: string; driveId?: string; feeRate?: number } | { driveId: string; feeRate: number };
+  let fees = calculateHireFees({ driveId: null });
+  let driveLog: { driveId: string; collegeId: string } | null = null;
   if (b.proposalId) {
     const [placement] = await db.select().from(schema.proposals).where(eq(schema.proposals.id, b.proposalId)).limit(1);
     if (!placement || placement.employerId !== id) return NextResponse.json({ error: "Unknown placement" }, { status: 404 });
@@ -79,16 +84,26 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!td.ok) return td.response;
     if (placement.status !== "hired") return NextResponse.json({ error: "Full-time offers go to interns you've hired." }, { status: 409 });
     base = placement;
-    from = { baseProposalId: b.proposalId };
+    // A PPO keeps the terms the internship was hired on: an intern sourced from a campus drive converts at the drive's 1%,
+    // whenever it happens (after the drive ended or the company left). Read from the stored internship, never the request.
+    if (placement.driveId) {
+      fees = { ...calculateHireFees({ driveId: placement.driveId }), discountPercent: 0, ppoFeePercent: Number(placement.ppoFeePercent) };
+      from = { baseProposalId: b.proposalId, driveId: placement.driveId, feeRate: ppoRate(placement.ppoFeePercent) };
+    } else {
+      from = { baseProposalId: b.proposalId };
+    }
   } else {
     // A drive offer: the drive must be open to this employer (joined from the link, inside its window), a
     // full-time drive, the student one of its students and the project the employer's own.
     const loaded = await driveForEmployer(b.driveId!, guard.session);
     if (!loaded) return NextResponse.json({ error: "Not found" }, { status: 404 });
     if (!loaded.access.ok) return NextResponse.json({ error: "No access to this drive", reason: loaded.access.reason }, { status: 403 });
-    if (loaded.drive.kind !== "full_time") return NextResponse.json({ error: "Full-time offers go out from full-time drives." }, { status: 409 });
-    if (!(await eligibleStudents(loaded.drive)).some((s) => s.userId === b.internId)) {
-      return NextResponse.json({ error: "Student not in this drive" }, { status: 404 });
+    if (loaded.exited) return NextResponse.json({ error: "You left this drive.", reason: "exited" }, { status: 403 });
+    const student = (await eligibleStudents(loaded.drive)).find((s) => s.userId === b.internId);
+    if (!student) return NextResponse.json({ error: "Student not in this drive" }, { status: 404 });
+    // Every drive has both tracks; the full-time one is the final year only (B.Tech 4th, BCA 3rd: lib/college/eligibility.ts).
+    if (!fullTimeReady(student)) {
+      return NextResponse.json({ error: "Full-time offers go to final-year students only. Send this student an internship instead.", code: "not_final_year" }, { status: 422 });
     }
     // Only a student in Findtern's candidate pool takes offers (the card shows the button for them alone).
     const [inPool] = await db
@@ -98,7 +113,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       .where(and(eq(schema.users.id, b.internId!), ...candidatePoolClauses()))
       .limit(1);
     if (!inPool) return NextResponse.json({ error: "This student can't take offers yet." }, { status: 409 });
-    // An intern this employer already hired converts through the placement, at the standard rate, never the drive rate.
+    // An intern this employer already hired converts through the placement, at the rate that placement was hired on.
     const [held] = await db
       .select({ id: schema.proposals.id })
       .from(schema.proposals)
@@ -114,6 +129,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!isProjectOpen(project.status, project.takenDownAt)) return NextResponse.json({ error: "That project is closed. Pick an open one." }, { status: 409 });
     base = { internId: b.internId!, projectId: project.id, flowType: "direct", skills: [], aiRatings: null };
     from = { driveId: loaded.drive.id, feeRate: DRIVE_FULL_TIME_FEE };
+    fees = calculateHireFees({ driveId: loaded.drive.id });
+    driveLog = { driveId: loaded.drive.id, collegeId: loaded.drive.collegeId };
   }
   // The candidate rules of the internship proposals route, on both paths: an active intern account, not frozen
   // (on hold), and not held by another company's accepted offer or running hire. Otherwise the offer goes out but
@@ -203,6 +220,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         // The assessment the hire was made on travels with the full-time offer
         // (legacy routes.ts:13261).
         aiRatings: base.aiRatings ?? null,
+        // Server-decided drive terms (lib/college/drive-pricing.ts); any pricing field in the body is never read.
+        driveId: fees.driveId,
+        pricingTier: fees.pricingTier,
+        discountPercent: fees.discountPercent,
+        ppoFeePercent: String(fees.ppoFeePercent),
       })
       .returning();
     return created;
@@ -213,6 +235,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!proposal) {
     return NextResponse.json({ error: "You've already sent this intern a full-time offer." }, { status: 409 });
   }
+
+  if (driveLog) await logDriveActivity(db, { ...driveLog, employerId: id, action: "sent_fulltime_offer", metadata: { proposalId: proposal.id, internId: base.internId } });
 
   await notify({
     to: { type: "intern", id: base.internId },
@@ -243,7 +267,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     `timezone: ${b.timezone}`,
     `shift: ${b.shiftFrom} - ${b.shiftTo}`,
     `annualCtc: ${b.ctcCurrency} ${b.annualCtc}`,
-    ...("driveId" in from ? [`campusDrive: ${from.driveId} (hiring fee ${from.feeRate * 100}%)`] : []),
+    ...(fees.driveId ? [`campusDrive: ${fees.driveId} (hiring fee ${fees.ppoFeePercent}%)`] : []),
     `offerLetter: ${offerLetterUrl}`,
   ].join("\n");
   try {

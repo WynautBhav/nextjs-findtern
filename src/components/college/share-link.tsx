@@ -29,7 +29,7 @@ export function ShareLink({
   const message = [
     `Dear hiring team,`,
     ``,
-    `${collegeName} is running a virtual placement drive on Findtern: "${driveTitle}" (${kind === "full_time" ? "full-time roles" : "internships"}).`,
+    `${collegeName} is running a virtual placement drive on Findtern: "${driveTitle}" (${kind === "full_time" ? "full-time roles" : "internships and full-time roles"}).`,
     `It is open from ${fmt(startsAt)} to ${fmt(endsAt)}.`,
     ``,
     `Every student in the drive has taken Findtern's AI interview, so you can filter by score, CGPA, branch and skills, shortlist, and call students on video right away.`,

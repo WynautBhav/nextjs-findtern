@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { NextResponse } from "next/server";
+import { autoJoinInvitedDrives } from "@/lib/college/campus-lock";
 import { z } from "zod";
 
 import { getDb, schema } from "@/lib/db";
@@ -82,6 +83,8 @@ export async function POST(req: Request) {
     throw e;
   }
 
+  // A company the placement office invited by this email enters its drive now, link or not (lib/college/campus-lock.ts).
+  await autoJoinInvitedDrives(employer.id, employer.companyEmail);
   const res = NextResponse.json({ employer: { id: employer.id, companyEmail: employer.companyEmail } });
   await issueCsrfCookie(res);
   return withSession(res, { uid: employer.id, role: "employer", email: employer.companyEmail, password });

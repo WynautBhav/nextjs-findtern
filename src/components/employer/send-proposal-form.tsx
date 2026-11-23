@@ -1,5 +1,6 @@
 "use client";
 
+import { discountedMonthlyMinor } from "@/lib/college/drive-pricing";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
@@ -91,6 +92,7 @@ export function SendProposalForm({
   candidateHasLaptop = null,
   heldProjectIds = [],
   place = null,
+  driveDiscountPercent = 0,
 }: {
   candidate: CandidateSummary;
   /** Where the candidate said they can work; the offer's location follows it. */
@@ -112,6 +114,8 @@ export function SendProposalForm({
   heldProjectIds?: string[];
   /** Where the company is taxed; null when its profile can't say, and the GST line is left out. */
   place?: PlaceOfSupply | null;
+  /** A campus drive candidate: % off the monthly charge. Shown only; the server decides it again when the offer is sent. */
+  driveDiscountPercent?: number;
 }) {
   const router = useProgressRouter();
   // The project the employer came from, not just the first one in the list:
@@ -177,15 +181,15 @@ export function SendProposalForm({
   // The day count behind that figure, quoted in the working so the two match.
   const monthlyDays = billableWorkingDays(schedule);
   const totals = useMemo(() => {
-    const monthly = monthlyHours * (rate.hourlyRateMinor / 100);
+    const monthly = discountedMonthlyMinor(Math.round(monthlyHours * rate.hourlyRateMinor), driveDiscountPercent) / 100;
     // The one-time hiring fee, charged once with the first payment.
     const perHire = rate.perHireMinor / 100;
     return { monthly, perHire };
-  }, [monthlyHours, rate]);
+  }, [monthlyHours, rate, driveDiscountPercent]);
   const firstNote = firstPaymentNote(candidate.scored ? candidate.score : null);
   // The fee as billing will charge it under the live per-band setting (the server page priced it with that setting).
   const fee = feeDisplay({ currency, chargedMinor: rate.perHireMinor, listMinor: rate.perHireListMinor });
-  const breakdown = offerBreakdown({ currency, hourlyRateMinor: rate.hourlyRateMinor, hours: monthlyHours, fee, place });
+  const breakdown = offerBreakdown({ currency, hourlyRateMinor: rate.hourlyRateMinor, hours: monthlyHours, fee, place, driveDiscountPercent });
 
   /** Validate first; the policy agreement only opens for a complete offer. */
   function review() {

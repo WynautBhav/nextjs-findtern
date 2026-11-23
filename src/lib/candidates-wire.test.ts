@@ -80,7 +80,7 @@ function data(ids: string[], unlocked: string[] = []): CandidatesData {
     presence: Object.fromEntries(ids.map((id) => [id, "Online"])),
     saved: new Set(),
     savedCount: 1,
-    pro: { active: false, ignored: false, offered: true, charge: null, periodDays: 30, colleges: [], hiddenNoScore: 0, approxKept: 0 },
+    pro: { active: false, ignored: false, offered: true, charge: null, periodDays: 30, colleges: [], campusColleges: null, hiddenNoScore: 0, approxKept: 0 },
     relaxCounts: null,
   };
 }

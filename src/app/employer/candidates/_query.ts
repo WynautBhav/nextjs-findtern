@@ -1,3 +1,5 @@
+import { campusCohort, cohortClause } from "@/lib/college/campus-lock";
+import { redactCollegeName } from "@/lib/college/labels";
 import { and, desc, eq, inArray, not, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
@@ -27,7 +29,7 @@ import { FILTER_KEYS, cityTerms, type CandidatesData, type Filters, type ProData
 /** A safety ceiling, not a page size: the pool is ranked in memory (EMB-06). */
 const POOL_CEILING = 5000;
 
-const NO_PRO: ProData = { active: false, ignored: false, offered: false, charge: null, periodDays: null, colleges: [], hiddenNoScore: 0, approxKept: 0 };
+const NO_PRO: ProData = { active: false, ignored: false, offered: false, charge: null, periodDays: null, colleges: [], campusColleges: null, hiddenNoScore: 0, approxKept: 0 };
 
 /**
  * Everything the candidates page reads. `filters.project` is corrected in
@@ -93,6 +95,9 @@ export async function loadCandidates(
   };
   const db0 = getDb();
   const hiredP = early(hiredInternIds(db0, uid, opts.viewingAsAdmin));
+  // Campus-locked mode (lib/college/campus-lock.ts): inside a live drive the pool is that drive's students only. Server side,
+  // whatever the URL asks for, so no filter or tampered parameter widens it.
+  const lockP = early(campusCohort(uid));
   const picksP = !opts.lean && filters.ids.length > 0 ? early(hiredAmong(db0, uid, filters.ids)) : null;
   const projectsP = early(
     db0
@@ -182,6 +187,7 @@ export async function loadCandidates(
     const shortlistP = early(
       (async () => {
         if (!activeProjectId) return;
+        const lock = cohortClause(await lockP);
         const rows = await db
           .selectDistinct({ internId: schema.employerCartItems.internId })
           .from(schema.employerCartItems)
@@ -195,6 +201,7 @@ export async function loadCandidates(
               ...candidatePoolClauses(),
               not(heldElsewhereSql(uid)),
               notHiredByEmployerSql(uid),
+              lock,
             ),
           );
         data.shortlisted = new Set(rows.map((r) => r.internId));
@@ -336,6 +343,24 @@ export async function loadCandidates(
     // The whole filtered pool, ranked in memory (EMB-06: this was the
     // newest 500 rows, so above 500 interns the score sort and the total
     // were wrong). The ceiling only guards against a runaway table.
+    const cohort = await lockP;
+    const lock = cohortClause(cohort, { fullTime: filters.fullTime });
+    if (cohort && proActive) {
+      // Inside a drive the pool is one college already: the College filter shows it, and the other colleges on Findtern by
+      // their initials only (owner, 23 Nov). A college ticked from an older link is set aside so it cannot empty the list.
+      filters.colleges = [];
+      const current = cohort.drives[0];
+      const others = await db
+        .select({ name: schema.colleges.name })
+        .from(schema.colleges)
+        .where(and(eq(schema.colleges.isActive, true), not(eq(schema.colleges.id, current.drive.collegeId))))
+        .orderBy(schema.colleges.name)
+        .limit(50);
+      data.pro.campusColleges = {
+        current: { name: current.collegeName, count: (filters.fullTime ? cohort.finalYear : cohort.ids).size },
+        others: others.map((o) => redactCollegeName(o.name)),
+      };
+    }
     const savedOnly = filters.saved && Boolean(activeProjectId);
     const readPool = () => db
       .select({ user: schema.users, onboarding: schema.internOnboarding })
@@ -351,6 +376,7 @@ export async function loadCandidates(
             : and(...clauses),
           notHiredByEmployerSql(uid),
           not(heldElsewhereSql(uid)),
+          lock,
         ),
       )
       // Newest onboarding row first, so the dedupe below keeps it (legacy

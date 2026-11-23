@@ -164,6 +164,7 @@ export function FilterColumn({
               cgpaVerified={filters.cgpaVerified}
               colleges={filters.colleges}
               options={pro.colleges}
+              campus={pro.campusColleges}
             />
           ) : (
             <ProLockedCard offered={pro.offered} />

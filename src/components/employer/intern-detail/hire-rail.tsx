@@ -34,6 +34,7 @@ type RailProps = {
   comparePicks: string[];
   compareBlocked: string | null;
   shortlist: { projectId: string; on: boolean } | null;
+  driveFullTime?: { driveId: string; projects: { id: string; name: string }[] } | null;
 };
 
 /** The control for the one thing to do next: white on the green rail, brand green on the bar. */
@@ -101,8 +102,11 @@ export function HireRail(props: RailProps) {
         {hasLower ? (
           <div className="space-y-4 bg-white p-6">
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 [&>*:only-child]:col-span-full [&_button]:w-full [&_button]:justify-center">
+              {props.driveFullTime && !relation?.fullTimeFrom ? (
+                <FullTimeOfferButton employerId={employerId} candidate={displayName} fteStatus={employerFte} timezone={employerZone} drive={{ driveId: props.driveFullTime.driveId, internId, projects: props.driveFullTime.projects }} />
+              ) : null}
               {relation?.fullTimeFrom ? (
-                <FullTimeOfferButton employerId={employerId} proposalId={relation.fullTimeFrom} candidate={displayName} fteStatus={employerFte} timezone={employerZone} />
+                <FullTimeOfferButton employerId={employerId} proposalId={relation.fullTimeFrom} feeRate={relation.fullTimeFeeRate} candidate={displayName} fteStatus={employerFte} timezone={employerZone} />
               ) : null}
               {showShortlist ? <ShortlistToggle internId={internId} projectId={shortlist!.projectId} shortlisted={shortlist!.on} /> : null}
               <BookMeetingButton internId={internId} projectId={shortlist?.projectId ?? null} candidateLabel={displayName} meetingOpen={Boolean(relation?.meetingOpen)} />

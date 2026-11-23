@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { requireMutation } from "@/lib/guards-mutation";
@@ -8,6 +8,7 @@ import { inviteSigOk, isInvited } from "@/lib/college/drive-invite";
 import { driveCodeSecret } from "@/lib/drives/code-derive";
 import { hashDriveToken } from "@/lib/college/tokens";
 import { getDb, schema } from "@/lib/db";
+import { logDriveActivity } from "@/lib/college/campus-lock";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
 
 // The share link's token, or the signed invite a company got by email (lib/college/drive-invite.ts).
@@ -56,11 +57,19 @@ export async function POST(req: Request) {
             collegeActive: row.collegeActive,
           });
     if (!access.ok) return { status: 403 as const, reason: access.reason };
-    await tx
+    const [prior] = await tx
+      .select({ status: schema.collegeDriveEmployers.status })
+      .from(schema.collegeDriveEmployers)
+      .where(and(eq(schema.collegeDriveEmployers.driveId, row.drive.id), eq(schema.collegeDriveEmployers.employerId, guard.session.uid)))
+      .limit(1);
+    // A company that left the drive early stays out: the link does not put it back under the campus lock.
+    if (prior?.status === "exited") return { status: 403 as const, reason: "exited" };
+    const [added] = await tx
       .insert(schema.collegeDriveEmployers)
-      .values({ driveId: row.drive.id, employerId: guard.session.uid })
-      .onConflictDoNothing();
-    return { status: 200 as const, drive: row.drive };
+      .values({ driveId: row.drive.id, employerId: guard.session.uid, via: "token" in cred ? "link" : "invite" })
+      .onConflictDoNothing()
+      .returning({ id: schema.collegeDriveEmployers.id });
+    return { status: 200 as const, drive: row.drive, added: Boolean(added) };
   });
   if (outcome.status === 404) return NextResponse.json({ error: "This link isn't valid" }, { status: 404 });
   if (outcome.status === 403) {
@@ -68,9 +77,12 @@ export async function POST(req: Request) {
       revoked: "The college has closed this link.",
       not_started: "This drive hasn't opened yet.",
       ended: "This drive has ended.",
+      exited: "You left this drive. Your offers and hires from it are still in your account.",
     };
     return NextResponse.json({ error: msg[outcome.reason] ?? "This link isn't valid", reason: outcome.reason }, { status: 403 });
   }
   const { drive } = outcome;
+  // Logged after the commit: a failed log insert inside the transaction would roll the join back.
+  if (outcome.added) await logDriveActivity(getDb(), { driveId: drive.id, collegeId: drive.collegeId, employerId: guard.session.uid, action: "joined_drive", metadata: { via: "token" in cred ? "link" : "invite" } });
   return NextResponse.json({ driveId: drive.id, redirect: `/employer/drives/${drive.id}` });
 }

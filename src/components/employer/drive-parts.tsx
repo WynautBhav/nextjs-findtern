@@ -36,7 +36,7 @@ export function DriveStatePill({ state, audience = "employer" }: { state: DriveW
 }
 
 export const KIND_LABEL: Record<string, string> = {
-  internship: "Internship drive",
+  internship: "Interns and full-time",
   full_time: "Full-time drive",
 };
 

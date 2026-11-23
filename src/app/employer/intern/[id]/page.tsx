@@ -1,3 +1,4 @@
+import { campusCohort } from "@/lib/college/campus-lock";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { and, desc, eq, gte, inArray, sql } from "drizzle-orm";
@@ -310,6 +311,19 @@ export default async function EmployerInternDetail({
   const axes = RATING_META.map((m) => ({ label: m.label, value: profile.ratings[m.key] > 0 ? Math.min(10, profile.ratings[m.key]) : null }));
   const rated = axes.filter((a): a is { label: string; value: number } => a.value !== null).sort((a, b) => b.value - a.value);
   const linkedin = nameUnlocked ? linkedinHref(profile.linkedinUrl) : null;
+  // Campus drive, Full-time track: a final-year student of the drive this company is in can get a full-time offer at the
+  // drive's 1% fee, straight from the profile (the server checks the drive, the year and the project again).
+  let driveFullTime: { driveId: string; projects: { id: string; name: string }[] } | null = null;
+  const cohort = relation?.hired || relation?.proposal?.fullTime ? null : await campusCohort(employerId);
+  const ftDrive = cohort?.finalYear.has(profile.id) ? cohort.driveOf.get(profile.id) : undefined;
+  if (ftDrive) {
+    const rows = await getDb()
+      .select({ id: schema.projects.id, name: schema.projects.projectName, status: schema.projects.status, takenDownAt: schema.projects.takenDownAt })
+      .from(schema.projects)
+      .where(eq(schema.projects.employerId, employerId))
+      .orderBy(desc(schema.projects.createdAt));
+    driveFullTime = { driveId: ftDrive, projects: rows.filter((r) => isOpenProject(r.status, r.takenDownAt)).map((r) => ({ id: r.id, name: r.name ?? "Project" })) };
+  }
   const sendHref = `/employer/send-proposal?intern=${encodeURIComponent(profile.id)}${shortlist ? `&project=${encodeURIComponent(shortlist.projectId)}` : ""}`;
   return (
     <ProfileView
@@ -336,6 +350,7 @@ export default async function EmployerInternDetail({
       comparePicks={comparePicks}
       compareBlocked={compareBlocked}
       shortlist={shortlist}
+      driveFullTime={driveFullTime}
       wanted={wanted}
       matchCount={matchCount}
       workPreferences={workPreferences}

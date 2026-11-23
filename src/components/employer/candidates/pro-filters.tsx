@@ -3,7 +3,7 @@ import { Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ButtonLink } from "@/components/ui/button";
 import { RatingSlider } from "@/components/employer/candidate-filters";
-import { CollegePicker } from "@/components/employer/candidates/college-picker";
+import { CampusCollegeSelect, CollegePicker } from "@/components/employer/candidates/college-picker";
 import { SwitchField } from "@/components/employer/candidates/filter-parts";
 import type { CollegeOption } from "@/lib/candidate-pro-filters";
 
@@ -91,11 +91,14 @@ export function ProFilterSections({
   cgpaVerified,
   colleges,
   options,
+  campus = null,
 }: {
   cgpaMin: number;
   cgpaVerified: boolean;
   colleges: string[];
   options: CollegeOption[];
+  /** Inside a live campus drive: its college, and the others by initials only (server-redacted). */
+  campus?: { current: CollegeOption; others: string[] } | null;
 }) {
   return (
     <>
@@ -105,7 +108,7 @@ export function ProFilterSections({
         <p className="mt-1 text-xs leading-relaxed text-text-subtle">A percentage score is converted to CGPA (÷ 9.5) and marked approx.</p>
       </ProSection>
       <ProSection id="pro-college-title" title="College">
-        <CollegePicker options={options} selected={colleges} />
+        {campus ? <CampusCollegeSelect current={campus.current} others={campus.others} /> : <CollegePicker options={options} selected={colleges} />}
       </ProSection>
     </>
   );
