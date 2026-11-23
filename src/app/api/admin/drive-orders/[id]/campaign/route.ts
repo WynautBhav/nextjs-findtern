@@ -5,6 +5,7 @@ import { getDb } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { redactError } from "@/lib/outbox";
 import { queueCodeEmails } from "@/lib/drives/campaign";
+import { codeUnusableSql } from "@/lib/drives/code-eligibility";
 import { drainOutboxAfterQueue } from "@/lib/outbox/drain-after";
 import { rowsToDrain } from "@/lib/outbox/drain-now";
 import { maskEmail, planRecipients, shapeCounts } from "@/lib/outbox/run";
@@ -50,7 +51,7 @@ export async function GET(req: Request, ctx: Ctx) {
   const size = Math.min(100, Math.max(1, Number(url.searchParams.get("pageSize")) || 25));
   const pool = getDb().$client;
   const [ents, ex] = await Promise.all([
-    pool.query(`SELECT e.id AS entry_id, e.college_email_norm AS email, dc.id AS code_id, dc.status AS code_status FROM drive_roster_entries e LEFT JOIN drive_codes dc ON dc.entry_id = e.id WHERE e.order_id = $1`, [orderId]),
+    pool.query(`SELECT e.id AS entry_id, e.college_email_norm AS email, dc.id AS code_id, dc.status AS code_status FROM drive_roster_entries e LEFT JOIN drive_codes dc ON dc.entry_id = e.id WHERE e.order_id = $1 AND NOT ${codeUnusableSql("e", "(SELECT o2.college_id FROM college_drive_orders o2 WHERE o2.id = $1)")}`, [orderId]),
     pool.query(`SELECT ob.entry_id, ob.status FROM email_outbox ob JOIN email_campaigns ca ON ca.id::text = ob.campaign_id WHERE ca.order_id = $1 AND ca.kind = 'drive_code'`, [orderId]),
   ]);
   const eligible = planRecipients(

@@ -8,7 +8,7 @@ import { FileSpreadsheet, Upload } from "lucide-react";
 import { buttonClass } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 import { yearLabel } from "@/lib/college/labels";
-import { parseRoster } from "@/lib/college/roster";
+import { decodeRosterBytes, parseRoster } from "@/lib/college/roster";
 import { cn } from "@/lib/utils";
 
 const SAMPLE = "Name,Phone,Email,Roll No,Year,Branch\nAsha Sharma,9876543210,asha.sharma@college.edu.in,22CS014,3,CSE\nRavi Meena,9812345678,ravi.meena@college.edu.in,22EC031,3,ECE\n";
@@ -46,7 +46,7 @@ export function RosterImport() {
       setProblem("That file is over 2 MB. Split it into smaller files and upload them one by one.");
       return;
     }
-    setText(await f.text());
+    setText(decodeRosterBytes(new Uint8Array(await f.arrayBuffer())));
     setSource(f.name);
     setPasting(false);
   }
