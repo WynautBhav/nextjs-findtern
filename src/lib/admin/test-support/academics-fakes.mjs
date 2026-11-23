@@ -88,3 +88,6 @@ export const getDb = () => ({
     }
   },
 });
+
+// lib/candidate-pro-access: no employer has Findtern Pro in these tests (the CGPA notice then carries no numbers).
+export const proAccess = async () => false;

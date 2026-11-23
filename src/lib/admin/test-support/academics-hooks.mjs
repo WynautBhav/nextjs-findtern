@@ -6,7 +6,8 @@ import path from "node:path";
 
 const SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../..");
 const FAKES = pathToFileURL(path.join(path.dirname(fileURLToPath(import.meta.url)), "academics-fakes.mjs")).href;
-const FAKED = new Set(["@/lib/db", "@/lib/guards-mutation", "next/server"]);
+// The Findtern Pro check is faked too (not under test here; the real one reaches the cache and subscription tables).
+const FAKED = new Set(["@/lib/db", "@/lib/guards-mutation", "next/server", "@/lib/candidate-pro-access"]);
 
 export async function resolve(specifier, context, next) {
   if (FAKED.has(specifier)) return { url: FAKES, shortCircuit: true };
