@@ -56,6 +56,8 @@ export type Intern360Props = {
   hasPhoto: boolean;
   interviews: Interview[];
   proposals: Proposal[];
+  /** Each offer's status as the intern and the employer see it (expired once lapsed); the stored status still decides actions. */
+  proposalStatusShown?: Record<string, string>;
   timesheets: Timesheet[];
   payouts: InternPayout[];
   employerNames: Record<string, string>;
@@ -100,6 +102,7 @@ export function Intern360View({
   hasPhoto,
   interviews,
   proposals,
+  proposalStatusShown,
   timesheets,
   payouts,
   employerNames,
@@ -178,8 +181,9 @@ export function Intern360View({
 
   const interviewStatuses = [...new Set(interviews.map((i) => interviewLifecycle(i).status))];
   const filteredInterviews = interviews.filter((i) => interviewFilter === "all" || interviewLifecycle(i).status === interviewFilter);
-  const proposalStatuses = [...new Set([...PROPOSAL_STATUSES, ...proposals.map((p) => p.status)])];
-  const filteredProposals = proposals.filter((p) => proposalFilter === "all" || p.status === proposalFilter);
+  const shown = (p: Proposal) => proposalStatusShown?.[p.id] ?? p.status ?? "";
+  const proposalStatuses = [...new Set([...PROPOSAL_STATUSES, ...proposals.map(shown)])];
+  const filteredProposals = proposals.filter((p) => proposalFilter === "all" || shown(p) === proposalFilter);
 
   const info = (
     <InfoList>
@@ -366,7 +370,7 @@ export function Intern360View({
                             {offer.startDate ? ` · starts ${formatDate(offer.startDate)}` : ""} · sent {formatDate(p.createdAt)}
                           </p>
                         </div>
-                        <StatusBadge value={p.status} />
+                        <StatusBadge value={shown(p)} />
                         {/* row actions */}
                         <div className="flex items-center gap-2">
                           <button type="button" onClick={() => setSelectedProposal(p)} className={cn(buttonClass({ variant: "outline", size: "sm" }), ADMIN_PILL_SECONDARY)}>

@@ -76,7 +76,7 @@ export const OUTCOMES: { key: Exclude<Outcome, "">; label: string }[] = [
   { key: "accepted", label: "Accepted an offer" },
   { key: "open", label: "Offer not answered" },
   { key: "rejected", label: "Rejected an offer" },
-  { key: "withdrawn", label: "Offer withdrawn" },
+  { key: "withdrawn", label: "Offer withdrawn or closed" },
   { key: "met", label: "Had a meeting" },
   { key: "meet-upcoming", label: "Meeting booked" },
   { key: "meet-waiting", label: "Meeting not answered yet" },

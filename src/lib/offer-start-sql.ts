@@ -7,5 +7,7 @@ import { sql, type SQL, type SQLWrapper } from "drizzle-orm";
  * Relative imports only: the node tests load this file directly.
  */
 export function startBegunSql(offerDetails: SQLWrapper, today: string): SQL {
-  return sql`(left(${offerDetails}->>'startDate', 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' and left(${offerDetails}->>'startDate', 10) <= ${today})`;
+  // coalesce: an offer with no start date (a full-time offer keeps its date inside fullTimeOffer) has NOT begun. Without it
+  // the comparison is NULL, and `NOT NULL` is NULL too, so the row fell out of both "waiting" and "lapsed".
+  return sql`coalesce(left(${offerDetails}->>'startDate', 10) ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' and left(${offerDetails}->>'startDate', 10) <= ${today}, false)`;
 }

@@ -93,7 +93,7 @@ export function overviewModes(all: MasterRow[]): OverviewModes {
     offers.rejected += r.offersRejected;
     offers.notAnswered += r.offersOpen;
   }
-  // Whatever is left was withdrawn by the employer; never below zero if a status is new.
+  // Whatever is left was withdrawn by the employer or closed (taken elsewhere, closed by Findtern, unpaid); never below zero if a status is new.
   offers.withdrawn = Math.max(0, offers.received - offers.accepted - offers.rejected - offers.notAnswered);
   const meetings = { total: 0, done: 0, notAccepted: 0, upcoming: 0, waiting: 0, other: 0, students: 0 };
   for (const r of rows) {

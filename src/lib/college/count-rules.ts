@@ -17,13 +17,13 @@ const col = (alias: string, c: string) => sql.raw(`${alias}.${c}`);
 
 /** Unanswered and its start day has begun (IST), or already stored as a no-reply expiry: the intern's "lapsed". */
 export function offerLapsedSql(alias: string, today: string): SQL {
-  return sql`((${col(alias, "status")} IN ('sent', 'interview_scheduled') AND ${startBegunSql(col(alias, "offer_details"), today)})
+  return sql`((${col(alias, "status")} IN ('sent', 'interview_scheduled') AND ${col(alias, "hired_at")} IS NULL AND ${startBegunSql(col(alias, "offer_details"), today)})
     OR (${col(alias, "status")} = 'expired' AND ${col(alias, "offer_details")}->>'expiredReason' = 'no_reply_past_start'))`;
 }
 
 /** Still waiting on the student: sent, and the start day has not begun. */
 export function offerWaitingSql(alias: string, today: string): SQL {
-  return sql`(${col(alias, "status")} = 'sent' AND NOT ${startBegunSql(col(alias, "offer_details"), today)})`;
+  return sql`(${col(alias, "status")} = 'sent' AND ${col(alias, "hired_at")} IS NULL AND NOT ${startBegunSql(col(alias, "offer_details"), today)})`;
 }
 
 /** Open (not answered, not closed): sent or interview booked, and the start day has not begun. */

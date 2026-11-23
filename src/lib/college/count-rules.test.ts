@@ -28,7 +28,7 @@ test("the offer SQL compares the start day with the IST day offerPastStart uses"
 
 test("offers waiting on the student are sent and not past their start day", () => {
   const { text, params } = render(offerWaitingSql("pr", TODAY));
-  assert.match(text, /pr\.status = 'sent' AND NOT \(left\(pr\.offer_details/);
+  assert.match(text, /pr\.status = 'sent' AND pr\.hired_at IS NULL AND NOT coalesce\(left\(pr\.offer_details/);
   assert.deepEqual(params, [TODAY]);
   // The intern's screens read a sent offer past its start day as lapsed, so it is not waiting.
   assert.equal(internOfferKey({ status: "sent", offerDetails: { startDate: "2026-11-24" } }, NOW), "lapsed");
@@ -61,4 +61,11 @@ test("meetings are upcoming or waiting only while their time has not passed", ()
   assert.match(wait.text, /^\(iv\.status = 'pending' AND NOT \(/);
   const gone = render(interviewExpiredSql("iv", nowIso));
   assert.match(gone.text, /iv\.status = 'expired' OR \(iv\.status IN \('pending', 'waiting', 'proposed', 'scheduled'\) AND/);
+});
+
+test("an offer with no start date (full-time offers keep theirs inside fullTimeOffer) has not begun, never NULL", () => {
+  // NULL here made NOT(...) NULL as well, so such offers dropped out of "waiting" and "lapsed" alike.
+  const { text } = render(startBegunSql(sql.raw("pr.offer_details"), TODAY));
+  assert.match(text, /^coalesce\(/);
+  assert.match(text, /, false\)$/);
 });

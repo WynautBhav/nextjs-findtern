@@ -21,6 +21,8 @@ import { allows } from "@/lib/admin/permissions";
 import { listCandidateDocuments } from "@/lib/admin/candidate-documents-list";
 import { loadInternActivity, type ActivityEntry } from "@/lib/admin/record-activity";
 import { getDb, schema, withoutPassword } from "@/lib/db";
+import { openOrderProposalIds } from "@/lib/employer-payable";
+import { effectiveProposalStatus } from "@/lib/proposal-expiry";
 import { perfScope } from "@/lib/perf/timing";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -180,12 +182,19 @@ async function load(id: string) {
   ]);
 
 
+  // What each offer reads as on the intern's and the employer's screens: a lapsed or unpaid-past-start offer shows expired
+  // (proposal-expiry.ts), with a payment order still open freezing it, as the admin tracker does.
+  const payingEmployers = [...new Set(proposals.filter((p) => p.status === "accepted").map((p) => p.employerId))];
+  const openOrders = new Set((await Promise.all(payingEmployers.map((e) => openOrderProposalIds(db, e)))).flatMap((s) => [...s]));
+  const proposalStatusShown = Object.fromEntries(proposals.map((p) => [p.id, effectiveProposalStatus({ ...p, hasOpenOrder: openOrders.has(p.id) })]));
+
   return {
     user,
     onboarding: onboarding ?? null,
     documents: documents ?? null,
     interviews,
     proposals,
+    proposalStatusShown,
     timesheets,
     payouts,
     aiInterviewIds: interviews.filter((i) => isAiInterview(i.employerId, employers.find((e) => e.id === i.employerId)?.email)).map((i) => i.id),
