@@ -111,7 +111,7 @@ export function PricingCalculator({
         </p>
 
         <p className="mt-5 max-w-sm text-sm leading-relaxed text-ink-600">
-          The first month is paid at hire{perHireFree ? " (the per-hire charge is free for now on this plan)" : " with the per-hire charge"}; each later month is billed against the timesheets you approve, due 2 days before the intern&apos;s pay day (you can pay up to 15 days early).{" "}
+          The first month is paid at hire{perHireFree ? " (the per-hire charge is free for now on this plan)" : " with the per-hire charge"}; each later month is billed against the timesheets you approve, due 2 days before the intern&apos;s pay day (you can pay the next month any time).{" "}
           {isIndia ? "Prices include GST." : currency === "USD" ? "Billed in US dollars." : `Billed in US dollars; ${currency} shown at a reference rate.`}
         </p>
       </div>
