@@ -2095,3 +2095,10 @@ html {
     animation: none;
   }
 }
+
+/* .tile-lift sets box-shadow after Tailwind's focus-visible:ring-* (which is a box-shadow too), so a focused tile
+   showed no ring at all. An outline cannot be overridden by the shadow. */
+.tile-lift:focus-visible {
+  outline: 2px solid var(--color-brand-500);
+  outline-offset: 2px;
+}
