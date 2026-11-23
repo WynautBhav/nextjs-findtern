@@ -129,7 +129,7 @@ for (const s of students) {
   }
 }
 // Every student in a drive call must show it (the 23 Nov "Vikram Saini" case).
-const inDrive = students.filter((s) => calls.has(s.user_id)).length;
+const inDrive = students.filter((s) => (calls.get(s.user_id) ?? []).some((c) => c.status !== "cancelled")).length;
 const shownInDrive = students.filter((s) => shown.get(s.email.toLowerCase())?.driveCalls).length;
 if (inDrive !== shownInDrive) failures.push(`students with a drive call: tables ${inDrive}, master data ${shownInDrive}`);
 

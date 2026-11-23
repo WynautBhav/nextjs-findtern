@@ -147,3 +147,17 @@ test("an unanswered offer whose start day began is lapsed, not 'Offers not answe
   assert.deepEqual(b.lists.offersWaiting.map((s) => s.userId), ["b"]);
   assert.equal(b.offerCount, 2, "a lapsed offer still counts as an offer received");
 });
+
+test("a meet request the company cancelled is not 'asked to meet' (like a withdrawn offer is not an offer)", () => {
+  const b = buildDriveBoard({
+    students,
+    meetings: [
+      { userId: "a", company: "Acme", status: "cancelled", createdAt: at(30), startsAt: at(25) },
+      { userId: "b", company: "Beta", status: "accepted", createdAt: at(30), startsAt: at(25) },
+    ],
+    offers: [],
+    offline: null,
+    now: NOW,
+  });
+  assert.deepEqual(b.lists.called.map((s) => s.userId), ["b"]);
+});

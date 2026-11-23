@@ -86,7 +86,8 @@ export function buildDriveBoard(input: {
       internships: perStudent(hired.filter((o) => !o.fullTime), students, (rs) => `Internship with ${names(rs)}`),
       fullTime: perStudent(hired.filter((o) => o.fullTime), students, (rs) => `Full-time with ${names(rs)}`),
       // The pipeline's stages: any call request at all, and any hire (one row per student).
-      called: perStudent(input.meetings, students, (rs) => `${rs.length === 1 ? "1 meet request" : `${rs.length} meet requests`} · ${names(rs)}`),
+      // A request the company cancelled no longer counts, as a withdrawn offer does not count as an offer (master data agrees).
+      called: perStudent(input.meetings.filter((m) => m.status !== "cancelled"), students, (rs) => `${rs.length === 1 ? "1 meet request" : `${rs.length} meet requests`} · ${names(rs)}`),
       hired: hiredItems,
     },
   };

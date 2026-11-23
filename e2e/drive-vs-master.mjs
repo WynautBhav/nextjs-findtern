@@ -140,7 +140,7 @@ for (const drive of drives) {
     hired: ids(offers.filter(isHired)),
     meetings: ids(meets.filter((m) => m.status === "accepted"), "user_id"),
     meetingsWaiting: ids(meets.filter((m) => m.status === "requested" && m.starts_at.getTime() + GRACE_MS >= now && drive.ends_at.getTime() > now && (!drive.revoked_at || drive.revoked_at.getTime() > now)), "user_id"),
-    called: ids(meets, "user_id"),
+    called: ids(meets.filter((m) => m.status !== "cancelled"), "user_id"),
   };
 
   /* ── Compare ── */
