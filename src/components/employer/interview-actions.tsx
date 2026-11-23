@@ -56,7 +56,10 @@ export function InterviewActions({
   requested = false,
   canCancel = false,
   bookAgain = null,
+  rescheduleBlocked = false,
 }: {
+  /** Another meeting with this candidate is open (hasOpenMeeting): the server refuses new times here, so the button shows dimmed with its name. */
+  rescheduleBlocked?: boolean;
   /** A "Book meeting" for a closed or cancelled meeting (the schedule passes its own button). */
   bookAgain?: React.ReactNode;
   /** Whose move an open offer is: "yours" means the candidate's offer waits on this employer (answered in the row's reply, so no reminder or revise here). */
@@ -244,7 +247,7 @@ export function InterviewActions({
             type="button"
             onClick={() => toggle("reschedule")}
             aria-expanded={panel === "reschedule"}
-            disabled={busy !== null}
+            disabled={busy !== null || rescheduleBlocked}
             className={buttonClass({ variant: stage === "expired" || stage === "employer_no_show" || requested ? "primary" : "outline", size: "sm" })}
           >
             <CalendarClock className="size-4" aria-hidden />
@@ -258,7 +261,7 @@ export function InterviewActions({
           items={[
             ...(canRemind && primary !== "remind" ? [{ label: "Send reminder", onSelect: () => void remind(), icon: <Bell />, disabled: busy !== null }] : []),
             ...(canReschedule && primary !== "reschedule"
-              ? [{ label: rescheduleLabel, onSelect: () => toggle("reschedule"), icon: <CalendarClock />, disabled: busy !== null }]
+              ? [{ label: rescheduleLabel, onSelect: () => toggle("reschedule"), icon: <CalendarClock />, disabled: busy !== null || rescheduleBlocked }]
               : []),
             ...(canMarkCompleted && stage === "expired" ? [{ label: "Mark completed", onSelect: () => void markCompleted(), icon: <CalendarCheck />, disabled: busy !== null }] : []),
             ...(canFeedback && primary !== "feedback" ? [{ label: "Leave feedback", onSelect: () => toggle("feedback"), icon: <MessageSquare /> }] : []),

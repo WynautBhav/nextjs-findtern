@@ -7,8 +7,16 @@ import { test } from "node:test";
 const ROOT = join(import.meta.dirname, "..", "..", "..");
 const src = (f: string) => readFileSync(join(ROOT, f), "utf8");
 
-test("the booking service refuses a second open meeting through hasOpenMeeting", () => {
-  assert.match(src("src/lib/meetings/service.ts"), /hasOpenMeeting\(open\)/);
+test("the booking service and offering new times both refuse a second open meeting through one hasOpenMeeting helper", () => {
+  const s = src("src/lib/meetings/service.ts");
+  assert.match(s, /hasOpenMeeting\(exceptId \?/);
+  assert.match(s, /input\.type === "reschedule" && \(await otherOpenMeeting\(tx, cur\.employerId, cur\.internId, cur\.id\)\)/);
+  assert.match(s, /otherOpenMeeting\(tx, i\.employerId, i\.internId, null\)/);
+});
+
+test("the schedule dims the offer-new-times button when another meeting with the candidate is open", () => {
+  assert.match(src("src/app/employer/schedule/schedule-view.tsx"), /rescheduleBlocked=\{rescheduleBlocked\}/);
+  assert.match(src("src/components/employer/interview-actions.tsx"), /disabled=\{busy !== null \|\| rescheduleBlocked\}/);
 });
 
 test("every Book meeting button reads hasOpenMeeting (candidate list and quick view, profile, proposal, cart, schedule, orders)", () => {

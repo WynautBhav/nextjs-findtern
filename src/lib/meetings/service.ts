@@ -68,13 +68,30 @@ export async function busyStarts(db: Pick<Db, "select">, employerId: string, int
 }
 
 /** Locks both parties for the length of a transaction, so two picks for the same person cannot both pass the conflict check. */
-async function withPartyLocks<T>(db: Db, employerId: string, internId: string, fn: (tx: Parameters<Parameters<Db["transaction"]>[0]>[0]) => Promise<T>): Promise<T> {
+async function withPartyLocks<T>(db: Db, employerId: string, internId: string, fn: (tx: Tx) => Promise<T>): Promise<T> {
   const keys = [`meet:${employerId}`, `meet:${internId}`].sort();
   return db.transaction(async (tx) => {
     for (const k of keys) await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${k}))`);
     return fn(tx);
   });
 }
+
+type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
+/**
+ * Another open meeting (hasOpenMeeting) between this employer and intern, other than `exceptId`. Read inside withPartyLocks:
+ * booking a new meeting and offering new times on an old one both check it, so a parallel pair cannot both win.
+ */
+async function otherOpenMeeting(tx: Tx, employerId: string, internId: string, exceptId: string | null): Promise<boolean> {
+  const { hasOpenMeeting } = await import("@/lib/employer-interview-rules");
+  const open = await tx
+    .select()
+    .from(schema.interviews)
+    .where(and(eq(schema.interviews.employerId, employerId), eq(schema.interviews.internId, internId), inArray(schema.interviews.status, ["pending", "scheduled"])));
+  return hasOpenMeeting(exceptId ? open.filter((o) => o.id !== exceptId) : open);
+}
+
+const OPEN_MEETING = "A meeting with this candidate is already open - finish it first.";
 
 export type Names = { employer: string; employerContact: string; intern: string; internFirst: string; internSeesCompany: boolean };
 
@@ -152,6 +169,8 @@ export async function act(interviewId: string, role: Role, uid: string, input: A
             : { type: "reschedule", by: role, slots: input.slots, busy: await busyStarts(tx, cur.employerId, cur.internId, cur.id) };
     const r = step(cur, action);
     if (!r.ok) return refused(r);
+    // New times revive an expired or lapsed meeting: never beside another open one with the same candidate (same rule as booking).
+    if (input.type === "reschedule" && (await otherOpenMeeting(tx, cur.employerId, cur.internId, cur.id))) return fail(409, OPEN_MEETING, "open_meeting");
     const f = r.fields;
     const [row] = await tx
       .update(schema.interviews)
@@ -310,15 +329,10 @@ export type CreateInput = { employerId: string; internId: string; projectId: str
  * company's three new times, blocks a second one.
  */
 export async function createMeeting(db: Db, i: CreateInput): Promise<{ ok: true; interview: Interview } | Fail> {
-  const { hasOpenMeeting } = await import("@/lib/employer-interview-rules");
   const created = await withPartyLocks(db, i.employerId, i.internId, async (tx) => {
     const r = step(undefined, { type: "propose", by: "employer", slots: i.slots, busy: await busyStarts(tx, i.employerId, i.internId, null) });
     if (!r.ok) return refused(r);
-    const open = await tx
-      .select()
-      .from(schema.interviews)
-      .where(and(eq(schema.interviews.employerId, i.employerId), eq(schema.interviews.internId, i.internId), inArray(schema.interviews.status, ["pending", "scheduled"])));
-    if (hasOpenMeeting(open)) return fail(409, "A meeting with this candidate is already open - finish it first.", "open_meeting");
+    if (await otherOpenMeeting(tx, i.employerId, i.internId, null)) return fail(409, OPEN_MEETING, "open_meeting");
     const [row] = await tx
       .insert(schema.interviews)
       .values({ employerId: i.employerId, internId: i.internId, projectId: i.projectId ?? undefined, timezone: i.timezone, ...rowFields(r.fields), gateToken: newToken() })
