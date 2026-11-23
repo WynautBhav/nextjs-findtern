@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { canCancel, canChoose, canRequestReschedule, checkOffer, firstConflict, isLapsed, isRescheduleRequest, overlaps, reasonProblem, requestReasonProblem, respondByFor, step, viewFor, type Fields, type MeetingState } from "./slots.ts";
+import { canCancel, canChoose, checkOffer, firstConflict, isLapsed, isRescheduleRequest, overlaps, reasonProblem, respondByFor, step, viewFor, type Fields, type MeetingState } from "./slots.ts";
 
 const NOW = Date.parse("2026-11-20T06:00:00Z");
 const H = 3_600_000;
@@ -85,32 +85,28 @@ describe("conflicts", () => {
   });
 });
 
-describe("reschedule requests (the intern asks, never proposes)", () => {
+describe("the intern cannot reschedule (the employer re-offers, the intern only picks, declines or cancels)", () => {
   const a = () => must(step(undefined, { type: "propose", by: "employer", slots: [at(10), at(20), at(30)] }, NOW)).fields;
-  it("an open offer becomes a request: pending, no times, marked intern, round + 1, the note kept", () => {
-    const b = must(step(asState(a()), { type: "request_reschedule", by: "intern", reason: " Exam that day " }, NOW)).fields;
-    assert.equal(b.status, "pending");
-    assert.equal(b.proposedBy, "intern");
-    assert.equal(b.round, 2);
-    assert.deepEqual([b.slot1, b.slot2, b.slot3, b.respondBy, b.selectedSlot], [null, null, null, null, null]);
-    assert.equal(b.cancelReason, "Exam that day");
-    assert.equal(isRescheduleRequest(asState(b)), true);
-  });
-  it("a booked meeting can be re-opened the same way; once started it cannot", () => {
+  // A request an intern made before reschedule was removed: pending, no times, intern-marked. Still shown, and the employer answers it.
+  const legacyRequest = (): MeetingState => ({ status: "pending", proposedBy: "intern", round: 2, slot1: null, slot2: null, slot3: null, respondBy: null });
+  it("an intern reschedule request is refused on an open offer, a booked meeting and a lapsed offer; nothing changes", () => {
     const booked = must(step(asState(a()), { type: "choose", by: "intern", slot: 1 }, NOW)).fields;
-    assert.equal(must(step(asState(booked), { type: "request_reschedule", by: "intern" }, NOW)).fields.selectedSlot, null);
-    assert.equal((canRequestReschedule(asState(booked), at(10).getTime()) as { code: string }).code, "started");
+    for (const s of [asState(a()), asState(booked), { ...asState(a()), respondBy: at(-1) }]) {
+      const r = step(s, { type: "request_reschedule", by: "intern", reason: "Exam that day" }, NOW) as { ok: boolean; code: string };
+      assert.equal(r.ok, false);
+      assert.equal(r.code, "intern_reschedule_removed");
+    }
   });
-  it("only the intern asks; asking twice, a long note, or on a closed meeting is refused", () => {
-    assert.equal((step(asState(a()), { type: "request_reschedule", by: "employer" }, NOW) as { code: string }).code, "intern_only");
-    const b = must(step(asState(a()), { type: "request_reschedule", by: "intern" }, NOW)).fields;
-    assert.equal((step(asState(b), { type: "request_reschedule", by: "intern" }, NOW) as { code: string }).code, "already_requested");
-    assert.equal((step(asState(a()), { type: "request_reschedule", by: "intern", reason: "x".repeat(301) }, NOW) as { code: string }).code, "reason_too_long");
-    assert.equal(requestReasonProblem(undefined), null);
-    assert.equal((step(asState({ ...a(), status: "cancelled" }), { type: "request_reschedule", by: "intern" }, NOW) as { code: string }).code, "not_open");
+  it("it is refused for the employer too, and on a closed meeting", () => {
+    assert.equal((step(asState(a()), { type: "request_reschedule", by: "employer" }, NOW) as { code: string }).code, "intern_reschedule_removed");
+    assert.equal((step(asState({ ...a(), status: "cancelled" }), { type: "request_reschedule", by: "intern" }, NOW) as { code: string }).code, "intern_reschedule_removed");
   });
-  it("nobody can choose from a request; the employer re-offers exactly three (round + 1, back to employer, note cleared)", () => {
-    const b = asState(must(step(asState(a()), { type: "request_reschedule", by: "intern", reason: "Exam" }, NOW)).fields);
+  it("the intern cannot offer times by any route", () => {
+    assert.equal((step(asState(a()), { type: "reschedule", by: "intern", slots: [at(40), at(41), at(42)] }, NOW) as { code: string }).code, "employer_only");
+  });
+  it("an old request still reads as a request: nobody can choose from it; the employer re-offers exactly three (round + 1, back to employer, note cleared)", () => {
+    const b = legacyRequest();
+    assert.equal(isRescheduleRequest(b), true);
     assert.equal((step(b, { type: "choose", by: "employer", slot: 1 }, NOW) as { code: string }).code, "awaiting_times");
     assert.equal((step(b, { type: "reschedule", by: "employer", slots: [at(40), at(41)] }, NOW) as { code: string }).code, "need_three_slots");
     const c = must(step(b, { type: "reschedule", by: "employer", slots: [at(40), at(41), at(42)] }, NOW)).fields;
@@ -120,12 +116,8 @@ describe("reschedule requests (the intern asks, never proposes)", () => {
     assert.equal(must(step(asState(c), { type: "choose", by: "intern", slot: 2 }, NOW)).fields.status, "scheduled");
   });
   it("the employer's re-offer is checked for clashes like a new one", () => {
-    const b = asState(must(step(asState(a()), { type: "request_reschedule", by: "intern" }, NOW)).fields);
-    const r = step(b, { type: "reschedule", by: "employer", slots: [at(40), at(41), at(42)], busy: [at(41).getTime()] }, NOW) as { code: string };
+    const r = step(legacyRequest(), { type: "reschedule", by: "employer", slots: [at(40), at(41), at(42)], busy: [at(41).getTime()] }, NOW) as { code: string };
     assert.equal(r.code, "conflict");
-  });
-  it("the intern cannot offer times by any route", () => {
-    assert.equal((step(asState(a()), { type: "reschedule", by: "intern", slots: [at(40), at(41), at(42)] }, NOW) as { code: string }).code, "employer_only");
   });
 });
 
@@ -186,19 +178,16 @@ describe("viewFor", () => {
   it("tells each side whose turn it is", () => {
     assert.equal(viewFor(open, "intern", NOW).turn, "yours");
     assert.equal(viewFor(open, "employer", NOW).turn, "theirs");
-    assert.equal(viewFor(open, "intern", NOW).canRequestReschedule, true);
-    assert.equal(viewFor(open, "employer", NOW).canRequestReschedule, false);
     assert.equal(viewFor(open, "intern", NOW).canReschedule, false);
     assert.equal(viewFor(open, "employer", NOW).canReschedule, true);
     assert.equal(viewFor(open, "employer", NOW).canChoose, false);
     assert.equal(viewFor({ ...open, status: "scheduled", selectedSlot: 1 }, "intern", NOW).turn, "none");
     assert.equal(viewFor(open, "intern", at(9).getTime()).lapsed, true);
   });
-  it("a reschedule request is the employer's move, not the intern's", () => {
-    const req = asState(must(step(open, { type: "request_reschedule", by: "intern" }, NOW)).fields);
+  it("an old reschedule request is the employer's move, not the intern's", () => {
+    const req: MeetingState = { status: "pending", proposedBy: "intern", round: 2, slot1: null, slot2: null, slot3: null, respondBy: null };
     assert.equal(viewFor(req, "intern", NOW).requested, true);
     assert.equal(viewFor(req, "intern", NOW).canChoose, false);
-    assert.equal(viewFor(req, "intern", NOW).canRequestReschedule, false);
     assert.equal(viewFor(req, "intern", NOW).canCancel, true);
     assert.equal(viewFor(req, "employer", NOW).canReschedule, true);
   });

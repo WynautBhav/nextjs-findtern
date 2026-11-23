@@ -331,22 +331,10 @@ export const emails = {
     preheader: `${o.other} offered ${o.times.length} times. Choose the one that works.`,
     heading: o.revised ? "New time slots for your meeting" : "Choose a time for your meeting",
     greeting: hi(o.name),
-    lines: [`${o.other} ${o.revised ? "offered new time slots to meet" : "offered time slots to meet"}${o.project ? ` about ${o.project}` : ""}. Choose one (${o.zone}). If none work, ask to reschedule and they will offer new time slots.`],
+    lines: [`${o.other} ${o.revised ? "offered new time slots to meet" : "offered time slots to meet"}${o.project ? ` about ${o.project}` : ""}. Choose one (${o.zone}).`],
     bullets: o.times,
     status: "Awaiting your choice",
     cta: ctaTo("Choose a time", "/intern/interviews"),
-  }),
-
-  /** The candidate asked to reschedule without proposing times: the company is asked for three new ones. */
-  meetingRescheduleRequested: (o: { name: string; candidate: string; reason?: string | null; project?: string | null }): EmailContent => ({
-    subject: "Candidate asked to reschedule | Findtern",
-    preheader: "Please offer 3 new time slots.",
-    heading: "A candidate asked to reschedule",
-    greeting: hi(o.name),
-    lines: [`The candidate asked to reschedule${o.project ? ` the meeting about ${o.project}` : ""}: please offer 3 new time slots.`],
-    facts: [["Candidate", o.candidate], ...(o.reason ? ([["Their note", o.reason]] as [string, string][]) : [])],
-    status: "Offer 3 new time slots",
-    cta: ctaTo("Offer 3 time slots", "/employer/schedule"),
   }),
 
   /** A confirmed meeting. `gateUrl` is Findtern's own /meet/<token> page: the raw Meet link never goes in mail. */

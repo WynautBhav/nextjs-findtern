@@ -125,7 +125,7 @@ export function SlotPicker({
           })}
         </ul>
         <p className="mt-3 text-pretty text-xs text-text-subtle">
-          A booked time can&apos;t be changed here. To reschedule or cancel, write to support before the start.
+          A booked time can&apos;t be changed here. To cancel, write to support before the start.
         </p>
         {status}
       </div>

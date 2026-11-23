@@ -130,7 +130,7 @@ export default async function InternInterviews() {
         <section data-first-content className="space-y-4">
           <SectionHead
             title={toPick.length === 1 ? "Choose a time for 1 interview" : `Choose a time for ${toPick.length} interviews`}
-            hint="Choose one of the 3 time slots the company offered, then confirm. If none work, ask to reschedule."
+            hint="Choose one of the 3 time slots the company offered, then confirm."
           />
           <FoldedList rows={toPick.map(row)} more="more" />
         </section>

@@ -7,6 +7,3 @@ export const slotsBody = z
   .transform((b) => (b.slots ?? [b.slot1, b.slot2, b.slot3]).filter((s): s is string => Boolean(s)));
 
 export const cancelBody = z.object({ reason: z.string().trim().min(1).max(1000) });
-
-/** The intern's reschedule request: an optional short note, never times. */
-export const rescheduleRequestBody = z.object({ reason: z.string().trim().max(300).optional() }).strip();

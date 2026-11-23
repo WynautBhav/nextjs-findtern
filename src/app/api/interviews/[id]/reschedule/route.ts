@@ -9,7 +9,7 @@ import { assertInterviewActionable } from "@/lib/projects/takedown-guard-server"
 
 /**
  * The EMPLOYER offers exactly three new times for a booked, lapsed, requested or still-open meeting; it goes back to pending and
- * the candidate chooses one. Interns never offer times (403): they ask to reschedule at /request-reschedule. A booked slot's Meet
+ * the candidate chooses one. Interns never offer times (403), and cannot ask to reschedule either. A booked slot's Meet
  * event is deleted and the other side's calendar file withdrawn. Times are typed in the project's zone.
  */
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {

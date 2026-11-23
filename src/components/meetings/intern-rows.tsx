@@ -19,7 +19,7 @@ export const meetingSlots = (i: InterviewRow) =>
   [i.slot1, i.slot2, i.slot3].flatMap((d, n) => (d instanceof Date ? [{ index: n + 1, iso: d.toISOString() }] : []));
 
 /**
- * An open company meeting on the intern's page: the company's three times to choose from, a reschedule the candidate asked for
+ * An open company meeting on the intern's page: the company's three times to choose from, a reschedule request made earlier
  * (waiting on the company's three new times), or a booked time. The candidate never proposes times. Every time is IST.
  */
 export function OpenMeetingRow({ i, title, company, serverNow }: { i: InterviewRow; title: string; company: string; serverNow: string }) {
@@ -49,7 +49,7 @@ export function OpenMeetingRow({ i, title, company, serverNow }: { i: InterviewR
               <InterviewJoin interview={serializeJoinInput(i)} serverNow={serverNow} />
             </div>
           </div>
-          <InternMeetingActions interviewId={i.id} booked canCancel={view.canCancel} canRequestReschedule={view.canRequestReschedule} />
+          <InternMeetingActions interviewId={i.id} canCancel={view.canCancel} />
         </div>
       ) : view.requested ? (
         <div className="space-y-3">
@@ -62,19 +62,19 @@ export function OpenMeetingRow({ i, title, company, serverNow }: { i: InterviewR
               </>
             ) : null}
           </p>
-          <InternMeetingActions interviewId={i.id} canCancel={view.canCancel} canRequestReschedule={false} />
+          <InternMeetingActions interviewId={i.id} canCancel={view.canCancel} />
         </div>
       ) : slots.length === 0 ? (
         <div className="space-y-3">
           <p className="text-pretty text-sm text-text-subtle">The company has not sent its time slots yet. They appear here as soon as they are set.</p>
-          <InternMeetingActions interviewId={i.id} canCancel={view.canCancel} canRequestReschedule={false} />
+          <InternMeetingActions interviewId={i.id} canCancel={view.canCancel} />
         </div>
       ) : view.turn === "yours" ? (
-        <OfferReply interviewId={i.id} slots={slots} zone={IST_ZONE} role="intern" canRequestReschedule={view.canRequestReschedule} serverNow={serverNow} />
+        <OfferReply interviewId={i.id} slots={slots} zone={IST_ZONE} role="intern" serverNow={serverNow} />
       ) : (
         <div className="space-y-3">
           <p className="text-pretty text-sm text-ink-700">
-            {mine ? "These are time slots you sent earlier. The company picks one or offers new time slots." : view.lapsed ? "These time slots have lapsed. Ask to reschedule, or wait for the company to offer new ones." : "The company has not confirmed a time yet."} Times are in India time (IST).
+            {mine ? "These are time slots you sent earlier. The company picks one or offers new time slots." : view.lapsed ? "These time slots have lapsed. Wait for the company to offer new ones." : "The company has not confirmed a time yet."} Times are in India time (IST).
           </p>
           <ul className="flex flex-wrap gap-2" aria-label="Time slots offered">
             {slots.map((slot) => (
@@ -83,7 +83,7 @@ export function OpenMeetingRow({ i, title, company, serverNow }: { i: InterviewR
               </li>
             ))}
           </ul>
-          <InternMeetingActions interviewId={i.id} canCancel={view.canCancel} canRequestReschedule={view.canRequestReschedule && !mine} />
+          <InternMeetingActions interviewId={i.id} canCancel={view.canCancel} />
         </div>
       )}
     </AgendaRow>
