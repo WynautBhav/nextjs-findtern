@@ -1,4 +1,5 @@
 import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { isNewestOnboarding } from "@/lib/onboarding-newest";
 
 import { getDb, schema } from "@/lib/db";
 import { SETTLED_STATUSES } from "@/lib/refund-accounting";
@@ -42,7 +43,7 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
       })
       .from(schema.internOnboarding)
       .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
-      .where(eq(schema.users.role, "intern")),
+      .where(and(eq(schema.users.role, "intern"), isNewestOnboarding())),
     db
       .select({ id: schema.employers.id, companyName: schema.employers.companyName, createdAt: schema.employers.createdAt })
       .from(schema.employers)
@@ -120,7 +121,7 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
       .select({ city: sql<string>`min(trim(${schema.internOnboarding.city}))`, c: count() })
       .from(schema.internOnboarding)
       .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
-      .where(and(eq(schema.users.role, "intern"), hasCity))
+      .where(and(eq(schema.users.role, "intern"), hasCity, isNewestOnboarding()))
       .groupBy(sql`lower(trim(${schema.internOnboarding.city}))`)
       .orderBy(sql`count(*) desc`, sql`min(trim(${schema.internOnboarding.city}))`)
       .limit(6),
@@ -128,7 +129,7 @@ export async function loadAnalytics(range: { since: Date | null; until: Date | n
       .select({ c: count() })
       .from(schema.internOnboarding)
       .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
-      .where(and(eq(schema.users.role, "intern"), hasCity)),
+      .where(and(eq(schema.users.role, "intern"), hasCity, isNewestOnboarding())),
   ]);
 
   // Paid either way legacy records it: a paid intern_payments row or the flag.

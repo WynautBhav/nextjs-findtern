@@ -1,4 +1,5 @@
 import { and, asc, count, desc, eq, inArray, notInArray, sql, type SQL } from "drizzle-orm";
+import { isNewestOnboarding } from "@/lib/onboarding-newest";
 
 import { getDb, schema } from "@/lib/db";
 import { feePaidSql } from "@/lib/fee-paid-sql";
@@ -171,7 +172,7 @@ export async function loadInterns(
               : [dir === "asc" ? asc(u.createdAt) : desc(u.createdAt)];
 
   if (opts.maxRows != null) {
-    const [c] = await db.select({ c: count() }).from(u).leftJoin(o, eq(o.userId, u.id)).where(where);
+    const [c] = await db.select({ c: count() }).from(u).leftJoin(o, and(eq(o.userId, u.id), isNewestOnboarding())).where(where);
     if (Number(c?.c ?? 0) > opts.maxRows) return { rows: [] as InternRow[], total: Number(c?.c ?? 0), signups: 0, incomplete: 0 };
   }
 
@@ -209,17 +210,17 @@ export async function loadInterns(
           : {}),
       })
       .from(u)
-      .leftJoin(o, eq(o.userId, u.id))
+      .leftJoin(o, and(eq(o.userId, u.id), isNewestOnboarding()))
       .where(where)
       .orderBy(...orderBy, desc(u.id))
       .limit(req.limit)
       .offset(req.offset),
-    db.select({ c: count() }).from(u).leftJoin(o, eq(o.userId, u.id)).where(where),
+    db.select({ c: count() }).from(u).leftJoin(o, and(eq(o.userId, u.id), isNewestOnboarding())).where(where),
     db.select({ c: count() }).from(u).where(eq(u.role, "intern")),
     db
       .select({ c: count() })
       .from(u)
-      .leftJoin(o, eq(o.userId, u.id))
+      .leftJoin(o, and(eq(o.userId, u.id), isNewestOnboarding()))
       .where(and(eq(u.role, "intern"), profileIncomplete)),
   ]);
 

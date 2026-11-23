@@ -1,5 +1,6 @@
 import { and, count, eq, gte, lt, sql } from "drizzle-orm";
 import type { AnyPgColumn } from "drizzle-orm/pg-core";
+import { isNewestOnboarding } from "@/lib/onboarding-newest";
 
 import { getDb, schema } from "@/lib/db";
 import { hiringFunnel } from "@/lib/admin/funnel";
@@ -54,7 +55,7 @@ export default async function PlatformSummary({ window: w }: TabProps) {
       .select({ c: count() })
       .from(schema.internOnboarding)
       .innerJoin(schema.users, eq(schema.users.id, schema.internOnboarding.userId))
-      .where(and(eq(schema.users.role, "intern"), meaningfulProfile(), from(schema.internOnboarding.createdAt))),
+      .where(and(eq(schema.users.role, "intern"), meaningfulProfile(), isNewestOnboarding(), from(schema.internOnboarding.createdAt))),
     db.select({ c: count() }).from(schema.interviews).where(and(realInterview, from(schema.interviews.createdAt))),
     db.select({ c: count() }).from(schema.proposals).where(and(realProposal, sql`${schema.proposals.hiredAt} is not null`, from(schema.proposals.hiredAt))),
     db.select({ c: count() }).from(schema.employers).where(and(realEmployers(), from(schema.employers.createdAt))),
@@ -65,6 +66,7 @@ export default async function PlatformSummary({ window: w }: TabProps) {
         c: count(),
       })
       .from(schema.internOnboarding)
+      .where(isNewestOnboarding())
       .groupBy(sql`coalesce(${schema.internOnboarding.state}, 'Unlisted')`)
       .orderBy(sql`count(*) desc`)
       .limit(6),

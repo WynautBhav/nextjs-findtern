@@ -1,4 +1,5 @@
 import { and, count, eq, sql } from "drizzle-orm";
+import { isNewestOnboarding } from "@/lib/onboarding-newest";
 
 import { getDb, schema } from "@/lib/db";
 import { AI_INTERVIEW_EMAIL, realEmployerId, TEST_EMPLOYER_ID } from "@/lib/admin/scope";
@@ -47,7 +48,7 @@ function candidatesAwaitingScore(): Promise<number | null> {
     const res = await getDb().execute<{ value: number }>(sql`
       SELECT count(*)::int AS value
         FROM ${schema.users} u
-        LEFT JOIN ${schema.internOnboarding} o ON o.user_id = u.id
+        LEFT JOIN ${schema.internOnboarding} o ON o.user_id = u.id AND ${isNewestOnboarding("o")}
         JOIN LATERAL (
           SELECT lower(i.status) AS status FROM ${schema.interviews} i
            WHERE i.intern_id = u.id AND ${AI_INTERVIEW}
