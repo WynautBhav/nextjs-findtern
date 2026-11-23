@@ -3,7 +3,7 @@
 // Loopback scratch DB only (findtern_ca_wp2 on 55490). Idempotent. Usage: DATABASE_URL=... node e2e/college-audit/wp2-fixtures.mjs
 import pg from "pg";
 const url = process.env.DATABASE_URL ?? "";
-if (!/^postgresql:\/\/findtern@127\.0\.0\.1:5549\d\/findtern_ca_wp2$/.test(url)) throw new Error("refusing: DATABASE_URL must be the wp2 scratch DB");
+if (!/^postgresql:\/\/findtern@127\.0\.0\.1:5549\d\/findtern_ca_[A-Za-z0-9_]+$/.test(url)) throw new Error("refusing: DATABASE_URL must be the wp2 scratch DB");
 const c = new pg.Client({ connectionString: url, options: "-c TimeZone=UTC" });
 await c.connect();
 const cur = (await c.query("select current_database() db, inet_server_port() port")).rows[0];

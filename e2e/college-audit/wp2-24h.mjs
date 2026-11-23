@@ -4,7 +4,7 @@
 import pg from "pg";
 import { login, BASE } from "./wp2-lib.mjs";
 const url = process.env.DATABASE_URL ?? "";
-if (!/^postgresql:\/\/findtern@127\.0\.0\.1:5549\d\/findtern_ca_wp2$/.test(url)) throw new Error("refusing: wp2 scratch DB only");
+if (!/^postgresql:\/\/findtern@127\.0\.0\.1:5549\d\/findtern_ca_[A-Za-z0-9_]+$/.test(url)) throw new Error("refusing: wp2 scratch DB only");
 const db = new pg.Client({ connectionString: url, options: "-c TimeZone=UTC" });
 await db.connect();
 console.log("[24h]", JSON.stringify((await db.query("select current_database() db, inet_server_port() port")).rows[0]));
