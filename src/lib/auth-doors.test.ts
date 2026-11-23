@@ -29,3 +29,18 @@ test("ownNext drops another account type's page, which would only bounce to its 
   assert.equal(ownNext("/internships", "employer"), "/internships");
   assert.equal(ownNext("", "employer"), "");
 });
+
+test("a placement officer can reset their own password: link on the college sign in, college in the forgot and reset routes (owner, 23 Nov)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const login = readFileSync("src/app/(auth)/login/page.tsx", "utf8");
+  assert.match(login, /forgotHref=\{authPath\("\/forgot-password", door\)\}/);
+  const forgot = readFileSync("src/app/api/auth/forgot-password/route.ts", "utf8");
+  assert.match(forgot, /"college"/);
+  assert.match(forgot, /college: \{ table: schema\.collegeAdmins/);
+  assert.match(forgot, /\/reset-password\?as=college&/);
+  const reset = readFileSync("src/app/api/auth/reset-password/route.ts", "utf8");
+  assert.match(reset, /subjectType === "college"[\s\S]*?update\(schema\.collegeAdmins\)/);
+  for (const page of ["src/app/(auth)/forgot-password/page.tsx", "src/app/(auth)/reset-password/page.tsx"]) {
+    assert.match(readFileSync(page, "utf8"), /doorOf\(as, \["intern", "employer", "college"\]\)/, page);
+  }
+});

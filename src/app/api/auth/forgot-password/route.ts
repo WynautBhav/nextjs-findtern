@@ -11,7 +11,7 @@ import { publicOrigin } from "@/lib/google";
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email(),
-  role: z.enum(["intern", "employer", "admin"]).default("intern"),
+  role: z.enum(["intern", "employer", "college", "admin"]).default("intern"),
 });
 
 /** Legacy reset links lived 30 minutes (routes.ts:3428). */
@@ -30,6 +30,8 @@ export async function POST(req: Request) {
   // One lookup per account type; each yields the subject row the token is issued against.
   const lookup = {
     admin: { table: schema.admins, email: schema.admins.email, id: schema.admins.id, type: "admin", path: "/reset-password?as=admin&" },
+    // Placement officers (23 Nov): reset their own password instead of asking Findtern.
+    college: { table: schema.collegeAdmins, email: schema.collegeAdmins.email, id: schema.collegeAdmins.id, type: "college", path: "/reset-password?as=college&" },
     employer: { table: schema.employers, email: schema.employers.companyEmail, id: schema.employers.id, type: "employer", path: "/reset-password?as=employer&" },
     intern: { table: schema.users, email: schema.users.email, id: schema.users.id, type: "user", path: "/reset-password?" },
   }[parsed.data.role];

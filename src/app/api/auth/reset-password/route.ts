@@ -32,12 +32,15 @@ export async function POST(req: Request) {
   const password = await hashPassword(parsed.data.password);
   if (row.subjectType === "employer") {
     await db.update(schema.employers).set({ password, passwordChangedAt: new Date() }).where(eq(schema.employers.id, row.subjectId));
+  } else if (row.subjectType === "college") {
+    // The session carries the password version, so the new hash ends every other placement-console session.
+    await db.update(schema.collegeAdmins).set({ password }).where(eq(schema.collegeAdmins.id, row.subjectId));
   } else if (row.subjectType === "admin") {
     await db.update(schema.admins).set({ password }).where(eq(schema.admins.id, row.subjectId));
   } else {
     await db.update(schema.users).set({ password }).where(eq(schema.users.id, row.subjectId));
   }
   // A reset ends every existing session on the account (INT-26).
-  forgetAccountStatus(row.subjectType === "employer" ? "employer" : row.subjectType === "admin" ? "admin" : "intern", row.subjectId);
+  forgetAccountStatus(row.subjectType === "user" ? "intern" : row.subjectType, row.subjectId);
   return NextResponse.json({ ok: true });
 }

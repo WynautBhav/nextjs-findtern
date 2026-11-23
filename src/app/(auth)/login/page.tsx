@@ -106,7 +106,7 @@ export default async function LoginPage({
           endpoint={d.endpoint}
           emailPlaceholder={d.email}
           redirectTo={next || d.home}
-          forgotHref={door === "college" ? undefined : authPath("/forgot-password", door)}
+          forgotHref={authPath("/forgot-password", door)}
           googleHref={google}
           googleLabel="Sign in or sign up with Google"
           verifyHref={door === "college" ? undefined : authPath("/verify-email", door)}
@@ -116,11 +116,11 @@ export default async function LoginPage({
 
       {door === "college" ? (
         <p className="mt-7 text-sm text-text-subtle">
-          Forgot your password, or need a login for a colleague?{" "}
+          Need a login for a colleague?{" "}
           <NewTabLink href="/contact?type=college" className="font-semibold text-brand-700 underline-offset-4 hover:underline">
             Ask Findtern
           </NewTabLink>
-          . Placement console logins are issued and reset by our team.
+          . Placement console logins are issued by our team.
         </p>
       ) : (
         <p className="mt-7 text-center text-sm text-text-subtle">

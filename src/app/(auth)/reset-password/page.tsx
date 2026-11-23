@@ -21,7 +21,7 @@ export default async function ResetPasswordPage({
 }) {
   const { token, as } = await searchParams;
   const value = Array.isArray(token) ? token[0] : token;
-  const role = as === "admin" ? "admin" : doorOf(as, ["intern", "employer"]);
+  const role = as === "admin" ? "admin" : doorOf(as, ["intern", "employer", "college"]);
 
   return (
     <AuthShell

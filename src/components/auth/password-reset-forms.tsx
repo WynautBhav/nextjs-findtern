@@ -22,7 +22,7 @@ import { PasswordInput } from "@/components/auth/password-input";
  * double-submit to satisfy.
  */
 
-export function ForgotPasswordForm({ role = "intern" }: { role?: "intern" | "employer" | "admin" }) {
+export function ForgotPasswordForm({ role = "intern" }: { role?: "intern" | "employer" | "college" | "admin" }) {
   const loginHref = role === "admin" ? "/admin/login" : `/login?as=${role}`;
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
@@ -68,7 +68,7 @@ export function ForgotPasswordForm({ role = "intern" }: { role?: "intern" | "emp
           name="email"
           type="email"
           autoComplete="email"
-          placeholder="you@gmail.com"
+          placeholder={role === "college" ? "you@yourcollege.ac.in" : role === "employer" ? "you@company.com" : "you@gmail.com"}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           className="mt-2 h-11 w-full rounded-lg border border-ink-200 bg-white px-3.5 text-sm text-ink-900 outline-none transition-[border-color,box-shadow] placeholder:text-ink-500 focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20"
@@ -100,7 +100,7 @@ export function ResetPasswordForm({
   role = "intern",
 }: {
   token: string | null;
-  role?: "intern" | "employer" | "admin";
+  role?: "intern" | "employer" | "college" | "admin";
 }) {
   const loginHref = role === "admin" ? "/admin/login" : `/login?as=${role}`;
   const [password, setPassword] = useState("");

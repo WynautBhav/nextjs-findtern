@@ -9,7 +9,7 @@ import { tempPassword } from "@/lib/college/temp-password";
 import { hashPassword } from "@/lib/security/password";
 
 /**
- * #29: a placement officer cannot reset their own password; they ask Findtern. This sets a new random one,
+ * #29: Findtern staff reset a placement officer's password (they can also use Forgot password themselves). This sets a new random one,
  * returns it once, and ends their other sessions (their `pv` no longer matches the new hash).
  * The path is under /api/admin/colleges, so the `companies:write` rule applies (see admin/permissions.ts).
  */
