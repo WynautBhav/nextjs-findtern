@@ -146,9 +146,9 @@ export function PresenceLive({
             <p className="mt-3 text-sm text-ink-700">
               {/* Said plainly; it read "0 more can get a phone alert; 35 only see…". */}
               {snap.alertable === 0
-                ? "None of the offline students has call alerts on, so a nudge reaches them when they next open Findtern."
+                ? "None of the offline students has phone alerts on, so a nudge reaches them when they next open Findtern."
                 : snap.alertable === snap.offline.length
-                  ? "Every offline student has call alerts on: a nudge reaches their phone now."
+                  ? "Every offline student has phone alerts on: a nudge reaches their phone now."
                   : `${snap.alertable} offline students get a nudge on their phone now; the rest when they next open Findtern.`}
             </p>
           ) : null}
