@@ -151,6 +151,8 @@ function Membership({
             {verified
               ? college.verifiedBy === "promo" || college.verifiedBy === "college_code" || college.verifiedBy === "drive_code"
                 ? "You used your college's code, so employers in its drives see you as a verified student."
+                : college.verifiedBy === "tpo"
+                ? "Your placement office accepted you, so employers in its drives see you as a verified student."
                 : college.verifiedBy === "roster"
                 ? "Your email is on your college's student list, so employers in its drives see you as a verified student."
                 : "You signed up with your college email, so employers in its drives see you as a verified student."
