@@ -148,8 +148,11 @@ const live = `m.college_id = $1 AND m.left_at IS NULL`;
 const members = Number(await one(`SELECT count(*) FROM college_memberships m WHERE ${live}`, [cid]));
 const verifiedN = Number(await one(`SELECT count(*) FROM college_memberships m WHERE ${live} AND m.status = 'verified'`, [cid]));
 const claimedN = members - verifiedN;
-const rosterN = Number(await one(`SELECT count(*) FROM college_roster WHERE college_id = $1`, [cid]));
-const noAccount = Number(await one(`SELECT count(*) FROM college_roster r WHERE r.college_id = $1 AND NOT EXISTS (SELECT 1 FROM users u WHERE lower(u.email) = r.email)`, [cid]));
+// A student who LEFT this college vanishes from every count and list, so their roster row is not on the list any more.
+const leaverSql = `EXISTS (SELECT 1 FROM users u JOIN college_memberships m ON m.user_id = u.id WHERE lower(u.email) = r.email AND m.college_id = r.college_id AND m.left_at IS NOT NULL)
+  AND NOT EXISTS (SELECT 1 FROM users u JOIN college_memberships m ON m.user_id = u.id WHERE lower(u.email) = r.email AND m.college_id = r.college_id AND m.left_at IS NULL)`;
+const rosterN = Number(await one(`SELECT count(*) FROM college_roster r WHERE r.college_id = $1 AND NOT (${leaverSql})`, [cid]));
+const noAccount = Number(await one(`SELECT count(*) FROM college_roster r WHERE r.college_id = $1 AND NOT (${leaverSql}) AND NOT EXISTS (SELECT 1 FROM users u WHERE lower(u.email) = r.email)`, [cid]));
 const noScore = Number(await one(`SELECT count(*) FROM college_memberships m LEFT JOIN intern_onboarding o ON o.user_id = m.user_id WHERE ${live} AND m.status = 'verified' AND jsonb_typeof(o.extra_data->'findternScore') IS DISTINCT FROM 'number'`, [cid]));
 const real = `p.employer_id <> 'admin' AND lower(coalesce((SELECT company_email FROM employers e WHERE e.id = p.employer_id), '')) <> 'ai-interview@findtern.ai'`;
 const offers24 = Number(await one(`SELECT count(*) FROM proposals p JOIN college_memberships m ON m.user_id = p.intern_id AND ${live} AND m.status = 'verified' WHERE p.status <> 'draft' AND ${real} AND p.created_at > (now() AT TIME ZONE 'UTC') - interval '24 hours'`, [cid]));

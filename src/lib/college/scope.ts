@@ -24,6 +24,7 @@ import { CALL_GRACE_MS, ONLINE_WINDOW_MS } from "./constants";
 import { interviewUpcomingSql, offerWaitingSql } from "./count-rules";
 import { cgpaSqlText } from "./cgpa-sql";
 import { redactUnverified } from "./serialize";
+import { rosterRowLeftSql } from "./roster-left";
 export { HEARTBEAT_MS, ONLINE_WINDOW_MS } from "./constants";
 
 export type CollegeContext = {
@@ -235,6 +236,7 @@ export async function rosterCoverage(collegeId: string, acceptable: ReadonlySet<
         WHERE lower(u.email) = ${r.email} AND m.college_id = ${collegeId} AND m.left_at IS NULL AND m.status = 'verified'
       ) AS joined
     FROM ${r} WHERE ${r.collegeId} = ${collegeId}
+      AND NOT ${rosterRowLeftSql(sql`${r.email}`, collegeId)}
     ORDER BY ${r.name}
   `);
   const rows = res.rows as Row[];
