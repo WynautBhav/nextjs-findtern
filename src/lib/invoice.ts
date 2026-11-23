@@ -194,15 +194,28 @@ function money(minor: number, currency: string): string {
 export function lineRows(
   lines: readonly InvoiceLine[],
   grossMinor: number,
+  discountMinor = 0,
 ): { label: string; detail?: string | null; priceMinor: number | null }[] {
-  if (lines.length === 1) return [{ label: lines[0].label, detail: lines[0].detail, priceMinor: grossMinor }];
+  // The prices print before the promo discount; the discount and the total follow in the summary rows.
+  const before = grossMinor + Math.max(0, discountMinor);
+  if (lines.length === 1) return [{ label: lines[0].label, detail: lines[0].detail, priceMinor: before }];
   const priced = lines.filter((l) => l.amountMinor != null);
-  const split = priced.length > 0 && priced.reduce((sum, l) => sum + (l.amountMinor ?? 0), 0) === grossMinor;
-  return lines.map((l) => ({
+  const sum = priced.reduce((total, l) => total + (l.amountMinor ?? 0), 0);
+  // List-priced lines already add up to the price before the discount. Lines that add up to what was paid took the code off
+  // the stipend, which is always the first line of a discounted order (the hiring fee is never discounted), so it carries it back.
+  const split = priced.length > 0 && (sum === before || (discountMinor > 0 && sum === grossMinor));
+  const firstPriced = lines.findIndex((l) => l.amountMinor != null);
+  const addBack = split && sum !== before ? discountMinor : 0;
+  return lines.map((l, i) => ({
     label: l.label,
     detail: l.detail,
-    priceMinor: split && l.amountMinor != null ? l.amountMinor : null,
+    priceMinor: split && l.amountMinor != null ? l.amountMinor + (i === firstPriced ? addBack : 0) : null,
   }));
+}
+
+/** The discount row's label: a code reads "Promo code X"; legacy's uncoded "Discount (10%)" is already a label. */
+export function discountRowLabel(code: string): string {
+  return /^Discount\b/i.test(code) ? code : `Promo code ${code}`;
 }
 
 /** "14-10-26": the invoice date as an Indian date, day-month-year. */
@@ -236,17 +249,20 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
     split.mode === "export"
       ? `<p class="note">Export of services. Supply meant for export without payment of integrated tax.</p>`
       : "";
-  const promoNote = input.promo
-    ? `<p class="note">Promo ${esc(input.promo.code)} applied${
-        input.promo.discountMinor ? `: you saved ${m(input.promo.discountMinor)}, already taken off the prices above` : ""
-      }.</p>`
-    : "";
+  // With an amount: its own rows (price before, discount, then the taxes and the total on what is left). Without one: a note.
+  const discountMinor = input.promo?.discountMinor && input.promo.discountMinor > 0 ? input.promo.discountMinor : 0;
+  const promoNote = input.promo && !discountMinor ? `<p class="note">Promo ${esc(input.promo.code)} applied.</p>` : "";
+  const discountRows =
+    input.promo && discountMinor
+      ? `<div class="row"><span>Price before discount</span><span>${m(input.amountMinor + discountMinor)}</span></div>
+         <div class="row"><span>${esc(discountRowLabel(input.promo.code))}</span><span>-${m(discountMinor)}</span></div>`
+      : "";
   const gstLine = seller.gstin ? `GST: ${esc(seller.gstin)}` : `<span class="warn">GST: not configured</span>`;
   const sac = esc(input.sac ?? "998519");
   const address = buyerAddress(buyer);
 
   const items = input.lines?.length
-    ? lineRows(input.lines, input.amountMinor).map(
+    ? lineRows(input.lines, input.amountMinor, discountMinor).map(
         (row) => `<tr>
         <td><div class="item">${esc(row.label)}</div>${row.detail ? `<div class="muted">${esc(row.detail)}</div>` : ""}<div class="muted">SAC ${sac}</div></td>
         <td class="price">${row.priceMinor == null ? "Included" : m(row.priceMinor)}</td>
@@ -257,7 +273,7 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
         <td><div class="item">${esc(input.description)}</div>${
           input.items?.length ? `<div class="muted">${input.items.map((item) => esc(item)).join("<br />")}</div>` : ""
         }<div class="muted">SAC ${sac}</div></td>
-        <td class="price">${m(input.amountMinor)}</td>
+        <td class="price">${m(input.amountMinor + discountMinor)}</td>
       </tr>`,
       ];
 
@@ -347,6 +363,7 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
     </table>
 
     <div class="sum">
+      ${discountRows}
       <div class="row"><span>Taxable value</span><span>${m(split.baseMinor)}</span></div>
       ${taxRows}
       <div class="row final"><span>Total</span><span>${m(split.totalMinor)}</span></div>

@@ -19,6 +19,28 @@ test("the intern copy is byte-identical to the admin print of the same row", () 
   assert.match(mine.html, /021126-124/);
 });
 
+test("the intern's invoice shows the promo discount, the price before it and the total after it", () => {
+  const [mine] = ownInternInvoices([rec()], "u1", seller);
+  assert.match(mine.html, /Price before discount<\/span><span>₹\s?2,748\.00/);
+  assert.match(mine.html, /Promo code SAVE10<\/span><span>-₹\s?249\.00/);
+  assert.match(mine.html, /Total<\/span><span>₹\s?2,499\.00/);
+  // the list row names the same code and amount
+  assert.equal(mine.promoCode, "SAVE10");
+  assert.equal(mine.discountMinor, 24900);
+  const [plain] = ownInternInvoices([rec({ raw: {} })], "u1", seller);
+  assert.equal(plain.promoCode, null);
+  assert.equal(plain.discountMinor, 0);
+  assert.doesNotMatch(plain.html, /Price before discount/);
+});
+
+test("a 100% code's ₹0 invoice shows the whole price taken off", () => {
+  const [free] = ownInternInvoices([rec({ id: "free", amountMinor: 0, gateway: "free", raw: { promoCode: "FREE100", discountMinor: 249900 } })], "u1", seller);
+  assert.match(free.html, /Price before discount<\/span><span>₹\s?2,499\.00/);
+  assert.match(free.html, /Promo code FREE100<\/span><span>-₹\s?2,499\.00/);
+  assert.match(free.html, /Total<\/span><span>₹\s?0\.00/);
+  assert.equal(free.discountMinor, 249900);
+});
+
 test("another intern's invoice is unreachable", () => {
   assert.deepEqual(ownInternInvoices([rec({ internId: "u2" })], "u1", seller), []);
   assert.equal(isOwnInvoice(rec({ internId: "u2" }), "u1"), false);

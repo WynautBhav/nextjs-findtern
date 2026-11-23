@@ -80,20 +80,51 @@ test("the invoice follows the reference PDF: header band, dd-mm-yy date, Taxable
   assert.match(html, /admin@findtern\.in/);
 });
 
-test("a promo is noted under the totals and never changes the arithmetic rows", () => {
-  const html = taxInvoiceHtml({
-    invoiceNo: "141026-02",
-    date: new Date("2026-10-14T06:00:00Z"),
-    orderId: "order_p",
-    currency: "INR",
-    amountMinor: 400_000,
-    description: "Hiring services",
-    promo: { code: "WELCOME", discountMinor: 100_000 },
-    seller: { name: "Findtern Private Limited", address: "Jaipur", gstin: "08AAGCF2512F1Z0", email: "admin@findtern.in" },
-    buyer: { name: "Acme", place: { kind: "india", stateCode: "08", stateName: "Rajasthan" } },
-  });
-  assert.match(html, /Promo WELCOME applied: you saved ₹\s?1,000\.00/);
+const promoBase = {
+  invoiceNo: "141026-02",
+  date: new Date("2026-10-14T06:00:00Z"),
+  orderId: "order_p",
+  currency: "INR",
+  description: "Hiring services",
+  seller: { name: "Findtern Private Limited", address: "Jaipur", gstin: "08AAGCF2512F1Z0", email: "admin@findtern.in" },
+  buyer: { name: "Acme", place: { kind: "india" as const, stateCode: "08", stateName: "Rajasthan" } },
+};
+
+test("a promo prints its own discount rows: price before, code and amount off, and the total after", () => {
+  const html = taxInvoiceHtml({ ...promoBase, amountMinor: 400_000, promo: { code: "WELCOME", discountMinor: 100_000 } });
+  assert.match(html, /Price before discount<\/span><span>₹\s?5,000\.00/);
+  assert.match(html, /Promo code WELCOME<\/span><span>-₹\s?1,000\.00/);
   assert.match(html, /Total<\/span><span>₹\s?4,000\.00/);
+  // the single item row shows the price before the discount, so the rows add up
+  assert.match(html, /class="price">₹\s?5,000\.00/);
+  // legacy's uncoded discount is already a label
+  const legacy = taxInvoiceHtml({ ...promoBase, amountMinor: 400_000, promo: { code: "Discount (20%)", discountMinor: 100_000 } });
+  assert.match(legacy, /Discount \(20%\)<\/span><span>-₹/);
+  assert.doesNotMatch(legacy, /Promo code Discount/);
+});
+
+test("a promo with no recorded amount keeps the one-line note and no discount row", () => {
+  const html = taxInvoiceHtml({ ...promoBase, amountMinor: 400_000, promo: { code: "WELCOME", discountMinor: null } });
+  assert.match(html, /Promo WELCOME applied\./);
+  assert.doesNotMatch(html, /Price before discount/);
+});
+
+test("a 100% code: the whole price is taken off and the total is ₹0.00", () => {
+  const html = taxInvoiceHtml({ ...promoBase, amountMinor: 0, promo: { code: "FREE100", discountMinor: 249_900 } });
+  assert.match(html, /Price before discount<\/span><span>₹\s?2,499\.00/);
+  assert.match(html, /Promo code FREE100<\/span><span>-₹\s?2,499\.00/);
+  assert.match(html, /Total<\/span><span>₹\s?0\.00/);
+});
+
+test("lineRows adds the discount back so the item prices plus the discount row equal the total", () => {
+  // one line is the whole order, before the discount
+  assert.deepEqual(lineRows([{ label: "A", amountMinor: null }], 400_000, 100_000).map((r) => r.priceMinor), [500_000]);
+  // lines already net of the code (stipend takes the difference): the first line carries it back
+  assert.deepEqual(lineRows([{ label: "Stipend", amountMinor: 150_000 }, { label: "Fee", amountMinor: 50_000 }], 200_000, 100_000).map((r) => r.priceMinor), [250_000, 50_000]);
+  // list-priced lines (several hires, or a waiver): already the price before the discount
+  assert.deepEqual(lineRows([{ label: "A", amountMinor: 100_000 }, { label: "B", amountMinor: 200_000 }], 200_000, 100_000).map((r) => r.priceMinor), [100_000, 200_000]);
+  // prices that match neither stay "Included"
+  assert.deepEqual(lineRows([{ label: "A", amountMinor: 1 }, { label: "B", amountMinor: 2 }], 200_000, 100_000).map((r) => r.priceMinor), [null, null]);
 });
 
 test("EMH-08: invoice prints the per-line label, the full-time wording and the bank block", () => {

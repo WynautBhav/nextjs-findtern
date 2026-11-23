@@ -139,7 +139,8 @@ test("promo note: the shared builder gives one note, coded or legacy percentage"
   const row = { id: legacy.id, orderId: legacy.orderId, currency: "INR", amountMinor: legacy.amountMinor, status: "paid", createdAt: null, buyer, partyId: "e", partyName: "Acme", partyEmail: "x", invoicePromo: b.get(legacy.id)!.promo } as AdminInvoiceRow;
   const adminHtml = taxInvoiceHtml(adminInvoiceInput(row, "employer", seller));
   const employerHtml = taxInvoiceHtml({ ...adminInvoiceInput(row, "employer", seller), promo: b.get(legacy.id)!.promo });
-  assert.match(adminHtml, /Promo Discount \(10%\) applied: you saved/);
+  assert.match(adminHtml, /Discount \(10%\)<\/span><span>-₹/);
+  assert.match(adminHtml, /Price before discount/);
   assert.equal(adminHtml, employerHtml);
 });
 
@@ -178,7 +179,8 @@ test("admin print: an intern-fee row keeps the single SAC 999293 line, no employ
   const html = taxInvoiceHtml(input);
   assert.match(html, /SAC 999293/);
   assert.match(html, /Candidate activation/);
-  assert.match(html, /Promo CAMPUS99 applied/);
+  assert.match(html, /Promo code CAMPUS99<\/span><span>-₹\s?200\.00/);
+  assert.match(html, /Price before discount<\/span><span>₹\s?699\.00/);
   assert.doesNotMatch(html, /SAC 998519/);
   // an employer row prints SAC 998519 from its own lines
   const emp = adminInvoiceInput({ ...row, invoiceLines: [{ label: "Asha K - Designer", amountMinor: 49900 }], invoiceDescription: "Intern hiring services" }, "employer", seller);

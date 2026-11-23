@@ -83,7 +83,7 @@ export function internInvoiceNumbered(amountMinor: number, raw: Record<string, u
 export const isOwnInvoice = (r: InternPaymentRecord, uid: string) =>
   r.internId === uid && r.status === "paid" && !!r.invoiceNumber && (r.amountMinor > 0 || zeroValueInvoiceEligible(r.raw));
 
-export type InternInvoice = { id: string; number: string; orderId: string; paidAt: string | null; amountMinor: number; currency: string; html: string };
+export type InternInvoice = { id: string; number: string; orderId: string; paidAt: string | null; amountMinor: number; currency: string; /** The promo code used and what it took off (0 when none); the print shows both as rows. */ promoCode: string | null; discountMinor: number; html: string };
 
 /** Server-side: filter to the session's own rows (again, after the SQL filter) and pre-render each print. */
 export function ownInternInvoices(records: InternPaymentRecord[], uid: string, seller: InvoiceSeller): InternInvoice[] {
@@ -98,6 +98,8 @@ export function ownInternInvoices(records: InternPaymentRecord[], uid: string, s
         paidAt: row.paidAt ?? null,
         amountMinor: row.amountMinor,
         currency: row.currency,
+        promoCode: row.promoCode ?? null,
+        discountMinor: row.discountMinor ?? 0,
         html: taxInvoiceHtml(adminInvoiceInput(row, "intern", seller)),
       };
     });

@@ -167,6 +167,8 @@ async function loadOrders(employerId: string) {
         amountMinor: p.amountMinor,
         refundedMinor: orderRefunds(p).refundedMinor,
         currency,
+        promoCode: inv.promo?.code ?? null,
+        discountMinor: inv.promo?.discountMinor ?? 0,
         candidates: inv.hireNames,
         projects: inv.projects,
         html: taxInvoiceHtml({
