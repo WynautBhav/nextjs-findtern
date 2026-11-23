@@ -52,14 +52,21 @@ test("T1 builder input: typed IST wall time round-trips across IST midnight", ()
 });
 
 // Every college date that is formatted in a client component or on a server must name its zone, else the server's and the
-// browser's zone disagree (React #418) or the day is wrong in the evening. Found on the leave requests table; still open
-// as a REQUEST to WP5 (src/components/college/leave-requests-table.tsx:13). Kept as a todo so it flips when fixed.
+// browser's zone disagree (React #418) or the day is wrong in the evening. Found on the leave requests table; was open
+// as a REQUEST to WP5 (src/components/college/leave-requests-table.tsx:13). Fixed in INT-06 (ist.ts: istDay).
 import { readFileSync } from "node:fs";
-test("T1 no college screen formats a date without the IST zone", { todo: "REQUEST WP5: leave-requests-table.tsx day(); WP3: drive-dashboard.tsx Activated" }, () => {
+test("T1 no college screen formats a date without the IST zone (INT-06)", () => {
   const offenders: string[] = [];
   for (const f of ["src/components/college/leave-requests-table.tsx", "src/app/college/drive-dashboard.tsx"]) {
     const src = readFileSync(f, "utf8");
     for (const m of src.matchAll(/toLocale(?:Date|Time)String\(("en-IN"|"en-GB"|undefined)?(?:,\s*\{[^}]*\})?\)/g)) if (!/timeZone/.test(m[0])) offenders.push(`${f}: ${m[0]}`);
   }
   assert.deepEqual(offenders, []);
+});
+
+import { istDay } from "../college/ist.ts";
+test("INT-06 istDay shows the IST day whatever the host zone is (20:00 UTC on 23 Nov is already 24 Nov in IST)", () => {
+  assert.equal(istDay("2026-11-23T20:00:00Z"), "24 Nov 2026");
+  assert.equal(istDay("2026-11-23T18:29:00Z"), "23 Nov 2026");
+  assert.equal(istDay("2026-11-23T20:00:00Z", "numeric"), "24/11/2026");
 });

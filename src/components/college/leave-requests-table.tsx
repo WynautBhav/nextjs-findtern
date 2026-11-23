@@ -6,11 +6,12 @@ import { useMemo, useState } from "react";
 import { EmptyScene, Pill, Surface } from "@/components/app/primitives";
 import { buttonVariants } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
+import { istDay } from "@/lib/college/ist";
 import { LEAVE_BULK_MAX, LEAVE_NOTE_MAX } from "@/lib/college/leave-request";
 import type { CollegeLeaveRow } from "@/lib/college/leave-request-read";
 import { cn } from "@/lib/utils";
 
-const day = (iso: string) => new Date(iso).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+const day = (iso: string) => istDay(iso);
 
 const WHO: Record<string, string> = { college_admin: "Your placement office", admin: "Findtern", system: "Closed automatically", student: "The student" };
 

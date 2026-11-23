@@ -6,6 +6,7 @@ import { EmptyScene, Pill, Surface, type Tone } from "@/components/app/primitive
 import { APP_FILTER_BAR, APP_FILTER_CONTROL, APP_FILTER_SELECT } from "@/components/app/filter-controls";
 import { cn } from "@/lib/utils";
 import { DRIVE_STATUSES, DRIVE_STATUS_LABEL, type DriveStatus } from "@/lib/college/drive-dashboard";
+import { istDay } from "@/lib/college/ist";
 
 type Metrics = {
   orders: { id: string; slots: number; issued: number; redeemed: number; pending: number; unused: number; interviews: Record<string, number> }[];
@@ -156,7 +157,7 @@ export function DriveDashboard() {
                 <p className="font-medium">{r.name}</p>
                 <p className="break-all text-text-subtle">{r.email}</p>
                 <p className="mt-2 flex flex-wrap items-center gap-2"><span className="text-text-subtle">Status:</span><Pill tone={TONE[r.status]}>{DRIVE_STATUS_LABEL[r.status]}</Pill></p>
-                <p className="nums text-text-subtle">Activated: {r.activatedAt ? new Date(r.activatedAt).toLocaleDateString("en-IN") : "Not yet"}</p>
+                <p className="nums text-text-subtle">Activated: {r.activatedAt ? istDay(r.activatedAt, "numeric") : "Not yet"}</p>
               </li>
             ))}
           </ul>
@@ -175,7 +176,7 @@ export function DriveDashboard() {
                   <tr key={r.id} className="border-t">
                     <td className="py-2 pr-3"><span className="block font-medium">{r.name}</span><span className="text-text-subtle">{r.email}</span></td>
                     <td className="px-2"><Pill tone={TONE[r.status]}>{DRIVE_STATUS_LABEL[r.status]}</Pill></td>
-                    <td className="nums pl-2">{r.activatedAt ? new Date(r.activatedAt).toLocaleDateString("en-IN") : "—"}</td>
+                    <td className="nums pl-2">{r.activatedAt ? istDay(r.activatedAt, "numeric") : "—"}</td>
                   </tr>
                 ))}
               </tbody>
