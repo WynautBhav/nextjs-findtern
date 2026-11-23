@@ -1,3 +1,4 @@
+import { loadSessionFacts, passwordVersionCurrent } from "@/lib/account-status";
 import { requireCollegeRead } from "@/lib/college/guard";
 import { presenceSnapshot } from "@/lib/college/scope";
 import { eligibleStudents, driveForCollegeAdmin } from "@/lib/college/scope";
@@ -42,6 +43,12 @@ export async function GET(req: Request) {
   let timer: ReturnType<typeof setInterval> | undefined;
   let last = "";
   let lastSent = 0;
+  const { session } = ctx;
+  /** The same facts getSession() checks per request (account-status.ts), read directly because cookies() is not available between ticks. */
+  const sessionStillValid = async () => {
+    const facts = await loadSessionFacts("college", session.uid, session.sid);
+    return !facts.revoked && facts.active && passwordVersionCurrent("college", session.pv, facts.pv);
+  };
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -60,6 +67,13 @@ export async function GET(req: Request) {
         if (busy) return;
         busy = true;
         try {
+          // The guard above ran when the stream opened. Re-check the account every tick: an officer or college switched
+          // off, a reset password or a logout must end the stream, not leave names and roll numbers flowing for minutes.
+          if (!(await sessionStillValid())) {
+            send(`event: ended\ndata: {}\n\n`);
+            stop();
+            return;
+          }
           const snap = await presenceSnapshot(ctx.college.id, scope);
           const key = `${snap.online}/${snap.total}/${snap.offline.map((o) => o.userId).join(",")}`;
           if (key !== last) {

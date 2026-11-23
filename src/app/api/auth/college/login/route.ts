@@ -6,7 +6,7 @@ import { accountDisabledBody } from "@/lib/account-disabled";
 import { getDb, schema } from "@/lib/db";
 import { withSession, issueCsrfCookie } from "@/lib/auth";
 import { verifyPasswordOrDummy, needsRehash, hashPassword } from "@/lib/security/password";
-import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
+import { limiters, clientIp, takeAuth } from "@/lib/security/rate-limit";
 
 const bodySchema = z.object({
   email: z.string().trim().toLowerCase().email(),
@@ -18,7 +18,7 @@ export async function POST(req: Request) {
   const ip = clientIp(req.headers);
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Enter your email and password" }, { status: 400 });
-  if (!limiters.login.take(bucketKey(ip, parsed.data.email))) {
+  if (!takeAuth(limiters.login, "college/login", ip, parsed.data.email)) {
     return NextResponse.json({ error: "Too many attempts. Try again in 15 minutes." }, { status: 429 });
   }
 
