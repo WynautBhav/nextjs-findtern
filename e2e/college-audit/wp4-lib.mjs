@@ -1,8 +1,10 @@
 // WP4 helpers: a cookie-jar HTTP client for the college audit (loopback only, DB 5549x only).
 import pg from "pg";
 
+import { assertLocalDb } from "./lib/local-only.mjs";
 export const BASE = process.env.BASE ?? "";
 if (!/^http:\/\/localhost:333\d$/.test(BASE)) throw new Error(`BASE must be http://localhost:333x (got '${BASE}')`);
+assertLocalDb(process.env.DATABASE_URL);
 if (!/127\.0\.0\.1:5549\d\/findtern_ca_/.test(process.env.DATABASE_URL ?? "")) throw new Error("DATABASE_URL must be a findtern_ca_* DB on 5549x");
 export const PASSWORD = "Findtern@2026";
 export const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, max: 4 });

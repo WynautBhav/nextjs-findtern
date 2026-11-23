@@ -2,8 +2,10 @@
 // Loopback only: refuses a DATABASE_URL / BASE that is not this machine.
 import pg from "pg";
 
+import { assertLocalDb } from "./lib/local-only.mjs";
 export const BASE = process.env.BASE ?? "http://localhost:3333";
 const DB = process.env.DATABASE_URL;
+assertLocalDb(DB);
 if (!DB || !/@(127\.0\.0\.1|localhost):5549\d\//.test(DB)) throw new Error("DATABASE_URL must be a findtern_ca_* test DB on 5549x");
 if (!/^http:\/\/(localhost|127\.0\.0\.1):333\d$/.test(BASE)) throw new Error("BASE must be http://localhost:333x");
 

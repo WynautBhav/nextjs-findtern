@@ -1,9 +1,11 @@
 // WP5 audit helper: cookie-jar API client + direct DB access. Loopback only (scratch DB on 5549x, app on 333x).
 import pg from "pg";
 
+import { assertLocalDb } from "./lib/local-only.mjs";
 export const BASE = process.env.BASE ?? "http://localhost:3335";
 const DB = process.env.DATABASE_URL ?? "";
 if (!/^http:\/\/(localhost|127\.0\.0\.1):333\d$/.test(BASE)) throw new Error("BASE must be http://localhost:333x");
+assertLocalDb(DB);
 if (!/@127\.0\.0\.1:5549\d\/findtern_ca_/.test(DB)) throw new Error("DATABASE_URL must be a findtern_ca_* DB on 5549x");
 export const PASSWORD = "Findtern@2026";
 

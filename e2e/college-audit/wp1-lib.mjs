@@ -2,11 +2,13 @@
 // Run from the worktree with BASE=http://localhost:3331 and DATABASE_URL=postgresql://findtern@127.0.0.1:55490/findtern_ca_wp1.
 import pg from "pg";
 
+import { assertLocalDb } from "./lib/local-only.mjs";
 export const BASE = process.env.BASE ?? "http://localhost:3331";
 export const DB_URL = process.env.DATABASE_URL ?? "";
 export const PASSWORD = "Findtern@2026";
 
 if (!/^http:\/\/(localhost|127\.0\.0\.1):333\d$/.test(BASE)) throw new Error(`refused: BASE must be http://localhost:333x (got ${BASE})`);
+assertLocalDb(DB_URL);
 if (!/^postgresql:\/\/findtern@127\.0\.0\.1:5549\d\/findtern_ca_[A-Za-z0-9_]+$/.test(DB_URL)) throw new Error("refused: DATABASE_URL must be a findtern_ca_* scratch DB on 127.0.0.1:5549x");
 
 let ipCounter = 0;
