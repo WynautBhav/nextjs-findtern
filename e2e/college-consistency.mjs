@@ -29,7 +29,7 @@ const q = async (s, p = []) => (await db.query(s, p)).rows;
 const college = (await q(`SELECT c.id FROM college_admins a JOIN colleges c ON c.id = a.college_id WHERE a.email = $1`, [TPO.email]))[0];
 if (!college) throw new Error(`no college admin ${TPO.email}`);
 const students = await q(
-  `SELECT m.user_id, u.email FROM college_memberships m JOIN users u ON u.id = m.user_id WHERE m.college_id = $1 AND m.status = 'verified' ORDER BY u.email`,
+  `SELECT m.user_id, u.email FROM college_memberships m JOIN users u ON u.id = m.user_id WHERE m.college_id = $1 AND m.status = 'verified' AND m.left_at IS NULL ORDER BY u.email`,
   [college.id],
 );
 const ids = students.map((s) => s.user_id);
