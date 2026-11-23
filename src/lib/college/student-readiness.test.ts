@@ -80,6 +80,6 @@ test("R4-01: code-verified, claimed and left students get the gate's verdict", a
     { userId: "left", status: "verified", verifiedBy: "college_code", leftAt: new Date() },
   ]);
   for (const [id, ok] of [["code", true], ["claimed", false], ["left", false], ["none", false]] as const) {
-    assert.equal(hireGateDecision(row, docs, ids.has(id)).ok, ok, id);
+    assert.equal(hireGateDecision(row, { ...docs, collegeVerified: ids.has(id) }).ok, ok, id);
   }
 });

@@ -79,9 +79,14 @@ test("college sign-in has the same address ceiling as the other three sign-ins (
 });
 
 test("drive share links: the token is read once from the URL, never logged, and the landing page sends no referrer", () => {
-  const page = readFileSync(join(root, "app/drive/[token]/page.tsx"), "utf8");
-  assert.ok(/referrer:\s*"no-referrer"/.test(page), "drive landing page must set referrer no-referrer");
-  assert.ok(/robots:\s*\{[^}]*index:\s*false/.test(page), "drive landing page must not be indexed");
+
+  // Both link pages (share link and company invite) carry a secret in the URL: they share one metadata that sends no referrer.
+  const landing = readFileSync(join(root, "app/drive/drive-landing.tsx"), "utf8");
+  assert.ok(/referrer:\s*"no-referrer"/.test(landing), "drive landing metadata must set referrer no-referrer");
+  for (const f of ["app/drive/[token]/page.tsx", "app/drive/invite/[driveId]/page.tsx"]) {
+    assert.match(readFileSync(join(root, f), "utf8"), /export const metadata = driveLandingMetadata;/, `${f} must use the no-referrer metadata`);
+  }
+  assert.ok(/robots:\s*\{[^}]*index:\s*false/.test(landing), "drive landing metadata must not be indexed");
   for (const f of ["app/api/drives/join/route.ts", "app/api/college/drives/[id]/link/route.ts", "app/api/college/drives/route.ts"]) {
     assert.ok(!/console\.(log|info|warn|error)\([^)]*token/i.test(read(f)), `${f} logs a token`);
   }
