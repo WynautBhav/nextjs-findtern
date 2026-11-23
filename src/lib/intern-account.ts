@@ -19,10 +19,11 @@ export function getAccountType(extraData: unknown): AccountType | null {
 
 /**
  * Memberships that something other than the student's own say-so verified: the college's code
- * (college_code), the TPO's code (promo), a personal drive code (drive_code) or the college's own roster.
+ * (college_code), the TPO's code (promo), a personal drive code (drive_code), the college's own roster, or the placement
+ * officer accepting the student (tpo: only offered for students something besides the officer agrees on, see college/approvals.ts).
  * A college email address (email_domain) is a claim the student can make alone, so it cannot back a college account.
  */
-export const CODE_VERIFIED_BY: readonly string[] = ["college_code", "promo", "drive_code", "roster"];
+export const CODE_VERIFIED_BY: readonly string[] = ["college_code", "promo", "drive_code", "roster", "tpo"];
 
 export function isCodeVerifiedMembership(m: { status: string; verifiedBy: string | null; leftAt?: Date | null } | null | undefined): boolean {
   return Boolean(m && !m.leftAt && m.status === "verified" && m.verifiedBy && CODE_VERIFIED_BY.includes(m.verifiedBy));

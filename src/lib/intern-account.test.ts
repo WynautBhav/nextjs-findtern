@@ -27,7 +27,7 @@ test("a candidate who paid cannot flip into the college view; a college account 
 
 test("which memberships can back a college account", () => {
   const m = (verifiedBy: string | null, status = "verified", leftAt: Date | null = null) => ({ status, verifiedBy, leftAt });
-  for (const by of ["college_code", "promo", "drive_code", "roster"]) assert.equal(isCodeVerifiedMembership(m(by)), true, by);
+  for (const by of ["college_code", "promo", "drive_code", "roster", "tpo"]) assert.equal(isCodeVerifiedMembership(m(by)), true, by);
   assert.equal(isCodeVerifiedMembership(m("email_domain")), false);
   assert.equal(isCodeVerifiedMembership(m(null)), false);
   assert.equal(isCodeVerifiedMembership(m("college_code", "claimed")), false);
