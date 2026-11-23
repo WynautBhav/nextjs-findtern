@@ -44,7 +44,7 @@ test("WP5-L4 the 'college paid' / code mail skips a student the college cannot l
   assert.match(sql, /intern_payments/);
   assert.match(sql, /college_memberships/);
   assert.match(sql, /mem\.college_id <> o\.college_id/);
-  assert.match(sql, /e\.intern_id IS NOT NULL/);
+  assert.match(sql, /e\.intern_id/);
 });
 
 import { normaliseEmail, normaliseName, normalisePhoneE164 } from "../drives/import/normalize.ts";
@@ -54,4 +54,11 @@ test("WP5-U5 drive sheet: invisible characters never reach a name, an email or a
   assert.equal(normaliseEmail("mail\u200bzw@x.in"), "mailzw@x.in");
   assert.equal(normaliseEmail("\ufeffA@X.IN\u200b"), "a@x.in");
   assert.equal(normalisePhoneE164("+91\u200b 98765-43210"), "+919876543210");
+});
+
+test("INT-08 a sheet row whose account was NOT linked (denied / other college: WP4 leaves intern_id empty) is still skipped by its verified email", () => {
+  const sql = codeUnusableSql("e", "o.college_id");
+  assert.match(sql, /u\.email = e\.college_email_norm/);
+  assert.match(sql, /u\.email_verified/);
+  assert.doesNotMatch(sql, /e\.intern_id = /, "all arms must use the matched account, not only the linked one");
 });

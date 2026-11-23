@@ -7,9 +7,12 @@
  *   - the student is a live member of ANOTHER college (leaving needs that college's approval).
  */
 export function codeUnusableSql(e: string, college: string): string {
-  return `(${e}.intern_id IS NOT NULL AND (
-    EXISTS (SELECT 1 FROM intern_payments pay WHERE pay.intern_id = ${e}.intern_id AND pay.status = 'paid')
-    OR EXISTS (SELECT 1 FROM intern_onboarding ob WHERE ob.user_id = ${e}.intern_id AND coalesce(ob.extra_data->'payment'->>'isPaid', '') = 'true')
-    OR EXISTS (SELECT 1 FROM college_denials d WHERE d.college_id = ${college} AND d.user_id = ${e}.intern_id)
-    OR EXISTS (SELECT 1 FROM college_memberships mem WHERE mem.user_id = ${e}.intern_id AND mem.left_at IS NULL AND mem.college_id <> ${college})))`;
+  // The account this row stands for: the linked one, else (WP4: a denied / other-college / left student is NOT linked by a
+  // confirm) the intern whose VERIFIED email is the row's email. Without this the unlinked rows would all be mailed.
+  const who = `coalesce(${e}.intern_id, (SELECT u.id FROM users u WHERE u.role = 'intern' AND u.email_verified AND u.email = ${e}.college_email_norm LIMIT 1))`;
+  return `(${who} IS NOT NULL AND (
+    EXISTS (SELECT 1 FROM intern_payments pay WHERE pay.intern_id = ${who} AND pay.status = 'paid')
+    OR EXISTS (SELECT 1 FROM intern_onboarding ob WHERE ob.user_id = ${who} AND coalesce(ob.extra_data->'payment'->>'isPaid', '') = 'true')
+    OR EXISTS (SELECT 1 FROM college_denials d WHERE d.college_id = ${college} AND d.user_id = ${who})
+    OR EXISTS (SELECT 1 FROM college_memberships mem WHERE mem.user_id = ${who} AND mem.left_at IS NULL AND mem.college_id <> ${college})))`;
 }

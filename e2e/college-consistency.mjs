@@ -178,7 +178,7 @@ if (!adminJar) failures.push(`admin login failed (${adminLogin.status}): admin p
 else {
   const adminCollege = await page(`/admin/colleges/${cid}`, adminJar);
   check("/admin/colleges/<id> 'Students in this college'", num(adminCollege, /Students in this college\s*([\d,]+)/), members);
-  check("/admin/colleges/<id> Students tab count", num(adminCollege, /Students\s+([\d,]+)\s+Wallet/), claimedN);
+  check("/admin/colleges/<id> Students tab count", num(adminCollege, /Students\s+([\d,]+)\s+Wallet/) ?? 0, claimedN);
   const list = await page("/admin/colleges", adminJar);
   check("/admin/colleges row 'Students'", num(list, /JK Lakshmipat University\s+Code \S+ · [^\d]*?(\d[\d,]*)\s+\d+ of/), members);
 }
