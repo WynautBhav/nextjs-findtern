@@ -31,6 +31,7 @@ import { buttonClass } from "@/components/ui/button";
 export const dynamic = "force-dynamic";
 
 /** How the student became one of the college's, in the officer's words. */
+const HIDDEN_HINT = "Hidden until verified";
 const VERIFIED_BY: Record<string, string> = {
   promo: "Verified by your student code",
   roster: "On your roster",
@@ -182,7 +183,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
               {readiness.paused ? "Account paused" : !readiness.seen ? "Hidden from employers" : readiness.hireable ? "Visible to employers" : "Visible, can't be hired yet"}
             </p>
           ) : null}
-          <p className="mt-1 text-xs text-text-subtle">{online ? "Online now" : `Last active ${ago(seen?.toISOString() ?? null)}`}</p>
+          {verified ? <p className="mt-1 text-xs text-text-subtle">{online ? "Online now" : `Last active ${ago(seen?.toISOString() ?? null)}`}</p> : null}
 
           <div className="mt-4 flex gap-2">
             {phone ? (
@@ -238,7 +239,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2 border-t border-ink-100 px-5 py-4">
-          {!ai.done ? <NudgeButton kind="interview" userIds={[id]} label="Nudge to take the interview" size="sm" /> : null}
+          {verified && !ai.done ? <NudgeButton kind="interview" userIds={[id]} label="Nudge to take the interview" size="sm" /> : null}
           <StudentRemove userId={id} name={name || student.email} />
         </div>
       </aside>
@@ -259,16 +260,17 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
 
         {/* The four numbers an officer asks about first; the score is the one filled tile. */}
         <ul className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="At a glance">
-          <Kpi on label="Findtern score" value={ai.done && student.score !== null ? student.score.toFixed(1) : "—"} hint={ai.done ? "out of 10" : ai.label} />
-          <Kpi label="CGPA" value={student.cgpa?.toFixed(1) ?? "—"} hint={student.cgpa !== null ? "out of 10" : "Not entered"} />
-          <Kpi label="Offers" value={String(proposals.length)} hint={student.offersPending > 0 ? `${student.offersPending} waiting on reply` : student.hired > 0 ? "Hired" : "None waiting"} />
-          <Kpi label="Meetings" value={String(meetings)} hint={calls.length > 0 ? `${calls.length} from your drives` : "Interviews, calls"} />
+          {/* A claimed student's figures are hidden, not zero: never say "not started" or "none" about data the officer may not see. */}
+          <Kpi on label="Findtern score" value={ai.done && student.score !== null ? student.score.toFixed(1) : "—"} hint={!verified ? HIDDEN_HINT : ai.done ? "out of 10" : ai.label} />
+          <Kpi label="CGPA" value={student.cgpa?.toFixed(1) ?? "—"} hint={!verified ? HIDDEN_HINT : student.cgpa !== null ? "out of 10" : "Not entered"} />
+          <Kpi label="Offers" value={verified ? String(proposals.length) : "—"} hint={!verified ? HIDDEN_HINT : student.offersPending > 0 ? `${student.offersPending} waiting on reply` : student.hired > 0 ? "Hired" : "None waiting"} />
+          <Kpi label="Meetings" value={verified ? String(meetings) : "—"} hint={!verified ? HIDDEN_HINT : calls.length > 0 ? `${calls.length} from your drives` : "Interviews, calls"} />
         </ul>
 
         <Panel>
           <PanelHeader
             title="AI interview"
-            description={ai.done ? "Scored by Findtern's AI interview. The student sees the same report." : `Status: ${ai.label}`}
+            description={!verified ? "Shown once you verify this student." : ai.done ? "Scored by Findtern's AI interview. The student sees the same report." : `Status: ${ai.label}`}
             action={
               links.feedbackLink || links.recordingLink ? (
                 <>
@@ -304,12 +306,16 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                 )}
               </dl>
             ) : (
-              <EmptyScene
-                compact
-                title="No AI interview score"
-                body="This student has not taken the AI interview. Employers in drives filter on this score, so a nudge is worth sending."
-                who="You - use the nudge button on the left"
-              />
+              verified ? (
+                <EmptyScene
+                  compact
+                  title="No AI interview score"
+                  body="This student has not taken the AI interview. Employers in drives filter on this score, so a nudge is worth sending."
+                  who="You - use the nudge button on the left"
+                />
+              ) : (
+                <EmptyScene compact title="Hidden until verified" body="Scores, offers and meetings of a student you have not verified stay private. Verify the student with your student code to see them." />
+              )
             )}
             {links.feedbackLink || links.recordingLink ? (
               <p className="text-xs text-text-subtle">
@@ -344,7 +350,11 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
             description="From employers on Findtern and in your drives."
             action={student.offersPending > 0 ? <NudgeButton kind="offer" userIds={[id]} label="Nudge to reply" /> : undefined}
           />
-          {proposals.length + interviews.length + calls.length === 0 ? (
+          {!verified ? (
+            <PanelBody>
+              <EmptyScene compact title="Hidden until verified" body="Offers and meetings of a student you have not verified stay private." />
+            </PanelBody>
+          ) : proposals.length + interviews.length + calls.length === 0 ? (
             <PanelBody>
               <EmptyScene
                 compact

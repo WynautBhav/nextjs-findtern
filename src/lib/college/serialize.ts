@@ -46,17 +46,19 @@ type Progress = {
   callsPending: number;
   interviewsScheduled: number;
   driveMeetings: number;
+  lastSeenAt?: Date | null;
   lastActivityAt: Date | null;
+  semester?: number | null;
 };
 
 /**
- * Anyone can claim a college at sign-up, so a claimed student's progress (score, CGPA, AI interview,
- * offers, meetings, activity) stays hidden from that college until the officer verifies them.
+ * Anyone can claim a college at sign-up, so a claimed student's progress (score, CGPA, semester, AI interview,
+ * offers, meetings, last seen, activity) stays hidden from that college until the officer verifies them.
  * Name, email, year and branch stay so the officer can decide.
  */
 export function redactUnverified<T extends Progress>(s: T): T {
   if (s.status === "verified") return s;
-  return { ...s, cgpa: null, score: null, aiStatus: "not_applied", offersPending: 0, proposals: 0, hired: 0, offersNew: 0, hiredNew: 0, callsPending: 0, interviewsScheduled: 0, driveMeetings: 0, lastActivityAt: null };
+  return { ...s, cgpa: null, score: null, aiStatus: "not_applied", offersPending: 0, proposals: 0, hired: 0, offersNew: 0, hiredNew: 0, callsPending: 0, interviewsScheduled: 0, driveMeetings: 0, lastSeenAt: null, lastActivityAt: null, ...("semester" in s ? { semester: null } : {}) };
 }
 
 /** AI report and recording: verified students only (WP8 / C9). */
