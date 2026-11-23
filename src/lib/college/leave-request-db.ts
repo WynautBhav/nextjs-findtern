@@ -20,6 +20,8 @@ export type Actor = { type: "college_admin" | "admin"; id: string };
 export async function endMembership(client: PgClient, userId: string): Promise<void> {
   await run(client, "UPDATE college_memberships SET left_at = now() WHERE user_id = $1 AND left_at IS NULL", [userId]);
   await run(client, "DELETE FROM college_presence WHERE user_id = $1", [userId]);
+  // Same closing a drive revoke does (closeDriveCalls): the student is no longer in any drive, so no request or call stays open for them. Nobody is notified.
+  await run(client, "UPDATE college_drive_meetings SET status = 'cancelled', responded_at = now() WHERE user_id = $1 AND status IN ('requested', 'accepted')", [userId]);
   await run(
     client,
     "UPDATE intern_onboarding SET extra_data = extra_data || jsonb_build_object('accountType', 'individual') WHERE user_id = $1 AND extra_data->>'accountType' = 'college'",
