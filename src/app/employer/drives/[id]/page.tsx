@@ -10,6 +10,7 @@ import { getDb, schema } from "@/lib/db";
 import { displayNameOf, initialsOf, readSkills } from "@/lib/employer-candidates";
 import { candidatePoolClauses } from "@/lib/employer-pool";
 import { hiredInternIds } from "@/lib/employer-visibility";
+import { inIdList } from "@/lib/sql-ids";
 import { isProjectOpen } from "@/lib/project-locations";
 import { timezoneForLocation } from "@/lib/timezones";
 import { HeroPanel } from "@/components/employer/kit/hero-panel";
@@ -118,7 +119,7 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
           .select({ userId: schema.users.id })
           .from(schema.users)
           .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-          .where(and(inArray(schema.users.id, ids), ...candidatePoolClauses()))
+          .where(and(inIdList(schema.users.id, ids), ...candidatePoolClauses()))
       : Promise.resolve([]),
   ]);
   // Full-time drives: the employer offers a full-time role from the card (1% hiring fee), filed under one of its projects.
