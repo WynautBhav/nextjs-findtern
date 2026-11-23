@@ -33,3 +33,12 @@ test("the batch reference is the invoice's payment id", () => {
   assert.equal(seatInvoiceInput({ ...batch, referenceId: "UTR123" }, college("Rajasthan"), seller).paymentId, "UTR123");
   assert.equal(seatInvoiceInput(batch, college("Rajasthan"), seller).paymentId, null);
 });
+
+test("seatInvoiceState (R1-01): the serial decides what a batch shows, not its amount", async () => {
+  const { seatInvoiceState } = await import("./seat-invoice.ts");
+  assert.equal(seatInvoiceState({ status: "paid", amountMinor: 0, invoiceNumber: "FTN/2026-27/0007" }), "serial", "a free batch that already holds a serial keeps its invoice");
+  assert.equal(seatInvoiceState({ status: "paid", amountMinor: 4720, invoiceNumber: "FTN/2026-27/0008" }), "serial");
+  assert.equal(seatInvoiceState({ status: "paid", amountMinor: 0, invoiceNumber: null }), "covered");
+  assert.equal(seatInvoiceState({ status: "paid", amountMinor: 4720, invoiceNumber: null }), "pending", "never prints 'Invoice null'");
+  assert.equal(seatInvoiceState({ status: "pending", amountMinor: 4720, invoiceNumber: null }), "none");
+});
