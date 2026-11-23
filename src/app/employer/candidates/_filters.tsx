@@ -89,6 +89,8 @@ export function FilterColumn({
       className="lg:rounded-2xl lg:border lg:border-ink-200 lg:bg-white lg:p-6 lg:shadow-xs"
     >
       <FilterPanel key={panelEpoch} cityDefault={cityDefault} raised={compareIds.length > 0} activeCount={activeFilterCount(filters, effectiveSkills, projectCity)} total={total}>
+        {/* The project on screen travels with every filter change: without it the results fell back to another project. */}
+        {activeProjectId ? <input type="hidden" name="project" value={activeProjectId} /> : null}
         {compareIds.length > 0 ? <input type="hidden" name="ids" value={compareIds.join(",")} /> : null}
         {filters.view !== "list" ? <input type="hidden" name="view" value={filters.view} /> : null}
         {filters.pageSize !== DEFAULT_PAGE_SIZE ? <input type="hidden" name="pageSize" value={filters.pageSize} /> : null}

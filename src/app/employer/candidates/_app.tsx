@@ -92,7 +92,8 @@ export function CandidatesApp({
       // Compare picks are not part of what the list is (they are kept in the cookie); a bare query would restore saved filters.
       params.delete("ids");
       params.delete("ftInternId");
-      if ([...params.keys()].length === 0) params.set("fresh", "1");
+      // The panel always sends the project: the project alone is still "no filters", not a bare visit.
+      if ([...params.keys()].every((k) => k === "project")) params.set("fresh", "1");
       setPanelQs(options?.source === "panel" ? normaliseQuery(params) : null);
       q.set(params.toString(), { history: options?.replace ? "replace" : "push", debounce: options?.debounce });
     },
