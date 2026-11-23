@@ -11,6 +11,7 @@ import { revalidatePublicRoles } from "@/lib/projects/revalidate-public";
 import { projectNameIssue } from "@/lib/project-name";
 import {
   MAX_PROJECT_SKILLS,
+  preferredLocationsToSave,
   projectLocationsError,
   projectPlaceError,
   projectSkillsError,
@@ -58,7 +59,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const placeProblem = projectPlaceError(d, STATES);
   if (placeProblem) return NextResponse.json({ error: placeProblem }, { status: 400 });
   // A new project has no legacy list to keep: at most three places.
-  const locationProblem = projectLocationsError(d.preferredLocations ?? []);
+  const locationProblem = projectLocationsError(preferredLocationsToSave(d.locationType, d.preferredLocations));
   if (locationProblem) return NextResponse.json({ error: locationProblem }, { status: 400 });
 
   const db = getDb();
@@ -93,8 +94,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       // A remote role has no place (legacy stored none).
       city: remote ? null : d.city?.trim() || null,
       state: remote ? null : d.state?.trim() || null,
-      // Remote: at most the one preferred work location the form sends.
-      preferredLocations: remote ? (d.preferredLocations ?? []).slice(0, 1) : (d.preferredLocations ?? []),
+      // Remote has no work location: no preferred locations either.
+      preferredLocations: preferredLocationsToSave(d.locationType, d.preferredLocations),
       // Self-service posting starts as a draft; the employer publishes it with Submit (no admin review).
       status: "draft",
     })

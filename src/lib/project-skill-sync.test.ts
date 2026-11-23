@@ -51,9 +51,9 @@ test("a picked city saves with its state on an on-site or hybrid project", async
   assert.equal(projectCityPlan("Aurangabad", { locationType: "hybrid", state: "Goa" }, districts).action, "skip");
   assert.equal(projectCityPlan("Atlantis", onsite, districts).action, "skip");
   assert.equal(projectCityPlan("", onsite, districts).action, "skip");
-  // Remote: the city is the preferred work location; clearing it clears that.
-  assert.deepEqual(projectCityPlan("pune", { locationType: "remote", state: null }, districts), { action: "save", body: { preferredLocations: ["Pune"] }, label: "Pune" });
-  assert.deepEqual(projectCityPlan("", { locationType: "remote", state: null }, districts), { action: "save", body: { preferredLocations: [] }, label: "" });
+  // Remote: no work location, so a picked or cleared city never writes to the project.
+  assert.equal(projectCityPlan("pune", { locationType: "remote", state: null }, districts).action, "skip");
+  assert.equal(projectCityPlan("", { locationType: "remote", state: null }, districts).action, "skip");
   assert.equal(projectCityPlan("Atlantis", { locationType: "remote", state: null }, districts).action, "skip");
 });
 

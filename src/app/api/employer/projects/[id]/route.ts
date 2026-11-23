@@ -15,6 +15,7 @@ import {
   CLOSED_PROJECT_STATUS,
   MAX_PROJECT_SKILLS,
   isProjectOpen,
+  preferredLocationsToSave,
   projectLocationsError,
   projectPlaceError,
   projectSkillsError,
@@ -110,12 +111,16 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       d.state = null;
     }
   }
+  // A remote project has no work location: whatever is sent (or left from before a switch to remote) saves as none.
+  if ((d.locationType ?? project.locationType) === "remote" && (d.preferredLocations !== undefined || d.locationType !== undefined)) {
+    d.preferredLocations = preferredLocationsToSave("remote", d.preferredLocations);
+  }
   if (d.status && d.status !== "active") d.status = CLOSED_PROJECT_STATUS;
 
   // At most three preferred locations, except that a project saved under the
   // old limit of five may resave the places it already has.
-  if (parsed.data.preferredLocations) {
-    const locationProblem = projectLocationsError(parsed.data.preferredLocations, project.preferredLocations ?? []);
+  if (d.preferredLocations) {
+    const locationProblem = projectLocationsError(d.preferredLocations, project.preferredLocations ?? []);
     if (locationProblem) return NextResponse.json({ error: locationProblem }, { status: 400 });
   }
 
