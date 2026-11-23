@@ -88,6 +88,16 @@ function windowDenial(drive: DriveLike, now: number): AccessResult | null {
   return null;
 }
 
+/** The checks every way into a drive shares, once its credential (token or invite) is known to be good. */
+function afterCredential(input: { drive: DriveLike; session: SessionLike; collegeActive: boolean }, now: number): AccessResult {
+  if (!input.collegeActive) return { ok: false, reason: "revoked" };
+  const w = windowDenial(input.drive, now);
+  if (w) return w;
+  if (!input.session) return { ok: false, reason: "sign_in" };
+  if (input.session.role !== "employer") return { ok: false, reason: "not_employer" };
+  return { ok: true };
+}
+
 /** Opening the share link. */
 export function checkDriveLink(input: {
   drive: DriveLike;
@@ -97,15 +107,24 @@ export function checkDriveLink(input: {
   collegeActive: boolean;
   now?: number;
 }): AccessResult {
-  const now = input.now ?? Date.now();
   // Token first: a wrong token must not learn anything about the drive.
   if (!tokenMatches(input.token, input.drive.tokenHash)) return { ok: false, reason: "bad_token" };
-  if (!input.collegeActive) return { ok: false, reason: "revoked" };
-  const w = windowDenial(input.drive, now);
-  if (w) return w;
-  if (!input.session) return { ok: false, reason: "sign_in" };
-  if (input.session.role !== "employer") return { ok: false, reason: "not_employer" };
-  return { ok: true };
+  return afterCredential(input, input.now ?? Date.now());
+}
+
+/**
+ * Opening an emailed invite (./drive-invite.ts). `valid` is the caller's verdict on the signature and on the address
+ * still being on the drive's invited list; everything after that is the same as for the share link.
+ */
+export function checkDriveInviteLink(input: {
+  drive: DriveLike;
+  valid: boolean;
+  session: SessionLike;
+  collegeActive: boolean;
+  now?: number;
+}): AccessResult {
+  if (!input.valid) return { ok: false, reason: "bad_token" };
+  return afterCredential(input, input.now ?? Date.now());
 }
 
 /** Every drive API call after the link was opened. */

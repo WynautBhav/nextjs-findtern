@@ -7,8 +7,11 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { csrfFetch } from "@/lib/client-fetch";
 
-/** Trades the share-link token for the employer's pass into the drive. */
-export function DriveEnterButton({ token }: { token: string }) {
+/** What opens the drive: the share link's token, or the signed invite from the company's email. */
+export type DriveCredential = { token: string } | { driveId: string; email: string; sig: string };
+
+/** Trades the share-link token (or emailed invite) for the employer's pass into the drive. */
+export function DriveEnterButton({ credential }: { credential: DriveCredential }) {
   const router = useProgressRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +23,7 @@ export function DriveEnterButton({ token }: { token: string }) {
       const res = await csrfFetch("/api/drives/join", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token }),
+        body: JSON.stringify(credential),
       });
       const data = (await res.json().catch(() => ({}))) as { redirect?: string; error?: string };
       if (!res.ok || !data.redirect) {

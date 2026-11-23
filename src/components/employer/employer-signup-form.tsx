@@ -40,15 +40,18 @@ import { PasswordInput } from "@/components/auth/password-input";
 export function EmployerSignupForm({
   google = null,
   next,
+  prefill,
 }: {
   google?: { email: string; name: string } | null;
+  /** A drive invite's company and address: they only fill the fields in, the address is still verified by code. */
+  prefill?: { companyName: string; email: string };
   /** Where to go once the account exists (from ?next=, e.g. a college drive link), else onboarding. */
   next?: string;
 } = {}) {
   const router = useProgressRouter();
   const [name, setName] = useState(google?.name ?? "");
-  const [companyName, setCompanyName] = useState("");
-  const [companyEmail, setCompanyEmail] = useState(google?.email ?? "");
+  const [companyName, setCompanyName] = useState(prefill?.companyName ?? "");
+  const [companyEmail, setCompanyEmail] = useState(google?.email ?? prefill?.email ?? "");
   const [countryCode, setCountryCode] = useState("+91");
   const [phoneNumber, setPhoneNumber] = useState("");
   // The number a "taken" answer was for, so an edit drops a stale answer.

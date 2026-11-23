@@ -43,6 +43,10 @@ export default async function SignupPage({
   const internGoogle = fromGoogle && !isEmployer ? { email: one(params.email), firstName: one(params.firstName), lastName: one(params.lastName) } : null;
   const employerGoogle = fromGoogle && isEmployer ? { email: one(params.email), name: one(params.name) } : null;
   const showGoogle = !fromGoogle && googleLoginEnabled();
+  // A drive invite sends a new company here with its name and address (display only; the address is still verified).
+  const invitedCompany = one(params.company).trim().slice(0, 120);
+  const invitedEmail = one(params.email).trim().slice(0, 200);
+  const prefill = !fromGoogle && isEmployer && (invitedCompany || invitedEmail) ? { companyName: invitedCompany, email: invitedEmail } : undefined;
 
   return (
     <AuthShell
@@ -89,7 +93,7 @@ export default async function SignupPage({
 
       <div className={showGoogle ? "mt-5" : "mt-8"}>
         {isEmployer ? (
-          <EmployerSignupForm key="employer" google={employerGoogle} next={next || undefined} />
+          <EmployerSignupForm key="employer" google={employerGoogle} next={next || undefined} prefill={prefill} />
         ) : (
           <SignupForm key="intern" google={internGoogle} next={next || undefined} />
         )}

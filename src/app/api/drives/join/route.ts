@@ -3,12 +3,18 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 import { requireMutation } from "@/lib/guards-mutation";
-import { checkDriveLink } from "@/lib/college/access";
+import { checkDriveInviteLink, checkDriveLink } from "@/lib/college/access";
+import { inviteSigOk, isInvited } from "@/lib/college/drive-invite";
+import { driveCodeSecret } from "@/lib/drives/code-derive";
 import { hashDriveToken } from "@/lib/college/tokens";
 import { getDb, schema } from "@/lib/db";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
 
-const bodySchema = z.object({ token: z.string().min(20).max(100) });
+// The share link's token, or the signed invite a company got by email (lib/college/drive-invite.ts).
+const bodySchema = z.union([
+  z.object({ token: z.string().min(20).max(100) }),
+  z.object({ driveId: z.string().uuid(), email: z.string().max(200), sig: z.string().min(20).max(100) }),
+]);
 
 /**
  * A signed-in employer enters a drive from its share link. From here on their
@@ -27,16 +33,26 @@ export async function POST(req: Request) {
   // One transaction, the drive row read FOR SHARE: a link reissue (QA-200)
   // waits for this join to finish, then its delete removes the new row, so a
   // join can't slip in between the reissue's swap and its delete.
+  const cred = parsed.data;
   const outcome = await getDb().transaction(async (tx) => {
     const [row] = await tx
       .select({ drive: schema.collegeDrives, collegeActive: schema.colleges.isActive })
       .from(schema.collegeDrives)
       .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeDrives.collegeId))
-      .where(eq(schema.collegeDrives.tokenHash, hashDriveToken(parsed.data.token)))
+      .where("token" in cred ? eq(schema.collegeDrives.tokenHash, hashDriveToken(cred.token)) : eq(schema.collegeDrives.id, cred.driveId))
       .limit(1)
       .for("share", { of: schema.collegeDrives });
     if (!row) return { status: 404 as const };
-    const access = checkDriveLink({ drive: row.drive, token: parsed.data.token, session: guard.session, collegeActive: row.collegeActive });
+    // An invite is good only while its address is still on the drive's list and the drive's link has not been reissued.
+    const access =
+      "token" in cred
+        ? checkDriveLink({ drive: row.drive, token: cred.token, session: guard.session, collegeActive: row.collegeActive })
+        : checkDriveInviteLink({
+            drive: row.drive,
+            valid: isInvited(row.drive.invitedEmployers, cred.email) && inviteSigOk(driveCodeSecret(), row.drive.id, row.drive.tokenHash, cred.email, cred.sig),
+            session: guard.session,
+            collegeActive: row.collegeActive,
+          });
     if (!access.ok) return { status: 403 as const, reason: access.reason };
     await tx
       .insert(schema.collegeDriveEmployers)

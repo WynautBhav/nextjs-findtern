@@ -7,6 +7,7 @@ import { requireRole } from "@/lib/auth";
 import { EmptyScene } from "@/components/app/primitives";
 import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
+import { safeNext } from "@/lib/google";
 import { NotificationList, type NotificationRow } from "@/components/app/notification-list";
 import { PageHeader } from "@/components/layout/page-header";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,11 @@ function hrefFor(type: string, data: Record<string, unknown> | null): string | n
     case "full_time_offer_status":
     case "full_time_fee_paid":
       return id("proposalId") ? `/employer/proposal/${id("proposalId")}` : "/employer/proposals";
+    case "drive_invite": {
+      // The signed invite path the college's mail carries; only a same-site path is followed.
+      const path = typeof data?.path === "string" ? safeNext(data.path, "") : "";
+      return path || null;
+    }
     case "cgpa_verified":
       return "/employer/proposals?status=accepted";
     case "cgpa_incorrect":
