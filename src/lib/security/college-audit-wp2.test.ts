@@ -54,3 +54,11 @@ test("WP2-02: a claimed student exports blank beyond name, email, course, branch
   assert.equal(row, '"Asha Meena","asha@jklu.edu.in","","","","","","","","","","","","",""');
   assert.equal(cellText(verified, "email"), "asha@jklu.edu.in");
 });
+
+test("WP2-03: last seen in the CSV is India time, not a UTC ISO string", () => {
+  const verified = buildMasterRow({ ...base, status: "verified" as const }, undefined);
+  const row = { ...verified, lastSeenAt: "2026-11-22T20:00:00.000Z" }; // 01:30 IST on the 23rd
+  assert.equal(cellText(row, "lastSeenAt"), "2026-11-23 01:30 IST");
+  assert.equal(cellText({ ...row, lastSeenAt: null }, "lastSeenAt"), "");
+  assert.equal(cellText({ ...row, lastSeenAt: "not a date" }, "lastSeenAt"), "");
+});

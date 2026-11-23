@@ -376,6 +376,12 @@ export function driveCalls(m: Pick<Meetings, "callsAccepted" | "callsNotTaken" |
     .join(" · ");
 }
 
+/** An instant as India time for the file an officer opens in a spreadsheet: "2026-11-23 08:28 IST" (the ISO text read as UTC). */
+export function istStamp(iso: string): string {
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? "" : `${new Date(t + 330 * 60_000).toISOString().slice(0, 16).replace("T", " ")} IST`;
+}
+
 /** A cell as plain text, the same in the table's title and in the CSV. Missing is "". */
 export function cellText(row: MasterRow, key: MasterColumn["key"], origin = ""): string {
   switch (key) {
@@ -385,6 +391,8 @@ export function cellText(row: MasterRow, key: MasterColumn["key"], origin = ""):
       return row.hasRecording ? `${origin}/api/college/students/${row.userId}/recording` : "";
     case "workMode":
       return row.workMode ? MODE_LABEL[row.workMode] : "";
+    case "lastSeenAt":
+      return row.lastSeenAt ? istStamp(row.lastSeenAt) : "";
     case "earningsMinor":
       return row.verified ? (row.earningsMinor / 100).toFixed(2) : "";
     case "hired":
