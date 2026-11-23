@@ -129,6 +129,15 @@ export function isBlockingInterview(iv: SlotLike, now: number = Date.now()): boo
 }
 
 /**
+ * The employer already has an open meeting with this candidate: a live offer or booking that has not run out, or a reschedule
+ * request still waiting for the company's new times. Every "Book meeting" button reads this (disabled while true) and the
+ * booking service refuses a second one by the same rule, so the screens and the server agree. Pass one pair's interviews.
+ */
+export function hasOpenMeeting(interviews: SlotLike[], now: number = Date.now()): boolean {
+  return interviews.some((iv) => isBlockingInterview(iv, now) || hasNoSlotsToPick(iv));
+}
+
+/**
  * The meeting has happened: marked completed, or a scheduled meeting whose
  * time slot has run out. Feedback opens only then (bug sheet 26 Oct).
  */

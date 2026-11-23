@@ -12,6 +12,7 @@ import {
   isMeetingOver,
   reminderWindow,
   hasNoSlotsToPick,
+  hasOpenMeeting,
   isStaleInterview,
   meetingTime,
   employerNoShow,
@@ -243,4 +244,16 @@ test("joinCounts: a click days early only opens the link; from 15 minutes before
   assert.equal(joinCounts(iv, min(AFTER_CUTOVER, -16)), false);
   assert.equal(joinCounts(iv, min(AFTER_CUTOVER, -15)), true);
   assert.equal(joinCounts(iv, min(AFTER_CUTOVER, 10)), true);
+});
+
+test("hasOpenMeeting: a live offer, a booking or a reschedule request is open; ended, cancelled and lapsed are not", () => {
+  assert.equal(hasOpenMeeting([{ status: "pending", slot1: h(3), slot2: h(4), slot3: h(5) }], NOW), true, "offer waiting on the candidate");
+  assert.equal(hasOpenMeeting([{ status: "scheduled", slot1: h(3), slot2: null, slot3: null, selectedSlot: 1 }], NOW), true, "booked");
+  assert.equal(hasOpenMeeting([{ status: "pending", slot1: null, slot2: null, slot3: null }], NOW), true, "waiting for new times");
+  assert.equal(hasOpenMeeting([{ status: "scheduled", slot1: h(-5), slot2: null, slot3: null, selectedSlot: 1 }], NOW), false, "ended");
+  assert.equal(hasOpenMeeting([{ status: "cancelled", slot1: h(3), slot2: null, slot3: null }], NOW), false, "cancelled");
+  assert.equal(hasOpenMeeting([{ status: "completed", slot1: h(3), slot2: null, slot3: null }], NOW), false, "completed");
+  assert.equal(hasOpenMeeting([{ status: "pending", slot1: h(-5), slot2: h(-3), slot3: null }], NOW), false, "every slot passed");
+  assert.equal(hasOpenMeeting([{ status: "pending", slot1: h(3), slot2: null, slot3: null, respondBy: h(-1) }], NOW), false, "respond-by lapsed");
+  assert.equal(hasOpenMeeting([], NOW), false);
 });

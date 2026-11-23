@@ -3,6 +3,10 @@ import type { PlacementLedger } from "@/lib/dues";
 export type HireRow = {
   proposalId: string;
   internId: string;
+  /** The project they were hired on; "Book meeting" books inside it. */
+  projectId: string | null;
+  /** An open meeting with them on any project (hasOpenMeeting): "Book meeting" shows disabled. */
+  meetingOpen: boolean;
   candidateName: string;
   candidateEmail?: string | null;
   projectName: string;

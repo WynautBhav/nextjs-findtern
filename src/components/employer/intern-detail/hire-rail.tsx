@@ -105,7 +105,7 @@ export function HireRail(props: RailProps) {
                 <FullTimeOfferButton employerId={employerId} proposalId={relation.fullTimeFrom} candidate={displayName} fteStatus={employerFte} timezone={employerZone} />
               ) : null}
               {showShortlist ? <ShortlistToggle internId={internId} projectId={shortlist!.projectId} shortlisted={shortlist!.on} /> : null}
-              <BookMeetingButton internId={internId} projectId={shortlist?.projectId ?? null} candidateLabel={displayName} />
+              <BookMeetingButton internId={internId} projectId={shortlist?.projectId ?? null} candidateLabel={displayName} meetingOpen={Boolean(relation?.meetingOpen)} />
               {/* EMB-12: hires and full-time offers are not compared (legacy). */}
               {compareBlocked ? null : <CompareToggle employerId={employerId} internId={internId} projectId={shortlist?.projectId ?? null} picked={comparePicks} />}
             </div>

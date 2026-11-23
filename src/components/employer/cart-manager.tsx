@@ -51,6 +51,8 @@ export type CartLineItem = {
   meetingUntil?: string | null;
   /** When that meeting is (ISO), for "Meeting on <date>" on the held Send proposal. */
   meetingAt?: string | null;
+  /** An open meeting with them on any project (hasOpenMeeting): "Book meeting" shows disabled. */
+  meetingOpen?: boolean;
   /** The booked meeting's link while it is live, for "Join meeting". */
   meetingLink?: string | null;
   /** The booked interview behind `meetingLink`; Join records through it. */
@@ -148,7 +150,7 @@ export function CartManager({
     if (end === null || !iv) return;
     const at = meetingTime(iv);
     setCartLines((prev) =>
-      prev.map((l) => (l.candidate.id === internId ? { ...l, meetingUntil: new Date(end).toISOString(), meetingAt: at === null ? null : new Date(at).toISOString() } : l)),
+      prev.map((l) => (l.candidate.id === internId ? { ...l, meetingOpen: true, meetingUntil: new Date(end).toISOString(), meetingAt: at === null ? null : new Date(at).toISOString() } : l)),
     );
   }
 

@@ -35,7 +35,7 @@ export function cardCandidate(profile: CandidateProfile, unlocked: boolean, proA
 
 export type CardRow = {
   candidate: CandidateProfile;
-  relation: Pick<CandidateRelation, "proposal" | "expired" | "pendingMeetingAt"> | null;
+  relation: Pick<CandidateRelation, "proposal" | "expired" | "pendingMeetingAt" | "meetingOpen"> | null;
   presence: string | null;
   interested: boolean;
   shortlisted: boolean;
@@ -88,7 +88,7 @@ export function toResultsWire(data: CandidatesData, filters: Filters): ResultsWi
       const unlocked = data.nameUnlocked.has(candidate.id);
       return {
         candidate: cardCandidate(candidate, unlocked, data.pro.active),
-        relation: rel ? { proposal: rel.proposal, expired: rel.expired, pendingMeetingAt: rel.pendingMeetingAt } : null,
+        relation: rel ? { proposal: rel.proposal, expired: rel.expired, pendingMeetingAt: rel.pendingMeetingAt, meetingOpen: rel.meetingOpen } : null,
         presence: data.presence[candidate.id] ?? null,
         interested: data.saved.has(candidate.id),
         shortlisted: data.shortlisted.has(candidate.id),

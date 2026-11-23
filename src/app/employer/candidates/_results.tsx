@@ -181,6 +181,7 @@ export function Results({
                   presence={data.presence[candidate.id] ?? null}
                   interested={data.saved.has(candidate.id)}
                   pendingMeetingAt={rel?.pendingMeetingAt ?? null}
+                  meetingOpen={rel?.meetingOpen ?? false}
                   layout={filters.view}
                 />
               );

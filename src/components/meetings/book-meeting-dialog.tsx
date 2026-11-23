@@ -217,7 +217,7 @@ function BookMeetingForm({
   );
 }
 
-/** A "Book meeting" button that owns its dialog. With `meetingOpen` the pair already has a live meeting: shown disabled. */
+/** A "Book meeting" button that owns its dialog. With `meetingOpen` (hasOpenMeeting) the pair already has an open meeting: shown dimmed and not clickable, same name. */
 export function BookMeetingButton({
   size = "sm",
   variant = "outline",
@@ -231,11 +231,12 @@ export function BookMeetingButton({
       <button
         type="button"
         disabled={meetingOpen}
-        onClick={() => setOpen(true)}
+        aria-disabled={meetingOpen || undefined}
+        onClick={() => !meetingOpen && setOpen(true)}
         className={buttonClass({ variant, size, className: ["min-h-11", className].filter(Boolean).join(" ") })}
       >
         <CalendarPlus className="size-4" aria-hidden />
-        {meetingOpen ? "Meeting open" : "Book meeting"}
+        Book meeting
       </button>
       <BookMeetingDialog {...props} open={open} onOpenChange={setOpen} />
     </>

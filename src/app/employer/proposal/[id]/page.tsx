@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull } from "drizzle-orm";
 import { Clock } from "lucide-react";
 
 import { getDb, schema } from "@/lib/db";
@@ -10,7 +10,7 @@ import { canAccess } from "@/lib/security/guards";
 import { initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
 import { formatDate as formatWords, formatMoney, formatSlotTime } from "@/lib/format";
-import { interviewStage, meetingTime } from "@/lib/employer-interview-rules";
+import { hasOpenMeeting, interviewStage, meetingTime } from "@/lib/employer-interview-rules";
 import { serializeJoinInput } from "@/lib/interview-join";
 import { JoinMeetingButton } from "@/components/employer/meeting-join";
 import { fullTimeFeeMinor, fullTimeRate, hireFeeMinor } from "@/lib/checkout";
@@ -149,6 +149,8 @@ export default async function EmployerProposalDetail({
 
   // The booked interview with this candidate that is still ahead or running, so it can be joined from here (bug sheet 12 Nov, row 12).
   let interview: typeof schema.interviews.$inferSelect | null = null;
+  // Any open meeting with them (offered or booked, any project): "Book meeting" is dimmed while one is open.
+  let meetingOpen = false;
   try {
     const rows = await getDb()
       .select()
@@ -157,13 +159,15 @@ export default async function EmployerProposalDetail({
         and(
           eq(schema.interviews.employerId, proposal.employerId),
           eq(schema.interviews.internId, proposal.internId),
-          eq(schema.interviews.status, "scheduled"),
+          inArray(schema.interviews.status, ["pending", "scheduled"]),
         ),
       )
       .orderBy(desc(schema.interviews.createdAt));
+    meetingOpen = hasOpenMeeting(rows);
     interview =
       rows.find(
         (iv) =>
+          iv.status === "scheduled" &&
           (!iv.projectId || !proposal.projectId || iv.projectId === proposal.projectId) && ["upcoming", "live"].includes(interviewStage(iv)),
       ) ?? null;
   } catch (err) {
@@ -322,7 +326,7 @@ export default async function EmployerProposalDetail({
       sendNewHref={sendNewHref}
       bookMeeting={
         projectDown ? null : (
-          <BookMeetingButton internId={proposal.internId} projectId={proposal.projectId} projectName={projectName} candidateLabel={internName} meetingOpen={Boolean(interview)} className="max-sm:w-full" />
+          <BookMeetingButton internId={proposal.internId} projectId={proposal.projectId} projectName={projectName} candidateLabel={internName} meetingOpen={meetingOpen} className="max-sm:w-full" />
         )
       }
       takedown={projectDown ? <TakedownBanner projects={[{ id: projectDown.id, name: projectName ?? "This project", reason: projectDown.reason }]} /> : null}

@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, BriefcaseBusiness, CalendarCheck, CreditCard, Download, FileText } from "lucide-react";
+import { AlertTriangle, BriefcaseBusiness, CalendarCheck, CalendarPlus, CreditCard, Download, FileText } from "lucide-react";
 
 import { Pill } from "@/components/app/primitives";
 import { Avatar } from "@/components/app/avatar";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { FullTimeOfferButton } from "@/components/employer/full-time-offer-button";
 import { RowMenu } from "@/components/app/row-menu";
+import { BookMeetingDialog } from "@/components/meetings/book-meeting-dialog";
 import { downloadCsv } from "@/lib/admin/csv";
 import { formatDate, formatMoney } from "@/lib/format";
 import { filterHires } from "@/lib/orders-filter";
@@ -78,6 +79,8 @@ export function HiresPanel({
 }) {
   // The full-time offer dialog, opened from a row's menu.
   const [ftFor, setFtFor] = useState<string | null>(null);
+  // The Book meeting dialog, opened from a row's menu.
+  const [meetFor, setMeetFor] = useState<HireRow | null>(null);
   const [q, setQ] = useState("");
   const rows = useMemo(() => filterHires(hires, q), [hires, q]);
   // Same rule as each row's "pay offline" line, over the rows shown.
@@ -313,6 +316,7 @@ export function HiresPanel({
                         ...(due && !h.fullTime ? [{ label: "Timesheets", href: timesheets, icon: <CalendarCheck /> }] : []),
                         ...(due || !h.fullTime ? [{ label: "Contract", href: contract, icon: <FileText /> }] : []),
                         ...(h.canOfferFullTime ? [{ label: "Full-time offer", onSelect: () => setFtFor(h.proposalId), icon: <BriefcaseBusiness /> }] : []),
+                        { label: "Book meeting", onSelect: () => setMeetFor(h), icon: <CalendarPlus />, disabled: h.meetingOpen },
                       ]}
                     />
                     {h.canOfferFullTime ? (
@@ -333,6 +337,16 @@ export function HiresPanel({
           </ul>
           </div>
           </div>
+          {meetFor ? (
+            <BookMeetingDialog
+              open
+              onOpenChange={(o) => !o && setMeetFor(null)}
+              internId={meetFor.internId}
+              projectId={meetFor.projectId}
+              projectName={meetFor.projectName}
+              candidateLabel={meetFor.candidateName}
+            />
+          ) : null}
         </>
       )}
     </div>
