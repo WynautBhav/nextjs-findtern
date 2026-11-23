@@ -1,3 +1,5 @@
+import { z } from "zod";
+
 /**
  * Discount rules shared by promo create and edit. Edit sends only the fields that changed, so the
  * check runs on the row as it will be after the edit ({ ...existing, ...sent }).
@@ -6,6 +8,16 @@ export type PromoDiscountInput = {
   discountType?: string | null;
   discountValue?: number | null;
   appliesTo?: string | null;
+};
+
+/** The promo columns are 32-bit integers: a larger number used to reach the insert and come back as an empty 500. */
+const PG_INT_MAX = 2_147_483_647;
+
+/** Zod fields for the promo numbers, shared by create and edit (the whole-number and sign rules, plus the column limit). */
+export const promoNumberFields = {
+  discountValue: z.number("Enter a discount value").int("Discount must be a whole number").positive("Discount must be greater than 0").max(PG_INT_MAX, "Discount is too large"),
+  maxUsages: z.number().int().positive("Max uses must be at least 1").max(PG_INT_MAX, "Max uses is too large"),
+  minOrderAmountMinor: z.number().int().min(0, "Minimum order can't be negative").max(PG_INT_MAX, "Minimum order is too large"),
 };
 
 /** A reason the discount is not allowed, or null. */

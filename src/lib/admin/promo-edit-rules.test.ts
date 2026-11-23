@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { fullDiscountUsesWaiver, promoCodeProblem, promoDiscountProblem } from "./promo-edit-rules.ts";
+import { fullDiscountUsesWaiver, promoCodeProblem, promoDiscountProblem, promoNumberFields } from "./promo-edit-rules.ts";
 
 test("a percentage above 100 is refused", () => {
   assert.match(promoDiscountProblem({ discountType: "percentage", discountValue: 150, appliesTo: "intern" }) ?? "", /more than 100/);
@@ -58,5 +58,18 @@ test("a 100% code for any audience but intern is made as a full-waiver code, the
   for (const appliesTo of ["intern", "employer", "both", "subscription"]) {
     const input = { discountType: "percentage", discountValue: 100, appliesTo };
     assert.ok(fullDiscountUsesWaiver(input) || promoDiscountProblem(input) === null, appliesTo);
+  }
+});
+
+// The columns are 32-bit integers: a bigger number used to reach the insert and come back as an empty 500.
+test("promo numbers above the integer column are refused with a message, not stored", () => {
+  const max = 2_147_483_647;
+  assert.equal(promoNumberFields.discountValue.safeParse(max).success, true);
+  assert.equal(promoNumberFields.maxUsages.safeParse(max).success, true);
+  assert.equal(promoNumberFields.minOrderAmountMinor.safeParse(max).success, true);
+  for (const [name, schema] of Object.entries(promoNumberFields)) {
+    const r = schema.safeParse(max + 1);
+    assert.equal(r.success, false, name);
+    assert.match(r.success ? "" : r.error.issues[0].message, /too large|at most/i, name);
   }
 });

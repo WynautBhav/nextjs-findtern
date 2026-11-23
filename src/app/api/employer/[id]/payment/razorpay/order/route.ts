@@ -7,7 +7,7 @@ import { z } from "zod";
 
 import { withLock, type Tx } from "@/lib/advisory-lock";
 import { getDb, schema } from "@/lib/db";
-import { paymentIndexMismatch } from "@/lib/dues";
+import { paymentIndexRefusal } from "@/lib/dues";
 import { hireGateLines, profileCompleteForHire, profileIncompleteBody } from "@/lib/hire-gate";
 import { requireMutation } from "@/lib/guards-mutation";
 import { assertProposalActionable } from "@/lib/projects/takedown-guard-server";
@@ -179,9 +179,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   // A new hire on an offer that is on hold (the intern's account is frozen) waits; a due month of a running hire keeps going.
   if (hireIds.length > 0 && (await heldProposalIds(getDb(), hireIds)).size > 0) return NextResponse.json(ON_HOLD_REFUSAL, { status: 409 });
   // Never re-price a repeat submit as the next month: refuse when the month asked for is not the one due.
-  if (paymentIndexMismatch(paying, parsed.data.paymentIndex)) {
-    return NextResponse.json({ error: "This month is already paid. Refresh the page to see it under Orders." }, { status: 409 });
-  }
+  const wrongMonth = paymentIndexRefusal(paying, parsed.data.paymentIndex);
+  if (wrongMonth) return NextResponse.json({ error: wrongMonth }, { status: 409 });
   // An incomplete profile cannot be hired, so no order opens for it: before any gateway call, and before the waiver branch below
   // settles one with no payment at all. Every new hire, full-time included (settlement marks it Hired); a due month is a hire that
   // already happened. Settlement is deliberately not gated: by then money has been taken.

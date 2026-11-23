@@ -81,10 +81,19 @@ export function paymentPromo(raw: unknown, fallback?: unknown, amountMinor?: num
  * "Discount (10%)" for the upfront-payment discount, which has no code; a
  * coded discount names the code.
  */
-export function discountLabel(promo: PaymentPromo, amountMinor: number): string | null {
+export function discountLabel(promo: PaymentPromo, amountMinor: number, feeMinor = 0): string | null {
   if (promo.code) return promo.code;
   if (promo.discountMinor <= 0) return null;
-  const before = amountMinor + promo.discountMinor;
+  // The one-time hiring fee is never discounted, so the percentage is of the charges without it.
+  const before = Math.max(0, amountMinor + promo.discountMinor - feeMinor);
   const pct = before > 0 ? Math.round((promo.discountMinor / before) * 100) : 0;
   return pct > 0 ? `Discount (${pct}%)` : "Discount";
+}
+
+/** The one-time hiring fee an employer order recorded (`notes.perHireFeeMinor`), summed over its hires; 0 for older orders. */
+export function paymentFeeMinor(raw: unknown): number {
+  const r = bag(raw);
+  const order = bag(r.order);
+  const notes = Object.keys(bag(order.notes)).length ? bag(order.notes) : bag(r.notes);
+  return Object.values(bag(notes.perHireFeeMinor)).reduce<number>((sum, v) => sum + (minor(v) ?? 0), 0);
 }

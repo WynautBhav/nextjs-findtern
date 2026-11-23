@@ -186,3 +186,19 @@ test("admin print: an intern-fee row keeps the single SAC 999293 line, no employ
   const emp = adminInvoiceInput({ ...row, invoiceLines: [{ label: "Asha K - Designer", amountMinor: 49900 }], invoiceDescription: "Intern hiring services" }, "employer", seller);
   assert.match(taxInvoiceHtml(emp), /SAC 998519/);
 });
+
+test("an upfront discount with no code: the discount row carries it, so the stipend line does not claim to be after it, and the % is of the charges without the fee", () => {
+  // 3 x 10,000 of stipend + 5,000 fee; 10% off the stipend = 3,000; paid 32,000
+  const p = pay({
+    id: "up1",
+    orderId: "order_up",
+    amountMinor: 3_200_000,
+    raw: { notes: { proposalIds: ["prop1"], paymentMode: "total", perHireFeeMinor: { prop1: 500_000 }, upfrontDiscountMinor: { prop1: 300_000 }, discountAmountMinor: 300_000 } },
+  });
+  const inv = employerInvoice({ payment: p, allPayments: [p], legacyPaid: [], hires });
+  assert.doesNotMatch(inv.lines[0].detail ?? "", /after an upfront discount/);
+  assert.deepEqual(inv.promo, { code: "Discount (10%)", discountMinor: 300_000 });
+  // a coded promo on top: the stipend line is after the upfront discount and before the code, so it keeps saying so
+  const coded = pay({ ...p, id: "up2", orderId: "order_up2", raw: { ...p.raw as object, promo: { promoCode: "ACME10", discountMinor: 100_000 } } });
+  assert.match(employerInvoice({ payment: coded, allPayments: [coded], legacyPaid: [], hires }).lines[0].detail ?? "", /after an upfront discount of ₹3,000/);
+});

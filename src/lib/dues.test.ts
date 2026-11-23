@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { monthlyDues, paymentIndexMismatch, placementLedger } from "./dues.ts";
+import { monthlyDues, paymentIndexMismatch, paymentIndexRefusal, placementLedger } from "./dues.ts";
 import { engagementEndOn, postpaidDueOn } from "./billing-plan.ts";
 
 test("paymentIndexMismatch: a repeat submit for a paid month is refused, not re-priced", () => {
@@ -44,4 +44,36 @@ test("placementLedger: the next month comes from paid instalments, never from to
   const l = placementLedger(waivedHire, [noFirstMonth]);
   assert.deepEqual([l.monthsPaid, l.nextDue], [0, "2026-12-21"]); // fee only: month 1 is next
   assert.deepEqual(monthlyDues([waivedHire], [noFirstMonth]).map((d) => [d.monthsPaid, d.dueOn, d.payable]), [[0, "2026-12-21", true]]);
+});
+
+// A code that takes the whole price leaves nothing to pay: every month is covered, so the hire is Fully paid, not "No instalment paid".
+const waiverOrder = (extra: Record<string, unknown>) => ({
+  status: "paid",
+  paidAt: "2026-11-20T10:00:00Z",
+  raw: { notes: { proposalIds: ["p1"], ...extra }, promo: { promoCode: "FREE", discountMinor: 100_000_000 } },
+});
+
+test("placementLedger: a 3-month upfront hire waived in full is Fully paid at 3 of 3", () => {
+  const l = placementLedger(waivedHire, [waiverOrder({ paymentMode: "total" })]);
+  assert.deepEqual([l.totalMinor, l.paidMinor, l.dueMinor, l.monthsPaid, l.nextDue], [0, 0, 0, 3, null]);
+  assert.equal(l.status, "fully_paid");
+});
+
+test("placementLedger: a 1-month post-paid hire waived in full is Fully paid", () => {
+  const one = { ...waivedHire, offerDetails: { ...waivedHire.offerDetails, duration: "1m" } };
+  const l = placementLedger(one, [waiverOrder({ paymentMode: "hiring_fee", firstMonthProposalIds: ["p1"] })]);
+  assert.deepEqual([l.plan, l.dueMinor, l.monthsPaid], ["postpaid", 0, 1]);
+  assert.equal(l.status, "fully_paid");
+});
+
+test("placementLedger: a hire nothing has paid yet is still unpaid", () => {
+  assert.equal(placementLedger(waivedHire, []).status, "unpaid");
+});
+
+test("paymentIndexRefusal: a later month than the one due says an earlier month is due first; a paid month says already paid", () => {
+  assert.equal(paymentIndexRefusal([{ due: { monthsPaid: 1 } }], 1), null);
+  assert.match(paymentIndexRefusal([{ due: { monthsPaid: 1 } }], 2) ?? "", /earlier month is due first/);
+  assert.match(paymentIndexRefusal([{ due: null }], 2) ?? "", /earlier month is due first/);
+  assert.match(paymentIndexRefusal([{ due: { monthsPaid: 2 } }], 1) ?? "", /already paid/);
+  assert.match(paymentIndexRefusal([{ due: { monthsPaid: 1 } }], 0) ?? "", /already paid/);
 });

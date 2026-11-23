@@ -213,3 +213,15 @@ test("a foreign client's invoice prints no GST lines but still carries the SAC",
   assert.match(html, /Outside India \(export of services\)/);
   assert.match(html, /SAC 998519/);
 });
+
+test("the discount rows chain: price before, discount, price after (GST included), then the taxable value and taxes add to the total", () => {
+  const html = taxInvoiceHtml({ ...promoBase, amountMinor: 400_000, promo: { code: "WELCOME", discountMinor: 100_000 } });
+  const at = (re: RegExp) => html.search(re);
+  assert.match(html, /Price after discount<\/span><span>₹\s?4,000\.00/);
+  assert.ok(at(/Price before discount/) < at(/Promo code WELCOME/) && at(/Promo code WELCOME/) < at(/Price after discount/) && at(/Price after discount/) < at(/Taxable value/));
+  // no discount, no after row
+  assert.doesNotMatch(taxInvoiceHtml({ ...promoBase, amountMinor: 400_000 }), /Price after discount/);
+  // an export has no tax, so the taxable value already is the price after the discount
+  const exp = taxInvoiceHtml({ ...promoBase, buyer: { name: "Acme Inc", place: { kind: "export" as const } }, amountMinor: 400_000, promo: { code: "WELCOME", discountMinor: 100_000 } });
+  assert.doesNotMatch(exp, /Price after discount/);
+});
