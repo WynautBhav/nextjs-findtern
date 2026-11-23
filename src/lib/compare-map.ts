@@ -75,3 +75,8 @@ export function writeCompareMap(map: CompareMap, projectId: string, ids: string[
 export function serializeCompareMap(employerId: string, map: CompareMap): string | null {
   return Object.keys(map).length ? `${employerId}:${JSON.stringify(map)}` : null;
 }
+
+/** The picks `projectId` holds in a cookie value (empty when it holds none, or there is no project). */
+export function picksFor(raw: string | null | undefined, employerId: string, projectId: string | null, legacyProject?: string | null): string[] {
+  return (projectId && readCompareMap(raw, employerId, legacyProject)[projectId]) || [];
+}

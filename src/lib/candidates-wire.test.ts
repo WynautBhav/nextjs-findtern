@@ -180,3 +180,23 @@ test("one city only: a legacy list in the URL keeps its first city, and the matc
   assert.deepEqual(cityTerms(",Mumbai"), ["mumbai"]);
   assert.deepEqual(cityTerms(""), []);
 });
+
+test("CGPA and percentage cross the wire only for an employer with Pro", () => {
+  const free = JSON.stringify(toResultsWire(data(["a1"]), readFilters({})));
+  assert.equal(free.includes("8.1"), false, "score leaked to a non-Pro employer");
+  assert.equal(free.includes('"scoreType":"CGPA"'), false);
+  const pro = data(["a1"]);
+  pro.pro.active = true;
+  assert.equal(toResultsWire(pro, readFilters({})).rows[0].candidate.academics?.score, "8.1");
+  assert.equal(cardCandidate(profile("x"), false).academics?.score, "", "the default is closed");
+});
+
+test("every employer page that shows a score asks the Pro check first", () => {
+  const read = (p: string) => readFileSync(join(import.meta.dirname, "..", p), "utf8");
+  for (const file of ["app/employer/compare/page.tsx", "app/employer/intern/[id]/page.tsx"]) {
+    const src = read(file);
+    assert.match(src, /proAccess\(/, file);
+    assert.match(src, /withoutScoreUnlessPro\(/, file);
+  }
+  assert.match(read("app/employer/candidates/_results.tsx"), /cardCandidate\(candidate, .*data\.pro\.active\)/);
+});

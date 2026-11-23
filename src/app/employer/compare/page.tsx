@@ -7,7 +7,8 @@ import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { requireEmployerSetup } from "@/lib/employer-setup";
 import { formatDate, formatMoney } from "@/lib/format";
-import { RATING_META, displayNameOf, preferredCities, redactForEmployer, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { RATING_META, displayNameOf, preferredCities, redactForEmployer, toCandidateProfile, withoutScoreUnlessPro, type CandidateProfile } from "@/lib/employer-candidates";
+import { proAccess } from "@/lib/candidate-pro-access";
 import { shortlistProjectsByIntern } from "@/lib/employer-shortlist";
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
 import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
@@ -98,6 +99,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   };
   const db0 = getDb();
   const hiredP = early(hiredInternIds(db0, session.uid));
+  const proP = early(proAccess(session.uid));
   const projectsP = early(
     db0
       .select({
@@ -189,7 +191,9 @@ export default async function CompareCandidates({ searchParams }: { searchParams
         .map((row) => toCandidateProfile(row, onboardingByUser.get(row.id)));
       // Only the redacted profile leaves this block (no email, LinkedIn, recording; name only once hired), so
       // no child, server or client, can ever be handed the unredacted one.
-      const redacted = profiles.map((p) => redactForEmployer(p, nameUnlocked.has(p.id)));
+      // CGPA and percentage are Findtern Pro only: blanked here, so a free employer's page never carries them.
+      const proActive = await proP;
+      const redacted = profiles.map((p) => withoutScoreUnlessPro(redactForEmployer(p, nameUnlocked.has(p.id)), proActive));
       // Photos and the offer relations read together; a candidate already hired is dropped once the relations are in.
       const [rel] = await Promise.all([relP!, attachPhotos(db, redacted)]);
       relations = rel;

@@ -10,7 +10,7 @@ import { SkillFilter } from "@/components/employer/skill-filter";
 import { KeepFocusClear } from "@/components/app/keep-focus-clear";
 import { ResultsRegion } from "@/components/app/results-region";
 import { SURFACE_CLASS } from "@/components/app/primitives";
-import { RememberSelection } from "@/components/employer/remember-selection";
+import { RememberSelection, readComparePicks } from "@/components/employer/remember-selection";
 import { HireFlow } from "@/components/employer/hire-flow";
 import { cn } from "@/lib/utils";
 import { FilterColumn } from "./_filters";
@@ -66,7 +66,7 @@ export function CandidatesApp({
     return true;
   });
   const picks = useComparePicks();
-  if (hydrated && seeded && picks.project !== data.activeProjectId && getPicks().project !== data.activeProjectId) seedPicks(data.activeProjectId, filters.ids);
+  if (hydrated && seeded && picks.project !== data.activeProjectId && getPicks().project !== data.activeProjectId) seedPicks(data.activeProjectId, readComparePicks(uid, data.activeProjectId));
   const compareIds = hydrated ? picks.ids : initial.wire.filters.ids;
   const view = useMemo(() => ({ ...filters, ids: compareIds }), [filters, compareIds]);
 
@@ -193,7 +193,7 @@ export function CandidatesApp({
 
           {/* Phones: the compare tray sits over the bottom nav, so the last row needs room to scroll clear of it. */}
           <div className={cn("min-w-0 lg:pl-8", compareIds.length >= 1 ? "pb-40 lg:pb-24" : "max-lg:pb-20")}>
-            <RememberSelection employerId={uid} project={activeProjectId} compare={compareIds} filters={loadFailed ? undefined : rememberQueryOf(filters)} />
+            <RememberSelection employerId={uid} project={activeProjectId} compare={hydrated && picks.project !== activeProjectId ? undefined : compareIds} filters={loadFailed ? undefined : rememberQueryOf(filters)} />
 
             {compareIds.length >= 1 ? (
               <div

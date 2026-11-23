@@ -6,7 +6,8 @@ import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
 import { candidateRelations, isAdminViewing, type CandidateRelation } from "@/lib/employer-visibility";
 import { PLAN_NAME, bandFor } from "@/lib/score";
-import { RATING_META, displayNameOf, isCatalogSkill, toCandidateProfile, type CandidateProfile } from "@/lib/employer-candidates";
+import { RATING_META, displayNameOf, isCatalogSkill, toCandidateProfile, withoutScoreUnlessPro, type CandidateProfile } from "@/lib/employer-candidates";
+import { proAccess } from "@/lib/candidate-pro-access";
 import { hideContactText } from "@/lib/contact-scrub";
 import { employerRegion, resolvePricing } from "@/lib/employer-pricing";
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
@@ -235,7 +236,8 @@ export default async function EmployerInternDetail({
         .orderBy(desc(schema.internOnboarding.updatedAt))
         .limit(1);
 
-      profile = toCandidateProfile(user, onboarding);
+      // CGPA and percentage are Findtern Pro only: blanked here, before the profile goes to any component.
+      profile = withoutScoreUnlessPro(toCandidateProfile(user, onboarding), await proAccess(employerId));
       // Photo shows before hire (owner, 6 Nov); the name stays initials until hired.
       await attachPhotos(db, [profile]);
       presence = (await presenceOf([profile.id]).catch(() => ({} as Record<string, PresenceLabel | null>)))[profile.id] ?? null;

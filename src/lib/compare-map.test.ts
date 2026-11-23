@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { MAX_COMPARE, MAX_COMPARE_PROJECTS, parseIds, readCompareMap, serializeCompareMap, writeCompareMap } from "./compare-map.ts";
+import { MAX_COMPARE, MAX_COMPARE_PROJECTS, parseIds, picksFor, readCompareMap, serializeCompareMap, writeCompareMap } from "./compare-map.ts";
 
 const E = "emp1";
 
@@ -55,4 +55,19 @@ test("the old one-list cookie goes to the project that was open, or is dropped",
   assert.deepEqual(readCompareMap(`${E}:a,b,c`, E, "p1"), { p1: ["a", "b", "c"] });
   assert.deepEqual(readCompareMap(`${E}:a,b`, E, null), {});
   assert.deepEqual(readCompareMap(`${E}:`, E, "p1"), {});
+});
+
+test("a project's picks survive picking in another project and switching back", () => {
+  // The browser's cookie, after the same writes RememberSelection / the tick make.
+  let cookie: string | null = serializeCompareMap(E, writeCompareMap({}, "A", ["a", "b"]));
+  assert.deepEqual(picksFor(cookie, E, "A"), ["a", "b"]);
+  assert.deepEqual(picksFor(cookie, E, "B"), [], "B starts empty");
+  cookie = serializeCompareMap(E, writeCompareMap(readCompareMap(cookie, E), "B", ["c"]));
+  assert.deepEqual(picksFor(cookie, E, "B"), ["c"]);
+  assert.deepEqual(picksFor(cookie, E, "A"), ["a", "b"], "A is remembered");
+  // Opening B with no picks writes nothing for A.
+  cookie = serializeCompareMap(E, writeCompareMap(readCompareMap(cookie, E), "B", []));
+  assert.deepEqual(picksFor(cookie, E, "A"), ["a", "b"]);
+  assert.deepEqual(picksFor(cookie, E, null), []);
+  assert.deepEqual(picksFor(undefined, E, "A"), []);
 });
