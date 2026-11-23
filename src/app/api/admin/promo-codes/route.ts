@@ -3,7 +3,9 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { recordAdminAudit } from "@/lib/admin/audit";
-import { promoCodeProblem, promoDiscountProblem } from "@/lib/admin/promo-edit-rules";
+import { allows } from "@/lib/admin/permissions";
+import { loadPromoPrices } from "@/lib/admin/promo-prices";
+import { FREE_CODE_NEEDS_FINANCE, promoCodeProblem, promoDiscountProblem, promoMakesFree } from "@/lib/admin/promo-edit-rules";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
@@ -42,6 +44,11 @@ export async function POST(req: Request) {
 
   const bad = promoCodeProblem(parsed.data.code) ?? promoDiscountProblem(parsed.data);
   if (bad) return NextResponse.json({ error: bad }, { status: 400 });
+
+  // A code that makes the price zero (100%, or a fixed amount at or above it) is finance's call, like a full-waiver code.
+  if (!allows(guard.session.permissions, ["transactions:write"]) && promoMakesFree(parsed.data, await loadPromoPrices())) {
+    return NextResponse.json({ error: FREE_CODE_NEEDS_FINANCE }, { status: 403 });
+  }
 
   const window = promoWindowProblem(
     parsed.data.validFrom ? new Date(parsed.data.validFrom) : null,

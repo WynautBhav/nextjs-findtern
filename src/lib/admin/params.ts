@@ -20,13 +20,16 @@ export type RawSearchParams = Record<string, string | string[] | undefined>;
 export function flattenParams(raw: RawSearchParams | undefined): Record<string, string> {
   const out: Record<string, string> = {};
   if (!raw) return out;
+  // A NUL byte (?q=a%00b) is never valid text for Postgres: it would fail the query and blank the page, so it is dropped here, once, for every filter.
+  const clean = (v: string) => v.replaceAll("\u0000", "");
   for (const [key, value] of Object.entries(raw)) {
-    if (typeof value === "string") out[key] = value;
-    else if (Array.isArray(value) && typeof value[0] === "string") out[key] = value[0];
+    if (typeof value === "string") out[key] = clean(value);
+    else if (Array.isArray(value) && typeof value[0] === "string") out[key] = clean(value[0]);
   }
   return out;
 }
 
+export const MAX_PAGE = 1_000_000;
 export const PER_PAGE_OPTIONS = [10, 25, 50, 100] as const;
 
 /**
@@ -43,10 +46,11 @@ export function parsePageRequest(params: Record<string, string>): {
   search: string;
   set: (key: string, value: string | null) => Record<string, string>;
 } {
-  const page = Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1);
+  // Capped: `?page=99999999999999999999` parses to 1e20, an OFFSET Postgres rejects. Past the last page the pages redirect back.
+  const page = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(params.page ?? "1", 10) || 1));
   const rawPer = Number.parseInt(params.per ?? "25", 10) || 25;
   const perPage = (PER_PAGE_OPTIONS as readonly number[]).includes(rawPer) ? rawPer : 25;
-  const search = (params.q ?? "").trim();
+  const search = (params.q ?? "").replaceAll("\u0000", "").trim();
 
   return {
     page,

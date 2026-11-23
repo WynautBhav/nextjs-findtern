@@ -178,3 +178,14 @@ test("a check on file refuses a cleared score, and writes nothing", async () => 
   assert.deepEqual(F().extra, extra);
   assert.equal(F().audits.length, 0);
 });
+
+test("with several onboarding rows the edit reads the newest one (the row the hire gate and the list read)", async () => {
+  const { PgDialect } = await import("drizzle-orm/pg-core");
+  fakes.reset();
+  F().extra = prodExtra();
+  await put(fix);
+  const order = F().orderBy as unknown[] | undefined;
+  assert.ok(order && order.length >= 1, "the onboarding read must be ordered");
+  const text = order.map((c) => new PgDialect().sqlToQuery(c as never).sql).join(" ");
+  assert.match(text, /"created_at" desc/);
+});

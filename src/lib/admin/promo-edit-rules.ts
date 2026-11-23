@@ -36,3 +36,28 @@ export function promoCodeProblem(code: string): string | null {
   if (!/^[A-Z0-9_-]+$/.test(c)) return "Code can use letters, numbers, - and _ only";
   return null;
 }
+
+/** Why a non-finance admin may not touch a code that makes a payment free (create, edit, switch on or delete). */
+export const FREE_CODE_NEEDS_FINANCE = "A code that makes a payment free needs the Accounts permission (record payouts and promo codes).";
+
+/** The list prices (paise, as the order is built) a fixed code is compared with: the intern activation fee and the subscription price. */
+export type PromoPrices = { activationMinor: number; subscriptionMinor: number };
+
+/**
+ * Does this code take a whole payment to zero? A full waiver, a 100% code or a fixed amount at or above the price of the
+ * payment it is for. Employer hiring codes never do: the hiring charge is always paid, and a fixed one is refused at quote
+ * time when it would cover the stipend. A missing audience reads as "both" (intern and employer), as at redemption.
+ */
+export function promoMakesFree(
+  { discountType, discountValue, appliesTo }: PromoDiscountInput,
+  prices: PromoPrices,
+): boolean {
+  if (discountType === "full_waiver") return true;
+  const value = discountValue ?? 0;
+  if (discountType === "percentage") return value >= 100;
+  if (discountType !== "fixed") return false;
+  const scope = appliesTo ?? "both";
+  if (scope === "subscription") return value >= prices.subscriptionMinor;
+  if (scope === "intern" || scope === "both") return value >= prices.activationMinor;
+  return false;
+}

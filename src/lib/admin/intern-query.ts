@@ -7,6 +7,7 @@ import { loadCompleteProfileIds } from "@/lib/admin/profile-state-load";
 import { aiInterviewAt, aiInterviewStatus, findternScoreSql } from "@/lib/admin/scope";
 import { loadLedgerByIntern, loadPlacementDues, type PlacementDueRow } from "@/lib/admin/payout-list";
 import { activeAccountSql } from "@/lib/admin/account-views";
+import { latestOnboardingJoin } from "@/lib/admin/latest-onboarding";
 import { maskTail } from "@/lib/admin/identity-mask";
 import { courseExpr, courseFilterSql, courseOptions, parseCourse } from "@/lib/admin/intern-course";
 import { internMoney, matchesDue, todayIstIso, type DueFilter, type InternMoney } from "@/lib/admin/intern-list";
@@ -171,7 +172,7 @@ export async function loadInterns(
               : [dir === "asc" ? asc(u.createdAt) : desc(u.createdAt)];
 
   if (opts.maxRows != null) {
-    const [c] = await db.select({ c: count() }).from(u).leftJoin(o, eq(o.userId, u.id)).where(where);
+    const [c] = await db.select({ c: count() }).from(u).leftJoin(o, latestOnboardingJoin(o, u.id)).where(where);
     if (Number(c?.c ?? 0) > opts.maxRows) return { rows: [] as InternRow[], total: Number(c?.c ?? 0), signups: 0, incomplete: 0 };
   }
 
@@ -209,17 +210,17 @@ export async function loadInterns(
           : {}),
       })
       .from(u)
-      .leftJoin(o, eq(o.userId, u.id))
+      .leftJoin(o, latestOnboardingJoin(o, u.id))
       .where(where)
       .orderBy(...orderBy, desc(u.id))
       .limit(req.limit)
       .offset(req.offset),
-    db.select({ c: count() }).from(u).leftJoin(o, eq(o.userId, u.id)).where(where),
+    db.select({ c: count() }).from(u).leftJoin(o, latestOnboardingJoin(o, u.id)).where(where),
     db.select({ c: count() }).from(u).where(eq(u.role, "intern")),
     db
       .select({ c: count() })
       .from(u)
-      .leftJoin(o, eq(o.userId, u.id))
+      .leftJoin(o, latestOnboardingJoin(o, u.id))
       .where(and(eq(u.role, "intern"), profileIncomplete)),
   ]);
 
