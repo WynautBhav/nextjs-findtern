@@ -1,4 +1,5 @@
 import { withPgTransaction } from "@/lib/db/pg-tx";
+import { codeUnusableSql } from "./code-eligibility";
 import { buildOutboxRows, insertRows } from "@/lib/outbox";
 import { planRecipients } from "@/lib/outbox/run";
 
@@ -12,7 +13,7 @@ export async function queueCodeEmails(orderId: string, adminId: string, opts: { 
     const ents = await c.query(
       `SELECT e.id AS entry_id, e.college_email_norm AS email, e.intern_id AS intern_id, dc.id AS code_id, dc.status AS code_status
          FROM drive_roster_entries e LEFT JOIN drive_codes dc ON dc.entry_id = e.id
-        WHERE e.order_id = $1 ORDER BY e.row_no`,
+        WHERE e.order_id = $1 AND NOT ${codeUnusableSql("e", "(SELECT o2.college_id FROM college_drive_orders o2 WHERE o2.id = $1)")} ORDER BY e.row_no`,
       [orderId],
     );
     const ex = await c.query(

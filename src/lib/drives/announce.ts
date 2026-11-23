@@ -2,6 +2,7 @@ import { getDb } from "@/lib/db";
 import { notify } from "@/lib/notify";
 import { SITE_URL } from "@/lib/seo";
 
+import { codeUnusableSql } from "./code-eligibility";
 import { queueCodeEmails } from "./campaign";
 
 /**
@@ -19,7 +20,7 @@ export async function announceConfirmed(importId: string, adminId: string): Prom
          JOIN drive_codes k ON k.entry_id = e.id AND k.status = 'issued'
          JOIN college_drive_orders o ON o.id = e.order_id
          JOIN colleges c ON c.id = o.college_id
-        WHERE e.import_id = $1 AND e.state = 'valid' AND e.intern_id IS NOT NULL`,
+        WHERE e.import_id = $1 AND e.state = 'valid' AND e.intern_id IS NOT NULL AND NOT ${codeUnusableSql("e", "o.college_id")}`,
       [importId],
     );
     for (const row of r.rows) {
