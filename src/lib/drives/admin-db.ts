@@ -19,7 +19,7 @@ import { planConfirm } from "./import/plan.ts";
 import { readRosterRows } from "./import/read.ts";
 import { validateRows } from "./import/validate.ts";
 import {
-  MAX_IMPORT_ROWS, PREVIEW_ROWS, applyExisting, confirmProblem, countStates, emailFromKey, entryEmailKey, planIdentityDecision, planPaid, sameMapping, seatBatchForOrder, validateMapping,
+  MAX_IMPORT_ROWS, PREVIEW_ROWS, applyExisting, confirmProblem, countStates, emailFromKey, entryEmailKey, invoiceNeeded, planIdentityDecision, rosterLinkBlock, planPaid, sameMapping, seatBatchForOrder, validateMapping,
   type EntryCounts,
 } from "./admin-rules.ts";
 
@@ -136,12 +136,16 @@ export async function markOrderPaid(input: { orderId: string; method: string; re
     );
     const seatBatchId = String(batch.rows[0].id);
     // Same GST serial as every other seat batch, taken in this transaction so a rollback returns it.
-    const counter = await c.query(
-      "INSERT INTO invoice_counters (fy, last) VALUES ($1, 1) ON CONFLICT (fy) DO UPDATE SET last = invoice_counters.last + 1, updated_at = now() RETURNING last",
-      [financialYear(now)],
-    );
-    const invoiceNumber = formatInvoiceNumber(now, Number(counter.rows[0].last));
-    await c.query("UPDATE college_seat_batches SET invoice_number = $2 WHERE id = $1 AND invoice_number IS NULL", [seatBatchId, invoiceNumber]);
+    // A batch with nothing to pay (the carried-over credit covers the whole order) is not a supply: no invoice, so no serial is spent (employer orders follow the same rule).
+    let invoiceNumber: string | null = null;
+    if (invoiceNeeded(b.amountMinor)) {
+      const counter = await c.query(
+        "INSERT INTO invoice_counters (fy, last) VALUES ($1, 1) ON CONFLICT (fy) DO UPDATE SET last = invoice_counters.last + 1, updated_at = now() RETURNING last",
+        [financialYear(now)],
+      );
+      invoiceNumber = formatInvoiceNumber(now, Number(counter.rows[0].last));
+      await c.query("UPDATE college_seat_batches SET invoice_number = $2 WHERE id = $1 AND invoice_number IS NULL", [seatBatchId, invoiceNumber]);
+    }
     const linked = await c.query("UPDATE college_drive_orders SET seat_batch_id = $2 WHERE id = $1 RETURNING *", [input.orderId, seatBatchId]);
     const order = orderDto(linked.rows[0]);
     let activated = false;
@@ -309,7 +313,19 @@ export async function confirmImport(input: { importId: string; adminId: string }
 
     for (const m of matches) await c.query("UPDATE drive_roster_entries SET match = $2::jsonb WHERE id = $1", [byRow.get(m.rowNo)!.id, JSON.stringify(m.match)]);
     let linked = 0;
+    const linkIds = plan.link.map((l) => l.internId);
+    const state = await c.query(
+      `SELECT u.id, m.college_id, m.left_at, EXISTS (SELECT 1 FROM college_denials d WHERE d.college_id = $2 AND d.user_id = u.id) AS denied
+         FROM users u LEFT JOIN college_memberships m ON m.user_id = u.id WHERE u.id = ANY($1::varchar[])`,
+      [linkIds, order.collegeId],
+    );
+    const blocked = new Set(
+      state.rows
+        .filter((r) => rosterLinkBlock(order.collegeId, { membership: r.college_id ? { collegeId: String(r.college_id), leftAt: (r.left_at as Date | null) ?? null } : null, denied: Boolean(r.denied) }) !== null)
+        .map((r) => String(r.id)),
+    );
     for (const l of plan.link) {
+      if (blocked.has(l.internId)) continue;
       const u = await c.query("UPDATE drive_roster_entries SET intern_id = $2 WHERE id = $1 AND intern_id IS NULL", [byRow.get(l.rowNo)!.id, l.internId]);
       if ((u.rowCount ?? 0) === 1) { linked += 1; await verifyMembership(c, l.internId, order.collegeId); }
     }

@@ -179,7 +179,8 @@ export async function redeemCollegePromo(input: { uid: string; typed: unknown })
   });
   if (refused) {
     if ("alreadyPaid" in refused && refused.alreadyPaid) return { ok: true, alreadyPaid: true, collegeName: null, kind: "promo" };
-    return { ok: false, status: 409, error: "A payment is already being completed. Give it a moment, then refresh.", reason: "busy", kind: "promo" };
+    // The refusal's own words: "last free seat is on a payment still open" for a capped code, "already being completed" for a double click.
+    return { ok: false, status: 409, error: "error" in refused ? refused.error : "A payment is already being completed. Give it a moment, then refresh.", reason: "busy", kind: "promo" };
   }
   const close = () =>
     getDb()

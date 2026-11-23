@@ -67,6 +67,13 @@ export async function redeemDriveCode(
     throw new RedeemRefused(403, "This code is not valid for your college");
   }
 
+  // A student the placement office denied cannot join this college by any route (the membership trigger would reject it as a 500).
+  const denied = await q(
+    "SELECT 1 FROM college_denials d JOIN college_drive_orders o ON o.college_id = d.college_id JOIN drive_codes c ON c.order_id = o.id WHERE c.code_hash = $1 AND d.user_id = $2",
+    [hashDriveCode(input.code, input.secret), input.internId],
+  );
+  if (denied.rowCount > 0) throw new RedeemRefused(403, "This code is not valid for your college");
+
   const mem = (await q("SELECT college_id, status FROM college_memberships WHERE user_id = $1 AND left_at IS NULL", [input.internId])).rows[0];
   let entitlementId = "";
   const tx: RedeemTx = {

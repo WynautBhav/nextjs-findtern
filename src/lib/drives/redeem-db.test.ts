@@ -14,12 +14,13 @@ test("entry binding", () => {
   assert.equal(entryBindingDecision("u2", "u1"), "refuse");
 });
 
-function fakeClient(opts: { entryIntern: string | null; codeStatus?: string; paid?: boolean; orderStatus?: string }) {
+function fakeClient(opts: { entryIntern: string | null; codeStatus?: string; paid?: boolean; orderStatus?: string; denied?: boolean }) {
   const log: string[] = [];
   const client = {
     async query(sql: string, params: unknown[] = []) {
       log.push(sql);
       const r = (rows: Record<string, unknown>[] = [], rowCount = rows.length) => ({ rows, rowCount });
+      if (sql.includes("FROM college_denials")) return r(opts.denied ? [{ "?column?": 1 }] : []);
       if (sql.includes("FOR UPDATE OF c")) return r([{ code_id: "k1", entry_id: "e1", intern_id: opts.entryIntern }]);
       if (sql.includes("FROM college_memberships")) return r();
       if (sql.startsWith("SELECT id, order_id")) {
@@ -43,6 +44,12 @@ const input = { code, internId: "u1", secret, now: new Date("2026-11-07T00:00:00
 test("someone else's entry is refused 403 before anything is written", async () => {
   const { client, log } = fakeClient({ entryIntern: "u2" });
   await assert.rejects(redeemDriveCode(client, input), (e) => e instanceof RedeemRefused && e.status === 403);
+  assert.ok(!log.some((s) => s.startsWith("UPDATE") || s.startsWith("INSERT")));
+});
+
+test("a student the placement office denied is refused 403 before anything is written (WP4-05: it was a 500 from the membership trigger)", async () => {
+  const { client, log } = fakeClient({ entryIntern: null, denied: true });
+  await assert.rejects(redeemDriveCode(client, input), (e) => e instanceof RedeemRefused && e.status === 403 && /not valid for your college/.test(e.publicMessage));
   assert.ok(!log.some((s) => s.startsWith("UPDATE") || s.startsWith("INSERT")));
 });
 

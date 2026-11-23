@@ -111,6 +111,28 @@ export function seatBatchForOrder(order: { id: string; collegeId: string; slots:
   };
 }
 
+export type LinkBlock = "denied" | "other_college" | "left";
+
+/**
+ * Whether confirm may tie a roster row to the matched account (and verify it into the college). Null: yes.
+ * Never for a student the placement office denied (only a restore brings them back), one who belongs to another
+ * college right now, or one who left THIS college (leaving is a decision; an import must not undo it).
+ * Such a row still gets its code; it just is not bound to that account, so nobody is told "accept your fee"
+ * for a seat they cannot take, and the code only works for whoever may actually use it.
+ */
+export function rosterLinkBlock(collegeId: string, a: { membership: { collegeId: string; leftAt: Date | null } | null; denied: boolean }): LinkBlock | null {
+  if (a.denied) return "denied";
+  const m = a.membership;
+  if (!m) return null;
+  if (m.collegeId === collegeId) return m.leftAt ? "left" : null;
+  return m.leftAt ? null : "other_college";
+}
+
+/** A seat batch gets a GST invoice (and a serial) only when money is due: a ₹0 batch (full credit) has nothing to tax. */
+export function invoiceNeeded(batchAmountMinor: number): boolean {
+  return batchAmountMinor > 0;
+}
+
 /** Regression guard for the retired college-code path: a batch that backs a drive order never raises the seat cap. */
 export function shouldRaiseSeatCap(batch: { driveOrderId: string | null | undefined }): boolean {
   return !batch.driveOrderId;
