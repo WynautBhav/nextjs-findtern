@@ -71,6 +71,12 @@ const adminRoutes = [
   { m: "POST", p: `/api/admin/drive-orders/${FAKE}/payment`, body: {}, cls: "money" },
   { m: "POST", p: `/api/admin/drive-orders/${FAKE}/campaign`, body: {}, cls: "company" },
   { m: "POST", p: `/api/admin/drive-orders/${FAKE}/imports`, body: {}, cls: "company" },
+  { m: "GET", p: `/api/admin/drive-orders/${FAKE}/campaign`, cls: "companyRead" },
+  { m: "GET", p: `/api/admin/drive-orders/${FAKE}/imports`, cls: "companyRead" },
+  { m: "POST", p: `/api/admin/drive-orders/${FAKE}/outbox/${FAKE2}/resend`, body: {}, cls: "company" },
+  { m: "GET", p: `/api/admin/imports/${FAKE}`, cls: "companyRead" },
+  { m: "POST", p: `/api/admin/imports/${FAKE}/confirm`, body: {}, cls: "company" },
+  { m: "POST", p: `/api/admin/identity-reviews/${FAKE}`, body: {}, cls: "company" },
   { m: "GET", p: "/api/admin/drive-overview", cls: "companyRead" },
   { m: "GET", p: "/api/admin/identity-reviews", cls: "companyRead" },
 ];
@@ -569,7 +575,7 @@ if (run("R1")) {
   const [s0] = await sql("select value from platform_settings where key='college_fee_per_student_minor'");
   const sPar = await Promise.all([1, 2].map(() => superAdmin.req("PUT", "/api/admin/colleges/settings", { json: { feePerStudentMinor: Number(s0?.value ?? 80000) } })));
   h.check("R1.settings-put-same-value-idempotent", sPar.every((r) => r.status === 200), sPar.map((r) => r.status).join());
-  const pp = await Promise.all([1, 2].map(() => superAdmin.req("PATCH", `/api/admin/colleges/${B}`, { json: { city: "Jaipur" } })));
+  const pp = await Promise.all([1, 2].map(() => superAdmin.req("PATCH", `/api/admin/colleges/${B}`, { json: { showOnWebsite: false } })));
   h.check("R1.college-patch-parallel", pp.every((r) => r.status === 200), pp.map((r) => r.status).join());
   // TPO routes
   const lk = await Promise.all([1, 2].map(() => tpoB.req("POST", `/api/college/drives/${F.driveB.id}/link`)));
