@@ -22,6 +22,8 @@ const secrets = [...new Set(everyone.flatMap((r) => [r.a, r.p, r.bank].filter((v
 const ids = claimed.map((c) => c.id);
 const verifiedNames = new Set((await db.query(`select lower(trim(u.first_name || ' ' || coalesce(u.last_name, ''))) n from college_memberships m join users u on u.id = m.user_id where m.status = 'verified' and m.left_at is null`)).rows.map((r) => r.n));
 const namesakes = new Set(claimed.filter((c) => verifiedNames.has(`${c.first_name} ${c.last_name ?? ""}`.trim().toLowerCase())).map((c) => c.id));
+// The seed stamps every presence row with the same now(): a claimed student's timestamp that a verified student also carries is not a leak.
+const verifiedSeen = new Set((await db.query(`select p.last_seen_at s from college_presence p join college_memberships m on m.user_id = p.user_id where m.status = 'verified' and m.left_at is null`)).rows.map((r) => new Date(r.s + "Z").toISOString().slice(0, 19)));
 const proposals = (await db.query(`select id from proposals where intern_id = any($1)`, [ids])).rows.map((r) => r.id);
 const meets = (await db.query(`select id from college_drive_meetings where user_id = any($1)`, [ids])).rows.map((r) => r.id);
 
@@ -37,7 +39,7 @@ for (const p of pages) {
   const what = [];
   for (const c of claimed) {
     if (c.linkedin && flat.includes(c.linkedin)) what.push(`${c.email} linkedin`);
-    if (c.seen) { const iso = new Date(c.seen + "Z").toISOString().slice(0, 19); if (flat.includes(iso)) what.push(`${c.email} lastSeenAt ${iso}`); }
+    if (c.seen) { const iso = new Date(c.seen + "Z").toISOString().slice(0, 19); if (!verifiedSeen.has(iso) && flat.includes(iso)) what.push(`${c.email} lastSeenAt ${iso}`); }
   }
   for (const v of [...proposals, ...meets]) if (flat.includes(v)) what.push(`internal id ${v}`);
   // Bounded: an 11-digit number must not be matched inside an SVG coordinate.
