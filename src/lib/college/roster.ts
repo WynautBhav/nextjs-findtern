@@ -15,12 +15,32 @@ const HEADERS: Record<keyof RosterInput, RegExp> = {
   phone: /phone|mobile|contact\s*(no|number)|whats\s*app|^cell$/i,
 };
 
-/** The last 10 digits of an Indian mobile number, or null when the cell is not one. */
+/**
+ * An Indian mobile as its 10 digits, or null. Accepted shapes: 10 digits, 0 + 10, 91 + 10, 091 + 10, 0091 + 10 (with
+ * spaces, dashes, brackets, a leading + or a spreadsheet's ".0" or leading apostrophe). Anything else is not a number
+ * we can trust: a +44 number, an 11-digit typo or a decimal is never cut down to its last ten digits.
+ */
 export function readPhone(raw: string): string | null {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length < 10 || digits.length > 13) return null;
-  const ten = digits.slice(-10);
-  return /^[6-9]/.test(ten) ? ten : null;
+  const s = raw.trim().replace(/^'/, "").replace(/^(\d+)\.0+$/, "$1");
+  if (/[^\d\s\-().+]/.test(s) || s.lastIndexOf("+") > 0) return null;
+  let d = s.replace(/\D/g, "");
+  if (s.startsWith("+") && !d.startsWith("91")) return null;
+  if (d.length === 14 && d.startsWith("0091")) d = d.slice(4);
+  else if (d.length === 13 && d.startsWith("091")) d = d.slice(3);
+  else if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
+  else if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
+  return /^[6-9]\d{9}$/.test(d) ? d : null;
+}
+
+/** Bytes of a roster file as text: UTF-8 (BOM dropped), UTF-16 with a BOM, else Windows-1252 (Excel's plain "CSV"). */
+export function decodeRosterBytes(bytes: Uint8Array): string {
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+  if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder("utf-16be").decode(bytes.subarray(2));
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^\uFEFF/, "");
+  } catch {
+    return new TextDecoder("windows-1252").decode(bytes);
+  }
 }
 
 /** ";" when the header line has more semicolons than commas and tabs (European-locale Excel exports). */
@@ -85,6 +105,9 @@ export function readYear(raw: string, isSemester = false): number | null {
 }
 
 const EMAIL = /^[^\s@;,]+@[^\s@;,]+\.[^\s@;,]+$/;
+const NOT_THE_STUDENT = /parent|guardian|father|mother|emergency|spouse/i;
+/** Zero-width and other format characters (ZWSP, ZWNJ, BOM, bidi marks): invisible in a sheet, fatal in an email match. */
+const INVISIBLE = /\p{Cf}/gu;
 
 export function parseRoster(text: string): { rows: RosterInput[]; errors: string[] } {
   const table = splitCsv(text);
@@ -92,7 +115,8 @@ export function parseRoster(text: string): { rows: RosterInput[]; errors: string
   const header = table[0].map((h) => h.trim());
   const col = {} as Record<keyof RosterInput, number>;
   for (const key of Object.keys(HEADERS) as (keyof RosterInput)[]) {
-    col[key] = header.findIndex((h) => HEADERS[key].test(h));
+    // A parent's or guardian's column (email, mobile, name) is never the student's own.
+    col[key] = header.findIndex((h) => HEADERS[key].test(h) && !NOT_THE_STUDENT.test(h));
   }
   if (col.email < 0) return { rows: [], errors: ["No email column found. Add a column called \"Email\"."] };
   const semester = col.year >= 0 && /sem/i.test(header[col.year]);
@@ -102,7 +126,7 @@ export function parseRoster(text: string): { rows: RosterInput[]; errors: string
   const errors: string[] = [];
   table.slice(1).forEach((r, i) => {
     const line = i + 2;
-    const email = (r[col.email] ?? "").trim().toLowerCase();
+    const email = (r[col.email] ?? "").replace(INVISIBLE, "").trim().toLowerCase();
     if (!EMAIL.test(email)) {
       errors.push(`Row ${line}: "${email || "(blank)"}" is not an email address.`);
       return;
@@ -130,7 +154,7 @@ export function parseRoster(text: string): { rows: RosterInput[]; errors: string
 export function normalizeEmails(raw: readonly string[]): string[] {
   const out = new Set<string>();
   for (const e of raw) {
-    const email = e.trim().toLowerCase();
+    const email = e.replace(INVISIBLE, "").trim().toLowerCase();
     if (EMAIL.test(email)) out.add(email);
   }
   return [...out];
