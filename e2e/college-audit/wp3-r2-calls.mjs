@@ -50,7 +50,7 @@ try {
   await q(`UPDATE college_drive_meetings SET status = 'cancelled' WHERE id = $1`, [c.meeting.id]);
   await q(`UPDATE users SET is_active = false WHERE id = $1`, [c.id]);
   let r = await call(c.id);
-  check("R3-01.1", "disabled student: 404 with the neutral message (was 'Unknown candidate')", r.status === 404 && neutral(r), `${r.status} ${r.text}`);
+  check("R3-01.1", "disabled student: 409, the same status and neutral message as on hold / held elsewhere (R4-02)", r.status === 409 && neutral(r), `${r.status} ${r.text}`);
   await q(`UPDATE users SET is_active = true, frozen_at = now() WHERE id = $1`, [c.id]);
   r = await call(c.id);
   check("R3-01.2", "student on hold: 409, the same message, no mention of a hold", r.status === 409 && neutral(r) && !/hold|moderat|review/i.test(r.text), `${r.status} ${r.text}`);

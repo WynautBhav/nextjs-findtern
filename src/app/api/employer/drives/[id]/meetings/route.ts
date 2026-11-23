@@ -12,7 +12,7 @@ import { heldElsewhereIds } from "@/lib/employer-pool";
 
 /**
  * One answer for every student the employer can no longer call (an inactive account, one on hold, one held by another
- * company's accepted offer or hire): the same words, so nothing hints at why. Only the status code differs, as before.
+ * company's accepted offer or hire): the same words, so nothing hints at why. The status code is the same too (409), so nothing tells the cases apart.
  */
 const STUDENT_UNAVAILABLE = { error: "This student is no longer available.", code: "candidate_unavailable" } as const;
 
@@ -65,8 +65,9 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     .from(schema.users)
     .where(eq(schema.users.id, parsed.data.userId))
     .limit(1);
-  if (!candidate || candidate.role !== "intern" || !candidate.isActive) return NextResponse.json(STUDENT_UNAVAILABLE, { status: 404 });
-  if (candidate.frozenAt) return NextResponse.json(STUDENT_UNAVAILABLE, { status: 409 });
+  if (!candidate || candidate.role !== "intern") return NextResponse.json(STUDENT_UNAVAILABLE, { status: 404 });
+  // A disabled account answers exactly like one on hold or held elsewhere (same status, same message): the status code must not tell them apart (R4-02).
+  if (!candidate.isActive || candidate.frozenAt) return NextResponse.json(STUDENT_UNAVAILABLE, { status: 409 });
   if ((await heldElsewhereIds(db, guard.session.uid, [parsed.data.userId])).has(parsed.data.userId)) {
     return NextResponse.json(STUDENT_UNAVAILABLE, { status: 409 });
   }
