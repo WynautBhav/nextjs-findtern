@@ -120,14 +120,14 @@ export function DriveBuilder({
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     }).catch(() => null);
-    const body = (await res?.json().catch(() => null)) as { id?: string; url?: string; error?: string; invites?: { sent: string[]; failed: string[] } } | null;
+    const body = (await res?.json().catch(() => null)) as { id?: string; url?: string; error?: string; invites?: { sent: string[]; failed: string[]; limited: string[] } } | null;
     setSaving(false);
     if (!res?.ok) {
       setError(body?.error ?? "Couldn't save. Check your connection and try again.");
       return;
     }
     // "Invite sent to hr@acme.com": each newly invited company was emailed (and alerted in its app if it has an account).
-    const invited = body?.invites ? inviteSentLine(body.invites.sent, body.invites.failed) : null;
+    const invited = body?.invites ? inviteSentLine(body.invites.sent, body.invites.failed, body.invites.limited) : null;
     if (!d.id && body?.id) {
       if (invited) setSaved(invited);
       setD((x) => ({ ...x, id: body.id }));

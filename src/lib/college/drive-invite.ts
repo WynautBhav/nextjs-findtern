@@ -76,6 +76,6 @@ export function driveInviteEmail(o: { company: string; collegeName: string; driv
       const url = linkTo(o.path);
       return url === null ? undefined : { label: "Join the drive", url };
     })(),
-    reason: `You're receiving this because ${college}'s placement office listed this address for a campus drive on Findtern. The link is for your company only; don't forward it.`,
+    reason: `You're receiving this because ${college}'s placement office listed this address for a campus drive on Findtern.`,
   };
 }

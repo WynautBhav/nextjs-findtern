@@ -96,3 +96,47 @@ test("a drive may open on a day that has already started (past start is accepted
   const bad = driveInput.safeParse({ ...base, endsAt: base.startsAt });
   assert.equal(bad.success, false);
 });
+
+const { InviteGate, INVITES_PER_COLLEGE_PER_DAY } = await import("./drive-invite-limit.ts");
+const people = (n: number, tag = "a") => Array.from({ length: n }, (_, i) => ({ company: `C${i}`, email: `${tag}${i}@x.com` }));
+
+test("a college can send at most 50 invite mails a day; the rest are held back, not lost", () => {
+  assert.equal(INVITES_PER_COLLEGE_PER_DAY, 50);
+  const gate = new InviteGate();
+  const t = 1_000_000;
+  const first = gate.plan("college-1", "drive-1", people(40), t);
+  assert.equal(first.send.length, 40);
+  const second = gate.plan("college-1", "drive-2", people(20, "b"), t + 1000);
+  assert.equal(second.send.length, 10);
+  assert.equal(second.limited.length, 10);
+  // Another college has its own allowance.
+  assert.equal(gate.plan("college-2", "drive-3", people(5, "c"), t).send.length, 5);
+  // A day later the allowance is back.
+  assert.equal(gate.plan("college-1", "drive-4", people(3, "d"), t + 24 * 3600_000 + 1).send.length, 3);
+});
+
+test("the same address is never re-invited to the same drive within 24 hours", () => {
+  const gate = new InviteGate();
+  const t = 5_000_000;
+  const one = [{ company: "Acme", email: "hr@acme.com" }];
+  assert.equal(gate.plan("c", "d1", one, t).send.length, 1);
+  // Removed and added again an hour later: no second mail, and it does not eat the allowance or read as "limit reached".
+  const again = gate.plan("c", "d1", [{ company: "Acme", email: "HR@acme.com" }], t + 3600_000);
+  assert.deepEqual([again.send.length, again.limited.length], [0, 0]);
+  // A different drive is a different invite.
+  assert.equal(gate.plan("c", "d2", one, t + 3600_000).send.length, 1);
+  // After 24 hours it may be sent again.
+  assert.equal(gate.plan("c", "d1", one, t + 24 * 3600_000 + 1).send.length, 1);
+});
+
+test("the officer is told when the daily limit held invites back", () => {
+  assert.equal(inviteSentLine(["a@x.com"], [], ["b@y.com"]), "Invite sent to a@x.com. Invite limit reached; try again tomorrow.");
+  assert.equal(inviteSentLine([], [], ["b@y.com"]), "Invite limit reached; try again tomorrow.");
+  assert.equal(inviteSentLine([], [], []), null);
+});
+
+test("the invite email does not promise the link is exclusive to the company", () => {
+  const c = driveInviteEmail({ company: "Acme", collegeName: "JKLU", driveTitle: "T", kind: "internship", startsAt: new Date(0), endsAt: new Date(1e10), path: "/drive/invite/x?e=a&s=b" });
+  assert.doesNotMatch(c.reason ?? "", /only|don't forward|do not forward/i);
+  assert.match(c.reason ?? "", /placement office/);
+});

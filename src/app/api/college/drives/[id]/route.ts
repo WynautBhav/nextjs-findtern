@@ -29,6 +29,6 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
     .set({ ...parsed.data, updatedAt: new Date() })
     .where(eq(schema.collegeDrives.id, drive.id));
   const { title, kind, startsAt, endsAt } = parsed.data;
-  const invites = await sendDriveInvites({ id: drive.id, title, kind, startsAt, endsAt, tokenHash: drive.tokenHash }, g.ctx.college.name, newInvitees(drive.invitedEmployers, parsed.data.invitedEmployers));
+  const invites = await sendDriveInvites({ id: drive.id, title, kind, startsAt, endsAt, tokenHash: drive.tokenHash }, g.ctx.college.id, g.ctx.college.name, newInvitees(drive.invitedEmployers, parsed.data.invitedEmployers));
   return NextResponse.json({ ok: true, invites });
 }

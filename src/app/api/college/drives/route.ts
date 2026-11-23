@@ -23,6 +23,6 @@ export async function POST(req: Request) {
     .returning({ id: schema.collegeDrives.id });
   // After the commit: each invited company is emailed (and alerted in its app if it has an account).
   const { title, kind, startsAt, endsAt } = parsed.data;
-  const invites = await sendDriveInvites({ id: drive.id, title, kind, startsAt, endsAt, tokenHash: hash }, g.ctx.college.name, newInvitees([], parsed.data.invitedEmployers));
+  const invites = await sendDriveInvites({ id: drive.id, title, kind, startsAt, endsAt, tokenHash: hash }, g.ctx.college.id, g.ctx.college.name, newInvitees([], parsed.data.invitedEmployers));
   return NextResponse.json({ id: drive.id, url: driveShareUrl(tryPublicOrigin(), token), invites }, { status: 201 });
 }
