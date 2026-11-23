@@ -1,7 +1,19 @@
+import { isCodeVerifiedMembership } from "../intern-account.ts";
 import { draftFromRecord, emptyDraft, validateProfile, type OnboardingLike } from "../onboarding.ts";
 
-/** Whether the files that "Complete & Submit" needs are on file. */
-export type ProfileDocs = { hasPhoto: boolean; hasPanImage: boolean; hasAadhaarImage: boolean };
+/**
+ * Whether the files that "Complete & Submit" needs are on file, and whether a College account has joined its college with a
+ * verified code (without it every College account intern failed the hire gate, 23 Nov).
+ */
+export type ProfileDocs = { hasPhoto: boolean; hasPanImage: boolean; hasAadhaarImage: boolean; collegeVerified?: boolean };
+
+/** The one way to build ProfileDocs from an intern's latest documents row and college membership row. */
+export function profileDocsOf(
+  doc: { photo?: string | null; pan?: string | null; aadhaar?: string | null } | null | undefined,
+  membership: { status: string; verifiedBy: string | null; leftAt?: Date | null } | null | undefined,
+): ProfileDocs {
+  return { hasPhoto: Boolean(doc?.photo), hasPanImage: Boolean(doc?.pan), hasAadhaarImage: Boolean(doc?.aadhaar), collegeVerified: isCodeVerifiedMembership(membership) };
+}
 
 /**
  * A profile counts as completed for admin only when the intern has submitted it

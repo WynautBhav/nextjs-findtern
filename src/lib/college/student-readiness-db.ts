@@ -2,6 +2,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { candidatePoolClauses } from "@/lib/employer-pool";
+import { profileDocsOf } from "@/lib/admin/profile-state";
 import { hireGateDecision } from "@/lib/hire-gate";
 import { hasMarksheet, openStepOf, readinessFrom, type Readiness } from "./student-readiness";
 
@@ -14,7 +15,7 @@ export async function readinessForMany(ids: string[]): Promise<Map<string, Readi
   const out = new Map<string, Readiness>();
   if (ids.length === 0) return out;
   const db = getDb();
-  const [users, rows, docs, pool] = await Promise.all([
+  const [users, rows, docs, pool, memberships] = await Promise.all([
     db.select({ id: schema.users.id, visibility: schema.users.profileVisibility, isActive: schema.users.isActive, frozenAt: schema.users.frozenAt }).from(schema.users).where(inArray(schema.users.id, ids)),
     db.select().from(schema.internOnboarding).where(inArray(schema.internOnboarding.userId, ids)).orderBy(desc(schema.internOnboarding.createdAt)),
     db
@@ -27,7 +28,12 @@ export async function readinessForMany(ids: string[]): Promise<Map<string, Readi
       .from(schema.users)
       .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
       .where(and(inArray(schema.users.id, ids), ...candidatePoolClauses())),
+    db
+      .select({ userId: schema.collegeMemberships.userId, status: schema.collegeMemberships.status, verifiedBy: schema.collegeMemberships.verifiedBy, leftAt: schema.collegeMemberships.leftAt })
+      .from(schema.collegeMemberships)
+      .where(inArray(schema.collegeMemberships.userId, ids)),
   ]);
+  const membershipOf = new Map(memberships.map((m) => [m.userId, m]));
   // Latest row wins, as on the admin page and in the hire gate (both lists are newest first).
   const rowOf = new Map<string, (typeof rows)[number]>();
   for (const r of rows) if (r.userId && !rowOf.has(r.userId)) rowOf.set(r.userId, r);
@@ -40,7 +46,7 @@ export async function readinessForMany(ids: string[]): Promise<Map<string, Readi
     const doc = docOf.get(u.id);
     const extra = (row?.extraData ?? {}) as Record<string, unknown>;
     const ratings = (extra.ratings ?? {}) as Record<string, unknown>;
-    const files = { hasPhoto: Boolean(doc?.photo), hasPanImage: Boolean(doc?.pan), hasAadhaarImage: Boolean(doc?.aadhaar) };
+    const files = profileDocsOf(doc, membershipOf.get(u.id));
     const { submitted, openStep } = openStepOf(row, files);
     out.set(
       u.id,

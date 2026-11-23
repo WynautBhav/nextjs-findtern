@@ -125,7 +125,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   }
 
   // The shortlist count rides on its own item, like the bag in the header.
-  const groups: ConsoleNavGroup[] = withDrivesItem(NAV_GROUPS, hasDrives, { href: DRIVES_HREF, label: "Campus drives", icon: <GraduationCap /> }).map((g) => ({
+  const groups: ConsoleNavGroup[] = withDrivesItem(NAV_GROUPS, hasDrives, { href: DRIVES_HREF, label: "Drives", icon: <GraduationCap /> }).map((g) => ({
     ...g,
     items: g.items.map((i) => (i.href === "/employer/cart" && cartCount > 0 ? { ...i, badge: cartCount > 99 ? "99+" : cartCount, badgeLabel: "saved" } : i)),
   }));

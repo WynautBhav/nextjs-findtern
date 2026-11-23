@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 
-import { isProfileSubmittedComplete, type ProfileDocs } from "./admin/profile-state.ts";
+import { isProfileSubmittedComplete, profileDocsOf, type ProfileDocs } from "./admin/profile-state.ts";
 import { draftFromRecord, emptyDraft, validateStep, VALIDATED_STEPS, type OnboardingLike } from "./onboarding.ts";
 
 /**
@@ -67,7 +67,7 @@ type Db = Pick<ReturnType<typeof import("@/lib/db").getDb>, "select">;
 export async function profileCompleteForHire(db: Db, internId: string): Promise<HireGateDecision> {
   // Imported here so the pure rule above runs under node:test, which has no `@/` alias.
   const { schema } = await import("@/lib/db");
-  const [[row], [doc]] = await Promise.all([
+  const [[row], [doc], [membership]] = await Promise.all([
     db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, internId)).orderBy(desc(schema.internOnboarding.createdAt)).limit(1),
     db
       .select({ photo: schema.internDocuments.profilePhotoName, pan: schema.internDocuments.panImageName, aadhaar: schema.internDocuments.aadhaarImageName })
@@ -75,6 +75,11 @@ export async function profileCompleteForHire(db: Db, internId: string): Promise<
       .where(eq(schema.internDocuments.userId, internId))
       .orderBy(desc(schema.internDocuments.createdAt))
       .limit(1),
+    db
+      .select({ status: schema.collegeMemberships.status, verifiedBy: schema.collegeMemberships.verifiedBy, leftAt: schema.collegeMemberships.leftAt })
+      .from(schema.collegeMemberships)
+      .where(eq(schema.collegeMemberships.userId, internId))
+      .limit(1),
   ]);
-  return hireGateDecision(row, { hasPhoto: Boolean(doc?.photo), hasPanImage: Boolean(doc?.pan), hasAadhaarImage: Boolean(doc?.aadhaar) });
+  return hireGateDecision(row, profileDocsOf(doc, membership));
 }

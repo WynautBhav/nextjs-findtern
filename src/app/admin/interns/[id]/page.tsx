@@ -1,4 +1,4 @@
-import { isProfileSubmittedComplete } from "@/lib/admin/profile-state";
+import { isProfileSubmittedComplete, profileDocsOf } from "@/lib/admin/profile-state";
 import { legacyFeeFlag } from "@/lib/admin/fee-flag";
 import type { Metadata } from "next";
 import { isAiInterview } from "@/lib/admin/interview-notes";
@@ -154,7 +154,7 @@ export default function AdminInternDetail(props: Parameters<typeof AdminInternDe
 async function load(id: string) {
   const db = getDb();
   // One wave: the user lookup no longer gates the rest (an unknown id wastes six cheap indexed reads and 404s).
-  const [[user], [onboarding], [documents], interviews, proposals, timesheets, payouts, [paidFee]] = await Promise.all([
+  const [[user], [onboarding], [documents], interviews, proposals, timesheets, payouts, [paidFee], [membership]] = await Promise.all([
     db.select(withoutPassword(getTableColumns(schema.users))).from(schema.users).where(eq(schema.users.id, id)).limit(1),
     db.select().from(schema.internOnboarding).where(eq(schema.internOnboarding.userId, id)).limit(1),
     db.select().from(schema.internDocuments).where(eq(schema.internDocuments.userId, id)).orderBy(desc(schema.internDocuments.createdAt)).limit(1),
@@ -166,6 +166,11 @@ async function load(id: string) {
       .select({ id: schema.internPayments.id })
       .from(schema.internPayments)
       .where(and(eq(schema.internPayments.internId, id), eq(schema.internPayments.status, "paid")))
+      .limit(1),
+    db
+      .select({ status: schema.collegeMemberships.status, verifiedBy: schema.collegeMemberships.verifiedBy, leftAt: schema.collegeMemberships.leftAt })
+      .from(schema.collegeMemberships)
+      .where(eq(schema.collegeMemberships.userId, id))
       .limit(1),
   ]);
   if (!user) return null;
@@ -202,10 +207,9 @@ async function load(id: string) {
     projectNames: Object.fromEntries(projects.map((p) => [p.id, p.name])),
     feePaid: Boolean(paidFee) || legacyFeeFlag(onboarding?.extraData),
     // Submitted and every required onboarding field filled: the same rule as the candidates list (lib/admin/profile-state).
-    profileComplete: isProfileSubmittedComplete(onboarding, {
-      hasPhoto: Boolean(documents?.profilePhotoName),
-      hasPanImage: Boolean(documents?.panImageName),
-      hasAadhaarImage: Boolean(documents?.aadhaarImageName),
-    }),
+    profileComplete: isProfileSubmittedComplete(
+      onboarding,
+      profileDocsOf({ photo: documents?.profilePhotoName, pan: documents?.panImageName, aadhaar: documents?.aadhaarImageName }, membership),
+    ),
   };
 }

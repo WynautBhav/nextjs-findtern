@@ -82,3 +82,33 @@ test("B-62 covers full-time lines at order creation; only a due month is exempt"
   const lines = [{ id: "new" }, { id: "ft", fullTime: true }, { id: "due", due: { monthsPaid: 1 } }];
   assert.deepEqual(hireGateLines(lines).map((l) => l.id), ["new", "ft"]);
 });
+
+test("a College account passes once the college code is verified, and only then (funtosubs1, 23 Nov)", () => {
+  const college = row({ accountType: "college" });
+  assert.deepEqual(hireGateDecision(college, { ...docs, collegeVerified: true }), { ok: true });
+  const refused = hireGateDecision(college, docs);
+  assert.equal(refused.ok, false);
+  assert.ok(!refused.ok && refused.missing.includes("accountType"));
+});
+
+test("every place that judges a profile complete also reads the college membership (College account interns were all blocked)", async () => {
+  const { readFileSync } = await import("node:fs");
+  for (const f of [
+    "src/lib/hire-gate.ts",
+    "src/lib/admin/profile-state-load.ts",
+    "src/app/admin/interns/[id]/page.tsx",
+    "src/lib/college/student-readiness-db.ts",
+  ]) {
+    const src = readFileSync(f, "utf8");
+    assert.match(src, /profileDocsOf\(/, `${f} must build its docs with profileDocsOf (it carries collegeVerified)`);
+    assert.match(src, /collegeMemberships/, `${f} must read the college membership`);
+  }
+});
+
+test("profileDocsOf: files on file, and collegeVerified only for a live code-verified membership", async () => {
+  const { profileDocsOf } = await import("./admin/profile-state.ts");
+  assert.deepEqual(profileDocsOf({ photo: "a.jpg", pan: "p.jpg", aadhaar: null }, { status: "verified", verifiedBy: "college_code", leftAt: null }), { hasPhoto: true, hasPanImage: true, hasAadhaarImage: false, collegeVerified: true });
+  assert.equal(profileDocsOf(undefined, { status: "verified", verifiedBy: "college_code", leftAt: new Date() }).collegeVerified, false);
+  assert.equal(profileDocsOf(undefined, { status: "pending", verifiedBy: null }).collegeVerified, false);
+  assert.equal(profileDocsOf(undefined, undefined).collegeVerified, false);
+});
