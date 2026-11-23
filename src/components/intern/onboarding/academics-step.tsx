@@ -215,13 +215,13 @@ export function AcademicsStep({ values, update, errors, college }: StepProps) {
         </Section>
       ) : null}
 
-      <Section title={phd ? "Certificates" : "Marksheets"} hint="Your latest semester or final marksheet. Optional - you can add several.">
+      <Section title="Marksheets" hint="Your latest semester or final marksheet. Optional - you can add several.">
         <FileList
           rowId="marksheets"
           files={a.marksheetUploads ?? []}
           max={MAX_MARKSHEETS}
           kind="marksheet"
-          noun={phd ? "certificate" : "marksheet"}
+          noun="marksheet"
           onChange={(marksheetUploads) => set({ marksheetUploads })}
         />
       </Section>

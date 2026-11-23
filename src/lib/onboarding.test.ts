@@ -362,6 +362,12 @@ test("no 'Score so far' copy remains in the academics step", () => {
   assert.match(src, /Your current aggregated score/);
 });
 
+test("the marksheet section is called Marksheets for every level, Ph.D included (owner, 23 Nov)", () => {
+  const src = readFileSync(join(import.meta.dirname, "../components/intern/onboarding/academics-step.tsx"), "utf8");
+  assert.match(src, /<Section title="Marksheets"/);
+  assert.doesNotMatch(src, /\? "Certificates" : "Marksheets"/);
+});
+
 test("emergency contact: a valid Indian number, not your own (INT-40)", () => {
   const e = validateStep({ ...complete(), emergencyName: "", emergencyPhone: "12345" }, 0, ctx);
   assert.equal(e.emergencyName, undefined);
