@@ -44,7 +44,7 @@ type SortState = { key: Key; dir: "asc" | "desc" };
 type View = { id: string; name: string; columns: Key[]; filters: Filters; sort: SortState; own?: boolean };
 
 const NO_FILTERS: Filters = { course: "", year: "", mode: "", laptop: "any", openToWork: "any", placement: "any", status: "any", minScore: "", minCgpa: "", quadrant: "", band: "", marks: "", outcome: "" };
-const BASE: Key[] = ["name", "degree", "branch", "year", "cgpa", "score", "offers", "hired", "ppo", "lastSeenAt"];
+const BASE: Key[] = ["name", "degree", "branch", "year", "cgpa", "score", "meetingsMissed", "offers", "offerReplies", "hired", "ppo", "lastSeenAt"];
 const SCORES: Key[] = ["name", "degree", "branch", "cgpa", "english", "coding", "aptitude", "aiInterview", "score", "offers"];
 
 const PRESETS: View[] = [
@@ -73,6 +73,9 @@ function sortValue(r: MasterRow, k: Key): string | number | null {
   if (k === "lastSeenAt") return r.lastSeenAt ? Date.parse(r.lastSeenAt) : null;
   if (k === "meetingsDone") return r.verified ? r.meetings.done : null;
   if (k === "meetingsNotAccepted") return r.verified ? r.meetings.notAccepted : null;
+  if (k === "driveCalls") return r.verified && r.meetings.callsAccepted + r.meetings.callsNotTaken + r.meetings.callsWaiting > 0 ? r.meetings.callsAccepted * 1e6 + r.meetings.callsNotTaken * 1e3 + r.meetings.callsWaiting : null;
+  if (k === "meetingsMissed") return r.verified ? r.meetings.missed : null;
+  if (k === "offerReplies") return r.verified && r.offers > 0 ? r.offersAccepted * 1e6 + r.offersRejected * 1e3 + r.offersLapsed : null;
   const v = r[k as keyof MasterRow];
   if (v === null || v === undefined) return null;
   if (typeof v === "boolean") return v ? 1 : 0;
@@ -208,7 +211,7 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
   const [viewId, setViewId] = useState(start.id);
   // A meetings drill-down from the Overview shows the meeting counts, so each row says why it is in the list.
   const [columns, setColumns] = useState<Key[]>(() =>
-    /^(met|meet-|not-accepted)/.test(initial.outcome ?? "") ? ["name", "degree", "branch", "year", "meetingsDone", "meetingsNotAccepted", "score", "offers", "hired", "lastSeenAt"] : start.columns,
+    /^(met|meet-|not-accepted|call-)/.test(initial.outcome ?? "") ? ["name", "degree", "branch", "year", "meetingsDone", "meetingsNotAccepted", "meetingsMissed", "driveCalls", "score", "offers", "hired", "lastSeenAt"] : start.columns,
   );
   // Filters can arrive in the link (from the Dashboard pop-up and its tiles): only known values are taken.
   const [filters, setFilters] = useState<Filters>(() => {

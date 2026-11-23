@@ -90,7 +90,7 @@ export function overviewModes(all: MasterRow[]): OverviewModes {
   for (const r of rows) {
     offers.received += r.offers;
     offers.accepted += r.offersAccepted;
-    offers.rejected += r.offersRejected;
+    offers.rejected += r.offersRejected + r.offersLapsed;
     offers.notAnswered += r.offersOpen;
   }
   // Whatever is left was withdrawn by the employer or closed (taken elsewhere, closed by Findtern, unpaid); never below zero if a status is new.

@@ -4,13 +4,14 @@ import { realEmployerId } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
 import { todayIst } from "@/lib/offer";
 import { acceptedStatusesSql, interviewExpiredSql, interviewUpcomingSql, interviewWaitingSql, offerLapsedSql, offerOpenSql } from "./count-rules";
+import { CALL_GRACE_MS } from "./constants";
 import { studentsForCollegeAdmin, type CollegeContext } from "./scope";
 import { buildMasterRow, NO_MEETINGS, type MasterExtras, type MasterRow, type Meetings } from "./master-row";
 
 const meetingsOf = (v: unknown): Meetings => {
   const m = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
   const n = (k: keyof Meetings) => Number(m[k] ?? 0) || 0;
-  return m.total === undefined ? NO_MEETINGS : { total: n("total"), done: n("done"), notAccepted: n("notAccepted"), upcoming: n("upcoming"), waiting: n("waiting") };
+  return m.total === undefined ? NO_MEETINGS : { total: n("total"), done: n("done"), missed: n("missed"), notAccepted: n("notAccepted"), upcoming: n("upcoming"), waiting: n("waiting"), callsAccepted: n("callsAccepted"), callsNotTaken: n("callsNotTaken"), callsWaiting: n("callsWaiting") };
 };
 
 /** Onboarding keys master data may read. An allowlist: Aadhaar, PAN, bank, address and PIN are never selected. */
@@ -31,6 +32,9 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
   if (ids.length) {
     const o = schema.internOnboarding;
     const keys = sql.join(EXTRA_KEYS.map((k) => sql`${k}`), sql`, `);
+    // A call request is answerable until CALL_GRACE_MS after its start, while its drive is open (scope.ts calls_pending).
+    const callWaiting = sql`(dm.status = 'requested' AND dm.starts_at + make_interval(secs => ${CALL_GRACE_MS / 1000}) >= ${nowIso}::timestamp
+      AND dr.ends_at > ${nowIso}::timestamp AND (dr.revoked_at IS NULL OR dr.revoked_at > ${nowIso}::timestamp))`;
     const res = await getDb().execute(sql`
       SELECT ${o.userId} AS user_id,
         (SELECT coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb) FROM jsonb_each(coalesce(${o.extraData}, '{}'::jsonb)) e WHERE e.key IN (${keys})) AS extra,
@@ -38,7 +42,8 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
         ${o.hasLaptop} AS has_laptop, ${o.city} AS city, ${o.state} AS state, ${o.experienceJson} AS experience,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status <> 'draft' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status IN (${acceptedStatusesSql()}) AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_accepted,
-        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND (pr.status = 'rejected' OR ${offerLapsedSql('pr', today)}) AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_rejected,
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status = 'rejected' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_rejected,
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND ${offerLapsedSql('pr', today)} AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_lapsed,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND ${offerOpenSql('pr', today)} AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_open,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND (pr.hired_at IS NOT NULL OR pr.status IN ('hired', 'completed')) AND ${realEmployerId(sql`pr.employer_id`)}) AS hired,
         (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status NOT IN ('draft', 'withdrawn')
@@ -48,10 +53,22 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
         (SELECT jsonb_build_object(
             'total', count(*),
             'done', count(*) FILTER (WHERE iv.status = 'completed'),
-            'notAccepted', count(*) FILTER (WHERE iv.status IN ('declined', 'rejected') OR (iv.status = 'cancelled' AND iv.cancelled_by = 'intern') OR ${interviewExpiredSql('iv', nowIso)}),
+            -- The employer marked it missed: the student did not show (interviews/[id]/mark-missed; never the employer's own no-show).
+            'missed', count(*) FILTER (WHERE iv.status = 'missed'),
+            -- Time passed on an invite the student never picked a slot for. A booked one (selected_slot set) the employer never
+            -- closed is not the student's refusal: it stays in the rest ("missed, called off or not closed").
+            'notAccepted', count(*) FILTER (WHERE iv.status IN ('declined', 'rejected') OR (iv.status = 'cancelled' AND iv.cancelled_by = 'intern') OR (${interviewExpiredSql('iv', nowIso)} AND iv.selected_slot IS NULL)),
             'upcoming', count(*) FILTER (WHERE ${interviewUpcomingSql('iv', nowIso)}),
             'waiting', count(*) FILTER (WHERE ${interviewWaitingSql('iv', nowIso)}))
-          FROM ${schema.interviews} iv WHERE iv.intern_id = ${o.userId} AND ${realEmployerId(sql`iv.employer_id`)}) AS meetings
+          FROM ${schema.interviews} iv WHERE iv.intern_id = ${o.userId} AND ${realEmployerId(sql`iv.employer_id`)}) AS meetings,
+        -- Live calls inside a campus drive (a separate table from employer meetings), by the drive board's rules
+        -- (drive-board.ts): accepted = held; waiting = requested, still answerable in an open drive; the rest not taken.
+        (SELECT jsonb_build_object(
+            'callsAccepted', count(*) FILTER (WHERE dm.status = 'accepted'),
+            'callsWaiting', count(*) FILTER (WHERE ${callWaiting}),
+            'callsNotTaken', count(*) FILTER (WHERE dm.status IN ('declined', 'expired') OR (dm.status = 'requested' AND NOT ${callWaiting})))
+          FROM ${schema.collegeDriveMeetings} dm JOIN ${schema.collegeDrives} dr ON dr.id = dm.drive_id
+          WHERE dm.user_id = ${o.userId} AND dr.college_id = ${ctx.college.id}) AS calls
       FROM ${o}
       WHERE ${o.userId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
     `);
@@ -68,11 +85,12 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
         offers: Number(r.offers ?? 0),
         offersAccepted: Number(r.offers_accepted ?? 0),
         offersRejected: Number(r.offers_rejected ?? 0),
+        offersLapsed: Number(r.offers_lapsed ?? 0),
         offersOpen: Number(r.offers_open ?? 0),
         hired: Number(r.hired ?? 0),
         ppo: Number(r.ppo ?? 0),
         earningsMinor: Number(r.earnings_minor ?? 0),
-        meetings: meetingsOf(r.meetings),
+        meetings: meetingsOf({ ...(r.meetings as object), ...(r.calls as object) }),
       });
     }
   }

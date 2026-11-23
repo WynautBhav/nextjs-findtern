@@ -383,14 +383,17 @@ async function main() {
         const future = s.stage === "interview_scheduled";
         // Edge case: 1 in 5 "scheduled" interviews has a slot that already passed with nobody closing it (lapsed everywhere).
         const base = future ? (s.n % 5 === 0 ? -2 : 1 + (s.n % 6)) : -1 - (s.n % 10);
+        // Edge case: 1 in 4 past meetings the student didn't attend (the employer marked it missed).
+        const missed = !future && s.n % 4 === 0;
         await q(`INSERT INTO interviews (employer_id, intern_id, project_id, status, slot1, slot2, slot3, selected_slot, timezone, meeting_link, notes, created_at)
                  VALUES ($1,$2,$3,$4,$5,$6,$7,1,'Asia/Kolkata',$8,$9,$10)`,
-          [emp.id, u.id, proj.id, future ? "scheduled" : "completed", iso(base), iso(base + 1), iso(base + 2),
-           future ? "https://meet.example.com/seed-room" : null, future ? null : "Clear communicator, solid fundamentals.", iso(base - 3)]);
+          [emp.id, u.id, proj.id, future ? "scheduled" : missed ? "missed" : "completed", iso(base), iso(base + 1), iso(base + 2),
+           future ? "https://meet.example.com/seed-room" : null, future || missed ? null : "Clear communicator, solid fundamentals.", iso(base - 3)]);
       }
       // Edge cases: 1 in 5 sent offers is past its start date with no reply (lapsed for the student and the employer);
       // 1 in 3 accepted offers has the employer's payment in progress ("processing").
-      if (s.stage === "proposal_sent") await insertProposal("sent", internOffer(proj.title, s.n % 5 === 0 ? -1 : 10 + (s.n % 10)), s.n % 5 === 0 ? iso(-9) : recent(2 + (s.n % 40)));
+      // and 1 in 5 of the rest was turned down by the student.
+      if (s.stage === "proposal_sent") await insertProposal(s.n % 5 === 2 ? "rejected" : "sent", internOffer(proj.title, s.n % 5 === 0 ? -1 : 10 + (s.n % 10)), s.n % 5 === 0 ? iso(-9) : recent(2 + (s.n % 40)));
       if (s.stage === "proposal_accepted") await insertProposal(s.n % 3 === 0 ? "processing" : "accepted", internOffer(proj.title, 8 + (s.n % 10)), recent(10 + (s.n % 30)));
       if (s.stage === "hired_recent") {
         const offer = internOffer(proj.title, 4 + (s.n % 6));

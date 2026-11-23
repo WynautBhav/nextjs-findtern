@@ -45,9 +45,11 @@ export type MasterRow = {
   aiInterview: number | null;
   score: number | null;
   offers: number;
-  /** Offers by what the student did: accepted (accepted, processing, hired, completed), rejected (or lapsed unanswered past the start date), or not answered (sent or interview booked, start date ahead). */
+  /** Offers by what the student did: accepted (accepted, processing, hired, completed), rejected (turned down), deadline
+   * missed (unanswered when the start date came: the intern's "Rejected · no response"), or not answered yet (start date ahead). */
   offersAccepted: number;
   offersRejected: number;
+  offersLapsed: number;
   offersOpen: number;
   /** Academic score out of 10: CGPA, or a percentage divided by 10 (for bands only; the CGPA column stays CGPA). */
   marks10: number | null;
@@ -62,15 +64,19 @@ export type MasterRow = {
 };
 
 /**
- * A student's employer meetings: done = completed; notAccepted = the invite lapsed unanswered (expired), the student
+ * A student's employer meetings: done = completed; notAccepted = the invite lapsed with no slot picked, the student
  * cancelled it, or a legacy declined/rejected; upcoming = booked (scheduled); waiting = times offered, no answer yet
- * (pending). The rest of the total was missed (no_show) or called off by the employer.
+ * (pending). The rest of the total was missed, called off by the employer, or booked and never closed after its time.
  */
-export type Meetings = { total: number; done: number; notAccepted: number; upcoming: number; waiting: number };
-export const NO_MEETINGS: Meetings = { total: 0, done: 0, notAccepted: 0, upcoming: 0, waiting: 0 };
+export type Meetings = {
+  total: number; done: number; missed: number; notAccepted: number; upcoming: number; waiting: number;
+  /** Live calls inside a campus drive (not part of `total`): accepted (held), not taken (declined or lapsed), waiting. */
+  callsAccepted: number; callsNotTaken: number; callsWaiting: number;
+};
+export const NO_MEETINGS: Meetings = { total: 0, done: 0, missed: 0, notAccepted: 0, upcoming: 0, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 };
 
 /** Drill-down groups from the Placement analysis: the students behind each block. "" = everyone. */
-export type Outcome = "" | "no-offer" | "accepted" | "open" | "rejected" | "withdrawn" | "met" | "meet-upcoming" | "meet-waiting" | "not-accepted" | "meet-other";
+export type Outcome = "" | "no-offer" | "accepted" | "open" | "rejected" | "withdrawn" | "met" | "meet-upcoming" | "meet-waiting" | "not-accepted" | "meet-other" | "call-took" | "call-waiting" | "call-not-taken";
 export const OUTCOMES: { key: Exclude<Outcome, "">; label: string }[] = [
   { key: "no-offer", label: "Interviewed, no offer" },
   { key: "accepted", label: "Accepted an offer" },
@@ -81,9 +87,12 @@ export const OUTCOMES: { key: Exclude<Outcome, "">; label: string }[] = [
   { key: "meet-upcoming", label: "Meeting booked" },
   { key: "meet-waiting", label: "Meeting not answered yet" },
   { key: "not-accepted", label: "Didn't accept a meeting" },
-  { key: "meet-other", label: "Meeting missed or called off" },
+  { key: "meet-other", label: "Meeting missed, called off or not closed" },
+  { key: "call-took", label: "Took a drive call" },
+  { key: "call-waiting", label: "Drive call not answered yet" },
+  { key: "call-not-taken", label: "Didn't take a drive call" },
 ];
-const withdrawnOf = (r: MasterRow) => r.offers - r.offersAccepted - r.offersRejected - r.offersOpen;
+const withdrawnOf = (r: MasterRow) => r.offers - r.offersAccepted - r.offersRejected - r.offersLapsed - r.offersOpen;
 const meetOtherOf = (m: Meetings) => m.total - m.done - m.notAccepted - m.upcoming - m.waiting;
 
 export function matchesOutcome(r: MasterRow, o: Outcome): boolean {
@@ -92,13 +101,16 @@ export function matchesOutcome(r: MasterRow, o: Outcome): boolean {
     case "no-offer": return r.score !== null && r.offers === 0;
     case "accepted": return r.offersAccepted > 0;
     case "open": return r.offersOpen > 0;
-    case "rejected": return r.offersRejected > 0;
+    case "rejected": return r.offersRejected + r.offersLapsed > 0;
     case "withdrawn": return withdrawnOf(r) > 0;
     case "met": return r.meetings.done > 0;
     case "meet-upcoming": return r.meetings.upcoming > 0;
     case "meet-waiting": return r.meetings.waiting > 0;
     case "not-accepted": return r.meetings.notAccepted > 0;
     case "meet-other": return meetOtherOf(r.meetings) > 0;
+    case "call-took": return r.meetings.callsAccepted > 0;
+    case "call-waiting": return r.meetings.callsWaiting > 0;
+    case "call-not-taken": return r.meetings.callsNotTaken > 0;
   }
 }
 
@@ -132,6 +144,7 @@ export type MasterExtras = {
   offers: number;
   offersAccepted: number;
   offersRejected: number;
+  offersLapsed: number;
   offersOpen: number;
   hired: number;
   ppo: number;
@@ -211,6 +224,7 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     offers: 0,
     offersAccepted: 0,
     offersRejected: 0,
+    offersLapsed: 0,
     offersOpen: 0,
     marks10: null,
     hired: false,
@@ -259,6 +273,7 @@ export function buildMasterRow(s: ScopedStudent, x: MasterExtras | undefined): M
     offers: x.offers,
     offersAccepted: x.offersAccepted,
     offersRejected: x.offersRejected,
+    offersLapsed: x.offersLapsed,
     offersOpen: x.offersOpen,
     marks10: s.cgpa ?? percentOutOf10(a),
     hired: x.hired > 0,
@@ -275,7 +290,7 @@ export type ColumnKind = "text" | "number" | "score" | "bool" | "list" | "date" 
 export type ColumnGroup = "Student" | "Course" | "Preferences" | "Scores" | "Placement";
 
 export type MasterColumn = {
-  key: keyof MasterRow | "report" | "recording" | "meetingsDone" | "meetingsNotAccepted";
+  key: keyof MasterRow | "report" | "recording" | "meetingsDone" | "meetingsNotAccepted" | "meetingsMissed" | "offerReplies" | "driveCalls";
   label: string;
   group: ColumnGroup;
   kind: ColumnKind;
@@ -319,6 +334,9 @@ export const MASTER_COLUMNS: MasterColumn[] = [
   { key: "earningsMinor", label: "Earnings", group: "Placement", kind: "money" },
   { key: "meetingsDone", label: "Meetings done", group: "Placement", kind: "number" },
   { key: "meetingsNotAccepted", label: "Meetings not accepted", group: "Placement", kind: "number" },
+  { key: "meetingsMissed", label: "Meetings missed", group: "Placement", kind: "number" },
+  { key: "offerReplies", label: "Offer replies", group: "Placement", kind: "text" },
+  { key: "driveCalls", label: "Drive calls", group: "Placement", kind: "text" },
 ];
 
 export const COLUMN_KEYS = new Set(MASTER_COLUMNS.map((c) => c.key));
@@ -332,6 +350,31 @@ function percentOutOf10(a: Record<string, unknown>): number | null {
 }
 
 const MODE_LABEL: Record<string, string> = { remote: "Remote", hybrid: "Hybrid", onsite: "Onsite" };
+
+/** What the student did with their offers, e.g. "2 accepted · 1 rejected · 1 deadline missed"; "" with no offer. */
+export function offerReplies(r: Pick<MasterRow, "offersAccepted" | "offersRejected" | "offersLapsed" | "offersOpen">): string {
+  return [
+    [r.offersAccepted, "accepted"],
+    [r.offersRejected, "rejected"],
+    [r.offersLapsed, "deadline missed"],
+    [r.offersOpen, "waiting"],
+  ]
+    .filter(([n]) => (n as number) > 0)
+    .map(([n, w]) => `${n} ${w}`)
+    .join(" · ");
+}
+
+/** A student's live drive calls, e.g. "1 accepted · 1 not taken"; "" with none. */
+export function driveCalls(m: Pick<Meetings, "callsAccepted" | "callsNotTaken" | "callsWaiting">): string {
+  return [
+    [m.callsAccepted, "accepted"],
+    [m.callsNotTaken, "not taken"],
+    [m.callsWaiting, "waiting"],
+  ]
+    .filter(([n]) => (n as number) > 0)
+    .map(([n, w]) => `${n} ${w}`)
+    .join(" · ");
+}
 
 /** A cell as plain text, the same in the table's title and in the CSV. Missing is "". */
 export function cellText(row: MasterRow, key: MasterColumn["key"], origin = ""): string {
@@ -353,6 +396,12 @@ export function cellText(row: MasterRow, key: MasterColumn["key"], origin = ""):
       return row.verified ? String(row.meetings.done) : "";
     case "meetingsNotAccepted":
       return row.verified ? String(row.meetings.notAccepted) : "";
+    case "meetingsMissed":
+      return row.verified ? String(row.meetings.missed) : "";
+    case "offerReplies":
+      return row.verified ? offerReplies(row) : "";
+    case "driveCalls":
+      return row.verified ? driveCalls(row.meetings) : "";
     default: {
       const v = row[key];
       if (v === null || v === undefined) return "";
