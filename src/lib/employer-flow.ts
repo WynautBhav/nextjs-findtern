@@ -2,7 +2,7 @@ import { cache } from "react";
 import { and, eq, gte, inArray } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { proposalCgpaGate, type CgpaGate } from "@/lib/cgpa-verification";
+import { proposalCgpaGate, withoutCgpaScores, type CgpaGate } from "@/lib/cgpa-verification";
 import { payableCheckoutForRequest } from "@/lib/employer-payable";
 import { parseOffer, type Offer } from "@/lib/offer";
 import { orderProposalIds } from "@/lib/order-ids";
@@ -65,12 +65,17 @@ export const cartInternIdsForRequest = cache(async (employerId: string): Promise
 type StateRow = { id: string; internId: string; status: string; hiredAt: Date | string | null; updatedAt?: Date | string | null; offerDetails: unknown; currency?: string | null };
 
 /** What `offerState` needs besides the row: whether an order is open for it and where the intern's CGPA check stands. */
-export type StateContext = { openOrders: Set<string>; extraByIntern: Map<string, unknown> };
+export type StateContext = {
+  openOrders: Set<string>;
+  extraByIntern: Map<string, unknown>;
+  /** The employer holds Findtern Pro: only then does the CGPA correction notice carry the scores. Absent means no. */
+  pro?: boolean;
+};
 
 /** One proposal's state, with the CGPA gate and the open-order freeze applied. The single entry point for every counting screen. */
 export function stateForRow(row: StateRow, ctx: StateContext, now: Date = new Date()): { offer: Offer; state: OfferState; gate: CgpaGate } {
   const offer = parseOffer(row.offerDetails, row.currency);
-  const gate = proposalCgpaGate({ status: row.status, extraData: ctx.extraByIntern.get(row.internId), offerDetails: row.offerDetails, updatedAt: row.updatedAt }, now);
+  const gate = withoutCgpaScores(proposalCgpaGate({ status: row.status, extraData: ctx.extraByIntern.get(row.internId), offerDetails: row.offerDetails, updatedAt: row.updatedAt }, now), ctx.pro === true);
   const state = offerState({ status: row.status, hiredAt: row.hiredAt, offerDetails: row.offerDetails, hasOpenOrder: ctx.openOrders.has(row.id), gate }, offer, now);
   return { offer, state, gate };
 }

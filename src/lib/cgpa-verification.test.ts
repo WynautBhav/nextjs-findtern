@@ -11,6 +11,7 @@ import {
   readCgpaVerification,
   semesterFromInput,
   semesterOptions,
+  withoutCgpaScores,
   yearOfStudy,
   type CgpaGate,
 } from "./cgpa-verification.ts";
@@ -276,4 +277,14 @@ test("semesterFromInput: any whole number is kept as typed, empty or 0 is nothin
   assert.equal(semesterFromInput("0"), null);
   assert.equal(semesterFromInput("abc"), null);
   assert.equal(semesterFromInput("123"), 12);
+});
+
+test("withoutCgpaScores: no Pro drops both scores and keeps the state; Pro keeps the gate as is", () => {
+  const extraData = cv({ status: "incorrect", claimedScore: "8.9", correctedScore: "7.9", decidedAt: "2026-11-17T20:00:00.000Z" });
+  const g = proposalCgpaGate(accepted({ extraData }), at(30));
+  const free = withoutCgpaScores(g, false);
+  assert.equal(free.state, "incorrect_unacked");
+  assert.ok(!("correctedFrom" in free) && !("correctedTo" in free));
+  assert.doesNotMatch(JSON.stringify(free), /8\.9|7\.9/);
+  assert.equal(withoutCgpaScores(g, true), g);
 });

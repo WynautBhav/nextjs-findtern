@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { recordAdminAudit } from "@/lib/admin/audit";
+import { proAccess } from "@/lib/candidate-pro-access";
 import { applyCgpaDecision, withCgpaCorrection } from "@/lib/cgpa-verification-flow";
 import { cgpaEmployerNotice } from "@/lib/cgpa-employer-notice";
 import { cgpaEmails } from "@/lib/emails/cgpa";
@@ -141,6 +142,7 @@ async function tell(internId: string, decided: Extract<ReturnType<typeof applyCg
           correctedScore: v.correctedScore ?? "",
           scoreType: v.scoreType,
           at,
+          showScores: await proAccess(o.employerId),
         }),
       ).catch((err) => console.error("[cgpa-decision] employer notice failed", err));
     }

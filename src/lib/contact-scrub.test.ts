@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { HIDDEN_MESSAGE, contactFieldError, findContact, normalizeForDetection, scrubContact } from "./contact-scrub.ts";
+import { HIDDEN_MESSAGE, NAME_MASK, contactFieldError, findContact, maskInternName, normalizeForDetection, scrubContact } from "./contact-scrub.ts";
 
 const kinds = (s: string) => findContact(s).kinds.sort();
 
@@ -173,4 +173,19 @@ test("detection stays fast on long hostile input", () => {
   const t = Date.now();
   for (const s of ["a".repeat(2000), "a.".repeat(1000), "1 ".repeat(1000), "aGVsbG8gd29ybGQ".repeat(130), "a@".repeat(1000)]) findContact(s);
   assert.ok(Date.now() - t < 1000, `took ${Date.now() - t} ms`);
+});
+
+test("maskInternName: before hire the intern's own name is masked in nested free text, other text is kept", () => {
+  const out = maskInternName(
+    { experiences: [{ company: "Acme", description: "Built tools. Ishaan Nair led the team; ishaan did QA.", role: "SDE" }], academics: { institution: "Nair Institute" }, skills: ["React"] },
+    "Ishaan",
+    "Nair",
+  );
+  const text = JSON.stringify(out);
+  assert.doesNotMatch(text, /Ishaan|Nair|ishaan/i);
+  assert.ok(text.includes(NAME_MASK));
+  assert.equal(out.experiences[0].company, "Acme");
+  assert.deepEqual(out.skills, ["React"]);
+  assert.equal(maskInternName("Plain text", "Ishaan", "Nair"), "Plain text");
+  assert.equal(maskInternName("Nairobi trip", "Ishaan", "Nair"), "Nairobi trip");
 });

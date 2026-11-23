@@ -120,6 +120,15 @@ export type CgpaGate = {
   correctedTo?: string;
 };
 
+/** The gate as an employer without Findtern Pro may see it: the state, never the claimed or corrected score. */
+export function withoutCgpaScores(gate: CgpaGate, pro: boolean): CgpaGate {
+  if (pro) return gate;
+  const rest = { ...gate };
+  delete rest.correctedFrom;
+  delete rest.correctedTo;
+  return rest;
+}
+
 const asIso = (v: unknown): string | null => {
   if (v instanceof Date) return Number.isNaN(v.getTime()) ? null : v.toISOString();
   if (typeof v !== "string" || !v.trim()) return null;

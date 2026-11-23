@@ -265,6 +265,31 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       assert.equal((await call(reschedule, lapsed.id, { slots: [wall(330), wall(331), wall(332)] })).status, 200);
       assert.equal((await row(lapsed.id)).status, "pending");
     });
+
+    await t.test("a cancel reason loses contact details and names before the hire: stored row, other side's alert", async () => {
+      const [intern] = [await mkUser("Gita")];
+      try {
+        await relate(e2, intern);
+        const made = await offer(e2, intern);
+        assert.equal(made.status, 201, JSON.stringify(made.body));
+        const id = (made.body.interview as { id: string }).id;
+        as("intern", intern.id);
+        const raw = `Gita Test, call 98290 12345, ${tag}-Gita@example.test. Exam clash on Monday.`;
+        assert.equal((await call(cancel, id, { reason: raw })).status, 200);
+        const stored = (await row(id)).cancelReason ?? "";
+        assert.doesNotMatch(stored, /Gita|98290|example\.test/);
+        assert.match(stored, /Exam clash on Monday/);
+        const [alert] = await db.select().from(schema.notifications).where(sql`${schema.notifications.recipientId} = ${e2.id} and ${schema.notifications.type} = 'meeting_cancelled' and ${schema.notifications.data}->>'interviewId' = ${id}`);
+        assert.ok(alert, "the employer got an alert");
+        assert.doesNotMatch(alert.message, /Gita|98290|example\.test/);
+      } finally {
+        await db.execute(sql`delete from notifications where recipient_id in (${intern.id}, ${e2.id})`);
+        await db.execute(sql`delete from interviews where intern_id = ${intern.id}`);
+        await db.execute(sql`delete from employer_cart_items where intern_id = ${intern.id}`);
+        await db.execute(sql`delete from intern_onboarding where user_id = ${intern.id}`);
+        await db.delete(schema.users).where(sql`${schema.users.id} = ${intern.id}`);
+      }
+    });
   } finally {
     const ids = [i1, i2, i3].map((u) => u.id);
     await db.execute(sql`delete from notifications where recipient_id in (${sql.join([...ids, e1.id, e2.id].map((x) => sql`${x}`), sql`, `)})`);

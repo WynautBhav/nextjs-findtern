@@ -13,6 +13,7 @@ import { interviewZone, loadProjectZones } from "@/lib/project-zones";
 import { wallTimeToUtc } from "@/lib/timezones";
 
 import { getCalendar } from "./calendar.ts";
+import { scrubMeetingReason } from "./reason-scrub.ts";
 import { bookedStart, MEETING_MS, step, type Action, type Fields, type Refusal, type Role } from "./slots.ts";
 
 type Db = ReturnType<typeof getDb>;
@@ -156,6 +157,8 @@ export async function act(interviewId: string, role: Role, uid: string, input: A
   if ((role === "employer" ? iv.employerId : iv.internId) !== uid) return fail(403, "Forbidden");
 
   const prev = { status: iv.status, round: iv.round, proposedBy: iv.proposedBy };
+  // The reason is shown to the other side (alert, mail, schedule page): before the hire it carries no contact detail or name.
+  const reason = input.type === "cancel" ? await cleanReason(db, iv, input.reason) : "";
   const written = await withPartyLocks(db, iv.employerId, iv.internId, async (tx) => {
     const [cur] = await tx.select().from(schema.interviews).where(eq(schema.interviews.id, interviewId)).limit(1);
     if (!cur) return fail(404, "Not found");
@@ -171,7 +174,7 @@ export async function act(interviewId: string, role: Role, uid: string, input: A
     if (!r.ok) return refused(r);
     // New times revive an expired or lapsed meeting: never beside another open one with the same candidate (same rule as booking).
     if (input.type === "reschedule" && (await otherOpenMeeting(tx, cur.employerId, cur.internId, cur.id))) return fail(409, OPEN_MEETING, "open_meeting");
-    const f = r.fields;
+    const f = input.type === "cancel" && r.fields.cancelReason ? { ...r.fields, cancelReason: reason } : r.fields;
     const [row] = await tx
       .update(schema.interviews)
       .set({
@@ -198,6 +201,20 @@ export async function act(interviewId: string, role: Role, uid: string, input: A
   await resolveInterviewNotifications(row.internId, row.id).catch(() => undefined);
   await tellOtherSide(db, role, before, final, input).catch((e) => console.error("[meetings] notify failed", e));
   return { ok: true, interview: final };
+}
+
+/** A cancel reason as the other side may read it: names and contact details are masked until this pair's hire is paid. */
+async function cleanReason(db: Db, iv: Interview, raw: string): Promise<string> {
+  const [[user], [emp], [hire]] = await Promise.all([
+    db.select({ f: schema.users.firstName, l: schema.users.lastName }).from(schema.users).where(eq(schema.users.id, iv.internId)).limit(1),
+    db.select({ name: schema.employers.name, company: schema.employers.companyName, site: schema.employers.websiteUrl, email: schema.employers.companyEmail }).from(schema.employers).where(eq(schema.employers.id, iv.employerId)).limit(1),
+    db
+      .select({ id: schema.proposals.id })
+      .from(schema.proposals)
+      .where(and(eq(schema.proposals.employerId, iv.employerId), eq(schema.proposals.internId, iv.internId), hiredProposalSql()))
+      .limit(1),
+  ]);
+  return scrubMeetingReason(raw.trim(), { hired: Boolean(hire), company: emp?.company, employerNames: [emp?.name], internFirst: user?.f, internLast: user?.l, companyWebsite: emp?.site, companyEmail: emp?.email });
 }
 
 /** Makes the Meet event for a booked meeting; with no calendar connected (or Google down) the meeting stays booked, link pending. */

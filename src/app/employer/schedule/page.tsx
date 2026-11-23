@@ -11,6 +11,7 @@ import { LoadError } from "@/components/app/load-error";
 import { SITE } from "@/lib/content/site";
 import { displayNameOf, initialsOf } from "@/lib/employer-candidates";
 import { hiredInternIds } from "@/lib/employer-visibility";
+import { scrubContact } from "@/lib/contact-scrub";
 import { projectZone } from "@/lib/timezones";
 import { viewFor } from "@/lib/meetings/slots";
 import { dayLabel, ScheduleView, type Params, type Row, type StatusFilter } from "./schedule-view";
@@ -104,6 +105,8 @@ export default async function EmployerSchedule({ searchParams }: { searchParams:
             .where(and(eq(schema.employerCartItems.employerId, uid), inArray(schema.employerCartItems.listType, ["cart", "checkout"])))
         : Promise.resolve([] as { n: number }[]),
     ]);
+    // A reason stored before the cancel route cleaned it: until the hire is paid, one carrying contact details is hidden whole.
+    rows = rows.map((r) => (r.cancelReason && !unlocked.has(r.internId) ? { ...r, cancelReason: scrubContact(r.cancelReason).text } : r));
     if (rows.length === 0) shortlisted = Number(shortlistRows[0]?.n ?? 0);
     for (const u of users) {
       const first = (u.firstName || "").trim();

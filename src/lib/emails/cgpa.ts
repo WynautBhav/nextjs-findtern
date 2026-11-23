@@ -94,9 +94,12 @@ export const cgpaEmployerCopy = {
     title: `Ready to pay: ${candidate}`,
     message: `The offer to ${candidate} for ${role} is ready for payment. It is under To pay.`,
   }),
-  incorrect: (candidate: string, role: string, from: string, to: string, scoreType: string) => ({
+  /** `scores` only for an employer with Findtern Pro; without it the score is corrected, never quoted. */
+  incorrect: (candidate: string, role: string, scores: { from: string; to: string; scoreType: string } | null) => ({
     title: "CGPA corrected: confirm to continue",
-    message: `Findtern corrected the CGPA of ${candidate} for ${role} from ${from}${unit(scoreType)} to ${to}${unit(scoreType)}. Review it and confirm to continue.`,
+    message: scores
+      ? `Findtern corrected the CGPA of ${candidate} for ${role} from ${scores.from}${unit(scores.scoreType)} to ${scores.to}${unit(scores.scoreType)}. Review it and confirm to continue.`
+      : `Findtern corrected the CGPA of ${candidate} for ${role}. Confirm to continue.`,
   }),
 };
 

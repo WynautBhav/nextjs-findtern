@@ -436,3 +436,20 @@ export function scrubOutgoing(body: string, terms: string[]): { text: string; ch
   if (bad(text)) text = OUTGOING_HIDDEN;
   return { text, changed: text !== original, kinds: [...kinds], names };
 }
+
+/**
+ * Read-side backstop for an intern's profile text shown to an employer before the hire: the intern's own first and
+ * last name (typed into an experience, company or institution field) is masked wherever it appears in a string,
+ * however it is cased or disguised. Lists and nested rows are walked; non-string values pass through.
+ */
+export function maskInternName<T>(value: T, first: string | null | undefined, last: string | null | undefined): T {
+  const terms = denyTermsFor({ internFirst: first, internLast: last });
+  if (terms.length === 0) return value;
+  const walk = (v: unknown): unknown => {
+    if (typeof v === "string") return hasDeniedName(v, terms) ? scrubOutgoing(v, terms).text : v;
+    if (Array.isArray(v)) return v.map(walk);
+    if (v && typeof v === "object" && !(v instanceof Date)) return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, walk(x)]));
+    return v;
+  };
+  return walk(value) as T;
+}
