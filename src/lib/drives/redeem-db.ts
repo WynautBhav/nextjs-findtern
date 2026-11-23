@@ -67,7 +67,9 @@ export async function redeemDriveCode(
     throw new RedeemRefused(403, "This code is not valid for your college");
   }
 
-  // A student the placement office denied cannot join this college by any route (the membership trigger would reject it as a 500).
+  // A student the placement office denied cannot join this college by any route (the membership trigger would reject it as a 500), and
+  // only a restore brings them back: refuse here, before the code is touched, in the neutral words of a code from another college.
+  // A student whose leave was approved has no denial: the code gives them a fresh membership (year and branch cleared, below).
   const denied = await q(
     "SELECT 1 FROM college_denials d JOIN college_drive_orders o ON o.college_id = d.college_id JOIN drive_codes c ON c.order_id = o.id WHERE c.code_hash = $1 AND d.user_id = $2",
     [hashDriveCode(input.code, input.secret), input.internId],
@@ -95,13 +97,6 @@ export async function redeemDriveCode(
     secret: input.secret,
   });
   if (!res.ok) throw new RedeemRefused(res.status, res.error);
-
-  // A student the placement office denied does not come back through a code (only a restore does). The trigger on
-  // college_memberships would refuse the write anyway, but as a raw database error after the code was touched; refuse
-  // here, in the same neutral words as a code from another college. A student whose leave was approved has no denial:
-  // the code gives them a fresh membership (year and branch cleared, below).
-  const denied = await q("SELECT 1 FROM college_denials WHERE college_id = $1 AND user_id = $2", [res.collegeId, input.internId]);
-  if (denied.rows.length > 0) throw new RedeemRefused(403, "This code is not valid for your college");
 
   // A student whose fee is already settled would burn a seat for nothing.
   const paid = await q(
