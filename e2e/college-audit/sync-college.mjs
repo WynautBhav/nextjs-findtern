@@ -1,7 +1,7 @@
 // Part B (college screens) of the data-sync oracle: for every student of one college compare DB truth with
 //   (a) the TPO master-data CSV export (19 DB-derived columns), (b) the Students page card, (c) the Master data table row,
 // and every dashboard / Students / Approvals / Master-data / admin-college tile with its own SQL. Read-only (the export writes one audit row).
-import { q, one, session, htmlText, textProblems, cell, rec } from "./sync-lib.mjs";
+import { q, one, session, sessionAny, htmlText, textProblems, cell, rec } from "./sync-lib.mjs";
 import { MASTER_COLUMNS, cgpaText } from "../../src/lib/college/master-row.ts";
 
 export function parseCsv(text) {
@@ -37,7 +37,7 @@ export async function truthFor(collegeId) {
 
 export async function collegeOracle(tag, { collegeId, tpoEmail, admin, sampleCap = Infinity }) {
   const A = "B-college";
-  const tpo = await session("college", tpoEmail);
+  const tpo = await sessionAny("college", tpoEmail);
   const truth = await truthFor(collegeId);
   const ver = truth.filter((t) => t.mstatus === "verified");
   const sample = ver.length > sampleCap ? ver.slice(0, sampleCap) : ver;
@@ -77,9 +77,9 @@ export async function collegeOracle(tag, { collegeId, tpoEmail, admin, sampleCap
     const i = sp.indexOf(` ${name} `);
     if (i < 0) continue;
     const seg = sp.slice(i, i + 700); checked++;
-    const m = seg.match(new RegExp(`^ ${esc(name)} (\\S+) · (\\d)(?:st|nd|rd|th) year · (.+?) (?:\\d+ \\w+ ago|just now|never|—|-).*?(\\+\\d+ \\d+) (\\S+@\\S+) Findtern score (\\S+) CGPA (\\S+)`));
+    const m = seg.match(new RegExp(`^ ${esc(name)} (?:(\\S+) )?(?:· )?(\\d)(?:st|nd|rd|th) year · (.+?) (?:\\d+ \\w+ ago|just now|never|Online|Offline|—|-).*?(\\+\\d+ \\d+) (\\S+@\\S+) Findtern score (\\S+) CGPA (\\S+)`));
     if (!m) { cell(s.email, "card", "students-page", "parsable", "unparsable: " + seg.slice(0, 80), { area: A }); miss++; continue; }
-    const [, roll, yr, br, ph, em, sc, cg] = m;
+    const [, roll = "", yr, br, ph, em, sc, cg] = m;
     for (const [f, e, a] of [["roll", s.roll ?? "", roll], ["year", ord(s.year), ord(Number(yr))], ["branch", s.mbranch ?? s.spec, br], ["phone", `+${String(s.cc).replace("+", "")} ${s.phone}`, ph], ["email", s.email, em], ["score", s.fscore ? fix1(s.fscore) : "—", sc], ["cgpa", cgpaOf(s) ?? "—", cg]])
       if (!cell(s.email, f, "students-page", e, a, { area: A })) miss++;
   }

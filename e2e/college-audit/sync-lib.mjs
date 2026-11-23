@@ -2,7 +2,9 @@
 // Every check is recorded with rec(area, id, name, ok, detail); every compared value with cell(entity, field, screen, expected, actual).
 // summary() prints a PASS/FAIL line count and writes a machine-readable JSON (SYNC_OUT or ./sync-oracle.json).
 import { createRequire } from "node:module";
-import { writeFileSync } from "node:fs";
+import { writeFileSync, readFileSync, existsSync, chmodSync } from "node:fs";
+import { homedir } from "node:os";
+import { deflateSync, crc32 } from "node:zlib";
 import { assertLocalOnly } from "./lib/local-only.mjs";
 
 const require = createRequire(process.cwd() + "/");
@@ -40,9 +42,25 @@ export async function session(role, email, password = PASSWORD) {
   return { call, get: (p) => call("GET", p), post: (p, b) => call("POST", p, b ?? {}), patch: (p, b) => call("PATCH", p, b ?? {}), del: (p) => call("DELETE", p), cookie };
 }
 
+// ---- credentials kept OUT of the repo and the report: a 0600 JSON file {email: password} (SYNC_SECRETS, default ~/.cache/findtern-college-audit/sync-secrets.json)
+export const SECRETS_FILE = process.env.SYNC_SECRETS ?? `${homedir()}/.cache/findtern-college-audit/sync-secrets.json`;
+export const secrets = () => (existsSync(SECRETS_FILE) ? JSON.parse(readFileSync(SECRETS_FILE, "utf8")) : {});
+export function saveSecret(email, password) { const s = secrets(); s[email.toLowerCase()] = password; writeFileSync(SECRETS_FILE, JSON.stringify(s, null, 1), { mode: 0o600 }); chmodSync(SECRETS_FILE, 0o600); }
+/** Passwords to try for a harness-made or seeded account: stored secret, then the harness intern/employer password, then the seed password. */
+export const passwordsFor = (email) => [secrets()[String(email).toLowerCase()], process.env.SYNC_ENTRY_PW ?? "Sync@2026x", PASSWORD].filter(Boolean);
+/** session() that tries every known password for the account (never prints them). */
+export async function sessionAny(role, email) {
+  let last;
+  for (const pw of passwordsFor(email)) { try { return await session(role, email, pw); } catch (e) { last = e; if (!/: 401/.test(e.message)) throw e; } }
+  throw last;
+}
+
 // ---- recording --------------------------------------------------------------------------------------------------
 export const results = []; // {area,id,name,ok,detail}
 export const cells = [];   // {entity,field,screen,expected,actual,ok}
+export const wordings = []; // {entity, role, screen, raw, canonical}: how each screen words a status, mapped to the canonical status (for the cross-role wording table)
+/** Record the status wording a screen uses for an entity; canonical = the DB-derived status the wording must stand for. */
+export function wording(entity, role, screen, raw, canonical) { wordings.push({ entity, role, screen, raw: raw == null ? null : String(raw), canonical }); }
 let quiet = process.env.SYNC_QUIET === "1";
 export function rec(area, id, name, ok, detail = "") {
   results.push({ area, id, name, ok: !!ok, detail: ok ? "" : String(detail).slice(0, 600) });
@@ -59,10 +77,10 @@ export function cell(entity, field, screen, expected, actual, { norm = (x) => x,
 }
 export function summary(extra = {}) {
   const fails = results.filter((r) => !r.ok);
-  const out = { when: new Date().toISOString(), base: BASE, checks: results.length, pass: results.length - fails.length, fail: fails.length, cells: cells.length, cellMismatches: cells.filter((c) => !c.ok).length, failures: fails, ...extra };
+  const out = { when: new Date().toISOString(), base: BASE, checks: results.length, pass: results.length - fails.length, fail: fails.length, cells: cells.length, cellMismatches: cells.filter((c) => !c.ok).length, wordings: wordings.length, failures: fails, ...extra };
   console.log(`\nSYNC SUMMARY: ${out.checks} checks, ${out.pass} pass, ${out.fail} FAIL; matrix cells ${out.cells}, mismatches ${out.cellMismatches}`);
   const file = process.env.SYNC_OUT ?? "sync-oracle.json";
-  writeFileSync(file, JSON.stringify({ ...out, results, cells }, null, 1));
+  writeFileSync(file, JSON.stringify({ ...out, results, cells, wordings }, null, 1));
   return out;
 }
 
@@ -92,3 +110,6 @@ export function ist(d) {
 }
 /** Indian grouping: 1234567 -> 12,34,567 */
 export const inr = (n) => { const [i, f] = String(Math.abs(n)).split("."); const last3 = i.slice(-3), rest = i.slice(0, -3); return (n < 0 ? "-" : "") + (rest ? rest.replace(/\B(?=(\d{2})+(?!\d))/g, ",") + "," : "") + last3 + (f ? "." + f : ""); };
+
+// ---- a small valid PNG (proof photos / uploads)
+export const png = (size, rgb) => { const row = Buffer.concat([Buffer.from([0]), Buffer.from(Array.from({ length: size }, () => rgb).flat())]); const raw = Buffer.concat(Array.from({ length: size }, () => row)); const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(size, 0); ihdr.writeUInt32BE(size, 4); ihdr[8] = 8; ihdr[9] = 2; const chunk = (t, d) => { const len = Buffer.alloc(4); len.writeUInt32BE(d.length); const body = Buffer.concat([Buffer.from(t), d]); const c = Buffer.alloc(4); c.writeUInt32BE(crc32(body) >>> 0); return Buffer.concat([len, body, c]); }; return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]); };
