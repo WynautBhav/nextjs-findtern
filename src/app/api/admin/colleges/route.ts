@@ -5,6 +5,7 @@ import { z } from "zod";
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { withLock } from "@/lib/advisory-lock";
 import { withFreshCollegeCode } from "@/lib/college/code";
+import { duplicateProbe } from "@/lib/college/create-dup";
 import { requireMutation } from "@/lib/guards-mutation";
 import { CACHE_TAGS, purgeServerCache } from "@/lib/server-cache";
 import { getDb, schema } from "@/lib/db";
@@ -35,17 +36,21 @@ export async function POST(req: Request) {
   const stateProblem = gstinStateError(d.gstin, d.state);
   if (stateProblem) return NextResponse.json({ error: stateProblem }, { status: 400 });
   // A clash on the AISHE code answers 409 below; a clash on the random Findtern code is retried with a new one.
-  // Same name and city is the same college: the check and the insert run under one lock, so a double click or two tabs
-  // make one college (there is no unique index on the name to catch the second).
+  // Same name and city is the same college (see duplicateProbe for when the check applies): the check and the insert
+  // run under one lock, so a double click or two tabs make one college (the AISHE index catches the coded case).
+  const probe = duplicateProbe(d);
   const nameKey = d.name.toLowerCase().replace(/\s+/g, " ");
   const cityKey = d.city.toLowerCase();
   const made = await withLock(`college-create:${nameKey}|${cityKey}`, async (tx) => {
-    const [same] = await tx
-      .select({ id: schema.colleges.id })
-      .from(schema.colleges)
-      .where(sql`regexp_replace(lower(${schema.colleges.name}), '[[:space:]]+', ' ', 'g') = ${nameKey} and coalesce(lower(${schema.colleges.city}), '') = ${cityKey}`)
-      .limit(1);
-    if (same) return { refused: "same_name" as const };
+    if (probe) {
+      const samePayload = probe.payload ? sql` and coalesce(${schema.colleges.gstin}, '') = ${probe.payload.gstin} and ${schema.colleges.emailDomains} = ${JSON.stringify(probe.payload.domains)}::jsonb` : sql``;
+      const [same] = await tx
+        .select({ id: schema.colleges.id })
+        .from(schema.colleges)
+        .where(sql`regexp_replace(lower(${schema.colleges.name}), '[[:space:]]+', ' ', 'g') = ${probe.nameKey} and coalesce(lower(${schema.colleges.city}), '') = ${probe.cityKey}${samePayload}`)
+        .limit(1);
+      if (same) return { refused: "same_name" as const };
+    }
     // Each try is a savepoint, so a duplicate random code does not abort the outer transaction.
     const [created] = await withFreshCollegeCode((code) => tx.transaction((sp) => sp
     .insert(schema.colleges)

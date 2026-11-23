@@ -14,7 +14,7 @@ type Tile = { key: BoardKey; label: string; hint: (n: number) => string; nudge?:
 
 /** Needs the officer now, most urgent first (his order: calls, offers, offline). */
 const CRITICAL: Tile[] = [
-  { key: "meetingsWaiting", label: "Meets not answered", hint: (n) => (n ? "An employer asked; the student hasn't replied" : "Every meet request is answered"), nudge: "meeting", critical: true },
+  { key: "meetingsWaiting", label: "Drive meets not answered", hint: (n) => (n ? "An employer asked; the student hasn't replied" : "Every meet request is answered"), nudge: "meeting", critical: true },
   { key: "offersWaiting", label: "Offers not answered", hint: (n) => (n ? "Neither accepted nor declined yet" : "Every offer has a reply"), nudge: "offer", critical: true },
   { key: "offline", label: "Offline now", hint: (n) => (n ? "Not on Findtern during the drive" : "Everyone is online"), nudge: "online", critical: true },
 ];

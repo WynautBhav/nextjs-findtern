@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { normalizeEmails, parseRoster, removalEmails, readYear, splitCsv } from "./roster.ts";
+import { normalizeEmails, parseRoster, readPhone, removalEmails, readYear, splitCsv } from "./roster.ts";
 
 test("loose headers, BOM, quotes and CRLF", () => {
   const csv = '﻿Roll No,Student Name,Email ID,Department,Year\r\n21CS001,"Sharma, Asha",Asha@JKLU.edu.in,CSE,3rd\r\n21CS002,Ravi,ravi@jklu.edu.in,"ECE",IV\r\n';
@@ -64,4 +64,14 @@ test("parseRoster reads a phone column and keeps the row when the number is bad"
   assert.deepEqual(rows.map((r) => r.phone), ["9876543210", null, null]);
   assert.equal(errors.length, 1);
   assert.match(errors[0], /Row 3/);
+});
+
+test("readPhone (R2-05): common Indian formats are read, wrong countries, typos and decimals still are not", () => {
+  for (const ok of ["(+91) 98765 43210", "+91 0 98765 43210", "+91-098765-43210", "(+91)9876543210", " +91 98765 43210", "098765 43210", "0091 98765 43210", "9876543210.0", "'9876543210"]) assert.equal(readPhone(ok), "9876543210", ok);
+  for (const bad of ["+44 98765 43210", "(+44) 7911 123456", "987654321011", "98765432101", "+91 98765 4321", "12345", "91 98765+43210", "++91 98765 43210", "9876543210.5", "call 9876543210"]) assert.equal(readPhone(bad), null, bad);
+});
+
+test("parseRoster (R2-05): a guardian's phone column is never the student's number", () => {
+  const { rows } = parseRoster("Name,Email,Mobile No,Parent Mobile\nRiya,riya@x.edu,(+91) 98765 43210,9123456789\nAman,aman@x.edu,,9123456789");
+  assert.deepEqual(rows.map((r) => r.phone), ["9876543210", null]);
 });

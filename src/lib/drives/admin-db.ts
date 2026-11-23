@@ -383,7 +383,7 @@ export async function listPendingReviews(collegeId: string) {
 }
 export type ReviewDto = Awaited<ReturnType<typeof listPendingReviews>>[number];
 
-export async function decideReview(input: { reviewId: string; decision: unknown; internId?: unknown; adminId: string }): Promise<{ status: "linked" | "rejected"; internId: string | null; replayed: boolean }> {
+export async function decideReview(input: { reviewId: string; decision: unknown; internId?: unknown; adminId: string }): Promise<{ status: "linked" | "rejected"; internId: string | null; replayed: boolean; inactive?: true }> {
   return withPgTransaction(async (c) => {
     const rv = await c.query("SELECT v.*, o.college_id FROM identity_reviews v JOIN college_drive_orders o ON o.id = v.order_id WHERE v.id = $1 FOR UPDATE OF v", [input.reviewId]);
     const review = rv.rows[0];
@@ -404,6 +404,14 @@ export async function decideReview(input: { reviewId: string; decision: unknown;
       return { status: "rejected" as const, internId: null, replayed: false };
     }
     const internId = plan.internId!;
+    // The queue hides a disabled account (PENDING_REVIEWS_SQL), so a link by id must not reach one either. The suggestion is closed
+    // (rejected: the table has no reason column, the audit row carries it) instead of staying pending where nobody can see it.
+    const [who] = (await c.query("SELECT is_active FROM users WHERE id = $1", [internId])).rows;
+    if (!who?.is_active) {
+      await c.query("UPDATE identity_reviews SET status = 'rejected', decided_by = $3, decided_at = $4 WHERE entry_id = $1 AND candidate_intern_id = $2 AND status = 'pending'", [review.entry_id, internId, input.adminId, now]);
+      await audit(c, input.adminId, "identityDecide", "identity_review", input.reviewId, { decision: "reject", reason: "account_disabled", entryId: String(review.entry_id), candidateInternId: internId });
+      return { status: "rejected" as const, internId: null, replayed: false, inactive: true as const };
+    }
     const u = await c.query("UPDATE drive_roster_entries SET intern_id = $2 WHERE id = $1 AND intern_id IS NULL", [review.entry_id, internId]);
     if ((u.rowCount ?? 0) !== 1) throw new HttpError(409, "This row is already linked to a student");
     await verifyMembership(c, internId, String(review.college_id));

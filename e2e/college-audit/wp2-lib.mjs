@@ -1,5 +1,7 @@
 // Shared helpers for the WP2 scripts: college login and page fetch on the local build.
+import { assertLocalOnly } from "./lib/local-only.mjs";
 export const BASE = process.env.WP2_BASE ?? "http://localhost:3332"; // not $BASE: the shell env is shared and can point at another package
+assertLocalOnly(BASE);
 const rnd = () => `10.8.${Math.floor(Math.random() * 256)}.${1 + Math.floor(Math.random() * 250)}`;
 export async function login(email = "tpo@jklu.edu.in", path = "/api/auth/college/login", password = "Findtern@2026") {
   const r = await fetch(`${BASE}${path}`, { method: "POST", headers: { "content-type": "application/json", origin: BASE, "x-forwarded-for": rnd() }, body: JSON.stringify({ email, password }) });

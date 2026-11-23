@@ -3,6 +3,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { getDb, schema } from "@/lib/db";
 import { candidatePoolClauses } from "@/lib/employer-pool";
 import { hireGateDecision } from "@/lib/hire-gate";
+import { inIdList } from "@/lib/sql-ids";
 import { hasMarksheet, openStepOf, readinessFrom, type Readiness } from "./student-readiness";
 
 /**
@@ -26,7 +27,7 @@ export async function readinessForMany(ids: string[]): Promise<Map<string, Readi
       .select({ id: schema.users.id })
       .from(schema.users)
       .innerJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, schema.users.id))
-      .where(and(inArray(schema.users.id, ids), ...candidatePoolClauses())),
+      .where(and(inIdList(schema.users.id, ids), ...candidatePoolClauses())),
   ]);
   // Latest row wins, as on the admin page and in the hire gate (both lists are newest first).
   const rowOf = new Map<string, (typeof rows)[number]>();

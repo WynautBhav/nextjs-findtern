@@ -180,7 +180,7 @@ else {
   check("/admin/colleges/<id> 'Students in this college'", num(adminCollege, /Students in this college\s*([\d,]+)/), members);
   check("/admin/colleges/<id> Students tab count", num(adminCollege, /Students\s+([\d,]+)\s+Wallet/) ?? 0, claimedN);
   const list = await page("/admin/colleges", adminJar);
-  check("/admin/colleges row 'Students'", num(list, /JK Lakshmipat University\s+Code \S+ · [^\d]*?(\d[\d,]*)\s+\d+ of/), members);
+  check("/admin/colleges row 'Students'", num(list, /JK Lakshmipat University\s+Code \S+ · [^\d]*?(\d[\d,]*)\s+\d[\d,]* of/), members);
 }
 console.log(`[consistency] C2: members ${members} (verified ${verifiedN}, waiting ${claimedN}), roster ${rosterN}, offers 24h ${offers24}, hires 24h ${hires24}`);
 

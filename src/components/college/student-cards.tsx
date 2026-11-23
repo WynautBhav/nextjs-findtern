@@ -32,7 +32,7 @@ const FILTERS: { id: Exclude<Filter, "all">; label: string }[] = [
   { id: "interviewed", label: "AI interview done" },
   { id: "offered", label: "Got an offer" },
   { id: "offers", label: "Offer waiting" },
-  { id: "calls", label: "Meets not answered" },
+  { id: "calls", label: "Drive meets not answered" },
   { id: "hired", label: "Hired" },
   { id: "hidden", label: "Hidden from employers" },
   { id: "not_open", label: "Not open to work" },

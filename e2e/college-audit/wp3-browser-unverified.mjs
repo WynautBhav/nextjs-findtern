@@ -1,6 +1,6 @@
 // WP3: (1) 'In association with' bar in a real browser, (2) a TPO hand-included UNVERIFIED student as the employer sees them.
 //   . ~/.cache/findtern-college-audit/env.sh; use_wp 3; node e2e/college-audit/wp3-browser-unverified.mjs
-import { openRoles, closeAll } from "/home/wynautbhav/hermes-team/artifacts/findtern-college-audit/tools/ctx.mjs";
+import { openRoles, closeAll } from "./lib/ctx.mjs";
 import { q, one, session, check, finish, flight } from "./wp3-lib.mjs";
 
 const drive = await one(`SELECT * FROM college_drives WHERE title = 'Summer internship drive 2027'`);
@@ -14,7 +14,7 @@ page.on("pageerror", (e) => errors.push(String(e)));
 await page.goto(`${process.env.BASE}/employer/drives/${drive.id}`, { waitUntil: "networkidle", timeout: 60000 });
 const bar = await page.locator("text=In association with").first().isVisible().catch(() => false);
 check("B1.1", "'In association with <college>' shows in the employer's top bar on the drive page", bar && (await page.locator("text=JK Lakshmipat University").count()) > 0);
-await page.screenshot({ path: "/home/wynautbhav/hermes-team/artifacts/findtern-college-audit/wp3/employer-drive-bar.png" });
+await page.screenshot({ path: (await import("node:path")).resolve(process.env.OUT ?? "./out", "employer-drive-bar.png") });
 await page.goto(`${process.env.BASE}/employer/dashboard`, { waitUntil: "networkidle", timeout: 60000 });
 check("B1.2", "the bar is gone on the employer dashboard (only inside a drive)", !(await page.locator("text=In association with").first().isVisible().catch(() => false)));
 check("B1.3", "no page errors", errors.length === 0, errors.join("; "));

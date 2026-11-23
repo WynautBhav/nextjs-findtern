@@ -65,7 +65,7 @@ export default async function StudentsPage({ searchParams }: { searchParams?: Pr
             <HeroStat label="Median score" value={median === null ? "—" : median.toFixed(1)} hint="out of 10" />
             <HeroStat label="Score 6 or above" value={ready} hint={offers ? `${offers} already have an offer` : "The line most employers filter on"} />
           </HeroStats>
-          {scores.length > 0 ? <ScoreDots scores={scores} /> : <p className="text-sm text-on-dark-subtle">Scores appear here as your students take the AI interview.</p>}
+          {scores.length > 0 ? <ScoreDots scores={scores} /> : <p className="text-sm text-on-dark">Scores appear here as your students take the AI interview.</p>}
         </div>
       </CollegeHero>
       <StudentCards

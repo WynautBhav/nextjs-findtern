@@ -1,7 +1,9 @@
 // WP2 C1: every Students-page tile, hidden-reason chip, year tab and stage chip opens a list of exactly that size. Needs the wp2 build on :3332 and Chromium (ctx.mjs helper).
 // Usage (cwd = worktree): node e2e/college-audit/wp2-students-counts.mjs
-import { openRoles, closeAll } from "/home/wynautbhav/hermes-team/artifacts/findtern-college-audit/tools/ctx.mjs";
-const base = "http://localhost:3332";
+import { openRoles, closeAll } from "./lib/ctx.mjs";
+import { assertLocalOnly } from "./lib/local-only.mjs";
+const base = process.env.WP2_BASE ?? "http://localhost:3332";
+assertLocalOnly(base);
 const { browser, ctxs } = await openRoles(["tpo"], { base });
 const p = await ctxs.tpo.newPage();
 let bad = 0, ok = 0;

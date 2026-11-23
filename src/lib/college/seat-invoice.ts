@@ -27,3 +27,13 @@ export function seatInvoiceInput(
     sac: "999293",
   };
 }
+
+/**
+ * What the batch lists show about the paperwork. The serial decides, not the amount:
+ * a batch that holds a GST serial keeps its invoice even when credit covered all of it.
+ */
+export function seatInvoiceState(b: { status: string; amountMinor: number; invoiceNumber: string | null }): "none" | "serial" | "pending" | "covered" {
+  if (b.status !== "paid") return "none";
+  if (b.invoiceNumber != null) return "serial";
+  return b.amountMinor > 0 ? "pending" : "covered";
+}

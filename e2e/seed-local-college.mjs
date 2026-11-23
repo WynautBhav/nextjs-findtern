@@ -10,7 +10,7 @@
  *   … node e2e/seed-local-college.mjs --yes --students=2000   # same world at another size (50 to 20000; default 500)
  *   DATABASE_URL=postgresql://…@127.0.0.1:5435/<db> node e2e/seed-local-college.mjs --refresh-meets
  *       # no wipe: the open drive meet requests start again (a request lapses 10 minutes after its start, so the
- *       # "Meets not answered" list empties itself about 20 minutes after seeding; run this before testing it)
+ *       # "Drive meets not answered" list empties itself about 20 minutes after seeding; run this before testing it)
  *
  * LOCAL ONLY: refuses any host that is not 127.0.0.1 / localhost. It empties accounts, activity and payments (rows
  * only; the schema, migration record, colleges, plans, settings, terms and website_* content stay), then seeds. One
