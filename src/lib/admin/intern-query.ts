@@ -8,6 +8,7 @@ import { aiInterviewAt, aiInterviewStatus, findternScoreSql } from "@/lib/admin/
 import { loadLedgerByIntern, loadPlacementDues, type PlacementDueRow } from "@/lib/admin/payout-list";
 import { activeAccountSql } from "@/lib/admin/account-views";
 import { maskTail } from "@/lib/admin/identity-mask";
+import { courseExpr, courseFilterSql, courseOptions, parseCourse } from "@/lib/admin/intern-course";
 import { internMoney, matchesDue, todayIstIso, type DueFilter, type InternMoney } from "@/lib/admin/intern-list";
 
 /**
@@ -48,6 +49,20 @@ export type InternRow = {
 
 /** Hired = status "hired" or a hire timestamp (legacy rule, lib/hire-status). */
 const HIRED = sql`(lower(p.status) = 'hired' OR p.hired_at IS NOT NULL)`;
+
+/** Course filter options: the distinct degrees stored on intern profiles. */
+export async function loadInternCourses() {
+  const o = schema.internOnboarding;
+  const course = courseExpr(o.extraData);
+  const rows = await getDb()
+    .select({ course })
+    .from(o)
+    .innerJoin(schema.users, eq(schema.users.id, o.userId))
+    .where(eq(schema.users.role, "intern"))
+    .groupBy(course)
+    .limit(500);
+  return courseOptions(rows.map((r) => r.course));
+}
 
 export async function loadInterns(
   params: Record<string, string>,
@@ -127,6 +142,7 @@ export async function loadInterns(
     params.hired === "yes" ? hiredExists : params.hired === "no" ? sql`not ${hiredExists}` : undefined,
     params.offer === "full_time" ? fullTime : params.offer === "internship" ? and(hiredExists, sql`not ${fullTime}`) : undefined,
     params.payment === "paid" ? feePaid : params.payment === "unpaid" ? sql`not ${feePaid}` : undefined,
+    courseFilterSql(o.extraData, parseCourse(params)),
     dueCondition,
   ].filter(Boolean) as SQL[];
   const where = and(...conditions);
