@@ -16,6 +16,7 @@ import { humanizeStatus, proposalStatus } from "@/components/app/status";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { interviewLifecycle } from "@/lib/interview-lifecycle";
 import { effectiveStatus } from "@/lib/college/meetings";
+import { cgpaText } from "@/lib/college/master-row";
 import { aiStatusLabel, cohortGoal, membershipLabel, yearLabel, ago } from "@/lib/college/labels";
 import { auditCollegeView, requireCollegeContext, studentForCollegeAdmin } from "@/lib/college/scope";
 import { getDb, schema } from "@/lib/db";
@@ -262,7 +263,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
         <ul className="grid grid-cols-2 gap-3 xl:grid-cols-4" aria-label="At a glance">
           {/* A claimed student's figures are hidden, not zero: never say "not started" or "none" about data the officer may not see. */}
           <Kpi on label="Findtern score" value={ai.done && student.score !== null ? student.score.toFixed(1) : "—"} hint={!verified ? HIDDEN_HINT : ai.done ? "out of 10" : ai.label} />
-          <Kpi label="CGPA" value={student.cgpa?.toFixed(1) ?? "—"} hint={!verified ? HIDDEN_HINT : student.cgpa !== null ? "out of 10" : "Not entered"} />
+          <Kpi label="CGPA" value={student.cgpa !== null ? cgpaText(student.cgpa) : "—"} hint={!verified ? HIDDEN_HINT : student.cgpa !== null ? "out of 10" : "Not entered"} />
           <Kpi label="Offers" value={verified ? String(proposals.length) : "—"} hint={!verified ? HIDDEN_HINT : student.offersPending > 0 ? `${student.offersPending} waiting on reply` : student.hired > 0 ? "Hired" : "None waiting"} />
           <Kpi label="Meetings" value={verified ? String(meetings) : "—"} hint={!verified ? HIDDEN_HINT : calls.length > 0 ? `${calls.length} from your drives` : "Interviews, calls"} />
         </ul>

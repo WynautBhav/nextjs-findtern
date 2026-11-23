@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 const { redactUnverified, toStudentRow } = await import("../college/serialize.ts");
-const { csvCell, toCsv, buildMasterRow, cellText } = await import("../college/master-row.ts");
+const { csvCell, toCsv, buildMasterRow, cellText, cgpaText } = await import("../college/master-row.ts");
 
 const NOW = new Date("2026-11-23T04:00:00Z");
 const base = {
@@ -61,4 +61,16 @@ test("WP2-03: last seen in the CSV is India time, not a UTC ISO string", () => {
   assert.equal(cellText(row, "lastSeenAt"), "2026-11-23 01:30 IST");
   assert.equal(cellText({ ...row, lastSeenAt: null }, "lastSeenAt"), "");
   assert.equal(cellText({ ...row, lastSeenAt: "not a date" }, "lastSeenAt"), "");
+});
+
+test("WP2-05: a CGPA keeps the precision the student entered, so the table, the CSV and the filters agree", () => {
+  assert.equal(cgpaText(8.47), "8.47");
+  assert.equal(cgpaText(7.96), "7.96");
+  assert.equal(cgpaText(8.5), "8.5");
+  assert.equal(cgpaText(9), "9.0");
+  assert.equal(cgpaText(6.05), "6.05");
+  const row = { ...buildMasterRow({ ...base, status: "verified" as const }, undefined), cgpa: 8.47 };
+  assert.equal(cellText(row, "cgpa"), "8.47");
+  assert.equal(cellText({ ...row, cgpa: 7.5 }, "cgpa"), "7.5");
+  assert.equal(cellText({ ...row, score: 7.4 }, "score"), "7.4", "the Findtern score keeps one decimal");
 });

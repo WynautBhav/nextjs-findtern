@@ -10,6 +10,7 @@ import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { COHORTS, HIDDEN_REASONS, aiStatusLabel, ago, yearLabel } from "@/lib/college/labels";
 import type { HiddenReason } from "@/lib/college/student-readiness";
 import type { RosterListRow } from "@/lib/college/scope";
+import { cgpaText } from "@/lib/college/master-row";
 import { cn } from "@/lib/utils";
 import { EmptyScene, Pill, SURFACE_CLASS } from "@/components/app/primitives";
 import { CopyText } from "./copy-text";
@@ -485,7 +486,7 @@ function StudentCard({ s, now }: { s: StudentRow; now: number }) {
         </div>
         <div>
           <p className="text-xs text-text-subtle">CGPA</p>
-          <p className={cn("nums text-lg font-medium leading-tight", s.cgpa !== null ? "text-ink-900" : "text-ink-400")}>{s.cgpa?.toFixed(1) ?? "—"}</p>
+          <p className={cn("nums text-lg font-medium leading-tight", s.cgpa !== null ? "text-ink-900" : "text-ink-400")}>{s.cgpa !== null ? cgpaText(s.cgpa) : "—"}</p>
         </div>
         {s.offersPending > 0 ? (
           <span className="relative z-10 ml-auto">

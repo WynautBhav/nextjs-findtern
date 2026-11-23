@@ -376,6 +376,14 @@ export function driveCalls(m: Pick<Meetings, "callsAccepted" | "callsNotTaken" |
     .join(" · ");
 }
 
+/**
+ * A CGPA as the student entered it: one decimal when that says it all (8.5), two when it needs them (8.47). A CGPA of 8.47 read as
+ * "8.5" disagreed with the "8.5+" filter that leaves it out, and the officer could not check an eligibility cut-off from the file.
+ */
+export function cgpaText(v: number): string {
+  return Math.abs(v * 10 - Math.round(v * 10)) < 1e-9 ? v.toFixed(1) : v.toFixed(2);
+}
+
 /** An instant as India time for the file an officer opens in a spreadsheet: "2026-11-23 08:28 IST" (the ISO text read as UTC). */
 export function istStamp(iso: string): string {
   const t = Date.parse(iso);
@@ -416,7 +424,7 @@ export function cellText(row: MasterRow, key: MasterColumn["key"], origin = ""):
       if (Array.isArray(v)) return v.join(", ");
       if (typeof v === "boolean") return v ? "Yes" : "No";
       // Scores always carry one decimal (6.0, not 6); counts and years never do.
-      if (typeof v === "number") return SCORE_KEYS.has(key) ? v.toFixed(1) : String(Math.round(v));
+      if (typeof v === "number") return key === "cgpa" ? cgpaText(v) : SCORE_KEYS.has(key) ? v.toFixed(1) : String(Math.round(v));
       return String(v);
     }
   }
