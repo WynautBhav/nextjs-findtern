@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 
 import { HIGH_CGPA, STRONG_SCORE, quadrantOf, type Quadrant } from "@/lib/college/insights";
+import { cgpaText } from "@/lib/college/master-row";
 import { cn } from "@/lib/utils";
 
 export type ScorePoint = { userId: string; name: string; score: number; cgpa: number };
@@ -68,7 +69,7 @@ export function ScoreVsCgpa({ points }: { points: ScorePoint[] }) {
                 r={pick === q.id ? 4 : 3.2}
                 className={cn(q.dot, "transition-opacity duration-200 motion-reduce:transition-none", pick && pick !== q.id ? "opacity-15" : "opacity-85")}
               >
-                <title>{`${p.name}: score ${p.score.toFixed(1)}, CGPA ${p.cgpa.toFixed(1)}`}</title>
+                <title>{`${p.name}: score ${p.score.toFixed(1)}, CGPA ${cgpaText(p.cgpa)}`}</title>
               </circle>
             );
           })}
@@ -110,7 +111,7 @@ export function ScoreVsCgpa({ points }: { points: ScorePoint[] }) {
                 <li key={p.userId}>
                   <Link href={`/college/students/${p.userId}`} className="flex items-center gap-3 py-2 text-sm hover:underline hover:underline-offset-4 focus-visible:outline-2 focus-visible:outline-brand-600">
                     <span className="min-w-0 flex-1 truncate font-medium text-ink-900">{p.name}</span>
-                    <span className="nums text-xs text-text-subtle">CGPA <span className="text-ink-800">{p.cgpa.toFixed(1)}</span></span>
+                    <span className="nums text-xs text-text-subtle">CGPA <span className="text-ink-800">{cgpaText(p.cgpa)}</span></span>
                     <span className="nums w-8 text-right font-medium text-ink-900">{p.score.toFixed(1)}</span>
                   </Link>
                 </li>

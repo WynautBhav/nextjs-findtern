@@ -10,6 +10,7 @@ import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { COHORTS, HIDDEN_REASONS, aiStatusLabel, ago, yearLabel } from "@/lib/college/labels";
 import type { HiddenReason } from "@/lib/college/student-readiness";
 import type { RosterListRow } from "@/lib/college/scope";
+import { cgpaText } from "@/lib/college/master-row";
 import { cn } from "@/lib/utils";
 import { EmptyScene, Pill, SURFACE_CLASS } from "@/components/app/primitives";
 import { CopyText } from "./copy-text";
@@ -122,11 +123,19 @@ export function StudentCards({
 
   const counts = useMemo(() => {
     const c: Record<string, number> = { all: students.length };
-    for (const s of students) c[String(s.year)] = (c[String(s.year)] ?? 0) + 1;
+    for (const s of students) c[String(s.year ?? 0)] = (c[String(s.year ?? 0)] ?? 0) + 1;
     return c;
   }, [students]);
 
-  const inYear = useMemo(() => students.filter((s) => cohort === "all" || s.year === cohort), [students, cohort]);
+  // Every year the college has students in, so the year counts add up to "All years" (COHORTS alone left 1st years unreachable).
+  const yearTabs = useMemo(() => {
+    const goals = new Map<number, string>(COHORTS.map((c) => [c.year, c.goal]));
+    const years = [...new Set(students.map((s) => s.year).filter((y): y is number => y !== null))].sort((x, y) => x - y);
+    const tabs = years.map((year) => ({ year, label: yearLabel(year), goal: goals.get(year) ?? "" }));
+    // 0 = no year on file (those students would otherwise be in "All years" only).
+    return students.some((s) => s.year === null) ? [...tabs, { year: 0, label: "Year not set", goal: "" }] : tabs;
+  }, [students]);
+  const inYear = useMemo(() => students.filter((s) => cohort === "all" || (cohort === 0 ? s.year === null : s.year === cohort)), [students, cohort]);
   const filterCounts = useMemo(() => Object.fromEntries(FILTERS.map((f) => [f.id, inYear.filter((s) => matches(s, f.id, now)).length])) as Record<Filter, number>, [inYear, now]);
   const stageCounts = useMemo(() => {
     const c = Object.fromEntries(STAGES.map((g) => [g.id, 0])) as Record<Stuck, number>;
@@ -164,7 +173,7 @@ export function StudentCards({
     <div role="group" aria-label="Year" className="-mx-4 flex shrink-0 items-center gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:px-0">
                 <span aria-hidden className="text-xs text-text-subtle">Year</span>
                 <div className="inline-flex rounded-full bg-ink-100 p-1">
-                  {[{ year: "all" as const, label: "All years", goal: "" }, ...COHORTS].map((c) => {
+                  {[{ year: "all" as const, label: "All years", goal: "" }, ...yearTabs].map((c) => {
                     const on = cohort === c.year;
                     return (
                       <button
@@ -477,7 +486,7 @@ function StudentCard({ s, now }: { s: StudentRow; now: number }) {
         </div>
         <div>
           <p className="text-xs text-text-subtle">CGPA</p>
-          <p className={cn("nums text-lg font-medium leading-tight", s.cgpa !== null ? "text-ink-900" : "text-ink-400")}>{s.cgpa?.toFixed(1) ?? "—"}</p>
+          <p className={cn("nums text-lg font-medium leading-tight", s.cgpa !== null ? "text-ink-900" : "text-ink-400")}>{s.cgpa !== null ? cgpaText(s.cgpa) : "—"}</p>
         </div>
         {s.offersPending > 0 ? (
           <span className="relative z-10 ml-auto">

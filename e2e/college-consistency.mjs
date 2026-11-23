@@ -133,6 +133,57 @@ const inDrive = students.filter((s) => (calls.get(s.user_id) ?? []).some((c) => 
 const shownInDrive = students.filter((s) => shown.get(s.email.toLowerCase())?.driveCalls).length;
 if (inDrive !== shownInDrive) failures.push(`students with a drive call: tables ${inDrive}, master data ${shownInDrive}`);
 
+// ── C2: the numbers on the TPO dashboard, Students, Master data and the admin college pages equal the database. ──────────
+// Plain SQL oracles (not the app's code); every figure is read from the rendered text of the page that shows it.
+const text = (html) => html.replace(/<script[\s\S]*?<\/script>/g, " ").replace(/<style[\s\S]*?<\/style>/g, " ").replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/&#x27;/g, "'").replace(/\s+/g, " ");
+const adminLogin = await fetch(`${BASE}/api/auth/admin/login`, { method: "POST", headers: { "content-type": "application/json", origin: BASE, "x-forwarded-for": `10.9.${Math.floor(Math.random() * 256)}.${1 + Math.floor(Math.random() * 250)}` }, body: JSON.stringify({ email: process.env.ADMIN_EMAIL ?? "admin@findtern.dev", password: process.env.ADMIN_PASSWORD ?? TPO.password }) });
+const tpoJar = jar.join("; ");
+const adminJar = adminLogin.ok ? adminLogin.headers.getSetCookie().map((c) => c.split(";")[0]).join("; ") : null;
+const page = async (path, cookie) => text(await (await fetch(`${BASE}${path}`, { headers: { cookie }, redirect: "manual" })).text());
+const num = (t, re) => { const m = t.match(re); return m ? Number(m[1].replace(/,/g, "")) : null; };
+const check = (what, got, want) => { if (got !== want) failures.push(`${what}: page shows ${got}, database says ${want}`); };
+const one = async (sql, p = []) => Object.values((await q(sql, p))[0] ?? {})[0];
+const cid = college.id;
+const live = `m.college_id = $1 AND m.left_at IS NULL`;
+const members = Number(await one(`SELECT count(*) FROM college_memberships m WHERE ${live}`, [cid]));
+const verifiedN = Number(await one(`SELECT count(*) FROM college_memberships m WHERE ${live} AND m.status = 'verified'`, [cid]));
+const claimedN = members - verifiedN;
+const rosterN = Number(await one(`SELECT count(*) FROM college_roster WHERE college_id = $1`, [cid]));
+const noAccount = Number(await one(`SELECT count(*) FROM college_roster r WHERE r.college_id = $1 AND NOT EXISTS (SELECT 1 FROM users u WHERE lower(u.email) = r.email)`, [cid]));
+const noScore = Number(await one(`SELECT count(*) FROM college_memberships m LEFT JOIN intern_onboarding o ON o.user_id = m.user_id WHERE ${live} AND m.status = 'verified' AND jsonb_typeof(o.extra_data->'findternScore') IS DISTINCT FROM 'number'`, [cid]));
+const real = `p.employer_id <> 'admin' AND lower(coalesce((SELECT company_email FROM employers e WHERE e.id = p.employer_id), '')) <> 'ai-interview@findtern.ai'`;
+const offers24 = Number(await one(`SELECT count(*) FROM proposals p JOIN college_memberships m ON m.user_id = p.intern_id AND ${live} AND m.status = 'verified' WHERE p.status <> 'draft' AND ${real} AND p.created_at > (now() AT TIME ZONE 'UTC') - interval '24 hours'`, [cid]));
+const hires24 = Number(await one(`SELECT count(*) FROM proposals p JOIN college_memberships m ON m.user_id = p.intern_id AND ${live} AND m.status = 'verified' WHERE ${real} AND p.hired_at > (now() AT TIME ZONE 'UTC') - interval '24 hours'`, [cid]));
+const withOffer = Number(await one(`SELECT count(DISTINCT p.intern_id) FROM proposals p JOIN college_memberships m ON m.user_id = p.intern_id AND ${live} AND m.status = 'verified' WHERE p.status <> 'draft' AND ${real}`, [cid]));
+const hiredN = Number(await one(`SELECT count(DISTINCT p.intern_id) FROM proposals p JOIN college_memberships m ON m.user_id = p.intern_id AND ${live} AND m.status = 'verified' WHERE (p.hired_at IS NOT NULL OR p.status IN ('hired', 'completed')) AND ${real}`, [cid]));
+const scoredN = verifiedN - noScore;
+
+const dash = await page("/college", tpoJar);
+check("/college 'Verified on Findtern'", num(dash, /Verified on Findtern\s+([\d,]+)/), verifiedN);
+check("/college 'On your list'", num(dash, /On your list\s+([\d,]+)/), rosterN);
+check("/college 'AI interview done'", num(dash, /AI interview done\s+([\d,]+)/), scoredN);
+check("/college 'Got an offer'", num(dash, /Got an offer\s+([\d,]+)/), withOffer);
+check("/college tile 'AI interview not done'", num(dash, /AI interview not done\s+([\d,]+)/), noScore);
+check("/college tile 'Not joined yet'", num(dash, /Not joined yet\s+([\d,]+)/), noAccount);
+check("/college tile 'Waiting for approval'", num(dash, /Waiting for approval\s+([\d,]+)/) ?? 0, claimedN);
+check("/college last 24 h new offers", num(dash, /Last 24 hours:\s*([\d,]+) new offers/), offers24);
+check("/college last 24 h hires", num(dash, /new offers\s*·\s*([\d,]+) hires?/), hires24);
+const studentsPage = await page("/college/students", tpoJar);
+check("/college/students 'Verified students'", num(studentsPage, /Verified students\s+([\d,]+)/), verifiedN);
+const md = await page("/college/master-data", tpoJar);
+check("/college/master-data header students", num(md, /Master data\s+([\d,]+) students/), members);
+check("/college/master-data header waiting", num(md, /([\d,]+) waiting for your approval/) ?? 0, claimedN);
+check("/college/approvals 'Waiting for you'", num(await page("/college/approvals", tpoJar), /Waiting for you\s+([\d,]+)/) ?? 0, claimedN);
+if (!adminJar) failures.push(`admin login failed (${adminLogin.status}): admin pages not checked`);
+else {
+  const adminCollege = await page(`/admin/colleges/${cid}`, adminJar);
+  check("/admin/colleges/<id> 'Students in this college'", num(adminCollege, /Students in this college\s*([\d,]+)/), members);
+  check("/admin/colleges/<id> Students tab count", num(adminCollege, /Students\s+([\d,]+)\s+Wallet/), claimedN);
+  const list = await page("/admin/colleges", adminJar);
+  check("/admin/colleges row 'Students'", num(list, /JK Lakshmipat University\s+Code \S+ · [^\d]*?(\d[\d,]*)\s+\d+ of/), members);
+}
+console.log(`[consistency] C2: members ${members} (verified ${verifiedN}, waiting ${claimedN}), roster ${rosterN}, offers 24h ${offers24}, hires 24h ${hires24}`);
+
 await db.end();
 console.log(`[consistency] ${students.length} students · students with data per column ${JSON.stringify(tally)} · in a drive call ${inDrive}`);
 if (failures.length) {
