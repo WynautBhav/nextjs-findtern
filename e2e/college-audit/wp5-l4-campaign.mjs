@@ -34,8 +34,10 @@ await sleep(2500);
 report("after campaign:");
 const camp2 = await admin.post(`/api/admin/drive-orders/${orderId}/campaign`);
 check("campaign repeat queues 0", camp2.json?.queued === 0, camp2.text);
-const tick = await fetch(process.env.BASE + "/api/cron/email-outbox", { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } });
-console.log("tick", tick.status, await tick.text());
+// The outbox is one global queue, so mail queued earlier (other tests, other orders) goes first: tick the cron until it is empty.
+let tick;
+for (let i = 0; i < 30; i++) { tick = await (await fetch(process.env.BASE + "/api/cron/email-outbox", { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } })).json(); if (tick.stoppedBy === "empty") break; }
+console.log("tick", JSON.stringify(tick));
 await sleep(500);
 for (const [n, e] of [["un1", D("un1")], ["un2", D("un2")]]) check(`${n} got exactly one code mail`, by(e).filter((b) => CODE.test(b)).length === 1, JSON.stringify(by(e).map(subj)));
 const un1c = await codeOfRow(importId, 5);

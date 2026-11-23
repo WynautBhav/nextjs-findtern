@@ -2,6 +2,7 @@
 //   source ~/.cache/findtern-college-audit/env.sh; use_wp 5; node e2e/college-audit/wp5-l1-approvals.mjs
 import { login, q, mkUser, check, failures, closeDb, SFX, JKLU, JKLU_CODE, POORNIMA_CODE, POORNIMA } from "./wp5-lib.mjs";
 
+const PH = `98${String(Math.floor(Math.random() * 1e8)).padStart(8, "0")}`;
 const tpo = await login("tpo", "tpo@jklu.edu.in");
 const admin = await login("admin", "admin@findtern.dev");
 const decide = (api, ids, action) => api.post("/api/college/students/decide", { userIds: ids, action });
@@ -11,7 +12,7 @@ const mem = async (id) => (await q("select college_id,status,verified_by,left_at
 const A = await mkUser({ first: "Asha", last: "Rao", email: `asha.rao.${SFX}@gmail.com` }); // list + same name
 const B = await mkUser({ first: "Vikram", last: "Mehta", email: `vikram.${SFX}@gmail.com` }); // list email, different name
 const C = await mkUser({ first: "Carl", last: "Dsouza", email: `carl.${SFX}@gmail.com`, verified: false }); // unverified
-const D = await mkUser({ first: "Diya", last: "Jain", email: `diya.${SFX}@gmail.com`, phone: "9811100001" }); // phone-only
+const D = await mkUser({ first: "Diya", last: "Jain", email: `diya.${SFX}@gmail.com`, phone: PH }); // phone-only
 const E = await mkUser({ first: "Eve", last: "Stranger", email: `eve.${SFX}@gmail.com` }); // nowhere
 const F = await mkUser({ first: "Farah", last: "Khan", email: `farah.${SFX}@gmail.com` }); // in Poornima
 const G = await mkUser({ first: "Gina", last: "Paul", email: `gina.${SFX}@jklu.edu.in` }); // college domain
@@ -24,7 +25,7 @@ const csv = [
   `Asha Rao,${A.email},`,
   `Ravi Kumar,${B.email},`,
   `Carl Dsouza,${C.email},`,
-  `Diya Jain,diya.alt.${SFX}@college.in,9811100001`,
+  `Diya Jain,diya.alt.${SFX}@college.in,${PH}`,
   `Farah Khan,${F.email},`,
   `Ivan Roy,${I.email},`,
   `Fred Frozen,${Fr.email},`,
@@ -39,7 +40,7 @@ check("A (list, same name) offered to TPO", approvalsWaiting("Asha Rao"));
 check("G (college domain) offered", approvalsWaiting("Gina Paul"));
 check("B (list email, different name) NOT shown to TPO", !approvalsWaiting("Vikram") && !approvalsWaiting("Ravi Kumar"));
 check("C (unverified) NOT shown", !approvalsWaiting("Carl Dsouza"));
-check("D (phone only) NOT shown (no name/phone leak)", !approvalsWaiting("Diya") && !page.includes("9811100001") && !page.includes("1001"));
+check("D (phone only) NOT shown (no name/phone leak)", !approvalsWaiting("Diya") && !page.includes(PH) && !page.includes("1001"));
 check("E stranger NOT shown", !approvalsWaiting("Eve"));
 check("F (other college member) NOT shown", !approvalsWaiting("Farah"));
 check("I (disabled) NOT shown", !approvalsWaiting("Ivan"));

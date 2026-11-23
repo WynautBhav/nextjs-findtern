@@ -46,7 +46,7 @@ const officerMails = log.split("--- ").filter((b) => /^20\d\d-/.test(b) && /aske
 console.log("officer mails:", officerMails.length, "recipients:", officerMails.map((b) => b.match(/^To: (.*)$/m)?.[1]).join(" | "));
 check("only the college's officer was mailed (3 requests -> 3 mails, to tpo only)", officerMails.every((b) => /^To: tpo@jklu.edu.in$/m.test(b)), "");
 const m1 = officerMails.find((b) => /Leo One/.test(b));
-check("hostile reason is not raw HTML in mail", m1 && !/<script>/.test(m1.replace(/^[\s\S]*?<html/i, "")) , "text part shown; html part checked below");
+check("officer mail carries the reason as plain text (HTML escaping is covered by src/lib/emails.test.ts)", !!m1 && m1.includes("Reason: <script>alert(1)</script>"), "")
 console.log((m1 ?? "").slice(0, 400));
 
 // TPO list
