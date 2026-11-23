@@ -48,7 +48,7 @@ export function Averages({ data, className }: { data: PlacementData; className?:
     <div className={cn("flex gap-8", className)}>
       {figs.map(([label, value]) => (
         <div key={label} className="min-w-0">
-          <p className="text-[13px] text-on-dark-subtle">{label}</p>
+          <p className="text-[13px] text-on-dark">{label}</p>
           <p className="nums mt-1 text-[1.75rem] font-light leading-none tracking-[-0.03em] text-white">{value}</p>
         </div>
       ))}
@@ -80,16 +80,16 @@ export function Meetings({ data, className }: { data: PlacementData; className?:
     <section className={cn("grid gap-x-10 gap-y-4 sm:grid-cols-[auto_1fr] sm:items-end", className)} aria-label="Meetings with employers">
       <div className="flex gap-8">
         <div>
-          <p className="text-[13px] text-on-dark-subtle">Meetings conducted</p>
+          <p className="text-[13px] text-on-dark">Meetings conducted</p>
           <p className="nums mt-1 text-[1.75rem] font-light leading-none tracking-[-0.03em] text-accent-300">{n(m.done)}</p>
         </div>
         <div>
-          <p className="text-[13px] text-on-dark-subtle">Not accepted</p>
+          <p className="text-[13px] text-on-dark">Not accepted</p>
           <p className="nums mt-1 text-[1.75rem] font-light leading-none tracking-[-0.03em] text-white">{n(m.notAccepted)}</p>
         </div>
       </div>
       <div className="min-w-0">
-        <p className="mb-2 text-[13px] text-on-dark-subtle">
+        <p className="mb-2 text-[13px] text-on-dark">
           <span className="nums text-white">{n(m.total)}</span> meetings asked for by employers, with <span className="nums text-white">{n(m.students)}</span> students
         </p>
         <div className="flex h-2.5 gap-0.5 overflow-hidden" role="img" aria-label={`${m.total} meetings: ${parts.map((p) => `${p.label} ${p.v}`).join(", ")}`}>

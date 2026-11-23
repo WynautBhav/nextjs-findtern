@@ -58,7 +58,7 @@ export function HeroModes({ students, data, initialMode, initialDesign, rows, co
                 sync(m.id, m.id === "students" ? 0 : design[m.id]);
               }}
               className={cn(
-                "min-h-9 rounded-full px-4 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-white/80",
+                "min-h-9 rounded-full px-4 text-sm font-medium outline-none max-lg:min-h-11 transition-colors focus-visible:ring-2 focus-visible:ring-white/80",
                 mode === m.id ? "bg-white text-brand-900" : "text-white/80 hover:bg-white/10 hover:text-white",
               )}
             >
@@ -68,7 +68,7 @@ export function HeroModes({ students, data, initialMode, initialDesign, rows, co
         </div>
         {mode !== "students" && list.length > 1 ? (
           <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Compare designs">
-            <span className="mr-1 text-xs text-on-dark-subtle">Design</span>
+            <span className="mr-1 text-xs text-on-dark">Design</span>
             {list.map((d, i) => (
               <button
                 key={d.name}
@@ -81,7 +81,7 @@ export function HeroModes({ students, data, initialMode, initialDesign, rows, co
                   sync(mode, i);
                 }}
                 className={cn(
-                  "nums grid size-8 place-items-center rounded-full text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-white/80",
+                  "nums grid size-8 place-items-center max-lg:size-11 rounded-full text-xs font-medium outline-none focus-visible:ring-2 focus-visible:ring-white/80",
                   current === i ? "bg-accent-400 text-brand-950" : "bg-white/10 text-white hover:bg-white/20",
                 )}
               >
@@ -91,7 +91,7 @@ export function HeroModes({ students, data, initialMode, initialDesign, rows, co
           </div>
         ) : null}
       </div>
-      {mode !== "students" && list.length > 1 ? <p className="mt-2 text-right text-xs text-on-dark-subtle">{list[current].name}</p> : null}
+      {mode !== "students" && list.length > 1 ? <p className="mt-2 text-right text-xs text-on-dark">{list[current].name}</p> : null}
 
       <div role="tabpanel" aria-label={MODES.find((m) => m.id === mode)?.label}>
         {mode === "students" ? students : mode === "categories" ? (() => { const C = CATEGORY_DESIGNS[current].Component; return <C data={data.categories} />; })() : (() => { const C = PLACEMENT_DESIGNS[current].Component; return <C data={data.placement} />; })()}

@@ -30,7 +30,7 @@ export function Swatch({ fill, className }: { fill: string; className?: string }
 /** A legend; an item with `drill` opens Master data for its students (the Overview pop-up). */
 export function Legend({ items, className }: { items: { label: string; fill: string; value?: number; drill?: { title: string; filters: DrillFilters } }[]; className?: string }) {
   return (
-    <ul className={cn("flex flex-wrap gap-x-5 gap-y-2 text-xs text-on-dark-subtle", className)}>
+    <ul className={cn("flex flex-wrap gap-x-5 gap-y-2 text-xs text-on-dark", className)}>
       {items.map((i) => {
         const body = (
           <>
@@ -59,9 +59,9 @@ export function Legend({ items, className }: { items: { label: string; fill: str
 export function Figure({ label, value, note, gold = false, size = "md" }: { label: string; value: React.ReactNode; note?: React.ReactNode; gold?: boolean; size?: "md" | "lg" }) {
   return (
     <div className="min-w-0">
-      <p className="text-[13px] text-on-dark-subtle">{label}</p>
+      <p className="text-[13px] text-on-dark">{label}</p>
       <p className={cn("nums mt-1 font-light leading-none tracking-[-0.03em]", size === "lg" ? "text-[2.5rem]" : "text-[1.75rem]", gold ? "text-accent-300" : "text-white")}>{value}</p>
-      {note ? <p className="nums mt-1.5 text-xs text-on-dark-subtle">{note}</p> : null}
+      {note ? <p className="nums mt-1.5 text-xs text-on-dark">{note}</p> : null}
     </div>
   );
 }

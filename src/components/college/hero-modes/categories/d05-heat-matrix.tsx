@@ -71,7 +71,7 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
     <DesignFrame label="Degrees by Findtern band as a heat matrix" finding={finding(data, "degree")}>
       <div className="grid gap-8 lg:grid-cols-[1fr_19rem] lg:gap-10">
         <div className="min-w-0">
-          <div className={cn(grid, "mb-1.5 text-[11px] text-on-dark-subtle sm:text-xs")}>
+          <div className={cn(grid, "mb-1.5 text-[11px] text-on-dark sm:text-xs")}>
             <span />
             {COLS.map((c) => {
               const b = data.coffee.find((x) => x.key === c.key)!;
@@ -110,7 +110,7 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
               </div>
             ))}
             <div className={cn(grid, "pt-1")}>
-              <span className="text-sm text-on-dark-subtle">All</span>
+              <span className="text-sm text-on-dark">All</span>
               {COLS.map((c) => {
                 const v = data.coffee.find((x) => x.key === c.key)?.students ?? 0;
                 return (
@@ -137,7 +137,7 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
           <Block title="Done with the AI interview">
             <NumLink filters={{ band: "done" }} title="Done with the AI interview" label={`${data.interviewed} students done with the AI interview`} className="flex items-baseline gap-2">
               <span className="nums text-[2.5rem] font-light leading-none tracking-[-0.03em] text-white">{n(data.interviewed)}</span>
-              <span className="nums text-sm text-on-dark-subtle">
+              <span className="nums text-sm text-on-dark">
                 of {n(data.students)} students · {pct(data.interviewed, data.students)}%
               </span>
             </NumLink>
@@ -147,7 +147,7 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
               {data.marks.map((b) => {
                 const o = level(b.students, maxMarks);
                 return (
-                  <li key={b.key} className="min-w-0 text-[11px] text-on-dark-subtle sm:text-xs">
+                  <li key={b.key} className="min-w-0 text-[11px] text-on-dark sm:text-xs">
                     <DrillLink title={`CGPA / % ${b.name} (${b.range})`} filters={{ marks: b.key }} aria-label={`CGPA / % ${b.name} (${b.range}): ${b.students} students. Open in Master data`} className={cn("group block rounded-md", FOCUS)}>
                       <span className="relative grid h-11 place-items-center rounded-md transition-transform group-hover:-translate-y-px sm:h-12" style={{ background: white(0.05) }}>
                         <span className="absolute inset-0 rounded-md" style={{ background: MARKS_FILL[b.key], opacity: o }} aria-hidden />
@@ -161,7 +161,7 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
                 );
               })}
             </ul>
-            {data.marksMissing > 0 ? <p className="nums mt-1.5 text-xs text-on-dark-subtle">{n(data.marksMissing)} with no CGPA or % on file</p> : null}
+            {data.marksMissing > 0 ? <p className="nums mt-1.5 text-xs text-on-dark">{n(data.marksMissing)} with no CGPA or % on file</p> : null}
           </Block>
           <Block title="Year of study, share interviewed" className="mt-5">
             <ul className="flex flex-wrap gap-x-4 gap-y-2" aria-label="Students by year">
@@ -169,7 +169,7 @@ export function HeatMatrix({ data }: { data: CategoriesData }) {
                 <li key={y.year}>
                   <DrillLink title={`Year ${y.year}`} filters={{ year: y.year }} aria-label={`Year ${y.year}: ${y.interviewed} of ${y.students} interviewed. Open in Master data`} className={cn("group flex items-center gap-2 whitespace-nowrap rounded-md pr-1", FOCUS)}>
                     <Ring share={pct(y.interviewed, y.students)} />
-                    <span className="nums text-xs text-on-dark-subtle">
+                    <span className="nums text-xs text-on-dark">
                       <span className="block text-[13px] text-white group-hover:underline">Year {y.year}</span>
                       <span className="text-white">{n(y.interviewed)}</span>/{n(y.students)}
                     </span>

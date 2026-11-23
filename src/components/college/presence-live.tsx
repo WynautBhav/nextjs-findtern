@@ -89,7 +89,7 @@ export function PresenceLive({
           </p>
           {showTitle ? (
             <h2 id="live-drive" className="mt-1 text-xl font-semibold tracking-[-0.02em] text-ink-900">
-              <Link href={`/college/drives/${driveId}`} className="hover:underline hover:underline-offset-4">
+              <Link href={`/college/drives/${driveId}`} className="inline-flex items-center hover:underline hover:underline-offset-4 max-lg:min-h-11">
                 {driveTitle}
               </Link>
             </h2>
@@ -166,11 +166,11 @@ export function PresenceLive({
               </div>
               <div className="mt-1.5 flex justify-between text-xs text-text-subtle">
                 <span>{fmt(starts)}</span>
-                <span>{fmt(ends)}</span>
+                <span>{fmt(ends)} IST</span>
               </div>
             </div>
           ) : (
-            <p className="mt-2 text-xs text-text-subtle">Open until {fmt(ends)}</p>
+            <p className="mt-2 text-xs text-text-subtle">Open until {fmt(ends)} IST</p>
           )}
           {snap.offline.length > 0 ? (
             <div className="mt-auto pt-5">
