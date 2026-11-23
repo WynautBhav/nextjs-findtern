@@ -22,12 +22,12 @@ import type { schema } from "@/lib/db";
 /** Each stage, as the employer reads it. */
 export const STAGE: Record<InterviewStage, { label: string; tone: Tone }> = {
   awaiting_pick: { label: "Waiting on candidate", tone: "waiting" },
-  expired: { label: "Expired", tone: "closed" },
-  employer_no_show: { label: "Expired", tone: "closed" },
+  expired: { label: "Meeting expired", tone: "closed" },
+  employer_no_show: { label: "Meeting expired", tone: "closed" },
   upcoming: { label: "Scheduled", tone: "live" },
   live: { label: "Happening now", tone: "new" },
   over: { label: "Completed", tone: "paid" },
-  missed: { label: "Missed", tone: "closed" },
+  missed: { label: "Meeting expired", tone: "closed" },
   closed: { label: "Closed", tone: "closed" },
 };
 

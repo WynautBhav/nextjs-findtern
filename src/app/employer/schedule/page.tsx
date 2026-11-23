@@ -27,9 +27,8 @@ const PAST_PAGE = 5;
 const STATUS_FILTERS: StatusFilter[] = [
   { value: "scheduled", label: "Scheduled", stages: ["upcoming", "live"] },
   { value: "sent", label: "Open offers", stages: ["awaiting_pick"] },
-  { value: "expired", label: "Expired", stages: ["expired", "employer_no_show"] },
+  { value: "expired", label: "Expired", stages: ["expired", "employer_no_show", "missed"] },
   { value: "completed", label: "Completed", stages: ["over"] },
-  { value: "missed", label: "Missed", stages: ["missed"] },
   { value: "cancelled", label: "Cancelled", stages: ["closed"] },
 ];
 

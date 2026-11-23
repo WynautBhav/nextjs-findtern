@@ -40,8 +40,10 @@ test("a hired candidate keeps Book meeting where hires are listed (Orders)", () 
   assert.match(src("src/components/employer/orders/hires-panel.tsx"), /label: "Book meeting"[^}]*disabled: h\.meetingOpen/);
 });
 
-test("the employer's no-show stage reads just Expired", () => {
+test("a no-show, a missed round and a lapsed one all read Meeting expired, on both sides (owner, 23 Nov)", () => {
   const s = src("src/app/employer/schedule/schedule-view.tsx");
-  assert.match(s, /employer_no_show: \{ label: "Expired",/);
+  for (const stage of ["expired", "employer_no_show", "missed"]) assert.match(s, new RegExp(`${stage}: \\{ label: "Meeting expired",`));
   assert.doesNotMatch(s, /employer didn't join/i);
+  const intern = src("src/components/meetings/intern-rows.tsx");
+  assert.doesNotMatch(intern, /label: "(Missed|Expired|Employer didn't join)"/);
 });

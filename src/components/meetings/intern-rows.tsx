@@ -111,7 +111,7 @@ export function PastMeetingRow({ i, title, company }: { i: InterviewRow; title: 
       {/* The pill already says "Interview done"; its generic sentence would repeat on every row. */}
       {outcome.label === "Interview done" ? null : <p className="mt-1 text-pretty text-sm text-text-subtle">{outcome.detail}</p>}
       {/* A missed round can carry feedback too; the employer is told it is shared. */}
-      {(outcome.label === "Interview done" || outcome.label === "Missed") && feedback ? (
+      {(outcome.label === "Interview done" || (i.status ?? "").toLowerCase() === "missed") && feedback ? (
         <div className="mt-2 rounded-apple-sm bg-brand-50/70 p-4">
           <p className="text-xs font-medium text-brand-800">Feedback from the company</p>
           <p className="mt-1 whitespace-pre-line text-pretty text-sm text-ink-800">{feedback}</p>
@@ -129,12 +129,12 @@ function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: Reac
   const status = (i.status ?? "").toLowerCase();
   if (status === "missed") {
     return {
-      label: "Missed",
+      label: "Meeting expired",
       tone: "closed",
       // INW-22: no off-platform contact; support handles it.
       detail: (
         <>
-          This round was marked as missed. If that is wrong, write to{" "}
+          This meeting expired. If that is wrong, write to{" "}
           <a href={`mailto:${SITE.email}`} className="font-medium text-brand-700 underline-offset-4 hover:underline">
             {SITE.email}
           </a>{" "}
@@ -164,14 +164,15 @@ function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: Reac
   }
   if (employerNoShow(i)) {
     return {
-      label: "Employer didn't join",
+      label: "Meeting expired",
       tone: "closed",
-      detail: "The company did not join within 30 minutes of the start, so this round expired. It does not count against you.",
+      icon: <CalendarX2 />,
+      detail: "This meeting expired. It does not count against you.",
     };
   }
   if (interviewLifecycle(i).expired) {
     return {
-      label: "Expired",
+      label: "Meeting expired",
       tone: "closed",
       icon: <CalendarX2 />,
       detail: i.selectedSlot ? "This interview's time passed and it was not marked complete. The company can offer new time slots." : "Nobody picked a time before the offer ran out, so it expired.",
@@ -181,7 +182,7 @@ function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: Reac
     return { label: "Interview done", tone: "paid", detail: "No written feedback yet. Any offer that follows lands in Offers." };
   }
   if (isStaleInterview(i)) {
-    return { label: "Expired", tone: "closed", detail: "Every offered time passed before one was picked, so this invite expired." };
+    return { label: "Meeting expired", tone: "closed", detail: "Every offered time passed before one was picked, so this invite expired." };
   }
   return { label: "Closed", tone: "neutral", detail: "This interview is closed." };
 }
