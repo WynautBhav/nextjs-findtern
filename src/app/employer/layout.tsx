@@ -14,6 +14,7 @@ import {
   KeyRound,
   Receipt,
   CalendarClock,
+  GraduationCap,
   Sparkles,
 } from "lucide-react";
 
@@ -32,6 +33,7 @@ import { SITE } from "@/lib/content/site";
 import { shouldShowTermsPrompt } from "@/lib/terms";
 import { getEmployerRows } from "@/lib/employer-request";
 import { gated } from "@/lib/request-gate";
+import { DRIVES_HREF, employerTabHrefs, withDrivesItem } from "@/lib/employer-nav";
 
 // The path in order: find, shortlist, offer, interview, hire, then timesheet and pay.
 // Shortlist is its own step of that path (the page, its title and the hiring-steps bar all
@@ -79,6 +81,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   let companyName = "Company Account";
   let unreadAlerts = 0;
   let cartCount = 0;
+  let hasDrives = false;
   // Unknown (a failed read) must not trap someone behind a pop-up they may have already accepted.
   let termsVersion: string | null | undefined;
   // Three independent reads, started together (through the per-request gate, so the page's other reads share the pool fairly). Each result is kept or dropped on its own, so one failed read
@@ -89,7 +92,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   const [empRes, countsRes] = await Promise.allSettled([
     getEmployerRows(session.uid),
     gated(() =>
-      db.execute<{ unread: string | number; cart: string | number }>(sql`
+      db.execute<{ unread: string | number; cart: string | number; drives: boolean }>(sql`
         SELECT
           (SELECT count(*) FROM ${schema.notifications}
             WHERE ${schema.notifications.recipientType} = 'employer' AND ${schema.notifications.recipientId} = ${session.uid} AND ${schema.notifications.isRead} = false) AS unread,
@@ -97,7 +100,12 @@ export default async function EmployerLayout({ children }: { children: React.Rea
           -- its steps strip: saved, legacy "checkout" rows included, and no live proposal yet (QA-124).
           (SELECT count(DISTINCT ci.intern_id) FROM ${schema.employerCartItems} ci
             WHERE ci.employer_id = ${session.uid} AND ci.list_type IN ('cart', 'checkout')
-              AND NOT EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.employer_id = ci.employer_id AND p.intern_id = ci.intern_id AND lower(btrim(p.status)) NOT IN ('rejected', 'withdrawn', 'expired'))) AS cart`),
+              AND NOT EXISTS (SELECT 1 FROM ${schema.proposals} p WHERE p.employer_id = ci.employer_id AND p.intern_id = ci.intern_id AND lower(btrim(p.status)) NOT IN ('rejected', 'withdrawn', 'expired'))) AS cart,
+          -- Campus drives: any drive this company has joined, or one it is invited to that has not ended. Read here, in the
+          -- layout every employer page shares, so the nav item cannot depend on which page is open.
+          (EXISTS (SELECT 1 FROM ${schema.collegeDriveEmployers} de WHERE de.employer_id = ${session.uid})
+            OR EXISTS (SELECT 1 FROM ${schema.collegeDrives} d, jsonb_array_elements(d.invited_employers) inv
+              WHERE d.ends_at > now() AND d.revoked_at IS NULL AND lower(btrim(inv->>'email')) = lower(btrim(${session.email}::text)))) AS drives`),
     ),
   ]);
   if (empRes.status === "fulfilled") {
@@ -109,6 +117,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     const row = countsRes.value.rows[0];
     unreadAlerts = Number(row?.unread ?? 0);
     cartCount = Number(row?.cart ?? 0);
+    hasDrives = row?.drives === true;
   }
   // A failed read leaves its fallback (0 = no badge, never a wrong number) but must not be silent.
   for (const [what, res] of [["company", empRes], ["alert and shortlist badges", countsRes]] as const) {
@@ -116,7 +125,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
   }
 
   // The shortlist count rides on its own item, like the bag in the header.
-  const groups = NAV_GROUPS.map((g) => ({
+  const groups: ConsoleNavGroup[] = withDrivesItem(NAV_GROUPS, hasDrives, { href: DRIVES_HREF, label: "Campus drives", icon: <GraduationCap /> }).map((g) => ({
     ...g,
     items: g.items.map((i) => (i.href === "/employer/cart" && cartCount > 0 ? { ...i, badge: cartCount > 99 ? "99+" : cartCount, badgeLabel: "saved" } : i)),
   }));
@@ -128,7 +137,7 @@ export default async function EmployerLayout({ children }: { children: React.Rea
     icon: <ShoppingBag />,
     ...(cartCount > 0 ? { badge: cartCount > 99 ? "99+" : cartCount } : {}),
   };
-  const tabs = ["/employer/dashboard", "/employer/candidates", "/employer/proposals", "/employer/cart"]
+  const tabs = employerTabHrefs(hasDrives)
     .map((href) => (href === shortlistTab.href ? shortlistTab : flat.find((i) => i.href === href)))
     .filter((i): i is ConsoleNavItem => Boolean(i));
 
