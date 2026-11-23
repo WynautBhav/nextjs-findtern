@@ -22,7 +22,7 @@ import {
 } from "@/lib/admin/intern-columns";
 import { InternColumnsMenu } from "@/components/admin/intern-columns-menu";
 import { flattenParams, parsePageRequest, pastLastPageHref, toPage, toQueryString } from "@/lib/admin/params";
-import { INTERN_SORTS as SORTS, loadInterns, type InternRow as Row } from "@/lib/admin/intern-query";
+import { INTERN_SORTS as SORTS, loadInternCourses, loadInterns, type InternRow as Row } from "@/lib/admin/intern-query";
 import { matchesDue, todayIstIso } from "@/lib/admin/intern-list";
 import { AdminLoadError, AdminPageHeader } from "@/components/admin/panel";
 import { AdminTabs, type AdminTabItem } from "@/components/admin/admin-tabs";
@@ -67,6 +67,8 @@ const FILTERS: ToolbarFilter[] = [
       { value: "no", label: "Not hired" },
     ],
   },
+  // Course options are filled from the stored degrees at render (see `filters` below).
+  { key: "course", label: "Course", allLabel: "All courses", options: [] },
   {
     key: "offer",
     label: "Offer type",
@@ -246,6 +248,13 @@ export default async function AdminInterns({
   }
 
   const { rows, total, signups, incomplete } = data;
+  // A missing option list only leaves the Course filter empty; it must not take the page down.
+  const courses = await loadInternCourses().catch((err) => {
+    console.error("[admin/interns] course options failed", err);
+    return [] as { value: string; label: string }[];
+  });
+  const picked = params.course?.trim();
+  if (picked && !courses.some((c) => c.value.toLowerCase() === picked.toLowerCase())) courses.push({ value: picked, label: picked });
   const pastLast = pastLastPageHref("/admin/interns", params, req.page, total, req.perPage);
   if (pastLast) redirect(pastLast);
   const page = toPage(rows, total, req.page, req.perPage);
@@ -413,7 +422,7 @@ export default async function AdminInterns({
             noun="candidates"
             caption="Candidates"
             searchPlaceholder="Search name, email or phone…"
-            filters={FILTERS}
+            filters={FILTERS.map((f) => (f.key === "course" ? { ...f, options: courses } : f))}
             extraControls={<InternColumnsMenu visible={visible} adminUid={adminUid} />}
             rowClassName="group/row"
             empty={{
