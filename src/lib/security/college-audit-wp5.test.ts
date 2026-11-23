@@ -58,7 +58,7 @@ test("WP5-U5 drive sheet: invisible characters never reach a name, an email or a
 
 test("INT-08 a sheet row whose account was NOT linked (denied / other college: WP4 leaves intern_id empty) is still skipped by its verified email", () => {
   const sql = codeUnusableSql("e", "o.college_id");
-  assert.match(sql, /u\.email = e\.college_email_norm/);
+  assert.match(sql, /lower\(u\.email\) = e\.college_email_norm/);
   assert.match(sql, /u\.email_verified/);
   assert.doesNotMatch(sql, /e\.intern_id = /, "all arms must use the matched account, not only the linked one");
 });
