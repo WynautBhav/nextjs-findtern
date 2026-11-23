@@ -96,6 +96,13 @@ export async function redeemDriveCode(
   });
   if (!res.ok) throw new RedeemRefused(res.status, res.error);
 
+  // A student the placement office denied does not come back through a code (only a restore does). The trigger on
+  // college_memberships would refuse the write anyway, but as a raw database error after the code was touched; refuse
+  // here, in the same neutral words as a code from another college. A student whose leave was approved has no denial:
+  // the code gives them a fresh membership (year and branch cleared, below).
+  const denied = await q("SELECT 1 FROM college_denials WHERE college_id = $1 AND user_id = $2", [res.collegeId, input.internId]);
+  if (denied.rows.length > 0) throw new RedeemRefused(403, "This code is not valid for your college");
+
   // A student whose fee is already settled would burn a seat for nothing.
   const paid = await q(
     `SELECT 1 WHERE EXISTS (SELECT 1 FROM intern_payments WHERE intern_id = $1 AND status = 'paid')

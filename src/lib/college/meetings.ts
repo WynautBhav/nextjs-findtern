@@ -203,6 +203,15 @@ export async function studentCall(userId: string, meetingId: string): Promise<{ 
 }
 
 /**
+ * A student who left the college (leave approved) is no longer one of the drive's students: their open request or
+ * accepted call reads as `cancelled` to the employer, as it does to the student (who can no longer accept it).
+ * Applied when the employer's views are built; the stored row is closed by whoever ends the membership.
+ */
+export function viewsForStudentsInDrive(rows: (typeof schema.collegeDriveMeetings.$inferSelect)[], studentIds: ReadonlySet<string>): MeetingView[] {
+  return rows.map(toView).map((v) => ((v.status === "requested" || v.status === "accepted") && !studentIds.has(v.userId) ? { ...v, status: "cancelled" as const, meetingLink: null } : v));
+}
+
+/**
  * Turning a drive off closes its open calls too: requests and accepted calls become `cancelled`, so no student
  * accepts (or joins) a call of a drive the officer shut. Runs on the caller's db/tx.
  */
