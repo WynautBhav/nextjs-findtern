@@ -18,6 +18,9 @@ export async function sendNudge(input: {
 }): Promise<{ ok: true; pushed: boolean; emailed: boolean; emailFailed: boolean } | { ok: false; error: string; status: number }> {
   const db = getDb();
   const now = new Date();
+  // A disabled or banned account is not written to at all: no nudge row, no bell, no push, no email.
+  const [target] = await db.select({ isActive: schema.users.isActive }).from(schema.users).where(eq(schema.users.id, input.userId)).limit(1);
+  if (!target?.isActive) return { ok: false, error: "This account is not active.", status: 404 };
   const [last] = await db
     .select({ createdAt: schema.collegeNudges.createdAt })
     .from(schema.collegeNudges)
