@@ -19,7 +19,7 @@ import { planConfirm } from "./import/plan.ts";
 import { readRosterRows } from "./import/read.ts";
 import { validateRows } from "./import/validate.ts";
 import {
-  MAX_IMPORT_ROWS, PREVIEW_ROWS, applyExisting, confirmProblem, countStates, emailFromKey, entryEmailKey, invoiceNeeded, planIdentityDecision, rosterLinkBlock, planPaid, sameMapping, seatBatchForOrder, validateMapping,
+  MAX_IMPORT_ROWS, PREVIEW_ROWS, applyExisting, confirmProblem, countStates, emailFromKey, entryEmailKey, invoiceNeeded, planIdentityDecision, rosterLinkBlock, planPaid, VERIFY_MEMBERSHIP_SQL, IMPORT_CANDIDATE_USERS_SQL, PENDING_REVIEWS_SQL, LINK_BLOCK_TEXT, sameMapping, seatBatchForOrder, validateMapping,
   type EntryCounts,
 } from "./admin-rules.ts";
 
@@ -277,12 +277,22 @@ export async function createImportPreview(input: { orderId: string; bytes: Uint8
 export type ConfirmResult = { linked: number; reviews: number; codesIssued: number; skipped: number };
 
 async function verifyMembership(c: PgClient, internId: string, collegeId: string) {
-  // Never moves a student between colleges and never touches users: only an own-college membership is created or upgraded.
-  // A student the placement office denied is skipped (college_denials, approvals.ts); only a restore brings them back.
-  await c.query(
-    "INSERT INTO college_memberships (user_id, college_id, status, verified_by) SELECT $1::varchar,$2::varchar,'verified','roster' WHERE NOT EXISTS (SELECT 1 FROM college_denials d WHERE d.college_id = $2::varchar AND d.user_id = $1::varchar) ON CONFLICT (user_id) DO UPDATE SET status = 'verified', verified_by = 'roster', left_at = NULL WHERE college_memberships.college_id = EXCLUDED.college_id",
+  // Never moves a student between colleges, never revives one who left, never touches users (VERIFY_MEMBERSHIP_SQL).
+  await c.query(VERIFY_MEMBERSHIP_SQL, [internId, collegeId]);
+}
+
+/** The student's standing in this college: why a link cannot give them a membership, or null when they have a live one. */
+async function linkBlockFor(c: PgClient, internId: string, collegeId: string) {
+  const r = await c.query(
+    `SELECT m.college_id, m.left_at, EXISTS (SELECT 1 FROM college_denials d WHERE d.college_id = $2 AND d.user_id = $1) AS denied
+       FROM (SELECT 1) x LEFT JOIN college_memberships m ON m.user_id = $1`,
     [internId, collegeId],
   );
+  const row = r.rows[0];
+  const block = rosterLinkBlock(collegeId, { membership: row?.college_id ? { collegeId: String(row.college_id), leftAt: (row.left_at as Date | null) ?? null } : null, denied: Boolean(row?.denied) });
+  if (block) return block;
+  // No block, yet no live membership of this college: the student left ANOTHER college and cannot be moved by a link.
+  return row?.college_id && String(row.college_id) === collegeId && !row.left_at ? null : "other_college" as const;
 }
 
 export async function confirmImport(input: { importId: string; adminId: string }): Promise<{ result: ConfirmResult; replayed: boolean }> {
@@ -303,7 +313,7 @@ export async function confirmImport(input: { importId: string; adminId: string }
     const phones = ents.rows.map((r) => r.phone_e164 as string | null).filter((p): p is string => !!p).map((p) => p.slice(3));
     // Verified-email exact matches by the unique email index; phone candidates by the (country, phone) unique index. Role intern only.
     const users = await c.query(
-      "SELECT id, email, email_verified, country_code, phone_number, first_name, last_name FROM users WHERE role = 'intern' AND ((email = ANY($1::text[]) AND email_verified) OR (country_code = '+91' AND phone_number = ANY($2::text[])))",
+      IMPORT_CANDIDATE_USERS_SQL,
       [emails, phones],
     );
     const candidates: CandidateUser[] = users.rows.map((u) => ({ id: String(u.id), email: String(u.email), emailVerified: !!u.email_verified, phone: `${String(u.country_code).trim()}${String(u.phone_number).replace(/\D/g, "")}`, name: `${u.first_name} ${u.last_name}` }));
@@ -366,13 +376,7 @@ async function insertCodes(c: PgClient, rows: DriveCodeRow[]) {
 
 export async function listPendingReviews(collegeId: string) {
   const r = await pool().query(
-    `SELECT v.id, v.order_id, v.entry_id, v.candidate_intern_id, e.name AS entry_name, e.college_email_norm, e.phone_e164,
-            u.first_name, u.last_name, u.email AS candidate_email
-       FROM identity_reviews v
-       JOIN college_drive_orders o ON o.id = v.order_id
-       JOIN drive_roster_entries e ON e.id = v.entry_id
-       JOIN users u ON u.id = v.candidate_intern_id
-      WHERE o.college_id = $1 AND v.status = 'pending' ORDER BY v.created_at LIMIT 200`,
+    PENDING_REVIEWS_SQL,
     [collegeId],
   );
   return r.rows.map((x) => ({ id: String(x.id), orderId: String(x.order_id), entryName: String(x.entry_name), entryEmail: String(x.college_email_norm), entryPhone: (x.phone_e164 as string | null) ?? null, candidateId: String(x.candidate_intern_id), candidateName: `${x.first_name} ${x.last_name}`, candidateEmail: String(x.candidate_email) }));
@@ -403,6 +407,9 @@ export async function decideReview(input: { reviewId: string; decision: unknown;
     const u = await c.query("UPDATE drive_roster_entries SET intern_id = $2 WHERE id = $1 AND intern_id IS NULL", [review.entry_id, internId]);
     if ((u.rowCount ?? 0) !== 1) throw new HttpError(409, "This row is already linked to a student");
     await verifyMembership(c, internId, String(review.college_id));
+    // A link that leaves the student without a live membership of this college is refused (the throw rolls the row link back), not answered 200.
+    const blocked = await linkBlockFor(c, internId, String(review.college_id));
+    if (blocked) throw new HttpError(409, LINK_BLOCK_TEXT[blocked]);
     await c.query("UPDATE identity_reviews SET status = CASE WHEN candidate_intern_id = $2 THEN 'linked' ELSE 'rejected' END, decided_by = $3, decided_at = $4 WHERE entry_id = $1 AND status = 'pending'", [review.entry_id, internId, input.adminId, now]);
     await audit(c, input.adminId, "identityDecide", "identity_review", input.reviewId, { decision: "link", entryId: String(review.entry_id), internId });
     return { status: "linked" as const, internId, replayed: false };

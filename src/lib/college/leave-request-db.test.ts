@@ -172,8 +172,8 @@ test("INT-05: approving a leave also closes the student's open drive meet reques
   assert.match(close!, /user_id = \$1/);
 });
 
-test("INT-05: declining a leave leaves the student's meets alone", async () => {
+test("INT-05: rejecting a leave leaves the student's meets alone", async () => {
   const w = world({ requests: [{ id: "r1", user_id: "u1", college_id: "c1", membership_id: "m1", status: "requested", reason: null }] });
-  await decideLeaveRequestIn(w.client, { actor: officer, collegeId: "c1", requestId: "r1", action: "decline", note: null });
+  await decideLeaveRequestIn(w.client, { actor: officer, collegeId: "c1", requestId: "r1", action: "reject", note: null });
   assert.ok(!w.log.some((s) => s.startsWith("UPDATE college_drive_meetings")));
 });
