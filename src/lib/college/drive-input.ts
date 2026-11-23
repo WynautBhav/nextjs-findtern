@@ -41,6 +41,22 @@ export const driveInput = z
 
 export type DriveInput = z.infer<typeof driveInput>;
 
+/** Slack for the minutes between picking "now" and pressing Save. */
+const PAST_GRACE_MS = 10 * 60_000;
+
+/**
+ * Owner, 23 Nov: a drive link can't be backdated. A new start can't be in the past and the end must be ahead.
+ * An edit may keep the start a live drive already has (`savedStartsAt`), so a running drive stays editable,
+ * but never move it to another past time.
+ */
+export function drivePastDateProblem(d: { startsAt: Date; endsAt: Date }, opts: { now?: Date; savedStartsAt?: Date | null } = {}): { error: string; path: "startsAt" | "endsAt" } | null {
+  const now = (opts.now ?? new Date()).getTime();
+  const keptStart = opts.savedStartsAt != null && d.startsAt.getTime() === opts.savedStartsAt.getTime();
+  if (!keptStart && d.startsAt.getTime() < now - PAST_GRACE_MS) return { error: "The drive can't open in the past. Pick today or a later date.", path: "startsAt" };
+  if (d.endsAt.getTime() <= now) return { error: "The drive must close in the future.", path: "endsAt" };
+  return null;
+}
+
 export function driveUrl(origin: string, token: string): string {
   return `${origin.replace(/\/$/, "")}/drive/${token}`;
 }

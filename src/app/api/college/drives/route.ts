@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 import { tryPublicOrigin } from "@/lib/origin";
 import { requireCollegeMutation } from "@/lib/college/guard";
-import { driveInput, driveShareUrl } from "@/lib/college/drive-input";
+import { driveInput, drivePastDateProblem, driveShareUrl } from "@/lib/college/drive-input";
 import { generateDriveToken } from "@/lib/college/tokens";
 import { invitesToSend, withUnsent } from "@/lib/college/drive-invite";
 import { sendAndRecordInvites } from "@/lib/college/drive-invite-send";
@@ -16,6 +16,8 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the drive details" }, { status: 400 });
   }
+  const past = drivePastDateProblem(parsed.data);
+  if (past) return NextResponse.json({ error: past.error, field: past.path }, { status: 400 });
   const { token, hash } = generateDriveToken();
   // Every invited company is unsent until its mail goes out (recorded below), so a held-back one is retried on a later save.
   const list = parsed.data.invitedEmployers ?? [];

@@ -90,7 +90,7 @@ export function Meetings({ data, className }: { data: PlacementData; className?:
       </div>
       <div className="min-w-0">
         <p className="mb-2 text-[13px] text-on-dark">
-          <span className="nums text-white">{n(m.total)}</span> meetings asked for by employers, with <span className="nums text-white">{n(m.students)}</span> students
+          <span className="nums text-white">{n(m.total)}</span> {m.total === 1 ? "meeting" : "meetings"} asked for by employers, with <span className="nums text-white">{n(m.students)}</span> {m.students === 1 ? "student" : "students"}
         </p>
         <div className="flex h-2.5 gap-0.5 overflow-hidden" role="img" aria-label={`${m.total} meetings: ${parts.map((p) => `${p.label} ${p.v}`).join(", ")}`}>
           {m.total ? parts.map((p) => (p.v ? <span key={p.key} style={{ flexGrow: p.v, flexBasis: 0, background: p.fill }} /> : null)) : <span className="flex-1" style={{ background: white(0.08) }} />}

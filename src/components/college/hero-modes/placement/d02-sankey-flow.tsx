@@ -3,6 +3,7 @@ import { DesignFrame, GOLD, Legend, n, OUTCOME_FILL, white } from "../kit";
 import { cn } from "@/lib/utils";
 import { Averages, BandBar, goldA, MarksBar, Meetings, onFill } from "./parts";
 import { DrillLink, type DrillFilters } from "../drill";
+import { fitColumn } from "./sankey-fit";
 
 const W = 1000;
 const H = 230;
@@ -44,13 +45,13 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
   const offerS = Math.min(data.withOffer, inter);
   const noOfferS = inter - offerS;
   const s0 = per(inter, H - 2 * PAD);
-  const s1 = per(inter, H - 2 * PAD - GAP);
-  const so = per(o.received, H - 2 * PAD - 3 * GAP);
+  const col1 = fitColumn([offerS, noOfferS], H - 2 * PAD - GAP);
+  const col2 = fitColumn([o.accepted, o.notAnswered, o.rejected, o.withdrawn], H - 2 * PAD - 3 * GAP);
 
   const X = (i: number) => i * STEP;
   const interviewed: Node = { id: "i", label: "Interviewed", v: inter, x: X(0), y: PAD, h: inter * s0, fill: white(0.72) };
-  const offer: Node = { id: "o", label: "Got an offer", v: offerS, x: X(1), y: PAD, h: offerS * s1, fill: white(0.38) };
-  const none: Node = { id: "n", label: "No offer", v: noOfferS, x: X(1), y: PAD + offer.h + GAP, h: noOfferS * s1, fill: white(0.16) };
+  const offer: Node = { id: "o", label: "Got an offer", v: offerS, x: X(1), y: PAD, h: col1.heights[0], fill: white(0.38) };
+  const none: Node = { id: "n", label: "No offer", v: noOfferS, x: X(1), y: PAD + offer.h + GAP, h: col1.heights[1], fill: white(0.16) };
   let cy = PAD;
   const outs: Node[] = (
     [
@@ -59,20 +60,22 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
       ["rejected", "Rejected", o.rejected],
       ["withdrawn", "Withdrawn", o.withdrawn],
     ] as const
-  ).map(([k, label, v]) => {
-    const nd: Node = { id: k, label, v, x: X(2), y: cy, h: v * so, fill: OUTCOME_FILL[k] };
+  ).map(([k, label, v], i) => {
+    const nd: Node = { id: k, label, v, x: X(2), y: cy, h: col2.heights[i], fill: OUTCOME_FILL[k] };
     cy += nd.h + GAP;
     return nd;
   });
   const acc = outs[0];
   const hiredS = data.internships;
-  const intern: Node = { id: "h", label: "Internships", v: hiredS, x: X(3), y: 28, h: hiredS * so, fill: GOLD, below: true };
-  const ppo: Node = { id: "p", label: "PPO", v: data.ppo, x: X(4), y: 62, h: data.ppo * so, fill: GOLD, below: true };
+  // Internships and PPOs keep the Accepted node's scale, so a raised small node never shrinks them.
+  const perOffer = o.accepted ? acc.h / o.accepted : col2.scale;
+  const intern: Node = { id: "h", label: "Internships", v: hiredS, x: X(3), y: 28, h: hiredS * perOffer, fill: GOLD, below: true };
+  const ppo: Node = { id: "p", label: "PPO", v: data.ppo, x: X(4), y: 62, h: data.ppo * perOffer, fill: GOLD, below: true };
   const nodes = [interviewed, offer, none, ...outs, intern, ppo];
 
   // Ribbons.
   const ribbons: { d: string; fill: string }[] = [];
-  ribbons.push({ d: ribbon(interviewed.x + NW, interviewed.y, offer.h / s1 * s0, offer.x, offer.y, offer.h), fill: white(0.14) });
+  ribbons.push({ d: ribbon(interviewed.x + NW, interviewed.y, offerS * s0, offer.x, offer.y, offer.h), fill: white(0.14) });
   ribbons.push({ d: ribbon(interviewed.x + NW, interviewed.y + (offerS * s0), noOfferS * s0, none.x, none.y, none.h), fill: white(0.06) });
   let sy = offer.y;
   for (const t of outs) {
@@ -80,9 +83,9 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
     ribbons.push({ d: ribbon(offer.x + NW, sy, sh, t.x, t.y, t.h), fill: t.id === "accepted" ? goldA(0.3) : white(0.08) });
     sy += sh;
   }
-  const hSrc = Math.min(hiredS, o.accepted) * so;
+  const hSrc = Math.min(hiredS, o.accepted) * perOffer;
   ribbons.push({ d: ribbon(acc.x + NW, acc.y, hSrc, intern.x, intern.y, intern.h), fill: goldA(0.3) });
-  const pSrc = Math.min(data.ppo, hiredS) * so;
+  const pSrc = Math.min(data.ppo, hiredS) * perOffer;
   ribbons.push({ d: ribbon(intern.x + NW, intern.y, pSrc, ppo.x, ppo.y, ppo.h), fill: goldA(0.3) });
 
   return (
@@ -116,8 +119,8 @@ export function SankeyFlow({ data }: { data: PlacementData }) {
             >
               {nd.h === 0 && !nd.below ? null : (
                 <span className={tight ? "flex items-baseline justify-center gap-1.5" : "contents"}>
-                  <span className="hidden text-xs sm:block" style={{ color: nd.below ? "var(--color-on-dark)" : txt }}>{nd.label}</span>
-                  <span className="nums text-sm font-medium sm:text-lg" style={{ color: txt }}>{n(nd.v)}</span>
+                  <span className={cn("hidden text-xs sm:block", tight && "leading-none")} style={{ color: nd.below ? "var(--color-on-dark)" : txt }}>{nd.label}</span>
+                  <span className={cn("nums font-medium", tight ? "text-sm leading-none" : "text-sm sm:text-lg")} style={{ color: txt }}>{n(nd.v)}</span>
                 </span>
               )}
             </DrillLink>

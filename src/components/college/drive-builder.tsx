@@ -17,6 +17,7 @@ import { ShareLink } from "./share-link";
 import type { StudentRow } from "./types";
 import { buttonClass } from "@/components/ui/button";
 import { DmyDateInput } from "@/components/app/dmy-date-input";
+import { todayIst } from "@/lib/offer";
 
 export type DriveDraft = {
   id?: string;
@@ -60,6 +61,7 @@ export function DriveBuilder({
 }) {
   const router = useRouter();
   const [d, setD] = useState<DriveDraft>(initial);
+  const today = todayIst();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
@@ -192,8 +194,9 @@ export function DriveBuilder({
             </div>
           </fieldset>
 
-          <IstDateTime label="Opens (IST)" value={d.startsAt} onChange={(v) => set("startsAt", v)} field={field} />
-          <IstDateTime label="Closes (IST)" value={d.endsAt} onChange={(v) => set("endsAt", v)} field={field} hint="The link stops working at this time." />
+          {/* No backdated drives (owner, 23 Nov): past days are greyed; a live drive being edited keeps its own start day. */}
+          <IstDateTime label="Opens (IST)" value={d.startsAt} min={initial.startsAt && initial.startsAt.slice(0, 10) < today ? initial.startsAt.slice(0, 10) : today} onChange={(v) => set("startsAt", v)} field={field} />
+          <IstDateTime label="Closes (IST)" value={d.endsAt} min={d.startsAt.slice(0, 10) > today ? d.startsAt.slice(0, 10) : today} onChange={(v) => set("endsAt", v)} field={field} hint="The link stops working at this time." />
 
           <label className="block md:col-span-2">
             <span className="text-sm font-medium text-ink-800">Note for employers <span className="font-normal text-text-subtle">(optional)</span></span>
@@ -380,9 +383,12 @@ function IstDateTime({
   onChange,
   field,
   hint,
+  min,
 }: {
   label: string;
   value: string;
+  /** Earliest day (YYYY-MM-DD) the picker offers. */
+  min?: string;
   onChange: (value: string) => void;
   field: string;
   hint?: string;
@@ -397,6 +403,7 @@ function IstDateTime({
           aria-label={`${label}, date`}
           className={field}
           value={date}
+          min={min}
           onChange={(iso) => onChange(iso ? `${iso}T${time}` : "")}
           required
         />
