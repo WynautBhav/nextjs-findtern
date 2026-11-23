@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import type { PgClient } from "../db/pg-tx.ts";
-import { deriveDriveCode, hashDriveCode } from "../drives/code-derive.ts";
+import { deriveDriveCode } from "../drives/code-derive.ts";
 import { redeemDriveCode, RedeemRefused } from "../drives/redeem-db.ts";
 
 /**
