@@ -1,5 +1,6 @@
 import { and, count, eq, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { isNewestOnboarding } from "@/lib/onboarding-newest";
 
 import { calendarMissing } from "@/lib/calendar-status";
 import { dbTimestamp, getDb, schema } from "@/lib/db";
@@ -346,7 +347,7 @@ async function loadUnscored(now: Date, weekAgo: Date): Promise<Result> {
   // The rail's definition: latest AI interview completed, no numeric Findtern Score.
   const from = sql`
         FROM ${schema.users} u
-        LEFT JOIN ${schema.internOnboarding} o ON o.user_id = u.id
+        LEFT JOIN ${schema.internOnboarding} o ON o.user_id = u.id AND ${isNewestOnboarding("o")}
         JOIN LATERAL (
           SELECT lower(i.status) AS status, i.created_at, i.updated_at FROM ${schema.interviews} i
            WHERE i.intern_id = u.id AND ${AI_INTERVIEW}

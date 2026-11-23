@@ -3,6 +3,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 
 import { getSession, loginRedirectFor } from "@/lib/auth";
 import { getDb, schema } from "@/lib/db";
+import { isNewestOnboarding } from "@/lib/onboarding-newest";
 import { aiInterviewStatus, findternScoreSql, realEmployerId } from "@/lib/admin/scope";
 import type { SessionData } from "@/lib/security/session";
 import {
@@ -151,7 +152,7 @@ async function loadMembers(collegeId: string, onlyUserId?: string): Promise<Coll
         (SELECT max(pr.updated_at) FROM ${schema.proposals} pr WHERE pr.intern_id = ${m.userId})) AT TIME ZONE 'UTC') AS last_activity_at
     FROM ${m}
     JOIN ${u} ON ${u.id} = ${m.userId}
-    LEFT JOIN ${o} ON ${o.userId} = ${m.userId}
+    LEFT JOIN ${o} ON ${o.userId} = ${m.userId} AND ${isNewestOnboarding()}
     LEFT JOIN ${schema.collegePresence} p ON p.user_id = ${m.userId}
     LEFT JOIN ${schema.collegeRoster} r ON r.college_id = ${m.collegeId} AND r.email = lower(${u.email})
     WHERE ${m.collegeId} = ${collegeId} AND ${m.leftAt} IS NULL${onlyUserId ? sql` AND ${m.userId} = ${onlyUserId}` : sql``}

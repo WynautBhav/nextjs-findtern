@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { realEmployerId } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
 import { todayIst } from "@/lib/offer";
+import { isNewestOnboarding } from "@/lib/onboarding-newest";
 import { acceptedStatusesSql, offerUnpaidExpiredSql, interviewExpiredSql, interviewUpcomingSql, interviewWaitingSql, offerLapsedSql, offerOpenSql } from "./count-rules";
 import { CALL_GRACE_MS } from "./constants";
 import { studentsForCollegeAdmin, type CollegeContext } from "./scope";
@@ -36,21 +37,21 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
     const callWaiting = sql`(dm.status = 'requested' AND dm.starts_at + make_interval(secs => ${CALL_GRACE_MS / 1000}) >= ${nowIso}::timestamp
       AND dr.ends_at > ${nowIso}::timestamp AND (dr.revoked_at IS NULL OR dr.revoked_at > ${nowIso}::timestamp))`;
     const res = await getDb().execute(sql`
-      SELECT ${o.userId} AS user_id,
+      SELECT u.id AS user_id,
         (SELECT coalesce(jsonb_object_agg(e.key, e.value), '{}'::jsonb) FROM jsonb_each(coalesce(${o.extraData}, '{}'::jsonb)) e WHERE e.key IN (${keys})) AS extra,
         ${o.skills} AS skills, ${o.locationTypes} AS location_types, ${o.preferredLocations} AS preferred_locations,
         ${o.hasLaptop} AS has_laptop, ${o.city} AS city, ${o.state} AS state, ${o.experienceJson} AS experience,
-        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status <> 'draft' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers,
-        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status IN (${acceptedStatusesSql()})
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = u.id AND pr.status <> 'draft' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers,
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = u.id AND pr.status IN (${acceptedStatusesSql()})
           AND NOT ${offerUnpaidExpiredSql('pr', today)} AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_accepted,
-        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status = 'rejected' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_rejected,
-        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND ${offerLapsedSql('pr', today)} AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_lapsed,
-        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND ${offerOpenSql('pr', today)} AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_open,
-        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND (pr.hired_at IS NOT NULL OR pr.status IN ('hired', 'completed')) AND ${realEmployerId(sql`pr.employer_id`)}) AS hired,
-        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = ${o.userId} AND pr.status NOT IN ('draft', 'withdrawn')
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = u.id AND pr.status = 'rejected' AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_rejected,
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = u.id AND ${offerLapsedSql('pr', today)} AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_lapsed,
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = u.id AND ${offerOpenSql('pr', today)} AND ${realEmployerId(sql`pr.employer_id`)}) AS offers_open,
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = u.id AND (pr.hired_at IS NOT NULL OR pr.status IN ('hired', 'completed')) AND ${realEmployerId(sql`pr.employer_id`)}) AS hired,
+        (SELECT count(*) FROM ${schema.proposals} pr WHERE pr.intern_id = u.id AND pr.status NOT IN ('draft', 'withdrawn')
           AND jsonb_typeof(pr.offer_details->'fullTimeOffer') = 'object' AND ${realEmployerId(sql`pr.employer_id`)}) AS ppo,
         (SELECT coalesce(sum(w.amount_minor), 0) FROM ${schema.collegeWalletEntries} w
-          WHERE w.college_id = ${ctx.college.id} AND w.intern_id = ${o.userId} AND w.kind = 'incentive') AS earnings_minor,
+          WHERE w.college_id = ${ctx.college.id} AND w.intern_id = u.id AND w.kind = 'incentive') AS earnings_minor,
         (SELECT jsonb_build_object(
             'total', count(*),
             'done', count(*) FILTER (WHERE iv.status = 'completed'),
@@ -61,7 +62,7 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
             'notAccepted', count(*) FILTER (WHERE iv.status IN ('declined', 'rejected') OR (iv.status = 'cancelled' AND iv.cancelled_by = 'intern') OR (${interviewExpiredSql('iv', nowIso)} AND iv.selected_slot IS NULL)),
             'upcoming', count(*) FILTER (WHERE ${interviewUpcomingSql('iv', nowIso)}),
             'waiting', count(*) FILTER (WHERE ${interviewWaitingSql('iv', nowIso)}))
-          FROM ${schema.interviews} iv WHERE iv.intern_id = ${o.userId} AND ${realEmployerId(sql`iv.employer_id`)}) AS meetings,
+          FROM ${schema.interviews} iv WHERE iv.intern_id = u.id AND ${realEmployerId(sql`iv.employer_id`)}) AS meetings,
         -- Live calls inside a campus drive (a separate table from employer meetings), by the drive board's rules
         -- (drive-board.ts): accepted = held; waiting = requested, still answerable in an open drive; the rest not taken.
         (SELECT jsonb_build_object(
@@ -69,9 +70,10 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
             'callsWaiting', count(*) FILTER (WHERE ${callWaiting}),
             'callsNotTaken', count(*) FILTER (WHERE dm.status IN ('declined', 'expired') OR (dm.status = 'requested' AND NOT ${callWaiting})))
           FROM ${schema.collegeDriveMeetings} dm JOIN ${schema.collegeDrives} dr ON dr.id = dm.drive_id
-          WHERE dm.user_id = ${o.userId} AND dr.college_id = ${ctx.college.id}) AS calls
-      FROM ${o}
-      WHERE ${o.userId} IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
+          WHERE dm.user_id = u.id AND dr.college_id = ${ctx.college.id}) AS calls
+      FROM ${schema.users} u
+      LEFT JOIN ${o} ON ${o.userId} = u.id AND ${isNewestOnboarding()}
+      WHERE u.id IN (${sql.join(ids.map((id) => sql`${id}`), sql`, `)})
     `);
     for (const r of res.rows as Record<string, unknown>[]) {
       extras.set(String(r.user_id), {

@@ -1,4 +1,5 @@
 import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { isNewestOnboarding } from "@/lib/onboarding-newest";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
     phoneNumber: u.phoneNumber,
     extra: schema.internOnboarding.extraData,
   };
-  const base = db.select(columns).from(u).leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, u.id));
+  const base = db.select(columns).from(u).leftJoin(schema.internOnboarding, and(eq(schema.internOnboarding.userId, u.id), isNewestOnboarding()));
 
   if ("search" in parsed.data) {
     const q = parsed.data.search;

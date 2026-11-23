@@ -1,4 +1,5 @@
 import { sql, type SQL } from "drizzle-orm";
+import { isNewestOnboarding } from "@/lib/onboarding-newest";
 
 import { getDb, schema } from "@/lib/db";
 import { SETTLED_STATUSES } from "@/lib/refund-accounting";
@@ -152,13 +153,13 @@ export async function loadAcquisition(w: ReportWindow): Promise<Acquisition> {
     timed("overview", "acq-type", () =>
       db
         .execute(sql`SELECT coalesce(nullif(${schema.internOnboarding.extraData}->>'accountType', ''), 'not chosen') AS label, count(*)::int AS c
-          FROM ${U} LEFT JOIN ${schema.internOnboarding} ON ${schema.internOnboarding.userId} = ${U.id} WHERE ${cohort} GROUP BY 1 ORDER BY c DESC LIMIT 5`)
+          FROM ${U} LEFT JOIN ${schema.internOnboarding} ON ${schema.internOnboarding.userId} = ${U.id} AND ${isNewestOnboarding()} WHERE ${cohort} GROUP BY 1 ORDER BY c DESC LIMIT 5`)
         .then((r) => (r.rows as { label: string; c: number }[]).map((x) => ({ label: x.label, count: n(x.c) }))),
     ),
     timed("overview", "acq-total", () =>
       db
         .execute(sql`SELECT count(*)::int AS signups, count(*) FILTER (WHERE ${paidFeeSql(sql`${U.id}`)})::int AS paid
-          FROM ${U} LEFT JOIN ${schema.internOnboarding} ON ${schema.internOnboarding.userId} = ${U.id} WHERE ${cohort}`)
+          FROM ${U} LEFT JOIN ${schema.internOnboarding} ON ${schema.internOnboarding.userId} = ${U.id} AND ${isNewestOnboarding()} WHERE ${cohort}`)
         .then((r) => r.rows[0] as { signups: number; paid: number }),
     ),
   ]);

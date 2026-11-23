@@ -1,4 +1,5 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
+import { isNewestOnboarding } from "@/lib/onboarding-newest";
 
 import { getDb, schema } from "@/lib/db";
 import { feePaidSql } from "@/lib/fee-paid-sql";
@@ -43,7 +44,7 @@ export async function loadAiLinkRows(): Promise<AiLinkListRow[]> {
     })
     .from(i)
     .innerJoin(u, eq(u.id, i.internId))
-    .leftJoin(schema.internOnboarding, eq(schema.internOnboarding.userId, u.id))
+    .leftJoin(schema.internOnboarding, and(eq(schema.internOnboarding.userId, u.id), isNewestOnboarding()))
     .leftJoin(schema.projects, eq(schema.projects.id, i.projectId))
     .where(sql`(${i.employerId} = ${TEST_EMPLOYER_ID} OR ${i.employerId} IN (SELECT id FROM ${schema.employers} WHERE lower(company_email) = ${AI_INTERVIEW_EMAIL}))`),
   ]);
