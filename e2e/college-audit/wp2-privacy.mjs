@@ -17,6 +17,10 @@ const claimed = (await db.query(`select m.user_id id, u.email, u.first_name, u.l
   from college_memberships m join users u on u.id=m.user_id join intern_onboarding o on o.user_id=m.user_id left join college_presence p on p.user_id=m.user_id
   where m.status='claimed' and m.left_at is null order by u.email`)).rows;
 if (claimed.length < 5) throw new Error("run wp2-fixtures.mjs first");
+// wp2-fixtures stamps the claimed students' presence with now(); a page that prints the server's own current time (presence snapshot `at`)
+// in that same second would look like a leaked lastSeenAt (the residual flake). Let the second pass before any page is read.
+const waitS = Number((await db.query(`select greatest(0, 2.2 - extract(epoch from ((now() at time zone 'utc') - max(p.last_seen_at)))) w from college_presence p where p.user_id = any($1)`, [claimed.map((c) => c.id)])).rows[0].w ?? 0);
+if (waitS > 0) await new Promise((r) => setTimeout(r, waitS * 1000));
 const everyone = (await db.query(`select o.aadhaar_number a, o.pan_number p, o.pin_code pin, o.extra_data->'bankDetails'->>'accountNumber' bank, o.extra_data->>'emergencyPhone' em from intern_onboarding o`)).rows;
 const secrets = [...new Set(everyone.flatMap((r) => [r.a, r.p, r.bank].filter((v) => v && v.length >= 6)))];
 const ids = claimed.map((c) => c.id);

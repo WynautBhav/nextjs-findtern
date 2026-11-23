@@ -42,7 +42,7 @@ await wipeMeetings();
 
 await q(`UPDATE users SET is_active = false WHERE id = $1`, [s1.id]);
 r = await ask(s1.id);
-check("P1.3", "deactivated account: meet request refused (404)", r.status === 404, `${r.status} ${r.text.slice(0, 160)}`);
+check("P1.3", "deactivated account: meet request refused (409, the same as on hold; R4-02)", r.status === 409, `${r.status} ${r.text.slice(0, 160)}`);
 await q(`UPDATE users SET is_active = true WHERE id = $1`, [s1.id]);
 await wipeMeetings();
 
