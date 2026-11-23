@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { recordAdminAudit } from "@/lib/admin/audit";
-import { promoCodeProblem, promoDiscountProblem } from "@/lib/admin/promo-edit-rules";
+import { promoCodeProblem, promoDiscountProblem, promoNumberFields } from "@/lib/admin/promo-edit-rules";
 import { getDb, schema } from "@/lib/db";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation } from "@/lib/promo";
@@ -13,9 +13,9 @@ const bodySchema = z.object({
   code: z.string().trim().min(2, "Code must be at least 2 characters"),
   description: z.string().nullish(),
   discountType: z.enum(["percentage", "fixed"]),
-  discountValue: z.number("Enter a discount value").int("Discount must be a whole number").positive("Discount must be greater than 0"),
-  maxUsages: z.number().int().positive("Max uses must be at least 1").nullish(),
-  minOrderAmountMinor: z.number().int().min(0, "Minimum order can't be negative").nullish(),
+  discountValue: promoNumberFields.discountValue,
+  maxUsages: promoNumberFields.maxUsages.nullish(),
+  minOrderAmountMinor: promoNumberFields.minOrderAmountMinor.nullish(),
   validFrom: z.string().datetime().nullish(),
   validUntil: z.string().datetime().nullish(),
   isActive: z.boolean().default(true),

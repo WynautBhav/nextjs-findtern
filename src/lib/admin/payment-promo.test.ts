@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { discountLabel, paymentPromo } from "./payment-promo.ts";
+import { discountLabel, paymentFeeMinor, paymentPromo } from "./payment-promo.ts";
 
 test("new-app intern fee: flat promoCode + discountMinor", () => {
   assert.deepEqual(paymentPromo({ promoCode: "WELCOME20", discountMinor: 49980 }), { code: "WELCOME20", discountMinor: 49980 });
@@ -47,4 +47,17 @@ test("discount label: code wins, otherwise legacy 'Discount (x%)'", () => {
   assert.equal(discountLabel({ code: "ACME10", discountMinor: 100 }, 900), "ACME10");
   assert.equal(discountLabel({ code: null, discountMinor: 200000 }, 1800000), "Discount (10%)");
   assert.equal(discountLabel({ code: null, discountMinor: 0 }, 1800000), null);
+});
+
+test("discountLabel: the hiring fee is never discounted, so the percentage is of the charges without it", () => {
+  // 90,000 of monthly charges + 5,000 fee, 10% off the charges: 9,000 off, 86,000 paid
+  assert.equal(discountLabel({ code: null, discountMinor: 900000 }, 8600000), "Discount (9%)");
+  assert.equal(discountLabel({ code: null, discountMinor: 900000 }, 8600000, 500000), "Discount (10%)");
+});
+
+test("paymentFeeMinor: the one-time fee an order recorded, summed over its hires", () => {
+  assert.equal(paymentFeeMinor({ notes: { perHireFeeMinor: { a: 500000, b: 250000 } } }), 750000);
+  assert.equal(paymentFeeMinor({ order: { notes: { perHireFeeMinor: { a: 500000 } } } }), 500000);
+  assert.equal(paymentFeeMinor({ notes: {} }), 0);
+  assert.equal(paymentFeeMinor(null), 0);
 });

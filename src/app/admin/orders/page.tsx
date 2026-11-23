@@ -12,7 +12,7 @@ import { orderReview } from "@/lib/payment-flags";
 import { employerInvoices, needsLegacyNumber } from "@/lib/employer-invoice";
 import { loadInvoiceHires } from "@/lib/employer-invoice-hires";
 import { AdminInvoicesView, type AdminInvoiceRow } from "@/components/admin/admin-invoices-view";
-import { discountLabel, paymentPromo } from "@/lib/admin/payment-promo";
+import { discountLabel, paymentFeeMinor, paymentPromo } from "@/lib/admin/payment-promo";
 import { flattenParams, type RawSearchParams } from "@/lib/admin/params";
 import { passThroughMinorOf } from "@/lib/admin/revenue";
 import { isTestEmployer } from "@/lib/admin/scope";
@@ -96,7 +96,7 @@ async function loadOrders(): Promise<{ rows: AdminInvoiceRow[]; uncounted: Set<s
       interns: orderInternsLabel(o.raw, orderProposalIds(o.raw).map((id) => hires.get(id)?.who).filter((who): who is string => Boolean(who))),
       promoCode: promo.code,
       discountMinor: promo.discountMinor,
-      discountLabel: discountLabel(promo, o.amountMinor),
+      discountLabel: discountLabel(promo, o.amountMinor, paymentFeeMinor(o.raw)),
       // The settle flag, a second payment for the order, a refused amount: each in words, for the badge, filter and CSV.
       needsReview: orderReview(o.raw).flagged,
       reviewReasons: orderReview(o.raw).reasons.map((r) => r.label),

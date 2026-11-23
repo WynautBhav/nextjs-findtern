@@ -8,7 +8,7 @@ import { parseOffer } from "./offer.ts";
 import { feeRateLabel, fullTimeRate } from "./checkout.ts";
 import { subscriptionLineLabel } from "./subscription/order.ts";
 import { orderProposalIds } from "./order-ids.ts";
-import { discountLabel, paymentPromo } from "./admin/payment-promo.ts";
+import { discountLabel, paymentFeeMinor, paymentPromo } from "./admin/payment-promo.ts";
 
 /**
  * The one place an employer payment becomes an invoice number, a description
@@ -92,6 +92,11 @@ function build(
   const feeOrder = mode === "hiring_fee";
   const monthly = mode === "monthly";
 
+  const promoFacts = paymentPromo(p.raw, undefined, p.amountMinor);
+  const promoCode = discountLabel(promoFacts, p.amountMinor, paymentFeeMinor(p.raw));
+  // With no code, the discount row IS the upfront discount, and the lines print before it: the stipend line must not say "after" it.
+  const upfrontShownBelow = !promoFacts.code && promoFacts.discountMinor > 0;
+
   const lines: InvoiceLine[] = rows.flatMap((r) => {
     const offer = parseOffer(r.offerDetails as never, r.currency as never);
     if (offer.fullTime) {
@@ -141,15 +146,12 @@ function build(
       paymentIndex,
       chargedMinor: rows.length === 1 ? p.amountMinor : null,
       feeMinor,
-      upfrontDiscountMinor: monthly ? 0 : recordedUpfrontDiscountOf(p.raw, r.proposalId),
+      upfrontDiscountMinor: monthly || upfrontShownBelow ? 0 : recordedUpfrontDiscountOf(p.raw, r.proposalId),
     });
   });
 
   const hit = needsLegacyNumber(p) ? legacyNumbers.get(p.orderId) : undefined;
   const number = hit && p.paidAt && hit.paidAtMs === p.paidAt.getTime() ? hit.number : displayInvoiceNumber(p, legacyPaid);
-
-  const promoFacts = paymentPromo(p.raw, undefined, p.amountMinor);
-  const promoCode = discountLabel(promoFacts, p.amountMinor);
 
   return {
     number,

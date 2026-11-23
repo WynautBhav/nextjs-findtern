@@ -255,7 +255,11 @@ export function taxInvoiceHtml(input: InvoiceInput): string {
   const discountRows =
     input.promo && discountMinor
       ? `<div class="row"><span>Price before discount</span><span>${m(input.amountMinor + discountMinor)}</span></div>
-         <div class="row"><span>${esc(discountRowLabel(input.promo.code))}</span><span>-${m(discountMinor)}</span></div>`
+         <div class="row"><span>${esc(discountRowLabel(input.promo.code))}</span><span>-${m(discountMinor)}</span></div>
+         ${
+           // The taxable value is without GST: show what is left of the price (GST included) first, so the rows read top to bottom. An export has no tax, so its taxable value is that.
+           split.baseMinor === input.amountMinor ? "" : `<div class="row"><span>Price after discount</span><span>${m(input.amountMinor)}</span></div>`
+         }`
       : "";
   const gstLine = seller.gstin ? `GST: ${esc(seller.gstin)}` : `<span class="warn">GST: not configured</span>`;
   const sac = esc(input.sac ?? "998519");

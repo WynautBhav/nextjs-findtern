@@ -188,11 +188,20 @@ export function placementLedger(hire: HireLike, allPayments: readonly PaidOrderL
     // The last period's end (as the instalments and timesheets count it), not start + months, which is a day later.
     endsOn: offer.fullTime ? null : (engagementEndOn(offer.startDate, offer.months) ?? addMonths(offer.startDate, offer.months)),
     // A month a promo waived in full is still a month paid: the row says Month 2 next, so it is not "No instalment paid".
-    status: dueMinor === 0 && paidMinor > 0 ? "fully_paid" : paidMinor > 0 || (covered > 0 && dueMinor > 0) ? "partially_paid" : "unpaid",
+    // A hire waived in full has nothing paid and nothing due, but every month is covered: that is Fully paid too.
+    status: dueMinor === 0 && (paidMinor > 0 || (covered > 0 && covered >= months)) ? "fully_paid" : paidMinor > 0 || (covered > 0 && dueMinor > 0) ? "partially_paid" : "unpaid",
   };
 }
 
 /** True when any line being paid is not the month the client asked for (already paid, or a later one is due). */
 export function paymentIndexMismatch(lines: { due: { monthsPaid: number } | null }[], paymentIndex: number): boolean {
   return lines.some((l) => (l.due?.monthsPaid ?? 0) !== paymentIndex);
+}
+
+/** Why `paymentIndex` is refused (a month already paid, or a later one asked before the month due), or null when it is the month due. */
+export function paymentIndexRefusal(lines: { due: { monthsPaid: number } | null }[], paymentIndex: number): string | null {
+  if (!paymentIndexMismatch(lines, paymentIndex)) return null;
+  return lines.some((l) => (l.due?.monthsPaid ?? 0) < paymentIndex)
+    ? "An earlier month is due first. Refresh the page to pay it."
+    : "This month is already paid. Refresh the page to see it under Orders.";
 }
