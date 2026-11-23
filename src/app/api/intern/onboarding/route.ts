@@ -1,4 +1,5 @@
 import { and, eq, ne, sql } from "drizzle-orm";
+import { ID_LOCKED_MESSAGE, lockedIdField } from "@/lib/id-lock";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -272,6 +273,9 @@ export async function POST(req: Request) {
     .where(eq(schema.internOnboarding.userId, session.uid))
     .limit(1);
   const saved = existing ? draftFromRecord(existing) : {};
+  // A saved Aadhaar or PAN number is locked (23 Nov): a different one is refused; the same one or none is fine.
+  const lockedField = lockedIdField(existing, body);
+  if (lockedField) return NextResponse.json({ error: ID_LOCKED_MESSAGE, code: "id_locked", step: 0, fields: { [lockedField]: ID_LOCKED_MESSAGE } }, { status: 409 });
 
   // Only a number already on file may break the "never starts with 0 or 1"
   // rule (legacy rows, INT-30); a new one is checked on drafts too, or one

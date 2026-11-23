@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
 import { getDb, schema } from "@/lib/db";
+import { ID_LOCKED_MESSAGE, cardImageLocked } from "@/lib/id-lock";
 import { requireMutation } from "@/lib/guards-mutation";
 import { MAX_MARKSHEETS } from "@/lib/onboarding";
 import { bucketKey, clientIp, limiters } from "@/lib/security/rate-limit";
@@ -38,6 +39,15 @@ export async function POST(req: Request): Promise<Response> {
   const kind = KINDS[kindName];
   if (!kind || !kind.roles.includes(session.role)) {
     return NextResponse.json({ error: "You can't upload that here" }, { status: 400 });
+  }
+  // A saved Aadhaar or PAN card image is locked: the intern can see it is on file, and only an admin can change it.
+  if (kindName === "aadhaar" || kindName === "pan") {
+    const [doc] = await getDb()
+      .select({ aadhaarImageName: schema.internDocuments.aadhaarImageName, panImageName: schema.internDocuments.panImageName })
+      .from(schema.internDocuments)
+      .where(eq(schema.internDocuments.userId, session.uid))
+      .limit(1);
+    if (cardImageLocked(kindName, doc)) return NextResponse.json({ error: ID_LOCKED_MESSAGE, code: "id_locked" }, { status: 409 });
   }
   const type = req.headers.get("content-type")?.split(";")[0].trim() ?? "";
   const badType = checkType(kind, type, session.role);
