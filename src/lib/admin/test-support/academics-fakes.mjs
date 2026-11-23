@@ -33,6 +33,10 @@ function tx() {
         /** @type {any} */
         const api = {
           where: () => api,
+          orderBy: (...cols) => {
+            g.__acad.orderBy = cols;
+            return api;
+          },
           limit: () => api,
           for: () => {
             g.__acad.locked = true;

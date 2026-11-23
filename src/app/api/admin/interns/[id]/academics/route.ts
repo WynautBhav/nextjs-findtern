@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { recordAdminAudit } from "@/lib/admin/audit";
 import { EDIT_FIELDS, academicsProblems, firstProblem, mergeAcademics, readAcademicsValues, LEVEL_LABELS, type AcademicsEdit } from "@/lib/admin/academics-edit";
+import { latestOnboardingOrder } from "@/lib/admin/latest-onboarding";
 import { applyAdminScoreEdit, withCgpaCorrection } from "@/lib/cgpa-verification-flow";
 import { cgpaEmployerNotice } from "@/lib/cgpa-employer-notice";
 import { getDb, schema } from "@/lib/db";
@@ -65,6 +66,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       .select({ id: schema.internOnboarding.id, extra: schema.internOnboarding.extraData })
       .from(schema.internOnboarding)
       .where(eq(schema.internOnboarding.userId, id))
+      .orderBy(...latestOnboardingOrder(schema.internOnboarding)) // the row the hire gate and the list read
       .limit(1)
       .for("update");
     if (!row) return { ok: false, status: 404, error: "Not found" };

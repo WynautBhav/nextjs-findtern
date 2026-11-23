@@ -3,12 +3,17 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { diffFields, recordAdminAudit } from "@/lib/admin/audit";
-import { promoCodeProblem, promoDiscountProblem, promoNumberFields } from "@/lib/admin/promo-edit-rules";
+import { allows } from "@/lib/admin/permissions";
+import { loadPromoPrices } from "@/lib/admin/promo-prices";
+import { FREE_CODE_NEEDS_FINANCE, promoCodeProblem, promoDiscountProblem, promoMakesFree, promoNumberFields } from "@/lib/admin/promo-edit-rules";
 import { getDb, schema } from "@/lib/db";
 import { isFullWaiver, waiverCodeTail, waiverEditProblem } from "@/lib/full-waiver";
 import { requireMutation } from "@/lib/guards-mutation";
 import { DUPLICATE_CODE, isUniqueViolation, openPromoOrders } from "@/lib/promo";
 import { collegeCodeDeleteProblem, collegeCodeEditProblem, promoDeleteProblem, promoExpiryProblem, promoMaxUsagesProblem, promoRenameProblem, PROMO_APPLIES_TO, promoWindowProblem } from "@/lib/promo-rules";
+
+/** Finance (transactions:write) decides every code that makes a payment free, the same bar as creating a waiver; super admin passes. */
+const mayHandleFreeCodes = (permissions: readonly string[] | undefined) => allows(permissions, ["transactions:write"]);
 
 // Omitted = leave as is; null = clear.
 const bodySchema = z.object({
@@ -75,6 +80,12 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     .where(eq(schema.promoCodes.id, id))
     .limit(1);
   if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // A code that is free now, or would be after this edit, is finance's to change, switch on/off or rename.
+  if (!mayHandleFreeCodes(guard.session.permissions)) {
+    const prices = await loadPromoPrices();
+    const after = { discountType: parsed.data.discountType ?? existing.discountType, discountValue: parsed.data.discountValue ?? existing.discountValue, appliesTo: parsed.data.appliesTo ?? existing.appliesTo };
+    if (promoMakesFree(existing, prices) || promoMakesFree(after, prices)) return NextResponse.json({ error: FREE_CODE_NEEDS_FINANCE }, { status: 403 });
+  }
   // A college's code keeps its discount, audience and cap; those change on the college screen.
   const locked = collegeCodeEditProblem(existing, parsed.data);
   if (locked) return NextResponse.json({ error: locked }, { status: 403 });
@@ -134,8 +145,9 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
   const guard = await requireMutation({ req, roles: ["admin"] });
   if (!guard.ok) return guard.response;
   const db = getDb();
-  const [row] = await db.select({ collegeId: schema.promoCodes.collegeId, code: schema.promoCodes.code, usedCount: schema.promoCodes.usedCount, discountType: schema.promoCodes.discountType }).from(schema.promoCodes).where(eq(schema.promoCodes.id, id)).limit(1);
+  const [row] = await db.select({ collegeId: schema.promoCodes.collegeId, code: schema.promoCodes.code, usedCount: schema.promoCodes.usedCount, discountType: schema.promoCodes.discountType, discountValue: schema.promoCodes.discountValue, appliesTo: schema.promoCodes.appliesTo }).from(schema.promoCodes).where(eq(schema.promoCodes.id, id)).limit(1);
   if (!row) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (!mayHandleFreeCodes(guard.session.permissions) && promoMakesFree(row, await loadPromoPrices())) return NextResponse.json({ error: FREE_CODE_NEEDS_FINANCE }, { status: 403 });
   const locked = collegeCodeDeleteProblem(row.collegeId);
   if (locked) return NextResponse.json({ error: locked }, { status: 403 });
   // A code with history is turned off, never deleted: its redemptions are the record behind real orders.
