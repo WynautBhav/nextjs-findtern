@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+import { picksFor, readCompareMap, serializeCompareMap, writeCompareMap } from "./compare-map.ts";
 import { adjustedBadge, getPicks, getShortlistOverride, resetPicksStore, seedPicks, setPicks, setShortlistOverride, shortlistSnapshot, subscribePicks, subscribeShortlist, togglePick } from "./candidate-picks-store.ts";
 
 const read = (p: string) => readFileSync(join(import.meta.dirname, "..", p), "utf8");
@@ -77,4 +78,29 @@ test("the Candidates region: one hook, no per-change navigation, panel not re-ke
   assert.match(filters, /key=\{panelEpoch\}/);
   // The in-page links do not prefetch the whole page.
   assert.match(read("app/employer/candidates/_link.tsx"), /prefetch = false/);
+});
+
+test("switching project in the list: the project's own picks come back from the cookie, not from the results endpoint", () => {
+  // The results endpoint cannot read the picks cookie (path=/employer), so its ids are always empty; seeding from them
+  // wiped a project's picks on the way back. The region seeds from the browser's cookie instead.
+  const app = read("app/employer/candidates/_app.tsx");
+  assert.match(app, /seedPicks\(data\.activeProjectId, readComparePicks\(uid, data\.activeProjectId\)\)/);
+  assert.doesNotMatch(app, /seedPicks\(data\.activeProjectId, filters\.ids\)/);
+  assert.match(read("components/employer/remember-selection.tsx"), /export function readComparePicks/);
+
+  resetPicksStore();
+  const E = "emp";
+  let cookie: string | null = null;
+  const save = () => (cookie = serializeCompareMap(E, writeCompareMap(readCompareMap(cookie, E), getPicks().project!, getPicks().ids)));
+  seedPicks("A", []);
+  setPicks(["a", "b"]);
+  save();
+  seedPicks("B", picksFor(cookie, E, "B"));
+  assert.deepEqual(getPicks(), { project: "B", ids: [] });
+  togglePick("c");
+  save();
+  seedPicks("A", picksFor(cookie, E, "A"));
+  assert.deepEqual(getPicks(), { project: "A", ids: ["a", "b"] });
+  seedPicks("B", picksFor(cookie, E, "B"));
+  assert.deepEqual(getPicks().ids, ["c"]);
 });

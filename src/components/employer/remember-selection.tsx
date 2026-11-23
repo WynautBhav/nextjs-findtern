@@ -9,7 +9,7 @@
 
 import { useEffect } from "react";
 
-import { readCompareMap, serializeCompareMap, writeCompareMap } from "@/lib/compare-map";
+import { picksFor, readCompareMap, serializeCompareMap, writeCompareMap } from "@/lib/compare-map";
 
 const MAX_AGE = 60 * 60 * 24 * 30;
 /** At most this many projects keep their filters; the oldest drop first. */
@@ -52,15 +52,28 @@ function writeFilters(employerId: string, project: string, query: string) {
   write("ft_emp_filters", keys.length ? `${prefix}${JSON.stringify(kept)}` : null);
 }
 
+/** The project cookie's project id for this employer, or null (also what an old one-list picks cookie belongs to). */
+function storedProject(employerId: string): string | null {
+  const stored = read("ft_emp_project");
+  const prefix = `${employerId}:`;
+  return stored.startsWith(prefix) ? stored.slice(prefix.length) : null;
+}
+
+/**
+ * The compare picks the browser's cookie holds for `project`. The results endpoint (/api/employer/*) never sees this
+ * cookie (path=/employer), so after a project switch the list seeds its ticks from here, not from that response.
+ */
+export function readComparePicks(employerId: string, project: string | null): string[] {
+  return picksFor(read("ft_emp_compare"), employerId, project, storedProject(employerId));
+}
+
 /**
  * Save `ids` as the compare picks for `project`, leaving every other project's
  * picks as the cookie holds them (read at write time, so two tabs do not clobber
  * each other more than they must).
  */
 export function saveComparePicks(employerId: string, project: string, ids: string[]) {
-  const prefix = `${employerId}:`;
-  const stored = read("ft_emp_project");
-  const current = readCompareMap(read("ft_emp_compare"), employerId, stored.startsWith(prefix) ? stored.slice(prefix.length) : null);
+  const current = readCompareMap(read("ft_emp_compare"), employerId, storedProject(employerId));
   write("ft_emp_compare", serializeCompareMap(employerId, writeCompareMap(current, project, ids)));
 }
 

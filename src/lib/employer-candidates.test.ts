@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-import { matchesPlace, preferredCities, rawScore, redactForEmployer, toCandidateProfile } from "./employer-candidates.ts";
+import { matchesPlace, preferredCities, rawScore, redactForEmployer, toCandidateProfile, withoutScoreUnlessPro } from "./employer-candidates.ts";
 
 // EMB-02: legacy stored findternScore as a number or a numeric string and
 // read it with Number(); the new pool must agree on who is scored.
@@ -100,4 +100,22 @@ test("a list profile carries no contact field, locked or unlocked; unlocking kee
   }
   assert.equal(redactForEmployer(profile, true).fullName, "Asha Rao");
   assert.equal(redactForEmployer(profile, false).fullName, "");
+});
+
+test("CGPA and percentage are blanked unless the employer has Pro", () => {
+  const academics = {
+    institution: "X", degree: "B.Tech", specialization: "CSE", level: "", startYear: "", endYear: "", status: "",
+    score: "8.1", scoreType: "cgpa",
+    courses: [{ name: "C", institution: "I", level: "", completed: "", score: "92%" }],
+  };
+  const p = { id: "a", academics };
+  const free = withoutScoreUnlessPro(p, false);
+  assert.equal(free.academics?.score, "");
+  assert.equal(free.academics?.scoreType, "");
+  assert.equal(free.academics?.courses[0].score, "");
+  assert.equal(free.academics?.degree, "B.Tech", "everything else stays");
+  assert.equal(JSON.stringify(free).includes("8.1"), false);
+  assert.equal(academics.score, "8.1", "the input is not mutated");
+  assert.equal(withoutScoreUnlessPro(p, true), p);
+  assert.deepEqual(withoutScoreUnlessPro({ id: "b", academics: null }, false), { id: "b", academics: null });
 });

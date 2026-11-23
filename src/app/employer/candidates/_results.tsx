@@ -166,7 +166,7 @@ export function Results({
                   // The AI interview recording stays hidden until hire; only the
                   // written report is shown before (legacy detail:1578).
                   // The one row mapper the results endpoint uses too (lib/candidates-wire): what leaves the server is decided there.
-                  candidate={cardCandidate(candidate, data.nameUnlocked.has(candidate.id))}
+                  candidate={cardCandidate(candidate, data.nameUnlocked.has(candidate.id), data.pro.active)}
                   currency={data.currency}
                   region={data.region}
                   selected={compareIds.includes(candidate.id)}

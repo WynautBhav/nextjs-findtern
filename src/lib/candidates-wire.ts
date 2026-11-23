@@ -8,7 +8,7 @@
  * uploaded: photos show before hire (owner call, 6 Nov).
  */
 
-import { redactForEmployer, type CandidateProfile } from "./employer-candidates.ts";
+import { redactForEmployer, withoutScoreUnlessPro, type CandidateProfile } from "./employer-candidates.ts";
 import type { CandidatesData, Filters, ProData } from "./candidates-params.ts";
 import type { CandidateRelation } from "./employer-visibility.ts";
 import type { Currency } from "./employer-pricing.ts";
@@ -17,8 +17,8 @@ import type { schema } from "./db/index.ts";
 import type { CollegeOption } from "./candidate-pro-filters.ts";
 
 /** A card's candidate: `redactForEmployer` plus the fields no card uses taken off. */
-export function cardCandidate(profile: CandidateProfile, unlocked: boolean): CandidateProfile {
-  const redacted = redactForEmployer(profile, unlocked);
+export function cardCandidate(profile: CandidateProfile, unlocked: boolean, proActive = false): CandidateProfile {
+  const redacted = withoutScoreUnlessPro(redactForEmployer(profile, unlocked), proActive);
   const a = redacted.academics;
   return {
     ...redacted,
@@ -87,7 +87,7 @@ export function toResultsWire(data: CandidatesData, filters: Filters): ResultsWi
       const rel = data.relations.get(candidate.id);
       const unlocked = data.nameUnlocked.has(candidate.id);
       return {
-        candidate: cardCandidate(candidate, unlocked),
+        candidate: cardCandidate(candidate, unlocked, data.pro.active),
         relation: rel ? { proposal: rel.proposal, expired: rel.expired, pendingMeetingAt: rel.pendingMeetingAt } : null,
         presence: data.presence[candidate.id] ?? null,
         interested: data.saved.has(candidate.id),

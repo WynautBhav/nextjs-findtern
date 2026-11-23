@@ -197,6 +197,17 @@ export function redactForEmployer<T extends CandidateProfile>(profile: T, unlock
 }
 
 /**
+ * CGPA and percentage (the degree score and each course's score) are a Findtern Pro feature: without an active
+ * subscription they are blanked here, on the server, so they never reach the employer's browser. Callers pass the result
+ * of `proAccess` (fail closed: anything but a confirmed subscription is false).
+ */
+export function withoutScoreUnlessPro<T extends { academics: Academics | null }>(profile: T, proActive: boolean): T {
+  const a = profile.academics;
+  if (proActive || !a) return profile;
+  return { ...profile, academics: { ...a, score: "", scoreType: "", courses: a.courses.map((c) => ({ ...c, score: "" })) } };
+}
+
+/**
  * Intern ids this employer has hired (any project). Lives in
  * `lib/employer-visibility` (not here) so this module stays import-free and
  * unit-testable under plain node. Feed the result into `displayNameOf` so
