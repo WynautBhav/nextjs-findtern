@@ -408,7 +408,7 @@ async function main() {
       // Edge cases: 1 in 5 sent offers is past its start date with no reply (lapsed for the student and the employer);
       // 1 in 3 accepted offers has the employer's payment in progress ("processing").
       // and 1 in 5 of the rest was turned down by the student.
-      if (s.stage === "proposal_sent") await insertProposal(s.n % 5 === 2 ? "rejected" : "sent", internOffer(proj.title, s.n % 5 === 0 ? -1 : 10 + (s.n % 10)), s.n % 5 === 0 ? iso(-9) : recent(2 + (s.n % 40)));
+      if (s.stage === "proposal_sent") await insertProposal(s.n % 5 === 2 ? "rejected" : "sent", internOffer(proj.title, s.n % 5 === 0 ? -1 : 10 + (s.n % 10)), recent(2 + (s.n % 40)));
       if (s.stage === "proposal_accepted") await insertProposal(s.n % 3 === 0 ? "processing" : "accepted", internOffer(proj.title, 8 + (s.n % 10)), recent(10 + (s.n % 30)));
       if (s.stage === "hired_recent") {
         const offer = internOffer(proj.title, 4 + (s.n % 6));

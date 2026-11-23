@@ -19,7 +19,8 @@ export type MeetingRow = {
   /** When the call was set to start; a request lapses CALL_GRACE_MS after it (meetings.ts effectiveStatus). */
   startsAt?: Date;
 };
-export type OfferRow = { userId: string; company: string | null; status: string; hired: boolean; fullTime: boolean; createdAt: Date };
+/** pastStart: the offer's start day has begun (offer-start-sql.ts), so an unanswered one has lapsed, not waiting. */
+export type OfferRow = { userId: string; company: string | null; status: string; hired: boolean; fullTime: boolean; createdAt: Date; pastStart?: boolean };
 export type OfflineRow = { userId: string };
 
 export type BoardKey = "meetingsWaiting" | "offersWaiting" | "offline" | "offers" | "meetings" | "internships" | "fullTime" | "called" | "hired";
@@ -67,7 +68,9 @@ export function buildDriveBoard(input: {
   // Only requests the student can still accept: a lapsed one is expired for the student and the employer alike.
   const waiting = input.meetings.filter((m) => m.status === "requested" && (!m.startsAt || m.startsAt.getTime() + CALL_GRACE_MS >= now));
   const held = input.meetings.filter((m) => m.status === "accepted");
-  const open = input.offers.filter((o) => o.status === "sent");
+  // Waiting on the student: sent, not hired, start day not begun (college count-rules offerWaitingSql). Past it the
+  // offer lapsed ("deadline missed" in master data, "no response" for the student, "expired" for the employer).
+  const open = input.offers.filter((o) => o.status === "sent" && !o.hired && !o.pastStart);
   const hired = input.offers.filter((o) => o.hired || HIRED.has(o.status));
   const inDrive = input.offers.filter((o) => students.has(o.userId));
   const hiredItems = perStudent(hired, students, (rs) => `${rs.some((r) => r.fullTime) ? "Full-time" : "Internship"} with ${names(rs)}`);

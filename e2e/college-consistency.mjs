@@ -82,7 +82,7 @@ function expected(id) {
 }
 
 // Sign in as the college officer and export master data for every verified student.
-const login = await fetch(`${BASE}/api/auth/college/login`, { method: "POST", headers: { "content-type": "application/json", origin: BASE }, body: JSON.stringify(TPO) });
+const login = await fetch(`${BASE}/api/auth/college/login`, { method: "POST", headers: { "content-type": "application/json", origin: BASE, "x-forwarded-for": `10.9.${Math.floor(Math.random() * 256)}.${1 + Math.floor(Math.random() * 250)}` }, body: JSON.stringify(TPO) });
 if (!login.ok) throw new Error(`college login ${login.status}`);
 const jar = login.headers.getSetCookie().map((c) => c.split(";")[0]);
 const csrf = decodeURIComponent(jar.find((c) => c.startsWith("ft_csrf="))?.slice(8) ?? "");

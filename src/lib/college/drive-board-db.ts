@@ -2,6 +2,8 @@ import { and, eq, gte, inArray, lte, ne, sql, type AnyColumn } from "drizzle-orm
 
 import { realEmployerId } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
+import { todayIst } from "@/lib/offer";
+import { startBegunSql } from "@/lib/offer-start-sql";
 import { q } from "./sql";
 import { buildDriveBoard, matchInvites, type CameEmployer, type DriveBoard, type DriveStudentRef, type Invite } from "./drive-board";
 import type { Drive } from "./scope";
@@ -68,6 +70,7 @@ export async function loadDriveBoard(
             hiredAt: p.hiredAt,
             createdAt: utc(p.createdAt),
             fullTime: sql<boolean>`jsonb_typeof(${p.offerDetails}->'fullTimeOffer') = 'object'`,
+            pastStart: sql<boolean>`${startBegunSql(p.offerDetails, todayIst(new Date(now)))}`,
           })
           .from(p)
           .where(and(inArray(p.internId, ids), inArray(p.employerId, employerIds), gte(p.createdAt, drive.startsAt), lte(p.createdAt, drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt), ne(p.status, "draft"), realEmployerId(p.employerId)))
@@ -80,7 +83,7 @@ export async function loadDriveBoard(
     meetings: meetings.map((m) => ({ userId: m.userId, company: companyOf.get(m.employerId) ?? null, status: m.status, createdAt: m.createdAt, startsAt: m.startsAt })),
     offers: offers
       .filter((o) => o.status !== "withdrawn")
-      .map((o) => ({ userId: o.userId, company: companyOf.get(o.employerId) ?? null, status: (o.status ?? "").toLowerCase(), hired: o.hiredAt !== null, fullTime: Boolean(o.fullTime), createdAt: o.createdAt ?? drive.startsAt })),
+      .map((o) => ({ userId: o.userId, company: companyOf.get(o.employerId) ?? null, status: (o.status ?? "").toLowerCase(), hired: o.hiredAt !== null, fullTime: Boolean(o.fullTime), pastStart: Boolean(o.pastStart), createdAt: o.createdAt ?? drive.startsAt })),
     offline,
     now,
   });

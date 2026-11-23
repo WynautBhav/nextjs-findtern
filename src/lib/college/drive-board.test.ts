@@ -132,3 +132,18 @@ test("the closed-drive sentence counts students, so it agrees with the pipeline"
   assert.equal(b.lists.offers.length, 2);
   assert.equal(closedDriveFinding(b.lists), "2 students got an offer, 0 students had a meet and 1 student was hired in this drive.");
 });
+
+test("an unanswered offer whose start day began is lapsed, not 'Offers not answered' (master data: deadline missed)", () => {
+  const b = buildDriveBoard({
+    students,
+    meetings: [],
+    offers: [
+      { userId: "a", company: "Acme", status: "sent", hired: false, fullTime: false, createdAt: at(60), pastStart: true },
+      { userId: "b", company: "Beta", status: "sent", hired: false, fullTime: false, createdAt: at(50), pastStart: false },
+    ],
+    offline: null,
+    now: NOW,
+  });
+  assert.deepEqual(b.lists.offersWaiting.map((s) => s.userId), ["b"]);
+  assert.equal(b.offerCount, 2, "a lapsed offer still counts as an offer received");
+});
