@@ -7,6 +7,7 @@ import { isHiredProposal } from "./hire-status";
 import { parseOffer, todayIst } from "./offer";
 import { LIVE_STATUSES } from "./employer-offer-status";
 import { EXPIRY_LABEL, expiryOf, type ExpiryReason } from "./proposal-expiry";
+import { hasOpenMeeting } from "./employer-interview-rules";
 import { pendingMeetingAtFor } from "./proposal-guard";
 
 export { isLiveOffer } from "./employer-offer-status";
@@ -127,6 +128,11 @@ export type CandidateRelation = {
    */
   pendingMeetingAt: string | null;
   /**
+   * An open meeting with them on ANY project (hasOpenMeeting): every "Book meeting" button for them shows disabled, because the
+   * booking service refuses a second open meeting per employer and candidate. Unlike `pendingMeetingAt`, not scoped to a project.
+   */
+  meetingOpen: boolean;
+  /**
    * The newest expired offer (no reply, unpaid or closed by Findtern), only while nothing live or hired shows. The card keeps
    * its history ("Expired") instead of reading as never contacted; "Send proposal" stays open for a new offer.
    */
@@ -192,6 +198,7 @@ export async function candidateRelations(
         meetings.filter((m) => m.internId === id),
         { projectId },
       ),
+      meetingOpen: hasOpenMeeting(meetings.filter((m) => m.internId === id)),
     });
   }
   return out;

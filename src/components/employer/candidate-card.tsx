@@ -54,6 +54,8 @@ export interface CandidateCardProps {
   interested?: boolean;
   /** ISO time of a booked meeting that still holds the candidate: "Send proposal" waits for it. */
   pendingMeetingAt?: string | null;
+  /** An open meeting with them on any project: "Book meeting" shows disabled. */
+  meetingOpen?: boolean;
   /** "list" (default): the full-width card. "grid": the compact one, two across, three on wide screens. "rows": one dense line, same actions. */
   layout?: ListView;
 }
@@ -207,6 +209,7 @@ export function CandidateCard({
   presence = null,
   interested = false,
   pendingMeetingAt = null,
+  meetingOpen = false,
   layout = "list",
 }: CandidateCardProps) {
   const pricing = resolved ?? resolvePricing(candidate.score, [], currency, region, PER_HIRE_FEE_DEFAULT);
@@ -268,7 +271,7 @@ export function CandidateCard({
       wantedSkills={wantedSkills}
       profileHref={profileHref}
       projectId={projectId}
-      meetingOpen={Boolean(sendProposalHold(pendingMeetingAt))}
+      meetingOpen={meetingOpen}
       className={QUICK_VIEW_PILL}
     />
   );

@@ -20,6 +20,8 @@ export type CartLineItem = {
   acceptedProposalId?: string | null;
   /** An open meeting holds the candidate until this time (ISO); no new booking or proposal before. */
   meetingUntil?: string | null;
+  /** An open meeting with them on any project (hasOpenMeeting): "Book meeting" shows disabled. */
+  meetingOpen?: boolean;
   /** The booked meeting's link while it is live, for "Join meeting". */
   meetingLink?: string | null;
   meetingInterviewId?: string | null;

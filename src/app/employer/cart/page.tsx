@@ -14,7 +14,7 @@ import { employerRegion, resolvePricing, type Currency } from "@/lib/employer-pr
 import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
 import { pendingMeetingAtFor } from "@/lib/proposal-guard";
-import { isBlockingInterview, isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
+import { hasOpenMeeting, isBlockingInterview, isMeetingLinkLive, meetingEndsAt } from "@/lib/employer-interview-rules";
 import { cartInternIdsForRequest, hireFlowCounts, loadFlowProposals } from "@/lib/employer-flow";
 import { normalizeStatus } from "@/components/employer/proposal-bucket";
 import { payableCheckoutForRequest } from "@/lib/employer-payable";
@@ -259,6 +259,7 @@ async function loadCart(uid: string, unlockAll: boolean): Promise<CartData> {
         openProposalId: openFor.get(item.internId) ?? null,
         acceptedProposalId: acceptedFor.get(item.internId) ?? null,
         meetingUntil: meetingUntil.get(item.internId) ?? null,
+        meetingOpen: hasOpenMeeting(meetingRows.filter((iv) => iv.internId === item.internId)),
         meetingAt: pendingMeetingAtFor(meetingRows.filter((iv) => iv.internId === item.internId), { projectId: item.projectId }),
         meetingLink: meetingLinks.get(item.internId)?.link ?? null,
         meetingInterviewId: meetingLinks.get(item.internId)?.id ?? null,

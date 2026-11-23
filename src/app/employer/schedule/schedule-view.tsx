@@ -4,7 +4,7 @@ import { CalendarDays, CalendarX2, Search } from "lucide-react";
 import { EmptyScene, FilterTabs, PageHead, Pill, Surface, type Tone } from "@/components/app/primitives";
 import { AutoSubmitForm } from "@/components/app/auto-submit-form";
 import { buttonClass } from "@/components/ui/button";
-import { isMeetingLinkLive, meetingTime, canLeaveFeedback, canMarkCompleted, canMarkMissed, type InterviewStage } from "@/lib/employer-interview-rules";
+import { hasOpenMeeting, isMeetingLinkLive, meetingTime, canLeaveFeedback, canMarkCompleted, canMarkMissed, type InterviewStage } from "@/lib/employer-interview-rules";
 import { formatSlotDay } from "@/lib/format";
 import { ProposalTabs } from "@/components/employer/section-tabs";
 import { InterviewActions } from "@/components/employer/interview-actions";
@@ -23,7 +23,7 @@ import type { schema } from "@/lib/db";
 export const STAGE: Record<InterviewStage, { label: string; tone: Tone }> = {
   awaiting_pick: { label: "Waiting on candidate", tone: "waiting" },
   expired: { label: "Expired", tone: "closed" },
-  employer_no_show: { label: "Expired: employer didn't join", tone: "closed" },
+  employer_no_show: { label: "Expired", tone: "closed" },
   upcoming: { label: "Scheduled", tone: "live" },
   live: { label: "Happening now", tone: "new" },
   over: { label: "Completed", tone: "paid" },
@@ -77,6 +77,8 @@ export function ScheduleView({
   statusFilters: StatusFilter[];
 }) {
   const field = fieldClass;
+  // Candidates this company has an open meeting with: "Book meeting" on a cancelled row of theirs is dimmed.
+  const openWith = new Set([...new Set(all.map((x) => x.iv.internId))].filter((id) => hasOpenMeeting(all.filter((x) => x.iv.internId === id).map((x) => x.iv))));
   return (
     <div>
       <PageHead
@@ -190,7 +192,7 @@ export function ScheduleView({
                   <h2 className="mb-2 text-base font-semibold text-ink-900">{sec.title}</h2>
                   <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
                     {sec.rows.map((r) => (
-                      <ScheduleRow key={r.iv.id} r={r} now={now} past={sec.past === true} employerId={employerId} />
+                      <ScheduleRow key={r.iv.id} r={r} now={now} past={sec.past === true} employerId={employerId} meetingOpen={openWith.has(r.iv.internId)} />
                     ))}
                   </Surface>
                   {sec.more > 0 ? (
@@ -238,7 +240,7 @@ function clockOf(t: number, tz: string): { time: string; zone: string } {
   return { time, zone };
 }
 
-function ScheduleRow({ r, now, past, employerId }: { r: Row; now: number; past: boolean; employerId: string }) {
+function ScheduleRow({ r, now, past, employerId, meetingOpen }: { r: Row; now: number; past: boolean; employerId: string; meetingOpen: boolean }) {
   const { iv, stage } = r;
   const slots = [iv.slot1, iv.slot2, iv.slot3].filter((x): x is NonNullable<typeof x> => Boolean(x));
   const link = isMeetingLinkLive(iv, now) ? maskMeetingLink(iv.meetingLink) : null;
@@ -357,6 +359,7 @@ function ScheduleRow({ r, now, past, employerId }: { r: Row; now: number; past: 
               candidateLabel={r.name}
               defaultTimezone={r.tz}
               lockTimezone={Boolean(iv.projectId)}
+              meetingOpen={meetingOpen}
             />
           ) : null
         }

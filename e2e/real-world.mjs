@@ -203,7 +203,7 @@ async function interviewScenario(name, steps, want) {
   for (const step of steps) await step({ s, id, intern });
   const V = {
     intern: ["Booked", "Choose a time", "Interview done", "Employer didn't join", "Expired", "Missed", "Cancelled", "Closed"],
-    employer: ["Waiting on candidate", "Expired: employer didn't join", "Expired", "Scheduled", "Happening now", "Completed", "Missed", "Closed", "Cancelled"],
+    employer: ["Waiting on candidate", "Expired", "Scheduled", "Happening now", "Completed", "Missed", "Closed", "Cancelled"],
     admin: ["Pending", "Scheduled", "Expired", "Missed", "Completed", "Cancelled"],
     college: ["Pending", "Scheduled", "Expired", "Missed", "Completed", "Cancelled"],
   };
@@ -249,7 +249,7 @@ const markDone = async ({ id }) => { const r = await emp.a.call("POST", `/api/in
 const cancelByEmployer = async ({ id }) => { const r = await emp.a.call("POST", `/api/interviews/${id}/cancel`, { reason: "Role filled" }); if (!r.ok) throw new Error(`cancel ${r.status} ${JSON.stringify(r.body)}`); };
 
 await interviewScenario("Meeting booked by the student", [pickSlot], { intern: "Booked", employer: "Scheduled", admin: "Scheduled", college: "Scheduled", master: { meetingsDone: "0", meetingsNotAccepted: "0", meetingsMissed: "0" } });
-await interviewScenario("Booked, time passes, employer never joins", [pickSlot, slotPassed], { intern: "Employer didn't join", employer: "Expired: employer didn't join", admin: "Expired", college: "Expired", master: { meetingsNotAccepted: "0", meetingsMissed: "0" } });
+await interviewScenario("Booked, time passes, employer never joins", [pickSlot, slotPassed], { intern: "Employer didn't join", employer: "Expired", admin: "Expired", college: "Expired", master: { meetingsNotAccepted: "0", meetingsMissed: "0" } });
 await interviewScenario("Booked, time passes, employer marks student missed", [pickSlot, meetingStarts, employerJoins, slotPassed, markMissed], { intern: "Missed", employer: "Missed", admin: "Missed", college: "Missed", master: { meetingsMissed: "1", meetingsNotAccepted: "0" } });
 await interviewScenario("Booked, held, employer marks it done", [pickSlot, meetingStarts, employerJoins, slotPassed, markDone], { intern: "Interview done", employer: "Completed", admin: "Completed", college: "Completed", master: { meetingsDone: "1" } });
 await interviewScenario("Invite never answered, every slot passes", [slotPassed], { intern: "Expired", employer: "Expired", admin: "Expired", college: "Expired", master: { meetingsNotAccepted: "1" } });

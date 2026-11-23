@@ -1,6 +1,6 @@
 import { isHiredProposal } from "@/lib/hire-status";
 import type { Metadata } from "next";
-import { and, desc, eq, isNull, lt, or } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, lt, or } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
 import { requireRole } from "@/lib/auth";
@@ -21,6 +21,7 @@ import { getInvoiceSeller } from "@/lib/invoice-seller";
 import { LEGACY_INVOICE_CUTOFF, taxInvoiceHtml } from "@/lib/invoice";
 import { employerInvoices } from "@/lib/employer-invoice";
 import { loadInvoiceHires } from "@/lib/employer-invoice-hires";
+import { hasOpenMeeting } from "@/lib/employer-interview-rules";
 import { timezoneForLocation } from "@/lib/timezones";
 import { parseOffer, todayIst } from "@/lib/offer";
 import { payableCheckoutForRequest } from "@/lib/employer-payable";
@@ -110,6 +111,14 @@ async function loadOrders(employerId: string) {
   );
 
   // Hired only: an accepted-but-unpaid offer is not a hire and its name stays masked.
+  const hiredInterns = [...new Set(proposalRows.filter((r) => r.proposal.status === "hired").map((r) => r.proposal.internId))];
+  // A hire keeps its Book meeting button (not on the Candidates list or shortlist any more); dimmed while a meeting is open.
+  const openMeetings = hiredInterns.length
+    ? await db
+        .select()
+        .from(schema.interviews)
+        .where(and(eq(schema.interviews.employerId, employerId), inArray(schema.interviews.internId, hiredInterns), inArray(schema.interviews.status, ["pending", "scheduled"])))
+    : [];
   const hires: HireRow[] = proposalRows
     .filter((r) => r.proposal.status === "hired")
     .map((r) => {
@@ -118,6 +127,8 @@ async function loadOrders(employerId: string) {
       return {
         proposalId: r.proposal.id,
         internId: r.proposal.internId,
+        projectId: r.proposal.projectId ?? null,
+        meetingOpen: hasOpenMeeting(openMeetings.filter((iv) => iv.internId === r.proposal.internId)),
         candidateName: nameOf(r),
         candidateEmail: r.email,
         projectName: r.projectName ?? "Project",

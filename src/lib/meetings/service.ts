@@ -325,7 +325,7 @@ export type CreateInput = { employerId: string; internId: string; projectId: str
  * company's three new times, blocks a second one.
  */
 export async function createMeeting(db: Db, i: CreateInput): Promise<{ ok: true; interview: Interview } | Fail> {
-  const { isBlockingInterview, hasNoSlotsToPick } = await import("@/lib/employer-interview-rules");
+  const { hasOpenMeeting } = await import("@/lib/employer-interview-rules");
   const created = await withPartyLocks(db, i.employerId, i.internId, async (tx) => {
     const r = step(undefined, { type: "propose", by: "employer", slots: i.slots, busy: await busyStarts(tx, i.employerId, i.internId, null) });
     if (!r.ok) return refused(r);
@@ -333,7 +333,7 @@ export async function createMeeting(db: Db, i: CreateInput): Promise<{ ok: true;
       .select()
       .from(schema.interviews)
       .where(and(eq(schema.interviews.employerId, i.employerId), eq(schema.interviews.internId, i.internId), inArray(schema.interviews.status, ["pending", "scheduled"])));
-    if (open.some((iv) => isBlockingInterview(iv) || hasNoSlotsToPick(iv))) return fail(409, "A meeting with this candidate is already open - finish it first.", "open_meeting");
+    if (hasOpenMeeting(open)) return fail(409, "A meeting with this candidate is already open - finish it first.", "open_meeting");
     const [row] = await tx
       .insert(schema.interviews)
       .values({ employerId: i.employerId, internId: i.internId, projectId: i.projectId ?? undefined, timezone: i.timezone, ...rowFields(r.fields), gateToken: newToken() })

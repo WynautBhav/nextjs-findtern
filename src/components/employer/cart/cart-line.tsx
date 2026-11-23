@@ -36,7 +36,9 @@ export function CartLine({
   const locked = meetingLocked(line);
   const closed = Boolean(line.projectClosed);
   const profileHref = `/employer/intern/${encodeURIComponent(c.id)}?project=${encodeURIComponent(line.projectId)}`;
-  const canMeet = !line.acceptedProposalId && !line.openProposalId && !closed && !locked;
+  const canMeet = !line.acceptedProposalId && !line.openProposalId && !closed;
+  // Shown, but dimmed, while any meeting with them is open (the server refuses a second one).
+  const meetBlocked = locked || Boolean(line.meetingOpen);
 
   return (
     <li className="rise tile-lift rounded-[24px] bg-white p-4 shadow-tile ring-1 ring-ink-100 sm:p-5" style={{ "--i": index } as React.CSSProperties}>
@@ -131,7 +133,7 @@ export function CartLine({
           <RowMenu
             label={`More actions for ${name}`}
             items={[
-              ...(canMeet ? [{ label: "Book meeting", onSelect: onMeeting, icon: <Video /> }] : []),
+              ...(canMeet ? [{ label: "Book meeting", onSelect: onMeeting, icon: <Video />, disabled: meetBlocked }] : []),
               { label: "Open profile", href: profileHref, icon: <UserRound /> },
               { label: "Remove from shortlist", onSelect: onRemove, icon: <Trash2 />, destructive: true, disabled: busy },
             ]}
