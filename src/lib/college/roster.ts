@@ -16,18 +16,21 @@ const HEADERS: Record<keyof RosterInput, RegExp> = {
 };
 
 /**
- * An Indian mobile as its 10 digits, or null. Accepted shapes: 10 digits, 0 + 10, 91 + 10, 091 + 10, 0091 + 10 (with
+ * An Indian mobile as its 10 digits, or null. Accepted shapes: 10 digits, 0 + 10, 91 + 10, 091 + 10, 0091 + 10, +91 0 + 10 (with
  * spaces, dashes, brackets, a leading + or a spreadsheet's ".0" or leading apostrophe). Anything else is not a number
  * we can trust: a +44 number, an 11-digit typo or a decimal is never cut down to its last ten digits.
  */
 export function readPhone(raw: string): string | null {
   const s = raw.trim().replace(/^'/, "").replace(/^(\d+)\.0+$/, "$1");
-  if (/[^\d\s\-().+]/.test(s) || s.lastIndexOf("+") > 0) return null;
+  // A "+" is only ever the first thing (a bracket or space may come before it: "(+91) 98765 43210"), and only once.
+  if (/[^\d\s\-().+]/.test(s) || !/^[^+]*$|^[\s(]*\+[^+]*$/.test(s)) return null;
   let d = s.replace(/\D/g, "");
-  if (s.startsWith("+") && !d.startsWith("91")) return null;
+  const plus = s.includes("+");
+  if (plus && !d.startsWith("91")) return null;
   if (d.length === 14 && d.startsWith("0091")) d = d.slice(4);
   else if (d.length === 13 && d.startsWith("091")) d = d.slice(3);
   else if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
+  else if (plus && d.length === 13 && d.startsWith("910")) d = d.slice(3); // "+91 0 98765 43210": a trunk 0 kept after the country code
   else if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
   return /^[6-9]\d{9}$/.test(d) ? d : null;
 }
