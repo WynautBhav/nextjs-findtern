@@ -1,5 +1,6 @@
 import type { PgClient } from "../db/pg-tx.ts";
 import { withPgTransaction } from "../db/pg-tx.ts";
+import { CALL_GRACE_MS } from "./constants.ts";
 import { cleanText, decisionOutcome, LEAVE_NOTE_MAX, LEAVE_REASON_MAX, requestProblem, type LeaveAction, type Problem } from "./leave-request.ts";
 
 /**
@@ -20,8 +21,17 @@ export type Actor = { type: "college_admin" | "admin"; id: string };
 export async function endMembership(client: PgClient, userId: string): Promise<void> {
   await run(client, "UPDATE college_memberships SET left_at = now() WHERE user_id = $1 AND left_at IS NULL", [userId]);
   await run(client, "DELETE FROM college_presence WHERE user_id = $1", [userId]);
-  // Same closing a drive revoke does (closeDriveCalls): the student is no longer in any drive, so no request or call stays open for them. Nobody is notified.
-  await run(client, "UPDATE college_drive_meetings SET status = 'cancelled', responded_at = now() WHERE user_id = $1 AND status IN ('requested', 'accepted')", [userId]);
+  // Like closeDriveCalls, but only what is still open for the student: a request or accepted call of a drive that has not ended
+  // or been revoked, whose time has not passed (the request lapse window). A call that happened, a lapsed request and everything
+  // in an ended drive is history and keeps its status and responded_at. Nobody is notified.
+  await run(
+    client,
+    `UPDATE college_drive_meetings SET status = 'cancelled', responded_at = now()
+     WHERE user_id = $1 AND status IN ('requested', 'accepted')
+       AND starts_at + make_interval(secs => $2::double precision) >= now()
+       AND drive_id IN (SELECT id FROM college_drives WHERE ends_at > now() AND (revoked_at IS NULL OR revoked_at > now()))`,
+    [userId, CALL_GRACE_MS / 1000],
+  );
   await run(
     client,
     "UPDATE intern_onboarding SET extra_data = extra_data || jsonb_build_object('accountType', 'individual') WHERE user_id = $1 AND extra_data->>'accountType' = 'college'",
