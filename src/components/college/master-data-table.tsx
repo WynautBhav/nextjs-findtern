@@ -99,7 +99,7 @@ function matches(r: MasterRow, f: Filters, q: string): boolean {
   if (f.minCgpa && (r.cgpa === null || r.cgpa < Number(f.minCgpa))) return false;
   if (f.quadrant && quadrantOf(r) !== f.quadrant) return false;
   if (f.band === "done" && r.score === null) return false;
-  if (f.band === "none" && r.score !== null) return false;
+  if (f.band === "none" && (r.score !== null || !r.verified)) return false; // a claimed student's score is hidden, not absent: never "not interviewed"
   if (f.band && f.band !== "done" && f.band !== "none" && (r.score === null || coffeeOf(r.score) !== f.band)) return false;
   if (f.marks && (r.marks10 === null || marksOf(r.marks10) !== f.marks)) return false;
   if (f.outcome && !matchesOutcome(r, f.outcome)) return false;
@@ -252,7 +252,7 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
   };
 
   const courses = useMemo(() => [...new Set(rows.map((r) => r.degree ?? "Course not set"))].sort(), [rows]);
-  const years = useMemo(() => [...new Set(rows.map((r) => r.year).filter((y): y is number => y !== null))].sort(), [rows]);
+  const years = useMemo(() => [...new Set(rows.map((r) => r.year).filter((y): y is number => y !== null))].sort((a, b) => a - b), [rows]);
 
   const visible = useMemo(() => {
     const words = q.trim().toLowerCase();
@@ -302,7 +302,7 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
       const a = document.createElement("a");
       const name = ((viewId === "all" && downloadName) || allViews.find((v) => v.id === viewId)?.name || "master data").replace(/[^a-z0-9]+/gi, "-").toLowerCase();
       a.href = url;
-      a.download = `${name}-${new Date().toLocaleDateString("en-CA")}.csv`;
+      a.download = `${name}-${new Date(Date.now() + 330 * 60_000).toISOString().slice(0, 10)}.csv`; // India date, whatever the browser's zone is
       document.body.appendChild(a);
       a.click();
       a.remove();
