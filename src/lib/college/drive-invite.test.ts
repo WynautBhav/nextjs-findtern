@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 process.env.PUBLIC_ORIGIN = "http://localhost:3000";
 
-const { inviteSig, inviteSigOk, invitePath, newInvitees, isInvited, driveInviteEmail } = await import("./drive-invite.ts");
+const { inviteSig, inviteSigOk, invitePath, invitesToSend, withUnsent, canSendInvites, isInvited, driveInviteEmail } = await import("./drive-invite.ts");
 const { inviteSentLine } = await import("./drive-invite-line.ts");
 const { checkDriveInviteLink } = await import("./access.ts");
 const { driveInput } = await import("./drive-input.ts");
@@ -34,16 +34,16 @@ test("the invite path is a same-origin path that survives the sign-in and sign-u
   assert.equal(safeNext(path, "/fallback"), path);
 });
 
-test("only addresses that were not already invited get a new invite", () => {
+test("only addresses that were not already invited, or never reached, get an invite", () => {
   const before = [{ company: "Acme", email: "hr@acme.com" }];
   const after = [
     { company: "Acme", email: "HR@acme.com" },
     { company: "Beta", email: "jobs@beta.io" },
     { company: "Beta again", email: "jobs@beta.io" },
   ];
-  assert.deepEqual(newInvitees(before, after), [{ company: "Beta", email: "jobs@beta.io" }]);
-  assert.deepEqual(newInvitees(undefined, after).map((i) => i.email), ["hr@acme.com", "jobs@beta.io"]);
-  assert.deepEqual(newInvitees(before, undefined), []);
+  assert.deepEqual(invitesToSend(before, after), [{ company: "Beta", email: "jobs@beta.io" }]);
+  assert.deepEqual(invitesToSend(undefined, after).map((i) => i.email), ["hr@acme.com", "jobs@beta.io"]);
+  assert.deepEqual(invitesToSend(before, undefined), []);
   assert.equal(isInvited(after, " JOBS@beta.io "), true);
   assert.equal(isInvited(before, "jobs@beta.io"), false);
 });
@@ -139,4 +139,68 @@ test("the invite email does not promise the link is exclusive to the company", (
   const c = driveInviteEmail({ company: "Acme", collegeName: "JKLU", driveTitle: "T", kind: "internship", startsAt: new Date(0), endsAt: new Date(1e10), path: "/drive/invite/x?e=a&s=b" });
   assert.doesNotMatch(c.reason ?? "", /only|don't forward|do not forward/i);
   assert.match(c.reason ?? "", /placement office/);
+});
+
+test("a company the invite never reached is retried on the next save; one that was reached is not", () => {
+  const stored = [
+    { company: "Acme", email: "hr@acme.com" },
+    { company: "Held", email: "held@x.io", unsent: true as const },
+    { company: "Gone", email: "gone@x.io", unsent: true as const },
+  ];
+  // The officer re-saves the same list (the browser sends no `unsent`), minus Gone.
+  const resaved = [
+    { company: "Acme", email: "HR@acme.com" },
+    { company: "Held", email: "held@x.io" },
+  ];
+  assert.deepEqual(invitesToSend(stored, resaved).map((i) => i.email), ["held@x.io"]);
+  assert.deepEqual(invitesToSend(stored, resaved).map((i) => "unsent" in i), [false]);
+});
+
+test("the saved list flags exactly the addresses with no successful send", () => {
+  const list = [
+    { company: "A", email: "a@x.io", unsent: true as const },
+    { company: "B", email: "b@x.io" },
+    { company: "C", email: "c@x.io" },
+  ];
+  assert.deepEqual(withUnsent(list, ["B@x.io"]), [
+    { company: "A", email: "a@x.io" },
+    { company: "B", email: "b@x.io", unsent: true },
+    { company: "C", email: "c@x.io" },
+  ]);
+  assert.deepEqual(withUnsent(list, []), [{ company: "A", email: "a@x.io" }, { company: "B", email: "b@x.io" }, { company: "C", email: "c@x.io" }]);
+});
+
+test("no invite is sent for a drive that has already ended", () => {
+  const now = Date.now();
+  assert.equal(canSendInvites({ startsAt: new Date(now - 7 * 864e5), endsAt: new Date(now - 1000), revokedAt: null }, now), false);
+  assert.equal(canSendInvites({ startsAt: new Date(now - 1000), endsAt: new Date(now + 1000), revokedAt: null }, now), true);
+  assert.equal(canSendInvites({ startsAt: new Date(now + 864e5), endsAt: new Date(now + 2 * 864e5), revokedAt: null }, now), true);
+});
+
+test("the same company typed twice (any case) is stored once", () => {
+  const r = driveInput.parse({
+    title: "Dedupe drive",
+    kind: "internship",
+    startsAt: "2026-11-01T00:00:00Z",
+    endsAt: "2026-11-08T00:00:00Z",
+    invitedEmployers: [
+      { company: "Acme", email: "HR@Acme.com" },
+      { company: "Acme again", email: "hr@acme.com " },
+      { company: "Beta", email: "jobs@beta.io" },
+    ],
+  });
+  assert.deepEqual(r.invitedEmployers, [
+    { company: "Acme", email: "hr@acme.com" },
+    { company: "Beta", email: "jobs@beta.io" },
+  ]);
+});
+
+test("a failed send can be tried again the same day (forget), and a reissue can re-mail everyone", () => {
+  const gate = new InviteGate();
+  const t = 9_000_000;
+  const one = [{ company: "Acme", email: "hr@acme.com" }];
+  assert.equal(gate.plan("c", "d1", one, t).send.length, 1);
+  assert.equal(gate.plan("c", "d1", one, t + 1).send.length, 0);
+  gate.forget("d1", ["HR@acme.com"]);
+  assert.equal(gate.plan("c", "d1", one, t + 2).send.length, 1);
 });

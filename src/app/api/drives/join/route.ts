@@ -44,6 +44,8 @@ export async function POST(req: Request) {
       .for("share", { of: schema.collegeDrives });
     if (!row) return { status: 404 as const };
     // An invite is good only while its address is still on the drive's list and the drive's link has not been reissued.
+    // It is not tied to the signed-in account's email: the share link admits any signed-in company too, and both end in
+    // the same window, college and role checks, so an invite grants nothing the share link does not.
     const access =
       "token" in cred
         ? checkDriveLink({ drive: row.drive, token: cred.token, session: guard.session, collegeActive: row.collegeActive })

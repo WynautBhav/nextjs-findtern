@@ -2,16 +2,22 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type { EmailContent } from "../emails.ts";
 import { linkTo } from "../origin.ts";
+import { driveWindow } from "./access.ts";
 
 /**
  * Invites a placement officer sends to a company (the "Companies you invited" list on a drive).
  *
  * The drive's share token is stored hashed and shown once, so an invite cannot carry it. Its link instead carries an
  * HMAC of (drive, the drive's current token hash, the invited email): unguessable, good for that drive and that
- * address only, nothing stored, and issuing a new drive link (or removing the company from the list) kills it.
+ * address only, nothing stored, and issuing a new drive link (or removing the company from the list) kills it. A link
+ * reissue therefore re-mails the whole list with fresh signatures (api/college/drives/[id]/link).
+ *
+ * An invite grants no more than the share link: both end in the same window, college and employer checks, and the share
+ * link admits any signed-in company, so the invite is not tied to the address of the account that opens it.
  */
 
-export type Invitee = { company: string; email: string };
+/** `unsent`: no mail has reached this address yet (daily cap, mail failure), so the next save tries again. Server-side only. */
+export type Invitee = { company: string; email: string; unsent?: true };
 
 const norm = (email: string) => email.trim().toLowerCase();
 
@@ -36,17 +42,31 @@ export function isInvited(invited: Invitee[] | null | undefined, email: string):
   return (invited ?? []).some((i) => norm(i.email) === norm(email));
 }
 
-/** Companies in `after` that `before` did not already hold (by email), once each: the ones to send an invite to. */
-export function newInvitees(before: Invitee[] | null | undefined, after: Invitee[] | null | undefined): Invitee[] {
-  const seen = new Set((before ?? []).map((i) => norm(i.email)));
+/**
+ * Companies in `after` to send an invite to, once each: those `before` did not hold (by email), and those it held but
+ * flagged `unsent` because no mail reached them. The browser never sends the flag, so `before` is the saved list.
+ */
+export function invitesToSend(before: Invitee[] | null | undefined, after: Invitee[] | null | undefined): Invitee[] {
+  const reached = new Set((before ?? []).filter((i) => !i.unsent).map((i) => norm(i.email)));
   const out: Invitee[] = [];
   for (const i of after ?? []) {
     const email = norm(i.email);
-    if (seen.has(email)) continue;
-    seen.add(email);
+    if (reached.has(email)) continue;
+    reached.add(email);
     out.push({ company: i.company, email });
   }
   return out;
+}
+
+/** `list` with `unsent` set on exactly the addresses in `emails` (and cleared on the rest). */
+export function withUnsent(list: Invitee[], emails: Iterable<string>): Invitee[] {
+  const flagged = new Set([...emails].map(norm));
+  return list.map(({ company, email }) => (flagged.has(norm(email)) ? { company, email, unsent: true as const } : { company, email }));
+}
+
+/** An ended drive refuses every join, so inviting to it would only spend the daily cap. */
+export function canSendInvites(drive: { startsAt: Date; endsAt: Date; revokedAt: Date | null }, now = Date.now()): boolean {
+  return driveWindow(drive, now) !== "ended";
 }
 
 const oneLine = (s: string) => s.replace(/[\r\n]+/g, " ").trim();
