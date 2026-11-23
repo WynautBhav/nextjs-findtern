@@ -37,8 +37,9 @@ import { useConfirm } from "@/components/app/use-confirm";
 import { ADMIN_PILL_PRIMARY, ADMIN_PILL_SECONDARY, ADMIN_SURFACE } from "@/components/admin/surface";
 import { FILTER_CONTROL, FILTER_SELECT, FilterBar, FilterField } from "@/components/admin/filter-controls";
 import { COLLEGE_CODE_LOCKED, promoExpiryProblem, promoState, type PromoAppliesTo, type PromoState } from "@/lib/promo-rules";
-import { FullWaiverDialog } from "@/components/admin/full-waiver-dialog";
+import { FullWaiverDialog, type Audience as WaiverAudience } from "@/components/admin/full-waiver-dialog";
 import { isFullWaiver } from "@/lib/full-waiver";
+import { fullDiscountUsesWaiver } from "@/lib/admin/promo-edit-rules";
 import { isoToIstInput, istInputToIso } from "@/lib/admin/promo-form-time";
 import { paginate, sortPromos, type PromoSort, type Redemption } from "@/lib/admin/promo-redemptions";
 
@@ -102,6 +103,8 @@ export function PromoCodesManager({
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [typeFilter, setTypeFilter] = useState<"all" | "percentage" | "fixed" | "full_waiver">("all");
   const [waiverOpen, setWaiverOpen] = useState(false);
+  // A 100% code picked in the New code form opens the waiver dialog with its audience; the key remounts it fresh each time.
+  const [waiverSeed, setWaiverSeed] = useState<{ key: number; audience: WaiverAudience | "" }>({ key: 0, audience: "" });
   const [sort, setSort] = useState<PromoSort>("newest");
   const [page, setPage] = useState(1);
 
@@ -216,6 +219,17 @@ export function PromoCodesManager({
     }
     if (discountType === "percentage" && valNum > 100) {
       invalid("Percentage discount cannot exceed 100%.", "promo-value");
+      return;
+    }
+    // A 100% code for anyone but interns is a full-waiver code (the one code that may make a payment free): hand it to that dialog.
+    if (!editingPromo && fullDiscountUsesWaiver({ discountType, discountValue: valNum, appliesTo })) {
+      if (!canMintWaiver) {
+        invalid("A 100% code for this audience is a full-waiver code. Ask someone with finance access to create it.", "promo-value");
+        return;
+      }
+      setModalOpen(false);
+      setWaiverSeed((s) => ({ key: s.key + 1, audience: appliesTo }));
+      setWaiverOpen(true);
       return;
     }
     if (discountType === "percentage" && valNum === 100 && appliesTo !== "intern") {
@@ -721,6 +735,8 @@ export function PromoCodesManager({
       </Dialog>
 
       <FullWaiverDialog
+        key={waiverSeed.key}
+        initialAudience={waiverSeed.audience}
         open={waiverOpen}
         onOpenChange={setWaiverOpen}
         onCreated={(promo) => {
@@ -820,6 +836,9 @@ export function PromoCodesManager({
                 />
               </div>
             </div>
+            {!editingPromo && fullDiscountUsesWaiver({ discountType, discountValue: Number(discountValue), appliesTo }) ? (
+              <p className="text-xs text-ink-600">100% for this audience is a full-waiver code: the whole payment is free, no card. Next step sets its uses and expiry.</p>
+            ) : null}
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>

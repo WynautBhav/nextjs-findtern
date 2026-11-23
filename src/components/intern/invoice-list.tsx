@@ -49,6 +49,11 @@ export function InvoiceList({ invoices }: { invoices: InternInvoice[] }) {
               <p className="text-xs text-text-subtle">
                 {i.paidAt ? formatDate(i.paidAt) : "-"} · {formatMoney(i.amountMinor, i.currency === "USD" ? "USD" : "INR")}
               </p>
+              {i.promoCode && i.discountMinor > 0 ? (
+                <p className="text-xs text-text-subtle">
+                  Promo {i.promoCode} · -{formatMoney(i.discountMinor, i.currency === "USD" ? "USD" : "INR", { zeroLabel: false })}
+                </p>
+              ) : null}
             </div>
             <div className="flex gap-2">
               <button type="button" onClick={() => view(i)} className={buttonClass({ variant: "outline", size: "md" })}>

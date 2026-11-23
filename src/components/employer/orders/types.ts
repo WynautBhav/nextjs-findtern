@@ -32,6 +32,9 @@ export type InvoiceRow = {
   /** Refunded out of this order (0 when none); the invoice itself stands as issued. */
   refundedMinor?: number;
   currency: string;
+  /** The promo code this payment used (or legacy's "Discount (10%)"), and what it took off, in `currency` minor units; null / 0 when none. */
+  promoCode?: string | null;
+  discountMinor?: number;
   candidates: string[];
   projects: string[];
   /** Finished invoice HTML, rendered on the server. */

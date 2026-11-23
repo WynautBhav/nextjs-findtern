@@ -20,6 +20,15 @@ export function promoDiscountProblem({ discountType, discountValue, appliesTo }:
   return null;
 }
 
+/**
+ * A 100% code the ordinary form can store is an intern code (its activation settles free). For every other audience a 100% code
+ * is a full-waiver code (lib/full-waiver.ts): the one code that may bring a hiring payment or a subscription to zero, which then
+ * settles with no gateway order. The admin form hands that choice to the waiver dialog.
+ */
+export function fullDiscountUsesWaiver({ discountType, discountValue, appliesTo }: PromoDiscountInput): boolean {
+  return discountType === "percentage" && discountValue === 100 && appliesTo !== "intern";
+}
+
 /** Code text: 3-32 characters, letters, digits, "_" and "-" (stored upper-case). */
 export function promoCodeProblem(code: string): string | null {
   const c = code.trim().toUpperCase();

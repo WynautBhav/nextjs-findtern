@@ -35,7 +35,7 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
       const day = (i.paidAt ?? i.payroll?.issuedAt)?.slice(0, 10) ?? "";
       if (from && (!day || day < from)) return false;
       if (to && (!day || day > to)) return false;
-      return matchesQuery(q, [i.number, i.orderId, i.paymentId, i.currency, day, i.paidAt ? formatDate(i.paidAt) : "", ...i.candidates, ...i.projects]);
+      return matchesQuery(q, [i.number, i.orderId, i.paymentId, i.currency, day, i.paidAt ? formatDate(i.paidAt) : "", i.promoCode, ...i.candidates, ...i.projects]);
     });
   }, [invoices, q, currency, from, to]);
   const filtering = Boolean(q) || currency !== "all" || from || to;
@@ -55,7 +55,7 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
   return (
     <div>
       <div className={cn(TOOLBAR_CARD, "grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.6fr)_10rem_10rem_10rem_auto] lg:items-end")}>
-        <SearchField value={q} onChange={setQ} placeholder="Candidate, project, invoice or order ID" />
+        <SearchField value={q} onChange={setQ} placeholder="Candidate, project, invoice, order ID or promo code" />
         <label className={labelClass}>
           Currency
           <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={cn(fieldClass, "mt-1.5")}>
@@ -91,12 +91,14 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
         <OrdersEmpty compact title="No invoice matches" body="Try another name or ID, or reset the filters to see every invoice." />
       ) : (
         <Surface data-stack tabIndex={0} role="region" aria-label="Invoices" className="relative overflow-x-auto focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600">
-          <table className="w-full border-collapse lg:min-w-[42rem]">
+          <table className="w-full border-collapse lg:min-w-[54rem]">
             <thead className="border-b border-ink-100 bg-ink-50">
               <tr>
                 <th scope="col" className={thClass}>Invoice</th>
                 <th scope="col" className={thClass}>Candidate</th>
                 <th scope="col" className={thClass}>Project</th>
+                <th scope="col" className={thClass}>Promo code</th>
+                <th scope="col" className={cn(thClass, "text-right")}>Discount</th>
                 <th scope="col" className={cn(thClass, "text-right")}>Amount</th>
                 <th scope="col" className={thClass}>Paid on</th>
                 {/* From lg the wide table can scroll sideways, so the actions stay pinned to the right edge; below lg rows stack and nothing scrolls. */}
@@ -129,6 +131,10 @@ export function InvoicesPanel({ invoices }: { invoices: InvoiceRow[] }) {
                   </td>
                   <td data-label="Candidate" className={cn(tdClass, "[overflow-wrap:anywhere]")}>{i.candidates.join(", ") || "-"}</td>
                   <td data-label="Project" className={cn(tdClass, "[overflow-wrap:anywhere]")}>{i.projects.join(", ") || "-"}</td>
+                  <td data-label="Promo code" className={cn(tdClass, "[overflow-wrap:anywhere]")}>{i.promoCode || "-"}</td>
+                  <td data-label="Discount" className={cn(tdClass, "nums text-right")}>
+                    {i.promoCode && (i.discountMinor ?? 0) > 0 ? `-${formatMoney(i.discountMinor ?? 0, i.currency, { zeroLabel: false })}` : "-"}
+                  </td>
                   <td data-label="Amount" className={cn(tdClass, "nums text-right font-semibold text-ink-900")}>
                     {formatMoney(i.amountMinor, i.currency, { zeroLabel: false })}
                     {(i.refundedMinor ?? 0) > 0 ? (

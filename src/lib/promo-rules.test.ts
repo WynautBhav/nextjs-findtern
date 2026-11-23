@@ -179,3 +179,16 @@ test("B-27: a past expiry is refused; today-onward and no expiry pass; an unchan
   assert.equal(promoExpiryProblem(new Date(old.getTime() + 20_000), old, now), null, "same minute as the stored value is not a change");
   assert.match(promoExpiryProblem(new Date("2026-10-01T00:00:00Z"), old, now) ?? "", /in the past/, "moving to another past date is refused");
 });
+
+test("a 100% code takes the whole order and leaves nothing to charge the gateway for", () => {
+  const full: PromoRow = { ...base, discountType: "percentage", discountValue: 100 };
+  for (const [order, currency] of [[249_900, "INR"], [2_499, "USD"], [1, "INR"]] as const) {
+    const off = promoDiscount(full, order, currency);
+    assert.equal(off, order, `${order} ${currency}`);
+    assert.equal(order - off, 0);
+  }
+  // a fixed code bigger than the order never goes below zero either
+  assert.equal(promoDiscount({ ...base, discountType: "fixed", discountValue: 9_999_900 }, 249_900, "INR"), 249_900);
+  // an ordinary employer code that would clear the stipend is refused (only a full waiver may make a hiring payment free)
+  assert.equal(employerPromoTooLarge(500_000, 500_000), true);
+});

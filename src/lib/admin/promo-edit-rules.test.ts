@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { promoCodeProblem, promoDiscountProblem } from "./promo-edit-rules.ts";
+import { fullDiscountUsesWaiver, promoCodeProblem, promoDiscountProblem } from "./promo-edit-rules.ts";
 
 test("a percentage above 100 is refused", () => {
   assert.match(promoDiscountProblem({ discountType: "percentage", discountValue: 150, appliesTo: "intern" }) ?? "", /more than 100/);
@@ -44,4 +44,19 @@ test("a 100% Findtern Pro subscription code is refused in words about the subscr
   assert.doesNotMatch(msg, /stipend/i);
   // the employer wording is unchanged
   assert.match(promoDiscountProblem({ discountType: "percentage", discountValue: 100, appliesTo: "employer" }) ?? "", /stipend/);
+});
+
+test("a 100% code for any audience but intern is made as a full-waiver code, the one code that may make a payment free", () => {
+  for (const appliesTo of ["employer", "both", "subscription"]) {
+    assert.equal(fullDiscountUsesWaiver({ discountType: "percentage", discountValue: 100, appliesTo }), true, appliesTo);
+  }
+  // intern 100% is an ordinary code (its activation settles free); anything under 100%, and fixed amounts, are ordinary too
+  assert.equal(fullDiscountUsesWaiver({ discountType: "percentage", discountValue: 100, appliesTo: "intern" }), false);
+  assert.equal(fullDiscountUsesWaiver({ discountType: "percentage", discountValue: 99, appliesTo: "employer" }), false);
+  assert.equal(fullDiscountUsesWaiver({ discountType: "fixed", discountValue: 100, appliesTo: "employer" }), false);
+  // so every audience the form offers can end up with a 100% code
+  for (const appliesTo of ["intern", "employer", "both", "subscription"]) {
+    const input = { discountType: "percentage", discountValue: 100, appliesTo };
+    assert.ok(fullDiscountUsesWaiver(input) || promoDiscountProblem(input) === null, appliesTo);
+  }
 });

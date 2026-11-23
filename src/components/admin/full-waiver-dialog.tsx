@@ -14,7 +14,7 @@ const inputClass =
   "mt-1.5 min-h-11 w-full rounded-apple-sm border border-ink-200 bg-surface px-3 text-base sm:text-sm text-ink-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring placeholder:text-text-subtle focus:border-brand-500";
 
 const DAY_MS = 86_400_000;
-type Audience = "employer" | "intern" | "both" | "subscription";
+export type Audience = "employer" | "intern" | "both" | "subscription";
 const AUDIENCES: { value: Audience; label: string }[] = [
   { value: "employer", label: "Hiring payments" },
   { value: "subscription", label: "Subscription" },
@@ -27,10 +27,21 @@ const AUDIENCES: { value: Audience; label: string }[] = [
  * Always capped: 1 to 25 uses, an expiry within 30 days, an audience chosen on purpose. The server enforces the same caps;
  * these inputs only make the right choice the easy one. The code is shown once, here, after it is created.
  */
-export function FullWaiverDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: (promo: PromoCode) => void }) {
+export function FullWaiverDialog({
+  open,
+  onOpenChange,
+  onCreated,
+  initialAudience = "",
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (promo: PromoCode) => void;
+  /** Preselected "Who can use it" (a 100% code chosen in the New code form); read when the dialog mounts, so remount it with a key. */
+  initialAudience?: Audience | "";
+}) {
   const [confirmed, setConfirmed] = useState(false);
   const [code, setCode] = useState("");
-  const [appliesTo, setAppliesTo] = useState<Audience | "">("");
+  const [appliesTo, setAppliesTo] = useState<Audience | "">(initialAudience);
   const [maxUsages, setMaxUsages] = useState<number | string>(FULL_WAIVER_LIMITS.maxUsesDefault);
   const [validUntil, setValidUntil] = useState(() => isoToIstInput(new Date(Date.now() + FULL_WAIVER_LIMITS.expiryDaysDefault * DAY_MS)));
   const [saving, setSaving] = useState(false);
@@ -43,7 +54,7 @@ export function FullWaiverDialog({ open, onOpenChange, onCreated }: { open: bool
   function reset() {
     setConfirmed(false);
     setCode("");
-    setAppliesTo("");
+    setAppliesTo(initialAudience);
     setMaxUsages(FULL_WAIVER_LIMITS.maxUsesDefault);
     setValidUntil(isoToIstInput(new Date(Date.now() + FULL_WAIVER_LIMITS.expiryDaysDefault * DAY_MS)));
     setError("");
