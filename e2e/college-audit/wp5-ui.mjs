@@ -1,7 +1,10 @@
 // WP5: the intern college card, leave request through the real UI, officer queue, admin panel. Text + screenshots.
-import { openRoles, closeAll } from "/home/wynautbhav/hermes-team/artifacts/findtern-college-audit/tools/ctx.mjs";
+import { openRoles, closeAll } from "./lib/ctx.mjs";
 import { q, closeDb, check, failures, mkUser, SFX, JKLU } from "./wp5-lib.mjs";
-const EV = "/home/wynautbhav/hermes-team/artifacts/findtern-college-audit/wp5/evidence";
+import { mkdirSync } from "node:fs";
+import { resolve } from "node:path";
+const EV = resolve(process.env.OUT ?? "./out"); // screenshots; ./out is gitignored
+mkdirSync(EV, { recursive: true });
 const base = process.env.BASE;
 const s = await mkUser({ first: "Uma", last: "Ui", email: `uma.ui.${SFX}@jklu.edu.in` });
 await q("insert into college_memberships (user_id,college_id,status,verified_by,year,branch) values ($1,$2,'verified','email_domain',2,'CSE')", [s.id, JKLU]);

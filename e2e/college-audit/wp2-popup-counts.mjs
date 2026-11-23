@@ -1,6 +1,8 @@
 // WP2 C1: opens 40 heat-matrix / categories numbers as the Overview pop-up and compares the pop-up list size with the number clicked. Cwd = worktree.
-import { openRoles, closeAll } from "/home/wynautbhav/hermes-team/artifacts/findtern-college-audit/tools/ctx.mjs";
-const base = "http://localhost:3332";
+import { openRoles, closeAll } from "./lib/ctx.mjs";
+import { assertLocalOnly } from "./lib/local-only.mjs";
+const base = process.env.WP2_BASE ?? "http://localhost:3332";
+assertLocalOnly(base);
 const { browser, ctxs } = await openRoles(["tpo"], { base });
 const p = await ctxs.tpo.newPage();
 await p.goto(`${base}/college?mode=categories&design=1`, { waitUntil: "load" }); await p.waitForTimeout(700);

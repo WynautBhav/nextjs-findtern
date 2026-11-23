@@ -20,6 +20,8 @@ if (claimed.length < 5) throw new Error("run wp2-fixtures.mjs first");
 const everyone = (await db.query(`select o.aadhaar_number a, o.pan_number p, o.pin_code pin, o.extra_data->'bankDetails'->>'accountNumber' bank, o.extra_data->>'emergencyPhone' em from intern_onboarding o`)).rows;
 const secrets = [...new Set(everyone.flatMap((r) => [r.a, r.p, r.bank].filter((v) => v && v.length >= 6)))];
 const ids = claimed.map((c) => c.id);
+const verifiedNames = new Set((await db.query(`select lower(trim(u.first_name || ' ' || coalesce(u.last_name, ''))) n from college_memberships m join users u on u.id = m.user_id where m.status = 'verified' and m.left_at is null`)).rows.map((r) => r.n));
+const namesakes = new Set(claimed.filter((c) => verifiedNames.has(`${c.first_name} ${c.last_name ?? ""}`.trim().toLowerCase())).map((c) => c.id));
 const proposals = (await db.query(`select id from proposals where intern_id = any($1)`, [ids])).rows.map((r) => r.id);
 const meets = (await db.query(`select id from college_drive_meetings where user_id = any($1)`, [ids])).rows.map((r) => r.id);
 
@@ -40,7 +42,9 @@ for (const p of pages) {
   for (const v of [...proposals, ...meets]) if (flat.includes(v)) what.push(`internal id ${v}`);
   // Bounded: an 11-digit number must not be matched inside an SVG coordinate.
   for (const v of secrets) if (new RegExp(`(?<![\\w.])${v.replace(/[^\w]/g, "\\$&")}(?![\\w])`).test(flat)) what.push(`SECRET ${v.slice(0, 3)}***`);
-  for (const c of claimed) { const nm = flat.match(new RegExp(`(?<![A-Za-z])${`${c.first_name} ${c.last_name}`.trim().replace(/[^A-Za-z0-9 ]/g, ".")}: score [0-9.]+`)); if (nm) what.push(`${c.email} named in a score chart title: ${nm[0]}`); }
+  // Chart titles carry only "First Last: score N", so a claimed student is told apart by id: a name that ALSO belongs to a verified
+  // student (namesakes exist at 2000 seeded students) is not evidence about the claimed one and is skipped.
+  for (const c of claimed) { if (namesakes.has(c.id)) continue; const nm = flat.match(new RegExp(`(?<![A-Za-z])${`${c.first_name} ${c.last_name}`.trim().replace(/[^A-Za-z0-9 ]/g, ".")}: score [0-9.]+`)); if (nm) what.push(`${c.email} named in a score chart title: ${nm[0]}`); }
   // The master data / drive rows carry numbers per student: parse each claimed row's flight object.
   for (const c of claimed) {
     for (const m of flat.matchAll(new RegExp(`"userId":"${c.id}"[^{}]{0,2500}`, "g"))) {

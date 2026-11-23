@@ -1,8 +1,10 @@
 // WP5 L3 in the browser: officer's uploader: paste, Windows-1252 file, UTF-16 file, xlsx refusal, preview before save.
-import { openRoles, closeAll } from "/home/wynautbhav/hermes-team/artifacts/findtern-college-audit/tools/ctx.mjs";
+import { openRoles, closeAll } from "./lib/ctx.mjs";
 import { q, closeDb, check, failures, SFX, JKLU } from "./wp5-lib.mjs";
 import { writeFileSync, mkdirSync } from "node:fs";
-const EV = "/home/wynautbhav/hermes-team/artifacts/findtern-college-audit/wp5/evidence";
+import { resolve } from "node:path";
+const EV = resolve(process.env.OUT ?? "./out"); // screenshots; ./out is gitignored
+mkdirSync(EV, { recursive: true });
 const T = process.env.TMPDIR;
 const base = process.env.BASE;
 const { browser, ctxs } = await openRoles(["tpo"], { base });

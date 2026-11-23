@@ -3,7 +3,7 @@
 //   DATABASE_URL=postgresql://findtern@127.0.0.1:55490/findtern_ca_wp2 node e2e/college-audit/wp2-cgpa-precision.mjs
 import pg from "pg";
 import { login, parseCsv } from "./wp2-lib.mjs";
-import { openRoles, closeAll } from "/home/wynautbhav/hermes-team/artifacts/findtern-college-audit/tools/ctx.mjs";
+import { openRoles, closeAll } from "./lib/ctx.mjs";
 const url = process.env.DATABASE_URL ?? "";
 if (!/^postgresql:\/\/findtern@127\.0\.0\.1:5549\d\/findtern_ca_wp2$/.test(url)) throw new Error("refusing: wp2 scratch DB only");
 const base = process.env.WP2_BASE ?? "http://localhost:3332";
