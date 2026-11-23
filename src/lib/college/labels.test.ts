@@ -91,3 +91,9 @@ test("initialsOf does not depend on the reader's locale (R3-07): Turkish i / ı 
   assert.equal(initialsOf("İlker İpek"), "İİ");
   assert.equal(initialsOf("istanbul"), "I");
 });
+
+test("the 'already have an offer' line under Score 6 or above counts only those students (Subodh showed 8 of 9 when 6 had one; owner, 23 Nov)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const src = readFileSync("src/app/college/students/page.tsx", "utf8");
+  assert.match(src, /const offers = interviewed\.filter\(\(s\) => s\.score !== null && s\.score >= 6 && s\.proposals > 0\)/);
+});

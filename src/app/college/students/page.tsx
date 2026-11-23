@@ -50,7 +50,8 @@ export default async function StudentsPage({ searchParams }: { searchParams?: Pr
   const sorted = [...scores].sort((a, b) => a - b);
   const median = sorted.length ? (sorted.length % 2 ? sorted[(sorted.length - 1) / 2] : (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2) : null;
   const ready = scores.filter((s) => s >= 6).length;
-  const offers = students.filter((s) => s.proposals > 0).length;
+  // Read under "Score 6 or above", so it counts only those students (it counted every student with an offer: "9 ... 8 have an offer" when 6 did).
+  const offers = interviewed.filter((s) => s.score !== null && s.score >= 6 && s.proposals > 0).length;
   return (
     <div className="space-y-6">
       <CollegeHero
