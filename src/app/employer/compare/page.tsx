@@ -9,6 +9,7 @@ import { requireEmployerSetup } from "@/lib/employer-setup";
 import { formatDate, formatMoney } from "@/lib/format";
 import { RATING_META, displayNameOf, preferredCities, redactForEmployer, toCandidateProfile, withoutScoreUnlessPro, type CandidateProfile } from "@/lib/employer-candidates";
 import { proAccess } from "@/lib/candidate-pro-access";
+import { cgpaLabel } from "@/lib/candidate-pro-filters";
 import { shortlistProjectsByIntern } from "@/lib/employer-shortlist";
 import { candidateRelations, hiredInternIds, type CandidateRelation } from "@/lib/employer-visibility";
 import { attachPhotos, visibleInternIds } from "@/lib/employer-pool";
@@ -576,7 +577,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
                   <p className="mt-0.5 break-words text-ink-600">{studyOf(c.academics) || "Degree not stated"}</p>
                   {c.academics?.score ? (
                     <p className="nums mt-0.5 text-ink-600">
-                      {c.academics.scoreType === "percentage" ? "Percentage" : "CGPA"} {c.academics.score}
+                      CGPA {cgpaLabel(c.academics.score, c.academics.scoreType)}
                     </p>
                   ) : null}
                 </Cell>

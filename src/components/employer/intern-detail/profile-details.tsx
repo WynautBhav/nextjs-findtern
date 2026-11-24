@@ -1,6 +1,7 @@
 import { Award, GraduationCap } from "lucide-react";
 
 import { Pill, SectionHead, Surface } from "@/components/app/primitives";
+import { cgpaLabel } from "@/lib/candidate-pro-filters";
 import type { Academics } from "@/lib/employer-candidates";
 import { formatDate } from "@/lib/format";
 import { dateLabel, type OnboardingDraft, type QualificationEntry } from "@/lib/onboarding";
@@ -18,7 +19,7 @@ export function EducationSection({ academics, headline, className }: { academics
   const years = [academics.startYear, academics.endYear].filter(Boolean).join(" – ");
   const figures = [
     { label: "Years", value: years },
-    { label: academics.score && academics.scoreType ? academics.scoreType.toUpperCase() : "Score", value: academics.score || "" },
+    { label: "CGPA", value: cgpaLabel(academics.score, academics.scoreType) },
     { label: "Status", value: academics.status ? humanise(academics.status) : "" },
   ].filter((f) => f.value);
   return (

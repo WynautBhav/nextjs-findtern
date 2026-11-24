@@ -1,5 +1,6 @@
 import { HIDDEN_UNTIL_HIRE } from "./contact-scrub.ts";
 import { readCgpaVerification } from "./cgpa-verification.ts";
+import { cgpaText } from "./college/master-row.ts";
 
 /**
  * The two subscriber-only filters of the employer candidates page (Findtern Pro): a minimum CGPA (with a
@@ -35,6 +36,18 @@ export function cgpaOf(score: string | null | undefined, scoreType: string | nul
   const asPercent = type === "percentage" || (type !== "cgpa" && n > 10);
   if (asPercent) return n <= 100 ? { value: Math.min(10, round2(n / PERCENT_PER_CGPA)), approx: true } : null;
   return n <= 10 ? { value: n, approx: false } : null;
+}
+
+/**
+ * A degree score as the employer reads it, always as a CGPA (as on the college master data): "8.4" stays "8.4", a
+ * percentage of 85 reads "8.95 (85%)". A score that is not a usable number is shown as stored, never dropped.
+ */
+export function cgpaLabel(score: string | null | undefined, scoreType: string | null | undefined): string {
+  const raw = String(score ?? "").trim();
+  const v = cgpaOf(raw, scoreType);
+  // "8.4/10" typed as a percentage contradicts itself: shown as stored rather than converted.
+  if (!v || (v.approx && /\/\s*10$/.test(raw))) return raw;
+  return v.approx ? `${cgpaText(v.value)} (${raw.replace(/\s*%$/, "")}%)` : raw.replace(/\s*\/\s*10$/, "");
 }
 
 /** One college, compared case-, width- and whitespace-insensitively. */

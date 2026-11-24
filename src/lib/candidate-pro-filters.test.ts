@@ -5,6 +5,7 @@ import {
   PERCENT_PER_CGPA,
   MAX_COLLEGES,
   applyProFilters,
+  cgpaLabel,
   cgpaOf,
   collegeKey,
   hasProCriteria,
@@ -14,6 +15,21 @@ import {
   type ProFacts,
 } from "./candidate-pro-filters.ts";
 import { collegeSortToken, parseCollegeSort, sortByCollege } from "./candidate-sort.ts";
+
+/* ── cgpaLabel: what an employer reads ──────────────────────────────────── */
+
+test("cgpaLabel shows a CGPA as entered and a percentage as CGPA with the percentage after it", () => {
+  assert.equal(cgpaLabel("8.4", "cgpa"), "8.4");
+  assert.equal(cgpaLabel("8.47", "cgpa"), "8.47");
+  assert.equal(cgpaLabel("85", "percentage"), "8.95 (85%)");
+  assert.equal(cgpaLabel("85%", "percentage"), "8.95 (85%)");
+  assert.equal(cgpaLabel("99", "percentage"), "10.0 (99%)");
+  assert.equal(cgpaLabel("76", ""), "8.0 (76%)");
+  assert.equal(cgpaLabel("", "cgpa"), "");
+  assert.equal(cgpaLabel("101", "percentage"), "101", "an unreadable score is shown as stored, never dropped");
+  assert.equal(cgpaLabel("8.4/10", "cgpa"), "8.4");
+  assert.equal(cgpaLabel("8.4/10", "percentage"), "8.4/10", "a /10 score typed as a percentage is shown as stored");
+});
 
 /* ── cgpaOf: what a stored score means on the 0-10 scale ──────────────────── */
 
