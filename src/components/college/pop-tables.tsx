@@ -111,7 +111,7 @@ function PopTable<R, K extends string>({
                 <DropdownMenuCheckboxItem
                   key={c.key}
                   checked={visible.has(c.key)}
-                  disabled={c.key === first}
+                  disabled={c.key === first || c.locked}
                   // Keep the menu open so several columns can be switched in one go.
                   onSelect={(e) => e.preventDefault()}
                   onCheckedChange={(on) => {
@@ -183,6 +183,7 @@ function PopTable<R, K extends string>({
                       className={cn(
                         "sticky top-0 z-10 whitespace-nowrap border-b border-ink-200 bg-white p-0 text-xs font-normal text-ink-500",
                         c.key === first && "left-0 z-20",
+                        c.highlight && "bg-brand-50 font-medium text-brand-800",
                       )}
                     >
                       <button
@@ -213,6 +214,7 @@ function PopTable<R, K extends string>({
                         "max-w-[22rem] truncate whitespace-nowrap border-b border-ink-100 px-3 py-2.5 text-ink-700 group-hover:bg-ink-50",
                         c.numeric && "nums text-right",
                         c.key === first && "sticky left-0 z-[1] bg-white pl-5 sm:pl-6",
+                        c.highlight && "bg-brand-50/70 font-medium text-ink-900 group-hover:bg-brand-50",
                         ci === shownCols.length - 1 && "pr-5 sm:pr-6",
                       )}
                     >
@@ -270,7 +272,7 @@ export function StudentTable({ rows, people, title, driveTitle }: { rows: BoardI
   const years = useMemo(() => [...new Set(all.map((r) => r.year).filter((y): y is number => y !== null))].sort((a, b) => a - b), [all]);
   const companies = useMemo(() => sortedUnique(all.flatMap((r) => r.companies)), [all]);
   // A list with no detail text at all (the whole drive) does not open with an empty column.
-  const defaults = useMemo(() => (all.some((r) => r.detail) ? STUDENT_DEFAULTS : STUDENT_DEFAULTS.filter((k) => k !== "detail")), [all]);
+  const defaults = STUDENT_DEFAULTS;
 
   return (
     <PopTable<StudentTableRow, StudentColKey>

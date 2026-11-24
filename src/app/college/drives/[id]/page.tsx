@@ -24,6 +24,8 @@ import { loadDriveEmployers } from "@/lib/college/drive-employers-db";
 import { loadDriveSummary } from "@/lib/college/drive-summary-db";
 import { toLocalInput } from "@/lib/college/ist";
 import { buildPeople } from "@/lib/college/pop-table";
+import { driveReach } from "@/lib/college/drive-reach";
+import { readinessForMany } from "@/lib/college/student-readiness-db";
 import { audienceLabel, DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
 import { driveForCollegeAdmin, eligibleStudents, presenceSnapshot, requireCollegeContext, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { driveDataOpen, toStudentRow } from "@/lib/college/serialize";
@@ -129,6 +131,22 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   // A finished drive: one card (its own hero) and the analysis under it; every figure opens its list in a pop-up.
   if (!open && summary) {
     // What the pop-up tables show beyond the board row. Verified students only, like the board; all of it is already loaded above.
+    // Strength and who was left out, one reason each, as things stand today (Findtern keeps no history of it).
+    const readiness = await readinessForMany(eligible.map((s) => s.userId));
+    const reach = driveReach(eligible, readiness);
+    const refOf = new Map(eligible.map((s) => [s.userId, s]));
+    const reachRows = Object.fromEntries(
+      reach.buckets.map((b) => [
+        b.id,
+        b.ids.map((id) => {
+          const st = refOf.get(id)!;
+          const r = toRef(st);
+          // P3: a student the officer has not verified shows name, year and branch only.
+          return { ...r, phone: st.status === "verified" ? r.phone : null, detail: b.id === "unverified" || st.status !== "verified" ? b.label : (readiness.get(id)?.seenWhy || b.label) };
+        }),
+      ]),
+    );
+    const lastSeen = Object.fromEntries(verified.map((s) => [s.userId, s.lastSeenAt ? s.lastSeenAt.toISOString() : null]));
     const people = buildPeople({
       students: verified.map((s) => {
         const r = toStudentRow(s);
@@ -144,6 +162,9 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
         <PastDriveCard
           hero={{ title: drive.title, lede }}
           scores={Object.fromEntries(verified.map((s) => [s.userId, s.score ?? null]))}
+          reach={reach}
+          reachRows={reachRows}
+          lastSeen={lastSeen}
           people={people}
           window={{ start: drive.startsAt, end: drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt }}
           board={board}

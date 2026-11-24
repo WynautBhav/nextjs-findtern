@@ -58,8 +58,12 @@ test("hidden profiles: one reason each, the first that blocks, in the order the 
   assert.equal(reason({ frozen: true, rejected: true }), "paused");
   assert.equal(reason({ rejected: true, openToWork: false }), "rejected");
   assert.equal(readinessFrom({ ...out, rejected: true }).seenWhy, "Findtern did not approve this profile.");
-  assert.equal(reason({ openToWork: false, submitted: false }), "open_to_work");
-  assert.equal(reason({ submitted: false, interviewed: false }), "interview");
+  // Open to work counts only when it is the one blocker left (owner, 24 Nov): never on top of an earlier one.
+  assert.equal(reason({ openToWork: false, submitted: false }), "profile");
+  assert.equal(reason({ openToWork: false, interviewed: false }), "interview");
+  assert.equal(reason({ openToWork: false, approved: false }), "checks");
+  assert.equal(reason({ openToWork: false }), "open_to_work");
+  assert.equal(reason({ submitted: false, interviewed: false }), "profile");
   assert.equal(reason({ openStep: 2 }), "profile");
   assert.equal(reason({ submitted: false }), "profile");
   assert.equal(reason({ interviewed: false }), "interview");

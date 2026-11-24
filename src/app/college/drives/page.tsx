@@ -8,6 +8,9 @@ import { ButtonLink } from "@/components/ui/button";
 import { driveWindow } from "@/lib/college/access";
 import { drivesOverview } from "@/lib/college/drives";
 import { driveMeetCounts } from "@/lib/college/drive-board-db";
+import { driveReach } from "@/lib/college/drive-reach";
+import { readinessForMany } from "@/lib/college/student-readiness-db";
+import { DriveReachView } from "@/components/college/drive-reach-view";
 import { eligibleStudents } from "@/lib/college/scope";
 import { DRIVE_KIND_LABEL, audienceLabel } from "@/lib/college/labels";
 import { timeUntil } from "@/lib/college/time-left";
@@ -39,15 +42,19 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
   const ctx = await requireCollegeContext();
   const [all, sp] = await Promise.all([drivesOverview(ctx.college.id), searchParams]);
   const now = requestTime();
-  // Meets per drive by the drive page's own rules (its verified students, calls and interviews), so the two agree.
+  // Each drive's students once: its meets by the drive page's own rules (verified students, calls and interviews), and
+  // its strength with why the rest were left out.
+  const eligibleOf = new Map(await Promise.all(all.map(async ({ drive }) => [drive.id, await eligibleStudents(drive)] as const)));
   const meets = new Map(
     await Promise.all(
       all.map(async ({ drive }) => {
-        const ids = (await eligibleStudents(drive)).filter((s) => s.status === "verified").map((s) => s.userId);
+        const ids = (eligibleOf.get(drive.id) ?? []).filter((s) => s.status === "verified").map((s) => s.userId);
         return [drive.id, await driveMeetCounts(drive, ids, now)] as const;
       }),
     ),
   );
+  const readiness = await readinessForMany([...new Set([...eligibleOf.values()].flat().map((s) => s.userId))]);
+  const reachOf = (id: string) => driveReach(eligibleOf.get(id) ?? [], readiness);
   // Active = open now or still to open; Past = finished or closed by the officer.
   const allStates = all.map(({ drive }) => driveWindow(drive, now));
   const activeCount = allStates.filter((st) => st === "live" || st === "upcoming").length;
@@ -151,6 +158,7 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
                       </div>
                     ))}
                   </dl>
+                  <DriveReachView reach={reachOf(drive.id)} compact className="mt-4 border-t border-ink-100 pt-4" note={w === "live" || w === "upcoming" ? undefined : "Reasons as they stand today."} />
                 </Link>
               </li>
             );

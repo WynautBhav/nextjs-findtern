@@ -77,7 +77,8 @@ function matches(s: StudentRow, f: Filter, now: number) {
   if (f === "calls") return s.callsPending > 0;
   if (f === "hired") return s.hired > 0;
   if (f === "hidden") return Boolean(s.hiddenWhy);
-  if (f === "not_open") return !s.openToWork;
+  // Only students for whom Open to work is the one blocker left (owner, 24 Nov): one reason each, as on the dashboard.
+  if (f === "not_open") return s.hidden !== undefined ? s.hidden === "open_to_work" : !s.openToWork;
   if (f === "offline") return !s.lastActivityAt || now - new Date(s.lastActivityAt).getTime() >= WEEK;
   return true;
 }

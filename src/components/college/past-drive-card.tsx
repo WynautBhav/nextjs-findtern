@@ -14,6 +14,7 @@ import { PastDriveCharts, type Pop } from "./past-drive-charts";
 import { duration } from "./drive-summary";
 import { EmployerTable, StudentTable } from "./pop-tables";
 import { offerTypeOf, type PersonInfo } from "@/lib/college/pop-table";
+import type { DriveReach, ReachBucketId } from "@/lib/college/drive-reach";
 
 /**
  * A finished drive as one card on the hero field (owner brief, 24 Nov 2026): Candidates and Employers behind the same
@@ -54,6 +55,9 @@ const focusRing = "outline-none focus-visible:ring-2 focus-visible:ring-white/80
 export function PastDriveCard({
   hero,
   scores,
+  reach,
+  reachRows,
+  lastSeen,
   people,
   window,
   board,
@@ -68,6 +72,11 @@ export function PastDriveCard({
   activityCount,
 }: {
   hero: { title: string; lede: string };
+  /** Strength and who was left out, one reason each, with each reason's students. */
+  reach: DriveReach;
+  reachRows: Partial<Record<ReachBucketId, BoardItem[]>>;
+  /** When each verified student was last on Findtern (ISO), for the Never online list. */
+  lastSeen: Record<string, string | null>;
   /** Findtern score per student (null: not interviewed), for the score-band chart. */
   scores: Record<string, number | null>;
   /** What the student tables show beyond the board row (email, CGPA, score, minutes online, offers, hired, companies). */
@@ -114,7 +123,7 @@ export function PastDriveCard({
     const rows = everyone.filter((x) => (on ? x.minutes > 0 : x.minutes === 0));
     return on
       ? minutesPop("Came online in the drive", plural(rows.length, "student", "students"), rows)
-      : { kind: "items", title: "Never online in the drive", note: plural(rows.length, "student", "students"), rows: students(rows.map((r) => r.userId), () => "Never online in the drive") };
+      : { kind: "items", title: "Never online in the drive", note: plural(rows.length, "student", "students"), rows: students(rows.map((r) => r.userId), (id) => (lastSeen[id] ? `Last active ${when(new Date(lastSeen[id]!))}` : "Never signed in")) };
   };
 
   return (
@@ -294,7 +303,7 @@ export function PastDriveCard({
       </Dialog>
     </div>
     </CollegeHero>
-    <PastDriveCharts board={board} employers={employers} summary={summary} scores={scores} window={window} spread={spread} open={open} listPop={(k) => listPop(k, board)} />
+    <PastDriveCharts reach={reach} reachRows={reachRows} board={board} employers={employers} summary={summary} scores={scores} window={window} spread={spread} open={open} listPop={(k) => listPop(k, board)} />
     </>
   );
 }

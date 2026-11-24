@@ -1,6 +1,8 @@
 "use client";
 
 import { Surface } from "@/components/app/primitives";
+import type { DriveReach, ReachBucketId } from "@/lib/college/drive-reach";
+import { DriveReachView } from "./drive-reach-view";
 import type { BoardItem, BoardKey, DriveBoard } from "@/lib/college/drive-board";
 import type { DriveEmployers } from "@/lib/college/drive-employers";
 import type { DriveSummary } from "@/lib/college/drive-summary";
@@ -35,6 +37,8 @@ export type Pop =
 const ring = "outline-none focus-visible:ring-2 focus-visible:ring-brand-500";
 
 export function PastDriveCharts({
+  reach,
+  reachRows,
   board,
   employers,
   summary,
@@ -44,6 +48,8 @@ export function PastDriveCharts({
   open,
   listPop,
 }: {
+  reach: DriveReach;
+  reachRows: Partial<Record<ReachBucketId, BoardItem[]>>;
   board: DriveBoard;
   employers: DriveEmployers;
   summary: DriveSummary;
@@ -61,6 +67,16 @@ export function PastDriveCharts({
 
   return (
     <div className="grid gap-6 lg:grid-cols-2">
+      <Card title="Who could take part" note={`${plural(reach.strength, "student", "students")} match the drive`} className="lg:col-span-2">
+        <DriveReachView
+          reach={reach}
+          note="One reason each, the first that blocks, as things stand today."
+          onOpen={(id) => {
+            const b = reach.buckets.find((x) => x.id === id)!;
+            open({ kind: "items", title: b.label, note: `${plural(b.ids.length, "student", "students")} employers couldn't see`, rows: reachRows[id] ?? [] });
+          }}
+        />
+      </Card>
       <Funnel board={board} open={open} listPop={listPop} />
       <Outcomes board={board} open={open} items={items} companies={companies} />
       <Days board={board} window={window} open={open} items={items} companies={companies} />

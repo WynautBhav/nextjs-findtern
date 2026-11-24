@@ -55,6 +55,8 @@ export function readinessFrom(o: {
   hiddenByAdmin: boolean;
   /** Findtern reviewed the profile and rejected it. */
   rejected: boolean;
+  /** Findtern's approval is through (no status at all counts as approved, as in the employer pool). Optional: approved. */
+  approved?: boolean;
   /** An AI interview rating and a Findtern score. */
   interviewed: boolean;
   hireable: boolean;
@@ -65,8 +67,10 @@ export function readinessFrom(o: {
   marksheet: boolean;
 }): Readiness {
   const paused = o.frozen || !o.isActive;
-  // The pool query is the truth; the flags only explain a "no", first reason wins. Approval and the interview fee read
-  // as one "Findtern's checks" line: what the student paid is not the officer's to see.
+  // The pool query is the truth; the flags only explain a "no", first reason wins, in the student's own order (owner,
+  // 24 Nov): Findtern's verdict, then the profile, the AI interview and Findtern's checks. Open to work comes last: a
+  // student counts there only when it is the one thing still in the way, never on top of an earlier blocker. Approval and
+  // the interview fee read as one "Findtern's checks" line: what the student paid is not the officer's to see.
   const incomplete = !o.submitted || o.openStep !== null;
   const hidden: HiddenReason | null = o.inPool
     ? null
@@ -74,13 +78,15 @@ export function readinessFrom(o: {
       ? "paused"
       : o.rejected
         ? "rejected"
-        : !o.openToWork
-          ? "open_to_work"
+        : incomplete
+          ? "profile"
           : !o.interviewed
             ? "interview"
-            : incomplete
-              ? "profile"
-              : "checks";
+            : o.approved === false
+              ? "checks"
+              : !o.openToWork
+                ? "open_to_work"
+                : "checks";
   const seenWhy = hidden === null ? "" : HIDDEN_WHY[hidden](o);
   const hireWhy = o.hireable
     ? ""

@@ -2,13 +2,17 @@ import { DriveBuilder } from "@/components/college/drive-builder";
 import { toLocalInput } from "@/lib/college/ist";
 import { requireCollegeContext, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { toStudentRow } from "@/lib/college/serialize";
+import { readinessForMany } from "@/lib/college/student-readiness-db";
 
 export const dynamic = "force-dynamic";
 
 export default async function NewDrivePage() {
   const ctx = await requireCollegeContext();
   // Only verified students are ever shown to employers (eligibility.ts), so only they are counted and offered here.
-  const students = (await studentsForCollegeAdmin(ctx)).filter((s) => s.status === "verified").map(toStudentRow);
+  const verified = (await studentsForCollegeAdmin(ctx)).filter((s) => s.status === "verified");
+  // Each student's one reason employers can't see them (or null), for the form's Drive summary.
+  const readiness = await readinessForMany(verified.map((s) => s.userId));
+  const students = verified.map((s) => ({ ...toStudentRow(s), hidden: readiness.get(s.userId)?.hidden ?? (readiness.get(s.userId)?.seen ? null : "profile") }));
   const branches = [...new Set(students.map((s) => s.branch).filter((b): b is string => Boolean(b)))].sort();
   const start = new Date();
   // The top of the current hour: the link works the moment it is created, unless the officer picks a later opening.

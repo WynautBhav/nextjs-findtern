@@ -116,6 +116,10 @@ export type ColumnDef<R, K extends string> = {
   numeric?: boolean;
   /** On by default. */
   main?: boolean;
+  /** Can't be switched off in the Columns menu. */
+  locked?: boolean;
+  /** Tinted, to stand out from the other columns. */
+  highlight?: boolean;
   /** The CSV header, when it should say more than the label (a unit). */
   csvLabel?: string;
   csv: (r: R) => unknown;
@@ -127,6 +131,8 @@ const text = (v: string | null | undefined) => (v && v.trim() ? v : null);
 
 export const STUDENT_COLUMNS: ColumnDef<StudentTableRow, StudentColKey>[] = [
   { key: "name", label: "Name", main: true, csv: (r) => r.name || "Student", sort: (r) => (r.name || "Student").toLowerCase() },
+  // Always second and always on, tinted so it reads first (owner, 24 Nov): what happened is why the list was opened.
+  { key: "detail", label: "What happened", main: true, locked: true, highlight: true, csv: (r) => r.detail, sort: (r) => text(r.detail)?.toLowerCase() ?? null },
   { key: "year", label: "Year", main: true, csv: (r) => (r.year ? yearLabel(r.year) : null), sort: (r) => r.year },
   { key: "branch", label: "Branch", main: true, csv: (r) => r.branch, sort: (r) => text(r.branch)?.toLowerCase() ?? null },
   { key: "phone", label: "Phone", main: true, csv: (r) => phoneCsv(r.phone), sort: (r) => text(r.phone) },
@@ -136,7 +142,6 @@ export const STUDENT_COLUMNS: ColumnDef<StudentTableRow, StudentColKey>[] = [
   { key: "band", label: "Score band", csv: (r) => r.bandName, sort: (r) => r.score },
   { key: "openToWork", label: "Open to work", main: true, csv: (r) => yesNo(r.openToWork !== false), sort: (r) => (r.openToWork !== false ? 1 : 0) },
   { key: "minutes", label: "Time online", csvLabel: "Time online in the drive (minutes)", numeric: true, csv: (r) => r.minutes, sort: (r) => r.minutes },
-  { key: "detail", label: "What happened", main: true, csv: (r) => r.detail, sort: (r) => text(r.detail)?.toLowerCase() ?? null },
   { key: "offerType", label: "Offer type", main: true, csv: (r) => r.offerType, sort: (r) => r.offerType },
   { key: "companies", label: "Companies", csv: (r) => r.companies.join("; "), sort: (r) => (r.companies.length ? r.companies.join(", ").toLowerCase() : null) },
   { key: "offers", label: "Offers", numeric: true, csv: (r) => r.offers, sort: (r) => r.offers },

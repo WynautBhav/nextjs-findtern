@@ -61,6 +61,7 @@ export async function readinessForMany(ids: string[]): Promise<Map<string, Readi
         openToWork: extra.openToWork !== false,
         hiddenByAdmin: extra.hiddenByAdmin === true,
         rejected: extra.approvalStatus === "Rejected",
+        approved: (typeof extra.approvalStatus === "string" && extra.approvalStatus ? extra.approvalStatus : "Approved") === "Approved",
         interviewed: Number(extra.findternScore) > 0 && Number(ratings.interview) > 0,
         hireable: hireGateDecision(row, files).ok,
         submitted,

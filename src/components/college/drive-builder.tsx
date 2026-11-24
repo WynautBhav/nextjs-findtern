@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { FileUp, Search } from "lucide-react";
 
 import { isStudentEligible } from "@/lib/college/eligibility";
+import { driveReach } from "@/lib/college/drive-reach";
+import { DriveReachView } from "./drive-reach-view";
 import { fromLocalInput } from "@/lib/college/ist";
 import { cgpaText } from "@/lib/college/master-row";
 import { COHORTS, yearLabel } from "@/lib/college/labels";
@@ -109,6 +111,11 @@ export function DriveBuilder({
     for (const s of students) (isStudentEligible(s, rules) ? inside : outside).push(s);
     return { inside, outside };
   }, [students, rules]);
+  // Strength and who is left out, one reason each, when the page loaded each student's reason (the new-drive page does).
+  const reach = useMemo(
+    () => (students.every((s) => s.hidden !== undefined) ? driveReach(split.inside.map((s) => ({ userId: s.userId, status: "verified" })), new Map(split.inside.map((s) => [s.userId, { seen: !s.hidden, hidden: s.hidden ?? null }]))) : null),
+    [students, split.inside],
+  );
 
   const list = (view === "in" ? split.inside : split.outside).filter((s) =>
     `${s.name} ${s.rollNo ?? ""} ${s.branch ?? ""}`.toLowerCase().includes(q.trim().toLowerCase()),
@@ -385,7 +392,7 @@ export function DriveBuilder({
         <section className={cn(SURFACE_CLASS, "flex flex-wrap items-center justify-between gap-4 px-5 py-4")}>
           <p className="min-w-0 text-sm text-ink-700">
             <span className="block text-[0.9375rem] font-semibold text-ink-900">
-              Employers will see <span className="nums">{split.inside.length}</span> of your <span className="nums">{students.length}</span> students
+              <span className="nums">{split.inside.length}</span> of your <span className="nums">{students.length}</span> students match this drive
             </span>
             Only your students, and only while the drive is open. You can limit it by CGPA, score, year or branch, or pick students by hand.
           </p>
@@ -394,6 +401,16 @@ export function DriveBuilder({
           </button>
         </section>
       )}
+
+      {reach ? (
+        <section className={SURFACE_CLASS} aria-labelledby="drive-reach">
+          <header className="border-b border-ink-100 px-5 py-4">
+            <h2 id="drive-reach" className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Drive summary</h2>
+            <p className="mt-0.5 text-sm text-text-subtle">How many students employers will see, and why the rest won&apos;t: one reason each, the first that blocks.</p>
+          </header>
+          <DriveReachView reach={reach} className="px-5 py-4" />
+        </section>
+      ) : null}
 
       {collegeLogoUrl !== undefined ? (
         <section className={SURFACE_CLASS} aria-labelledby="college-logo">
