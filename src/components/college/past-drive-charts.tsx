@@ -37,6 +37,7 @@ export type Pop =
 const ring = "outline-none focus-visible:ring-2 focus-visible:ring-brand-500";
 
 export function PastDriveCharts({
+  neverOnline,
   reach,
   reachRows,
   board,
@@ -48,6 +49,8 @@ export function PastDriveCharts({
   open,
   listPop,
 }: {
+  /** The card's own Never online list (last active per student), so the chart's Never bar opens the very same one. */
+  neverOnline: Pop;
   reach: DriveReach;
   reachRows: Partial<Record<ReachBucketId, BoardItem[]>>;
   board: DriveBoard;
@@ -81,7 +84,7 @@ export function PastDriveCharts({
       <Outcomes board={board} open={open} items={items} companies={companies} />
       <Days board={board} window={window} open={open} items={items} companies={companies} />
       <Bands board={board} scores={scores} open={open} />
-      <Online summary={summary} open={open} items={items} />
+      <Online summary={summary} open={open} items={items} neverOnline={neverOnline} />
       <Companies board={board} employers={employers} open={open} />
       <NudgeChart board={board} summary={summary} open={open} listPop={listPop} />
       {spread ? (
@@ -531,7 +534,7 @@ const ONLINE_BUCKETS: { label: string; test: (m: number) => boolean }[] = [
 ];
 
 /** 5. How long students were on Findtern during the drive. */
-function Online({ summary, open, items }: { summary: DriveSummary; open: (p: Pop) => void; items: (ids: string[], line: (id: string) => string) => BoardItem[] }) {
+function Online({ summary, open, items, neverOnline }: { summary: DriveSummary; open: (p: Pop) => void; items: (ids: string[], line: (id: string) => string) => BoardItem[]; neverOnline: Pop }) {
   const all = summary.online.everyone;
   const mins = new Map(all.map((s) => [s.userId, s.minutes]));
   const buckets = ONLINE_BUCKETS.map((b) => ({
@@ -558,7 +561,7 @@ function Online({ summary, open, items }: { summary: DriveSummary; open: (p: Pop
                   disabled={!b.rows.length}
                   aria-label={`${b.label}: ${b.rows.length} students`}
                   onClick={() =>
-                    open({
+                    open(i === 0 ? neverOnline : {
                       kind: "items",
                       title: `Online ${b.label.toLowerCase()}`,
                       note: plural(b.rows.length, "student", "students"),

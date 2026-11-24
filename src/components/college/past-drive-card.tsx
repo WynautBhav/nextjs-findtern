@@ -303,7 +303,7 @@ export function PastDriveCard({
       </Dialog>
     </div>
     </CollegeHero>
-    <PastDriveCharts reach={reach} reachRows={reachRows} board={board} employers={employers} summary={summary} scores={scores} window={window} spread={spread} open={open} listPop={(k) => listPop(k, board)} />
+    <PastDriveCharts neverOnline={onlinePop(false)} reach={reach} reachRows={reachRows} board={board} employers={employers} summary={summary} scores={scores} window={window} spread={spread} open={open} listPop={(k) => listPop(k, board)} />
     </>
   );
 }
