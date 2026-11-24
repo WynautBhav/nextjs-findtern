@@ -194,6 +194,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
                   : "Send it to the companies you invite. They must sign in to Findtern. Turn the drive off at any time."
             }
           />
+          {w === "ended" ? null : (
           <PanelBody>
             <LinkActions
               driveId={drive.id}
@@ -205,6 +206,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
               kind={drive.kind}
             />
           </PanelBody>
+          )}
       </Panel>
 
       <DriveActivity rows={activity} />
