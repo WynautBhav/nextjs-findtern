@@ -29,6 +29,7 @@ export type Pop =
   | { kind: "list"; key: BoardKey; title: string; note: string }
   | { kind: "company"; id: string }
   | { kind: "items"; title: string; note: string; rows: BoardItem[] }
+  | { kind: "employers"; title: string; note: string }
   | { kind: "slot"; title: string; note: string; body: React.ReactNode };
 
 const ring = "outline-none focus-visible:ring-2 focus-visible:ring-brand-500";

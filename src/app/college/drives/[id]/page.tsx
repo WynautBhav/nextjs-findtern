@@ -23,6 +23,7 @@ import { loadDriveBoard } from "@/lib/college/drive-board-db";
 import { loadDriveEmployers } from "@/lib/college/drive-employers-db";
 import { loadDriveSummary } from "@/lib/college/drive-summary-db";
 import { toLocalInput } from "@/lib/college/ist";
+import { buildPeople } from "@/lib/college/pop-table";
 import { audienceLabel, DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
 import { driveForCollegeAdmin, eligibleStudents, presenceSnapshot, requireCollegeContext, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { driveDataOpen, toStudentRow } from "@/lib/college/serialize";
@@ -127,11 +128,23 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
 
   // A finished drive: one card (its own hero) and the analysis under it; every figure opens its list in a pop-up.
   if (!open && summary) {
+    // What the pop-up tables show beyond the board row. Verified students only, like the board; all of it is already loaded above.
+    const people = buildPeople({
+      students: verified.map((s) => {
+        const r = toStudentRow(s);
+        return { userId: r.userId, email: r.email, cgpa: r.cgpa, score: r.score };
+      }),
+      minutes: summary.tracked === "none" ? null : new Map(summary.online.everyone.map((x) => [x.userId, x.minutes])),
+      offers: board.facts.offers,
+      meets: board.facts.meets,
+      hiredIds: board.lists.hired.map((s) => s.userId),
+    });
     return (
       <div className="space-y-6">
         <PastDriveCard
           hero={{ title: drive.title, lede }}
           scores={Object.fromEntries(verified.map((s) => [s.userId, s.score ?? null]))}
+          people={people}
           window={{ start: drive.startsAt, end: drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt }}
           board={board}
           byEmployer={byEmployer}

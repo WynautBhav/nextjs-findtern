@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Mail, Phone } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
@@ -9,10 +9,11 @@ import type { DriveEmployers, EmployerRow } from "@/lib/college/drive-employers"
 import type { DriveSummary } from "@/lib/college/drive-summary";
 import { shortDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { Row } from "./drive-board-view";
 import { CollegeHero } from "./kit";
 import { PastDriveCharts, type Pop } from "./past-drive-charts";
 import { duration } from "./drive-summary";
+import { EmployerTable, StudentTable } from "./pop-tables";
+import type { PersonInfo } from "@/lib/college/pop-table";
 
 /**
  * A finished drive as one card on the hero field (owner brief, 24 Nov 2026): Candidates and Employers behind the same
@@ -53,6 +54,7 @@ const focusRing = "outline-none focus-visible:ring-2 focus-visible:ring-white/80
 export function PastDriveCard({
   hero,
   scores,
+  people,
   window,
   board,
   byEmployer,
@@ -68,6 +70,8 @@ export function PastDriveCard({
   hero: { title: string; lede: string };
   /** Findtern score per student (null: not interviewed), for the score-band chart. */
   scores: Record<string, number | null>;
+  /** What the student tables show beyond the board row (email, CGPA, score, minutes online, offers, hired, companies). */
+  people: Record<string, PersonInfo>;
   window: { start: Date; end: Date };
   board: DriveBoard;
   byEmployer: Record<string, DriveBoard>;
@@ -101,9 +105,16 @@ export function PastDriveCard({
   };
 
   const everyone = summary.online.everyone;
+  // Students from the drive's own list, so every student pop-up is the same table. Ids the drive does not hold are left out.
+  const byId = new Map(board.lists.all.map((s) => [s.userId, s]));
+  const students = (ids: string[], line: (id: string) => string): BoardItem[] => ids.flatMap((id) => (byId.has(id) ? [{ ...byId.get(id)!, detail: line(id) }] : []));
+  const minutesLine = (m: { userId: string; minutes: number }[]) => (id: string) => `${duration(m.find((x) => x.userId === id)?.minutes ?? 0)} online`;
+  const minutesPop = (title: string, note: string, rows: { userId: string; minutes: number }[]): Pop => ({ kind: "items", title, note, rows: students(rows.map((r) => r.userId), minutesLine(rows)) });
   const onlinePop = (on: boolean): Pop => {
     const rows = everyone.filter((x) => (on ? x.minutes > 0 : x.minutes === 0));
-    return { kind: "slot", title: on ? "Came online in the drive" : "Never online in the drive", note: plural(rows.length, "student", "students"), body: on ? <Minutes rows={rows} /> : <Names rows={rows} /> };
+    return on
+      ? minutesPop("Came online in the drive", plural(rows.length, "student", "students"), rows)
+      : { kind: "items", title: "Never online in the drive", note: plural(rows.length, "student", "students"), rows: students(rows.map((r) => r.userId), () => "Never online in the drive") };
   };
 
   return (
@@ -178,7 +189,7 @@ export function PastDriveCard({
                       label="Average time online"
                       value={summary.online.studentsAvg}
                       text={duration(summary.online.studentsAvg)}
-                      onClick={() => open({ kind: "slot", title: "Time online, most first", note: `Average ${duration(summary.online.studentsAvg)} per student.${summary.tracked === "partial" ? " Recorded for part of the drive only." : ""}`, body: <Minutes rows={everyone.filter((x) => x.minutes > 0)} /> })}
+                      onClick={() => open(minutesPop("Time online, most first", `Average ${duration(summary.online.studentsAvg)} per student.${summary.tracked === "partial" ? " Recorded for part of the drive only." : ""}`, everyone.filter((x) => x.minutes > 0)))}
                     />
                     <Line label="Came online" value={summary.online.studentsEver} onClick={() => open(onlinePop(true))} />
                     <Line label={summary.tracked === "partial" ? "Not seen since recording began" : "Never online"} value={summary.online.neverOnlineCount} onClick={() => open(onlinePop(false))} />
@@ -188,12 +199,12 @@ export function PastDriveCard({
                   label="Median reply to a meet"
                   value={summary.speed.meetMedianMin}
                   text={summary.speed.meetMedianMin === null ? "—" : duration(summary.speed.meetMedianMin)}
-                  onClick={summary.speed.slowMeet.length ? () => open({ kind: "slot", title: "Slowest to answer a meet", note: `Half replied faster than ${duration(summary.speed.meetMedianMin)}.`, body: <Minutes rows={summary.speed.slowMeet} /> }) : undefined}
+                  onClick={summary.speed.slowMeet.length ? () => open({ kind: "items", title: "Slowest to answer a meet", note: `Half replied faster than ${duration(summary.speed.meetMedianMin)}.`, rows: students(summary.speed.slowMeet.map((r) => r.userId), (id) => `Took ${duration(summary.speed.slowMeet.find((x) => x.userId === id)?.minutes ?? 0)} to answer`) }) : undefined}
                 />
                 <Line
                   label="Strong, not reached"
                   value={summary.missed.count}
-                  onClick={() => open({ kind: "slot", title: "Strong students not reached", note: "Findtern score 8 or more, with no meet request and no offer.", body: <Strong rows={summary.missed.rows} /> })}
+                  onClick={() => open({ kind: "items", title: "Strong students not reached", note: "Findtern score 8 or more, with no meet request and no offer.", rows: students(summary.missed.rows.map((r) => r.userId), (id) => `Score ${summary.missed.rows.find((x) => x.userId === id)?.score?.toFixed(1) ?? "—"} · no meet request, no offer`) })}
                 />
               </Ledger>
             </div>
@@ -208,7 +219,7 @@ export function PastDriveCard({
                   value={came.length}
                   share={invited ? `of ${n(invited)} invited` : null}
                   bar={invited ? pct(employers.rows.filter((r) => r.invited && r.employerId).length, invited) : 100}
-                  onClick={() => open({ kind: "slot", title: "Companies in the drive", note: `${plural(came.length, "company", "companies")} came${employers.invitedMissing ? ` · ${plural(employers.invitedMissing, "invited company", "invited companies")} didn't` : ""}`, body: <Companies rows={employers.rows} minutes={minutesOf} tracked={summary.tracked !== "none"} /> })}
+                  onClick={() => open({ kind: "employers", title: "Companies in the drive", note: `${plural(came.length, "company", "companies")} came${employers.invitedMissing ? ` · ${plural(employers.invitedMissing, "invited company", "invited companies")} didn't` : ""}` })}
                 />
               </li>
               <li>
@@ -277,8 +288,8 @@ export function PastDriveCard({
       </div>
 
       <Dialog open={pop !== null} onOpenChange={(o) => { if (!o) setPop(null); }}>
-        <DialogContent onCloseAutoFocus={(e) => { if (opener.current) { e.preventDefault(); opener.current.focus(); } }} className="drill-panel flex max-h-[calc(100dvh-2rem)] w-[min(56rem,calc(100%-2rem))] max-w-none flex-col gap-0 overflow-hidden bg-ink-50 p-0 sm:max-w-none">
-          {pop ? <PopBody pop={pop} board={board} byEmployer={byEmployer} employers={employers.rows} minutes={minutesOf} tracked={summary.tracked !== "none"} /> : null}
+        <DialogContent onOpenAutoFocus={(e) => { e.preventDefault(); (e.currentTarget as HTMLElement).focus(); }} onCloseAutoFocus={(e) => { if (opener.current) { e.preventDefault(); opener.current.focus(); } }} className="drill-panel flex max-h-[calc(100dvh-2rem)] w-[min(76rem,calc(100%-2rem))] max-w-none flex-col gap-0 overflow-hidden bg-ink-50 p-0 sm:max-w-none">
+          {pop ? <PopBody pop={pop} board={board} byEmployer={byEmployer} employers={employers.rows} minutes={minutesOf} tracked={summary.tracked !== "none"} people={people} driveTitle={hero.title} onCompany={(id) => setPop({ kind: "company", id })} /> : null}
         </DialogContent>
       </Dialog>
     </div>
@@ -349,22 +360,12 @@ function Num({ v, gold, last }: { v: number | null; gold?: boolean; last?: boole
   return <td className={cn("nums py-1 text-right", !last && "pr-3", v === null ? "text-white/40" : v === 0 ? "text-white/40" : gold ? "text-accent-300" : "text-white")}>{v === null ? "—" : n(v)}</td>;
 }
 
-/** The pop-up: a title, one line on what it counts, then the full list on a white sheet. */
-function PopBody({ pop, board, byEmployer, employers, minutes, tracked }: { pop: Pop; board: DriveBoard; byEmployer: Record<string, DriveBoard>; employers: EmployerRow[]; minutes: Map<string, number>; tracked: boolean }) {
+/** The pop-up: a title, one line on what it counts, then the full table on a white sheet. */
+function PopBody({ pop, board, byEmployer, employers, minutes, tracked, people, driveTitle, onCompany }: { pop: Pop; board: DriveBoard; byEmployer: Record<string, DriveBoard>; employers: EmployerRow[]; minutes: Map<string, number>; tracked: boolean; people: Record<string, PersonInfo>; driveTitle: string; onCompany: (id: string) => void }) {
   if (pop.kind === "company") {
     const r = employers.find((e) => e.employerId === pop.id);
     const b = byEmployer[pop.id];
-    return r && b ? <CompanyPop r={r} b={b} minutes={minutes.get(pop.id)} tracked={tracked} /> : <Head title="Company" note="Nothing recorded for this company." />;
-  }
-  if (pop.kind === "items") {
-    return (
-      <>
-        <Head title={pop.title} note={pop.note} />
-        <Sheet>
-          <Students rows={pop.rows} />
-        </Sheet>
-      </>
-    );
+    return r && b ? <CompanyPop r={r} b={b} minutes={minutes.get(pop.id)} tracked={tracked} people={people} driveTitle={driveTitle} /> : <Head title="Company" note="Nothing recorded for this company." />;
   }
   if (pop.kind === "slot") {
     return (
@@ -377,9 +378,11 @@ function PopBody({ pop, board, byEmployer, employers, minutes, tracked }: { pop:
   return (
     <>
       <Head title={pop.title} note={pop.note} />
-      <Sheet>
-        <Students rows={board.lists[pop.key]} />
-      </Sheet>
+      {pop.kind === "employers" ? (
+        <EmployerTable rows={employers} minutes={minutes} tracked={tracked} title={pop.title} driveTitle={driveTitle} onOpen={onCompany} />
+      ) : (
+        <StudentTable rows={pop.kind === "items" ? pop.rows : board.lists[pop.key]} people={people} title={pop.title} driveTitle={driveTitle} />
+      )}
     </>
   );
 }
@@ -401,17 +404,6 @@ function Sheet({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Students({ rows }: { rows: BoardItem[] }) {
-  if (!rows.length) return <p className="px-5 py-8 text-sm text-text-subtle">Nobody here.</p>;
-  return (
-    <ul className="divide-y divide-ink-100">
-      {rows.map((r) => (
-        <Row key={r.userId} r={r} />
-      ))}
-    </ul>
-  );
-}
-
 const COMPANY_LISTS: { key: BoardKey; label: string }[] = [
   { key: "called", label: "Asked to meet" },
   { key: "meetings", label: "Met" },
@@ -420,10 +412,17 @@ const COMPANY_LISTS: { key: BoardKey; label: string }[] = [
 ];
 
 /** One company: who to call, its figures, and the students it asked, met, offered and hired. */
-function CompanyPop({ r, b, minutes, tracked }: { r: EmployerRow; b: DriveBoard; minutes?: number; tracked: boolean }) {
+function CompanyPop({ r, b, minutes, tracked, people, driveTitle }: { r: EmployerRow; b: DriveBoard; minutes?: number; tracked: boolean; people: Record<string, PersonInfo>; driveTitle: string }) {
   // Offers first: what an officer opens a company for. Else its first list with anyone in it.
   const first = b.lists.offers.length ? "offers" : (COMPANY_LISTS.find((l) => b.lists[l.key].length)?.key ?? "called");
   const [sel, setSel] = useState<BoardKey>(first);
+  // This company's own offers, hires and contact for each student, not the whole drive's (b is its own board).
+  const own = useMemo(() => {
+    const hired = new Set(b.lists.hired.map((x) => x.userId));
+    const offers = new Map<string, number>();
+    for (const o of b.facts.offers) offers.set(o.userId, (offers.get(o.userId) ?? 0) + 1);
+    return Object.fromEntries(Object.entries(people).map(([id, p]) => [id, { ...p, offers: offers.get(id) ?? 0, hired: hired.has(id), companies: [r.company] }]));
+  }, [b, people, r.company]);
   return (
     <>
       <header className="drill-step border-b border-ink-200/70 px-5 pb-4 pt-5 pr-14 sm:px-6" style={{ "--i": 0 } as React.CSSProperties}>
@@ -464,78 +463,8 @@ function CompanyPop({ r, b, minutes, tracked }: { r: EmployerRow; b: DriveBoard;
           ))}
         </div>
       </header>
-      <Sheet>
-        <Students rows={b.lists[sel]} />
-      </Sheet>
+      {/* Keyed by the tab, so a filter set on one list does not carry over to a list it may not fit. */}
+      <StudentTable key={sel} rows={b.lists[sel]} people={own} title={`${r.company}, ${COMPANY_LISTS.find((l) => l.key === sel)!.label.toLowerCase()}`} driveTitle={driveTitle} />
     </>
-  );
-}
-
-function Companies({ rows, minutes, tracked }: { rows: EmployerRow[]; minutes: Map<string, number>; tracked: boolean }) {
-  return (
-    <ul className="divide-y divide-ink-100">
-      {rows.map((r) => (
-        <li key={r.key} className="grid gap-x-6 gap-y-1 px-5 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
-          <div className="min-w-0">
-            <p className="truncate font-medium text-ink-900">{r.company}</p>
-            <p className="truncate text-xs text-text-subtle">{[r.contact, r.phone, r.email].filter(Boolean).join(" · ") || "No contact on file"}</p>
-          </div>
-          <p className="nums text-sm text-ink-700">
-            {r.employerId ? (
-              <>
-                {r.joinedAt ? `Joined ${when(r.joinedAt)}` : "Came"}
-                {tracked && r.employerId && minutes.has(r.employerId) ? ` · ${duration(minutes.get(r.employerId)!)} online` : ""}
-              </>
-            ) : (
-              <span className="text-warning">Invited, didn&apos;t come</span>
-            )}
-          </p>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function Minutes({ rows }: { rows: { userId: string; name: string; minutes: number }[] }) {
-  if (!rows.length) return <p className="px-5 py-8 text-sm text-text-subtle">Nothing recorded.</p>;
-  return (
-    <ul className="divide-y divide-ink-100">
-      {rows.map((x, i) => (
-        <li key={`${x.userId}-${i}`} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
-          <a href={`/college/students/${x.userId}`} className="truncate font-medium text-ink-900 hover:text-brand-700 hover:underline">{x.name}</a>
-          <span className="nums shrink-0 text-ink-700">{duration(x.minutes)}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function Names({ rows }: { rows: { userId: string; name: string }[] }) {
-  if (!rows.length) return <p className="px-5 py-8 text-sm text-text-subtle">Nobody here.</p>;
-  return (
-    <ul className="divide-y divide-ink-100">
-      {rows.map((x) => (
-        <li key={x.userId} className="px-5 py-3 text-sm">
-          <a href={`/college/students/${x.userId}`} className="font-medium text-ink-900 hover:text-brand-700 hover:underline">{x.name}</a>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function Strong({ rows }: { rows: DriveSummary["missed"]["rows"] }) {
-  if (!rows.length) return <p className="px-5 py-8 text-sm text-text-subtle">Every strong student was reached.</p>;
-  return (
-    <ul className="divide-y divide-ink-100">
-      {rows.map((x) => (
-        <li key={x.userId} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 px-5 py-3 text-sm">
-          <span className="min-w-0">
-            <a href={`/college/students/${x.userId}`} className="block truncate font-medium text-ink-900 hover:text-brand-700 hover:underline">{x.name}</a>
-            <span className="block truncate text-xs text-text-subtle">{[x.branch, x.year ? `Year ${x.year}` : null, x.phone].filter(Boolean).join(" · ")}</span>
-          </span>
-          <span className="nums text-ink-700">{x.score?.toFixed(1) ?? "—"}</span>
-        </li>
-      ))}
-    </ul>
   );
 }
