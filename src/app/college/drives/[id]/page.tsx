@@ -22,7 +22,7 @@ import { loadDriveBoard } from "@/lib/college/drive-board-db";
 import { loadDriveEmployers } from "@/lib/college/drive-employers-db";
 import { loadDriveSummary } from "@/lib/college/drive-summary-db";
 import { toLocalInput } from "@/lib/college/ist";
-import { DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
+import { audienceLabel, DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
 import { driveForCollegeAdmin, eligibleStudents, presenceSnapshot, requireCollegeContext, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { driveDataOpen, toStudentRow } from "@/lib/college/serialize";
 import { shortDateTime } from "@/lib/format";
@@ -116,7 +116,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
     <div className="space-y-6">
       <CollegeHero
         title={drive.title}
-        lede={`${DRIVE_KIND_LABEL[drive.kind] ?? drive.kind} · ${WINDOW_LABEL[w]} · ${fmt(drive.startsAt)} to ${fmt(drive.endsAt)} · ${plural(eligible.length, "student", "students")} in the drive`}
+        lede={`${DRIVE_KIND_LABEL[drive.kind] ?? drive.kind}${audienceLabel(drive.audience) ? ` · ${audienceLabel(drive.audience)}` : ""} · ${WINDOW_LABEL[w]} · ${fmt(drive.startsAt)} to ${fmt(drive.endsAt)} · ${plural(eligible.length, "student", "students")} in the drive`}
         actions={
           open ? (
             <>
@@ -220,6 +220,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
             <DriveBuilder
               collegeId={ctx.college.id}
               collegeName={ctx.college.name}
+              collegeLogoUrl={ctx.college.logoUrl}
               students={rows}
               branches={branches}
               live={w === "live"}
@@ -236,7 +237,9 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
                 branches: e.branches ?? [],
                 includeUserIds: drive.includeUserIds,
                 excludeUserIds: drive.excludeUserIds,
-                invitedEmployers: invited,
+                audience: drive.audience === "tech" || drive.audience === "non_tech" ? drive.audience : "any",
+                // Name and phone ride along on the stored rows (0055), so an edit opens them filled in.
+                invitedEmployers: drive.invitedEmployers ?? invited,
               }}
             />
           </div>
