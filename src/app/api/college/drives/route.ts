@@ -7,6 +7,7 @@ import { generateDriveToken } from "@/lib/college/tokens";
 import { invitesToSend, prepareInvited, withUnsent } from "@/lib/college/drive-invite";
 import { sendAndRecordInvites } from "@/lib/college/drive-invite-send";
 import { getDb, schema } from "@/lib/db";
+import { blockedInvites } from "@/lib/college/drive-overlap";
 
 /** Create a drive. The link's token is returned once and never stored. */
 export async function POST(req: Request) {
@@ -20,6 +21,9 @@ export async function POST(req: Request) {
   if (!parsed.data.audience || parsed.data.audience === "any") return NextResponse.json({ error: "Pick Tech or Non-tech for this drive.", field: "audience" }, { status: 400 });
   const past = drivePastDateProblem(parsed.data);
   if (past) return NextResponse.json({ error: past.error, field: past.path }, { status: 400 });
+  // One drive at a time: no invited company may already be in an overlapping drive (owner, 24 Nov).
+  const [blocked] = await blockedInvites(getDb(), { collegeId: g.ctx.college.id, driveId: null, w: parsed.data, emails: (parsed.data.invitedEmployers ?? []).map((i) => i.email) });
+  if (blocked) return NextResponse.json({ error: blocked.error, field: "invitedEmployers" }, { status: 409 });
   const { token, hash } = generateDriveToken();
   // Every invited company is unsent until its mail goes out (recorded below), so a held-back one is retried on a later save.
   const list = prepareInvited(parsed.data.invitedEmployers ?? [], null);

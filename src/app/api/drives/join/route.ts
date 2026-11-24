@@ -9,6 +9,8 @@ import { driveCodeSecret } from "@/lib/drives/code-derive";
 import { hashDriveToken } from "@/lib/college/tokens";
 import { getDb, schema } from "@/lib/db";
 import { logDriveActivity } from "@/lib/college/campus-lock";
+import { busyDriveFor, lockEmployerDrives, type BusyDrive } from "@/lib/college/drive-overlap";
+import { shortDateTime } from "@/lib/format";
 import { limiters, bucketKey, clientIp } from "@/lib/security/rate-limit";
 
 // The share link's token, or the signed invite a company got by email (lib/college/drive-invite.ts).
@@ -22,6 +24,12 @@ const bodySchema = z.union([
  * pass is the joined row, not the token, so the token never has to sit in a
  * URL they keep using (or in their browser history after this page).
  */
+/** The company's own other drive, which it may see: name, college and when it ends. */
+function busyLine(b: BusyDrive): string {
+  const until = shortDateTime(b.endsAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+  return `You're in the campus drive "${b.title}" (${b.college}) until ${until}. A company can be in one drive at a time: exit that drive or wait until it ends.`;
+}
+
 export async function POST(req: Request) {
   const guard = await requireMutation({ req, roles: ["employer"] });
   if (!guard.ok) return guard.response;
@@ -64,6 +72,12 @@ export async function POST(req: Request) {
       .limit(1);
     // A company that left the drive early stays out: the link does not put it back under the campus lock.
     if (prior?.status === "exited") return { status: 403 as const, reason: "exited" };
+    // One drive at a time: a company already inside another drive that overlaps this one can't enter it (owner, 24 Nov).
+    if (!prior) {
+      await lockEmployerDrives(tx, guard.session.uid);
+      const busy = await busyDriveFor(tx, guard.session.uid, row.drive, row.drive.id);
+      if (busy) return { status: 409 as const, busy };
+    }
     const [added] = await tx
       .insert(schema.collegeDriveEmployers)
       .values({ driveId: row.drive.id, employerId: guard.session.uid, via: "token" in cred ? "link" : "invite" })
@@ -72,6 +86,7 @@ export async function POST(req: Request) {
     return { status: 200 as const, drive: row.drive, added: Boolean(added) };
   });
   if (outcome.status === 404) return NextResponse.json({ error: "This link isn't valid" }, { status: 404 });
+  if (outcome.status === 409) return NextResponse.json({ error: busyLine(outcome.busy), reason: "busy" }, { status: 409 });
   if (outcome.status === 403) {
     const msg: Record<string, string> = {
       revoked: "This drive has ended.",

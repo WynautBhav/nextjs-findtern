@@ -8,6 +8,7 @@ import { inviteeAddProblem, type Invitee } from "@/lib/college/drive-invite";
 import { sendDriveInvites } from "@/lib/college/drive-invite-send";
 import { driveForCollegeAdmin } from "@/lib/college/scope";
 import { driveDataOpen } from "@/lib/college/serialize";
+import { blockedInvites } from "@/lib/college/drive-overlap";
 import { schema } from "@/lib/db";
 
 /**
@@ -31,6 +32,8 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
     const list = row?.list ?? [];
     const problem = inviteeAddProblem(list, email);
     if (problem) return { error: problem } as const;
+    const [blocked] = await blockedInvites(tx, { collegeId: drive.collegeId, driveId: drive.id, w: drive, emails: [email] });
+    if (blocked) return { error: blocked.error } as const;
     const invites = await sendDriveInvites({ id: drive.id, title: drive.title, kind: drive.kind, startsAt: drive.startsAt, endsAt: drive.endsAt, revokedAt: drive.revokedAt, tokenHash: drive.tokenHash }, g.ctx.college.id, g.ctx.college.name, [added]);
     // Failed or held back by the daily cap: flagged unsent, so the next save or link reissue tries again. Neither (the
     // address was already emailed for this drive today, drive-invite-limit.ts) counts as reached.

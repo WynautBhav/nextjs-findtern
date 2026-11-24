@@ -5,6 +5,7 @@ import { getDb, schema } from "@/lib/db";
 import { emails } from "@/lib/emails";
 import { inIdList } from "@/lib/sql-ids";
 import { mailCollegeOfficers } from "./mail";
+import { busyDriveFor, lockEmployerDrives } from "./drive-overlap";
 import { eligibleStudents, type Drive } from "./scope";
 import { fullTimeReady } from "./eligibility";
 
@@ -157,7 +158,7 @@ export async function autoJoinInvitedDrives(employerId: string, email: string, d
   if (!norm) return [];
   try {
     const drives = await db
-      .select({ id: schema.collegeDrives.id, collegeId: schema.collegeDrives.collegeId })
+      .select({ id: schema.collegeDrives.id, collegeId: schema.collegeDrives.collegeId, startsAt: schema.collegeDrives.startsAt, endsAt: schema.collegeDrives.endsAt, revokedAt: schema.collegeDrives.revokedAt })
       .from(schema.collegeDrives)
       .innerJoin(schema.colleges, eq(schema.colleges.id, schema.collegeDrives.collegeId))
       .where(
@@ -169,12 +170,18 @@ export async function autoJoinInvitedDrives(employerId: string, email: string, d
         ),
       );
     const joined: string[] = [];
-    for (const d of drives) {
-      const [row] = await db
-        .insert(schema.collegeDriveEmployers)
-        .values({ driveId: d.id, employerId, via: "auto" })
-        .onConflictDoNothing()
-        .returning({ id: schema.collegeDriveEmployers.id });
+    // Earliest first: with two overlapping invites, the company enters the one that opens first (one drive at a time).
+    for (const d of [...drives].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime())) {
+      const row = await db.transaction(async (tx) => {
+        await lockEmployerDrives(tx, employerId);
+        if (await busyDriveFor(tx, employerId, d, d.id)) return null;
+        const [added] = await tx
+          .insert(schema.collegeDriveEmployers)
+          .values({ driveId: d.id, employerId, via: "auto" })
+          .onConflictDoNothing()
+          .returning({ id: schema.collegeDriveEmployers.id });
+        return added ?? null;
+      });
       if (!row) continue;
       joined.push(d.id);
       await logDriveActivity(db, { driveId: d.id, collegeId: d.collegeId, employerId, action: "joined_drive", metadata: { via: "auto" } });

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 
 import { requireCollegeMutation } from "@/lib/college/guard";
 import { driveInput, drivePastDateProblem } from "@/lib/college/drive-input";
@@ -8,6 +8,7 @@ import { sendAndRecordInvites } from "@/lib/college/drive-invite-send";
 import { driveForCollegeAdmin } from "@/lib/college/scope";
 import { driveDataOpen } from "@/lib/college/serialize";
 import { getDb, schema } from "@/lib/db";
+import { blockedInvites, busyDriveFor } from "@/lib/college/drive-overlap";
 
 /** Edit dates, eligibility and the include/exclude lists. The link is unchanged. Companies newly added to the invited list, or never reached by an earlier mail, are emailed. */
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
@@ -26,6 +27,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
   const past = drivePastDateProblem(parsed.data, { savedStartsAt: drive.startsAt });
   if (past) return NextResponse.json({ error: past.error, field: past.path }, { status: 400 });
+  // One drive at a time: the invited companies, and those already inside, must not be in another drive on the new dates.
+  const w = { startsAt: parsed.data.startsAt, endsAt: parsed.data.endsAt, revokedAt: drive.revokedAt };
+  const [blocked] = await blockedInvites(getDb(), { collegeId: drive.collegeId, driveId: drive.id, w, emails: (parsed.data.invitedEmployers ?? drive.invitedEmployers ?? []).map((i) => i.email) });
+  if (blocked) return NextResponse.json({ error: blocked.error, field: "invitedEmployers" }, { status: 409 });
+  const inside = await getDb().select({ id: schema.collegeDriveEmployers.employerId }).from(schema.collegeDriveEmployers).where(and(eq(schema.collegeDriveEmployers.driveId, drive.id), ne(schema.collegeDriveEmployers.status, "exited")));
+  for (const e of inside) {
+    if (await busyDriveFor(getDb(), e.id, w, drive.id)) {
+      return NextResponse.json({ error: "A company already in this drive is in another campus drive on the new dates. A company can be in one drive at a time, so keep the dates or ask it to exit the other drive.", field: "endsAt" }, { status: 409 });
+    }
+  }
   // Companies never reached by a mail (new, or held back by the daily cap or a failed send before) are flagged unsent until it goes out.
   const submitted = parsed.data.invitedEmployers ? prepareInvited(parsed.data.invitedEmployers, drive.invitedEmployers) : undefined;
   const toSend = invitesToSend(drive.invitedEmployers, submitted);
