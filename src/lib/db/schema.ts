@@ -1220,6 +1220,8 @@ export const collegeDrives = pgTable("college_drives", {
   collegeId: varchar("college_id").notNull(),
   title: text("title").notNull(),
   kind: text("kind").notNull().default("internship"), // internship | full_time
+  /** Who the drive is for (0055): tech | non_tech | any. A label only; it never changes which students are eligible. */
+  audience: text("audience").notNull().default("any"),
   description: text("description"),
   startsAt: timestamp("starts_at").notNull(),
   endsAt: timestamp("ends_at").notNull(),
@@ -1228,7 +1230,7 @@ export const collegeDrives = pgTable("college_drives", {
   includeUserIds: jsonb("include_user_ids").$type<string[]>().notNull().default([]),
   excludeUserIds: jsonb("exclude_user_ids").$type<string[]>().notNull().default([]),
   /** Companies the officer invited (0051): the drive page counts who came and lists who to chase. */
-  invitedEmployers: jsonb("invited_employers").$type<{ company: string; email: string }[]>().notNull().default([]),
+  invitedEmployers: jsonb("invited_employers").$type<{ company: string; email: string; name?: string; phone?: string }[]>().notNull().default([]),
   tokenHash: text("token_hash").notNull(),
   revokedAt: timestamp("revoked_at"),
   /** The paid drive order this drive runs on (drizzle/0018). */

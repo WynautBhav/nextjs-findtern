@@ -7,7 +7,7 @@ import { DriveStatePill } from "@/components/employer/drive-parts";
 import { ButtonLink } from "@/components/ui/button";
 import { driveWindow } from "@/lib/college/access";
 import { drivesOverview } from "@/lib/college/drives";
-import { DRIVE_KIND_LABEL } from "@/lib/college/labels";
+import { DRIVE_KIND_LABEL, audienceLabel } from "@/lib/college/labels";
 import { timeUntil } from "@/lib/college/time-left";
 import { requireCollegeContext } from "@/lib/college/scope";
 import { shortDateTime } from "@/lib/format";
@@ -113,6 +113,7 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
                       <p className="flex flex-wrap items-center gap-2">
                         <DriveStatePill state={w} audience="college" />
                         <span className="text-xs font-medium text-text-subtle">{DRIVE_KIND_LABEL[drive.kind] ?? drive.kind}</span>
+                        {audienceLabel(drive.audience) ? <span className="text-xs font-medium text-text-subtle">· {audienceLabel(drive.audience)}</span> : null}
                       </p>
                       <h2 className="mt-2.5 line-clamp-2 break-words text-xl font-semibold tracking-[-0.02em] text-ink-900">{drive.title}</h2>
                     </div>

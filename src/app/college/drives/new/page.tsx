@@ -21,6 +21,7 @@ export default async function NewDrivePage() {
         heading={{ title: "New campus drive", lede: "Name it, set when it is open, and you get one link to send to the employers you invite. They see your students only. It opens straight away unless you choose a later time." }}
         collegeId={ctx.college.id}
         collegeName={ctx.college.name}
+        collegeLogoUrl={ctx.college.logoUrl}
         students={students}
         branches={branches}
         initial={{

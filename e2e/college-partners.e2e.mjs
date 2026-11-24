@@ -97,7 +97,8 @@ test("officer: signs in and sees the console", async () => {
 
 test("officer: builds a live drive that shows only Sana", async () => {
   await tpo.goto(`${BASE}/college/drives/new`);
-  await tpo.getByLabel("Name").fill("E2E campus drive");
+  await tpo.getByLabel("Name", { exact: true }).first().fill("E2E campus drive");
+  await tpo.getByRole("radio", { name: "Tech", exact: true }).check({ force: true }); // a new drive says who it is for
   await fillIst(tpo, "Opens (IST)", -5);
   await fillIst(tpo, "Closes (IST)", 120);
   await tpo.getByRole("button", { name: "Choose who is shown" }).click(); // a new drive shows everyone until the officer narrows it

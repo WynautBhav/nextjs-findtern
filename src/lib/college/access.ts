@@ -180,6 +180,8 @@ const COLLEGE_ADMIN_WRITES = new Set([
   "roster:remove",
   "nudge:send",
   "bank:update",
+  // The college's logo, shown on its drive pages (upload kind college_logo).
+  "logo:update",
   "payout:request",
   "leave:decide",
   // Who is in the college is the officer's call (accept, deny, restore). Still nothing about the student's own data.

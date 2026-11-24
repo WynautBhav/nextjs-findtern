@@ -17,7 +17,7 @@ import { driveWindow } from "./access.ts";
  */
 
 /** `unsent`: no mail has reached this address yet (daily cap, mail failure), so the next save tries again. Server-side only. */
-export type Invitee = { company: string; email: string; unsent?: true };
+export type Invitee = { company: string; email: string; unsent?: true; name?: string; phone?: string };
 
 const norm = (email: string) => email.trim().toLowerCase();
 
@@ -61,7 +61,28 @@ export function invitesToSend(before: Invitee[] | null | undefined, after: Invit
 /** `list` with `unsent` set on exactly the addresses in `emails` (and cleared on the rest). */
 export function withUnsent(list: Invitee[], emails: Iterable<string>): Invitee[] {
   const flagged = new Set([...emails].map(norm));
-  return list.map(({ company, email }) => (flagged.has(norm(email)) ? { company, email, unsent: true as const } : { company, email }));
+  return list.map((i) => {
+    const rest = { ...i };
+    delete rest.unsent;
+    return flagged.has(norm(rest.email)) ? { ...rest, unsent: true as const } : rest;
+  });
+}
+
+/**
+ * The list to save. A row's contact name and phone are kept as typed (a blank one is dropped, not stored as ""). A row that
+ * carries neither key at all (the edit form was opened before those fields existed, or by an older client) keeps what the
+ * drive already has for that email, so saving never wipes contact details the officer did not touch.
+ */
+export function prepareInvited<T extends { email: string; name?: string; phone?: string }>(submitted: T[], saved: Invitee[] | null | undefined): T[] {
+  const byEmail = new Map((saved ?? []).map((i) => [norm(i.email), i]));
+  return submitted.map((row) => {
+    const untouched = row.name === undefined && row.phone === undefined;
+    const old = untouched ? byEmail.get(norm(row.email)) : undefined;
+    const { name: n, phone: p, ...rest } = row;
+    const name = (untouched ? old?.name : n) || undefined;
+    const phone = (untouched ? old?.phone : p) || undefined;
+    return { ...rest, ...(name ? { name } : {}), ...(phone ? { phone } : {}) } as T;
+  });
 }
 
 /** An ended drive refuses every join, so inviting to it would only spend the daily cap. */

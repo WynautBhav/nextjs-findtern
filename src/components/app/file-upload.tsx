@@ -119,7 +119,7 @@ export function FileUpload({
   preview,
   shrink,
 }: {
-  kind: "profile_photo" | "aadhaar" | "pan" | "intro_video" | "marksheet" | "certificate" | "employer_logo" | "offer_letter" | "cms_image" | "support";
+  kind: "profile_photo" | "aadhaar" | "pan" | "intro_video" | "marksheet" | "certificate" | "employer_logo" | "college_logo" | "offer_letter" | "cms_image" | "support";
   accept: string;
   label: string;
   hint?: string;

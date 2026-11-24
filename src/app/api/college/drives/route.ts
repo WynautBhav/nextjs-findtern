@@ -4,7 +4,7 @@ import { tryPublicOrigin } from "@/lib/origin";
 import { requireCollegeMutation } from "@/lib/college/guard";
 import { driveInput, drivePastDateProblem, driveShareUrl } from "@/lib/college/drive-input";
 import { generateDriveToken } from "@/lib/college/tokens";
-import { invitesToSend, withUnsent } from "@/lib/college/drive-invite";
+import { invitesToSend, prepareInvited, withUnsent } from "@/lib/college/drive-invite";
 import { sendAndRecordInvites } from "@/lib/college/drive-invite-send";
 import { getDb, schema } from "@/lib/db";
 
@@ -16,11 +16,13 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Check the drive details" }, { status: 400 });
   }
+  // A new drive says who it is for. "any" is only what drives made before the label existed read as.
+  if (!parsed.data.audience || parsed.data.audience === "any") return NextResponse.json({ error: "Pick Tech or Non-tech for this drive.", field: "audience" }, { status: 400 });
   const past = drivePastDateProblem(parsed.data);
   if (past) return NextResponse.json({ error: past.error, field: past.path }, { status: 400 });
   const { token, hash } = generateDriveToken();
   // Every invited company is unsent until its mail goes out (recorded below), so a held-back one is retried on a later save.
-  const list = parsed.data.invitedEmployers ?? [];
+  const list = prepareInvited(parsed.data.invitedEmployers ?? [], null);
   const toSend = invitesToSend([], list);
   const [drive] = await getDb()
     .insert(schema.collegeDrives)

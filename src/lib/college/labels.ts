@@ -47,6 +47,13 @@ export function aiStatusLabel(status: string): { label: string; done: boolean } 
 
 export const DRIVE_KIND_LABEL: Record<string, string> = { internship: "Interns and full-time", full_time: "Full-time" };
 
+/** Who a drive is for ("tech" | "non_tech"); a label only. Null for "any" (drives made before the label existed) so nothing is shown. */
+export function audienceLabel(audience: string | null | undefined): string | null {
+  if (audience === "tech") return "For tech students";
+  if (audience === "non_tech") return "For non-tech students";
+  return null;
+}
+
 export const WINDOW_LABEL: Record<string, string> = {
   upcoming: "Opens soon",
   live: "Live",
