@@ -25,7 +25,7 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 const UNLOCK_COPY: Record<(typeof UNLOCKS)[number], string> = {
-  "CGPA filter": "Narrow the candidate list to a verified CGPA range.",
+  "CGPA filter": "Narrow the candidate list to a minimum CGPA.",
   "College filter and sort": "Filter candidates by college, and sort the list by it.",
 };
 

@@ -161,7 +161,6 @@ export function FilterColumn({
           {pro.active ? (
             <ProFilterSections
               cgpaMin={filters.cgpaMin}
-              cgpaVerified={filters.cgpaVerified}
               colleges={filters.colleges}
               options={pro.colleges}
               campus={pro.campusColleges}

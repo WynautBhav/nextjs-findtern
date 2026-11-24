@@ -41,7 +41,6 @@ export function ProLockedCard({ offered }: { offered: boolean }) {
       {/* Disabled previews: they show what is behind the lock. They never submit and cannot be focused. */}
       <div className="mt-2 border-t border-brand-200/60 pt-2">
         <RatingSlider name="cgpaMin" label="Minimum CGPA" defaultValue={0} disabled describedBy={why} />
-        <SwitchField name="cgpaVerified" value="1" defaultChecked={false} label="Verified CGPA only" disabled describedBy={why} />
         <div className="py-1.5">
           <label htmlFor="pro-locked-college" className="text-sm text-ink-700">
             College
@@ -88,13 +87,11 @@ function ProSection({ id, title, children }: { id: string; title: string; childr
  */
 export function ProFilterSections({
   cgpaMin,
-  cgpaVerified,
   colleges,
   options,
   campus = null,
 }: {
   cgpaMin: number;
-  cgpaVerified: boolean;
   colleges: string[];
   options: CollegeOption[];
   /** Inside a live campus drive: its college, and the others by initials only (server-redacted). */
@@ -104,7 +101,6 @@ export function ProFilterSections({
     <>
       <ProSection id="pro-cgpa-title" title="CGPA">
         <RatingSlider name="cgpaMin" label="Minimum CGPA" defaultValue={cgpaMin} />
-        <SwitchField name="cgpaVerified" value="1" defaultChecked={cgpaVerified} label="Verified CGPA only" hint="A college has confirmed the score." />
         <p className="mt-1 text-xs leading-relaxed text-text-subtle">A percentage score is converted to CGPA (÷ 9.5) and marked approx.</p>
       </ProSection>
       <ProSection id="pro-college-title" title="College">

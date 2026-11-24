@@ -17,10 +17,10 @@ const first = (v: Raw): string | undefined => (Array.isArray(v) ? v[0] : v);
 export function proRequestOf(params: { cgpaMin?: Raw; cgpaVerified?: Raw; colleges?: Raw; sort?: Raw }): ProRequest {
   const raw = String(first(params.cgpaMin) ?? "").trim();
   const n = /^\d+(\.\d+)?$/.test(raw) ? Number(raw) : 0;
-  const values = params.cgpaVerified === undefined ? [] : Array.isArray(params.cgpaVerified) ? params.cgpaVerified : [params.cgpaVerified];
   return {
     cgpaMin: Number.isFinite(n) && n > 0 ? Math.min(10, Math.round(n * 10) / 10) : 0,
-    cgpaVerified: values.some((v) => ["1", "true", "on"].includes(v.trim().toLowerCase())),
+    // The "Verified CGPA only" filter was removed (24 Nov 2026): an old link or saved view carrying it is ignored.
+    cgpaVerified: false,
     colleges: parseColleges(params.colleges),
     collegeSort: parseCollegeSort(params.sort),
   };

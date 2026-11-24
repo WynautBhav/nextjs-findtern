@@ -108,7 +108,7 @@ test("without access the same request changes nothing: no filtering, no sorting,
 });
 
 test("without access each locked parameter alone is ignored", () => {
-  for (const raw of [{ cgpaMin: "9" }, { cgpaVerified: "1" }, { colleges: "Nowhere" }, { sort: "college_desc" }, { sort: "coding,college" }]) {
+  for (const raw of [{ cgpaMin: "9" }, { colleges: "Nowhere" }, { sort: "college_desc" }, { sort: "coding,college" }]) {
     const r = enforcePro(pool, proRequestOf(raw), false, factsOf);
     assert.deepEqual(ids(r.order(r.items)), ids(pool), JSON.stringify(raw));
     assert.equal(r.ignored, true, JSON.stringify(raw));
@@ -152,8 +152,9 @@ test("proRequestOf reads and bounds the URL values", () => {
   assert.equal(proRequestOf({ cgpaMin: "99" }).cgpaMin, 10);
   for (const bad of ["-1", "abc", "NaN", "Infinity", ""]) assert.equal(proRequestOf({ cgpaMin: bad }).cgpaMin, 0, bad);
   assert.equal(proRequestOf({ cgpaMin: ["8.5", "2"] }).cgpaMin, 8.5);
-  assert.equal(proRequestOf({ cgpaVerified: "1" }).cgpaVerified, true);
-  assert.equal(proRequestOf({ cgpaVerified: ["0", "1"] }).cgpaVerified, true);
+  // The "Verified CGPA only" filter was removed: the parameter is ignored.
+  assert.equal(proRequestOf({ cgpaVerified: "1" }).cgpaVerified, false);
+  assert.equal(proRequestOf({ cgpaVerified: ["0", "1"] }).cgpaVerified, false);
   assert.equal(proRequestOf({ cgpaVerified: "0" }).cgpaVerified, false);
   assert.equal(proRequestOf({ sort: ["coding", "college_desc"] }).collegeSort, "desc");
 });
@@ -176,7 +177,7 @@ test("colleges with commas, ampersands, quotes, plus signs and non-Latin letters
   const { qs, back } = roundTrip(proRequestOf({ cgpaMin: "7.5", cgpaVerified: "1", colleges }));
   assert.deepEqual(back.colleges, colleges);
   assert.equal(back.cgpaMin, 7.5);
-  assert.equal(back.cgpaVerified, true);
+  assert.equal(back.cgpaVerified, false);
   assert.ok(!qs.includes(" ") && !qs.includes("&&"), qs);
 });
 
