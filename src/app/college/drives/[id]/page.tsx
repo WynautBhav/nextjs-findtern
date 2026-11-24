@@ -123,11 +123,36 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
     />
   );
 
+  const lede = `${DRIVE_KIND_LABEL[drive.kind] ?? drive.kind}${audienceLabel(drive.audience) ? ` · ${audienceLabel(drive.audience)}` : ""} · ${WINDOW_LABEL[w]} · ${fmt(drive.startsAt)} to ${fmt(drive.endsAt)} · ${plural(eligible.length, "student", "students")} in the drive`;
+
+  // A finished drive: one card (its own hero) and the analysis under it; every figure opens its list in a pop-up.
+  if (!open && summary) {
+    return (
+      <div className="space-y-6">
+        <PastDriveCard
+          hero={{ title: drive.title, lede }}
+          scores={Object.fromEntries(verified.map((s) => [s.userId, s.score ?? null]))}
+          window={{ start: drive.startsAt, end: drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt }}
+          board={board}
+          byEmployer={byEmployer}
+          employers={employers}
+          summary={summary}
+          finding={finding}
+          initialShow={sp.show}
+          timeline={timeline}
+          spread={spread.branches.length ? <DriveSpread branches={spread.branches} years={spread.years} /> : null}
+          activity={<DriveActivityList rows={activity} className="px-5 py-2 sm:px-6" />}
+          activityCount={activity.length}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <CollegeHero
         title={drive.title}
-        lede={`${DRIVE_KIND_LABEL[drive.kind] ?? drive.kind}${audienceLabel(drive.audience) ? ` · ${audienceLabel(drive.audience)}` : ""} · ${WINDOW_LABEL[w]} · ${fmt(drive.startsAt)} to ${fmt(drive.endsAt)} · ${plural(eligible.length, "student", "students")} in the drive`}
+        lede={lede}
         actions={
           open ? (
             <>
@@ -144,20 +169,6 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
           ) : null
         }
       >
-        {!open && summary ? (
-          <PastDriveCard
-            board={board}
-            byEmployer={byEmployer}
-            employers={employers}
-            summary={summary}
-            finding={finding}
-            initialShow={sp.show}
-            timeline={timeline}
-            spread={spread.branches.length ? <div className="px-5 py-4 sm:px-6"><DriveSpread branches={spread.branches} years={spread.years} /></div> : null}
-            activity={<DriveActivityList rows={activity} className="px-5 py-2 sm:px-6" />}
-            activityCount={activity.length}
-          />
-        ) : (
         <>
         <p className="mt-6 max-w-3xl text-pretty text-base text-white">{finding}</p>
         <div className="mt-8">
@@ -174,7 +185,6 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
         </div>
         <div className="mt-8 border-t border-white/10 pt-6">{timeline}</div>
         </>
-        )}
       </CollegeHero>
 
       {/* A finished drive is the one card above: its lists open in pop-ups, so nothing else repeats them below. */}

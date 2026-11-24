@@ -38,6 +38,8 @@ export type DriveSummary = {
     neverOnline: StudentMinutes[];
     neverOnlineCount: number;
     most: StudentMinutes[];
+    /** Every student in the drive with their minutes, most first (names shown): the past-drive card's lists and chart. */
+    everyone: StudentMinutes[];
     employers: { employerId: string; company: string; minutes: number }[];
   };
   speed: {
@@ -167,6 +169,7 @@ export function buildDriveSummary(input: {
     neverOnline: open ? never.slice(0, 50) : [],
     neverOnlineCount: never.length,
     most: open ? [...studentMinutes].filter((s) => s.minutes > 0).sort((a, b) => b.minutes - a.minutes).slice(0, 5) : [],
+    everyone: open && tracked !== "none" ? [...studentMinutes].sort((a, b) => b.minutes - a.minutes) : [],
     employers: employers.map((e) => ({ employerId: e.employerId, company: e.company, minutes: minutesOf(e.employerId) })),
   };
 

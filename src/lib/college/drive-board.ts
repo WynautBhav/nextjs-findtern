@@ -68,6 +68,11 @@ export type DriveBoard = {
   offerSplit: { internship: number; fullTime: number };
   /** Meet requests counted one by one (a student can have several): sent (not cancelled), accepted, completed, expired. */
   meetCounts: { sent: number; accepted: number; completed: number; expired: number };
+  /** Each offer (with what became of it) and meet request in the drive, for the past-drive charts. */
+  facts: {
+    offers: { userId: string; company: string | null; at: Date; outcome: "accepted" | "declined" | "open"; fullTime: boolean }[];
+    meets: { userId: string; company: string | null; at: Date }[];
+  };
   /** Nudges sent, counted one by one (a student can be nudged three times); the list is per student. */
   nudgeCounts: Record<NudgeKey, number>;
   /** Offline is known only while the drive is live; null otherwise. */
@@ -161,6 +166,10 @@ export function buildDriveBoard(input: {
   const nudgeTotal = (kind: NudgeHistoryKind) => nudges.filter((n) => n.kind === kind && students.has(n.userId)).length;
   return {
     offerCount: inDrive.length,
+    facts: {
+      offers: inDrive.map((o) => ({ userId: o.userId, company: o.company, at: o.createdAt, outcome: accepted(o) ? "accepted" : declined(o) ? "declined" : "open", fullTime: o.fullTime })),
+      meets: sentMeets.filter((m) => students.has(m.userId)).map((m) => ({ userId: m.userId, company: m.company, at: m.createdAt })),
+    },
     meetCounts: { sent: inDriveCount(sentMeets), accepted: inDriveCount(held), completed: inDriveCount(done), expired: inDriveCount(lapsed) },
     offerSplit: { internship: inDrive.filter((o) => !o.fullTime).length, fullTime: inDrive.filter((o) => o.fullTime).length },
     nudgeCounts: { nudgedOnline: nudgeTotal("online"), nudgedOpenToWork: nudgeTotal("open_to_work"), nudgedMeet: nudgeTotal("meeting"), nudgedOffer: nudgeTotal("offer") },

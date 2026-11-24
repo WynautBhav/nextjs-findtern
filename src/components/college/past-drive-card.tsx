@@ -10,6 +10,8 @@ import type { DriveSummary } from "@/lib/college/drive-summary";
 import { shortDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { Row } from "./drive-board-view";
+import { CollegeHero } from "./kit";
+import { PastDriveCharts, type Pop } from "./past-drive-charts";
 import { duration } from "./drive-summary";
 
 /**
@@ -25,10 +27,6 @@ const plural = (v: number, one: string, many: string) => `${n(v)} ${v === 1 ? on
 const when = (d: Date) => shortDateTime(d, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 type Tab = "candidates" | "employers";
-type Pop =
-  | { kind: "list"; key: BoardKey; title: string; note: string }
-  | { kind: "company"; id: string }
-  | { kind: "slot"; title: string; note: string; body: React.ReactNode };
 
 /** A past drive's old "still waiting" lists, asked for by a link (?show=): what they became once it ended. */
 const PAST_ALIAS: Partial<Record<string, BoardKey>> = { meetingsWaiting: "meetExpired", offersWaiting: "unanswered", offline: "all", online: "all", notOpen: "all" };
@@ -44,11 +42,18 @@ const LIST_TITLE: Partial<Record<BoardKey, string>> = {
   fullTime: "Hired full-time / PPO",
   declinedAll: "Turned every offer down",
   unanswered: "Never replied to an offer",
+  nudgedOnline: "Nudged to come online",
+  nudgedOpenToWork: "Nudged to turn on Open to work",
+  nudgedMeet: "Nudged to answer a meet",
+  nudgedOffer: "Nudged to reply to an offer",
 };
 
 const focusRing = "outline-none focus-visible:ring-2 focus-visible:ring-white/80";
 
 export function PastDriveCard({
+  hero,
+  scores,
+  window,
   board,
   byEmployer,
   employers,
@@ -60,6 +65,10 @@ export function PastDriveCard({
   activity,
   activityCount,
 }: {
+  hero: { title: string; lede: string };
+  /** Findtern score per student (null: not interviewed), for the score-band chart. */
+  scores: Record<string, number | null>;
+  window: { start: Date; end: Date };
   board: DriveBoard;
   byEmployer: Record<string, DriveBoard>;
   employers: DriveEmployers;
@@ -91,7 +100,15 @@ export function PastDriveCard({
     setPop(p);
   };
 
+  const everyone = summary.online.everyone;
+  const onlinePop = (on: boolean): Pop => {
+    const rows = everyone.filter((x) => (on ? x.minutes > 0 : x.minutes === 0));
+    return { kind: "slot", title: on ? "Came online in the drive" : "Never online in the drive", note: plural(rows.length, "student", "students"), body: on ? <Minutes rows={rows} /> : <Names rows={rows} /> };
+  };
+
   return (
+    <>
+    <CollegeHero title={hero.title} lede={hero.lede}>
     <div className="mt-6">
       <div role="tablist" aria-label="Drive view" className="inline-flex flex-wrap gap-1 rounded-full bg-white/10 p-1">
         {(["candidates", "employers"] as const).map((t) => (
@@ -146,23 +163,25 @@ export function PastDriveCard({
                 <Line label="Turned every offer down" value={L.declinedAll.length} onClick={() => open(listPop("declinedAll", board))} />
                 <Line label="Never replied" value={L.unanswered.length} onClick={() => open(listPop("unanswered", board))} />
               </Ledger>
-              <Ledger title="Time online">
+              <Ledger title="Nudges sent">
+                <Line label="Come online" value={board.nudgeCounts.nudgedOnline} onClick={() => open(listPop("nudgedOnline", board))} />
+                <Line label="Turn on Open to work" value={board.nudgeCounts.nudgedOpenToWork} onClick={() => open(listPop("nudgedOpenToWork", board))} />
+                <Line label="Answer a meet request" value={board.nudgeCounts.nudgedMeet} onClick={() => open(listPop("nudgedMeet", board))} />
+                <Line label="Reply to an offer" value={board.nudgeCounts.nudgedOffer} onClick={() => open(listPop("nudgedOffer", board))} />
+              </Ledger>
+              <Ledger title="Online and reach">
                 {summary.tracked === "none" ? (
-                  <li className="py-1.5 text-sm text-on-dark">Not recorded for this drive.</li>
+                  <li className="py-1.5 text-sm text-on-dark">Online time not recorded.</li>
                 ) : (
                   <>
                     <Line
-                      label="Average per student"
+                      label="Average time online"
                       value={summary.online.studentsAvg}
                       text={duration(summary.online.studentsAvg)}
-                      onClick={() => open({ kind: "slot", title: "Most time online", note: `Average ${duration(summary.online.studentsAvg)} per student.${summary.tracked === "partial" ? " Recorded for part of the drive only." : ""}`, body: <Minutes rows={summary.online.most} /> })}
+                      onClick={() => open({ kind: "slot", title: "Time online, most first", note: `Average ${duration(summary.online.studentsAvg)} per student.${summary.tracked === "partial" ? " Recorded for part of the drive only." : ""}`, body: <Minutes rows={everyone.filter((x) => x.minutes > 0)} /> })}
                     />
-                    <Line label="Came online" value={summary.online.studentsEver} />
-                    <Line
-                      label={summary.tracked === "partial" ? "Not seen since recording began" : "Never online"}
-                      value={summary.online.neverOnlineCount}
-                      onClick={() => open({ kind: "slot", title: "Never online in the drive", note: plural(summary.online.neverOnlineCount, "student", "students"), body: <Names rows={summary.online.neverOnline} /> })}
-                    />
+                    <Line label="Came online" value={summary.online.studentsEver} onClick={() => open(onlinePop(true))} />
+                    <Line label={summary.tracked === "partial" ? "Not seen since recording began" : "Never online"} value={summary.online.neverOnlineCount} onClick={() => open(onlinePop(false))} />
                   </>
                 )}
                 <Line
@@ -171,19 +190,11 @@ export function PastDriveCard({
                   text={summary.speed.meetMedianMin === null ? "—" : duration(summary.speed.meetMedianMin)}
                   onClick={summary.speed.slowMeet.length ? () => open({ kind: "slot", title: "Slowest to answer a meet", note: `Half replied faster than ${duration(summary.speed.meetMedianMin)}.`, body: <Minutes rows={summary.speed.slowMeet} /> }) : undefined}
                 />
-              </Ledger>
-              <Ledger title="Reach">
                 <Line
                   label="Strong, not reached"
                   value={summary.missed.count}
                   onClick={() => open({ kind: "slot", title: "Strong students not reached", note: "Findtern score 8 or more, with no meet request and no offer.", body: <Strong rows={summary.missed.rows} /> })}
                 />
-                <Line
-                  label="Nudges sent"
-                  value={summary.nudges.total}
-                  onClick={() => open({ kind: "slot", title: "Nudges sent", note: "“Worked” means the student did it within a day.", body: <Nudges s={summary} /> })}
-                />
-                {spread ? <Line label="By branch and year" text="View" onClick={() => open({ kind: "slot", title: "Offers by branch and year", note: `${plural(L.offers.length, "student", "students")} offered · ${n(L.hired.length)} hired`, body: spread })} /> : null}
               </Ledger>
             </div>
           </>
@@ -271,6 +282,9 @@ export function PastDriveCard({
         </DialogContent>
       </Dialog>
     </div>
+    </CollegeHero>
+    <PastDriveCharts board={board} employers={employers} summary={summary} scores={scores} window={window} spread={spread} open={open} listPop={(k) => listPop(k, board)} />
+    </>
   );
 }
 
@@ -341,6 +355,16 @@ function PopBody({ pop, board, byEmployer, employers, minutes, tracked }: { pop:
     const r = employers.find((e) => e.employerId === pop.id);
     const b = byEmployer[pop.id];
     return r && b ? <CompanyPop r={r} b={b} minutes={minutes.get(pop.id)} tracked={tracked} /> : <Head title="Company" note="Nothing recorded for this company." />;
+  }
+  if (pop.kind === "items") {
+    return (
+      <>
+        <Head title={pop.title} note={pop.note} />
+        <Sheet>
+          <Students rows={pop.rows} />
+        </Sheet>
+      </>
+    );
   }
   if (pop.kind === "slot") {
     return (
@@ -513,32 +537,5 @@ function Strong({ rows }: { rows: DriveSummary["missed"]["rows"] }) {
         </li>
       ))}
     </ul>
-  );
-}
-
-function Nudges({ s }: { s: DriveSummary }) {
-  if (!s.nudges.total) return <p className="px-5 py-8 text-sm text-text-subtle">No nudges were sent in this drive.</p>;
-  return (
-    <>
-      <ul className="divide-y divide-ink-100 border-b border-ink-100">
-        {s.nudges.byKind.map((k) => (
-          <li key={k.kind} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
-            <span className="text-ink-800">{k.label}</span>
-            <span className="nums text-ink-900">{k.checkable ? `${n(k.worked)} of ${n(k.sent)} worked` : `${n(k.sent)} sent`}</span>
-          </li>
-        ))}
-      </ul>
-      <ul className="divide-y divide-ink-100">
-        {s.nudges.rows.map((r, i) => (
-          <li key={`${r.userId}-${r.kind}-${i}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-x-3 px-5 py-2.5 text-sm">
-            <a href={`/college/students/${r.userId}`} className="truncate font-medium text-ink-900 hover:text-brand-700 hover:underline">{r.name}</a>
-            <span className={cn("text-right", r.worked === false ? "text-warning" : r.worked ? "text-success" : "text-text-subtle")}>{r.outcome}</span>
-            <span className="nums col-span-2 text-xs text-text-subtle">
-              {r.kind === "meeting" ? "Answer a meet" : r.kind === "offer" ? "Reply to an offer" : r.kind === "online" ? "Come online" : "Interview"} · {when(r.at)}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </>
   );
 }
