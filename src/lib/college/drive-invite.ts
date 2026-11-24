@@ -58,6 +58,17 @@ export function invitesToSend(before: Invitee[] | null | undefined, after: Invit
   return out;
 }
 
+/** The most companies one drive invites (drive-input.ts caps the edit form the same). */
+export const MAX_INVITED = 50;
+
+/** Why one more company can't be added to `list` (Invite a company), or null: already on it by email, or the cap. */
+export function inviteeAddProblem(list: Invitee[] | null | undefined, email: string): string | null {
+  const all = list ?? [];
+  if (all.some((i) => norm(i.email) === norm(email))) return "This company is already invited.";
+  if (all.length >= MAX_INVITED) return `A drive can invite at most ${MAX_INVITED} companies.`;
+  return null;
+}
+
 /** `list` with `unsent` set on exactly the addresses in `emails` (and cleared on the rest). */
 export function withUnsent(list: Invitee[], emails: Iterable<string>): Invitee[] {
   const flagged = new Set([...emails].map(norm));

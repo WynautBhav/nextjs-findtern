@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 process.env.PUBLIC_ORIGIN = "http://localhost:3000";
 
-const { inviteSig, inviteSigOk, invitePath, invitesToSend, withUnsent, canSendInvites, isInvited, driveInviteEmail } = await import("./drive-invite.ts");
+const { inviteSig, inviteSigOk, invitePath, invitesToSend, withUnsent, canSendInvites, isInvited, driveInviteEmail, inviteeAddProblem } = await import("./drive-invite.ts");
 const { inviteSentLine } = await import("./drive-invite-line.ts");
 const { checkDriveInviteLink } = await import("./access.ts");
 const { driveInput } = await import("./drive-input.ts");
@@ -203,4 +203,13 @@ test("a failed send can be tried again the same day (forget), and a reissue can 
   assert.equal(gate.plan("c", "d1", one, t + 1).send.length, 0);
   gate.forget("d1", ["HR@acme.com"]);
   assert.equal(gate.plan("c", "d1", one, t + 2).send.length, 1);
+});
+
+test("adding one company: refused when that email is already invited (any case) or the drive has 50, else allowed", () => {
+  const list = [{ company: "Acme", email: "hr@acme.com" }];
+  assert.equal(inviteeAddProblem(list, " HR@Acme.com "), "This company is already invited.");
+  assert.equal(inviteeAddProblem(list, "jobs@beta.in"), null);
+  const full = Array.from({ length: 50 }, (_, i) => ({ company: `C${i}`, email: `c${i}@x.com` }));
+  assert.equal(inviteeAddProblem(full, "new@x.com"), "A drive can invite at most 50 companies.");
+  assert.equal(inviteeAddProblem(null, "new@x.com"), null);
 });

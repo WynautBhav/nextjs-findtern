@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { csrfFetch } from "@/lib/client-fetch";
 import { inviteSentLine } from "@/lib/college/drive-invite-line";
 import { buttonClass } from "@/components/ui/button";
+import { InviteCompany } from "./invite-company";
 import { ShareLink } from "./share-link";
 
 /** Issue a fresh link (old one dies) or close the drive to every employer at once. */
@@ -101,6 +102,16 @@ export function LinkActions(props: {
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
+          {/* Adding a company never touches the link: the safe way to bring one more in. */}
+          {!props.revoked ? (
+            <InviteCompany
+              driveId={props.driveId}
+              onNote={(text) => {
+                setError(null);
+                setNote(text);
+              }}
+            />
+          ) : null}
           <button
             type="button"
             data-ask="POST"
