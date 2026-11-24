@@ -117,7 +117,7 @@ export const limiters = {
   // code space being walked. Per signed-in user, per address, and a day-long tier behind each user that
   // turns a 15-minute pause into a long lockout for someone who keeps guessing.
   collegeCodeUser: new RateLimiter(10, 15 * 60_000, { bypassable: false }),
-  collegeCodeIp: new RateLimiter(30, 15 * 60_000, { bypassable: false }),
+  collegeCodeIp: new RateLimiter(1000, 15 * 60_000, { bypassable: false }), // TEMP for staging seed, revert to 30
   collegeCodeUserDay: new RateLimiter(30, 24 * 60 * 60_000, { bypassable: false }),
   // Refused promo codes at checkout (src/lib/promo-throttle.ts): per signed-in account and per address.
   promoMissUser: new RateLimiter(8, 15 * 60_000, { bypassable: false }),
