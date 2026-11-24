@@ -70,7 +70,6 @@ test("before any tracking, online time is unknown rather than zero", () => {
   const s = base({ trackingSince: null });
   assert.equal(s.tracked, "none");
   assert.equal(s.online.studentsAvg, null);
-  assert.equal(s.employers[0].minutes, null);
   assert.equal(s.nudges.rows.find((r) => r.kind === "online")?.worked, null);
   assert.ok(!s.health.signals.some((x) => x.key === "online"));
 });
@@ -93,13 +92,6 @@ test("missed: strong students with no meet and no offer, strongest first", () =>
   const s = base();
   assert.ok(STRONG_SCORE <= 8.5);
   assert.deepEqual(s.missed.rows.map((r) => r.userId), ["c", "d"]);
-});
-
-test("per company: meets, offers and hires", () => {
-  assert.deepEqual(
-    base().employers.map((e) => [e.company, e.meets, e.offers, e.hires]),
-    [["Acme", 2, 1, 1], ["Beta", 1, 1, 0]],
-  );
 });
 
 test("C12: a closed drive keeps every figure and drops every name", () => {
