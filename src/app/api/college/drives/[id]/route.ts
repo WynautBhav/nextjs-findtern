@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { requireCollegeMutation } from "@/lib/college/guard";
 import { driveInput, drivePastDateProblem } from "@/lib/college/drive-input";
-import { invitesToSend, withUnsent } from "@/lib/college/drive-invite";
+import { invitesToSend, prepareInvited, withUnsent } from "@/lib/college/drive-invite";
 import { sendAndRecordInvites } from "@/lib/college/drive-invite-send";
 import { driveForCollegeAdmin } from "@/lib/college/scope";
 import { driveDataOpen } from "@/lib/college/serialize";
@@ -27,7 +27,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const past = drivePastDateProblem(parsed.data, { savedStartsAt: drive.startsAt });
   if (past) return NextResponse.json({ error: past.error, field: past.path }, { status: 400 });
   // Companies never reached by a mail (new, or held back by the daily cap or a failed send before) are flagged unsent until it goes out.
-  const submitted = parsed.data.invitedEmployers;
+  const submitted = parsed.data.invitedEmployers ? prepareInvited(parsed.data.invitedEmployers, drive.invitedEmployers) : undefined;
   const toSend = invitesToSend(drive.invitedEmployers, submitted);
   await getDb()
     .update(schema.collegeDrives)

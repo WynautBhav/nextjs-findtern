@@ -5,6 +5,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { requireRole } from "@/lib/auth";
 import { driveWindow } from "@/lib/college/access";
+import { audienceLabel } from "@/lib/college/labels";
 import { driveForEmployer, eligibleStudents } from "@/lib/college/scope";
 import { DriveActions, DriveStats } from "@/components/employer/campus/drive-overview";
 import { getDb, schema } from "@/lib/db";
@@ -52,6 +53,12 @@ export default async function EmployerDrivePage({ params }: { params: Promise<{ 
           <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm text-on-dark-subtle">
             <DriveStatePill state={state} />
             <span>Interns and full-time</span>
+            {audienceLabel(drive.audience) ? (
+              <>
+                <span aria-hidden>·</span>
+                <span>{audienceLabel(drive.audience)}</span>
+              </>
+            ) : null}
             <span aria-hidden>·</span>
             <span className="nums">
               Closes {driveTime(drive.endsAt)}

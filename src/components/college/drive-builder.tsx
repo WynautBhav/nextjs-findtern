@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import { FileUp, Search } from "lucide-react";
 
 import { isStudentEligible } from "@/lib/college/eligibility";
 import { fromLocalInput } from "@/lib/college/ist";
@@ -10,8 +10,13 @@ import { cgpaText } from "@/lib/college/master-row";
 import { COHORTS, yearLabel } from "@/lib/college/labels";
 import { csrfFetch } from "@/lib/client-fetch";
 import { inviteSentLine } from "@/lib/college/drive-invite-line";
+import type { Audience } from "@/lib/college/drive-input";
+import { MAX_IMPORT_BYTES, MAX_INVITES, inviteRowProblem, mergeInvites, parseInviteSheet, toApiRow, type InviteRow } from "@/lib/college/invite-import";
+import { decodeRosterBytes } from "@/lib/college/roster";
 import { cn } from "@/lib/utils";
 import { PageHead, SURFACE_CLASS } from "@/components/app/primitives";
+import { FileUpload } from "@/components/app/file-upload";
+import { CollegeMark } from "@/components/employer/drive-parts";
 
 import { ShareLink } from "./share-link";
 import type { StudentRow } from "./types";
@@ -23,6 +28,8 @@ export type DriveDraft = {
   id?: string;
   title: string;
   kind: "internship" | "full_time";
+  /** Tech / Non-tech label. Left out, a saved drive keeps its own; a new drive must pick one. "any" reads "Not set". */
+  audience?: Audience;
   description: string;
   startsAt: string;
   endsAt: string;
@@ -33,8 +40,16 @@ export type DriveDraft = {
   includeUserIds: string[];
   excludeUserIds: string[];
   /** Companies the officer invited: the drive page shows who came and who to chase. */
-  invitedEmployers?: { company: string; email: string }[];
+  invitedEmployers?: InvitedRow[];
 };
+
+/** name and phone are absent on rows saved before those fields existed; the server then keeps what it has. */
+type InvitedRow = { company: string; email: string; name?: string; phone?: string };
+
+const AUDIENCE_OPTIONS: { value: Exclude<Audience, "any">; label: string }[] = [
+  { value: "tech", label: "Tech" },
+  { value: "non_tech", label: "Non-tech" },
+];
 
 const field =
   "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
@@ -45,6 +60,7 @@ export function DriveBuilder({
   branches,
   collegeId,
   collegeName,
+  collegeLogoUrl,
   live = false,
   heading,
 }: {
@@ -53,6 +69,8 @@ export function DriveBuilder({
   branches: string[];
   collegeId: string;
   collegeName: string;
+  /** The college's logo (null: none yet). Leave it out to hide the logo block. */
+  collegeLogoUrl?: string | null;
   /** The drive is open right now; edits reach employers immediately. */
   live?: boolean;
   /** The new-drive heading. Once the drive is created it becomes the drive's
@@ -68,6 +86,9 @@ export function DriveBuilder({
   const [link, setLink] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [view, setView] = useState<"in" | "out">("in");
+  const [logoUrl, setLogoUrl] = useState<string | null>(collegeLogoUrl ?? null);
+  const [audienceError, setAudienceError] = useState(false);
+  const [rowErrors, setRowErrors] = useState(false);
   // A new drive shows every student unless the officer asks to narrow it; an existing drive opens with its rules visible.
   const [limit, setLimit] = useState(Boolean(initial.id) || Boolean(initial.minCgpa || initial.minScore || initial.years.length || initial.branches.length || initial.includeUserIds.length || initial.excludeUserIds.length));
 
@@ -103,20 +124,34 @@ export function DriveBuilder({
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
     setError(null);
     setSaved(null);
+    // The server checks all of this again; these only say what is wrong before anything is sent.
+    if (!d.id && (!d.audience || d.audience === "any")) {
+      setAudienceError(true);
+      setError("Pick Tech or Non-tech.");
+      document.getElementById("audience-tech")?.focus();
+      return;
+    }
+    const invited = (d.invitedEmployers ?? []).filter((r) => r.company.trim() || r.email.trim() || (r.name ?? "").trim() || (r.phone ?? "").trim());
+    if (invited.some((r) => inviteRowProblem(asInviteRow(r)))) {
+      setRowErrors(true);
+      setError("Fix the employers marked below.");
+      return;
+    }
+    setSaving(true);
     const payload = {
       title: d.title,
       kind: d.kind,
+      ...(d.audience ? { audience: d.audience } : {}),
       description: d.description,
       startsAt: fromLocalInput(d.startsAt),
       endsAt: fromLocalInput(d.endsAt),
       eligibility: rules.eligibility,
       includeUserIds: d.includeUserIds,
       excludeUserIds: d.excludeUserIds,
-      // Blank rows are dropped; a half-filled one is sent so the API can say what is missing.
-      invitedEmployers: (d.invitedEmployers ?? []).filter((i) => i.company.trim() || i.email.trim()),
+      // Blank rows are dropped. A row saved before name and phone existed is sent as it is, so the server keeps its details.
+      invitedEmployers: invited.map((r) => (r.name === undefined && r.phone === undefined ? { company: r.company.trim(), email: r.email.trim() } : toApiRow(asInviteRow(r)))),
     };
     const res = await csrfFetch(d.id ? `/api/college/drives/${d.id}` : "/api/college/drives", {
       method: d.id ? "PATCH" : "POST",
@@ -130,9 +165,9 @@ export function DriveBuilder({
       return;
     }
     // "Invite sent to hr@acme.com": each newly invited company was emailed (and alerted in its app if it has an account).
-    const invited = body?.invites ? inviteSentLine(body.invites.sent, body.invites.failed, body.invites.limited) : null;
+    const inviteLine = body?.invites ? inviteSentLine(body.invites.sent, body.invites.failed, body.invites.limited) : null;
     if (!d.id && body?.id) {
-      if (invited) setSaved(invited);
+      if (inviteLine) setSaved(inviteLine);
       setD((x) => ({ ...x, id: body.id }));
       setLink(body.url ? new URL(body.url, window.location.origin).href : null);
       // Update the address without remounting, so the one-time link stays on screen.
@@ -140,7 +175,7 @@ export function DriveBuilder({
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    setSaved(invited ? `Saved. ${invited}` : "Saved. Employers see the change on their next refresh.");
+    setSaved(inviteLine ? `Saved. ${inviteLine}` : "Saved. Employers see the change on their next refresh.");
     router.refresh();
   }
 
@@ -168,6 +203,42 @@ export function DriveBuilder({
             <input className={cn(field, "mt-1.5")} value={d.title} onChange={(e) => set("title", e.target.value)} required maxLength={120} placeholder="e.g. Summer internship drive 2027" />
           </label>
 
+          {/* Tech / Non-tech is a label for employers; it never changes which students they see (owner, 24 Nov). */}
+          <fieldset className="md:col-span-2" aria-describedby="audience-hint">
+            <legend className="text-sm font-medium text-ink-800">Who is it for</legend>
+            <div className="mt-1.5 flex flex-wrap gap-1.5">
+              {[...AUDIENCE_OPTIONS, ...(initial.audience === "any" ? [{ value: "any" as const, label: "Not set" }] : [])].map((o) => {
+                const on = (d.audience ?? "") === o.value;
+                return (
+                  <label
+                    key={o.value}
+                    className={cn(
+                      "inline-flex min-h-11 cursor-pointer items-center rounded-apple-sm border px-3.5 text-sm font-medium has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand-500/40",
+                      on ? "border-brand-700 bg-brand-50 text-brand-800" : "border-ink-200 text-ink-700 hover:bg-ink-50",
+                    )}
+                  >
+                    <input
+                      id={`audience-${o.value === "non_tech" ? "non-tech" : o.value}`}
+                      type="radio"
+                      name="audience"
+                      value={o.value}
+                      checked={on}
+                      onChange={() => {
+                        set("audience", o.value);
+                        setAudienceError(false);
+                      }}
+                      className="sr-only"
+                    />
+                    {o.label}
+                  </label>
+                );
+              })}
+            </div>
+            <span id="audience-hint" className={cn("mt-1 block text-xs", audienceError ? "font-medium text-danger" : "text-text-subtle")}>
+              {audienceError ? "Pick Tech or Non-tech." : "Shown to employers. It doesn't change which students they see."}
+            </span>
+          </fieldset>
+
           {/* One kind of drive: inside it the employer picks Interns or Full-time (final year only). Owner, 23 Nov. */}
           <p className="text-sm text-text-subtle md:col-span-2">
             Employers hire interns and full-time from the same drive. Full-time offers go to final-year students only.
@@ -175,7 +246,7 @@ export function DriveBuilder({
 
           {/* No backdated drives (owner, 23 Nov): past days are greyed; a live drive being edited keeps its own start day. */}
           <IstDateTime label="Opens (IST)" value={d.startsAt} min={initial.startsAt && initial.startsAt.slice(0, 10) < today ? initial.startsAt.slice(0, 10) : today} onChange={(v) => set("startsAt", v)} field={field} />
-          <IstDateTime label="Closes (IST)" value={d.endsAt} min={d.startsAt.slice(0, 10) > today ? d.startsAt.slice(0, 10) : today} onChange={(v) => set("endsAt", v)} field={field} hint="The link stops working at this time." />
+          <IstDateTime label="Closes (IST)" value={d.endsAt} min={d.startsAt.slice(0, 10) > today ? d.startsAt.slice(0, 10) : today} onChange={(v) => set("endsAt", v)} field={field} />
 
           <label className="block md:col-span-2">
             <span className="text-sm font-medium text-ink-800">Note for employers <span className="font-normal text-text-subtle">(optional)</span></span>
@@ -190,7 +261,7 @@ export function DriveBuilder({
         </div>
       </section>
 
-      <InvitedCompanies value={d.invitedEmployers ?? []} onChange={(v) => set("invitedEmployers", v)} />
+      <InvitedEmployers value={d.invitedEmployers ?? []} onChange={(v) => set("invitedEmployers", v)} showErrors={rowErrors} />
 
       {limit ? (
       <section className={SURFACE_CLASS}>
@@ -334,14 +405,30 @@ export function DriveBuilder({
         </section>
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="submit"
-          disabled={saving}
-          className={buttonClass({ className: "disabled:opacity-60" })}
-        >
-          {saving ? "Saving…" : d.id ? "Save changes" : "Create drive and get link"}
-        </button>
+      {collegeLogoUrl !== undefined ? (
+        <section className={SURFACE_CLASS} aria-labelledby="college-logo">
+          <header className="border-b border-ink-100 px-5 py-4">
+            <h2 id="college-logo" className="text-lg font-semibold tracking-[-0.02em] text-ink-900">Your college logo</h2>
+            <p className="mt-0.5 text-sm text-text-subtle">{logoUrl ? "Employers see this on the drive page, for all your drives." : "Not added yet. Employers will see it on the drive page, for all your drives."}</p>
+          </header>
+          <div className="flex flex-wrap items-center gap-4 px-5 py-4">
+            <CollegeMark name={collegeName} logoUrl={logoUrl} className="size-16 rounded-xl" />
+            <FileUpload kind="college_logo" accept="image/jpeg,image/png,image/webp" label="Logo" noun={logoUrl ? "new logo" : "logo"} hint="JPG, PNG or WebP, up to 5 MB." onUploaded={(r) => setLogoUrl(r.url)} />
+          </div>
+        </section>
+      ) : null}
+
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <button
+            type="submit"
+            disabled={saving}
+            className={buttonClass({ className: "disabled:opacity-60" })}
+          >
+            {saving ? "Saving…" : d.id ? "Save changes" : "Create drive and get link"}
+          </button>
+          <p className="text-sm text-text-subtle">The link stops working when the drive ends.</p>
+        </div>
         <p role="status" aria-live="polite" className={cn("text-sm", error ? "text-danger" : "text-brand-800")}>
           {error ?? saved}
         </p>
@@ -401,38 +488,177 @@ function IstDateTime({
   );
 }
 
-/** The companies the officer is inviting, so the drive page can say who came and who to chase. */
-function InvitedCompanies({ value, onChange }: { value: { company: string; email: string }[]; onChange: (v: { company: string; email: string }[]) => void }) {
-  const rows = value.length ? value : [{ company: "", email: "" }];
-  const put = (i: number, k: "company" | "email", v: string) => onChange(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+const asInviteRow = (r: InvitedRow): InviteRow => ({ company: r.company, email: r.email, name: r.name ?? "", phone: r.phone ?? "" });
+const BLANK: InvitedRow = { company: "", email: "", name: "", phone: "" };
+const isBlank = (r: InvitedRow) => !r.company.trim() && !r.email.trim() && !(r.name ?? "").trim() && !(r.phone ?? "").trim();
+
+type ImportNote = { kind: "done" | "error"; text: string; skipped: string[] };
+
+/**
+ * The employers the officer is inviting, so the drive page can say who came and who to chase. Type them in, or import a
+ * CSV; imported rows join the same list, where each one can be fixed or removed before saving.
+ */
+function InvitedEmployers({ value, onChange, showErrors }: { value: InvitedRow[]; onChange: (v: InvitedRow[]) => void; showErrors: boolean }) {
+  const rows = value.length ? value : [BLANK];
+  const [note, setNote] = useState<ImportNote | null>(null);
+  const [busy, setBusy] = useState(false);
+  const list = useRef<HTMLUListElement>(null);
+  const focusLast = useRef(false);
+  const put = (i: number, k: "company" | "email" | "name" | "phone", v: string) => onChange(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+
+  // "Add more" puts the cursor in the new row's first field.
+  useEffect(() => {
+    if (!focusLast.current) return;
+    focusLast.current = false;
+    list.current?.querySelector<HTMLInputElement>("li:last-child input")?.focus();
+  }, [rows.length]);
+
+  async function importFile(file: File) {
+    setNote(null);
+    if (!/\.(csv|tsv|txt)$/i.test(file.name)) {
+      setNote({ kind: "error", text: "Save your sheet as a CSV file and import that. Excel files (.xlsx) can't be read.", skipped: [] });
+      return;
+    }
+    if (file.size > MAX_IMPORT_BYTES) {
+      setNote({ kind: "error", text: "That file is too big. Import a CSV with only your employers.", skipped: [] });
+      return;
+    }
+    setBusy(true);
+    try {
+      const parsed = parseInviteSheet(decodeRosterBytes(new Uint8Array(await file.arrayBuffer())));
+      if (parsed.rows.length === 0) {
+        setNote({ kind: "error", text: parsed.errors[0] ?? "No employers found in that file.", skipped: parsed.errors.slice(1) });
+        return;
+      }
+      const merged = mergeInvites(rows.filter((r) => !isBlank(r)).map((r) => ({ ...r, name: r.name ?? "", phone: r.phone ?? "" })), parsed.rows);
+      onChange(merged.rows);
+      const extra = [merged.duplicates ? `${merged.duplicates} already on your list` : null, merged.overflow ? `${merged.overflow} didn't fit (a drive takes at most ${MAX_INVITES})` : null].filter(Boolean);
+      setNote({
+        kind: "done",
+        text: `Added ${merged.added} ${merged.added === 1 ? "employer" : "employers"} from ${file.name.slice(0, 60)}${extra.length ? `. ${extra.join("; ")}` : ""}.`,
+        skipped: parsed.errors,
+      });
+    } catch {
+      setNote({ kind: "error", text: "That file couldn't be read. Try saving it as CSV again.", skipped: [] });
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className={SURFACE_CLASS} aria-labelledby="invited-companies">
       <header className="border-b border-ink-100 px-5 py-4">
         <h2 id="invited-companies" className="text-lg font-semibold tracking-[-0.02em] text-ink-900">
-          Companies you invited <span className="text-sm font-normal text-text-subtle">(optional)</span>
+          Employers you are inviting <span className="text-sm font-normal text-text-subtle">(optional)</span>
         </h2>
-        <p className="mt-0.5 text-sm text-text-subtle">Each new company is emailed a link to join the drive, and gets an alert if it already has a Findtern account. The drive page shows who came in and who you still need to chase.</p>
+        <p className="mt-0.5 text-sm text-text-subtle">Each new employer is emailed a link to join the drive, and gets an alert if it already has a Findtern account. The drive page shows who came in and who you still need to chase.</p>
       </header>
-      <ul className="space-y-2 px-5 py-4">
-        {rows.map((r, i) => (
-          <li key={i} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]">
-            <input aria-label={`Company ${i + 1}`} className={field} value={r.company} maxLength={120} onChange={(e) => put(i, "company", e.target.value)} placeholder="Company name" />
-            <input aria-label={`Company ${i + 1} email`} type="email" className={field} value={r.email} maxLength={200} onChange={(e) => put(i, "email", e.target.value)} placeholder="hr@company.com" />
-            <button
-              type="button"
-              onClick={() => onChange(rows.filter((_, j) => j !== i))}
-              aria-label={`Remove company ${i + 1}`}
-              className={buttonClass({ variant: "ghost", size: "sm", className: "h-11 text-ink-600" })}
-            >
-              Remove
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div className="border-t border-ink-100 px-5 py-3">
-        <button type="button" disabled={rows.length >= 50} onClick={() => onChange([...rows, { company: "", email: "" }])} className={buttonClass({ variant: "outline", size: "sm" })}>
-          Add a company
-        </button>
+      <p role="note" className="border-b border-accent-300/60 bg-accent-100/60 px-5 py-3 text-sm text-accent-700">
+        Ask each employer which email they will log in or sign up with, and add only that one. If they join with a different email, they can still come in, but you won&apos;t get insights for them.
+      </p>
+
+      <div className="space-y-3 px-5 py-4">
+        <div aria-hidden className="hidden gap-2 text-xs font-medium text-text-subtle xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,0.9fr)_5.5rem]">
+          <span>Name</span>
+          <span>Company name</span>
+          <span>Email</span>
+          <span>Phone</span>
+          <span />
+        </div>
+        <ul ref={list} className="space-y-4 xl:space-y-2">
+          {rows.map((r, i) => {
+            const problem = showErrors && !isBlank(r) ? inviteRowProblem(asInviteRow(r)) : null;
+            const bad = (f: string) => (problem?.field === f ? true : undefined);
+            return (
+              <li key={i} className="grid gap-2 rounded-apple-sm border border-ink-100 p-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,0.9fr)_5.5rem] xl:border-0 xl:p-0">
+                <label className="block">
+                  <span className="text-sm font-medium text-ink-800 xl:sr-only">Name</span>
+                  <input className={cn(field, "mt-1.5 xl:mt-0")} value={r.name ?? ""} maxLength={120} autoComplete="off" onChange={(e) => put(i, "name", e.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium text-ink-800 xl:sr-only">Company name</span>
+                  <input className={cn(field, "mt-1.5 xl:mt-0")} value={r.company} maxLength={120} autoComplete="off" aria-invalid={bad("company")} aria-describedby={bad("company") ? `emp-err-${i}` : undefined} onChange={(e) => put(i, "company", e.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium text-ink-800 xl:sr-only">Email</span>
+                  <input type="email" className={cn(field, "mt-1.5 xl:mt-0")} value={r.email} maxLength={200} autoComplete="off" aria-invalid={bad("email")} aria-describedby={bad("email") ? `emp-err-${i}` : undefined} onChange={(e) => put(i, "email", e.target.value)} />
+                </label>
+                <label className="block">
+                  <span className="text-sm font-medium text-ink-800 xl:sr-only">Phone</span>
+                  <input type="tel" inputMode="tel" className={cn(field, "mt-1.5 xl:mt-0")} value={r.phone ?? ""} maxLength={40} autoComplete="off" aria-invalid={bad("phone")} aria-describedby={bad("phone") ? `emp-err-${i}` : undefined} onChange={(e) => put(i, "phone", e.target.value)} />
+                </label>
+                <div className="flex items-end sm:col-span-2 xl:col-span-1">
+                  <button
+                    type="button"
+                    onClick={() => onChange(rows.length > 1 ? rows.filter((_, j) => j !== i) : [])}
+                    aria-label={`Remove employer ${i + 1}`}
+                    className={buttonClass({ variant: "ghost", size: "sm", className: "h-11 text-ink-600" })}
+                  >
+                    Remove
+                  </button>
+                </div>
+                {problem ? (
+                  <p id={`emp-err-${i}`} role="alert" className="text-xs font-medium text-danger sm:col-span-2 xl:col-span-5">
+                    {problem.message}
+                  </p>
+                ) : null}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className="space-y-3 border-t border-ink-100 px-5 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={rows.length >= MAX_INVITES}
+            onClick={() => {
+              focusLast.current = true;
+              onChange([...rows, { ...BLANK }]);
+            }}
+            className={buttonClass({ variant: "outline", size: "sm" })}
+          >
+            Add more
+          </button>
+          <label
+            className={buttonClass({
+              variant: "outline",
+              size: "sm",
+              className: cn("cursor-pointer has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-brand-600", busy && "pointer-events-none opacity-60"),
+            })}
+          >
+            <FileUp className="size-4" aria-hidden />
+            {busy ? "Reading…" : "Import file"}
+            <input
+              type="file"
+              accept=".csv,.tsv,.txt,text/csv"
+              className="sr-only"
+              disabled={busy}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) void importFile(f);
+              }}
+            />
+          </label>
+          <span className="text-xs text-text-subtle">CSV with the columns Name, Company name, Email, Phone.</span>
+        </div>
+        <div role="status" aria-live="polite">
+          {note ? (
+            <div className={cn("text-sm", note.kind === "error" ? "text-danger" : "text-ink-800")}>
+              <p className="font-medium">{note.text}</p>
+              {note.skipped.length ? (
+                <ul className="mt-1 list-disc space-y-0.5 pl-5 text-xs text-text-subtle">
+                  {note.skipped.slice(0, 5).map((m) => (
+                    <li key={m}>{m}</li>
+                  ))}
+                  {note.skipped.length > 5 ? <li>and {note.skipped.length - 5} more</li> : null}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
     </section>
   );

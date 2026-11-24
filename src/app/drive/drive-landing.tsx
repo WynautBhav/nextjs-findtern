@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { getSession } from "@/lib/auth";
 import { driveWindow } from "@/lib/college/access";
+import { audienceLabel } from "@/lib/college/labels";
 import { eligibleStudents } from "@/lib/college/scope";
 import type { schema } from "@/lib/db";
 import { ButtonLink } from "@/components/ui/button";
@@ -81,6 +82,7 @@ export async function DriveLanding({
             <div className="flex flex-wrap items-center gap-2">
               <DriveStatePill state={state} />
               <span className="text-sm font-medium text-ink-600">{KIND_LABEL[drive.kind] ?? "Campus drive"}</span>
+              {audienceLabel(drive.audience) ? <span className="text-sm font-medium text-ink-600">· {audienceLabel(drive.audience)}</span> : null}
             </div>
             <h1
               id="drive-title"

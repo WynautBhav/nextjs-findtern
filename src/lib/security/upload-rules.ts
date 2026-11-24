@@ -44,6 +44,8 @@ export const KINDS: Record<string, UploadKind> = {
   // save puts the key on its row (extra.academics …certificateUploads).
   certificate: { roles: ["intern"], types: INTERN_SCANS, max: IMAGE_MAX },
   employer_logo: { roles: ["employer"], types: IMAGES, max: IMAGE_MAX, isPublic: true },
+  // A placement officer's college logo (shown on the drive page employers open). The route writes it to the officer's own college only.
+  college_logo: { roles: ["college"], types: IMAGES, max: IMAGE_MAX, isPublic: true },
   // PDF, PNG or JPG, as legacy accepted (employer-orders full-time dialog).
   offer_letter: { roles: ["employer"], types: ["application/pdf", "image/png", "image/jpeg"], max: 10 * MB },
   cms_image: { roles: ["admin"], types: IMAGES, max: IMAGE_MAX, isPublic: true },
@@ -76,6 +78,7 @@ export const WEBP: Record<string, { maxPx: number; quality: number }> = {
   marksheet: { maxPx: 2000, quality: 85 },
   certificate: { maxPx: 2000, quality: 85 },
   employer_logo: { maxPx: 1200, quality: 85 },
+  college_logo: { maxPx: 1200, quality: 85 },
   cms_image: { maxPx: 2400, quality: 82 },
   // Shared kinds: only their image files are converted; a PDF or video skips this (see prepareUpload).
   offer_letter: { maxPx: 2000, quality: 85 },

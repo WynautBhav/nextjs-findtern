@@ -290,7 +290,8 @@ await check("Officer roster page lists the one roster student who never joined",
 const ist = (min) => new Date(Date.now() + min * 60_000 + 330 * 60_000).toISOString().slice(0, 16);
 await check("Officer builds a live drive: CGPA ≥ 6, then hand-adds Neha (claimed, CGPA 5.8)", async () => {
   await tpo.goto(`${B}/college/drives/new`);
-  await tpo.getByLabel("Name").fill(DRIVE);
+  await tpo.getByLabel("Name", { exact: true }).first().fill(DRIVE);
+  await tpo.getByRole("radio", { name: "Tech", exact: true }).check({ force: true }); // a new drive says who it is for
   await tpo.getByLabel("Opens (IST)").fill(ist(-2));
   await tpo.getByLabel("Closes (IST)").fill(ist(180));
   await tpo.getByLabel("Minimum CGPA").fill("6");

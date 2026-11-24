@@ -6,7 +6,10 @@ import { ID_LOCKED_MESSAGE, cardImageLocked } from "@/lib/id-lock";
 import { fillFromOlder } from "@/lib/intern-docs-merge";
 import { withInternLock, type InternTx } from "@/lib/intern-save-lock";
 import { requireMutation } from "@/lib/guards-mutation";
+import { collegeAdminMay } from "@/lib/college/access";
+import { getCollegeContext } from "@/lib/college/scope";
 import { MAX_MARKSHEETS } from "@/lib/onboarding";
+import { CACHE_TAGS, purgeServerCache } from "@/lib/server-cache";
 import { bucketKey, clientIp, limiters } from "@/lib/security/rate-limit";
 import type { SessionData } from "@/lib/security/session";
 import { signedUrl } from "@/lib/security/sign";
@@ -26,7 +29,7 @@ export async function POST(req: Request): Promise<Response> {
   const noStore = { "Cache-Control": "no-store" };
   // CSRF, session and View-as read-only are all enforced here; which roles may
   // upload which kind is checked per kind below.
-  const guard = await requireMutation({ req, roles: ["intern", "employer", "admin"] });
+  const guard = await requireMutation({ req, roles: ["intern", "employer", "admin", "college"] });
   if (!guard.ok) return guard.response;
   const { session } = guard;
   const rl = bucketKey(clientIp(req.headers), session.uid);
@@ -41,6 +44,13 @@ export async function POST(req: Request): Promise<Response> {
   const kind = kindFor(kindName);
   if (!kind || !kind.roles.includes(session.role)) {
     return NextResponse.json({ error: "You can't upload that here" }, { status: 400 });
+  }
+  // A college logo goes to the officer's own college (taken from the session, never from the request), and only while that officer may write.
+  let logoCollegeId: string | null = null;
+  if (kindName === "college_logo") {
+    const college = collegeAdminMay("logo:update") ? await getCollegeContext() : null;
+    if (!college) return NextResponse.json({ error: "You can't upload that here" }, { status: 403 });
+    logoCollegeId = college.college.id;
   }
   // A saved Aadhaar or PAN card image is locked: the intern can see it is on file, and only an admin can change it.
   if (kindName === "aadhaar" || kindName === "pan") {
@@ -83,7 +93,10 @@ export async function POST(req: Request): Promise<Response> {
   const stored = await put(kind.isPublic ? "public" : session.uid, prepared.bytes, contentType, kind.max);
   // Same lock as the onboarding save, so parallel uploads for one intern take turns on one row; the card-image lock is
   // checked again inside it (the check above can be passed by two requests at once).
-  if ((await withInternLock(session.uid, (tx) => attach(tx, kindName, session, stored, fileName))) === "locked") {
+  if (logoCollegeId) {
+    await getDb().update(schema.colleges).set({ logoUrl: `/api/files/public/${stored.key}` }).where(eq(schema.colleges.id, logoCollegeId));
+    purgeServerCache(CACHE_TAGS.colleges);
+  } else if ((await withInternLock(session.uid, (tx) => attach(tx, kindName, session, stored, fileName))) === "locked") {
     return NextResponse.json({ error: ID_LOCKED_MESSAGE, code: "id_locked" }, { status: 409 });
   }
 

@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { invitePhone } from "./invite-import.ts";
+
 /** Dates outside this window are typos (and years past Postgres' timestamp range answer a 500). */
 const MIN_DATE = Date.UTC(2000, 0, 1);
 const MAX_DATE = Date.UTC(2101, 0, 1);
@@ -7,12 +9,43 @@ const sensibleDate = z.coerce
   .date()
   .refine((d) => d.getTime() >= MIN_DATE && d.getTime() < MAX_DATE, { message: "Pick a date between 2000 and 2100" });
 
+/** Who a drive is for. A label only: it never changes which students are eligible. "any" is every drive made before it existed. */
+export const AUDIENCES = ["tech", "non_tech", "any"] as const;
+export type Audience = (typeof AUDIENCES)[number];
+
+/** Control characters and line breaks never belong in a name or company; they would break the invite email's lines. */
+const CONTROL = /[\p{Cc}\p{Cf}]/gu;
+
+const contactName = z.string().max(120).transform((v) => v.replace(CONTROL, " ").replace(/\s+/g, " ").trim());
+
+/** One invited employer. name and phone are optional; an empty string means "cleared" (the route drops it, see prepareInvited). */
+export const invitedEmployer = z.object({
+  company: z.string().max(120).transform((v) => v.replace(CONTROL, " ").replace(/\s+/g, " ").trim()).pipe(z.string().min(1, "Name the company")),
+  email: z.string().trim().toLowerCase().email("Check the company email").max(200),
+  name: contactName.optional(),
+  phone: z
+    .string()
+    .max(40)
+    .optional()
+    .transform((v, ctx) => {
+      if (v === undefined) return undefined;
+      const r = invitePhone(v);
+      if (r.error) {
+        ctx.addIssue({ code: "custom", message: r.error });
+        return z.NEVER;
+      }
+      return r.phone ?? "";
+    }),
+});
+
 /** Drive builder payload, shared by create and update. */
 export const driveInput = z
   .object({
     title: z.string().trim().min(3, "Give the drive a name").max(120),
     // One kind of drive since 23 Nov (employers pick Interns or Full-time inside it); an older client may still send one.
     kind: z.enum(["internship", "full_time"]).optional(),
+    // Tech / Non-tech label. Optional so an edit that leaves it out keeps the saved one; a new drive must pick one (the create route checks).
+    audience: z.enum(AUDIENCES).optional(),
     description: z.string().trim().max(2000).optional().default(""),
     startsAt: sensibleDate,
     endsAt: sensibleDate,
@@ -27,7 +60,7 @@ export const driveInput = z
     includeUserIds: z.array(z.string().min(1)).max(2000).default([]),
     excludeUserIds: z.array(z.string().min(1)).max(2000).default([]),
     invitedEmployers: z
-      .array(z.object({ company: z.string().trim().min(1, "Name the company").max(120), email: z.string().trim().toLowerCase().email("Check the company email").max(200) }))
+      .array(invitedEmployer)
       .max(50, "Invite at most 50 companies per drive")
       // The same address typed twice (emails are already lowercased above) is one company: keep the first.
       .transform((list) => list.filter((i, at) => list.findIndex((o) => o.email === i.email) === at))
