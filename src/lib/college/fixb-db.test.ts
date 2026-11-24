@@ -34,7 +34,10 @@ test("R2-04: cgpaSql rounds once, so the display, the min-CGPA filter and the 8+
     assert.equal(await q("8.5"), 8.5);
     assert.equal(await q("10"), 10);
     assert.equal(await q("10.4"), null, "above 10 is not a CGPA");
-    assert.equal(await q("85", "percentage"), null, "percentages are not converted");
+    assert.equal(await q("85", "percentage"), 8.95, "a percentage is converted: 85 / 9.5");
+    assert.equal(await q("99", "percentage"), 10, "capped at 10");
+    assert.equal(await q("76", ""), 8, "no type and above 10 reads as a percentage");
+    assert.equal(await q("101", "percentage"), null, "above 100 is not a percentage");
     // What the screen prints is what the filter compares: 8.47 passes 'min 8.47'; 8.00 is in the 8+ band.
     const shown = (v: number) => (Math.abs(v * 10 - Math.round(v * 10)) < 1e-9 ? v.toFixed(1) : v.toFixed(2));
     for (const s of ["8.4651", "7.996", "6.005", "9.995"]) {

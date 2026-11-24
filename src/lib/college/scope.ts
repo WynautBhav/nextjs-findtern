@@ -94,9 +94,8 @@ const num = (v: unknown): number | null => {
 const date = (v: unknown): Date | null => (v ? new Date(v as string) : null);
 
 /**
- * CGPA out of the legacy academics JSON. Percentages are not converted:
- * there is no honest conversion, so a percentage student fails a CGPA
- * cutoff unless the college includes them by hand.
+ * CGPA out of the legacy academics JSON; a percentage is converted
+ * (percentage / 9.5, see cgpa-sql.ts).
  */
 function cgpaSql() {
   return sql.raw(cgpaSqlText(`"intern_onboarding"."extra_data"->'academics'`));
