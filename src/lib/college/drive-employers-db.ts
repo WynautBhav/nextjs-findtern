@@ -4,13 +4,14 @@ import { realEmployerId } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
 import type { CameEmployer, Invite } from "./drive-board";
 import { buildDriveEmployers, countByEmployer, type DriveEmployers } from "./drive-employers";
+import { loadDriveInterviews } from "./drive-interviews-db";
 import type { Drive } from "./scope";
 
 /** Plain `timestamp` columns hold UTC wall time; read them as timestamptz (see drive-board-db.ts). */
 const utc = (col: AnyColumn) => sql<Date>`(${col} AT TIME ZONE 'UTC')`.mapWith((v: string | Date) => new Date(v));
 
 /**
- * The Employers panel's data. Meetings come from college_drive_meetings for this drive; offers and hires from
+ * The Employers panel's data. Meetings: the drive's calls plus the interviews its companies scheduled with its students in the window; offers and hires from
  * proposals to the drive's students created inside the drive window (not draft, not withdrawn: the rule loadDriveBoard
  * uses); online / last seen from user_presence. `studentIds` are the drive's verified students.
  */
@@ -19,7 +20,7 @@ export async function loadDriveEmployers(drive: Drive, studentIds: string[], cam
   const db = getDb();
   const p = schema.proposals;
   const end = drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt;
-  const [meetings, offers, presence] = employerIds.length
+  const [calls, offers, presence, interviews] = employerIds.length
     ? await Promise.all([
         db
           .select({ employerId: schema.collegeDriveMeetings.employerId, status: schema.collegeDriveMeetings.status })
@@ -38,8 +39,10 @@ export async function loadDriveEmployers(drive: Drive, studentIds: string[], cam
               .from(schema.userPresence)
               .where(inArray(schema.userPresence.userId, employerIds))
           : Promise.resolve([]),
+        loadDriveInterviews(drive, studentIds, employerIds, now),
       ])
-    : [[], [], []];
+    : [[], [], [], []];
+  const meetings = [...calls, ...interviews];
   return buildDriveEmployers({
     came,
     invited,

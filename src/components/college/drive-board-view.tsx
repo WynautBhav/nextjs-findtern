@@ -35,6 +35,18 @@ const NUDGES: Tile[] = [
   { key: "nudgedOffer", label: "Reminded about an offer", nudge: "offer", figure: (b) => b.nudgeCounts.nudgedOffer, hint: sentTo },
 ];
 const ALL_STUDENTS: Tile = { key: "all", label: "Total students", hint: () => "Verified, in the drive" };
+/** Under a meeting figure: how many different students it covers. */
+const ofStudents = (n: number, none: string) => (n ? `${n} ${n === 1 ? "student" : "students"}` : none);
+/** Meet requests from employers, counted one by one; each opens its students. Live and past alike. */
+const MEETINGS: Group = {
+  title: "Meetings",
+  tiles: [
+    { key: "called", label: "Meets sent", figure: (b) => b.meetCounts.sent, hint: (n) => ofStudents(n, "No meet request yet") },
+    { key: "meetings", label: "Meets accepted", figure: (b) => b.meetCounts.accepted, hint: (n) => ofStudents(n, "None accepted") },
+    { key: "meetCompleted", label: "Meets completed", figure: (b) => b.meetCounts.completed, hint: (n) => (n ? `${ofStudents(n, "")} · accepted, time over` : "None yet") },
+    { key: "meetExpired", label: "Meets expired", figure: (b) => b.meetCounts.expired, hint: (n) => (n ? `${ofStudents(n, "")} · no reply in time` : "None expired") },
+  ],
+};
 const OFFER_COUNTS = (b: DriveBoard) => `${b.offerCount} ${b.offerCount === 1 ? "offer" : "offers"} · ${b.offerSplit.internship} internship · ${b.offerSplit.fullTime} full-time / PPO`;
 
 /** While the drive runs: what needs the officer now (his order: calls, offers, offline, then Open to work), who is here, what it produced. */
@@ -49,11 +61,11 @@ const LIVE: Group[] = [
     ],
   },
   { title: "Students in the drive", tiles: [ALL_STUDENTS, { key: "online", label: "Online now", hint: (n) => (n ? "On Findtern right now" : "Nobody is online"), ofTotal: true, needsPresence: true }] },
+  MEETINGS,
   {
     title: "What this drive has produced",
     tiles: [
       { key: "offers", label: "Offers received", figure: (b) => b.offerCount, hint: (n, b) => (b.offerCount ? `to ${n} ${n === 1 ? "student" : "students"}` : "No offer yet") },
-      { key: "meetings", label: "Meets accepted", hint: (n) => (n ? "Live meets students accepted" : "No meet accepted yet") },
       { key: "internships", label: "Placed: internship", hint: (n) => (n ? "Hired for an internship" : "No hire yet") },
       { key: "fullTime", label: "Placed: full-time", hint: (n) => (n ? "Hired for a full-time role" : "No hire yet") },
     ],
@@ -77,19 +89,19 @@ const PAST: Group[] = [
       { key: "hired", label: "Hired", hint: (n) => (n ? "Hired by a company" : "No hire") },
       { key: "internships", label: "Internship", hint: (n) => (n ? "Hired for an internship" : "No internship hire") },
       { key: "fullTime", label: "Full-time / PPO", hint: (n) => (n ? "Hired for a full-time or PPO role" : "No full-time hire") },
-      { key: "meetings", label: "Meets accepted", hint: (n) => (n ? "Live meets students accepted" : "No meet accepted") },
     ],
   },
+  MEETINGS,
   { title: "Nudges sent", tiles: NUDGES },
 ];
 /** Opened from the hero's pipeline; not tiles of their own. */
 const STAGES: Tile[] = [
-  { key: "called", label: "Asked to meet", hint: () => "" },
   { key: "hired", label: "Hired", hint: () => "" },
 ];
 const PAGE = 40;
 const GRID = {
   2: "grid grid-cols-2 divide-x divide-ink-100 border-b border-ink-100",
+  3: "grid grid-cols-3 divide-x divide-ink-100 border-b border-ink-100",
   4: "grid grid-cols-2 divide-ink-100 border-b border-ink-100 max-sm:[&>*:nth-child(n+3)]:border-t max-sm:[&>*:nth-child(even)]:border-l sm:grid-cols-4 sm:divide-x",
 } as const;
 
@@ -162,7 +174,7 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
       ) : null}
       {groups.map((g) => (
         <TileGroup key={g.title} title={g.title}>
-          <div className={g.tiles.length === 2 ? GRID[2] : GRID[4]}>{g.tiles.map(button)}</div>
+          <div className={g.tiles.length === 2 ? GRID[2] : g.tiles.length === 3 ? GRID[3] : GRID[4]}>{g.tiles.map(button)}</div>
         </TileGroup>
       ))}
 

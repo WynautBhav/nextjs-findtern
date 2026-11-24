@@ -6,6 +6,7 @@ import { todayIst } from "@/lib/offer";
 import { startBegunSql } from "@/lib/offer-start-sql";
 import { q } from "./sql";
 import { buildDriveBoard, matchInvites, type CameEmployer, type DriveBoard, type DriveStudentRef, type Invite, type NudgeRow } from "./drive-board";
+import { loadDriveInterviews } from "./drive-interviews-db";
 import type { Drive } from "./scope";
 
 /**
@@ -62,11 +63,13 @@ export async function loadDriveBoard(
   const p = schema.proposals;
   const n = schema.collegeNudges;
   const end = drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt;
-  const [meetings, offers, nudges] = await Promise.all([
+  const [calls, interviews, offers, nudges] = await Promise.all([
     db
       .select({ userId: schema.collegeDriveMeetings.userId, employerId: schema.collegeDriveMeetings.employerId, status: schema.collegeDriveMeetings.status, createdAt: utc(schema.collegeDriveMeetings.createdAt), startsAt: utc(schema.collegeDriveMeetings.startsAt) })
       .from(schema.collegeDriveMeetings)
       .where(eq(schema.collegeDriveMeetings.driveId, drive.id)),
+    // Interviews the drive's companies scheduled with its students count as meets too.
+    loadDriveInterviews(drive, ids, employerIds, now),
     ids.length && employerIds.length
       ? db
           .select({
@@ -89,6 +92,7 @@ export async function loadDriveBoard(
           .where(and(eq(n.collegeId, drive.collegeId), inArray(n.userId, ids), inArray(n.kind, ["online", "open_to_work", "meeting", "offer"]), gte(n.createdAt, drive.startsAt), lte(n.createdAt, end)))
       : Promise.resolve([] as NudgeRow[]),
   ]);
+  const meetings = [...calls, ...interviews];
   const invited = (drive.invitedEmployers ?? []) as Invite[];
   const { arrived, missing, walkIns } = matchInvites(invited, came);
   const make = (only: string | null) => {
@@ -98,7 +102,7 @@ export async function loadDriveBoard(
     const touched = new Set([...ms.map((m) => m.userId), ...os.map((o) => o.userId)]);
     return buildDriveBoard({
       students: only ? students.filter((s) => touched.has(s.userId)) : students,
-      meetings: ms.map((m) => ({ userId: m.userId, company: companyOf.get(m.employerId) ?? null, status: m.status, createdAt: m.createdAt, startsAt: m.startsAt })),
+      meetings: ms.map((m) => ({ userId: m.userId, company: companyOf.get(m.employerId) ?? null, status: m.status, createdAt: m.createdAt, startsAt: m.startsAt ?? undefined })),
       offers: os.map((o) => ({ userId: o.userId, company: companyOf.get(o.employerId) ?? null, status: (o.status ?? "").toLowerCase(), hired: o.hiredAt !== null, fullTime: Boolean(o.fullTime), pastStart: Boolean(o.pastStart), createdAt: o.createdAt ?? drive.startsAt })),
       offline,
       nudges: nudges as NudgeRow[],
@@ -108,4 +112,22 @@ export async function loadDriveBoard(
   const only = employerId && companyOf.has(employerId) ? employerId : null;
   const board = make(null);
   return { board, view: only ? make(only) : board, filter: only ? { employerId: only, company: companyOf.get(only)?.trim() || "This company" } : null, came, invited, arrived, missing, walkIns };
+}
+
+/**
+ * The drive page's Meetings figures for one drive (sent, accepted, completed, expired), for screens that show a drive
+ * without its board (the drives list). Same students, calls, interviews and rules as loadDriveBoard, so they agree.
+ */
+export async function driveMeetCounts(drive: Drive, studentIds: string[], now: number): Promise<DriveBoard["meetCounts"]> {
+  const employerIds = (await driveEmployerContacts(drive.id)).map((c) => c.employerId);
+  const [calls, interviews] = await Promise.all([
+    getDb()
+      .select({ userId: schema.collegeDriveMeetings.userId, status: schema.collegeDriveMeetings.status, createdAt: utc(schema.collegeDriveMeetings.createdAt), startsAt: utc(schema.collegeDriveMeetings.startsAt) })
+      .from(schema.collegeDriveMeetings)
+      .where(eq(schema.collegeDriveMeetings.driveId, drive.id)),
+    loadDriveInterviews(drive, studentIds, employerIds, now),
+  ]);
+  const students: DriveStudentRef[] = studentIds.map((userId) => ({ userId, name: "", rollNo: null, year: null, branch: null, phone: null }));
+  const meetings = [...calls, ...interviews].map((m) => ({ userId: m.userId, company: null, status: m.status, createdAt: m.createdAt, startsAt: m.startsAt ?? undefined }));
+  return buildDriveBoard({ students, meetings, offers: [], offline: null, now }).meetCounts;
 }

@@ -61,7 +61,9 @@ const median = (xs: number[]): number | null => {
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
 };
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
-const answered = (status: string) => status === "accepted" || status === "declined";
+/** The student replied: yes or no to a call, or picked a slot (an interview that then ran or was missed). */
+const answered = (status: string) => status === "accepted" || status === "declined" || status === "completed" || status === "missed";
+const metStatus = (status: string) => status === "accepted" || status === "completed" || status === "missed";
 const offerAnswered = (o: SummaryOffer) => o.hired || ["accepted", "rejected", "processing", "hired", "completed"].includes(o.status);
 
 export function buildDriveSummary(input: {
@@ -91,7 +93,7 @@ export function buildDriveSummary(input: {
 
   // Funnel: unique students at each step.
   const called = new Set(meetings.map((m) => m.userId));
-  const met = new Set(meetings.filter((m) => m.status === "accepted").map((m) => m.userId));
+  const met = new Set(meetings.filter((m) => metStatus(m.status)).map((m) => m.userId));
   const offered = new Set(offers.map((o) => o.userId));
   const hired = new Set(offers.filter((o) => o.hired).map((o) => o.userId));
   // Offers need not follow a meet, so each step is measured against the base it really is a part of.

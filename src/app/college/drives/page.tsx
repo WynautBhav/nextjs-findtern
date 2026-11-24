@@ -7,6 +7,8 @@ import { DriveStatePill } from "@/components/employer/drive-parts";
 import { ButtonLink } from "@/components/ui/button";
 import { driveWindow } from "@/lib/college/access";
 import { drivesOverview } from "@/lib/college/drives";
+import { driveMeetCounts } from "@/lib/college/drive-board-db";
+import { eligibleStudents } from "@/lib/college/scope";
 import { DRIVE_KIND_LABEL, audienceLabel } from "@/lib/college/labels";
 import { timeUntil } from "@/lib/college/time-left";
 import { requireCollegeContext } from "@/lib/college/scope";
@@ -37,6 +39,15 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
   const ctx = await requireCollegeContext();
   const [all, sp] = await Promise.all([drivesOverview(ctx.college.id), searchParams]);
   const now = requestTime();
+  // Meets per drive by the drive page's own rules (its verified students, calls and interviews), so the two agree.
+  const meets = new Map(
+    await Promise.all(
+      all.map(async ({ drive }) => {
+        const ids = (await eligibleStudents(drive)).filter((s) => s.status === "verified").map((s) => s.userId);
+        return [drive.id, await driveMeetCounts(drive, ids, now)] as const;
+      }),
+    ),
+  );
   // Active = open now or still to open; Past = finished or closed by the officer.
   const allStates = all.map(({ drive }) => driveWindow(drive, now));
   const activeCount = allStates.filter((st) => st === "live" || st === "upcoming").length;
@@ -46,7 +57,7 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
   const live = allStates.filter((s) => s === "live").length;
   const employers = all.reduce((n, d) => n + d.employers, 0);
   const shortlisted = all.reduce((n, d) => n + d.shortlisted, 0);
-  const answered = all.reduce((n, d) => n + d.accepted, 0);
+  const answered = all.reduce((n, d) => n + (meets.get(d.drive.id)?.accepted ?? 0), 0);
   return (
     <div className="space-y-6">
       <CollegeHero
@@ -63,7 +74,7 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
             <HeroStat label="Open now" value={live} hint={live ? "Employers can enter" : "No drive is open"} />
             <HeroStat label="Employers entered" value={employers} hint={`across ${all.length} ${all.length === 1 ? "drive" : "drives"}`} />
             <HeroStat label="Students shortlisted" value={shortlisted} />
-            <HeroStat label="Meets accepted" value={answered} hint="Live meets in a drive" />
+            <HeroStat label="Meets accepted" value={answered} hint="Drive calls and interviews" />
           </HeroStats>
         ) : null}
       </CollegeHero>
@@ -95,7 +106,8 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
         </Surface>
       ) : (
         <ul className="grid gap-4 lg:grid-cols-2">
-          {drives.map(({ drive, employers: e, calls, accepted, shortlisted: s }, i) => {
+          {drives.map(({ drive, employers: e, shortlisted: s }, i) => {
+            const { sent: calls, accepted } = meets.get(drive.id) ?? { sent: 0, accepted: 0 };
             const w = states[i];
             const span = drive.endsAt.getTime() - drive.startsAt.getTime();
             const share = w === "live" && span > 0 ? Math.min(1, Math.max(0, (now - drive.startsAt.getTime()) / span)) : null;

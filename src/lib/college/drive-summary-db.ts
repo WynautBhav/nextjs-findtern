@@ -2,6 +2,7 @@ import { and, eq, gte, inArray, lte, ne, sql, type AnyColumn } from "drizzle-orm
 
 import { realEmployerId } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
+import { loadDriveInterviews } from "./drive-interviews-db";
 import { buildDriveSummary, NUDGE_WINDOW_MS, type DriveSummary, type SummaryStudent } from "./drive-summary";
 import type { CameEmployer } from "./drive-board";
 import type { Drive } from "./scope";
@@ -25,7 +26,7 @@ export async function loadDriveSummary(drive: Drive, students: SummaryStudent[],
   const pm = schema.presenceMinutes;
   const n = schema.collegeNudges;
 
-  const [meetings, offers, nudges, minuteRows, [since]] = await Promise.all([
+  const [calls, offers, nudges, minuteRows, [since], interviews] = await Promise.all([
     db
       .select({ userId: schema.collegeDriveMeetings.userId, employerId: schema.collegeDriveMeetings.employerId, status: schema.collegeDriveMeetings.status, createdAt: utc(schema.collegeDriveMeetings.createdAt), respondedAt: sql<string | null>`(${schema.collegeDriveMeetings.respondedAt} AT TIME ZONE 'UTC')` })
       .from(schema.collegeDriveMeetings)
@@ -61,7 +62,9 @@ export async function loadDriveSummary(drive: Drive, students: SummaryStudent[],
           .where(and(inArray(pm.userId, people), gte(pm.minute, start), lte(pm.minute, new Date(end.getTime() + NUDGE_WINDOW_MS))))
       : Promise.resolve([]),
     db.select({ first: sql<string | null>`(min(${pm.minute}) AT TIME ZONE 'UTC')` }).from(pm),
+    loadDriveInterviews(drive, ids, employerIds),
   ]);
+  const meetings = [...calls.map((m) => ({ ...m, respondedAt: instant(m.respondedAt) })), ...interviews];
 
   const minutes = new Map<string, number>();
   const stamps = new Map<string, number[]>();
@@ -79,7 +82,7 @@ export async function loadDriveSummary(drive: Drive, students: SummaryStudent[],
     window: { start, end },
     trackingSince: instant(since?.first),
     students,
-    meetings: meetings.map((m) => ({ ...m, respondedAt: instant(m.respondedAt) })),
+    meetings,
     offers: offers.map((o) => ({ userId: o.userId, employerId: o.employerId, status: (o.status ?? "").toLowerCase(), hired: o.hiredAt !== null, createdAt: o.createdAt, answeredAt: instant(o.answeredAt) })),
     nudges,
     minutes,

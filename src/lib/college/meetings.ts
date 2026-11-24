@@ -8,7 +8,7 @@ import { initialsOf } from "@/lib/employer-candidates";
 import { notify } from "@/lib/notify";
 import { linkTo } from "@/lib/origin";
 import { studentCallOpen } from "./access";
-import { CALL_GRACE_MS } from "./constants";
+import { CALL_GRACE_MS, MEETING_MINUTES } from "./constants";
 import { pickMeetingLink } from "./meeting-link";
 import { maskMeetingViews, type MeetingView } from "./meeting-views";
 import { sendPush } from "./push";
@@ -19,7 +19,7 @@ import { sendPush } from "./push";
  * bell or a push. A request no one answered by start + GRACE is expired.
  */
 export const MEETING_DELAYS = [0, 5, 10] as const;
-export const MEETING_MINUTES = 20;
+export { MEETING_MINUTES };
 const GRACE_MS = CALL_GRACE_MS;
 
 export type { MeetingView };

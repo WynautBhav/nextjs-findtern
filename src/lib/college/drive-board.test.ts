@@ -247,3 +247,50 @@ test("a past drive keeps the nudge history but offers no nudge again", () => {
   assert.equal(b.nudgeCounts.nudgedOffer, 1);
   assert.equal(b.lists.nudgedOffer[0].again, false);
 });
+
+test("meetings: sent, accepted, completed (slot over) and expired (no reply past start + grace), counted one by one", () => {
+  const b = buildDriveBoard({
+    students,
+    meetings: [
+      // a: accepted, its 20-minute slot ended 10 min ago -> accepted and completed
+      { userId: "a", company: "Acme", status: "accepted", createdAt: at(40), startsAt: at(30) },
+      // a: accepted, starts in 5 min -> accepted, not completed
+      { userId: "a", company: "Beta", status: "accepted", createdAt: at(2), startsAt: at(-5) },
+      // b: never answered, started 15 min ago (past the 10-min grace) -> expired
+      { userId: "b", company: "Acme", status: "requested", createdAt: at(20), startsAt: at(15) },
+      // b: already marked expired
+      { userId: "b", company: "Gamma", status: "expired", createdAt: at(90), startsAt: at(80) },
+      // c: declined -> sent only; and a cancelled one that never counts
+      { userId: "c", company: "Acme", status: "declined", createdAt: at(10), startsAt: at(5) },
+      { userId: "c", company: "Beta", status: "cancelled", createdAt: at(10), startsAt: at(5) },
+    ],
+    offers: [],
+    offline: null,
+    now: NOW,
+  });
+  assert.deepEqual(b.meetCounts, { sent: 5, accepted: 2, completed: 1, expired: 2 });
+  assert.deepEqual(b.lists.called.map((s) => s.userId).sort(), ["a", "b", "c"]);
+  assert.deepEqual(b.lists.meetings.map((s) => s.userId), ["a"]);
+  assert.deepEqual(b.lists.meetCompleted.map((s) => s.userId), ["a"]);
+  assert.equal(b.lists.meetCompleted[0].detail, "Meet with Acme");
+  assert.deepEqual(b.lists.meetExpired.map((s) => s.userId), ["b"]);
+  assert.equal(b.lists.meetExpired[0].detail, "2 meets expired · Acme, Gamma");
+});
+
+test("interviews count as meets: picked-slot ones are accepted, marked completed count as completed, missed do not, unpicked wait", () => {
+  const b = buildDriveBoard({
+    students,
+    meetings: [
+      { userId: "a", company: "Amazon", status: "completed", createdAt: at(300) },
+      { userId: "b", company: "Amazon", status: "missed", createdAt: at(300) },
+      { userId: "c", company: "Amazon", status: "requested", createdAt: at(5) }, // invite, no slot picked yet
+    ],
+    offers: [],
+    offline: null,
+    now: NOW,
+  });
+  assert.deepEqual(b.meetCounts, { sent: 3, accepted: 2, completed: 1, expired: 0 });
+  assert.deepEqual(b.lists.meetCompleted.map((s) => s.userId), ["a"]);
+  assert.deepEqual(b.lists.meetingsWaiting.map((s) => s.userId), ["c"]);
+  assert.deepEqual(b.lists.called.map((s) => s.userId).sort(), ["a", "b", "c"]);
+});
