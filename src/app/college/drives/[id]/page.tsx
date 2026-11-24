@@ -43,7 +43,7 @@ function requestTime(): number {
  * edit form. Once it is over: the same board and lists, read-only (student names show; no nudges, no editing).
  * `?employer=<id>` narrows the board to the students one company met or offered to.
  */
-export default async function DrivePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string; show?: string; view?: string; employer?: string }> }) {
+export default async function DrivePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string; show?: string; view?: string; employer?: string; close?: string }> }) {
   const ctx = await requireCollegeContext();
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const drive = await driveForCollegeAdmin(ctx, id);
@@ -127,6 +127,8 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
                 {sp.view === "summary" ? "Hide summary" : "Drive summary"}
               </ButtonLink>
               <ButtonLink href={`/college/drives/${drive.id}?edit=1#edit`} variant="white">Edit drive</ButtonLink>
+              {/* The Link panel's own Close drive, opened at its confirm step: one flow, not a second copy. */}
+              <ButtonLink href={`/college/drives/${drive.id}?close=1#link`} variant="outlineLight">Close drive</ButtonLink>
             </>
           ) : null
         }
@@ -183,22 +185,25 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
         <PresenceLive driveId={drive.id} driveTitle={drive.title} showTitle={false} startsAt={drive.startsAt.toISOString()} endsAt={drive.endsAt.toISOString()} initial={presence} />
       ) : null}
 
-      <Panel>
+      <Panel id="link" className="scroll-mt-6">
           <PanelHeader
             title="Link"
             description={
               w === "revoked"
-                ? "Turned off. No employer can get in."
+                ? "Closed. No employer can get in. Reopen it with a new link."
                 : w === "ended"
                   ? "Ended. No employer can get in."
-                  : "Send it to the companies you invite. They must sign in to Findtern. Turn the drive off at any time."
+                  : "Send it to the companies you invite. They must sign in to Findtern. Close the drive at any time."
             }
           />
           {w === "ended" ? null : (
           <PanelBody>
             <LinkActions
+              // Remounted when the hero's Close drive adds ?close=1, so it opens at the confirm step.
+              key={sp.close === "1" ? "close" : "link"}
               driveId={drive.id}
               revoked={w === "revoked"}
+              askClose={sp.close === "1" && open}
               collegeName={ctx.college.name}
               driveTitle={drive.title}
               startsAt={drive.startsAt.toISOString()}

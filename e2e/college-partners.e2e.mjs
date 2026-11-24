@@ -193,8 +193,8 @@ test("officer: sees Sana online and the employer inside; closes the link", async
   assert.match(await main.innerText(), /1 shortlisted · 1 call\b/);
   await main.getByText(/^1\s*\/1$/).waitFor(); // presence: 1 of 1 eligible online
   // Confirmed in the page now, not a browser dialog.
-  await tpo.getByRole("button", { name: "Turn off drive" }).click();
-  await tpo.getByRole("button", { name: "Yes, turn off the drive" }).click();
+  await tpo.getByRole("button", { name: "Close drive" }).click();
+  await tpo.getByRole("button", { name: "Yes, close the drive" }).click();
   await main.getByText("Turned off. No employer can get in.").waitFor();
 });
 

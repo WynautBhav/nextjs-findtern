@@ -12,6 +12,8 @@ import { ShareLink } from "./share-link";
 export function LinkActions(props: {
   driveId: string;
   revoked: boolean;
+  /** Open straight at the Close drive confirm (the hero's Close drive button). */
+  askClose?: boolean;
   collegeName: string;
   driveTitle: string;
   startsAt: string;
@@ -25,7 +27,7 @@ export function LinkActions(props: {
   const [note, setNote] = useState<string | null>(null);
   // Asked in the page, not window.confirm (as admin since QA-145): the
   // consequence is spelled out next to the yes/cancel pair.
-  const [asking, setAsking] = useState<"POST" | "DELETE" | null>(null);
+  const [asking, setAsking] = useState<"POST" | "DELETE" | null>(props.askClose && !props.revoked ? "DELETE" : null);
 
   // Cancel or Esc puts focus back on the button that asked (QA-159).
   const box = useRef<HTMLDivElement>(null);
@@ -56,7 +58,7 @@ export function LinkActions(props: {
 
   const consequence =
     asking === "DELETE"
-      ? "Every employer, including those already inside, loses access immediately."
+      ? "The drive ends now. Every employer, including those already inside, loses access immediately. You can reopen it later with a new link."
       : "The current link stops working, and companies already inside are let out too. Companies you invited are emailed a fresh invite; send the new link to any others you still want. Shortlists are kept.";
 
   return (
@@ -89,7 +91,7 @@ export function LinkActions(props: {
               onClick={() => void call(asking)}
               className={buttonClass({ variant: asking === "DELETE" ? "dark" : "primary", size: "sm" })}
             >
-              {asking === "DELETE" ? "Yes, turn off the drive" : "Yes, issue a new link"}
+              {asking === "DELETE" ? "Yes, close the drive" : "Yes, issue a new link"}
             </button>
             {/* Cancel takes the focus: Enter on a focused "close" can't be undone. */}
             <button type="button" autoFocus onClick={cancel} className={buttonClass({ variant: "outline", size: "sm" })}>
@@ -116,7 +118,7 @@ export function LinkActions(props: {
               onClick={() => setAsking("DELETE")}
               className={buttonClass({ variant: "ghost", size: "sm", className: "text-danger hover:bg-danger-soft" })}
             >
-              Turn off drive
+              Close drive
             </button>
           ) : null}
         </div>
