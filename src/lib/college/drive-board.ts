@@ -97,6 +97,13 @@ function perStudent<T extends { userId: string; createdAt: Date }>(rows: T[], st
     .map(({ rs, s }) => ({ ...s, detail: line(rs) }));
 }
 
+/** "1 full-time offer", "2 internship offers", "1 full-time and 1 internship offer". */
+const offerKinds = (rs: OfferRow[]) => {
+  const ft = rs.filter((r) => r.fullTime).length;
+  const it = rs.length - ft;
+  if (ft && it) return `${ft} full-time and ${it} internship ${it === 1 ? "offer" : "offers"}`;
+  return `${rs.length} ${ft ? "full-time" : "internship"} ${rs.length === 1 ? "offer" : "offers"}`;
+};
 const names = (rs: { company: string | null }[]) => [...new Set(rs.map((r) => company(r.company)))].join(", ");
 
 /** "Nudged 3 times · last 2 h ago", one line per student, most-nudged first. */
@@ -187,7 +194,7 @@ export function buildDriveBoard(input: {
       nudgedOpenToWork: nudged("open_to_work"),
       nudgedMeet: nudged("meeting"),
       nudgedOffer: nudged("offer"),
-      offers: perStudent(inDrive, students, (rs) => `${rs.length === 1 ? "1 offer" : `${rs.length} offers`} · ${names(rs)}`),
+      offers: perStudent(inDrive, students, (rs) => `${offerKinds(rs)} · ${names(rs)}`),
       meetings: perStudent(held, students, (rs) => `${rs.length === 1 ? "Meet" : `${rs.length} meets`} with ${names(rs)}`),
       meetCompleted: perStudent(done, students, (rs) => `${rs.length === 1 ? "Meet" : `${rs.length} meets`} with ${names(rs)}`),
       meetExpired: perStudent(lapsed, students, (rs) => `${rs.length === 1 ? "1 meet expired" : `${rs.length} meets expired`} · ${names(rs)}`),

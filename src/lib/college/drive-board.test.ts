@@ -44,7 +44,7 @@ test("results: offers counted one by one, hires split into internship and full-t
   });
   assert.equal(b.offerCount, 3, "an offer to a student outside the drive does not count");
   assert.equal(b.lists.offers.length, 2);
-  assert.equal(b.lists.offers.find((s) => s.userId === "a")?.detail, "2 offers · Beta, Acme");
+  assert.equal(b.lists.offers.find((s) => s.userId === "a")?.detail, "2 internship offers · Beta, Acme");
   assert.deepEqual(b.lists.internships.map((s) => s.userId), ["a"]);
   assert.deepEqual(b.lists.fullTime.map((s) => s.userId), ["b"]);
   assert.equal(b.offlineKnown, false);

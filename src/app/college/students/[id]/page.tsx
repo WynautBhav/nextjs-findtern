@@ -166,7 +166,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
           </span>
           <h1 className="mt-3 text-xl font-semibold tracking-[-0.02em] text-ink-900">{name || student.email}</h1>
           <p className="mt-0.5 text-sm text-text-subtle">
-            {[student.rollNo, yearLabel(student.year), student.branch].filter((v) => v && v !== "—").join(" · ") || "Year not set"}
+            {[yearLabel(student.year), student.branch].filter((v) => v && v !== "—").join(" · ") || "Year not set"}
           </p>
           <div className="mt-3">
             {student.status === "verified" ? (

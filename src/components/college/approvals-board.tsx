@@ -140,7 +140,7 @@ export function ApprovalsBoard({ candidates, removed, reviews = [], endpoint = "
                         <span className="block truncate text-[0.9375rem] font-semibold text-ink-900">{c.name || c.email}</span>
                         <span className="block break-all text-sm text-ink-600">{c.email}</span>
                         <span className="mt-0.5 block text-xs text-text-subtle">
-                          {[c.rollNo, c.year ? yearLabel(c.year) : null, c.branch, c.accountSince ? `On Findtern since ${formatDate(c.accountSince)}` : null].filter(Boolean).join(" · ")}
+                          {[c.year ? yearLabel(c.year) : null, c.branch, c.accountSince ? `On Findtern since ${formatDate(c.accountSince)}` : null].filter(Boolean).join(" · ")}
                         </span>
                       </span>
                     </label>

@@ -16,13 +16,24 @@ export type PersonInfo = {
   offers: number;
   hired: boolean;
   companies: string[];
+  /** The kind of offer(s) the student got: full-time / PPO, internship, or both; null without an offer. */
+  offerType: OfferType | null;
 };
+
+export type OfferType = "Full-time / PPO" | "Internship" | "Both";
+/** Full-time, internship or both, from the student's offers. */
+export function offerTypeOf(offers: { fullTime?: boolean }[]): OfferType | null {
+  if (!offers.length) return null;
+  const full = offers.some((o) => o.fullTime);
+  const intern = offers.some((o) => !o.fullTime);
+  return full && intern ? "Both" : full ? "Full-time / PPO" : "Internship";
+}
 
 export function buildPeople(input: {
   students: { userId: string; email: string | null; cgpa: number | null; score: number | null }[];
   /** userId -> minutes online, or null when not recorded. */
   minutes: Map<string, number> | null;
-  offers: { userId: string; company: string | null }[];
+  offers: { userId: string; company: string | null; fullTime?: boolean }[];
   meets: { userId: string; company: string | null }[];
   hiredIds: Iterable<string>;
 }): Record<string, PersonInfo> {
@@ -46,6 +57,7 @@ export function buildPeople(input: {
         offers: offers.get(s.userId) ?? 0,
         hired: hired.has(s.userId),
         companies: [...(companies.get(s.userId) ?? [])].sort((a, b) => a.localeCompare(b)),
+        offerType: offerTypeOf(input.offers.filter((o) => o.userId === s.userId)),
       } satisfies PersonInfo,
     ]),
   );
@@ -74,6 +86,7 @@ export type StudentTableRow = BoardItem & {
   offers: number;
   hired: boolean;
   companies: string[];
+  offerType: OfferType | null;
 };
 
 /** A board row joined to what the pop-up knows about the student. Missing info reads as missing, never as zero. */
@@ -90,10 +103,11 @@ export function toStudentTableRow(item: BoardItem, p: PersonInfo | undefined, ba
     offers: p?.offers ?? 0,
     hired: p?.hired ?? false,
     companies: p?.companies ?? [],
+    offerType: p?.offerType ?? null,
   };
 }
 
-export type StudentColKey = "name" | "rollNo" | "year" | "branch" | "phone" | "email" | "cgpa" | "score" | "band" | "openToWork" | "minutes" | "detail" | "companies" | "offers" | "hired";
+export type StudentColKey = "name" | "year" | "branch" | "phone" | "email" | "cgpa" | "score" | "band" | "openToWork" | "minutes" | "detail" | "offerType" | "companies" | "offers" | "hired";
 
 type Sortable = string | number | null;
 export type ColumnDef<R, K extends string> = {
@@ -113,7 +127,6 @@ const text = (v: string | null | undefined) => (v && v.trim() ? v : null);
 
 export const STUDENT_COLUMNS: ColumnDef<StudentTableRow, StudentColKey>[] = [
   { key: "name", label: "Name", main: true, csv: (r) => r.name || "Student", sort: (r) => (r.name || "Student").toLowerCase() },
-  { key: "rollNo", label: "Roll no", main: true, csv: (r) => r.rollNo, sort: (r) => text(r.rollNo)?.toLowerCase() ?? null },
   { key: "year", label: "Year", main: true, csv: (r) => (r.year ? yearLabel(r.year) : null), sort: (r) => r.year },
   { key: "branch", label: "Branch", main: true, csv: (r) => r.branch, sort: (r) => text(r.branch)?.toLowerCase() ?? null },
   { key: "phone", label: "Phone", main: true, csv: (r) => phoneCsv(r.phone), sort: (r) => text(r.phone) },
@@ -121,9 +134,10 @@ export const STUDENT_COLUMNS: ColumnDef<StudentTableRow, StudentColKey>[] = [
   { key: "cgpa", label: "CGPA", numeric: true, main: true, csv: (r) => (r.cgpa === null ? null : r.cgpa.toFixed(2)), sort: (r) => r.cgpa },
   { key: "score", label: "Findtern score", numeric: true, main: true, csv: (r) => (r.score === null ? null : r.score.toFixed(1)), sort: (r) => r.score },
   { key: "band", label: "Score band", csv: (r) => r.bandName, sort: (r) => r.score },
-  { key: "openToWork", label: "Open to work", csv: (r) => yesNo(r.openToWork !== false), sort: (r) => (r.openToWork !== false ? 1 : 0) },
+  { key: "openToWork", label: "Open to work", main: true, csv: (r) => yesNo(r.openToWork !== false), sort: (r) => (r.openToWork !== false ? 1 : 0) },
   { key: "minutes", label: "Time online", csvLabel: "Time online in the drive (minutes)", numeric: true, csv: (r) => r.minutes, sort: (r) => r.minutes },
   { key: "detail", label: "What happened", main: true, csv: (r) => r.detail, sort: (r) => text(r.detail)?.toLowerCase() ?? null },
+  { key: "offerType", label: "Offer type", main: true, csv: (r) => r.offerType, sort: (r) => r.offerType },
   { key: "companies", label: "Companies", csv: (r) => r.companies.join("; "), sort: (r) => (r.companies.length ? r.companies.join(", ").toLowerCase() : null) },
   { key: "offers", label: "Offers", numeric: true, csv: (r) => r.offers, sort: (r) => r.offers },
   { key: "hired", label: "Hired", main: true, csv: (r) => yesNo(r.hired), sort: (r) => (r.hired ? 1 : 0) },
@@ -137,9 +151,11 @@ export type StudentFilters = {
   band: string;
   company: string;
   open: "" | "yes" | "no";
+  /** full: has a full-time / PPO offer; intern: has an internship offer. */
+  type: "" | "full" | "intern";
   hired: "" | "yes" | "no";
 };
-export const NO_STUDENT_FILTERS: StudentFilters = { q: "", branch: "", year: "", band: "", company: "", open: "", hired: "" };
+export const NO_STUDENT_FILTERS: StudentFilters = { q: "", branch: "", year: "", band: "", company: "", open: "", type: "", hired: "" };
 
 const norm = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
 const digits = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
@@ -155,11 +171,12 @@ function matches(hay: (string | null | undefined)[], q: string): boolean {
 export function filterStudents(rows: StudentTableRow[], f: StudentFilters): StudentTableRow[] {
   return rows.filter(
     (r) =>
-      matches([r.name, r.rollNo, r.phone, r.email], f.q) &&
+      matches([r.name, r.phone, r.email], f.q) &&
       (!f.branch || r.branch === f.branch) &&
       (!f.year || String(r.year ?? "") === f.year) &&
       (!f.band || (f.band === "none" ? r.band === null : r.band === f.band)) &&
       (!f.company || r.companies.includes(f.company)) &&
+      (!f.type || (f.type === "full" ? r.offerType === "Full-time / PPO" || r.offerType === "Both" : r.offerType === "Internship" || r.offerType === "Both")) &&
       (!f.open || (r.openToWork !== false) === (f.open === "yes")) &&
       (!f.hired || r.hired === (f.hired === "yes")),
   );

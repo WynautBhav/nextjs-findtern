@@ -42,7 +42,7 @@ const item = (userId: string, name: string, extra: Partial<StudentTableRow> = {}
 const rows = [item("a", "Asha"), item("b", "=Bhavna", { branch: "ECE", year: 2, openToWork: false, phone: null }), item("c", "Chirag", { year: null, branch: null })].map((r) => toStudentTableRow(r, people[r.userId], band));
 
 test("buildPeople: offers counted one by one, companies deduped and trimmed, minutes null when not recorded", () => {
-  assert.deepEqual(people.a, { email: "asha@x.edu", cgpa: 8.2, score: 8.4, minutes: 95, offers: 2, hired: true, companies: ["Acme", "Beta"] });
+  assert.deepEqual(people.a, { email: "asha@x.edu", cgpa: 8.2, score: 8.4, minutes: 95, offers: 2, hired: true, companies: ["Acme", "Beta"], offerType: "Internship" });
   assert.equal(people.b.minutes, 0);
   assert.equal(people.c.offers, 0);
   assert.deepEqual(people.c.companies, []);
@@ -59,11 +59,12 @@ test("a student the pop-up knows nothing about reads as missing, not zero", () =
   assert.equal(r.hired, false);
 });
 
-test("filters: search over name, roll, phone digits and email; branch, year, band, company, open, hired", () => {
+test("filters: search over name, phone digits and email (never the roll no); branch, year, band, company, open, hired", () => {
   const ids = (f: Partial<typeof NO_STUDENT_FILTERS>) => filterStudents(rows, { ...NO_STUDENT_FILTERS, ...f }).map((r) => r.userId);
   assert.deepEqual(ids({}), ["a", "b", "c"]);
   assert.deepEqual(ids({ q: "asha" }), ["a"]);
-  assert.deepEqual(ids({ q: "r-c" }), ["c"]);
+  // Roll numbers are not a Findtern field: search does not match them.
+  assert.deepEqual(ids({ q: "r-c" }), []);
   assert.deepEqual(ids({ q: "9876543210" }), ["a", "c"]);
   assert.deepEqual(ids({ q: "cmd@x" }), ["b"]);
   assert.deepEqual(ids({ branch: "CSE" }), ["a"]);
@@ -151,4 +152,16 @@ test("phones keep a readable form in the CSV, without the formula guard's quote"
   assert.equal(phoneCsv(null), null);
   // Not a phone: left alone, so csv.ts still neutralises it.
   assert.equal(csvCell(phoneCsv("+SUM(A1)")), "'+SUM(A1)");
+});
+
+test("offer type: full-time, internship or both, and the Offer type filter", async () => {
+  const { offerTypeOf } = await import("./pop-table.ts");
+  assert.equal(offerTypeOf([]), null);
+  assert.equal(offerTypeOf([{ fullTime: true }]), "Full-time / PPO");
+  assert.equal(offerTypeOf([{ fullTime: false }, { fullTime: false }]), "Internship");
+  assert.equal(offerTypeOf([{ fullTime: true }, { fullTime: false }]), "Both");
+  const typed = [item("f", "Full", { offerType: "Full-time / PPO" }), item("i", "Intern", { offerType: "Internship" }), item("x", "Both", { offerType: "Both" }), item("n", "None", { offerType: null })] as StudentTableRow[];
+  const ids = (type: "full" | "intern") => filterStudents(typed, { ...NO_STUDENT_FILTERS, type }).map((r) => r.userId);
+  assert.deepEqual(ids("full"), ["f", "x"]);
+  assert.deepEqual(ids("intern"), ["i", "x"]);
 });

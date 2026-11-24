@@ -13,7 +13,7 @@ import { CollegeHero } from "./kit";
 import { PastDriveCharts, type Pop } from "./past-drive-charts";
 import { duration } from "./drive-summary";
 import { EmployerTable, StudentTable } from "./pop-tables";
-import type { PersonInfo } from "@/lib/college/pop-table";
+import { offerTypeOf, type PersonInfo } from "@/lib/college/pop-table";
 
 /**
  * A finished drive as one card on the hero field (owner brief, 24 Nov 2026): Candidates and Employers behind the same
@@ -421,7 +421,7 @@ function CompanyPop({ r, b, minutes, tracked, people, driveTitle }: { r: Employe
     const hired = new Set(b.lists.hired.map((x) => x.userId));
     const offers = new Map<string, number>();
     for (const o of b.facts.offers) offers.set(o.userId, (offers.get(o.userId) ?? 0) + 1);
-    return Object.fromEntries(Object.entries(people).map(([id, p]) => [id, { ...p, offers: offers.get(id) ?? 0, hired: hired.has(id), companies: [r.company] }]));
+    return Object.fromEntries(Object.entries(people).map(([id, p]) => [id, { ...p, offers: offers.get(id) ?? 0, hired: hired.has(id), companies: [r.company], offerType: offerTypeOf(b.facts.offers.filter((o) => o.userId === id)) }]));
   }, [b, people, r.company]);
   return (
     <>

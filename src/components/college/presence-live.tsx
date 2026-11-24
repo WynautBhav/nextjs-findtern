@@ -71,10 +71,6 @@ export function PresenceLive({
   const elapsed = starts ? Math.min(1, Math.max(0, (now - starts.getTime()) / Math.max(1, ends.getTime() - starts.getTime()))) : null;
   const alertOff = snap.offline.filter((o) => o.alertable);
   const quiet = snap.offline.filter((o) => !o.alertable);
-  // Two "Aarav Sharma"s must be tellable apart before you chase one.
-  const seen = new Map<string, number>();
-  for (const o of snap.offline) seen.set(o.name, (seen.get(o.name) ?? 0) + 1);
-  const dupes = new Set([...seen].filter(([, n]) => n > 1).map(([name]) => name));
   const fmt = (d: Date) => shortDateTime(d, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
   // A hall of seats: one square per eligible student, online first. Offline squares carry the name on hover.
   const dot = snap.total > 400 ? "size-2 rounded-[2px]" : snap.total > 160 ? "size-3 rounded-[3px]" : "size-4 rounded-[4px]";
@@ -199,7 +195,6 @@ export function PresenceLive({
                 >
                   <span aria-hidden className={cn("size-1.5 rounded-full", o.alertable ? "bg-ink-500" : "bg-ink-200")} />
                   {o.name || "Unnamed student"}
-                  {dupes.has(o.name) && o.rollNo ? <span className="nums text-ink-600">{o.rollNo}</span> : null}
                   {o.alertable ? <span className="sr-only">(phone alerts on)</span> : null}
                 </Link>
               </li>

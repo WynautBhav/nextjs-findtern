@@ -281,9 +281,14 @@ export function StudentTable({ rows, people, title, driveTitle }: { rows: BoardI
       nouns="students"
       download={slugify(title, driveTitle)}
       defaults={defaults}
-      search={<SearchBox value={f.q} onChange={(v) => set("q", v)} label="Search name, roll no, phone or email" />}
+      search={<SearchBox value={f.q} onChange={(v) => set("q", v)} label="Search name, phone or email" />}
       filters={
         <>
+          <Pick label="Open to work" value={f.open} onChange={(v) => set("open", v as StudentFilters["open"])}>
+            <option value="">Open to work: any</option>
+            <option value="yes">Open to work</option>
+            <option value="no">Not open to work</option>
+          </Pick>
           <Pick label="Branch" value={f.branch} onChange={(v) => set("branch", v)}>
             <option value="">All branches</option>
             {branches.map((b) => (
@@ -317,10 +322,10 @@ export function StudentTable({ rows, people, title, driveTitle }: { rows: BoardI
               </option>
             ))}
           </Pick>
-          <Pick label="Open to work" value={f.open} onChange={(v) => set("open", v as StudentFilters["open"])}>
-            <option value="">Open to work: any</option>
-            <option value="yes">Open to work</option>
-            <option value="no">Not open to work</option>
+          <Pick label="Offer type" value={f.type} onChange={(v) => set("type", v as StudentFilters["type"])}>
+            <option value="">Offer type: any</option>
+            <option value="full">Full-time / PPO</option>
+            <option value="intern">Internship</option>
           </Pick>
           <Pick label="Hired" value={f.hired} onChange={(v) => set("hired", v as StudentFilters["hired"])}>
             <option value="">Hired: any</option>
@@ -345,8 +350,6 @@ function studentCell(key: StudentColKey, r: StudentTableRow): React.ReactNode {
           {r.name || "Student"}
         </Link>
       );
-    case "rollNo":
-      return orDash(r.rollNo);
     case "year":
       return r.year ? yearLabel(r.year) : <Dash />;
     case "branch":
@@ -373,6 +376,8 @@ function studentCell(key: StudentColKey, r: StudentTableRow): React.ReactNode {
       return r.score === null ? <Dash /> : r.score.toFixed(1);
     case "band":
       return orDash(r.bandName);
+    case "offerType":
+      return orDash(r.offerType);
     case "openToWork":
       return r.openToWork !== false ? "Yes" : <span className="text-text-subtle">No</span>;
     case "minutes":

@@ -462,7 +462,7 @@ function StudentCard({ s, now }: { s: StudentRow; now: number }) {
           >
             {name}
           </Link>
-          <p className="truncate text-xs text-text-subtle">{[s.rollNo, yearLabel(s.year), s.branch].filter((v) => v && v !== "—").join(" · ") || "Year not set"}</p>
+          <p className="truncate text-xs text-text-subtle">{[yearLabel(s.year), s.branch].filter((v) => v && v !== "—").join(" · ") || "Year not set"}</p>
           <span className="mt-0.5 hidden lg:block">
             <Online at={s.lastSeenAt ?? s.lastActivityAt} now={now} />
           </span>
@@ -507,7 +507,7 @@ function ListCard({ r }: { r: RosterListRow }) {
         <Initials seed={r.email} name={name} className="size-10" />
         <div className="min-w-0 flex-1">
           <p className="truncate font-medium text-ink-900">{name}</p>
-          <p className="truncate text-xs text-text-subtle">{[r.rollNo, r.year ? yearLabel(r.year) : null, r.branch].filter(Boolean).join(" · ") || "On your list"}</p>
+          <p className="truncate text-xs text-text-subtle">{[r.year ? yearLabel(r.year) : null, r.branch].filter(Boolean).join(" · ") || "On your list"}</p>
         </div>
         <Pill tone={r.state === "on_findtern" ? "waiting" : "closed"}>{r.state === "on_findtern" ? "Waiting for you" : "Not joined"}</Pill>
       </div>
