@@ -64,9 +64,9 @@ const CLOSED = "The drive is over, so names are closed. The figures stay.";
 
 /**
  * The drive summary. Live: opened from the hero's "Drive summary" button; every list links to the student or
- * carries the one action that fixes it. Over: shown under the hero as a report, figures only (C12).
+ * carries the one action that fixes it. Over: shown under the hero as a read-only report (names, no actions).
  */
-export function DriveSummary({ s, open, startedLabel }: { s: Summary; open: boolean; startedLabel: string }) {
+export function DriveSummary({ s, open, canAct = open, startedLabel }: { s: Summary; open: boolean; /** The drive is still running: nudge buttons show. A finished drive shows names but no actions. */ canAct?: boolean; startedLabel: string }) {
   const since = s.trackingSince ? shortDateTime(s.trackingSince, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" }) : null;
   const verdict = VERDICT[s.health.verdict];
   const funnelBase = s.funnel[0]?.value ?? 0;
@@ -168,7 +168,7 @@ export function DriveSummary({ s, open, startedLabel }: { s: Summary; open: bool
                     </span>
                     <span className="col-span-2 flex items-center gap-3">
                       <span className="flex-1">{k.checkable ? <Bar value={k.worked} of={k.sent} /> : null}</span>
-                      {open && again.length && k.kind !== "interview" ? (
+                      {canAct && again.length && k.kind !== "interview" ? (
                         <NudgeButton kind={k.kind} userIds={again} label={`Nudge ${n(again.length)} again`} size="xs" />
                       ) : null}
                     </span>
@@ -176,7 +176,7 @@ export function DriveSummary({ s, open, startedLabel }: { s: Summary; open: bool
                 );
               })}
             </ul>
-          ) : open ? (
+          ) : canAct ? (
             <p className="text-sm text-ink-700">Use Nudge on any list in the drive board below; each one shows up here with what came of it.</p>
           ) : null}
           {open && s.nudges.rows.length ? (
@@ -209,7 +209,7 @@ export function DriveSummary({ s, open, startedLabel }: { s: Summary; open: bool
           title="Students online"
           note={trackedNote ?? "Time with Findtern open during the drive."}
           action={
-            open && s.tracked !== "none" && s.online.neverOnline.length ? (
+            canAct && s.tracked !== "none" && s.online.neverOnline.length ? (
               <NudgeButton kind="online" userIds={s.online.neverOnline.map((x) => x.userId)} label={`Nudge ${n(s.online.neverOnline.length)} never online`} size="xs" emphasis />
             ) : null
           }

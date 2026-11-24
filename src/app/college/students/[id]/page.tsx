@@ -26,7 +26,7 @@ import { expiryOf } from "@/lib/proposal-expiry";
 import { parseOffer } from "@/lib/offer";
 import { realEmployerId } from "@/lib/admin/scope";
 import { shortDateTime } from "@/lib/format";
-import { canOpenArtifacts, driveDataOpen, tpoProfile } from "@/lib/college/serialize";
+import { canOpenArtifacts, tpoProfile } from "@/lib/college/serialize";
 import { buttonClass } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
@@ -69,7 +69,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
   const onRoster = Boolean(onRosterRow);
   // A claimed student's offers, interviews and drive calls stay hidden until the officer verifies them.
   const verified = student.status === "verified";
-  const [[onboarding], [user], proposals, interviews, allCalls, views, readiness] = await Promise.all([
+  const [[onboarding], [user], proposals, interviews, calls, views, readiness] = await Promise.all([
     // Allowlist: no Aadhaar, PAN, PIN, bank or emergency contact ever reaches this render (P-4). Columns are picked one by one,
     // and extra_data keeps only the keys draftFromRecord, the ratings and aiInterviewLinks read.
     db
@@ -105,7 +105,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
     !verified
       ? Promise.resolve([])
       : db
-        .select({ m: schema.collegeDriveMeetings, drive: schema.collegeDrives.title, d: schema.collegeDrives })
+        .select({ m: schema.collegeDriveMeetings, drive: schema.collegeDrives.title })
         .from(schema.collegeDriveMeetings)
         .innerJoin(schema.collegeDrives, eq(schema.collegeDrives.id, schema.collegeDriveMeetings.driveId))
         .where(and(eq(schema.collegeDriveMeetings.userId, id), eq(schema.collegeDrives.collegeId, ctx.college.id)))
@@ -125,8 +125,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
     for (const pid of await openOrderProposalIds(getDb(), employerId)) openOrders.add(pid);
   }
 
-  // An ended or revoked drive no longer shows its calls (C12).
-  const calls = allCalls.filter((c) => driveDataOpen(c.d));
+  // Calls from ended drives show too: a finished drive's student lists are readable (read-only).
   const profile = tpoProfile(student.status, onboarding, user ? `${user.cc} ${user.phone}` : null);
   // One audit row per full-profile view, written after the response so it never blocks the page.
   if (profile) {

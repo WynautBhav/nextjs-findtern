@@ -34,7 +34,7 @@ export async function GET(req: Request) {
   let scope: string[] | undefined;
   if (driveId) {
     const drive = await driveForCollegeAdmin(ctx, driveId);
-    // An ended or revoked drive no longer shows its student list (WP8 / C12), here as on the drive page.
+    // Presence is live-only: an ended or revoked drive has no live stream (its lists stay readable on the drive page).
     if (!drive || !driveDataOpen(drive)) return new Response("Not found", { status: 404 });
     scope = (await eligibleStudents(drive)).map((s) => s.userId);
   }

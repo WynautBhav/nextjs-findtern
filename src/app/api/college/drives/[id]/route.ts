@@ -16,7 +16,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   const { id } = await ctx.params;
   const drive = await driveForCollegeAdmin(g.ctx, id);
   if (!drive) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  // C12: once a drive has ended or been revoked it is closed. Editing dates would reopen its student data.
+  // Once a drive has ended or been revoked it is closed to editing (its lists stay readable, read-only). Editing dates would reopen it.
   if (!driveDataOpen(drive)) {
     return NextResponse.json({ error: "This drive is over, so it can no longer be edited." }, { status: 409 });
   }

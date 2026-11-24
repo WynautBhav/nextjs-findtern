@@ -64,7 +64,11 @@ export function redactUnverified<T extends Progress>(s: T): T {
 /** AI report and recording: verified students only (WP8 / C9). */
 export const canOpenArtifacts = (status: string) => status === "verified";
 
-/** A TPO sees a drive's student-level data only while it is upcoming or live (WP8 / C12). */
+/**
+ * The drive is still running (upcoming or live). It gates ACTIONS: editing the drive, the live presence stream and
+ * nudges. It no longer gates viewing: the C12 rule that hid a finished drive's student names is dropped, so the
+ * student lists of a past drive are read-only, not closed.
+ */
 export const driveDataOpen = (drive: Parameters<typeof driveWindow>[0], now = Date.now()) => {
   const w = driveWindow(drive, now);
   return w === "live" || w === "upcoming";

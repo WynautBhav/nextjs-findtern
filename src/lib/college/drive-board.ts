@@ -9,8 +9,18 @@ import { ago } from "./labels.ts";
  * drive's students on or after the drive opened. Offers and hires carry no drive id, so this is the rule.
  */
 
-export type DriveStudentRef = { userId: string; name: string; rollNo: string | null; year: number | null; branch: string | null; phone: string | null };
-export type BoardItem = DriveStudentRef & { detail: string };
+export type DriveStudentRef = {
+  userId: string;
+  name: string;
+  rollNo: string | null;
+  year: number | null;
+  branch: string | null;
+  phone: string | null;
+  /** The student's own "open to work" switch. Missing counts as on, so only an explicit false lands in "Not open to work". */
+  openToWork?: boolean;
+};
+/** `again`: on a nudge-history row, the student still needs that nudge now (so a Nudge again button makes sense). */
+export type BoardItem = DriveStudentRef & { detail: string; again?: boolean };
 
 export type MeetingRow = {
   userId: string;
@@ -23,18 +33,49 @@ export type MeetingRow = {
 /** pastStart: the offer's start day has begun (offer-start-sql.ts), so an unanswered one has lapsed, not waiting. */
 export type OfferRow = { userId: string; company: string | null; status: string; hired: boolean; fullTime: boolean; createdAt: Date; pastStart?: boolean };
 export type OfflineRow = { userId: string };
+/** One nudge the officer sent (college_nudges), inside the drive's window. */
+export type NudgeRow = { userId: string; kind: string; createdAt: Date };
 
-export type BoardKey = "meetingsWaiting" | "offersWaiting" | "offline" | "offers" | "meetings" | "internships" | "fullTime" | "called" | "hired";
+/** The nudge kinds the board tracks, and the list each one fills. "interview" nudges are not part of a drive. */
+export type NudgeHistoryKind = "online" | "open_to_work" | "meeting" | "offer";
+export type NudgeKey = "nudgedOnline" | "nudgedOpenToWork" | "nudgedMeet" | "nudgedOffer";
+export const NUDGE_KEY: Record<NudgeHistoryKind, NudgeKey> = { online: "nudgedOnline", open_to_work: "nudgedOpenToWork", meeting: "nudgedMeet", offer: "nudgedOffer" };
+
+export type BoardKey =
+  | "meetingsWaiting"
+  | "offersWaiting"
+  | "offline"
+  | "online"
+  | "notOpen"
+  | "all"
+  | "offers"
+  | "declinedAll"
+  | "unanswered"
+  | "meetings"
+  | "internships"
+  | "fullTime"
+  | "called"
+  | "hired"
+  | NudgeKey;
 
 export type DriveBoard = {
   lists: Record<BoardKey, BoardItem[]>;
   /** Offers counted one by one (a student can hold two); the list is per student. */
   offerCount: number;
+  /** The same offers split by kind: an offer with a full-time / PPO part counts as full-time. */
+  offerSplit: { internship: number; fullTime: number };
+  /** Nudges sent, counted one by one (a student can be nudged three times); the list is per student. */
+  nudgeCounts: Record<NudgeKey, number>;
   /** Offline is known only while the drive is live; null otherwise. */
   offlineKnown: boolean;
 };
 
 const HIRED = new Set(["hired", "completed"]);
+/** The student said yes (the employer may not have paid yet), or was hired. */
+const ACCEPTED = new Set(["accepted", "processing", "hired", "completed"]);
+const DECLINED = new Set(["rejected", "declined"]);
+const accepted = (o: OfferRow) => o.hired || ACCEPTED.has(o.status);
+const declined = (o: OfferRow) => !o.hired && DECLINED.has(o.status);
 const company = (c: string | null) => c?.trim() || "An employer";
 
 /** Group rows per student, newest first, and describe them in one line. */
@@ -49,12 +90,28 @@ function perStudent<T extends { userId: string; createdAt: Date }>(rows: T[], st
 
 const names = (rs: { company: string | null }[]) => [...new Set(rs.map((r) => company(r.company)))].join(", ");
 
+/** "Nudged 3 times · last 2 h ago", one line per student, most-nudged first. */
+function nudgeHistory(rows: NudgeRow[], kind: NudgeHistoryKind, students: Map<string, DriveStudentRef>, stillNeeds: Set<string>, now: number): BoardItem[] {
+  const by = new Map<string, Date[]>();
+  for (const r of rows) if (r.kind === kind && students.has(r.userId)) by.set(r.userId, [...(by.get(r.userId) ?? []), r.createdAt]);
+  return [...by.entries()]
+    .map(([id, times]) => ({ id, n: times.length, last: new Date(Math.max(...times.map((t) => t.getTime()))) }))
+    .sort((a, b) => b.n - a.n || b.last.getTime() - a.last.getTime())
+    .map(({ id, n, last }) => ({
+      ...students.get(id)!,
+      detail: `Nudged ${n === 1 ? "1 time" : `${n} times`} · last ${ago(last.toISOString(), now)}`,
+      again: stillNeeds.has(id),
+    }));
+}
+
 export function buildDriveBoard(input: {
   students: DriveStudentRef[];
   meetings: MeetingRow[];
   offers: OfferRow[];
   /** Students offline right now, or null when the drive is not live. */
   offline: OfflineRow[] | null;
+  /** Nudges sent to the drive's students inside the drive's window. Optional: none. */
+  nudges?: NudgeRow[];
   now: number;
 }): DriveBoard {
   const students = new Map(input.students.map((s) => [s.userId, s]));
@@ -68,13 +125,47 @@ export function buildDriveBoard(input: {
   const hired = input.offers.filter((o) => o.hired || HIRED.has(o.status));
   const inDrive = input.offers.filter((o) => students.has(o.userId));
   const hiredItems = perStudent(hired, students, (rs) => `${rs.some((r) => r.fullTime) ? "Full-time" : "Internship"} with ${names(rs)}`);
+
+  // Past-drive answers, per student, from every offer they hold: none accepted but one declined; none answered at all
+  // (still sent, or lapsed). A student who accepted one offer and left another open is in neither.
+  const offersBy = new Map<string, OfferRow[]>();
+  for (const o of inDrive) offersBy.set(o.userId, [...(offersBy.get(o.userId) ?? []), o]);
+  const withOffers = (keep: (rs: OfferRow[]) => boolean) => [...offersBy.values()].filter(keep).flat();
+  const declinedAll = withOffers((rs) => !rs.some(accepted) && rs.some(declined));
+  const unanswered = withOffers((rs) => !rs.some(accepted) && !rs.some(declined));
+
+  // Offline is known only while the drive is live; online is the rest of the drive's students.
+  const offlineIds = new Set((input.offline ?? []).filter((o) => students.has(o.userId)).map((o) => o.userId));
+  const waitingMeet = perStudent(waiting, students, (rs) => `${names(rs)} asked for a meet · ${ago(rs[0].createdAt.toISOString(), now)}`);
+  const waitingOffer = perStudent(open, students, (rs) => `Offer from ${names(rs)} · sent ${ago(rs[0].createdAt.toISOString(), now)}`);
+  const notOpen = input.students.filter((s) => s.openToWork === false).map((s) => ({ ...s, detail: "Open to work is off" }));
+  const nudges = input.nudges ?? [];
+  const needs: Record<NudgeHistoryKind, Set<string>> = {
+    online: offlineIds,
+    open_to_work: new Set(notOpen.map((s) => s.userId)),
+    meeting: new Set(waitingMeet.map((s) => s.userId)),
+    offer: new Set(waitingOffer.map((s) => s.userId)),
+  };
+  const nudged = (kind: NudgeHistoryKind) => nudgeHistory(nudges, kind, students, needs[kind], now);
+  const nudgeTotal = (kind: NudgeHistoryKind) => nudges.filter((n) => n.kind === kind && students.has(n.userId)).length;
   return {
     offerCount: inDrive.length,
+    offerSplit: { internship: inDrive.filter((o) => !o.fullTime).length, fullTime: inDrive.filter((o) => o.fullTime).length },
+    nudgeCounts: { nudgedOnline: nudgeTotal("online"), nudgedOpenToWork: nudgeTotal("open_to_work"), nudgedMeet: nudgeTotal("meeting"), nudgedOffer: nudgeTotal("offer") },
     offlineKnown: input.offline !== null,
     lists: {
-      meetingsWaiting: perStudent(waiting, students, (rs) => `${names(rs)} asked for a meet · ${ago(rs[0].createdAt.toISOString(), now)}`),
-      offersWaiting: perStudent(open, students, (rs) => `Offer from ${names(rs)} · sent ${ago(rs[0].createdAt.toISOString(), now)}`),
-      offline: (input.offline ?? []).filter((o) => students.has(o.userId)).map((o) => ({ ...students.get(o.userId)!, detail: "Not on Findtern right now" })),
+      meetingsWaiting: waitingMeet,
+      offersWaiting: waitingOffer,
+      offline: [...offlineIds].map((id) => ({ ...students.get(id)!, detail: "Not on Findtern right now" })),
+      online: input.offline === null ? [] : input.students.filter((s) => !offlineIds.has(s.userId)).map((s) => ({ ...s, detail: "On Findtern now" })),
+      notOpen,
+      all: input.students.map((s) => ({ ...s, detail: "" })),
+      declinedAll: perStudent(declinedAll, students, (rs) => `Declined ${names(rs.filter(declined))}${rs.some((r) => !declined(r)) ? ` · no reply to ${names(rs.filter((r) => !declined(r)))}` : ""}`),
+      unanswered: perStudent(unanswered, students, (rs) => `${rs.length === 1 ? "No reply to" : `No reply to ${rs.length} offers:`} ${names(rs)}`),
+      nudgedOnline: nudged("online"),
+      nudgedOpenToWork: nudged("open_to_work"),
+      nudgedMeet: nudged("meeting"),
+      nudgedOffer: nudged("offer"),
       offers: perStudent(inDrive, students, (rs) => `${rs.length === 1 ? "1 offer" : `${rs.length} offers`} · ${names(rs)}`),
       meetings: perStudent(held, students, (rs) => `${rs.length === 1 ? "Meet" : `${rs.length} meets`} with ${names(rs)}`),
       internships: perStudent(hired.filter((o) => !o.fullTime), students, (rs) => `Internship with ${names(rs)}`),

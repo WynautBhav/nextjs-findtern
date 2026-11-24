@@ -5,7 +5,7 @@ import { getDb, schema } from "@/lib/db";
 import { todayIst } from "@/lib/offer";
 import { startBegunSql } from "@/lib/offer-start-sql";
 import { q } from "./sql";
-import { buildDriveBoard, matchInvites, type CameEmployer, type DriveBoard, type DriveStudentRef, type Invite } from "./drive-board";
+import { buildDriveBoard, matchInvites, type CameEmployer, type DriveBoard, type DriveStudentRef, type Invite, type NudgeRow } from "./drive-board";
 import type { Drive } from "./scope";
 
 /**
@@ -43,20 +43,26 @@ export async function driveEmployerContacts(driveId: string): Promise<CameEmploy
 /**
  * Everything the drive page needs for one drive: the employer alert and the board. `students` are the drive's
  * students (eligibleStudents), already scoped to this college; offline is passed in from the presence snapshot.
+ * `employerId`: one company that came through the link. Then `view` is the board of the students that company met or
+ * made an offer to (from its meetings and offers only); `board` stays the whole drive's. Without it, `view` is `board`.
+ * An id that is not a company of this drive is ignored.
  */
 export async function loadDriveBoard(
   drive: Drive,
   students: DriveStudentRef[],
   offline: { userId: string }[] | null,
   now = Date.now(),
-): Promise<{ board: DriveBoard; came: CameEmployer[]; invited: Invite[]; arrived: Invite[]; missing: Invite[]; walkIns: number }> {
+  employerId?: string | null,
+): Promise<{ board: DriveBoard; view: DriveBoard; filter: { employerId: string; company: string } | null; came: CameEmployer[]; invited: Invite[]; arrived: Invite[]; missing: Invite[]; walkIns: number }> {
   const came = await driveEmployerContacts(drive.id);
   const ids = students.map((s) => s.userId);
   const employerIds = came.map((c) => c.employerId);
   const companyOf = new Map(came.map((c) => [c.employerId, c.company]));
   const db = getDb();
   const p = schema.proposals;
-  const [meetings, offers] = await Promise.all([
+  const n = schema.collegeNudges;
+  const end = drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt;
+  const [meetings, offers, nudges] = await Promise.all([
     db
       .select({ userId: schema.collegeDriveMeetings.userId, employerId: schema.collegeDriveMeetings.employerId, status: schema.collegeDriveMeetings.status, createdAt: utc(schema.collegeDriveMeetings.createdAt), startsAt: utc(schema.collegeDriveMeetings.startsAt) })
       .from(schema.collegeDriveMeetings)
@@ -73,19 +79,33 @@ export async function loadDriveBoard(
             pastStart: sql<boolean>`${startBegunSql(p.offerDetails, todayIst(new Date(now)))}`,
           })
           .from(p)
-          .where(and(inArray(p.internId, ids), inArray(p.employerId, employerIds), gte(p.createdAt, drive.startsAt), lte(p.createdAt, drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt), ne(p.status, "draft"), realEmployerId(p.employerId)))
+          .where(and(inArray(p.internId, ids), inArray(p.employerId, employerIds), gte(p.createdAt, drive.startsAt), lte(p.createdAt, end), ne(p.status, "draft"), realEmployerId(p.employerId)))
       : Promise.resolve([]),
+    // Nudges carry no drive id: the drive's students, nudged by this college inside the drive's window.
+    ids.length
+      ? db
+          .select({ userId: n.userId, kind: n.kind, createdAt: utc(n.createdAt) })
+          .from(n)
+          .where(and(eq(n.collegeId, drive.collegeId), inArray(n.userId, ids), inArray(n.kind, ["online", "open_to_work", "meeting", "offer"]), gte(n.createdAt, drive.startsAt), lte(n.createdAt, end)))
+      : Promise.resolve([] as NudgeRow[]),
   ]);
   const invited = (drive.invitedEmployers ?? []) as Invite[];
   const { arrived, missing, walkIns } = matchInvites(invited, came);
-  const board = buildDriveBoard({
-    students,
-    meetings: meetings.map((m) => ({ userId: m.userId, company: companyOf.get(m.employerId) ?? null, status: m.status, createdAt: m.createdAt, startsAt: m.startsAt })),
-    offers: offers
-      .filter((o) => o.status !== "withdrawn")
-      .map((o) => ({ userId: o.userId, company: companyOf.get(o.employerId) ?? null, status: (o.status ?? "").toLowerCase(), hired: o.hiredAt !== null, fullTime: Boolean(o.fullTime), pastStart: Boolean(o.pastStart), createdAt: o.createdAt ?? drive.startsAt })),
-    offline,
-    now,
-  });
-  return { board, came, invited, arrived, missing, walkIns };
+  const make = (only: string | null) => {
+    const ms = meetings.filter((m) => !only || m.employerId === only);
+    const os = offers.filter((o) => o.status !== "withdrawn" && (!only || o.employerId === only));
+    // One company's view lists the students it met or offered to, not the whole drive.
+    const touched = new Set([...ms.map((m) => m.userId), ...os.map((o) => o.userId)]);
+    return buildDriveBoard({
+      students: only ? students.filter((s) => touched.has(s.userId)) : students,
+      meetings: ms.map((m) => ({ userId: m.userId, company: companyOf.get(m.employerId) ?? null, status: m.status, createdAt: m.createdAt, startsAt: m.startsAt })),
+      offers: os.map((o) => ({ userId: o.userId, company: companyOf.get(o.employerId) ?? null, status: (o.status ?? "").toLowerCase(), hired: o.hiredAt !== null, fullTime: Boolean(o.fullTime), pastStart: Boolean(o.pastStart), createdAt: o.createdAt ?? drive.startsAt })),
+      offline,
+      nudges: nudges as NudgeRow[],
+      now,
+    });
+  };
+  const only = employerId && companyOf.has(employerId) ? employerId : null;
+  const board = make(null);
+  return { board, view: only ? make(only) : board, filter: only ? { employerId: only, company: companyOf.get(only)?.trim() || "This company" } : null, came, invited, arrived, missing, walkIns };
 }

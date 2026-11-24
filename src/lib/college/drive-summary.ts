@@ -3,8 +3,8 @@
  * how long students and employers were online, how fast students reply, who strong is being missed, and each
  * company's part. Pure: the database reads are in drive-summary-db.ts, so every rule here is unit tested.
  *
- * C12: once a drive is over the officer sees figures only. `open` false drops every student-level list here,
- * so the page cannot render a name it was never given.
+ * `open` true gives the student-level lists (names); false drops them here, so the page cannot render a name it was
+ * never given. The drive page passes true for past drives too (C12 is dropped); only actions are live-only.
  */
 
 export type SummaryStudent = { userId: string; name: string; branch: string | null; year: number | null; phone: string | null; score: number | null };

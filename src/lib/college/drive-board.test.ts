@@ -173,3 +173,77 @@ test("INT-07: board times read like the rest of the console (shared ago): under 
   assert.equal(b.lists.meetingsWaiting[0].detail, "Acme asked for a meet · just now");
   assert.match(b.lists.offersWaiting[0].detail, /sent yesterday$/);
 });
+
+const four = ["a", "b", "c", "d"].map(stu);
+
+test("not open to work, online and total: only an explicit off counts; online is the drive minus offline", () => {
+  const roster = [{ ...stu("a"), openToWork: false }, { ...stu("b"), openToWork: true }, stu("c")];
+  const b = buildDriveBoard({ students: roster, meetings: [], offers: [], offline: [{ userId: "b" }], now: NOW });
+  assert.deepEqual(b.lists.notOpen.map((s) => s.userId), ["a"]);
+  assert.deepEqual(b.lists.online.map((s) => s.userId), ["a", "c"]);
+  assert.deepEqual(b.lists.offline.map((s) => s.userId), ["b"]);
+  assert.equal(b.lists.all.length, 3);
+  const upcoming = buildDriveBoard({ students: roster, meetings: [], offers: [], offline: null, now: NOW });
+  assert.equal(upcoming.lists.online.length, 0, "online is unknown unless the drive is live");
+  assert.equal(upcoming.lists.notOpen.length, 1, "open to work does not depend on presence");
+});
+
+test("offer outcomes: didn't accept any, didn't answer any, and the internship / full-time split", () => {
+  const b = buildDriveBoard({
+    students: four,
+    meetings: [],
+    offers: [
+      { userId: "a", company: "Acme", status: "rejected", hired: false, fullTime: false, createdAt: at(60) },
+      { userId: "a", company: "Beta", status: "sent", hired: false, fullTime: true, createdAt: at(55), pastStart: true },
+      { userId: "b", company: "Acme", status: "sent", hired: false, fullTime: false, createdAt: at(50) },
+      { userId: "b", company: "Gamma", status: "expired", hired: false, fullTime: false, createdAt: at(45) },
+      { userId: "c", company: "Acme", status: "rejected", hired: false, fullTime: false, createdAt: at(40) },
+      { userId: "c", company: "Beta", status: "accepted", hired: false, fullTime: true, createdAt: at(35) },
+      { userId: "d", company: "Acme", status: "hired", hired: true, fullTime: false, createdAt: at(30) },
+    ],
+    offline: null,
+    now: NOW,
+  });
+  assert.deepEqual(b.lists.declinedAll.map((s) => s.userId), ["a"], "a declined one and no yes");
+  assert.equal(b.lists.declinedAll[0].detail, "Declined Acme · no reply to Beta");
+  assert.deepEqual(b.lists.unanswered.map((s) => s.userId), ["b"], "all still sent or lapsed");
+  assert.equal(b.lists.unanswered[0].detail, "No reply to 2 offers: Gamma, Acme");
+  assert.equal(b.offerCount, 7);
+  assert.deepEqual(b.offerSplit, { internship: 5, fullTime: 2 });
+  assert.deepEqual(b.lists.hired.map((s) => s.userId), ["d"]);
+  assert.equal(b.lists.offers.length, 4);
+});
+
+test("nudge history: counted per kind and per student, newest nudge shown, only the drive's students", () => {
+  const b = buildDriveBoard({
+    students,
+    meetings: [{ userId: "a", company: "Acme", status: "requested", createdAt: at(30) }],
+    offers: [],
+    offline: [{ userId: "b" }],
+    nudges: [
+      { userId: "b", kind: "online", createdAt: at(300) },
+      { userId: "b", kind: "online", createdAt: at(120) },
+      { userId: "b", kind: "online", createdAt: at(200) },
+      { userId: "c", kind: "online", createdAt: at(10) },
+      { userId: "a", kind: "meeting", createdAt: at(20) },
+      { userId: "a", kind: "open_to_work", createdAt: at(5) },
+      { userId: "a", kind: "interview", createdAt: at(5) },
+      { userId: "outsider", kind: "online", createdAt: at(1) },
+    ],
+    now: NOW,
+  });
+  assert.deepEqual(b.nudgeCounts, { nudgedOnline: 4, nudgedOpenToWork: 1, nudgedMeet: 1, nudgedOffer: 0 });
+  assert.deepEqual(b.lists.nudgedOnline.map((s) => s.userId), ["b", "c"], "most nudged first");
+  assert.equal(b.lists.nudgedOnline[0].detail, "Nudged 3 times · last 2 h ago");
+  assert.equal(b.lists.nudgedOnline[1].detail, "Nudged 1 time · last 10 min ago");
+  // Nudge again only for who still needs it: b is offline, c came online.
+  assert.deepEqual(b.lists.nudgedOnline.map((s) => s.again), [true, false]);
+  assert.equal(b.lists.nudgedMeet[0].again, true, "the meet request is still unanswered");
+  assert.equal(b.lists.nudgedOpenToWork[0].again, false, "a is open to work (not off)");
+});
+
+test("a past drive keeps the nudge history but offers no nudge again", () => {
+  const b = buildDriveBoard({ students, meetings: [], offers: [], offline: null, nudges: [{ userId: "a", kind: "offer", createdAt: at(900) }], now: NOW });
+  assert.equal(b.nudgeCounts.nudgedOffer, 1);
+  assert.equal(b.lists.nudgedOffer[0].again, false);
+});

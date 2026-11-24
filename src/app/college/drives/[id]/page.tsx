@@ -38,10 +38,11 @@ function requestTime(): number {
 
 /**
  * One campus drive. While it is open: what needs the officer now (calls and offers students haven't answered,
- * students offline), what it has produced, the employer alert, the link and the edit form. Once it is over: the
- * same figures as a report, without the student lists (C12).
+ * students offline or not open to work), what it has produced, the nudges sent, the employer alert, the link and the
+ * edit form. Once it is over: the same board and lists, read-only (student names show; no nudges, no editing).
+ * `?employer=<id>` narrows the board to the students one company met or offered to.
  */
-export default async function DrivePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string; show?: string; view?: string }> }) {
+export default async function DrivePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string; show?: string; view?: string; employer?: string }> }) {
   const ctx = await requireCollegeContext();
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const drive = await driveForCollegeAdmin(ctx, id);
@@ -57,14 +58,14 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   const presence = w === "live" ? await presenceSnapshot(ctx.college.id, verified.map((s) => s.userId)) : null;
   const toRef = (s: (typeof eligible)[number]) => {
     const r = toStudentRow(s);
-    return { userId: r.userId, name: r.name, rollNo: r.rollNo, year: r.year, branch: r.branch, phone: r.phone };
+    return { userId: r.userId, name: r.name, rollNo: r.rollNo, year: r.year, branch: r.branch, phone: r.phone, openToWork: r.openToWork };
   };
   const refs = eligible.map(toRef);
-  const { board, came, invited, arrived, missing, walkIns } = await loadDriveBoard(drive, verified.map(toRef), presence ? presence.offline : null, now);
-  // Drive summary: opened from the hero while the drive runs; always shown, under the hero, once it is over (figures only, C12).
+  const { board, view, filter, came, invited, arrived, missing, walkIns } = await loadDriveBoard(drive, verified.map(toRef), presence ? presence.offline : null, now, sp.employer);
+  // Drive summary: opened from the hero while the drive runs; always shown, under the hero, once it is over (names, read-only).
   const showSummary = !open || sp.view === "summary";
   const summary = showSummary
-    ? await loadDriveSummary(drive, verified.map((s) => ({ ...toRef(s), score: s.score })), came, open)
+    ? await loadDriveSummary(drive, verified.map((s) => ({ ...toRef(s), score: s.score })), came, true)
     : null;
   const activity: DriveActivityRow[] = (
     await getDb()
@@ -80,7 +81,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   const rows = students.map(toStudentRow).map((r) => (r.status === "verified" ? r : { ...r, lastSeenAt: null }));
   const branches = [...new Set(rows.map((s) => s.branch).filter((b): b is string => Boolean(b)))].sort();
   const e = readEligibility(drive.eligibility);
-  // Offers by branch and year: counts only, so they stay on a past drive too (C12 closes the names, not the totals).
+  // Offers by branch and year: counts only, so they stay on a past drive too (a finished drive is read-only).
   const offeredIds = new Set(board.lists.offers.map((s) => s.userId));
   const hiredIds = new Set(board.lists.hired.map((s) => s.userId));
   const group = (key: (r: (typeof refs)[number]) => string) => {
@@ -152,9 +153,15 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
         </div>
       </CollegeHero>
 
-      {summary ? <DriveSummary s={summary} open={open} startedLabel={fmt(drive.startsAt)} /> : null}
+      {summary ? <DriveSummary s={summary} open canAct={open} startedLabel={fmt(drive.startsAt)} /> : null}
 
-      {open ? <DriveBoardView board={board} live={w === "live"} open={open} initial={sp.show} /> : null}
+      <DriveBoardView
+        key={filter?.employerId ?? "all"}
+        board={view}
+        open={open}
+        initial={sp.show}
+        filter={filter ? { company: filter.company, clearHref: `/college/drives/${drive.id}#board` } : null}
+      />
 
       {spread.branches.length > 0 ? (
         <Surface className="p-5 sm:p-6">
