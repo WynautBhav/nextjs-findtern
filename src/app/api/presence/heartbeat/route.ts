@@ -18,5 +18,10 @@ export async function POST(req: Request) {
     .insert(schema.userPresence)
     .values({ userId: uid, lastSeenAt: sql`now()` })
     .onConflictDoUpdate({ target: schema.userPresence.userId, set: { lastSeenAt: sql`now()` } });
+  // Online time for drive summaries: this minute, once (two beats in one minute are one row).
+  await getDb()
+    .insert(schema.presenceMinutes)
+    .values({ userId: uid, minute: sql`date_trunc('minute', now() AT TIME ZONE 'UTC')` })
+    .onConflictDoNothing();
   return NextResponse.json({ ok: true }, { headers: { "Cache-Control": "no-store" } });
 }

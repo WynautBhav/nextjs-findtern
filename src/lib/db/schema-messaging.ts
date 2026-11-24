@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { bigserial, boolean, check, index, jsonb, pgTable, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
+import { bigserial, boolean, check, index, jsonb, pgTable, primaryKey, text, timestamp, uniqueIndex, varchar } from "drizzle-orm/pg-core";
 
 // Mirrors drizzle/0023_messaging.sql column for column.
 
@@ -40,6 +40,16 @@ export const userPresence = pgTable("user_presence", {
   /** 0027. Employers see this user's online / last seen only while true. Enforced in lib/presence.ts. */
   showActivity: boolean("show_activity").notNull().default(true),
 });
+
+/** 0054. One row per user per minute a Findtern tab was open (heartbeat). Drive summaries add these up into online time. */
+export const presenceMinutes = pgTable("presence_minutes", {
+  userId: varchar("user_id").notNull(),
+  /** UTC wall time, truncated to the minute. */
+  minute: timestamp("minute").notNull(),
+}, (t) => ({
+  presenceMinutesPk: primaryKey({ name: "presence_minutes_pk", columns: [t.userId, t.minute] }),
+  presenceMinutesMinuteIdx: index("presence_minutes_minute_idx").on(t.minute),
+}));
 
 export const realtimeEvents = pgTable("realtime_events", {
   id: bigserial("id", { mode: "number" }).primaryKey(),

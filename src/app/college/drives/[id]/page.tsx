@@ -11,6 +11,7 @@ import { Surface } from "@/components/app/primitives";
 import { yearLabel } from "@/lib/college/labels";
 import { DriveBoardView } from "@/components/college/drive-board-view";
 import { DriveBuilder } from "@/components/college/drive-builder";
+import { DriveSummary } from "@/components/college/drive-summary";
 import { EmployerAlert } from "@/components/college/employer-alert";
 import { LinkActions } from "@/components/college/link-actions";
 import { PresenceLive } from "@/components/college/presence-live";
@@ -18,6 +19,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { driveWindow, readEligibility } from "@/lib/college/access";
 import { closedDriveFinding } from "@/lib/college/drive-board";
 import { loadDriveBoard } from "@/lib/college/drive-board-db";
+import { loadDriveSummary } from "@/lib/college/drive-summary-db";
 import { toLocalInput } from "@/lib/college/ist";
 import { DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
 import { driveForCollegeAdmin, eligibleStudents, presenceSnapshot, requireCollegeContext, studentsForCollegeAdmin } from "@/lib/college/scope";
@@ -39,7 +41,7 @@ function requestTime(): number {
  * students offline), what it has produced, the employer alert, the link and the edit form. Once it is over: the
  * same figures as a report, without the student lists (C12).
  */
-export default async function DrivePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string; show?: string }> }) {
+export default async function DrivePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ edit?: string; show?: string; view?: string }> }) {
   const ctx = await requireCollegeContext();
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const drive = await driveForCollegeAdmin(ctx, id);
@@ -59,6 +61,11 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   };
   const refs = eligible.map(toRef);
   const { board, came, invited, arrived, missing, walkIns } = await loadDriveBoard(drive, verified.map(toRef), presence ? presence.offline : null, now);
+  // Drive summary: opened from the hero while the drive runs; always shown, under the hero, once it is over (figures only, C12).
+  const showSummary = !open || sp.view === "summary";
+  const summary = showSummary
+    ? await loadDriveSummary(drive, verified.map((s) => ({ ...toRef(s), score: s.score })), came, open)
+    : null;
   const activity: DriveActivityRow[] = (
     await getDb()
       .select({ id: schema.driveActivityLogs.id, action: schema.driveActivityLogs.action, at: schema.driveActivityLogs.createdAt, company: schema.employers.companyName })
@@ -107,7 +114,19 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
       <CollegeHero
         title={drive.title}
         lede={`${DRIVE_KIND_LABEL[drive.kind] ?? drive.kind} · ${WINDOW_LABEL[w]} · ${fmt(drive.startsAt)} to ${fmt(drive.endsAt)} · ${plural(eligible.length, "student", "students")} in the drive`}
-        actions={open ? <ButtonLink href={`/college/drives/${drive.id}?edit=1#edit`} variant="white">Edit drive</ButtonLink> : null}
+        actions={
+          open ? (
+            <>
+              <ButtonLink
+                href={sp.view === "summary" ? `/college/drives/${drive.id}` : `/college/drives/${drive.id}?view=summary#summary`}
+                variant="outlineLight"
+              >
+                {sp.view === "summary" ? "Hide summary" : "Drive summary"}
+              </ButtonLink>
+              <ButtonLink href={`/college/drives/${drive.id}?edit=1#edit`} variant="white">Edit drive</ButtonLink>
+            </>
+          ) : null
+        }
       >
         <p className="mt-6 max-w-3xl text-pretty text-base text-white">{finding}</p>
         <div className="mt-8">
@@ -132,6 +151,8 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
           />
         </div>
       </CollegeHero>
+
+      {summary ? <DriveSummary s={summary} open={open} startedLabel={fmt(drive.startsAt)} /> : null}
 
       {open ? <DriveBoardView board={board} live={w === "live"} open={open} initial={sp.show} /> : null}
 
