@@ -19,23 +19,32 @@ export function DriveActivity({ rows }: { rows: DriveActivityRow[] }) {
     <Panel>
       <PanelHeader title="Company activity" description="What each company did in this drive, newest first." />
       <PanelBody>
-        {rows.length === 0 ? (
-          <p className="text-sm text-text-subtle">No company has done anything in this drive yet.</p>
-        ) : (
-          <ol className="divide-y divide-ink-100">
-            {rows.map((r) => (
-              <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2.5 text-sm">
-                <span className="min-w-0 text-ink-800">
-                  <span className="font-semibold text-ink-900">{r.company}</span> {LABEL[r.action] ?? r.action}
-                </span>
-                <time dateTime={r.at} className="nums shrink-0 text-text-subtle">
-                  {shortDateTime(new Date(r.at), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
-                </time>
-              </li>
-            ))}
-          </ol>
-        )}
+        <DriveActivityList rows={rows} />
       </PanelBody>
     </Panel>
+  );
+}
+
+/** The list alone, for the past-drive card's pop-up. */
+export function DriveActivityList({ rows, className }: { rows: DriveActivityRow[]; className?: string }) {
+  return (
+    <div className={className}>
+      {rows.length === 0 ? (
+        <p className="text-sm text-text-subtle">No company has done anything in this drive yet.</p>
+      ) : (
+        <ol className="divide-y divide-ink-100">
+          {rows.map((r) => (
+            <li key={r.id} className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2.5 text-sm">
+              <span className="min-w-0 text-ink-800">
+                <span className="font-semibold text-ink-900">{r.company}</span> {LABEL[r.action] ?? r.action}
+              </span>
+              <time dateTime={r.at} className="nums shrink-0 text-text-subtle">
+                {shortDateTime(new Date(r.at), { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}
+              </time>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
   );
 }

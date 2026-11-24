@@ -54,7 +54,9 @@ export async function loadDriveBoard(
   offline: { userId: string }[] | null,
   now = Date.now(),
   employerId?: string | null,
-): Promise<{ board: DriveBoard; view: DriveBoard; filter: { employerId: string; company: string } | null; came: CameEmployer[]; invited: Invite[]; arrived: Invite[]; missing: Invite[]; walkIns: number }> {
+  /** Also build each company's own board (the past-drive card's company pop-up). In memory, no extra queries. */
+  perEmployer = false,
+): Promise<{ board: DriveBoard; view: DriveBoard; byEmployer: Record<string, DriveBoard>; filter: { employerId: string; company: string } | null; came: CameEmployer[]; invited: Invite[]; arrived: Invite[]; missing: Invite[]; walkIns: number }> {
   const came = await driveEmployerContacts(drive.id);
   const ids = students.map((s) => s.userId);
   const employerIds = came.map((c) => c.employerId);
@@ -111,7 +113,8 @@ export async function loadDriveBoard(
   };
   const only = employerId && companyOf.has(employerId) ? employerId : null;
   const board = make(null);
-  return { board, view: only ? make(only) : board, filter: only ? { employerId: only, company: companyOf.get(only)?.trim() || "This company" } : null, came, invited, arrived, missing, walkIns };
+  const byEmployer: Record<string, DriveBoard> = perEmployer ? Object.fromEntries(employerIds.map((id) => [id, make(id)])) : {};
+  return { board, view: only ? make(only) : board, byEmployer, filter: only ? { employerId: only, company: companyOf.get(only)?.trim() || "This company" } : null, came, invited, arrived, missing, walkIns };
 }
 
 /**

@@ -224,7 +224,8 @@ function TileGroup({ title, children }: { title: string; children: ReactNode }) 
   );
 }
 
-function Row({ r, nudge }: { r: BoardItem; nudge?: NudgeHistoryKind }) {
+/** One student in a list: name and roll line, what happened, phone. Shared with the past-drive pop-ups. */
+export function Row({ r, nudge }: { r: BoardItem; nudge?: NudgeHistoryKind }) {
   const meta = [r.rollNo, r.year ? yearLabel(r.year) : null, r.branch].filter(Boolean).join(" · ");
   return (
     <li className="grid gap-x-6 gap-y-1.5 px-5 py-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto_auto] sm:items-center">

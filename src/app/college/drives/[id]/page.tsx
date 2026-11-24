@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { and, desc, eq } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { DriveActivity, type DriveActivityRow } from "@/components/college/drive-activity";
+import { DriveActivity, DriveActivityList, type DriveActivityRow } from "@/components/college/drive-activity";
+import { PastDriveCard } from "@/components/college/past-drive-card";
 
 import { Panel, PanelBody, PanelHeader } from "@/components/college/panel";
 import { CollegeHero } from "@/components/college/kit";
@@ -62,7 +63,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
     return { userId: r.userId, name: r.name, rollNo: r.rollNo, year: r.year, branch: r.branch, phone: r.phone, openToWork: r.openToWork };
   };
   const refs = eligible.map(toRef);
-  const { board, view, filter, came, invited, missing } = await loadDriveBoard(drive, verified.map(toRef), presence ? presence.offline : null, now, sp.employer);
+  const { board, view, byEmployer, filter, came, invited, missing } = await loadDriveBoard(drive, verified.map(toRef), presence ? presence.offline : null, now, open ? sp.employer : null, !open);
   const employers = await loadDriveEmployers(drive, verified.map((s) => s.userId), came, invited, open, now);
   // Drive summary: opened from the hero while the drive runs; always shown, under the hero, once it is over (names, read-only).
   const showSummary = !open || sp.view === "summary";
@@ -112,6 +113,16 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
           .join(" · ")
       : "Nothing is waiting on you right now.";
 
+  const timeline = (
+    <EmployerArrivals
+      start={drive.startsAt}
+      end={drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt}
+      now={now}
+      arrivals={came.map((c) => ({ id: c.employerId, company: c.company ?? "Employer", at: c.joinedAt }))}
+      missing={open ? missing.map((m) => m.company) : []}
+    />
+  );
+
   return (
     <div className="space-y-6">
       <CollegeHero
@@ -133,6 +144,21 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
           ) : null
         }
       >
+        {!open && summary ? (
+          <PastDriveCard
+            board={board}
+            byEmployer={byEmployer}
+            employers={employers}
+            summary={summary}
+            finding={finding}
+            initialShow={sp.show}
+            timeline={timeline}
+            spread={spread.branches.length ? <div className="px-5 py-4 sm:px-6"><DriveSpread branches={spread.branches} years={spread.years} /></div> : null}
+            activity={<DriveActivityList rows={activity} className="px-5 py-2 sm:px-6" />}
+            activityCount={activity.length}
+          />
+        ) : (
+        <>
         <p className="mt-6 max-w-3xl text-pretty text-base text-white">{finding}</p>
         <div className="mt-8">
           <DrivePipeline
@@ -146,17 +172,14 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
             ]}
           />
         </div>
-        <div className="mt-8 border-t border-white/10 pt-6">
-          <EmployerArrivals
-            start={drive.startsAt}
-            end={drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt}
-            now={now}
-            arrivals={came.map((c) => ({ id: c.employerId, company: c.company ?? "Employer", at: c.joinedAt }))}
-            missing={open ? missing.map((m) => m.company) : []}
-          />
-        </div>
+        <div className="mt-8 border-t border-white/10 pt-6">{timeline}</div>
+        </>
+        )}
       </CollegeHero>
 
+      {/* A finished drive is the one card above: its lists open in pop-ups, so nothing else repeats them below. */}
+      {!open ? null : (
+      <>
       {summary ? <DriveSummary s={summary} open canAct={open} startedLabel={fmt(drive.startsAt)} /> : null}
 
       <DriveBoardView
@@ -215,6 +238,8 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
       </Panel>
 
       <DriveActivity rows={activity} />
+      </>
+      )}
 
       {/* Folded unless asked for (Edit drive): the page is about the drive running. Gone once it is over. */}
       {open ? (
