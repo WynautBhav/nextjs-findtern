@@ -81,6 +81,15 @@ test("tracking that began after the drive started is partial; after it ended, no
   assert.equal(late.online.studentsAvg, null);
 });
 
+test("partial tracking: online is not graded, and nudges sent before tracking are not judged", () => {
+  // Tracking began 30 minutes in; both "come online" nudges went out at minute 5.
+  const s = base({ trackingSince: at(30) });
+  assert.ok(!s.health.signals.some((x) => x.key === "online"));
+  for (const r of s.nudges.rows.filter((x) => x.kind === "online")) assert.equal(r.worked, null);
+  assert.equal(s.nudges.again.online, undefined);
+  assert.equal(s.nudges.byKind.find((k) => k.kind === "online")?.checkable, false);
+});
+
 test("reply speed is the median, in minutes for meets and hours for offers", () => {
   const s = base();
   assert.equal(s.speed.meetMedianMin, 12);

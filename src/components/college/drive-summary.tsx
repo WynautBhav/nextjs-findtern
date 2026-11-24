@@ -69,6 +69,9 @@ const CLOSED = "The drive is over, so names are closed. The figures stay.";
 export function DriveSummary({ s, open, canAct = open, startedLabel }: { s: Summary; open: boolean; /** The drive is still running: nudge buttons show. A finished drive shows names but no actions. */ canAct?: boolean; startedLabel: string }) {
   const since = s.trackingSince ? shortDateTime(s.trackingSince, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric" }) : null;
   const verdict = VERDICT[s.health.verdict];
+  const sinceDay = s.trackingSince ? shortDateTime(s.trackingSince, { timeZone: "Asia/Kolkata", day: "numeric", month: "short" }) : null;
+  // On a part-recorded drive "never online" is not known; only "not seen since tracking began" is.
+  const notSeen = s.tracked === "partial" && sinceDay ? `not seen since ${sinceDay}` : "never online";
   const funnelBase = s.funnel[0]?.value ?? 0;
   const empMax = Math.max(1, ...s.online.employers.map((e) => e.minutes));
   const trackedNote =
@@ -210,7 +213,7 @@ export function DriveSummary({ s, open, canAct = open, startedLabel }: { s: Summ
           note={trackedNote ?? "Time with Findtern open during the drive."}
           action={
             canAct && s.tracked !== "none" && s.online.neverOnline.length ? (
-              <NudgeButton kind="online" userIds={s.online.neverOnline.map((x) => x.userId)} label={`Nudge ${n(s.online.neverOnline.length)} never online`} size="xs" emphasis />
+              <NudgeButton kind="online" userIds={s.online.neverOnline.map((x) => x.userId)} label={`Nudge ${n(s.online.neverOnline.length)} ${notSeen}`} size="xs" emphasis />
             ) : null
           }
         >
@@ -228,7 +231,7 @@ export function DriveSummary({ s, open, canAct = open, startedLabel }: { s: Summ
                   <dd className="nums mt-1 text-lg font-light tracking-[-0.02em] sm:text-xl text-ink-900">{n(s.online.studentsEver)}</dd>
                 </div>
                 <div>
-                  <dt className="text-xs text-text-subtle">Never online</dt>
+                  <dt className="text-xs text-text-subtle first-letter:uppercase">{notSeen}</dt>
                   <dd className={cn("nums mt-1 text-lg font-light tracking-[-0.02em] sm:text-xl", s.online.neverOnlineCount ? "text-warning" : "text-ink-900")}>{n(s.online.neverOnlineCount)}</dd>
                 </div>
               </dl>
@@ -249,7 +252,7 @@ export function DriveSummary({ s, open, canAct = open, startedLabel }: { s: Summ
           )}
         </Block>
 
-        <Block id="sum-online-employers" title="Companies online" note={s.tracked === "none" ? (trackedNote ?? undefined) : "Time each company had Findtern open during the drive."}>
+        <Block id="sum-online-employers" title="Companies online" note={trackedNote ?? "Time each company had Findtern open during the drive."}>
           {s.online.employers.length === 0 ? (
             <p className="text-sm text-ink-700">No company has come in yet.</p>
           ) : (

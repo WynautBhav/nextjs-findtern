@@ -93,7 +93,6 @@ export async function DriveLanding({
             <p className="mt-3 text-pretty text-[0.9375rem] leading-relaxed text-ink-600">
               {college.name}
               {college.city ? `, ${college.city}` : ""} is inviting employers to meet its students on Findtern.
-              {drive.description ? ` ${drive.description}` : ""}
             </p>
 
             {/* One quiet list, not four equal cards with an icon each (a §0 tell). */}

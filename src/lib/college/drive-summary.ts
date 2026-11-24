@@ -119,6 +119,7 @@ export function buildDriveSummary(input: {
     const after = (d: Date | null) => d !== null && d > n.createdAt && d <= until;
     if (n.kind === "online") {
       if (tracked === "none") return { worked: null, outcome: "Online time not recorded yet" };
+      if (input.trackingSince && n.createdAt < input.trackingSince) return { worked: null, outcome: "Sent before online time was recorded" };
       return input.onlineAt(n.userId, n.createdAt, until) ? { worked: true, outcome: "Came online" } : { worked: false, outcome: "Not online since" };
     }
     if (n.kind === "meeting") {
@@ -195,7 +196,8 @@ export function buildDriveSummary(input: {
   } else {
     signals.push({ key: "employers", label: "Companies in the drive", value: String(employers.length), ok: employers.length >= 3, href: `${input.driveHref}#employer-alert` });
   }
-  if (tracked !== "none" && students.length) signals.push({ key: "online", label: "Students online at least once", value: `${pct(online.studentsEver, students.length)}%`, ok: pct(online.studentsEver, students.length) >= 50, href: href("offline") });
+  // Graded only when the whole drive was recorded: a part-recorded drive would look emptier than it was.
+  if (tracked === "full" && students.length) signals.push({ key: "online", label: "Students online at least once", value: `${pct(online.studentsEver, students.length)}%`, ok: pct(online.studentsEver, students.length) >= 50, href: href("offline") });
   const bad = signals.filter((s) => !s.ok);
   const verdict: DriveSummary["health"]["verdict"] = bad.length === 0 ? "good" : bad.length <= 2 ? "watch" : "poor";
   const line = verdict === "good" ? "Every signal is where it should be." : `Below target: ${bad.map((b) => `${b.label.toLowerCase()} ${b.value}`).join(", ")}.`;

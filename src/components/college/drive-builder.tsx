@@ -248,16 +248,6 @@ export function DriveBuilder({
           <IstDateTime label="Opens (IST)" value={d.startsAt} min={initial.startsAt && initial.startsAt.slice(0, 10) < today ? initial.startsAt.slice(0, 10) : today} onChange={(v) => set("startsAt", v)} field={field} />
           <IstDateTime label="Closes (IST)" value={d.endsAt} min={d.startsAt.slice(0, 10) > today ? d.startsAt.slice(0, 10) : today} onChange={(v) => set("endsAt", v)} field={field} />
 
-          <label className="block md:col-span-2">
-            <span className="text-sm font-medium text-ink-800">Note for employers <span className="font-normal text-text-subtle">(optional)</span></span>
-            <textarea
-              className="mt-1.5 min-h-24 w-full rounded-apple-sm border border-ink-200 bg-white px-3 py-2.5 text-sm text-ink-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20"
-              value={d.description}
-              onChange={(e) => set("description", e.target.value)}
-              maxLength={2000}
-              placeholder="Batch, timings, who to contact at the placement cell"
-            />
-          </label>
         </div>
       </section>
 
