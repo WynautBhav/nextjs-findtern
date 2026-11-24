@@ -46,7 +46,6 @@ export type DriveSummary = {
     slowMeet: { userId: string; name: string; minutes: number }[];
   };
   missed: { count: number; rows: SummaryStudent[] };
-  employers: { employerId: string; company: string; joinedAt: Date; minutes: number | null; shortlisted: number; meets: number; offers: number; hires: number }[];
 };
 
 const NUDGE_LABEL: Record<NudgeKind, string> = { online: "Come online", meeting: "Answer a meet request", offer: "Reply to an offer", interview: "Interview" };
@@ -182,18 +181,6 @@ export function buildDriveSummary(input: {
   // Strong students nobody has reached.
   const missedAll = students.filter((s) => s.score !== null && s.score >= STRONG_SCORE && !called.has(s.userId) && !offered.has(s.userId)).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 
-  // Each company's part.
-  const employerRows = employers.map((e) => ({
-    employerId: e.employerId,
-    company: e.company,
-    joinedAt: e.joinedAt,
-    minutes: tracked === "none" ? null : minutesOf(e.employerId),
-    shortlisted: e.shortlisted,
-    meets: meetings.filter((m) => m.employerId === e.employerId).length,
-    offers: offers.filter((o) => o.employerId === e.employerId).length,
-    hires: offers.filter((o) => o.employerId === e.employerId && o.hired).length,
-  }));
-
   // Health: a handful of signals, each with a plain threshold, each a link to where it can be fixed.
   const meetAsked = meetings.length;
   const meetAnswered = meetings.filter((m) => answered(m.status)).length;
@@ -222,6 +209,5 @@ export function buildDriveSummary(input: {
     online,
     speed,
     missed: { count: missedAll.length, rows: open ? missedAll.slice(0, 20) : [] },
-    employers: employerRows,
   };
 }

@@ -12,6 +12,7 @@ import { yearLabel } from "@/lib/college/labels";
 import { DriveBoardView } from "@/components/college/drive-board-view";
 import { DriveBuilder } from "@/components/college/drive-builder";
 import { DriveSummary } from "@/components/college/drive-summary";
+import { DriveEmployersPanel } from "@/components/college/drive-employers";
 import { EmployerAlert } from "@/components/college/employer-alert";
 import { LinkActions } from "@/components/college/link-actions";
 import { PresenceLive } from "@/components/college/presence-live";
@@ -19,6 +20,7 @@ import { ButtonLink } from "@/components/ui/button";
 import { driveWindow, readEligibility } from "@/lib/college/access";
 import { closedDriveFinding } from "@/lib/college/drive-board";
 import { loadDriveBoard } from "@/lib/college/drive-board-db";
+import { loadDriveEmployers } from "@/lib/college/drive-employers-db";
 import { loadDriveSummary } from "@/lib/college/drive-summary-db";
 import { toLocalInput } from "@/lib/college/ist";
 import { DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
@@ -61,6 +63,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   };
   const refs = eligible.map(toRef);
   const { board, came, invited, arrived, missing, walkIns } = await loadDriveBoard(drive, verified.map(toRef), presence ? presence.offline : null, now);
+  const employers = await loadDriveEmployers(drive, verified.map((s) => s.userId), came, invited, open, now);
   // Drive summary: opened from the hero while the drive runs; always shown, under the hero, once it is over (figures only, C12).
   const showSummary = !open || sp.view === "summary";
   const summary = showSummary
@@ -167,6 +170,8 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
           </div>
         </Surface>
       ) : null}
+
+      <DriveEmployersPanel driveId={drive.id} data={employers} over={!open} />
 
       <EmployerAlert invited={invited} arrived={arrived} missing={missing} came={came} walkIns={walkIns} over={!open} />
 

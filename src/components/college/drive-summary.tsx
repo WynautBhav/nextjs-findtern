@@ -321,44 +321,6 @@ export function DriveSummary({ s, open, startedLabel }: { s: Summary; open: bool
           {!open && s.missed.count ? <p className="mt-3 text-xs text-text-subtle">{CLOSED}</p> : null}
         </Block>
       </div>
-
-      {/* Each company's part in the drive. */}
-      <div className="border-t border-ink-100">
-        <Block id="sum-employers" title="What each company did">
-          {s.employers.length === 0 ? (
-            <p className="text-sm text-ink-700">No company has come in yet.</p>
-          ) : (
-            <div className="-mx-5 overflow-x-auto sm:-mx-6">
-              <table className="w-full min-w-[40rem] text-sm">
-                <thead>
-                  <tr className="text-left text-xs text-text-subtle">
-                    <th scope="col" className="px-5 pb-2 font-medium sm:px-6">Company</th>
-                    <th scope="col" className="px-3 pb-2 font-medium">Came in</th>
-                    <th scope="col" className="px-3 pb-2 text-right font-medium">Online</th>
-                    <th scope="col" className="px-3 pb-2 text-right font-medium">Shortlisted</th>
-                    <th scope="col" className="px-3 pb-2 text-right font-medium">Meets</th>
-                    <th scope="col" className="px-3 pb-2 text-right font-medium">Offers</th>
-                    <th scope="col" className="px-5 pb-2 text-right font-medium sm:px-6">Hires</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-ink-100 border-t border-ink-100">
-                  {s.employers.map((e) => (
-                    <tr key={e.employerId}>
-                      <th scope="row" className="px-5 py-2.5 text-left font-medium text-ink-900 sm:px-6">{e.company}</th>
-                      <td className="nums px-3 py-2.5 text-ink-700">{when(e.joinedAt)}</td>
-                      <td className="nums px-3 py-2.5 text-right text-ink-700">{duration(e.minutes)}</td>
-                      <td className="nums px-3 py-2.5 text-right text-ink-900">{n(e.shortlisted)}</td>
-                      <td className="nums px-3 py-2.5 text-right text-ink-900">{n(e.meets)}</td>
-                      <td className="nums px-3 py-2.5 text-right text-ink-900">{n(e.offers)}</td>
-                      <td className={cn("nums px-5 py-2.5 text-right sm:px-6", e.hires ? "font-semibold text-ink-900" : "text-ink-700")}>{n(e.hires)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Block>
-      </div>
     </section>
   );
 }
