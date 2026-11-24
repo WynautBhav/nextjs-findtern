@@ -26,7 +26,7 @@ export async function reissueDriveLink(
   now: Date = new Date(),
 ): Promise<void> {
   await db.transaction(async (tx) => {
-    await tx.update(collegeDrives).set({ tokenHash, revokedAt: null, updatedAt: now }).where(eq(collegeDrives.id, driveId));
+    await tx.update(collegeDrives).set({ tokenHash, updatedAt: now }).where(eq(collegeDrives.id, driveId));
     // A company that left the drive (Exit campus drive) keeps its row: a new link, a resent invite or an auto-join at
     // sign-in must not put it back under the lock and the drive pricing.
     await tx.delete(collegeDriveEmployers).where(and(eq(collegeDriveEmployers.driveId, driveId), ne(collegeDriveEmployers.status, "exited")));

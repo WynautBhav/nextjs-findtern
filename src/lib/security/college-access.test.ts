@@ -259,7 +259,7 @@ test("QA-201: a drive of an inactive college refuses the link and every API call
 
 // ── QA-200: a new link lets out everyone who joined through the old one ─
 
-test("QA-200: reissuing a link swaps the token, reopens the drive and deletes the joined rows, in one transaction", async () => {
+test("QA-200: reissuing a link swaps the token and deletes the joined rows, in one transaction, and never reopens a closed drive", async () => {
   const { reissueDriveLink } = await import("../college/link.ts");
   const { getTableName } = await import("drizzle-orm");
   const ops: string[] = [];
@@ -290,7 +290,7 @@ test("QA-200: reissuing a link swaps the token, reopens the drive and deletes th
   };
   await reissueDriveLink(db as never, "drive-x", "new-hash");
   assert.deepEqual(ops, [
-    'tx update college_drives {"tokenHash":"new-hash","revokedAt":null}',
+    'tx update college_drives {"tokenHash":"new-hash"}',
     "tx delete college_drive_employers",
   ]);
   // And with its row gone, the employer who joined through the old link is

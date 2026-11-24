@@ -14,9 +14,14 @@ test("the booking service and offering new times both refuse a second open meeti
   assert.match(s, /otherOpenMeeting\(tx, i\.employerId, i\.internId, null\)/);
 });
 
-test("the schedule dims the offer-new-times button when another meeting with the candidate is open", () => {
-  assert.match(src("src/app/employer/schedule/schedule-view.tsx"), /rescheduleBlocked=\{rescheduleBlocked\}/);
-  assert.match(src("src/components/employer/interview-actions.tsx"), /disabled=\{busy !== null \|\| rescheduleBlocked\}/);
+test("employers have no reschedule (owner 24 Nov 2026): no button or panel, and the route refuses", () => {
+  const actions = src("src/components/employer/interview-actions.tsx");
+  assert.doesNotMatch(actions, /OfferTimes|"reschedule"|Reschedule"|Offer 3 (new )?time/);
+  assert.doesNotMatch(src("src/app/employer/schedule/schedule-view.tsx"), /rescheduleBlocked/);
+  const route = src("src/app/api/interviews/[id]/reschedule/route.ts");
+  assert.match(route, /employer_reschedule_removed/);
+  assert.match(route, /status: 403/);
+  assert.doesNotMatch(route, /\bact\(|\.update\(|\.insert\(/);
 });
 
 test("every Book meeting button reads hasOpenMeeting (candidate list and quick view, profile, proposal, cart, schedule, orders)", () => {

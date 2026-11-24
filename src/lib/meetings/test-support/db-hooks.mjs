@@ -29,7 +29,7 @@ export async function load(url, context, next) {
     const src = {
       "next-server": `export const NextResponse = { json: (body, init) => ({ status: init?.status ?? 200, body }), redirect: (u) => ({ status: 302, location: String(u) }) }; export const after = (fn) => fn();`,
       guard: `export const requireMutation = async ({ roles }) => { const s = globalThis.__session; return s && roles.includes(s.role) ? { ok: true, session: s } : { ok: false, response: { status: 401, body: { error: "Unauthenticated" } } }; };`,
-      auth: `export const getSession = async () => globalThis.__session ?? null;`,
+      auth: `export const getSession = async () => globalThis.__session ?? null; export const loginRedirectFor = async (role) => "/login?role=" + role;`,
       "next-headers": `export const cookies = async () => ({ get: () => undefined, set() {}, delete() {} }); export const headers = async () => new Headers();`,
       empty: `export {};`,
       "intern-unlock": `export const internLockResponse = async () => null;`,

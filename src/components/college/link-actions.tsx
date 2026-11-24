@@ -12,7 +12,6 @@ import { ShareLink } from "./share-link";
 /** Issue a fresh link (old one dies) or close the drive to every employer at once. */
 export function LinkActions(props: {
   driveId: string;
-  revoked: boolean;
   /** Open straight at the Close drive confirm (the hero's Close drive button). */
   askClose?: boolean;
   collegeName: string;
@@ -28,7 +27,7 @@ export function LinkActions(props: {
   const [note, setNote] = useState<string | null>(null);
   // Asked in the page, not window.confirm (as admin since QA-145): the
   // consequence is spelled out next to the yes/cancel pair.
-  const [asking, setAsking] = useState<"POST" | "DELETE" | null>(props.askClose && !props.revoked ? "DELETE" : null);
+  const [asking, setAsking] = useState<"POST" | "DELETE" | null>(props.askClose ? "DELETE" : null);
 
   // Cancel or Esc puts focus back on the button that asked (QA-159).
   const box = useRef<HTMLDivElement>(null);
@@ -59,19 +58,19 @@ export function LinkActions(props: {
 
   const consequence =
     asking === "DELETE"
-      ? "The drive ends now. Every employer, including those already inside, loses access immediately. You can reopen it later with a new link."
+      ? "The drive ends now and can't be reopened. Every employer, including those already inside, loses access immediately."
       : "The current link stops working, and companies already inside are let out too. Companies you invited are emailed a fresh invite; send the new link to any others you still want. Shortlists are kept.";
 
   return (
     <div ref={box} className="space-y-4">
       {url ? (
         <ShareLink url={url} {...props} />
-      ) : !props.revoked ? (
+      ) : (
         // Only a fingerprint of the link is stored, so it can't be shown again.
         <p className="text-sm text-ink-600">
           The link was shown once, when it was made, and can&apos;t be shown again. If you&apos;ve lost it, issue a new one.
         </p>
-      ) : null}
+      )}
       {asking ? (
         <div
           role="group"
@@ -103,35 +102,31 @@ export function LinkActions(props: {
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           {/* Adding a company never touches the link: the safe way to bring one more in. */}
-          {!props.revoked ? (
-            <InviteCompany
-              driveId={props.driveId}
-              onNote={(text) => {
-                setError(null);
-                setNote(text);
-              }}
-            />
-          ) : null}
+          <InviteCompany
+            driveId={props.driveId}
+            onNote={(text) => {
+              setError(null);
+              setNote(text);
+            }}
+          />
           <button
             type="button"
             data-ask="POST"
             disabled={busy}
-            onClick={() => (props.revoked ? void call("POST") : setAsking("POST"))}
+            onClick={() => setAsking("POST")}
             className={buttonClass({ variant: "outline", size: "sm" })}
           >
-            {props.revoked ? "Reopen with a new link" : "Issue a new link"}
+            Issue a new link
           </button>
-          {!props.revoked ? (
-            <button
-              type="button"
-              data-ask="DELETE"
-              disabled={busy}
-              onClick={() => setAsking("DELETE")}
-              className={buttonClass({ variant: "ghost", size: "sm", className: "text-danger hover:bg-danger-soft" })}
-            >
-              Close drive
-            </button>
-          ) : null}
+          <button
+            type="button"
+            data-ask="DELETE"
+            disabled={busy}
+            onClick={() => setAsking("DELETE")}
+            className={buttonClass({ variant: "ghost", size: "sm", className: "text-danger hover:bg-danger-soft" })}
+          >
+            Close drive
+          </button>
         </div>
       )}
       <span role="status" aria-live="polite" className={error ? "text-sm text-danger" : "text-sm text-ink-600"}>

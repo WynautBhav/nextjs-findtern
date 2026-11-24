@@ -148,7 +148,7 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       await db.delete(schema.interviews).where(eq(schema.interviews.id, other.id));
     });
 
-    await t.test("intern cannot offer times or ask to reschedule (403, nothing changes); the employer re-offers exactly 3 -> intern picks", async () => {
+    await t.test("nobody can reschedule (403, nothing changes): not the intern, not the employer; the intern picks from the first times", async () => {
       const first = await offer(e1, i3, [wall(140), wall(141), wall(142)]);
       assert.equal(first.status, 201, JSON.stringify(first.body));
       const id = (first.body.interview as { id: string }).id;
@@ -168,17 +168,13 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       assert.ok(cur.slot1 && cur.slot2 && cur.slot3, "the company's three times are still there");
       const notes = await db.select().from(schema.notifications).where(sql`${schema.notifications.recipientId} = ${e1.id} and ${schema.notifications.data}->>'interviewId' = ${id} and ${schema.notifications.type} = 'meeting_reschedule_requested'`);
       assert.equal(notes.length, 0, "no reschedule notification");
-      // the employer must offer exactly 3
+      // ...and the employer can't reschedule either (owner 24 Nov 2026): refused, nothing changes; the intern picks from the first times
       as("employer", e1.id);
-      assert.equal((await call(reschedule, id, { slots: [wall(40), wall(41)] })).status, 400);
-      assert.equal((await call(reschedule, id, { slots: [wall(40), wall(41), wall(41)] })).status, 400);
       const re = await call(reschedule, id, { slots: [wall(40), wall(41), wall(42)] });
-      assert.equal(re.status, 200, JSON.stringify(re.body));
+      assert.equal(re.status, 403, JSON.stringify(re.body));
+      assert.equal(re.body.code, "employer_reschedule_removed");
       cur = await row(id);
-      assert.equal(cur.proposedBy, "employer");
-      assert.equal(cur.round, 2);
-      assert.ok(cur.slot1 && cur.slot2 && cur.slot3 && cur.respondBy);
-      assert.equal(cur.cancelReason, null);
+      assert.deepEqual([cur.status, cur.proposedBy, cur.round], ["pending", "employer", 1]);
       as("intern", i3.id);
       assert.equal((await call(selectSlot, id, { slot: 3 })).status, 200);
       assert.equal((await row(id)).status, "scheduled");
@@ -241,29 +237,20 @@ test("meeting routes, real SQL", { skip: !enabled && "set MEETINGS_TEST_DATABASE
       assert.equal((await call(askReschedule, id, {})).status, 403, "a lapsed offer cannot be turned into a request either");
     });
 
-    await t.test("one open meeting per pair: an expired or lapsed meeting cannot be revived while another is open (409 open_meeting); the open one itself can be re-offered", async () => {
-      // e2 + i3 still has the lapsed offer from the test above. A fresh offer is allowed and is now the open one.
+    await t.test("an expired, lapsed or open meeting is never re-offered: the employer's reschedule is refused for each (403), nothing changes", async () => {
       const lapsed = (await db.select().from(schema.interviews).where(sql`${schema.interviews.employerId} = ${e2.id} and ${schema.interviews.internId} = ${i3.id}`))[0];
       const fresh = await offer(e2, i3, [wall(300), wall(301), wall(302)]);
       assert.equal(fresh.status, 201, JSON.stringify(fresh.body));
       const openId = (fresh.body.interview as { id: string }).id;
       await db.update(schema.interviews).set({ status: "expired" }).where(eq(schema.interviews.id, lapsed.id));
       as("employer", e2.id);
-      for (const id of [lapsed.id]) {
+      for (const id of [lapsed.id, openId]) {
+        const before = await row(id);
         const r = await call(reschedule, id, { slots: [wall(310), wall(311), wall(312)] });
-        assert.equal(r.status, 409, JSON.stringify(r.body));
-        assert.equal(r.body.code, "open_meeting");
-        assert.equal((await row(id)).status, "expired", "still expired");
+        assert.equal(r.status, 403, JSON.stringify(r.body));
+        assert.equal(r.body.code, "employer_reschedule_removed");
+        assert.deepEqual([(await row(id)).status, (await row(id)).round], [before.status, before.round]);
       }
-      // the same pair's lapsed-but-not-yet-swept pending row is refused the same way
-      await db.update(schema.interviews).set({ status: "pending", respondBy: new Date(Date.now() - 60_000) }).where(eq(schema.interviews.id, lapsed.id));
-      assert.equal((await call(reschedule, lapsed.id, { slots: [wall(310), wall(311), wall(312)] })).body.code, "open_meeting");
-      // the open meeting itself is still re-offerable
-      assert.equal((await call(reschedule, openId, { slots: [wall(320), wall(321), wall(322)] })).status, 200);
-      // once the open one is cancelled the lapsed one can be revived
-      assert.equal((await call(cancel, openId, { reason: "no longer needed" })).status, 200);
-      assert.equal((await call(reschedule, lapsed.id, { slots: [wall(330), wall(331), wall(332)] })).status, 200);
-      assert.equal((await row(lapsed.id)).status, "pending");
     });
 
     await t.test("a cancel reason loses contact details and names before the hire: stored row, other side's alert", async () => {

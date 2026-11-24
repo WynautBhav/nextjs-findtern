@@ -134,7 +134,7 @@ function EntryPanel({
   if (state === "revoked" || state === "ended") {
     return (
       <PanelCopy
-        title={state === "ended" ? "This drive has ended" : "The college has closed this link"}
+        title="This drive has ended"
         body="Ask the placement office for a new link if you were expecting to join. You can still find candidates on Findtern."
       >
         <ButtonLink href="/employers" variant="outline" block>

@@ -74,7 +74,7 @@ export async function POST(req: Request) {
   if (outcome.status === 404) return NextResponse.json({ error: "This link isn't valid" }, { status: 404 });
   if (outcome.status === 403) {
     const msg: Record<string, string> = {
-      revoked: "The college has closed this link.",
+      revoked: "This drive has ended.",
       not_started: "This drive hasn't opened yet.",
       ended: "This drive has ended.",
       exited: "You left this drive. Your offers and hires from it are still in your account.",

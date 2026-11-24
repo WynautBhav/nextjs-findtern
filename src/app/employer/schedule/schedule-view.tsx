@@ -192,7 +192,7 @@ export function ScheduleView({
                   <h2 className="mb-2 text-base font-semibold text-ink-900">{sec.title}</h2>
                   <Surface as="ul" className="divide-y divide-ink-100 overflow-hidden">
                     {sec.rows.map((r) => (
-                      <ScheduleRow key={r.iv.id} r={r} now={now} past={sec.past === true} employerId={employerId} meetingOpen={openWith.has(r.iv.internId)} rescheduleBlocked={hasOpenMeeting(all.filter((x) => x.iv.internId === r.iv.internId && x.iv.id !== r.iv.id).map((x) => x.iv))} />
+                      <ScheduleRow key={r.iv.id} r={r} now={now} past={sec.past === true} employerId={employerId} meetingOpen={openWith.has(r.iv.internId)} />
                     ))}
                   </Surface>
                   {sec.more > 0 ? (
@@ -240,7 +240,7 @@ function clockOf(t: number, tz: string): { time: string; zone: string } {
   return { time, zone };
 }
 
-function ScheduleRow({ r, now, past, employerId, meetingOpen, rescheduleBlocked }: { r: Row; now: number; past: boolean; employerId: string; meetingOpen: boolean; rescheduleBlocked: boolean }) {
+function ScheduleRow({ r, now, past, employerId, meetingOpen }: { r: Row; now: number; past: boolean; employerId: string; meetingOpen: boolean }) {
   const { iv, stage } = r;
   const slots = [iv.slot1, iv.slot2, iv.slot3].filter((x): x is NonNullable<typeof x> => Boolean(x));
   const link = isMeetingLinkLive(iv, now) ? maskMeetingLink(iv.meetingLink) : null;
@@ -315,7 +315,7 @@ function ScheduleRow({ r, now, past, employerId, meetingOpen, rescheduleBlocked 
           ) : null}
           {requested ? (
             <p className="mt-1 text-sm text-ink-600">
-              The candidate asked to reschedule: please offer 3 new time slots.
+              The candidate asked to reschedule. Cancel this meeting and book a new one if you still want to meet.
               {iv.cancelReason ? (
                 <>
                   {" "}
@@ -350,7 +350,7 @@ function ScheduleRow({ r, now, past, employerId, meetingOpen, rescheduleBlocked 
         joinInput={serializeJoinInput(iv)}
         serverNow={new Date(now).toISOString()}
         bookAgain={
-          cancelled && !r.down ? (
+          (cancelled || stage === "expired" || stage === "employer_no_show") && !r.down ? (
             <BookMeetingButton
               employerId={employerId}
               internId={iv.internId}
@@ -365,7 +365,6 @@ function ScheduleRow({ r, now, past, employerId, meetingOpen, rescheduleBlocked 
         }
         turn={view.turn}
         requested={requested}
-        rescheduleBlocked={rescheduleBlocked}
         canCancel={view.canCancel && !theirs && !r.down}
       />
       {theirs && !r.down ? (

@@ -30,7 +30,7 @@ export function DriveStatePill({ state, audience = "employer" }: { state: DriveW
     // Never wraps: "Live now" broke over two lines beside a long title.
     <Pill tone={s.tone} className="shrink-0 whitespace-nowrap">
       {state === "live" ? <span aria-hidden className="size-1.5 rounded-full bg-brand-600" /> : null}
-      {audience === "college" && state === "revoked" ? "Link closed" : s.label}
+      {audience === "college" && state === "revoked" ? "Closed" : s.label}
     </Pill>
   );
 }

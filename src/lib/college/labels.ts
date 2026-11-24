@@ -58,7 +58,7 @@ export const WINDOW_LABEL: Record<string, string> = {
   upcoming: "Opens soon",
   live: "Live",
   ended: "Ended",
-  revoked: "Link closed",
+  revoked: "Closed",
 };
 
 /** The India calendar day (days since 1970) of an instant: "yesterday" means yesterday there, not 24 to 48 hours ago. */

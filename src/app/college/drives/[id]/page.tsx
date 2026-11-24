@@ -160,7 +160,8 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
       {summary ? <DriveSummary s={summary} open canAct={open} startedLabel={fmt(drive.startsAt)} /> : null}
 
       <DriveBoardView
-        key={filter?.employerId ?? "all"}
+        // Remounted when a link changes ?show= (hero pipeline, summary): the board opens that list instead of keeping its tab.
+        key={`${filter?.employerId ?? "all"}:${sp.show ?? ""}`}
         board={view}
         open={open}
         initial={sp.show}
@@ -190,19 +191,18 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
             title="Link"
             description={
               w === "revoked"
-                ? "Closed. No employer can get in. Reopen it with a new link."
+                ? "Closed. No employer can get in."
                 : w === "ended"
                   ? "Ended. No employer can get in."
                   : "Send it to the companies you invite. They must sign in to Findtern. Close the drive at any time."
             }
           />
-          {w === "ended" ? null : (
+          {w === "ended" || w === "revoked" ? null : (
           <PanelBody>
             <LinkActions
               // Remounted when the hero's Close drive adds ?close=1, so it opens at the confirm step.
               key={sp.close === "1" ? "close" : "link"}
               driveId={drive.id}
-              revoked={w === "revoked"}
               askClose={sp.close === "1" && open}
               collegeName={ctx.college.name}
               driveTitle={drive.title}

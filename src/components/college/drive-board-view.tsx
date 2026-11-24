@@ -98,6 +98,11 @@ const PAST: Group[] = [
 const STAGES: Tile[] = [
   { key: "hired", label: "Hired", hint: () => "" },
 ];
+/**
+ * A live drive's "still waiting" lists, asked for on a past one (the summary's links): what they became once it ended.
+ * Without this the board fell back to Offers (owner brief, 24 Nov: "clicking meetings jumps to Offers").
+ */
+const PAST_ALIAS: Partial<Record<BoardKey, BoardKey>> = { meetingsWaiting: "meetExpired", offersWaiting: "unanswered", offline: "all", online: "all", notOpen: "all" };
 const PAGE = 40;
 const GRID = {
   2: "grid grid-cols-2 divide-x divide-ink-100 border-b border-ink-100",
@@ -118,7 +123,8 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
   const unknown = (t: Tile) => Boolean(t.needsPresence) && !board.offlineKnown;
   const need = LIVE[0].tiles.find((t) => board.lists[t.key].length > 0 && !unknown(t));
   const first = open ? (need?.key ?? "offers") : "offers";
-  const [sel, setSel] = useState<BoardKey>(all.find((t) => t.key === initial)?.key ?? first);
+  const asked = (!open && initial ? (PAST_ALIAS[initial as BoardKey] ?? initial) : initial) as BoardKey | undefined;
+  const [sel, setSel] = useState<BoardKey>(all.find((t) => t.key === asked)?.key ?? first);
   const [showAll, setShowAll] = useState(false);
   const tile = all.find((t) => t.key === sel)!;
   const rows = board.lists[sel];
