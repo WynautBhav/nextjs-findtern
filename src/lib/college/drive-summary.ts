@@ -94,6 +94,8 @@ export function buildDriveSummary(input: {
   onlineAt: (userId: string, from: Date, to: Date) => boolean;
   employers: SummaryEmployer[];
   invitedCount: number;
+  /** Invited companies that actually came in (matched by email or name, drive-board.ts matchInvites); not everyone who joined. */
+  invitedCame?: number;
 }): DriveSummary {
   const { open, students, meetings, offers, nudges, employers, window: win } = input;
   const byStudent = new Map(students.map((s) => [s.userId, s]));
@@ -215,10 +217,11 @@ export function buildDriveSummary(input: {
   if (offers.length) signals.push({ key: "offer-replies", label: "Offers answered", value: `${pct(offerAnsweredN, offers.length)}%`, ok: pct(offerAnsweredN, offers.length) >= 60, href: href("offersWaiting") });
   if (students.length) signals.push({ key: "reach", label: "Students asked to meet", value: `${pct(called.size, students.length)}%`, ok: pct(called.size, students.length) >= 25, href: href("called") });
   if (input.invitedCount) {
-    const cameInvited = Math.min(employers.length, input.invitedCount);
-    signals.push({ key: "employers", label: "Invited companies came", value: `${cameInvited} of ${input.invitedCount}`, ok: pct(cameInvited, input.invitedCount) >= 60, href: `${input.driveHref}#employer-alert` });
+    // A walk-in company is not an invited one coming: count only invites that matched a company in the drive (bug 26 Nov).
+    const cameInvited = Math.min(input.invitedCame ?? 0, input.invitedCount);
+    signals.push({ key: "employers", label: "Invited companies came", value: `${cameInvited} of ${input.invitedCount}`, ok: pct(cameInvited, input.invitedCount) >= 60, href: `${input.driveHref}#${cameInvited < input.invitedCount ? "employers-missing" : "employers"}` });
   } else {
-    signals.push({ key: "employers", label: "Companies in the drive", value: String(employers.length), ok: employers.length >= 3, href: `${input.driveHref}#employer-alert` });
+    signals.push({ key: "employers", label: "Companies in the drive", value: String(employers.length), ok: employers.length >= 3, href: `${input.driveHref}#employers` });
   }
   // Graded only when the whole drive was recorded: a part-recorded drive would look emptier than it was.
   if (tracked === "full" && students.length) signals.push({ key: "online", label: "Students online at least once", value: `${pct(online.studentsEver, students.length)}%`, ok: pct(online.studentsEver, students.length) >= 50, href: href("offline") });

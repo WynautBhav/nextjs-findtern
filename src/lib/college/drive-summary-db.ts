@@ -4,7 +4,7 @@ import { realEmployerId } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
 import { loadDriveInterviews } from "./drive-interviews-db";
 import { buildDriveSummary, NUDGE_WINDOW_MS, type DriveSummary, type SummaryStudent } from "./drive-summary";
-import type { CameEmployer } from "./drive-board";
+import { matchInvites, type CameEmployer } from "./drive-board";
 import type { Drive } from "./scope";
 
 /** Plain `timestamp` columns hold UTC wall time; read them as instants (as drive-board-db.ts does). */
@@ -89,5 +89,6 @@ export async function loadDriveSummary(drive: Drive, students: SummaryStudent[],
     onlineAt: (userId, from, to) => (stamps.get(userId) ?? []).some((t) => t > from.getTime() && t <= to.getTime()),
     employers: came.map((c) => ({ employerId: c.employerId, company: c.company ?? "Employer", joinedAt: c.joinedAt, shortlisted: c.shortlisted ?? 0 })),
     invitedCount: (drive.invitedEmployers ?? []).length,
+    invitedCame: matchInvites(drive.invitedEmployers ?? [], came).arrived.length,
   });
 }

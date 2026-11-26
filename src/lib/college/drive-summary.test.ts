@@ -152,3 +152,12 @@ test("open to work nudges: turned on within a day worked; still off did not; no 
   assert.equal(outcome("b"), "Open to work still off");
   assert.equal(outcome("c"), "On now (switch time not recorded)");
 });
+
+test("invited companies came counts only invites that came, not walk-ins (bug 26 Nov: 2 walk-ins, Tesla invited and absent read 1 of 1)", () => {
+  const signal = (over: Record<string, unknown>) => base(over).health.signals.find((x) => x.key === "employers");
+  assert.equal(signal({ invitedCount: 1, invitedCame: 0 })?.value, "0 of 1");
+  assert.equal(signal({ invitedCount: 1, invitedCame: 0 })?.ok, false);
+  assert.match(signal({ invitedCount: 1, invitedCame: 0 })?.href ?? "", /#employers-missing$/);
+  assert.equal(signal({ invitedCount: 2, invitedCame: 2 })?.value, "2 of 2");
+  assert.equal(signal({ invitedCount: 1 })?.value, "0 of 1", "unknown matches never count walk-ins");
+});
