@@ -265,6 +265,7 @@ export function PastDriveCard({
                     <th scope="col" className="py-2 pr-3 font-normal">Company</th>
                     <th scope="col" className="hidden py-2 pr-3 font-normal md:table-cell">Joined</th>
                     <th scope="col" className="hidden py-2 pr-3 text-right font-normal md:table-cell">Online</th>
+                    <th scope="col" className="py-2 pr-3 text-right font-normal">Shortlisted</th>
                     <th scope="col" className="py-2 pr-3 text-right font-normal">Meets</th>
                     <th scope="col" className="py-2 pr-3 text-right font-normal">Offers</th>
                     <th scope="col" className="py-2 text-right font-normal">Hired</th>
@@ -290,6 +291,7 @@ export function PastDriveCard({
                         </th>
                         <td className="nums hidden py-1 pr-3 text-on-dark md:table-cell">{r.joinedAt ? when(r.joinedAt) : "—"}</td>
                         <td className="nums hidden py-1 pr-3 text-right text-on-dark md:table-cell">{mins === undefined || summary.tracked === "none" ? "—" : duration(mins)}</td>
+                        <Num v={id ? r.shortlisted : null} />
                         <Num v={id ? r.meetings : null} />
                         <Num v={id ? r.offers : null} />
                         <Num v={id ? r.hires : null} gold last />
