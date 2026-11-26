@@ -61,6 +61,8 @@ export type EmployerRow = {
   meetings: number;
   offers: number;
   hires: number;
+  /** Students this company shortlisted in the drive (bug sheet 26 Nov). */
+  shortlisted: number;
 };
 
 export type DriveEmployers = {
@@ -102,12 +104,13 @@ export function buildDriveEmployers(input: {
       invited: matchInvites(input.invited, [c]).arrived.length > 0,
       joinedAt: c.joinedAt,
       status,
+      shortlisted: c.shortlisted ?? 0,
       ...(input.counts.get(c.employerId) ?? none),
     };
   });
   const { missing } = matchInvites(input.invited, input.came);
   for (const [i, m] of missing.entries()) {
-    rows.push({ key: `missing-${i}-${m.email}`, employerId: null, company: m.company, contact: null, phone: null, email: m.email, invited: true, joinedAt: null, status: { kind: "absent" }, ...none });
+    rows.push({ key: `missing-${i}-${m.email}`, employerId: null, company: m.company, contact: null, phone: null, email: m.email, invited: true, joinedAt: null, status: { kind: "absent" }, shortlisted: 0, ...none });
   }
   return { rows, inDrive: input.came.length, online, invitedMissing: missing.length };
 }

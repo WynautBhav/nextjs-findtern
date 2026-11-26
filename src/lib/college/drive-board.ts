@@ -16,6 +16,8 @@ export type DriveStudentRef = {
   year: number | null;
   branch: string | null;
   phone: string | null;
+  /** Verified students only: lets the board's list be searched by email. */
+  email?: string | null;
   /** The student's own "open to work" switch. Missing counts as on, so only an explicit false lands in "Not open to work". */
   openToWork?: boolean;
 };
@@ -33,6 +35,8 @@ export type MeetingRow = {
 /** pastStart: the offer's start day has begun (offer-start-sql.ts), so an unanswered one has lapsed, not waiting. */
 export type OfferRow = { userId: string; company: string | null; status: string; hired: boolean; fullTime: boolean; createdAt: Date; pastStart?: boolean };
 export type OfflineRow = { userId: string };
+/** An employer in the drive shortlisted the student. */
+export type ShortlistRow = { userId: string; company: string | null; createdAt: Date };
 /** One nudge the officer sent (college_nudges), inside the drive's window. */
 export type NudgeRow = { userId: string; kind: string; createdAt: Date };
 
@@ -54,6 +58,10 @@ export type BoardKey =
   | "meetings"
   | "meetCompleted"
   | "meetExpired"
+  | "meetDeclined"
+  | "meetCancelled"
+  | "offersWithdrawn"
+  | "shortlisted"
   | "internships"
   | "fullTime"
   | "called"
@@ -66,8 +74,13 @@ export type DriveBoard = {
   offerCount: number;
   /** The same offers split by kind: an offer with a full-time / PPO part counts as full-time. */
   offerSplit: { internship: number; fullTime: number };
-  /** Meet requests counted one by one (a student can have several): sent (not cancelled), accepted, completed, expired. */
-  meetCounts: { sent: number; accepted: number; completed: number; expired: number };
+  /** Meet requests counted one by one (a student can have several): sent (not cancelled), accepted, completed, expired,
+   *  declined by the student, cancelled, and still waiting on the student (bug sheet 26 Nov: every status shows). */
+  meetCounts: { sent: number; accepted: number; completed: number; expired: number; declined: number; cancelled: number; waiting: number };
+  /** Offers the company withdrew: listed on their own, never counted as offers. */
+  withdrawnCount: number;
+  /** Students shortlisted by at least one company in the drive. */
+  shortlistCount: number;
   /** Each offer (with what became of it) and meet request in the drive, for the past-drive charts. */
   facts: {
     offers: { userId: string; company: string | null; at: Date; outcome: "accepted" | "declined" | "open"; fullTime: boolean }[];
@@ -128,10 +141,18 @@ export function buildDriveBoard(input: {
   offline: OfflineRow[] | null;
   /** Nudges sent to the drive's students inside the drive's window. Optional: none. */
   nudges?: NudgeRow[];
+  /** Shortlists made by the drive's companies. Optional: none. */
+  shortlist?: ShortlistRow[];
   now: number;
 }): DriveBoard {
   const students = new Map(input.students.map((s) => [s.userId, s]));
   const { now } = input;
+  // A withdrawn offer is not an offer: it has its own list and touches no other figure.
+  const withdrawn = input.offers.filter((o) => o.status === "withdrawn");
+  input = { ...input, offers: input.offers.filter((o) => o.status !== "withdrawn") };
+  const declinedMeets = input.meetings.filter((m) => m.status === "declined" || m.status === "rejected");
+  const cancelledMeets = input.meetings.filter((m) => m.status === "cancelled");
+  const shortlist = (input.shortlist ?? []).filter((r) => students.has(r.userId));
   // Only requests the student can still accept: a lapsed one is expired for the student and the employer alike.
   const waiting = input.meetings.filter((m) => m.status === "requested" && (!m.startsAt || m.startsAt.getTime() + CALL_GRACE_MS >= now));
   // Accepted: the student said yes (a drive call), or picked a slot (an interview), whatever happened after.
@@ -177,7 +198,17 @@ export function buildDriveBoard(input: {
       offers: inDrive.map((o) => ({ userId: o.userId, company: o.company, at: o.createdAt, outcome: accepted(o) ? "accepted" : declined(o) ? "declined" : "open", fullTime: o.fullTime })),
       meets: sentMeets.filter((m) => students.has(m.userId)).map((m) => ({ userId: m.userId, company: m.company, at: m.createdAt })),
     },
-    meetCounts: { sent: inDriveCount(sentMeets), accepted: inDriveCount(held), completed: inDriveCount(done), expired: inDriveCount(lapsed) },
+    meetCounts: {
+      sent: inDriveCount(sentMeets),
+      accepted: inDriveCount(held),
+      completed: inDriveCount(done),
+      expired: inDriveCount(lapsed),
+      declined: inDriveCount(declinedMeets),
+      cancelled: inDriveCount(cancelledMeets),
+      waiting: inDriveCount(waiting),
+    },
+    withdrawnCount: withdrawn.filter((o) => students.has(o.userId)).length,
+    shortlistCount: new Set(shortlist.map((r) => r.userId)).size,
     offerSplit: { internship: inDrive.filter((o) => !o.fullTime).length, fullTime: inDrive.filter((o) => o.fullTime).length },
     nudgeCounts: { nudgedOnline: nudgeTotal("online"), nudgedOpenToWork: nudgeTotal("open_to_work"), nudgedMeet: nudgeTotal("meeting"), nudgedOffer: nudgeTotal("offer") },
     offlineKnown: input.offline !== null,
@@ -198,6 +229,10 @@ export function buildDriveBoard(input: {
       meetings: perStudent(held, students, (rs) => `${rs.length === 1 ? "Meet" : `${rs.length} meets`} with ${names(rs)}`),
       meetCompleted: perStudent(done, students, (rs) => `${rs.length === 1 ? "Meet" : `${rs.length} meets`} with ${names(rs)}`),
       meetExpired: perStudent(lapsed, students, (rs) => `${rs.length === 1 ? "1 meet expired" : `${rs.length} meets expired`} · ${names(rs)}`),
+      meetDeclined: perStudent(declinedMeets, students, (rs) => `Declined ${rs.length === 1 ? "a meet" : `${rs.length} meets`} with ${names(rs)}`),
+      meetCancelled: perStudent(cancelledMeets, students, (rs) => `${rs.length === 1 ? "Meet" : `${rs.length} meets`} with ${names(rs)} cancelled`),
+      offersWithdrawn: perStudent(withdrawn, students, (rs) => `${names(rs)} withdrew ${rs.length === 1 ? (rs[0].fullTime ? "a full-time offer" : "an internship offer") : `${rs.length} offers`}`),
+      shortlisted: perStudent(shortlist, students, (rs) => `Shortlisted by ${names(rs)}`),
       internships: perStudent(hired.filter((o) => !o.fullTime), students, (rs) => `Internship with ${names(rs)}`),
       fullTime: perStudent(hired.filter((o) => o.fullTime), students, (rs) => `Full-time with ${names(rs)}`),
       // The pipeline's stages: any call request at all, and any hire (one row per student).

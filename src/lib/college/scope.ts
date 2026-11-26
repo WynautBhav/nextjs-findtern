@@ -82,6 +82,8 @@ export type CollegeStudent = StudentFacts & {
   linkedin: string | null;
   /** The student's own "open to work" switch. Off = employers cannot find them. */
   openToWork: boolean;
+  /** When the switch last went back on (recorded from 26 Nov); null when never recorded. */
+  openToWorkAt?: Date | null;
 };
 
 type Row = Record<string, unknown>;
@@ -127,6 +129,7 @@ async function loadMembers(collegeId: string, onlyUserId?: string): Promise<Coll
       ${u.countryCode} AS country_code, ${u.phoneNumber} AS phone_number,
       nullif(${o.linkedinUrl}, '') AS linkedin,
       coalesce(${o.extraData}->>'openToWork', 'true') <> 'false' AS open_to_work,
+      CASE WHEN (${o.extraData}->>'openToWorkAt') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T' THEN (${o.extraData}->>'openToWorkAt') END AS open_to_work_at,
       ${cgpaSql()} AS cgpa,
       CASE WHEN (${o.extraData}->'academics'->>'currentSemester') ~ '^[0-9]{1,2}$' THEN (${o.extraData}->'academics'->>'currentSemester')::int END AS semester,
       ${findternScoreSql()} AS score,
@@ -187,6 +190,7 @@ async function loadMembers(collegeId: string, onlyUserId?: string): Promise<Coll
     driveMeetings: Number(r.drive_meetings ?? 0),
     lastActivityAt: date(r.last_activity_at),
     openToWork: r.open_to_work !== false,
+    openToWorkAt: typeof r.open_to_work_at === "string" ? new Date(r.open_to_work_at) : null,
   }));
 }
 

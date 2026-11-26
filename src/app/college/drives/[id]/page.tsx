@@ -66,12 +66,18 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
     return { userId: r.userId, name: r.name, rollNo: r.rollNo, year: r.year, branch: r.branch, phone: r.phone, openToWork: r.openToWork };
   };
   const refs = eligible.map(toRef);
-  const { board, view, byEmployer, filter, came, invited, missing } = await loadDriveBoard(drive, verified.map(toRef), presence ? presence.offline : null, now, open ? sp.employer : null, !open);
-  const employers = await loadDriveEmployers(drive, verified.map((s) => s.userId), came, invited, open, now);
+  // Verified students only, so their email can go on the board for its search (bug sheet 26 Nov); refs above stay without it.
+  const { board, view, byEmployer, filter, came, invited, missing } = await loadDriveBoard(drive, verified.map((s) => ({ ...toRef(s), email: toStudentRow(s).email })), presence ? presence.offline : null, now, open ? sp.employer : null, !open);
+  const loadedEmployers = await loadDriveEmployers(drive, verified.map((s) => s.userId), came, invited, open, now);
+  // Each company's Shortlisted figure from its own board (the drive's verified students), so the table and the board agree.
+  const employers = {
+    ...loadedEmployers,
+    rows: loadedEmployers.rows.map((r) => (r.employerId && byEmployer[r.employerId] ? { ...r, shortlisted: byEmployer[r.employerId].shortlistCount } : r)),
+  };
   // Drive summary: opened from the hero while the drive runs; always shown, under the hero, once it is over (names, read-only).
   const showSummary = !open || sp.view === "summary";
   const summary = showSummary
-    ? await loadDriveSummary(drive, verified.map((s) => ({ ...toRef(s), score: s.score })), came, true)
+    ? await loadDriveSummary(drive, verified.map((s) => ({ ...toRef(s), score: s.score, openToWorkAt: s.openToWorkAt })), came, true)
     : null;
   const activity: DriveActivityRow[] = (
     await getDb()

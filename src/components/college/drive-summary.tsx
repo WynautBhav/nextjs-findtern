@@ -223,7 +223,7 @@ export function DriveSummary({ s, open, canAct = open, startedLabel }: { s: Summ
             <>
               <dl className="grid grid-cols-3 gap-3 sm:gap-4">
                 <div>
-                  <dt className="text-xs text-text-subtle">Average per student</dt>
+                  <dt className="text-xs text-text-subtle">Average per student online</dt>
                   <dd className="nums mt-1 text-lg font-light tracking-[-0.02em] sm:text-xl text-ink-900">{duration(s.online.studentsAvg)}</dd>
                 </div>
                 <div>

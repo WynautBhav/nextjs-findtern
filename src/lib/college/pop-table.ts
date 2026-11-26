@@ -165,7 +165,7 @@ export const NO_STUDENT_FILTERS: StudentFilters = { q: "", branch: "", year: "",
 const norm = (s: string | null | undefined) => (s ?? "").toLowerCase().replace(/\s+/g, " ").trim();
 const digits = (s: string | null | undefined) => (s ?? "").replace(/\D/g, "");
 /** Typed text matches when every word is found in the haystack; digits also match a phone written with spaces. */
-function matches(hay: (string | null | undefined)[], q: string): boolean {
+export function matches(hay: (string | null | undefined)[], q: string): boolean {
   const words = norm(q).split(" ").filter(Boolean);
   if (!words.length) return true;
   const joined = hay.map(norm).join(" | ");
@@ -192,7 +192,7 @@ export const studentFiltersActive = (f: StudentFilters) => Object.values(f).some
 /* ---------- companies ---------- */
 
 export type EmployerTableRow = EmployerRow & { minutes: number | null };
-export type EmployerColKey = "company" | "contact" | "phone" | "email" | "invited" | "came" | "joinedAt" | "minutes" | "meetings" | "offers" | "hires";
+export type EmployerColKey = "company" | "contact" | "phone" | "email" | "invited" | "came" | "joinedAt" | "minutes" | "shortlisted" | "meetings" | "offers" | "hires";
 
 /** "2026-11-24 15:05" in India time, whatever the browser's zone is. */
 const istStamp = (d: Date) => new Date(d.getTime() + 330 * 60_000).toISOString().slice(0, 16).replace("T", " ");
@@ -206,6 +206,7 @@ export const EMPLOYER_COLUMNS: ColumnDef<EmployerTableRow, EmployerColKey>[] = [
   { key: "came", label: "Came", main: true, csv: (r) => (r.employerId ? "Came" : "Didn't come"), sort: (r) => (r.employerId ? 1 : 0) },
   { key: "joinedAt", label: "Joined at", csvLabel: "Joined at (IST)", main: true, csv: (r) => (r.joinedAt ? istStamp(r.joinedAt) : null), sort: (r) => r.joinedAt?.getTime() ?? null },
   { key: "minutes", label: "Time online", csvLabel: "Time online in the drive (minutes)", numeric: true, main: true, csv: (r) => r.minutes, sort: (r) => r.minutes },
+  { key: "shortlisted", label: "Shortlisted", numeric: true, main: true, csv: (r) => (r.employerId ? r.shortlisted : null), sort: (r) => (r.employerId ? r.shortlisted : null) },
   { key: "meetings", label: "Meets", numeric: true, main: true, csv: (r) => (r.employerId ? r.meetings : null), sort: (r) => (r.employerId ? r.meetings : null) },
   { key: "offers", label: "Offers", numeric: true, main: true, csv: (r) => (r.employerId ? r.offers : null), sort: (r) => (r.employerId ? r.offers : null) },
   { key: "hires", label: "Hired", numeric: true, main: true, csv: (r) => (r.employerId ? r.hires : null), sort: (r) => (r.employerId ? r.hires : null) },

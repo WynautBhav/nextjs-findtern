@@ -65,7 +65,7 @@ export async function loadDriveBoard(
   const p = schema.proposals;
   const n = schema.collegeNudges;
   const end = drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt;
-  const [calls, interviews, offers, nudges] = await Promise.all([
+  const [calls, interviews, offers, nudges, shortlist] = await Promise.all([
     db
       .select({ userId: schema.collegeDriveMeetings.userId, employerId: schema.collegeDriveMeetings.employerId, status: schema.collegeDriveMeetings.status, createdAt: utc(schema.collegeDriveMeetings.createdAt), startsAt: utc(schema.collegeDriveMeetings.startsAt) })
       .from(schema.collegeDriveMeetings)
@@ -93,21 +93,30 @@ export async function loadDriveBoard(
           .from(n)
           .where(and(eq(n.collegeId, drive.collegeId), inArray(n.userId, ids), inArray(n.kind, ["online", "open_to_work", "meeting", "offer"]), gte(n.createdAt, drive.startsAt), lte(n.createdAt, end)))
       : Promise.resolve([] as NudgeRow[]),
+    // Who the drive's companies shortlisted (bug sheet 26 Nov: the drive page shows it).
+    db
+      .select({ userId: schema.collegeDriveShortlist.userId, employerId: schema.collegeDriveShortlist.employerId, createdAt: utc(schema.collegeDriveShortlist.createdAt) })
+      .from(schema.collegeDriveShortlist)
+      .where(eq(schema.collegeDriveShortlist.driveId, drive.id)),
   ]);
   const meetings = [...calls, ...interviews];
   const invited = (drive.invitedEmployers ?? []) as Invite[];
   const { arrived, missing, walkIns } = matchInvites(invited, came);
   const make = (only: string | null) => {
     const ms = meetings.filter((m) => !only || m.employerId === only);
-    const os = offers.filter((o) => o.status !== "withdrawn" && (!only || o.employerId === only));
+    // Withdrawn offers go in too: the board lists them on their own and counts them as no offer.
+    const os = offers.filter((o) => !only || o.employerId === only);
     // One company's view lists the students it met or offered to, not the whole drive.
-    const touched = new Set([...ms.map((m) => m.userId), ...os.map((o) => o.userId)]);
+    const sl = shortlist.filter((r) => !only || r.employerId === only);
+    // Shortlisted and withdrawn-offer students are this company's too, so its Shortlisted and Withdrawn lists stay whole.
+    const touched = new Set([...ms.map((m) => m.userId), ...os.map((o) => o.userId), ...sl.map((r) => r.userId)]);
     return buildDriveBoard({
       students: only ? students.filter((s) => touched.has(s.userId)) : students,
       meetings: ms.map((m) => ({ userId: m.userId, company: companyOf.get(m.employerId) ?? null, status: m.status, createdAt: m.createdAt, startsAt: m.startsAt ?? undefined })),
       offers: os.map((o) => ({ userId: o.userId, company: companyOf.get(o.employerId) ?? null, status: (o.status ?? "").toLowerCase(), hired: o.hiredAt !== null, fullTime: Boolean(o.fullTime), pastStart: Boolean(o.pastStart), createdAt: o.createdAt ?? drive.startsAt })),
       offline,
       nudges: nudges as NudgeRow[],
+      shortlist: sl.map((r) => ({ userId: r.userId, company: companyOf.get(r.employerId) ?? null, createdAt: r.createdAt })),
       now,
     });
   };

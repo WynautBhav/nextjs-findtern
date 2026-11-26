@@ -9,7 +9,8 @@
 export function openToWorkPatch(next: boolean, previous: Record<string, unknown>): Record<string, unknown> {
   if (next) {
     if (previous.hiddenByAdmin === true) return {};
-    return { openToWork: true, hiddenAt: null };
+    // When it went back on, for a "Turn on Open to work" nudge's outcome (bug sheet 26 Nov). A repeat "on" keeps the stamp.
+    return previous.openToWork === false ? { openToWork: true, hiddenAt: null, openToWorkAt: new Date().toISOString() } : { openToWork: true, hiddenAt: null };
   }
   const alreadyHidden = previous.openToWork === false && typeof previous.hiddenAt === "string";
   return {

@@ -7,13 +7,23 @@
  * never given. The drive page passes true for past drives too (C12 is dropped); only actions are live-only.
  */
 
-export type SummaryStudent = { userId: string; name: string; branch: string | null; year: number | null; phone: string | null; score: number | null };
+export type SummaryStudent = {
+  userId: string;
+  name: string;
+  branch: string | null;
+  year: number | null;
+  phone: string | null;
+  score: number | null;
+  /** Open to work now, and when it last went back on (bug sheet 26 Nov: judges the "Turn on Open to work" nudge). */
+  openToWork?: boolean;
+  openToWorkAt?: Date | null;
+};
 export type SummaryMeeting = { userId: string; employerId: string; status: string; createdAt: Date; respondedAt: Date | null };
 export type SummaryOffer = { userId: string; employerId: string; status: string; hired: boolean; createdAt: Date; answeredAt: Date | null };
 export type SummaryNudge = { userId: string; kind: string; createdAt: Date };
 export type SummaryEmployer = { employerId: string; company: string; joinedAt: Date; shortlisted: number };
 
-export type NudgeKind = "online" | "meeting" | "offer" | "interview";
+export type NudgeKind = "online" | "meeting" | "offer" | "interview" | "open_to_work";
 export type NudgeRow = { userId: string; name: string; kind: NudgeKind; at: Date; worked: boolean | null; outcome: string };
 export type StudentMinutes = { userId: string; name: string; minutes: number };
 export type Signal = { key: string; label: string; value: string; ok: boolean; href: string };
@@ -50,7 +60,7 @@ export type DriveSummary = {
   missed: { count: number; rows: SummaryStudent[] };
 };
 
-const NUDGE_LABEL: Record<NudgeKind, string> = { online: "Come online", meeting: "Answer a meet request", offer: "Reply to an offer", interview: "Interview" };
+const NUDGE_LABEL: Record<NudgeKind, string> = { online: "Come online", meeting: "Answer a meet request", offer: "Reply to an offer", interview: "Interview", open_to_work: "Turn on Open to work" };
 /** A nudge "worked" if the thing it asked for happened within this long after it. */
 export const NUDGE_WINDOW_MS = 24 * 60 * 60_000;
 /** Strong enough that being left out of every meet and offer is worth a look. */
@@ -86,6 +96,7 @@ export function buildDriveSummary(input: {
   invitedCount: number;
 }): DriveSummary {
   const { open, students, meetings, offers, nudges, employers, window: win } = input;
+  const byStudent = new Map(students.map((s) => [s.userId, s]));
   const nameOf = new Map(students.map((s) => [s.userId, s.name || "Student"]));
   const inDrive = new Set(students.map((s) => s.userId));
   const href = (show: string) => `${input.driveHref}?show=${show}#board`;
@@ -134,13 +145,20 @@ export function buildDriveSummary(input: {
       const o = offers.find((x) => x.userId === n.userId && offerAnswered(x) && after(x.answeredAt));
       return o ? { worked: true, outcome: o.status === "rejected" ? "Declined the offer" : "Accepted the offer" } : { worked: false, outcome: "No reply yet" };
     }
+    if (n.kind === "open_to_work") {
+      const st = byStudent.get(n.userId);
+      if (st?.openToWorkAt && after(st.openToWorkAt)) return { worked: true, outcome: "Turned on Open to work" };
+      if (st?.openToWork === false) return { worked: false, outcome: "Open to work still off" };
+      // On now with no switch-on time inside the day: recorded only from 26 Nov, so it may have been turned on earlier.
+      return st?.openToWorkAt ? { worked: false, outcome: "Turned on later" } : { worked: null, outcome: "On now (switch time not recorded)" };
+    }
     return { worked: null, outcome: "Not tracked" };
   };
   const inWindow = nudges.filter((n) => inDrive.has(n.userId) && n.createdAt >= win.start && n.createdAt <= win.end);
   const rows: NudgeRow[] = inWindow
     .map((n) => ({ userId: n.userId, name: nameOf.get(n.userId) ?? "Student", kind: n.kind as NudgeKind, at: n.createdAt, ...outcomeOf(n) }))
     .sort((a, b) => b.at.getTime() - a.at.getTime());
-  const kinds: NudgeKind[] = ["online", "meeting", "offer", "interview"];
+  const kinds: NudgeKind[] = ["online", "open_to_work", "meeting", "offer", "interview"];
   const byKind = kinds
     .map((kind) => {
       const k = rows.filter((r) => r.kind === kind);
@@ -164,7 +182,8 @@ export function buildDriveSummary(input: {
   const studentMinutes = students.map((s) => ({ userId: s.userId, name: s.name || "Student", minutes: minutesOf(s.userId) }));
   const never = studentMinutes.filter((s) => s.minutes === 0);
   const online = {
-    studentsAvg: tracked === "none" || !students.length ? null : Math.round(studentMinutes.reduce((a, s) => a + s.minutes, 0) / students.length),
+    // Per student who came online (bug sheet 26 Nov): over everyone, a drive where most never came read "0 min".
+    studentsAvg: tracked === "none" || students.length === never.length ? null : Math.round(studentMinutes.reduce((a, s) => a + s.minutes, 0) / (students.length - never.length)),
     studentsEver: students.length - never.length,
     neverOnline: open ? never.slice(0, 50) : [],
     neverOnlineCount: never.length,

@@ -59,7 +59,8 @@ test("a nudge worked when the asked-for thing happened after it", () => {
 
 test("online time: average over every student, never-online named while open", () => {
   const s = base();
-  assert.equal(s.online.studentsAvg, 40);
+  // 160 min over the 3 students who came online (d never did).
+  assert.equal(s.online.studentsAvg, 53);
   assert.equal(s.online.neverOnlineCount, 1);
   assert.deepEqual(s.online.neverOnline.map((x) => x.userId), ["d"]);
   assert.equal(s.online.employers.find((e) => e.employerId === "e1")?.minutes, 90);
@@ -128,4 +129,26 @@ test("health names the weak signals", () => {
 test("nudges outside the drive window or for other students are left out", () => {
   const s = base({ nudges: [{ userId: "zz", kind: "online", createdAt: at(5) }, { userId: "a", kind: "online", createdAt: new Date(T0.getTime() - 60_000) }] });
   assert.equal(s.nudges.total, 0);
+});
+
+// Bug sheet 26 Nov: "Turn on Open to work" nudges are judged from the switch-on time.
+test("open to work nudges: turned on within a day worked; still off did not; no recorded time is not judged", () => {
+  const s = base({
+    students: [
+      { ...stu("a"), openToWork: true, openToWorkAt: at(70) },
+      { ...stu("b"), openToWork: false, openToWorkAt: null },
+      { ...stu("c"), openToWork: true, openToWorkAt: null },
+    ],
+    nudges: [
+      { userId: "a", kind: "open_to_work", createdAt: at(60) },
+      { userId: "b", kind: "open_to_work", createdAt: at(60) },
+      { userId: "c", kind: "open_to_work", createdAt: at(60) },
+    ],
+  });
+  const k = s.nudges.byKind.find((x) => x.kind === "open_to_work");
+  assert.deepEqual(k && { sent: k.sent, worked: k.worked, checkable: k.checkable }, { sent: 3, worked: 1, checkable: true });
+  const outcome = (id: string) => s.nudges.rows.find((r) => r.userId === id)?.outcome;
+  assert.equal(outcome("a"), "Turned on Open to work");
+  assert.equal(outcome("b"), "Open to work still off");
+  assert.equal(outcome("c"), "On now (switch time not recorded)");
 });

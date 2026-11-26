@@ -113,6 +113,7 @@ const emp = (key: string, company: string, extra: Partial<EmployerTableRow> = {}
   meetings: 3,
   offers: 2,
   hires: 1,
+  shortlisted: 4,
   minutes: 40,
   ...extra,
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { driveDayBuckets } from "@/lib/college/day-buckets";
 import { Surface } from "@/components/app/primitives";
 import type { DriveReach, ReachBucketId } from "@/lib/college/drive-reach";
 import { DriveReachView } from "./drive-reach-view";
@@ -355,19 +356,14 @@ function Days({
   items: (ids: string[], line: (id: string) => string) => BoardItem[];
   companies: (r: { company: string | null }[]) => string;
 }) {
-  const DAY = 86_400_000;
-  const days = Math.max(1, Math.ceil((window.end.getTime() - window.start.getTime()) / DAY));
-  const step = days > 31 ? 7 : 1;
-  const buckets = Array.from({ length: Math.ceil(days / step) }, (_, i) => {
-    const from = new Date(window.start.getTime() + i * step * DAY);
-    const to = new Date(Math.min(window.end.getTime(), from.getTime() + step * DAY));
-    const inB = (d: Date) => d >= from && (d < to || (i === Math.ceil(days / step) - 1 && d <= to));
-    return {
-      from,
-      meets: board.facts.meets.filter((m) => inB(m.at)),
-      offers: board.facts.offers.filter((o) => inB(o.at)),
-    };
-  });
+  // India calendar days (lib/college/day-buckets.ts), not 24 h steps from the opening time (bug sheet 26 Nov).
+  const plan = driveDayBuckets(window.start, window.end);
+  const step = plan.step;
+  const buckets = plan.buckets.map((bk, i) => ({
+    from: new Date(`${bk.day}T00:00:00+05:30`),
+    meets: board.facts.meets.filter((m) => plan.indexOf(m.at) === i),
+    offers: board.facts.offers.filter((o) => plan.indexOf(o.at) === i),
+  }));
   const peak = Math.max(1, ...buckets.map((b) => Math.max(b.meets.length, b.offers.length)));
   const busiest = [...buckets].sort((a, b) => b.meets.length + b.offers.length - (a.meets.length + a.offers.length))[0];
   const label = (b: (typeof buckets)[number]) => (step === 7 ? `Week of ${day(b.from)}` : day(b.from));
@@ -546,7 +542,7 @@ function Online({ summary, open, items, neverOnline }: { summary: DriveSummary; 
   return (
     <Card
       title="Time online"
-      note={summary.tracked === "none" ? "Not recorded for this drive" : `Average ${fmt(summary.online.studentsAvg ?? 0)} per student${summary.tracked === "partial" ? " · part of the drive" : ""}`}
+      note={summary.tracked === "none" ? "Not recorded for this drive" : `Average ${fmt(summary.online.studentsAvg ?? 0)} per student who came online${summary.tracked === "partial" ? " · part of the drive" : ""}`}
     >
       {summary.tracked === "none" || !all.length ? (
         <p className="text-sm text-ink-700">Online time was not recorded while this drive ran.</p>
@@ -656,7 +652,8 @@ function NudgeChart({ board, summary, open, listPop }: { board: DriveBoard; summ
       key: "nudgedOpenToWork",
       label: "Turn on Open to work",
       sent: board.nudgeCounts.nudgedOpenToWork,
-      worked: null,
+      // Judged from the switch-on time, recorded from 26 Nov (lib/open-to-work.ts).
+      worked: worked.get("open_to_work")?.checkable ? worked.get("open_to_work")!.worked : null,
     },
     {
       key: "nudgedMeet",

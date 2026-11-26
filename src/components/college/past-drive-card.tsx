@@ -38,6 +38,10 @@ const LIST_TITLE: Partial<Record<BoardKey, string>> = {
   meetings: "Meets accepted",
   meetCompleted: "Meets completed",
   meetExpired: "Meets expired",
+  meetDeclined: "Meets declined",
+  meetCancelled: "Meets cancelled",
+  offersWithdrawn: "Offers withdrawn",
+  shortlisted: "Shortlisted",
   offers: "Got an offer",
   hired: "Hired",
   internships: "Hired for an internship",
@@ -171,10 +175,13 @@ export function PastDriveCard({
 
             <div className="mt-8 grid gap-x-8 gap-y-7 border-t border-white/10 pt-6 sm:grid-cols-2 xl:grid-cols-4">
               <Ledger title="Meetings">
+                <Line label="Shortlisted" value={board.shortlistCount} onClick={() => open(listPop("shortlisted", board))} />
                 <Line label="Meets sent" value={board.meetCounts.sent} onClick={() => open(listPop("called", board))} />
                 <Line label="Accepted" value={board.meetCounts.accepted} onClick={() => open(listPop("meetings", board))} />
                 <Line label="Completed" value={board.meetCounts.completed} onClick={() => open(listPop("meetCompleted", board))} />
                 <Line label="Expired, no reply" value={board.meetCounts.expired} onClick={() => open(listPop("meetExpired", board))} />
+                <Line label="Declined" value={board.meetCounts.declined} onClick={() => open(listPop("meetDeclined", board))} />
+                <Line label="Cancelled" value={board.meetCounts.cancelled} onClick={() => open(listPop("meetCancelled", board))} />
               </Ledger>
               <Ledger title="Offers">
                 <Line label="Offers made" value={board.offerCount} onClick={() => open(listPop("offers", board))} />
@@ -182,6 +189,7 @@ export function PastDriveCard({
                 <Line label="Hired, full-time / PPO" value={L.fullTime.length} gold onClick={() => open(listPop("fullTime", board))} />
                 <Line label="Turned every offer down" value={L.declinedAll.length} onClick={() => open(listPop("declinedAll", board))} />
                 <Line label="Never replied" value={L.unanswered.length} onClick={() => open(listPop("unanswered", board))} />
+                <Line label="Withdrawn by company" value={board.withdrawnCount} onClick={() => open(listPop("offersWithdrawn", board))} />
               </Ledger>
               <Ledger title="Nudges sent">
                 <Line label="Come online" value={board.nudgeCounts.nudgedOnline} onClick={() => open(listPop("nudgedOnline", board))} />
@@ -198,7 +206,7 @@ export function PastDriveCard({
                       label="Average time online"
                       value={summary.online.studentsAvg}
                       text={duration(summary.online.studentsAvg)}
-                      onClick={() => open(minutesPop("Time online, most first", `Average ${duration(summary.online.studentsAvg)} per student.${summary.tracked === "partial" ? " Recorded for part of the drive only." : ""}`, everyone.filter((x) => x.minutes > 0)))}
+                      onClick={() => open(minutesPop("Time online, most first", `Average ${duration(summary.online.studentsAvg)} per student who came online.${summary.tracked === "partial" ? " Recorded for part of the drive only." : ""}`, everyone.filter((x) => x.minutes > 0)))}
                     />
                     <Line label="Came online" value={summary.online.studentsEver} onClick={() => open(onlinePop(true))} />
                     <Line label={summary.tracked === "partial" ? "Not seen since recording began" : "Never online"} value={summary.online.neverOnlineCount} onClick={() => open(onlinePop(false))} />

@@ -2,11 +2,12 @@
 
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Phone } from "lucide-react";
+import { Phone, Search } from "lucide-react";
 
 import { SURFACE_CLASS } from "@/components/app/primitives";
 import type { BoardItem, BoardKey, DriveBoard, NudgeHistoryKind } from "@/lib/college/drive-board";
 import { yearLabel } from "@/lib/college/labels";
+import { matches } from "@/lib/college/pop-table";
 import { cn } from "@/lib/utils";
 import { NudgeButton } from "./nudge-button";
 
@@ -45,6 +46,9 @@ const MEETINGS: Group = {
     { key: "meetings", label: "Meets accepted", figure: (b) => b.meetCounts.accepted, hint: (n) => ofStudents(n, "None accepted") },
     { key: "meetCompleted", label: "Meets completed", figure: (b) => b.meetCounts.completed, hint: (n) => (n ? `${ofStudents(n, "")} · accepted, time over` : "None yet") },
     { key: "meetExpired", label: "Meets expired", figure: (b) => b.meetCounts.expired, hint: (n) => (n ? `${ofStudents(n, "")} · no reply in time` : "None expired") },
+    // Bug sheet 26 Nov: every status, not only the good ones.
+    { key: "meetDeclined", label: "Meets declined", figure: (b) => b.meetCounts.declined, hint: (n) => (n ? `${ofStudents(n, "")} · said no` : "None declined") },
+    { key: "meetCancelled", label: "Meets cancelled", figure: (b) => b.meetCounts.cancelled, hint: (n) => (n ? ofStudents(n, "") : "None cancelled") },
   ],
 };
 const OFFER_COUNTS = (b: DriveBoard) => `${b.offerCount} ${b.offerCount === 1 ? "offer" : "offers"} · ${b.offerSplit.internship} internship · ${b.offerSplit.fullTime} full-time / PPO`;
@@ -65,7 +69,9 @@ const LIVE: Group[] = [
   {
     title: "What this drive has produced",
     tiles: [
+      { key: "shortlisted", label: "Shortlisted", figure: (b) => b.shortlistCount, hint: (n) => (n ? "By at least one company" : "Nobody shortlisted yet") },
       { key: "offers", label: "Offers received", figure: (b) => b.offerCount, hint: (n, b) => (b.offerCount ? `to ${n} ${n === 1 ? "student" : "students"}` : "No offer yet") },
+      { key: "offersWithdrawn", label: "Offers withdrawn", figure: (b) => b.withdrawnCount, hint: (n) => (n ? "The company took the offer back" : "None withdrawn") },
       { key: "internships", label: "Placed: internship", hint: (n) => (n ? "Hired for an internship" : "No hire yet") },
       { key: "fullTime", label: "Placed: full-time", hint: (n) => (n ? "Hired for a full-time role" : "No hire yet") },
     ],
@@ -126,9 +132,12 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
   const asked = (!open && initial ? (PAST_ALIAS[initial as BoardKey] ?? initial) : initial) as BoardKey | undefined;
   const [sel, setSel] = useState<BoardKey>(all.find((t) => t.key === asked)?.key ?? first);
   const [showAll, setShowAll] = useState(false);
+  // Bug sheet 26 Nov: find a student in the open list by name, phone or email.
+  const [q, setQ] = useState("");
   const tile = all.find((t) => t.key === sel)!;
   const rows = board.lists[sel];
-  const shown = showAll ? rows : rows.slice(0, PAGE);
+  const found = q.trim() ? rows.filter((r) => matches([r.name, r.phone, r.email], q)) : rows;
+  const shown = showAll || q.trim() ? found : found.slice(0, PAGE);
   // Nudging is for a running drive only. On a nudge-history list it goes to who still needs it, not to everyone once nudged.
   const canNudge = Boolean(tile.nudge) && open;
   const nudgeIds = (tile.key.startsWith("nudged") ? rows.filter((r) => r.again) : rows).map((r) => r.userId);
@@ -146,6 +155,7 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
         onClick={() => {
           setSel(t.key);
           setShowAll(false);
+          setQ("");
         }}
         className={cn(
           "relative flex min-h-[7.5rem] flex-col justify-between gap-3 px-5 py-4 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 disabled:cursor-default",
@@ -188,12 +198,27 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
         <h3 className="text-sm font-semibold text-ink-900">
           {tile.label} <span className="nums font-normal text-text-subtle">· {rows.length.toLocaleString("en-IN")} {rows.length === 1 ? "student" : "students"}</span>
         </h3>
+        <label className="relative order-last w-full sm:order-none sm:ml-auto sm:w-72">
+          <span className="sr-only">Search {tile.label.toLowerCase()} by name, phone or email</span>
+          <Search aria-hidden className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-ink-400" />
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search name, phone or email"
+            className="h-10 w-full rounded-apple-sm border border-ink-200 bg-white pl-9 pr-3 text-base text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm"
+          />
+        </label>
         {canNudge && nudgeIds.length > 0 ? (
           <NudgeButton key={`${sel}-${nudgeIds.length}`} kind={tile.nudge!} userIds={nudgeIds} label={tile.key.startsWith("nudged") ? `Nudge again ${nudgeIds.length}` : `Nudge all ${nudgeIds.length}`} emphasis />
         ) : null}
       </div>
       {rows.length === 0 ? (
         <p className="border-t border-ink-100 px-5 py-6 text-sm text-text-subtle">{open ? "Nobody here right now." : "Nobody here."}</p>
+      ) : found.length === 0 ? (
+        <p role="status" className="border-t border-ink-100 px-5 py-6 text-sm text-text-subtle">
+          No student in this list matches &ldquo;{q.trim()}&rdquo;.
+        </p>
       ) : (
         <ul className="divide-y divide-ink-100 border-t border-ink-100">
           {shown.map((r) => (
@@ -201,7 +226,7 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
           ))}
         </ul>
       )}
-      {rows.length > PAGE && !showAll ? (
+      {found.length > PAGE && !showAll && !q.trim() ? (
         <div className="border-t border-ink-100 px-5 py-3">
           <button type="button" onClick={() => setShowAll(true)} className="min-h-9 text-sm font-medium text-brand-700 hover:underline focus-visible:outline-2 focus-visible:outline-brand-600">
             Show all {rows.length.toLocaleString("en-IN")}

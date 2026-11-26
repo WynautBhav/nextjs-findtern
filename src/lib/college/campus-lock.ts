@@ -150,7 +150,7 @@ export async function driveSourceFor(employerId: string, internId: string): Prom
 
 /**
  * Path B of the invite: a company that signs up or signs in with an email the officer invited enters the drive without
- * opening the link. Only drives that have not ended or been switched off; the match is on the normalized email. Returns
+ * opening the link. Only drives that are open now (started, not ended, not switched off); the match is on the normalized email. Returns
  * the drives newly joined.
  */
 export async function autoJoinInvitedDrives(employerId: string, email: string, db: Db = getDb()): Promise<string[]> {
@@ -164,6 +164,9 @@ export async function autoJoinInvitedDrives(employerId: string, email: string, d
       .where(
         and(
           isNull(schema.collegeDrives.revokedAt),
+          // Open drives only: an invited company is not let in before the drive's start (bug sheet 26 Nov). It enters on
+          // its next sign-in once the drive is live, or from its invite link.
+          lte(schema.collegeDrives.startsAt, NOW_UTC),
           gt(schema.collegeDrives.endsAt, NOW_UTC),
           eq(schema.colleges.isActive, true),
           sql`EXISTS (SELECT 1 FROM jsonb_array_elements(${schema.collegeDrives.invitedEmployers}) inv WHERE lower(btrim(inv->>'email')) = ${norm})`,

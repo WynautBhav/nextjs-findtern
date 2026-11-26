@@ -43,6 +43,8 @@ export async function loadDriveInterviews(drive: Drive, studentIds: string[], em
     const slots = [at(r.slot1), at(r.slot2), at(r.slot3)];
     const picked = r.selectedSlot && r.selectedSlot >= 1 && r.selectedSlot <= 3 ? slots[r.selectedSlot - 1] : null;
     const life = interviewLifecycle({ status: r.status, slot1: slots[0], slot2: slots[1], slot3: slots[2], selectedSlot: r.selectedSlot, respondBy: at(r.respondBy), employerId: r.employerId }, now);
+    // A rescheduled invite was replaced by a new one, which is counted: this one is no meet at all (not a cancelled one).
+    if (life.state === "rescheduled") continue;
     const status =
       life.state === "upcoming" || life.state === "live" ? "accepted"
       : life.state === "awaiting_pick" ? "requested"

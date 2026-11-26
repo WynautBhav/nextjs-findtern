@@ -268,7 +268,7 @@ test("meetings: sent, accepted, completed (slot over) and expired (no reply past
     offline: null,
     now: NOW,
   });
-  assert.deepEqual(b.meetCounts, { sent: 5, accepted: 2, completed: 1, expired: 2 });
+  assert.deepEqual(b.meetCounts, { sent: 5, accepted: 2, completed: 1, expired: 2, declined: 1, cancelled: 1, waiting: 0 });
   assert.deepEqual(b.lists.called.map((s) => s.userId).sort(), ["a", "b", "c"]);
   assert.deepEqual(b.lists.meetings.map((s) => s.userId), ["a"]);
   assert.deepEqual(b.lists.meetCompleted.map((s) => s.userId), ["a"]);
@@ -289,8 +289,47 @@ test("interviews count as meets: picked-slot ones are accepted, marked completed
     offline: null,
     now: NOW,
   });
-  assert.deepEqual(b.meetCounts, { sent: 3, accepted: 2, completed: 1, expired: 0 });
+  assert.deepEqual(b.meetCounts, { sent: 3, accepted: 2, completed: 1, expired: 0, declined: 0, cancelled: 0, waiting: 1 });
   assert.deepEqual(b.lists.meetCompleted.map((s) => s.userId), ["a"]);
   assert.deepEqual(b.lists.meetingsWaiting.map((s) => s.userId), ["c"]);
   assert.deepEqual(b.lists.called.map((s) => s.userId).sort(), ["a", "b", "c"]);
+});
+
+// Bug sheet 26 Nov: every meet status is shown (declined and cancelled too), withdrawn offers have their own list
+// (and never count as offers), and the drive shows who was shortlisted.
+test("26 Nov: declined and cancelled meets, withdrawn offers and shortlists are counted and listed", () => {
+  const b = buildDriveBoard({
+    students,
+    meetings: [
+      { userId: "a", company: "Acme", status: "declined", createdAt: at(50) },
+      { userId: "a", company: "Beta", status: "cancelled", createdAt: at(40) },
+      { userId: "b", company: "Acme", status: "accepted", createdAt: at(30) },
+      { userId: "zz", company: "Acme", status: "declined", createdAt: at(20) },
+    ],
+    offers: [
+      { userId: "b", company: "Acme", status: "withdrawn", hired: false, fullTime: false, createdAt: at(25) },
+      { userId: "c", company: "Acme", status: "sent", hired: false, fullTime: false, createdAt: at(10) },
+    ],
+    shortlist: [
+      { userId: "a", company: "Acme", createdAt: at(60) },
+      { userId: "a", company: "Beta", createdAt: at(55) },
+      { userId: "c", company: "Acme", createdAt: at(5) },
+      { userId: "zz", company: "Acme", createdAt: at(5) },
+    ],
+    offline: null,
+    now: NOW,
+  });
+  assert.deepEqual(b.meetCounts, { sent: 2, accepted: 1, completed: 0, expired: 0, declined: 1, cancelled: 1, waiting: 0 });
+  assert.deepEqual(b.lists.meetDeclined.map((s) => s.userId), ["a"]);
+  assert.equal(b.lists.meetDeclined[0].detail, "Declined a meet with Acme");
+  assert.deepEqual(b.lists.meetCancelled.map((s) => s.userId), ["a"]);
+  assert.equal(b.lists.meetCancelled[0].detail, "Meet with Beta cancelled");
+  assert.equal(b.offerCount, 1);
+  assert.equal(b.withdrawnCount, 1);
+  assert.deepEqual(b.lists.offersWithdrawn.map((s) => s.userId), ["b"]);
+  assert.equal(b.lists.offersWithdrawn[0].detail, "Acme withdrew an internship offer");
+  assert.deepEqual(b.lists.offers.map((s) => s.userId), ["c"]);
+  assert.equal(b.shortlistCount, 2);
+  assert.deepEqual(b.lists.shortlisted.map((s) => s.userId), ["c", "a"]);
+  assert.equal(b.lists.shortlisted[1].detail, "Shortlisted by Beta, Acme");
 });
