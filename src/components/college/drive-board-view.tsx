@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Phone, Search } from "lucide-react";
 
@@ -137,6 +137,8 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
   const first = open ? (need?.key ?? "offers") : "offers";
   const asked = (!open && initial ? (PAST_ALIAS[initial as BoardKey] ?? initial) : initial) as BoardKey | undefined;
   const [sel, setSel] = useState<BoardKey>(all.find((t) => t.key === asked)?.key ?? first);
+  // Bug 26 Nov: a tile opens its list and brings it into view (smooth unless the reader asked for reduced motion).
+  const listTop = useRef<HTMLDivElement>(null);
   const [showAll, setShowAll] = useState(false);
   // Bug sheet 26 Nov: find a student in the open list by name, phone or email.
   const [q, setQ] = useState("");
@@ -162,6 +164,10 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
           setSel(t.key);
           setShowAll(false);
           setQ("");
+          requestAnimationFrame(() => {
+            const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            listTop.current?.scrollIntoView({ behavior: still ? "auto" : "smooth", block: "start" });
+          });
         }}
         className={cn(
           "relative flex min-h-[7.5rem] flex-col justify-between gap-3 px-5 py-4 text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500 disabled:cursor-default",
@@ -200,7 +206,7 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
         </TileGroup>
       ))}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+      <div ref={listTop} id="board-list" className="flex scroll-mt-24 flex-wrap items-center justify-between gap-3 px-5 py-4">
         <h3 className="text-sm font-semibold text-ink-900">
           {tile.label} <span className="nums font-normal text-text-subtle">· {rows.length.toLocaleString("en-IN")} {rows.length === 1 ? "student" : "students"}</span>
         </h3>

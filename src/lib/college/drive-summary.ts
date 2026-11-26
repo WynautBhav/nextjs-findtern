@@ -101,7 +101,7 @@ export function buildDriveSummary(input: {
   const byStudent = new Map(students.map((s) => [s.userId, s]));
   const nameOf = new Map(students.map((s) => [s.userId, s.name || "Student"]));
   const inDrive = new Set(students.map((s) => s.userId));
-  const href = (show: string) => `${input.driveHref}?show=${show}#board`;
+  const href = (show: string) => `${input.driveHref}?show=${show}#board-list`;
 
   // Recorded only from the first heartbeat ever stored: a drive that ended before then has no online time at all.
   const tracked: DriveSummary["tracked"] = !input.trackingSince || input.trackingSince > win.end ? "none" : input.trackingSince <= win.start ? "full" : "partial";

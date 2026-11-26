@@ -46,7 +46,7 @@ test("funnel counts unique students and the share of the step before", () => {
     s.funnel.map((f) => [f.key, f.value, f.share, f.of, f.notThrough]),
     [["all", 4, null, null, 0], ["called", 2, 50, "of the drive", 2], ["met", 1, 50, "of those asked", 1], ["offers", 2, 50, "of the drive", 2], ["hired", 1, 50, "of those offered", 1]],
   );
-  assert.equal(s.funnel[1].href, "/college/drives/d1?show=called#board");
+  assert.equal(s.funnel[1].href, "/college/drives/d1?show=called#board-list");
 });
 
 test("a nudge worked when the asked-for thing happened after it", () => {

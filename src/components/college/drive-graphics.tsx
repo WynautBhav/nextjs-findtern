@@ -41,7 +41,7 @@ export function DrivePipeline({ driveId, stages, open }: { driveId: string; stag
           <li key={s.key} className="relative min-w-0 lg:pr-8">
             {i > 0 ? <ChevronRight aria-hidden className="absolute -left-1 top-0 hidden size-4 -translate-x-full text-white/40 lg:block" /> : null}
             {open ? (
-              <Link href={`/college/drives/${driveId}?show=${s.key}#board`} className="block rounded-xl p-2 -m-2 outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/70">
+              <Link href={`/college/drives/${driveId}?show=${s.key}#board-list`} className="block rounded-xl p-2 -m-2 outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/70">
                 {body}
               </Link>
             ) : (
