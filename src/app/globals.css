@@ -1181,6 +1181,22 @@ body:has([data-slot="dialog-content"][data-state="open"], [data-slot="sheet-cont
    same media query (see src/lib/gsap.ts) so nothing is left half-applied.
    ========================================================================== */
 
+/* A placement officer's nudge (bug sheet 25 Nov): the control it is about pulses a soft brand ring three times, then
+   keeps a still ring so the eye can find it. Reduced motion (the block below) leaves only the still ring. */
+@keyframes nudge-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-500) 45%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 9px color-mix(in oklab, var(--color-brand-500) 18%, transparent);
+  }
+}
+.nudge-glow {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--color-brand-500) 45%, transparent);
+  animation: nudge-glow 1.6s ease-in-out 3;
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

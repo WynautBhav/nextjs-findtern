@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
-import { NUDGE_COOLDOWN_MS, planNudge, tallyNudges } from "./nudge-plan.ts";
+import { NUDGE_COOLDOWN_MS, nudgeGlow, nudgeHref, planNudge, tallyNudges } from "./nudge-plan.ts";
+import { internNotificationHref } from "../notification-href.ts";
 
 const now = new Date("2026-11-18T10:00:00Z");
 const ago = (ms: number) => new Date(now.getTime() - ms);
@@ -18,7 +19,7 @@ test("online nudge emails the student with subject, one line and the dashboard C
   assert.ok(plan.email);
   assert.equal(plan.email.subject, "JKLU placement drive is live");
   assert.equal(plan.email.lines.length, 1);
-  assert.deepEqual(plan.email.cta, { label: "Open Findtern", url: "https://findtern.in/intern/dashboard" });
+  assert.deepEqual(plan.email.cta, { label: "Open Findtern", url: "https://findtern.in/intern/dashboard?nudge=online" });
 });
 
 test("a second online nudge 11 minutes later emails again", () => {
@@ -26,7 +27,7 @@ test("a second online nudge 11 minutes later emails again", () => {
   assert.equal(plan.cooldown, false);
   if (plan.cooldown) return;
   assert.ok(plan.email);
-  assert.equal(plan.email.cta?.url, "https://findtern.in/intern/dashboard");
+  assert.equal(plan.email.cta?.url, "https://findtern.in/intern/dashboard?nudge=online");
 });
 
 test("online nudge is blocked inside the 10-minute cooldown", () => {
@@ -43,7 +44,7 @@ test("offer and interview email 11 minutes after the last one and keep the 10-mi
     assert.equal(planNudge({ ...base, kind, lastSameKindAt: ago(60_000) }).cooldown, true);
   }
   const offer = planNudge({ ...base, kind: "offer", lastSameKindAt: null });
-  assert.ok(!offer.cooldown && offer.email?.cta?.url === "https://findtern.in/intern/proposals");
+  assert.ok(!offer.cooldown && offer.email?.cta?.url === "https://findtern.in/intern/dashboard?nudge=offer");
 });
 
 test("no PUBLIC_ORIGIN (link is null): no email for any kind", () => {
@@ -74,4 +75,23 @@ test("the nudge route has the 60s window, per-student allSettled and sends the t
   assert.match(src, /export const maxDuration = 60;/);
   assert.match(src, /Promise\.allSettled/);
   assert.match(src, /NextResponse\.json\(tally\)/);
+});
+
+// Bug sheet 25 Nov: a nudge lands on the dashboard and the control it is about glows.
+test("every nudge links to the dashboard with its kind; the bell row links there too", () => {
+  for (const kind of ["online", "offer", "interview", "meeting", "open_to_work"] as const) {
+    assert.equal(nudgeHref(kind), `/intern/dashboard?nudge=${kind}`);
+    const plan = planNudge({ ...base, kind, lastSameKindAt: null });
+    assert.ok(!plan.cooldown && plan.copy.url === nudgeHref(kind));
+    assert.equal(internNotificationHref(`college_nudge_${kind}`, { url: "https://evil.example" }), nudgeHref(kind));
+  }
+  assert.equal(internNotificationHref("college_nudge_bogus", {}), "/intern/dashboard");
+});
+
+test("what glows: the kind in the link, plus unread nudges from the last two days; junk is ignored", () => {
+  assert.deepEqual([...nudgeGlow("offer", [])], ["offer"]);
+  assert.deepEqual([...nudgeGlow(["meeting", "x"], [])], ["meeting"]);
+  assert.deepEqual([...nudgeGlow("<script>", [])], []);
+  assert.deepEqual([...nudgeGlow(undefined, ["college_nudge_open_to_work", "proposal_received", "college_nudge_nope"])], ["open_to_work"]);
+  assert.deepEqual([...nudgeGlow("offer", ["college_nudge_offer", "college_nudge_interview"])].sort(), ["interview", "offer"]);
 });

@@ -304,7 +304,7 @@ function ScheduleRow({ r, now, past, employerId, meetingOpen }: { r: Row; now: n
           {cancelled ? (
             <p className="mt-1 text-sm text-ink-600">
               {iv.cancelledBy === "intern" ? "The candidate cancelled this meeting." : iv.cancelledBy === "employer" ? "You cancelled this meeting." : "This meeting was cancelled."}
-              {iv.cancelReason ? <> Reason: <span className="text-ink-800">{iv.cancelReason}</span></> : null}
+              {iv.cancelReason ? <> Reason: <span className="whitespace-pre-line text-ink-800">{iv.cancelReason}</span></> : null}
             </p>
           ) : null}
           {waiting && !theirs && offered.length ? (
@@ -319,7 +319,7 @@ function ScheduleRow({ r, now, past, employerId, meetingOpen }: { r: Row; now: n
               {iv.cancelReason ? (
                 <>
                   {" "}
-                  Their note: <span className="text-ink-800">{iv.cancelReason}</span>
+                  Their note: <span className="whitespace-pre-line text-ink-800">{iv.cancelReason}</span>
                 </>
               ) : null}
             </p>

@@ -1,36 +1,27 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { projectSkillPlan } from "./project-skill-sync.ts";
+import { projectSkillSave } from "./project-skill-sync.ts";
 import { EDITABLE_WHILE_PUBLISHED, isLockedWhilePublished } from "./projects/lifecycle.ts";
 
 const four = ["React", "SQL", "Figma", "Python"];
 
-test("four or more skills save to the project", () => {
-  assert.deepEqual(projectSkillPlan(four.slice(0, 3), four.slice(0, 3), four), { action: "save" });
-  assert.deepEqual(projectSkillPlan(four, four, [...four, "Go"]), { action: "save" });
-  assert.deepEqual(projectSkillPlan([...four, "Go"], [...four, "Go"], four), { action: "save" });
+// Bug sheet 25 Nov: chips only filter; the project changes only through "Save to project", at 4 to 7 skills.
+test("chips that match the project's skills (any order or case) offer no save", () => {
+  assert.deepEqual(projectSkillSave(four, ["python", "React", "figma", "SQL"]), { state: "same" });
 });
 
-test("removing below four is refused once the list has four", () => {
-  const plan = projectSkillPlan(four, four, four.slice(1));
-  assert.equal(plan.action, "block");
-  assert.match(plan.action === "block" ? plan.message : "", /at least 4 skills/);
+test("a changed list of 4 to 7 skills can be saved", () => {
+  assert.deepEqual(projectSkillSave(four, four.slice(0, 3).concat("Go")), { state: "ready" });
+  assert.deepEqual(projectSkillSave(four, [...four, "Go", "Rust", "C"]), { state: "ready" });
+  assert.deepEqual(projectSkillSave([], four), { state: "ready" });
 });
 
-test("a refused chip on a three-skill project can be removed", () => {
-  assert.equal(projectSkillPlan(["React", "SQL", "Go"], ["React", "SQL", "Go", "ed"], ["React", "SQL", "Go"]).action, "filter");
-});
-
-test("under four the change only filters, and says how many more are needed", () => {
-  assert.deepEqual(projectSkillPlan([], [], ["React"]), { action: "filter", message: "Add 3 more skills to save them to the project." });
-  assert.deepEqual(projectSkillPlan(["React"], ["React", "SQL"], ["React", "SQL", "Go"]), { action: "filter", message: "Add 1 more skill to save them to the project." });
-  // Already under four (a legacy project): removing is not blocked.
-  assert.equal(projectSkillPlan(["React", "SQL"], ["React", "SQL"], ["React"]).action, "filter");
-});
-
-test("a short list (an old link) can be built back up on a project with four saved", () => {
-  assert.equal(projectSkillPlan(four, ["React", "SQL"], ["React", "SQL", "Go"]).action, "filter");
+test("under 4 or over 7 the save waits, and says what is needed", () => {
+  assert.deepEqual(projectSkillSave(four, []), { state: "blocked", message: "Pick 4 to 7 skills to save them to the project." });
+  assert.deepEqual(projectSkillSave(four, ["React"]), { state: "blocked", message: "Add 3 more skills to save them to the project." });
+  assert.deepEqual(projectSkillSave(four, ["React", "SQL", "Go"]), { state: "blocked", message: "Add 1 more skill to save them to the project." });
+  assert.equal(projectSkillSave(four, [...four, "Go", "Rust", "C", "Java"]).state, "blocked");
 });
 
 test("a live project's skills can be edited", () => {

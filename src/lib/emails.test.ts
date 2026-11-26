@@ -178,3 +178,12 @@ test("an unbroken long string wraps inside the card: every block that holds user
   }
   assert.ok(checked > 20, `only ${checked} blocks checked`);
 });
+
+// Bug sheet 25 Nov: the cancel reason is optional and keeps its line breaks.
+test("meetingCancelled: a blank reason reads 'No reason given'; a typed one keeps its line breaks, escaped", () => {
+  const blank = renderEmail(emails.meetingCancelled({ name: "Asha", other: "Acme", reason: "", byWho: "Acme", forEmployer: false }));
+  assert.match(blank.html, /No reason given/);
+  assert.match(blank.text, /Reason: No reason given/);
+  const typed = renderEmail(emails.meetingCancelled({ name: "Asha", other: "Acme", reason: "Exam clash.\n<b>Next week?</b>", byWho: "Acme", forEmployer: false }));
+  assert.match(typed.html, /Exam clash\.<br>&lt;b&gt;Next week\?&lt;\/b&gt;/);
+});

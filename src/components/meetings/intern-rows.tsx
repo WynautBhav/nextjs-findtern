@@ -58,7 +58,7 @@ export function OpenMeetingRow({ i, title, company, serverNow }: { i: InterviewR
             {i.cancelReason ? (
               <>
                 {" "}
-                Your note: <span className="text-ink-800">{i.cancelReason}</span>
+                Your note: <span className="whitespace-pre-line text-ink-800">{i.cancelReason}</span>
               </>
             ) : null}
           </p>
@@ -155,7 +155,7 @@ function pastOutcome(i: InterviewRow): { label: string; tone: Tone; detail: Reac
           {i.cancelReason ? (
             <>
               {" "}
-              Reason: <span className="text-ink-800">{i.cancelReason}</span>
+              Reason: <span className="whitespace-pre-line text-ink-800">{i.cancelReason}</span>
             </>
           ) : null}
         </>

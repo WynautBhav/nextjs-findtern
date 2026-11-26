@@ -150,10 +150,19 @@ describe("cancel and reschedule", () => {
       assert.equal(f.cancelReason, "Clash with an exam");
     }
   });
-  it("a reason is required", () => {
-    assert.equal((step(booked, { type: "cancel", by: "intern", reason: " " }, NOW) as { code: string }).code, "reason_required");
+  it("a reason is optional: blank cancels with no reason stored; a typed one is a few words, at most 300 characters", () => {
+    const f = must(step(booked, { type: "cancel", by: "employer", reason: "  " }, NOW)).fields;
+    assert.equal(f.status, "cancelled");
+    assert.equal(f.cancelReason, null);
+    assert.equal(reasonProblem(undefined), null);
+    assert.equal(reasonProblem(""), null);
+    assert.notEqual(reasonProblem("ok"), null);
     assert.notEqual(reasonProblem("x".repeat(301)), null);
     assert.equal(reasonProblem("Not available"), null);
+  });
+  it("a reason keeps its line breaks (trimmed at the ends only)", () => {
+    const f = must(step(booked, { type: "cancel", by: "intern", reason: " Exam clash.\nCan we talk next week? " }, NOW)).fields;
+    assert.equal(f.cancelReason, "Exam clash.\nCan we talk next week?");
   });
   it("cannot cancel once started or when already closed", () => {
     assert.equal((canCancel(booked, at(10).getTime()) as { code: string }).code, "started");

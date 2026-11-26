@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileUp, Search } from "lucide-react";
 
@@ -13,7 +13,8 @@ import { COHORTS, yearLabel } from "@/lib/college/labels";
 import { csrfFetch } from "@/lib/client-fetch";
 import { inviteSentLine } from "@/lib/college/drive-invite-line";
 import type { Audience } from "@/lib/college/drive-input";
-import { MAX_IMPORT_BYTES, MAX_INVITES, inviteRowProblem, mergeInvites, parseInviteSheet, toApiRow, type InviteRow } from "@/lib/college/invite-import";
+import { MAX_IMPORT_BYTES, MAX_INVITES, inviteRowProblem, isBlankPhone, joinInvitePhone, mergeInvites, parseInviteSheet, splitInvitePhone, toApiRow, type InviteRow } from "@/lib/college/invite-import";
+import { DIAL_CODES } from "@/lib/data/dial-codes";
 import { decodeRosterBytes } from "@/lib/college/roster";
 import { cn } from "@/lib/utils";
 import { PageHead, SURFACE_CLASS } from "@/components/app/primitives";
@@ -140,7 +141,7 @@ export function DriveBuilder({
       document.getElementById("audience-tech")?.focus();
       return;
     }
-    const invited = (d.invitedEmployers ?? []).filter((r) => r.company.trim() || r.email.trim() || (r.name ?? "").trim() || (r.phone ?? "").trim());
+    const invited = (d.invitedEmployers ?? []).filter((r) => r.company.trim() || r.email.trim() || (r.name ?? "").trim() || !isBlankPhone(r.phone));
     if (invited.some((r) => inviteRowProblem(asInviteRow(r)))) {
       setRowErrors(true);
       setError("Fix the employers marked below.");
@@ -497,7 +498,7 @@ function IstDateTime({
 
 const asInviteRow = (r: InvitedRow): InviteRow => ({ company: r.company, email: r.email, name: r.name ?? "", phone: r.phone ?? "" });
 const BLANK: InvitedRow = { company: "", email: "", name: "", phone: "" };
-const isBlank = (r: InvitedRow) => !r.company.trim() && !r.email.trim() && !(r.name ?? "").trim() && !(r.phone ?? "").trim();
+const isBlank = (r: InvitedRow) => !r.company.trim() && !r.email.trim() && !(r.name ?? "").trim() && isBlankPhone(r.phone);
 
 type ImportNote = { kind: "done" | "error"; text: string; skipped: string[] };
 
@@ -512,6 +513,7 @@ function InvitedEmployers({ value, onChange, showErrors }: { value: InvitedRow[]
   const list = useRef<HTMLUListElement>(null);
   const focusLast = useRef(false);
   const put = (i: number, k: "company" | "email" | "name" | "phone", v: string) => onChange(rows.map((r, j) => (j === i ? { ...r, [k]: v } : r)));
+  const uid = useId();
 
   // "Add more" puts the cursor in the new row's first field.
   useEffect(() => {
@@ -565,7 +567,7 @@ function InvitedEmployers({ value, onChange, showErrors }: { value: InvitedRow[]
       </p>
 
       <div className="space-y-3 px-5 py-4">
-        <div aria-hidden className="hidden gap-2 text-xs font-medium text-text-subtle xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,0.9fr)_5.5rem]">
+        <div aria-hidden className="hidden gap-2 text-xs font-medium text-text-subtle xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.4fr)_5.5rem]">
           <span>Name</span>
           <span>Company name</span>
           <span>Email</span>
@@ -577,7 +579,7 @@ function InvitedEmployers({ value, onChange, showErrors }: { value: InvitedRow[]
             const problem = showErrors && !isBlank(r) ? inviteRowProblem(asInviteRow(r)) : null;
             const bad = (f: string) => (problem?.field === f ? true : undefined);
             return (
-              <li key={i} className="grid gap-2 rounded-apple-sm border border-ink-100 p-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.3fr)_minmax(0,0.9fr)_5.5rem] xl:border-0 xl:p-0">
+              <li key={i} className="grid gap-2 rounded-apple-sm border border-ink-100 p-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1.4fr)_5.5rem] xl:border-0 xl:p-0">
                 <label className="block">
                   <span className="text-sm font-medium text-ink-800 xl:sr-only">Name</span>
                   <input className={cn(field, "mt-1.5 xl:mt-0")} value={r.name ?? ""} maxLength={120} autoComplete="off" onChange={(e) => put(i, "name", e.target.value)} />
@@ -590,10 +592,44 @@ function InvitedEmployers({ value, onChange, showErrors }: { value: InvitedRow[]
                   <span className="text-sm font-medium text-ink-800 xl:sr-only">Email</span>
                   <input type="email" className={cn(field, "mt-1.5 xl:mt-0")} value={r.email} maxLength={200} autoComplete="off" aria-invalid={bad("email")} aria-describedby={bad("email") ? `emp-err-${i}` : undefined} onChange={(e) => put(i, "email", e.target.value)} />
                 </label>
-                <label className="block">
-                  <span className="text-sm font-medium text-ink-800 xl:sr-only">Phone</span>
-                  <input type="tel" inputMode="tel" className={cn(field, "mt-1.5 xl:mt-0")} value={r.phone ?? ""} maxLength={40} autoComplete="off" aria-invalid={bad("phone")} aria-describedby={bad("phone") ? `emp-err-${i}` : undefined} onChange={(e) => put(i, "phone", e.target.value)} />
-                </label>
+                {/* Country code + number (bug sheet 25 Nov); +91 by default, stored as before for India. */}
+                {(() => {
+                  const ph = splitInvitePhone(r.phone);
+                  return (
+                    <div>
+                      <span id={`${uid}-ph-${i}`} className="text-sm font-medium text-ink-800 xl:sr-only">
+                        Phone
+                      </span>
+                      <div className="mt-1.5 flex gap-1.5 xl:mt-0">
+                        <select
+                          aria-label={`Country code, employer ${i + 1}`}
+                          value={ph.code}
+                          onChange={(e) => put(i, "phone", joinInvitePhone(e.target.value, ph.number))}
+                          className={cn(field, "nums w-[5.75rem] shrink-0 px-2")}
+                        >
+                          {DIAL_CODES.some((d) => d.code === ph.code) ? null : <option value={ph.code}>{ph.code}</option>}
+                          {DIAL_CODES.map((d) => (
+                            <option key={`${d.code}-${d.country}`} value={d.code}>
+                              {d.code} {d.country}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="tel"
+                          inputMode="tel"
+                          className={cn(field, "min-w-0 flex-1")}
+                          value={ph.number}
+                          maxLength={32}
+                          autoComplete="off"
+                          aria-labelledby={`${uid}-ph-${i}`}
+                          aria-invalid={bad("phone")}
+                          aria-describedby={bad("phone") ? `emp-err-${i}` : undefined}
+                          onChange={(e) => put(i, "phone", joinInvitePhone(ph.code, e.target.value))}
+                        />
+                      </div>
+                    </div>
+                  );
+                })()}
                 <div className="flex items-end sm:col-span-2 xl:col-span-1">
                   <button
                     type="button"

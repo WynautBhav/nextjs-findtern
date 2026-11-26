@@ -10,31 +10,52 @@ export const NUDGE_KINDS = ["online", "offer", "interview", "meeting", "open_to_
 export type NudgeKind = (typeof NUDGE_KINDS)[number];
 export const NUDGE_COOLDOWN_MS = 10 * 60_000;
 
+/** Every nudge lands on the dashboard, where the control it is about glows (bug sheet 25 Nov). */
+export function nudgeHref(kind: NudgeKind): string {
+  return `/intern/dashboard?nudge=${kind}`;
+}
+
+const isKind = (v: unknown): v is NudgeKind => typeof v === "string" && (NUDGE_KINDS as readonly string[]).includes(v);
+
+/**
+ * The nudge kinds whose control glows on the dashboard: the one in the link (`?nudge=`, from the bell, push or email)
+ * and any still-unread nudge notification (the caller passes recent unread types). Anything else is ignored.
+ */
+export function nudgeGlow(param: unknown, unreadTypes: readonly string[]): Set<NudgeKind> {
+  const out = new Set<NudgeKind>();
+  for (const v of Array.isArray(param) ? param : [param]) if (isKind(v)) out.add(v);
+  for (const t of unreadTypes) {
+    const kind = t.startsWith("college_nudge_") ? t.slice("college_nudge_".length) : null;
+    if (isKind(kind)) out.add(kind);
+  }
+  return out;
+}
+
 const COPY: Record<NudgeKind, (college: string) => { title: string; message: string; url: string }> = {
   online: (c) => ({
     title: `${c} placement drive is live`,
     message: "Your placement cell asks you to open Findtern, so employers in the drive can reach you for a call.",
-    url: "/intern/dashboard",
+    url: nudgeHref("online"),
   }),
   offer: (c) => ({
     title: `${c}: an offer is waiting for your reply`,
     message: "Please accept or decline it. A quick answer, either way, lets the employer move on.",
-    url: "/intern/proposals",
+    url: nudgeHref("offer"),
   }),
   meeting: (c) => ({
     title: `${c}: an employer asked you for a call`,
     message: "Open Findtern and accept or decline the meeting request. Employers in the drive are waiting.",
-    url: "/intern/dashboard",
+    url: nudgeHref("meeting"),
   }),
   open_to_work: (c) => ({
     title: `${c}: turn on "Open to work"`,
     message: "While it is off, employers in the placement drive cannot find you. Turn it on from your dashboard.",
-    url: "/intern/dashboard",
+    url: nudgeHref("open_to_work"),
   }),
   interview: (c) => ({
     title: `${c}: take your AI interview`,
     message: "Your score is what employers in the drive filter on. It takes about an hour.",
-    url: "/intern/dashboard",
+    url: nudgeHref("interview"),
   }),
 };
 

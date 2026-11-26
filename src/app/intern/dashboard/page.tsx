@@ -31,7 +31,8 @@ import { formatPeriodDays, isoDay, todayIst } from "@/lib/timesheet-days";
 import { getDb, schema } from "@/lib/db";
 import { pendingClaimFor } from "@/lib/drives/claim";
 import { driveCodeSecret } from "@/lib/drives/code-derive";
-import { eq } from "drizzle-orm";
+import { and, eq, gte, like, sql } from "drizzle-orm";
+import { nudgeGlow } from "@/lib/college/nudge-plan";
 import { loadInternData } from "@/lib/intern-data";
 import { joinState, serializeJoinInput } from "@/lib/interview-join";
 import { companyIn, hoursByMonth, hoursIn, nextAction, roleOf, slotOf } from "@/lib/journey";
@@ -99,8 +100,29 @@ function ratingsOf(onboarding: { extraData?: Record<string, unknown> | null } | 
 const IST = "Asia/Kolkata";
 
 
-export default async function InternHome() {
+export default async function InternHome({ searchParams }: { searchParams: Promise<{ nudge?: string | string[] }> }) {
   const session = await requireRole("intern");
+  // A placement officer's nudge (bug sheet 25 Nov): the control it is about glows, from the nudge's own link or while
+  // the nudge sits unread in the bell (two days at most).
+  const [sp, unreadNudges] = await Promise.all([
+    searchParams,
+    getDb()
+      .select({ type: schema.notifications.type })
+      .from(schema.notifications)
+      .where(
+        and(
+          eq(schema.notifications.recipientType, "intern"),
+          eq(schema.notifications.recipientId, session.uid),
+          eq(schema.notifications.isRead, false),
+          like(schema.notifications.type, "college\\_nudge\\_%"),
+          // created_at holds UTC wall time.
+          gte(schema.notifications.createdAt, sql`(now() at time zone 'utc') - interval '2 days'`),
+        ),
+      )
+      .catch(() => []),
+  ]);
+  const glow = nudgeGlow(sp.nudge, unreadNudges.map((r) => r.type));
+  const glowFor = (key: string) => (key === "offer" && glow.has("offer")) || (key === "ai-interview" && glow.has("interview"));
 
   // Independent reads, in parallel. loadInternData is cache()d: the layout's call already did the work.
   const [data, [user], activated, activationFeeMinor, paidMinor, college, [presenceRow], lockState, acct] = await Promise.all([
@@ -381,9 +403,9 @@ export default async function InternHome() {
               <p className={cn("text-pretty font-medium leading-snug text-ink-900", i === 0 ? "text-lg" : "text-base")}>{step.title}</p>
               {step.detail ? <p className="mt-1 text-sm text-text-subtle">{step.detail}</p> : null}
               {step.joinLink ? (
-                <JoinGate link={step.joinLink} label={step.label} variant={i === 0 ? "primary" : "outline"} className={cn("mt-3 w-full", topLayout?.wide && "@xl:w-fit")} />
+                <JoinGate link={step.joinLink} label={step.label} variant={i === 0 ? "primary" : "outline"} className={cn("mt-3 w-full", topLayout?.wide && "@xl:w-fit", glowFor(step.key) && "nudge-glow")} />
               ) : step.href ? (
-                <Link href={step.href} className={buttonClass({ variant: i === 0 ? "primary" : "outline", className: cn("mt-3 w-full", topLayout?.wide && "@xl:w-fit") })}>
+                <Link href={step.href} className={buttonClass({ variant: i === 0 ? "primary" : "outline", className: cn("mt-3 w-full", topLayout?.wide && "@xl:w-fit", glowFor(step.key) && "nudge-glow") })}>
                   {step.label}
                   <ArrowRight className="size-4" aria-hidden />
                 </Link>
@@ -446,6 +468,7 @@ export default async function InternHome() {
       {/* Before going live the journey's last stop carries this; the switch stays on Your profile. */}
       {gettingStarted ? null : (
         <Tile
+          className={cn(glow.has("open_to_work") && !openToWork && "nudge-glow")}
           title="Profile status"
           aside={<VisibilityPill state={visibilityState(profileStatus.tone)}>{profileStatus.label}</VisibilityPill>}
           action={{ href: "/intern/profile", label: "See your profile as employers do" }}
@@ -506,7 +529,10 @@ export default async function InternHome() {
         {meetingsToAnswer > 0 ? (
           <Link
             href="/intern/interviews"
-            className="flex min-h-11 items-center justify-between gap-3 rounded-apple-md border border-accent-300/70 bg-accent-100 px-4 py-3 text-sm font-medium text-accent-700 outline-none transition-colors hover:border-accent-400 focus-visible:ring-2 focus-visible:ring-brand-600"
+            className={cn(
+              "flex min-h-11 items-center justify-between gap-3 rounded-apple-md border border-accent-300/70 bg-accent-100 px-4 py-3 text-sm font-medium text-accent-700 outline-none transition-colors hover:border-accent-400 focus-visible:ring-2 focus-visible:ring-brand-600",
+              glow.has("meeting") && "nudge-glow",
+            )}
           >
             <span className="nums">
               Choose a time for {meetingsToAnswer} {meetingsToAnswer === 1 ? "interview" : "interviews"}

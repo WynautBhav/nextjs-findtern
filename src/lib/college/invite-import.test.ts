@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { driveInput } from "./drive-input.ts";
 import { prepareInvited, withUnsent } from "./drive-invite.ts";
-import { MAX_INVITES, inviteRowProblem, invitePhone, mergeInvites, parseInviteSheet, toApiRow } from "./invite-import.ts";
+import { MAX_INVITES, inviteRowProblem, invitePhone, joinInvitePhone, mergeInvites, parseInviteSheet, splitInvitePhone, toApiRow } from "./invite-import.ts";
 
 const row = (o: Partial<{ name: string; company: string; email: string; phone: string }> = {}) => ({ name: "", company: "Acme", email: "hr@acme.com", phone: "", ...o });
 
@@ -53,7 +53,7 @@ test("a huge sheet is refused rather than read", () => {
 test("phones: common Indian shapes become 10 digits, junk and foreign numbers are refused", () => {
   for (const ok of ["9811122334", "+91 98111 22334", "098111-22334", "(+91) 98111 22334"]) assert.equal(invitePhone(ok).phone, "9811122334", ok);
   assert.deepEqual(invitePhone("  "), { phone: null, error: null });
-  for (const bad of ["12345", "5876543210", "+44 7911 123456", "9999999999", "1234567890", "98765 4321a"]) assert.ok(invitePhone(bad).error, bad);
+  for (const bad of ["12345", "5876543210", "+44 79", "9999999999", "1234567890", "98765 4321a"]) assert.ok(invitePhone(bad).error, bad);
 });
 
 test("row problems name the field; a fully blank row is not a problem", () => {
@@ -103,7 +103,7 @@ test("zod: an invited employer keeps name and phone, normalised; the phone is op
 test("zod: a bad phone, a bad email, a missing company, a long name and more than 50 rows are all refused", () => {
   const bad = (e: Record<string, unknown>) => driveInput.safeParse(drive({ invitedEmployers: [{ company: "Acme", email: "a@acme.com", ...e }] }));
   assert.equal(bad({ phone: "12345" }).success, false);
-  assert.equal(bad({ phone: "+44 7911 123456" }).success, false);
+  assert.equal(bad({ phone: "+44 79" }).success, false);
   assert.equal(bad({ email: "nope" }).success, false);
   assert.equal(bad({ company: "   " }).success, false);
   assert.equal(bad({ name: "x".repeat(121) }).success, false);
@@ -128,4 +128,31 @@ test("saving keeps contact details: a row with neither key keeps what is saved, 
   assert.deepEqual(prepareInvited([{ company: "New", email: "n@x.io" }], null), [{ company: "New", email: "n@x.io" }]);
   const flagged = withUnsent([{ company: "Acme", email: "hr@acme.com", name: "Priya", phone: "9811122334" }, { company: "B", email: "b@b.io", unsent: true }], ["hr@acme.com"]);
   assert.deepEqual(flagged, [{ company: "Acme", email: "hr@acme.com", name: "Priya", phone: "9811122334", unsent: true }, { company: "B", email: "b@b.io" }]);
+});
+
+// Bug sheet 25 Nov: the company phone takes a country code. India stays 10 digits (as stored before); others "+CC digits".
+test("invitePhone: a non-Indian number with its country code is kept as '+CC digits'; India still stores 10 digits", () => {
+  assert.deepEqual(invitePhone("+44 7700 900123"), { phone: "+44 7700900123", error: null });
+  assert.deepEqual(invitePhone("+1 (415) 555-0134"), { phone: "+1 4155550134", error: null });
+  assert.deepEqual(invitePhone("+971501234567"), { phone: "+971 501234567", error: null });
+  assert.deepEqual(invitePhone("+91 98111 22334"), { phone: "9811122334", error: null });
+  assert.deepEqual(invitePhone("98111 22334"), { phone: "9811122334", error: null });
+  assert.equal(invitePhone("+44 12").error, "Phone number must be 6 to 15 digits");
+  assert.notEqual(invitePhone("+999 1234567").error, null);
+  assert.deepEqual(invitePhone(""), { phone: null, error: null });
+});
+
+test("splitInvitePhone: the builder's code + number pair, defaulting to +91", () => {
+  assert.deepEqual(splitInvitePhone(""), { code: "+91", number: "" });
+  assert.deepEqual(splitInvitePhone("9876543210"), { code: "+91", number: "9876543210" });
+  assert.deepEqual(splitInvitePhone("+44 7700900123"), { code: "+44", number: "7700900123" });
+  assert.equal(joinInvitePhone("+44", "7700 900123"), "+44 7700 900123");
+  assert.equal(joinInvitePhone("+91", "98765 43210"), "98765 43210");
+  assert.equal(joinInvitePhone("+91", " "), "");
+  // A code picked before the number is kept, and counts as no phone until digits follow.
+  assert.equal(joinInvitePhone("+44", ""), "+44 ");
+  assert.deepEqual(splitInvitePhone("+44 "), { code: "+44", number: "" });
+  assert.deepEqual(invitePhone("+44 "), { phone: null, error: null });
+  assert.equal(inviteRowProblem(row({ phone: "+44 " })), null);
+  assert.equal(inviteRowProblem({ name: "", company: "", email: "", phone: "+44 " }), null);
 });

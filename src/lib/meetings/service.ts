@@ -279,7 +279,7 @@ async function tellOtherSide(db: Db, role: Role, before: Interview, iv: Intervie
       to,
       type: "meeting_cancelled",
       title: "Meeting cancelled",
-      message: `${fromLabel} cancelled the meeting: ${iv.cancelReason}`,
+      message: iv.cancelReason ? `${fromLabel} cancelled the meeting: ${iv.cancelReason}` : `${fromLabel} cancelled the meeting.`,
       data: { interviewId: iv.id, link: other === "intern" ? "/intern/interviews" : "/employer/schedule" },
       dedupeKey: `meeting_cancelled:${iv.id}`,
       email: emails.meetingCancelled({ name: toName, other: fromLabel, when: whenFor(other), reason: iv.cancelReason ?? "", byWho: fromLabel, forEmployer: other === "employer" }),

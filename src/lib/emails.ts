@@ -155,7 +155,7 @@ export function renderEmail(c: EmailContent): { subject: string; text: string; h
             ? `<a class="t-link" href="${esc(v)}" style="color:${BRAND};font-weight:400;text-decoration:underline;word-break:break-all;">${esc(v)}</a>`
             : isMoney(v)
               ? `<span class="amt" style="font-size:18px;line-height:26px;color:${BRAND};">${esc(v)}</span>`
-              : esc(v);
+              : esc(v).replace(/\r?\n/g, "<br>");
           return `<tr class="fr"><td class="fk line t-muted" valign="top" style="width:38%;padding:12px 16px 12px 0;word-break:break-word;overflow-wrap:anywhere;border-bottom:1px solid ${LINE};font-size:15px;line-height:24px;color:${MUTED};">${esc(k)}</td><td class="fv line t-ink" align="right" valign="top" style="padding:12px 0;border-bottom:1px solid ${LINE};font-size:15px;line-height:24px;font-weight:600;color:${INK};text-align:right;word-break:break-word;overflow-wrap:anywhere;font-variant-numeric:tabular-nums;">${value}</td></tr>`;
         })
         .join("")}</table>`
@@ -358,7 +358,7 @@ export const emails = {
     heading: "A meeting was cancelled",
     greeting: hi(o.name),
     lines: [`${o.byWho} cancelled the meeting with you.`],
-    facts: [[o.forEmployer ? "Candidate" : "Company", o.other], ...(o.when ? ([["Was on", o.when]] as [string, string][]) : []), ["Reason", o.reason]],
+    facts: [[o.forEmployer ? "Candidate" : "Company", o.other], ...(o.when ? ([["Was on", o.when]] as [string, string][]) : []), ["Reason", o.reason.trim() || "No reason given"]],
     status: "Cancelled",
     tone: "alert",
     cta: ctaTo("Open dashboard", o.forEmployer ? "/employer/schedule" : "/intern/interviews"),

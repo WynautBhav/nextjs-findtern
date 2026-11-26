@@ -1,22 +1,22 @@
 /**
- * Skills changed on the Candidates page (a chip removed, "+ Skill", a skill picked in the search) are the selected
- * project's skills too: the change saves to the project, then filters. A project keeps at least
- * MIN_PROJECT_SKILLS, so once the saved list has that many the filter cannot drop below; under it (a new or legacy
- * project) the change only filters until there are enough to save. `saved` is the project's stored list, not the chips:
- * a chip the project refused (a skill outside the list) can always be removed. Pure, so the rule is tested under plain `node --test`.
+ * Skills on the Candidates page only filter (bug sheet 25 Nov): the employer can drop every chip and explore freely.
+ * The selected project changes only when they press "Save to project", and only with MIN_PROJECT_SKILLS to
+ * MAX_PROJECT_SKILLS skills (the project route holds the same rule). Pure, so the rule is tested under plain `node --test`.
  */
-import { MIN_PROJECT_SKILLS } from "./project-locations.ts";
+import { MAX_PROJECT_SKILLS, MIN_PROJECT_SKILLS } from "./project-locations.ts";
 
-export type ProjectSkillPlan = { action: "save" } | { action: "block"; message: string } | { action: "filter"; message: string };
+export type ProjectSkillSave = { state: "same" } | { state: "ready" } | { state: "blocked"; message: string };
 
-/** `current` is the list on screen now: only a removal can be blocked, so a short list can always be built back up. */
-export function projectSkillPlan(saved: readonly string[], current: readonly string[], next: readonly string[]): ProjectSkillPlan {
-  if (next.length >= MIN_PROJECT_SKILLS) return { action: "save" };
-  if (saved.length >= MIN_PROJECT_SKILLS && next.length < current.length) {
-    return { action: "block", message: `A project needs at least ${MIN_PROJECT_SKILLS} skills. Add another skill before removing this one.` };
-  }
-  const more = MIN_PROJECT_SKILLS - next.length;
-  return { action: "filter", message: `Add ${more} more skill${more === 1 ? "" : "s"} to save them to the project.` };
+const key = (list: readonly string[]) => list.map((s) => s.trim().toLowerCase()).sort().join("|");
+
+/** Whether the chips on screen (`current`) differ from the project's stored list (`saved`), and can be saved as they are. */
+export function projectSkillSave(saved: readonly string[], current: readonly string[]): ProjectSkillSave {
+  if (key(saved) === key(current)) return { state: "same" };
+  const n = current.length;
+  if (n >= MIN_PROJECT_SKILLS && n <= MAX_PROJECT_SKILLS) return { state: "ready" };
+  if (n === 0 || n > MAX_PROJECT_SKILLS) return { state: "blocked", message: `Pick ${MIN_PROJECT_SKILLS} to ${MAX_PROJECT_SKILLS} skills to save them to the project.` };
+  const more = MIN_PROJECT_SKILLS - n;
+  return { state: "blocked", message: `Add ${more} more skill${more === 1 ? "" : "s"} to save them to the project.` };
 }
 
 /**

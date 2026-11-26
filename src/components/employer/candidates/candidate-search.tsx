@@ -19,7 +19,6 @@ import { rankSuggestions, searchHref, type Suggestion } from "@/lib/candidate-su
 import { MAX_SKILLS } from "@/lib/onboarding";
 import { requireSkillHref } from "@/lib/skill-filter-href";
 import { cn } from "@/lib/utils";
-import { useProjectSkills } from "@/app/employer/candidates/_project-skills";
 
 const PATH = "/employer/candidates";
 
@@ -74,7 +73,6 @@ export function CandidateSearch({
     : { skills: [], cities: [], all: [] as Suggestion[] };
   const items = open ? found.all : [];
   const full = required.length >= MAX_SKILLS;
-  const projectSkills = useProjectSkills();
 
   // `/` focuses the box that is on screen: the slim sticky bar's while it shows, else the toolbar's.
   useEffect(() => {
@@ -99,10 +97,8 @@ export function CandidateSearch({
     setOpen(false);
     setHighlight(-1);
     setValue("");
-    const href = requireSkillHref(pathname, params.toString(), required, skill, hasPro);
-    // With a project selected the new skill saves to it first (an addition is never blocked).
-    const next = [...required.filter((s) => s.toLowerCase() !== skill.toLowerCase()), skill];
-    void projectSkills.save(required, next).then((ok) => ok && go(href));
+    // Filters only; the skill row's "Save to project" puts it on the project (bug sheet 25 Nov).
+    go(requireSkillHref(pathname, params.toString(), required, skill, hasPro));
   }
   /** A skill row requires the skill (click, Enter or "+ Require" alike); a city row, or a skill already required, searches. */
   function pick(s: Suggestion) {

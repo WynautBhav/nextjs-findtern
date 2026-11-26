@@ -19,13 +19,14 @@ import { useId, useState } from "react";
 import Link from "@/app/employer/candidates/_link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useCandidatesGo } from "@/app/employer/candidates/_nav";
-import { Check, Plus, X } from "lucide-react";
+import { Check, Plus, Save, X } from "lucide-react";
 
 import { buttonClass } from "@/components/ui/button";
 
 import { suggestSkills } from "@/lib/data/skills";
 import { MAX_SKILLS } from "@/lib/onboarding";
 import { skillFilterHref } from "@/lib/skill-filter-href";
+import { projectSkillSave } from "@/lib/project-skill-sync";
 import { arrowKey, limitNote } from "@/components/employer/skill-combobox";
 import { cn } from "@/lib/utils";
 import { useProjectSkills } from "@/app/employer/candidates/_project-skills";
@@ -71,8 +72,11 @@ export function SkillFilter({
   // "Add skill" opens the inline box; it closes again when left empty.
   const [adding, setAdding] = useState(false);
   const full = active.length >= MAX_SKILLS;
-  // Candidates with a project selected: the change saves to the project first (and may be refused below its minimum).
+  // Candidates with a project selected: chips only filter; "Save to project" puts them on it, at 4 to 7 (bug sheet 25 Nov).
   const projectSkills$ = useProjectSkills();
+  const savePlan = projectSkills$.projectId ? projectSkillSave(projectSkills$.saved, active) : null;
+  // "Saved" only while the chips still match the project; a refusal stays until the next try.
+  const saveNote = projectSkills$.notice.startsWith("Not saved") || savePlan?.state === "same" ? projectSkills$.notice : "";
 
   const typed = query.trim();
   const options = typed ? suggestSkills(typed, 8).filter((s) => !active.includes(s)) : [];
@@ -83,6 +87,7 @@ export function SkillFilter({
   // What is on screen: nothing while the list is closed.
   const items = open ? rows : [];
   const limit = limitNote(active.length, MAX_SKILLS, "skills");
+  const liveNote = saveNote || (savePlan?.state === "blocked" ? savePlan.message : "") || limit;
 
   /**
    * `skills` in the URL - even empty - is the employer's own pick and wins
@@ -92,8 +97,8 @@ export function SkillFilter({
     return skillFilterHref(pathname, params.toString(), skills, hasPro); // A new filter starts at page one.
   }
 
-  async function change(next: string[]) {
-    if (await projectSkills$.save(active, next)) go(hrefWith(next));
+  function change(next: string[]) {
+    go(hrefWith(next));
   }
 
   function add(skill: string) {
@@ -149,9 +154,31 @@ export function SkillFilter({
         ) : null}
       </ul>
 
+      {active.length > 0 ? (
+        <button type="button" onClick={() => change([])} className="inline-flex min-h-9 items-center px-1.5 text-[13px] font-medium text-ink-700 underline underline-offset-4 outline-none hover:text-ink-900 focus-visible:ring-2 focus-visible:ring-brand-500 touch:min-h-11">
+          Clear skills
+        </button>
+      ) : null}
+
+      {savePlan && savePlan.state !== "same" ? (
+        <button
+          type="button"
+          aria-disabled={savePlan.state !== "ready" || projectSkills$.saving || undefined}
+          onClick={() => {
+            if (savePlan.state === "ready" && !projectSkills$.saving) void projectSkills$.saveSkills(active);
+          }}
+          className="group inline-flex min-h-9 items-center outline-none aria-disabled:cursor-not-allowed touch:min-h-11"
+        >
+          <span className="inline-flex h-7 items-center gap-1 rounded-lg bg-brand-700 px-2.5 text-[13px] font-medium text-white transition-colors group-hover:bg-brand-800 group-focus-visible:ring-2 group-focus-visible:ring-brand-500 group-focus-visible:ring-offset-1 group-aria-disabled:bg-ink-200 group-aria-disabled:text-ink-600">
+            <Save className="size-3.5" aria-hidden />
+            {projectSkills$.saving ? "Saving…" : "Save to project"}
+          </span>
+        </button>
+      ) : null}
+
       {/* Always mounted so the screen reader hears the note appear; empty it takes no room. */}
-      <p aria-live="polite" className={projectSkills$.notice || limit ? "inline-flex min-h-9 items-center text-[13px] text-ink-700 touch:min-h-11" : "sr-only"}>
-        {projectSkills$.notice || limit}
+      <p aria-live="polite" className={liveNote ? "inline-flex min-h-9 items-center text-[13px] text-ink-700 touch:min-h-11" : "sr-only"}>
+        {liveNote}
       </p>
 
       {full ? null : showAdd ? (

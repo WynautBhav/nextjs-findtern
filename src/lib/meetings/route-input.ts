@@ -6,4 +6,5 @@ export const slotsBody = z
   .object({ slots: z.array(wall).max(10).optional(), slot1: wall.optional(), slot2: wall.optional(), slot3: wall.optional() })
   .transform((b) => (b.slots ?? [b.slot1, b.slot2, b.slot3]).filter((s): s is string => Boolean(s)));
 
-export const cancelBody = z.object({ reason: z.string().trim().min(1).max(1000) });
+/** The reason is optional (bug sheet 25 Nov); the service judges its length. */
+export const cancelBody = z.object({ reason: z.string().trim().max(1000).optional().default("") });

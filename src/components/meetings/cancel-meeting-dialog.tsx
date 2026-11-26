@@ -57,12 +57,12 @@ function CancelForm({ interviewId, other, onClose }: { interviewId: string; othe
     <>
       <DialogHeader>
         <DialogTitle>Cancel this meeting?</DialogTitle>
-        <DialogDescription>Tell {other} why. They see your reason.</DialogDescription>
+        <DialogDescription>{other} is told. A reason is optional; they see it if you add one.</DialogDescription>
       </DialogHeader>
       <form onSubmit={submit} className="space-y-3 pt-1">
         <div>
           <label htmlFor={`${id}-reason`} className={labelClass}>
-            Reason
+            Reason <span className="font-normal text-text-subtle">(optional)</span>
           </label>
           <textarea
             id={`${id}-reason`}

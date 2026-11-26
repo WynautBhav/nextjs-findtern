@@ -1,19 +1,30 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { csrfFetch } from "@/lib/client-fetch";
 import { DISTRICTS } from "@/lib/data/districts";
-import { projectCityPlan, projectSkillPlan } from "@/lib/project-skill-sync";
+import { projectCityPlan } from "@/lib/project-skill-sync";
 
-type Save = (current: string[], next: string[]) => Promise<boolean>;
-type ProjectSkills = { save: Save; notice: string; saveCity: (city: string) => void; cityNotice: string };
+type ProjectSkills = {
+  /** The selected project (null outside the Candidates page, or with project matching off): no save is offered. */
+  projectId: string | null;
+  /** The project's stored skills. */
+  saved: string[];
+  /** "Save to project": puts these skills on the project. True when saved. */
+  saveSkills: (skills: string[]) => Promise<boolean>;
+  saving: boolean;
+  notice: string;
+  saveCity: (city: string) => void;
+  cityNotice: string;
+};
 
 const ProjectSkillsContext = createContext<ProjectSkills | null>(null);
 
 /**
- * The Candidates region with a project selected: a skill change saves to that project before it filters
- * (lib/project-skill-sync has the rule). Outside it (the Compare page) skills only filter.
+ * The Candidates region with a project selected. Skill chips only filter (bug sheet 25 Nov); "Save to project" puts the
+ * chips on the project, at 4 to 7 skills (lib/project-skill-sync has the rule). Outside it (the Compare page) skills only filter.
  */
 export function ProjectSkillsProvider({
   projectId,
@@ -37,53 +48,35 @@ export function ProjectSkillsProvider({
     setNotice("");
     setCityNotice("");
   }
-  // One save at a time, held until the reloaded list arrives: a second change built from the old list would overwrite the first.
+  const router = useRouter();
+  const [saving, setSaving] = useState(false);
   const busy = useRef(false);
-  const waitingFor = useRef<string | null>(null);
-  const savedKey = saved.join("|");
-  // The project's list reloaded: the next change starts from it.
-  useEffect(() => {
-    waitingFor.current = null;
-  }, [savedKey]);
-  const save = useCallback<Save>(
-    async (current, next) => {
-      if (!projectId) return true;
-      if (busy.current || waitingFor.current !== null) return false;
-      const plan = projectSkillPlan(saved, current, next);
-      if (plan.action === "block") {
-        setNotice(plan.message);
-        return false;
-      }
-      if (plan.action === "filter") {
-        setNotice(plan.message);
-        return true;
-      }
+  const saveSkills = useCallback(
+    async (skills: string[]) => {
+      if (!projectId || busy.current) return false;
       busy.current = true;
+      setSaving(true);
       try {
         const res = await csrfFetch(`/api/employer/projects/${projectId}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ skills: next }),
+          body: JSON.stringify({ skills }),
         });
         const body = (await res.json().catch(() => ({}))) as { error?: string };
-        // Not saved (a project in review, a skill outside the list): the list still filters, and says why.
-        // The server may respell a skill; give up waiting after a few seconds rather than lock the chips.
-        if (res.ok) {
-          const key = next.join("|");
-          waitingFor.current = key;
-          window.setTimeout(() => {
-            if (waitingFor.current === key) waitingFor.current = null;
-          }, 4000);
-        }
-        setNotice(res.ok ? "" : `Not saved to the project: ${body.error ?? "try again."}`);
+        // Not saved (a project in review, a skill outside the list): the chips still filter, and say why.
+        setNotice(res.ok ? "Saved to the project." : `Not saved to the project: ${body.error ?? "try again."}`);
+        // The project's stored list reloads, so the Save button goes away once it matches.
+        if (res.ok) router.refresh();
+        return res.ok;
       } catch {
         setNotice("Not saved to the project: check your connection and try again.");
+        return false;
       } finally {
         busy.current = false;
+        setSaving(false);
       }
-      return true;
     },
-    [projectId, saved],
+    [projectId, router],
   );
   // The city filter applies on its own (a form submit); the project save runs beside it and only reports back.
   const saveCity = useCallback(
@@ -109,11 +102,11 @@ export function ProjectSkillsProvider({
     },
     [projectId, place],
   );
-  const value = useMemo(() => ({ save, notice, saveCity, cityNotice }), [save, notice, saveCity, cityNotice]);
+  const value = useMemo(() => ({ projectId, saved, saveSkills, saving, notice, saveCity, cityNotice }), [projectId, saved, saveSkills, saving, notice, saveCity, cityNotice]);
   return <ProjectSkillsContext.Provider value={value}>{children}</ProjectSkillsContext.Provider>;
 }
 
-const filterOnly: ProjectSkills = { save: async () => true, notice: "", saveCity: () => {}, cityNotice: "" };
+const filterOnly: ProjectSkills = { projectId: null, saved: [], saveSkills: async () => false, saving: false, notice: "", saveCity: () => {}, cityNotice: "" };
 
 export function useProjectSkills(): ProjectSkills {
   return useContext(ProjectSkillsContext) ?? filterOnly;

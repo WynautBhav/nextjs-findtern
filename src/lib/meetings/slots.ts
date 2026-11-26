@@ -130,8 +130,9 @@ export function canReschedule(s: MeetingState, role: Role): { ok: true } | Refus
 }
 
 export function reasonProblem(reason: unknown): string | null {
+  // Optional (bug sheet 25 Nov): blank cancels without one; a typed reason is a few words.
   const r = typeof reason === "string" ? reason.trim() : "";
-  if (r.length < REASON_MIN) return "Say why you are cancelling (a few words).";
+  if (r.length > 0 && r.length < REASON_MIN) return "Write a few words, or leave the reason empty.";
   if (r.length > REASON_MAX) return `Keep the reason under ${REASON_MAX} characters.`;
   return null;
 }
@@ -142,7 +143,7 @@ export type Action =
   | { type: "reschedule"; by: Role; slots: Date[]; busy?: number[] }
   /** Always refused: kept so a stale client or a direct API call gets an explicit error. */
   | { type: "request_reschedule"; by: Role; reason?: string }
-  | { type: "cancel"; by: Role; reason: string }
+  | { type: "cancel"; by: Role; reason?: string | null }
   | { type: "expire" };
 
 export type Fields = {
@@ -224,7 +225,7 @@ export function step(current: MeetingState | undefined, action: Action, now: num
   if (!c.ok) return c;
   const problem = reasonProblem(action.reason);
   if (problem) return refuse("reason_required", problem);
-  return { ok: true, fields: { ...keep(current), status: "cancelled", cancelledBy: action.by, cancelReason: action.reason.trim() } };
+  return { ok: true, fields: { ...keep(current), status: "cancelled", cancelledBy: action.by, cancelReason: action.reason?.trim() || null } };
 }
 
 function keep(s: MeetingState): Fields {

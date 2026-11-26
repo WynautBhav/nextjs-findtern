@@ -56,7 +56,9 @@ export function MeetingSlots({
 }) {
   // "Now" in the meeting's timezone, so today's past times are not offered.
   const errId = useId();
-  const { now, today } = slotWindow(timezone);
+  const { now, today, maxDate } = slotWindow(timezone);
+  // The calendar greys out days before today and past the booking window, so a past day cannot be picked there.
+  const outsideWindow = (iso: string) => iso < today || iso > maxDate;
   // A wrong slot is said in the page, under its own row, not by the browser's min/max tooltip (B-42); the form
   // button is disabled on the same rule (hasSlotProblem).
   const problems = slotProblems(slots, timezone);
@@ -83,6 +85,7 @@ export function MeetingSlots({
                 required
                 value={date}
                 onChange={(iso) => set(idx, iso ? `${iso}T${time || "09:00"}` : "")}
+                isDisabled={outsideWindow}
                 aria-label={`Slot ${idx + 1} date`}
                 aria-invalid={invalid || problems[idx] ? true : undefined}
                 aria-describedby={cn(problems[idx] && `${errId}-${idx}`, invalid && describedBy) || undefined}

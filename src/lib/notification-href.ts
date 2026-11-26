@@ -9,6 +9,8 @@
  * stays a plain message rather than a link to somewhere arbitrary.
  */
 
+import { NUDGE_KINDS, nudgeHref, type NudgeKind } from "./college/nudge-plan.ts";
+
 function idFrom(data: unknown, key: string): string | null {
   if (!data || typeof data !== "object") return null;
   const raw = (data as Record<string, unknown>)[key];
@@ -19,6 +21,12 @@ function idFrom(data: unknown, key: string): string | null {
 
 export function internNotificationHref(type: string, data: unknown): string | null {
   const t = String(type ?? "").toLowerCase();
+
+  // A placement officer's nudge: the dashboard, with the control it is about glowing. Built from the type, never data.url.
+  if (t.startsWith("college_nudge_")) {
+    const kind = t.slice("college_nudge_".length);
+    return (NUDGE_KINDS as readonly string[]).includes(kind) ? nudgeHref(kind as NudgeKind) : "/intern/dashboard";
+  }
 
   if (t.startsWith("proposal_") || t.startsWith("full_time_")) {
     const id = idFrom(data, "proposalId");

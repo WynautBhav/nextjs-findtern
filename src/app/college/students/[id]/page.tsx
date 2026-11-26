@@ -398,6 +398,14 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                 <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
                   <div className="min-w-0">
                     <p className="font-medium text-ink-900">Interview · {i.createdAt ? shortDateTime(i.createdAt, { day: "numeric", month: "short" }) : "requested"}</p>
+                    {/* Bug sheet 25 Nov: the officer sees a cancelled interview, who cancelled it and the reason when one was given
+                        (stored with names and contact details masked before a hire). */}
+                    {interviewLifecycle(i).state === "cancelled" && (i.cancelledBy || i.cancelReason) ? (
+                      <p className="mt-0.5 text-sm text-ink-600">
+                        {i.cancelledBy === "employer" ? "The company cancelled." : i.cancelledBy === "intern" ? "The student cancelled." : null}
+                        {i.cancelReason ? <> Reason: <span className="whitespace-pre-line text-ink-800">{i.cancelReason}</span></> : null}
+                      </p>
+                    ) : null}
                   </div>
                   <Pill tone="neutral">{interviewLifecycle(i).label === "Waiting on candidate" ? humanizeStatus(i.status) : interviewLifecycle(i).label}</Pill>
                 </li>

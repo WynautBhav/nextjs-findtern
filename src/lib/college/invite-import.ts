@@ -5,7 +5,8 @@
  * there. Pure, so it is unit tested. The server still validates everything again (drive-input.ts).
  */
 
-import { INDIA_CODE, phoneError } from "../phone.ts";
+import { DIAL_CODES } from "../data/dial-codes.ts";
+import { INDIA_CODE, normalizePhone, phoneError } from "../phone.ts";
 import { readPhone, splitCsv } from "./roster.ts";
 
 export type InviteRow = { name: string; company: string; email: string; phone: string };
@@ -28,18 +29,61 @@ const INVISIBLE = /[\p{Cf}\p{Cc}]/gu;
 const EMAIL = /^[^\s@;,]+@[^\s@;,]+\.[^\s@;,]+$/;
 const clean = (s: string) => s.replace(INVISIBLE, " ").replace(/\s+/g, " ").trim();
 
-/** An Indian mobile as its 10 digits (any common way of writing it), or the reason it is not one. Blank is fine: the phone is optional. */
+/** No number: empty, or only the country code picked in the builder ("+44 "). */
+export function isBlankPhone(raw: string | undefined): boolean {
+  return /^(\+\d{1,4})?$/.test((raw ?? "").trim());
+}
+
+/** Known dialling codes, longest first, so "+971…" is read as +971 before +97 or +9. */
+const CODES = [...new Set(DIAL_CODES.map((d) => d.code))].sort((a, b) => b.length - a.length);
+
+/** A number written with a non-Indian country code: "+44 7700 900123", "+1 (415) 555-0134" or "+971501234567". Null for India or no "+". */
+function foreignPhone(s: string): { code: string; rest: string } | null {
+  const spaced = /^[\s(]*\+(\d{1,4})\)?[\s-]+(.+)$/.exec(s);
+  if (spaced) return `+${spaced[1]}` === INDIA_CODE ? null : { code: `+${spaced[1]}`, rest: spaced[2] };
+  const joined = /^[\s(]*\+(\d+)$/.exec(s.replace(/[\s\-().]/g, ""));
+  if (!joined || joined[1].startsWith("91")) return null;
+  const code = CODES.find((c) => `+${joined[1]}`.startsWith(c));
+  return code ? { code, rest: `+${joined[1]}`.slice(code.length) } : { code: "+?", rest: "" };
+}
+
+/**
+ * The company phone, or the reason it is not one. Blank is fine: the phone is optional. An Indian mobile (any common
+ * way of writing it) is its 10 digits, as stored before country codes; another country's is "+CC digits" (bug sheet
+ * 25 Nov), checked by the same rule as signup.
+ */
 export function invitePhone(raw: string | undefined): { phone: string | null; error: string | null } {
   const s = (raw ?? "").trim();
-  if (!s) return { phone: null, error: null };
+  if (isBlankPhone(s)) return { phone: null, error: null };
+  const foreign = foreignPhone(s);
+  if (foreign) {
+    if (!CODES.includes(foreign.code)) return { phone: null, error: "Check the country code" };
+    if (/[^\d\s\-().]/.test(foreign.rest)) return { phone: null, error: "Check the phone number" };
+    const digits = normalizePhone(foreign.rest);
+    const bad = phoneError(foreign.code, digits);
+    return bad ? { phone: null, error: bad } : { phone: `${foreign.code} ${digits}`, error: null };
+  }
   const digits = readPhone(s);
   const bad = digits === null ? "Check the phone number: 10 digits, starting with 6 to 9" : phoneError(INDIA_CODE, digits);
   return bad ? { phone: null, error: bad } : { phone: digits, error: null };
 }
 
+/** The builder's two controls for a stored or typed phone: its country code (+91 when none) and the rest. */
+export function splitInvitePhone(raw: string | undefined): { code: string; number: string } {
+  const s = (raw ?? "").trim();
+  const m = /^\+(\d{1,4})(?:\s+(.*))?$/.exec(s);
+  return m && `+${m[1]}` !== INDIA_CODE ? { code: `+${m[1]}`, number: m[2] ?? "" } : { code: INDIA_CODE, number: s.replace(/^\+91\s*/, "") };
+}
+
+/** Back to one string for the row: India as typed (read as 10 digits), another code in front of the number. */
+export function joinInvitePhone(code: string, number: string): string {
+  if (code === INDIA_CODE) return number.trim() ? number : "";
+  return `${code} ${number.trim() ? number : ""}`;
+}
+
 /** Why a row can't be sent as it stands, with the field to point at. Fully blank rows are not problems: they are ignored. */
 export function inviteRowProblem(r: InviteRow): { field: "company" | "email" | "phone"; message: string } | null {
-  if (!r.company.trim() && !r.email.trim() && !r.name.trim() && !r.phone.trim()) return null;
+  if (!r.company.trim() && !r.email.trim() && !r.name.trim() && isBlankPhone(r.phone)) return null;
   if (!clean(r.company)) return { field: "company", message: "Name the company" };
   const email = r.email.trim();
   if (!EMAIL.test(email) || email.length > 200) return { field: "email", message: "Check the company email" };
