@@ -168,6 +168,20 @@ export function buildDriveBoard(input: {
   // Expired: marked so, or never answered by start + grace (meetings.ts effectiveStatus).
   const lapsed = input.meetings.filter((m) => m.status === "expired" || (m.status === "requested" && m.startsAt && m.startsAt.getTime() + CALL_GRACE_MS < now));
   const sentMeets = input.meetings.filter((m) => m.status !== "cancelled");
+  // Bug 26 Nov: "What happened" names each meet's outcome, Completed and Withdrawn included, newest first.
+  const doneSet = new Set(done);
+  const lapsedSet = new Set(lapsed);
+  const meetLabel = (m: MeetingRow) =>
+    m.status === "cancelled" ? "Withdrawn"
+    : doneSet.has(m) ? "Completed"
+    : m.status === "missed" ? "Missed"
+    : held.includes(m) ? "Accepted"
+    : lapsedSet.has(m) ? "Expired"
+    : m.status === "declined" || m.status === "rejected" ? "Not accepted"
+    : "Waiting for reply";
+  const outcomes = (rs: MeetingRow[]) => rs.map((m) => `${company(m.company)}: ${meetLabel(m)}`).join(" · ");
+  const everyMeet = new Map<string, MeetingRow[]>();
+  for (const m of [...input.meetings].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())) everyMeet.set(m.userId, [...(everyMeet.get(m.userId) ?? []), m]);
   const inDriveCount = (rs: MeetingRow[]) => rs.filter((m) => students.has(m.userId)).length;
   // Waiting on the student: sent, not hired, start day not begun (college count-rules offerWaitingSql). Past it the
   // offer lapsed ("deadline missed" in master data, "no response" for the student, "expired" for the employer).
@@ -237,18 +251,18 @@ export function buildDriveBoard(input: {
       nudgedMeet: nudged("meeting"),
       nudgedOffer: nudged("offer"),
       offers: perStudent(inDrive, students, (rs) => `${offerKinds(rs)} · ${names(rs)}`),
-      meetings: perStudent(held, students, (rs) => `${rs.length === 1 ? "Meet" : `${rs.length} meets`} with ${names(rs)}`),
-      meetCompleted: perStudent(done, students, (rs) => `${rs.length === 1 ? "Meet" : `${rs.length} meets`} with ${names(rs)}`),
+      meetings: perStudent(held, students, outcomes),
+      meetCompleted: perStudent(done, students, outcomes),
       meetExpired: perStudent(lapsed, students, (rs) => `${rs.length === 1 ? "1 meet expired" : `${rs.length} meets expired`} · ${names(rs)}`),
       meetDeclined: perStudent(declinedMeets, students, (rs) => `Declined ${rs.length === 1 ? "a meet" : `${rs.length} meets`} with ${names(rs)}`),
-      meetCancelled: perStudent(cancelledMeets, students, (rs) => `${names(rs)} withdrew ${rs.length === 1 ? "a meet" : `${rs.length} meets`}`),
+      meetCancelled: perStudent(cancelledMeets, students, outcomes),
       offersWithdrawn: perStudent(withdrawn, students, (rs) => `${names(rs)} withdrew ${rs.length === 1 ? (rs[0].fullTime ? "a full-time offer" : "an internship offer") : `${rs.length} offers`}`),
       shortlisted: perStudent(shortlist, students, (rs) => `Shortlisted by ${names(rs)}`),
       internships: perStudent(hired.filter((o) => !o.fullTime), students, (rs) => `Internship with ${names(rs)}`),
       fullTime: perStudent(hired.filter((o) => o.fullTime), students, (rs) => `Full-time with ${names(rs)}`),
       // The pipeline's stages: any call request at all, and any hire (one row per student).
       // A request the company cancelled no longer counts, as a withdrawn offer does not count as an offer (master data agrees).
-      called: perStudent(sentMeets, students, (rs) => `${rs.length === 1 ? "1 meet request" : `${rs.length} meet requests`} · ${names(rs)}`),
+      called: perStudent(sentMeets, students, (rs) => outcomes(everyMeet.get(rs[0].userId) ?? rs)),
       hired: hiredItems,
     },
   };

@@ -16,8 +16,9 @@ export default async function NewDrivePage() {
   const students = verified.map((s) => ({ ...toStudentRow(s), hidden: readiness.get(s.userId)?.hidden ?? (readiness.get(s.userId)?.seen ? null : "profile") }));
   const degrees = degreeOptions(students);
   const start = new Date();
-  // The top of the current hour: the link works the moment it is created, unless the officer picks a later opening.
-  start.setMinutes(0, 0, 0);
+  // Now, to the minute: the link works the moment it is created, unless the officer picks a later opening. (The top of the
+  // hour was up to 59 minutes in the past, and the server refuses a new start more than 10 minutes back: bug 26 Nov.)
+  start.setSeconds(0, 0);
   const end = new Date(start.getTime() + 7 * 24 * 3600_000);
 
   return (

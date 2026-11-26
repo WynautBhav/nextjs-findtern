@@ -272,7 +272,7 @@ test("meetings: sent, accepted, completed (slot over) and expired (no reply past
   assert.deepEqual(b.lists.called.map((s) => s.userId).sort(), ["a", "b", "c"]);
   assert.deepEqual(b.lists.meetings.map((s) => s.userId), ["a"]);
   assert.deepEqual(b.lists.meetCompleted.map((s) => s.userId), ["a"]);
-  assert.equal(b.lists.meetCompleted[0].detail, "Meet with Acme");
+  assert.equal(b.lists.meetCompleted[0].detail, "Acme: Completed");
   assert.deepEqual(b.lists.meetExpired.map((s) => s.userId), ["b"]);
   assert.equal(b.lists.meetExpired[0].detail, "2 meets expired · Acme, Gamma");
 });
@@ -323,7 +323,7 @@ test("26 Nov: declined and cancelled meets, withdrawn offers and shortlists are 
   assert.deepEqual(b.lists.meetDeclined.map((s) => s.userId), ["a"]);
   assert.equal(b.lists.meetDeclined[0].detail, "Declined a meet with Acme");
   assert.deepEqual(b.lists.meetCancelled.map((s) => s.userId), ["a"]);
-  assert.equal(b.lists.meetCancelled[0].detail, "Beta withdrew a meet");
+  assert.equal(b.lists.meetCancelled[0].detail, "Beta: Withdrawn");
   assert.equal(b.offerCount, 1);
   assert.equal(b.withdrawnCount, 1);
   assert.deepEqual(b.lists.offersWithdrawn.map((s) => s.userId), ["b"]);
@@ -345,4 +345,20 @@ test("26 Nov PDF: students who haven't done the AI interview are a list the TPO 
   const b = buildDriveBoard({ students: [{ ...stu("a"), aiDone: false }, { ...stu("b"), aiDone: true }, stu("c")], meetings: [], offers: [], offline: null, now: NOW });
   assert.deepEqual(b.lists.aiPending.map((s) => s.userId), ["a"], "unknown (c) is not listed");
   assert.equal(b.lists.aiPending[0].detail, "AI interview not done");
+});
+
+test("What happened names every meet's outcome, Withdrawn and Completed included (bug 26 Nov)", () => {
+  const b = buildDriveBoard({
+    students: [stu("a")],
+    meetings: [
+      { userId: "a", company: "Acme", status: "completed", createdAt: at(300), startsAt: at(240) },
+      { userId: "a", company: "Beta", status: "cancelled", createdAt: at(200), startsAt: at(100) },
+      { userId: "a", company: "Gamma", status: "requested", createdAt: at(5), startsAt: at(-60) },
+    ],
+    offers: [],
+    offline: null,
+    now: NOW,
+  });
+  assert.equal(b.lists.called[0].detail, "Gamma: Waiting for reply · Beta: Withdrawn · Acme: Completed");
+  assert.equal(b.lists.meetings[0].detail, "Acme: Completed");
 });

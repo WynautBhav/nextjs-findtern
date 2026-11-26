@@ -166,7 +166,12 @@ export function DriveBuilder({
       kind: d.kind,
       ...(d.audience ? { audience: d.audience } : {}),
       description: d.description,
-      startsAt: fromLocalInput(d.startsAt),
+      // A new drive whose start slipped into the past while the form was open (under an hour) opens now, as promised.
+      startsAt: (() => {
+        const s = fromLocalInput(d.startsAt);
+        const t = Date.parse(s);
+        return !d.id && Number.isFinite(t) && t < Date.now() && Date.now() - t < 3600_000 ? new Date().toISOString() : s;
+      })(),
       endsAt: fromLocalInput(d.endsAt),
       eligibility: rules.eligibility,
       includeUserIds: d.includeUserIds,
