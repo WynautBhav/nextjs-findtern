@@ -323,7 +323,7 @@ test("26 Nov: declined and cancelled meets, withdrawn offers and shortlists are 
   assert.deepEqual(b.lists.meetDeclined.map((s) => s.userId), ["a"]);
   assert.equal(b.lists.meetDeclined[0].detail, "Declined a meet with Acme");
   assert.deepEqual(b.lists.meetCancelled.map((s) => s.userId), ["a"]);
-  assert.equal(b.lists.meetCancelled[0].detail, "Meet with Beta cancelled");
+  assert.equal(b.lists.meetCancelled[0].detail, "Beta withdrew a meet");
   assert.equal(b.offerCount, 1);
   assert.equal(b.withdrawnCount, 1);
   assert.deepEqual(b.lists.offersWithdrawn.map((s) => s.userId), ["b"]);
@@ -332,4 +332,17 @@ test("26 Nov: declined and cancelled meets, withdrawn offers and shortlists are 
   assert.equal(b.shortlistCount, 2);
   assert.deepEqual(b.lists.shortlisted.map((s) => s.userId), ["c", "a"]);
   assert.equal(b.lists.shortlisted[1].detail, "Shortlisted by Beta, Acme");
+});
+
+test("Offline now shows each student's last seen time, not 'Not on Findtern' (26 Nov PDF)", () => {
+  const seen = { ...stu("a"), lastSeenAt: new Date("2026-11-23T08:34:00Z") };
+  const b = buildDriveBoard({ students: [seen, stu("b")], meetings: [], offers: [], offline: [{ userId: "a" }, { userId: "b" }], now: NOW });
+  assert.equal(b.lists.offline.find((s) => s.userId === "a")?.detail, "Last seen 23 Nov, 2:04 pm");
+  assert.equal(b.lists.offline.find((s) => s.userId === "b")?.detail, "Not seen yet");
+});
+
+test("26 Nov PDF: students who haven't done the AI interview are a list the TPO can nudge", () => {
+  const b = buildDriveBoard({ students: [{ ...stu("a"), aiDone: false }, { ...stu("b"), aiDone: true }, stu("c")], meetings: [], offers: [], offline: null, now: NOW });
+  assert.deepEqual(b.lists.aiPending.map((s) => s.userId), ["a"], "unknown (c) is not listed");
+  assert.equal(b.lists.aiPending[0].detail, "AI interview not done");
 });

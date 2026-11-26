@@ -17,6 +17,7 @@ import { DRIVE_FULL_TIME_FEE } from "@/lib/checkout";
 import { logDriveActivity } from "@/lib/college/campus-lock";
 import { calculateHireFees, ppoRate } from "@/lib/college/drive-pricing";
 import { fullTimeReady } from "@/lib/college/eligibility";
+import { MEETING_ON_OFFER_LOCK, meetingHoldsOffer } from "@/lib/employer-interview-rules";
 import { driveForEmployer, eligibleStudents } from "@/lib/college/scope";
 import { candidatePoolClauses, heldElsewhereIds } from "@/lib/employer-pool";
 import { CANDIDATE_UNAVAILABLE } from "@/lib/candidate-hold";
@@ -144,6 +145,13 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (candidate.frozenAt) return NextResponse.json(ON_HOLD_REFUSAL, { status: 409 });
   if ((await heldElsewhereIds(db, id, [base.internId])).has(base.internId)) {
     return NextResponse.json(CANDIDATE_UNAVAILABLE, { status: 409 });
+  }
+  // 26 Nov PDF: on the drive path (a new full-time offer, not a hired intern's PPO), a meeting for this project holds the offer
+  // until the employer marks it complete, scoped like the internship route.
+  if (!b.proposalId) {
+    const meetingRows = await db.select().from(schema.interviews).where(and(eq(schema.interviews.employerId, id), eq(schema.interviews.internId, base.internId)));
+    const hold = meetingRows.filter((iv) => !iv.projectId || iv.projectId === b.projectId).map((iv) => meetingHoldsOffer(iv)).find((h) => h.held);
+    if (hold) return NextResponse.json({ error: hold.booked ? MEETING_ON_OFFER_LOCK : "The offer opens once the meeting has happened." }, { status: 409 });
   }
   // A taken-down listing sends no new offers, a full-time one included.
   if (base.projectId) {

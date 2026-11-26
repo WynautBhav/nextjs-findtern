@@ -27,7 +27,7 @@ import { toLocalInput } from "@/lib/college/ist";
 import { buildPeople } from "@/lib/college/pop-table";
 import { driveReach } from "@/lib/college/drive-reach";
 import { readinessForMany } from "@/lib/college/student-readiness-db";
-import { audienceLabel, DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
+import { aiStatusLabel, audienceLabel, DRIVE_KIND_LABEL, WINDOW_LABEL } from "@/lib/college/labels";
 import { driveForCollegeAdmin, eligibleStudents, presenceSnapshot, requireCollegeContext, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { driveDataOpen, toStudentRow } from "@/lib/college/serialize";
 import { shortDateTime } from "@/lib/format";
@@ -64,7 +64,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   const presence = w === "live" ? await presenceSnapshot(ctx.college.id, verified.map((s) => s.userId)) : null;
   const toRef = (s: (typeof eligible)[number]) => {
     const r = toStudentRow(s);
-    return { userId: r.userId, name: r.name, rollNo: r.rollNo, year: r.year, branch: r.branch, phone: r.phone, openToWork: r.openToWork };
+    return { userId: r.userId, name: r.name, rollNo: r.rollNo, year: r.year, branch: r.branch, phone: r.phone, openToWork: r.openToWork, lastSeenAt: s.status === "verified" ? (s.lastSeenAt ?? null) : null, aiDone: aiStatusLabel(s.aiStatus).done };
   };
   const refs = eligible.map(toRef);
   // Verified students only, so their email can go on the board for its search (bug sheet 26 Nov); refs above stay without it.
@@ -131,6 +131,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
       arrivals={came.map((c) => ({ id: c.employerId, company: c.company ?? "Employer", at: c.joinedAt }))}
       missing={open ? missing.map((m) => m.company) : []}
       clickable={!open}
+      jump={open}
     />
   );
 

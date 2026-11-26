@@ -36,7 +36,7 @@ import { canEmployerSeeIntern, heldElsewhereIds } from "@/lib/employer-pool";
 import { CANDIDATE_UNAVAILABLE } from "@/lib/candidate-hold";
 import { isProjectOpen } from "@/lib/project-locations";
 import { TAKEDOWN_BLOCKS, takedownBlock } from "@/lib/projects/takedown";
-import { isBlockingInterview } from "@/lib/employer-interview-rules";
+import { MEETING_ON_OFFER_LOCK, meetingHoldsOffer } from "@/lib/employer-interview-rules";
 import { modeProblem, workPreferenceOf } from "@/lib/work-preference";
 
 const LIVE = ["draft", "sent", "accepted", "interview_scheduled", "processing"];
@@ -250,11 +250,10 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     .select()
     .from(schema.interviews)
     .where(and(eq(schema.interviews.employerId, id), eq(schema.interviews.internId, b.internId)));
-  const pendingInterview = interviewRows.find(
-    (iv) => (!iv.projectId || iv.projectId === b.projectId) && isBlockingInterview(iv),
-  );
-  if (pendingInterview) {
-    return NextResponse.json({ error: "The offer opens once the interview has happened." }, { status: 409 });
+  // 26 Nov PDF: a booked meeting holds it until the employer marks it complete, even once its time is over.
+  const hold = interviewRows.filter((iv) => !iv.projectId || iv.projectId === b.projectId).map((iv) => meetingHoldsOffer(iv)).find((h) => h.held);
+  if (hold) {
+    return NextResponse.json({ error: hold.booked ? MEETING_ON_OFFER_LOCK : "The offer opens once the interview has happened." }, { status: 409 });
   }
   if (score < 6 && (b.duration === "3m" || b.duration === "6m")) {
     return NextResponse.json({ error: "Candidates scoring below 6 can be offered up to 2 months." }, { status: 400 });

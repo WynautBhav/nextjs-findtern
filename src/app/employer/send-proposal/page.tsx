@@ -26,7 +26,7 @@ import { isProjectOpen } from "@/lib/project-locations";
 import { SendProposalForm } from "@/components/employer/send-proposal-form";
 import { timezoneForLocation } from "@/lib/timezones";
 import { workPreferenceOf, type WorkPreference } from "@/lib/work-preference";
-import { isBlockingInterview } from "@/lib/employer-interview-rules";
+import { meetingHoldsOffer } from "@/lib/employer-interview-rules";
 import { ButtonLink, buttonClass } from "@/components/ui/button";
 import { getActivePricingPlans } from "@/lib/cached-reads";
 
@@ -178,7 +178,7 @@ export default async function SendProposal({
           .select()
           .from(schema.interviews)
           .where(and(eq(schema.interviews.employerId, uid), eq(schema.interviews.internId, user.id)));
-        for (const iv of meetings.filter((m) => isBlockingInterview(m))) {
+        for (const iv of meetings.filter((m) => meetingHoldsOffer(m).held)) {
           if (iv.projectId) heldProjectIds.push(iv.projectId);
           else heldEverywhere = true;
         }

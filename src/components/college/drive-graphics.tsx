@@ -5,6 +5,7 @@ import { shortDateTime } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 const n = (v: number) => v.toLocaleString("en-IN");
+const JUMP = "inline-flex min-h-9 items-center gap-1 rounded-sm underline decoration-white/40 underline-offset-4 outline-none hover:decoration-white focus-visible:ring-2 focus-visible:ring-white/80";
 const time = (d: Date) => shortDateTime(d, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 const pct = (part: number, whole: number) => (whole > 0 ? Math.round((part / whole) * 100) : 0);
 
@@ -39,7 +40,7 @@ export function DrivePipeline({ driveId, stages, open }: { driveId: string; stag
         return (
           <li key={s.key} className="relative min-w-0 lg:pr-8">
             {i > 0 ? <ChevronRight aria-hidden className="absolute -left-1 top-0 hidden size-4 -translate-x-full text-white/40 lg:block" /> : null}
-            {open && s.key !== "all" ? (
+            {open ? (
               <Link href={`/college/drives/${driveId}?show=${s.key}#board`} className="block rounded-xl p-2 -m-2 outline-none hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-white/70">
                 {body}
               </Link>
@@ -57,7 +58,7 @@ export function DrivePipeline({ driveId, stages, open }: { driveId: string; stag
  * Employer arrivals: the drive's window as a line, each company that came as a dot at the moment it opened the
  * link, "now" marked, and the invited companies still missing as hollow dots after the line.
  */
-export function EmployerArrivals({ start, end, now, arrivals, missing, clickable = false }: { start: Date; end: Date; now: number; arrivals: { id: string; company: string; at: Date }[]; missing: string[]; /** Names and dots become buttons carrying data-company; the parent opens that company. */ clickable?: boolean }) {
+export function EmployerArrivals({ start, end, now, arrivals, missing, clickable = false, jump = false }: { start: Date; end: Date; now: number; arrivals: { id: string; company: string; at: Date }[]; missing: string[]; /** Dots become buttons carrying data-company; the parent opens that company. */ clickable?: boolean; /** Live drive: "N came" and "N invited not yet" jump to the Employers panel below (26 Nov PDF). */ jump?: boolean }) {
   const span = Math.max(1, end.getTime() - start.getTime());
   const at = (d: Date | number) => Math.min(100, Math.max(0, ((typeof d === "number" ? d : d.getTime()) - start.getTime()) / span * 100));
   const nowAt = at(now);
@@ -73,7 +74,29 @@ export function EmployerArrivals({ start, end, now, arrivals, missing, clickable
       <figcaption className="flex flex-wrap items-baseline justify-between gap-2 text-[13px] font-medium text-on-dark">
         <span>Employers arriving</span>
         <span className="nums text-xs font-normal">
-          <span className="text-white">{arrivals.length}</span> came{missing.length ? <> · <span className="text-accent-300">{missing.length}</span> invited not yet</> : null}
+          {jump && arrivals.length ? (
+            <a href="#employers" className={JUMP}>
+              <span className="text-white">{arrivals.length}</span> came
+            </a>
+          ) : (
+            <>
+              <span className="text-white">{arrivals.length}</span> came
+            </>
+          )}
+          {missing.length ? (
+            <>
+              {" · "}
+              {jump ? (
+                <a href="#employers-missing" className={JUMP}>
+                  <span className="text-accent-300">{missing.length}</span> invited not yet
+                </a>
+              ) : (
+                <>
+                  <span className="text-accent-300">{missing.length}</span> invited not yet
+                </>
+              )}
+            </>
+          ) : null}
         </span>
       </figcaption>
       <div className="mt-3 flex items-end gap-4">
@@ -119,28 +142,7 @@ export function EmployerArrivals({ start, end, now, arrivals, missing, clickable
         <span>{time(start)}</span>
         <span>{time(end)}</span>
       </p>
-      {arrivals.length ? (
-        <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/85">
-          {[...arrivals].sort((p, q) => p.at.getTime() - q.at.getTime()).slice(0, 6).map((a) => (
-            <li key={a.id}>
-              {clickable ? (
-                <button type="button" data-company={a.id} aria-haspopup="dialog" className="flex min-h-9 items-center gap-1.5 rounded-sm underline-offset-4 outline-none hover:text-white hover:underline focus-visible:ring-2 focus-visible:ring-white/80">
-                  <span aria-hidden className="size-1.5 rounded-full bg-white" />
-                  {a.company} <span className="nums text-on-dark">{time(a.at)}</span>
-                </button>
-              ) : (
-                <span className="flex items-center gap-1.5">
-                  <span aria-hidden className="size-1.5 rounded-full bg-white" />
-                  {a.company} <span className="nums text-on-dark">{time(a.at)}</span>
-                </span>
-              )}
-            </li>
-          ))}
-          {arrivals.length > 6 ? <li className="text-on-dark">+{arrivals.length - 6} more below</li> : null}
-        </ul>
-      ) : (
-        <p className="mt-3 text-xs text-on-dark">No company has opened the link yet.</p>
-      )}
+      {arrivals.length ? null : <p className="mt-3 text-xs text-on-dark">No company has opened the link yet.</p>}
     </figure>
   );
 }

@@ -21,6 +21,7 @@ import {
   canLeaveFeedback,
   stageRank,
   NO_SHOW_RULE_FROM,
+  meetingHoldsOffer,
 } from "./employer-interview-rules.ts";
 
 const NOW = Date.parse("2026-10-19T12:00:00Z");
@@ -256,4 +257,22 @@ test("hasOpenMeeting: a live offer, a booking or a reschedule request is open; e
   assert.equal(hasOpenMeeting([{ status: "pending", slot1: h(-5), slot2: h(-3), slot3: null }], NOW), false, "every slot passed");
   assert.equal(hasOpenMeeting([{ status: "pending", slot1: h(3), slot2: null, slot3: null, respondBy: h(-1) }], NOW), false, "respond-by lapsed");
   assert.equal(hasOpenMeeting([], NOW), false);
+});
+
+// ---- 26 Nov PDF: a booked meeting holds offers until the employer marks it complete ----
+test("a booked meeting holds offers until it is marked complete (or missed), even after its time", () => {
+  const start = AFTER_CUTOVER;
+  const joined = booked(start, { employerJoinedAt: new Date(start) });
+  assert.equal(meetingHoldsOffer(joined, min(start, 10)).held, true, "on now");
+  assert.equal(meetingHoldsOffer(joined, min(start, 600)).held, true, "time over but never marked complete");
+  assert.equal(meetingHoldsOffer(joined, min(start, 600)).booked, true);
+  assert.equal(meetingHoldsOffer({ ...joined, status: "completed" }, min(start, 600)).held, false, "marked complete");
+  assert.equal(meetingHoldsOffer({ ...joined, status: "missed" }, min(start, 600)).held, false, "marked missed");
+  assert.equal(meetingHoldsOffer({ ...joined, status: "cancelled" }, min(start, 10)).held, false, "withdrawn");
+  // The employer never joined: no meeting happened, nothing to mark, so it does not hold the offer.
+  assert.equal(meetingHoldsOffer(booked(start), min(start, 600)).held, false);
+  // An invite with times offered and no answer yet still holds it until its times run out (today's rule).
+  const invite = { status: "pending", slot1: new Date(min(start, 120)), slot2: null, slot3: null, selectedSlot: null };
+  assert.deepEqual(meetingHoldsOffer(invite, start), { held: true, booked: false });
+  assert.equal(meetingHoldsOffer(invite, min(start, 600)).held, false);
 });

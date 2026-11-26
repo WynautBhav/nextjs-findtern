@@ -1,5 +1,6 @@
 import { CALL_GRACE_MS, MEETING_MINUTES } from "./constants.ts";
 import { ago } from "./labels.ts";
+import { shortDateTime } from "../format.ts";
 
 /**
  * One campus drive, as the placement officer runs it: what needs chasing now (critical) and what the drive has
@@ -20,6 +21,10 @@ export type DriveStudentRef = {
   email?: string | null;
   /** The student's own "open to work" switch. Missing counts as on, so only an explicit false lands in "Not open to work". */
   openToWork?: boolean;
+  /** When the student was last on Findtern (college presence); null = never seen. Shown on the Offline list. */
+  lastSeenAt?: Date | null;
+  /** False when the student hasn't finished the AI interview (employers can't see them yet); missing = not known. */
+  aiDone?: boolean;
 };
 /** `again`: on a nudge-history row, the student still needs that nudge now (so a Nudge again button makes sense). */
 export type BoardItem = DriveStudentRef & { detail: string; again?: boolean };
@@ -60,6 +65,7 @@ export type BoardKey =
   | "meetExpired"
   | "meetDeclined"
   | "meetCancelled"
+  | "aiPending"
   | "offersWithdrawn"
   | "shortlisted"
   | "internships"
@@ -215,7 +221,12 @@ export function buildDriveBoard(input: {
     lists: {
       meetingsWaiting: waitingMeet,
       offersWaiting: waitingOffer,
-      offline: [...offlineIds].map((id) => ({ ...students.get(id)!, detail: "Not on Findtern right now" })),
+      offline: [...offlineIds].map((id) => {
+        const s = students.get(id)!;
+        return { ...s, detail: s.lastSeenAt ? `Last seen ${shortDateTime(s.lastSeenAt, { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}` : "Not seen yet" };
+      }),
+      // 26 Nov PDF: students the TPO can nudge to finish the AI interview while the drive runs.
+      aiPending: input.students.filter((s) => s.aiDone === false).map((s) => ({ ...s, detail: "AI interview not done" })),
       online: input.offline === null ? [] : input.students.filter((s) => !offlineIds.has(s.userId)).map((s) => ({ ...s, detail: "On Findtern now" })),
       notOpen,
       all: input.students.map((s) => ({ ...s, detail: "" })),
@@ -230,7 +241,7 @@ export function buildDriveBoard(input: {
       meetCompleted: perStudent(done, students, (rs) => `${rs.length === 1 ? "Meet" : `${rs.length} meets`} with ${names(rs)}`),
       meetExpired: perStudent(lapsed, students, (rs) => `${rs.length === 1 ? "1 meet expired" : `${rs.length} meets expired`} · ${names(rs)}`),
       meetDeclined: perStudent(declinedMeets, students, (rs) => `Declined ${rs.length === 1 ? "a meet" : `${rs.length} meets`} with ${names(rs)}`),
-      meetCancelled: perStudent(cancelledMeets, students, (rs) => `${rs.length === 1 ? "Meet" : `${rs.length} meets`} with ${names(rs)} cancelled`),
+      meetCancelled: perStudent(cancelledMeets, students, (rs) => `${names(rs)} withdrew ${rs.length === 1 ? "a meet" : `${rs.length} meets`}`),
       offersWithdrawn: perStudent(withdrawn, students, (rs) => `${names(rs)} withdrew ${rs.length === 1 ? (rs[0].fullTime ? "a full-time offer" : "an internship offer") : `${rs.length} offers`}`),
       shortlisted: perStudent(shortlist, students, (rs) => `Shortlisted by ${names(rs)}`),
       internships: perStudent(hired.filter((o) => !o.fullTime), students, (rs) => `Internship with ${names(rs)}`),
@@ -244,7 +255,7 @@ export function buildDriveBoard(input: {
 }
 
 export type Invite = { company: string; email: string };
-export type CameEmployer = { employerId: string; company: string | null; contact: string | null; email: string | null; phone: string | null; joinedAt: Date; shortlisted?: number; calls?: number };
+export type CameEmployer = { employerId: string; company: string | null; contact: string | null; email: string | null; phone: string | null; joinedAt: Date; shortlisted?: number; calls?: number; /** Left the drive before it ended (college_drive_employers.status "exited"). */ exited?: boolean };
 
 const norm = (s: string | null | undefined) => (s ?? "").trim().toLowerCase().replace(/\s+/g, " ").replace(/\b(pvt|private|ltd|limited|llp|inc)\b\.?/g, "").trim();
 

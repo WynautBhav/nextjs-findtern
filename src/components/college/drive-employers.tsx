@@ -21,8 +21,10 @@ function Status({ s }: { s: EmployerRow["status"] }) {
       return <span className="text-ink-700">{s.label}</span>;
     case "never":
       return <span className="text-text-subtle">Not seen</span>;
-    case "came":
-      return <span className="text-ink-700">Came</span>;
+    case "completed":
+      return <span className="text-ink-700">Completed</span>;
+    case "withdrawn":
+      return <span className="font-medium text-accent-700">Withdrawn</span>;
     case "absent":
       return <span className="font-medium text-accent-700">Didn&apos;t show up</span>;
   }
@@ -76,20 +78,14 @@ const figure = (r: EmployerRow, v: number) => (r.employerId ? <span className={v
  */
 export function DriveEmployersPanel({ driveId, data, over }: { driveId: string; data: DriveEmployers; over: boolean }) {
   const { rows } = data;
-  return (
-    <section id="employers" aria-labelledby="drive-employers" className={cn("scroll-mt-6 overflow-hidden", SURFACE_CLASS)}>
-      <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-ink-100 px-5 py-4">
-        <h2 id="drive-employers" className="text-base font-semibold text-ink-900">Employers</h2>
-        {rows.length ? <p className="nums text-sm text-ink-700">{employersLine(data, over)}</p> : null}
-      </header>
-
-      {rows.length === 0 ? (
-        <p className="px-5 py-6 text-sm text-text-subtle">{over ? "No company came in through this drive." : "No company has come in yet."}</p>
-      ) : (
-        <>
+  const came = rows.filter((r) => r.employerId);
+  const missingRows = rows.filter((r) => !r.employerId);
+  // The phone list and the desktop table for one group of companies; the second group's header row is for screen readers only.
+  const table = (list: EmployerRow[], headless: boolean) => (
+    <>
           {/* Phone: one block per company. */}
           <ul className="divide-y divide-ink-100 sm:hidden">
-            {rows.map((r) => (
+            {list.map((r) => (
               <li key={r.key} className={cn("relative px-5 py-3 text-sm", r.employerId && "hover:bg-ink-50")}>
                 <div className="flex items-baseline justify-between gap-3">
                   <Company r={r} driveId={driveId} />
@@ -105,7 +101,7 @@ export function DriveEmployersPanel({ driveId, data, over }: { driveId: string; 
 
           <div className="hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[44rem] text-sm">
-              <thead>
+              <thead className={headless ? "sr-only" : undefined}>
                 <tr className="text-left text-xs text-text-subtle">
                   <th scope="col" className="px-5 py-2.5 font-medium">Company</th>
                   <th scope="col" className="px-3 py-2.5 font-medium">Status</th>
@@ -117,7 +113,7 @@ export function DriveEmployersPanel({ driveId, data, over }: { driveId: string; 
                 </tr>
               </thead>
               <tbody className="divide-y divide-ink-100 border-t border-ink-100">
-                {rows.map((r) => (
+                {list.map((r) => (
                   <tr key={r.key} className={cn("relative", r.employerId && "hover:bg-ink-50")}>
                     <td className="px-5 py-3">
                       <Company r={r} driveId={driveId} />
@@ -134,6 +130,29 @@ export function DriveEmployersPanel({ driveId, data, over }: { driveId: string; 
               </tbody>
             </table>
           </div>
+    </>
+  );
+  return (
+    <section id="employers" aria-labelledby="drive-employers" className={cn("scroll-mt-6 overflow-hidden", SURFACE_CLASS)}>
+      <header className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-ink-100 px-5 py-4">
+        <h2 id="drive-employers" className="text-base font-semibold text-ink-900">Employers</h2>
+        {rows.length ? <p className="nums text-sm text-ink-700">{employersLine(data, over)}</p> : null}
+      </header>
+
+      {rows.length === 0 ? (
+        <p className="px-5 py-6 text-sm text-text-subtle">{over ? "No company came in through this drive." : "No company has come in yet."}</p>
+      ) : (
+        <>
+          {came.length ? table(came, false) : null}
+          {/* 26 Nov PDF: "N invited not yet" on the drive's header jumps here. */}
+          {missingRows.length ? (
+            <>
+              <h3 id="employers-missing" className="scroll-mt-6 border-t border-ink-100 px-5 pb-1 pt-4 text-sm font-semibold text-ink-900">
+                {over ? <>Invited, didn&apos;t come</> : "Invited, not here yet"} <span className="nums font-normal text-text-subtle">· {n(missingRows.length)}</span>
+              </h3>
+              {table(missingRows, came.length > 0)}
+            </>
+          ) : null}
         </>
       )}
     </section>

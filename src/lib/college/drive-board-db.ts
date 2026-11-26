@@ -24,7 +24,7 @@ export async function driveEmployerContacts(driveId: string): Promise<CameEmploy
     .select({
       shortlisted: sql<number>`(SELECT count(*)::int FROM ${schema.collegeDriveShortlist} s WHERE s.drive_id = ${driveId} AND s.employer_id = ${employerId})`,
       calls: sql<number>`(SELECT count(*)::int FROM ${schema.collegeDriveMeetings} m WHERE m.drive_id = ${driveId} AND m.employer_id = ${employerId})`,
-      employerId: e.employerId, joinedAt: utc(e.joinedAt), company: em.companyName, name: em.name, contact: em.primaryContactName, email: em.companyEmail, cc: em.countryCode, phone: em.phoneNumber })
+      employerId: e.employerId, status: e.status, joinedAt: utc(e.joinedAt), company: em.companyName, name: em.name, contact: em.primaryContactName, email: em.companyEmail, cc: em.countryCode, phone: em.phoneNumber })
     .from(e)
     .leftJoin(em, eq(em.id, e.employerId))
     .where(eq(e.driveId, driveId))
@@ -38,6 +38,7 @@ export async function driveEmployerContacts(driveId: string): Promise<CameEmploy
     joinedAt: r.joinedAt,
     shortlisted: Number(r.shortlisted ?? 0),
     calls: Number(r.calls ?? 0),
+    exited: r.status === "exited",
   }));
 }
 

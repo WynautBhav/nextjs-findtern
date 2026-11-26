@@ -137,6 +137,19 @@ export function hasOpenMeeting(interviews: SlotLike[], now: number = Date.now())
   return interviews.some((iv) => isBlockingInterview(iv, now) || hasNoSlotsToPick(iv));
 }
 
+/** What the employer reads when a meeting holds the offer (26 Nov PDF). */
+export const MEETING_ON_OFFER_LOCK = "Since meeting is on, you cannot send offers. Mark complete and you can send offer.";
+
+/**
+ * Whether this meeting holds back an offer to the candidate (26 Nov PDF). A booked meeting holds it until the employer marks it
+ * complete or missed, even once its time has passed; one the employer never joined (no-show) did not happen and holds nothing.
+ * An invite still waiting for the candidate holds it until its times run out, as before. `booked` picks the message.
+ */
+export function meetingHoldsOffer(iv: SlotLike, now: number = Date.now()): { held: boolean; booked: boolean } {
+  if (isBookedOpen(iv)) return { held: !employerNoShow(iv, now), booked: true };
+  return { held: isBlockingInterview(iv, now), booked: false };
+}
+
 /**
  * The meeting has happened: marked completed, or a scheduled meeting whose
  * time slot has run out. Feedback opens only then (bug sheet 26 Oct).

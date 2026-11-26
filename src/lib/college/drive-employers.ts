@@ -43,7 +43,8 @@ export type EmployerStatus =
   | { kind: "online" }
   | { kind: "seen"; label: string }
   | { kind: "never" }
-  | { kind: "came" } // a finished drive: "online now" no longer means anything
+  | { kind: "completed" } // stayed in until the drive ended: "online now" no longer means anything
+  | { kind: "withdrawn" } // left the drive early (Exit drive)
   | { kind: "absent" };
 
 export type EmployerRow = {
@@ -88,7 +89,9 @@ export function buildDriveEmployers(input: {
   const rows: EmployerRow[] = input.came.map((c) => {
     const seen = input.lastSeen.get(c.employerId) ?? null;
     let status: EmployerStatus;
-    if (input.over) status = { kind: "came" };
+    // 26 Nov PDF: the TPO sees who withdrew (left early) and who completed the drive.
+    if (c.exited) status = { kind: "withdrawn" };
+    else if (input.over) status = { kind: "completed" };
     else if (isOnline(seen, now)) status = { kind: "online" };
     else if (seen) status = { kind: "seen", label: `Last seen ${ago(seen.toISOString(), now)}` };
     else status = { kind: "never" };

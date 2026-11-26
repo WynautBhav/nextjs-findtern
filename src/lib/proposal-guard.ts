@@ -7,10 +7,10 @@
  * failed click. Kept free of the `@/` alias so `node --test` can run it.
  */
 
-import { isBlockingInterview, meetingTime } from "./employer-interview-rules.ts";
+import { meetingHoldsOffer, meetingTime } from "./employer-interview-rules.ts";
 import { shortDate } from "./format.ts";
 
-type InterviewLike = Parameters<typeof isBlockingInterview>[0] & { projectId?: string | null };
+type InterviewLike = Parameters<typeof meetingHoldsOffer>[0] & { projectId?: string | null };
 
 /**
  * When the pending meeting with a candidate is (ISO), or null. Only meetings
@@ -24,7 +24,8 @@ export function pendingMeetingAtFor(
   const now = options.now ?? Date.now();
   const times = interviews
     .filter((iv) => !options.projectId || !iv.projectId || iv.projectId === options.projectId)
-    .filter((iv) => isBlockingInterview(iv, now))
+    // 26 Nov PDF: a booked meeting holds the offer until it is marked complete, as the send routes refuse.
+    .filter((iv) => meetingHoldsOffer(iv, now).held)
     .map((iv) => meetingTime(iv))
     .filter((t): t is number => t !== null);
   return times.length > 0 ? new Date(Math.min(...times)).toISOString() : null;

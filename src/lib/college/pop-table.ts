@@ -194,6 +194,12 @@ export const studentFiltersActive = (f: StudentFilters) => Object.values(f).some
 export type EmployerTableRow = EmployerRow & { minutes: number | null };
 export type EmployerColKey = "company" | "contact" | "phone" | "email" | "invited" | "came" | "joinedAt" | "minutes" | "shortlisted" | "meetings" | "offers" | "hires";
 
+/** One word for where the company stands: Completed, Withdrawn (left early), In the drive, or Didn't come (26 Nov PDF). */
+export function employerStatusText(r: EmployerRow): string {
+  if (!r.employerId) return "Didn't come";
+  return r.status.kind === "withdrawn" ? "Withdrawn" : r.status.kind === "completed" ? "Completed" : "In the drive";
+}
+
 /** "2026-11-24 15:05" in India time, whatever the browser's zone is. */
 const istStamp = (d: Date) => new Date(d.getTime() + 330 * 60_000).toISOString().slice(0, 16).replace("T", " ");
 
@@ -203,7 +209,7 @@ export const EMPLOYER_COLUMNS: ColumnDef<EmployerTableRow, EmployerColKey>[] = [
   { key: "phone", label: "Phone", main: true, csv: (r) => phoneCsv(r.phone), sort: (r) => text(r.phone) },
   { key: "email", label: "Email", main: true, csv: (r) => r.email, sort: (r) => text(r.email)?.toLowerCase() ?? null },
   { key: "invited", label: "Invited", main: true, csv: (r) => yesNo(r.invited), sort: (r) => (r.invited ? 1 : 0) },
-  { key: "came", label: "Came", main: true, csv: (r) => (r.employerId ? "Came" : "Didn't come"), sort: (r) => (r.employerId ? 1 : 0) },
+  { key: "came", label: "Status", main: true, csv: (r) => employerStatusText(r), sort: (r) => (r.employerId ? (r.status.kind === "withdrawn" ? 1 : 2) : 0) },
   { key: "joinedAt", label: "Joined at", csvLabel: "Joined at (IST)", main: true, csv: (r) => (r.joinedAt ? istStamp(r.joinedAt) : null), sort: (r) => r.joinedAt?.getTime() ?? null },
   { key: "minutes", label: "Time online", csvLabel: "Time online in the drive (minutes)", numeric: true, main: true, csv: (r) => r.minutes, sort: (r) => r.minutes },
   { key: "shortlisted", label: "Shortlisted", numeric: true, main: true, csv: (r) => (r.employerId ? r.shortlisted : null), sort: (r) => (r.employerId ? r.shortlisted : null) },

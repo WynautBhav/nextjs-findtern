@@ -38,8 +38,7 @@ const LIST_TITLE: Partial<Record<BoardKey, string>> = {
   meetings: "Meets accepted",
   meetCompleted: "Meets completed",
   meetExpired: "Meets expired",
-  meetDeclined: "Meets declined",
-  meetCancelled: "Meets cancelled",
+  meetCancelled: "Meets withdrawn",
   offersWithdrawn: "Offers withdrawn",
   shortlisted: "Shortlisted",
   offers: "Got an offer",
@@ -182,8 +181,7 @@ export function PastDriveCard({
                 <Line label="Accepted" value={board.meetCounts.accepted} onClick={() => open(listPop("meetings", board))} />
                 <Line label="Completed" value={board.meetCounts.completed} onClick={() => open(listPop("meetCompleted", board))} />
                 <Line label="Expired, no reply" value={board.meetCounts.expired} onClick={() => open(listPop("meetExpired", board))} />
-                <Line label="Declined" value={board.meetCounts.declined} onClick={() => open(listPop("meetDeclined", board))} />
-                <Line label="Cancelled" value={board.meetCounts.cancelled} onClick={() => open(listPop("meetCancelled", board))} />
+                <Line label="Withdrawn" value={board.meetCounts.cancelled} onClick={() => open(listPop("meetCancelled", board))} />
               </Ledger>
               <Ledger title="Offers">
                 <Line label="Offers made" value={board.offerCount} onClick={() => open(listPop("offers", board))} />
@@ -308,7 +306,7 @@ export function PastDriveCard({
                 </button>
               ) : null}
             </div>
-            {/* The arrivals' names and dots open that company, like the table rows. */}
+            {/* The arrivals' dots open that company, like the table rows. */}
             <div
               className="mt-6 border-t border-white/10 pt-5"
               onClick={(e) => {

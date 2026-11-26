@@ -16,7 +16,7 @@ type Tile = {
   label: string;
   hint: (n: number, b: DriveBoard) => string;
   /** The nudge this list sends. On a nudge-history list it goes only to the students who still need it (`again`). */
-  nudge?: NudgeHistoryKind;
+  nudge?: NudgeHistoryKind | "interview";
   critical?: boolean;
   /** Shown as "x of the drive's students". */
   ofTotal?: boolean;
@@ -46,9 +46,8 @@ const MEETINGS: Group = {
     { key: "meetings", label: "Meets accepted", figure: (b) => b.meetCounts.accepted, hint: (n) => ofStudents(n, "None accepted") },
     { key: "meetCompleted", label: "Meets completed", figure: (b) => b.meetCounts.completed, hint: (n) => (n ? `${ofStudents(n, "")} · accepted, time over` : "None yet") },
     { key: "meetExpired", label: "Meets expired", figure: (b) => b.meetCounts.expired, hint: (n) => (n ? `${ofStudents(n, "")} · no reply in time` : "None expired") },
-    // Bug sheet 26 Nov: every status, not only the good ones.
-    { key: "meetDeclined", label: "Meets declined", figure: (b) => b.meetCounts.declined, hint: (n) => (n ? `${ofStudents(n, "")} · said no` : "None declined") },
-    { key: "meetCancelled", label: "Meets cancelled", figure: (b) => b.meetCounts.cancelled, hint: (n) => (n ? ofStudents(n, "") : "None cancelled") },
+    // A meet the company called off reads "Withdrawn"; students can't decline a meet, so there is no Declined tile (26 Nov PDF).
+    { key: "meetCancelled", label: "Meets withdrawn", figure: (b) => b.meetCounts.cancelled, hint: (n) => (n ? `${ofStudents(n, "")} · called off by the company` : "None withdrawn") },
   ],
 };
 const OFFER_COUNTS = (b: DriveBoard) => `${b.offerCount} ${b.offerCount === 1 ? "offer" : "offers"} · ${b.offerSplit.internship} internship · ${b.offerSplit.fullTime} full-time / PPO`;
@@ -60,11 +59,18 @@ const LIVE: Group[] = [
     tiles: [
       { key: "meetingsWaiting", label: "Drive meets not answered", hint: (n) => (n ? "An employer asked; the student hasn't replied" : "Every meet request is answered"), nudge: "meeting", critical: true },
       { key: "offersWaiting", label: "Offers not answered", hint: (n) => (n ? "Neither accepted nor declined yet" : "Every offer has a reply"), nudge: "offer", critical: true },
-      { key: "offline", label: "Offline now", hint: (n) => (n ? "Not on Findtern during the drive" : "Everyone is online"), nudge: "online", critical: true, ofTotal: true, needsPresence: true },
+      { key: "offline", label: "Offline now", hint: (n) => (n ? "Each shows when last seen" : "Everyone is online"), nudge: "online", critical: true, ofTotal: true, needsPresence: true },
       { key: "notOpen", label: "Not open to work", hint: (n) => (n ? "Employers can't find them" : "Everyone is open to work"), nudge: "open_to_work", critical: true, ofTotal: true },
     ],
   },
-  { title: "Students in the drive", tiles: [ALL_STUDENTS, { key: "online", label: "Online now", hint: (n) => (n ? "On Findtern right now" : "Nobody is online"), ofTotal: true, needsPresence: true }] },
+  {
+    title: "Students in the drive",
+    tiles: [
+      ALL_STUDENTS,
+      { key: "online", label: "Online now", hint: (n) => (n ? "On Findtern right now" : "Nobody is online"), ofTotal: true, needsPresence: true },
+      { key: "aiPending", label: "AI interview not done", hint: (n) => (n ? "Employers can't see them yet" : "Everyone has done it"), nudge: "interview", critical: true, ofTotal: true },
+    ],
+  },
   MEETINGS,
   {
     title: "What this drive has produced",
@@ -108,7 +114,7 @@ const STAGES: Tile[] = [
  * A live drive's "still waiting" lists, asked for on a past one (the summary's links): what they became once it ended.
  * Without this the board fell back to Offers (owner brief, 24 Nov: "clicking meetings jumps to Offers").
  */
-const PAST_ALIAS: Partial<Record<BoardKey, BoardKey>> = { meetingsWaiting: "meetExpired", offersWaiting: "unanswered", offline: "all", online: "all", notOpen: "all" };
+const PAST_ALIAS: Partial<Record<BoardKey, BoardKey>> = { meetingsWaiting: "meetExpired", offersWaiting: "unanswered", offline: "all", online: "all", notOpen: "all", aiPending: "all" };
 const PAGE = 40;
 const GRID = {
   2: "grid grid-cols-2 divide-x divide-ink-100 border-b border-ink-100",
@@ -250,7 +256,7 @@ function TileGroup({ title, children }: { title: string; children: ReactNode }) 
 }
 
 /** One student in a list: name and roll line, what happened, phone. Shared with the past-drive pop-ups. */
-export function Row({ r, nudge }: { r: BoardItem; nudge?: NudgeHistoryKind }) {
+export function Row({ r, nudge }: { r: BoardItem; nudge?: NudgeHistoryKind | "interview" }) {
   const meta = [r.year ? yearLabel(r.year) : null, r.branch].filter(Boolean).join(" · ");
   return (
     <li className="grid gap-x-6 gap-y-1.5 px-5 py-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)_auto_auto] sm:items-center">

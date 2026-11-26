@@ -15,7 +15,7 @@ import { getPerHireFeeSetting } from "@/lib/platform-settings";
 import { skillBaseName, studyOf } from "@/components/employer/candidate-view";
 import { candidateStatusPill } from "@/components/employer/candidate-status";
 import { attachPhotos, canEmployerSeeIntern } from "@/lib/employer-pool";
-import { isBlockingInterview } from "@/lib/employer-interview-rules";
+import { MEETING_ON_OFFER_LOCK, meetingHoldsOffer } from "@/lib/employer-interview-rules";
 import { notify } from "@/lib/notify";
 import { isOpenProject, rememberedSelection } from "@/lib/employer-selection";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
@@ -226,8 +226,10 @@ export default async function EmployerInternDetail({
         action = { kind: "blocked", reason: "A full-time offer is already out." };
       } else if (openForProject) {
         action = { kind: "view", proposalId: openForProject.id };
-      } else if (interviews.some((iv) => (!project || !iv.projectId || iv.projectId === project.id) && isBlockingInterview(iv))) {
-        action = { kind: "blocked", reason: "Finish the booked interview first." };
+      } else {
+        // 26 Nov PDF: a booked meeting holds the offer until it is marked complete (the send routes refuse by the same rule).
+        const hold = interviews.filter((iv) => !project || !iv.projectId || iv.projectId === project.id).map((iv) => meetingHoldsOffer(iv)).find((h) => h.held);
+        if (hold) action = { kind: "blocked", reason: hold.booked ? MEETING_ON_OFFER_LOCK : "Finish the booked interview first." };
       }
 
       const [onboarding] = await db

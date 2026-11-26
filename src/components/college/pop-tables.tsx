@@ -17,6 +17,7 @@ import {
   STUDENT_COLUMNS,
   csvColumnsFor,
   employerFiltersActive,
+  employerStatusText,
   filterEmployers,
   filterStudents,
   nextSort,
@@ -484,7 +485,7 @@ function employerCell(key: EmployerColKey, r: EmployerTableRow, onOpen: (id: str
     case "invited":
       return r.invited ? "Yes" : <span className="text-text-subtle">No</span>;
     case "came":
-      return came ? "Came" : <span className="text-warning">Didn&apos;t come</span>;
+      return came ? (r.status.kind === "withdrawn" ? <span className="text-accent-700">Withdrawn</span> : employerStatusText(r)) : <span className="text-warning">Didn&apos;t come</span>;
     case "joinedAt":
       return r.joinedAt ? <span className="nums">{when(r.joinedAt)}</span> : <Dash />;
     case "minutes":

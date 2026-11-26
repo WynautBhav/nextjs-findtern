@@ -11,6 +11,7 @@ import { ButtonLink } from "@/components/ui/button";
 import type { CandidateRelation } from "@/lib/employer-visibility";
 import type { resolvePricing } from "@/lib/employer-pricing";
 import { formatMoney, formatRate } from "@/lib/format";
+import { DRIVE_FULL_TIME_FEE } from "@/lib/checkout";
 
 import { mainAction, type ProfileAction } from "./profile-helpers";
 
@@ -74,62 +75,88 @@ function MainControl({ main, sendHref, className, onDark = false }: { main: NonN
 export function HireRail(props: RailProps) {
   const { employerId, employerFte, employerZone, internId, displayName, scored, plan, pricing, currency, action, sendHref, relation, appliedProjects, comparePicks, compareBlocked, shortlist } = props;
   const main = mainAction(action, relation);
-  // Bug sheet 25 Nov: from the drive's Full-time tab the green rail's button is the full-time offer, at every width (the
-  // floating bar stands down, so the form never opens twice), and the internship proposal moves below as a quiet link.
-  const ftMain = Boolean(props.fullTimeFirst && props.driveFullTime && !relation?.fullTimeFrom && main?.kind === "send");
+  // 26 Nov PDF: a drive student eligible for full-time gets two cards, Internship, then "OR", then Full-time. Only the one the
+  // employer is hiring for is the green card: Full-time when opened from the drive's Full-time tab, Internship otherwise.
+  const ftCard = Boolean(props.driveFullTime && !relation?.fullTimeFrom);
+  const ftFirst = ftCard && Boolean(props.fullTimeFirst);
+  // While a meeting holds the offer, neither card can send one; the reason shows on each (meetingHoldsOffer).
+  const ftLocked = ftCard && action.kind === "blocked" ? action.reason : null;
+  const ftMain = ftFirst && !ftLocked && main?.kind === "send";
   const showShortlist = Boolean(shortlist && action.kind === "send");
   // Book meeting is always offered, so the lower block always renders.
   const hasLower = true;
+  const internshipOnGreen = !ftFirst;
   return (
     <aside aria-label="Hire" className="min-w-0 xl:col-start-2 xl:row-span-2 xl:row-start-1">
       <div className="rise overflow-hidden rounded-[24px] shadow-tile-brand xl:sticky xl:top-24" style={{ ["--i" as string]: 1 }}>
-        <div className="bg-[linear-gradient(140deg,var(--color-brand-700),var(--color-brand-950))] p-6 text-white">
-          <p className="nums text-5xl font-light leading-none tracking-[-0.05em]">{formatRate(pricing.hourlyRateMinor, currency)}</p>
-          <p className="mt-3 text-sm text-on-dark-subtle">What you pay, set by the {scored ? `${plan} ` : ""}band</p>
+        <section
+          aria-label={ftCard ? "Internship" : undefined}
+          className={internshipOnGreen ? "bg-[linear-gradient(140deg,var(--color-brand-700),var(--color-brand-950))] p-6 text-white" : "border-b border-ink-100 bg-white p-6 text-ink-900"}
+        >
+          {ftCard ? <p className={internshipOnGreen ? "mb-3 text-sm font-medium text-on-dark-subtle" : "mb-3 text-sm font-medium text-ink-600"}>Internship</p> : null}
+          <p className={internshipOnGreen ? "nums text-5xl font-light leading-none tracking-[-0.05em]" : "nums text-3xl font-light leading-none tracking-[-0.04em] text-ink-900"}>{formatRate(pricing.hourlyRateMinor, currency)}</p>
+          <p className={internshipOnGreen ? "mt-3 text-sm text-on-dark-subtle" : "mt-2 text-sm text-ink-600"}>What you pay, set by the {scored ? `${plan} ` : ""}band</p>
           {pricing.perHireMinor > 0 ? (
-            <p className="nums mt-0.5 text-sm text-on-dark-subtle">
-              plus <span className="font-medium text-white">{formatMoney(pricing.perHireMinor, currency)}</span> one-time hiring charge
+            <p className={internshipOnGreen ? "nums mt-0.5 text-sm text-on-dark-subtle" : "nums mt-0.5 text-sm text-ink-600"}>
+              plus <span className={internshipOnGreen ? "font-medium text-white" : "font-medium text-ink-900"}>{formatMoney(pricing.perHireMinor, currency)}</span> one-time hiring charge
             </p>
           ) : (
-            <p className="nums mt-0.5 text-sm text-on-dark-subtle">
-              plus <s className="text-on-dark-subtle/80">{formatMoney(pricing.perHireListMinor, currency)}</s> <span className="font-semibold text-data-on-dark">(FREE)</span> one-time hiring charge
+            <p className={internshipOnGreen ? "nums mt-0.5 text-sm text-on-dark-subtle" : "nums mt-0.5 text-sm text-ink-600"}>
+              plus <s className={internshipOnGreen ? "text-on-dark-subtle/80" : "text-ink-500"}>{formatMoney(pricing.perHireListMinor, currency)}</s> <span className={internshipOnGreen ? "font-semibold text-data-on-dark" : "font-semibold text-success"}>(FREE)</span> one-time hiring charge
             </p>
           )}
-          {ftMain && props.driveFullTime ? (
-            <>
-              <FullTimeOfferButton
-                employerId={employerId}
-                candidate={displayName}
-                fteStatus={employerFte}
-                timezone={employerZone}
-                drive={{ driveId: props.driveFullTime.driveId, internId, projects: props.driveFullTime.projects }}
-                variant="white"
-                label="Send full-time offer"
-                defaultOpen={props.fullTimeFirst === "open"}
-                className="mt-5 w-full"
-              />
-              <p className="mt-2 text-sm text-on-dark-subtle">From the campus drive: 1% of the annual CTC.</p>
-            </>
-          ) : main ? (
+          {main ? (
             main.kind === "reason" ? (
-              <p className="mt-5 rounded-apple-sm bg-white/10 px-4 py-2.5 text-sm text-white">{main.text}</p>
-            ) : (
+              <p className={internshipOnGreen ? "mt-5 rounded-apple-sm bg-white/10 px-4 py-2.5 text-sm text-white" : "mt-4 rounded-apple-sm bg-ink-50 px-4 py-2.5 text-sm text-ink-800"}>{main.text}</p>
+            ) : internshipOnGreen ? (
               <MainControl onDark main={main} sendHref={sendHref} className="mt-5 min-h-11 max-xl:hidden" />
+            ) : main.kind === "send" ? (
+              <ButtonLink href={sendHref} variant="outline" size="sm" className="mt-4 min-h-11 w-full justify-center">
+                <Send className="size-4" aria-hidden />
+                Send internship proposal
+              </ButtonLink>
+            ) : (
+              <MainControl main={main} sendHref={sendHref} className="mt-4 min-h-11" />
             )
           ) : null}
-        </div>
+        </section>
+
+        {ftCard && props.driveFullTime ? (
+          <>
+            <p aria-hidden className="flex items-center gap-3 bg-white px-6 py-2 text-xs font-medium tracking-wide text-ink-500">
+              <span className="h-px flex-1 bg-ink-200" />
+              OR
+              <span className="h-px flex-1 bg-ink-200" />
+            </p>
+            <section
+              aria-label="Full-time hire"
+              className={ftFirst ? "bg-[linear-gradient(140deg,var(--color-brand-700),var(--color-brand-950))] p-6 text-white" : "border-b border-ink-100 bg-white px-6 pb-6 pt-2 text-ink-900"}
+            >
+              <p className={ftFirst ? "mb-3 text-sm font-medium text-on-dark-subtle" : "mb-3 text-sm font-medium text-ink-600"}>Full-time hire</p>
+              <p className={ftFirst ? "nums text-5xl font-light leading-none tracking-[-0.05em]" : "nums text-3xl font-light leading-none tracking-[-0.04em] text-ink-900"}>{DRIVE_FULL_TIME_FEE * 100}%</p>
+              <p className={ftFirst ? "mt-3 text-sm text-on-dark-subtle" : "mt-2 text-sm text-ink-600"}>of the annual CTC, from the campus drive</p>
+              {ftLocked ? (
+                <p className={ftFirst ? "mt-5 rounded-apple-sm bg-white/10 px-4 py-2.5 text-sm text-white" : "mt-4 rounded-apple-sm bg-ink-50 px-4 py-2.5 text-sm text-ink-800"}>{ftLocked}</p>
+              ) : (
+                <FullTimeOfferButton
+                  employerId={employerId}
+                  candidate={displayName}
+                  fteStatus={employerFte}
+                  timezone={employerZone}
+                  drive={{ driveId: props.driveFullTime.driveId, internId, projects: props.driveFullTime.projects }}
+                  variant={ftFirst ? "white" : "outline"}
+                  label="Send full-time offer"
+                  defaultOpen={ftMain && props.fullTimeFirst === "open"}
+                  className={ftFirst ? "mt-5 w-full" : "mt-4 w-full justify-center"}
+                />
+              )}
+            </section>
+          </>
+        ) : null}
 
         {hasLower ? (
           <div className="space-y-4 bg-white p-6">
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 [&>*:only-child]:col-span-full [&_button]:w-full [&_button]:justify-center">
-              {ftMain ? (
-                <ButtonLink href={sendHref} variant="outline" size="sm" className="min-h-11 w-full justify-center">
-                  <Send className="size-4" aria-hidden />
-                  Internship proposal instead
-                </ButtonLink>
-              ) : props.driveFullTime && !relation?.fullTimeFrom ? (
-                <FullTimeOfferButton employerId={employerId} candidate={displayName} fteStatus={employerFte} timezone={employerZone} drive={{ driveId: props.driveFullTime.driveId, internId, projects: props.driveFullTime.projects }} />
-              ) : null}
               {relation?.fullTimeFrom ? (
                 <FullTimeOfferButton employerId={employerId} proposalId={relation.fullTimeFrom} feeRate={relation.fullTimeFeeRate} candidate={displayName} fteStatus={employerFte} timezone={employerZone} />
               ) : null}

@@ -25,8 +25,10 @@ test("offered slots with no pick still hold the candidate, at the first slot", (
   assert.equal(pendingMeetingAtFor([iv], { now: NOW }), "2026-11-10T05:00:00.000Z");
 });
 
-test("a finished, completed, cancelled or over meeting does not hold", () => {
-  assert.equal(pendingMeetingAtFor([booked("2026-11-06T09:00:00Z")], { now: NOW }), null);
+test("a completed, missed or cancelled meeting does not hold; one whose time is over but not marked complete still does (26 Nov PDF)", () => {
+  assert.equal(pendingMeetingAtFor([booked("2026-11-06T09:00:00Z")], { now: NOW }), "2026-11-06T09:00:00.000Z");
+  assert.equal(pendingMeetingAtFor([booked("2026-11-06T09:00:00Z", { status: "completed" })], { now: NOW }), null);
+  assert.equal(pendingMeetingAtFor([booked("2026-11-06T09:00:00Z", { status: "missed" })], { now: NOW }), null);
   assert.equal(pendingMeetingAtFor([booked("2026-11-09T09:00:00Z", { status: "completed" })], { now: NOW }), null);
   assert.equal(pendingMeetingAtFor([booked("2026-11-09T09:00:00Z", { status: "cancelled" })], { now: NOW }), null);
   assert.equal(pendingMeetingAtFor([], { now: NOW }), null);

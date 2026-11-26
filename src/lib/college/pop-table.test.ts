@@ -109,7 +109,7 @@ const emp = (key: string, company: string, extra: Partial<EmployerTableRow> = {}
   email: `hr@${key}.com`,
   invited: true,
   joinedAt: new Date("2026-11-20T09:35:00Z"),
-  status: { kind: "came" },
+  status: { kind: "completed" },
   meetings: 3,
   offers: 2,
   hires: 1,
@@ -130,8 +130,8 @@ test("company filters: search, came or not, invited or not", () => {
 test("company CSV: IST time, dash-free blanks for a company that never came, honest zero for one that did", () => {
   const csv = toCsv(emps, csvColumnsFor(EMPLOYER_COLUMNS, new Set(["company", "came", "joinedAt", "offers"] as const)));
   const lines = csv.replace(/^﻿/, "").trim().split("\r\n");
-  assert.equal(lines[0], "Company,Came,Joined at (IST),Offers");
-  assert.equal(lines[1], "Acme,Came,2026-11-20 15:05,2");
+  assert.equal(lines[0], "Company,Status,Joined at (IST),Offers");
+  assert.equal(lines[1], "Acme,Completed,2026-11-20 15:05,2");
   assert.equal(lines[3], "Gamma,Didn't come,,");
   const sorted = sortRows(emps, EMPLOYER_COLUMNS, { key: "offers", dir: "desc" }).map((r) => r.key);
   assert.deepEqual(sorted, ["acme", "beta", "missing-0"]);

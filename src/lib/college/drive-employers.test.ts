@@ -48,7 +48,7 @@ test("invited flag by email or name; the invited company that never came is a ro
 
 test("a finished drive says who came, never who is online", () => {
   const d = live(true);
-  assert.deepEqual(d.rows[0].status, { kind: "came" });
+  assert.deepEqual(d.rows[0].status, { kind: "completed" });
   assert.equal(d.online, 0);
   assert.equal(employersLine(d, true), "3 in the drive · 1 invited company didn't come");
 });
@@ -56,4 +56,11 @@ test("a finished drive says who came, never who is online", () => {
 test("the line and the link", () => {
   assert.equal(employersLine(live(), false), "3 in the drive · 1 online now · 1 invited company didn't come");
   assert.equal(employerHref("d1", "e1"), "/college/drives/d1?employer=e1#board");
+});
+
+test("26 Nov PDF: a company that left early reads Withdrawn, live or over; one that stayed reads Completed once it ends", () => {
+  const run = (over: boolean) =>
+    buildDriveEmployers({ came: [{ ...came("e1", "Acme", "hr@acme.com"), exited: true }, came("e2", "Beta", "x@beta.com")], invited: [], counts: new Map(), lastSeen: new Map(), over, now: NOW });
+  assert.deepEqual(run(false).rows.map((r) => r.status.kind), ["withdrawn", "never"]);
+  assert.deepEqual(run(true).rows.map((r) => r.status.kind), ["withdrawn", "completed"]);
 });
