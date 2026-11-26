@@ -183,7 +183,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
               {readiness.paused ? "Account paused" : !readiness.seen ? "Hidden from employers" : readiness.hireable ? "Visible to employers" : "Visible, can't be hired yet"}
             </p>
           ) : null}
-          {verified ? <p className="mt-1 text-xs text-text-subtle">{online ? "Online now" : `Last active ${ago(seen?.toISOString() ?? null)}`}</p> : null}
+          {verified ? <p className="mt-1 text-xs text-text-subtle">{online ? "Online now" : seen ? `Last seen ${shortDateTime(seen, { day: "numeric", month: "short", year: shortDateTime(seen, { year: "numeric" }) === shortDateTime(new Date(requestTime()), { year: "numeric" }) ? undefined : "numeric", hour: "numeric", minute: "2-digit" })}` : "Not seen yet"}</p> : null}
 
           <div className="mt-4 flex gap-2">
             {phone ? (

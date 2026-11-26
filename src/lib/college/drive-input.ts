@@ -55,6 +55,7 @@ export const driveInput = z
         minScore: z.number().min(0).max(10).optional(),
         years: z.array(z.number().int().min(1).max(5)).max(5).optional(),
         branches: z.array(z.string().trim().min(1).max(80)).max(40).optional(),
+        degrees: z.array(z.string().trim().min(1).max(80)).max(40).optional(),
       })
       .default({}),
     includeUserIds: z.array(z.string().min(1)).max(2000).default([]),

@@ -117,6 +117,8 @@ export function PastDriveCard({
     setPop(p);
   };
 
+  const openCompanies = () => open({ kind: "employers", title: "Companies in the drive", note: `${plural(came.length, "company", "companies")} came${employers.invitedMissing ? ` · ${plural(employers.invitedMissing, "invited company", "invited companies")} didn't` : ""}` });
+
   const everyone = summary.online.everyone;
   // Students from the drive's own list, so every student pop-up is the same table. Ids the drive does not hold are left out.
   const byId = new Map(board.lists.all.map((s) => [s.userId, s]));
@@ -236,7 +238,7 @@ export function PastDriveCard({
                   value={came.length}
                   share={invited ? `of ${n(invited)} invited` : null}
                   bar={invited ? pct(employers.rows.filter((r) => r.invited && r.employerId).length, invited) : 100}
-                  onClick={() => open({ kind: "employers", title: "Companies in the drive", note: `${plural(came.length, "company", "companies")} came${employers.invitedMissing ? ` · ${plural(employers.invitedMissing, "invited company", "invited companies")} didn't` : ""}` })}
+                  onClick={openCompanies}
                 />
               </li>
               <li>
@@ -272,7 +274,7 @@ export function PastDriveCard({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/10 border-t border-white/10">
-                  {employers.rows.map((r) => {
+                  {employers.rows.slice(0, COMPANY_ROWS).map((r) => {
                     const id = r.employerId;
                     const mins = id ? minutesOf.get(id) : undefined;
                     return (
@@ -300,8 +302,22 @@ export function PastDriveCard({
                   })}
                 </tbody>
               </table>
+              {employers.rows.length > COMPANY_ROWS ? (
+                <button type="button" aria-haspopup="dialog" onClick={openCompanies} className={cn("mt-3 min-h-11 rounded-md px-3 text-sm font-medium text-white underline-offset-4 hover:bg-white/10 hover:underline", focusRing)}>
+                  View more <span className="nums text-on-dark">({n(employers.rows.length - COMPANY_ROWS)})</span>
+                </button>
+              ) : null}
             </div>
-            <div className="mt-6 border-t border-white/10 pt-5">{timeline}</div>
+            {/* The arrivals' names and dots open that company, like the table rows. */}
+            <div
+              className="mt-6 border-t border-white/10 pt-5"
+              onClick={(e) => {
+                const id = (e.target as HTMLElement).closest<HTMLElement>("[data-company]")?.dataset.company;
+                if (id) open({ kind: "company", id });
+              }}
+            >
+              {timeline}
+            </div>
           </>
         )}
       </div>
@@ -317,6 +333,9 @@ export function PastDriveCard({
     </>
   );
 }
+
+/** The Each company table shows this many rows; View more opens all of them with search, filters and CSV. */
+const COMPANY_ROWS = 5;
 
 function listPop(key: BoardKey, board: DriveBoard): Pop {
   const rows = board.lists[key].length;

@@ -2,6 +2,7 @@ import { DriveBuilder } from "@/components/college/drive-builder";
 import { toLocalInput } from "@/lib/college/ist";
 import { requireCollegeContext, studentsForCollegeAdmin } from "@/lib/college/scope";
 import { toStudentRow } from "@/lib/college/serialize";
+import { degreeOptions } from "@/lib/college/eligibility";
 import { readinessForMany } from "@/lib/college/student-readiness-db";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +14,7 @@ export default async function NewDrivePage() {
   // Each student's one reason employers can't see them (or null), for the form's Drive summary.
   const readiness = await readinessForMany(verified.map((s) => s.userId));
   const students = verified.map((s) => ({ ...toStudentRow(s), hidden: readiness.get(s.userId)?.hidden ?? (readiness.get(s.userId)?.seen ? null : "profile") }));
-  const branches = [...new Set(students.map((s) => s.branch).filter((b): b is string => Boolean(b)))].sort();
+  const degrees = degreeOptions(students);
   const start = new Date();
   // The top of the current hour: the link works the moment it is created, unless the officer picks a later opening.
   start.setMinutes(0, 0, 0);
@@ -27,7 +28,7 @@ export default async function NewDrivePage() {
         collegeName={ctx.college.name}
         collegeLogoUrl={ctx.college.logoUrl}
         students={students}
-        branches={branches}
+        degrees={degrees}
         initial={{
           title: "",
           kind: "internship",
@@ -38,6 +39,7 @@ export default async function NewDrivePage() {
           minScore: "",
           years: [],
           branches: [],
+          degrees: [],
           includeUserIds: [],
           excludeUserIds: [],
         }}

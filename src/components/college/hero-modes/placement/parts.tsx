@@ -67,14 +67,20 @@ export function Meetings({ data, className }: { data: PlacementData; className?:
     { key: "meet-upcoming", label: "Booked", v: m.upcoming, fill: white(0.72) },
     { key: "meet-waiting", label: "Waiting for the student", v: m.waiting, fill: white(0.38) },
     { key: "not-accepted", label: "Not accepted", v: m.notAccepted, fill: white(0.2) },
-    { key: "meet-other", label: "Missed or called off", v: m.other, fill: white(0.08) },
+    { key: "meet-missed", label: "Missed", v: m.missed, fill: white(0.15) },
+    { key: "meet-called-off", label: "Called off", v: m.calledOff, fill: white(0.11) },
+    { key: "meet-withdrawn", label: "Withdrawn", v: m.withdrawn, fill: white(0.08) },
+    { key: "meet-other", label: "Not closed", v: m.other, fill: white(0.05) },
   ] as const;
   const title: Record<(typeof parts)[number]["key"], string> = {
     met: "Students who had a meeting",
     "meet-upcoming": "Students with a meeting booked",
     "meet-waiting": "Students yet to answer a meeting",
     "not-accepted": "Students who didn't accept a meeting",
-    "meet-other": "Students with a missed or called-off meeting",
+    "meet-missed": "Students who missed a meeting",
+    "meet-called-off": "Students who called off a meeting",
+    "meet-withdrawn": "Students whose meeting the employer withdrew",
+    "meet-other": "Students with a booked meeting never closed",
   };
   return (
     <section className={cn("grid gap-x-10 gap-y-4 sm:grid-cols-[auto_1fr] sm:items-end", className)} aria-label="Meetings with employers">
@@ -95,7 +101,7 @@ export function Meetings({ data, className }: { data: PlacementData; className?:
         <div className="flex h-2.5 gap-0.5 overflow-hidden" role="img" aria-label={`${m.total} meetings: ${parts.map((p) => `${p.label} ${p.v}`).join(", ")}`}>
           {m.total ? parts.map((p) => (p.v ? <span key={p.key} style={{ flexGrow: p.v, flexBasis: 0, background: p.fill }} /> : null)) : <span className="flex-1" style={{ background: white(0.08) }} />}
         </div>
-        <Legend className="mt-2.5" items={parts.map((p) => ({ label: p.label, fill: p.fill, value: p.v, drill: p.v ? { title: title[p.key], filters: { outcome: p.key } } : undefined }))} />
+        <Legend className="mt-2.5" items={parts.filter((p) => p.key !== "meet-other" || p.v > 0).map((p) => ({ label: p.label, fill: p.fill, value: p.v, drill: p.v ? { title: title[p.key], filters: { outcome: p.key } } : undefined }))} />
       </div>
     </section>
   );

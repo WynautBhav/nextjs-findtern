@@ -18,7 +18,9 @@ export type DriveEligibility = {
   minCgpa?: number;
   minScore?: number;
   years?: number[];
+  /** Old drives only: the Branch filter became Degree on 26 Nov. Still read so their lists don't change. */
   branches?: string[];
+  degrees?: string[];
 };
 
 /** Tolerant read of the stored jsonb; anything malformed is dropped, not trusted. */
@@ -37,11 +39,20 @@ export function readEligibility(raw: Record<string, unknown> | null | undefined)
     const bs = raw.branches.filter((b): b is string => typeof b === "string" && b.trim() !== "").map(normBranch);
     if (bs.length) e.branches = bs;
   }
+  if (Array.isArray(raw?.degrees)) {
+    const ds = raw.degrees.filter((d): d is string => typeof d === "string" && normDegree(d) !== "").map(normDegree);
+    if (ds.length) e.degrees = ds;
+  }
   return e;
 }
 
 export function normBranch(b: string): string {
   return b.trim().toLowerCase();
+}
+
+/** "B.Sc", "BSc" and "b sc" are one degree. */
+export function normDegree(d: string): string {
+  return d.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
 export type StudentFacts = {
@@ -51,6 +62,8 @@ export type StudentFacts = {
   leftAt: Date | null;
   year: number | null;
   branch: string | null;
+  /** The degree from the student's academics (B.Tech, BCA…); absent on callers that don't load it. */
+  degree?: string | null;
   cgpa: number | null;
   score: number | null;
   /** Current semester from the student's academics, when they filled it in. */
@@ -99,5 +112,26 @@ export function isStudentEligible(s: StudentFacts, drive: DriveRules): boolean {
   if (e.minScore !== undefined && (s.score === null || s.score < e.minScore)) return false;
   if (e.years && (s.year === null || !e.years.includes(s.year))) return false;
   if (e.branches && (!s.branch || !e.branches.includes(normBranch(s.branch)))) return false;
+  if (e.degrees && (!s.degree || !e.degrees.includes(normDegree(s.degree)))) return false;
   return true;
+}
+
+/**
+ * The officer's filters win over hand-picks (26 Nov): after a filter changes, keep only the hand-added students who
+ * pass the drive's rules on their own.
+ */
+export function handPicksThatFit(students: StudentFacts[], drive: DriveRules): string[] {
+  const alone = { ...drive, includeUserIds: [] };
+  const fits = new Set(students.filter((s) => isStudentEligible(s, alone)).map((s) => s.userId));
+  return drive.includeUserIds.filter((id) => fits.has(id));
+}
+
+/** The Degree filter's options: each degree once (first spelling wins), A to Z. */
+export function degreeOptions(students: { degree?: string | null }[]): string[] {
+  const seen = new Map<string, string>();
+  for (const s of students) {
+    const d = s.degree?.trim();
+    if (d && normDegree(d) && !seen.has(normDegree(d))) seen.set(normDegree(d), d);
+  }
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }

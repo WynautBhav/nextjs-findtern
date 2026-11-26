@@ -12,7 +12,7 @@ import { buildMasterRow, NO_MEETINGS, type MasterExtras, type MasterRow, type Me
 const meetingsOf = (v: unknown): Meetings => {
   const m = (v && typeof v === "object" ? v : {}) as Record<string, unknown>;
   const n = (k: keyof Meetings) => Number(m[k] ?? 0) || 0;
-  return m.total === undefined ? NO_MEETINGS : { total: n("total"), done: n("done"), missed: n("missed"), notAccepted: n("notAccepted"), upcoming: n("upcoming"), waiting: n("waiting"), callsAccepted: n("callsAccepted"), callsNotTaken: n("callsNotTaken"), callsWaiting: n("callsWaiting") };
+  return m.total === undefined ? NO_MEETINGS : { total: n("total"), done: n("done"), missed: n("missed"), calledOff: n("calledOff"), withdrawn: n("withdrawn"), notAccepted: n("notAccepted"), upcoming: n("upcoming"), waiting: n("waiting"), callsAccepted: n("callsAccepted"), callsNotTaken: n("callsNotTaken"), callsWaiting: n("callsWaiting") };
 };
 
 /** Onboarding keys master data may read. An allowlist: Aadhaar, PAN, bank, address and PIN are never selected. */
@@ -57,9 +57,12 @@ export async function masterRowsForCollege(ctx: CollegeContext): Promise<MasterR
             'done', count(*) FILTER (WHERE iv.status = 'completed'),
             -- The employer marked it missed: the student did not show (interviews/[id]/mark-missed; never the employer's own no-show).
             'missed', count(*) FILTER (WHERE iv.status = 'missed'),
+            -- Called off = the student cancelled; withdrawn = the employer (or anyone else) cancelled it.
+            'calledOff', count(*) FILTER (WHERE iv.status = 'cancelled' AND iv.cancelled_by = 'intern'),
+            'withdrawn', count(*) FILTER (WHERE iv.status = 'cancelled' AND iv.cancelled_by IS DISTINCT FROM 'intern'),
             -- Time passed on an invite the student never picked a slot for. A booked one (selected_slot set) the employer never
-            -- closed is not the student's refusal: it stays in the rest ("missed, called off or not closed").
-            'notAccepted', count(*) FILTER (WHERE iv.status IN ('declined', 'rejected') OR (iv.status = 'cancelled' AND iv.cancelled_by = 'intern') OR (${interviewExpiredSql('iv', nowIso)} AND iv.selected_slot IS NULL)),
+            -- closed is not the student's refusal: it stays in the rest ("not closed").
+            'notAccepted', count(*) FILTER (WHERE iv.status IN ('declined', 'rejected') OR (${interviewExpiredSql('iv', nowIso)} AND iv.selected_slot IS NULL)),
             'upcoming', count(*) FILTER (WHERE ${interviewUpcomingSql('iv', nowIso)}),
             'waiting', count(*) FILTER (WHERE ${interviewWaitingSql('iv', nowIso)}))
           FROM ${schema.interviews} iv WHERE iv.intern_id = u.id AND ${realEmployerId(sql`iv.employer_id`)}) AS meetings,

@@ -2,9 +2,9 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileUp, Search } from "lucide-react";
+import { Download, FileUp, Search } from "lucide-react";
 
-import { isStudentEligible } from "@/lib/college/eligibility";
+import { handPicksThatFit, isStudentEligible, normDegree } from "@/lib/college/eligibility";
 import { driveReach } from "@/lib/college/drive-reach";
 import { DriveReachView } from "./drive-reach-view";
 import { fromLocalInput } from "@/lib/college/ist";
@@ -13,7 +13,7 @@ import { COHORTS, yearLabel } from "@/lib/college/labels";
 import { csrfFetch } from "@/lib/client-fetch";
 import { inviteSentLine } from "@/lib/college/drive-invite-line";
 import type { Audience } from "@/lib/college/drive-input";
-import { MAX_IMPORT_BYTES, MAX_INVITES, inviteRowProblem, isBlankPhone, joinInvitePhone, mergeInvites, parseInviteSheet, splitInvitePhone, toApiRow, type InviteRow } from "@/lib/college/invite-import";
+import { INVITE_SAMPLE_CSV, MAX_IMPORT_BYTES, MAX_INVITES, inviteRowProblem, isBlankPhone, joinInvitePhone, mergeInvites, parseInviteSheet, splitInvitePhone, toApiRow, type InviteRow } from "@/lib/college/invite-import";
 import { DIAL_CODES } from "@/lib/data/dial-codes";
 import { decodeRosterBytes } from "@/lib/college/roster";
 import { cn } from "@/lib/utils";
@@ -39,7 +39,9 @@ export type DriveDraft = {
   minCgpa: string;
   minScore: string;
   years: number[];
+  /** Old drives only (Branch became Degree on 26 Nov); shown so the officer can clear it. */
   branches: string[];
+  degrees: string[];
   includeUserIds: string[];
   excludeUserIds: string[];
   /** Companies the officer invited: the drive page shows who came and who to chase. */
@@ -54,13 +56,24 @@ const AUDIENCE_OPTIONS: { value: Exclude<Audience, "any">; label: string }[] = [
   { value: "non_tech", label: "Non-tech" },
 ];
 
+/** The drive's filters as the server stores them. */
+function eligibilityOf(d: DriveDraft): Record<string, unknown> {
+  const eligibility: Record<string, unknown> = {};
+  if (d.minCgpa.trim() !== "" && Number.isFinite(Number(d.minCgpa))) eligibility.minCgpa = Number(d.minCgpa);
+  if (d.minScore.trim() !== "" && Number.isFinite(Number(d.minScore))) eligibility.minScore = Number(d.minScore);
+  if (d.years.length) eligibility.years = d.years;
+  if (d.branches.length) eligibility.branches = d.branches;
+  if (d.degrees.length) eligibility.degrees = d.degrees;
+  return eligibility;
+}
+
 const field =
   "h-11 w-full rounded-apple-sm border border-ink-200 bg-white px-3 text-sm text-ink-900 placeholder:text-text-subtle focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20";
 
 export function DriveBuilder({
   initial,
   students,
-  branches,
+  degrees,
   collegeId,
   collegeName,
   collegeLogoUrl,
@@ -69,7 +82,8 @@ export function DriveBuilder({
 }: {
   initial: DriveDraft;
   students: StudentRow[];
-  branches: string[];
+  /** The degrees on file across the college's students, for the Degree filter. */
+  degrees: string[];
   collegeId: string;
   collegeName: string;
   /** The college's logo (null: none yet). Leave it out to hide the logo block. */
@@ -93,18 +107,17 @@ export function DriveBuilder({
   const [audienceError, setAudienceError] = useState(false);
   const [rowErrors, setRowErrors] = useState(false);
   // A new drive shows every student unless the officer asks to narrow it; an existing drive opens with its rules visible.
-  const [limit, setLimit] = useState(Boolean(initial.id) || Boolean(initial.minCgpa || initial.minScore || initial.years.length || initial.branches.length || initial.includeUserIds.length || initial.excludeUserIds.length));
+  const [limit, setLimit] = useState(Boolean(initial.id) || Boolean(initial.minCgpa || initial.minScore || initial.years.length || initial.branches.length || initial.degrees.length || initial.includeUserIds.length || initial.excludeUserIds.length));
 
   const set = <K extends keyof DriveDraft>(k: K, v: DriveDraft[K]) => setD((x) => ({ ...x, [k]: v }));
+  // The filters win over hand-picks (26 Nov): a changed filter drops the hand-added students it no longer fits.
+  const setFilter = <K extends "minCgpa" | "minScore" | "years" | "branches" | "degrees">(k: K, v: DriveDraft[K]) =>
+    setD((x) => {
+      const next = { ...x, [k]: v };
+      return { ...next, includeUserIds: handPicksThatFit(students, { collegeId, kind: next.kind, eligibility: eligibilityOf(next), includeUserIds: next.includeUserIds, excludeUserIds: next.excludeUserIds }) };
+    });
 
-  const rules = useMemo(() => {
-    const eligibility: Record<string, unknown> = {};
-    if (d.minCgpa.trim() !== "" && Number.isFinite(Number(d.minCgpa))) eligibility.minCgpa = Number(d.minCgpa);
-    if (d.minScore.trim() !== "" && Number.isFinite(Number(d.minScore))) eligibility.minScore = Number(d.minScore);
-    if (d.years.length) eligibility.years = d.years;
-    if (d.branches.length) eligibility.branches = d.branches;
-    return { collegeId, kind: d.kind, eligibility, includeUserIds: d.includeUserIds, excludeUserIds: d.excludeUserIds };
-  }, [d, collegeId]);
+  const rules = useMemo(() => ({ collegeId, kind: d.kind, eligibility: eligibilityOf(d), includeUserIds: d.includeUserIds, excludeUserIds: d.excludeUserIds }), [d, collegeId]);
 
   const split = useMemo(() => {
     const inside: StudentRow[] = [];
@@ -119,10 +132,10 @@ export function DriveBuilder({
   );
 
   const list = (view === "in" ? split.inside : split.outside).filter((s) =>
-    `${s.name} ${s.rollNo ?? ""} ${s.branch ?? ""}`.toLowerCase().includes(q.trim().toLowerCase()),
+    `${s.name} ${s.rollNo ?? ""} ${s.degree ?? ""} ${s.branch ?? ""}`.toLowerCase().includes(q.trim().toLowerCase()),
   );
 
-  function toggle(userId: string, to: "include" | "exclude" | "rules") {
+  function toggle(userId: string, to: "include" | "exclude") {
     setD((x) => ({
       ...x,
       includeUserIds: to === "include" ? [...new Set([...x.includeUserIds, userId])] : x.includeUserIds.filter((i) => i !== userId),
@@ -281,12 +294,12 @@ export function DriveBuilder({
         <div className="grid gap-5 px-5 py-5 md:grid-cols-2">
           <label className="block">
             <span className="text-sm font-medium text-ink-800">Minimum CGPA</span>
-            <input inputMode="decimal" className={cn(field, "mt-1.5")} value={d.minCgpa} onChange={(e) => set("minCgpa", e.target.value)} placeholder="Any" />
+            <input inputMode="decimal" className={cn(field, "mt-1.5")} value={d.minCgpa} onChange={(e) => setFilter("minCgpa", e.target.value)} placeholder="Any" />
             <span className="mt-1 block text-xs text-text-subtle">Students who reported a percentage, not a CGPA, are left out unless you add them by hand.</span>
           </label>
           <label className="block">
             <span className="text-sm font-medium text-ink-800">Minimum Findtern score</span>
-            <input inputMode="decimal" className={cn(field, "mt-1.5")} value={d.minScore} onChange={(e) => set("minScore", e.target.value)} placeholder="Any" />
+            <input inputMode="decimal" className={cn(field, "mt-1.5")} value={d.minScore} onChange={(e) => setFilter("minScore", e.target.value)} placeholder="Any" />
             <span className="mt-1 block text-xs text-text-subtle">Out of 10, from the AI interview. No interview means no score.</span>
           </label>
 
@@ -300,7 +313,7 @@ export function DriveBuilder({
                     key={y}
                     type="button"
                     aria-pressed={on}
-                    onClick={() => set("years", on ? d.years.filter((v) => v !== y) : [...d.years, y].sort())}
+                    onClick={() => setFilter("years", on ? d.years.filter((v) => v !== y) : [...d.years, y].sort())}
                     className={cn("min-h-11 rounded-apple-sm border px-3.5 text-sm font-medium", on ? "border-brand-700 bg-brand-50 text-brand-800" : "border-ink-200 text-ink-700 hover:bg-ink-50")}
                   >
                     {yearLabel(y)}
@@ -311,24 +324,32 @@ export function DriveBuilder({
           </fieldset>
 
           <fieldset>
-            <legend className="text-sm font-medium text-ink-800">Branch</legend>
+            <legend className="text-sm font-medium text-ink-800">Degree</legend>
             <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {branches.length === 0 ? <span className="text-sm text-text-subtle">No branches recorded yet.</span> : null}
-              {branches.map((b) => {
-                const on = d.branches.some((x) => x.toLowerCase() === b.toLowerCase());
+              {degrees.length === 0 ? <span className="text-sm text-text-subtle">No degrees recorded yet.</span> : null}
+              {degrees.map((g) => {
+                const on = d.degrees.some((x) => normDegree(x) === normDegree(g));
                 return (
                   <button
-                    key={b}
+                    key={g}
                     type="button"
                     aria-pressed={on}
-                    onClick={() => set("branches", on ? d.branches.filter((x) => x.toLowerCase() !== b.toLowerCase()) : [...d.branches, b])}
+                    onClick={() => setFilter("degrees", on ? d.degrees.filter((x) => normDegree(x) !== normDegree(g)) : [...d.degrees, g])}
                     className={cn("min-h-11 rounded-apple-sm border px-3.5 text-sm font-medium", on ? "border-brand-700 bg-brand-50 text-brand-800" : "border-ink-200 text-ink-700 hover:bg-ink-50")}
                   >
-                    {b}
+                    {g}
                   </button>
                 );
               })}
             </div>
+            {d.branches.length ? (
+              <p className="mt-2 flex flex-wrap items-center gap-x-2 text-xs text-text-subtle">
+                Also limited to branches: {d.branches.join(", ")}
+                <button type="button" onClick={() => setFilter("branches", [])} className="min-h-9 rounded-sm font-medium text-brand-700 underline-offset-4 hover:underline">
+                  Clear
+                </button>
+              </p>
+            ) : null}
           </fieldset>
         </div>
 
@@ -369,18 +390,18 @@ export function DriveBuilder({
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-ink-900">{s.name}</p>
                     <p className="nums text-xs text-text-subtle">
-                      {[yearLabel(s.year), s.branch, s.cgpa !== null ? `CGPA ${cgpaText(s.cgpa)}` : "CGPA —", s.score !== null ? `Score ${s.score.toFixed(1)}` : "No score"].filter(Boolean).join(" · ")}
+                      {[yearLabel(s.year), s.degree, s.branch, s.cgpa !== null ? `CGPA ${cgpaText(s.cgpa)}` : "CGPA —", s.score !== null ? `Score ${s.score.toFixed(1)}` : "No score"].filter(Boolean).join(" · ")}
                       {included ? <span className="ml-1.5 font-medium text-brand-800">· added by you</span> : null}
                       {excluded ? <span className="ml-1.5 font-medium text-accent-700">· removed by you</span> : null}
                     </p>
                   </div>
                   {view === "in" ? (
-                    <button type="button" onClick={() => toggle(s.userId, included ? "rules" : "exclude")} className="min-h-11 rounded-apple-sm px-3 text-sm font-medium text-ink-700 hover:bg-ink-100">
-                      {included ? "Undo add" : "Remove"}
+                    <button type="button" onClick={() => toggle(s.userId, "exclude")} aria-label={`Remove ${s.name}`} className="min-h-11 rounded-apple-sm px-3 text-sm font-medium text-ink-700 hover:bg-ink-100">
+                      Remove
                     </button>
                   ) : (
-                    <button type="button" onClick={() => toggle(s.userId, excluded ? "rules" : "include")} className="min-h-11 rounded-apple-sm px-3 text-sm font-medium text-brand-700 hover:bg-brand-50">
-                      {excluded ? "Undo remove" : "Add anyway"}
+                    <button type="button" onClick={() => toggle(s.userId, "include")} aria-label={`Add ${s.name}`} className="min-h-11 rounded-apple-sm px-3 text-sm font-medium text-brand-700 hover:bg-brand-50">
+                      Add
                     </button>
                   )}
                 </li>
@@ -395,7 +416,7 @@ export function DriveBuilder({
             <span className="block text-[0.9375rem] font-semibold text-ink-900">
               <span className="nums">{split.inside.length}</span> of your <span className="nums">{students.length}</span> students match this drive
             </span>
-            Only your students, and only while the drive is open. You can limit it by CGPA, score, year or branch, or pick students by hand.
+            Only your students, and only while the drive is open. You can limit it by CGPA, score, year or degree, or pick students by hand.
           </p>
           <button type="button" onClick={() => setLimit(true)} className={buttonClass({ variant: "outline", size: "sm" })}>
             Choose who is shown
@@ -563,7 +584,7 @@ function InvitedEmployers({ value, onChange, showErrors }: { value: InvitedRow[]
         <p className="mt-0.5 text-sm text-text-subtle">Each new employer is emailed a link to join the drive, and gets an alert if it already has a Findtern account. The drive page shows who came in and who you still need to chase.</p>
       </header>
       <p role="note" className="border-b border-accent-300/60 bg-accent-100/60 px-5 py-3 text-sm text-accent-700">
-        Ask each employer which email they will log in or sign up with, and add only that one. If they join with a different email, they can still come in, but you won&apos;t get insights for them.
+        Sent on WhatsApp
       </p>
 
       <div className="space-y-3 px-5 py-4">
@@ -685,6 +706,14 @@ function InvitedEmployers({ value, onChange, showErrors }: { value: InvitedRow[]
               }}
             />
           </label>
+          <a
+            href={`data:text/csv;charset=utf-8,${encodeURIComponent(INVITE_SAMPLE_CSV)}`}
+            download="findtern-employers-sample.csv"
+            className={buttonClass({ variant: "ghost", size: "sm" })}
+          >
+            <Download className="size-4" aria-hidden />
+            Sample file
+          </a>
           <span className="text-xs text-text-subtle">CSV with the columns Name, Company name, Email, Phone.</span>
         </div>
         <div role="status" aria-live="polite">

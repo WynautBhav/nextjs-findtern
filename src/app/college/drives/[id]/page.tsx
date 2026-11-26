@@ -18,6 +18,7 @@ import { LinkActions } from "@/components/college/link-actions";
 import { PresenceLive } from "@/components/college/presence-live";
 import { ButtonLink } from "@/components/ui/button";
 import { driveWindow, readEligibility } from "@/lib/college/access";
+import { degreeOptions, normDegree } from "@/lib/college/eligibility";
 import { closedDriveFinding } from "@/lib/college/drive-board";
 import { loadDriveBoard } from "@/lib/college/drive-board-db";
 import { loadDriveEmployers } from "@/lib/college/drive-employers-db";
@@ -91,8 +92,8 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
 
   // Last seen is activity: not shown for a student who is not verified yet.
   const rows = students.map(toStudentRow).map((r) => (r.status === "verified" ? r : { ...r, lastSeenAt: null }));
-  const branches = [...new Set(rows.map((s) => s.branch).filter((b): b is string => Boolean(b)))].sort();
   const e = readEligibility(drive.eligibility);
+  const degrees = degreeOptions(rows);
   // Offers by branch and year: counts only, so they stay on a past drive too (a finished drive is read-only).
   const offeredIds = new Set(board.lists.offers.map((s) => s.userId));
   const hiredIds = new Set(board.lists.hired.map((s) => s.userId));
@@ -129,6 +130,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
       now={now}
       arrivals={came.map((c) => ({ id: c.employerId, company: c.company ?? "Employer", at: c.joinedAt }))}
       missing={open ? missing.map((m) => m.company) : []}
+      clickable={!open}
     />
   );
 
@@ -304,7 +306,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
               collegeName={ctx.college.name}
               collegeLogoUrl={ctx.college.logoUrl}
               students={rows}
-              branches={branches}
+              degrees={degrees}
               live={w === "live"}
               initial={{
                 id: drive.id,
@@ -317,6 +319,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
                 minScore: e.minScore?.toString() ?? "",
                 years: e.years ?? [],
                 branches: e.branches ?? [],
+                degrees: (e.degrees ?? []).map((g) => degrees.find((o) => normDegree(o) === g) ?? g),
                 includeUserIds: drive.includeUserIds,
                 excludeUserIds: drive.excludeUserIds,
                 audience: drive.audience === "tech" || drive.audience === "non_tech" ? drive.audience : "any",

@@ -3,7 +3,7 @@ import { test } from "node:test";
 
 import { driveInput } from "./drive-input.ts";
 import { prepareInvited, withUnsent } from "./drive-invite.ts";
-import { MAX_INVITES, inviteRowProblem, invitePhone, joinInvitePhone, mergeInvites, parseInviteSheet, splitInvitePhone, toApiRow } from "./invite-import.ts";
+import { INVITE_SAMPLE_CSV, MAX_INVITES, inviteRowProblem, invitePhone, joinInvitePhone, mergeInvites, parseInviteSheet, splitInvitePhone, toApiRow } from "./invite-import.ts";
 
 const row = (o: Partial<{ name: string; company: string; email: string; phone: string }> = {}) => ({ name: "", company: "Acme", email: "hr@acme.com", phone: "", ...o });
 
@@ -160,4 +160,12 @@ test("splitInvitePhone: the builder's code + number pair, defaulting to +91", ()
   assert.deepEqual(invitePhone("+44 "), { phone: null, error: null });
   assert.equal(inviteRowProblem(row({ phone: "+44 " })), null);
   assert.equal(inviteRowProblem({ name: "", company: "", email: "", phone: "+44 " }), null);
+});
+
+test("the sample file (26 Nov) imports cleanly: two employers, no skipped rows", () => {
+  const { rows, errors } = parseInviteSheet(INVITE_SAMPLE_CSV);
+  assert.deepEqual(errors, []);
+  assert.equal(rows.length, 2);
+  assert.equal(rows[0].company, "Acme Analytics");
+  assert.equal(rows.every((r) => inviteRowProblem(r) === null), true);
 });

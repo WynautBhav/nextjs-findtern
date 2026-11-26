@@ -12,7 +12,6 @@ export const n = (v: number) => v.toLocaleString("en-IN");
 export const pct = (a: number, b: number) => (b ? Math.round((a / b) * 100) : 0);
 
 export const GOLD = "var(--color-accent-400)";
-export const GOLD_SOFT = "var(--color-accent-300)";
 export const white = (a: number) => `rgb(255 255 255 / ${a})`;
 
 /** Findtern bands: Espresso the quietest, Latte gold. */
@@ -52,17 +51,6 @@ export function Legend({ items, className }: { items: { label: string; fill: str
         );
       })}
     </ul>
-  );
-}
-
-/** A figure on the field: quiet label over a light number, an optional note under it. */
-export function Figure({ label, value, note, gold = false, size = "md" }: { label: string; value: React.ReactNode; note?: React.ReactNode; gold?: boolean; size?: "md" | "lg" }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-[13px] text-on-dark">{label}</p>
-      <p className={cn("nums mt-1 font-light leading-none tracking-[-0.03em]", size === "lg" ? "text-[2.5rem]" : "text-[1.75rem]", gold ? "text-accent-300" : "text-white")}>{value}</p>
-      {note ? <p className="nums mt-1.5 text-xs text-on-dark">{note}</p> : null}
-    </div>
   );
 }
 

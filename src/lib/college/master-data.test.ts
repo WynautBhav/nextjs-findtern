@@ -19,7 +19,7 @@ const extras = (over: Partial<MasterExtras> = {}): MasterExtras => ({
     aadhaarNumber: "1234 5678 9012", panNumber: "ABCDE1234F", bank: { accountNumber: "000111" },
   },
   skills: ["Excel", "Sales"], locationTypes: ["Hybrid", "remote", "space"], preferredLocations: ["Jaipur", "Delhi"],
-  hasLaptop: true, city: "Jaipur", state: "Rajasthan", experience: [{}], offers: 0, offersAccepted: 0, offersRejected: 0, offersLapsed: 0, offersOpen: 0, hired: 0, ppo: 0, earningsMinor: 0, meetings: { total: 0, done: 0, missed: 0, notAccepted: 0, upcoming: 0, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 }, ...over,
+  hasLaptop: true, city: "Jaipur", state: "Rajasthan", experience: [{}], offers: 0, offersAccepted: 0, offersRejected: 0, offersLapsed: 0, offersOpen: 0, hired: 0, ppo: 0, earningsMinor: 0, meetings: { total: 0, done: 0, missed: 0, calledOff: 0, withdrawn: 0, notAccepted: 0, upcoming: 0, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 }, ...over,
 });
 
 test("a verified student carries every field on the master data list", () => {
@@ -44,7 +44,7 @@ test("a verified student carries every field on the master data list", () => {
 });
 
 test("an unverified student shows only name, email, year, course and branch", () => {
-  const r = buildMasterRow(student({ status: "claimed", phone: null, linkedin: null, cgpa: null, score: null }), extras({ offers: 3, hired: 1, ppo: 1, earningsMinor: 50000, meetings: { total: 4, done: 2, missed: 0, notAccepted: 1, upcoming: 1, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 } }));
+  const r = buildMasterRow(student({ status: "claimed", phone: null, linkedin: null, cgpa: null, score: null }), extras({ offers: 3, hired: 1, ppo: 1, earningsMinor: 50000, meetings: { total: 4, done: 2, missed: 0, calledOff: 0, withdrawn: 0, notAccepted: 1, upcoming: 1, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 } }));
   assert.equal(r.verified, false);
   assert.equal(r.meetings.total, 0);
   for (const k of ["phone", "emergencyContact", "cgpa", "score", "english", "city", "laptop", "lastSeenAt", "professionalCourse"] as const) {
@@ -106,7 +106,7 @@ test("open to work: the student's own switch, shown only once the officer accept
 });
 
 test("meetings missed and offer replies show per student, deadline missed apart from rejected", () => {
-  const r = buildMasterRow(student(), extras({ offers: 5, offersAccepted: 1, offersRejected: 1, offersLapsed: 2, offersOpen: 1, meetings: { total: 3, done: 1, missed: 2, notAccepted: 0, upcoming: 0, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 } }));
+  const r = buildMasterRow(student(), extras({ offers: 5, offersAccepted: 1, offersRejected: 1, offersLapsed: 2, offersOpen: 1, meetings: { total: 3, done: 1, missed: 2, calledOff: 0, withdrawn: 0, notAccepted: 0, upcoming: 0, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 } }));
   assert.equal(cellText(r, "meetingsMissed"), "2");
   assert.equal(cellText(r, "offerReplies"), "1 accepted · 1 rejected · 2 deadline missed · 1 waiting");
   assert.equal(cellText(buildMasterRow(student(), extras()), "offerReplies"), "");
@@ -114,7 +114,7 @@ test("meetings missed and offer replies show per student, deadline missed apart 
 });
 
 test("every student in a drive call is reachable by one drive-call filter, and a booked meeting nobody closed is not 'didn't accept'", () => {
-  const m = (over: Partial<MasterExtras["meetings"]>) => buildMasterRow(student(), extras({ meetings: { total: 0, done: 0, missed: 0, notAccepted: 0, upcoming: 0, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0, ...over } }));
+  const m = (over: Partial<MasterExtras["meetings"]>) => buildMasterRow(student(), extras({ meetings: { total: 0, done: 0, missed: 0, calledOff: 0, withdrawn: 0, notAccepted: 0, upcoming: 0, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0, ...over } }));
   for (const [over, key] of [[{ callsAccepted: 1 }, "call-took"], [{ callsWaiting: 1 }, "call-waiting"], [{ callsNotTaken: 1 }, "call-not-taken"]] as const) {
     assert.equal(matchesOutcome(m(over), key), true, key);
     assert.equal(cellText(m(over), "driveCalls") !== "", true);
@@ -122,6 +122,15 @@ test("every student in a drive call is reachable by one drive-call filter, and a
   // Booked for a past slot and never closed: total 1, no bucket, so it lands in "missed, called off or not closed".
   assert.equal(matchesOutcome(m({ total: 1 }), "meet-other"), true);
   assert.equal(matchesOutcome(m({ total: 1 }), "not-accepted"), false);
+});
+
+test("missed, called off and withdrawn meetings each have their own filter and are not 'not closed' (26 Nov)", () => {
+  const m = (over: Partial<MasterExtras["meetings"]>) => buildMasterRow(student(), extras({ meetings: { total: 0, done: 0, missed: 0, calledOff: 0, withdrawn: 0, notAccepted: 0, upcoming: 0, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0, ...over } }));
+  for (const [over, key] of [[{ total: 1, missed: 1 }, "meet-missed"], [{ total: 1, calledOff: 1 }, "meet-called-off"], [{ total: 1, withdrawn: 1 }, "meet-withdrawn"]] as const) {
+    assert.equal(matchesOutcome(m(over), key), true, key);
+    assert.equal(matchesOutcome(m(over), "meet-other"), false, `${key} is not 'not closed'`);
+    assert.equal(matchesOutcome(m(over), "not-accepted"), false, `${key} is not 'not accepted'`);
+  }
 });
 
 // SYNC-01 / SYNC-02 (data-sync audit): what the student typed must reach the TPO's list.

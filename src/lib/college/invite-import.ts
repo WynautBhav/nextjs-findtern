@@ -170,3 +170,6 @@ export function mergeInvites(current: InviteRow[], incoming: InviteRow[]): { row
   }
   return { rows, added, duplicates, overflow };
 }
+
+/** The sample file offered next to "Import file" (26 Nov): the columns the importer reads, with two made-up employers. */
+export const INVITE_SAMPLE_CSV = "Name,Company name,Email,Phone\r\nPriya Sharma,Acme Analytics,priya@acme.example.com,+91 9811122334\r\nRahul Verma,Northwind Labs,hr@northwind.example.com,9822233445\r\n";

@@ -10,6 +10,7 @@ export type StudentRow = {
   status: "claimed" | "verified";
   year: number | null;
   branch: string | null;
+  degree?: string | null;
   cgpa: number | null;
   semester?: number | null;
   score: number | null;

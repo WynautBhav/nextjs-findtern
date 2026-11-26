@@ -57,7 +57,7 @@ export function DrivePipeline({ driveId, stages, open }: { driveId: string; stag
  * Employer arrivals: the drive's window as a line, each company that came as a dot at the moment it opened the
  * link, "now" marked, and the invited companies still missing as hollow dots after the line.
  */
-export function EmployerArrivals({ start, end, now, arrivals, missing }: { start: Date; end: Date; now: number; arrivals: { id: string; company: string; at: Date }[]; missing: string[] }) {
+export function EmployerArrivals({ start, end, now, arrivals, missing, clickable = false }: { start: Date; end: Date; now: number; arrivals: { id: string; company: string; at: Date }[]; missing: string[]; /** Names and dots become buttons carrying data-company; the parent opens that company. */ clickable?: boolean }) {
   const span = Math.max(1, end.getTime() - start.getTime());
   const at = (d: Date | number) => Math.min(100, Math.max(0, ((typeof d === "number" ? d : d.getTime()) - start.getTime()) / span * 100));
   const nowAt = at(now);
@@ -85,14 +85,27 @@ export function EmployerArrivals({ start, end, now, arrivals, missing }: { start
               <span className="absolute -top-1 left-1.5 text-[11px] font-medium text-accent-300">now</span>
             </span>
           ) : null}
-          {placed.map((p) => (
-            <span
-              key={p.id}
-              title={`${p.company} · ${time(p.at)}`}
-              className="absolute size-3 -translate-x-1/2 rounded-full bg-white ring-[3px] ring-brand-900"
-              style={{ left: `${p.x}%`, bottom: `${6 + p.row * 13}px` }}
-            />
-          ))}
+          {placed.map((p) =>
+            clickable ? (
+              <button
+                key={p.id}
+                type="button"
+                data-company={p.id}
+                aria-haspopup="dialog"
+                aria-label={`${p.company}, came ${time(p.at)}`}
+                title={`${p.company} · ${time(p.at)}`}
+                className="absolute size-3 -translate-x-1/2 rounded-full bg-white ring-[3px] ring-brand-900 outline-none before:absolute before:-inset-2 before:content-[''] hover:ring-accent-400 focus-visible:ring-white/80"
+                style={{ left: `${p.x}%`, bottom: `${6 + p.row * 13}px` }}
+              />
+            ) : (
+              <span
+                key={p.id}
+                title={`${p.company} · ${time(p.at)}`}
+                className="absolute size-3 -translate-x-1/2 rounded-full bg-white ring-[3px] ring-brand-900"
+                style={{ left: `${p.x}%`, bottom: `${6 + p.row * 13}px` }}
+              />
+            ),
+          )}
         </div>
         {missing.length ? (
           <span className="flex shrink-0 items-center gap-1 pb-1.5" aria-hidden>
@@ -109,9 +122,18 @@ export function EmployerArrivals({ start, end, now, arrivals, missing }: { start
       {arrivals.length ? (
         <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/85">
           {[...arrivals].sort((p, q) => p.at.getTime() - q.at.getTime()).slice(0, 6).map((a) => (
-            <li key={a.id} className="flex items-center gap-1.5">
-              <span aria-hidden className="size-1.5 rounded-full bg-white" />
-              {a.company} <span className="nums text-on-dark">{time(a.at)}</span>
+            <li key={a.id}>
+              {clickable ? (
+                <button type="button" data-company={a.id} aria-haspopup="dialog" className="flex min-h-9 items-center gap-1.5 rounded-sm underline-offset-4 outline-none hover:text-white hover:underline focus-visible:ring-2 focus-visible:ring-white/80">
+                  <span aria-hidden className="size-1.5 rounded-full bg-white" />
+                  {a.company} <span className="nums text-on-dark">{time(a.at)}</span>
+                </button>
+              ) : (
+                <span className="flex items-center gap-1.5">
+                  <span aria-hidden className="size-1.5 rounded-full bg-white" />
+                  {a.company} <span className="nums text-on-dark">{time(a.at)}</span>
+                </span>
+              )}
             </li>
           ))}
           {arrivals.length > 6 ? <li className="text-on-dark">+{arrivals.length - 6} more below</li> : null}

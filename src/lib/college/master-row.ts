@@ -64,19 +64,19 @@ export type MasterRow = {
 };
 
 /**
- * A student's employer meetings: done = completed; notAccepted = the invite lapsed with no slot picked, the student
- * cancelled it, or a legacy declined/rejected; upcoming = booked (scheduled); waiting = times offered, no answer yet
- * (pending). The rest of the total was missed, called off by the employer, or booked and never closed after its time.
+ * A student's employer meetings: done = completed; notAccepted = the invite lapsed with no slot picked, or a legacy
+ * declined/rejected; missed = the student didn't show; calledOff = the student cancelled; withdrawn = the employer cancelled;
+ * upcoming = booked (scheduled); waiting = times offered, no answer yet (pending). The rest: booked, never closed after its time.
  */
 export type Meetings = {
-  total: number; done: number; missed: number; notAccepted: number; upcoming: number; waiting: number;
+  total: number; done: number; missed: number; calledOff: number; withdrawn: number; notAccepted: number; upcoming: number; waiting: number;
   /** Live calls inside a campus drive (not part of `total`): accepted (held), not taken (declined or lapsed), waiting. */
   callsAccepted: number; callsNotTaken: number; callsWaiting: number;
 };
-export const NO_MEETINGS: Meetings = { total: 0, done: 0, missed: 0, notAccepted: 0, upcoming: 0, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 };
+export const NO_MEETINGS: Meetings = { total: 0, done: 0, missed: 0, calledOff: 0, withdrawn: 0, notAccepted: 0, upcoming: 0, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 };
 
 /** Drill-down groups from the Placement analysis: the students behind each block. "" = everyone. */
-export type Outcome = "" | "no-offer" | "accepted" | "open" | "rejected" | "withdrawn" | "met" | "meet-upcoming" | "meet-waiting" | "not-accepted" | "meet-other" | "call-took" | "call-waiting" | "call-not-taken";
+export type Outcome = "" | "no-offer" | "accepted" | "open" | "rejected" | "withdrawn" | "met" | "meet-upcoming" | "meet-waiting" | "not-accepted" | "meet-missed" | "meet-called-off" | "meet-withdrawn" | "meet-other" | "call-took" | "call-waiting" | "call-not-taken";
 export const OUTCOMES: { key: Exclude<Outcome, "">; label: string }[] = [
   { key: "no-offer", label: "Interviewed, no offer" },
   { key: "accepted", label: "Accepted an offer" },
@@ -87,13 +87,16 @@ export const OUTCOMES: { key: Exclude<Outcome, "">; label: string }[] = [
   { key: "meet-upcoming", label: "Meeting booked" },
   { key: "meet-waiting", label: "Meeting not answered yet" },
   { key: "not-accepted", label: "Didn't accept a meeting" },
-  { key: "meet-other", label: "Meeting missed, called off or not closed" },
+  { key: "meet-missed", label: "Missed a meeting" },
+  { key: "meet-called-off", label: "Called off a meeting" },
+  { key: "meet-withdrawn", label: "Meeting withdrawn by the employer" },
+  { key: "meet-other", label: "Meeting booked, not closed" },
   { key: "call-took", label: "Drive meets: accepted" },
   { key: "call-waiting", label: "Drive meets: not answered" },
   { key: "call-not-taken", label: "Drive meets: declined or lapsed" },
 ];
 const withdrawnOf = (r: MasterRow) => r.offers - r.offersAccepted - r.offersRejected - r.offersLapsed - r.offersOpen;
-const meetOtherOf = (m: Meetings) => m.total - m.done - m.notAccepted - m.upcoming - m.waiting;
+const meetOtherOf = (m: Meetings) => m.total - m.done - m.notAccepted - m.upcoming - m.waiting - m.missed - m.calledOff - m.withdrawn;
 
 export function matchesOutcome(r: MasterRow, o: Outcome): boolean {
   switch (o) {
@@ -107,6 +110,9 @@ export function matchesOutcome(r: MasterRow, o: Outcome): boolean {
     case "meet-upcoming": return r.meetings.upcoming > 0;
     case "meet-waiting": return r.meetings.waiting > 0;
     case "not-accepted": return r.meetings.notAccepted > 0;
+    case "meet-missed": return r.meetings.missed > 0;
+    case "meet-called-off": return r.meetings.calledOff > 0;
+    case "meet-withdrawn": return r.meetings.withdrawn > 0;
     case "meet-other": return meetOtherOf(r.meetings) > 0;
     case "call-took": return r.meetings.callsAccepted > 0;
     case "call-waiting": return r.meetings.callsWaiting > 0;
