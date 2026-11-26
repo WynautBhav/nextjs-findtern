@@ -281,6 +281,7 @@ export function PastDriveCard({
                           {id ? (
                             <button type="button" aria-haspopup="dialog" onClick={() => open({ kind: "company", id })} className={cn("-mx-2 flex min-h-11 w-[calc(100%+1rem)] items-center rounded-md px-2 text-left font-medium text-white hover:bg-white/10", focusRing)}>
                               <span className="truncate">{r.company}</span>
+                              {r.status.kind === "withdrawn" ? <span className="ml-2 shrink-0 text-xs font-normal text-accent-300">Withdrawn</span> : null}
                             </button>
                           ) : (
                             <span className="flex min-h-11 items-center gap-2">
