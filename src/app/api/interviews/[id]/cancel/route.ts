@@ -16,8 +16,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const locked = await internLockResponse(guard.session);
     if (locked) return locked;
   }
-  const parsed = cancelBody.safeParse(await req.json().catch(() => null));
-  if (!parsed.success) return NextResponse.json({ error: "Say why you are cancelling (a few words).", code: "reason_required" }, { status: 400 });
+  // The reason is optional (bug sheet 25 Nov): an empty body cancels without one; only an oversized one is refused here.
+  const parsed = cancelBody.safeParse(await req.json().catch(() => ({})));
+  if (!parsed.success) return NextResponse.json({ error: "Keep the reason under 300 characters.", code: "reason_invalid" }, { status: 400 });
   // An employer on a taken-down listing may only view it; the intern side is never blocked from cancelling.
   if (role === "employer") {
     const td = await assertInterviewActionable(id, guard.session.uid);

@@ -92,10 +92,12 @@ export function Results({
   data,
   filters,
   compareIds,
+  fullTimeTrack = false,
 }: {
   data: CandidatesData;
   filters: Filters;
   compareIds: string[];
+  fullTimeTrack?: boolean;
 }) {
   const { candidates, total, pages, loadFailed } = data;
   const compareFull = compareIds.length >= MAX_COMPARE;
@@ -183,6 +185,7 @@ export function Results({
                   pendingMeetingAt={rel?.pendingMeetingAt ?? null}
                   meetingOpen={rel?.meetingOpen ?? false}
                   layout={filters.view}
+                  fullTimeTrack={fullTimeTrack}
                 />
               );
             })}

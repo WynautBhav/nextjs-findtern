@@ -35,6 +35,8 @@ type RailProps = {
   compareBlocked: string | null;
   shortlist: { projectId: string; on: boolean } | null;
   driveFullTime?: { driveId: string; projects: { id: string; name: string }[] } | null;
+  /** Opened from a campus drive's Full-time tab: the full-time offer is the main action; "open" opens its form on arrival. */
+  fullTimeFirst?: "show" | "open" | null;
 };
 
 /** The control for the one thing to do next: white on the green rail, brand green on the bar. */
@@ -72,6 +74,9 @@ function MainControl({ main, sendHref, className, onDark = false }: { main: NonN
 export function HireRail(props: RailProps) {
   const { employerId, employerFte, employerZone, internId, displayName, scored, plan, pricing, currency, action, sendHref, relation, appliedProjects, comparePicks, compareBlocked, shortlist } = props;
   const main = mainAction(action, relation);
+  // Bug sheet 25 Nov: from the drive's Full-time tab the green rail's button is the full-time offer, at every width (the
+  // floating bar stands down, so the form never opens twice), and the internship proposal moves below as a quiet link.
+  const ftMain = Boolean(props.fullTimeFirst && props.driveFullTime && !relation?.fullTimeFrom && main?.kind === "send");
   const showShortlist = Boolean(shortlist && action.kind === "send");
   // Book meeting is always offered, so the lower block always renders.
   const hasLower = true;
@@ -90,7 +95,22 @@ export function HireRail(props: RailProps) {
               plus <s className="text-on-dark-subtle/80">{formatMoney(pricing.perHireListMinor, currency)}</s> <span className="font-semibold text-data-on-dark">(FREE)</span> one-time hiring charge
             </p>
           )}
-          {main ? (
+          {ftMain && props.driveFullTime ? (
+            <>
+              <FullTimeOfferButton
+                employerId={employerId}
+                candidate={displayName}
+                fteStatus={employerFte}
+                timezone={employerZone}
+                drive={{ driveId: props.driveFullTime.driveId, internId, projects: props.driveFullTime.projects }}
+                variant="white"
+                label="Send full-time offer"
+                defaultOpen={props.fullTimeFirst === "open"}
+                className="mt-5 w-full"
+              />
+              <p className="mt-2 text-sm text-on-dark-subtle">From the campus drive: 1% of the annual CTC.</p>
+            </>
+          ) : main ? (
             main.kind === "reason" ? (
               <p className="mt-5 rounded-apple-sm bg-white/10 px-4 py-2.5 text-sm text-white">{main.text}</p>
             ) : (
@@ -102,7 +122,12 @@ export function HireRail(props: RailProps) {
         {hasLower ? (
           <div className="space-y-4 bg-white p-6">
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-1 [&>*:only-child]:col-span-full [&_button]:w-full [&_button]:justify-center">
-              {props.driveFullTime && !relation?.fullTimeFrom ? (
+              {ftMain ? (
+                <ButtonLink href={sendHref} variant="outline" size="sm" className="min-h-11 w-full justify-center">
+                  <Send className="size-4" aria-hidden />
+                  Internship proposal instead
+                </ButtonLink>
+              ) : props.driveFullTime && !relation?.fullTimeFrom ? (
                 <FullTimeOfferButton employerId={employerId} candidate={displayName} fteStatus={employerFte} timezone={employerZone} drive={{ driveId: props.driveFullTime.driveId, internId, projects: props.driveFullTime.projects }} />
               ) : null}
               {relation?.fullTimeFrom ? (
@@ -150,8 +175,9 @@ export function HireRail(props: RailProps) {
  * and the phone tab bar, as the project form's bar does; on a desktop-width
  * shell it is inset past the sidebar.
  */
-export function HireBar({ pricing, currency, action, relation, sendHref }: Pick<RailProps, "pricing" | "currency" | "action" | "relation" | "sendHref">) {
+export function HireBar({ pricing, currency, action, relation, sendHref, hidden = false }: Pick<RailProps, "pricing" | "currency" | "action" | "relation" | "sendHref"> & { hidden?: boolean }) {
   const main = mainAction(action, relation);
+  if (hidden) return null;
   // A reason is a sentence for the rail, not an action to float.
   if (!main || main.kind === "reason") return null;
   return (

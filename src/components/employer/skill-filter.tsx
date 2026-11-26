@@ -164,6 +164,7 @@ export function SkillFilter({
         <button
           type="button"
           aria-disabled={savePlan.state !== "ready" || projectSkills$.saving || undefined}
+          aria-describedby={liveNote ? `${listId}-save-note` : undefined}
           onClick={() => {
             if (savePlan.state === "ready" && !projectSkills$.saving) void projectSkills$.saveSkills(active);
           }}
@@ -177,7 +178,7 @@ export function SkillFilter({
       ) : null}
 
       {/* Always mounted so the screen reader hears the note appear; empty it takes no room. */}
-      <p aria-live="polite" className={liveNote ? "inline-flex min-h-9 items-center text-[13px] text-ink-700 touch:min-h-11" : "sr-only"}>
+      <p id={`${listId}-save-note`} aria-live="polite" className={liveNote ? "inline-flex min-h-9 items-center text-[13px] text-ink-700 touch:min-h-11" : "sr-only"}>
         {liveNote}
       </p>
 

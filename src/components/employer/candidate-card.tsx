@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { useProgressRouter } from "@/components/layout/navigation-progress";
-import { Check, Clock, MapPin, Send, Sparkles, Star } from "lucide-react";
+import { BriefcaseBusiness, Check, Clock, MapPin, Send, Sparkles, Star } from "lucide-react";
 
 import { formatMoney } from "@/lib/format";
 import { HOURS_PER_MONTH } from "@/lib/plan-offer";
@@ -58,6 +58,8 @@ export interface CandidateCardProps {
   meetingOpen?: boolean;
   /** "list" (default): the full-width card. "grid": the compact one, two across, three on wide screens. "rows": one dense line, same actions. */
   layout?: ListView;
+  /** A campus drive's Full-time tab (final-year students only): the card's action is the full-time offer, not an internship proposal. */
+  fullTimeTrack?: boolean;
 }
 
 /**
@@ -211,6 +213,7 @@ export function CandidateCard({
   pendingMeetingAt = null,
   meetingOpen = false,
   layout = "list",
+  fullTimeTrack = false,
 }: CandidateCardProps) {
   const pricing = resolved ?? resolvePricing(candidate.score, [], currency, region, PER_HIRE_FEE_DEFAULT);
   const displayName = displayNameOf(candidate, nameUnlocked);
@@ -218,7 +221,12 @@ export function CandidateCard({
   // The headline is the degree and field (else the top two skills). The skills are listed once, in full, in the
   // "Skills" block below: they used to lead the headline and then drop out of the chips, so only four showed.
   const headline = headlineOf(candidate);
-  const profileHref = `/employer/intern/${encodeURIComponent(candidate.id)}${projectId ? `?project=${encodeURIComponent(projectId)}` : ""}`;
+  const profileQs = new URLSearchParams();
+  if (projectId) profileQs.set("project", projectId);
+  if (fullTimeTrack) profileQs.set("track", "full_time");
+  const profileHref = `/employer/intern/${encodeURIComponent(candidate.id)}${profileQs.size ? `?${profileQs}` : ""}`;
+  // Bug sheet 25 Nov ("how can I send a full-time proposal"): the Full-time tab's card opens the profile with the full-time offer form open.
+  const fullTimeHref = `/employer/intern/${encodeURIComponent(candidate.id)}?${new URLSearchParams([...profileQs, ["offer", "full_time"]])}`;
   const sendHref = `/employer/send-proposal?intern=${encodeURIComponent(candidate.id)}${projectId ? `&project=${encodeURIComponent(projectId)}` : ""}`;
   const place = candidate.city || candidate.location || "City not stated";
   const modes = candidate.workModes.join(" / ");
@@ -237,6 +245,11 @@ export function CandidateCard({
       className="relative z-10 max-w-60 text-right max-sm:max-w-none max-sm:flex-1 max-sm:items-stretch"
       controlClassName="justify-center rounded-xl border border-ink-200 sm:h-10 sm:touch:h-11"
     />
+  ) : fullTimeTrack ? (
+    <ButtonLink href={fullTimeHref} variant="primary" size="sm" className="relative z-10 h-11 rounded-xl px-4 sm:h-10 sm:touch:h-11">
+      <BriefcaseBusiness className="size-4" aria-hidden />
+      Send full-time offer
+    </ButtonLink>
   ) : (
     <ButtonLink href={sendHref} variant="primary" size="sm" className="relative z-10 h-11 rounded-xl px-4 sm:h-10 sm:touch:h-11">
       <Send className="size-4" aria-hidden />

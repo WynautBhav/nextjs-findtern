@@ -59,6 +59,8 @@ export type ProfileViewProps = {
   shortlist: { projectId: string; on: boolean } | null;
   /** Campus drive Full-time track: offer a full-time role at the drive's 1% fee. */
   driveFullTime?: { driveId: string; projects: { id: string; name: string }[] } | null;
+  /** From the drive's Full-time tab: the full-time offer leads ("open": its form opens on arrival). */
+  fullTimeFirst?: "show" | "open" | null;
   wanted: { project: string; skills: string[]; cities: string[] } | null;
   matchCount: number;
   workPreferences: ReturnType<typeof workPreferenceRows>;
@@ -122,7 +124,7 @@ export function ProfileView(props: ProfileViewProps) {
         </div>
 
         {/* Fixed, so out of the grid; placed here so a keyboard reaches the main action before the evidence. */}
-        <HireBar pricing={pricing} currency={currency} action={action} relation={relation} sendHref={sendHref} />
+        <HireBar pricing={pricing} currency={currency} action={action} relation={relation} sendHref={sendHref} hidden={Boolean(props.fullTimeFirst && props.driveFullTime)} />
 
         <HireRail
           employerId={employerId}
@@ -142,6 +144,7 @@ export function ProfileView(props: ProfileViewProps) {
           compareBlocked={compareBlocked}
           shortlist={shortlist}
           driveFullTime={props.driveFullTime ?? null}
+          fullTimeFirst={props.fullTimeFirst ?? null}
         />
 
         <div className="min-w-0 space-y-8 xl:col-start-1">

@@ -53,10 +53,10 @@ export default async function EmployerInternDetail({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ project?: string }>;
+  searchParams: Promise<{ project?: string; track?: string; offer?: string }>;
 }) {
   const { id } = await params;
-  const { project: requestedProject } = await searchParams;
+  const { project: requestedProject, track, offer } = await searchParams;
   const session = await requireRole("employer");
   const employerId = session.uid;
 
@@ -351,6 +351,8 @@ export default async function EmployerInternDetail({
       compareBlocked={compareBlocked}
       shortlist={shortlist}
       driveFullTime={driveFullTime}
+      // Opened from a drive's Full-time tab: the full-time offer is the main action (and opens at once from the card's button).
+      fullTimeFirst={driveFullTime && (track === "full_time" || offer === "full_time") ? (offer === "full_time" ? "open" : "show") : null}
       wanted={wanted}
       matchCount={matchCount}
       workPreferences={workPreferences}

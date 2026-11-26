@@ -34,7 +34,7 @@ test("bad rows are skipped with their line number; a bad phone only loses the ph
   const { rows, errors } = parseInviteSheet(csv);
   assert.deepEqual(rows.map((r) => [r.company, r.phone]), [["Acme", ""], ["Eps", "9811122334"]]);
   assert.equal(errors.length, 4);
-  assert.match(errors[0], /^Row 2: .*not a valid 10-digit mobile/);
+  assert.match(errors[0], /^Row 2: .*not a valid phone number/);
   assert.match(errors[1], /^Row 3: no company name; skipped/);
   assert.match(errors[2], /^Row 4: "not-an-email" is not an email address; skipped/);
   assert.match(errors[3], /^Row 5: a@acme.com appears twice/);
@@ -135,6 +135,7 @@ test("invitePhone: a non-Indian number with its country code is kept as '+CC dig
   assert.deepEqual(invitePhone("+44 7700 900123"), { phone: "+44 7700900123", error: null });
   assert.deepEqual(invitePhone("+1 (415) 555-0134"), { phone: "+1 4155550134", error: null });
   assert.deepEqual(invitePhone("+971501234567"), { phone: "+971 501234567", error: null });
+  assert.deepEqual(invitePhone("+44 07700 900123"), { phone: "+44 7700900123", error: null });
   assert.deepEqual(invitePhone("+91 98111 22334"), { phone: "9811122334", error: null });
   assert.deepEqual(invitePhone("98111 22334"), { phone: "9811122334", error: null });
   assert.equal(invitePhone("+44 12").error, "Phone number must be 6 to 15 digits");
@@ -146,6 +147,10 @@ test("splitInvitePhone: the builder's code + number pair, defaulting to +91", ()
   assert.deepEqual(splitInvitePhone(""), { code: "+91", number: "" });
   assert.deepEqual(splitInvitePhone("9876543210"), { code: "+91", number: "9876543210" });
   assert.deepEqual(splitInvitePhone("+44 7700900123"), { code: "+44", number: "7700900123" });
+  // Typing "+4…" into the number box keeps it whole (code still +91) until it is a full number.
+  assert.deepEqual(splitInvitePhone("+4"), { code: "+91", number: "+4" });
+  assert.deepEqual(splitInvitePhone("+447700900123"), { code: "+91", number: "+447700900123" });
+  assert.equal(joinInvitePhone("+91", "+447700900123"), "+447700900123");
   assert.equal(joinInvitePhone("+44", "7700 900123"), "+44 7700 900123");
   assert.equal(joinInvitePhone("+91", "98765 43210"), "98765 43210");
   assert.equal(joinInvitePhone("+91", " "), "");

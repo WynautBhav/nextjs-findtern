@@ -122,7 +122,6 @@ export default async function InternHome({ searchParams }: { searchParams: Promi
       .catch(() => []),
   ]);
   const glow = nudgeGlow(sp.nudge, unreadNudges.map((r) => r.type));
-  const glowFor = (key: string) => (key === "offer" && glow.has("offer")) || (key === "ai-interview" && glow.has("interview"));
 
   // Independent reads, in parallel. loadInternData is cache()d: the layout's call already did the work.
   const [data, [user], activated, activationFeeMinor, paidMinor, college, [presenceRow], lockState, acct] = await Promise.all([
@@ -315,6 +314,9 @@ export default async function InternHome({ searchParams }: { searchParams: Promi
   } else if (canOpen && action) {
     nextSteps.push({ key: "offer", title: action.title, detail: action.detail, href: action.href ?? undefined, label: action.action ?? "Open" });
   }
+  // A nudge glows the step it is about: the "offer" step only when it is an offer (it can hold another next action).
+  const offerStep = waitingOffers > 1 || action?.kind === "proposal";
+  const glowFor = (key: string) => (key === "offer" && offerStep && glow.has("offer")) || (key === "ai-interview" && glow.has("interview"));
   if (aiPhase === "ready") {
     const link = joinableLink(aiRow?.meetingLink);
     if (link) {

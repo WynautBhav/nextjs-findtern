@@ -59,7 +59,8 @@ export function invitePhone(raw: string | undefined): { phone: string | null; er
   if (foreign) {
     if (!CODES.includes(foreign.code)) return { phone: null, error: "Check the country code" };
     if (/[^\d\s\-().]/.test(foreign.rest)) return { phone: null, error: "Check the phone number" };
-    const digits = normalizePhone(foreign.rest);
+    // A trunk 0 written after the country code ("+44 07700 900123") is not dialled from abroad.
+    const digits = normalizePhone(foreign.rest).replace(/^0/, "");
     const bad = phoneError(foreign.code, digits);
     return bad ? { phone: null, error: bad } : { phone: `${foreign.code} ${digits}`, error: null };
   }
@@ -70,9 +71,11 @@ export function invitePhone(raw: string | undefined): { phone: string | null; er
 
 /** The builder's two controls for a stored or typed phone: its country code (+91 when none) and the rest. */
 export function splitInvitePhone(raw: string | undefined): { code: string; number: string } {
-  const s = (raw ?? "").trim();
-  const m = /^\+(\d{1,4})(?:\s+(.*))?$/.exec(s);
-  return m && `+${m[1]}` !== INDIA_CODE ? { code: `+${m[1]}`, number: m[2] ?? "" } : { code: INDIA_CODE, number: s.replace(/^\+91\s*/, "") };
+  const s = (raw ?? "").trimStart(); // the space after a picked code is kept: "+44 " is the code with no number yet
+  // Only a code followed by a space is split off ("+44 7700…", or "+44 " with no number yet): while "+4" is being typed it
+  // stays whole in the number box, so typing an international number in full is never cut short.
+  const m = /^\+(\d{1,4})\s+(.*)$/.exec(s);
+  return m && `+${m[1]}` !== INDIA_CODE ? { code: `+${m[1]}`, number: m[2] } : { code: INDIA_CODE, number: s.replace(/^\+91\s*/, "") };
 }
 
 /** Back to one string for the row: India as typed (read as 10 digits), another code in front of the number. */
@@ -126,7 +129,7 @@ export function parseInviteSheet(text: string): { rows: InviteRow[]; errors: str
     const bad = inviteRowProblem(row);
     if (bad?.field === "phone") {
       // Like the roster import: the employer is kept, the number is not.
-      errors.push(`Row ${line}: "${row.phone.slice(0, 20)}" is not a valid 10-digit mobile number; left blank.`);
+      errors.push(`Row ${line}: "${row.phone.slice(0, 20)}" is not a valid phone number; left blank.`);
       row.phone = "";
     } else if (bad) {
       errors.push(`Row ${line}: ${bad.field === "email" ? `"${row.email || "(blank)"}" is not an email address` : "no company name"}; skipped.`);
@@ -147,7 +150,7 @@ export function parseInviteSheet(text: string): { rows: InviteRow[]; errors: str
  * row wins), and the list never grows past MAX_INVITES; what did not fit is counted.
  */
 export function mergeInvites(current: InviteRow[], incoming: InviteRow[]): { rows: InviteRow[]; added: number; duplicates: number; overflow: number } {
-  const rows = current.filter((r) => r.company.trim() || r.email.trim() || r.name.trim() || r.phone.trim());
+  const rows = current.filter((r) => r.company.trim() || r.email.trim() || r.name.trim() || !isBlankPhone(r.phone));
   const have = new Set(rows.map((r) => r.email.trim().toLowerCase()).filter(Boolean));
   let added = 0;
   let duplicates = 0;

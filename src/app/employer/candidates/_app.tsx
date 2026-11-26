@@ -44,11 +44,14 @@ export function CandidatesApp({
   chrome,
   initial,
   flow,
+  inDrive = false,
 }: {
   uid: string;
   chrome: ChromeWire;
   initial: { qs: string; wire: ResultsWire };
   flow: HireFlowCounts | null;
+  /** The employer is inside a live campus drive: its Full-time tab sends full-time offers. */
+  inDrive?: boolean;
 }) {
   const q = useInstantQuery<ResultsWire>({
     endpoint: CANDIDATES_RESULTS_ENDPOINT,
@@ -250,7 +253,7 @@ export function CandidatesApp({
             ) : null}
 
             <ResultsRegion pending={q.pending} error={q.error} onRetry={q.refetch} count={data.total} updateKey={q.qs} noun="candidates" nounSingular="candidate">
-              <Results data={data} filters={view} compareIds={compareIds} />
+              <Results data={data} filters={view} compareIds={compareIds} fullTimeTrack={inDrive && Boolean(view.fullTime)} />
             </ResultsRegion>
           </div>
         </div>

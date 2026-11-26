@@ -42,6 +42,9 @@ export function FullTimeOfferButton({
   className,
   open: openProp,
   onOpenChange,
+  variant = "outline",
+  label = "Full-time offer",
+  defaultOpen = false,
 }: {
   employerId: string;
   /** The hired intern's placement; or `drive` for a campus drive student. */
@@ -58,9 +61,14 @@ export function FullTimeOfferButton({
   /** Controlled from outside (a row menu item opens it); no trigger button is drawn. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** The trigger's look: a quiet outline beside other actions, or the page's main action ("white" on the green rail). */
+  variant?: "outline" | "white" | "primary";
+  label?: string;
+  /** Opens on arrival (the Full-time tab's "Send full-time offer" on a candidate card). */
+  defaultOpen?: boolean;
 }) {
   const router = useRouter();
-  const [openState, setOpenState] = useState(false);
+  const [openState, setOpenState] = useState(defaultOpen);
   const controlled = openProp !== undefined;
   const open = controlled ? openProp : openState;
   const setOpen = (o: boolean) => (controlled ? onOpenChange?.(o) : setOpenState(o));
@@ -148,9 +156,9 @@ export function FullTimeOfferButton({
   return (
     <>
       {controlled ? null : (
-        <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant: "outline", size: "sm", className: cn("min-h-11", className) })}>
+        <button type="button" onClick={() => setOpen(true)} className={buttonClass({ variant, size: variant === "outline" ? "sm" : undefined, className: cn("min-h-11", className) })}>
           <BriefcaseBusiness className="size-4" aria-hidden />
-          Full-time offer
+          {label}
         </button>
       )}
       <Dialog open={open} onOpenChange={setOpen}>

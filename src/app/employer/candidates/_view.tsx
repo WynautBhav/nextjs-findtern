@@ -47,7 +47,7 @@ export function CandidatesView({
           fullTimeHref={withFilters(filters, { fullTime: true, page: "" })}
         />
       ) : null}
-      <CandidatesApp uid={uid} chrome={toChromeWire(uid, data)} initial={{ qs: initialQs, wire: toResultsWire(data, filters) }} flow={flow} />
+      <CandidatesApp uid={uid} chrome={toChromeWire(uid, data)} initial={{ qs: initialQs, wire: toResultsWire(data, filters) }} flow={flow} inDrive={Boolean(campus)} />
     </div>
   );
 }
