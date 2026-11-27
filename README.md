@@ -384,7 +384,7 @@ visitor shares one rate-limit bucket. `src/instrumentation.ts` logs a warning at
 
 ## Deploy
 
-Pushing to `master` deploys to Vercel. `vercel.json` is the config; the region is `sin1` (Singapore), next to the Supabase
+Pushing to `master` deploys to Vercel: project `findtern`, live at **https://findtern.vercel.app**. (A second Vercel project, `nextjs-findtern`, also watches this repo but has no environment variables, so its deploys always fail; ignore it.) `vercel.json` is the config; the region is `sin1` (Singapore), next to the Supabase
 ap-southeast-1 database.
 
 - `buildCommand`: `node --experimental-strip-types scripts/migrate.ts && next build`. **Every build applies pending migrations
