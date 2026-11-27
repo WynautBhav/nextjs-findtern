@@ -22,7 +22,7 @@ const samples = (n: string): [name: keyof typeof emails, content: EmailContent, 
   ["meetingScheduled", emails.meetingScheduled({ name: n, other: n, when: n, link: null, forEmployer: false }), false],
   ["interviewReminder", emails.interviewReminder({ name: n, pending: false, text: n, link: `https://meet.example.com/${n}` }), false],
   ["interviewReminder", emails.interviewReminder({ name: n, pending: true, text: n, link: null }), false],
-  ["interviewLinkReady", emails.interviewLinkReady({ name: n, link: `https://meet.example.com/${n}`, forEmployer: true }), true],
+  ["interviewLinkReady", emails.interviewLinkReady({ name: n, forEmployer: true }), true],
   ["aiInterviewLinkReady", emails.aiInterviewLinkReady({ name: n, link: `https://interview.example.com/${n}` }), false],
   ["interviewRescheduled", emails.interviewRescheduled({ name: n }), false],
   ["meetingProposed", emails.meetingProposed({ name: n, other: n, times: [n, n, n], zone: "IST", revised: true, project: n }), false],
@@ -186,4 +186,11 @@ test("meetingCancelled: a blank reason reads 'No reason given'; a typed one keep
   assert.match(blank.text, /Reason: No reason given/);
   const typed = renderEmail(emails.meetingCancelled({ name: "Asha", other: "Acme", reason: "Exam clash.\n<b>Next week?</b>", byWho: "Acme", forEmployer: false }));
   assert.match(typed.html, /Exam clash\.<br>&lt;b&gt;Next week\?&lt;\/b&gt;/);
+});
+
+// Owner, 27 Nov: meeting links never go out by mail; Join is on Findtern, where the join is recorded.
+test("interview emails carry no meeting link", () => {
+  const link = "https://meet.example.com/abc-defg-hij";
+  const mails = [emails.interviewReminder({ name: "A", pending: false, text: "Soon", link }), emails.interviewLinkReady({ name: "A", forEmployer: false })];
+  for (const m of mails) assert.doesNotMatch(JSON.stringify(m), /meet\.example|meet\.google|\/meet\//);
 });

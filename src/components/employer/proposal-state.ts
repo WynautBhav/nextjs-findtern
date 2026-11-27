@@ -152,7 +152,7 @@ export function offerState(p: OfferStateInput, offer: Pick<Offer, "startDate" | 
       };
     case "accepted":
       if (fullTime) {
-        return { ...base, label: "Full-time accepted · fee due", tone: "paid", next: "The candidate accepted. Pay the hiring fee from checkout.", canPay: unpaid };
+        return { ...base, label: "Full-time accepted · fee due", tone: "paid", next: "The candidate accepted. Pay the hiring fee from checkout.", canPay: unpaid, ...may };
       }
       return {
         ...base,
@@ -160,6 +160,7 @@ export function offerState(p: OfferStateInput, offer: Pick<Offer, "startDate" | 
         tone: "paid",
         next: "Pay for this hire to confirm it. Names and contact details unlock once your hire is paid.",
         canPay: unpaid,
+        ...may,
       };
     case "processing":
       return { ...base, label: "Payment in progress", tone: "waiting", next: "A payment is open for this hire. It settles in a few minutes." };

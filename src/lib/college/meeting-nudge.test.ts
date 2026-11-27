@@ -28,13 +28,13 @@ test("every list that shows a student with a waiting or booked meet offers that 
     offline: [],
     now: NOW,
   });
-  const kind = (list: "called" | "meetings", id: string) => b.lists[list].find((s) => s.userId === id)?.meetNudge;
+  const kind = (list: "called" | "meetBooked", id: string) => b.lists[list].find((s) => s.userId === id)?.meetNudge;
   assert.equal(kind("called", "a"), "meeting");
   assert.equal(kind("called", "b"), "meeting_reminder");
   assert.equal(kind("called", "c"), undefined, "its meet is over");
   assert.equal(kind("called", "d"), "meeting", "an unanswered request outranks a booked one");
-  assert.equal(kind("meetings", "b"), "meeting_reminder");
-  assert.equal(kind("meetings", "c"), undefined);
+  assert.equal(kind("meetBooked", "b"), "meeting_reminder");
+  assert.equal(kind("meetBooked", "c"), undefined, "its meet took place: conducted, not booked");
 });
 
 test("a nudge shows how often it was sent: open to work, meeting and reminder rows carry 'Nudged N times · last ...'", () => {

@@ -15,7 +15,7 @@ function base(over: Partial<Parameters<typeof buildDriveSummary>[0]> = {}) {
     trackingSince: new Date(T0.getTime() - 1),
     students: [stu("a"), stu("b"), stu("c", 9), stu("d", 8.5)],
     meetings: [
-      { userId: "a", employerId: "e1", status: "accepted", createdAt: at(10), respondedAt: at(14) },
+      { userId: "a", employerId: "e1", status: "completed", createdAt: at(10), respondedAt: at(14), startsAt: at(15) }, // a meeting the company marked completed
       { userId: "b", employerId: "e1", status: "declined", createdAt: at(20), respondedAt: at(40) },
       { userId: "b", employerId: "e2", status: "requested", createdAt: at(30), respondedAt: null },
     ],

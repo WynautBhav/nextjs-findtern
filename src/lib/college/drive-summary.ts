@@ -1,3 +1,4 @@
+import { meetOutcome } from "./meet-outcome.ts";
 /**
  * A drive's summary for the placement officer: how well it is going, where students drop out, which nudges worked,
  * how long students and employers were online, how fast students reply, who strong is being missed, and each
@@ -18,7 +19,7 @@ export type SummaryStudent = {
   openToWork?: boolean;
   openToWorkAt?: Date | null;
 };
-export type SummaryMeeting = { userId: string; employerId: string; status: string; createdAt: Date; respondedAt: Date | null };
+export type SummaryMeeting = { userId: string; employerId: string; status: string; createdAt: Date; respondedAt: Date | null; startsAt?: Date | null; cancelledBy?: string | null };
 export type SummaryOffer = { userId: string; employerId: string; status: string; hired: boolean; createdAt: Date; answeredAt: Date | null };
 export type SummaryNudge = { userId: string; kind: string; createdAt: Date };
 export type SummaryEmployer = { employerId: string; company: string; joinedAt: Date; shortlisted: number };
@@ -74,8 +75,7 @@ const median = (xs: number[]): number | null => {
 };
 const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
 /** The student replied: yes or no to a call, or picked a slot (an interview that then ran or was missed). */
-const answered = (status: string) => status === "accepted" || status === "declined" || status === "completed" || status === "missed";
-const metStatus = (status: string) => status === "accepted" || status === "completed" || status === "missed";
+const answered = (status: string) => status === "accepted" || status === "declined" || status === "completed" || status === "missed" || status === "unmarked";
 const offerAnswered = (o: SummaryOffer) => o.hired || ["accepted", "rejected", "processing", "hired", "completed"].includes(o.status);
 
 export function buildDriveSummary(input: {
@@ -84,6 +84,8 @@ export function buildDriveSummary(input: {
   window: { start: Date; end: Date };
   /** First minute online time was recorded at all; null = nothing recorded yet. */
   trackingSince: Date | null;
+  /** The clock meet outcomes are read at (a call whose time is over took place). Defaults to now. */
+  now?: number;
   students: SummaryStudent[];
   meetings: SummaryMeeting[];
   offers: SummaryOffer[];
@@ -97,10 +99,12 @@ export function buildDriveSummary(input: {
   /** Invited companies that actually came in (matched by email or name, drive-board.ts matchInvites); not everyone who joined. */
   invitedCame?: number;
 }): DriveSummary {
-  const { open, students, meetings, offers, nudges, employers, window: win } = input;
+  const { open, students, offers, nudges, employers, window: win } = input;
   const byStudent = new Map(students.map((s) => [s.userId, s]));
   const nameOf = new Map(students.map((s) => [s.userId, s.name || "Student"]));
   const inDrive = new Set(students.map((s) => s.userId));
+  // The drive's students only, as the board counts them.
+  const meetings = input.meetings.filter((m) => inDrive.has(m.userId));
   const href = (show: string) => `${input.driveHref}?show=${show}#board-list`;
 
   // Recorded only from the first heartbeat ever stored: a drive that ended before then has no online time at all.
@@ -108,7 +112,8 @@ export function buildDriveSummary(input: {
 
   // Funnel: unique students at each step.
   const called = new Set(meetings.map((m) => m.userId));
-  const met = new Set(meetings.filter((m) => metStatus(m.status)).map((m) => m.userId));
+  // Met = had a meeting that took place (meet-outcome.ts "conducted"): the board's Conducted list.
+  const met = new Set(meetings.filter((m) => meetOutcome(m, input.now ?? Date.now()) === "conducted").map((m) => m.userId));
   const offered = new Set(offers.map((o) => o.userId));
   const hired = new Set(offers.filter((o) => o.hired).map((o) => o.userId));
   // Offers need not follow a meet, so each step is measured against the base it really is a part of.
@@ -125,7 +130,7 @@ export function buildDriveSummary(input: {
   const funnel = [
     step("all", "In the drive", total, null, null, null),
     step("called", "Asked to meet", called.size, total, "of the drive", "called"),
-    step("met", "Met an employer", met.size, called.size, "of those asked", "meetings"),
+    step("met", "Met an employer", met.size, called.size, "of those asked", "meetConducted"),
     step("offers", "Got an offer", offered.size, total, "of the drive", "offers"),
     step("hired", "Hired", hired.size, offered.size, "of those offered", "hired"),
   ];

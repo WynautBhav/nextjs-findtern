@@ -1,7 +1,7 @@
 import { eq, inArray, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@/lib/db";
-import { driveEmployerContacts } from "./drive-board-db";
+import { loadDrivePool } from "./drive-board-db";
 import { isStudentEligible } from "./access";
 import { buildCompanies, type CompanyRow, type DriveFacts, type InviteContact } from "./companies";
 import { loadDriveEmployers } from "./drive-employers-db";
@@ -23,11 +23,12 @@ export async function companiesForCollege(ctx: CollegeContext): Promise<CompanyR
 
   const facts: DriveFacts[] = await Promise.all(
     drives.map(async (drive) => {
-      const came = await driveEmployerContacts(drive.id);
       const invited = (drive.invitedEmployers ?? []) as InviteContact[];
       const ids = verified.filter((s) => isStudentEligible(s, drive)).map((s) => s.userId);
-      // open = false: only the counts are wanted; presence is read once for all drives below.
-      const loaded = await loadDriveEmployers(drive, ids, came, invited, false);
+      // The drive's one pool, as its own page reads it. open = false: only the counts are wanted; presence is read once below.
+      const pool = await loadDrivePool(drive, ids);
+      const came = pool.came;
+      const loaded = await loadDriveEmployers(drive, pool, invited, false);
       const counts = new Map(loaded.rows.flatMap((r) => (r.employerId ? [[r.employerId, { meetings: r.meetings, offers: r.offers, hires: r.hires }] as const] : [])));
       return { driveId: drive.id, startsAt: drive.startsAt, came, invited, counts };
     }),

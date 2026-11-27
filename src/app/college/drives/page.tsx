@@ -7,7 +7,7 @@ import { DriveStatePill } from "@/components/employer/drive-parts";
 import { ButtonLink } from "@/components/ui/button";
 import { driveWindow } from "@/lib/college/access";
 import { drivesOverview } from "@/lib/college/drives";
-import { driveMeetCounts, driveShortlistCount } from "@/lib/college/drive-board-db";
+import { driveListFigures } from "@/lib/college/drive-board-db";
 import { driveReach } from "@/lib/college/drive-reach";
 import { readinessForMany } from "@/lib/college/student-readiness-db";
 import { DriveReachView } from "@/components/college/drive-reach-view";
@@ -46,23 +46,17 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
   // Each drive's students once: its meets by the drive page's own rules (verified students, calls and interviews), and
   // its strength with why the rest were left out.
   const eligibleOf = new Map(await Promise.all(all.map(async ({ drive }) => [drive.id, await eligibleStudents(drive)] as const)));
-  const meets = new Map(
+  // Each drive's figures from its one pool, built by the drive page's own board, so the list and the page agree.
+  const figures = new Map(
     await Promise.all(
       all.map(async ({ drive }) => {
         const ids = (eligibleOf.get(drive.id) ?? []).filter((s) => s.status === "verified").map((s) => s.userId);
-        return [drive.id, await driveMeetCounts(drive, ids, now)] as const;
+        return [drive.id, await driveListFigures(drive, ids, now)] as const;
       }),
     ),
   );
-  // Students shortlisted, by the drive page's own rule (the drive's list plus each company's regular Shortlist).
-  const shortlistedOf = new Map(
-    await Promise.all(
-      all.map(async ({ drive }) => {
-        const ids = (eligibleOf.get(drive.id) ?? []).filter((s) => s.status === "verified").map((s) => s.userId);
-        return [drive.id, await driveShortlistCount(drive.id, ids)] as const;
-      }),
-    ),
-  );
+  const meets = new Map([...figures].map(([id, f]) => [id, f.meetCounts]));
+  const shortlistedOf = new Map([...figures].map(([id, f]) => [id, f.shortlistCount]));
   const readiness = await readinessForMany([...new Set([...eligibleOf.values()].flat().map((s) => s.userId))]);
   const reachOf = (id: string) => driveReach(eligibleOf.get(id) ?? [], readiness);
   // Active = open now or still to open; Past = finished or closed by the officer.
@@ -74,7 +68,7 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
   const live = allStates.filter((s) => s === "live").length;
   const employers = all.reduce((n, d) => n + d.employers, 0);
   const shortlisted = [...shortlistedOf.values()].reduce((n, c) => n + c, 0);
-  const answered = all.reduce((n, d) => n + (meets.get(d.drive.id)?.accepted ?? 0), 0);
+  const conducted = all.reduce((n, d) => n + (meets.get(d.drive.id)?.completed ?? 0), 0);
   return (
     <div className="space-y-6">
       <LiveRefresh everyMs={60_000} />
@@ -92,7 +86,7 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
             <HeroStat label="Open now" value={live} hint={live ? "Employers can enter" : "No drive is open"} />
             <HeroStat label="Employers entered" value={employers} hint={`across ${all.length} ${all.length === 1 ? "drive" : "drives"}`} />
             <HeroStat label="Students shortlisted" value={shortlisted} />
-            <HeroStat label="Meets accepted" value={answered} hint="Drive calls and interviews" />
+            <HeroStat label="Meetings completed" value={conducted} hint="The company and the student met" />
           </HeroStats>
         ) : null}
       </CollegeHero>
@@ -126,7 +120,7 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
         <ul className="grid gap-4 lg:grid-cols-2">
           {drives.map(({ drive, employers: e }, i) => {
             const s = shortlistedOf.get(drive.id) ?? 0;
-            const { sent: calls, accepted } = meets.get(drive.id) ?? { sent: 0, accepted: 0 };
+            const { total: calls, completed: held } = meets.get(drive.id) ?? { total: 0, completed: 0 };
             const w = states[i];
             const span = drive.endsAt.getTime() - drive.startsAt.getTime();
             const share = w === "live" && span > 0 ? Math.min(1, Math.max(0, (now - drive.startsAt.getTime()) / span)) : null;
@@ -162,7 +156,7 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
                     {[
                       ["Employers", String(e)],
                       ["Shortlisted", String(s)],
-                      ["Meets accepted", calls ? `${accepted} of ${calls}` : "—"],
+                      ["Meetings completed", calls ? `${held} of ${calls}` : "—"],
                     ].map(([label, value]) => (
                       <div key={label} className="min-w-0">
                         <dt className="text-xs text-text-subtle">{label}</dt>

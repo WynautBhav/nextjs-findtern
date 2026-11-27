@@ -1,4 +1,5 @@
 import { CALL_GRACE_MS, MEETING_MINUTES } from "./constants.ts";
+import { MEET_LABEL, MEET_STAGE, MEET_STAGES, meetOutcome, type MeetStage } from "./meet-outcome.ts";
 import { ago } from "./labels.ts";
 import { shortDateTime } from "../format.ts";
 
@@ -47,6 +48,8 @@ export type MeetingRow = {
   /** A called-off meet: why, in the words of whoever cancelled it, and who that was (bug sheet 27 Nov). Line breaks are kept. */
   reason?: string | null;
   cancelledBy?: string | null;
+  /** A conducted (or missed) interview: the company's written feedback, as the student sees it. Line breaks are kept. */
+  feedback?: string | null;
 };
 /** The one place that says which nudge a student's meet calls for (the board lists and the student page agree); null when it needs none. */
 export function meetNudgeKind(m: { status: string; startsAt?: Date | null }, now: number): MeetNudgeKind | null {
@@ -95,11 +98,11 @@ export type BoardKey =
   | "offersSent"
   | "declinedAll"
   | "unanswered"
-  | "meetings"
+  | "meetBooked"
   | "meetCompleted"
   | "meetExpired"
-  | "meetDeclined"
-  | "meetCancelled"
+  | "meetWithdrawn"
+  | "offersExpired"
   | "aiPending"
   | "offersWithdrawn"
   | "offersAccepted"
@@ -120,12 +123,12 @@ export type DriveBoard = {
    * sent = every offer the drive's companies made = accepted + rejected + no reply yet + withdrawn (owner, 27 Nov: "offers sent should show
    * total offers"); hired = hiredInternship + hiredFullTime, and a hire is an accepted offer. The top "Got an offer" figure still leaves withdrawn offers out.
    */
-  offerCounts: { sent: number; accepted: number; rejected: number; withdrawn: number; hiredInternship: number; hiredFullTime: number };
+  offerCounts: { total: number } & Record<OfferStage, number> & { hiredInternship: number; hiredFullTime: number };
   /** The same offers split by kind: an offer with a full-time / PPO part counts as full-time. */
   offerSplit: { internship: number; fullTime: number };
-  /** Meet requests counted one by one (a student can have several): sent (not cancelled), accepted, completed, expired,
-   *  declined by the student, cancelled, and still waiting on the student (bug sheet 26 Nov: every status shows). */
-  meetCounts: { sent: number; accepted: number; completed: number; expired: number; declined: number; cancelled: number; waiting: number };
+  /** Meet requests counted one by one (a student can have several): every one asked (sent), and each by its one outcome
+   *  (meet-outcome.ts), so the outcomes always add up to sent. The dashboard and Master data count the same outcomes. */
+  meetCounts: { total: number } & Record<MeetStage, number>;
   /** Offers the company withdrew: listed on their own, never counted as offers. */
   withdrawnCount: number;
   /** Students shortlisted by at least one company in the drive. */
@@ -148,6 +151,22 @@ const DECLINED = new Set(["rejected", "declined"]);
 const isHired = (o: OfferRow) => o.hired || HIRED.has(o.status);
 const accepted = (o: OfferRow) => o.hired || ACCEPTED.has(o.status);
 const declined = (o: OfferRow) => !o.hired && DECLINED.has(o.status);
+
+/**
+ * Owner, 27 Nov: offers read like meetings. Each offer is in one stage, so the stages add up to the total:
+ * sent = no reply yet and its start day ahead (nudge it); accepted = the student said yes (hired ones included);
+ * rejected; expired = its start day began with no reply, or accepted and never paid; withdrawn by the company.
+ */
+export const OFFER_STAGES = ["sent", "accepted", "rejected", "expired", "withdrawn"] as const;
+export type OfferStage = (typeof OFFER_STAGES)[number];
+export function offerStage(o: OfferRow): OfferStage {
+  if (o.status === "withdrawn") return "withdrawn";
+  if (isHired(o)) return "accepted";
+  if (declined(o)) return "rejected";
+  if (o.status === "expired" || (o.pastStart && o.status !== "processing")) return "expired";
+  if (accepted(o)) return "accepted";
+  return "sent";
+}
 const company = (c: string | null) => c?.trim() || "An employer";
 
 /** Group rows per student, newest first, and describe them in one line. */
@@ -200,36 +219,26 @@ export function buildDriveBoard(input: {
   // A withdrawn offer is not an offer: it has its own list and touches no other figure.
   const withdrawn = input.offers.filter((o) => o.status === "withdrawn");
   input = { ...input, offers: input.offers.filter((o) => o.status !== "withdrawn") };
-  const declinedMeets = input.meetings.filter((m) => m.status === "declined" || m.status === "rejected");
-  const cancelledMeets = input.meetings.filter((m) => m.status === "cancelled");
   const shortlist = (input.shortlist ?? []).filter((r) => students.has(r.userId));
-  // Only requests the student can still accept: a lapsed one is expired for the student and the employer alike.
-  const waiting = input.meetings.filter((m) => m.status === "requested" && (!m.startsAt || m.startsAt.getTime() + CALL_GRACE_MS >= now));
-  // Accepted: the student said yes (a drive call), or picked a slot (an interview), whatever happened after.
-  const held = input.meetings.filter((m) => m.status === "accepted" || m.status === "completed" || m.status === "missed");
-  // Completed: an interview marked completed, or an accepted drive call whose slot is over (calls record no outcome).
-  const done = held.filter((m) => m.status === "completed" || (m.status === "accepted" && m.startsAt && m.startsAt.getTime() + MEETING_MINUTES * 60_000 <= now));
-  // Expired: marked so, or never answered by start + grace (meetings.ts effectiveStatus).
-  const lapsed = input.meetings.filter((m) => m.status === "expired" || (m.status === "requested" && m.startsAt && m.startsAt.getTime() + CALL_GRACE_MS < now));
-  const sentMeets = input.meetings.filter((m) => m.status !== "cancelled");
-  // Bug 26 Nov: "What happened" names each meet's outcome, Completed and Withdrawn included, newest first.
-  const doneSet = new Set(done);
-  const lapsedSet = new Set(lapsed);
-  const meetLabel = (m: MeetingRow) =>
-    m.status === "cancelled" ? "Withdrawn"
-    : doneSet.has(m) ? "Completed"
-    : m.status === "missed" ? "Missed"
-    : held.includes(m) ? "Accepted"
-    : lapsedSet.has(m) ? "Expired"
-    : m.status === "declined" || m.status === "rejected" ? "Not accepted"
-    : "Waiting for reply";
-  const outcomes = (rs: MeetingRow[]) => rs.map((m) => `${company(m.company)}: ${meetLabel(m)}`).join(" · ");
+  // Every meet has exactly one outcome (meet-outcome.ts); the tiles, lists and the other screens all read it.
+  const outcomeOf = new Map(input.meetings.map((m) => [m, meetOutcome(m, now)]));
+  const byStage = Object.fromEntries(MEET_STAGES.map((st) => [st, input.meetings.filter((m) => MEET_STAGE[outcomeOf.get(m)!] === st)])) as Record<MeetStage, MeetingRow[]>;
+  const waiting = byStage.sent;
+  const sentMeets = input.meetings;
+  // "What happened" names each meet's outcome, newest first; a conducted interview carries the company's feedback,
+  // a called-off one its reason (bug sheets 26 and 27 Nov).
+  const meetLabel = (m: MeetingRow) => MEET_LABEL[outcomeOf.get(m) ?? "waiting"];
+  const extra = (m: MeetingRow) =>
+    m.feedback && (outcomeOf.get(m) === "conducted" || outcomeOf.get(m) === "missed") ? `\nFeedback: ${m.feedback}`
+    : m.reason ? `\n${m.cancelledBy === "intern" ? "Student's reason" : "Reason"}: ${m.reason}`
+    : "";
+  const outcomes = (rs: MeetingRow[]) => (rs.some((m) => extra(m)) ? rs.map((m) => `${company(m.company)}: ${meetLabel(m)}${extra(m)}`).join("\n") : rs.map((m) => `${company(m.company)}: ${meetLabel(m)}`).join(" · "));
   const everyMeet = new Map<string, MeetingRow[]>();
   for (const m of [...input.meetings].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())) everyMeet.set(m.userId, [...(everyMeet.get(m.userId) ?? []), m]);
   const inDriveCount = (rs: MeetingRow[]) => rs.filter((m) => students.has(m.userId)).length;
   // Waiting on the student: sent, not hired, start day not begun (college count-rules offerWaitingSql). Past it the
   // offer lapsed ("deadline missed" in master data, "no response" for the student, "expired" for the employer).
-  const open = input.offers.filter((o) => o.status === "sent" && !o.hired && !o.pastStart);
+  const open = input.offers.filter((o) => offerStage(o) === "sent");
   const hired = input.offers.filter(isHired);
   const inDrive = input.offers.filter((o) => students.has(o.userId));
   const withdrawnInDrive = withdrawn.filter((o) => students.has(o.userId));
@@ -283,10 +292,8 @@ export function buildDriveBoard(input: {
   return {
     offerCount: inDrive.length,
     offerCounts: {
-      sent: inDrive.length + withdrawnInDrive.length,
-      accepted: inDrive.filter(accepted).length,
-      rejected: inDrive.filter(declined).length,
-      withdrawn: withdrawnInDrive.length,
+      total: inDrive.length + withdrawnInDrive.length,
+      ...(Object.fromEntries(OFFER_STAGES.map((st) => [st, [...inDrive, ...withdrawnInDrive].filter((o) => offerStage(o) === st).length])) as Record<OfferStage, number>),
       hiredInternship: inDrive.filter((o) => isHired(o) && !o.fullTime).length,
       hiredFullTime: inDrive.filter((o) => isHired(o) && o.fullTime).length,
     },
@@ -294,15 +301,7 @@ export function buildDriveBoard(input: {
       offers: inDrive.map((o) => ({ userId: o.userId, company: o.company, at: o.createdAt, outcome: accepted(o) ? "accepted" : declined(o) ? "declined" : "open", fullTime: o.fullTime })),
       meets: sentMeets.filter((m) => students.has(m.userId)).map((m) => ({ userId: m.userId, company: m.company, at: m.createdAt })),
     },
-    meetCounts: {
-      sent: inDriveCount(sentMeets),
-      accepted: inDriveCount(held),
-      completed: inDriveCount(done),
-      expired: inDriveCount(lapsed),
-      declined: inDriveCount(declinedMeets),
-      cancelled: inDriveCount(cancelledMeets),
-      waiting: inDriveCount(waiting),
-    },
+    meetCounts: { total: inDriveCount(sentMeets), ...(Object.fromEntries(MEET_STAGES.map((st) => [st, inDriveCount(byStage[st])])) as Record<MeetStage, number>) },
     withdrawnCount: withdrawnInDrive.length,
     shortlistCount: new Set(shortlist.map((r) => r.userId)).size,
     offerSplit: { internship: inDrive.filter((o) => !o.fullTime).length, fullTime: inDrive.filter((o) => o.fullTime).length },
@@ -327,26 +326,23 @@ export function buildDriveBoard(input: {
       nudgedMeet: nudged("meeting"),
       nudgedOffer: nudged("offer"),
       offers: perStudent(inDrive, students, (rs) => `${offerKinds(rs)} · ${names(rs)}`),
-      // The "Offers sent" tile: the same students and offers its figure counts, withdrawn ones included.
+      // The "Total offers" tile: the same students and offers its figure counts, withdrawn ones included.
       offersSent: perStudent([...inDrive, ...withdrawnInDrive], students, (rs) => {
         const taken = rs.filter((r) => r.status === "withdrawn").length;
         return `${offerKinds(rs)} · ${names(rs)}${taken ? ` · ${taken} withdrawn` : ""}`;
       }),
-      meetings: withMeetNudge(perStudent(held, students, outcomes)),
-      meetCompleted: perStudent(done, students, outcomes),
-      meetExpired: perStudent(lapsed, students, (rs) => `${rs.length === 1 ? "1 meet expired" : `${rs.length} meets expired`} · ${names(rs)}`),
-      meetDeclined: perStudent(declinedMeets, students, (rs) => `Declined ${rs.length === 1 ? "a meet" : `${rs.length} meets`} with ${names(rs)}`),
-      // The reason a meet was called off is on the row (owner, 27 Nov); the list shows its line breaks.
-      meetCancelled: perStudent(cancelledMeets, students, (rs) =>
-        rs.map((m) => `${company(m.company)}: ${meetLabel(m)}${m.reason ? `\n${m.cancelledBy === "intern" ? "Student's reason" : "Reason"}: ${m.reason}` : ""}`).join("\n")),
-      offersAccepted: perStudent(inDrive.filter(accepted), students, (rs) => `${offerKinds(rs)} accepted · ${names(rs)}`),
-      offersRejected: perStudent(inDrive.filter(declined), students, (rs) => `${offerKinds(rs)} rejected · ${names(rs)}`),
+      meetBooked: withMeetNudge(perStudent(byStage.accepted, students, outcomes)),
+      meetCompleted: perStudent(byStage.completed, students, outcomes),
+      meetExpired: perStudent(byStage.expired, students, outcomes),
+      meetWithdrawn: perStudent(byStage.withdrawn, students, outcomes),
+      offersAccepted: perStudent(inDrive.filter((o) => offerStage(o) === "accepted"), students, (rs) => `${offerKinds(rs)} accepted · ${names(rs)}`),
+      offersRejected: perStudent(inDrive.filter((o) => offerStage(o) === "rejected"), students, (rs) => `${offerKinds(rs)} rejected · ${names(rs)}`),
+      offersExpired: perStudent(inDrive.filter((o) => offerStage(o) === "expired"), students, (rs) => `${offerKinds(rs)} expired (no reply or not paid before the start day) · ${names(rs)}`),
       offersWithdrawn: perStudent(withdrawn, students, (rs) => `${names(rs)} withdrew ${rs.length === 1 ? (rs[0].fullTime ? "a full-time offer" : "an internship offer") : `${rs.length} offers`}`),
       shortlisted: perStudent(shortlist, students, (rs) => `Shortlisted by ${names(rs)}`),
       internships: perStudent(hired.filter((o) => !o.fullTime), students, (rs) => `Internship with ${names(rs)}`),
       fullTime: perStudent(hired.filter((o) => o.fullTime), students, (rs) => `Full-time with ${names(rs)}`),
-      // The pipeline's stages: any call request at all, and any hire (one row per student).
-      // A request the company cancelled no longer counts, as a withdrawn offer does not count as an offer (master data agrees).
+      // The pipeline's stages: any meet request at all (withdrawn ones too, as offers sent count withdrawn offers), and any hire.
       called: withMeetNudge(perStudent(sentMeets, students, (rs) => outcomes(everyMeet.get(rs[0].userId) ?? rs))),
       hired: hiredItems,
     },
@@ -376,7 +372,7 @@ export function matchInvites(invited: Invite[], came: CameEmployer[]): { arrived
  * The report sentence on a closed drive. Students, not offers: the pipeline counts students, and a student with two offers, or an
  * internship plus a full-time offer, is one student.
  */
-export function closedDriveFinding(lists: { offers: unknown[]; meetings: unknown[]; hired: unknown[] }): string {
+export function closedDriveFinding(lists: { offers: unknown[]; meetCompleted: unknown[]; hired: unknown[] }): string {
   const n = (c: number, one: string, many: string) => `${c.toLocaleString("en-IN")} ${c === 1 ? one : many}`;
-  return `${n(lists.offers.length, "student got an offer", "students got an offer")}, ${n(lists.meetings.length, "student had a meet", "students had a meet")} and ${n(lists.hired.length, "student was hired", "students were hired")} in this drive.`;
+  return `${n(lists.offers.length, "student got an offer", "students got an offer")}, ${n(lists.meetCompleted.length, "student had a meet", "students had a meet")} and ${n(lists.hired.length, "student was hired", "students were hired")} in this drive.`;
 }

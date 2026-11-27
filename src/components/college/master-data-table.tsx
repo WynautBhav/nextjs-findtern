@@ -13,6 +13,8 @@ import { COFFEE, MARKS, coffeeOf, marksOf, type CoffeeKey, type MarksKey } from 
 import { MASTER_COLUMNS, OUTCOMES, cellText, matchesOutcome, matchesWorkMode, type ColumnGroup, type Outcome, type MasterColumn, type MasterRow } from "@/lib/college/master-row";
 import { ONLINE_WINDOW_MS } from "@/lib/college/constants";
 import { cn } from "@/lib/utils";
+import type { NudgeKind } from "@/lib/college/nudge-plan";
+import { NudgeButton } from "./nudge-button";
 
 /**
  * Master data: every field on the placement office's list, as a table the officer shapes into views (columns,
@@ -331,6 +333,10 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
   /** A set filter is tinted, so the officer sees at a glance which of the twelve are narrowing the list. */
   const on = (active: boolean) => (active ? cn(select, "border-brand-600 bg-brand-50 font-medium text-brand-900") : select);
   const shown = visible.slice(0, limit);
+  // Bug sheet 27 Nov: a list of students to chase gets "Nudge all" once it has more than one. The nudge is the one that
+  // fits the filter: answer a meeting, turn up to a booked one, or reply to an offer.
+  const chase: NudgeKind | null = { "meet-waiting": "meeting", "call-waiting": "meeting", "meet-upcoming": "meeting_reminder", open: "offer" }[filters.outcome as string] as NudgeKind | undefined ?? null;
+  const chaseIds = chase ? visible.filter((r) => r.verified).map((r) => r.userId) : [];
 
   return (
     <div className={embedded ? "flex h-full min-h-0 flex-col gap-3" : "space-y-4"}>
@@ -371,6 +377,9 @@ export function MasterDataTable({ rows, collegeId, now, initial, downloadName, e
             <span className="font-medium text-ink-900">{visible.length.toLocaleString("en-IN")}</span> of {rows.length.toLocaleString("en-IN")} students
           </p>
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            {chase && chaseIds.length > 1 ? (
+              <NudgeButton key={`${chase}-${chaseIds.length}`} kind={chase} userIds={chaseIds} label={`${chase === "meeting_reminder" ? "Remind" : "Nudge"} all ${chaseIds.length.toLocaleString("en-IN")}`} />
+            ) : null}
             <Sheet>
               <SheetTrigger asChild>
                 <button type="button" className={buttonClass({ variant: "outline", size: "sm" }) + " disabled:opacity-50"}><Columns3 className="size-4" aria-hidden />Columns <span className="nums text-ink-500">{columns.length}</span></button>

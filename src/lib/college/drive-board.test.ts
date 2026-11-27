@@ -26,7 +26,7 @@ test("critical lists: unanswered calls, offers waiting on a reply, offline stude
   assert.match(b.lists.offersWaiting[0].detail, /^Offer from Acme · sent 1 h ago$/);
   assert.deepEqual(b.lists.offline.map((s) => s.userId), ["b"]);
   assert.equal(b.offlineKnown, true);
-  assert.deepEqual(b.lists.meetings.map((s) => s.userId), ["b"]);
+  assert.deepEqual([...b.lists.meetBooked, ...b.lists.meetCompleted].map((s) => s.userId), ["b"]);
 });
 
 test("results: offers counted one by one, hires split into internship and full-time", () => {
@@ -148,7 +148,8 @@ test("an unanswered offer whose start day began is lapsed, not 'Offers not answe
   assert.equal(b.offerCount, 2, "a lapsed offer still counts as an offer received");
 });
 
-test("a meet request the company cancelled is not 'asked to meet' (like a withdrawn offer is not an offer)", () => {
+// 27 Nov: offers sent count withdrawn offers (owner), so meets sent count withdrawn meets the same way; each shows its outcome.
+test("a meet request the company withdrew was still asked: it is in Asked to meet and in its own Withdrawn list", () => {
   const b = buildDriveBoard({
     students,
     meetings: [
@@ -159,7 +160,8 @@ test("a meet request the company cancelled is not 'asked to meet' (like a withdr
     offline: null,
     now: NOW,
   });
-  assert.deepEqual(b.lists.called.map((s) => s.userId), ["b"]);
+  assert.deepEqual(b.lists.called.map((s) => s.userId).sort(), ["a", "b"]);
+  assert.deepEqual(b.lists.meetWithdrawn.map((s) => s.userId), ["a"]);
 });
 
 test("INT-07: board times read like the rest of the console (shared ago): under a minute is 'just now', a day later is 'yesterday'", () => {
@@ -260,7 +262,7 @@ test("meetings: sent, accepted, completed (slot over) and expired (no reply past
       { userId: "b", company: "Acme", status: "requested", createdAt: at(20), startsAt: at(15) },
       // b: already marked expired
       { userId: "b", company: "Gamma", status: "expired", createdAt: at(90), startsAt: at(80) },
-      // c: declined -> sent only; and a cancelled one that never counts
+      // c: declined -> not accepted; and one the company withdrew (still a meet sent: withdrawn offers count as sent too)
       { userId: "c", company: "Acme", status: "declined", createdAt: at(10), startsAt: at(5) },
       { userId: "c", company: "Beta", status: "cancelled", createdAt: at(10), startsAt: at(5) },
     ],
@@ -268,16 +270,16 @@ test("meetings: sent, accepted, completed (slot over) and expired (no reply past
     offline: null,
     now: NOW,
   });
-  assert.deepEqual(b.meetCounts, { sent: 5, accepted: 2, completed: 1, expired: 2, declined: 1, cancelled: 1, waiting: 0 });
+  // Owner, 27 Nov: a call whose time passed is Completed only if both joined; calls keep no join record, so Expired.
+  assert.deepEqual({ ...b.meetCounts }, { total: 6, sent: 0, accepted: 1, completed: 0, expired: 4, withdrawn: 1 });
   assert.deepEqual(b.lists.called.map((s) => s.userId).sort(), ["a", "b", "c"]);
-  assert.deepEqual(b.lists.meetings.map((s) => s.userId), ["a"]);
-  assert.deepEqual(b.lists.meetCompleted.map((s) => s.userId), ["a"]);
-  assert.equal(b.lists.meetCompleted[0].detail, "Acme: Completed");
-  assert.deepEqual(b.lists.meetExpired.map((s) => s.userId), ["b"]);
-  assert.equal(b.lists.meetExpired[0].detail, "2 meets expired · Acme, Gamma");
+  assert.deepEqual(b.lists.meetBooked.map((s) => s.userId), ["a"]);
+  assert.deepEqual(b.lists.meetCompleted.map((s) => s.userId), []);
+  assert.deepEqual(b.lists.meetExpired.map((s) => s.userId).sort(), ["a", "b", "c"]);
+  assert.equal(b.lists.meetExpired.find((s) => s.userId === "b")!.detail, "Acme: Expired · not accepted · Gamma: Expired · not accepted");
 });
 
-test("interviews count as meets: picked-slot ones are accepted, marked completed count as completed, missed do not, unpicked wait", () => {
+test("interviews count as meets: marked completed is Completed, missed is Expired, unpicked is Sent", () => {
   const b = buildDriveBoard({
     students,
     meetings: [
@@ -289,8 +291,9 @@ test("interviews count as meets: picked-slot ones are accepted, marked completed
     offline: null,
     now: NOW,
   });
-  assert.deepEqual(b.meetCounts, { sent: 3, accepted: 2, completed: 1, expired: 0, declined: 0, cancelled: 0, waiting: 1 });
+  assert.deepEqual({ ...b.meetCounts }, { total: 3, sent: 1, accepted: 0, completed: 1, expired: 1, withdrawn: 0 });
   assert.deepEqual(b.lists.meetCompleted.map((s) => s.userId), ["a"]);
+  assert.deepEqual(b.lists.meetExpired.map((s) => s.userId), ["b"]);
   assert.deepEqual(b.lists.meetingsWaiting.map((s) => s.userId), ["c"]);
   assert.deepEqual(b.lists.called.map((s) => s.userId).sort(), ["a", "b", "c"]);
 });
@@ -319,11 +322,11 @@ test("26 Nov: declined and cancelled meets, withdrawn offers and shortlists are 
     offline: null,
     now: NOW,
   });
-  assert.deepEqual(b.meetCounts, { sent: 2, accepted: 1, completed: 0, expired: 0, declined: 1, cancelled: 1, waiting: 0 });
-  assert.deepEqual(b.lists.meetDeclined.map((s) => s.userId), ["a"]);
-  assert.equal(b.lists.meetDeclined[0].detail, "Declined a meet with Acme");
-  assert.deepEqual(b.lists.meetCancelled.map((s) => s.userId), ["a"]);
-  assert.equal(b.lists.meetCancelled[0].detail, "Beta: Withdrawn");
+  assert.deepEqual({ ...b.meetCounts }, { total: 3, sent: 0, accepted: 1, completed: 0, expired: 1, withdrawn: 1 });
+  assert.deepEqual(b.lists.meetExpired.map((s) => s.userId), ["a"]);
+  assert.equal(b.lists.meetExpired[0].detail, "Acme: Expired · not accepted");
+  assert.deepEqual(b.lists.meetWithdrawn.map((s) => s.userId), ["a"]);
+  assert.equal(b.lists.meetWithdrawn[0].detail, "Beta: Withdrawn by the company");
   assert.equal(b.offerCount, 1);
   assert.equal(b.withdrawnCount, 1);
   assert.deepEqual(b.lists.offersWithdrawn.map((s) => s.userId), ["b"]);
@@ -359,8 +362,8 @@ test("What happened names every meet's outcome, Withdrawn and Completed included
     offline: null,
     now: NOW,
   });
-  assert.equal(b.lists.called[0].detail, "Gamma: Waiting for reply · Beta: Withdrawn · Acme: Completed");
-  assert.equal(b.lists.meetings[0].detail, "Acme: Completed");
+  assert.equal(b.lists.called[0].detail, "Gamma: Sent, waiting for the student · Beta: Withdrawn by the company · Acme: Completed");
+  assert.equal(b.lists.meetCompleted[0].detail, "Acme: Completed");
 });
 
 test("offer figures: sent, accepted, rejected, withdrawn and hired by kind all come from the same offer rows", () => {
@@ -381,25 +384,27 @@ test("offer figures: sent, accepted, rejected, withdrawn and hired by kind all c
   const mine = rows.filter((o) => ["a", "b", "c"].includes(o.userId));
   const n = (f: (o: OfferRow) => boolean) => mine.filter(f).length;
   const c = b.offerCounts;
-  assert.deepEqual(c, {
-    sent: mine.length, // every offer made, withdrawn ones included (owner, 27 Nov)
+  assert.deepEqual({ ...c }, {
+    total: mine.length, // every offer made, withdrawn ones included (owner, 27 Nov)
+    sent: n((o) => o.status === "sent" && !o.pastStart),
     accepted: n((o) => o.hired || ["accepted", "processing", "hired", "completed"].includes(o.status)),
     rejected: n((o) => !o.hired && ["rejected", "declined"].includes(o.status)),
+    expired: 0,
     withdrawn: n((o) => o.status === "withdrawn"),
     hiredInternship: n((o) => o.hired && !o.fullTime),
     hiredFullTime: n((o) => o.hired && o.fullTime),
   });
-  assert.deepEqual(c, { sent: 9, accepted: 4, rejected: 2, withdrawn: 2, hiredInternship: 1, hiredFullTime: 1 });
-  // Sums: every offer made is accepted, rejected, withdrawn or still without a reply; a hire is an accepted offer.
-  assert.equal(c.sent, c.accepted + c.rejected + c.withdrawn + n((o) => o.status === "sent"));
+  assert.deepEqual({ ...c }, { total: 9, sent: 1, accepted: 4, rejected: 2, expired: 0, withdrawn: 2, hiredInternship: 1, hiredFullTime: 1 });
+  // Sums: every offer made is in one stage (sent, accepted, rejected, expired, withdrawn); a hire is an accepted offer.
+  assert.equal(c.total, c.sent + c.accepted + c.rejected + c.expired + c.withdrawn);
   assert.equal(c.hiredInternship + c.hiredFullTime, n((o) => o.hired));
   assert.ok(c.hiredInternship + c.hiredFullTime <= c.accepted);
   // The tiles' lists are the same offers seen per student.
   assert.deepEqual(b.lists.offersAccepted.map((s) => s.userId).sort(), ["a", "b", "c"]);
   assert.deepEqual(b.lists.offersRejected.map((s) => s.userId).sort(), ["b", "c"]);
-  // The "Got an offer" figure still leaves withdrawn offers out; "Offers sent" does not.
-  assert.equal(c.sent, b.offerCount + c.withdrawn);
-  // The Offers sent tile lists the same offers it counts: a student with only a withdrawn offer is on it too.
+  // The "Got an offer" figure still leaves withdrawn offers out; "Total offers" does not.
+  assert.equal(c.total, b.offerCount + c.withdrawn);
+  // The Total offers tile lists the same offers it counts: a student with only a withdrawn offer is on it too.
   assert.equal(b.lists.offersSent.length, new Set(mine.map((o) => o.userId)).size);
   assert.equal(c.withdrawn, b.withdrawnCount);
   assert.equal(c.hiredInternship + c.hiredFullTime, 2);

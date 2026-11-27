@@ -5,6 +5,7 @@ import { Mail, Phone } from "lucide-react";
 
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import type { BoardItem, BoardKey, DriveBoard } from "@/lib/college/drive-board";
+import { MEET_STAGE_LABEL, type MeetStage } from "@/lib/college/meet-outcome";
 import type { DriveEmployers, EmployerRow } from "@/lib/college/drive-employers";
 import type { DriveSummary } from "@/lib/college/drive-summary";
 import { shortDateTime } from "@/lib/format";
@@ -34,11 +35,17 @@ type Tab = "candidates" | "employers";
 const PAST_ALIAS: Partial<Record<string, BoardKey>> = { meetingsWaiting: "meetExpired", offersWaiting: "unanswered", offline: "all", online: "all", notOpen: "all" };
 const LIST_TITLE: Partial<Record<BoardKey, string>> = {
   all: "Students in the drive",
-  called: "Asked to meet",
-  meetings: "Meets accepted",
-  meetCompleted: "Meets completed",
-  meetExpired: "Meets expired",
-  meetCancelled: "Meets withdrawn",
+  called: "Total meetings",
+  meetingsWaiting: `Meetings: ${MEET_STAGE_LABEL.sent}`,
+  meetBooked: `Meetings: ${MEET_STAGE_LABEL.accepted}`,
+  meetCompleted: `Meetings: ${MEET_STAGE_LABEL.completed}`,
+  meetExpired: `Meetings: ${MEET_STAGE_LABEL.expired}`,
+  meetWithdrawn: `Meetings: ${MEET_STAGE_LABEL.withdrawn}`,
+  offersSent: "Total offers",
+  offersWaiting: "Offers: Sent",
+  offersAccepted: "Offers: Accepted",
+  offersRejected: "Offers: Rejected",
+  offersExpired: "Offers: Expired",
   offersWithdrawn: "Offers withdrawn",
   shortlisted: "Shortlisted",
   offers: "Got an offer",
@@ -177,19 +184,22 @@ export function PastDriveCard({
             <div className="mt-8 grid gap-x-8 gap-y-7 border-t border-white/10 pt-6 sm:grid-cols-2 xl:grid-cols-4">
               <Ledger title="Meetings">
                 <Line label="Shortlisted" value={board.shortlistCount} onClick={() => open(listPop("shortlisted", board))} />
-                <Line label="Meets sent" value={board.meetCounts.sent} onClick={() => open(listPop("called", board))} />
-                <Line label="Accepted" value={board.meetCounts.accepted} onClick={() => open(listPop("meetings", board))} />
-                <Line label="Completed" value={board.meetCounts.completed} onClick={() => open(listPop("meetCompleted", board))} />
-                <Line label="Expired, no reply" value={board.meetCounts.expired} onClick={() => open(listPop("meetExpired", board))} />
-                <Line label="Withdrawn" value={board.meetCounts.cancelled} onClick={() => open(listPop("meetCancelled", board))} />
+                {/* The board's own stages (meet-outcome.ts): the same figures as the tiles, adding up to Total meetings. */}
+                <Line label="Total meetings" value={board.meetCounts.total} onClick={() => open(listPop("called", board))} />
+                {MEET_LINES.map(([key, st]) => (
+                  <Line key={key} label={MEET_STAGE_LABEL[st]} value={board.meetCounts[st]} onClick={() => open(listPop(key, board))} />
+                ))}
               </Ledger>
               <Ledger title="Offers">
-                <Line label="Offers made" value={board.offerCount} onClick={() => open(listPop("offers", board))} />
-                <Line label="Hired, internship" value={L.internships.length} onClick={() => open(listPop("internships", board))} />
-                <Line label="Hired, full-time / PPO" value={L.fullTime.length} gold onClick={() => open(listPop("fullTime", board))} />
-                <Line label="Turned every offer down" value={L.declinedAll.length} onClick={() => open(listPop("declinedAll", board))} />
-                <Line label="Never replied" value={L.unanswered.length} onClick={() => open(listPop("unanswered", board))} />
-                <Line label="Withdrawn by company" value={board.withdrawnCount} onClick={() => open(listPop("offersWithdrawn", board))} />
+                {/* The board's offer stages: the same figures as its tiles, adding up to Total offers. */}
+                <Line label="Total offers" value={board.offerCounts.total} onClick={() => open(listPop("offersSent", board))} />
+                <Line label="Sent, no reply" value={board.offerCounts.sent} onClick={() => open(listPop("offersWaiting", board))} />
+                <Line label="Accepted" value={board.offerCounts.accepted} onClick={() => open(listPop("offersAccepted", board))} />
+                <Line label="Rejected" value={board.offerCounts.rejected} onClick={() => open(listPop("offersRejected", board))} />
+                <Line label="Expired" value={board.offerCounts.expired} onClick={() => open(listPop("offersExpired", board))} />
+                <Line label="Withdrawn" value={board.offerCounts.withdrawn} onClick={() => open(listPop("offersWithdrawn", board))} />
+                <Line label="Hired, internship" value={board.offerCounts.hiredInternship} onClick={() => open(listPop("internships", board))} />
+                <Line label="Hired, full-time / PPO" value={board.offerCounts.hiredFullTime} gold onClick={() => open(listPop("fullTime", board))} />
               </Ledger>
               <Ledger title="Nudges sent">
                 <Line label="Come online" value={board.nudgeCounts.nudgedOnline} onClick={() => open(listPop("nudgedOnline", board))} />
@@ -240,7 +250,7 @@ export function PastDriveCard({
                 />
               </li>
               <li>
-                <Big label="Meets sent" value={board.meetCounts.sent} share={`${n(board.meetCounts.accepted)} accepted`} bar={pct(board.meetCounts.accepted, board.meetCounts.sent)} onClick={() => open(listPop("called", board))} />
+                <Big label="Total meetings" value={board.meetCounts.total} share={`${n(board.meetCounts.completed)} completed`} bar={pct(board.meetCounts.completed, board.meetCounts.total)} onClick={() => open(listPop("called", board))} />
               </li>
               <li>
                 <Big label="Offers made" value={board.offerCount} share={`${n(board.offerSplit.fullTime)} full-time · ${n(board.offerSplit.internship)} internship`} bar={pct(L.offers.length, total)} onClick={() => open(listPop("offers", board))} />
@@ -335,11 +345,19 @@ export function PastDriveCard({
 
 /** The Each company table shows this many rows; View more opens all of them with search, filters and CSV. */
 const COMPANY_ROWS = 5;
+/** The meeting stages and the list each opens: the board's own (meet-outcome.ts). */
+const MEET_LINES: [BoardKey, MeetStage][] = [
+  ["meetingsWaiting", "sent"],
+  ["meetBooked", "accepted"],
+  ["meetCompleted", "completed"],
+  ["meetExpired", "expired"],
+  ["meetWithdrawn", "withdrawn"],
+];
 
 function listPop(key: BoardKey, board: DriveBoard): Pop {
   const rows = board.lists[key].length;
   const note =
-    key === "called" ? `${plural(board.meetCounts.sent, "meet request", "meet requests")} to ${plural(rows, "student", "students")}`
+    key === "called" ? `${plural(board.meetCounts.total, "meeting", "meetings")} with ${plural(rows, "student", "students")}`
     : key === "offers" ? `${plural(board.offerCount, "offer", "offers")} to ${plural(rows, "student", "students")} · ${n(board.offerSplit.fullTime)} full-time / PPO`
     : plural(rows, "student", "students");
   return { kind: "list", key, title: LIST_TITLE[key] ?? "Students", note };
@@ -443,7 +461,7 @@ function Sheet({ children }: { children: React.ReactNode }) {
 
 const COMPANY_LISTS: { key: BoardKey; label: string }[] = [
   { key: "called", label: "Asked to meet" },
-  { key: "meetings", label: "Met" },
+  { key: "meetCompleted", label: "Met" },
   { key: "offers", label: "Offered" },
   { key: "hired", label: "Hired" },
 ];

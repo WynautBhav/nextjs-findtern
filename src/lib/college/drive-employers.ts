@@ -26,7 +26,8 @@ export function countByEmployer(meetings: MeetingFact[], offers: OfferFact[]): M
     if (!c) out.set(id, (c = { meetings: 0, offers: 0, hires: 0 }));
     return c;
   };
-  for (const m of meetings) if ((m.status ?? "").toLowerCase() !== "cancelled") get(m.employerId).meetings++;
+  // Every meet the company asked for, withdrawn ones too: the same count as the board's Meets sent (meet-outcome.ts).
+  for (const m of meetings) get(m.employerId).meetings++;
   for (const o of offers) {
     get(o.employerId).offers++;
     if (o.hiredAt !== null || HIRED.has((o.status ?? "").toLowerCase())) {

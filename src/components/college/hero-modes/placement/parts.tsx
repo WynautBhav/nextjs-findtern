@@ -1,3 +1,4 @@
+import { MEET_STAGE_LABEL } from "@/lib/college/meet-outcome";
 import type { PlacementData } from "@/lib/college/overview-modes";
 import { cn } from "@/lib/utils";
 import { COFFEE_FILL, GOLD, Legend, MARKS_FILL, n, white } from "../kit";
@@ -57,41 +58,35 @@ export function Averages({ data, className }: { data: PlacementData; className?:
 }
 
 /**
- * Meetings with employers: the two figures asked for (conducted, not accepted by the student) and every meeting in
- * one bar, its parts adding up to the total. Legend items open the students behind each part.
+ * Meetings with employers, in the drive board's stages (meet-outcome.ts): Sent, Accepted, Completed, Expired, Withdrawn,
+ * one bar whose parts add up to the total. Legend items open the students behind each part in Master data.
  */
 export function Meetings({ data, className }: { data: PlacementData; className?: string }) {
   const m = data.meetings;
   const parts = [
-    { key: "met", label: "Conducted", v: m.done, fill: GOLD },
-    { key: "meet-upcoming", label: "Booked", v: m.upcoming, fill: white(0.72) },
-    { key: "meet-waiting", label: "Waiting for the student", v: m.waiting, fill: white(0.38) },
-    { key: "not-accepted", label: "Not accepted", v: m.notAccepted, fill: white(0.2) },
-    { key: "meet-missed", label: "Missed", v: m.missed, fill: white(0.15) },
-    { key: "meet-called-off", label: "Called off", v: m.calledOff, fill: white(0.11) },
-    { key: "meet-withdrawn", label: "Withdrawn", v: m.withdrawn, fill: white(0.08) },
-    { key: "meet-other", label: "Not closed", v: m.other, fill: white(0.05) },
+    { key: "met", label: MEET_STAGE_LABEL.completed, v: m.completed, fill: GOLD },
+    { key: "meet-upcoming", label: MEET_STAGE_LABEL.accepted, v: m.accepted, fill: white(0.72) },
+    { key: "meet-waiting", label: MEET_STAGE_LABEL.sent, v: m.sent, fill: white(0.38) },
+    { key: "meet-expired", label: MEET_STAGE_LABEL.expired, v: m.expired, fill: white(0.2) },
+    { key: "meet-any-withdrawn", label: MEET_STAGE_LABEL.withdrawn, v: m.withdrawn, fill: white(0.1) },
   ] as const;
   const title: Record<(typeof parts)[number]["key"], string> = {
-    met: "Students who had a meeting",
-    "meet-upcoming": "Students with a meeting booked",
+    met: "Students who had a completed meeting",
+    "meet-upcoming": "Students with an accepted meeting ahead",
     "meet-waiting": "Students yet to answer a meeting",
-    "not-accepted": "Students who didn't accept a meeting",
-    "meet-missed": "Students who missed a meeting",
-    "meet-called-off": "Students who called off a meeting",
-    "meet-withdrawn": "Students whose meeting the employer withdrew",
-    "meet-other": "Students with a booked meeting never closed",
+    "meet-expired": "Students with an expired meeting",
+    "meet-any-withdrawn": "Students with a withdrawn meeting",
   };
   return (
     <section className={cn("grid gap-x-10 gap-y-4 sm:grid-cols-[auto_1fr] sm:items-end", className)} aria-label="Meetings with employers">
       <div className="flex gap-8">
         <div>
-          <p className="text-[13px] text-on-dark">Meetings conducted</p>
-          <p className="nums mt-1 text-[1.75rem] font-light leading-none tracking-[-0.03em] text-accent-300">{n(m.done)}</p>
+          <p className="text-[13px] text-on-dark">Meetings completed</p>
+          <p className="nums mt-1 text-[1.75rem] font-light leading-none tracking-[-0.03em] text-accent-300">{n(m.completed)}</p>
         </div>
         <div>
-          <p className="text-[13px] text-on-dark">Not accepted</p>
-          <p className="nums mt-1 text-[1.75rem] font-light leading-none tracking-[-0.03em] text-white">{n(m.notAccepted)}</p>
+          <p className="text-[13px] text-on-dark">Expired</p>
+          <p className="nums mt-1 text-[1.75rem] font-light leading-none tracking-[-0.03em] text-white">{n(m.expired)}</p>
         </div>
       </div>
       <div className="min-w-0">
@@ -101,7 +96,7 @@ export function Meetings({ data, className }: { data: PlacementData; className?:
         <div className="flex h-2.5 gap-0.5 overflow-hidden" role="img" aria-label={`${m.total} meetings: ${parts.map((p) => `${p.label} ${p.v}`).join(", ")}`}>
           {m.total ? parts.map((p) => (p.v ? <span key={p.key} style={{ flexGrow: p.v, flexBasis: 0, background: p.fill }} /> : null)) : <span className="flex-1" style={{ background: white(0.08) }} />}
         </div>
-        <Legend className="mt-2.5" items={parts.filter((p) => p.key !== "meet-other" || p.v > 0).map((p) => ({ label: p.label, fill: p.fill, value: p.v, drill: p.v ? { title: title[p.key], filters: { outcome: p.key } } : undefined }))} />
+        <Legend className="mt-2.5" items={parts.map((p) => ({ label: p.label, fill: p.fill, value: p.v, drill: p.v ? { title: title[p.key], filters: { outcome: p.key } } : undefined }))} />
       </div>
     </section>
   );

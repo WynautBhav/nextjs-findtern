@@ -133,14 +133,13 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   // State-machine guard. The legacy routes had none, which meant a withdrawn
   // offer could be accepted afterwards and both parties could be told it was
   // live. Who may withdraw from which state is the one table in proposal-permissions.ts
-  // (employer: unanswered offers only; staff also an accepted, unpaid internship offer). A full-time
-  // acceptance is the hire itself, and a paid one is hired, so neither can be withdrawn.
+  // (employer and staff: until the hire is paid, even after the candidate accepted, internship or full-time).
   const offerForCancel = parseOffer(proposal.offerDetails, proposal.currency);
   if (status === "withdrawn" && (session.role === "employer" || session.role === "admin")) {
     const refused = proposalActionRefusal("withdraw", session.role, { status: proposal.status, hiredAt: proposal.hiredAt, fullTime: Boolean(offerForCancel.fullTime) });
     if (refused) return NextResponse.json({ error: refused }, { status: 409 });
   }
-  const cancelBeforePayment = session.role === "admin" && status === "withdrawn" && proposal.status === "accepted";
+  const cancelBeforePayment = (session.role === "admin" || session.role === "employer") && status === "withdrawn" && proposal.status === "accepted";
   if (cancelBeforePayment && (await hasOpenOrderFor(proposal.employerId, proposal.id))) {
     return NextResponse.json({ error: "A payment for this offer is in progress. Try again in a few minutes." }, { status: 409 });
   }

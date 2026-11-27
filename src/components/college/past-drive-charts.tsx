@@ -208,9 +208,9 @@ function Funnel({ board, open, listPop }: { board: DriveBoard; open: (p: Pop) =>
       ofLabel: "of the drive",
     },
     {
-      key: "meetings",
+      key: "meetCompleted",
       label: "Met an employer",
-      v: L.meetings.length,
+      v: L.meetCompleted.length,
       of: L.called.length,
       ofLabel: "of those asked",
     },

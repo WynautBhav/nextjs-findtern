@@ -40,7 +40,7 @@ test("the Shortlisted card is the length of the list it opens, whichever list th
 });
 
 // Item 28: "Offers sent" is every offer made, so an accepted offer plus a withdrawn one is 2.
-test("Offers sent counts every offer including withdrawn ones, and its list is the same students", () => {
+test("Total offers counts every offer including withdrawn ones, and its list is the same students", () => {
   const b = buildDriveBoard({
     students,
     meetings: [],
@@ -51,7 +51,7 @@ test("Offers sent counts every offer including withdrawn ones, and its list is t
     offline: null,
     now: NOW,
   });
-  assert.equal(b.offerCounts.sent, 2);
+  assert.equal(b.offerCounts.total, 2);
   assert.equal(b.offerCounts.accepted, 1);
   assert.equal(b.offerCounts.withdrawn, 1);
   assert.deepEqual(b.lists.offersSent.map((s) => s.userId).sort(), ["a", "b"]);
@@ -73,11 +73,12 @@ test("a called-off meet shows who called it off and why, with the reason's line 
     offline: null,
     now: NOW,
   });
-  const detail = (id: string) => b.lists.meetCancelled.find((s) => s.userId === id)!.detail;
-  assert.equal(detail("a"), "Acme: Withdrawn\nReason: Role filled.\nWe will write again in Jan.");
-  assert.equal(detail("b"), "Beta: Withdrawn\nStudent's reason: Clash with exam");
-  assert.equal(detail("c"), "Gamma: Withdrawn", "no reason on file: nothing invented");
-  assert.equal(b.lists.meetCancelled.length, b.meetCounts.cancelled);
+  const detail = (id: string) => b.lists.meetWithdrawn.find((s) => s.userId === id)!.detail;
+  assert.equal(detail("a"), "Acme: Withdrawn by the company\nReason: Role filled.\nWe will write again in Jan.");
+  assert.equal(detail("b"), "Beta: Withdrawn by the student\nStudent's reason: Clash with exam");
+  assert.equal(detail("c"), "Gamma: Withdrawn by the company", "no reason on file: nothing invented");
+  // Withdrawn by either side is the one Withdrawn stage (owner, 27 Nov); the line says who.
+  assert.equal(b.lists.meetWithdrawn.length, b.meetCounts.withdrawn);
 });
 
 // The class behind item 27: one number, two definitions. Only the loader may read the drive shortlist table, so every

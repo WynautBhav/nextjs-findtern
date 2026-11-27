@@ -11,13 +11,14 @@ const STATES = ["draft", "sent", "interview_scheduled", "accepted", "processing"
 const row = (status: string, over: Record<string, unknown> = {}) => ({ status, hiredAt: status === "hired" ? "2026-11-01" : null, fullTime: false, ...over });
 const may = (a: ProposalAction, who: ProposalActor, status: string, over: Record<string, unknown> = {}) => proposalActionRefusal(a, who, row(status, over)) === null;
 
-// 27 Nov decision: once the candidate accepts, the employer can't edit or withdraw; only admin can withdraw.
+// 27 Nov (second word from Vaibhav): the employer may withdraw until the hire is paid, even after the candidate accepted
+// (internship or full-time). Editing still closes once the candidate answers.
 const TABLE: Record<(typeof STATES)[number], [edit: [boolean, boolean], withdraw: [boolean, boolean]]> = {
   //                     edit [employer, admin]   withdraw [employer, admin]
   draft: [[true, true], [true, true]],
   sent: [[true, true], [true, true]],
   interview_scheduled: [[true, true], [true, true]],
-  accepted: [[false, true], [false, true]],
+  accepted: [[false, true], [true, true]],
   processing: [[false, false], [false, true]],
   rejected: [[false, false], [false, false]],
   withdrawn: [[false, false], [false, false]],
@@ -33,16 +34,16 @@ for (const status of STATES) {
   });
 }
 
-test("a full-time offer is editable in the same window as an internship (before the answer), then closed to everyone", () => {
+test("a full-time offer: editable until the answer, withdrawable until the fee is paid", () => {
   for (const s of ["draft", "sent", "interview_scheduled"]) {
     assert.ok(may("edit", "employer", s, { fullTime: true }), s);
     assert.ok(may("withdraw", "employer", s, { fullTime: true }), s);
   }
-  for (const s of ["accepted", "processing", "hired"]) {
-    for (const who of ["employer", "admin"] as const) {
-      assert.ok(!may("edit", who, s, { fullTime: true }), `edit ${who} ${s}`);
-      assert.ok(!may("withdraw", who, s, { fullTime: true }), `withdraw ${who} ${s}`);
-    }
+  for (const who of ["employer", "admin"] as const) {
+    assert.ok(may("withdraw", who, "accepted", { fullTime: true }), `withdraw ${who} accepted, unpaid`);
+    assert.ok(!may("withdraw", who, "accepted", { fullTime: true, hiredAt: "2026-11-01" }), `withdraw ${who} accepted, paid`);
+    for (const s of ["accepted", "processing", "hired"]) assert.ok(!may("edit", who, s, { fullTime: true }), `edit ${who} ${s}`);
+    for (const s of ["processing", "hired"]) assert.ok(!may("withdraw", who, s, { fullTime: true }), `withdraw ${who} ${s}`);
   }
 });
 
@@ -51,16 +52,23 @@ test("an expired offer (computed, still stored as sent) is refused with the expi
   assert.match(proposalActionRefusal("withdraw", "admin", row("sent", { expired: true })) ?? "", /expired/);
 });
 
-test("the words for an accepted offer tell the employer why and where to go", () => {
-  for (const a of ["edit", "withdraw"] as const) assert.match(proposalActionRefusal(a, "employer", row("accepted")) ?? "", /candidate accepted.*Findtern/);
+test("the words for editing an accepted offer tell the employer why and what is still possible", () => {
+  assert.match(proposalActionRefusal("edit", "employer", row("accepted")) ?? "", /candidate accepted.*withdraw/);
+  assert.equal(proposalActionRefusal("withdraw", "employer", row("accepted")), null);
 });
 
-test("the employer screens read the same table: no Edit or Withdraw once accepted, with or without a CGPA check open", () => {
+test("the employer screens read the same table: Withdraw but no Edit once accepted and unpaid, with or without a CGPA check open", () => {
   const AHEAD = { startDate: "2099-01-10", fullTime: null };
   for (const gate of [null, { state: "pending" }, { state: "overdue" }, { state: "incorrect_unacked", correctedFrom: "8.1", correctedTo: "7.4" }]) {
     const s = offerState({ status: "accepted", hiredAt: null, gate: gate as never }, AHEAD);
-    assert.deepEqual([s.canEdit, s.canWithdraw], [false, false], JSON.stringify(gate));
-    assert.doesNotMatch(s.next, /withdraw|edit the offer/i, s.next);
+    assert.deepEqual([s.canEdit, s.canWithdraw], [false, true], JSON.stringify(gate));
+    assert.doesNotMatch(s.next, /edit the offer/i, s.next);
+  }
+  for (const fullTime of [null, {}]) {
+    const paid = offerState({ status: "accepted", hiredAt: "2026-11-01" }, { startDate: "2099-01-10", fullTime: fullTime as never });
+    assert.deepEqual([paid.canEdit, paid.canWithdraw], [false, false], "paid: nothing");
+    const unpaid = offerState({ status: "accepted", hiredAt: null }, { startDate: "2099-01-10", fullTime: fullTime as never });
+    assert.equal(unpaid.canWithdraw, true, `unpaid ${fullTime ? "full-time" : "internship"}`);
   }
   for (const status of ["draft", "sent", "interview_scheduled"]) {
     const s = offerState({ status, hiredAt: null }, AHEAD);
@@ -78,7 +86,9 @@ test("both routes and the screens go through the one table", () => {
   assert.match(edit, /proposalActionRefusal\("edit", session\.role/);
   assert.match(status, /proposalActionRefusal\("withdraw", session\.role/);
   assert.doesNotMatch(edit, /const EDITABLE/);
-  assert.doesNotMatch(status, /\|\| session\.role === "employer"\) &&\s*status === "withdrawn"/);
+  // An accepted, unpaid withdrawal (either role) goes through the open-order check before it is allowed.
+  assert.match(status, /cancelBeforePayment = \(session\.role === "admin" \|\| session\.role === "employer"\)/);
+  assert.match(status, /cancelBeforePayment && \(await hasOpenOrderFor/);
 });
 
 test("offer letter key: the employer's own, and a PDF (the key's extension comes from the sniffed bytes)", () => {

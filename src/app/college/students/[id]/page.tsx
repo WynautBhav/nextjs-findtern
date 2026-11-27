@@ -15,7 +15,8 @@ import { StudentRemove } from "@/components/college/student-remove";
 import { humanizeStatus, proposalStatus } from "@/components/app/status";
 import { aiInterviewLinks } from "@/lib/ai-interview-links";
 import { interviewLifecycle } from "@/lib/interview-lifecycle";
-import { effectiveStatus } from "@/lib/college/meetings";
+import { MEET_LABEL, interviewMeetStatus, meetOutcome } from "@/lib/college/meet-outcome";
+import { feedbackForIntern } from "@/lib/interview-feedback";
 import { meetNudgeKind, type MeetNudgeKind } from "@/lib/college/drive-board";
 import { cgpaText } from "@/lib/college/master-row";
 import { aiStatusLabel, cohortGoal, membershipLabel, yearLabel, ago } from "@/lib/college/labels";
@@ -114,7 +115,7 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
       : db
         .select({ i: schema.interviews })
         .from(schema.interviews)
-        .where(and(eq(schema.interviews.internId, id), realEmployerId(schema.interviews.employerId), inArray(schema.interviews.status, ["scheduled", "completed", "pending", "expired", "missed", "cancelled"])))
+        .where(and(eq(schema.interviews.internId, id), realEmployerId(schema.interviews.employerId)))
         .orderBy(desc(schema.interviews.createdAt)),
     !verified
       ? Promise.resolve([])
@@ -161,7 +162,18 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
   // Contact details only through the verified profile: a claimed student stays redacted.
   const phone = profile?.phone ?? null;
   const linkedin = profile?.links.linkedin ?? "";
-  const meetings = interviews.length + calls.length;
+  // Each meet read once, by the rules every college screen counts (meet-outcome.ts): a rescheduled invite is no meet.
+  const now = requestTime();
+  const ivMeets = interviews.flatMap(({ i }) => {
+    const slots = [i.slot1, i.slot2, i.slot3];
+    const picked = i.selectedSlot && i.selectedSlot >= 1 && i.selectedSlot <= 3 ? slots[i.selectedSlot - 1] : null;
+    const status = interviewMeetStatus(interviewLifecycle(i).state, Boolean(picked));
+    if (status === null) return [];
+    const outcome = meetOutcome({ status, startsAt: picked, cancelledBy: i.cancelledBy }, now);
+    const feedback = outcome === "conducted" || outcome === "missed" ? feedbackForIntern(i.notes) : "";
+    return [{ i, status, outcome, feedback }];
+  });
+  const meetings = ivMeets.length + calls.length;
   const education = profile?.education ? [profile.education.degree, profile.education.branch, profile.education.institution, profile.education.year].filter(Boolean).join(" · ") : "";
 
   return (
@@ -405,23 +417,29 @@ export default async function CollegeStudentPage({ params }: { params: Promise<{
                       {shortDateTime(m.startsAt, { timeZone: "Asia/Kolkata", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })} IST
                     </p>
                   </div>
-                  <MeetStatus pill={humanizeStatus(effectiveStatus(m, requestTime()))} nudge={meetNudgeKind(m, requestTime())} userId={id} />
+                  <MeetStatus pill={MEET_LABEL[meetOutcome(m, now)]} nudge={meetNudgeKind(m, now)} userId={id} />
                 </li>
               ))}
-              {interviews.map(({ i }) => (
+              {ivMeets.map(({ i, status, outcome, feedback }) => (
                 <li key={i.id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
                   <div className="min-w-0">
                     <p className="font-medium text-ink-900">Interview · {i.createdAt ? shortDateTime(i.createdAt, { day: "numeric", month: "short" }) : "requested"}</p>
                     {/* Bug sheet 25 Nov: the officer sees a cancelled interview, who cancelled it and the reason when one was given
                         (stored with names and contact details masked before a hire). */}
-                    {interviewLifecycle(i).state === "cancelled" && (i.cancelledBy || i.cancelReason) ? (
+                    {status === "cancelled" && (i.cancelledBy || i.cancelReason) ? (
                       <p className="mt-0.5 text-sm text-ink-600">
                         {i.cancelledBy === "employer" ? "The company cancelled." : i.cancelledBy === "intern" ? "The student cancelled." : null}
                         {i.cancelReason ? <> Reason: <span className="whitespace-pre-line text-ink-800">{i.cancelReason}</span></> : null}
                       </p>
                     ) : null}
+                    {/* Bug sheet 27 Nov: a conducted (or missed) interview shows the company's feedback, as the student sees it. */}
+                    {feedback ? (
+                      <p className="mt-0.5 text-sm text-ink-600">
+                        Feedback: <span className="whitespace-pre-line text-ink-800">{feedback}</span>
+                      </p>
+                    ) : null}
                   </div>
-                  <MeetStatus pill={interviewLifecycle(i).label === "Waiting on candidate" ? humanizeStatus(i.status) : interviewLifecycle(i).label} nudge={interviewNudge(interviewLifecycle(i).state)} userId={id} />
+                  <MeetStatus pill={MEET_LABEL[outcome]} nudge={interviewNudge(interviewLifecycle(i).state)} userId={id} />
                 </li>
               ))}
             </ul>

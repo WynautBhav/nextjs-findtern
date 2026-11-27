@@ -138,7 +138,7 @@ export async function PUT(
           message: "The meeting link for your interview has been added. Open your interviews to join.",
           data,
           dedupeKey,
-          email: gate ? emails.interviewLinkReady({ name: await internFirstName(existing.internId), link: gate, forEmployer: false }) : undefined,
+          email: gate ? emails.interviewLinkReady({ name: await internFirstName(existing.internId), forEmployer: false }) : undefined,
         });
         await notify({
           to: { type: "employer", id: existing.employerId },
@@ -147,7 +147,7 @@ export async function PUT(
           message: "The meeting link for your interview has been added. Open your schedule to join.",
           data,
           dedupeKey,
-          email: gate ? emails.interviewLinkReady({ name: (await employerNames(existing.employerId)).contact, link: gate, forEmployer: true }) : undefined,
+          email: gate ? emails.interviewLinkReady({ name: (await employerNames(existing.employerId)).contact, forEmployer: true }) : undefined,
         });
       } catch (notifyErr) {
         console.error("Interview link notification failed:", notifyErr);

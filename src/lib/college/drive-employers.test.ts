@@ -7,7 +7,7 @@ const NOW = Date.parse("2026-11-23T10:00:00Z");
 const minAgo = (m: number) => new Date(NOW - m * 60_000);
 const came = (id: string, company: string, email: string) => ({ employerId: id, company, contact: "Ria", email, phone: null, joinedAt: minAgo(500) });
 
-test("counts: cancelled meets are out, offers count one by one, a student hired twice is one hire", () => {
+test("counts: every meet the company asked for (withdrawn too, as Meets sent), offers one by one, a student hired twice is one hire", () => {
   const c = countByEmployer(
     [{ employerId: "e1", status: "accepted" }, { employerId: "e1", status: "requested" }, { employerId: "e1", status: "cancelled" }, { employerId: "e2", status: "declined" }],
     [
@@ -18,7 +18,7 @@ test("counts: cancelled meets are out, offers count one by one, a student hired 
       { employerId: "e2", userId: "a", status: "declined", hiredAt: null },
     ],
   );
-  assert.deepEqual(c.get("e1"), { meetings: 2, offers: 4, hires: 2 });
+  assert.deepEqual(c.get("e1"), { meetings: 3, offers: 4, hires: 2 });
   assert.deepEqual(c.get("e2"), { meetings: 1, offers: 1, hires: 0 });
 });
 

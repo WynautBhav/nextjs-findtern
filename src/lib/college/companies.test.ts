@@ -82,7 +82,7 @@ test("a company name that starts like a formula cannot run in a spreadsheet", ()
 test("the loader reads only this college's drives and the companies that came to those drives", () => {
   const db = read("lib/college/companies-db.ts");
   assert.match(db, /eq\(schema\.collegeDrives\.collegeId, ctx\.college\.id\)/);
-  assert.ok(db.includes("driveEmployerContacts(drive.id)"), "companies are read per drive of this college, never by employer");
+  assert.ok(db.includes("loadDrivePool(drive, ids)"), "companies are read per drive of this college (its one pool), never by employer");
   assert.ok(!/from\(schema\.employers\)/.test(db), "no company table scan");
 });
 

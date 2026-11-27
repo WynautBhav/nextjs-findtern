@@ -64,19 +64,20 @@ export type MasterRow = {
 };
 
 /**
- * A student's employer meetings: done = completed; notAccepted = the invite lapsed with no slot picked, or a legacy
- * declined/rejected; missed = the student didn't show; calledOff = the student cancelled; withdrawn = the employer cancelled;
- * upcoming = booked (scheduled); waiting = times offered, no answer yet (pending). The rest: booked, never closed after its time.
+ * A student's meetings (interviews and drive calls), one outcome each (meet-outcome.ts): done = completed; upcoming =
+ * accepted; waiting = sent; missed; notJoined = an accepted call whose time passed with no join record; notClosed = a
+ * picked interview time passed and the company never marked it; notAccepted; withdrawn = the company called it off;
+ * calledOff = the student did. They add up to total; missed + notJoined + notClosed + notAccepted is the Expired stage.
  */
 export type Meetings = {
-  total: number; done: number; missed: number; calledOff: number; withdrawn: number; notAccepted: number; upcoming: number; waiting: number;
-  /** Live calls inside a campus drive (not part of `total`): accepted (held), not taken (declined or lapsed), waiting. */
+  total: number; done: number; missed: number; calledOff: number; withdrawn: number; notAccepted: number; upcoming: number; waiting: number; notClosed: number; notJoined: number;
+  /** The drive calls among them: accepted (booked or conducted), not taken (declined or lapsed), waiting. */
   callsAccepted: number; callsNotTaken: number; callsWaiting: number;
 };
-export const NO_MEETINGS: Meetings = { total: 0, done: 0, missed: 0, calledOff: 0, withdrawn: 0, notAccepted: 0, upcoming: 0, waiting: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 };
+export const NO_MEETINGS: Meetings = { total: 0, done: 0, missed: 0, calledOff: 0, withdrawn: 0, notAccepted: 0, upcoming: 0, waiting: 0, notClosed: 0, notJoined: 0, callsAccepted: 0, callsNotTaken: 0, callsWaiting: 0 };
 
 /** Drill-down groups from the Placement analysis: the students behind each block. "" = everyone. */
-export type Outcome = "" | "no-offer" | "accepted" | "open" | "rejected" | "withdrawn" | "met" | "meet-upcoming" | "meet-waiting" | "not-accepted" | "meet-missed" | "meet-called-off" | "meet-withdrawn" | "meet-other" | "call-took" | "call-waiting" | "call-not-taken";
+export type Outcome = "" | "no-offer" | "accepted" | "open" | "rejected" | "withdrawn" | "met" | "meet-upcoming" | "meet-waiting" | "not-accepted" | "meet-missed" | "meet-called-off" | "meet-withdrawn" | "meet-other" | "meet-expired" | "meet-any-withdrawn" | "call-took" | "call-waiting" | "call-not-taken";
 export const OUTCOMES: { key: Exclude<Outcome, "">; label: string }[] = [
   { key: "no-offer", label: "Interviewed, no offer" },
   { key: "accepted", label: "Accepted an offer" },
@@ -91,12 +92,14 @@ export const OUTCOMES: { key: Exclude<Outcome, "">; label: string }[] = [
   { key: "meet-called-off", label: "Called off a meeting" },
   { key: "meet-withdrawn", label: "Meeting withdrawn by the employer" },
   { key: "meet-other", label: "Meeting booked, not closed" },
+  { key: "meet-expired", label: "Meeting expired" },
+  { key: "meet-any-withdrawn", label: "Meeting withdrawn" },
   { key: "call-took", label: "Drive meets: accepted" },
   { key: "call-waiting", label: "Drive meets: not answered" },
   { key: "call-not-taken", label: "Drive meets: declined or lapsed" },
 ];
 const withdrawnOf = (r: MasterRow) => r.offers - r.offersAccepted - r.offersRejected - r.offersLapsed - r.offersOpen;
-const meetOtherOf = (m: Meetings) => m.total - m.done - m.notAccepted - m.upcoming - m.waiting - m.missed - m.calledOff - m.withdrawn;
+const meetOtherOf = (m: Meetings) => m.notClosed;
 
 export function matchesOutcome(r: MasterRow, o: Outcome): boolean {
   switch (o) {
@@ -114,6 +117,8 @@ export function matchesOutcome(r: MasterRow, o: Outcome): boolean {
     case "meet-called-off": return r.meetings.calledOff > 0;
     case "meet-withdrawn": return r.meetings.withdrawn > 0;
     case "meet-other": return meetOtherOf(r.meetings) > 0;
+    case "meet-expired": return r.meetings.missed + r.meetings.notJoined + r.meetings.notClosed + r.meetings.notAccepted > 0;
+    case "meet-any-withdrawn": return r.meetings.withdrawn + r.meetings.calledOff > 0;
     case "call-took": return r.meetings.callsAccepted > 0;
     case "call-waiting": return r.meetings.callsWaiting > 0;
     case "call-not-taken": return r.meetings.callsNotTaken > 0;

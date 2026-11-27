@@ -1,10 +1,9 @@
-import { and, eq, gte, inArray, lte, ne, sql, type AnyColumn } from "drizzle-orm";
+import { and, gte, inArray, lte, sql, type AnyColumn } from "drizzle-orm";
 
-import { realEmployerId } from "@/lib/admin/scope";
 import { getDb, schema } from "@/lib/db";
-import { loadDriveInterviews } from "./drive-interviews-db";
+import type { DrivePool } from "./drive-board-db";
 import { buildDriveSummary, NUDGE_WINDOW_MS, type DriveSummary, type SummaryStudent } from "./drive-summary";
-import { matchInvites, type CameEmployer } from "./drive-board";
+import { matchInvites } from "./drive-board";
 import type { Drive } from "./scope";
 
 /** Plain `timestamp` columns hold UTC wall time; read them as instants (as drive-board-db.ts does). */
@@ -15,45 +14,19 @@ const instant = (v: unknown): Date | null => (v ? new Date(v as string) : null);
  * Reads what the summary needs for one drive, already scoped by the caller: `students` are the drive's verified
  * students of this officer's college, `came` the companies that came in through its link.
  */
-export async function loadDriveSummary(drive: Drive, students: SummaryStudent[], came: CameEmployer[], open: boolean): Promise<DriveSummary> {
+export async function loadDriveSummary(drive: Drive, students: SummaryStudent[], pool: DrivePool, open: boolean): Promise<DriveSummary> {
   const db = getDb();
   const start = drive.startsAt;
   const end = drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt;
   const ids = students.map((s) => s.userId);
-  const employerIds = came.map((c) => c.employerId);
-  const people = [...ids, ...employerIds];
-  const p = schema.proposals;
+  const came = pool.came;
+  const people = [...ids, ...came.map((c) => c.employerId)];
   const pm = schema.presenceMinutes;
-  const n = schema.collegeNudges;
-
-  const [calls, offers, nudges, minuteRows, [since], interviews] = await Promise.all([
-    db
-      .select({ userId: schema.collegeDriveMeetings.userId, employerId: schema.collegeDriveMeetings.employerId, status: schema.collegeDriveMeetings.status, createdAt: utc(schema.collegeDriveMeetings.createdAt), respondedAt: sql<string | null>`(${schema.collegeDriveMeetings.respondedAt} AT TIME ZONE 'UTC')` })
-      .from(schema.collegeDriveMeetings)
-      .where(eq(schema.collegeDriveMeetings.driveId, drive.id)),
-    // The same offers the drive board counts: from companies that came, to the drive's students, sent inside the window.
-    ids.length && employerIds.length
-      ? db
-          .select({
-            userId: p.internId,
-            employerId: p.employerId,
-            status: p.status,
-            hiredAt: p.hiredAt,
-            createdAt: utc(p.createdAt),
-            answeredAt: sql<string | null>`coalesce(
-              nullif(${p.offerDetails}->>'acceptedAt', '')::timestamptz,
-              nullif(${p.offerDetails}->>'declinedAt', '')::timestamptz,
-              CASE WHEN ${p.status} IN ('accepted', 'rejected', 'processing', 'hired', 'completed') THEN ${p.updatedAt} AT TIME ZONE 'UTC' END)`,
-          })
-          .from(p)
-          .where(and(inArray(p.internId, ids), inArray(p.employerId, employerIds), gte(p.createdAt, start), lte(p.createdAt, end), ne(p.status, "draft"), ne(p.status, "withdrawn"), realEmployerId(p.employerId)))
-      : Promise.resolve([]),
-    ids.length
-      ? db
-          .select({ userId: n.userId, kind: n.kind, createdAt: utc(n.createdAt) })
-          .from(n)
-          .where(and(eq(n.collegeId, drive.collegeId), inArray(n.userId, ids), gte(n.createdAt, start), lte(n.createdAt, end)))
-      : Promise.resolve([]),
+  // Meetings, offers and nudges come from the drive's one pool (the board's own rows); only online time is read here.
+  const { meets: meetings, nudges } = pool;
+  // An offer the company withdrew is no offer to the student (the board's "Got an offer" leaves it out too).
+  const offers = pool.offers.filter((o) => o.status !== "withdrawn");
+  const [minuteRows, [since]] = await Promise.all([
     // Minutes online inside the window, and (for checking "come online" nudges) up to a day after it.
     people.length
       ? db
@@ -62,9 +35,7 @@ export async function loadDriveSummary(drive: Drive, students: SummaryStudent[],
           .where(and(inArray(pm.userId, people), gte(pm.minute, start), lte(pm.minute, new Date(end.getTime() + NUDGE_WINDOW_MS))))
       : Promise.resolve([]),
     db.select({ first: sql<string | null>`(min(${pm.minute}) AT TIME ZONE 'UTC')` }).from(pm),
-    loadDriveInterviews(drive, ids, employerIds),
   ]);
-  const meetings = [...calls.map((m) => ({ ...m, respondedAt: instant(m.respondedAt) })), ...interviews];
 
   const minutes = new Map<string, number>();
   const stamps = new Map<string, number[]>();
@@ -83,7 +54,8 @@ export async function loadDriveSummary(drive: Drive, students: SummaryStudent[],
     trackingSince: instant(since?.first),
     students,
     meetings,
-    offers: offers.map((o) => ({ userId: o.userId, employerId: o.employerId, status: (o.status ?? "").toLowerCase(), hired: o.hiredAt !== null, createdAt: o.createdAt, answeredAt: instant(o.answeredAt) })),
+    now: pool.now,
+    offers: offers.map((o) => ({ userId: o.userId, employerId: o.employerId, status: o.status, hired: o.hiredAt !== null, createdAt: o.createdAt, answeredAt: o.answeredAt })),
     nudges,
     minutes,
     onlineAt: (userId, from, to) => (stamps.get(userId) ?? []).some((t) => t > from.getTime() && t <= to.getTime()),

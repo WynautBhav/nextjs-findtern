@@ -6,6 +6,7 @@ import { Phone, Search } from "lucide-react";
 
 import { SURFACE_CLASS } from "@/components/app/primitives";
 import type { BoardItem, BoardKey, DriveBoard, NudgeHistoryKind } from "@/lib/college/drive-board";
+import { MEET_STAGE_LABEL } from "@/lib/college/meet-outcome";
 import { yearLabel } from "@/lib/college/labels";
 import { matches } from "@/lib/college/pop-table";
 import { cn } from "@/lib/utils";
@@ -38,27 +39,48 @@ const NUDGES: Tile[] = [
 const ALL_STUDENTS: Tile = { key: "all", label: "Total students", hint: () => "Verified, in the drive" };
 /** Under a meeting figure: how many different students it covers. */
 const ofStudents = (n: number, none: string) => (n ? `${n} ${n === 1 ? "student" : "students"}` : none);
-/** Meet requests from employers, counted one by one; each opens its students. Live and past alike. */
+/**
+ * Owner, 27 Nov: Total, Sent (waiting on the student: nudge), Accepted, Completed, Expired, Withdrawn, for meetings and
+ * offers alike. Every meeting and offer is in exactly one stage (meet-outcome.ts, drive-board.ts offerStage), so the
+ * stages add up to the total, and the summary and the dashboard read the same stages.
+ */
+const stageHint = (hint: string) => (n: number) => (n ? `${ofStudents(n, "")} · ${hint}` : "None");
 const MEETINGS: Group = {
   title: "Meetings",
   tiles: [
-    { key: "called", label: "Meets sent", figure: (b) => b.meetCounts.sent, hint: (n) => ofStudents(n, "No meet request yet") },
-    { key: "meetings", label: "Meets accepted", figure: (b) => b.meetCounts.accepted, hint: (n) => ofStudents(n, "None accepted") },
-    { key: "meetCompleted", label: "Meets completed", figure: (b) => b.meetCounts.completed, hint: (n) => (n ? `${ofStudents(n, "")} · accepted, time over` : "None yet") },
-    { key: "meetExpired", label: "Meets expired", figure: (b) => b.meetCounts.expired, hint: (n) => (n ? `${ofStudents(n, "")} · no reply in time` : "None expired") },
-    // A meet the company called off reads "Withdrawn"; students can't decline a meet, so there is no Declined tile (26 Nov PDF).
-    { key: "meetCancelled", label: "Meets withdrawn", figure: (b) => b.meetCounts.cancelled, hint: (n) => (n ? `${ofStudents(n, "")} · called off by the company` : "None withdrawn") },
+    { key: "called", label: "Total meetings", figure: (b) => b.meetCounts.total, hint: (n) => ofStudents(n, "No meeting asked for yet") },
+    { key: "meetingsWaiting", label: MEET_STAGE_LABEL.sent, figure: (b) => b.meetCounts.sent, hint: stageHint("waiting for the student's reply"), nudge: "meeting" },
+    { key: "meetBooked", label: MEET_STAGE_LABEL.accepted, figure: (b) => b.meetCounts.accepted, hint: stageHint("time still ahead") },
+    { key: "meetCompleted", label: MEET_STAGE_LABEL.completed, figure: (b) => b.meetCounts.completed, hint: stageHint("the company and the student met") },
+    { key: "meetExpired", label: MEET_STAGE_LABEL.expired, figure: (b) => b.meetCounts.expired, hint: stageHint("not accepted, not joined or time over") },
+    { key: "meetWithdrawn", label: MEET_STAGE_LABEL.withdrawn, figure: (b) => b.meetCounts.withdrawn, hint: stageHint("called off") },
   ],
 };
 const OFFER_COUNTS = (b: DriveBoard) => `${b.offerCount} ${b.offerCount === 1 ? "offer" : "offers"} · ${b.offerSplit.internship} internship · ${b.offerSplit.fullTime} full-time / PPO`;
+
+const OFFERS: Group = {
+    // Owner, 27 Nov: offers read like meetings (Total, Sent, Accepted, Rejected, Expired, Withdrawn: they add up to the
+    // total), and the hires split by kind. Offers counted one by one (drive-board.ts offerStage).
+    title: "Offers",
+    tiles: [
+      { key: "offersSent", label: "Total offers", figure: (b) => b.offerCounts.total, hint: (n) => ofStudents(n, "No offer yet") },
+      { key: "offersWaiting", label: "Sent", figure: (b) => b.offerCounts.sent, hint: stageHint("waiting for the student's reply"), nudge: "offer" },
+      { key: "offersAccepted", label: "Accepted", figure: (b) => b.offerCounts.accepted, hint: (n) => ofStudents(n, "None accepted") },
+      { key: "offersRejected", label: "Rejected", figure: (b) => b.offerCounts.rejected, hint: (n) => ofStudents(n, "None rejected") },
+      { key: "offersExpired", label: "Expired", figure: (b) => b.offerCounts.expired, hint: stageHint("no reply or not paid before the start day") },
+      { key: "offersWithdrawn", label: "Withdrawn", figure: (b) => b.offerCounts.withdrawn, hint: (n) => (n ? `${ofStudents(n, "")} · taken back by the company` : "None withdrawn") },
+      { key: "internships", label: "Hired: internship", figure: (b) => b.offerCounts.hiredInternship, hint: (n) => ofStudents(n, "No hire yet") },
+      { key: "fullTime", label: "Hired: full-time", figure: (b) => b.offerCounts.hiredFullTime, hint: (n) => ofStudents(n, "No hire yet") },
+    ],
+  };
 
 /** While the drive runs: what needs the officer now (his order: calls, offers, offline, then Open to work), who is here, what it produced. */
 const LIVE: Group[] = [
   {
     title: "Needs you now",
     tiles: [
-      { key: "meetingsWaiting", label: "Drive meets not answered", hint: (n) => (n ? "An employer asked; the student hasn't replied" : "Every meet request is answered"), nudge: "meeting", critical: true },
-      { key: "offersWaiting", label: "Offers not answered", hint: (n) => (n ? "Neither accepted nor declined yet" : "Every offer has a reply"), nudge: "offer", critical: true },
+      { key: "meetingsWaiting", label: "Meetings sent, no reply", figure: (b) => b.meetCounts.sent, hint: (n) => (n ? ofStudents(n, "") : "Every meeting is answered"), nudge: "meeting", critical: true },
+      { key: "offersWaiting", label: "Offers sent, no reply", figure: (b) => b.offerCounts.sent, hint: (n) => (n ? ofStudents(n, "") : "Every offer has a reply"), nudge: "offer", critical: true },
       { key: "offline", label: "Offline now", hint: (n) => (n ? "Each shows when last seen" : "Everyone is online"), nudge: "online", critical: true, ofTotal: true, needsPresence: true },
       { key: "notOpen", label: "Not open to work", hint: (n) => (n ? "Employers can't find them" : "Everyone is open to work"), nudge: "open_to_work", critical: true, ofTotal: true },
     ],
@@ -73,40 +95,23 @@ const LIVE: Group[] = [
     ],
   },
   MEETINGS,
-  {
-    // Owner, 27 Nov: sent, accepted, rejected, withdrawn, hired (internship), hired (full-time). Offers counted one by one (drive-board.ts offerCounts).
-    title: "Offers",
-    tiles: [
-      { key: "offersSent", label: "Offers sent", figure: (b) => b.offerCounts.sent, hint: (n) => ofStudents(n, "No offer yet") },
-      { key: "offersAccepted", label: "Accepted", figure: (b) => b.offerCounts.accepted, hint: (n) => ofStudents(n, "None accepted") },
-      { key: "offersRejected", label: "Rejected", figure: (b) => b.offerCounts.rejected, hint: (n) => ofStudents(n, "None rejected") },
-      { key: "offersWithdrawn", label: "Withdrawn", figure: (b) => b.offerCounts.withdrawn, hint: (n) => (n ? `${ofStudents(n, "")} · taken back by the company` : "None withdrawn") },
-      { key: "internships", label: "Hired: internship", figure: (b) => b.offerCounts.hiredInternship, hint: (n) => ofStudents(n, "No hire yet") },
-      { key: "fullTime", label: "Hired: full-time", figure: (b) => b.offerCounts.hiredFullTime, hint: (n) => ofStudents(n, "No hire yet") },
-    ],
-  },
+  OFFERS,
   { title: "Nudges sent", tiles: NUDGES },
 ];
 /** Once it is over: read-only. Who got what, who placed, and the nudges that were sent. */
 const PAST: Group[] = [
   {
-    title: "Offers",
+    title: "Students",
     tiles: [
       ALL_STUDENTS,
       { key: "offers", label: "Got an offer", hint: (n, b) => (n ? OFFER_COUNTS(b) : "No offer was made") },
-      { key: "declinedAll", label: "Didn't accept any offer", hint: (n) => (n ? "Had offers and said no to each" : "Nobody turned every offer down") },
+      { key: "hired", label: "Hired", hint: (n) => (n ? "Hired by a company" : "No hire") },
       { key: "unanswered", label: "Didn't answer any offer", hint: (n) => (n ? "Had offers and never replied" : "Everyone replied to something") },
     ],
   },
-  {
-    title: "Placed",
-    tiles: [
-      { key: "hired", label: "Hired", hint: (n) => (n ? "Hired by a company" : "No hire") },
-      { key: "internships", label: "Internship", hint: (n) => (n ? "Hired for an internship" : "No internship hire") },
-      { key: "fullTime", label: "Full-time / PPO", hint: (n) => (n ? "Hired for a full-time or PPO role" : "No full-time hire") },
-    ],
-  },
+  // The same Meetings and Offers figures as while the drive ran: one set of stages, live and past.
   MEETINGS,
+  OFFERS,
   { title: "Nudges sent", tiles: NUDGES },
 ];
 /** Opened from the hero's pipeline; not tiles of their own. */
@@ -123,6 +128,7 @@ const GRID = {
   2: "grid grid-cols-2 divide-x divide-ink-100 border-b border-ink-100",
   3: "grid grid-cols-3 divide-x divide-ink-100 border-b border-ink-100",
   6: "grid grid-cols-2 divide-ink-100 border-b border-ink-100 max-sm:[&>*:nth-child(n+3)]:border-t max-sm:[&>*:nth-child(even)]:border-l sm:grid-cols-3 sm:[&>*:nth-child(n+4)]:border-t sm:[&>*:not(:nth-child(3n+1))]:border-l",
+  8: "grid grid-cols-2 divide-ink-100 border-b border-ink-100 max-sm:[&>*:nth-child(n+3)]:border-t max-sm:[&>*:nth-child(even)]:border-l sm:grid-cols-4 sm:[&>*:nth-child(n+5)]:border-t sm:[&>*:not(:nth-child(4n+1))]:border-l",
   4: "grid grid-cols-2 divide-ink-100 border-b border-ink-100 max-sm:[&>*:nth-child(n+3)]:border-t max-sm:[&>*:nth-child(even)]:border-l sm:grid-cols-4 sm:divide-x",
 } as const;
 
@@ -153,6 +159,17 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
   // Nudging is for a running drive only. On a nudge-history list it goes to who still needs it, not to everyone once nudged.
   const canNudge = Boolean(tile.nudge) && open;
   const nudgeIds = (tile.key.startsWith("nudged") ? rows.filter((r) => r.again) : rows).map((r) => r.userId);
+  // "Nudge all" wherever a list has more than one student to chase (bug sheet 27 Nov); one student has the row's own button.
+  // A list without a nudge of its own (Meets sent, Booked) chases each student's meets: a reply, or a reminder to turn up.
+  const meetIds = (k: "meeting" | "meeting_reminder") => rows.filter((r) => r.meetNudge === k).map((r) => r.userId);
+  const batches: { kind: NudgeHistoryKind | "interview" | "meeting_reminder"; ids: string[]; label: string }[] = !open
+    ? []
+    : canNudge
+      ? nudgeIds.length > 1 ? [{ kind: tile.nudge!, ids: nudgeIds, label: tile.key.startsWith("nudged") ? `Nudge again ${nudgeIds.length}` : `Nudge all ${nudgeIds.length}` }] : []
+      : [
+          { kind: "meeting" as const, ids: meetIds("meeting"), label: `Nudge all ${meetIds("meeting").length} to reply` },
+          { kind: "meeting_reminder" as const, ids: meetIds("meeting_reminder"), label: `Remind all ${meetIds("meeting_reminder").length}` },
+        ].filter((b) => b.ids.length > 1);
 
   const button = (t: Tile) => {
     const n = figure(t);
@@ -206,7 +223,7 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
       ) : null}
       {groups.map((g) => (
         <TileGroup key={g.title} title={g.title}>
-          <div className={g.tiles.length === 2 ? GRID[2] : g.tiles.length === 3 ? GRID[3] : g.tiles.length === 6 ? GRID[6] : GRID[4]}>{g.tiles.map(button)}</div>
+          <div className={g.tiles.length === 2 ? GRID[2] : g.tiles.length === 3 ? GRID[3] : g.tiles.length === 6 || g.tiles.length === 9 ? GRID[6] : g.tiles.length === 8 ? GRID[8] : GRID[4]}>{g.tiles.map(button)}</div>
         </TileGroup>
       ))}
 
@@ -225,9 +242,9 @@ export function DriveBoardView({ board, open, initial, filter }: { board: DriveB
             className="h-10 w-full rounded-apple-sm border border-ink-200 bg-white pl-9 pr-3 text-base text-ink-900 outline-none placeholder:text-text-subtle focus-visible:border-brand-600 focus-visible:ring-[3px] focus-visible:ring-brand-600/20 md:text-sm"
           />
         </label>
-        {canNudge && nudgeIds.length > 0 ? (
-          <NudgeButton key={`${sel}-${nudgeIds.length}`} kind={tile.nudge!} userIds={nudgeIds} label={tile.key.startsWith("nudged") ? `Nudge again ${nudgeIds.length}` : `Nudge all ${nudgeIds.length}`} emphasis />
-        ) : null}
+        {batches.map((x) => (
+          <NudgeButton key={`${sel}-${x.kind}-${x.ids.length}`} kind={x.kind} userIds={x.ids} label={x.label} emphasis />
+        ))}
       </div>
       {rows.length === 0 ? (
         <p className="border-t border-ink-100 px-5 py-6 text-sm text-text-subtle">{open ? "Nobody here right now." : "Nobody here."}</p>

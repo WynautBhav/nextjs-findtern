@@ -24,7 +24,7 @@ import { driveCodeSecret } from "@/lib/drives/code-derive";
 import { tryPublicOrigin } from "@/lib/origin";
 import { degreeOptions, normDegree } from "@/lib/college/eligibility";
 import { closedDriveFinding } from "@/lib/college/drive-board";
-import { loadDriveBoard } from "@/lib/college/drive-board-db";
+import { loadDriveBoard, loadDrivePool } from "@/lib/college/drive-board-db";
 import { loadDriveEmployers } from "@/lib/college/drive-employers-db";
 import { loadDriveSummary } from "@/lib/college/drive-summary-db";
 import { toLocalInput } from "@/lib/college/ist";
@@ -76,8 +76,10 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   };
   const refs = eligible.map(toRef);
   // Verified students only, so their email can go on the board for its search (bug sheet 26 Nov); refs above stay without it.
-  const { board, view, byEmployer, filter, came, invited, missing } = await loadDriveBoard(drive, verified.map((s) => ({ ...toRef(s), email: toStudentRow(s).email })), presence ? presence.offline : null, now, open ? sp.employer : null, !open);
-  const loadedEmployers = await loadDriveEmployers(drive, verified.map((s) => s.userId), came, invited, open, now);
+  // ONE pool for the whole page: the board's cards, the summary and the Employers table all read these same rows.
+  const pool = await loadDrivePool(drive, verified.map((s) => s.userId), now);
+  const { board, view, byEmployer, filter, invited, missing } = await loadDriveBoard(drive, verified.map((s) => ({ ...toRef(s), email: toStudentRow(s).email })), presence ? presence.offline : null, now, open ? sp.employer : null, !open, pool);
+  const loadedEmployers = await loadDriveEmployers(drive, pool, invited, open, now);
   // Each company's Shortlisted figure from its own board (the drive's verified students), so the table and the board agree.
   const employers = {
     ...loadedEmployers,
@@ -86,7 +88,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
   // Drive summary: opened from the hero while the drive runs; always shown, under the hero, once it is over (names, read-only).
   const showSummary = !open || sp.view === "summary";
   const summary = showSummary
-    ? await loadDriveSummary(drive, verified.map((s) => ({ ...toRef(s), score: s.score, openToWorkAt: s.openToWorkAt })), came, true)
+    ? await loadDriveSummary(drive, verified.map((s) => ({ ...toRef(s), score: s.score, openToWorkAt: s.openToWorkAt })), pool, true)
     : null;
   const activity: DriveActivityRow[] = (
     await getDb()
@@ -139,7 +141,7 @@ export default async function DrivePage({ params, searchParams }: { params: Prom
       start={drive.startsAt}
       end={drive.revokedAt && drive.revokedAt < drive.endsAt ? drive.revokedAt : drive.endsAt}
       now={now}
-      arrivals={came.map((c) => ({ id: c.employerId, company: c.company ?? "Employer", at: c.joinedAt }))}
+      arrivals={pool.came.map((c) => ({ id: c.employerId, company: c.company ?? "Employer", at: c.joinedAt }))}
       missing={open ? missing.map((m) => m.company) : []}
       clickable={!open}
       jump={open}

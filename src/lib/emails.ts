@@ -381,19 +381,19 @@ export const emails = {
     preheader: o.pending ? "An employer is waiting for you to pick an interview slot." : "An interview you booked is coming up.",
     heading: o.pending ? "Pick your interview slot" : "Your interview is coming up",
     greeting: hi(o.name),
-    lines: [o.text],
-    facts: o.link ? [["Meeting page", o.link]] : undefined,
+    // No meeting link in mail (owner, 27 Nov): Join is on Findtern, where the join is recorded.
+    lines: [o.text, "Join from your Findtern dashboard when it is time."],
     cta: ctaTo("Open interviews", "/intern/interviews"),
   }),
 
-  /** Findtern added the meeting link by hand; no company name, the intern may not see it yet. */
-  interviewLinkReady: (o: { name: string; link: string; forEmployer: boolean }): EmailContent => ({
+  /** Findtern added the meeting link by hand; no company name, the intern may not see it yet. No link in the mail
+   *  (owner, 27 Nov): Join is on Findtern, where the join is recorded. */
+  interviewLinkReady: (o: { name: string; forEmployer: boolean }): EmailContent => ({
     subject: "Your interview link is ready | Findtern",
-    preheader: "The link is below and in your dashboard.",
+    preheader: "Join from your Findtern dashboard.",
     heading: "Your interview link is ready",
     greeting: hi(o.name),
-    lines: ["The meeting link for your interview has been added."],
-    facts: [["Meet link", o.link]],
+    lines: ["The meeting for your interview is ready. Join it from your Findtern dashboard when it is time."],
     cta: ctaTo("Open dashboard", `/${o.forEmployer ? "employer/schedule" : "intern/interviews"}`),
   }),
 
