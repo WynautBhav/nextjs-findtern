@@ -4,11 +4,13 @@ import assert from "node:assert/strict";
 process.env.SESSION_SECRET ||= "test-session-secret-at-least-32-chars-long";
 
 const { generateDriveToken, deriveDriveToken, hashDriveToken, tokenMatches } = await import("./tokens.ts");
+// The secret the drive page and generateDriveToken use (SIGNING_SECRET when set, else SESSION_SECRET). CI sets both, to different values.
+const { driveCodeSecret } = await import("../drives/code-derive.ts");
 const SECRET = "a-different-server-secret-at-least-32-chars";
 
 test("a drive link can be shown again: the stored key plus the server secret give back the token the hash was made from", () => {
   const { token, hash, key } = generateDriveToken();
-  const shown = deriveDriveToken(key, process.env.SESSION_SECRET!);
+  const shown = deriveDriveToken(key, driveCodeSecret());
   assert.equal(shown, token);
   assert.ok(tokenMatches(shown, hash));
   assert.equal(hashDriveToken(shown), hash);
@@ -20,7 +22,7 @@ test("the stored key alone is not the link, and a wrong key or secret never veri
   assert.notEqual(a.key, a.token);
   assert.notEqual(a.key, b.key);
   assert.equal(tokenMatches(deriveDriveToken(a.key, SECRET), a.hash), false, "another secret");
-  assert.equal(tokenMatches(deriveDriveToken(b.key, process.env.SESSION_SECRET!), a.hash), false, "another key");
+  assert.equal(tokenMatches(deriveDriveToken(b.key, driveCodeSecret()), a.hash), false, "another key");
 });
 
 test("a short secret is refused", () => {
@@ -32,7 +34,7 @@ const NOW = Date.now();
 const open = { startsAt: new Date(NOW - 3600_000), endsAt: new Date(NOW + 3600_000), revokedAt: null as Date | null };
 
 test("the page shows the current link only while the drive is open, and only when the key still matches the hash", () => {
-  const S = process.env.SESSION_SECRET!;
+  const S = driveCodeSecret();
   const { token, hash, key } = generateDriveToken();
   const d = { ...open, linkKey: key, tokenHash: hash };
   assert.equal(shownDriveLink(d, "https://app.test", S, NOW), `https://app.test/drive/${token}`);
