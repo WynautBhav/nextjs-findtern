@@ -71,6 +71,9 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   const remembered = await rememberedSelection(session.uid, one(sp.project));
   const projectParam = one(sp.project) || remembered.project || undefined;
   const ids = (sp.ids !== undefined ? parseIds(sp.ids) : remembered.compare).slice(0, MAX_COMPARE);
+  // Only a link that names its picks writes them back: picks read from the cookie are already there, and this page's
+  // snapshot can be an old one replayed by Back, which would overwrite newer picks (bug 27 Nov).
+  const explicitIds = sp.ids !== undefined ? ids : undefined;
   const skillsSet = sp.skills !== undefined;
   const typedSkills = (one(sp.skills) ?? "")
     .split(",")
@@ -236,7 +239,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
   if (candidates.length === 0) {
     return (
       <div>
-        <RememberSelection employerId={session.uid} compare={ids} project={activeProject?.id ?? null} />
+        <RememberSelection employerId={session.uid} compare={explicitIds} project={activeProject?.id ?? null} />
         <PageHead title="Compare candidates" lede={`Put up to ${MAX_COMPARE} candidates side by side.`} className={HEAD_CLASS} />
         <CompareTabs shortlist={shortlistCount} compare={0} />
         <EmptyScene
@@ -293,7 +296,7 @@ export default async function CompareCandidates({ searchParams }: { searchParams
 
   return (
     <div>
-      <RememberSelection employerId={session.uid} compare={ids} project={activeProject?.id ?? null} />
+      <RememberSelection employerId={session.uid} compare={explicitIds} project={activeProject?.id ?? null} />
       <ButtonLink href={backHref} variant="ghost" size="sm" className="-ml-3.5 mb-4 min-h-11">
         <ArrowLeft className="size-4" aria-hidden />
         Back to candidates

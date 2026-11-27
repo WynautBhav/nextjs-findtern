@@ -1,5 +1,5 @@
 import { stateForDistrict } from "./data/districts.ts";
-import { workModes } from "./onboarding.ts";
+import { WORK_MODE_ORDER, workModes } from "./onboarding.ts";
 import { bandFor } from "./score.ts";
 
 /**
@@ -39,10 +39,15 @@ export function workPreferenceOf(
   return { modes, cities, ...(freeBand ? { freeBand } : {}) };
 }
 
-/** The modes an offer may use: the candidate's, or all three when they never said. */
+/**
+ * The modes an offer may use: the candidate's most on-site mode and every less on-site one (open to on-site means open
+ * to hybrid and remote too; bug 27 Nov), or all three when they never said. Implied here, not only where the profile
+ * saves, because stored rows don't always hold the implied modes.
+ */
 export function offerableModes(pref: WorkPreference): string[] {
   if (pref.freeBand) return ["remote"];
-  return pref.modes.length > 0 ? pref.modes : ["remote", "hybrid", "onsite"];
+  const widest = Math.max(...pref.modes.map((m) => WORK_MODE_ORDER.indexOf(m as (typeof WORK_MODE_ORDER)[number])));
+  return widest >= 0 ? WORK_MODE_ORDER.slice(0, widest + 1) : [...WORK_MODE_ORDER];
 }
 
 /** Null when the offer's mode fits the candidate, else what to tell the employer. */

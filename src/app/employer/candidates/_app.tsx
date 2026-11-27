@@ -65,7 +65,13 @@ export function CandidatesApp({
   // Compare picks are the browser's (a tick costs no request); the server's list is only where they start from.
   const hydrated = useSyncExternalStore(noop, () => true, () => false);
   const [seeded] = useState(() => {
-    if (typeof window !== "undefined") seedPicks(initial.wire.activeProjectId, initial.wire.filters.ids);
+    // The cookie is written on every tick, so it is never older than this page's server snapshot, which Back and the
+    // router cache replay from an earlier visit: seeding from the snapshot wiped every pick made since (bug 27 Nov). A link
+    // that names its picks (?ids=) is the one case where the snapshot is the truth.
+    if (typeof window !== "undefined") {
+      const fromLink = new URLSearchParams(window.location.search).has("ids");
+      seedPicks(initial.wire.activeProjectId, fromLink ? initial.wire.filters.ids : readComparePicks(uid, initial.wire.activeProjectId));
+    }
     return true;
   });
   const picks = useComparePicks();
