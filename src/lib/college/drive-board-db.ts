@@ -5,7 +5,7 @@ import { getDb, schema } from "@/lib/db";
 import { todayIst } from "@/lib/offer";
 import { startBegunSql } from "@/lib/offer-start-sql";
 import { q } from "./sql";
-import { buildDriveBoard, matchInvites, type CameEmployer, type DriveBoard, type DriveStudentRef, type Invite, type NudgeRow } from "./drive-board";
+import { buildDriveBoard, matchInvites, mergeShortlist, type CameEmployer, type DriveBoard, type DriveStudentRef, type Invite, type NudgeRow } from "./drive-board";
 import { loadDriveInterviews } from "./drive-interviews-db";
 import type { Drive } from "./scope";
 
@@ -22,7 +22,6 @@ export async function driveEmployerContacts(driveId: string): Promise<CameEmploy
   const employerId = q(e, e.employerId);
   const rows = await getDb()
     .select({
-      shortlisted: sql<number>`(SELECT count(*)::int FROM ${schema.collegeDriveShortlist} s WHERE s.drive_id = ${driveId} AND s.employer_id = ${employerId})`,
       calls: sql<number>`(SELECT count(*)::int FROM ${schema.collegeDriveMeetings} m WHERE m.drive_id = ${driveId} AND m.employer_id = ${employerId})`,
       employerId: e.employerId, status: e.status, joinedAt: utc(e.joinedAt), company: em.companyName, name: em.name, contact: em.primaryContactName, email: em.companyEmail, cc: em.countryCode, phone: em.phoneNumber })
     .from(e)
@@ -36,10 +35,38 @@ export async function driveEmployerContacts(driveId: string): Promise<CameEmploy
     email: r.email,
     phone: r.phone ? `${r.cc ?? ""} ${r.phone}`.trim() : null,
     joinedAt: r.joinedAt,
-    shortlisted: Number(r.shortlisted ?? 0),
     calls: Number(r.calls ?? 0),
     exited: r.status === "exited",
   }));
+}
+
+/**
+ * Who this drive's companies shortlisted, among the given students: the drive's own list plus each company's regular
+ * Shortlist (employer_cart_items, what the company's own drive page counts). One row per (company, student).
+ * Every figure that says "shortlisted" for a drive reads this, so the officer's number is the employer's number.
+ */
+export async function loadDriveShortlist(driveId: string, employerIds: string[], studentIds: string[]): Promise<{ userId: string; employerId: string; createdAt: Date }[]> {
+  if (!studentIds.length) return [];
+  const db = getDb();
+  const [own, regular] = await Promise.all([
+    db
+      .select({ userId: schema.collegeDriveShortlist.userId, employerId: schema.collegeDriveShortlist.employerId, createdAt: utc(schema.collegeDriveShortlist.createdAt) })
+      .from(schema.collegeDriveShortlist)
+      .where(and(eq(schema.collegeDriveShortlist.driveId, driveId), inArray(schema.collegeDriveShortlist.userId, studentIds))),
+    employerIds.length
+      ? db
+          .select({ userId: schema.employerCartItems.internId, employerId: schema.employerCartItems.employerId, createdAt: utc(schema.employerCartItems.createdAt) })
+          .from(schema.employerCartItems)
+          .where(and(inArray(schema.employerCartItems.employerId, employerIds), inArray(schema.employerCartItems.internId, studentIds)))
+      : Promise.resolve([] as { userId: string; employerId: string; createdAt: Date }[]),
+  ]);
+  return mergeShortlist(own, regular);
+}
+
+/** Students at least one of the drive's companies shortlisted (the drives list, which shows no board). */
+export async function driveShortlistCount(driveId: string, studentIds: string[]): Promise<number> {
+  const employerIds = (await driveEmployerContacts(driveId)).map((c) => c.employerId);
+  return new Set((await loadDriveShortlist(driveId, employerIds, studentIds)).map((r) => r.userId)).size;
 }
 
 /**
@@ -94,12 +121,13 @@ export async function loadDriveBoard(
           .from(n)
           .where(and(eq(n.collegeId, drive.collegeId), inArray(n.userId, ids), inArray(n.kind, ["online", "open_to_work", "meeting", "meeting_reminder", "offer"]), gte(n.createdAt, drive.startsAt), lte(n.createdAt, end)))
       : Promise.resolve([] as NudgeRow[]),
-    // Who the drive's companies shortlisted (bug sheet 26 Nov: the drive page shows it).
-    db
-      .select({ userId: schema.collegeDriveShortlist.userId, employerId: schema.collegeDriveShortlist.employerId, createdAt: utc(schema.collegeDriveShortlist.createdAt) })
-      .from(schema.collegeDriveShortlist)
-      .where(eq(schema.collegeDriveShortlist.driveId, drive.id)),
+    // Who the drive's companies shortlisted (bug sheet 26 Nov: the drive page shows it; 27 Nov: the regular Shortlist counts too).
+    loadDriveShortlist(drive.id, employerIds, ids),
   ]);
+  // Each company's figure comes from the same rows as the board, so the two can't disagree.
+  const shortlistedBy = new Map<string, number>();
+  for (const r of shortlist) shortlistedBy.set(r.employerId, (shortlistedBy.get(r.employerId) ?? 0) + 1);
+  for (const c of came) c.shortlisted = shortlistedBy.get(c.employerId) ?? 0;
   const meetings = [...calls, ...interviews];
   const invited = (drive.invitedEmployers ?? []) as Invite[];
   const { arrived, missing, walkIns } = matchInvites(invited, came);
@@ -113,7 +141,7 @@ export async function loadDriveBoard(
     const touched = new Set([...ms.map((m) => m.userId), ...os.map((o) => o.userId), ...sl.map((r) => r.userId)]);
     return buildDriveBoard({
       students: only ? students.filter((s) => touched.has(s.userId)) : students,
-      meetings: ms.map((m) => ({ userId: m.userId, company: companyOf.get(m.employerId) ?? null, status: m.status, createdAt: m.createdAt, startsAt: m.startsAt ?? undefined })),
+      meetings: ms.map((m) => ({ userId: m.userId, company: companyOf.get(m.employerId) ?? null, status: m.status, createdAt: m.createdAt, startsAt: m.startsAt ?? undefined, reason: "reason" in m ? m.reason : null, cancelledBy: "cancelledBy" in m ? m.cancelledBy : null })),
       offers: os.map((o) => ({ userId: o.userId, company: companyOf.get(o.employerId) ?? null, status: (o.status ?? "").toLowerCase(), hired: o.hiredAt !== null, fullTime: Boolean(o.fullTime), pastStart: Boolean(o.pastStart), createdAt: o.createdAt ?? drive.startsAt })),
       offline,
       nudges: nudges as NudgeRow[],

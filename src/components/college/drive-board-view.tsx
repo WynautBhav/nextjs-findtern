@@ -77,7 +77,7 @@ const LIVE: Group[] = [
     // Owner, 27 Nov: sent, accepted, rejected, withdrawn, hired (internship), hired (full-time). Offers counted one by one (drive-board.ts offerCounts).
     title: "Offers",
     tiles: [
-      { key: "offers", label: "Offers sent", figure: (b) => b.offerCounts.sent, hint: (n) => ofStudents(n, "No offer yet") },
+      { key: "offersSent", label: "Offers sent", figure: (b) => b.offerCounts.sent, hint: (n) => ofStudents(n, "No offer yet") },
       { key: "offersAccepted", label: "Accepted", figure: (b) => b.offerCounts.accepted, hint: (n) => ofStudents(n, "None accepted") },
       { key: "offersRejected", label: "Rejected", figure: (b) => b.offerCounts.rejected, hint: (n) => ofStudents(n, "None rejected") },
       { key: "offersWithdrawn", label: "Withdrawn", figure: (b) => b.offerCounts.withdrawn, hint: (n) => (n ? `${ofStudents(n, "")} · taken back by the company` : "None withdrawn") },
@@ -276,7 +276,7 @@ export function Row({ r, nudge }: { r: BoardItem; nudge?: NudgeHistoryKind | "in
         </Link>
         {meta ? <p className="truncate text-xs text-text-subtle">{meta}</p> : null}
       </div>
-      <p className="min-w-0 text-sm text-ink-700">{r.detail}</p>
+      <p className="min-w-0 whitespace-pre-line text-sm text-ink-700">{r.detail}</p>
       {r.phone ? (
         <a href={`tel:${r.phone.replace(/\s+/g, "")}`} className="nums inline-flex items-center gap-1.5 text-sm text-ink-700 hover:text-brand-700">
           <Phone className="size-3.5 text-ink-400" aria-hidden />

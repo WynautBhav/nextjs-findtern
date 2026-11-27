@@ -382,22 +382,25 @@ test("offer figures: sent, accepted, rejected, withdrawn and hired by kind all c
   const n = (f: (o: OfferRow) => boolean) => mine.filter(f).length;
   const c = b.offerCounts;
   assert.deepEqual(c, {
-    sent: n((o) => o.status !== "withdrawn"),
+    sent: mine.length, // every offer made, withdrawn ones included (owner, 27 Nov)
     accepted: n((o) => o.hired || ["accepted", "processing", "hired", "completed"].includes(o.status)),
     rejected: n((o) => !o.hired && ["rejected", "declined"].includes(o.status)),
     withdrawn: n((o) => o.status === "withdrawn"),
     hiredInternship: n((o) => o.hired && !o.fullTime),
     hiredFullTime: n((o) => o.hired && o.fullTime),
   });
-  assert.deepEqual(c, { sent: 7, accepted: 4, rejected: 2, withdrawn: 2, hiredInternship: 1, hiredFullTime: 1 });
-  // Sums: every standing offer is accepted, rejected or still without a reply; a hire is an accepted offer.
-  assert.equal(c.sent, c.accepted + c.rejected + n((o) => o.status === "sent"));
+  assert.deepEqual(c, { sent: 9, accepted: 4, rejected: 2, withdrawn: 2, hiredInternship: 1, hiredFullTime: 1 });
+  // Sums: every offer made is accepted, rejected, withdrawn or still without a reply; a hire is an accepted offer.
+  assert.equal(c.sent, c.accepted + c.rejected + c.withdrawn + n((o) => o.status === "sent"));
   assert.equal(c.hiredInternship + c.hiredFullTime, n((o) => o.hired));
   assert.ok(c.hiredInternship + c.hiredFullTime <= c.accepted);
   // The tiles' lists are the same offers seen per student.
   assert.deepEqual(b.lists.offersAccepted.map((s) => s.userId).sort(), ["a", "b", "c"]);
   assert.deepEqual(b.lists.offersRejected.map((s) => s.userId).sort(), ["b", "c"]);
-  assert.equal(c.sent, b.offerCount);
+  // The "Got an offer" figure still leaves withdrawn offers out; "Offers sent" does not.
+  assert.equal(c.sent, b.offerCount + c.withdrawn);
+  // The Offers sent tile lists the same offers it counts: a student with only a withdrawn offer is on it too.
+  assert.equal(b.lists.offersSent.length, new Set(mine.map((o) => o.userId)).size);
   assert.equal(c.withdrawn, b.withdrawnCount);
   assert.equal(c.hiredInternship + c.hiredFullTime, 2);
 });

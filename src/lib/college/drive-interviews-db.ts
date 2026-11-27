@@ -10,7 +10,12 @@ const utc = (col: AnyColumn) => sql<Date>`(${col} AT TIME ZONE 'UTC')`.mapWith((
 const utcOrNull = (col: AnyColumn) => sql<string | null>`(${col} AT TIME ZONE 'UTC')`;
 
 /** A meet in the drive, in the drive-call vocabulary: requested | accepted | completed | missed | declined | expired | cancelled. */
-export type DriveMeetRow = { userId: string; employerId: string; status: string; createdAt: Date; startsAt: Date | null; respondedAt: Date | null };
+export type DriveMeetRow = {
+  userId: string; employerId: string; status: string; createdAt: Date; startsAt: Date | null; respondedAt: Date | null;
+  /** Why a cancelled meet was called off, in the words of whoever cancelled it (cancelledBy: employer | intern | admin). */
+  reason?: string | null;
+  cancelledBy?: string | null;
+};
 
 const at = (v: string | null | undefined): Date | null => (v ? new Date(v) : null);
 
@@ -35,6 +40,8 @@ export async function loadDriveInterviews(drive: Drive, studentIds: string[], em
       slot3: utcOrNull(i.slot3),
       selectedSlot: i.selectedSlot,
       respondBy: utcOrNull(i.respondBy),
+      cancelReason: i.cancelReason,
+      cancelledBy: i.cancelledBy,
     })
     .from(i)
     .where(and(inArray(i.internId, studentIds), inArray(i.employerId, employerIds), gte(i.createdAt, drive.startsAt), lte(i.createdAt, end), realEmployerId(i.employerId)));
@@ -52,7 +59,10 @@ export async function loadDriveInterviews(drive: Drive, studentIds: string[], em
       // Cancelled, and rescheduled (the invite was replaced by a new one), are not counted.
       : "cancelled";
     const answeredAt = status === "requested" || status === "expired" ? null : at(r.updatedAt);
-    out.push({ userId: r.userId, employerId: r.employerId, status, createdAt: r.createdAt, startsAt: picked, respondedAt: answeredAt });
+    out.push({
+      userId: r.userId, employerId: r.employerId, status, createdAt: r.createdAt, startsAt: picked, respondedAt: answeredAt,
+      ...(status === "cancelled" ? { reason: r.cancelReason?.trim() || null, cancelledBy: r.cancelledBy } : {}),
+    });
   }
   return out;
 }

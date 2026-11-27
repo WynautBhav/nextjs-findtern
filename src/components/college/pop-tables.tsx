@@ -386,7 +386,7 @@ function studentCell(key: StudentColKey, r: StudentTableRow): React.ReactNode {
     case "minutes":
       return r.minutes === null ? <Dash /> : duration(r.minutes);
     case "detail":
-      return r.detail ? <span title={r.detail}>{r.detail}</span> : <Dash />;
+      return r.detail ? <span title={r.detail} className="whitespace-pre-line">{r.detail}</span> : <Dash />;
     case "companies":
       return r.companies.length ? <span title={r.companies.join(", ")}>{r.companies.join(", ")}</span> : <Dash />;
     case "offers":

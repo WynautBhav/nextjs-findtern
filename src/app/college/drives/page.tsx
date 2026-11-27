@@ -7,7 +7,7 @@ import { DriveStatePill } from "@/components/employer/drive-parts";
 import { ButtonLink } from "@/components/ui/button";
 import { driveWindow } from "@/lib/college/access";
 import { drivesOverview } from "@/lib/college/drives";
-import { driveMeetCounts } from "@/lib/college/drive-board-db";
+import { driveMeetCounts, driveShortlistCount } from "@/lib/college/drive-board-db";
 import { driveReach } from "@/lib/college/drive-reach";
 import { readinessForMany } from "@/lib/college/student-readiness-db";
 import { DriveReachView } from "@/components/college/drive-reach-view";
@@ -54,6 +54,15 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
       }),
     ),
   );
+  // Students shortlisted, by the drive page's own rule (the drive's list plus each company's regular Shortlist).
+  const shortlistedOf = new Map(
+    await Promise.all(
+      all.map(async ({ drive }) => {
+        const ids = (eligibleOf.get(drive.id) ?? []).filter((s) => s.status === "verified").map((s) => s.userId);
+        return [drive.id, await driveShortlistCount(drive.id, ids)] as const;
+      }),
+    ),
+  );
   const readiness = await readinessForMany([...new Set([...eligibleOf.values()].flat().map((s) => s.userId))]);
   const reachOf = (id: string) => driveReach(eligibleOf.get(id) ?? [], readiness);
   // Active = open now or still to open; Past = finished or closed by the officer.
@@ -64,7 +73,7 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
   const states = drives.map(({ drive }) => driveWindow(drive, now));
   const live = allStates.filter((s) => s === "live").length;
   const employers = all.reduce((n, d) => n + d.employers, 0);
-  const shortlisted = all.reduce((n, d) => n + d.shortlisted, 0);
+  const shortlisted = [...shortlistedOf.values()].reduce((n, c) => n + c, 0);
   const answered = all.reduce((n, d) => n + (meets.get(d.drive.id)?.accepted ?? 0), 0);
   return (
     <div className="space-y-6">
@@ -115,7 +124,8 @@ export default async function DrivesPage({ searchParams }: { searchParams: Promi
         </Surface>
       ) : (
         <ul className="grid gap-4 lg:grid-cols-2">
-          {drives.map(({ drive, employers: e, shortlisted: s }, i) => {
+          {drives.map(({ drive, employers: e }, i) => {
+            const s = shortlistedOf.get(drive.id) ?? 0;
             const { sent: calls, accepted } = meets.get(drive.id) ?? { sent: 0, accepted: 0 };
             const w = states[i];
             const span = drive.endsAt.getTime() - drive.startsAt.getTime();
